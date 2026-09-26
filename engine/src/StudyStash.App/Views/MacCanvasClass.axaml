@@ -1,0 +1,201 @@
+<!-- A Canvas-linked class's own page (design 10 tabs, design 11 sections): header, Scout line, and either the
+     four tabs or one scrolling list of sections. Draws no outer padding or window — the library window's list
+     column (or, in the narrow Sections window, the whole content pane) gives the frame. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.MacCanvasClass"
+             x:DataType="vm:CanvasClassModel">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
+  </UserControl.Styles>
+  <UserControl.Resources>
+    <DataTemplate x:Key="AssignmentRow" x:DataType="vm:DueRow">
+      <Button Classes="cv-due-row" Classes.cv-selected="{Binding Selected}" Command="{Binding SelectCommand}">
+        <StackPanel Spacing="3">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="cv-row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="1" Classes="cv-row-right" Classes.cv-strong="{Binding Strong}"
+                       Text="{Binding Right}" Margin="8,0,0,0" VerticalAlignment="Bottom" />
+          </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Ellipse Classes="cv-row-dot" Classes.cv-selected="{Binding Selected}" Fill="{Binding Dot}" VerticalAlignment="Center" />
+            <TextBlock Classes="cv-row-sub" Text="{Binding Sub}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </StackPanel>
+      </Button>
+    </DataTemplate>
+    <DataTemplate x:Key="LecturesBlock" x:DataType="vm:CanvasClassModel">
+      <StackPanel>
+        <ItemsControl ItemsSource="{Binding RecentLectures}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:LectureRow">
+              <Button Classes="cv-lecture-row" Command="{Binding $parent[UserControl].((vm:CanvasClassModel)DataContext).OpenLectureCommand}" CommandParameter="{Binding}">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Classes="cv-lecture-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="1" Classes="cv-row-right" Text="{Binding When}" Margin="8,0,0,0" />
+                </Grid>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Classes="cv-hand-in" Margin="10,4,0,0" Command="{Binding AllLecturesCommand}">
+          <TextBlock Classes="cv-link" Text="{Binding AllLecturesText}" />
+        </Button>
+      </StackPanel>
+    </DataTemplate>
+    <DataTemplate x:Key="ModuleItemTemplate" x:DataType="vm:ModuleItemRow">
+      <Button Classes="cv-mod-item" Command="{Binding $parent[UserControl].((vm:CanvasClassModel)DataContext).OpenModuleItemRowCommand}" CommandParameter="{Binding}">
+        <Grid ColumnDefinitions="Auto,*,Auto" Margin="26,0,0,0">
+          <c:Icon Grid.Column="0" Classes="cv-tree-icon" Glyph="{Binding Glyph}" Margin="0,0,8,0" />
+          <TextBlock Grid.Column="1" Classes="cv-mod-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Grid.Column="2" Classes="cv-mod-right" Text="{Binding Right}" Margin="8,0,0,0" />
+        </Grid>
+      </Button>
+    </DataTemplate>
+    <DataTemplate x:Key="ModulesTree" x:DataType="vm:CanvasClassModel">
+      <ItemsControl ItemsSource="{Binding Modules}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ModuleNode">
+            <StackPanel>
+              <StackPanel IsVisible="{Binding Expanded}">
+                <TextBlock Classes="cv-mod-label" Margin="48,4,22,2" Text="{Binding Name}" />
+                <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource ModuleItemTemplate}" />
+              </StackPanel>
+              <Button Classes="cv-mod-collapsed" IsVisible="{Binding !Expanded}" Command="{Binding ToggleCommand}">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                  <c:Icon Grid.Column="0" Classes="cv-tree-icon" Glyph="chevron_right" Margin="0,0,8,0" />
+                  <TextBlock Grid.Column="1" Classes="cv-mod-collapsed-text" Text="{Binding Name}" />
+                  <TextBlock Grid.Column="2" Classes="cv-mod-collapsed-text" Text="{Binding ItemsCountText}" Margin="8,0,0,0" />
+                </Grid>
+              </Button>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel>
+      <StackPanel Margin="22,18,22,2" Spacing="0">
+        <TextBlock Classes="cv-due-title" Text="{Binding Title}" />
+        <TextBlock Classes="cv-due-sub" Text="{Binding HeaderLine}" />
+      </StackPanel>
+      <StackPanel Orientation="Horizontal" Spacing="6" Margin="22,6,22,0" IsVisible="{Binding HasScoutLine}">
+        <c:Icon Classes="cv-scoutline" Glyph="travel_explore" />
+        <TextBlock Classes="cv-due-sub" Text="{Binding ScoutLine}" />
+      </StackPanel>
+
+      <!-- Tabs layout -->
+      <Border Classes="cv-seg" Margin="12,14,12,4" IsVisible="{Binding IsTabsLayout}">
+        <Grid ColumnDefinitions="*,*,*,*">
+          <Button Classes="cv-seg-item" Classes.cv-on="{Binding IsLecturesTab}" Content="Lectures" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Lectures}" />
+          <Button Grid.Column="1" Classes="cv-seg-item" Classes.cv-on="{Binding IsAssignmentsTab}" Content="Assignments" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Assignments}" />
+          <Button Grid.Column="2" Classes="cv-seg-item" Classes.cv-on="{Binding IsModulesTab}" Content="Modules" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Modules}" />
+          <Button Grid.Column="3" Classes="cv-seg-item" Classes.cv-on="{Binding IsAnnouncementsTab}" Content="Announcements" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Announcements}" />
+        </Grid>
+      </Border>
+
+      <StackPanel IsVisible="{Binding IsTabsLayout}">
+        <StackPanel IsVisible="{Binding IsLecturesTab}">
+          <ContentControl Content="{Binding}" ContentTemplate="{StaticResource LecturesBlock}" Margin="0,0,0,0" />
+        </StackPanel>
+        <StackPanel IsVisible="{Binding IsAssignmentsTab}">
+          <TextBlock Classes="cv-group-label" Text="To hand in" IsVisible="{Binding HasToHandIn}" />
+          <ItemsControl ItemsSource="{Binding ToHandIn}" ItemTemplate="{StaticResource AssignmentRow}" />
+          <TextBlock Classes="cv-group-label" Text="Done" />
+          <ItemsControl ItemsSource="{Binding Done}" ItemTemplate="{StaticResource AssignmentRow}" />
+        </StackPanel>
+        <StackPanel IsVisible="{Binding IsModulesTab}" Margin="0,8,0,0">
+          <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ModulesTree}" />
+        </StackPanel>
+        <StackPanel IsVisible="{Binding IsAnnouncementsTab}" Margin="0,8,0,0">
+          <ItemsControl ItemsSource="{Binding Announcements}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:AnnouncementRow">
+                <Button Classes="cv-mod-item" Command="{Binding OpenCommand}">
+                  <Grid ColumnDefinitions="Auto,*,Auto">
+                    <Ellipse Grid.Column="0" Classes="cv-new-dot" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding New}" />
+                    <TextBlock Grid.Column="1" Classes="cv-mod-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Classes="cv-mod-right" Text="{Binding When}" Margin="8,0,0,0" />
+                  </Grid>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </StackPanel>
+
+      <!-- Sections layout -->
+      <StackPanel IsVisible="{Binding IsSectionsLayout}">
+        <TextBlock Classes="cv-group-label" Text="To hand in" IsVisible="{Binding HasToHandIn}" />
+        <ItemsControl ItemsSource="{Binding ToHandIn}" ItemTemplate="{StaticResource AssignmentRow}" IsVisible="{Binding HasToHandIn}" />
+
+        <TextBlock Classes="cv-group-label" Text="Lectures" />
+        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource LecturesBlock}" />
+
+        <Button Classes="cv-section-header" Margin="10,8,10,0" Command="{Binding ToggleModulesCommand}">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <c:Icon Grid.Column="0" Classes="cv-tree-icon cv-section" Glyph="expand_more" Margin="0,0,8,0" IsVisible="{Binding ModulesExpanded}" />
+            <c:Icon Grid.Column="0" Classes="cv-tree-icon cv-section" Glyph="chevron_right" Margin="0,0,8,0" IsVisible="{Binding !ModulesExpanded}" />
+            <TextBlock Grid.Column="1" Classes="cv-section-title" Text="Modules" />
+            <TextBlock Grid.Column="2" Classes="cv-row-right" Text="{Binding ModulesCount}" />
+          </Grid>
+        </Button>
+        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ModulesTree}" IsVisible="{Binding ModulesExpanded}" />
+
+        <Button Classes="cv-section-header" Margin="10,8,10,0" Command="{Binding ToggleFilesCommand}">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <c:Icon Grid.Column="0" Classes="cv-tree-icon cv-section" Glyph="expand_more" Margin="0,0,8,0" IsVisible="{Binding FilesExpanded}" />
+            <c:Icon Grid.Column="0" Classes="cv-tree-icon cv-section" Glyph="chevron_right" Margin="0,0,8,0" IsVisible="{Binding !FilesExpanded}" />
+            <TextBlock Grid.Column="1" Classes="cv-section-title" Text="Files" />
+            <TextBlock Grid.Column="2" Classes="cv-row-right" Text="{Binding FilesCount}" />
+          </Grid>
+        </Button>
+        <ItemsControl ItemsSource="{Binding Files}" IsVisible="{Binding FilesExpanded}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FileRow">
+              <StackPanel>
+                <TextBlock Classes="cv-mod-label" Text="{Binding FolderHeader}" Margin="48,4,22,2" IsVisible="{Binding FolderHeader, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Button Classes="cv-mod-item" Command="{Binding $parent[UserControl].((vm:CanvasClassModel)DataContext).OpenFileRowCommand}" CommandParameter="{Binding}">
+                  <Grid ColumnDefinitions="*,Auto" Margin="26,0,0,0">
+                    <TextBlock Classes="cv-mod-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Classes="cv-mod-right" Text="{Binding SizeText}" Margin="8,0,0,0" />
+                  </Grid>
+                </Button>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Button Classes="cv-section-header" Margin="10,8,10,0" Command="{Binding ToggleAnnouncementsCommand}">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <c:Icon Grid.Column="0" Classes="cv-tree-icon cv-section" Glyph="expand_more" Margin="0,0,8,0" IsVisible="{Binding AnnouncementsExpanded}" />
+            <c:Icon Grid.Column="0" Classes="cv-tree-icon cv-section" Glyph="chevron_right" Margin="0,0,8,0" IsVisible="{Binding !AnnouncementsExpanded}" />
+            <TextBlock Grid.Column="1" Classes="cv-section-title" Text="Announcements" />
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+              <Ellipse Classes="cv-new-dot" VerticalAlignment="Center" IsVisible="{Binding HasAnnouncementsNew}" />
+              <TextBlock Classes="cv-row-right" Text="{Binding AnnouncementsCountText}" />
+            </StackPanel>
+          </Grid>
+        </Button>
+        <ItemsControl ItemsSource="{Binding Announcements}" IsVisible="{Binding AnnouncementsExpanded}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:AnnouncementRow">
+              <Button Classes="cv-mod-item" Command="{Binding OpenCommand}">
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="26,0,0,0">
+                  <Ellipse Grid.Column="0" Classes="cv-new-dot" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding New}" />
+                  <TextBlock Grid.Column="1" Classes="cv-mod-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="2" Classes="cv-mod-right" Text="{Binding When}" Margin="8,0,0,0" />
+                </Grid>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Border Height="20" />
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -356,4 +356,105 @@
     <Setter Property="BoxShadow" Value="{DynamicResource Edge}, {DynamicResource CtlShadow}" />
   </Style>
 
+  <!-- design 10/11: a Canvas-linked class's own page -->
+  <Style Selector="c|Icon.cv-scoutline">
+    <Setter Property="Size" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <!-- the tabs layout's segmented control -->
+  <Style Selector="Border.cv-seg">
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Background" Value="{DynamicResource Group}" />
+    <Setter Property="Padding" Value="3" />
+  </Style>
+  <Style Selector="Button.cv-seg-item">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="Padding" Value="6,5" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.cv-seg-item.cv-on">
+    <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    <Setter Property="Background" Value="{DynamicResource Raised}" />
+  </Style>
+  <Style Selector="Button.cv-seg-item.cv-on /template/ Border#PART_Bg">
+    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+  </Style>
+
+  <!-- a tree section's own header row (Modules, Files, Announcements) -->
+  <Style Selector="Button.cv-section-header">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Height" Value="38" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="BorderThickness" Value="0,1,0,0" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
+  </Style>
+  <Style Selector="TextBlock.cv-section-title">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="c|Icon.cv-tree-icon">
+    <Setter Property="Size" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="c|Icon.cv-tree-icon.cv-section">
+    <Setter Property="Size" Value="18" />
+  </Style>
+  <Style Selector="Ellipse.cv-new-dot">
+    <Setter Property="Width" Value="6" />
+    <Setter Property="Height" Value="6" />
+    <Setter Property="Fill" Value="{DynamicResource Accent}" />
+  </Style>
+
+  <!-- a module: its own small label, an open module's items, a collapsed module's summary row -->
+  <Style Selector="TextBlock.cv-mod-label">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="Button.cv-mod-item">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="TextBlock.cv-mod-title">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="TextBlock.cv-mod-right">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="Button.cv-mod-collapsed">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="TextBlock.cv-mod-collapsed-text">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <!-- a lecture row -->
+  <Style Selector="Button.cv-lecture-row">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Padding" Value="12,7" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="TextBlock.cv-lecture-title">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <!-- a reader (a page or an announcement) -->
+  <Style Selector="TextBlock.cv-reader-body">
+    <Setter Property="FontFamily" Value="{DynamicResource SerifFont}" />
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="LineHeight" Value="25.6" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
 </Styles>
