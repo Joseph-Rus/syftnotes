@@ -248,9 +248,9 @@ public static class SelfTest
         var midnight = now.Date.AddDays(1).AddSeconds(-1);
         if (end > midnight) end = midnight;
         m.NewClass = "CS 101";
-        m.NewWhen = $"{Day(now.DayOfWeek)} {now.AddMinutes(-10):HH:mm}-{end:HH:mm}";
+        string when = m.NewWhen = $"{Day(now.DayOfWeek)} {now.AddMinutes(-10):HH:mm}-{end:HH:mm}";
         await m.AddClassCommand.ExecuteAsync(null);
-        Say(m.ClassProblem is null ? $"class added: {m.NewWhen}" : $"class problem: {m.ClassProblem}");
+        Say(m.ClassProblem is null ? $"class added: {when}" : $"class problem: {m.ClassProblem}");
         Shot(Shell.Windows.Setup, "setup-classes");
         if (m.ClassProblem is not null) throw new InvalidOperationException(m.ClassProblem);
         m.NextCommand.Execute(null);
