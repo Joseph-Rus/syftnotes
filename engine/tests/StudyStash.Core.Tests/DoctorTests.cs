@@ -3,8 +3,8 @@ using System.Text.Json.Nodes;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>tests/test_doctor.py, and every scenario golden.py gave the Python engine's doctor: the same checks, the same
-/// words, printed the same way.</summary>
+/// <summary>Every scenario the retired Python engine's doctor answered: the same checks, the same words, printed
+/// the same way.</summary>
 public class DoctorTests
 {
     static JsonObject P => Golden.Platform();
@@ -16,7 +16,7 @@ public class DoctorTests
 
     static Func<Task<Release?>> Latest(JsonNode? tag) => () => Task.FromResult(Rel(tag));
 
-    /// <summary>The temporary folder as golden.py wrote it; on Windows, with its forward slashes.</summary>
+    /// <summary>The temporary folder as the fixed fixture wrote it; on Windows, with its forward slashes.</summary>
     static string Scrub(string text, string root)
     {
         string s = text.Replace(root, "{root}");
@@ -96,7 +96,7 @@ public class DoctorTests
         };
         var said = new List<string>();
         Assert.Equal(0, await Doctor.RunAsync(dir.Path, null, host, said.Add));
-        Assert.StartsWith($"granola-share {Engine.Version}: library ({dir.Path})\n", said[0]);
+        Assert.StartsWith($"studystash {Engine.Version}: library ({dir.Path})\n", said[0]);
         Assert.Equal("All good.", said[^1]);
         var down = new DoctorHost
         {
@@ -105,7 +105,7 @@ public class DoctorTests
         };
         said.Clear();
         Assert.Equal(1, await Doctor.RunAsync(dir.Path, "server", down, said.Add));
-        Assert.Equal("Fix the X items above, then run `granola-share doctor` again.", said[^1]);
+        Assert.Equal("Fix the X items above, then run `studystash doctor` again.", said[^1]);
     }
 
     [Fact]

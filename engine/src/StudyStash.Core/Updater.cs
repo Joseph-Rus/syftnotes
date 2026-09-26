@@ -325,7 +325,7 @@ public static partial class Updates
         Func<Task<Release?>>? latest = null, ApplyFn? apply = null, Action<int>? exit = null)
     {
         log ??= Console.WriteLine;
-        bool underService = supervised ?? Environment.GetEnvironmentVariable(Autostart.ServiceEnv) == "1";
+        bool underService = supervised ?? Autostart.UnderService();
         apply ??= (r, h, l, restart) => ApplyAsync(r, h, host, l, restart);
         exit ??= Environment.Exit;
         Release? rel;
@@ -340,7 +340,7 @@ public static partial class Updates
         if (rel is null || !IsNewer(rel)) return "up to date";
         if (!underService || WhyNotUpdatable(host.Dir) is not null)
         {
-            log($"[update] {rel.Tag} is available: run `granola-share update`.");
+            log($"[update] {rel.Tag} is available: run `studystash update`.");
             return "available";
         }
         var gate = new UpdateLock(Path.Combine(home, "update.lock"));

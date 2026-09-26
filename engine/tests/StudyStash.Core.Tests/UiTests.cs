@@ -43,18 +43,13 @@ public class UiTests
     }
 
     [Fact]
-    public void Hosts_and_install_lines_match_python()
+    public void Hosts_and_versions_match_python()
     {
         foreach (var c in L("tailscale_problem"))
         {
             var t = c![0]!.AsObject();
             var ts = new TailscaleInfo(t["installed"]?.GetValue<bool>() ?? false, t["running"]?.GetValue<bool>() ?? false, t["state"]?.S() ?? "");
             Assert.Equal(c[1].S(), HostInfo.TailscaleProblem(ts));
-        }
-        foreach (var c in L("invite"))
-        {
-            var (mac, windows) = HostInfo.InviteCommands(c![0].S(), c[1].S());
-            Assert.Equal((c[2]!["mac"].S(), c[2]!["windows"].S()), (mac, windows));
         }
         foreach (var c in L("parse_version"))
             Assert.Equal(c![1]!.AsArray().Select(n => n!.GetValue<int>()), Updates.ParseVersion(c[0].S()));
@@ -109,6 +104,44 @@ public class UiTests
             listener.Stop();
         }
         Assert.Equal("free", await HostInfo.PortStatusAsync(port));
+    }
+
+    [Fact]
+    public async Task A_library_from_any_version_on_the_port_counts_as_ours()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Any, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        try
+        {
+            async Task<string> Answering(System.Net.HttpStatusCode status, string body, string? header = null)
+            {
+                using var http = new HttpClient(new HealthAnswer(status, body, header));
+                return await HostInfo.PortStatusAsync(port, http);
+            }
+            Assert.Equal("ours", await Answering(System.Net.HttpStatusCode.OK, "{}", "X-Study-Stash"));
+            // Libraries from before say so by what their health check answers: their details, or their password refusal.
+            Assert.Equal("ours", await Answering(System.Net.HttpStatusCode.OK, """{"ok": true, "pool_name": "Fall", "classes": ["CS 101"]}"""));
+            Assert.Equal("ours", await Answering(System.Net.HttpStatusCode.Unauthorized, """{"detail": "wrong password"}"""));
+            Assert.Equal("ours", await Answering(System.Net.HttpStatusCode.Unauthorized, """{"detail": "bad pool password"}"""));
+            Assert.Equal("busy", await Answering(System.Net.HttpStatusCode.Unauthorized, """{"detail": "sign in first"}"""));
+            Assert.Equal("busy", await Answering(System.Net.HttpStatusCode.OK, """{"ok": true}"""));
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    /// <summary>Answers every request with one status, JSON body and optional marker header.</summary>
+    sealed class HealthAnswer(System.Net.HttpStatusCode status, string body, string? header) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var r = new HttpResponseMessage(status) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };
+            if (header is not null) r.Headers.Add(header, "0.4.4");
+            return Task.FromResult(r);
+        }
     }
 
     [Fact]

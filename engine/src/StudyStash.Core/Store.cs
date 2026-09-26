@@ -85,8 +85,7 @@ public static partial class Notes
         return string.Join("\n", output);
     }
 
-    public static string Render(Meeting m, Classification c, string summaryMd = "", string summaryModel = "",
-        bool keepGranola = false)
+    public static string Render(Meeting m, Classification c, string summaryMd = "", string summaryModel = "")
     {
         var topicList = c.Topics ?? [];
         string topics = string.Join(", ", topicList);
@@ -100,12 +99,12 @@ public static partial class Notes
             $"class: {PyJson.Dumps(c.ClassName)}",
             $"date: {PyJson.Dumps(m.Date)}",
             $"source: {PyJson.Dumps(m.Owner)}",
-            $"granola_id: {PyJson.Dumps(m.Id)}",
-            $"granola_folder: {PyJson.Dumps(m.Folder)}",
+            $"id: {PyJson.Dumps(m.Id)}",
+            $"folder: {PyJson.Dumps(m.Folder)}",
             $"attendees: {PyJson.Dumps(m.Attendees)}",
             $"topics: {PyJson.Dumps(topicList)}",
             $"classified_by: {c.By} ({Py.FormatFixed(c.Confidence, 2)})",
-            $"summary_by: {PyJson.Dumps(summarized ? summaryModel : "granola")}",
+            $"summary_by: {PyJson.Dumps(summarized ? summaryModel : "")}",
             "---",
             "",
             $"# {lectureTitle}",
@@ -117,8 +116,6 @@ public static partial class Notes
         {
             lines.AddRange(["## Summary", "", DemoteHeadings(Py.Strip(summaryMd)), "",
                 $"_Written by {summaryModel} from the transcript._", ""]);
-            if (keepGranola && Py.Strip(m.NotesMarkdown).Length > 0)
-                lines.AddRange(["## Granola's notes", "", DemoteHeadings(Py.Strip(m.NotesMarkdown)), ""]);
         }
         else
         {
@@ -140,8 +137,8 @@ public static partial class Notes
 }
 
 /// <summary>
-/// The SQLite index (state.db) and the Markdown folder tree. A shared lecture arrives with its transcript and is
-/// queued; the pipeline writes notes from the transcript, sorts it into a class, and saves it here.
+/// The SQLite index (state.db) and the Markdown folder tree. A lecture arrives from the laptop with its transcript
+/// and is queued; the pipeline writes notes from the transcript, sorts it into a class, and saves it here.
 /// </summary>
 public sealed class Store : IDisposable
 {
@@ -177,7 +174,7 @@ public sealed class Store : IDisposable
     // Columns added after 0.1.0. Databases from older versions get them when opened.
     static readonly (string Name, string Decl)[] Migrations =
     [
-        ("payload_json", "TEXT"), // the whole shared lecture, so it can be processed again
+        ("payload_json", "TEXT"), // the whole lecture as the laptop sent it, so it can be processed again
         ("summary_md", "TEXT"), // our notes, written from the transcript
         ("summary_model", "TEXT"),
         ("status", "TEXT DEFAULT 'done'"), // queued | working | done | failed
@@ -297,7 +294,7 @@ public sealed class Store : IDisposable
 
     // --- the processing queue ------------------------------------------------------------------------------------
 
-    /// <summary>Accept a shared lecture. The pipeline picks it up and files it.</summary>
+    /// <summary>Accept a lecture the laptop sent. The pipeline picks it up and files it.</summary>
     public void Enqueue(Meeting m)
     {
         lock (gate)
@@ -349,7 +346,7 @@ public sealed class Store : IDisposable
 
     public void MarkFailed(string noteId, string error)
     {
-        // Only if still ours: a re-share or re-queue meanwhile means it runs again instead.
+        // Only if still ours: a resend or re-queue meanwhile means it runs again instead.
         lock (gate)
             Exec("UPDATE notes SET status=?, error=?, updated_at=? WHERE id=? AND status=?",
                 Failed, Py.Head(error, 2000), Now(), noteId, Working);
@@ -357,11 +354,11 @@ public sealed class Store : IDisposable
 
     /// <summary>
     /// Save the pipeline's result for a row it claimed, unless the note changed meanwhile. The pipeline works for
-    /// minutes on a snapshot: if the note was deleted, re-shared, or re-queued since, the result is stale and is
+    /// minutes on a snapshot: if the note was deleted, sent again, or re-queued since, the result is stale and is
     /// dropped (a re-queued note simply runs again). If a person moved the note meanwhile, their class wins.
     /// </summary>
     public string? Finish(NoteRow claimed, Meeting m, Classification c, string summaryMd = "", string summaryModel = "",
-        string error = "", bool keepGranola = false)
+        string error = "")
     {
         lock (gate)
         {
@@ -369,7 +366,7 @@ public sealed class Store : IDisposable
             if (row is null || row.Status != Working || row.UpdatedAt != claimed.UpdatedAt) return null;
             if (row.ClassifiedBy == "human" && !string.IsNullOrEmpty(row.ClassName))
                 c = new Classification(row.ClassName, 1.0, "human", c.LectureTitle, c.Topics);
-            return Save(m, c, summaryMd, summaryModel, error, keepGranola);
+            return Save(m, c, summaryMd, summaryModel, error);
         }
     }
 
@@ -429,13 +426,12 @@ public sealed class Store : IDisposable
     }
 
     /// <summary>Write the Markdown file and mark the note done.</summary>
-    public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "",
-        bool keepGranola = false)
+    public string Save(Meeting m, Classification c, string summaryMd = "", string summaryModel = "", string error = "")
     {
         lock (gate)
         {
             string path = TargetPath(m, c.ClassName);
-            Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel, keepGranola));
+            Py.WriteText(path, Notes.Render(m, c, summaryMd, summaryModel));
             string now = Now();
             string? oldPath = null, firstSeen = null;
             bool known = false;
@@ -477,7 +473,7 @@ public sealed class Store : IDisposable
         }
     }
 
-    /// <summary>The whole shared lecture behind a row (rebuilt from its columns and Markdown file for rows from 0.1).</summary>
+    /// <summary>The whole lecture behind a row (rebuilt from its columns and Markdown file for rows from 0.1).</summary>
     public Meeting Meeting(NoteRow row)
     {
         lock (gate)
@@ -661,7 +657,7 @@ public sealed class Store : IDisposable
         }
     }
 
-    public string? SetClass(string noteId, string className, string by = "human", bool keepGranola = false)
+    public string? SetClass(string noteId, string className, string by = "human")
     {
         lock (gate)
         {
@@ -676,7 +672,7 @@ public sealed class Store : IDisposable
             string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
             var m = Meeting(row);
             var c = new Classification(className, 1.0, by, row.LectureTitle ?? "", JsonList(row.Topics));
-            string newPath = Save(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "", row.Error ?? "", keepGranola);
+            string newPath = Save(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "", row.Error ?? "");
             DropEmptyDir(old, newPath);
             return newPath;
         }

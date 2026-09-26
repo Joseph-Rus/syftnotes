@@ -3,8 +3,8 @@ using System.Text.RegularExpressions;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>tests/test_dialogs_autostart.py and the Windows half of test_ready.py: the background services, under the
-/// Python engine's names and files, so either engine's replaces the other's.</summary>
+/// <summary>The background services, under Study Stash's own names and files (a fixed golden fixture, once the
+/// Python engine's own output).</summary>
 public class AutostartTests
 {
     static readonly string[] Engine = ["/opt/studystash"];
@@ -12,34 +12,43 @@ public class AutostartTests
     static ServicePlaces Places(TempDir dir) => new(dir["agents"], dir["startup"], dir["systemd"]);
 
     [Fact]
-    public void The_service_files_match_python()
+    public void The_service_files_render_exactly()
     {
         var s = Golden.Platform()["services"]!;
         var args = s["args"]!.AsArray().Select(a => a.S()).ToList();
         var odd = s["odd"]!.AsArray().Select(a => a.S()).ToList();
         string home = s["user_home"].S(), log = s["log"].S();
-        Assert.Equal(s["plist"].S(), Autostart.RenderPlist("com.granola-share.server", args, log, [], home));
-        Assert.Equal(s["plist_odd"].S(), Autostart.RenderPlist("com.granola-share.client", odd, log, [], home));
-        Assert.Equal(s["systemd"].S(), Autostart.RenderSystemd("granola-share server", args));
-        Assert.Equal(s["systemd_odd"].S(), Autostart.RenderSystemd("granola-share client", odd));
+        Assert.Equal(s["plist"].S(), Autostart.RenderPlist("com.study-stash.server", args, log, [], home));
+        Assert.Equal(s["plist_odd"].S(), Autostart.RenderPlist("com.study-stash.client", odd, log, [], home));
+        Assert.Equal(s["systemd"].S(), Autostart.RenderSystemd("Study Stash library", args));
+        Assert.Equal(s["systemd_odd"].S(), Autostart.RenderSystemd("Study Stash library", odd));
     }
 
     [Fact]
     public void Services_run_this_engine_and_say_they_are_services()
     {
-        Assert.Equal(["/opt/studystash", "--home", "/h", "client", "run"], Autostart.RoleArgs("client", "/h", Engine));
+        Assert.Throws<ArgumentException>(() => Autostart.RoleArgs("client", "/h", Engine)); // client is gone: only the library autostarts
         Assert.Throws<ArgumentException>(() => Autostart.RoleArgs("laptop", "/h", Engine));
         var args = Autostart.RoleArgs("server", "/h", Engine);
-        Assert.Contains("<key>GRANOLA_SHARE_SERVICE</key><string>1</string>", Autostart.RenderPlist("l", args, "/x"));
-        Assert.Contains("Environment=GRANOLA_SHARE_SERVICE=1", Autostart.RenderSystemd("d", args));
-        Assert.Equal("@echo off\r\nset GRANOLA_SHARE_SERVICE=1\r\n\"/opt/studystash\" \"--home\" \"/h\" \"run\"\r\n", Autostart.RenderCmd(args));
+        Assert.Contains("<key>STUDYSTASH_SERVICE</key><string>1</string>", Autostart.RenderPlist("l", args, "/x"));
+        Assert.Contains("Environment=STUDYSTASH_SERVICE=1", Autostart.RenderSystemd("d", args));
+        Assert.Equal("@echo off\r\nset STUDYSTASH_SERVICE=1\r\n\"/opt/studystash\" \"--home\" \"/h\" \"run\"\r\n", Autostart.RenderCmd(args));
         // .NET's own folder, for a build that doesn't carry it
         var env = new List<(string, string)> { ("DOTNET_ROOT", "/opt/dotnet") };
         Assert.Contains("        <key>DOTNET_ROOT</key><string>/opt/dotnet</string>\n    </dict>", Autostart.RenderPlist("l", args, "/x", env));
-        Assert.Contains("Environment=GRANOLA_SHARE_SERVICE=1\nEnvironment=DOTNET_ROOT=/opt/dotnet\nRestart=always", Autostart.RenderSystemd("d", args, env));
-        Assert.Contains("set GRANOLA_SHARE_SERVICE=1\r\nset DOTNET_ROOT=/opt/dotnet\r\n", Autostart.RenderCmd(args, env));
+        Assert.Contains("Environment=STUDYSTASH_SERVICE=1\nEnvironment=DOTNET_ROOT=/opt/dotnet\nRestart=always", Autostart.RenderSystemd("d", args, env));
+        Assert.Contains("set STUDYSTASH_SERVICE=1\r\nset DOTNET_ROOT=/opt/dotnet\r\n", Autostart.RenderCmd(args, env));
         // cmd reads a batch file in the console's code page: a home folder named José needs UTF-8 first
-        Assert.StartsWith("@echo off\r\nchcp 65001 >nul\r\nset GRANOLA_SHARE_SERVICE=1\r\n", Autostart.RenderCmd(Autostart.RoleArgs("server", @"C:\Users\José", Engine)));
+        Assert.StartsWith("@echo off\r\nchcp 65001 >nul\r\nset STUDYSTASH_SERVICE=1\r\n", Autostart.RenderCmd(Autostart.RoleArgs("server", @"C:\Users\José", Engine)));
+    }
+
+    [Fact]
+    public void A_service_file_from_before_the_rename_still_counts_as_a_service()
+    {
+        Assert.False(Autostart.UnderService(_ => null));
+        Assert.True(Autostart.UnderService(name => name == Autostart.ServiceEnv ? "1" : null));
+        Assert.True(Autostart.UnderService(name => name == Autostart.LegacyServiceEnv ? "1" : null));
+        Assert.False(Autostart.UnderService(name => name == Autostart.LegacyServiceEnv ? "0" : null));
     }
 
     [Fact]
@@ -48,8 +57,8 @@ public class AutostartTests
         using var dir = new TempDir();
         var run = new FakeRunner();
         string p = Autostart.Install("server", dir["home"], Places(dir), run.Run, Engine, "Darwin", []);
-        Assert.Equal(Path.Combine(dir["agents"], "com.granola-share.server.plist"), p);
-        Assert.Equal(Autostart.RenderPlist("com.granola-share.server", Autostart.RoleArgs("server", dir["home"], Engine),
+        Assert.Equal(Path.Combine(dir["agents"], "com.study-stash.server.plist"), p);
+        Assert.Equal(Autostart.RenderPlist("com.study-stash.server", Autostart.RoleArgs("server", dir["home"], Engine),
             Path.Combine(dir["home"], "logs", "server.log"), []), File.ReadAllText(p).ReplaceLineEndings("\n"));
         Assert.Equal(["launchctl", "bootstrap", $"gui/{Machine.Uid()}", p], run.Calls[^1]);
         Assert.Equal("bootout", run.Calls[^2][1]); // the old one goes first, whichever engine it ran
@@ -64,24 +73,64 @@ public class AutostartTests
     {
         using var dir = new TempDir();
         var run = new FakeRunner();
-        string cmd = Autostart.Install("client", dir["home"], Places(dir), run.Run, Engine, "Windows", []);
-        Assert.Equal(Path.Combine(dir["startup"], "granola-share-client.cmd"), cmd);
-        Assert.Contains("\"client\" \"run\"\r\n", File.ReadAllText(cmd));
-        // an older copy stops first (Python's or this engine's), then the new one starts right away
+        string cmd = Autostart.Install("server", dir["home"], Places(dir), run.Run, Engine, "Windows", []);
+        Assert.Equal(Path.Combine(dir["startup"], "study-stash-server.cmd"), cmd);
+        Assert.Contains("\"run\"\r\n", File.ReadAllText(cmd));
+        // an older copy stops first, then the new one starts right away
         Assert.Equal("powershell", run.Calls[0][0]);
         Assert.Contains("Stop-Process", run.Calls[0][^1]);
         Assert.Equal(["cmd", "/c", cmd], run.Calls[1]);
-        Assert.True(Autostart.Uninstall("client", Places(dir), run.Run, "Windows"));
+        Assert.True(Autostart.Uninstall("server", Places(dir), run.Run, "Windows"));
         Assert.False(File.Exists(cmd));
 
         run.Calls.Clear();
-        string unit = Autostart.Install("client", dir["home"], Places(dir), run.Run, Engine, "Linux", []);
-        Assert.EndsWith("granola-share-client.service", unit);
+        string unit = Autostart.Install("server", dir["home"], Places(dir), run.Run, Engine, "Linux", []);
+        Assert.EndsWith("study-stash-server.service", unit);
         Assert.Contains("Restart=always", File.ReadAllText(unit));
-        Assert.Equal([["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "granola-share-client.service"],
-            ["systemctl", "--user", "restart", "granola-share-client.service"]], run.Calls);
-        Assert.True(Autostart.Uninstall("client", Places(dir), run.Run, "Linux"));
-        Assert.Equal(["systemctl", "--user", "disable", "--now", "granola-share-client.service"], run.Calls[^1]);
+        Assert.Equal([["systemctl", "--user", "daemon-reload"], ["systemctl", "--user", "enable", "study-stash-server.service"],
+            ["systemctl", "--user", "restart", "study-stash-server.service"]], run.Calls);
+        Assert.True(Autostart.Uninstall("server", Places(dir), run.Run, "Linux"));
+        Assert.Equal(["systemctl", "--user", "disable", "--now", "study-stash-server.service"], run.Calls[^1]);
+    }
+
+    /// <summary>Where a service from before the app's rename lived, for each system.</summary>
+    static (string Server, string Client) LegacyPaths(TempDir dir, string system) => system switch
+    {
+        "Darwin" => (Path.Combine(dir["agents"], "com.granola-share.server.plist"), Path.Combine(dir["agents"], "com.granola-share.client.plist")),
+        "Windows" => (Path.Combine(dir["startup"], "granola-share-server.cmd"), Path.Combine(dir["startup"], "granola-share-client.cmd")),
+        _ => (Path.Combine(dir["systemd"], "granola-share-server.service"), Path.Combine(dir["systemd"], "granola-share-client.service")),
+    };
+
+    [Theory]
+    [InlineData("Darwin")]
+    [InlineData("Windows")]
+    [InlineData("Linux")]
+    public void Installing_the_library_retires_the_services_from_before_the_rename(string system)
+    {
+        using var dir = new TempDir();
+        var places = Places(dir);
+        var (legacyServer, legacyClient) = LegacyPaths(dir, system);
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyServer)!);
+        File.WriteAllText(legacyServer, "old");
+        File.WriteAllText(legacyClient, "old");
+        var run = new FakeRunner();
+        string installed = Autostart.Install("server", dir["home"], places, run.Run, Engine, system, []);
+        Assert.True(File.Exists(installed));
+        Assert.False(File.Exists(legacyServer));
+        Assert.False(File.Exists(legacyClient));
+        switch (system)
+        {
+            case "Darwin":
+                Assert.Equal(2, run.Calls.Count(c => c.Count >= 2 && c[0] == "launchctl" && c[1] == "bootout" && c[^1] != installed));
+                break;
+            case "Windows":
+                Assert.True(run.Calls.Count(c => c[0] == "powershell" && c[^1].Contains("Stop-Process")) >= 2);
+                break;
+            default:
+                Assert.Contains(run.Calls, c => c.SequenceEqual(["systemctl", "--user", "disable", "--now", "granola-share-server.service"]));
+                Assert.Contains(run.Calls, c => c.SequenceEqual(["systemctl", "--user", "disable", "--now", "granola-share-client.service"]));
+                break;
+        }
     }
 
     [Fact]
@@ -90,32 +139,32 @@ public class AutostartTests
         using var dir = new TempDir();
         var places = Places(dir);
         ProcResult Said(string text) => new(0, text);
-        Assert.Equal("missing", Autostart.Status("client", places, (_, _, _) => Said("state = running"), "Darwin"));
+        Assert.Equal("missing", Autostart.Status("server", places, (_, _, _) => Said("state = running"), "Darwin"));
         Directory.CreateDirectory(dir["agents"]);
-        File.WriteAllText(Path.Combine(dir["agents"], "com.granola-share.client.plist"), "");
-        Assert.Equal("running", Autostart.Status("client", places, (_, _, _) => Said("state = running"), "Darwin"));
-        Assert.Equal("stopped", Autostart.Status("client", places, (_, _, _) => Said("state = waiting"), "Darwin"));
-        Assert.Equal("stopped", Autostart.Status("client", places, (_, _, _) => null, "Darwin"));
-        Assert.Equal(["client"], Autostart.InstalledRoles(places, "Darwin"));
+        File.WriteAllText(Path.Combine(dir["agents"], "com.study-stash.server.plist"), "");
+        Assert.Equal("running", Autostart.Status("server", places, (_, _, _) => Said("state = running"), "Darwin"));
+        Assert.Equal("stopped", Autostart.Status("server", places, (_, _, _) => Said("state = waiting"), "Darwin"));
+        Assert.Equal("stopped", Autostart.Status("server", places, (_, _, _) => null, "Darwin"));
+        Assert.Equal(["server"], Autostart.InstalledRoles(places, "Darwin"));
         var run = new FakeRunner();
-        Autostart.Restart("client", places, run.Run, "Darwin");
-        Assert.Equal(["launchctl", "kickstart", "-k", $"gui/{Machine.Uid()}/com.granola-share.client"], run.Calls.Single());
+        Autostart.Restart("server", places, run.Run, "Darwin");
+        Assert.Equal(["launchctl", "kickstart", "-k", $"gui/{Machine.Uid()}/com.study-stash.server"], run.Calls.Single());
         var notLoaded = new FakeRunner((exe, args) => new ProcResult(args[0] == "kickstart" ? 113 : 0, ""));
-        Autostart.Restart("client", places, notLoaded.Run, "Darwin");
+        Autostart.Restart("server", places, notLoaded.Run, "Darwin");
         Assert.Equal("bootstrap", notLoaded.Calls[^1][1]);
 
         Directory.CreateDirectory(dir["systemd"]);
-        File.WriteAllText(Path.Combine(dir["systemd"], "granola-share-server.service"), "");
+        File.WriteAllText(Path.Combine(dir["systemd"], "study-stash-server.service"), "");
         Assert.Equal("running", Autostart.Status("server", places, (_, _, _) => Said("active\n"), "Linux"));
         Assert.Equal("stopped", Autostart.Status("server", places, (_, _, _) => Said("inactive\n"), "Linux"));
         run.Calls.Clear();
         Autostart.Restart("server", places, run.Run, "Linux");
-        Assert.Equal(["systemctl", "--user", "restart", "granola-share-server.service"], run.Calls.Single());
-        Autostart.Restart("client", places, run.Run, "Linux"); // not installed there: nothing to do
+        Assert.Equal(["systemctl", "--user", "restart", "study-stash-server.service"], run.Calls.Single());
+        Autostart.Restart("spare", places, run.Run, "Linux"); // no file for this role: nothing to do
         Assert.Single(run.Calls);
 
         Directory.CreateDirectory(dir["startup"]);
-        File.WriteAllText(Path.Combine(dir["startup"], "granola-share-server.cmd"), "");
+        File.WriteAllText(Path.Combine(dir["startup"], "study-stash-server.cmd"), "");
         Assert.Equal("running", Autostart.Status("server", places, (_, _, _) => Said("2\r\n"), "Windows"));
         Assert.Equal("stopped", Autostart.Status("server", places, (_, _, _) => Said("0\r\n"), "Windows"));
         Assert.Equal("stopped", Autostart.Status("server", places, (_, _, _) => Said("oops"), "Windows"));
@@ -209,8 +258,12 @@ public class AutostartTests
         if (Environment.GetEnvironmentVariable("STUDYSTASH_LIVE_SERVICE") != "1" || !(OperatingSystem.IsMacOS() || OperatingSystem.IsWindows())) return;
         Assert.Equal("missing", Autostart.Status("server", ServicePlaces.Default, Machine.Run));
         if (OperatingSystem.IsMacOS())
+        {
             Assert.False(Machine.Run("launchctl", ["print", $"gui/{Machine.Uid()}/{Autostart.Label("server")}"], TimeSpan.FromSeconds(10)) is { ExitCode: 0 },
                 "a library service is loaded on this computer: not touching it");
+            Assert.False(Machine.Run("launchctl", ["print", $"gui/{Machine.Uid()}/com.granola-share.server"], TimeSpan.FromSeconds(10)) is { ExitCode: 0 },
+                "a library service from before the rename is loaded on this computer: not touching it");
+        }
         else
         {
             var count = Machine.Run("powershell", ["-NoProfile", "-Command",

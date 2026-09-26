@@ -5,14 +5,14 @@ using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>tests/test_library_setup.py: the library's setup as a page, so nobody needs a terminal. Plus the page itself
-/// against the Python engine's, in four states.</summary>
+/// <summary>The library's setup as a page, so nobody needs a terminal. Plus the page itself against the Python
+/// engine's, in four states.</summary>
 public class LibrarySetupTests
 {
     static readonly List<(string, double)> Models = [("qwen3:1.7b", 1.4)];
     static readonly TailscaleInfo Tailnet = new(true, true, "Running", "pc.tail.ts.net", ["100.64.0.9"]);
 
-    /// <summary>golden.py's fakes: every check answered, and everything that changes the computer succeeds.</summary>
+    /// <summary>Every check answered, and everything that changes the computer succeeds.</summary>
     static SetupHost Fakes(string system = "Darwin", Func<string, Task<List<(string, double)>?>>? listModels = null, Func<bool>? ollamaInstalled = null,
         Func<Action<string>, Action<long, long>, Task<bool>>? installOllama = null, Func<string, string, Action<long, long>, Task<(bool, string)>>? pull = null,
         Func<TailscaleInfo>? tailscale = null, Func<Action<string>, Action<long, long>, Task<bool>>? installTailscale = null, Func<int, bool?>? firewall = null,
@@ -56,7 +56,7 @@ public class LibrarySetupTests
     static Task<HttpResponseMessage> Post(TestSite site, string path, object? body = null)
     {
         var r = new HttpRequestMessage(HttpMethod.Post, path) { Content = JsonContent.Create(body ?? new { }) };
-        r.Headers.TryAddWithoutValidation("X-Granola-Share", "1");
+        r.Headers.TryAddWithoutValidation("X-Study-Stash", "1");
         return site.Client.SendAsync(r);
     }
 
@@ -290,12 +290,31 @@ public class LibrarySetupTests
     public async Task The_page_matches_the_python_engine_in_every_state()
     {
         if (OperatingSystem.IsWindows()) return; // the page shows the notes folder, and Windows spells it with backslashes
+        foreach (var (name, want, html) in await GoldenStates())
+            Assert.True(html == want, $"setup page, {name}: differs from Python's at {Diff(want, html)}");
+    }
+
+    [Fact]
+    public async Task No_setup_state_mentions_granola()
+    {
+        foreach (var (name, _, html) in await GoldenStates())
+        {
+            Assert.False(html.Contains("granola", StringComparison.OrdinalIgnoreCase), $"setup page, {name}, mentions Granola");
+            Assert.DoesNotContain("install.sh", html); // the laptop gets the app, not a line for a terminal
+        }
+    }
+
+    /// <summary>The setup page in each state the fixture keeps (fresh, windows, mac-asleep, finished), as this
+    /// engine draws it, with the fixture's copy.</summary>
+    static async Task<List<(string Name, string Want, string Html)>> GoldenStates()
+    {
+        var states = new List<(string, string, string)>();
         foreach (var (name, want) in Golden.PageCases()["setup"]!.AsObject())
         {
             using var dir = new TempDir();
             Directory.CreateDirectory(dir["home"]);
             File.WriteAllText(Path.Combine(dir["home"], "setup_draft.json"), want!["draft"]!.ToJsonString());
-            // golden.py's fakes: its two models, its tailnet, 200.4 GB free, unless the state says otherwise
+            // The fixed fixture's two models, its tailnet, 200.4 GB free, unless the state says otherwise
             List<(string, double)> pageModels = [("qwen3:1.7b", 1.4), ("gemma4:e4b", 9.6)];
             var tailnet = new TailscaleInfo(true, true, "Running", "mini.tail.ts.net", ["100.64.0.9"]);
             Func<string, Task<List<(string, double)>?>> models = _ => Task.FromResult<List<(string, double)>?>(pageModels);
@@ -310,9 +329,9 @@ public class LibrarySetupTests
             };
             var s = new LibrarySetup(dir["home"], host);
             if (name == "finished") s.Finished = true;
-            string html = await SetupWeb.RenderAsync(s);
-            Assert.True(html == want["html"].S(), $"setup page, {name}: differs from Python's at {Diff(want["html"].S(), html)}");
+            states.Add((name, want["html"].S(), await SetupWeb.RenderAsync(s)));
         }
+        return states;
     }
 
     static string Diff(string want, string got)
@@ -329,6 +348,6 @@ public class LibrarySetupTests
         var (_, c) = await Client(dir, Fakes());
         await using var __ = c;
         var health = await Json(await c.Get("/healthz"));
-        Assert.Equal(("granola-share-setup", Engine.Version), (health["app"].S(), health["version"].S()));
+        Assert.Equal(("study-stash-setup", Engine.Version), (health["app"].S(), health["version"].S()));
     }
 }
