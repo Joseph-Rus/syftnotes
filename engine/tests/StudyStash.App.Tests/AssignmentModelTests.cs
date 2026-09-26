@@ -44,9 +44,9 @@ public class AssignmentModelTests
         Assert.Equal("18 / 20", model.ThirdValue);
 
         Assert.Equal(3, model.Rubric.Count);
-        Assert.Equal(new RubricRow("Base case", "5 / 5", null), model.Rubric[0]);
-        Assert.Equal(new RubricRow("Recursive case", "8 / 10", "“The frame for n = 1 is missing in 3b.”"), model.Rubric[1]);
-        Assert.Equal(new RubricRow("Helper functions", "5 / 5", "“Name helpers after what they return.”"), model.Rubric[2]);
+        Assert.Equal(new RubricRow("Base cases", "5 / 5", null), model.Rubric[0]);
+        Assert.Equal(new RubricRow("Stack traces", "8 / 10", "“The frame for n = 1 is missing in 3b.”"), model.Rubric[1]);
+        Assert.Equal(new RubricRow("Style", "5 / 5", "“Name helpers after what they return.”"), model.Rubric[2]);
 
         Assert.Equal("Graded · 18 / 20", model.SubmissionStatus);
         Assert.Equal("Submitted Tue 16 Sep, 9:41 PM", model.SubmissionDetail);

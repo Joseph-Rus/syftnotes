@@ -19,7 +19,7 @@
   "marked_done": null,
   "url": "https://school.instructure.com/courses/4201/assignments/9002",
   "folder": "Problem set 4",
-  "instructions": "Prove the closed form for the recurrence, then implement and test it.",
+  "instructions": "Five short problems on stack frames and scope. Show your working for 3a and 3b.",
   "unlock_at": "2025-09-09T06:59:00Z",
   "lock_at": "2025-09-17T06:59:00Z",
   "submission_types": [
@@ -52,7 +52,7 @@
   "rubric": [
     {
       "id": "r1",
-      "criterion": "Base case",
+      "criterion": "Base cases",
       "description": "The base case is proved.",
       "points": 5,
       "ratings": [
@@ -73,7 +73,7 @@
     },
     {
       "id": "r2",
-      "criterion": "Recursive case",
+      "criterion": "Stack traces",
       "description": "The inductive step is proved for every n.",
       "points": 10,
       "ratings": [
@@ -98,7 +98,7 @@
     },
     {
       "id": "r3",
-      "criterion": "Helper functions",
+      "criterion": "Style",
       "description": "Helpers are named for what they return.",
       "points": 5,
       "ratings": [

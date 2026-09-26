@@ -149,10 +149,10 @@ public static class CanvasFrames
         return border;
     }
 
-    static Border SidebarDot(string cls, int i, int count, bool mac)
+    static Control SidebarDot(string cls, int i, int count, bool mac, bool on)
     {
         var dot = new Ellipse { Width = 8, Height = 8, Fill = ClassDot(i), VerticalAlignment = VerticalAlignment.Center };
-        var text = new TextBlock { Text = cls, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        var text = new TextBlock { Text = cls, FontSize = 13, FontWeight = on && mac ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
         var countText = new TextBlock { Text = count.ToString(System.Globalization.CultureInfo.InvariantCulture), FontSize = 12, HorizontalAlignment = HorizontalAlignment.Right };
         countText.Bind(TextBlock.ForegroundProperty, countText.GetResourceObservable("Fg2"));
         var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Height = mac ? 32 : 40, Margin = new Thickness(12, 0) };
@@ -161,7 +161,12 @@ public static class CanvasFrames
         row.Children.Add(dot);
         row.Children.Add(text);
         row.Children.Add(countText);
-        return new Border { Child = row, Margin = new Thickness(mac ? 0 : 4, 0) };
+        var border = new Border { CornerRadius = new CornerRadius(mac ? 10 : 4), Child = row, Margin = new Thickness(mac ? 0 : 4, 0) };
+        if (on) border.Bind(Border.BackgroundProperty, border.GetResourceObservable(mac ? "Fill2" : "Subtle"));
+        if (!on || mac) return border;
+        var indicator = new Border { Width = 3, Height = 16, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+        indicator.Bind(Border.BackgroundProperty, indicator.GetResourceObservable("Accent"));
+        return new Grid { Children = { border, indicator } };
     }
 
     static Control SidebarBody(string selected, bool mac)
@@ -171,7 +176,7 @@ public static class CanvasFrames
         var classesLabel = new TextBlock { Text = "Classes", FontSize = mac ? 11 : 14, FontWeight = FontWeight.SemiBold, Margin = new Thickness(mac ? 10 : 16, 10, 0, 4) };
         stack.Children.Add(classesLabel);
         for (int i = 0; i < SidebarClasses.Length; i++)
-            stack.Children.Add(SidebarDot(SidebarClasses[i].Class, i, SidebarClasses[i].Count, mac));
+            stack.Children.Add(SidebarDot(SidebarClasses[i].Class, i, SidebarClasses[i].Count, mac, selected == SidebarClasses[i].Class));
         stack.Children.Add(new Border { Height = 8 });
         stack.Children.Add(SidebarRowBorder("inbox", "Unsorted", "2", selected == "Unsorted", mac));
         var status = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(mac ? 10 : 16, 12, 0, mac ? 0 : 8) };
@@ -209,9 +214,6 @@ public static class CanvasFrames
         var sidebarPad = new Border { Padding = new Thickness(8, 8, 0, 8), Child = sidebar };
         var sidebarPane = new Border { Width = 248, Child = sidebarPad };
 
-        var listPane = new Border { Width = 340, BorderThickness = new Thickness(0, 0, 1, 0), Child = list };
-        listPane.Bind(Border.BorderBrushProperty, listPane.GetResourceObservable("Sep"));
-
         var columns = detail is null ? $"248,{width - 248}" : "248,340,*";
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(columns), Height = 800 };
         Grid.SetColumn(sidebarPane, 0);
@@ -224,6 +226,8 @@ public static class CanvasFrames
         }
         else
         {
+            var listPane = new Border { Width = 340, BorderThickness = new Thickness(0, 0, 1, 0), Child = list };
+            listPane.Bind(Border.BorderBrushProperty, listPane.GetResourceObservable("Sep"));
             Grid.SetColumn(listPane, 1);
             grid.Children.Add(listPane);
             var detailPane = new Border { ClipToBounds = true, Child = detail };
@@ -275,9 +279,6 @@ public static class CanvasFrames
         navDock.Children.Add(navBody);
         var navPane = new Border { Width = 280, Padding = new Thickness(4, 4, 4, 8), Child = navDock };
 
-        var listPane = new Border { Width = listWidth, BorderThickness = new Thickness(0, 0, 1, 0), Child = list };
-        listPane.Bind(Border.BorderBrushProperty, listPane.GetResourceObservable("Sep"));
-
         Control layerContent;
         if (detail is null)
         {
@@ -285,6 +286,8 @@ public static class CanvasFrames
         }
         else
         {
+            var listPane = new Border { Width = listWidth, BorderThickness = new Thickness(0, 0, 1, 0), Child = list };
+            listPane.Bind(Border.BorderBrushProperty, listPane.GetResourceObservable("Sep"));
             var layerGrid = new Grid { ColumnDefinitions = new ColumnDefinitions($"{listWidth},*") };
             Grid.SetColumn(listPane, 0);
             var detailPane = new Border { ClipToBounds = true, Child = detail };

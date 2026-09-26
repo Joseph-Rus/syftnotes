@@ -221,7 +221,7 @@ public class CanvasClientTests
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/assignment", "assignment-9002");
         var a = await Client(fake).AssignmentAsync("CS 101", "9002", TestContext.Current.CancellationToken);
 
-        var graded = a!.Rubric.Single(r => r.Criterion == "Recursive case");
+        var graded = a!.Rubric.Single(r => r.Criterion == "Stack traces");
         Assert.Equal(8, graded.Mark?.Points);
         Assert.Equal("The frame for n = 1 is missing in 3b.", graded.Mark?.Comment);
         Assert.Equal(18, a.Submission?.Score);

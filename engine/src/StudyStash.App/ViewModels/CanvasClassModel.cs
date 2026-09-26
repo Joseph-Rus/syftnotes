@@ -103,6 +103,11 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
     public ObservableCollection<ModuleNode> Modules { get; } = [];
     [ObservableProperty] public partial bool ModulesExpanded { get; set; } = true;
 
+    /// <summary>The Sections layout's own compact preview — the current module (open) and the one just before it
+    /// (collapsed), newest first, the way the design draws it (the Modules tab, in the Tabs layout, still lists
+    /// every module).</summary>
+    public ObservableCollection<ModuleNode> RecentModules { get; } = [];
+
     [ObservableProperty] public partial int FilesCount { get; set; }
     public ObservableCollection<FileRow> Files { get; } = [];
     [ObservableProperty] public partial bool FilesExpanded { get; set; }
@@ -150,6 +155,8 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
             foreach (var it in m.Items) node.Items.Add(new ModuleItemRow(ModuleGlyph(it), it.Title, CanvasWords.ModuleItemWord(it), () => _ = OpenModuleItemAsync(it)));
             Modules.Add(node);
         }
+        RecentModules.Clear();
+        foreach (var node in RecentModuleNodes()) RecentModules.Add(node);
 
         FilesCount = files.Count;
         Files.Clear();
@@ -189,6 +196,18 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
     }
 
     void UpdateHeaderLine() => HeaderLine = $"{CanvasWords.LectureCountText(lectureTotal)} · {CanvasWords.ClassCanvasLine(code, name)}";
+
+    /// <summary>The current (still "started") module first, then the one right before it — or, when nothing's in
+    /// progress, the newest two — the compact preview the Sections layout draws under "Modules".</summary>
+    IEnumerable<ModuleNode> RecentModuleNodes()
+    {
+        if (Modules.Count == 0) yield break;
+        int current = Modules.ToList().FindLastIndex(m => m.Expanded);
+        if (current < 0) current = Modules.Count - 1;
+        yield return Modules[current];
+        int previous = current > 0 ? current - 1 : current + 1 < Modules.Count ? current + 1 : -1;
+        if (previous >= 0) yield return Modules[previous];
+    }
 
     DueRow MakeAssignmentRow(CanvasApi.Item item, TimeZoneInfo zone, DateTimeOffset now)
     {

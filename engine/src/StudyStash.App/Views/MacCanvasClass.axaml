@@ -54,26 +54,26 @@
         </Grid>
       </Button>
     </DataTemplate>
+    <DataTemplate x:Key="ModuleNodeTemplate" x:DataType="vm:ModuleNode">
+      <StackPanel>
+        <StackPanel IsVisible="{Binding Expanded}">
+          <TextBlock Classes="cv-mod-label" Margin="48,4,22,2" Text="{Binding Name}" />
+          <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource ModuleItemTemplate}" />
+        </StackPanel>
+        <Button Classes="cv-mod-collapsed" IsVisible="{Binding !Expanded}" Command="{Binding ToggleCommand}">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <c:Icon Grid.Column="0" Classes="cv-tree-icon" Glyph="chevron_right" Margin="0,0,8,0" />
+            <TextBlock Grid.Column="1" Classes="cv-mod-collapsed-text" Text="{Binding Name}" />
+            <TextBlock Grid.Column="2" Classes="cv-mod-collapsed-text" Text="{Binding ItemsCountText}" Margin="8,0,0,0" />
+          </Grid>
+        </Button>
+      </StackPanel>
+    </DataTemplate>
     <DataTemplate x:Key="ModulesTree" x:DataType="vm:CanvasClassModel">
-      <ItemsControl ItemsSource="{Binding Modules}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:ModuleNode">
-            <StackPanel>
-              <StackPanel IsVisible="{Binding Expanded}">
-                <TextBlock Classes="cv-mod-label" Margin="48,4,22,2" Text="{Binding Name}" />
-                <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource ModuleItemTemplate}" />
-              </StackPanel>
-              <Button Classes="cv-mod-collapsed" IsVisible="{Binding !Expanded}" Command="{Binding ToggleCommand}">
-                <Grid ColumnDefinitions="Auto,*,Auto">
-                  <c:Icon Grid.Column="0" Classes="cv-tree-icon" Glyph="chevron_right" Margin="0,0,8,0" />
-                  <TextBlock Grid.Column="1" Classes="cv-mod-collapsed-text" Text="{Binding Name}" />
-                  <TextBlock Grid.Column="2" Classes="cv-mod-collapsed-text" Text="{Binding ItemsCountText}" Margin="8,0,0,0" />
-                </Grid>
-              </Button>
-            </StackPanel>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+      <ItemsControl ItemsSource="{Binding Modules}" ItemTemplate="{StaticResource ModuleNodeTemplate}" />
+    </DataTemplate>
+    <DataTemplate x:Key="RecentModulesTree" x:DataType="vm:CanvasClassModel">
+      <ItemsControl ItemsSource="{Binding RecentModules}" ItemTemplate="{StaticResource ModuleNodeTemplate}" />
     </DataTemplate>
   </UserControl.Resources>
 
@@ -89,8 +89,8 @@
       </StackPanel>
 
       <!-- Tabs layout -->
-      <Border Classes="cv-seg" Margin="12,14,12,4" IsVisible="{Binding IsTabsLayout}">
-        <Grid ColumnDefinitions="*,*,*,*">
+      <Border Classes="cv-seg" Margin="12,14,12,4" HorizontalAlignment="Left" IsVisible="{Binding IsTabsLayout}">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto">
           <Button Classes="cv-seg-item" Classes.cv-on="{Binding IsLecturesTab}" Content="Lectures" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Lectures}" />
           <Button Grid.Column="1" Classes="cv-seg-item" Classes.cv-on="{Binding IsAssignmentsTab}" Content="Assignments" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Assignments}" />
           <Button Grid.Column="2" Classes="cv-seg-item" Classes.cv-on="{Binding IsModulesTab}" Content="Modules" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Modules}" />
@@ -144,7 +144,7 @@
             <TextBlock Grid.Column="2" Classes="cv-row-right" Text="{Binding ModulesCount}" />
           </Grid>
         </Button>
-        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource ModulesTree}" IsVisible="{Binding ModulesExpanded}" />
+        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource RecentModulesTree}" IsVisible="{Binding ModulesExpanded}" />
 
         <Button Classes="cv-section-header" Margin="10,8,10,0" Command="{Binding ToggleFilesCommand}">
           <Grid ColumnDefinitions="Auto,*,Auto">

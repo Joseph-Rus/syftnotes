@@ -177,4 +177,104 @@ public class CanvasShots
             Shot.Take("win-09-canvas-due-graded", SkinKind.Win, t,
                 () => CanvasFrames.WinApp("Due", new WinCanvasDue { DataContext = due }, new WinAssignment { DataContext = ps4 }));
     }
+
+    // ---- design 10/11: a Canvas-linked class's own page ----
+
+    /// <summary>The three newest lectures the shell would already have for CS 101, their days worded the way
+    /// <see cref="CanvasWords.ShortDay"/> does it.</summary>
+    static readonly (string Title, DateTimeOffset At)[] Cs101Lectures =
+    [
+        ("Recursion and the call stack", new DateTimeOffset(2025, 9, 23, 20, 0, 0, TimeSpan.Zero)),
+        ("Stack frames and scope", new DateTimeOffset(2025, 9, 18, 20, 0, 0, TimeSpan.Zero)),
+        ("Functions as values", new DateTimeOffset(2025, 9, 16, 20, 0, 0, TimeSpan.Zero)),
+    ];
+
+    static CanvasClassModel ClassModel()
+    {
+        var model = new CanvasClassModel(CanvasFixtures.Context());
+        var cs101 = CanvasFixtures.Load<List<CanvasApi.ClassRow>>("classes").Single(c => c.Class == "CS 101");
+        model.Show(cs101,
+            CanvasFixtures.Load<CanvasApi.AssignmentsResponse>("assignments-cs101"),
+            CanvasFixtures.Load<CanvasApi.ModulesResponse>("modules-cs101"),
+            CanvasFixtures.Load<CanvasApi.FilesResponse>("files-cs101"),
+            CanvasFixtures.Load<CanvasApi.AnnouncementsResponse>("announcements-cs101"));
+        model.SetLectures(Cs101Lectures.Select(l => new LectureRow(l.Title, CanvasWords.ShortDay(l.At, CanvasFixtures.Zone), () => { })).ToList(), 12);
+        return model;
+    }
+
+    [AvaloniaFact]
+    public void Mac_class_tabs()
+    {
+        var cls = ClassModel();
+        cls.Tab = ClassTab.Assignments;
+        cls.Done[0].SelectCommand.Execute(null); // Problem set 4
+        var ps4 = Detail("assignment-9002");
+        foreach (var t in Themes)
+        {
+            Control? built = null;
+            Shot.Take("mac-10-canvas-class-tabs", SkinKind.Mac, t,
+                () => built = CanvasFrames.MacApp("CS 101", new MacCanvasClass { DataContext = cls }, new MacAssignment { DataContext = ps4 }));
+            AssertIcons(built!);
+        }
+
+        // extras, not compared: the Modules and Announcements tabs
+        var modulesCls = ClassModel();
+        modulesCls.Tab = ClassTab.Modules;
+        foreach (var t in Themes)
+            Shot.Take("mac-10-canvas-class-tabs-modules", SkinKind.Mac, t,
+                () => CanvasFrames.MacApp("CS 101", new MacCanvasClass { DataContext = modulesCls }, new MacAssignment { DataContext = ps4 }));
+
+        var announceCls = ClassModel();
+        announceCls.Tab = ClassTab.Announcements;
+        CanvasReaderModel? reader = null;
+        announceCls.OnReader = r => reader = r;
+        announceCls.Announcements[0].OpenCommand.Execute(null);
+        foreach (var t in Themes)
+            Shot.Take("mac-10-canvas-class-announcement", SkinKind.Mac, t,
+                () => CanvasFrames.MacApp("CS 101", new MacCanvasClass { DataContext = announceCls }, new MacCanvasReader { DataContext = reader }));
+    }
+
+    [AvaloniaFact]
+    public void Win_class_tabs()
+    {
+        var cls = ClassModel();
+        cls.Tab = ClassTab.Assignments;
+        cls.Done[0].SelectCommand.Execute(null);
+        var ps4 = Detail("assignment-9002");
+        foreach (var t in Themes)
+        {
+            Control? built = null;
+            Shot.Take("win-10-canvas-class-tabs", SkinKind.Win, t,
+                () => built = CanvasFrames.WinApp("CS 101", new WinCanvasClass { DataContext = cls }, new WinAssignment { DataContext = ps4 }, listWidth: 360));
+            AssertIcons(built!);
+        }
+    }
+
+    [AvaloniaFact]
+    public void Mac_class_sections()
+    {
+        var cls = ClassModel();
+        cls.Layout = ClassLayout.Sections;
+        foreach (var t in Themes)
+        {
+            Control? built = null;
+            Shot.Take("mac-11-canvas-class-sections", SkinKind.Mac, t,
+                () => built = CanvasFrames.MacApp("CS 101", new MacCanvasClass { DataContext = cls }, width: 588));
+            AssertIcons(built!);
+        }
+    }
+
+    [AvaloniaFact]
+    public void Win_class_sections()
+    {
+        var cls = ClassModel();
+        cls.Layout = ClassLayout.Sections;
+        foreach (var t in Themes)
+        {
+            Control? built = null;
+            Shot.Take("win-11-canvas-class-sections", SkinKind.Win, t,
+                () => built = CanvasFrames.WinApp("CS 101", new WinCanvasClass { DataContext = cls }, width: 640));
+            AssertIcons(built!);
+        }
+    }
 }
