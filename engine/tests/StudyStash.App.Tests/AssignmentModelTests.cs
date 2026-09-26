@@ -21,9 +21,9 @@ public class AssignmentModelTests
         Assert.Equal("To do", model.ThirdValue);
 
         Assert.Equal(3, model.Rubric.Count);
-        Assert.Equal(new RubricRow("Correctness", "10 pts", null), model.Rubric[0]);
-        Assert.Equal(new RubricRow("Style", "6 pts", null), model.Rubric[1]);
-        Assert.Equal(new RubricRow("Write-up", "4 pts", null), model.Rubric[2]);
+        Assert.Equal(new RubricRow("Correct traces", "10 pts", null), model.Rubric[0]);
+        Assert.Equal(new RubricRow("Stack diagram at the deepest point", "6 pts", null), model.Rubric[1]);
+        Assert.Equal(new RubricRow("Return values labelled", "4 pts", null), model.Rubric[2]);
 
         Assert.Equal("Nothing handed in yet", model.SubmissionStatus);
         Assert.Equal("Due in 5 days", model.SubmissionDetail);

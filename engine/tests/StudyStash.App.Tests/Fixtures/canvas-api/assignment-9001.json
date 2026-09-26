@@ -19,7 +19,7 @@
   "marked_done": null,
   "url": "https://school.instructure.com/courses/4201/assignments/9001",
   "folder": "Lab 3",
-  "instructions": "Write three functions that trace their own recursion, then submit your traces alongside the code.",
+  "instructions": "Trace factorial(4) and fib(5) by hand. For each one, draw the call stack at its deepest point and write down what every call returns. Hand in a single PDF.",
   "unlock_at": "2025-09-23T06:59:00Z",
   "lock_at": null,
   "submission_types": [
@@ -31,7 +31,7 @@
   "rubric": [
     {
       "id": "r1",
-      "criterion": "Correctness",
+      "criterion": "Correct traces",
       "description": "Each function returns the right trace.",
       "points": 10,
       "ratings": [
@@ -52,7 +52,7 @@
     },
     {
       "id": "r2",
-      "criterion": "Style",
+      "criterion": "Stack diagram at the deepest point",
       "description": "Names read clearly and the trace format matches the handout.",
       "points": 6,
       "ratings": [
@@ -73,7 +73,7 @@
     },
     {
       "id": "r3",
-      "criterion": "Write-up",
+      "criterion": "Return values labelled",
       "description": "The short write-up explains what each trace shows.",
       "points": 4,
       "ratings": [
