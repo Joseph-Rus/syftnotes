@@ -177,13 +177,6 @@ public static class Skin
         r["Ring3"] = Shadows([Outer(0, 0, 0, 3, accentTint)]);
         r["Ring4"] = Shadows([Outer(0, 0, 0, 4, accentTint)]);
         r["OnAccentRing"] = Shadows([Outer(0, 0, 0, 1.5, onAccent)]);
-
-        // Old names, until every view uses the design's.
-        r["Mat"] = r["GlassSolid"];
-        r["Side"] = r["Page"] = r["Nav"] = r["Win"];
-        r["Control"] = r["Raised"];
-        r["Shadow"] = r["GlassShadow"];
-        r["ShadowSmall"] = Shadows([Outer(0, 1, 2, 0, Black(dark ? 0.35 : 0.14))]);
         B("Ground", dark ? Hex("#161616") : Hex("#E4E2DF"));
     }
 
@@ -234,12 +227,8 @@ public static class Skin
             B("IbGlyph", Colors.White);
             B("Hover", Black(0.04));
             B("Press", Black(0.02));
-            // Old names, until every view uses the design's.
             B("Fill", Black(0.04));
             B("Fill2", Black(0.06));
-            B("Page", Hex("#F9F9F9"));
-            B("Nav", Hex("#F3F3F3"));
-            B("Control", Hex("#FDFDFD"));
         }
         else
         {
@@ -281,12 +270,8 @@ public static class Skin
             B("IbGlyph", Colors.Black);
             B("Hover", White(0.06));
             B("Press", White(0.03));
-            // Old names, until every view uses the design's.
             B("Fill", White(0.06));
             B("Fill2", White(0.09));
-            B("Page", Hex("#272727"));
-            B("Nav", Hex("#202020"));
-            B("Control", Hex("#2D2D2D"));
         }
         B("IcInfo", accentText);
         B("Good", Good);
@@ -339,10 +324,17 @@ public static class Skin
     static Color Rgba(byte r, byte g, byte b, double a) => Color.FromArgb(Oklch.Byte(a), r, g, b);
 
     static BoxShadow Outer(double x, double y, double blur, double spread, Color c) =>
-        new() { OffsetX = x, OffsetY = y, Blur = blur, Spread = spread, Color = c };
+        new() { OffsetX = x, OffsetY = y, Blur = Blur(blur), Spread = spread, Color = c };
 
     static BoxShadow Inset(double x, double y, double blur, double spread, Color c) =>
-        new() { OffsetX = x, OffsetY = y, Blur = blur, Spread = spread, Color = c, IsInset = true };
+        new() { OffsetX = x, OffsetY = y, Blur = Blur(blur), Spread = spread, Color = c, IsInset = true };
+
+    /// <summary>
+    /// A CSS box-shadow blur as Avalonia's. CSS blurs by a Gaussian of half the blur radius; Avalonia takes the radius
+    /// the way Skia once did (0.2887 × radius + 0.5), which is only about 0.6 of that, so the design's shadows and the
+    /// accent's glow would come out tight and hard.
+    /// </summary>
+    public static double Blur(double css) => Math.Max(0, (css / 2 - 0.5) / 0.288675);
 
     static BoxShadows Shadows(BoxShadow[] s) => s.Length == 1 ? new BoxShadows(s[0]) : new BoxShadows(s[0], s[1..]);
 }
