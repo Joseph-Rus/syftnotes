@@ -1,0 +1,113 @@
+<!-- A lecture's notes with "Rewrite notes" (design 17): the current notes never change on screen until "Use new" is
+     pressed, however a rewrite ends. Only the notes block — the lecture's own title/meta row above it is the host
+     page's (WinLibrary). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.WinAiNotes"
+             x:DataType="vm:AiNotesModel">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+  </UserControl.Styles>
+
+  <StackPanel Spacing="12">
+
+    <!-- Rewriting -->
+    <Border Classes="ai-bar working" Padding="16,12,8,12" IsVisible="{Binding IsRewriting}">
+      <Grid ColumnDefinitions="Auto,12,*,Auto" VerticalAlignment="Center">
+        <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Accent}" />
+        <TextBlock Grid.Column="2" FontSize="14" TextWrapping="Wrap">
+          <Run FontWeight="SemiBold" Text="{Binding RewritingLead}" />
+          <Run Text=" Your current notes stay until the new ones are ready." />
+        </TextBlock>
+        <Button Grid.Column="3" Classes="ai-textbtn" Command="{Binding CancelCommand}" VerticalAlignment="Center">
+          <Border Classes="ai-pill-plain"><TextBlock Text="Cancel" /></Border>
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Ready -->
+    <Border Classes="ai-bar ready" Padding="16,8,8,8" IsVisible="{Binding IsReady}">
+      <Grid ColumnDefinitions="Auto,12,*,8,Auto,8,Auto,8,Auto" VerticalAlignment="Center">
+        <Border Classes="ai-ok-glyph"><TextBlock Text="✓" /></Border>
+        <TextBlock Grid.Column="2" FontSize="14" Text="{Binding ReadyLead}" TextTrimming="CharacterEllipsis" />
+        <Button Grid.Column="4" Classes="ai-textbtn" Command="{Binding KeepOldCommand}">
+          <Border Classes="ai-pill-plain"><TextBlock Text="Keep old" /></Border>
+        </Button>
+        <Button Grid.Column="6" Classes="ai-pillbtn" Command="{Binding CompareCommand}">
+          <Border Classes="ai-pill"><TextBlock Text="Compare" /></Border>
+        </Button>
+        <Button Grid.Column="8" Classes="ai-pillbtn" Command="{Binding UseNewCommand}">
+          <Border Classes="ai-pill" Classes.primary="True"><TextBlock Text="Use new" /></Border>
+        </Button>
+      </Grid>
+    </Border>
+
+    <!-- Failed -->
+    <Border Classes="ai-problem err" IsVisible="{Binding IsFailed}">
+      <Grid ColumnDefinitions="Auto,12,*">
+        <Border Classes="ai-problem-glyph err" VerticalAlignment="Top" Margin="0,3,0,0"><TextBlock Text="✕" /></Border>
+        <StackPanel Grid.Column="2" Spacing="8">
+          <TextBlock Classes="ai-problem-text">
+            <Run FontWeight="SemiBold" Text="{Binding FailedTitle}" />
+            <Run Text=" " /><Run Text="{Binding FailedMessage}" />
+          </TextBlock>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Classes="ai-pillbtn" Command="{Binding TryAgainCommand}">
+              <Border Classes="ai-pill"><TextBlock Text="Try again" /></Border>
+            </Button>
+            <Button Classes="ai-textbtn" Command="{Binding DismissCommand}">
+              <Border Classes="ai-pill-plain"><TextBlock Text="Dismiss" /></Border>
+            </Button>
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Summary header + Rewrite notes -->
+    <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
+      <TextBlock Classes="ai-notes-title" Text="Summary" />
+      <TextBlock Grid.Column="1" Classes="ai-notes-byline" Margin="10,0,0,0" Text="{Binding ShownByline}" />
+      <Button Grid.Column="3" Classes="ai-pillbtn" IsVisible="{Binding ShowRewriteButton}">
+        <Border Classes="ai-pill">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <c:Icon Glyph="refresh" Size="16" />
+            <TextBlock Text="Rewrite notes" />
+          </StackPanel>
+        </Border>
+        <Button.Flyout>
+          <Flyout Placement="BottomEdgeAlignedRight" ShowMode="Standard"
+                  Opened="OnMenuOpened" Closed="OnMenuClosed">
+            <ContentControl Content="{Binding Menu}">
+              <ContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:EngineMenuModel">
+                  <v:WinAiEngineMenu />
+                </DataTemplate>
+              </ContentControl.ContentTemplate>
+            </ContentControl>
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+    </Grid>
+
+    <!-- The notes, dimmed while the menu is open -->
+    <Border Classes="ai-dim" Classes.dimmed="{Binding Dimmed}" IsVisible="{Binding !IsComparing}">
+      <c:NoteView Markdown="{Binding ShownMarkdown}" />
+    </Border>
+
+    <!-- Compare: the current notes beside the new ones -->
+    <Grid ColumnDefinitions="*,28,*" IsVisible="{Binding IsComparing}">
+      <StackPanel Spacing="10">
+        <TextBlock Classes="ai-compare-head" Text="Current notes" />
+        <c:NoteView Markdown="{Binding CurrentBody}" />
+      </StackPanel>
+      <StackPanel Grid.Column="2" Spacing="10">
+        <TextBlock Classes="ai-compare-head" Text="{Binding DraftHeading}" />
+        <c:NoteView Markdown="{Binding DraftBody}" />
+      </StackPanel>
+    </Grid>
+
+  </StackPanel>
+</UserControl>

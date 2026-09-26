@@ -49,11 +49,26 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     /// <summary>What the notes area shows: the draft once it's ready (or while comparing), the current notes
     /// otherwise — either way with a leading "Summary" heading dropped, since the header row already says it.</summary>
-    public string ShownMarkdown => AiWords.DropLeadingSummary(State is RewriteState.Ready or RewriteState.Comparing ? DraftMarkdown : CurrentMarkdown);
+    public string ShownMarkdown => State is RewriteState.Ready or RewriteState.Comparing ? DraftBody : CurrentBody;
     public string ShownByline => State is RewriteState.Ready or RewriteState.Comparing ? DraftByline : CurrentByline;
+    /// <summary>The current and draft notes, each with a leading "Summary" heading dropped: what the compare
+    /// view's two columns show side by side.</summary>
+    public string CurrentBody => AiWords.DropLeadingSummary(CurrentMarkdown);
+    public string DraftBody => AiWords.DropLeadingSummary(DraftMarkdown);
     public bool ShowRewriteButton => State == RewriteState.Idle;
     public bool ShowBar => State is RewriteState.Rewriting or RewriteState.Ready or RewriteState.Failed;
     public bool Dimmed => MenuOpen;
+    public bool IsRewriting => State == RewriteState.Rewriting;
+    public bool IsReady => State == RewriteState.Ready;
+    public bool IsComparing => State == RewriteState.Comparing;
+    public bool IsFailed => State == RewriteState.Failed;
+
+    /// <summary>The failed bar's words, built the same way the matching problem card would be, so the two agree.</summary>
+    public string FailedTitle => AiWords.ProblemTitle("rewrite_failed", EngineName, "");
+    public string FailedMessage => AiWords.ProblemMessage("rewrite_failed", EngineName, "", "", 0, Error);
+    public string RewritingLead => $"Rewriting with {EngineName}…";
+    public string ReadyLead => $"New notes from {EngineName} are ready.";
+    public string DraftHeading => $"New notes from {EngineName}";
 
     public EngineMenuModel Menu { get; } = new() { Header = "Rewrite notes with", Width = 280, FooterText = "Keeps your current notes until you choose" };
 
@@ -72,7 +87,22 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShownByline));
         OnPropertyChanged(nameof(ShowRewriteButton));
         OnPropertyChanged(nameof(ShowBar));
+        OnPropertyChanged(nameof(IsRewriting));
+        OnPropertyChanged(nameof(IsReady));
+        OnPropertyChanged(nameof(IsComparing));
+        OnPropertyChanged(nameof(IsFailed));
     }
+
+    partial void OnEngineNameChanged(string value)
+    {
+        OnPropertyChanged(nameof(FailedTitle));
+        OnPropertyChanged(nameof(FailedMessage));
+        OnPropertyChanged(nameof(RewritingLead));
+        OnPropertyChanged(nameof(ReadyLead));
+        OnPropertyChanged(nameof(DraftHeading));
+    }
+
+    partial void OnErrorChanged(string value) => OnPropertyChanged(nameof(FailedMessage));
 
     partial void OnMenuOpenChanged(bool value) => OnPropertyChanged(nameof(Dimmed));
 
@@ -91,6 +121,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         CurrentMarkdown = markdown;
         CurrentByline = AiWords.WrittenByline(engineName, updatedAt);
         WriterId = FindEngineId(engineName);
+        OnPropertyChanged(nameof(CurrentBody));
         OnPropertyChanged(nameof(ShownMarkdown));
         OnPropertyChanged(nameof(ShownByline));
     }
@@ -152,6 +183,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             DraftMarkdown = d.Markdown;
             DraftByline = AiWords.DraftByline(d.By, d.At, Now());
+            OnPropertyChanged(nameof(DraftBody));
+            OnPropertyChanged(nameof(ShownMarkdown));
         }
         State = info.State switch
         {

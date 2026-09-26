@@ -307,4 +307,77 @@
     <Setter Property="CornerRadius" Value="16" />
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
   </Style>
+
+  <!-- A borderless pill (Keep old / Dismiss / Deny): text only, no fill, unlike Border.ai-pill. -->
+  <Style Selector="Border.ai-pill-plain">
+    <Setter Property="Height" Value="30" />
+    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="Padding" Value="14,0" />
+  </Style>
+  <Style Selector="Border.ai-pill-plain > TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- The notes header row (17): Summary + byline, and the page's own "Rewrite notes" pill. -->
+  <Style Selector="TextBlock.ai-notes-title">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="17" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.ai-notes-byline">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <!-- The rewrite status bar (17): r14 Group, a spinner or icon, its words, its actions. -->
+  <Style Selector="Border.ai-bar">
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Background" Value="{DynamicResource Group}" />
+  </Style>
+  <Style Selector="TextBlock.ai-bar-lead">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.ai-bar-text">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <!-- A compare column's own small heading ("Current notes" / "New notes from …"). -->
+  <Style Selector="TextBlock.ai-compare-head">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <!-- While the "Rewrite notes with" menu is open, the notes dim to .5 (17). -->
+  <Style Selector="Border.ai-dim">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Border.ai-dim.dimmed">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+
+  <!-- The AI problem card (18): r16 Group, an icon, a title and message, up to two actions. -->
+  <Style Selector="Border.ai-problem">
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Background" Value="{DynamicResource Group}" />
+    <Setter Property="Padding" Value="16,14,14,14" />
+  </Style>
+  <Style Selector="TextBlock.ai-problem-caption">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
+  </Style>
+  <Style Selector="TextBlock.ai-problem-title">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.ai-problem-message">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LineHeight" Value="17.4" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
 </Styles>
