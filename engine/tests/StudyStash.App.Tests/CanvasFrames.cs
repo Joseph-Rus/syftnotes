@@ -190,8 +190,10 @@ public static class CanvasFrames
     }
 
     /// <summary>Design 09/10: a 1280×800 Mac library window (grid 248 | 340 | *), the Due sidebar item (or a class)
-    /// selected, the given list and (optionally) detail panes filling the rest.</summary>
-    public static Control MacApp(string selected, Control list, Control? detail = null)
+    /// selected, the given list and (optionally) detail panes filling the rest. <paramref name="width"/> narrows the
+    /// whole window for the no-detail Sections layout (design 11: 588 wide, so the list pane reads 340 like every
+    /// other one) instead of letting the list stretch to fill 1280.</summary>
+    public static Control MacApp(string selected, Control list, Control? detail = null, double width = 1280)
     {
         var trafficLights = new StackPanel
         {
@@ -210,7 +212,7 @@ public static class CanvasFrames
         var listPane = new Border { Width = 340, BorderThickness = new Thickness(0, 0, 1, 0), Child = list };
         listPane.Bind(Border.BorderBrushProperty, listPane.GetResourceObservable("Sep"));
 
-        var columns = detail is null ? "248,*" : "248,340,*";
+        var columns = detail is null ? $"248,{width - 248}" : "248,340,*";
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(columns), Height = 800 };
         Grid.SetColumn(sidebarPane, 0);
         grid.Children.Add(sidebarPane);
@@ -229,14 +231,17 @@ public static class CanvasFrames
             grid.Children.Add(detailPane);
         }
 
-        var window = new Border { Width = 1280, Height = 800, CornerRadius = new CornerRadius(26), ClipToBounds = true, Child = grid };
+        var window = new Border { Width = width, Height = 800, CornerRadius = new CornerRadius(26), ClipToBounds = true, Child = grid };
         window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Win"));
         window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("GShadow"));
         return window;
     }
 
-    /// <summary>Design 09/10: a 1280×800 Windows library window (title bar, nav 280, list 340, detail *).</summary>
-    public static Control WinApp(string selected, Control list, Control? detail = null)
+    /// <summary>Design 09/10: a 1280×800 Windows library window (title bar, nav 280, list 340, detail *).
+    /// <paramref name="width"/> narrows the whole window for a no-detail layout (design 11: 640 wide, nav stays 280
+    /// so the content pane reads 360 the way the design draws it); <paramref name="listWidth"/> lets a detail-column
+    /// screen use its own list width (the class page's 360, instead of the Due list's 340).</summary>
+    public static Control WinApp(string selected, Control list, Control? detail = null, double width = 1280, double listWidth = 340)
     {
         var mark = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4), Margin = new Thickness(16, 0, 12, 0) };
         mark.Bind(Border.BackgroundProperty, mark.GetResourceObservable("Accent"));
@@ -270,7 +275,7 @@ public static class CanvasFrames
         navDock.Children.Add(navBody);
         var navPane = new Border { Width = 280, Padding = new Thickness(4, 4, 4, 8), Child = navDock };
 
-        var listPane = new Border { Width = 340, BorderThickness = new Thickness(0, 0, 1, 0), Child = list };
+        var listPane = new Border { Width = listWidth, BorderThickness = new Thickness(0, 0, 1, 0), Child = list };
         listPane.Bind(Border.BorderBrushProperty, listPane.GetResourceObservable("Sep"));
 
         Control layerContent;
@@ -280,7 +285,7 @@ public static class CanvasFrames
         }
         else
         {
-            var layerGrid = new Grid { ColumnDefinitions = new ColumnDefinitions("340,*") };
+            var layerGrid = new Grid { ColumnDefinitions = new ColumnDefinitions($"{listWidth},*") };
             Grid.SetColumn(listPane, 0);
             var detailPane = new Border { ClipToBounds = true, Child = detail };
             Grid.SetColumn(detailPane, 1);
@@ -306,7 +311,7 @@ public static class CanvasFrames
         stack.Children.Add(titleBar);
         stack.Children.Add(below);
 
-        var window = new Border { Width = 1280, Height = 800, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), ClipToBounds = true, Child = stack };
+        var window = new Border { Width = width, Height = 800, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), ClipToBounds = true, Child = stack };
         window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Mica"));
         window.Bind(Border.BorderBrushProperty, window.GetResourceObservable("FlyStroke"));
         window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("ShadowLg"));
