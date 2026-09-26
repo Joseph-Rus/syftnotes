@@ -101,7 +101,7 @@ Compared with the design's Canvas screens (06 settings, 07 connect, 08 states, 0
 
 ## What's on disk
 
-### Today (after T2)
+### Today (after T2, before T3–T8)
 
 ```
 <class folder>/Canvas/
@@ -120,7 +120,7 @@ home/
   chrome-extension/                   the extension's folder, for Chrome's "Load unpacked" (brought up to date when the library starts)
 ```
 
-### Target (after T8)
+### Target (after T8) — reached
 
 ```
 <class folder>/Canvas/
@@ -161,16 +161,21 @@ Each job's answer is classified (`Crawl.Classify`) before anything is filed:
 | 5xx, or no answer (status 0 with a network error) | A hiccup | Asked again, up to three times in all; then an error. |
 | "refused: not a Canvas URL", "too big", other 4xx | It won't work by asking again | An error. |
 
-**Sections.** Each class's listings (assignments, submissions, modules, announcements; later tasks add pages, files,
-quizzes, discussions and the planner) are sections of the sync: `reading` when it starts, then `ok` (the last page
-was read), `hidden` or `failed`. `Crawl.Sections` shows the current (or last) sync's; `TakeFinished` hands them to
-`CanvasSync.Finish`.
+**Sections.** Each class's listings (assignments, submissions, modules, announcements, files; pages outside modules,
+the syllabus and the front page aren't tracked sections — see below) are sections of the sync: `reading` when it
+starts, then `ok` (the last page was read), `hidden` or `failed`. `Crawl.Sections` shows the current (or last)
+sync's; `TakeFinished` hands them to `CanvasSync.Finish`.
 
 - A class whose `assignments` section isn't `ok` keeps its previous rows in `canvas_assignments.json`: no false
   "Removed", and the file is unchanged. Settings' error names what failed: "Couldn't read CS 101 assignments from
   Canvas (Canvas answered 503), so what you had is kept."
 - Listings whose pages only make sense together (modules, announcements) collect every page and are filed on the
-  last one. A failed or hidden one writes nothing, so modules.md and announcements.md stay as they were.
+  last one. A failed or hidden one writes nothing, so modules.md and announcements.md stay as they were (modules.md
+  is written at all only once the course is known to have any module, so a first sync that can't read modules leaves
+  no file rather than an empty one).
+- The Files area is two listings under one section (`files`): folders first (so each file's folder path is known),
+  then the files themselves, both paged; either one hidden or failing marks the whole section that way, and Canvas
+  is never asked for the files without their folders.
 - A class no longer linked to Canvas isn't reported as "Removed".
 
 **Other rules.** Every listing follows Canvas's `Link: <…>; rel="next"` header. Jobs the extension took and never
@@ -333,7 +338,8 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
   "media_url"}],"quiz":{…}|null (only once T6 fills `CourseIndex.Quizzes`),"spec","feedback"}` — `spec`/`feedback`
   are the assignment's own `spec.md`/`feedback.md`, relative to the class's folder, for `/api/v2/files/raw`. `file` =
   `{"id","name","size","content_type","format","local","skipped","url"}`; `format` is derived from the content type
-  or the name's extension when nothing more specific is saved (T5 will save a real one on `CourseFileInfo`).
+  or the name's extension (module File items save a real one straight on `ModuleItemInfo.Format`; Files-area items
+  derive it the same way when the API answers, since Canvas rarely changes a file's type between syncs).
   A 404 for an unknown class or assignment id.
 
 ### Modules, files, announcements, pages
@@ -435,16 +441,16 @@ Never mirrored, on purpose:
 | Videos, and any file over 40 MB | Too big for the extension's transport (bug 10); recorded as `skipped` with a Canvas link. |
 | Material only reachable outside Canvas (Box, Drive, OneDrive, a course website) | The sync has no session there; the course scout explores and saves what it can reach. |
 
-### A gap found while wiring these tools (not T8's — flagged for whoever next touches T5/T6)
+### The modules gap (T5), closed
 
-`Crawl.Modules(cls, list)` and `Crawl.Announcements(cls, list)` still only render `modules.md`/`announcements.md`
-(today's mirror); neither fills `CourseIndex.Modules` or `.Announcements` (the `ModuleInfo`/`AnnouncementInfo` lists
-the data model, `CanvasView`, the JSON API and `class_modules`/`class_announcements` all already expect). Against a
-real sync, `GET /api/v2/canvas/modules` and `/announcements` (and these two tools) answer an empty list today, even
-though the .md files and the assignments/submissions data are correct. `CanvasApiTests`/`CanvasToolsTests` don't
-catch it because they only check the JSON's shape, not that it's non-empty. Fixing it belongs with T5/T6 (populate
-`ModuleInfo`/`ModuleItemInfo`/`AnnouncementInfo` the way `AssignmentsPage` already does for assignments) — out of
-scope here, but worth doing before WS3 builds the Canvas screens against these endpoints.
+An earlier task left `Crawl.Modules(cls, list)` only rendering `modules.md` straight off Canvas's raw JSON, never
+filling `CourseIndex.Modules`: `GET /api/v2/canvas/modules` and `class_modules` answered an empty list against a real
+sync even though modules.md itself was right. T5 fixed it: `Crawl.Modules` now builds `ModuleInfo`/`ModuleItemInfo`
+for every item (a module with no inline `items` fetches them from `items_url`, paged), `modules.md` is rendered from
+that index when the sync finishes (like spec.md/feedback.md — a class whose first sync couldn't read its modules gets
+no outline instead of an empty one), and a renamed or reordered module moves its existing folder (`moddir:{class}:
+{id}` in the manifest) instead of leaving a duplicate. The Files area (folders, then files, both paged) now fills
+`CourseIndex.Files`/`FilesHidden` the same way. See `CanvasModulesTests.cs`.
 
 ## Testing
 
