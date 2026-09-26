@@ -588,6 +588,35 @@ public class AiShots
         foreach (var t in Themes)
             Shot.Take("win-15-ai-library-setup", SkinKind.Win, t, () => SetupFrame(SkinKind.Win, new WinAiSetup { DataContext = AiDemo.Setup() }));
     }
+
+    // --- 14: AI tool access --------------------------------------------------------------------------------------
+
+    static AiAccessModel AccessModel()
+    {
+        var m = new AiAccessModel(new FakeAiLibrary());
+        m.On = true;
+        m.ReadLectures = true;
+        m.ReadNotes = true;
+        m.ReadCanvas = true;
+        m.ReadAudio = false;
+        m.Connected.Add(new AiConnectionRow { Id = "1", Name = "Claude Code", Detail = "Signed in from the web", UsedWords = "Used 10:40", CanRemove = true, First = true });
+        m.Connected.Add(new AiConnectionRow { Id = "2", Name = "Codex", Detail = "Token", UsedWords = "Used Tue", CanRemove = true });
+        return m;
+    }
+
+    [AvaloniaFact]
+    public void Mac_ai_tool_access()
+    {
+        foreach (var t in Themes)
+            Shot.Take("mac-14-ai-tool-access", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI tool access", new MacAiAccess { DataContext = AccessModel() }));
+    }
+
+    [AvaloniaFact]
+    public void Win_ai_tool_access()
+    {
+        foreach (var t in Themes)
+            Shot.Take("win-14-ai-tool-access", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel() }));
+    }
 }
 
 static class AiShotsExtensions

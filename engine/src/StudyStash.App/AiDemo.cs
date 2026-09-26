@@ -21,6 +21,16 @@ public static class AiDemo
     /// notes (the design's first choice), not whatever <see cref="Overview"/> settled on for the engines pane.</summary>
     static AiOverview SetupOverview() => Overview() with { Ask = "ollama" };
 
+    /// <summary>The design's connected tools: an MCP client with a token, and Claude signed in from the web.</summary>
+    public static ToolAccessInfo Access() => new(
+        On: true, Reading: new ReadingScopes(),
+        Connections:
+        [
+            new ToolConnection("tok-1", "Cursor", "token") { Created = 1_726_000_000 },
+            new ToolConnection("sam-web", "Claude", "signin") { Created = 1_726_000_000, LastUsed = 1_726_600_000 },
+        ])
+    { PublicUrl = "https://sams-mini.tailnet.ts.net", HasPassword = true };
+
     /// <summary>Answers one fixed <see cref="AiOverview"/> and nothing else: enough to draw the panes, never a real
     /// library. <paramref name="rewrite"/> answers every rewrite call, for the notes screen's three states.</summary>
     sealed class Library(AiOverview overview, Func<string, RewriteInfo?>? rewrite = null) : IAiLibrary
@@ -39,6 +49,8 @@ public static class AiDemo
         public Task<RewriteInfo?> RewriteCancelAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
         public Task<RewriteInfo?> RewriteKeepAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
         public Task<RewriteInfo?> RewriteUseAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
+        public Task<ToolAccessInfo?> AccessAsync() => Task.FromResult<ToolAccessInfo?>(Access());
+        public Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null) => Task.FromResult<ToolAccessInfo?>(Access());
     }
 
     /// <summary>The AI engines pane, loaded: notes on Ollama, questions on Claude Code, the fallback on.</summary>
