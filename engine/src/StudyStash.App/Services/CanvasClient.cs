@@ -138,11 +138,11 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
             ["class"] = cls, ["ids"] = new JsonArray([.. ids.Select(i => (JsonNode)i)]),
         }, stop);
 
-    public Task<CanvasApi.NotificationsResponse?> NotificationsAsync(DateTimeOffset? after = null, CancellationToken stop = default) =>
+    public Task<CanvasApi.NotificationsResponse?> NotificationsAsync(long? after = null, CancellationToken stop = default) =>
         SendAsync<CanvasApi.NotificationsResponse>(HttpMethod.Get,
-            canvasRoot + "/notifications" + (after is null ? "" : $"?after={Q(after.Value.ToString("O", CultureInfo.InvariantCulture))}"), null, stop);
+            canvasRoot + "/notifications" + (after is null ? "" : $"?after={after.Value.ToString(CultureInfo.InvariantCulture)}"), null, stop);
 
-    public Task MarkNotificationsSeenAsync(string upTo, CancellationToken stop = default) =>
+    public Task MarkNotificationsSeenAsync(long upTo, CancellationToken stop = default) =>
         SendAsync<JsonObject>(HttpMethod.Post, canvasRoot + "/notifications/seen", new JsonObject { ["up_to"] = upTo }, stop);
 
     // ---- /api/v2/files (a lecture-style read of a Canvas file already saved locally) ----

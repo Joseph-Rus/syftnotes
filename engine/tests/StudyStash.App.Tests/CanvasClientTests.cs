@@ -298,18 +298,18 @@ public class CanvasClientTests
     public async Task NotificationsAsync_sends_after_as_a_query()
     {
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/notifications", "notifications");
-        await Client(fake).NotificationsAsync(new DateTimeOffset(2025, 9, 24, 0, 0, 0, TimeSpan.Zero), TestContext.Current.CancellationToken);
+        await Client(fake).NotificationsAsync(2, TestContext.Current.CancellationToken);
 
-        Assert.StartsWith("?after=2025-09-24", Assert.Single(fake.Requests).Query);
+        Assert.Equal("?after=2", Assert.Single(fake.Requests).Query);
     }
 
     [Fact]
     public async Task MarkNotificationsSeenAsync_posts_up_to()
     {
         var fake = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/notifications/seen", "{}");
-        await Client(fake).MarkNotificationsSeenAsync("n3", TestContext.Current.CancellationToken);
+        await Client(fake).MarkNotificationsSeenAsync(3, TestContext.Current.CancellationToken);
 
-        Assert.Contains("\"up_to\":\"n3\"", Assert.Single(fake.Requests).Body);
+        Assert.Contains("\"up_to\":3", Assert.Single(fake.Requests).Body);
     }
 
     // ---- files/raw, files ----
