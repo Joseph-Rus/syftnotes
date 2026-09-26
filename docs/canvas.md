@@ -317,13 +317,15 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
   {"state":"done|exploring|waiting|failed|never","files","when","report"}}]`. `suggested` (only when a class isn't
   linked) is `CourseMatch.Suggest`'s best guess from the school's course list: a shared number ("CS 101" ~
   "COMP 101") or a shared word, one a prefix of the other ("CALC" ~ "Calculus"); it's shown, never linked, by
-  itself. `announcements_new` is currently just unread-on-Canvas (T6's per-student "opened in Study Stash" tracking,
-  `CanvasSeen`, narrows this further once announcements are populated).
+  itself. `announcements_new` is unread-on-Canvas **and** not opened in Study Stash: `CanvasSeen`
+  (`home/canvas_seen.json`) narrows Canvas's own `read_state` further, per student, per class.
 - `GET /api/v2/canvas/due` → `{"synced","to_hand_in","next":item|null,"groups":[{"key","label","items":[item]}]}`
   across every class, groups in order **Overdue** (not done, due before now) / **This week** (due before the eighth
-  day from now) / **Later** / **No due date** / **Handed in** (submitted, graded or excused, most recently
-  submitted-or-graded first, only the last 7 days). `to_hand_in` is the size of the first four groups combined;
-  `next` is the soonest of them that isn't overdue.
+  day from now) / **Later** / **No due date** / **Handed in** (submitted, graded, excused, or marked done in Canvas's
+  own planner though nothing was ever handed in (T6, `item.marked_done`) — most recently
+  submitted/graded/marked-done first, only the last 7 days). `to_hand_in` is the size of the first four groups
+  combined; `next` is the soonest of them that isn't overdue. Canvas's planner also has to-dos with no assignment of
+  their own (an ungraded page or note with a date): kept in `CourseIndex.Todos`, not one of these groups.
 - `GET /api/v2/canvas/assignments?class=` → `{"class","to_hand_in":[item],"done":[item]}` (soonest due first / most
   recently due first). `item` = `{"class","id","name","kind","due","due_at","points","status","label","score",
   "grade","score_text","late","missing","excused","submitted","graded_at","marked_done","url","folder"}`.
@@ -335,7 +337,9 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
   "points","ratings":[{"label","points"}],"mark":{"points","rating","comment"}|null}],"submission":{"state",
   "attempt","submitted_at","graded_at","score","grade","late","points_deducted","body","files":[file],"attempts":
   [{"attempt","submitted_at","late","files":[file]}]}|null,"comments":[{"author","at","text","files":[file],
-  "media_url"}],"quiz":{…}|null (only once T6 fills `CourseIndex.Quizzes`),"spec","feedback"}` — `spec`/`feedback`
+  "media_url"}],"spec","feedback"}` — a graded quiz or discussion doesn't get a separate `"quiz"`/`"discussion"` key:
+  its facts fold straight into `spec.md`'s own fact line ("Quiz · 5 questions · 15 minutes · 2 attempts"), and a
+  discussion's prompt fills `"instructions"` when the assignment has none of its own (T6). `spec`/`feedback`
   are the assignment's own `spec.md`/`feedback.md`, relative to the class's folder, for `/api/v2/files/raw`. `file` =
   `{"id","name","size","content_type","format","local","skipped","url"}`; `format` is derived from the content type
   or the name's extension (module File items save a real one straight on `ModuleItemInfo.Format`; Files-area items
@@ -356,7 +360,10 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
   (`Core/Canvas/CanvasSeen.cs`, `home/canvas_seen.json`) so they stop counting as new even before Canvas itself
   shows them read.
 - `GET /api/v2/canvas/pages?class=` → `{"syllabus":path|null,"front_page":page|null,"pages":[page],"quizzes":[…],
-  "discussions":[…]}`; `page` = `{"title","url","updated_at","local","in_module"}`.
+  "discussions":[…]}`; `page` = `{"title","url","updated_at","local","in_module"}`. `quizzes`/`discussions` here list
+  every one Canvas has, but `local` is only set for a practice/ungraded one (its own `Canvas/quizzes/<title>.md` or
+  `Canvas/discussions/<title>.md`, T6); a graded one folded into an assignment has `local: null` here — its facts are
+  on the assignment instead (see "One assignment" above).
 
 ### Notifications
 
@@ -452,6 +459,45 @@ no outline instead of an empty one), and a renamed or reordered module moves its
 {id}` in the manifest) instead of leaving a duplicate. The Files area (folders, then files, both paged) now fills
 `CourseIndex.Files`/`FilesHidden` the same way. See `CanvasModulesTests.cs`.
 
+### Announcements, quizzes, discussions and the planner (T6), closed
+
+`Crawl.Announcements` used to render `announcements.md` straight off Canvas's raw JSON without ever filling
+`CourseIndex.Announcements` — exactly the modules gap T5 closed, but for announcements: the API and `class_announcements`
+always answered empty against a real sync. T6 fixed it the same way: `Announcements` now builds `AnnouncementInfo` for
+every item (author, posted date, Canvas's own read state, the body converted like a page's, with its file links
+resolved), queues its attachments into `Canvas/announcements/files/`, and `announcements.md` itself is rendered at
+`Render` (once, from the promoted index, like modules.md and spec.md) so its links point at where a file really
+landed. A `CanvasChange("announcement", …)` is said for an id the previous index didn't have — never on a class's
+first sync, matching how a new assignment is only news from the second sync on.
+
+Two new listings, added the same way modules and announcements already were: `quizzes`
+(`/api/v1/courses/{id}/quizzes`, never `/questions`, `/submissions` or `/quiz_submissions`) and `discussions`
+(`/api/v1/courses/{id}/discussion_topics` with no `only_announcements` — never `/entries`, `/view` or `/entry_list`).
+A quiz or discussion Canvas already folds into an assignment (its `quiz_id`/`discussion_topic_id` was already read
+off the assignment itself, T3) gets no `Canvas/quizzes/`or `Canvas/discussions/` file of its own: its facts (question
+count, time limit, attempts) or prompt are added straight into that assignment's `spec.md` instead
+(`CanvasMarkdown.Spec`'s new `quiz`/`discussion` parameters); an ungraded one gets its own file, and `Local` is set
+on the index *before* it's saved (`SetLocalPaths`, since `Render` — which does the actual writing — only runs after
+the index is promoted and saved) so the API can link to it from the moment the sync finishes.
+
+Canvas's planner is one request for every linked class together (`/api/v1/planner/items?context_codes[]=course_…`
+repeated, `start_date`/`end_date` a wide window around today): `Planner` sorts each item back to its class by
+`course_id` (a small `course id → class` map built at `Start`), an `assignment` item with `planner_override.
+marked_complete` becomes `Assignment.MarkedDone`/`MarkedDoneAt` (applied to the promoted index by `ApplyPlanner`,
+which — like `Submissions`'s section-independence — only overwrites what the planner listing itself read this sync,
+keeping the previous value when it didn't), anything else with a date becomes a `TodoInfo`, and a `calendar_event`
+is dropped (not coursework). `Assignment.Done` now also asks `MarkedDone`, so a student's own tick in Canvas moves
+work to the Due list's Handed-in group even though nothing was ever submitted — the moment it happened
+(`MarkedDoneAt`) sorts it there the same way a submission or a grade would. See `CanvasAnnouncementTests.cs`,
+`CanvasDueTests.cs`.
+
+One test-harness wrinkle worth knowing: Canvas answers announcements and real discussions at the *same* path
+(`only_announcements=true` is what tells them apart), but `FakeCanvas` routes by path alone. `FakeCanvas.Key` now
+special-cases `discussion_topics` without that flag onto its own internal key (`DiscussionsRoute`, never a real
+Canvas URL) so a fixture can answer the two differently; `Pages()` (paginating a listing across several fake
+responses) keeps `only_announcements=true` on every page's constructed `Link` header for the same reason, the way
+Canvas's own header would repeat the whole original query.
+
 ## Testing
 
 Nothing here ever contacts a real Canvas. `engine/tests/StudyStash.Core.Tests/FakeCanvas.cs` stands in for Canvas
@@ -468,5 +514,10 @@ COMP 101's) and reads the JSON API in this document back through a real `TestSit
 classes list (including a suggested, unlinked course), the cross-class Due list, one class's to-hand-in/done split,
 one assignment's rubric marks and the grader's comment, modules/files/announcements' shape, notifications (due soon,
 marking seen), a raw file download, and the old keys `GET /api/v2/canvas` and `GET /api/v2/assignments` still
-answer. Tests fix the clock at the design's "now", Thu 25 Sep 2025,
+answer. `CanvasAnnouncementTests` covers announcements read newest-first with an attachment saved, an announcement
+that's only news from its second sync on, a practice quiz's facts with no forbidden request ever made for its
+questions, and a discussion topic whose file never carries another student's reply (`cs101-discussion-entries.json`
+is registered but never asked for). `CanvasDueTests` covers an assignment marked done in the planner (moved to
+Handed in, kept even when a later sync's planner listing fails) and a planner to-do with no assignment of its own
+(`CourseIndex.Todos`), with calendar events dropped. Tests fix the clock at the design's "now", Thu 25 Sep 2025,
 10:24 in California (`2025-09-25T17:24:00Z`), and never assert times in the machine's own zone. Made-up people only.
