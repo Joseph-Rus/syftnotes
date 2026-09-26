@@ -147,4 +147,29 @@ public static class CanvasFrames
         }
         return row;
     }
+
+    /// <summary>Design 12: a 360-wide card standing in for the dropdown/flyout's own chrome, holding only our
+    /// <c>MacNextDue</c>/<c>WinNextDue</c> line — the dropdown itself is WS2/WS6's, so this is just enough of its
+    /// look for the line to sit somewhere plausible.</summary>
+    public static Control MacDropdownLine(Control content)
+    {
+        content.VerticalAlignment = VerticalAlignment.Top;
+        var card = new Border { Width = 360, Padding = new Thickness(16), Child = content, ClipToBounds = false, CornerRadius = new CornerRadius(22) };
+        card.Bind(Border.BackgroundProperty, card.GetResourceObservable("Glass"));
+        card.Bind(Border.BoxShadowProperty, card.GetResourceObservable("GlassShadow"));
+        return card;
+    }
+
+    public static Control WinDropdownLine(Control content)
+    {
+        content.VerticalAlignment = VerticalAlignment.Top;
+        var card = new Border
+        {
+            Width = 360, Padding = new Thickness(16), Child = content, ClipToBounds = false, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
+        };
+        card.Bind(Border.BackgroundProperty, card.GetResourceObservable("Acrylic"));
+        card.Bind(Border.BorderBrushProperty, card.GetResourceObservable("FlyStroke"));
+        card.Bind(Border.BoxShadowProperty, card.GetResourceObservable("ShadowLg"));
+        return card;
+    }
 }

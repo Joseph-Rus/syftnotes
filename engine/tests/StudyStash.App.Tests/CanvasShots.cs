@@ -2,7 +2,9 @@ using System.Net.Http;
 using System.Text.Json;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Layout;
 using Avalonia.LogicalTree;
+using Avalonia.Media;
 using Avalonia.Styling;
 using StudyStash.App;
 using StudyStash.App.Controls;
@@ -177,5 +179,77 @@ public class CanvasShots
         Shot.Take("win-07-canvas-connect-signed-out", SkinKind.Win, ThemeVariant.Light, () => CanvasFrames.WinSetup(new WinCanvasConnect { DataContext = signedOut }));
         Shot.Take("win-07-canvas-connect-match", SkinKind.Win, ThemeVariant.Light, () => CanvasFrames.WinSetup(new WinCanvasConnect { DataContext = match }));
         Shot.Take("win-07-canvas-connect-syncing", SkinKind.Win, ThemeVariant.Light, () => CanvasFrames.WinSetup(new WinCanvasConnect { DataContext = syncing }));
+    }
+
+    // ---- design 12: next due, the quick panel's Canvas rows, and a notification toast ----
+
+    static CanvasApi.NotificationRow Notification(long id, string kind, string title, string text) =>
+        new() { Id = id, Kind = kind, Title = title, Text = text, At = CanvasFixtures.Now };
+
+    /// <summary>The design's own three example toasts: the first expanded with its buttons, the rest collapsed —
+    /// exactly what the gallery in "Canvas Quick.html" draws, not a live poll's own ordering (see
+    /// <see cref="CanvasNotifier"/> for that).</summary>
+    static CanvasToastModel[] ToastGallery() =>
+    [
+        new(Notification(1, "new_assignment", "New assignment", "CS 101 · Lab 3 · due Tue 11:59 PM")) { When = "now", Expanded = true },
+        new(Notification(2, "due_moved", "Due date moved", "CALC II · Quiz 3 practice · now Fri 9:00 AM")) { When = "now" },
+        new(Notification(3, "new_score", "New score", "CS 101 · Problem set 4 · 18/20")) { When = "now" },
+    ];
+
+    static readonly string[] DotClasses = ["CS 101", "BIO 110", "CALC II", "HIST 210"];
+
+    static IBrush DotOf(string cls) => Skin.ClassDot(Array.IndexOf(DotClasses, cls) is var i && i >= 0 ? i : 0);
+
+    static QuickModel QuickWithDue()
+    {
+        var due = CanvasFixtures.Load<CanvasApi.DueResponse>("due");
+        var state = CanvasFixtures.Load<CanvasApi.State>("state-connected");
+        var q = new QuickModel { Query = "due" };
+        foreach (var row in CanvasQuick.Rows(due, state, "due", CanvasFixtures.Zone, CanvasFixtures.Now, DotOf, _ => { }, () => { }, () => { }))
+            q.Rows.Add(row);
+        q.SelectFirst();
+        return q;
+    }
+
+    [AvaloniaFact]
+    public void Mac_dropdown_quick_notify()
+    {
+        var due = CanvasFixtures.Load<CanvasApi.DueResponse>("due");
+        foreach (var t in Themes)
+        {
+            Control? built = null;
+            Shot.Take("mac-12-canvas-dropdown-quick-notify", SkinKind.Mac, t, () =>
+            {
+                var nextDue = CanvasQuick.NextDue(due, CanvasFixtures.Zone, CanvasFixtures.Now, _ => { })!;
+                var toasts = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
+                foreach (var toast in ToastGallery()) toasts.Children.Add(new MacCanvasToast { DataContext = toast });
+                return built = Shot.Side(
+                    CanvasFrames.MacDropdownLine(new MacNextDue { DataContext = nextDue }),
+                    new MacQuick { DataContext = QuickWithDue() },
+                    toasts);
+            });
+            AssertIcons(built!);
+        }
+    }
+
+    [AvaloniaFact]
+    public void Win_dropdown_quick_notify()
+    {
+        var due = CanvasFixtures.Load<CanvasApi.DueResponse>("due");
+        foreach (var t in Themes)
+        {
+            Control? built = null;
+            Shot.Take("win-12-canvas-dropdown-quick-notify", SkinKind.Win, t, () =>
+            {
+                var nextDue = CanvasQuick.NextDue(due, CanvasFixtures.Zone, CanvasFixtures.Now, _ => { })!;
+                var toasts = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
+                foreach (var toast in ToastGallery()) toasts.Children.Add(new WinCanvasToast { DataContext = toast });
+                return built = Shot.Side(
+                    CanvasFrames.WinDropdownLine(new WinNextDue { DataContext = nextDue }),
+                    new WinQuick { DataContext = QuickWithDue() },
+                    toasts);
+            });
+            AssertIcons(built!);
+        }
     }
 }
