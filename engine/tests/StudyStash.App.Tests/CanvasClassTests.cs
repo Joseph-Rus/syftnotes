@@ -119,6 +119,21 @@ public class CanvasClassTests
     }
 
     [Fact]
+    public void The_sections_preview_shows_only_the_current_module_and_the_one_before_it()
+    {
+        var model = Shown();
+        var recent = model.RecentModules;
+        Assert.Equal(2, recent.Count);
+        Assert.Equal("Week 4 · Recursion", recent[0].Name);
+        Assert.True(recent[0].Expanded);
+        Assert.Equal("Week 3 · Scope", recent[1].Name);
+        Assert.False(recent[1].Expanded);
+        // it's the very same node the full Modules list holds, so toggling one moves the other too
+        Assert.Same(model.Modules[3], recent[0]);
+        Assert.Same(model.Modules[2], recent[1]);
+    }
+
+    [Fact]
     public void A_collapsed_module_opens_when_toggled()
     {
         var week3 = Shown().Modules[2];
