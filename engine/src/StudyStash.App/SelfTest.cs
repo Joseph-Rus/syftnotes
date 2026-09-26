@@ -1,19 +1,31 @@
+using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using StudyStash.App.Services;
+using StudyStash.App.ViewModels;
+using StudyStash.Audio;
 using StudyStash.Core;
 
 namespace StudyStash.App;
 
 /// <summary>
-/// STUDYSTASH_SELFTEST=&lt;folder&gt;: the app tries itself, in its real windows. It opens each surface and saves a picture
-/// of it there, records a lecture with the pretend microphone (STUDYSTASH_MIC_FILE), follows it through Whisper to
-/// the library, and writes what happened to selftest.txt; then it quits. For CI, and for trying a build.
+/// STUDYSTASH_SELFTEST=&lt;folder&gt;: the app tries itself, for real, in its own windows. <see cref="Prepare"/> runs
+/// before Avalonia starts: it refuses a bad setup (a missing or unsafe --home, a bad microphone file, the wrong
+/// model), then starts a library and an AI engine of its own (see <see cref="SelfTestEngine"/>) so nothing here ever
+/// reaches the network, Hugging Face, a real Ollama, Canvas or Claude. <see cref="Run"/> then walks the real setup
+/// screens, records a lecture with the pretend microphone, follows it through Whisper to the library and back as
+/// notes, proves the queue and the problem states, pictures every surface, and quits — non-zero on any failure.
 /// </summary>
 public static class SelfTest
 {
     public static string? Dir => Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST") is { Length: > 0 } d ? d : null;
+
+    /// <summary>The self-test's own library, once <see cref="Prepare"/> has started it.</summary>
+    internal static LibraryService? Library { get; private set; }
+    internal static SelfTestEngine? Engine { get; private set; }
+    internal static string? LibraryPassword { get; private set; }
 
     static readonly List<string> said = [];
 
@@ -22,6 +34,104 @@ public static class SelfTest
         said.Add(line);
         Program.Log("[selftest] " + line);
     }
+
+    // --- before Avalonia starts ------------------------------------------------------------------------------------
+
+    /// <summary>Checks the self-test can run at all, and starts its own library and AI engine. Returns an exit code
+    /// for <see cref="Program.Main"/> to return at once (refusing to start the app), or null to carry on.</summary>
+    public static int? Prepare(string home)
+    {
+        if (Dir is null) return null;
+        Directory.CreateDirectory(Dir);
+        string? why = CheckHome(home);
+        if (why is null && (Environment.GetEnvironmentVariable("STUDYSTASH_MIC_FILE") is not { Length: > 0 } mic || !IsReadableWav(mic)))
+            why = "STUDYSTASH_MIC_FILE must be set to a readable WAV file";
+        if (why is null && (Environment.GetEnvironmentVariable("STUDYSTASH_WHISPER_MODEL") is not { Length: > 0 } model || !IsTinyModel(model)))
+            why = "STUDYSTASH_WHISPER_MODEL must be a path to the tiny model, matching its SHA-256";
+        if (why is not null)
+        {
+            File.WriteAllLines(Path.Combine(Dir, "selftest.txt"), [$"FAILED prepare: {why}", "failed"]);
+            return 2;
+        }
+        string modelPath = Environment.GetEnvironmentVariable("STUDYSTASH_WHISPER_MODEL")!;
+        try
+        {
+            Directory.CreateDirectory(home);
+            StartEnginesAsync(home, modelPath).GetAwaiter().GetResult();
+        }
+        catch (Exception e)
+        {
+            File.WriteAllLines(Path.Combine(Dir, "selftest.txt"), [$"FAILED prepare: couldn't start the self-test's own library: {e.Message}", "failed"]);
+            return 2;
+        }
+        // The file we validated becomes the mirror's copy; from here on the app downloads "tiny" like a real model,
+        // from our own engine instead of Hugging Face.
+        Environment.SetEnvironmentVariable("STUDYSTASH_WHISPER_MODEL", "tiny");
+        Environment.SetEnvironmentVariable("STUDYSTASH_MODEL_URL", Engine!.Url.TrimEnd('/') + "/models");
+        if (Environment.GetEnvironmentVariable("STUDYSTASH_MIC_SPEED") is not { Length: > 0 }) Environment.SetEnvironmentVariable("STUDYSTASH_MIC_SPEED", "4");
+        return null;
+    }
+
+    static string? CheckHome(string home)
+    {
+        if (string.IsNullOrEmpty(home) || Py.NormPath(home) == Py.NormPath(Configs.DefaultHome)) return "--home must be given, and can't be the default home";
+        if (Directory.Exists(home) && Directory.EnumerateFileSystemEntries(home).Any()) return "--home must be a new, empty folder";
+        return null;
+    }
+
+    static bool IsReadableWav(string path)
+    {
+        try
+        {
+            return File.Exists(path) && Sound.WavSeconds(path) > 0;
+        }
+        catch (Exception e) when (e is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    static bool IsTinyModel(string path) =>
+        File.Exists(path) && new FileInfo(path).Length == WhisperModels.Tiny.Bytes
+        && Convert.ToHexStringLower(SHA256.HashData(File.ReadAllBytes(path))) == WhisperModels.Tiny.Sha256;
+
+    static async Task StartEnginesAsync(string home, string modelPath)
+    {
+        Engine = await SelfTestEngine.StartAsync(modelPath);
+        string libHome = Path.Combine(home, "selftest-library");
+        Directory.CreateDirectory(libHome);
+        int port = SelfTestPorts.FreePair();
+        LibraryPassword = StudyStash.Library.Http.TokenUrlSafe(12);
+        var cfg = new Config(libHome, Path.Combine(libHome, "pool"))
+        {
+            PoolName = "Self-test library",
+            PoolPassword = LibraryPassword,
+            AdminPassword = StudyStash.Library.Http.TokenUrlSafe(12),
+            WebHost = "127.0.0.1",
+            WebPort = port,
+            AutoUpdate = false,
+            OllamaHost = Engine.Url,
+            OllamaModel = "self-test-notes",
+            Classes = [new ClassDef("CS 101"), new ClassDef("BIO 110")],
+        };
+        Directory.CreateDirectory(cfg.PoolDir);
+        Configs.Save(cfg);
+        Library = new LibraryService(libHome, cfg);
+        await Library.StartAsync();
+        if (Library.State is not (LibraryServiceState.Running or LibraryServiceState.Elsewhere))
+            throw new InvalidOperationException(Library.Failure ?? "the library didn't start");
+        Environment.SetEnvironmentVariable("STUDYSTASH_SELFTEST_LIBRARY_PORT", port.ToString());
+    }
+
+    /// <summary>Both stopped, wherever the run got to: a second run needs a clean slate, and nothing is left holding
+    /// the ports.</summary>
+    static async Task StopEnginesAsync()
+    {
+        if (Library is not null) await Library.StopAsync();
+        if (Engine is not null) await Engine.DisposeAsync();
+    }
+
+    // --- pictures and waiting ----------------------------------------------------------------------------------------
 
     static void Shot(Window? w, string name)
     {
@@ -35,7 +145,7 @@ public static class SelfTest
         bmp.Render(w);
         using var f = File.Create(Path.Combine(Dir!, name + ".png"));
         bmp.Save(f, PngBitmapEncoderOptions.Default);
-        Say($"{name}: {w.Bounds.Width:0}×{w.Bounds.Height:0} at {w.Position}");
+        Say($"{name}: {w.Bounds.Width:0}×{w.Bounds.Height:0} at {w.Position} (scale {w.RenderScaling:0.0#})");
     }
 
     static async Task Wait(double seconds) => await Task.Delay(TimeSpan.FromSeconds(seconds));
@@ -47,13 +157,28 @@ public static class SelfTest
         return done();
     }
 
+    /// <summary>Opens the dropdown the way the icon would, takes its picture under <paramref name="name"/>, and
+    /// hides it again.</summary>
+    static async Task PanelShot(string name)
+    {
+        Shell.Windows.OpenPanelViaIcon();
+        await Wait(0.5);
+        Shot(Shell.Windows.Panel, name);
+        Shell.Windows.Panel?.Hide();
+    }
+
+    // --- running it ----------------------------------------------------------------------------------------------
+
     public static void Run() => Dispatcher.UIThread.Post(async () =>
     {
         Directory.CreateDirectory(Dir!);
         int code = 0;
         try
         {
-            await Script();
+            var script = Script();
+            if (await Task.WhenAny(script, Task.Delay(TimeSpan.FromMinutes(8))) != script)
+                throw new TimeoutException("the self-test ran past 8 minutes");
+            await script;
             Say("ok");
         }
         catch (Exception e)
@@ -62,94 +187,218 @@ public static class SelfTest
             code = 1;
         }
         await File.WriteAllLinesAsync(Path.Combine(Dir!, "selftest.txt"), said);
+        await StopEnginesAsync();
         Shell.Quit(code);
     });
 
     static async Task Script()
     {
         var host = Shell.Host;
-        Say($"skin {Skin.Current}, model ready {host.ModelReady}, library {host.Library}");
-        await Wait(1.5);
-        Shot(Shell.Windows.Setup, "setup");
-        host.Save(s => s.SetupDone = true);
-        Shell.Windows.Setup?.Close();
+        Say($"skin {Skin.Current}, home {host.Home}");
+        await RunSetupAsync(host);
+        await RunRecordingAsync(host);
+        await RunProblemsAsync(host);
+        await RunSettingsAsync();
+    }
 
-        Shell.ShowLibrary();
-        await Until(() => host.Library != Services.LibraryState.NotSetUp || host.Client().ServerUrl.Length == 0, 10);
-        await Wait(2);
-        Shot(Shell.Windows.Main, "library");
-        if (Shell.HasDue)
+    // --- setup -------------------------------------------------------------------------------------------------------
+
+    static async Task RunSetupAsync(AppHost host)
+    {
+        bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
+        Say(opened ? "setup opened" : "setup didn't open");
+        var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
+
+        // Microphone: the pretend mic is already "allowed", so the level check should hear the looped fixture.
+        bool heard = await Until(() => m.MicHeard, 10);
+        Say(heard ? "microphone heard" : "microphone: nothing heard in 10 s");
+        Shot(Shell.Windows.Setup, "setup-microphone");
+        m.NextCommand.Execute(null);
+
+        // Library: find it (our own, on its own port, never 8787), a wrong password, then the right one.
+        await m.FindCommand.ExecuteAsync(null);
+        Say($"find: {m.LibraryResult}");
+        Shot(Shell.Windows.Setup, "setup-library-found");
+
+        m.Password = "not-the-password";
+        await m.ConnectCommand.ExecuteAsync(null);
+        Say($"wrong password: {m.LibraryResult}");
+        Shot(Shell.Windows.Setup, "setup-library-wrong-password");
+
+        m.Password = LibraryPassword ?? "";
+        await m.ConnectCommand.ExecuteAsync(null);
+        Say($"connect: {m.LibraryResult}");
+        Shot(Shell.Windows.Setup, "setup-library");
+        if (!m.LibraryOk) throw new InvalidOperationException("setup couldn't connect to the self-test's library");
+        m.NextCommand.Execute(null);
+
+        // Model: entering the step starts the download from our own mirror (never Hugging Face).
+        bool downloading = await Until(() => m.ModelProgress is > 0.05 and < 0.95, 20);
+        Say(downloading ? $"model downloading: {m.ModelDone} {m.ModelLeft}" : "model: no progress seen in 20 s");
+        Shot(Shell.Windows.Setup, "setup-model-downloading");
+        bool ready = await Until(() => m.ModelReady, 60);
+        Say(ready ? "model ready" : $"model: not ready in 60 s ({m.ModelProblem})");
+        Shot(Shell.Windows.Setup, "setup-model-ready");
+        if (!ready) throw new InvalidOperationException("the model never finished downloading");
+        m.NextCommand.Execute(null);
+
+        // Classes: CS 101, with a time covering right now, so recording follows the timetable straight to it.
+        var now = DateTime.Now;
+        var end = now.AddMinutes(80);
+        var midnight = now.Date.AddDays(1).AddSeconds(-1);
+        if (end > midnight) end = midnight;
+        m.NewClass = "CS 101";
+        string when = m.NewWhen = $"{Day(now.DayOfWeek)} {now.AddMinutes(-10):HH:mm}-{end:HH:mm}";
+        await m.AddClassCommand.ExecuteAsync(null);
+        Say(m.ClassProblem is null ? $"class added: {when}" : $"class problem: {m.ClassProblem}");
+        Shot(Shell.Windows.Setup, "setup-classes");
+        if (m.ClassProblem is not null) throw new InvalidOperationException(m.ClassProblem);
+        m.NextCommand.Execute(null);
+
+        if (m.OnTaskbar)
         {
-            await Shell.ShowDuePublic();
-            await Wait(2);
-            Shot(Shell.Windows.Main, "library-due");
+            Shot(Shell.Windows.Setup, "setup-taskbar");
+            m.NextCommand.Execute(null);
         }
 
-        // STUDYSTASH_SELFTEST_ASK: ask the library's AI in the full app, and picture the answer.
-        if (Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_ASK") is { Length: > 0 } question)
-        {
-            var asking = Shell.AskForSelfTest(question);
-            bool answered = await Until(() => asking.IsCompleted, 120);
-            await Wait(1);
-            Say(answered ? $"answered: {Py.Head(Shell.AnswerForSelfTest ?? "", 120)}" : "no answer in 120 s");
-            Shot(Shell.Windows.Main, "library-answer");
-        }
-
-        Shell.Windows.TogglePanel();
+        // Finish: role stays Laptop (we never picked "this computer"); no login item is touched (the box is unticked).
+        m.NextCommand.Execute(null);
+        bool closed = await Until(() => Shell.Windows.Setup is null, 10);
+        Say(closed ? $"setup finished: role {host.Settings.Role}, setup done {host.Settings.SetupDone}" : "setup: the window never closed");
         await Wait(1);
-        Shot(Shell.Windows.Panel, "panel-idle");
-        Shell.Windows.Panel?.Hide();
+        Shot(Shell.Windows.Main, "library-empty");
+    }
 
-        Shell.Windows.ToggleQuick();
-        await Wait(1);
-        Shot(Shell.Windows.Quick, "quick");
-        Shell.Windows.Quick?.Hide();
+    static string Day(DayOfWeek d) => d switch
+    {
+        DayOfWeek.Monday => "Mon", DayOfWeek.Tuesday => "Tue", DayOfWeek.Wednesday => "Wed", DayOfWeek.Thursday => "Thu",
+        DayOfWeek.Friday => "Fri", DayOfWeek.Saturday => "Sat", _ => "Sun",
+    };
 
-        Shell.ShowSettings();
-        await Wait(1);
-        Shot(Shell.Windows.Settings, "settings");
-        foreach (string section in new[] { "AI", "Canvas" })
-        {
-            if ((Shell.Windows.Settings?.Content as Control)?.DataContext is not Services.SettingsModel sm) break;
-            sm.Section = section;
-            await Wait(2);
-            Shot(Shell.Windows.Settings, "settings-" + section.ToLowerInvariant());
-        }
-        Shell.Windows.Settings?.Close();
+    // --- recording -----------------------------------------------------------------------------------------------
 
-        if (!host.ModelReady)
-        {
-            Say("no model: recording skipped");
-            return;
-        }
-        Shell.Windows.Record();
+    static async Task RunRecordingAsync(AppHost host)
+    {
+        await PanelShot("panel-idle");
+        Say($"panel: {Shell.Windows.PanelModel.RecordLabel} — {Shell.Windows.PanelModel.Hint}");
+
+        Shell.Windows.RecordViaShortcut();
         var live = host.Recorder.Current;
-        Say(live is null ? "recording didn't start" : $"recording {live.Id}");
-        if (live is null) return;
-        await Wait(2);
+        Say(live is null ? "recording didn't start" : $"recording {live.Id} for {live.ClassName}");
+        if (live is null) throw new InvalidOperationException("Record didn't start a lecture");
+        await Wait(1.5);
         Shot(Shell.Windows.Recorder, "recorder-pill");
-        Shell.Windows.Panel?.Hide();
-        Shell.Windows.TogglePanel();
-        await Wait(1);
-        Shot(Shell.Windows.Panel, "panel-recording");
-        Shell.Windows.Panel?.Hide();
-        // Whisper takes a piece every 20 to 30 seconds while it records.
-        bool heard = await Until(() => host.Lectures.Get(live.Id)?.Segments.Count > 0, 60);
-        Say(heard ? $"heard: {host.Lectures.Get(live.Id)!.Segments[0].Text}" : "heard nothing in 60 s");
+
+        Shell.Windows.TogglePause();
+        await Wait(0.5);
+        Shot(Shell.Windows.Recorder, "recorder-paused");
+        Shell.Windows.TogglePause();
+
+        await PanelShot("panel-recording");
+
+        // Keep recording until there's enough transcript for the notes engine to bother with, or 300 s of audio.
+        bool enough = await Until(() => host.Lectures.Get(live.Id)?.Transcript().Length >= 1600 || (host.Recorder.Current?.Seconds ?? 0) >= 300, 300);
+        var l = host.Lectures.Get(live.Id);
+        Say(enough ? $"heard {l?.Transcript().Length} characters" : $"only heard {l?.Transcript().Length ?? 0} characters in time");
         Shell.Windows.ShowRecorder(expanded: true);
         await Wait(1);
         Shot(Shell.Windows.Recorder, "recorder-expanded");
+
         Shell.Windows.StopRecording();
-        bool done = await Until(() => host.Lectures.Get(live.Id)?.State is LectureState.Sending or LectureState.Writing or LectureState.Filed or LectureState.Failed, 120);
-        var l = host.Lectures.Get(live.Id);
+        bool transcribed = await Until(() => host.Lectures.Get(live.Id)?.State is LectureState.Sending or LectureState.Writing or LectureState.Filed or LectureState.Failed, 120);
+        l = host.Lectures.Get(live.Id);
         Say($"after stopping: {l?.State} ({l?.Segments.Count} lines, {TimedText.Clock(l?.Seconds ?? 0)})");
-        if (done && host.Client().ServerUrl.Length > 0)
-        {
-            bool filed = await Until(() => host.Lectures.Get(live.Id)?.State is LectureState.Filed or LectureState.Failed, 90);
-            Say($"library: {host.Lectures.Get(live.Id)?.State} in '{host.Lectures.Get(live.Id)?.FiledClass}'");
-        }
-        Shell.Windows.TogglePanel();
+        if (!transcribed) throw new InvalidOperationException("Whisper never finished the lecture");
+
+        bool filed = await Until(() => host.Lectures.Get(live.Id)?.State is LectureState.Filed or LectureState.Failed, 180);
+        l = host.Lectures.Get(live.Id);
+        Say(filed && l?.State == LectureState.Filed ? $"filed in '{l.FiledClass}'" : $"not filed: {l?.State} {l?.Error}");
+        Say($"the self-test's engine saw {Engine!.SortRequests} sort request(s) and {Engine.NotesRequests} notes request(s)");
+        if (l?.State != LectureState.Filed) throw new InvalidOperationException("the lecture was never filed");
+
+        Shell.ShowLibrary();
+        await Wait(1.5);
+        Shell.Windows.OpenLecture(live.Id);
         await Wait(1);
-        Shot(Shell.Windows.Panel, "panel-after");
+        Shot(Shell.Windows.Main, "library-note");
+        Shell.Windows.OpenLecture(live.Id, transcript: true);
+        await Wait(1);
+        Shot(Shell.Windows.Main, "library-transcript");
+
+        Shell.Windows.ToggleQuick();
+        await Shell.Windows.Search("midterm");
+        await Wait(1);
+        Shot(Shell.Windows.Quick, "quick-search");
+        Say($"quick search 'midterm': {Shell.Windows.QuickModel.Rows.Count} row(s)");
+        Shell.Windows.Quick?.Hide();
+    }
+
+    // --- problems: the library goes away, and comes back --------------------------------------------------------
+
+    static async Task RunProblemsAsync(AppHost host)
+    {
+        await Library!.StopAsync();
+        bool gone = await Until(() => host.Library != LibraryState.Connected, 30);
+        Say(gone ? $"library stopped: {host.Library}" : "library: still says Connected 30 s after stopping it");
+        await PanelShot("panel-library-unreachable");
+
+        Shell.Windows.RecordViaShortcut();
+        var waiting = host.Recorder.Current;
+        if (waiting is not null)
+        {
+            await Wait(2); // ~8 s of audio at 4x speed
+            Shell.Windows.StopRecording();
+            await Wait(1);
+            var wl = host.Lectures.Get(waiting.Id);
+            Say($"recorded while the library was down: {wl?.State}");
+            await PanelShot("panel-waiting");
+        }
+        else
+        {
+            Say("couldn't record while the library was down (model or mic problem)");
+        }
+
+        await Library.StartAsync();
+        bool back = await Until(() => host.Library == LibraryState.Connected, 30);
+        Say(back ? "library reachable again" : "library: didn't reconnect in 30 s");
+        if (waiting is not null)
+        {
+            bool waitingFiled = await Until(() => host.Lectures.Get(waiting.Id)?.State == LectureState.Filed, 120);
+            Say(waitingFiled ? "the waiting lecture was filed once the library answered" : $"the waiting lecture stayed {host.Lectures.Get(waiting.Id)?.State}");
+        }
+
+        // A changed password: the library says so, and setting it right again in Settings would fix it (not
+        // exercised here — Settings' library section is a WS4/WS1 screen).
+        await Library.StopAsync();
+        var cfg = Library.Cfg;
+        cfg.PoolPassword = "a-different-password";
+        Configs.Save(cfg);
+        await Library.StartAsync();
+        bool wrongPw = await Until(() => host.Library == LibraryState.WrongPassword, 30);
+        Say(wrongPw ? "password change noticed" : $"password change: library says {host.Library}");
+        await PanelShot("panel-wrong-password");
+
+        await Library.StopAsync();
+        cfg.PoolPassword = LibraryPassword ?? "";
+        Configs.Save(cfg);
+        await Library.StartAsync();
+        bool restored = await Until(() => host.Library == LibraryState.Connected, 30);
+        Say(restored ? "password restored, connected again" : $"password restore: library says {host.Library}");
+    }
+
+    // --- settings ------------------------------------------------------------------------------------------------
+
+    static async Task RunSettingsAsync()
+    {
+        Shell.ShowSettings();
+        await Wait(1);
+        Shot(Shell.Windows.Settings, "settings-library");
+        if ((Shell.Windows.Settings?.Content as Control)?.DataContext is SettingsModel sm)
+        {
+            sm.Section = "Recording";
+            await Wait(1);
+            Shot(Shell.Windows.Settings, "settings-recording");
+        }
+        Shell.Windows.Settings?.Close();
     }
 }

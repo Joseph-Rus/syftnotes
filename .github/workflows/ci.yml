@@ -210,14 +210,30 @@ jobs:
         run: |
           sh macos/build-app.sh arm64 dist/arm64
           sh macos/build-app.sh x64 dist/x64
-      - name: It opens its windows and tries each one (no library, so setup first)
+      # Whisper's smallest model: the self-test's own library and AI engine use it, never Hugging Face at run time.
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/whisper
+          key: whisper-ggml-tiny-v1
+      - name: Whisper tiny, for the self-test
+        run: |
+          mkdir -p "$RUNNER_TEMP/whisper"
+          [ -f "$RUNNER_TEMP/whisper/ggml-tiny.bin" ] || curl -fsSL -o "$RUNNER_TEMP/whisper/ggml-tiny.bin" \
+            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+      - name: It sets up, records, transcribes, files and reads back a lecture (SelfTest.cs)
         run: |
           APP="dist/arm64/Study Stash.app"
           codesign --verify --deep "$APP"
-          STUDYSTASH_SELFTEST="$RUNNER_TEMP/selftest" "$APP/Contents/MacOS/StudyStash" --home "$RUNNER_TEMP/none" &
-          for i in $(seq 1 90); do [ -f "$RUNNER_TEMP/selftest/selftest.txt" ] && break; sleep 1; done
-          cat "$RUNNER_TEMP/selftest/selftest.txt"
-          tail -1 "$RUNNER_TEMP/selftest/selftest.txt" | grep -qx ok
+          STUDYSTASH_SELFTEST="$RUNNER_TEMP/selftest" \
+            STUDYSTASH_WHISPER_MODEL="$RUNNER_TEMP/whisper/ggml-tiny.bin" \
+            STUDYSTASH_MIC_FILE="$PWD/engine/tests/StudyStash.Core.Tests/Fixtures/speech.wav" \
+            "$APP/Contents/MacOS/StudyStash" --home "$RUNNER_TEMP/none" &
+          pid=$!
+          for i in $(seq 1 480); do kill -0 "$pid" 2>/dev/null || break; sleep 1; done
+          if kill -0 "$pid" 2>/dev/null; then kill "$pid" 2>/dev/null; echo "the self-test ran past 480 s"; exit 1; fi
+          wait "$pid"; code=$?
+          cat "$RUNNER_TEMP/selftest/selftest.txt" || true
+          [ "$code" -eq 0 ] && [ "$(tail -1 "$RUNNER_TEMP/selftest/selftest.txt")" = "ok" ]
       - name: Name the DMGs for the release
         run: |
           mkdir -p out
@@ -252,15 +268,31 @@ jobs:
           $out = "dist\Study Stash"
           dotnet publish engine\src\StudyStash.App -c Release -r win-x64 --self-contained true -p:DebugType=None -o $out
           Get-ChildItem "$out\runtimes" -Directory | Where-Object { $_.Name -notin @("win-x64", "vulkan") } | Remove-Item -Recurse -Force
-      - name: It opens its windows and tries each one (no library, so setup first)
+      # Whisper's smallest model: the self-test's own library and AI engine use it, never Hugging Face at run time.
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/whisper
+          key: whisper-ggml-tiny-v1
+      - name: Whisper tiny, for the self-test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\whisper" | Out-Null
+          $model = "$env:RUNNER_TEMP\whisper\ggml-tiny.bin"
+          if (-not (Test-Path $model)) {
+            Invoke-WebRequest -Uri "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin" -OutFile $model
+          }
+      - name: It sets up, records, transcribes, files and reads back a lecture (SelfTest.cs)
         shell: pwsh
         run: |
           $env:STUDYSTASH_SELFTEST = "$env:RUNNER_TEMP\selftest"
+          $env:STUDYSTASH_WHISPER_MODEL = "$env:RUNNER_TEMP\whisper\ggml-tiny.bin"
+          $env:STUDYSTASH_MIC_FILE = "$pwd\engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav"
           $p = Start-Process -FilePath "dist\Study Stash\StudyStash.exe" -ArgumentList "--home", "$env:RUNNER_TEMP\none" -PassThru
           $f = "$env:STUDYSTASH_SELFTEST\selftest.txt"
-          for ($i = 0; $i -lt 90 -and -not (Test-Path $f); $i++) { Start-Sleep 1 }
-          if (-not (Test-Path $f)) { Stop-Process -Id $p.Id -ErrorAction SilentlyContinue; throw "no self-test in 90 s" }
-          Get-Content $f
+          $finished = $p.WaitForExit(480000)
+          if (-not $finished) { Stop-Process -Id $p.Id -ErrorAction SilentlyContinue; throw "the self-test ran past 480 s" }
+          if (Test-Path $f) { Get-Content $f }
+          if ($p.ExitCode -ne 0) { throw "the self-test exited $($p.ExitCode)" }
           if ((Get-Content $f | Select-Object -Last 1) -ne "ok") { throw "the self-test failed" }
       - name: Zip it
         shell: pwsh

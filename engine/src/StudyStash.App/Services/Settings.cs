@@ -78,6 +78,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string Password { get; set; } = "";
     [ObservableProperty] public partial string? LibrarySay { get; set; }
     [ObservableProperty] public partial bool LibraryHere { get; set; }
+    /// <summary>How this computer's own library is doing (Both/Library roles only): running, starting, stopped,
+    /// already running from elsewhere, its port taken, or why it stopped.</summary>
+    [ObservableProperty] public partial string LibraryServiceLine { get; set; } = "";
     [ObservableProperty] public partial string DisplayName { get; set; } = "";
 
     // Recording
@@ -87,6 +90,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool ComputerAudio { get; set; }
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
     [ObservableProperty] public partial bool Shortcuts { get; set; }
+    /// <summary>Which shortcut (if either) another app already has, once the toggle's had a moment to try them.</summary>
+    [ObservableProperty] public partial string? ShortcutsSay { get; set; }
     public bool CanRecordComputerAudio => host.CanRecordComputerAudio;
 
     // Classes
@@ -133,6 +138,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public bool OnGeneral => Section == "General";
     public bool HasWebUrl => !string.IsNullOrEmpty(WebUrl);
     public bool HasConnections => Connections.Count > 0;
+    /// <summary>This computer's own library isn't running (or couldn't), and its role calls for one.</summary>
+    public bool CanStartLibrary => host.Settings.Role != AppRole.Laptop
+        && host.LocalLibrary?.State is null or LibraryServiceState.Stopped or LibraryServiceState.Failed or LibraryServiceState.PortTaken;
+    /// <summary>This computer's own library is ours to stop (started by us, not one already running elsewhere).</summary>
+    public bool CanStopLibrary => host.LocalLibrary?.State == LibraryServiceState.Running;
 
     public static SettingsModel Make(AppHost host) => new(host);
 
@@ -156,7 +166,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Shortcuts = host.Settings.Shortcuts;
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
         ClaudeCommand = claude.ClaudeCodeCommand;
-        foreach (var m in WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id))
+        // Whisper tiny is only for trying things out: listed only when it's the one in use.
+        foreach (var m in WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == host.Model.Id))
             Models.Add(new ModelChoice { Model = m, Chosen = m.Id == host.Model.Id, Here = WhisperModels.IsDownloaded(host.Home, m) });
         foreach (var c in host.Timetable.Classes)
             Rows.Add(new TimetableRow { Name = c.Name, Times = string.Join(", ", c.Times.Select(t => t.Describe())), Dot = Skin.ClassDot(Math.Max(0, host.ColorOf(c.Name))) });
@@ -182,18 +193,41 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         {
             LibraryState.Connected when host.OlderLibrary => $"Connected to {cc.PoolName}. It runs an older Study Stash: update it to browse, search and ask from here.",
             LibraryState.Connected => $"Connected to {cc.PoolName} at {cc.ServerUrl}.",
+            LibraryState.Starting => "Starting your library…",
             LibraryState.Unreachable => $"Can't reach {cc.ServerUrl} right now. Lectures wait here until it's back.",
             LibraryState.WrongPassword => "The library's password changed. Type the new one below.",
             _ => "No library yet.",
         };
-        ModelLine = host.ModelReady ? $"{host.Model.Name} is ready."
-            : host.Downloading is { } d ? $"Downloading {host.Model.Name}: {Math.Round(d.Fraction * 100)}%. {d.Left()}"
-            : host.DownloadProblem ?? $"{host.Model.Name} isn't downloaded yet.";
+        string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
+        LibraryServiceLine = host.Settings.Role == AppRole.Laptop ? "" : host.LocalLibrary?.State switch
+        {
+            LibraryServiceState.Running => $"Your library runs on this {device}, on port {host.LocalLibrary.Cfg.WebPort}.",
+            LibraryServiceState.Starting => "Starting your library…",
+            LibraryServiceState.Elsewhere => $"A library is already running on this {device}.",
+            LibraryServiceState.PortTaken => host.LocalLibrary.Failure ?? "Its port is taken by another program.",
+            LibraryServiceState.Failed => $"It stopped: {host.LocalLibrary.Failure}",
+            _ => "Stopped.",
+        };
+        OnPropertyChanged(nameof(CanStartLibrary));
+        OnPropertyChanged(nameof(CanStopLibrary));
+        ShortcutsSay = Shell.ShortcutsSay();
+        ModelLine = ModelWords(host);
         foreach (var m in Models)
         {
             m.Chosen = m.Model.Id == host.Model.Id;
             m.Here = WhisperModels.IsDownloaded(host.Home, m.Model);
         }
+    }
+
+    /// <summary>Settings → Recording's line about the model: ready, "Downloading Whisper large-v3: 1.9 GB of 3.1 GB.
+    /// About 4 minutes left.", why the download stopped, or not downloaded yet.</summary>
+    public static string ModelWords(AppHost host)
+    {
+        if (host.ModelReady) return $"{host.Model.Name} is ready.";
+        if (host.DownloadProblem is { } problem) return problem;
+        if (host.Downloading is { } d)
+            return $"Downloading {(host.DownloadingModel ?? host.Model).Name}: {d.Amount}." + (d.Left() is { } left ? $" {left}." : "");
+        return $"{host.Model.Name} isn't downloaded yet.";
     }
 
     partial void OnSectionChanged(string value)
@@ -245,7 +279,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         var cc = host.Client();
         if (cc.DisplayName == value.Trim()) return;
         cc.DisplayName = value.Trim();
-        Configs.SaveClient(cc);
+        host.SaveClient(cc);
     }
 
     [RelayCommand] void Go(string section) => Section = section;
@@ -262,7 +296,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             cc.ServerUrl = url;
             cc.PoolKey = Password.Trim();
             cc.PoolName = health["pool_name"]?.GetValue<string>() ?? "";
-            Configs.SaveClient(cc);
+            host.SaveClient(cc);
             Address = url;
             Password = "";
             LibrarySay = $"Connected to {cc.PoolName}.";
@@ -281,15 +315,49 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         if (cc.ServerUrl.Length > 0) Dialogs.OpenUrl(cc.ServerUrl);
     }
 
+    /// <summary>Start this computer's own library again (after Stop, or a problem such as a taken port).</summary>
+    [RelayCommand]
+    void StartLibrary() => _ = host.RefreshLocalLibraryAsync();
+
+    /// <summary>Stop this computer's own library. Only the one we started or adopted: never a library from elsewhere.</summary>
+    [RelayCommand]
+    async Task StopLibrary()
+    {
+        if (host.LocalLibrary is { } svc) await svc.StopAsync();
+    }
+
+    /// <summary>A plain laptop decides, from Settings, to also run the library on this computer.</summary>
+    [RelayCommand]
+    async Task MakeThisTheLibrary()
+    {
+        LibrarySay = "Starting your library…";
+        try
+        {
+            string done = await Services.LibraryHere.ThisComputer().CreateAsync(host, $"{DisplayName}'s library", StudyStash.Library.Http.TokenUrlSafe(12), DisplayName);
+            LibraryHere = true;
+            LibrarySay = done;
+        }
+        catch (Exception e) when (e is InvalidOperationException or ArgumentException)
+        {
+            LibrarySay = e.Message;
+        }
+    }
+
     [RelayCommand]
     void PickModel(ModelChoice choice)
     {
         host.Save(s => s.Model = choice.Model.Id);
         Refresh();
-        if (!WhisperModels.IsDownloaded(host.Home, choice.Model)) _ = host.DownloadModelAsync(choice.Model);
+        // One already here needs nothing, and a download of another one is no longer wanted.
+        if (WhisperModels.IsDownloaded(host.Home, choice.Model)) host.StopDownload();
+        else _ = host.DownloadModelAsync(choice.Model);
     }
 
+    /// <summary>Download (or try again now).</summary>
     [RelayCommand] void DownloadModel() => _ = host.DownloadModelAsync();
+
+    /// <summary>Whisper couldn't start with the model: throw it away and download it again.</summary>
+    [RelayCommand] void RedownloadModel() => _ = host.RedownloadModel();
 
     [RelayCommand]
     async Task AddClass()

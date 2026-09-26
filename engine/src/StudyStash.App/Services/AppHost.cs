@@ -1,11 +1,21 @@
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using StudyStash.App.Platform;
 using StudyStash.Audio;
 using StudyStash.Core;
 
 namespace StudyStash.App.Services;
+
+/// <summary>What this computer does: record and send lectures (Laptop), also run the library (Both), or only run the
+/// library, with no recording (Library).</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<AppRole>))]
+public enum AppRole
+{
+    Laptop,
+    Both,
+    Library,
+}
 
 /// <summary>The app's own settings (app.json beside client.toml): what's been set up, and how to record.</summary>
 public sealed class AppSettings
@@ -21,8 +31,12 @@ public sealed class AppSettings
     public bool ComputerAudio { get; set; }
     /// <summary>Filed lectures' audio is deleted after this many days (the notes and transcript stay). 0 keeps it.</summary>
     public int KeepAudioDays { get; set; } = 30;
-    /// <summary>This computer is the library too (it runs the library's service).</summary>
-    public bool LibraryHere { get; set; }
+    /// <summary>What this computer is for.</summary>
+    public AppRole Role { get; set; } = AppRole.Laptop;
+    /// <summary>This computer is the library too (Both or Library). Read-only: set <see cref="Role"/> instead. Kept
+    /// for the places that only ask "is it here", such as Settings' binding.</summary>
+    [JsonIgnore]
+    public bool LibraryHere => Role != AppRole.Laptop;
     public bool Shortcuts { get; set; } = true;
     public double? RecorderX { get; set; }
     public double? RecorderY { get; set; }
@@ -35,7 +49,12 @@ public sealed class AppSettings
     {
         try
         {
-            return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(PathIn(home)), Json) ?? new AppSettings();
+            string text = File.ReadAllText(PathIn(home));
+            var settings = JsonSerializer.Deserialize<AppSettings>(text, Json) ?? new AppSettings();
+            // Before roles existed, "library_here": true meant Both; a file with no "role" yet still means that.
+            if (JsonNode.Parse(text) is JsonObject raw && raw["role"] is null && raw["library_here"]?.GetValue<bool>() == true)
+                settings.Role = AppRole.Both;
+            return settings;
         }
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
         {
@@ -56,6 +75,8 @@ public sealed class AppSettings
 public enum LibraryState
 {
     NotSetUp,
+    /// <summary>This computer's own library is starting: not "Can't reach your library" while it does.</summary>
+    Starting,
     Connected,
     Unreachable,
     WrongPassword,
@@ -66,7 +87,7 @@ public enum LibraryState
 /// library's classes (asked for every 20 seconds, which also says whether it's reachable), the model and its
 /// download, and the timetable. The windows read it and are told when it changes.
 /// </summary>
-public sealed class AppHost : IDisposable
+public sealed class AppHost : IDisposable, IProblemSource
 {
     readonly CancellationTokenSource stop = new();
     readonly Action<string> log;
@@ -75,8 +96,15 @@ public sealed class AppHost : IDisposable
     Timer? watchdog;
     int checking;
     KeepAwake? awake;
+    readonly ModelSetting models;
+    readonly HttpClient? http;
+    readonly Func<LibraryService>? localLibrary;
+    // The model download: one at a time, its stop button, and a nudge that ends a wait to try again.
+    readonly Lock downloadLock = new();
     CancellationTokenSource? download;
-    bool disposed;
+    TaskCompletionSource? retryNow;
+    Task downloadTask = Task.CompletedTask;
+    volatile bool disposed;
 
     public string Home { get; }
     public AppSettings Settings { get; private set; }
@@ -87,17 +115,28 @@ public sealed class AppHost : IDisposable
     public Timetable Timetable { get; private set; }
 
     public LibraryState Library { get; private set; } = LibraryState.NotSetUp;
+    /// <summary>This computer's own library, for Both/Library roles: started in <see cref="Start"/>, stopped in
+    /// <see cref="Dispose"/>. Null on a plain laptop.</summary>
+    public LibraryService? LocalLibrary { get; private set; }
     /// <summary>The library is from before /api/v2 (the Python engine): it files lectures, but can't be browsed, searched
     /// or asked from the app until it's updated.</summary>
     public bool OlderLibrary { get; private set; }
     /// <summary>The library's name, classes (in order: their colors) and the rest of /api/v2/library.</summary>
     public JsonObject? Overview { get; private set; }
     public DownloadProgress? Downloading { get; private set; }
+    /// <summary>The model <see cref="Downloading"/> is about.</summary>
+    public WhisperModel? DownloadingModel { get; private set; }
+    /// <summary>Why the model isn't downloading ("Not enough space for …", "The download stopped (no internet?)…").</summary>
     public string? DownloadProblem { get; private set; }
     /// <summary>Why Whisper isn't writing lectures down ("Whisper couldn't start: …"); null while it works.</summary>
     public string? WhisperProblem => Whisper.Problem;
     /// <summary>Why the recording paused by itself (the microphone, the disk); null while all is well.</summary>
     public string? RecorderProblem => Recorder.LastProblem;
+
+    // IProblemSource: Problems.For reads AppHost through these, so a test can hand it a fake instead.
+    AppRole IProblemSource.Role => Settings.Role;
+    LibraryServiceState? IProblemSource.LocalLibraryState => LocalLibrary?.State;
+    string? IProblemSource.LocalLibraryFailure => LocalLibrary?.Failure;
 
     /// <summary>Anything the windows show changed (called on a worker thread).</summary>
     public event Action? Changed;
@@ -114,13 +153,20 @@ public sealed class AppHost : IDisposable
     /// <summary>
     /// The app's engine room for a settings folder. <paramref name="microphone"/> stands in for the microphone; without
     /// one, STUDYSTASH_MIC_FILE (a WAV) does, and only with neither is the real microphone ever opened.
+    /// <paramref name="models"/> is the model the environment asks for (by default, this process's: see
+    /// <see cref="ModelSetting"/>); <paramref name="http"/> downloads it (a test's pretend server).
+    /// <paramref name="localLibrary"/> makes this computer's own library (a test's, on a spare port with no real child).
     /// </summary>
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
-        Action<string>? log = null, ILoginItems? loginItems = null)
+        Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
+        Func<LibraryService>? localLibrary = null)
     {
         Home = home;
         this.log = log ?? (s => Console.WriteLine(s));
         pretendMic = microphone ?? MicFromEnvironment();
+        this.models = models ?? ModelSetting.FromEnvironment();
+        this.http = http;
+        this.localLibrary = localLibrary;
         LoginItems = loginItems ?? Platform.LoginItems.System;
         Directory.CreateDirectory(home);
         Settings = AppSettings.Load(home);
@@ -158,7 +204,38 @@ public sealed class AppHost : IDisposable
     /// <summary>Write a line in the app's log.</summary>
     public void Log(string line) => log(line);
 
-    public ClientConfig Client() => Configs.LoadClient(Home);
+    readonly Lock clientLock = new();
+    ClientConfig? client;
+    DateTime clientReadAt;
+
+    /// <summary>client.toml, read once and kept until the file's own timestamp moves on (someone else wrote it, or
+    /// <see cref="SaveClient"/> did): every tick doesn't need its own trip to disk.</summary>
+    public ClientConfig Client()
+    {
+        string path = Path.Combine(Home, "client.toml");
+        lock (clientLock)
+        {
+            DateTime mtime = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
+            if (client is null || mtime != clientReadAt)
+            {
+                client = Configs.LoadClient(Home);
+                clientReadAt = mtime;
+            }
+            return client;
+        }
+    }
+
+    /// <summary>Write client.toml and keep it as what <see cref="Client"/> hands back, so the app's own save is never
+    /// immediately re-read as if someone else had changed it.</summary>
+    public void SaveClient(ClientConfig cc)
+    {
+        Configs.SaveClient(cc);
+        lock (clientLock)
+        {
+            client = cc;
+            clientReadAt = File.Exists(cc.ConfigPath) ? File.GetLastWriteTimeUtc(cc.ConfigPath) : DateTime.MinValue;
+        }
+    }
 
     // --- the microphone -------------------------------------------------------------------------------------------
     // The only way the app reaches the microphone: with a pretend one (a test, the self-test, STUDYSTASH_MIC_FILE) the
@@ -204,11 +281,12 @@ public sealed class AppHost : IDisposable
         return cc.ServerUrl.Length > 0 ? new RemoteLibrary(cc.ServerUrl, cc.PoolKey) : null;
     }
 
-    public WhisperModel Model => WhisperModels.Find(Settings.Model)
-        ?? WhisperModels.Recommended(Machine.Platform, RuntimeInformation.OSArchitecture, Machine.TotalRamGb());
+    /// <summary>The transcription model: the one the environment names, else the one picked in Settings, else the one
+    /// for this computer (large-v3, or the compact turbo with little memory).</summary>
+    public WhisperModel Model => models.Model ?? WhisperModels.Find(Settings.Model) ?? WhisperModels.Recommended(Machine.TotalRamGb());
 
-    /// <summary>STUDYSTASH_MODEL_FILE: a model file to use instead of the downloaded one (trying the app with a small one).</summary>
-    static string? ModelFile => Environment.GetEnvironmentVariable("STUDYSTASH_MODEL_FILE") is { Length: > 0 } f && File.Exists(f) ? f : null;
+    /// <summary>A model file the environment gives to use as it is (nothing downloads); null normally.</summary>
+    public string? ModelFile => models.File;
 
     public bool ModelReady => ModelFile is not null || WhisperModels.IsDownloaded(Home, Model);
 
@@ -225,6 +303,33 @@ public sealed class AppHost : IDisposable
         running.Add(Task.Run(WatchLibrary));
         running.Add(Task.Run(() => Lectures.PruneAudio(Settings.KeepAudioDays, DateTimeOffset.Now)));
         watchdog = new Timer(_ => CheckRecorder(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        // A download that quitting (or a closed laptop) cut short picks up where it stopped. A library-only
+        // computer never records, so it never needs the model.
+        if (Settings.SetupDone && Settings.Role != AppRole.Library && !ModelReady) _ = DownloadModelAsync();
+        if (Settings.Role != AppRole.Laptop && Settings.SetupDone) _ = RefreshLocalLibraryAsync();
+    }
+
+    /// <summary>Take this as this computer's own library: the one <see cref="LocalLibrary"/> shows from now on, stopped
+    /// in <see cref="Dispose"/>. Setup calls this the moment it starts one (before the app has even reached
+    /// <see cref="Start"/> for a first-time "this computer" library), so that library is never left running past quit.
+    /// Does nothing if one is already in charge.</summary>
+    internal void UseLocalLibrary(LibraryService svc)
+    {
+        if (LocalLibrary is not null) return;
+        LocalLibrary = svc;
+        svc.Changed += () => Changed?.Invoke();
+    }
+
+    /// <summary>Start this computer's own library (Settings' Start button, after Stop or a problem): make one if there
+    /// isn't one yet, otherwise just ask the one we have to try again (a no-op while it's already up).</summary>
+    public Task RefreshLocalLibraryAsync()
+    {
+        if (LocalLibrary is null)
+        {
+            var svc = localLibrary?.Invoke() ?? new LibraryService(Home, Configs.Load(Home));
+            UseLocalLibrary(svc);
+        }
+        return LocalLibrary!.StartAsync();
     }
 
     /// <summary>Every second, on the thread pool: the recorder looks at its microphone and the disk. One look at a
@@ -269,62 +374,86 @@ public sealed class AppHost : IDisposable
         }
     }
 
+    /// <summary>Only one check talks to the library at a time: Setup, Settings' Connect and the background watch can
+    /// all ask for one at once, and there's no sense in two racing.</summary>
+    readonly SemaphoreSlim libraryCheck = new(1, 1);
+    /// <summary>A dropped Tailscale link shouldn't leave the dropdown saying "connected" for minutes: the library's
+    /// own HTTP client waits far longer than that, so a check gives up on its own after this.</summary>
+    static readonly TimeSpan LibraryCheckTimeout = TimeSpan.FromSeconds(8);
+    readonly Lock timetableLock = new();
+
     /// <summary>Ask the library how it is; its classes come back, and they keep the timetable honest.</summary>
     public async Task CheckLibraryAsync()
     {
-        var before = Library;
-        if (Remote() is not { } lib)
+        await libraryCheck.WaitAsync();
+        try
         {
-            Library = LibraryState.NotSetUp;
-        }
-        else
-        {
-            try
+            var before = Library;
+            if (LocalLibrary is { State: LibraryServiceState.Starting })
+            {
+                // Our own library is coming up: "Can't reach it" would be alarming and wrong.
+                Library = LibraryState.Starting;
+                Changed?.Invoke();
+                return;
+            }
+            if (Remote() is not { } lib)
+            {
+                Library = LibraryState.NotSetUp;
+            }
+            else
             {
                 try
                 {
-                    Overview = await lib.OverviewAsync();
-                    OlderLibrary = false;
-                }
-                catch (LibraryRefusedException e) when (e.Status == 404)
-                {
-                    // The Python engine's library: its classes from /api/health, in its order.
-                    var cc = Client();
-                    var health = await LibraryApi.CheckServerAsync(cc.ServerUrl, cc.PoolKey);
-                    int i = 0;
-                    Overview = new JsonObject
+                    try
                     {
-                        ["name"] = health["pool_name"]?.DeepClone(),
-                        ["classes"] = new JsonArray((health["classes"] as JsonArray ?? []).Select(n => (JsonNode?)new JsonObject { ["name"] = n?.DeepClone(), ["lectures"] = 0, ["color"] = i++ }).ToArray()),
-                        ["unsorted"] = 0,
-                        ["ask"] = false,
-                    };
-                    OlderLibrary = true;
+                        Overview = await lib.OverviewAsync().WaitAsync(LibraryCheckTimeout);
+                        OlderLibrary = false;
+                    }
+                    catch (LibraryRefusedException e) when (e.Status == 404)
+                    {
+                        // The Python engine's library: its classes from /api/health, in its order.
+                        var cc = Client();
+                        var health = await LibraryApi.CheckServerAsync(cc.ServerUrl, cc.PoolKey).WaitAsync(LibraryCheckTimeout);
+                        int i = 0;
+                        Overview = new JsonObject
+                        {
+                            ["name"] = health["pool_name"]?.DeepClone(),
+                            ["classes"] = new JsonArray((health["classes"] as JsonArray ?? []).Select(n => (JsonNode?)new JsonObject { ["name"] = n?.DeepClone(), ["lectures"] = 0, ["color"] = i++ }).ToArray()),
+                            ["unsorted"] = 0,
+                            ["ask"] = false,
+                        };
+                        OlderLibrary = true;
+                    }
+                    Library = LibraryState.Connected;
+                    var names = (Overview["classes"] as JsonArray ?? []).Select(c => c?["name"]?.GetValue<string>() ?? "").ToList();
+                    lock (timetableLock)
+                        if (!OlderLibrary && names.Count > 0 && Timetable.KeepOnly(names)) Timetable.Save(Home);
                 }
-                Library = LibraryState.Connected;
-                var names = (Overview["classes"] as JsonArray ?? []).Select(c => c?["name"]?.GetValue<string>() ?? "").ToList();
-                if (!OlderLibrary && names.Count > 0 && Timetable.KeepOnly(names)) Timetable.Save(Home);
+                catch (InvalidOperationException e) when (e.Message == "wrong password")
+                {
+                    Library = LibraryState.WrongPassword;
+                }
+                catch (InvalidOperationException)
+                {
+                    Library = LibraryState.Unreachable;
+                }
+                catch (LibraryRefusedException e) when (e.Status is 401 or 403)
+                {
+                    Library = LibraryState.WrongPassword;
+                }
+                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or TimeoutException or LibraryRefusedException or JsonException)
+                {
+                    Library = LibraryState.Unreachable;
+                }
             }
-            catch (InvalidOperationException e) when (e.Message == "wrong password")
-            {
-                Library = LibraryState.WrongPassword;
-            }
-            catch (InvalidOperationException)
-            {
-                Library = LibraryState.Unreachable;
-            }
-            catch (LibraryRefusedException e) when (e.Status is 401 or 403)
-            {
-                Library = LibraryState.WrongPassword;
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException or JsonException)
-            {
-                Library = LibraryState.Unreachable;
-            }
+            // Lectures that waited for it go now: a wake alone would leave them waiting out their last try's wait (10 minutes).
+            if (before != Library && Library == LibraryState.Connected) Sender.RetryNow();
+            Changed?.Invoke();
         }
-        // Lectures that waited for it go now: a wake alone would leave them waiting out their last try's wait (10 minutes).
-        if (before != Library && Library == LibraryState.Connected) Sender.RetryNow();
-        Changed?.Invoke();
+        finally
+        {
+            libraryCheck.Release();
+        }
     }
 
     /// <summary>The library's classes, in its order: (name, color index, lectures).</summary>
@@ -334,19 +463,28 @@ public sealed class AppHost : IDisposable
 
     public int ColorOf(string className) => Classes().FirstOrDefault(c => c.Name == className) is { Name.Length: > 0 } c ? c.Color : -1;
 
-    /// <summary>"Library connected · Model ready", or what needs doing, and whether all is well.</summary>
-    public (string Text, bool Good) Status()
+    /// <summary>"Library connected · Model ready", or what needs doing: pure, so a test needn't drive a real library
+    /// or download to check the words.</summary>
+    public static string StatusText(LibraryState library, bool localLibraryRunning, bool modelReady, DownloadProgress? downloading)
     {
-        string lib = Library switch
+        string lib = localLibraryRunning
+            ? $"Library running on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}"
+            : library switch
         {
             LibraryState.Connected => "Library connected",
+            LibraryState.Starting => "Starting your library…",
             LibraryState.Unreachable => "Can't reach your library",
             LibraryState.WrongPassword => "Library password changed",
             _ => "No library yet",
         };
-        string model = ModelReady ? "Model ready" : Downloading is { } d ? $"Model {Math.Round(d.Fraction * 100)}%" : "No transcription model";
-        return ($"{lib} · {model}", Library == LibraryState.Connected && ModelReady);
+        string model = modelReady ? "Model ready" : downloading is { } d ? $"Model {Math.Round(d.Fraction * 100)}%" : "No transcription model";
+        return $"{lib} · {model}";
     }
+
+    /// <summary>"Library connected · Model ready", or what needs doing, and whether all is well.</summary>
+    public (string Text, bool Good) Status() =>
+        (StatusText(Library, Settings.Role != AppRole.Laptop && LocalLibrary?.State == LibraryServiceState.Running, ModelReady, Downloading),
+            Library == LibraryState.Connected && ModelReady);
 
     /// <summary>Change the settings and write them to app.json. A full disk (or a folder it can't write) is said, not
     /// thrown: the change still holds until the app quits.</summary>
@@ -367,7 +505,7 @@ public sealed class AppHost : IDisposable
 
     public void SaveTimetable(Timetable t)
     {
-        Timetable = t;
+        lock (timetableLock) Timetable = t;
         try
         {
             t.Save(Home);
@@ -416,40 +554,217 @@ public sealed class AppHost : IDisposable
 
     // --- the model --------------------------------------------------------------------------------------------------
 
-    /// <summary>Download the model for this computer (or pick up a download a closed laptop cut short).</summary>
-    public async Task DownloadModelAsync(WhisperModel? model = null)
+    /// <summary>What the setup and Settings say while a dropped connection waits to be tried again.</summary>
+    public const string DownloadStopped = "The download stopped (no internet?). It picks up where it left off.";
+
+    /// <summary>How long a download that stopped (no internet) waits before trying again: 30 seconds, a minute, two,
+    /// then every five minutes while the app runs.</summary>
+    public static TimeSpan RetryAfter(int failures) => TimeSpan.FromSeconds(failures switch
     {
+        0 => 30,
+        1 => 60,
+        2 => 120,
+        _ => 300,
+    });
+
+    /// <summary>
+    /// Download a model (the one for this computer unless another is given), or pick up where its download stopped.
+    /// Another model while one downloads: that one stops (its .part stays) and this one starts. The same one while it
+    /// waits to try again: it tries now (setup's Try again, Settings' Download). The task ends when the download does.
+    /// </summary>
+    public Task DownloadModelAsync(WhisperModel? model = null)
+    {
+        // A model file given to use as it is (the self-test's): nothing to download unless another is picked.
+        if (model is null && ModelFile is not null) return Task.CompletedTask;
         model ??= Model;
-        if (WhisperModels.IsDownloaded(Home, model) || download is not null) return;
-        download = new CancellationTokenSource();
-        DownloadProblem = null;
-        Downloading = new DownloadProgress(0, model.Bytes, 0);
+        if (WhisperModels.IsDownloaded(Home, model)) return Task.CompletedTask;
+        lock (downloadLock)
+        {
+            if (disposed) return Task.CompletedTask;
+            if (download is not null && DownloadingModel?.Id == model.Id)
+            {
+                retryNow?.TrySetResult();
+                return downloadTask;
+            }
+            download?.Cancel();
+            var cts = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
+            download = cts;
+            DownloadingModel = model;
+            DownloadProblem = null;
+            string part = WhisperModels.PathFor(Home, model) + ".part";
+            Downloading = new DownloadProgress(File.Exists(part) ? Math.Min(new FileInfo(part).Length, model.Bytes) : 0, model.Bytes, 0);
+            // On the thread pool: picking up a download first reads the gigabytes already here.
+            downloadTask = Task.Run(() => DownloadAsync(model, cts));
+        }
         Changed?.Invoke();
+        return downloadTask;
+    }
+
+    /// <summary>Stop the model download (another model, already here, was picked). What came stays for next time.</summary>
+    public void StopDownload()
+    {
+        lock (downloadLock) download?.Cancel();
+    }
+
+    /// <summary>Throw the model away and download it again (Whisper couldn't start with it: it may be damaged).</summary>
+    public Task RedownloadModel()
+    {
+        var model = Model;
+        if (ModelFile is not null)
+        {
+            // The environment's own file isn't the app's to delete.
+            log($"[model] {ModelFile} is given to use as it is: nothing to download again");
+            return Task.CompletedTask;
+        }
+        lock (downloadLock)
+        {
+            if (download is not null && DownloadingModel?.Id == model.Id)
+            {
+                retryNow?.TrySetResult();
+                return downloadTask;
+            }
+        }
+        string path = WhisperModels.PathFor(Home, model);
         try
         {
-            await ModelDownload.RunAsync(Home, model, new Progress<DownloadProgress>(p =>
+            File.Delete(path);
+            File.Delete(path + ".part");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log($"[model] couldn't remove {path}: {e.Message}");
+            DownloadProblem = $"The old {model.Name} couldn't be removed: {e.Message}";
+            Changed?.Invoke();
+            return Task.CompletedTask;
+        }
+        log($"[model] downloading {model.Name} again");
+        return DownloadModelAsync(model);
+    }
+
+    async Task DownloadAsync(WhisperModel model, CancellationTokenSource cts)
+    {
+        int failures = 0;
+        bool damagedBefore = false;
+        try
+        {
+            while (true)
             {
-                Downloading = p;
-                Changed?.Invoke();
-            }), download.Token);
-            log($"[model] {model.Name} downloaded");
+                try
+                {
+                    await ModelDownload.RunAsync(Home, model, Progress(cts), cts.Token, http, models.UrlFor(model));
+                    Say(cts, null);
+                    log($"[model] {model.Name} downloaded");
+                    return;
+                }
+                catch (NotEnoughSpaceException e)
+                {
+                    // Only the student can make room: no trying again until they ask.
+                    log($"[model] {e.Message}");
+                    Say(cts, e.Message);
+                    return;
+                }
+                catch (InvalidDataException e) when (!damagedBefore)
+                {
+                    damagedBefore = true;
+                    log($"[model] {e.Message} Downloading it again.");
+                }
+                catch (InvalidDataException e)
+                {
+                    log($"[model] {e.Message}");
+                    Say(cts, e.Message);
+                    return;
+                }
+                catch (Exception e) when (e is HttpRequestException or IOException || (e is TaskCanceledException && !cts.IsCancellationRequested))
+                {
+                    var wait = RetryAfter(failures++);
+                    log($"[model] {e.Message}: trying again in {wait.TotalSeconds:0} s");
+                    await WaitToRetry(wait, cts);
+                }
+            }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
         }
-        catch (Exception e) when (e is HttpRequestException or IOException or InvalidDataException)
+        catch (Exception e)
         {
-            DownloadProblem = e is HttpRequestException ? "The download stopped (no internet?). It picks up where it left off." : e.Message;
-            log($"[model] {e.Message}");
+            // Anything else (a folder it can't write): said, and tried again when the student asks.
+            log($"[model] {e}");
+            Say(cts, $"The download stopped: {e.Message}");
         }
         finally
         {
-            download.Dispose();
-            download = null;
-            Downloading = null;
+            lock (downloadLock)
+            {
+                if (download == cts)
+                {
+                    download = null;
+                    retryNow = null;
+                    Downloading = null;
+                    DownloadingModel = null;
+                }
+                cts.Dispose();
+            }
             Changed?.Invoke();
             Whisper.Wake();
         }
+    }
+
+    /// <summary>Progress straight to the windows, while this is still the download the app wants. Once bytes arrive
+    /// again, a problem from an earlier try is over.</summary>
+    IProgress<DownloadProgress> Progress(CancellationTokenSource cts)
+    {
+        long? from = null;
+        return new Reporter(p =>
+        {
+            lock (downloadLock)
+            {
+                if (download != cts) return;
+                from ??= p.Done;
+                Downloading = p;
+                if (p.Done > from) DownloadProblem = null;
+            }
+            Changed?.Invoke();
+        });
+    }
+
+    /// <summary>Say why this download stopped (or null: it's fine), unless another has taken its place.</summary>
+    void Say(CancellationTokenSource cts, string? problem)
+    {
+        lock (downloadLock)
+        {
+            if (download != cts) return;
+            DownloadProblem = problem;
+        }
+        Changed?.Invoke();
+    }
+
+    /// <summary>Say the download stopped, then wait to try again: until the wait's over, or the student says now.</summary>
+    async Task WaitToRetry(TimeSpan wait, CancellationTokenSource cts)
+    {
+        var now = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        // Together, so a Try again the moment the words show is never missed.
+        lock (downloadLock)
+        {
+            if (download == cts)
+            {
+                retryNow = now;
+                DownloadProblem = DownloadStopped;
+            }
+        }
+        Changed?.Invoke();
+        using (var waiting = CancellationTokenSource.CreateLinkedTokenSource(cts.Token))
+        {
+            await Task.WhenAny(Task.Delay(wait, waiting.Token), now.Task);
+            await waiting.CancelAsync();
+        }
+        cts.Token.ThrowIfCancellationRequested();
+        lock (downloadLock)
+            if (retryNow == now) retryNow = null;
+    }
+
+    sealed class Reporter(Action<DownloadProgress> report) : IProgress<DownloadProgress>
+    {
+        public void Report(DownloadProgress value) => report(value);
     }
 
     /// <summary>Stop: the lecture being recorded is saved, and Whisper, the sender and the library check get up to 3
@@ -468,12 +783,26 @@ public sealed class AppHost : IDisposable
             log($"[app] couldn't finish the recording: {e.Message}");
         }
         stop.Cancel();
-        download?.Cancel();
+        Task downloading;
+        lock (downloadLock)
+        {
+            download?.Cancel();
+            downloading = downloadTask;
+        }
         awake?.Dispose();
         awake = null;
+        if (LocalLibrary is { } lib)
+        {
+            // A clean stop (SIGTERM, then a moment to shut its database down) if it manages one in time; otherwise
+            // Dispose's hard kill so quitting is never held up by a library that won't go. On the thread pool: awaits
+            // inside StopAsync must not need this (UI) thread's own message loop to go on.
+            try { Task.Run(lib.StopAsync).Wait(TimeSpan.FromSeconds(3)); }
+            catch (AggregateException e) { log($"[library] {e.InnerException?.Message}"); }
+            lib.Dispose();
+        }
         try
         {
-            if (!Task.WaitAll([.. running], TimeSpan.FromSeconds(3))) log("[app] still busy after 3 seconds: quitting anyway");
+            if (!Task.WaitAll([.. running, downloading], TimeSpan.FromSeconds(3))) log("[app] still busy after 3 seconds: quitting anyway");
         }
         catch (AggregateException e)
         {

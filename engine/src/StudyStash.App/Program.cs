@@ -29,6 +29,10 @@ static class Program
         int at = Array.IndexOf(args, "--home");
         if (at >= 0 && at + 1 < args.Length) Home = Path.GetFullPath(Py.ExpandUser(args[at + 1]));
         Background = args.Contains("--background");
+        // STUDYSTASH_SELFTEST: before anything touches --home (even making its logs folder, which would fail the
+        // "new, empty folder" check), refuse a bad setup or start the self-test's own library and AI engine, so the
+        // run that follows never reaches the real network.
+        if (SelfTest.Prepare(Home) is int refusal) return refusal;
         Directory.CreateDirectory(Path.Combine(Home, "logs"));
         AppDomain.CurrentDomain.UnhandledException += (_, e) => Log($"[crash] {e.ExceptionObject}");
         TaskScheduler.UnobservedTaskException += (_, e) =>

@@ -35,6 +35,7 @@ public static partial class Shell
     static readonly QuickModel quick = new();
     static readonly LibraryModel library = new();
     static SetupModel? setup;
+    static MicCheck? micCheck;
 
     static Floating? panelWindow, recorderWindow, quickWindow;
     static Window? mainWindow, setupWindow, settingsWindow;
@@ -49,6 +50,11 @@ public static partial class Shell
     /// <summary>The class Record will use, picked by hand; null follows the timetable.</summary>
     static string? chosenClass;
     static string? liveId;
+    /// <summary>What's wrong right now (from <see cref="Problems"/>), so the panel's Fix button knows what to do.</summary>
+    static AppProblem? currentProblem;
+    static LibraryState lastLibraryState = LibraryState.NotSetUp;
+    static bool hotkeysOn;
+    static HotkeyResult hotkeys;
 
     public static AppHost Host => host;
 
@@ -81,16 +87,20 @@ public static partial class Shell
             Program.Log("[app] this Mac doesn't say when the app is opened again; a second copy still hands off");
         host = new AppHost(home, laptop: new LaptopHost(), log: Program.Log);
         Skin.UseTheme(ColourThemes.Find(host.Settings.Theme));
-        host.Changed += () => Dispatcher.UIThread.Post(Refresh);
+        host.Changed += RequestRefresh;
         host.Heard += (l, lines) => Dispatcher.UIThread.Post(() => AddHeard(l, lines));
-        host.Filed += l => Dispatcher.UIThread.Post(() => Toast($"Filed in {(l.FiledClass.Length > 0 ? l.FiledClass : "your library")}",
-            l.FiledTitle.Length > 0 ? l.FiledTitle : "The notes are written.", "Open note", () => OpenLecture(l.Id)));
+        host.Filed += l => Dispatcher.UIThread.Post(() =>
+        {
+            Toast($"Filed in {(l.FiledClass.Length > 0 ? l.FiledClass : "your library")}",
+                l.FiledTitle.Length > 0 ? l.FiledTitle : "The notes are written.", "Open note", () => OpenLecture(l.Id));
+            RequestLibraryReload();
+        });
         host.Problem += (title, why) => Dispatcher.UIThread.Post(() => Toast(title, why, null, null));
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
         host.Start();
         MakeTray();
-        if (host.Settings.Shortcuts && !Hotkeys.Register(OnShortcut)) Program.Log("[app] the shortcuts are taken by another app");
+        ApplyShortcutsSetting(force: true);
         ticker = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Tick());
         ticker.Start();
         Refresh();
@@ -108,11 +118,39 @@ public static partial class Shell
         public static Window? Quick => quickWindow;
         public static Window? Recorder => recorderWindow;
         public static Window? Settings => settingsWindow;
+        /// <summary>Setup's own view model, while its window is open: what the self-test drives (steps, connect,
+        /// find, add a class) the same way the view's bindings would.</summary>
+        public static ViewModels.SetupModel? SetupModel => setup;
         public static void TogglePanel() => Shell.TogglePanel();
         public static void ToggleQuick() => Shell.ToggleQuick();
         public static void Record() => ToggleRecording();
         public static void StopRecording() => Shell.StopRecording();
+        public static void TogglePause() => Shell.TogglePause();
         public static void ShowRecorder(bool expanded) => Shell.ShowRecorder(expanded);
+        /// <summary>Record the way the global shortcut would, so the self-test exercises that path too (setup first,
+        /// if it isn't done).</summary>
+        public static void RecordViaShortcut() => OnShortcut(Shortcut.Record);
+        /// <summary>Opens a lecture's notes (or transcript) in the library window, as clicking it would.</summary>
+        public static void OpenLecture(string id, bool transcript = false) => Shell.OpenLecture(id, transcript);
+        /// <summary>Searches the quick panel, as typing in it would.</summary>
+        public static Task Search(string query) => SearchAsync(query);
+        public static QuickModel QuickModel => quick;
+        public static PanelModel PanelModel => panel;
+
+        /// <summary>Opens the dropdown the way clicking the real icon would (a Mac's status item; Windows' tray
+        /// otherwise), and how far its centre landed from the icon's own, in points — the self-test's placement
+        /// check ("panel under the icon"). Null off a Mac, or before the icon exists.</summary>
+        public static double? OpenPanelViaIcon()
+        {
+            if (!OperatingSystem.IsMacOS())
+            {
+                Shell.TogglePanel();
+                return null;
+            }
+            double? iconCentre = MacStatusItem.ButtonFrame() is { } f ? f.X + f.Width / 2 : null;
+            MacStatusItem.PerformClick();
+            return iconCentre is double x && panelWindow is { } w ? Math.Abs(w.Position.X + w.Bounds.Width / 2 - x) : null;
+        }
     }
 
     static void OnHandOff(string message)
@@ -144,8 +182,43 @@ public static partial class Shell
 
     static void OnShortcut(Shortcut s)
     {
+        if (!host.Settings.SetupDone)
+        {
+            ShowSetup();
+            return;
+        }
         if (s == Shortcut.Quick) ToggleQuick();
         else ToggleRecording();
+    }
+
+    /// <summary>The Shortcuts toggle in Settings applies at once, without restarting: turned off, both let go;
+    /// turned back on, they're asked for again (and the app says if either is taken).</summary>
+    static void ApplyShortcutsSetting(bool force = false)
+    {
+        bool wanted = host.Settings.Shortcuts;
+        if (!force && wanted == hotkeysOn) return;
+        hotkeysOn = wanted;
+        if (wanted)
+        {
+            hotkeys = Hotkeys.Register(OnShortcut);
+            if (!hotkeys.All) Program.Log("[app] a shortcut is taken by another app");
+        }
+        else
+        {
+            Hotkeys.Unregister();
+            hotkeys = new HotkeyResult(true, true);
+        }
+    }
+
+    /// <summary>Settings' words about the shortcuts: which one (if any) another app already has.</summary>
+    public static string? ShortcutsSay()
+    {
+        if (!hotkeysOn) return null;
+        string quick = Skin.Current == SkinKind.Mac ? "⌥Space" : "Alt+Shift+Space";
+        string record = Skin.Current == SkinKind.Mac ? "⌥⇧R" : "Ctrl+Alt+R";
+        if (!hotkeys.Quick) return $"{quick} is taken by another app, so search from the menu bar.";
+        if (!hotkeys.Record) return $"{record} is taken by another app, so record from the menu bar.";
+        return null;
     }
 
     /// <summary>Quit Study Stash, with an exit code (the self-test's pass or fail). Only the first call counts.</summary>
@@ -174,6 +247,7 @@ public static partial class Shell
         }
         tray?.Dispose();
         tray = null;
+        if (OperatingSystem.IsMacOS()) MacStatusItem.Destroy();
         Player.Stop();
         host.Save(_ => { });
         Program.Log("[app] quitting");
@@ -181,9 +255,9 @@ public static partial class Shell
 
     // --- the tray ---------------------------------------------------------------------------------------------------
 
-    /// <summary>The icon: the waveform glyph (a template image on a Mac, which the menu bar tints), with a red dot
-    /// while recording.</summary>
-    static WindowIcon TrayImage(bool recording)
+    /// <summary>The icon, as PNG bytes: the waveform glyph (a template image on a Mac, which the menu bar tints),
+    /// with a red dot while recording.</summary>
+    static byte[] TrayImageBytes(bool recording)
     {
         const int size = 44;
         var bmp = new RenderTargetBitmap(new PixelSize(size, size), new Vector(96, 96));
@@ -197,14 +271,26 @@ public static partial class Shell
         }
         var stream = new MemoryStream();
         bmp.Save(stream, PngBitmapEncoderOptions.Default);
-        stream.Position = 0;
+        return stream.ToArray();
+    }
+
+    static WindowIcon TrayImage(bool recording)
+    {
+        var stream = new MemoryStream(TrayImageBytes(recording));
         return new WindowIcon(stream);
     }
 
     static void MakeTray()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            // Avalonia's own TrayIcon never raises Clicked on macOS, so the menu bar icon is a real NSStatusItem.
+            MacStatusItem.Create(leftClick: x => TogglePanel(new PixelPoint((int)x, 0)),
+                record: ToggleRecording, search: ToggleQuick, open: ShowLibrary, settings: ShowSettings, quit: () => Quit());
+            MacStatusItem.SetIcon(TrayImageBytes(false));
+            return;
+        }
         tray = new TrayIcon { Icon = TrayImage(false), ToolTipText = "Study Stash", IsVisible = true };
-        if (OperatingSystem.IsMacOS()) MacOSProperties.SetIsTemplateIcon(tray, true);
         tray.Clicked += (_, _) => TogglePanel();
         var menu = new NativeMenu();
         void Item(string title, Action act)
@@ -213,15 +299,16 @@ public static partial class Shell
             i.Click += (_, _) => act();
             menu.Add(i);
         }
-        // Windows opens the flyout on a click; this menu is the right click (and a Mac's fallback).
         Item("Record", ToggleRecording);
         Item("Search notes and lectures", ToggleQuick);
         Item("Open Study Stash", ShowLibrary);
         Item("Settings…", ShowSettings);
         menu.Add(new NativeMenuItemSeparator());
         Item("Quit Study Stash", () => Quit());
-        if (OperatingSystem.IsWindows()) tray.Menu = menu;
+        tray.Menu = menu;
         TrayIcon.SetIcons(app, new TrayIcons { tray });
+        // The tray's ink is black or white depending on the theme; redraw it when that changes.
+        app.ActualThemeVariantChanged += (_, _) => tray.Icon = TrayImage(trayRecording);
     }
 
     // --- what the buttons do ---------------------------------------------------------------------------------------
@@ -243,12 +330,8 @@ public static partial class Shell
             ShowLibrary();
         };
         panel.OnSwitchClass = PickClass;
-        panel.OnOpenLecture = item =>
-        {
-            panelWindow?.Hide();
-            if (item.Id == liveId) ShowRecorder(expanded: true);
-            else OpenLecture(item.Id);
-        };
+        panel.OnFixProblem = FixProblem;
+        panel.OnOpenLecture = OpenRecentLecture;
 
         recorder.OnPause = TogglePause;
         recorder.OnStop = () => StopRecording();
@@ -291,6 +374,16 @@ public static partial class Shell
                 "Settings", ShowSettings);
             return;
         }
+        var mic = host.MicAccess();
+        if (mic is MicAccess.Denied or MicAccess.Restricted)
+        {
+            var p = Problems.For(host);
+            Toast(p?.Title ?? "Study Stash can't use the microphone", p?.Detail ?? "", p is { HasAction: true } ? p.ActionLabel : null,
+                () => Dialogs.OpenUrl(host.MicSettingsUrl));
+            return;
+        }
+        // Not asked yet: ask now, and start recording anyway (the watchdog catches a refusal once it comes).
+        if (mic == MicAccess.NotAsked) host.AskMic();
         try
         {
             var l = host.StartRecording(RecordClass());
@@ -358,6 +451,54 @@ public static partial class Shell
         if (panelWindow?.Content is Control c) menu.Open(c);
     }
 
+    /// <summary>The panel's Fix button: what to do depends on which problem is showing right now.</summary>
+    static void FixProblem()
+    {
+        switch (currentProblem?.Kind)
+        {
+            case ProblemKind.MicDenied:
+                Dialogs.OpenUrl(host.MicSettingsUrl);
+                break;
+            case ProblemKind.WhisperFailed:
+                _ = host.RedownloadModel();
+                break;
+            case ProblemKind.DownloadFailed or ProblemKind.NoModel:
+                _ = host.DownloadModelAsync();
+                break;
+            case ProblemKind.LibraryStopped:
+                _ = host.RefreshLocalLibraryAsync();
+                break;
+            case ProblemKind.WrongPassword or ProblemKind.NotSetUp:
+                ShowSettings();
+                break;
+        }
+    }
+
+    /// <summary>A click on one of the dropdown's recent lectures: the live one opens the recorder, a failed one is
+    /// tried again, one still on its way just says where it is, and a filed one (or one being written up) opens.</summary>
+    static void OpenRecentLecture(LectureItem item)
+    {
+        panelWindow?.Hide();
+        if (item.Id == liveId)
+        {
+            ShowRecorder(expanded: true);
+            return;
+        }
+        switch (item.State)
+        {
+            case LectureState.Failed:
+                host.Retry(item.Id);
+                Toast("Trying again", item.Title, null, null);
+                break;
+            case LectureState.Transcribing or LectureState.Sending:
+                Toast(item.Title, item.Detail, null, null);
+                break;
+            default:
+                OpenLecture(item.Id);
+                break;
+        }
+    }
+
     static void AddHeard(Lecture l, IReadOnlyList<Spoken> lines)
     {
         if (l.Id != liveId) return;
@@ -408,29 +549,30 @@ public static partial class Shell
 
     static Control PanelView() => Skin.Current == SkinKind.Mac ? new MacPanel { DataContext = panel } : new WinPanel { DataContext = panel };
 
-    static void TogglePanel()
+    /// <summary>Opens or closes the dropdown. <paramref name="near"/> is where the icon was clicked, when that's
+    /// known outright (the Mac status item hands its own icon's position); otherwise the pointer's own position is
+    /// asked for (a Windows tray click, or the shortcut).</summary>
+    static void TogglePanel(PixelPoint? near = null)
     {
         if (panelWindow?.IsVisible == true)
         {
             panelWindow.Hide();
             return;
         }
+        // The click that opens it follows the deactivate that just closed it (one gesture, two events): don't reopen.
+        if (panelWindow is not null && DateTime.UtcNow - panelWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
         panelWindow ??= new Floating { Content = PanelView(), CloseOnDeactivate = true, Title = "Study Stash" };
         Refresh();
-        var (area, scale) = panelWindow.WorkArea(Floating.Pointer());
+        // NSEvent's mouse location is in points, in the same coordinate space Avalonia's screens report: no
+        // rescaling (a display's own scale factor doesn't change where its menu bar sits in that shared space).
+        var pointer = near ?? Floating.Pointer();
+        var (_, scale) = panelWindow.WorkArea(pointer);
         var size = panelWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
-        if (OperatingSystem.IsMacOS())
-        {
-            // Below the menu bar, under the icon that was clicked.
-            int x = (Floating.Pointer()?.X is int px ? (int)(px * scale) : area.Right - size.Width) - (int)(24 * scale) - room;
-            panelWindow.Position = new PixelPoint(Math.Clamp(x, area.X, area.Right - size.Width), area.Y + (int)(6 * scale) - room);
-        }
-        else
-        {
-            // 12 px above the tray, like Quick Settings.
-            panelWindow.Position = new PixelPoint(area.Right - size.Width - (int)(12 * scale) + room, area.Bottom - size.Height - (int)(12 * scale) + room);
-        }
+        var anchor = pointer ?? new PixelPoint(0, 0);
+        panelWindow.Position = OperatingSystem.IsMacOS()
+            ? Placement.MacDropdown(anchor, panelWindow.ScreenList(), size, room)
+            : Placement.TrayFlyout(anchor, panelWindow.ScreenList(), size, room);
         panelWindow.Show();
         panelWindow.Activate();
         Desktop.Activate();
@@ -448,42 +590,49 @@ public static partial class Shell
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
         var w = new Floating { Content = view, Title = "Study Stash recorder" };
-        // Drag it anywhere by its background; it remembers where.
+        // Drag it anywhere by its background; where it lands is saved once the drag ends, not on every pixel moved.
         view.PointerPressed += (_, e) =>
         {
             if (e.Source is TextBox || !e.GetCurrentPoint(view).Properties.IsLeftButtonPressed) return;
             w.BeginMoveDrag(e);
         };
-        w.PositionChanged += (_, _) =>
-        {
-            if (!w.IsVisible) return;
-            var (_, scale) = w.WorkArea(w.Position);
-            var size = w.Measured(scale);
-            host.Settings.RecorderX = w.Position.X + size.Width;
-            host.Settings.RecorderY = w.Position.Y;
-        };
+        view.PointerReleased += (_, _) => SaveRecorderPosition();
         w.Closing += (_, e) =>
         {
             if (quitting) return;
             e.Cancel = true;
             w.Hide();
+            SaveRecorderPosition();
         };
+        // A display is unplugged, or one's plugged back in: put it back where it belongs, or on screen at least.
+        w.Screens.Changed += (_, _) => PlaceRecorder();
         return w;
     }
 
-    /// <summary>The recorder keeps its top right corner where you left it (a corner by default) as it grows and shrinks.</summary>
+    /// <summary>Remembers the recorder's top right corner, so it comes back there next time (a drag just ended, or
+    /// the window is about to hide or the app to quit).</summary>
+    static void SaveRecorderPosition()
+    {
+        if (recorderWindow is not { IsVisible: true } w) return;
+        var (_, scale) = w.WorkArea(w.Position);
+        var size = w.Measured(scale);
+        host.Save(s =>
+        {
+            s.RecorderX = w.Position.X + size.Width;
+            s.RecorderY = w.Position.Y;
+        });
+    }
+
+    /// <summary>The recorder keeps its top right corner where you left it (a corner by default) as it grows and
+    /// shrinks, on whichever display it was on — or the default corner, if that display is gone.</summary>
     static void PlaceRecorder()
     {
         if (recorderWindow is null) return;
-        var (area, scale) = recorderWindow.WorkArea();
+        var (_, scale) = recorderWindow.WorkArea(recorderWindow.Position);
         var size = recorderWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
-        int right = host.Settings.RecorderX is double rx ? (int)rx : area.Right - (int)(16 * scale) + room;
-        int top = host.Settings.RecorderY is double ry ? (int)ry
-            : OperatingSystem.IsMacOS() ? area.Y + (int)(10 * scale) - room : area.Bottom - size.Height - (int)(12 * scale) + room;
-        int x = Math.Clamp(right - size.Width, area.X - room, area.Right - size.Width + room);
-        int y = Math.Clamp(top, area.Y - room, area.Bottom - size.Height + room);
-        recorderWindow.Position = new PixelPoint(x, y);
+        PixelPoint? saved = host.Settings.RecorderX is double rx && host.Settings.RecorderY is double ry ? new PixelPoint((int)rx, (int)ry) : null;
+        recorderWindow.Position = Placement.KeepOnScreen(saved, recorderWindow.ScreenList(), size, OperatingSystem.IsMacOS(), room);
     }
 
     static void ToggleQuick()
@@ -493,6 +642,7 @@ public static partial class Shell
             quickWindow.Hide();
             return;
         }
+        if (quickWindow is not null && DateTime.UtcNow - quickWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
         var view = quickWindow?.Content;
         if (quickWindow is null)
         {
@@ -502,9 +652,11 @@ public static partial class Shell
         quick.Answering = false;
         quick.Query = "";
         _ = SearchAsync("");
-        var (area, scale) = quickWindow.WorkArea(Floating.Pointer());
+        var pointer = Floating.Pointer();
+        var (_, scale) = quickWindow.WorkArea(pointer);
         var size = quickWindow.Measured(scale);
-        quickWindow.Position = new PixelPoint(area.X + (area.Width - size.Width) / 2, area.Y + area.Height / 5 - (int)(Floating.ShadowRoom * scale));
+        int room = (int)(Floating.ShadowRoom * scale);
+        quickWindow.Position = Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room);
         quickWindow.Show();
         quickWindow.Activate();
         Desktop.Activate();
@@ -586,28 +738,19 @@ public static partial class Shell
             w.Opened += (_, _) => MicaIfAvailable(w);
         }
         var model = setup;
+        var mic = micCheck = new MicCheck();
         setup.OnFinish = () =>
         {
-            host.Save(s => s.SetupDone = true);
+            Setup.Finish(model, host);
             w.Close();
-            // Only when the student ticked it: starting at login changes this computer.
-            if (model.StartAtLogin)
-            {
-                try
-                {
-                    host.LoginItems.StartAtLogin(true, host.Home);
-                }
-                catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
-                {
-                    Program.Log($"[app] start at login: {e.Message}");
-                }
-            }
             ShowLibrary();
         };
         w.Closed += (_, _) =>
         {
             setupWindow = null;
             if (setup == model) setup = null;
+            mic.Close();
+            if (micCheck == mic) micCheck = null;
             UpdateDock();
         };
         setupWindow = w;
@@ -650,8 +793,16 @@ public static partial class Shell
         Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true));
 
     /// <summary>A notification in the design's look: top right on a Mac, above the tray on Windows. It goes by itself.</summary>
+    /// <summary>Toasts on screen right now, oldest first: how they stack, and what stops the same title firing twice
+    /// in a row.</summary>
+    static readonly List<(string Title, DateTime At, Floating Window)> toasts = [];
+
     public static void Toast(string title, string text, string? action, Action? run)
     {
+        if (quitting) return;
+        var now = DateTime.UtcNow;
+        toasts.RemoveAll(t => !t.Window.IsVisible);
+        if (toasts.Any(t => t.Title == title && now - t.At < TimeSpan.FromSeconds(10))) return;
         var view = new ToastView { Title = title, Text = text, ActionLabel = action };
         var w = new Floating { Content = view, Title = title, ShowActivated = false };
         view.Acted += () =>
@@ -660,12 +811,13 @@ public static partial class Shell
             run?.Invoke();
         };
         view.Dismissed += w.Close;
-        var (area, scale) = w.WorkArea();
+        w.Closed += (_, _) => toasts.RemoveAll(t => t.Window == w);
+        var (_, scale) = w.WorkArea();
         var size = w.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
-        w.Position = OperatingSystem.IsMacOS()
-            ? new PixelPoint(area.Right - size.Width - (int)(12 * scale) + room, area.Y + (int)(12 * scale) - room)
-            : new PixelPoint(area.Right - size.Width - (int)(12 * scale) + room, area.Bottom - size.Height - (int)(12 * scale) + room);
+        // Stacked below (a Mac, top right) or above (Windows, bottom right) whichever toasts are already showing.
+        w.Position = Placement.ToastSpot(w.ScreenList(), toasts.Count, size, OperatingSystem.IsMacOS(), room);
+        toasts.Add((title, now, w));
         w.Show();
         DispatcherTimer.RunOnce(() =>
         {
@@ -677,6 +829,7 @@ public static partial class Shell
 
     static void Tick()
     {
+        if (setup is not null && micCheck is not null) Setup.TickMic(setup, host, micCheck);
         var live = host.Recorder.Current;
         if (live is null) return;
         string elapsed = TimedText.Clock(host.Recorder.Elapsed);
@@ -685,9 +838,44 @@ public static partial class Shell
         panel.Levels = recorder.Levels = levels;
     }
 
+    static DateTime lastRefreshAt = DateTime.MinValue;
+    static bool refreshDue, refreshRetryQueued;
+
+    /// <summary>The host changed (called from any thread, often several times a second): at most one <see cref="Refresh"/>
+    /// runs every 100 ms, on the UI thread, however many times this fires in between.</summary>
+    static void RequestRefresh()
+    {
+        refreshDue = true;
+        Dispatcher.UIThread.Post(TryRefresh);
+    }
+
+    static void TryRefresh()
+    {
+        if (quitting || !refreshDue) return;
+        var now = DateTime.UtcNow;
+        var since = now - lastRefreshAt;
+        if (since < TimeSpan.FromMilliseconds(100))
+        {
+            if (!refreshRetryQueued)
+            {
+                refreshRetryQueued = true;
+                DispatcherTimer.RunOnce(() =>
+                {
+                    refreshRetryQueued = false;
+                    TryRefresh();
+                }, TimeSpan.FromMilliseconds(100) - since);
+            }
+            return;
+        }
+        refreshDue = false;
+        lastRefreshAt = now;
+        Refresh();
+    }
+
     static void Refresh()
     {
         if (quitting) return;
+        ApplyShortcutsSetting();
         var live = host.Recorder.Current;
         liveId = live?.Id;
         bool recording = live is not null;
@@ -698,35 +886,63 @@ public static partial class Shell
         int color = host.ColorOf(cls);
         panel.ClassDot = recorder.ClassDot = color >= 0 ? Skin.ClassDot(color) : Brushes.Gray;
         var now = host.ClassNow();
+        var problem = Problems.For(host);
+        currentProblem = problem;
+        panel.ProblemTitle = problem?.Title;
+        panel.ProblemDetail = problem?.Detail;
+        panel.ProblemAction = problem is { HasAction: true } p ? p.ActionLabel : null;
+        panel.CanRecord = recording || (host.ModelReady && host.MicAccess() is not (MicAccess.Denied or MicAccess.Restricted));
         panel.Hint = recording ? null
+            : !panel.CanRecord && problem is not null ? problem.Title
             : chosenClass is { Length: > 0 } ? "Picked by you"
             : chosenClass is "" ? "The library will sort it"
             : now is not null ? $"From your timetable · {now.Time.Describe()}"
             : host.Timetable.Next(DateTime.Now) is { } next ? $"No class on now · next, {next.Class.Name} {next.Class.Time.Describe()}" : null;
-        panel.CanRecord = host.ModelReady || recording;
         var (status, good) = host.Status();
         panel.Status = status;
         panel.StatusGood = good;
-        library.Status = host.Library switch
+        library.Status = host.Settings.Role != AppRole.Laptop && host.LocalLibrary?.State == LibraryServiceState.Running
+            ? $"Library running on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}"
+            : host.Library switch
         {
             LibraryState.Connected => "Library connected",
+            LibraryState.Starting => "Starting your library…",
             LibraryState.Unreachable => "Can't reach your library",
             LibraryState.WrongPassword => "Library password changed",
             _ => "No library yet",
         };
         library.StatusGood = host.Library == LibraryState.Connected;
+        // The library just came back: the window, if it's open, gets its class reloaded so a note written while it
+        // was gone shows up without reopening the window.
+        if (lastLibraryState != LibraryState.Connected && host.Library == LibraryState.Connected) RequestLibraryReload();
+        lastLibraryState = host.Library;
         RefreshRecent();
-        if (trayRecording != recording && tray is not null)
+        if (trayRecording != recording)
         {
             trayRecording = recording;
-            tray.Icon = TrayImage(recording);
+            if (OperatingSystem.IsMacOS()) MacStatusItem.SetIcon(TrayImageBytes(recording));
+            else if (tray is not null) tray.Icon = TrayImage(recording);
         }
-        if (OperatingSystem.IsWindows() && mainWindow?.TryGetPlatformHandle()?.Handle is IntPtr hwnd)
-        {
-            var busy = host.Lectures.All().FirstOrDefault(l => l.State == LectureState.Transcribing);
-            Desktop.TaskbarProgress(hwnd, busy?.Progress);
-        }
+        if (OperatingSystem.IsWindows()) UpdateTaskbar(problem);
         if (setup is not null) Setup.Refresh(setup, host);
+    }
+
+    static int lastTaskbarPercent = -1;
+
+    /// <summary>Windows: every visible regular window's taskbar button shows the model's download, or a lecture
+    /// transcribing, or turns red while <paramref name="problem"/> is stopping a lecture being recorded.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    static void UpdateTaskbar(AppProblem? problem)
+    {
+        double? fraction = !host.ModelReady && host.Downloading is { } d ? d.Fraction
+            : host.Lectures.All().FirstOrDefault(l => l.State == LectureState.Transcribing)?.Progress;
+        bool blocked = !panel.CanRecord && problem is not null;
+        foreach (var w in new[] { mainWindow, setupWindow, settingsWindow })
+            if (w?.IsVisible == true && w.TryGetPlatformHandle()?.Handle is IntPtr hwnd)
+                Desktop.TaskbarProgress(hwnd, fraction, blocked);
+        int percent = fraction is double f ? (int)(Math.Round(f * 10) * 10) : -1;
+        if (percent != lastTaskbarPercent && percent >= 0) Program.Log($"[taskbar] {percent}%");
+        lastTaskbarPercent = percent;
     }
 
     /// <summary>The dropdown's recent lectures: this laptop's (where each is on its way), newest first.</summary>
@@ -738,6 +954,7 @@ public static partial class Shell
             return new LectureItem
             {
                 Id = l.Id,
+                State = l.State,
                 Title = l.FiledTitle.Length > 0 ? l.FiledTitle : l.ClassName.Length > 0 ? $"{l.ClassName} lecture" : "Lecture",
                 Detail = l.State switch
                 {
