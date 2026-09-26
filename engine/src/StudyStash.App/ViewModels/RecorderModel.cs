@@ -36,7 +36,7 @@ public sealed partial class ChatMessage : ObservableObject
 
 /// <summary>
 /// The floating recorder: a pill with the time, the waveform, the class, Pause and Stop; expanded, the transcript
-/// as it comes in, fading upward, and a chat about the lecture so far.
+/// as it comes in, fading upward, and a chat about the lecture so far (with any engine).
 /// </summary>
 public sealed partial class RecorderModel : ObservableObject
 {
@@ -46,12 +46,12 @@ public sealed partial class RecorderModel : ObservableObject
     [ObservableProperty] public partial bool IsPaused { get; set; }
     [ObservableProperty] public partial IReadOnlyList<double>? Levels { get; set; }
     [ObservableProperty] public partial bool Expanded { get; set; }
-    [ObservableProperty] public partial string Question { get; set; } = "";
     /// <summary>Whisper hasn't anything yet: what the transcript area says instead.</summary>
     [ObservableProperty] public partial string Waiting { get; set; } = "What's said shows here a few seconds after it's said.";
 
     public ObservableCollection<HeardLine> Lines { get; } = [];
-    public ObservableCollection<ChatMessage> Chat { get; } = [];
+    /// <summary>Asking about the lecture so far, with any engine (design 16's compact chat).</summary>
+    [ObservableProperty] public partial AiAskModel? Ask { get; set; }
 
     public bool IsRunning => !IsPaused;
     public string PauseGlyph => IsPaused ? "play_arrow" : "pause";
@@ -76,8 +76,6 @@ public sealed partial class RecorderModel : ObservableObject
     public Action? OnPause { get; set; }
     public Action? OnStop { get; set; }
     public Action<bool>? OnExpand { get; set; }
-    public Func<string, Task>? OnAsk { get; set; }
-    public Action<SourceChip>? OnPlay { get; set; }
 
     [RelayCommand] void Pause() => OnPause?.Invoke();
     [RelayCommand] void Stop() => OnStop?.Invoke();
@@ -88,15 +86,4 @@ public sealed partial class RecorderModel : ObservableObject
         Expanded = !Expanded;
         OnExpand?.Invoke(Expanded);
     }
-
-    [RelayCommand]
-    async Task Ask()
-    {
-        string q = Question.Trim();
-        if (q.Length == 0 || OnAsk is null) return;
-        Question = "";
-        await OnAsk(q);
-    }
-
-    [RelayCommand] void Play(SourceChip chip) => OnPlay?.Invoke(chip);
 }

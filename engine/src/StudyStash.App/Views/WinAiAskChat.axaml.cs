@@ -13,4 +13,14 @@ public partial class WinAiAskChat : UserControl
             if (DataContext is AiAskModel m) m.CloseMenu = () => EngineChip.Flyout?.Hide();
         };
     }
+
+    /// <summary>Inside another surface (the recorder's expanded card): no card of its own, just the thread and field.</summary>
+    public void Embed()
+    {
+        Card.Background = null;
+        Card.BorderThickness = new Avalonia.Thickness(0);
+        Card.BoxShadow = default;
+        Card.Padding = new Avalonia.Thickness(0);
+        Card.Width = double.NaN;
+    }
 }

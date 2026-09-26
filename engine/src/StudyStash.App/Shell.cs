@@ -338,8 +338,6 @@ public static partial class Shell
         recorder.OnPause = TogglePause;
         recorder.OnStop = () => StopRecording();
         recorder.OnExpand = expanded => PlaceRecorder();
-        recorder.OnAsk = AskLive;
-        recorder.OnPlay = chip => Play(chip.LectureId ?? liveId, chip.At);
 
         quick.OnQuery = q => _ = SearchAsync(q);
         quick.OnAsk = AskQuick;
@@ -398,7 +396,7 @@ public static partial class Shell
             var l = host.StartRecording(RecordClass());
             liveId = l.Id;
             recorder.Lines.Clear();
-            recorder.Chat.Clear();
+            recorder.Ask = LiveAsk();
             recorder.Waiting = "What's said shows here a few seconds after it's said.";
             panelWindow?.Hide();
             ShowRecorder(expanded: false);
@@ -521,14 +519,19 @@ public static partial class Shell
 
     static string Trim(string s, int n) => s.Length <= n ? s : s[..n].TrimEnd() + "…";
 
-    static async Task AskLive(string question)
+    /// <summary>The recorder's chat for a new lecture: asks about what's been said so far, with any engine (the
+    /// library's default for questions until another is picked).</summary>
+    static AiAskModel LiveAsk()
     {
-        recorder.Chat.Add(new ChatMessage { Mine = true, Text = question });
-        var answer = new ChatMessage { Thinking = true };
-        recorder.Chat.Add(answer);
-        while (recorder.Chat.Count > 6) recorder.Chat.RemoveAt(0);
-        var live = host.Recorder.Current;
-        await Answer(answer, lib => lib.AskAsync(question, className: null, live: live?.Transcript(), liveTitle: $"{(live?.ClassName is { Length: > 0 } c ? c : "This lecture")}, now"));
+        var ask = new AiAskModel(Ai())
+        {
+            Live = () => host.Recorder.Current?.Transcript(),
+            LiveTitle = $"{(host.Recorder.Current?.ClassName is { Length: > 0 } c ? c : "This lecture")}, now",
+            OpenSettings = () => ShowSettings("AI"),
+            OnSource = s => Play(s.Id ?? liveId, s.At ?? 0),
+        };
+        _ = ask.Load();
+        return ask;
     }
 
     static async Task Answer(ChatMessage into, Func<RemoteLibrary, Task<JsonObject>> ask)

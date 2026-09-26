@@ -24,11 +24,7 @@ public static class Demo
         r.Lines.Add(new HeardLine { Time = "19:30", Text = "Think of each call as a plate on a stack. You can only take the top one off." });
         r.Lines.Add(new HeardLine { Time = "21:52", Text = "When factorial of three calls factorial of two, the first call is paused, waiting." });
         r.Lines.Add(new HeardLine { Time = "24:12", Text = "And when we hit the base case, the frames come off one by one.", Latest = true });
-        r.Chat.Add(new ChatMessage { Mine = true, Text = "What did she say is on the midterm?" });
-        var a = new ChatMessage { Text = "Recursion traces and call-stack diagrams, like last week's. Big-O proofs won't be on it." };
-        a.Sources.Add(new SourceChip { Label = "18:05", At = 1085 });
-        a.Sources.Add(new SourceChip { Label = "18:40", At = 1120 });
-        r.Chat.Add(a);
+        r.Ask = AiDemo.Chat();
         return r;
     }
 

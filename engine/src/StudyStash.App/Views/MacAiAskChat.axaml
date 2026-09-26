@@ -13,7 +13,7 @@
     <StyleInclude Source="avares://StudyStash/Views/MacAiStyles.axaml" />
   </UserControl.Styles>
 
-  <c:Glass CornerRadius="28" Padding="14,12,12,12" Width="360" ClipToBounds="False">
+  <c:Glass Name="Card" CornerRadius="28" Padding="14,12,12,12" Width="360" ClipToBounds="False">
     <StackPanel Spacing="10">
       <ItemsControl ItemsSource="{Binding Turns}">
         <ItemsControl.ItemsPanel>

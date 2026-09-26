@@ -4,6 +4,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacRecorder"
              x:DataType="vm:RecorderModel"
              ClipToBounds="False">
@@ -86,65 +87,8 @@
             </Border>
           </Grid>
 
-          <!-- Ask about this lecture -->
-          <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="12,4,12,12">
-            <!-- Not clipped: your bubble glows past its edge. -->
-            <ItemsControl ItemsSource="{Binding Chat}" ClipToBounds="False">
-              <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
-              </ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:ChatMessage">
-                  <Panel>
-                    <!-- Yours: text at most 78% of the 336 across, the answer's 88%, each plus its padding (as the design's CSS);
-                         a bubble whose text wraps takes all of that, as in the design -->
-                    <Border Classes="tint" IsVisible="{Binding Mine}" HorizontalAlignment="Right" MaxWidth="290" CornerRadius="18" Padding="14,8">
-                      <c:FitWidth>
-                        <TextBlock Text="{Binding Text}" FontSize="13" LineHeight="18.2" TextWrapping="Wrap" Foreground="{DynamicResource OnAccent}" />
-                      </c:FitWidth>
-                    </Border>
-                    <Border Classes="fill" IsVisible="{Binding !Mine}" HorizontalAlignment="Left" MaxWidth="324" CornerRadius="18" Padding="14,10">
-                      <c:FitWidth>
-                        <StackPanel Spacing="8">
-                          <c:Spinner IsVisible="{Binding Thinking}" Width="14" Height="14" HorizontalAlignment="Left" Foreground="{DynamicResource Fg2}" />
-                          <TextBlock Text="{Binding Text}" FontSize="13" LineHeight="18.85" TextWrapping="Wrap" />
-                          <ItemsControl ItemsSource="{Binding Sources}" IsVisible="{Binding HasSources}">
-                            <ItemsControl.ItemsPanel>
-                              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                              <DataTemplate x:DataType="vm:SourceChip">
-                                <Button Classes="fill2" Theme="{StaticResource Surface}" Height="26" CornerRadius="13" Padding="8,0,10,0"
-                                        Command="{Binding $parent[UserControl].((vm:RecorderModel)DataContext).PlayCommand}" CommandParameter="{Binding}"
-                                        ToolTip.Tip="Play from here">
-                                  <StackPanel Orientation="Horizontal" Spacing="3">
-                                    <c:Icon Glyph="play_arrow" Filled="True" Size="15" Foreground="{DynamicResource AccentText}" />
-                                    <TextBlock Classes="num" Text="{Binding Label}" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
-                                  </StackPanel>
-                                </Button>
-                              </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                          </ItemsControl>
-                        </StackPanel>
-                      </c:FitWidth>
-                    </Border>
-                  </Panel>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <Border Classes="fill" Height="44" CornerRadius="22" Padding="16,0,6,0" Margin="0,2,0,0">
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBox Classes="bare" Text="{Binding Question}" PlaceholderText="Ask about this lecture" PlaceholderForeground="{DynamicResource Fg2}" FontSize="13">
-                  <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
-                  </TextBox.KeyBindings>
-                </TextBox>
-                <Button Grid.Column="1" Classes="small" Background="{DynamicResource Fill2}" Command="{Binding AskCommand}" ToolTip.Tip="Ask">
-                  <c:Icon Glyph="arrow_upward" Size="18" Foreground="{DynamicResource Fg2}" />
-                </Button>
-              </Grid>
-            </Border>
-          </StackPanel>
+          <!-- Ask about this lecture, with any engine (design 16) -->
+          <v:MacAiAskChat Name="AskChat" DockPanel.Dock="Bottom" Margin="12,4,12,12" DataContext="{Binding Ask}" />
 
           <!-- What's been said, newest at the bottom, fading out toward the top -->
           <ScrollViewer Name="Heard" Padding="20,0,20,16" VerticalScrollBarVisibility="Hidden">
