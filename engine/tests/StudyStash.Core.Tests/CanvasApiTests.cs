@@ -252,11 +252,21 @@ public class CanvasApiTests
         await using var _1 = site;
         using var _2 = dir;
         var before = await GetAsync(site, "/api/v2/canvas/announcements?class=CS%20101");
-        // The listing isn't populated by the sync yet (a later task's work): the shape is right regardless.
-        Assert.True(before.ContainsKey("count"));
-        Assert.True(before.ContainsKey("new"));
-        var seen = await PostAsync(site, "/api/v2/canvas/announcements/seen", """{"class":"CS 101","ids":[1,2]}""");
+        Assert.Equal(4, before["count"]!.GetValue<int>());
+        Assert.Equal(1, before["new"]!.GetValue<int>()); // "Lab 3 is up" is the only unread one (design: "4 · 1 new")
+        var items = before["items"]!.AsArray();
+        Assert.Equal(["Lab 3 is up", "Office hours move to Thursday this week", "Problem set 3 solutions", "Welcome to COMP 101"],
+            items.Select(a => a!["title"]!.GetValue<string>())); // newest first
+        var unread = items.Single(a => a!["title"]!.GetValue<string>() == "Lab 3 is up")!;
+        Assert.Equal(("Dr. Okafor", true, false), (unread["author"]!.GetValue<string>(), unread["new"]!.GetValue<bool>(), unread["read_on_canvas"]!.GetValue<bool>()));
+        var withFile = items.Single(a => a!["title"]!.GetValue<string>() == "Problem set 3 solutions")!;
+        var file = Assert.Single(withFile["files"]!.AsArray());
+        Assert.Equal(("ps3-solutions.pdf", "PDF"), (file!["name"]!.GetValue<string>(), file["format"]!.GetValue<string>()));
+
+        var seen = await PostAsync(site, "/api/v2/canvas/announcements/seen", """{"class":"CS 101","ids":[6004]}""");
         Assert.True(seen.IsSuccessStatusCode);
+        var after = await GetAsync(site, "/api/v2/canvas/announcements?class=CS%20101");
+        Assert.Equal(0, after["new"]!.GetValue<int>()); // opened in Study Stash, though still unread on Canvas itself
     }
 
     [Fact]

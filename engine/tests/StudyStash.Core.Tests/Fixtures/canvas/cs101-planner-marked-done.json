@@ -1,0 +1,8 @@
+[
+  {
+    "context_type": "Course", "course_id": 4201, "plannable_type": "assignment", "plannable_id": 9001,
+    "plannable_date": "2025-10-01T06:59:00Z", "html_url": "https://canvas.test/courses/4201/assignments/9001",
+    "plannable": {"id": 9001, "title": "Lab 3: recursion traces"},
+    "planner_override": {"id": 501, "plannable_type": "assignment", "plannable_id": 9001, "marked_complete": true, "dismissed": false, "updated_at": "2025-09-24T20:00:00Z"}
+  }
+]
