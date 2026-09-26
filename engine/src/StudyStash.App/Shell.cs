@@ -122,6 +122,21 @@ public static partial class Shell
         public static void Record() => ToggleRecording();
         public static void StopRecording() => Shell.StopRecording();
         public static void ShowRecorder(bool expanded) => Shell.ShowRecorder(expanded);
+
+        /// <summary>Opens the dropdown the way clicking the real icon would (a Mac's status item; Windows' tray
+        /// otherwise), and how far its centre landed from the icon's own, in points — the self-test's placement
+        /// check ("panel under the icon"). Null off a Mac, or before the icon exists.</summary>
+        public static double? OpenPanelViaIcon()
+        {
+            if (!OperatingSystem.IsMacOS())
+            {
+                Shell.TogglePanel();
+                return null;
+            }
+            double? iconCentre = MacStatusItem.ButtonFrame() is { } f ? f.X + f.Width / 2 : null;
+            MacStatusItem.PerformClick();
+            return iconCentre is double x && panelWindow is { } w ? Math.Abs(w.Position.X + w.Bounds.Width / 2 - x) : null;
+        }
     }
 
     static void OnHandOff(string message)
@@ -218,6 +233,7 @@ public static partial class Shell
         }
         tray?.Dispose();
         tray = null;
+        if (OperatingSystem.IsMacOS()) MacStatusItem.Destroy();
         Player.Stop();
         host.Save(_ => { });
         Program.Log("[app] quitting");
@@ -225,9 +241,9 @@ public static partial class Shell
 
     // --- the tray ---------------------------------------------------------------------------------------------------
 
-    /// <summary>The icon: the waveform glyph (a template image on a Mac, which the menu bar tints), with a red dot
-    /// while recording.</summary>
-    static WindowIcon TrayImage(bool recording)
+    /// <summary>The icon, as PNG bytes: the waveform glyph (a template image on a Mac, which the menu bar tints),
+    /// with a red dot while recording.</summary>
+    static byte[] TrayImageBytes(bool recording)
     {
         const int size = 44;
         var bmp = new RenderTargetBitmap(new PixelSize(size, size), new Vector(96, 96));
@@ -241,14 +257,26 @@ public static partial class Shell
         }
         var stream = new MemoryStream();
         bmp.Save(stream, PngBitmapEncoderOptions.Default);
-        stream.Position = 0;
+        return stream.ToArray();
+    }
+
+    static WindowIcon TrayImage(bool recording)
+    {
+        var stream = new MemoryStream(TrayImageBytes(recording));
         return new WindowIcon(stream);
     }
 
     static void MakeTray()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            // Avalonia's own TrayIcon never raises Clicked on macOS, so the menu bar icon is a real NSStatusItem.
+            MacStatusItem.Create(leftClick: x => TogglePanel(new PixelPoint((int)x, 0)),
+                record: ToggleRecording, search: ToggleQuick, open: ShowLibrary, settings: ShowSettings, quit: () => Quit());
+            MacStatusItem.SetIcon(TrayImageBytes(false));
+            return;
+        }
         tray = new TrayIcon { Icon = TrayImage(false), ToolTipText = "Study Stash", IsVisible = true };
-        if (OperatingSystem.IsMacOS()) MacOSProperties.SetIsTemplateIcon(tray, true);
         tray.Clicked += (_, _) => TogglePanel();
         var menu = new NativeMenu();
         void Item(string title, Action act)
@@ -257,15 +285,16 @@ public static partial class Shell
             i.Click += (_, _) => act();
             menu.Add(i);
         }
-        // Windows opens the flyout on a click; this menu is the right click (and a Mac's fallback).
         Item("Record", ToggleRecording);
         Item("Search notes and lectures", ToggleQuick);
         Item("Open Study Stash", ShowLibrary);
         Item("Settings…", ShowSettings);
         menu.Add(new NativeMenuItemSeparator());
         Item("Quit Study Stash", () => Quit());
-        if (OperatingSystem.IsWindows()) tray.Menu = menu;
+        tray.Menu = menu;
         TrayIcon.SetIcons(app, new TrayIcons { tray });
+        // The tray's ink is black or white depending on the theme; redraw it when that changes.
+        app.ActualThemeVariantChanged += (_, _) => tray.Icon = TrayImage(trayRecording);
     }
 
     // --- what the buttons do ---------------------------------------------------------------------------------------
@@ -506,29 +535,30 @@ public static partial class Shell
 
     static Control PanelView() => Skin.Current == SkinKind.Mac ? new MacPanel { DataContext = panel } : new WinPanel { DataContext = panel };
 
-    static void TogglePanel()
+    /// <summary>Opens or closes the dropdown. <paramref name="near"/> is where the icon was clicked, when that's
+    /// known outright (the Mac status item hands its own icon's position); otherwise the pointer's own position is
+    /// asked for (a Windows tray click, or the shortcut).</summary>
+    static void TogglePanel(PixelPoint? near = null)
     {
         if (panelWindow?.IsVisible == true)
         {
             panelWindow.Hide();
             return;
         }
+        // The click that opens it follows the deactivate that just closed it (one gesture, two events): don't reopen.
+        if (panelWindow is not null && DateTime.UtcNow - panelWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
         panelWindow ??= new Floating { Content = PanelView(), CloseOnDeactivate = true, Title = "Study Stash" };
         Refresh();
-        var (area, scale) = panelWindow.WorkArea(Floating.Pointer());
+        // NSEvent's mouse location is in points, in the same coordinate space Avalonia's screens report: no
+        // rescaling (a display's own scale factor doesn't change where its menu bar sits in that shared space).
+        var pointer = near ?? Floating.Pointer();
+        var (_, scale) = panelWindow.WorkArea(pointer);
         var size = panelWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
-        if (OperatingSystem.IsMacOS())
-        {
-            // Below the menu bar, under the icon that was clicked.
-            int x = (Floating.Pointer()?.X is int px ? (int)(px * scale) : area.Right - size.Width) - (int)(24 * scale) - room;
-            panelWindow.Position = new PixelPoint(Math.Clamp(x, area.X, area.Right - size.Width), area.Y + (int)(6 * scale) - room);
-        }
-        else
-        {
-            // 12 px above the tray, like Quick Settings.
-            panelWindow.Position = new PixelPoint(area.Right - size.Width - (int)(12 * scale) + room, area.Bottom - size.Height - (int)(12 * scale) + room);
-        }
+        var anchor = pointer ?? new PixelPoint(0, 0);
+        panelWindow.Position = OperatingSystem.IsMacOS()
+            ? Placement.MacDropdown(anchor, panelWindow.ScreenList(), size, room)
+            : Placement.TrayFlyout(anchor, panelWindow.ScreenList(), size, room);
         panelWindow.Show();
         panelWindow.Activate();
         Desktop.Activate();
@@ -546,42 +576,49 @@ public static partial class Shell
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
         var w = new Floating { Content = view, Title = "Study Stash recorder" };
-        // Drag it anywhere by its background; it remembers where.
+        // Drag it anywhere by its background; where it lands is saved once the drag ends, not on every pixel moved.
         view.PointerPressed += (_, e) =>
         {
             if (e.Source is TextBox || !e.GetCurrentPoint(view).Properties.IsLeftButtonPressed) return;
             w.BeginMoveDrag(e);
         };
-        w.PositionChanged += (_, _) =>
-        {
-            if (!w.IsVisible) return;
-            var (_, scale) = w.WorkArea(w.Position);
-            var size = w.Measured(scale);
-            host.Settings.RecorderX = w.Position.X + size.Width;
-            host.Settings.RecorderY = w.Position.Y;
-        };
+        view.PointerReleased += (_, _) => SaveRecorderPosition();
         w.Closing += (_, e) =>
         {
             if (quitting) return;
             e.Cancel = true;
             w.Hide();
+            SaveRecorderPosition();
         };
+        // A display is unplugged, or one's plugged back in: put it back where it belongs, or on screen at least.
+        w.Screens.Changed += (_, _) => PlaceRecorder();
         return w;
     }
 
-    /// <summary>The recorder keeps its top right corner where you left it (a corner by default) as it grows and shrinks.</summary>
+    /// <summary>Remembers the recorder's top right corner, so it comes back there next time (a drag just ended, or
+    /// the window is about to hide or the app to quit).</summary>
+    static void SaveRecorderPosition()
+    {
+        if (recorderWindow is not { IsVisible: true } w) return;
+        var (_, scale) = w.WorkArea(w.Position);
+        var size = w.Measured(scale);
+        host.Save(s =>
+        {
+            s.RecorderX = w.Position.X + size.Width;
+            s.RecorderY = w.Position.Y;
+        });
+    }
+
+    /// <summary>The recorder keeps its top right corner where you left it (a corner by default) as it grows and
+    /// shrinks, on whichever display it was on — or the default corner, if that display is gone.</summary>
     static void PlaceRecorder()
     {
         if (recorderWindow is null) return;
-        var (area, scale) = recorderWindow.WorkArea();
+        var (_, scale) = recorderWindow.WorkArea(recorderWindow.Position);
         var size = recorderWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
-        int right = host.Settings.RecorderX is double rx ? (int)rx : area.Right - (int)(16 * scale) + room;
-        int top = host.Settings.RecorderY is double ry ? (int)ry
-            : OperatingSystem.IsMacOS() ? area.Y + (int)(10 * scale) - room : area.Bottom - size.Height - (int)(12 * scale) + room;
-        int x = Math.Clamp(right - size.Width, area.X - room, area.Right - size.Width + room);
-        int y = Math.Clamp(top, area.Y - room, area.Bottom - size.Height + room);
-        recorderWindow.Position = new PixelPoint(x, y);
+        PixelPoint? saved = host.Settings.RecorderX is double rx && host.Settings.RecorderY is double ry ? new PixelPoint((int)rx, (int)ry) : null;
+        recorderWindow.Position = Placement.KeepOnScreen(saved, recorderWindow.ScreenList(), size, OperatingSystem.IsMacOS(), room);
     }
 
     static void ToggleQuick()
@@ -591,6 +628,7 @@ public static partial class Shell
             quickWindow.Hide();
             return;
         }
+        if (quickWindow is not null && DateTime.UtcNow - quickWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
         var view = quickWindow?.Content;
         if (quickWindow is null)
         {
@@ -600,9 +638,11 @@ public static partial class Shell
         quick.Answering = false;
         quick.Query = "";
         _ = SearchAsync("");
-        var (area, scale) = quickWindow.WorkArea(Floating.Pointer());
+        var pointer = Floating.Pointer();
+        var (_, scale) = quickWindow.WorkArea(pointer);
         var size = quickWindow.Measured(scale);
-        quickWindow.Position = new PixelPoint(area.X + (area.Width - size.Width) / 2, area.Y + area.Height / 5 - (int)(Floating.ShadowRoom * scale));
+        int room = (int)(Floating.ShadowRoom * scale);
+        quickWindow.Position = Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room);
         quickWindow.Show();
         quickWindow.Activate();
         Desktop.Activate();
@@ -758,16 +798,11 @@ public static partial class Shell
         };
         view.Dismissed += w.Close;
         w.Closed += (_, _) => toasts.RemoveAll(t => t.Window == w);
-        var (area, scale) = w.WorkArea();
+        var (_, scale) = w.WorkArea();
         var size = w.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
         // Stacked below (a Mac, top right) or above (Windows, bottom right) whichever toasts are already showing.
-        int stacked = toasts.Sum(t => (int)t.Window.Measured(scale).Height + (int)(8 * scale));
-        int x = area.Right - size.Width - (int)(12 * scale) + room;
-        int y = OperatingSystem.IsMacOS()
-            ? area.Y + (int)(12 * scale) - room + stacked
-            : area.Bottom - size.Height - (int)(12 * scale) + room - stacked;
-        w.Position = new PixelPoint(x, y);
+        w.Position = Placement.ToastSpot(w.ScreenList(), toasts.Count, size, OperatingSystem.IsMacOS(), room);
         toasts.Add((title, now, w));
         w.Show();
         DispatcherTimer.RunOnce(() =>
@@ -868,10 +903,11 @@ public static partial class Shell
         if (lastLibraryState != LibraryState.Connected && host.Library == LibraryState.Connected) RequestLibraryReload();
         lastLibraryState = host.Library;
         RefreshRecent();
-        if (trayRecording != recording && tray is not null)
+        if (trayRecording != recording)
         {
             trayRecording = recording;
-            tray.Icon = TrayImage(recording);
+            if (OperatingSystem.IsMacOS()) MacStatusItem.SetIcon(TrayImageBytes(recording));
+            else if (tray is not null) tray.Icon = TrayImage(recording);
         }
         if (OperatingSystem.IsWindows()) UpdateTaskbar(problem);
         if (setup is not null) Setup.Refresh(setup, host);
