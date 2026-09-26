@@ -1,0 +1,22 @@
+<!-- A class page's reader (design 10, Windows): a page's saved text, or an announcement's body, under one meta
+     line. Draws no outer padding or window — the detail column gives the frame. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.WinCanvasReader"
+             x:DataType="vm:CanvasReaderModel">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/WinCanvasStyles.axaml" />
+  </UserControl.Styles>
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel MaxWidth="620" Margin="48,40,48,40" Spacing="10" HorizontalAlignment="Left">
+      <TextBlock Classes="cv-meta" Text="{Binding Meta}" />
+      <TextBlock Classes="cv-detail-title" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
+      <c:NoteView Markdown="{Binding Body}" />
+      <Button Classes="cv-hand-in" Margin="0,8,0,0" Command="{Binding OpenInCanvasCommand}">
+        <TextBlock Classes="cv-hand-in" Text="Open in Canvas" />
+      </Button>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
