@@ -133,7 +133,7 @@ public class CanvasTests
             _ => canvas.On(path, j => new CanvasResult(j.Id, 401, "", "", "", "", FakeCanvas.Base + "/login/saml") { SignedOut = true }),
         };
         Assert.True(canvas.Run(sync));
-        Assert.Equal(4, canvas.Requested.Count); // the first four asks, then nothing more
+        Assert.Equal(6, canvas.Requested.Count); // the first batch of per-class asks, then nothing more (the planner's job never goes out)
         Assert.False(sync.Crawl.Active);
         Assert.False(Directory.Exists(Path.Combine(FakeCanvas.CanvasRoot(dir), "assignments")));
         var s = CanvasSettings.Load(dir.Path);

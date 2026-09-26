@@ -1,20 +1,14 @@
 [
   {
-    "context_type": "Course", "course_id": 4201, "plannable_type": "assignment", "plannable_id": 9001,
-    "plannable_date": "2025-10-01T06:59:00Z", "html_url": "https://canvas.test/courses/4201/assignments/9001",
-    "plannable": {"id": 9001, "title": "Lab 3: recursion traces"},
-    "planner_override": {"id": 501, "plannable_type": "assignment", "plannable_id": 9001, "marked_complete": true, "dismissed": false, "updated_at": "2025-09-24T20:00:00Z"}
-  },
-  {
-    "context_type": "Course", "course_id": 4201, "plannable_type": "wiki_page", "plannable_id": 5501,
+    "context_type": "Course", "course_id": 4201, "plannable_type": "wiki_page", "plannable_id": 6601,
     "plannable_date": "2025-09-29T06:59:00Z", "html_url": "https://canvas.test/courses/4201/pages/read-chapter-4",
-    "plannable": {"id": 5501, "title": "Read: Chapter 4 overview", "todo_date": "2025-09-29T06:59:00Z"},
+    "plannable": {"id": 6601, "title": "Read: Chapter 4 overview", "todo_date": "2025-09-29T06:59:00Z"},
     "planner_override": null
   },
   {
-    "context_type": "Course", "course_id": 4201, "plannable_type": "calendar_event", "plannable_id": 5502,
-    "plannable_date": "2025-09-30T17:00:00Z", "html_url": "https://canvas.test/courses/4201/calendar_events/5502",
-    "plannable": {"id": 5502, "title": "Guest lecture: compilers"},
+    "context_type": "Course", "course_id": 4201, "plannable_type": "calendar_event", "plannable_id": 6602,
+    "plannable_date": "2025-09-30T17:00:00Z", "html_url": "https://canvas.test/courses/4201/calendar_events/6602",
+    "plannable": {"id": 6602, "title": "Guest lecture: compilers"},
     "planner_override": null
   }
 ]

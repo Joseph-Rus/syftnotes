@@ -129,8 +129,10 @@ public class CanvasAssignmentTests
         Assert.Contains("| Stack traces (A frame for every call, in order.) | 10 | Full marks (10); One frame missing (8); No marks (0) |", spec);
         string lab3 = File.ReadAllText(Path.Combine(FakeCanvas.CanvasRoot(dir), "assignments", "Lab 3- recursion traces", "spec.md"));
         Assert.Contains("| Correct traces (Every call and every return value is right.) | 10 | Full marks (10); Partial (5); No marks (0) |", lab3);
+        // The Syllabus quiz's fact line folds in the quiz listing's own facts (T6): its questions and time limit,
+        // instead of the assignment's bare "2 attempts".
         string quiz = File.ReadAllText(Path.Combine(FakeCanvas.CanvasRoot(dir), "assignments", "Syllabus quiz", "spec.md"));
-        Assert.Contains("**Due** Fri 5 Sep 2025, 11:59 PM · **5 points** · 2 attempts\n", quiz);
+        Assert.Contains("**Due** Fri 5 Sep 2025, 11:59 PM · **5 points** · Quiz · 5 questions · 15 minutes · 2 attempts\n", quiz);
     }
 
     [Fact]

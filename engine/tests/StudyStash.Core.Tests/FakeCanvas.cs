@@ -76,9 +76,13 @@ public sealed partial class FakeCanvas
     /// <summary>A listing in pages: each page links to the next, the way Canvas's Link header does.</summary>
     public FakeCanvas Pages(string path, params string[] pages)
     {
+        // A paged discussion_topics is always the announcements listing in these tests (the only one ever paged):
+        // Canvas's real Link header repeats the whole original query, so this one carries only_announcements=true
+        // forward too, the way Key() needs to keep telling it apart from a real (unpaged) discussions listing.
+        string extra = path.EndsWith("/discussion_topics", StringComparison.Ordinal) ? "&only_announcements=true" : "";
         for (int i = 0; i < pages.Length; i++)
             Set(i == 0 ? path : $"{path}?page={i + 1}", new Reply(200, Encoding.UTF8.GetBytes(JsonOf(pages[i])),
-                i + 1 < pages.Length ? $"<{Base}{path}?page={i + 2}>; rel=\"next\"" : ""));
+                i + 1 < pages.Length ? $"<{Base}{path}?page={i + 2}{extra}>; rel=\"next\"" : ""));
         return this;
     }
 
@@ -107,6 +111,12 @@ public sealed partial class FakeCanvas
 
     /// <summary>How many times a path (any page, any query) was asked for.</summary>
     public int Asked(string path) => Requested.Count(u => new Uri(u).AbsolutePath == path);
+
+    /// <summary>Like <see cref="Asked"/>, but for a course's <c>discussion_topics</c>: <paramref name="announcements"/>
+    /// picks the announcements listing (<c>only_announcements=true</c>) or the real discussions one (without it) —
+    /// they share a path, so plain <see cref="Asked"/> would count both.</summary>
+    public int AskedDiscussionTopics(string path, bool announcements) =>
+        Requested.Count(u => new Uri(u).AbsolutePath == path && u.Contains("only_announcements=true", StringComparison.Ordinal) == announcements);
 
     /// <summary>What the extension would hand back for this job.</summary>
     public CanvasResult Answer(CanvasJob job)
@@ -168,7 +178,8 @@ public sealed partial class FakeCanvas
         .Bytes("/files/8701/download", Encoding.UTF8.GetBytes("print('ps3')\n"))
         .Bytes("/files/8601/download", Encoding.UTF8.GetBytes("%PDF-1.4 lab 2"))
         .Bytes("/files/8600/download", Encoding.UTF8.GetBytes("%PDF-1.4 lab 2 draft"))
-        .Bytes("/files/8604/download", Encoding.UTF8.GetBytes("%PDF-1.4 lab 2 marked up"));
+        .Bytes("/files/8604/download", Encoding.UTF8.GetBytes("%PDF-1.4 lab 2 marked up"))
+        .Bytes("/files/5201/download", Encoding.UTF8.GetBytes("%PDF-1.4 ps3 solutions"));
 
     /// <summary>A library whose classes are linked to these Canvas courses, synced by a <see cref="CanvasSync"/> on the
     /// given clock, in California's time zone. Class folders are under <c>pool/</c> in the temp folder.</summary>

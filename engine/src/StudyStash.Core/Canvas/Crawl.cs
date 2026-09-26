@@ -365,17 +365,16 @@ public sealed partial class Crawl
     }
 
     /// <summary>The extension started afresh (installed, reloaded, or asked to sync): whatever it had taken is lost with
-    /// its old copy, so it goes back in the queue now instead of in ten minutes.</summary>
+    /// its old copy, so it goes back in the queue now, first out (ahead of anything nobody's tried yet), instead of
+    /// waiting ten minutes.</summary>
     public void Requeue()
     {
         lock (gate)
         {
             if (Inflight.Count == 0) return;
-            foreach (var (id, rec) in Inflight.ToList())
-            {
-                Jobs.Add(rec!["job"]!.DeepClone());
-                Inflight.Remove(id);
-            }
+            var lost = Inflight.Select(kv => kv.Value!["job"]!.DeepClone()).ToList(); // Inflight keeps the order Next() handed them out in
+            foreach (string id in Inflight.Select(kv => kv.Key).ToList()) Inflight.Remove(id);
+            for (int i = lost.Count - 1; i >= 0; i--) Jobs.Insert(0, lost[i]);
             Save();
         }
     }

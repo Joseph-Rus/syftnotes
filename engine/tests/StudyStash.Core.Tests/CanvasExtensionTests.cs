@@ -103,8 +103,8 @@ public class CanvasExtensionTests
 
         // Chrome runs 1.2: it takes the sync's first jobs, then reloads into the new folder before answering them.
         var taken = sync.Work(force: false, "1.2").Jobs;
-        Assert.Equal(4, taken.Count);
-        Assert.Equal((0, 4), sync.Crawl.Left);
+        Assert.Equal(6, taken.Count);
+        Assert.Equal((1, 6), sync.Crawl.Left); // the planner's one cross-class job is still waiting (Next takes 6 at a time)
 
         // The new copy starts with force: what the old one held comes back at once, not in ten minutes.
         var again = sync.Work(force: true, Extension.Version(), Extension.Protocol).Jobs;
@@ -174,7 +174,7 @@ public class CanvasExtensionTests
 
         // Version 1.2 speaks no protocol: it's given the sync's jobs like any other.
         var work = await JsonOf(await AsExtension("/api/v2/canvas/work?v=1.2"));
-        Assert.Equal(4, work["jobs"]!.AsArray().Count);
+        Assert.Equal(6, work["jobs"]!.AsArray().Count); // Next()'s batch of 6; the planner's cross-class job trails behind
         Assert.Equal((Extension.Version(), Extension.Protocol), (work["ext"]!.GetValue<string>(), work["p"]!.GetValue<int>()));
         var state = await AsApp(HttpMethod.Get);
         Assert.Equal(("1.2", Extension.Version(), true), (state["extension_version"]!.GetValue<string>(), state["extension_latest"]!.GetValue<string>(), state["extension_outdated"]!.GetValue<bool>()));

@@ -144,7 +144,7 @@ public class CanvasSyncTests
                 .On(AnnouncementsPath, j => new CanvasResult(j.Id, 0, "", "", "", "TypeError: Failed to fetch", ""));
             Assert.True(canvas.Run(sync));
             Assert.Equal(3, canvas.Asked(ModulesPath));
-            Assert.Equal(3, canvas.Asked(AnnouncementsPath));
+            Assert.Equal(3, canvas.AskedDiscussionTopics(AnnouncementsPath, announcements: true));
             var sections = sync.Crawl.Sections["CS 101"];
             Assert.Equal(("failed", "failed", "ok"), (sections["modules"], sections["announcements"], sections["assignments"]));
             string error = CanvasSettings.Load(dir.Path).Error;
@@ -205,7 +205,7 @@ public class CanvasSyncTests
             .Pages(AnnouncementsPath, Split("cs101-announcements.json", 2, 1, 1));
         Assert.True(canvas.Run(sync));
         Assert.Equal(2, canvas.Asked(ModulesPath));
-        Assert.Equal(3, canvas.Asked(AnnouncementsPath));
+        Assert.Equal(3, canvas.AskedDiscussionTopics(AnnouncementsPath, announcements: true));
 
         string root = FakeCanvas.CanvasRoot(dir);
         string modules = File.ReadAllText(Path.Combine(root, "modules.md"));
