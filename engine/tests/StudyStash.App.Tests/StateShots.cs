@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Styling;
@@ -31,7 +32,7 @@ public class StateShots
                     m.MicLevels = Wave;
                     m.MicHeard = true;
                     return View(skin, m);
-                }, 850, 608);
+                }, size: new Size(850, 608));
     }
 
     [AvaloniaFact]
@@ -45,7 +46,7 @@ public class StateShots
                     m.Go(SetupStep.Library);
                     m.LibraryResult = "Found mac-mini on your Tailscale network. Type its password.";
                     return View(skin, m);
-                }, 850, 608);
+                }, size: new Size(850, 608));
     }
 
     [AvaloniaFact]
@@ -60,7 +61,7 @@ public class StateShots
                     m.PickThisCommand.Execute(null);
                     m.LibraryName = "Ada's library";
                     return View(skin, m);
-                }, 850, 608);
+                }, size: new Size(850, 608));
     }
 
     // --- the dropdown, saying what's wrong (task 6) -----------------------------------------------------------------
@@ -120,6 +121,6 @@ public class StateShots
         string slug = kind.ToString().ToLowerInvariant();
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
             foreach (var t in Themes)
-                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-dropdown-{slug}", skin, t, () => PanelView(skin, PanelWith(kind)), 360, 460);
+                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-dropdown-{slug}", skin, t, () => PanelView(skin, PanelWith(kind)), size: new Size(360, 460));
     }
 }
