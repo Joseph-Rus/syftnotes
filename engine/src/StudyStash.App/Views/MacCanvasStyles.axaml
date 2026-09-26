@@ -342,7 +342,7 @@
     <Setter Property="FontWeight" Value="Medium" />
   </Style>
   <Style Selector="Button.cv-toolbtn /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource Edge}, {DynamicResource CtlShadow}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource CtlGlassShadow}" />
   </Style>
   <Style Selector="Button.cv-toolicon">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -353,7 +353,7 @@
     <Setter Property="HorizontalContentAlignment" Value="Center" />
   </Style>
   <Style Selector="Button.cv-toolicon /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource Edge}, {DynamicResource CtlShadow}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource CtlGlassShadow}" />
   </Style>
 
   <!-- design 10/11: a Canvas-linked class's own page -->
@@ -419,6 +419,7 @@
   </Style>
   <Style Selector="Button.cv-mod-item">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Margin" Value="10,0" />
     <Setter Property="Padding" Value="12,6" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
@@ -431,6 +432,7 @@
   </Style>
   <Style Selector="Button.cv-mod-collapsed">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Margin" Value="10,0" />
     <Setter Property="Padding" Value="12,6" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
@@ -442,6 +444,7 @@
   <!-- a lecture row -->
   <Style Selector="Button.cv-lecture-row">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Margin" Value="10,0" />
     <Setter Property="Padding" Value="12,7" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>

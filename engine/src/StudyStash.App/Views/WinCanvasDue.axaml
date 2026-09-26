@@ -27,8 +27,8 @@
                       <!-- No column/row defs: the indicator overlays the row's content, matching the design's
                            absolutely-positioned accent bar. -->
                       <Grid>
-                        <Border Classes="cv-row-indicator" IsVisible="{Binding Selected}" />
-                        <StackPanel Spacing="2" Margin="12,0,0,0">
+                        <Border Classes="cv-row-indicator" IsVisible="{Binding Selected}" Margin="-12,0,0,0" />
+                        <StackPanel Spacing="2">
                           <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Classes="cv-row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
                             <TextBlock Grid.Column="1" Classes="cv-row-right" Classes.cv-strong="{Binding Strong}"

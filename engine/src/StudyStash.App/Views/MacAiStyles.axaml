@@ -33,8 +33,9 @@
     <Setter Property="Background" Value="{DynamicResource Sep}" />
     <Setter Property="Margin" Value="16,0,0,0" />
   </Style>
+  <!-- A row is 57 px in all (design 13): its own 8 px margin above and below, round at least this. -->
   <Style Selector="Grid.ai-row">
-    <Setter Property="MinHeight" Value="56" />
+    <Setter Property="MinHeight" Value="41" />
   </Style>
   <Style Selector="StackPanel.ai-row-text">
     <Setter Property="Spacing" Value="2" />
@@ -85,6 +86,13 @@
     <Setter Property="FontSize" Value="13" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
+  <Style Selector="Border.ai-pill > StackPanel">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-pill > StackPanel > TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
   <Style Selector="Border.ai-pill.primary">
     <Setter Property="Background" Value="{DynamicResource Tint}" />
     <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
@@ -112,6 +120,10 @@
   </Style>
   <Style Selector="Border.ai-select TextBlock">
     <Setter Property="FontSize" Value="13" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-select > Grid">
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Button.ai-select-btn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
@@ -219,6 +231,13 @@
     <Setter Property="Height" Value="30" />
     <Setter Property="CornerRadius" Value="15" />
     <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
+  </Style>
+  <!-- The chip's words and icons sit on its middle line, whatever the host's own alignment. -->
+  <Style Selector="Border.ai-chip > StackPanel">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-chip StackPanel > TextBlock">
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Border.ai-chip TextBlock">
     <Setter Property="FontSize" Value="12" />

@@ -107,6 +107,7 @@ public static class Demo
         {
             ClassName = "CS 101", Dot = Cs, Meta = "CS 101 · Tuesday 23 September · 1 h 12 min", Title = "Recursion and the call stack", Markdown = Notes,
         };
+        m.Ask = AiDemo.AskIdle();
         return m;
     }
 

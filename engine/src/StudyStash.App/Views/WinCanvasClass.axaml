@@ -14,8 +14,8 @@
     <DataTemplate x:Key="AssignmentRow" x:DataType="vm:DueRow">
       <Button Classes="cv-due-row" Classes.cv-selected="{Binding Selected}" Command="{Binding SelectCommand}">
         <Grid>
-          <Border Classes="cv-row-indicator" IsVisible="{Binding Selected}" />
-          <StackPanel Spacing="2" Margin="12,0,0,0">
+          <Border Classes="cv-row-indicator" IsVisible="{Binding Selected}" Margin="-12,0,0,0" />
+          <StackPanel Spacing="2">
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Classes="cv-row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
               <TextBlock Grid.Column="1" Classes="cv-row-right" Classes.cv-strong="{Binding Strong}"
@@ -43,7 +43,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <Button Classes="cv-hand-in" Margin="8,4,0,0" Command="{Binding AllLecturesCommand}">
+        <Button Classes="cv-hand-in" Margin="20,4,0,0" Command="{Binding AllLecturesCommand}">
           <TextBlock Classes="cv-link" Text="{Binding AllLecturesText}" />
         </Button>
       </StackPanel>
@@ -64,7 +64,7 @@
           <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource ModuleItemTemplate}" />
         </StackPanel>
         <Button Classes="cv-mod-collapsed" IsVisible="{Binding !Expanded}" Command="{Binding ToggleCommand}">
-          <Grid ColumnDefinitions="Auto,*,Auto">
+          <Grid ColumnDefinitions="Auto,*,Auto" Margin="26,0,0,0">
             <c:Icon Grid.Column="0" Classes="cv-tree-icon" Glyph="chevron_right" Margin="0,0,10,0" />
             <TextBlock Grid.Column="1" Classes="cv-mod-collapsed-text" Text="{Binding Name}" />
             <TextBlock Grid.Column="2" Classes="cv-mod-collapsed-text" Text="{Binding ItemsCountText}" Margin="8,0,0,0" />

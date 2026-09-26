@@ -79,7 +79,7 @@ public class CanvasShots
 
     /// <summary>The Connected fixtures Settings → Canvas reads for design 06: state, overview, classes, and the
     /// POST routes its buttons hit (never actually called by a shot, but harmless to answer).</summary>
-    static FakeLibrary ConnectedLibrary(string state = "state-connected") => new FakeLibrary()
+    internal static FakeLibrary ConnectedLibrary(string state = "state-connected") => new FakeLibrary()
         .Json(HttpMethod.Get, "/api/v2/canvas/state", state)
         .Json(HttpMethod.Get, "/api/v2/canvas", "canvas")
         .Json(HttpMethod.Get, "/api/v2/canvas/classes", "classes")
@@ -126,14 +126,14 @@ public class CanvasShots
 
     // ---- design 09: the Due list and an assignment ----
 
-    static async Task<CanvasDueModel> DueModel()
+    internal static async Task<CanvasDueModel> DueModel()
     {
         var model = new CanvasDueModel(CanvasFixtures.Context(new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/due", "due")));
         await model.LoadAsync();
         return model;
     }
 
-    static AssignmentModel Detail(string fixture)
+    internal static AssignmentModel Detail(string fixture)
     {
         var m = new AssignmentModel(CanvasFixtures.Context());
         m.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>(fixture));
@@ -193,7 +193,7 @@ public class CanvasShots
         ("Functions as values", new DateTimeOffset(2025, 9, 16, 20, 0, 0, TimeSpan.Zero)),
     ];
 
-    static CanvasClassModel ClassModel()
+    internal static CanvasClassModel ClassModel()
     {
         var model = new CanvasClassModel(CanvasFixtures.Context());
         var cs101 = CanvasFixtures.Load<List<CanvasApi.ClassRow>>("classes").Single(c => c.Class == "CS 101");
@@ -394,7 +394,7 @@ public class CanvasShots
     /// <summary>The design's own three example toasts: the first expanded with its buttons, the rest collapsed —
     /// exactly what the gallery in "Canvas Quick.html" draws, not a live poll's own ordering (see
     /// <see cref="CanvasNotifier"/> for that).</summary>
-    static CanvasToastModel[] ToastGallery() =>
+    internal static CanvasToastModel[] ToastGallery() =>
     [
         new(Notification(1, "new_assignment", "New assignment", "CS 101 · Lab 3 · due Tue 11:59 PM")) { When = "now", Expanded = true },
         new(Notification(2, "due_moved", "Due date moved", "CALC II · Quiz 3 practice · now Fri 9:00 AM")) { When = "now" },
@@ -405,7 +405,7 @@ public class CanvasShots
 
     static IBrush DotOf(string cls) => Skin.ClassDot(Array.IndexOf(DotClasses, cls) is var i && i >= 0 ? i : 0);
 
-    static QuickModel QuickWithDue()
+    internal static QuickModel QuickWithDue()
     {
         var due = CanvasFixtures.Load<CanvasApi.DueResponse>("due");
         var state = CanvasFixtures.Load<CanvasApi.State>("state-connected");

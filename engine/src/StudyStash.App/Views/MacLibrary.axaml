@@ -36,6 +36,38 @@
     <Style Selector="Button.cls TextBlock.count">
       <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     </Style>
+    <Style Selector="TextBlock.classes">
+      <Setter Property="Margin" Value="10,8,10,6" />
+    </Style>
+    <Style Selector="Button.cls.unsorted">
+      <Setter Property="Padding" Value="7,0" />
+      <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
+    <Style Selector="c|Icon.unsorted">
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+    </Style>
+    <Style Selector="StackPanel.side.canvas">
+      <Setter Property="Spacing" Value="2" />
+    </Style>
+    <Style Selector="StackPanel.side.canvas StackPanel.rows">
+      <Setter Property="Spacing" Value="2" />
+    </Style>
+    <Style Selector="StackPanel.side.canvas Panel.slot">
+      <Setter Property="Width" Value="16" />
+    </Style>
+    <Style Selector="StackPanel.side.canvas TextBlock.classes">
+      <Setter Property="Margin" Value="10,10,10,4" />
+    </Style>
+    <Style Selector="StackPanel.side.canvas Button.cls.unsorted">
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
+    <Style Selector="StackPanel.side.canvas c|Icon.unsorted">
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    </Style>
+    <Style Selector="StackPanel.side.canvas Button.cls.selected TextBlock.title">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
     <Style Selector="Button.card">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="CornerRadius" Value="14" />
@@ -103,27 +135,33 @@
             <Ellipse Width="12" Height="12" Fill="#FEBC2E" />
             <Ellipse Width="12" Height="12" Fill="#28C840" />
           </StackPanel>
-          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="10,0,10,4">
-            <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" />
-            <TextBlock Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
-          </StackPanel>
-          <StackPanel>
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,8,*" Margin="10,0,10,4">
+            <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Top" Margin="0,5,0,0" />
+            <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+          </Grid>
+          <!-- With Canvas (design 09) the rows sit 2 px apart, each led by a 16 px slot, and the chosen one is bolder. -->
+          <StackPanel Classes="side" Classes.canvas="{Binding HasDue}">
             <Button Classes="cls" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
                     Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
               <Grid ColumnDefinitions="Auto,8,*,Auto">
-                <c:Icon Glyph="event_upcoming" Size="16" Foreground="{DynamicResource AccentText}" />
+                <c:Icon Glyph="event_upcoming" Size="17" Width="16" Foreground="{DynamicResource AccentText}" />
                 <TextBlock Grid.Column="2" Classes="title" Text="Due" FontSize="13" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="3" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" FontSize="13" VerticalAlignment="Center" />
               </Grid>
             </Button>
-            <TextBlock Text="Classes" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" Margin="10,8,10,6" />
+            <TextBlock Classes="classes" Text="Classes" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
             <ItemsControl ItemsSource="{Binding Classes}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Classes="rows" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:ClassItem">
                   <Button Classes="cls" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
                           Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
                     <Grid ColumnDefinitions="Auto,8,*,Auto">
-                      <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                      <Panel Classes="slot">
+                        <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                      </Panel>
                       <TextBlock Grid.Column="2" Classes="title" Text="{Binding Name}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="3" Classes="count" Text="{Binding Count}" FontSize="13" VerticalAlignment="Center" />
                     </Grid>
@@ -131,11 +169,11 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Button Classes="cls" Classes.selected="{Binding Unsorted.Selected, FallbackValue=False}" Padding="7,0" Margin="0,8,0,0"
+            <Button Classes="cls unsorted" Classes.selected="{Binding Unsorted.Selected, FallbackValue=False}"
                     IsVisible="{Binding Unsorted, Converter={x:Static ObjectConverters.IsNotNull}}"
                     Command="{Binding PickClassCommand}" CommandParameter="{Binding Unsorted}">
               <Grid ColumnDefinitions="Auto,8,*,Auto">
-                <c:Icon Glyph="inbox" Size="16" Foreground="{DynamicResource AccentText}" />
+                <c:Icon Classes="unsorted" Glyph="inbox" Size="16" Width="16" />
                 <TextBlock Grid.Column="2" Classes="title" Text="Unsorted" FontSize="13" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="3" Classes="count" Text="{Binding Unsorted.Count, FallbackValue=0}" FontSize="13" VerticalAlignment="Center" />
               </Grid>
@@ -147,10 +185,12 @@
       <!-- The list: lectures by week, Canvas's Due list, or a linked class's own page -->
       <Panel Grid.Column="1" Grid.ColumnSpan="{Binding ColumnSpan}" Width="{Binding ListWidth}" IsVisible="{Binding ShowListColumn}">
       <DockPanel Margin="0,8,0,0" IsVisible="{Binding ShowLectures}">
-        <StackPanel DockPanel.Dock="Top" Height="52" VerticalAlignment="Center" Margin="20,0">
-          <TextBlock Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold" />
-          <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
-        </StackPanel>
+        <Border DockPanel.Dock="Top" Height="52" Margin="20,0">
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold" />
+            <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
+          </StackPanel>
+        </Border>
         <Panel>
           <TextBlock IsVisible="{Binding HasEmpty}" Text="{Binding Empty}" FontSize="13" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="20,10" />
           <ScrollViewer VerticalScrollBarVisibility="Auto">

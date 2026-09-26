@@ -53,6 +53,26 @@ public static class AiDemo
         public Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null) => Task.FromResult<ToolAccessInfo?>(Access());
     }
 
+    /// <summary>A library's AI that answers the design's overview (and no rewrite running): what the settings window
+    /// and the full app read in their pictures.</summary>
+    public static IAiLibrary DemoLibrary() => new Library(Overview(), id => new RewriteInfo(id, "none"));
+
+    /// <summary>A lecture's notes as the full app shows them before any rewrite: written by Ollama.</summary>
+    public static AiNotesModel LectureNotes(string markdown)
+    {
+        var m = new AiNotesModel(DemoLibrary());
+        m.Load(LectureId, markdown, "Ollama", Now).GetAwaiter().GetResult();
+        return m;
+    }
+
+    /// <summary>The ask bar under a lecture, nothing asked yet: questions go to Claude Code.</summary>
+    public static AiAskModel AskIdle()
+    {
+        var m = new AiAskModel(DemoLibrary()) { LectureId = LectureId, ClassName = "CS 101" };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
     /// <summary>The AI engines pane, loaded: notes on Ollama, questions on Claude Code, the fallback on.</summary>
     public static AiEnginesModel Engines()
     {

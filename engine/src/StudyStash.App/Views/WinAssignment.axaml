@@ -49,11 +49,11 @@
             </Grid>
           </Border>
 
-          <TextBlock Classes="cv-h3" Text="Instructions" Margin="0,6,0,0" IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Classes="cv-h3" Text="Instructions" Margin="0,18,0,0" IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           <TextBlock Text="{Binding Instructions}" FontSize="15" LineHeight="24" TextWrapping="Wrap"
                      IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-          <TextBlock Classes="cv-h3" Text="Rubric" Margin="0,2,0,0" IsVisible="{Binding HasRubric}" />
+          <TextBlock Classes="cv-h3" Text="Rubric" Margin="0,14,0,0" IsVisible="{Binding HasRubric}" />
           <ItemsControl ItemsSource="{Binding Rubric}" IsVisible="{Binding HasRubric}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:RubricRow">
@@ -69,7 +69,7 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
 
-          <TextBlock Classes="cv-h3" Text="Your submission" Margin="0,2,0,0" />
+          <TextBlock Classes="cv-h3" Text="Your submission" Margin="0,14,0,0" />
           <Border Classes="cv-submission">
             <StackPanel Spacing="12">
               <StackPanel Orientation="Horizontal" Spacing="10">

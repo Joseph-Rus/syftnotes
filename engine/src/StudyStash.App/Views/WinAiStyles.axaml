@@ -74,6 +74,12 @@
     <Setter Property="FontSize" Value="14" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
+  <Style Selector="Border.ai-pill > StackPanel">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-pill > StackPanel > TextBlock">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
   <Style Selector="Border.ai-pill.primary">
     <Setter Property="Background" Value="{DynamicResource Accent}" />
     <Setter Property="BorderThickness" Value="0" />
@@ -220,6 +226,13 @@
   </Style>
   <Style Selector="Border.ai-chip-engine TextBlock, Border.ai-chip-scope TextBlock">
     <Setter Property="FontSize" Value="14" />
+  </Style>
+  <!-- The chip's words and icons sit on its middle line, whatever the host's own alignment. -->
+  <Style Selector="Border.ai-chip-engine > StackPanel, Border.ai-chip-scope > StackPanel">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-chip-engine StackPanel > TextBlock, Border.ai-chip-scope StackPanel > TextBlock">
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Button.ai-chipbtn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
