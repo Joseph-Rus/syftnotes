@@ -1,0 +1,392 @@
+<!-- Shared looks for the Mac's AI screens (13–18): the settings pane's title and groups, pills, selects, the state
+     dot, a toggle switch and a radio, all in Liquid Glass. Included from each AI UserControl, never from Styles.axaml
+     (WS2's). -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:StudyStash.App.Controls">
+  <Style Selector="TextBlock.ai-title">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="26" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="TextBlock.ai-sub">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="19.5" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.ai-section">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.ai-link">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+
+  <Style Selector="Border.ai-group">
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Background" Value="{DynamicResource Group}" />
+  </Style>
+  <Style Selector="Border.ai-sep">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Sep}" />
+    <Setter Property="Margin" Value="16,0,0,0" />
+  </Style>
+  <Style Selector="Grid.ai-row">
+    <Setter Property="MinHeight" Value="56" />
+  </Style>
+  <Style Selector="StackPanel.ai-row-text">
+    <Setter Property="Spacing" Value="2" />
+  </Style>
+  <Style Selector="TextBlock.ai-row-title">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="TextBlock.ai-row-sub">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <Style Selector="Border.ai-tile">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+  </Style>
+
+  <Style Selector="Ellipse.ai-dot">
+    <Setter Property="Width" Value="6" />
+    <Setter Property="Height" Value="6" />
+    <Setter Property="Fill" Value="{DynamicResource Fg3}" />
+  </Style>
+  <Style Selector="Ellipse.ai-dot.good">
+    <Setter Property="Fill" Value="{DynamicResource Good}" />
+  </Style>
+  <Style Selector="Ellipse.ai-dot.warn">
+    <Setter Property="Fill" Value="{DynamicResource Warn}" />
+  </Style>
+  <Style Selector="TextBlock.ai-state">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="TextBlock.ai-state.warn">
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+  </Style>
+
+  <!-- The design's pill button: plain (Raised) or primary (Tint), 30 tall, r15. -->
+  <Style Selector="Border.ai-pill">
+    <Setter Property="Height" Value="30" />
+    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Background" Value="{DynamicResource Raised}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+  </Style>
+  <Style Selector="Border.ai-pill > TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-pill.primary">
+    <Setter Property="Background" Value="{DynamicResource Tint}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
+  </Style>
+  <Style Selector="Border.ai-pill.primary > TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="Button.ai-pillbtn">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="CornerRadius" Value="15" />
+  </Style>
+  <Style Selector="Button.ai-textbtn">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+  </Style>
+
+  <!-- The design's select: a pill with a name and unfold_more, opening a Flyout. -->
+  <Style Selector="Border.ai-select">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Width" Value="180" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Background" Value="{DynamicResource Raised}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+    <Setter Property="Padding" Value="12,0,8,0" />
+  </Style>
+  <Style Selector="Border.ai-select TextBlock">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="Button.ai-select-btn">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+  </Style>
+
+  <Style Selector="MenuItem.ai-item">
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <Styles.Resources>
+    <!-- The menu (the "Answer with" / "Add an engine" look, in miniature for 13's own selects). -->
+    <ControlTheme x:Key="AiMenuFlyout" TargetType="MenuFlyoutPresenter">
+      <Setter Property="Background" Value="{DynamicResource GlassSolid}" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="6" />
+      <Setter Property="MinWidth" Value="180" />
+    </ControlTheme>
+
+    <!-- A toggle switch: 38×22, r11, the knob 18, white. -->
+    <ControlTheme x:Key="AiToggle" TargetType="ToggleButton">
+      <Setter Property="Width" Value="38" />
+      <Setter Property="Height" Value="22" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="Track" CornerRadius="11" Background="{DynamicResource Fill2}">
+            <Border Name="Knob" Width="18" Height="18" CornerRadius="9" Background="White" HorizontalAlignment="Left" Margin="2,0,0,0"
+                    BoxShadow="0 1 3 0 #40000000" />
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:checked /template/ Border#Track">
+        <Setter Property="Background" Value="{DynamicResource Accent}" />
+      </Style>
+      <Style Selector="^:checked /template/ Border#Knob">
+        <Setter Property="HorizontalAlignment" Value="Right" />
+        <Setter Property="Margin" Value="0,0,2,0" />
+      </Style>
+    </ControlTheme>
+  </Styles.Resources>
+
+  <!-- A radio: 16, on = Accent fill with a 6px white dot; off = a 1px Fg3 ring. -->
+  <Style Selector="Border.ai-radio">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Fg3}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Border.ai-radio.on">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <!-- The "Answer with" / "Rewrite notes with" menu (16/17): glass, 260/280 wide, r18. -->
+  <Style Selector="TextBlock.ai-menu-header">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="Padding" Value="10,6,10,4" />
+  </Style>
+  <Style Selector="Border.ai-menu-item">
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="10,6" />
+  </Style>
+  <Style Selector="Border.ai-menu-item.selected">
+    <Setter Property="Background" Value="{DynamicResource Tint}" />
+  </Style>
+  <Style Selector="Border.ai-menu-item.selected TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+  </Style>
+  <Style Selector="Border.ai-menu-item.selected TextBlock.ai-menu-sub">
+    <Setter Property="Opacity" Value="0.85" />
+  </Style>
+  <Style Selector="Border.ai-menu-item.selected c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+  </Style>
+  <Style Selector="Border.ai-menu-item.disabled">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+  <Style Selector="TextBlock.ai-menu-title">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="TextBlock.ai-menu-sub">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="Button.ai-menu-footer">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Padding" Value="32,6,10,6" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Button.ai-menu-footer TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <!-- The ask bar (16): glass 560×48 r24, an engine chip, a scope chip and a round send button. -->
+  <Style Selector="Border.ai-chip">
+    <Setter Property="Height" Value="30" />
+    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
+  </Style>
+  <Style Selector="Border.ai-chip TextBlock">
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="Border.ai-chip-engine">
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+    <Setter Property="Padding" Value="10,0,8,0" />
+  </Style>
+  <Style Selector="Border.ai-chip-scope">
+    <Setter Property="Background" Value="{DynamicResource Fill}" />
+    <Setter Property="Padding" Value="12,0,8,0" />
+  </Style>
+  <Style Selector="Border.ai-chip-scope TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="Button.ai-chipbtn">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="CornerRadius" Value="15" />
+  </Style>
+  <Style Selector="Button.ai-send">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-send">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+  </Style>
+
+  <!-- The chat's bubbles and field, and the ask bar's floating answer card (16). -->
+  <Style Selector="Border.ai-bubble-q">
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Padding" Value="14,8" />
+    <Setter Property="Background" Value="{DynamicResource Tint}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+  </Style>
+  <Style Selector="Border.ai-bubble-q TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Border.ai-bubble-a">
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Padding" Value="14,10" />
+    <Setter Property="Background" Value="{DynamicResource Fill}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="TextBlock.ai-answer">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="18.85" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.ai-byline">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="TextBlock.ai-thinking">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="Border.ai-field">
+    <Setter Property="Height" Value="44" />
+    <Setter Property="CornerRadius" Value="22" />
+    <Setter Property="Background" Value="{DynamicResource Fill}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
+    <Setter Property="Padding" Value="16,0,6,0" />
+  </Style>
+  <Style Selector="Border.ai-field-chip">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+    <Setter Property="Padding" Value="8,0,6,0" />
+  </Style>
+  <Style Selector="Border.ai-field-chip TextBlock">
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="Border.ai-field-send">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+  </Style>
+
+  <!-- A borderless pill (Keep old / Dismiss / Deny): text only, no fill, unlike Border.ai-pill. -->
+  <Style Selector="Border.ai-pill-plain">
+    <Setter Property="Height" Value="30" />
+    <Setter Property="CornerRadius" Value="15" />
+    <Setter Property="Padding" Value="14,0" />
+  </Style>
+  <Style Selector="Border.ai-pill-plain > TextBlock">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- The notes header row (17): Summary + byline, and the page's own "Rewrite notes" pill. -->
+  <Style Selector="TextBlock.ai-notes-title">
+    <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+    <Setter Property="FontSize" Value="17" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.ai-notes-byline">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <!-- The rewrite status bar (17): r14 Group, a spinner or icon, its words, its actions. -->
+  <Style Selector="Border.ai-bar">
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Background" Value="{DynamicResource Group}" />
+  </Style>
+  <Style Selector="TextBlock.ai-bar-lead">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.ai-bar-text">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <!-- A compare column's own small heading ("Current notes" / "New notes from …"). -->
+  <Style Selector="TextBlock.ai-compare-head">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+
+  <!-- While the "Rewrite notes with" menu is open, the notes dim to .5 (17). -->
+  <Style Selector="Border.ai-dim">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Border.ai-dim.dimmed">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+
+  <!-- The AI problem card (18): r16 Group, an icon, a title and message, up to two actions. -->
+  <Style Selector="Border.ai-problem">
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Background" Value="{DynamicResource Group}" />
+    <Setter Property="Padding" Value="16,14,14,14" />
+  </Style>
+  <Style Selector="TextBlock.ai-problem-caption">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
+  </Style>
+  <Style Selector="TextBlock.ai-problem-title">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.ai-problem-message">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LineHeight" Value="17.4" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="c|Icon.ai-problem-icon">
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="c|Icon.ai-problem-icon.accent">
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="c|Icon.ai-problem-icon.warn">
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+  </Style>
+</Styles>
