@@ -106,6 +106,11 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     partial void OnMenuOpenChanged(bool value) => OnPropertyChanged(nameof(Dimmed));
 
+    partial void OnEngineChanged(string value)
+    {
+        foreach (var i in Menu.Items) i.Selected = i.Id == value;
+    }
+
     /// <summary>Sets the notes as they stand right now (from the lecture the host already has), then reads the
     /// library once to build the "Rewrite notes with" menu and pick up any job already running.</summary>
     public async Task Load(string lectureId, string markdown, string notesModel, string updatedAt)
@@ -179,6 +184,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         if (info.Current is { } cur) SetCurrent(cur.Markdown, cur.By, cur.At);
         EngineName = info.EngineName;
         Error = info.Error;
+        if (info.Engine.Length > 0) lastEngine = info.Engine;
         if (info.Draft is { } d)
         {
             DraftMarkdown = d.Markdown;

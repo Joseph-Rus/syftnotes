@@ -491,3 +491,381 @@ public class AiAskModelTests
         Assert.Empty(model.Menu.Items);
     }
 }
+
+public class AiWordsRewriteAndProblemTests
+{
+    [Fact]
+    public void A_leading_summary_heading_is_dropped_but_no_other_one_is()
+    {
+        Assert.Equal("Body text.", AiWords.DropLeadingSummary("# Summary\nBody text."));
+        Assert.Equal("Body text.", AiWords.DropLeadingSummary("## Summary\n\nBody text."));
+        Assert.Equal("No heading here.", AiWords.DropLeadingSummary("No heading here."));
+        Assert.Equal("# Topics\nBody.\n## Summary\nMore.", AiWords.DropLeadingSummary("# Topics\nBody.\n## Summary\nMore."));
+    }
+
+    [Fact]
+    public void Bylines_read_the_designs_way()
+    {
+        Assert.Equal("Written by Ollama · Tue 11:52", AiWords.WrittenByline("Ollama", new DateTime(2025, 9, 23, 11, 52, 0).ToString("o")));
+        Assert.Equal("Claude Code · just now", AiWords.DraftByline("Claude Code", DateTime.Now.ToString("o"), DateTime.Now));
+    }
+
+    [Theory]
+    [InlineData("engine_offline", "Engine offline", "power_off", "Accent", "err")]
+    [InlineData("not_signed_in", "Not signed in", "person_off", "Warn", "warn")]
+    [InlineData("model_missing", "Model missing", "download", "Warn", "warn")]
+    [InlineData("usage_limit", "Usage limit", "hourglass_top", "Fg2", "info")]
+    [InlineData("fell_back", "Fell back", "swap_horiz", "Fg2", "info")]
+    [InlineData("access_request", "Access request", "key", "Fg2", "info")]
+    [InlineData("library_offline", "Library offline", "cloud_off", "Warn", "err")]
+    [InlineData("rewrite_failed", "Rewrite failed", "error", "Warn", "err")]
+    public void Every_problem_kind_has_its_caption_icon_colour_and_severity(string kind, string caption, string icon, string colour, string severity)
+    {
+        Assert.Equal(caption, AiWords.ProblemCaption(kind));
+        Assert.Equal(icon, AiWords.ProblemIcon(kind));
+        Assert.Equal(colour, AiWords.ProblemColorKey(kind));
+        Assert.Equal(severity, AiWords.ProblemSeverity(kind));
+    }
+
+    [Fact]
+    public void Problem_words_match_the_designs_exact_sentences()
+    {
+        Assert.Equal("Ollama isn't running on your library", AiWords.ProblemTitle("engine_offline", "Ollama", ""));
+        Assert.Equal("New lectures wait and get their notes when it's back.", AiWords.ProblemMessage("engine_offline", "Ollama", "", "", 0, ""));
+
+        Assert.Equal("Sign in to Codex on your library", AiWords.ProblemTitle("not_signed_in", "Codex", ""));
+        Assert.Equal("Until then, questions go to Claude Code.", AiWords.ProblemMessage("not_signed_in", "Codex", "Claude Code", "", 0, ""));
+
+        Assert.Equal("Ollama needs its notes model", AiWords.ProblemTitle("model_missing", "Ollama", ""));
+        Assert.Equal("About 40 GB, downloaded once on your library.", AiWords.ProblemMessage("model_missing", "Ollama", "", "", 40, ""));
+        Assert.Equal("Downloaded once on your library.", AiWords.ProblemMessage("model_missing", "Ollama", "", "", 0, ""));
+
+        Assert.Equal("Claude Code hit its usage limit", AiWords.ProblemTitle("usage_limit", "Claude Code", ""));
+        var until = DateTime.Today.AddHours(15);
+        Assert.Equal("Questions go to Ollama until 3:00 PM.", AiWords.ProblemMessage("usage_limit", "Claude Code", "Ollama", until.ToString("o"), 0, ""));
+
+        Assert.Equal("This answer came from Ollama", AiWords.ProblemTitle("fell_back", "Ollama", ""));
+
+        Assert.Equal("Codex wants to read your library", AiWords.ProblemTitle("access_request", "Codex", ""));
+        Assert.Equal("From Eli's MacBook. It can read, not change.", AiWords.ProblemMessage("access_request", "Codex", "", "", 0, "Eli's MacBook"));
+
+        Assert.Equal("Your library isn't answering", AiWords.ProblemTitle("library_offline", "", ""));
+        Assert.Equal("Engines run on your library. Check it's on and connected.", AiWords.ProblemMessage("library_offline", "", "", "", 0, ""));
+
+        Assert.Equal("Claude Code couldn't rewrite the notes", AiWords.ProblemTitle("rewrite_failed", "Claude Code", ""));
+        Assert.Equal("Claude Code hit its usage limit. Your current notes are unchanged.", AiWords.ProblemMessage("rewrite_failed", "Claude Code", "", "", 0, "Claude Code hit its usage limit."));
+    }
+
+    [Fact]
+    public void Row_actions_match_the_design()
+    {
+        Assert.Equal("Start Ollama", AiWords.ProblemAction("engine_offline"));
+        Assert.Equal("Sign in", AiWords.ProblemAction("not_signed_in"));
+        Assert.Equal("Download", AiWords.ProblemAction("model_missing"));
+        Assert.Equal("Dismiss", AiWords.ProblemAction("usage_limit"));
+        Assert.Equal("", AiWords.ProblemAction("fell_back"));
+        Assert.Equal("Try again", AiWords.ProblemAction("library_offline"));
+        Assert.Equal("Try again", AiWords.ProblemAction("rewrite_failed"));
+    }
+}
+
+public class AiNotesModelTests
+{
+    static readonly NotesVersion Current = new("# Summary\n\nBody text.", "Ollama", new DateTime(2025, 9, 23, 11, 52, 0).ToString("o"));
+
+    static (AiNotesModel Model, FakeAiLibrary Library) Loaded(RewriteInfo? job = null)
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview(), OnRewrite = _ => job ?? new RewriteInfo("lec-1", "none") { Current = Current } };
+        // A delay that never fires: these tests check the state right after one call, not a poll picking up a
+        // later change — Polling_picks_up_a_job_that_finishes_while_watching below builds its own instant one.
+        var model = new AiNotesModel(lib) { Delay = (_, ct) => Task.Delay(Timeout.InfiniteTimeSpan, ct) };
+        return (model, lib);
+    }
+
+    [AvaloniaFact]
+    public async Task Loading_shows_the_current_notes_and_the_menu_checks_the_writer_last()
+    {
+        var (model, _) = Loaded();
+
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+
+        Assert.Equal("Written by Ollama · Tue 11:52", model.CurrentByline);
+        Assert.Equal("Body text.", model.ShownMarkdown);
+        Assert.Equal(RewriteState.Idle, model.State);
+        Assert.True(model.ShowRewriteButton);
+        Assert.Equal(["claude", "codex", "ollama"], model.Menu.Items.Select(i => i.Id));
+        Assert.True(model.Menu.Items.Single(i => i.Id == "ollama").Checked);
+        Assert.Equal("Wrote the current notes", model.Menu.Items.Single(i => i.Id == "ollama").Subtitle);
+        Assert.False(model.Menu.Items.Single(i => i.Id == "codex").Enabled);
+    }
+
+    [AvaloniaFact]
+    public async Task Picking_an_engine_in_the_menu_starts_a_rewrite_and_keeps_the_old_notes()
+    {
+        var (model, lib) = Loaded();
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        lib.OnRewriteStart = (id, engine) => new RewriteInfo(id, "working") { Engine = engine, EngineName = "Claude Code", Current = Current };
+
+        await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)model.Menu.Items.Single(i => i.Id == "claude").Command).ExecuteAsync(null);
+
+        Assert.Contains("rewrite-start:lec-1:claude", lib.Calls);
+        Assert.Equal(RewriteState.Rewriting, model.State);
+        Assert.False(model.MenuOpen);
+        Assert.Equal("Rewriting with Claude Code…", model.RewritingLead);
+        Assert.Equal("Body text.", model.ShownMarkdown); // unchanged: still the current notes
+    }
+
+    [AvaloniaFact]
+    public async Task Polling_picks_up_a_job_that_finishes_while_watching()
+    {
+        var draft = new NotesVersion("# Summary\n\nNew body.", "Claude Code", DateTime.Now.ToString("o"));
+        int calls = 0;
+        var lib = new FakeAiLibrary
+        {
+            Overview = AiTestData.MixedOverview(),
+            OnRewrite = _ => ++calls == 1
+                ? new RewriteInfo("lec-1", "working") { Engine = "claude", EngineName = "Claude Code", Current = Current }
+                : new RewriteInfo("lec-1", "ready") { Engine = "claude", EngineName = "Claude Code", Current = Current, Draft = draft },
+        };
+        var model = new AiNotesModel(lib) { Delay = (_, _) => Task.CompletedTask };
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+
+        for (int i = 0; i < 50 && model.State != RewriteState.Ready; i++) await Task.Delay(10);
+
+        Assert.Equal(RewriteState.Ready, model.State);
+        Assert.Equal("New body.", model.ShownMarkdown);
+        Assert.Equal("Claude Code · just now", model.ShownByline);
+        model.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task Keep_old_drops_the_draft_and_leaves_the_current_notes()
+    {
+        var draft = new NotesVersion("# Summary\n\nNew body.", "Claude Code", DateTime.Now.ToString("o"));
+        var (model, lib) = Loaded(new RewriteInfo("lec-1", "ready") { Engine = "claude", EngineName = "Claude Code", Current = Current, Draft = draft });
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        lib.OnRewriteKeep = _ => new RewriteInfo("lec-1", "none") { Current = Current };
+
+        await model.KeepOldCommand.ExecuteAsync(null);
+
+        Assert.Contains("rewrite-keep:lec-1", lib.Calls);
+        Assert.Equal(RewriteState.Idle, model.State);
+        Assert.Equal("Body text.", model.ShownMarkdown);
+    }
+
+    [AvaloniaFact]
+    public async Task Use_new_saves_the_draft_and_says_so()
+    {
+        var draft = new NotesVersion("# Summary\n\nNew body.", "Claude Code", DateTime.Now.ToString("o"));
+        var (model, lib) = Loaded(new RewriteInfo("lec-1", "ready") { Engine = "claude", EngineName = "Claude Code", Current = Current, Draft = draft });
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        lib.OnRewriteUse = _ => new RewriteInfo("lec-1", "none") { Current = draft };
+        bool changed = false;
+        model.NotesChanged += () => changed = true;
+
+        await model.UseNewCommand.ExecuteAsync(null);
+
+        Assert.Contains("rewrite-use:lec-1", lib.Calls);
+        Assert.True(changed);
+        Assert.Equal("New body.", model.ShownMarkdown);
+        Assert.Equal(RewriteState.Idle, model.State);
+    }
+
+    [AvaloniaFact]
+    public async Task Compare_shows_both_and_the_current_notes_never_change_until_use()
+    {
+        var draft = new NotesVersion("# Summary\n\nNew body.", "Claude Code", DateTime.Now.ToString("o"));
+        var (model, _) = Loaded(new RewriteInfo("lec-1", "ready") { Engine = "claude", EngineName = "Claude Code", Current = Current, Draft = draft });
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+
+        model.CompareCommand.Execute(null);
+
+        Assert.Equal(RewriteState.Comparing, model.State);
+        Assert.Equal("Body text.", model.CurrentBody);
+        Assert.Equal("New body.", model.DraftBody);
+
+        model.BackFromCompareCommand.Execute(null);
+        Assert.Equal(RewriteState.Ready, model.State);
+    }
+
+    [AvaloniaFact]
+    public async Task Cancel_stops_a_running_rewrite_and_the_notes_stay()
+    {
+        var (model, lib) = Loaded();
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        lib.OnRewriteStart = (id, engine) => new RewriteInfo(id, "working") { Engine = engine, EngineName = "Claude Code", Current = Current };
+        await ((CommunityToolkit.Mvvm.Input.IAsyncRelayCommand)model.Menu.Items.Single(i => i.Id == "claude").Command).ExecuteAsync(null);
+        lib.OnRewriteCancel = _ => new RewriteInfo("lec-1", "cancelled") { Current = Current };
+
+        await model.CancelCommand.ExecuteAsync(null);
+
+        Assert.Contains("rewrite-cancel:lec-1", lib.Calls);
+        Assert.Equal(RewriteState.Idle, model.State);
+    }
+
+    [AvaloniaFact]
+    public async Task A_failed_rewrite_says_why_and_try_again_uses_the_same_engine()
+    {
+        var (model, lib) = Loaded(new RewriteInfo("lec-1", "failed") { Engine = "claude", EngineName = "Claude Code", Error = "Claude Code hit its usage limit.", Current = Current });
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+
+        Assert.True(model.IsFailed);
+        Assert.Equal("Claude Code couldn't rewrite the notes", model.FailedTitle);
+        Assert.Equal("Claude Code hit its usage limit. Your current notes are unchanged.", model.FailedMessage);
+
+        lib.OnRewriteStart = (id, engine) => new RewriteInfo(id, "working") { Engine = engine, EngineName = "Claude Code", Current = Current };
+        await model.TryAgainCommand.ExecuteAsync(null);
+
+        Assert.Contains("rewrite-start:lec-1:claude", lib.Calls);
+        Assert.Equal(RewriteState.Rewriting, model.State);
+    }
+
+    [AvaloniaFact]
+    public async Task Dismiss_clears_a_failed_state_back_to_idle()
+    {
+        var (model, _) = Loaded(new RewriteInfo("lec-1", "failed") { Engine = "claude", EngineName = "Claude Code", Error = "boom", Current = Current });
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+
+        model.DismissCommand.Execute(null);
+
+        Assert.Equal(RewriteState.Idle, model.State);
+        Assert.Equal("", model.Error);
+    }
+
+    [AvaloniaFact]
+    public async Task A_refusal_to_start_is_a_passing_word_not_a_card()
+    {
+        var (model, lib) = Loaded();
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        lib.OnRewriteStart = (_, _) => throw new LibraryRefusedException(409, "a rewrite is already running for this lecture.");
+
+        await model.RewriteCommand.ExecuteAsync("claude");
+
+        Assert.Equal("a rewrite is already running for this lecture.", model.Say);
+        Assert.Equal(RewriteState.Idle, model.State);
+    }
+
+    [AvaloniaFact]
+    public async Task An_older_library_says_so()
+    {
+        var model = new AiNotesModel(new FakeAiLibrary { Overview = null });
+
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+
+        Assert.True(model.OlderLibrary);
+    }
+
+    [AvaloniaFact]
+    public async Task A_library_that_cant_be_reached_says_offline()
+    {
+        var model = new AiNotesModel(new FakeAiLibrary { OnEngines = () => throw new HttpRequestException("down") });
+
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+
+        Assert.True(model.Offline);
+    }
+}
+
+public class AiProblemsModelTests
+{
+    [AvaloniaFact]
+    public async Task Loading_builds_one_card_per_server_problem()
+    {
+        var overview = AiTestData.MixedOverview() with
+        {
+            Problems = [new AiProblemInfo("p1", "engine_offline", "ollama", "Ollama"), new AiProblemInfo("p2", "usage_limit", "claude", "Claude Code") { FallbackTo = "ollama", Until = DateTime.Today.AddHours(15).ToString("o") }],
+        };
+        var model = new AiProblemsModel(new FakeAiLibrary { Overview = overview });
+
+        await model.Load();
+
+        Assert.Equal(["p1", "p2"], model.Problems.Select(p => p.Id));
+        var offline = model.Problems.Single(p => p.Id == "p1");
+        Assert.Equal("Engine offline", offline.Caption);
+        Assert.Equal("Ollama isn't running on your library", offline.Title);
+        Assert.Equal("Start Ollama", offline.PrimaryWords);
+        var limit = model.Problems.Single(p => p.Id == "p2");
+        Assert.Equal("Questions go to Ollama until 3:00 PM.", limit.Message);
+    }
+
+    [AvaloniaFact]
+    public async Task An_engine_offline_cards_action_starts_it()
+    {
+        var overview = AiTestData.MixedOverview() with { Problems = [new AiProblemInfo("p1", "engine_offline", "ollama", "Ollama")] };
+        var lib = new FakeAiLibrary { Overview = overview };
+        var model = new AiProblemsModel(lib);
+        await model.Load();
+
+        await model.Problems.Single().PrimaryCommand!.ExecuteAsync(null);
+
+        Assert.Contains("start:ollama", lib.Calls);
+    }
+
+    [AvaloniaFact]
+    public async Task Closing_a_server_problem_dismisses_it_on_the_library()
+    {
+        var overview = AiTestData.MixedOverview() with { Problems = [new AiProblemInfo("p1", "usage_limit", "claude", "Claude Code")] };
+        var lib = new FakeAiLibrary { Overview = overview };
+        var model = new AiProblemsModel(lib);
+        await model.Load();
+
+        await model.Problems.Single().CloseCommand!.ExecuteAsync(null);
+
+        Assert.Contains("dismiss:p1", lib.Calls);
+        Assert.Empty(model.Problems);
+    }
+
+    [AvaloniaFact]
+    public void A_fell_back_answer_has_no_action_only_a_close()
+    {
+        var model = new AiProblemsModel(new FakeAiLibrary());
+
+        model.AddFellBack("turn-1", "Ollama", "Claude Code didn't respond in time.");
+
+        var p = model.Problems.Single();
+        Assert.Equal("This answer came from Ollama", p.Title);
+        Assert.Equal("Claude Code didn't respond in time.", p.Message);
+        Assert.Equal("", p.PrimaryWords);
+        Assert.True(p.CanClose);
+
+        model.AddFellBack("turn-1", "Ollama", "again"); // the same id never duplicates
+        Assert.Single(model.Problems);
+    }
+
+    [AvaloniaFact]
+    public async Task Library_offline_and_rewrite_failed_call_their_own_retry()
+    {
+        var model = new AiProblemsModel(new FakeAiLibrary());
+        bool retriedOffline = false, retriedRewrite = false;
+
+        model.AddLibraryOffline(() => { retriedOffline = true; return Task.CompletedTask; });
+        model.AddRewriteFailed("lec-1", "Claude Code", "boom", () => { retriedRewrite = true; return Task.CompletedTask; });
+
+        await model.Problems.Single(p => p.Kind == "library_offline").PrimaryCommand!.ExecuteAsync(null);
+        await model.Problems.Single(p => p.Kind == "rewrite_failed").PrimaryCommand!.ExecuteAsync(null);
+
+        Assert.True(retriedOffline);
+        Assert.True(retriedRewrite);
+        Assert.Equal("Claude Code couldn't rewrite the notes", model.Problems.Single(p => p.Kind == "rewrite_failed").Title);
+        Assert.Equal("boom Your current notes are unchanged.", model.Problems.Single(p => p.Kind == "rewrite_failed").Message);
+    }
+
+    [AvaloniaFact]
+    public void An_access_request_offers_allow_and_deny()
+    {
+        var model = new AiProblemsModel(new FakeAiLibrary());
+        bool allowed = false, denied = false;
+
+        model.AddAccessRequest("req-1", "Codex", "Eli's MacBook", () => { allowed = true; return Task.CompletedTask; }, () => { denied = true; return Task.CompletedTask; });
+
+        var p = model.Problems.Single();
+        Assert.Equal("Codex wants to read your library", p.Title);
+        Assert.Equal("From Eli's MacBook. It can read, not change.", p.Message);
+        Assert.True(p.PrimaryIsAccent);
+
+        p.SecondaryCommand!.Execute(null);
+        Assert.True(denied);
+        p.PrimaryCommand!.Execute(null);
+        Assert.True(allowed);
+    }
+}
