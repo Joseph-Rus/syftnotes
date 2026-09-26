@@ -168,4 +168,74 @@ public static class CanvasMarkdown
         while (same < from.Length && same < to.Length - 1 && from[same] == to[same]) same++;
         return string.Join('/', Enumerable.Repeat("..", from.Length - same).Concat(to.Skip(same).Select(Uri.EscapeDataString)));
     }
+
+    /// <summary>How a module item links a service it isn't Canvas: "Box", "Drive", "OneDrive", "YouTube".</summary>
+    static string? SourceName(string? source) => source switch
+    {
+        "box" => "Box", "drive" => "Drive", "onedrive" => "OneDrive", "youtube" => "YouTube", _ => null,
+    };
+
+    /// <summary>A local path (relative to the class folder, "Canvas/modules/…") as modules.md links it: relative to
+    /// the class's Canvas folder (where modules.md itself lives), spaces the only thing escaped (Canvas's own titles
+    /// may hold characters a strict URL escape would mangle for no reader's benefit).</summary>
+    static string ModuleLink(string classRelPath) =>
+        (classRelPath.StartsWith("Canvas/", StringComparison.Ordinal) ? classRelPath["Canvas/".Length..] : classRelPath).Replace(" ", "%20");
+
+    /// <summary>One module item's line in the outline: what it is, and where it really is (a local copy, a linked
+    /// assignment's spec.md, or Canvas itself).</summary>
+    static string ItemLine(ModuleItemInfo it, CourseIndex index)
+    {
+        string suffix = it.Locked ? " (locked)" : "";
+        switch (it.Kind)
+        {
+            case "header":
+                return $"**{it.Title}**";
+            case "file":
+                if (it.Local is { Length: > 0 } floc)
+                {
+                    var bits = new List<string>();
+                    if (it.Format is { Length: > 0 } f) bits.Add(f);
+                    if (Size(it.Size) is { Length: > 0 } sz) bits.Add(sz);
+                    string tag = bits.Count > 0 ? $" ({string.Join(", ", bits)})" : "";
+                    return $"[{it.Title}]({ModuleLink(floc)}){tag}{suffix}";
+                }
+                return $"{it.Title} (not saved: {it.Skipped ?? "unavailable"}, on Canvas: {it.Url}){suffix}";
+            case "page":
+                return it.Local is { Length: > 0 } ploc ? $"[{it.Title}]({ModuleLink(ploc)}){suffix}" : $"{it.Title} (on Canvas: {it.Url}){suffix}";
+            case "assignment" or "quiz" or "discussion":
+                var linked = it.Kind switch
+                {
+                    "quiz" => index.Assignments.FirstOrDefault(a => a.QuizId == it.AssignmentId),
+                    "discussion" => index.Assignments.FirstOrDefault(a => a.DiscussionTopicId == it.AssignmentId),
+                    _ => index.Assignments.FirstOrDefault(a => a.Id == it.AssignmentId),
+                };
+                return linked is { Folder.Length: > 0 } a
+                    ? $"[{it.Title}]({ModuleLink(a.Folder + "/spec.md")}){suffix}"
+                    : $"{it.Title} (on Canvas: {it.Url}){suffix}";
+            case "link":
+                string dest = it.ExternalUrl is { Length: > 0 } eu ? eu : it.Url;
+                string? source = SourceName(it.Source);
+                string linkTag = source is null ? " (link)" : it.Saved ? $" (saved from {source})" : " (link)";
+                return $"[{it.Title}]({dest}){linkTag}{suffix}";
+            case "tool":
+                return $"[{it.Title}]({(it.ExternalUrl is { Length: > 0 } tu ? tu : it.Url)}) (tool){suffix}";
+            default:
+                return $"{it.Title} (on Canvas: {it.Url}){suffix}";
+        }
+    }
+
+    /// <summary>modules.md: every module, in Canvas's order, each item linked to where it really landed (a local
+    /// copy, a linked assignment's spec.md) or to Canvas when there's nothing local to point at.</summary>
+    public static string Modules(string cls, CourseIndex index)
+    {
+        var sb = new StringBuilder($"# {cls}: Canvas modules\n\n_From Canvas; the local copies are linked. Rewritten on every sync._\n\n");
+        foreach (var m in index.Modules.OrderBy(m => m.Position))
+        {
+            sb.Append("## ").Append(m.Name).Append("\n\n");
+            foreach (var it in m.Items)
+                sb.Append(new string(' ', 2 * it.Indent)).Append("- ").Append(ItemLine(it, index)).Append('\n');
+            sb.Append('\n');
+        }
+        return sb.ToString().TrimEnd() + "\n";
+    }
 }

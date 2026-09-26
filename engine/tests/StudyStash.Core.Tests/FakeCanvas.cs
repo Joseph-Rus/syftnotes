@@ -145,6 +145,8 @@ public sealed partial class FakeCanvas
         .Json("/api/v1/courses/4201/discussion_topics", "cs101-announcements.json")
         .Json("/api/v1/courses/4201/files/555", "cs101-file-555.json")
         .Json("/api/v1/courses/4201/pages/lab-3-instructions", "cs101-page-lab-3-instructions.json")
+        .Json("/api/v1/courses/4201/folders", "[]")
+        .Json("/api/v1/courses/4201/files", "[]")
         .Bytes("/files/555/download", Encoding.UTF8.GetBytes("%PDF-1.4 recursion slides"))
         .Bytes("/files/8801/download", Encoding.UTF8.GetBytes("%PDF-1.4 ps4 answers"))
         .Bytes("/files/8802/download", Encoding.UTF8.GetBytes("def fact(n):\n    return 1 if n <= 1 else n * fact(n - 1)\n"))

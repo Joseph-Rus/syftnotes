@@ -169,7 +169,7 @@ public static class CanvasView
     // --- one assignment's detail --------------------------------------------------------------------------------
 
     /// <summary>A rough shape for a file, from its content type or name, when nothing better is known yet.</summary>
-    static string FormatOf(string contentType, string name) => contentType switch
+    public static string FormatOf(string contentType, string name) => contentType switch
     {
         _ when contentType.Contains("pdf", StringComparison.OrdinalIgnoreCase) => "PDF",
         _ when contentType.Contains("word", StringComparison.OrdinalIgnoreCase) || contentType.Contains("wordprocessingml", StringComparison.OrdinalIgnoreCase) => "Word",

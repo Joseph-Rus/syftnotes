@@ -88,7 +88,7 @@ public sealed partial class Crawl
     public static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(10);
 
     /// <summary>The listings each class is read through; each is a section of the sync.</summary>
-    public static readonly IReadOnlyList<string> Listings = ["assignments", "submissions", "modules", "announcements"];
+    public static readonly IReadOnlyList<string> Listings = ["assignments", "submissions", "modules", "announcements", "files"];
     // Listings whose pages only make sense together (an outline, a newest-first list): filed once the last page is in.
     static readonly HashSet<string> Whole = ["modules", "announcements"];
 
@@ -259,6 +259,8 @@ public sealed partial class Crawl
         Add($"{api}?include[]=syllabus_body&include[]=term", "json", Tag("course", cls));
         Add($"{api}/pages?per_page=100&sort=title", "json", Tag("pages", cls));
         Add($"{api}/front_page", "json", Tag("front_page", cls));
+        // The Files area: folders first (so each file's path is known), then the files themselves (FilesStage).
+        Add($"{api}/folders?per_page=100", "json", Tag("files", cls, ("stage", "folders")));
     }
 
     /// <summary>Start a sync of these classes (class → Canvas course id). False if one is already running.</summary>
@@ -294,7 +296,7 @@ public sealed partial class Crawl
                 // Only the student's own: every attempt (submission_history), the grader's comments and rubric marks.
                 Add($"{api}/students/submissions?student_ids[]=self&include[]=submission_comments&include[]=rubric_assessment&include[]=assignment"
                     + "&include[]=submission_history&per_page=100", "json", Tag("submissions", cls));
-                Add($"{api}/modules?include[]=items&per_page=100", "json", Tag("modules", cls));
+                Add($"{api}/modules?include[]=items&include[]=content_details&per_page=100", "json", Tag("modules", cls));
                 // Not /api/v1/announcements: without an end_date it stops 28 days after its start_date. The course's
                 // own list has the whole term, and whether the student has read each one.
                 Add($"{api}/discussion_topics?only_announcements=true&per_page=100", "json", Tag("announcements", cls));
@@ -547,7 +549,9 @@ public sealed partial class Crawl
         }
     }
 
-    /// <summary>Each assignment's spec.md and feedback.md, from the class's index (a spec written by hand is left alone).</summary>
+    /// <summary>Each assignment's spec.md and feedback.md, from the class's index (a spec written by hand is left
+    /// alone), and modules.md once the course is known to have any module (never written from nothing known, so a
+    /// class whose first sync couldn't read its modules gets no outline instead of an empty one).</summary>
     void Render(string cls, CourseIndex index)
     {
         var tz = zone();
@@ -560,6 +564,7 @@ public sealed partial class Crawl
                 Write(cls, Path.Combine(dir, "spec.md"), CanvasMarkdown.Spec(cls, a, tz));
             if (CanvasMarkdown.HasFeedback(a)) Write(cls, Path.Combine(dir, "feedback.md"), CanvasMarkdown.Feedback(cls, a, tz, now));
         }
+        if (index.Modules.Count > 0) Write(cls, Path.Combine(CanvasDir(cls), "modules.md"), CanvasMarkdown.Modules(cls, index));
     }
 
     // --- what each answer becomes ---------------------------------------------------------------------------------
@@ -585,6 +590,7 @@ public sealed partial class Crawl
             more = true;
         }
         string cls = S(tag["class"]);
+        if (type == "files") { FilesStage(cls, tag, body as JsonArray ?? [], more); return; }
         switch (type)
         {
             case "assignments": AssignmentsPage(cls, body as JsonArray ?? []); break;
@@ -599,8 +605,18 @@ public sealed partial class Crawl
                 if (type == "modules") Modules(cls, all);
                 else Announcements(cls, all);
                 break;
+            case var mi when mi.StartsWith("module_items:", StringComparison.Ordinal):
+                if (PagesSoFar[cls] is not JsonObject mpage) PagesSoFar[cls] = mpage = [];
+                if (mpage[mi] is not JsonArray macc) mpage[mi] = macc = [];
+                foreach (var item in body as JsonArray ?? []) macc.Add(item?.DeepClone());
+                if (more) break;
+                mpage.Remove(mi);
+                long modId = long.Parse(mi.Split(':')[1], CultureInfo.InvariantCulture);
+                if (Staged(cls).Modules.FirstOrDefault(m => m.Id == modId) is { } modInfo)
+                    modInfo.Items = BuildItems(cls, modId, ModuleFolderAbs(cls, modId), macc);
+                break;
             case "file_meta": if (body is JsonObject meta) Attach(cls, tag, WantFile(cls, meta, S(tag["dir"]))); break;
-            case "page": if (body is JsonObject page) Page(cls, page, S(tag["dir"])); break;
+            case "page": if (body is JsonObject page) Page(cls, page, tag); break;
             case "course": if (body is JsonObject course) Course(cls, course); break;
             case "pages": PagesListing(cls, body as JsonArray ?? []); break;
             case "front_page": if (body is JsonObject front) FrontPage(cls, front); break;
@@ -608,6 +624,11 @@ public sealed partial class Crawl
         }
         if (!more) Section(cls, type, "ok");
     }
+
+    string ModuleFolderAbs(string cls, long moduleId) =>
+        S(Manifest[$"moddir:{cls}:{moduleId}"]) is { Length: > 0 } rel
+            ? Path.Combine(classDir(cls), rel.Replace('/', Path.DirectorySeparatorChar))
+            : Path.Combine(CanvasDir(cls), "modules");
 
     string CanvasDir(string cls) => Path.Combine(classDir(cls), "Canvas");
 
@@ -734,9 +755,20 @@ public sealed partial class Crawl
     /// <see cref="Forget"/> notices if it never arrives).</summary>
     void Attach(string cls, JsonObject tag, FileRef f)
     {
-        if (S(tag["owner"]) != "assignment" || !long.TryParse(S(tag["ownerId"]), out long id)) return;
-        var index = Staged(cls);
-        (index.Assignments.FirstOrDefault(x => x.Id == id) ?? index.Staged?.Assignments.GetValueOrDefault(id))?.InstructionFiles.Add(f);
+        string owner = S(tag["owner"]);
+        if (owner == "assignment" && long.TryParse(S(tag["ownerId"]), out long id))
+        {
+            var index = Staged(cls);
+            (index.Assignments.FirstOrDefault(x => x.Id == id) ?? index.Staged?.Assignments.GetValueOrDefault(id))?.InstructionFiles.Add(f);
+        }
+        else if (owner == "module_item" && long.TryParse(S(tag["moduleId"]), out long modId) && long.TryParse(S(tag["itemId"]), out long itemId)
+                 && Staged(cls).Modules.FirstOrDefault(m => m.Id == modId)?.Items.FirstOrDefault(i => i.Id == itemId) is { } item)
+        {
+            item.Local = f.Local;
+            item.Size = f.Size;
+            item.Skipped = f.Skipped;
+            item.Format = CanvasView.FormatOf(f.ContentType, f.Name);
+        }
     }
 
     static string Num(double? d) => (d ?? 0).ToString("0.##", CultureInfo.InvariantCulture);
@@ -878,54 +910,227 @@ public sealed partial class Crawl
         Manifest[S(tag["key"])] = S(tag["updated"]);
     }
 
+    /// <summary>Each module, its folder (by Canvas id, renamed in place rather than duplicated), and its items: File
+    /// and Page items queue their own fetch; a module with no inline items (<c>items_url</c>) is fetched separately
+    /// (<see cref="BuildItems"/> runs again once that finishes, from <c>module_items:&lt;id&gt;</c>).</summary>
     void Modules(string cls, JsonArray list)
     {
-        string root = CanvasDir(cls);
-        var outline = new StringBuilder($"# {cls}: Canvas modules\n\n_From Canvas; the local copies are linked. Rewritten on every sync._\n\n");
+        var modules = new List<ModuleInfo>();
         foreach (var mod in list.OfType<JsonObject>().OrderBy(m => D(m["position"]) ?? 0))
         {
-            string folder = Path.Combine(root, "modules", $"{D(mod["position"]) ?? 0:00} {SafeName(S(mod["name"]), 80)}");
-            outline.Append("## ").Append(S(mod["name"])).Append("\n\n");
-            foreach (var it in (mod["items"] as JsonArray ?? []).OfType<JsonObject>())
+            long id = (long)(D(mod["id"]) ?? 0);
+            int position = (int)(D(mod["position"]) ?? 0);
+            string name = S(mod["name"]);
+            string folder = ModuleDir(cls, id, position, name);
+            var info = new ModuleInfo
             {
-                string kind = S(it["type"]), title = S(it["title"]), indent = new(' ', 2 * (int)(D(it["indent"]) ?? 0));
-                string Link(string file) => Path.GetRelativePath(root, Path.Combine(folder, file)).Replace('\\', '/').Replace(" ", "%20");
-                switch (kind)
-                {
-                    case "SubHeader":
-                        outline.Append(indent).Append("- **").Append(title).Append("**\n");
-                        break;
-                    case "File":
-                        Add(S(it["url"]), "json", Tag("file_meta", cls, ("dir", folder)));
-                        outline.Append(indent).Append($"- [{title}]({Link(SafeName(title))}) (file)\n");
-                        break;
-                    case "Page":
-                        Add(S(it["url"]), "json", Tag("page", cls, ("dir", folder)));
-                        outline.Append(indent).Append($"- [{title}]({Link(SafeName(title) + ".md")})\n");
-                        if (S(it["page_url"]) is { Length: > 0 } slug)
-                            (modulePageSlugs.TryGetValue(cls, out var known) ? known : modulePageSlugs[cls] = []).Add(slug);
-                        break;
-                    case "ExternalUrl" or "ExternalTool":
-                        outline.Append(indent).Append($"- [{title}]({(S(it["external_url"]) is { Length: > 0 } ext ? ext : S(it["html_url"]))}) (link)\n");
-                        break;
-                    default:
-                        outline.Append(indent).Append($"- {title} ({(kind.Length > 0 ? kind.ToLowerInvariant() : "item")}, on Canvas: {S(it["html_url"])})\n");
-                        break;
-                }
-            }
-            outline.Append('\n');
+                Id = id, Name = name, Position = position,
+                State = S(mod["state"]) is { Length: > 0 } st ? st : null,
+                UnlockAt = S(mod["unlock_at"]) is { Length: > 0 } u ? u : null,
+                ItemsCount = (int)(D(mod["items_count"]) ?? 0),
+            };
+            modules.Add(info);
+            if (mod["items"] is JsonArray items) info.Items = BuildItems(cls, id, folder, items);
+            else if (S(mod["items_url"]) is { Length: > 0 } itemsUrl)
+                Add($"{itemsUrl}{(itemsUrl.Contains('?') ? "&" : "?")}include[]=content_details&per_page=100", "json", Tag($"module_items:{id}", cls));
         }
-        Write(cls, Path.Combine(root, "modules.md"), outline.ToString().TrimEnd() + "\n");
+        Staged(cls).Modules = modules;
     }
 
-    void Page(string cls, JsonObject page, string dir)
+    /// <summary>The folder for a module, by its Canvas id (<c>moddir:{class}:{id}</c>): a renamed or reordered module
+    /// moves its existing folder (when nothing already sits where it's moving to) instead of making a second one.</summary>
+    string ModuleDir(string cls, long moduleId, int position, string name)
     {
-        if (Flag(page["locked_for_user"])) return;
+        string key = $"moddir:{cls}:{moduleId}";
+        string desiredRel = Rel(cls, Path.Combine(CanvasDir(cls), "modules", $"{position:00} {SafeName(name, 80)}"));
+        string desiredAbs = Path.Combine(classDir(cls), desiredRel.Replace('/', Path.DirectorySeparatorChar));
+        if (S(Manifest[key]) is { Length: > 0 } known && !string.Equals(known, desiredRel, StringComparison.Ordinal))
+        {
+            string knownAbs = Path.Combine(classDir(cls), known.Replace('/', Path.DirectorySeparatorChar));
+            if (Directory.Exists(knownAbs) && !Directory.Exists(desiredAbs))
+            {
+                Directory.CreateDirectory(Py.Parent(desiredAbs));
+                Directory.Move(knownAbs, desiredAbs);
+                RewriteManifestPrefix(cls, known, desiredRel);
+            }
+            else if (Directory.Exists(knownAbs))
+            {
+                desiredAbs = knownAbs;
+                desiredRel = known;
+            }
+        }
+        Manifest[key] = desiredRel;
+        return desiredAbs;
+    }
+
+    /// <summary>A moved folder's saved files still answer to their old manifest keys (the version markers, and the
+    /// one-copy-per-file-id map): rewrite whichever of those point inside <paramref name="oldRel"/> to
+    /// <paramref name="newRel"/> instead.</summary>
+    void RewriteManifestPrefix(string cls, string oldRel, string newRel)
+    {
+        string oldPre = oldRel.Replace('\\', '/').TrimEnd('/') + "/", newPre = newRel.Replace('\\', '/').TrimEnd('/') + "/";
+        foreach (var (key, value) in Manifest.ToList())
+        {
+            if (key.StartsWith($"fileloc:{cls}:", StringComparison.Ordinal) && S(value).StartsWith(oldPre, StringComparison.Ordinal))
+                Manifest[key] = newPre + S(value)[oldPre.Length..];
+            else if (key.StartsWith("file:", StringComparison.Ordinal) && key.IndexOf(':', 5) is int second and >= 0
+                     && key[(second + 1)..].StartsWith(oldPre, StringComparison.Ordinal))
+            {
+                string newKey = key[..(second + 1)] + newPre + key[(second + 1 + oldPre.Length)..];
+                Manifest.Remove(key);
+                Manifest[newKey] = value?.DeepClone();
+            }
+        }
+    }
+
+    /// <summary>box.com, drive/docs.google.com, onedrive.live.com/1drv.ms/*.sharepoint.com, youtube.com/youtu.be: the
+    /// services a module's external links most often point at (the scout may have saved a copy beside them).</summary>
+    static string? SourceOf(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return null;
+        string host = u.Host.ToLowerInvariant();
+        bool Is(string domain) => host == domain || host.EndsWith("." + domain, StringComparison.Ordinal);
+        if (Is("box.com")) return "box";
+        if (Is("drive.google.com") || Is("docs.google.com")) return "drive";
+        if (Is("onedrive.live.com") || Is("1drv.ms") || Is("sharepoint.com")) return "onedrive";
+        if (Is("youtube.com") || Is("youtu.be")) return "youtube";
+        return null;
+    }
+
+    /// <summary>A file the scout saved beside an external link, named after the item (any extension).</summary>
+    static string? ScoutSaved(string folderAbs, string title)
+    {
+        if (!Directory.Exists(folderAbs)) return null;
+        string stem = SafeName(title);
+        return Directory.EnumerateFiles(folderAbs).FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == stem);
+    }
+
+    /// <summary>One module's items, in Canvas's order: a file or page queues its own fetch (into the module's own
+    /// folder); an assignment, quiz or discussion is resolved to its spec.md when the outline is rendered, once every
+    /// listing is in.</summary>
+    List<ModuleItemInfo> BuildItems(string cls, long moduleId, string folderAbs, JsonArray items)
+    {
+        string folderRel = Rel(cls, folderAbs);
+        var result = new List<ModuleItemInfo>();
+        foreach (var it in items.OfType<JsonObject>())
+        {
+            string type = S(it["type"]);
+            var info = new ModuleItemInfo
+            {
+                Id = (long)(D(it["id"]) ?? 0), Type = type,
+                Title = S(it["title"]) is { Length: > 0 } t ? t : "untitled",
+                Indent = (int)(D(it["indent"]) ?? 0), Url = S(it["html_url"]),
+                Locked = Flag(it["content_details"]?["locked_for_user"]),
+            };
+            long contentId = (long)(D(it["content_id"]) ?? 0);
+            switch (type)
+            {
+                case "File":
+                    info.Kind = "file";
+                    if (info.Locked) info.Skipped = "locked";
+                    else if (S(it["url"]) is { Length: > 0 } fileUrl)
+                        Add(fileUrl, "json", Tag("file_meta", cls, ("dir", folderAbs), ("owner", "module_item"),
+                            ("moduleId", moduleId.ToString(CultureInfo.InvariantCulture)), ("itemId", info.Id.ToString(CultureInfo.InvariantCulture))));
+                    break;
+                case "Page":
+                    info.Kind = "page";
+                    info.PageUrl = S(it["page_url"]) is { Length: > 0 } slug ? slug : null;
+                    if (info.Locked) info.Skipped = "locked";
+                    else if (S(it["url"]) is { Length: > 0 } pageUrl)
+                    {
+                        Add(pageUrl, "json", Tag("page", cls, ("dir", folderAbs), ("owner", "module_item"),
+                            ("moduleId", moduleId.ToString(CultureInfo.InvariantCulture)), ("itemId", info.Id.ToString(CultureInfo.InvariantCulture))));
+                        if (info.PageUrl is { Length: > 0 } known)
+                            (modulePageSlugs.TryGetValue(cls, out var slugs) ? slugs : modulePageSlugs[cls] = []).Add(known);
+                    }
+                    break;
+                case "Assignment": info.Kind = "assignment"; info.AssignmentId = contentId; break;
+                case "Quiz": info.Kind = "quiz"; info.AssignmentId = contentId; break;
+                case "Discussion": info.Kind = "discussion"; info.AssignmentId = contentId; break;
+                case "ExternalUrl":
+                    info.Kind = "link";
+                    info.ExternalUrl = S(it["external_url"]) is { Length: > 0 } eu ? eu : S(it["html_url"]);
+                    info.Source = SourceOf(info.ExternalUrl);
+                    if (ScoutSaved(folderAbs, info.Title) is { } found) { info.Saved = true; info.Local = Rel(cls, found); }
+                    break;
+                case "ExternalTool":
+                    info.Kind = "tool";
+                    info.ExternalUrl = S(it["external_url"]) is { Length: > 0 } tu ? tu : S(it["url"]);
+                    break;
+                case "SubHeader": info.Kind = "header"; break;
+                default: info.Kind = type.Length > 0 ? type.ToLowerInvariant() : "item"; break;
+            }
+            result.Add(info);
+        }
+        return result;
+    }
+
+    /// <summary>A course's Files area: folders first (so each file's path is known), then the files (paged, both).
+    /// Skipped when Canvas hides it (401/403/404, handled generically as <c>files</c> is hidden or failed).</summary>
+    void FilesStage(string cls, JsonObject tag, JsonArray page, bool more)
+    {
+        string stage = S(tag["stage"]), bufKey = "files_" + stage;
+        if (PagesSoFar[cls] is not JsonObject mine) PagesSoFar[cls] = mine = [];
+        if (mine[bufKey] is not JsonArray all) mine[bufKey] = all = [];
+        foreach (var item in page) all.Add(item?.DeepClone());
+        if (more) return;
+        mine.Remove(bufKey);
+        if (stage == "folders")
+        {
+            var folders = new JsonObject();
+            foreach (var f in all.OfType<JsonObject>()) folders[Num(D(f["id"]))] = FolderPath(S(f["full_name"]));
+            mine["files_foldermap"] = folders;
+            string canvasUrl = S(data["base"]);
+            long courseId = Staged(cls).CourseId;
+            Add($"{canvasUrl}/api/v1/courses/{courseId}/files?per_page=100", "json", Tag("files", cls, ("stage", "course_files")));
+            return;
+        }
+        var folderMap = mine["files_foldermap"] as JsonObject ?? [];
+        mine.Remove("files_foldermap");
+        var list = new List<CourseFileInfo>();
+        foreach (var f in all.OfType<JsonObject>())
+        {
+            if (Flag(f["hidden_for_user"]) || Flag(f["locked_for_user"])) continue;
+            string folder = S(folderMap[Num(D(f["folder_id"]))]);
+            var saved = WantFile(cls, f, Path.Combine(CanvasDir(cls), "files", folder.Replace('/', Path.DirectorySeparatorChar)));
+            list.Add(new CourseFileInfo
+            {
+                Id = saved.Id, Folder = folder, Name = saved.Name, Size = saved.Size, ContentType = saved.ContentType,
+                UpdatedAt = S(f["updated_at"]) is { Length: > 0 } u ? u : null, Local = saved.Local, Skipped = saved.Skipped,
+            });
+        }
+        Staged(cls).Files = list;
+        Section(cls, "files", "ok");
+    }
+
+    /// <summary>A folder's path under the Files area, without Canvas's leading "course files".</summary>
+    static string FolderPath(string fullName) =>
+        (fullName.StartsWith("course files", StringComparison.OrdinalIgnoreCase) ? fullName["course files".Length..] : fullName).Trim('/');
+
+    void Page(string cls, JsonObject page, JsonObject tag)
+    {
+        string dir = S(tag["dir"]);
+        if (Flag(page["locked_for_user"]))
+        {
+            AttachModuleItem(cls, tag, local: null, skipped: "locked");
+            return;
+        }
         // A file a module page links to is wanted into that module's own folder, not pages/files/.
         var (body, links) = HtmlText.Convert(S(page["body"]), BuildContext(cls, Staged(cls).CourseId, Rel(cls, dir)));
         QueueFileLinks(cls, links, Path.Combine(dir, "files"));
         string text = $"# {S(page["title"])}\n\n_From Canvas ({S(page["html_url"])}), updated {CanvasMarkdown.When(S(page["updated_at"]), zone())}._\n\n{body}\n";
-        Write(cls, Path.Combine(dir, SafeName(S(page["title"]) is { Length: > 0 } t ? t : "page") + ".md"), text);
+        string path = Path.Combine(dir, SafeName(S(page["title"]) is { Length: > 0 } t ? t : "page") + ".md");
+        Write(cls, path, text);
+        AttachModuleItem(cls, tag, Rel(cls, path), skipped: null);
+    }
+
+    /// <summary>A module Page item learns where its Markdown landed (or that it was locked), once it's fetched.</summary>
+    void AttachModuleItem(string cls, JsonObject tag, string? local, string? skipped)
+    {
+        if (S(tag["owner"]) != "module_item" || !long.TryParse(S(tag["moduleId"]), out long modId) || !long.TryParse(S(tag["itemId"]), out long itemId)) return;
+        if (Staged(cls).Modules.FirstOrDefault(m => m.Id == modId)?.Items.FirstOrDefault(i => i.Id == itemId) is not { } item) return;
+        item.Local = local;
+        item.Skipped = skipped;
     }
 
     void Announcements(string cls, JsonArray list)
