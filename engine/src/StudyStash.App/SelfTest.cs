@@ -255,6 +255,13 @@ public static class SelfTest
         if (m.ClassProblem is not null) throw new InvalidOperationException(m.ClassProblem);
         m.NextCommand.Execute(null);
 
+        // Canvas is optional: the self-test skips it (there's no Chrome or Canvas here to connect).
+        if (m.OnCanvas)
+        {
+            Shot(Shell.Windows.Setup, "setup-canvas");
+            m.SkipCommand.Execute(null);
+        }
+
         if (m.OnTaskbar)
         {
             Shot(Shell.Windows.Setup, "setup-taskbar");
@@ -262,7 +269,7 @@ public static class SelfTest
         }
 
         // Finish: role stays Laptop (we never picked "this computer"); no login item is touched (the box is unticked).
-        m.NextCommand.Execute(null);
+        if (Shell.Windows.Setup is not null && m.IsLast) m.NextCommand.Execute(null);
         bool closed = await Until(() => Shell.Windows.Setup is null, 10);
         Say(closed ? $"setup finished: role {host.Settings.Role}, setup done {host.Settings.SetupDone}" : "setup: the window never closed");
         await Wait(1);

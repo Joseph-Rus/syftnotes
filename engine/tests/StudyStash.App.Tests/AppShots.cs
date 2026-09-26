@@ -152,6 +152,49 @@ public class AppShots
         await SettingsShot("win-14-ai-tool-access-app", SkinKind.Win, "Access");
     }
 
+    /// <summary>Setup at Canvas (design 07): the extension step open, as the lane's own shot has it.</summary>
+    static async Task<SetupModel> SetupCanvas(SkinKind skin)
+    {
+        var m = SetupModel.For(skin);
+        m.Canvas = await CanvasShots.Step2Async();
+        m.Canvas.StepLabel = "";
+        m.Canvas.ShowFooter = false;
+        m.Go(SetupStep.Canvas);
+        return m;
+    }
+
+    /// <summary>Library setup at the AI engines (design 15).</summary>
+    static SetupModel SetupAi(SkinKind skin)
+    {
+        var m = SetupModel.For(skin);
+        m.SetRole(AppRole.Library, skin);
+        m.Ai = AiDemo.Setup();
+        m.Go(SetupStep.Ai);
+        return m;
+    }
+
+    [AvaloniaFact]
+    public async Task Mac_setup_canvas_ai()
+    {
+        var canvas = await SetupCanvas(SkinKind.Mac);
+        foreach (var t in Themes)
+            Shot.Take("mac-07-canvas-connect-app", SkinKind.Mac, t, () => new MacSetup { DataContext = canvas, DrawChrome = true });
+        var ai = SetupAi(SkinKind.Mac);
+        foreach (var t in Themes)
+            Shot.Take("mac-15-ai-library-setup-app", SkinKind.Mac, t, () => new MacSetup { DataContext = ai, DrawChrome = true });
+    }
+
+    [AvaloniaFact]
+    public async Task Win_setup_canvas_ai()
+    {
+        var canvas = await SetupCanvas(SkinKind.Win);
+        foreach (var t in Themes)
+            Shot.Take("win-07-canvas-connect-app", SkinKind.Win, t, () => new WinSetup { DataContext = canvas, DrawChrome = true });
+        var ai = SetupAi(SkinKind.Win);
+        foreach (var t in Themes)
+            Shot.Take("win-15-ai-library-setup-app", SkinKind.Win, t, () => new WinSetup { DataContext = ai, DrawChrome = true });
+    }
+
     /// <summary>Design 12's dropdown: the timetable's hint, then the next thing due.</summary>
     static PanelModel PanelWithDue()
     {

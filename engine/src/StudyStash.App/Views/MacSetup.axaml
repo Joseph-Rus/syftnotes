@@ -1,9 +1,11 @@
-<!-- First-run setup (Surfaces, macOS 05): four steps: the microphone, the library, the transcription model (a 3 GB
-     download), and classes (optional). The window is opaque Win; only the steps sidebar is a floating glass panel. -->
+<!-- First-run setup (Surfaces, macOS 05): the microphone, the library, the transcription model (a 3 GB download), the
+     AI engines when this Mac is the library (15), classes (optional) and Canvas (optional, 07). The window is opaque Win;
+     only the steps sidebar is a floating glass panel. The AI and Canvas steps widen the window to the design's 900. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacSetup"
              x:DataType="vm:SetupModel"
              Width="720" Height="480">
@@ -77,6 +79,13 @@
       <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
       <Setter Property="Margin" Value="0,0,0,4" />
     </Style>
+    <!-- The AI and Canvas steps (07, 15) start a little higher, in their taller window. -->
+    <Style Selector="DockPanel.stepcol">
+      <Setter Property="Margin" Value="40,56,40,20" />
+    </Style>
+    <Style Selector="DockPanel.stepcol.wide">
+      <Setter Property="Margin" Value="40,44,40,20" />
+    </Style>
   </UserControl.Styles>
 
   <Border Name="Chrome" Classes="chrome" Background="{DynamicResource Win}" ClipToBounds="True">
@@ -102,7 +111,7 @@
                       <TextBlock Text="{Binding Number}" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <TextBlock Grid.Column="2" Classes="title" Text="{Binding Title}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="3" Text="Optional" IsVisible="{Binding Optional}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="3" Text="Optional" IsVisible="{Binding ShowOptional}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                   </Grid>
                 </Border>
               </DataTemplate>
@@ -112,15 +121,20 @@
       </c:Glass>
 
       <!-- The step -->
-      <DockPanel Grid.Column="1" Margin="40,56,40,20">
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-          <Button Classes="push fill" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}">
-            <TextBlock Text="Back" FontSize="13" />
+      <DockPanel Grid.Column="1" Classes="stepcol" Classes.wide="{Binding Wide}">
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto">
+          <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
+            <TextBlock Text="Skip for now" FontSize="13" Foreground="{DynamicResource Fg2}" />
           </Button>
-          <Button Classes="push tint" Command="{Binding NextCommand}">
-            <TextBlock Text="{Binding ContinueLabel}" FontSize="13" FontWeight="Medium" />
-          </Button>
-        </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+            <Button Classes="push fill" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}">
+              <TextBlock Text="Back" FontSize="13" />
+            </Button>
+            <Button Classes="push tint" Command="{Binding NextCommand}" IsEnabled="{Binding CanContinue}">
+              <TextBlock Text="{Binding ContinueLabel}" FontSize="13" FontWeight="Medium" />
+            </Button>
+          </StackPanel>
+        </Grid>
         <StackPanel>
           <TextBlock Text="{Binding StepLabel}" FontSize="12" Foreground="{DynamicResource Fg2}" />
 
@@ -254,6 +268,16 @@
             </Grid>
             <TextBlock IsVisible="{Binding HasClassProblem}" Text="{Binding ClassProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="440" HorizontalAlignment="Left" Margin="0,8,0,0" />
           </StackPanel>
+
+          <!-- The AI engines (15): the pane pads itself, so it sits out to the column's edges -->
+          <Panel IsVisible="{Binding OnAi}" Margin="-40,6,-40,0">
+            <v:MacAiSetup DataContext="{Binding Ai}" />
+          </Panel>
+
+          <!-- Canvas (07): its own steps; the footer's Skip for now, Back and Finish are setup's -->
+          <Panel IsVisible="{Binding OnCanvas}" Margin="0,6,0,0">
+            <v:MacCanvasConnect DataContext="{Binding Canvas}" />
+          </Panel>
         </StackPanel>
       </DockPanel>
     </Grid>

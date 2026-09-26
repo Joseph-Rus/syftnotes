@@ -11,7 +11,11 @@ public enum SetupStep
     Microphone,
     Library,
     Model,
+    /// <summary>This computer is the library: who writes the notes and answers questions (design 15).</summary>
+    Ai,
     Classes,
+    /// <summary>Optional: bring in Canvas (design 07).</summary>
+    Canvas,
     /// <summary>Windows only: pin the tray icon out of the overflow.</summary>
     Taskbar,
 }
@@ -28,11 +32,14 @@ public sealed partial class StepItem : ObservableObject
 
     public bool Todo => !Done && !Current;
     public bool ShowNumber => !Done;
+    /// <summary>"Optional" until the step's been passed (then its check says enough).</summary>
+    public bool ShowOptional => Optional && !Done;
 
     partial void OnDoneChanged(bool value)
     {
         OnPropertyChanged(nameof(Todo));
         OnPropertyChanged(nameof(ShowNumber));
+        OnPropertyChanged(nameof(ShowOptional));
     }
 
     partial void OnCurrentChanged(bool value) => OnPropertyChanged(nameof(Todo));
@@ -48,7 +55,8 @@ public sealed partial class SetupClass : ObservableObject
 
 /// <summary>
 /// First-run setup: the microphone, the library (this computer, or another), the transcription model (a download of a
-/// few gigabytes), your classes (optional), and on Windows, keeping the icon on the taskbar.
+/// few gigabytes), the AI engines (when this computer is the library), your classes (optional), Canvas (optional), and
+/// on Windows, keeping the icon on the taskbar.
 /// </summary>
 public sealed partial class SetupModel : ObservableObject
 {
@@ -102,12 +110,19 @@ public sealed partial class SetupModel : ObservableObject
     public bool HasClassProblem => !string.IsNullOrEmpty(ClassProblem);
     partial void OnClassProblemChanged(string? value) => OnPropertyChanged(nameof(HasClassProblem));
 
+    // AI engines and Canvas: each step's own model, made by the host when the step opens (the library is known then).
+    [ObservableProperty] public partial AiSetupModel? Ai { get; set; }
+    [ObservableProperty] public partial CanvasConnectModel? Canvas { get; set; }
+
     public string DeviceWord => Skin.Current == SkinKind.Mac ? "Mac" : "PC";
     public int Count => Steps.Count;
     public int Index => Steps.ToList().FindIndex(s => s.Step == Step) + 1;
     public bool IsLast => Index == Count;
-    public string StepLabel => IsLast && Skin.Current == SkinKind.Win ? "Last step" : $"Step {Index} of {Count}";
-    public string ContinueLabel => IsLast ? "Finish" : "Continue";
+    public string StepLabel =>
+        OnAi && Role == AppRole.Library ? $"Library setup · step {Index} of {Count}"
+        : OnCanvas ? $"Step {Index} of {Count} · Optional"
+        : IsLast && Skin.Current == SkinKind.Win ? "Last step" : $"Step {Index} of {Count}";
+    public string ContinueLabel => IsLast ? "Finish" : OnCanvas ? "Next" : "Continue";
     public bool CanGoBack => Index > 1;
 
     public bool OnMicrophone => Step == SetupStep.Microphone;
@@ -115,6 +130,14 @@ public sealed partial class SetupModel : ObservableObject
     public bool OnModel => Step == SetupStep.Model;
     public bool OnClasses => Step == SetupStep.Classes;
     public bool OnTaskbar => Step == SetupStep.Taskbar;
+    public bool OnAi => Step == SetupStep.Ai;
+    public bool OnCanvas => Step == SetupStep.Canvas;
+    /// <summary>The steps drawn the setup's own way (not the AI and Canvas panes, which bring their own title).</summary>
+    public bool OnPlainStep => !OnAi && !OnCanvas;
+    /// <summary>The AI and Canvas steps need a bigger window than the rest (the design's 900 wide).</summary>
+    public bool Wide => OnAi || OnCanvas;
+    /// <summary>Continue waits while Canvas is finding courses or linking one.</summary>
+    public bool CanContinue => !OnCanvas || Canvas?.CanFinish != false;
     public bool HasLibraryResult => !string.IsNullOrEmpty(LibraryResult);
     public bool HasModelProblem => !string.IsNullOrEmpty(ModelProblem);
     public bool ModelDownloading => !ModelReady && !HasModelProblem;
@@ -141,7 +164,9 @@ public sealed partial class SetupModel : ObservableObject
         if (role != AppRole.Library) Steps.Add(new StepItem { Step = SetupStep.Microphone, Number = n++, Title = "Microphone" });
         Steps.Add(new StepItem { Step = SetupStep.Library, Number = n++, Title = "Library" });
         if (role != AppRole.Library) Steps.Add(new StepItem { Step = SetupStep.Model, Number = n++, Title = "Transcription model" });
+        if (role != AppRole.Laptop) Steps.Add(new StepItem { Step = SetupStep.Ai, Number = n++, Title = "AI engines" });
         Steps.Add(new StepItem { Step = SetupStep.Classes, Number = n++, Title = "Classes", Optional = true });
+        Steps.Add(new StepItem { Step = SetupStep.Canvas, Number = n++, Title = "Canvas", Optional = true });
         if (sk == SkinKind.Win) Steps.Add(new StepItem { Step = SetupStep.Taskbar, Number = n++, Title = "Taskbar" });
         Go(Steps.Any(s => s.Step == wanted) ? wanted : Steps[0].Step);
         NotifyStepDerived();
@@ -163,11 +188,28 @@ public sealed partial class SetupModel : ObservableObject
     void NotifyStepDerived()
     {
         foreach (string p in new[] { nameof(Index), nameof(IsLast), nameof(StepLabel), nameof(ContinueLabel), nameof(CanGoBack), nameof(OnMicrophone),
-                     nameof(OnLibrary), nameof(OnModel), nameof(OnClasses), nameof(OnTaskbar) })
+                     nameof(OnLibrary), nameof(OnModel), nameof(OnClasses), nameof(OnTaskbar), nameof(OnAi), nameof(OnCanvas), nameof(OnPlainStep),
+                     nameof(Wide), nameof(CanContinue) })
             OnPropertyChanged(p);
     }
 
-    partial void OnStepChanged(SetupStep value) => NotifyStepDerived();
+    partial void OnStepChanged(SetupStep value)
+    {
+        NotifyStepDerived();
+        OnEnter?.Invoke(value);
+    }
+
+    partial void OnCanvasChanged(CanvasConnectModel? oldValue, CanvasConnectModel? newValue)
+    {
+        if (oldValue is not null) oldValue.PropertyChanged -= OnCanvasPropertyChanged;
+        if (newValue is not null) newValue.PropertyChanged += OnCanvasPropertyChanged;
+        OnPropertyChanged(nameof(CanContinue));
+    }
+
+    void OnCanvasPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CanvasConnectModel.CanFinish)) OnPropertyChanged(nameof(CanContinue));
+    }
 
     partial void OnThisComputerChanged(bool value)
     {
@@ -214,6 +256,10 @@ public sealed partial class SetupModel : ObservableObject
     public Func<Task>? OnAddClass { get; set; }
     public Action? OnTaskbarSettings { get; set; }
     public Func<SetupStep, bool>? CanLeave { get; set; }
+    /// <summary>A step that saves before moving on (the AI engines): false stays, and the step says why.</summary>
+    public Func<SetupStep, Task<bool>>? LeaveAsync { get; set; }
+    /// <summary>A step just opened: the host makes what it needs (the AI and Canvas steps' models).</summary>
+    public Action<SetupStep>? OnEnter { get; set; }
     public Action? OnFinish { get; set; }
 
     [RelayCommand] void AllowMic() => OnAllowMic?.Invoke();
@@ -275,10 +321,23 @@ public sealed partial class SetupModel : ObservableObject
         if (i >= 0) Go(Steps[i].Step);
     }
 
+    /// <summary>Canvas's "Skip for now": on to the next step (or finish), saving nothing more.</summary>
     [RelayCommand]
-    void Next()
+    void Skip()
+    {
+        if (IsLast)
+        {
+            OnFinish?.Invoke();
+            return;
+        }
+        Go(Steps[Index].Step);
+    }
+
+    [RelayCommand]
+    async Task Next()
     {
         if (CanLeave?.Invoke(Step) == false) return;
+        if (LeaveAsync is not null && !await LeaveAsync(Step)) return;
         if (IsLast)
         {
             OnFinish?.Invoke();

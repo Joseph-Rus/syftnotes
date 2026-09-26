@@ -287,7 +287,7 @@ public class CanvasShots
     static CanvasConnectModel Connect(FakeLibrary handler) =>
         new(CanvasFixtures.Context(handler), new CanvasWatch(CanvasFixtures.Context(handler)));
 
-    static async Task<CanvasConnectModel> Step2Async()
+    internal static async Task<CanvasConnectModel> Step2Async()
     {
         var handler = new FakeLibrary()
             .Json(HttpMethod.Get, "/api/v2/canvas/state", "state-no-extension")

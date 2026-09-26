@@ -736,7 +736,7 @@ public static partial class Shell
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacSetup { DataContext = setup, DrawChrome = false } : new WinSetup { DataContext = setup, DrawChrome = false };
         var w = new Window
         {
-            Title = "Set up Study Stash", Width = 720, Height = 480, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = view,
+            Title = "Set up Study Stash", SizeToContent = SizeToContent.WidthAndHeight, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = view,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? 48 : 32,
         };
         Look.Apply(w);
@@ -754,12 +754,16 @@ public static partial class Shell
             w.Close();
             ShowLibrary();
         };
+        setup.OnEnter = step => EnterSetupStep(model, step);
+        // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
+        setup.LeaveAsync = async step => step != SetupStep.Ai || model.Ai is not { } ai || await ai.SaveAsync();
         w.Closed += (_, _) =>
         {
             setupWindow = null;
             if (setup == model) setup = null;
             mic.Close();
             if (micCheck == mic) micCheck = null;
+            model.Canvas?.Dispose();
             UpdateDock();
         };
         setupWindow = w;
@@ -767,6 +771,27 @@ public static partial class Shell
         UpdateDock();
         w.Activate();
         Desktop.Activate();
+    }
+
+    /// <summary>The AI and Canvas steps need the library (connected two steps before): their models are made as each
+    /// opens, reading the library then.</summary>
+    static void EnterSetupStep(SetupModel model, SetupStep step)
+    {
+        switch (step)
+        {
+            case SetupStep.Ai:
+                model.Ai ??= new AiSetupModel(Ai());
+                _ = model.Ai.Load();
+                break;
+            case SetupStep.Canvas when model.Canvas is null:
+                var watch = CanvasPoll();
+                var connect = new CanvasConnectModel(Canvas(), watch) { ShowFooter = false, FinishLabel = model.ContinueLabel };
+                connect.OnSkip = () => model.SkipCommand.Execute(null);
+                connect.OnFinish = () => model.NextCommand.Execute(null);
+                model.Canvas = connect;
+                _ = StartConnectAsync(connect, watch);
+                break;
+        }
     }
 
     public static void ShowSettings() => ShowSettings(null);

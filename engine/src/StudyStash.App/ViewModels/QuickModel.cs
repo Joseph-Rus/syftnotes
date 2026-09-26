@@ -25,6 +25,8 @@ public sealed partial class QuickRow : ObservableObject
     public string Meta { get; init; } = "";
     /// <summary>A passage's line under it: "Recursion and the call stack · Key points".</summary>
     public string Sub { get; init; } = "";
+    /// <summary>The right-hand text reads in the accent, semibold: something missing on Canvas.</summary>
+    public bool Strong { get; init; }
     public IBrush Dot { get; init; } = Brushes.Gray;
     public string Glyph { get; init; } = "";
     public string? LectureId { get; init; }

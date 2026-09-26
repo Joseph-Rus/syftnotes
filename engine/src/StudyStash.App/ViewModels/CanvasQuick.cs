@@ -63,6 +63,7 @@ public static class CanvasQuick
                     Kind = QuickKind.Lecture,
                     Title = item.Name,
                     Meta = CanvasWords.QuickDueLine(item, zone, now),
+                    Strong = item.Missing,
                     Dot = dotOf(item.Class),
                     ClassName = item.Class,
                     Run = () => open(item),

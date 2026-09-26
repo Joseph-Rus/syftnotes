@@ -38,15 +38,67 @@ public sealed class SetupTests
     public void Laptop_and_Both_keep_the_microphone_and_model_library_only_skips_them()
     {
         var m = SetupModel.For(SkinKind.Mac);
-        Assert.Equal(["Microphone", "Library", "Transcription model", "Classes"], m.Steps.Select(s => s.Title));
-        Assert.Equal([1, 2, 3, 4], m.Steps.Select(s => s.Number));
+        Assert.Equal(["Microphone", "Library", "Transcription model", "Classes", "Canvas"], m.Steps.Select(s => s.Title));
+        Assert.Equal([1, 2, 3, 4, 5], m.Steps.Select(s => s.Number));
 
+        // This computer is the library too: it picks the AI engines that run on it.
         m.SetRole(AppRole.Both, SkinKind.Mac);
-        Assert.Equal(["Microphone", "Library", "Transcription model", "Classes"], m.Steps.Select(s => s.Title));
+        Assert.Equal(["Microphone", "Library", "Transcription model", "AI engines", "Classes", "Canvas"], m.Steps.Select(s => s.Title));
 
         m.SetRole(AppRole.Library, SkinKind.Mac);
-        Assert.Equal(["Library", "Classes"], m.Steps.Select(s => s.Title));
-        Assert.Equal([1, 2], m.Steps.Select(s => s.Number));
+        Assert.Equal(["Library", "AI engines", "Classes", "Canvas"], m.Steps.Select(s => s.Title));
+        Assert.Equal([1, 2, 3, 4], m.Steps.Select(s => s.Number));
+    }
+
+    [Fact]
+    public void Canvas_is_an_optional_step_near_the_end_and_its_label_says_so()
+    {
+        var mac = SetupModel.For(SkinKind.Mac);
+        mac.Go(SetupStep.Canvas);
+        Assert.True(mac.Steps.Single(s => s.Step == SetupStep.Canvas).Optional);
+        Assert.Equal("Step 5 of 5 · Optional", mac.StepLabel);
+        Assert.Equal("Finish", mac.ContinueLabel);
+        Assert.True(mac.Wide);
+
+        var win = SetupModel.For(SkinKind.Win);
+        win.Go(SetupStep.Canvas);
+        Assert.Equal("Step 5 of 6 · Optional", win.StepLabel);
+        Assert.Equal("Next", win.ContinueLabel);
+    }
+
+    [Fact]
+    public void A_library_only_setup_calls_its_AI_step_library_setup()
+    {
+        var m = SetupModel.For(SkinKind.Mac);
+        m.SetRole(AppRole.Library, SkinKind.Mac);
+        m.Go(SetupStep.Ai);
+        Assert.Equal("Library setup · step 2 of 4", m.StepLabel);
+        Assert.False(m.OnPlainStep);
+    }
+
+    [Fact]
+    public async Task Skip_moves_on_and_a_step_that_saves_first_can_hold_Continue()
+    {
+        var m = SetupModel.For(SkinKind.Mac);
+        var entered = new List<SetupStep>();
+        m.OnEnter = entered.Add;
+        m.Go(SetupStep.Classes);
+        m.SkipCommand.Execute(null);
+        Assert.Equal(SetupStep.Canvas, m.Step);
+        bool finished = false;
+        m.OnFinish = () => finished = true;
+        m.SkipCommand.Execute(null);
+        Assert.True(finished);
+        Assert.Equal([SetupStep.Classes, SetupStep.Canvas], entered);
+
+        m.SetRole(AppRole.Both, SkinKind.Mac);
+        m.Go(SetupStep.Ai);
+        m.LeaveAsync = step => Task.FromResult(step != SetupStep.Ai);
+        await m.NextCommand.ExecuteAsync(null);
+        Assert.Equal(SetupStep.Ai, m.Step);
+        m.LeaveAsync = _ => Task.FromResult(true);
+        await m.NextCommand.ExecuteAsync(null);
+        Assert.Equal(SetupStep.Classes, m.Step);
     }
 
     [Fact]
@@ -56,7 +108,7 @@ public sealed class SetupTests
         Assert.Equal(SetupStep.Taskbar, m.Steps[^1].Step);
 
         m.SetRole(AppRole.Library, SkinKind.Win);
-        Assert.Equal(["Library", "Classes", "Taskbar"], m.Steps.Select(s => s.Title));
+        Assert.Equal(["Library", "AI engines", "Classes", "Canvas", "Taskbar"], m.Steps.Select(s => s.Title));
     }
 
     [Fact]

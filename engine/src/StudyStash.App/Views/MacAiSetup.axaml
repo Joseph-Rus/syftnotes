@@ -30,7 +30,7 @@
             <DataTemplate x:DataType="vm:AiSetupRow">
               <StackPanel>
                 <Border Classes="ai-sep" Margin="44,0,0,0" IsVisible="{Binding !First}" />
-                <Grid ColumnDefinitions="Auto,12,*,Auto" MinHeight="56" Margin="16,8">
+                <Grid ColumnDefinitions="Auto,12,*,Auto" MinHeight="41" Margin="16,8">
                   <Button Grid.ColumnSpan="3" Classes="ai-textbtn" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
                     <Grid ColumnDefinitions="Auto,12,*">
                       <Border Classes="ai-radio" Classes.on="{Binding Selected}" VerticalAlignment="Center">

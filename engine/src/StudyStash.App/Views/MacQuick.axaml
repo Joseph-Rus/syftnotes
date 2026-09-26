@@ -49,6 +49,10 @@
       <Setter Property="IsVisible" Value="False" />
     </Style>
     <!-- The chosen row or chip: the accent through the glass, its words on the accent. -->
+    <Style Selector="TextBlock.meta.strong">
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
     <Style Selector="Button.tint TextBlock.meta">
       <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
       <Setter Property="Opacity" Value="0.85" />
@@ -119,7 +123,7 @@
                     <Grid IsVisible="{Binding IsLecture}" Height="40" Margin="14,0" ColumnDefinitions="8,10,*,Auto,10,12">
                       <Border Classes="dot" Width="8" Height="8" CornerRadius="4" Background="{Binding Dot}" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
+                      <TextBlock Grid.Column="3" Classes="meta" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
                       <TextBlock Grid.Column="5" Classes="enter meta" Text="↩" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                     <!-- A passage from notes -->
