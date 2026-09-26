@@ -69,7 +69,7 @@ public static class CanvasQuick
                 });
         }
         rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Actions", First = rows.Count == 0 });
-        rows.Add(new QuickRow { Kind = QuickKind.Action, Title = "Sync Canvas", Meta = CanvasWords.LastSyncLine(state?.LastSync, zone), Glyph = "sync", Run = sync });
+        rows.Add(new QuickRow { Kind = QuickKind.Action, Title = "Sync Canvas", Meta = CanvasWords.QuickLastSyncLine(state?.LastSync, zone), Glyph = "sync", Run = sync });
         rows.Add(new QuickRow { Kind = QuickKind.Action, Title = "Open Due", Glyph = "event_upcoming", Run = openDue });
         return rows;
     }
