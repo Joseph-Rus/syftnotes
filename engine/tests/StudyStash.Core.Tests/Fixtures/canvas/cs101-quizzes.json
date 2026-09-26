@@ -1,0 +1,14 @@
+[
+  {
+    "id": 7001, "title": "Syllabus quiz", "quiz_type": "assignment", "assignment_id": 9005,
+    "due_at": "2025-09-06T06:59:00Z", "points_possible": 5, "time_limit": 15, "allowed_attempts": 2,
+    "question_count": 5, "description": "<p>Five short questions on the syllabus.</p>", "locked_for_user": false,
+    "html_url": "https://canvas.test/courses/4201/quizzes/7001"
+  },
+  {
+    "id": 7002, "title": "Practice: recursion warm-up", "quiz_type": "practice_quiz", "assignment_id": null,
+    "due_at": null, "points_possible": null, "time_limit": null, "allowed_attempts": -1,
+    "question_count": 8, "description": "<p>Ungraded practice questions on recursion. Try them before Lab 3.</p>",
+    "locked_for_user": false, "html_url": "https://canvas.test/courses/4201/quizzes/7002"
+  }
+]

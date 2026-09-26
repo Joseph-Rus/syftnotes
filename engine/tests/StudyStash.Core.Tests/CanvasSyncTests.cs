@@ -144,7 +144,7 @@ public class CanvasSyncTests
                 .On(AnnouncementsPath, j => new CanvasResult(j.Id, 0, "", "", "", "TypeError: Failed to fetch", ""));
             Assert.True(canvas.Run(sync));
             Assert.Equal(3, canvas.Asked(ModulesPath));
-            Assert.Equal(3, canvas.Asked(AnnouncementsPath));
+            Assert.Equal(3, canvas.AskedDiscussionTopics(AnnouncementsPath, announcements: true));
             var sections = sync.Crawl.Sections["CS 101"];
             Assert.Equal(("failed", "failed", "ok"), (sections["modules"], sections["announcements"], sections["assignments"]));
             string error = CanvasSettings.Load(dir.Path).Error;
@@ -163,7 +163,7 @@ public class CanvasSyncTests
         using var dir = new TempDir();
         var sync = FakeCanvas.Library(dir, () => FakeCanvas.DesignNow);
         var canvas = new FakeCanvas().Status("/api/v1/courses/4201/files", 401, Unauthorized).Status("/files/9/download", 404, "Not found")
-            .On("/api/v1/courses/4201/users", j => new CanvasResult(j.Id, 401, "", "", "", "", FakeCanvas.Base + "/login/canvas"));
+            .On("/api/v1/courses/4201/quizzes", j => new CanvasResult(j.Id, 401, "", "", "", "", FakeCanvas.Base + "/login/canvas"));
         async Task<JsonObject> Read(string path, string kind = "json", string saveTo = "")
         {
             var reading = sync.FetchAsync(path, kind, saveTo);
@@ -175,7 +175,7 @@ public class CanvasSyncTests
         Assert.Null(hidden["error"]);
         Assert.Equal(401, hidden["status"]!.GetValue<int>());
         Assert.Contains("not authorized", hidden["json"]!.GetValue<string>());
-        Assert.Equal("Chrome isn't signed in to Canvas.", (await Read("/api/v1/courses/4201/users"))["error"]!.GetValue<string>());
+        Assert.Equal("Chrome isn't signed in to Canvas.", (await Read("/api/v1/courses/4201/quizzes"))["error"]!.GetValue<string>());
         var missing = await Read("/files/9/download", "bytes", "CS 101/Canvas/files/notes.pdf");
         Assert.Contains("404", missing["error"]!.GetValue<string>());
         Assert.False(File.Exists(Path.Combine(FakeCanvas.CanvasRoot(dir), "files", "notes.pdf")));
@@ -205,7 +205,7 @@ public class CanvasSyncTests
             .Pages(AnnouncementsPath, Split("cs101-announcements.json", 2, 1, 1));
         Assert.True(canvas.Run(sync));
         Assert.Equal(2, canvas.Asked(ModulesPath));
-        Assert.Equal(3, canvas.Asked(AnnouncementsPath));
+        Assert.Equal(3, canvas.AskedDiscussionTopics(AnnouncementsPath, announcements: true));
 
         string root = FakeCanvas.CanvasRoot(dir);
         string modules = File.ReadAllText(Path.Combine(root, "modules.md"));
@@ -239,7 +239,7 @@ public class CanvasSyncTests
 
         if (how == "the whole listing fails") canvas.Status(AssignmentsPath, 500);
         else canvas.Status(AssignmentsPath + "?page=2", 502, "Bad Gateway");
-        var said = new List<string>();
+        var said = new List<CanvasChange>();
         sync.Finished += said.AddRange;
         Assert.True(canvas.Run(sync));
 
@@ -329,7 +329,7 @@ public class CanvasSyncTests
         byte[] list = File.ReadAllBytes(Assignments.PathIn(dir.Path));
         Assert.Contains(files.Keys, f => f.EndsWith("ps4-answers.pdf", StringComparison.Ordinal));
         int asked = canvas.Requested.Count;
-        var said = new List<string>();
+        var said = new List<CanvasChange>();
         sync.Finished += said.AddRange;
 
         Assert.True(canvas.Run(sync));

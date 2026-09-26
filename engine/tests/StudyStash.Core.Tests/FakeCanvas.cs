@@ -14,6 +14,8 @@ public sealed partial class FakeCanvas
     public const string Base = "https://canvas.test";
     /// <summary>The design's "now": Thu 25 Sep 2025, 10:24 in California.</summary>
     public static readonly DateTimeOffset DesignNow = new(2025, 9, 25, 17, 24, 0, TimeSpan.Zero);
+    /// <summary>The design's time zone: California's.</summary>
+    public static readonly TimeZoneInfo Zone = TimeZoneInfo.FindSystemTimeZoneById("America/Los_Angeles");
 
     /// <summary>One answer: status, body, paging link, and what the extension passes on from the headers.</summary>
     public sealed record Reply(int Status, byte[] Body, string Link = "", double? Rate = null, double? RetryAfter = null,
@@ -49,11 +51,22 @@ public sealed partial class FakeCanvas
     [GeneratedRegex("[?&]page=(\\d+)")]
     private static partial Regex PageParam();
 
-    /// <summary>"https://canvas.test/api/v1/x?per_page=100&amp;page=2" → "/api/v1/x?page=2"; page 1 is the bare path.</summary>
+    [GeneratedRegex("(?:^|[?&])only_announcements=true(?:&|$)")]
+    private static partial Regex OnlyAnnouncements();
+
+    /// <summary>The key a discussions listing (no <c>only_announcements</c>) answers at, distinct from the
+    /// announcements listing at the same Canvas path: <see cref="Key"/> only tells them apart this way.</summary>
+    public static string DiscussionsRoute(string coursePath) => $"{coursePath}@discussions";
+
+    /// <summary>"https://canvas.test/api/v1/x?per_page=100&amp;page=2" → "/api/v1/x?page=2"; page 1 is the bare path.
+    /// A course's <c>discussion_topics</c> answers two different real listings at the one path (announcements with
+    /// <c>only_announcements=true</c>, real discussions without it); everything else here truly ignores the query.</summary>
     static string Key(string url)
     {
         var u = new Uri(url);
-        return PageParam().Match(u.Query) is { Success: true } m && m.Groups[1].Value != "1" ? $"{u.AbsolutePath}?page={m.Groups[1].Value}" : u.AbsolutePath;
+        string path = u.AbsolutePath.EndsWith("/discussion_topics", StringComparison.Ordinal) && !OnlyAnnouncements().IsMatch(u.Query)
+            ? DiscussionsRoute(u.AbsolutePath) : u.AbsolutePath;
+        return PageParam().Match(u.Query) is { Success: true } m && m.Groups[1].Value != "1" ? $"{path}?page={m.Groups[1].Value}" : path;
     }
 
     /// <summary>JSON (or the name of a fixture file) for a path.</summary>
@@ -63,9 +76,13 @@ public sealed partial class FakeCanvas
     /// <summary>A listing in pages: each page links to the next, the way Canvas's Link header does.</summary>
     public FakeCanvas Pages(string path, params string[] pages)
     {
+        // A paged discussion_topics is always the announcements listing in these tests (the only one ever paged):
+        // Canvas's real Link header repeats the whole original query, so this one carries only_announcements=true
+        // forward too, the way Key() needs to keep telling it apart from a real (unpaged) discussions listing.
+        string extra = path.EndsWith("/discussion_topics", StringComparison.Ordinal) ? "&only_announcements=true" : "";
         for (int i = 0; i < pages.Length; i++)
             Set(i == 0 ? path : $"{path}?page={i + 1}", new Reply(200, Encoding.UTF8.GetBytes(JsonOf(pages[i])),
-                i + 1 < pages.Length ? $"<{Base}{path}?page={i + 2}>; rel=\"next\"" : ""));
+                i + 1 < pages.Length ? $"<{Base}{path}?page={i + 2}{extra}>; rel=\"next\"" : ""));
         return this;
     }
 
@@ -94,6 +111,12 @@ public sealed partial class FakeCanvas
 
     /// <summary>How many times a path (any page, any query) was asked for.</summary>
     public int Asked(string path) => Requested.Count(u => new Uri(u).AbsolutePath == path);
+
+    /// <summary>Like <see cref="Asked"/>, but for a course's <c>discussion_topics</c>: <paramref name="announcements"/>
+    /// picks the announcements listing (<c>only_announcements=true</c>) or the real discussions one (without it) —
+    /// they share a path, so plain <see cref="Asked"/> would count both.</summary>
+    public int AskedDiscussionTopics(string path, bool announcements) =>
+        Requested.Count(u => new Uri(u).AbsolutePath == path && u.Contains("only_announcements=true", StringComparison.Ordinal) == announcements);
 
     /// <summary>What the extension would hand back for this job.</summary>
     public CanvasResult Answer(CanvasJob job)
@@ -133,22 +156,33 @@ public sealed partial class FakeCanvas
     }
 
     /// <summary>COMP 101 (course 4201) as the design shows it: five assignments, Problem set 4 graded with a rubric and
-    /// a comment, two modules, four announcements (one unread), a page and the files they link.</summary>
+    /// a comment, two modules, four announcements (one unread), a page and the files they link. Lab 2 (not drawn in
+    /// detail) has what the design doesn't show: two attempts (the first with a video that's never downloaded), a
+    /// marked-up PDF from the grader, a video comment, and a reply by the student.</summary>
     public static FakeCanvas Cs101() => new FakeCanvas()
         .Json("/api/v1/courses/4201/assignments", "cs101-assignments.json")
         .Json("/api/v1/courses/4201/students/submissions", "cs101-submissions.json")
         .Json("/api/v1/courses/4201/modules", "cs101-modules.json")
         .Json("/api/v1/courses/4201/discussion_topics", "cs101-announcements.json")
+        .Json(DiscussionsRoute("/api/v1/courses/4201/discussion_topics"), "cs101-discussions.json")
+        .Json("/api/v1/courses/4201/discussion_topics/8001/entries", "cs101-discussion-entries.json")
+        .Json("/api/v1/courses/4201/quizzes", "cs101-quizzes.json")
+        .Json("/api/v1/planner/items", "cs101-planner.json")
         .Json("/api/v1/courses/4201/files/555", "cs101-file-555.json")
         .Json("/api/v1/courses/4201/pages/lab-3-instructions", "cs101-page-lab-3-instructions.json")
+        .Json("/api/v1/courses/4201/folders", "[]")
+        .Json("/api/v1/courses/4201/files", "[]")
         .Bytes("/files/555/download", Encoding.UTF8.GetBytes("%PDF-1.4 recursion slides"))
         .Bytes("/files/8801/download", Encoding.UTF8.GetBytes("%PDF-1.4 ps4 answers"))
         .Bytes("/files/8802/download", Encoding.UTF8.GetBytes("def fact(n):\n    return 1 if n <= 1 else n * fact(n - 1)\n"))
         .Bytes("/files/8701/download", Encoding.UTF8.GetBytes("print('ps3')\n"))
-        .Bytes("/files/8601/download", Encoding.UTF8.GetBytes("%PDF-1.4 lab 2"));
+        .Bytes("/files/8601/download", Encoding.UTF8.GetBytes("%PDF-1.4 lab 2"))
+        .Bytes("/files/8600/download", Encoding.UTF8.GetBytes("%PDF-1.4 lab 2 draft"))
+        .Bytes("/files/8604/download", Encoding.UTF8.GetBytes("%PDF-1.4 lab 2 marked up"))
+        .Bytes("/files/5201/download", Encoding.UTF8.GetBytes("%PDF-1.4 ps3 solutions"));
 
     /// <summary>A library whose classes are linked to these Canvas courses, synced by a <see cref="CanvasSync"/> on the
-    /// given clock. Class folders are under <c>pool/</c> in the temp folder.</summary>
+    /// given clock, in California's time zone. Class folders are under <c>pool/</c> in the temp folder.</summary>
     public static CanvasSync Library(TempDir dir, Func<DateTimeOffset> clock, params (string Class, long Course)[] courses)
     {
         CanvasSettings.Update(dir.Path, s =>
@@ -156,7 +190,7 @@ public sealed partial class FakeCanvas
             s.Url = Base;
             foreach (var (cls, id) in courses.Length > 0 ? courses : [("CS 101", 4201L)]) s.Courses[cls] = id;
         });
-        return new CanvasSync(dir.Path, c => ClassDir(dir, c), _ => { }) { Clock = clock };
+        return new CanvasSync(dir.Path, c => ClassDir(dir, c), _ => { }) { Clock = clock, Zone = Zone };
     }
 
     public static string ClassDir(TempDir dir, string cls)
