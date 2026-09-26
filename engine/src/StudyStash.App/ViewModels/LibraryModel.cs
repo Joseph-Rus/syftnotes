@@ -99,6 +99,10 @@ public sealed partial class LibraryModel : ObservableObject
     [ObservableProperty] public partial LibraryList List { get; set; } = LibraryList.Lectures;
     /// <summary>Canvas's Due list, while Due is open.</summary>
     [ObservableProperty] public partial CanvasDueModel? DueList { get; set; }
+    /// <summary>What's wrong with Canvas (not set up, signed out, Chrome away…), atop the Due list; null while it's
+    /// connected or syncing.</summary>
+    [ObservableProperty] public partial CanvasStatusModel? DueStatus { get; set; }
+    public bool HasDueStatus => DueStatus is not null;
     /// <summary>A class linked to Canvas, while it's open.</summary>
     [ObservableProperty] public partial CanvasClassModel? CanvasClass { get; set; }
     /// <summary>An assignment open on the right (from Due, or a class's own lists); null shows the lecture.</summary>
@@ -157,6 +161,7 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(ListWidth));
     }
 
+    partial void OnDueStatusChanged(CanvasStatusModel? value) => OnPropertyChanged(nameof(HasDueStatus));
     partial void OnAssignmentChanged(AssignmentModel? value) => DetailChanged();
     partial void OnReaderChanged(CanvasReaderModel? value) => DetailChanged();
     partial void OnNotesChanged(AiNotesModel? value) => OnPropertyChanged(nameof(HasNotes));

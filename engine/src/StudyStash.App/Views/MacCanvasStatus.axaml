@@ -17,7 +17,7 @@
       <c:Icon Grid.Column="0" IsVisible="{Binding !IsSyncing}" Classes="cv-glyph" Glyph="{Binding Glyph}" VerticalAlignment="Center"
               Classes.cv-info="{Binding IsInfo}" Classes.cv-ok="{Binding IsOk}" Classes.cv-warn="{Binding IsWarn}" Classes.cv-error="{Binding IsError}" />
       <StackPanel Grid.Column="1" MinWidth="0" VerticalAlignment="Center">
-        <TextBlock Classes="cv-title" Text="{Binding Title}" />
+        <TextBlock Classes="cv-title" Text="{Binding Title}" TextWrapping="Wrap" />
         <TextBlock Classes="cv-text" Text="{Binding Text}" />
         <Border Classes="cv-track" IsVisible="{Binding HasProgress}">
           <Grid>

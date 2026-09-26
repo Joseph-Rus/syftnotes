@@ -44,6 +44,15 @@ public class AppShots
         return m;
     }
 
+    /// <summary>The Due page when Canvas needs something (Chrome signed out of Canvas): design 08's card above it.</summary>
+    static async Task<LibraryModel> DueAppSignedOut()
+    {
+        var m = await DueApp();
+        m.DueStatus = new CanvasStatusModel(CanvasFixtures.Context());
+        m.DueStatus.Show(CanvasFixtures.Load<CanvasApi.State>("state-signed-out"));
+        return m;
+    }
+
     static LibraryModel ClassApp(bool narrow)
     {
         var m = Sidebar("CS 101");
@@ -74,6 +83,9 @@ public class AppShots
         var due = await DueApp();
         foreach (var t in Themes)
             Shot.Take("mac-09-canvas-due-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = due, Width = 1280, Height = 800 });
+        var signedOut = await DueAppSignedOut();
+        foreach (var t in Themes)
+            Shot.Take("mac-09-canvas-due-app-signed-out", SkinKind.Mac, t, () => new MacLibrary { DataContext = signedOut, Width = 1280, Height = 800 });
         var cls = ClassApp(narrow: false);
         foreach (var t in Themes)
             Shot.Take("mac-10-canvas-class-tabs-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = cls, Width = 1280, Height = 800 });
@@ -88,6 +100,9 @@ public class AppShots
         var due = await DueApp();
         foreach (var t in Themes)
             Shot.Take("win-09-canvas-due-app", SkinKind.Win, t, () => new WinLibrary { DataContext = due, Width = 1280, Height = 800 });
+        var signedOut = await DueAppSignedOut();
+        foreach (var t in Themes)
+            Shot.Take("win-09-canvas-due-app-signed-out", SkinKind.Win, t, () => new WinLibrary { DataContext = signedOut, Width = 1280, Height = 800 });
         var cls = ClassApp(narrow: false);
         foreach (var t in Themes)
             Shot.Take("win-10-canvas-class-tabs-app", SkinKind.Win, t, () => new WinLibrary { DataContext = cls, Width = 1280, Height = 800 });

@@ -221,9 +221,13 @@
           </ScrollViewer>
         </Panel>
       </DockPanel>
-      <Panel IsVisible="{Binding ShowDueList}">
+      <DockPanel IsVisible="{Binding ShowDueList}">
+        <!-- Canvas needs something (design 08's cards), above what's due -->
+        <Panel DockPanel.Dock="Top" IsVisible="{Binding HasDueStatus}" Margin="12,14,12,0">
+          <v:MacCanvasStatus DataContext="{Binding DueStatus}" />
+        </Panel>
         <v:MacCanvasDue DataContext="{Binding DueList}" />
-      </Panel>
+      </DockPanel>
       <Panel IsVisible="{Binding ShowCanvasClass}">
         <v:MacCanvasClass DataContext="{Binding CanvasClass}" />
       </Panel>

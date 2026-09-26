@@ -324,6 +324,7 @@ public static partial class Shell
         if (turn != libraryTurn) return;
         UpdateDueItem();
         UpdateNextDue();
+        UpdateDueStatus();
         if (canvasDue is { } due) list.Show(due);
         var rows = list.Groups.SelectMany(g => g.Rows).ToList();
         var pick = dueSelection is var (cls, id) ? rows.FirstOrDefault(r => r.Class == cls && r.Id == id) : null;

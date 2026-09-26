@@ -258,9 +258,13 @@
               </ScrollViewer>
             </Panel>
           </DockPanel>
-          <Panel Margin="0,0,1,0" IsVisible="{Binding ShowDueList}">
+          <DockPanel Margin="0,0,1,0" IsVisible="{Binding ShowDueList}">
+            <!-- Canvas needs something (design 08's InfoBars), above what's due -->
+            <Panel DockPanel.Dock="Top" IsVisible="{Binding HasDueStatus}" Margin="12,14,12,0">
+              <v:WinCanvasStatus DataContext="{Binding DueStatus}" />
+            </Panel>
             <v:WinCanvasDue DataContext="{Binding DueList}" />
-          </Panel>
+          </DockPanel>
           <Panel Margin="0,0,1,0" IsVisible="{Binding ShowCanvasClass}">
             <v:WinCanvasClass DataContext="{Binding CanvasClass}" />
           </Panel>

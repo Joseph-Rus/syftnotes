@@ -93,6 +93,7 @@ public static partial class Shell
     {
         if (quitting || canvasWatch?.State is not { } state) return;
         library.Status = LibraryStatus();
+        UpdateDueStatus();
         if (canvasDue is not null && state.LastSync == canvasSynced) return;
         canvasSynced = state.LastSync;
         _ = CanvasSyncedAsync();
@@ -151,6 +152,19 @@ public static partial class Shell
         if (host.Library == LibraryState.Connected && canvasWatch?.State is { Status: "connected" or "syncing" or "updated", LastSync: { } synced })
             status += $" · Canvas synced {CanvasWords.Clock(synced, TimeZoneInfo.Local)}";
         return status;
+    }
+
+    /// <summary>The Due page's card for when Canvas needs something: any state but connected or syncing. Its button
+    /// connects Canvas (or shows how) in a window of its own.</summary>
+    static void UpdateDueStatus()
+    {
+        if (canvasWatch?.State is { } s && s.Status is not ("connected" or "syncing" or ""))
+        {
+            var card = library.DueStatus ?? new CanvasStatusModel(Canvas()) { OnConnect = ShowCanvasConnect, OnShowMeHow = ShowCanvasConnect };
+            card.Show(s);
+            library.DueStatus = card;
+        }
+        else library.DueStatus = null;
     }
 
     /// <summary>The dropdown's "Next due" line, from the last answer about what's due.</summary>
