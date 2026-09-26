@@ -1,0 +1,36 @@
+<!-- A Canvas notification, as its own floating window (design 12): a 344-wide glass card, the freshest one showing
+     its "Open"/"Later" pair. The window that hosts this belongs to the shell; this control draws no chrome of its
+     own but the glass panel itself. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.MacCanvasToast"
+             x:DataType="vm:CanvasToastModel"
+             Width="344" ClipToBounds="False">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
+  </UserControl.Styles>
+  <c:Glass CornerRadius="22" Padding="14,12" Background="{DynamicResource Glass}" BoxShadow="{DynamicResource GlassShadow}">
+    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
+      <Border Classes="cv-toast-tile" VerticalAlignment="Top">
+        <c:Icon Glyph="graphic_eq" Size="22" Foreground="{DynamicResource OnAccent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Border>
+      <StackPanel Spacing="1" MinWidth="0" HorizontalAlignment="Stretch">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0" Classes="cv-toast-title" Text="{Binding Title}" />
+          <TextBlock Grid.Column="1" Classes="cv-toast-when" Text="{Binding When}" Margin="8,0,0,0" />
+        </Grid>
+        <TextBlock Classes="cv-toast-text" Text="{Binding Text}" />
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible="{Binding Expanded}">
+          <Button Classes="cv-toast-btn" Command="{Binding OpenCommand}">
+            <TextBlock Text="Open" />
+          </Button>
+          <Button Classes="cv-toast-btn" Command="{Binding DismissCommand}">
+            <TextBlock Text="{Binding DismissLabel}" />
+          </Button>
+        </StackPanel>
+      </StackPanel>
+    </StackPanel>
+  </c:Glass>
+</UserControl>
