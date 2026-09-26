@@ -14,12 +14,14 @@ namespace StudyStash.Core.Canvas;
 /// <param name="DueAt">The due date as Canvas gave it (UTC ISO), or "".</param>
 /// <param name="Comments">How many comments others (the grader) left; null in a list saved before it was counted.</param>
 /// <param name="MarkedDone">Marked done in Canvas's planner.</param>
+/// <param name="MarkedDoneAt">When it was marked done, Canvas's UTC ISO; "" when it wasn't.</param>
 public sealed record Assignment(string ClassName, long Id, string Name, string Due, double? Points, string Status,
     double? Score, string Submitted, string Url, bool Late = false, bool Missing = false, bool Excused = false, string Grade = "",
-    string GradedAt = "", string GradingType = "", string Kind = "assignment", string DueAt = "", int? Comments = null, bool MarkedDone = false)
+    string GradedAt = "", string GradingType = "", string Kind = "assignment", string DueAt = "", int? Comments = null,
+    bool MarkedDone = false, string MarkedDoneAt = "")
 {
-    /// <summary>Handed in or doesn't need anything more.</summary>
-    public bool Done => Status is "graded" or "submitted" or "excused" or "late";
+    /// <summary>Handed in, doesn't need anything more, or the student ticked it off themselves.</summary>
+    public bool Done => Status is "graded" or "submitted" or "excused" or "late" || MarkedDone;
 }
 
 /// <summary>Something that changed on Canvas between two syncs, in the design's words ("Graded: CS 101 · Problem set 4
@@ -112,7 +114,7 @@ public static class Assignments
         var s = a.Submission;
         return new Assignment(className, a.Id, a.Name, Local(a.DueAt, zone), a.Points, StatusOf(a, now), s?.Score, Local(s?.SubmittedAt, zone),
             a.HtmlUrl, s?.Late ?? false, s?.Missing ?? false, s?.Excused ?? false, s?.Grade ?? "", s?.GradedAt ?? "", a.GradingType, a.Kind,
-            a.DueAt ?? "", s?.Comments.Count(c => !c.Mine) ?? 0);
+            a.DueAt ?? "", s?.Comments.Count(c => !c.Mine) ?? 0, a.MarkedDone, a.MarkedDoneAt ?? "");
     }
 
     public static bool Published(JsonObject a) => a["published"] is not JsonValue p || p.GetValueKind() != JsonValueKind.False;

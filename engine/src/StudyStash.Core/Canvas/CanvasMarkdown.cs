@@ -42,8 +42,19 @@ public static class CanvasMarkdown
         _ => null,
     };
 
-    /// <summary>spec.md: what the assignment asks, by when, how it's marked.</summary>
-    public static string Spec(string cls, AssignmentInfo a, TimeZoneInfo zone)
+    /// <summary>A quiz's own facts, the way spec.md states them: "Quiz · 10 questions · 30 minutes · 2 attempts".</summary>
+    static string QuizFacts(QuizInfo q)
+    {
+        var facts = new List<string> { "Quiz" };
+        if (q.QuestionCount is int qc) facts.Add(qc == 1 ? "1 question" : $"{qc} questions");
+        if (q.TimeLimit is int tl) facts.Add($"{tl} minutes");
+        if (q.AllowedAttempts is int aa) facts.Add(aa < 0 ? "unlimited attempts" : aa == 1 ? "1 attempt" : $"{aa} attempts");
+        return string.Join(" · ", facts);
+    }
+
+    /// <summary>spec.md: what the assignment asks, by when, how it's marked. <paramref name="quiz"/> and
+    /// <paramref name="discussion"/> are the quiz or discussion this assignment folds in (T6), when it's one.</summary>
+    public static string Spec(string cls, AssignmentInfo a, TimeZoneInfo zone, QuizInfo? quiz = null, DiscussionInfo? discussion = null)
     {
         var sb = new StringBuilder();
         sb.Append("---\n")
@@ -59,13 +70,17 @@ public static class CanvasMarkdown
         var facts = new List<string> { When(a.DueAt, zone) is { Length: > 0 } d ? $"**Due** {d}" : "**No due date**" };
         if (a.GradingType != "not_graded") facts.Add($"**{Num(a.Points)} points**");
         if (Grading(a.GradingType) is { } how) facts.Add(how);
-        if (a.AllowedAttempts is int n and > 0) facts.Add(n == 1 ? "1 attempt" : $"{n} attempts");
+        // A quiz's own attempts fact says more than the assignment's (and would only repeat it).
+        if (quiz is null && a.AllowedAttempts is int n and > 0) facts.Add(n == 1 ? "1 attempt" : $"{n} attempts");
+        if (quiz is not null) facts.Add(QuizFacts(quiz));
         sb.Append(string.Join(" · ", facts)).Append("\n\n");
         var window = new List<string>();
         if (When(a.UnlockAt, zone) is { Length: > 0 } from) window.Add($"Available from {from}");
         if (When(a.LockAt, zone) is { Length: > 0 } until) window.Add($"Closes {until}");
         if (window.Count > 0) sb.Append(string.Join(" · ", window)).Append("\n\n");
-        sb.Append(a.Instructions.Length > 0 ? a.Instructions : "_No instructions on Canvas._").Append('\n');
+        // A graded discussion's own prompt fills in for instructions Canvas never gave the assignment.
+        string body = a.Instructions.Length > 0 ? a.Instructions : discussion?.Prompt is { Length: > 0 } prompt ? prompt : "_No instructions on Canvas._";
+        sb.Append(body).Append('\n');
         if (a.Rubric.Count > 0)
         {
             sb.Append("\n## Rubric\n\n| Criterion | Points | Levels |\n|---|---|---|\n");
@@ -238,4 +253,33 @@ public static class CanvasMarkdown
         }
         return sb.ToString().TrimEnd() + "\n";
     }
+
+    /// <summary>announcements.md: every announcement, newest first, its attachments linked to where they landed.</summary>
+    public static string Announcements(string cls, CourseIndex index, TimeZoneInfo zone)
+    {
+        var sb = new StringBuilder($"# {cls}: announcements\n\n_From Canvas, newest first._\n\n");
+        foreach (var a in index.Announcements)
+        {
+            sb.Append("## ").Append(a.Title).Append('\n')
+                .Append('_').Append(When(a.PostedAt, zone)).Append(" · ").Append(a.Author).Append("_\n\n")
+                .Append(a.Body.Length > 0 ? a.Body : "_No text._").Append('\n');
+            if (a.Files.Count > 0) sb.Append('\n').Append("**Attached:** ").Append(Files(a.Files, "Canvas")).Append('\n');
+            sb.Append('\n');
+        }
+        return sb.ToString().TrimEnd() + "\n";
+    }
+
+    /// <summary>An ungraded (practice or survey) quiz's own file, standing alone (a graded one folds into its
+    /// assignment's spec.md instead): its facts and description, never its questions.</summary>
+    public static string Quiz(QuizInfo q)
+    {
+        var sb = new StringBuilder().Append("# ").Append(q.Title).Append("\n\n").Append(QuizFacts(q)).Append("\n\n")
+            .Append(q.Description.Length > 0 ? q.Description : "_No description on Canvas._").Append('\n');
+        return sb.ToString();
+    }
+
+    /// <summary>An ungraded discussion's own file, standing alone (a graded one folds into its assignment's spec.md
+    /// instead): its prompt, never anyone's replies.</summary>
+    public static string Discussion(DiscussionInfo d) =>
+        $"# {d.Title}\n\n{(d.Prompt.Length > 0 ? d.Prompt : "_No prompt on Canvas._")}\n";
 }

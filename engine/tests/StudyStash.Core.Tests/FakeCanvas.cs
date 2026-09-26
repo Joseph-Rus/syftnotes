@@ -51,11 +51,22 @@ public sealed partial class FakeCanvas
     [GeneratedRegex("[?&]page=(\\d+)")]
     private static partial Regex PageParam();
 
-    /// <summary>"https://canvas.test/api/v1/x?per_page=100&amp;page=2" → "/api/v1/x?page=2"; page 1 is the bare path.</summary>
+    [GeneratedRegex("(?:^|[?&])only_announcements=true(?:&|$)")]
+    private static partial Regex OnlyAnnouncements();
+
+    /// <summary>The key a discussions listing (no <c>only_announcements</c>) answers at, distinct from the
+    /// announcements listing at the same Canvas path: <see cref="Key"/> only tells them apart this way.</summary>
+    public static string DiscussionsRoute(string coursePath) => $"{coursePath}@discussions";
+
+    /// <summary>"https://canvas.test/api/v1/x?per_page=100&amp;page=2" → "/api/v1/x?page=2"; page 1 is the bare path.
+    /// A course's <c>discussion_topics</c> answers two different real listings at the one path (announcements with
+    /// <c>only_announcements=true</c>, real discussions without it); everything else here truly ignores the query.</summary>
     static string Key(string url)
     {
         var u = new Uri(url);
-        return PageParam().Match(u.Query) is { Success: true } m && m.Groups[1].Value != "1" ? $"{u.AbsolutePath}?page={m.Groups[1].Value}" : u.AbsolutePath;
+        string path = u.AbsolutePath.EndsWith("/discussion_topics", StringComparison.Ordinal) && !OnlyAnnouncements().IsMatch(u.Query)
+            ? DiscussionsRoute(u.AbsolutePath) : u.AbsolutePath;
+        return PageParam().Match(u.Query) is { Success: true } m && m.Groups[1].Value != "1" ? $"{path}?page={m.Groups[1].Value}" : path;
     }
 
     /// <summary>JSON (or the name of a fixture file) for a path.</summary>
@@ -143,6 +154,10 @@ public sealed partial class FakeCanvas
         .Json("/api/v1/courses/4201/students/submissions", "cs101-submissions.json")
         .Json("/api/v1/courses/4201/modules", "cs101-modules.json")
         .Json("/api/v1/courses/4201/discussion_topics", "cs101-announcements.json")
+        .Json(DiscussionsRoute("/api/v1/courses/4201/discussion_topics"), "cs101-discussions.json")
+        .Json("/api/v1/courses/4201/discussion_topics/8001/entries", "cs101-discussion-entries.json")
+        .Json("/api/v1/courses/4201/quizzes", "cs101-quizzes.json")
+        .Json("/api/v1/planner/items", "cs101-planner.json")
         .Json("/api/v1/courses/4201/files/555", "cs101-file-555.json")
         .Json("/api/v1/courses/4201/pages/lab-3-instructions", "cs101-page-lab-3-instructions.json")
         .Json("/api/v1/courses/4201/folders", "[]")

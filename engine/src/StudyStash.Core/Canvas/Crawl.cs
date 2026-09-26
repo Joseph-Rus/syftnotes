@@ -87,8 +87,10 @@ public sealed partial class Crawl
     public static readonly TimeSpan FirstBackoff = TimeSpan.FromSeconds(30);
     public static readonly TimeSpan MaxBackoff = TimeSpan.FromMinutes(10);
 
-    /// <summary>The listings each class is read through; each is a section of the sync.</summary>
-    public static readonly IReadOnlyList<string> Listings = ["assignments", "submissions", "modules", "announcements", "files"];
+    /// <summary>The listings each class is read through; each is a section of the sync. <c>planner</c> is one job for
+    /// every linked class together (Canvas's planner takes them all at once), but still marked per class.</summary>
+    public static readonly IReadOnlyList<string> Listings =
+        ["assignments", "submissions", "modules", "announcements", "files", "quizzes", "discussions", "planner"];
     // Listings whose pages only make sense together (an outline, a newest-first list): filed once the last page is in.
     static readonly HashSet<string> Whole = ["modules", "announcements"];
 
@@ -109,6 +111,9 @@ public sealed partial class Crawl
     readonly Dictionary<string, PendingPage> pendingSyllabus = [];
     // A module's Page items (by slug), so the pages listing outside modules doesn't save them a second time.
     readonly Dictionary<string, HashSet<string>> modulePageSlugs = [];
+    // An assignment the planner says is marked done this sync, and when (class -> assignment id -> Canvas's UTC ISO,
+    // or null when it didn't say). This sync's memory only; ApplyPlanner bakes it into the index at Finish.
+    readonly Dictionary<string, Dictionary<long, string?>> markedDone = [];
 
     /// <summary>A page's Markdown before its file links are resolved, and where it belongs.</summary>
     sealed record PendingPage(string Title, string Body, string Dir, string HtmlUrl, string? UpdatedAt);
@@ -133,7 +138,7 @@ public sealed partial class Crawl
         data = Read() ?? [];
         data.Remove("assignments"); // a crawl.json from before the index kept every assignment's JSON here
         if (data["jobs"] is not JsonArray) data["jobs"] = new JsonArray();
-        foreach (string key in new[] { "inflight", "changed", "manifest", "sections", "pages" })
+        foreach (string key in new[] { "inflight", "changed", "manifest", "sections", "pages", "courses" })
             if (data[key] is not JsonObject) data[key] = new JsonObject();
         if (data["errors"] is not JsonArray) data["errors"] = new JsonArray();
     }
@@ -166,6 +171,8 @@ public sealed partial class Crawl
     JsonArray Errors => (JsonArray)data["errors"]!;
     JsonObject SectionStates => (JsonObject)data["sections"]!;
     JsonObject PagesSoFar => (JsonObject)data["pages"]!;
+    // Canvas course id (as a string) -> class name, so the one cross-class planner job can tell whose to-do is whose.
+    JsonObject Courses => (JsonObject)data["courses"]!;
 
     static bool Flag(JsonNode? v) => v is JsonValue j && j.GetValueKind() == JsonValueKind.True;
     static string S(JsonNode? v) => v is JsonValue j && j.GetValueKind() == JsonValueKind.String ? j.GetValue<string>() : "";
@@ -249,6 +256,14 @@ public sealed partial class Crawl
         if (wasReading && listing == "modules" && state != "reading") AfterModules(cls);
     }
 
+    /// <summary>Like <see cref="Section"/>, but for an answer whose job isn't one class's: the planner reads every
+    /// linked class in a single request, so its answer marks that listing for all of them at once.</summary>
+    void MarkSection(string cls, string listing, string state)
+    {
+        if (listing != "planner") { Section(cls, listing, state); return; }
+        foreach (string c in SectionStates.Select(kv => kv.Key).ToList()) Section(c, listing, state);
+    }
+
     /// <summary>Ask for what only makes sense once modules are known: the syllabus and course info, the pages
     /// outside modules, and the front page.</summary>
     void AfterModules(string cls)
@@ -275,6 +290,7 @@ public sealed partial class Crawl
             data["errors"] = new JsonArray();
             data["sections"] = new JsonObject();
             data["pages"] = new JsonObject();
+            data["courses"] = new JsonObject();
             data["active"] = true;
             data["ready"] = false;
             data["signed_out"] = false;
@@ -287,10 +303,12 @@ public sealed partial class Crawl
             pendingFrontPage.Clear();
             pendingSyllabus.Clear();
             modulePageSlugs.Clear();
+            markedDone.Clear();
             foreach (var (cls, id) in courses)
             {
                 staging[cls] = new CourseIndex { Class = cls, CourseId = id, Staged = new SyncParts() };
                 staging[cls].SaveStaged(home);
+                Courses[id.ToString(CultureInfo.InvariantCulture)] = cls;
                 string api = $"{canvasUrl}/api/v1/courses/{id}";
                 Add($"{api}/assignments?include[]=submission&per_page=100&order_by=due_at", "json", Tag("assignments", cls));
                 // Only the student's own: every attempt (submission_history), the grader's comments and rubric marks.
@@ -300,7 +318,20 @@ public sealed partial class Crawl
                 // Not /api/v1/announcements: without an end_date it stops 28 days after its start_date. The course's
                 // own list has the whole term, and whether the student has read each one.
                 Add($"{api}/discussion_topics?only_announcements=true&per_page=100", "json", Tag("announcements", cls));
+                // Real (non-announcement) discussion topics: never their /entries, /view or /entry_list.
+                Add($"{api}/discussion_topics?per_page=100", "json", Tag("discussions", cls));
+                // Never a quiz's /questions, /submissions or /quiz_submissions.
+                Add($"{api}/quizzes?per_page=100", "json", Tag("quizzes", cls));
                 foreach (string listing in Listings) Section(cls, listing, "reading");
+            }
+            // One request for every linked class's to-dos (Canvas's planner takes them all at once); Planner() sorts
+            // each item to its own class by course id, and marks "planner" for the whole class list once it's read.
+            if (courses.Count > 0)
+            {
+                var today = clock().UtcDateTime.Date;
+                string codes = string.Join("&", courses.Values.Select(id => $"context_codes[]=course_{id}"));
+                Add($"{canvasUrl}/api/v1/planner/items?start_date={today.AddDays(-28):yyyy-MM-dd}&end_date={today.AddDays(120):yyyy-MM-dd}&{codes}&per_page=100",
+                    "json", Tag("planner", ""));
             }
             Save();
             return true;
@@ -445,7 +476,7 @@ public sealed partial class Crawl
                         break;
                     case CanvasAnswer.Hidden:
                         Unqueue(tag);
-                        Section(cls, type, "hidden");
+                        MarkSection(cls, type, "hidden");
                         break;
                     case CanvasAnswer.RateLimited:
                         Jobs.Insert(0, job.DeepClone()); // first out when the pause is over: nothing is lost
@@ -458,8 +489,8 @@ public sealed partial class Crawl
                         break;
                     case CanvasAnswer.Transient or CanvasAnswer.Failed:
                         Unqueue(tag);
-                        Errors.Add($"{cls} {type}: {Why(r)}");
-                        Section(cls, type, "failed");
+                        Errors.Add($"{(cls.Length > 0 ? cls + " " : "")}{type}: {Why(r)}");
+                        MarkSection(cls, type, "failed");
                         break;
                     default:
                         Calm(D(rec["t"]) ?? 0, r.Rate);
@@ -470,8 +501,8 @@ public sealed partial class Crawl
             catch (Exception e) when (e is JsonException or IOException or InvalidOperationException or FormatException or UnauthorizedAccessException)
             {
                 Unqueue(tag);
-                Errors.Add($"{cls} {type}: {e.Message}"); // one odd item never stops the sync
-                Section(cls, type, "failed");
+                Errors.Add($"{(cls.Length > 0 ? cls + " " : "")}{type}: {e.Message}"); // one odd item never stops the sync
+                MarkSection(cls, type, "failed");
             }
             if (Flag(data["active"]) && Jobs.Count == 0 && Inflight.Count == 0)
             {
@@ -511,7 +542,7 @@ public sealed partial class Crawl
                 try
                 {
                     before[cls] = CourseIndex.Load(home, cls);
-                    after[cls] = CourseIndex.Promote(home, cls, states, at, index => { Forget(cls, index); FinishPages(cls, index); });
+                    after[cls] = CourseIndex.Promote(home, cls, states, at, index => { Forget(cls, index); FinishPages(cls, index); ApplyPlanner(cls, index, before[cls]); });
                     Render(cls, after[cls]);
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -560,11 +591,21 @@ public sealed partial class Crawl
         {
             if (a.Folder.Length == 0) continue;
             string dir = Path.Combine(classDir(cls), a.Folder);
+            var quiz = a.QuizId is long qid ? index.Quizzes.FirstOrDefault(q => q.Id == qid) : null;
+            var discussion = a.DiscussionTopicId is long did ? index.Discussions.FirstOrDefault(d => d.Id == did) : null;
             if (SpecHead(dir) is not { } head || head.Contains(Generated, StringComparison.Ordinal))
-                Write(cls, Path.Combine(dir, "spec.md"), CanvasMarkdown.Spec(cls, a, tz));
+                Write(cls, Path.Combine(dir, "spec.md"), CanvasMarkdown.Spec(cls, a, tz, quiz, discussion));
             if (CanvasMarkdown.HasFeedback(a)) Write(cls, Path.Combine(dir, "feedback.md"), CanvasMarkdown.Feedback(cls, a, tz, now));
         }
         if (index.Modules.Count > 0) Write(cls, Path.Combine(CanvasDir(cls), "modules.md"), CanvasMarkdown.Modules(cls, index));
+        if (index.Announcements.Count > 0) Write(cls, Path.Combine(CanvasDir(cls), "announcements.md"), CanvasMarkdown.Announcements(cls, index, tz));
+        // A quiz or discussion folded into its own assignment's spec.md isn't written again on its own.
+        var foldedQuizzes = index.Assignments.Where(a => a.QuizId is not null).Select(a => a.QuizId!.Value).ToHashSet();
+        foreach (var q in index.Quizzes.Where(q => !foldedQuizzes.Contains(q.Id)))
+            Write(cls, Path.Combine(CanvasDir(cls), "quizzes", SafeName(q.Title) + ".md"), CanvasMarkdown.Quiz(q));
+        var foldedDiscussions = index.Assignments.Where(a => a.DiscussionTopicId is not null).Select(a => a.DiscussionTopicId!.Value).ToHashSet();
+        foreach (var d in index.Discussions.Where(d => !foldedDiscussions.Contains(d.Id)))
+            Write(cls, Path.Combine(CanvasDir(cls), "discussions", SafeName(d.Title) + ".md"), CanvasMarkdown.Discussion(d));
     }
 
     // --- what each answer becomes ---------------------------------------------------------------------------------
@@ -595,6 +636,9 @@ public sealed partial class Crawl
         {
             case "assignments": AssignmentsPage(cls, body as JsonArray ?? []); break;
             case "submissions": Submissions(cls, body as JsonArray ?? []); break;
+            case "quizzes": QuizzesPage(cls, body as JsonArray ?? []); break;
+            case "discussions": DiscussionsPage(cls, body as JsonArray ?? []); break;
+            case "planner": Planner(body as JsonArray ?? []); break;
             case var whole when Whole.Contains(whole):
                 if (S(SectionStates[cls]?[type]) is "failed" or "hidden") break; // an earlier page went wrong: never file part of it
                 if (PagesSoFar[cls] is not JsonObject mine) PagesSoFar[cls] = mine = [];
@@ -622,7 +666,7 @@ public sealed partial class Crawl
             case "front_page": if (body is JsonObject front) FrontPage(cls, front); break;
             case "outside_page": if (body is JsonObject op) OutsidePage(cls, op, S(tag["slug"])); break;
         }
-        if (!more) Section(cls, type, "ok");
+        if (!more) MarkSection(cls, type, "ok");
     }
 
     string ModuleFolderAbs(string cls, long moduleId) =>
@@ -1133,14 +1177,129 @@ public sealed partial class Crawl
         item.Skipped = skipped;
     }
 
+    /// <summary>Every announcement, newest first, with its attachments queued into <c>announcements/files/</c> and
+    /// its body's own file links resolved the same way as a page's. <c>announcements.md</c> itself is rendered at
+    /// <see cref="Render"/>, from this, so its links point at where a file really landed.</summary>
     void Announcements(string cls, JsonArray list)
     {
-        if (list.Count == 0) return;
-        var sb = new StringBuilder($"# {cls}: announcements\n\n_From Canvas, newest first._\n\n");
+        var index = Staged(cls);
+        string destDir = Path.Combine(CanvasDir(cls), "announcements", "files");
+        var infos = new List<AnnouncementInfo>();
         foreach (var a in list.OfType<JsonObject>().OrderByDescending(x => S(x["posted_at"]), StringComparer.Ordinal))
-            sb.Append("## ").Append(S(a["title"])).Append("\n_").Append(CanvasMarkdown.When(S(a["posted_at"]), zone())).Append(" · ")
-                .Append(S(a["author"]?["display_name"])).Append("_\n\n").Append(HtmlText.ToMarkdown(S(a["message"]))).Append("\n\n");
-        Write(cls, Path.Combine(CanvasDir(cls), "announcements.md"), sb.ToString().TrimEnd() + "\n");
+        {
+            var (body, links) = HtmlText.Convert(S(a["message"]), BuildContext(cls, index.CourseId, Rel(cls, Path.Combine(CanvasDir(cls), "announcements"))));
+            QueueFileLinks(cls, links, destDir);
+            var files = (a["attachments"] as JsonArray ?? []).OfType<JsonObject>().Select(meta => WantFile(cls, meta, destDir)).ToList();
+            infos.Add(new AnnouncementInfo
+            {
+                Id = (long)(D(a["id"]) ?? 0), Title = Py.Strip(S(a["title"])), PostedAt = Opt(a["posted_at"]),
+                Author = Py.Strip(S(a["author"]?["display_name"])), ReadOnCanvas = S(a["read_state"]) == "read",
+                Body = body, Files = files, HtmlUrl = S(a["html_url"]),
+            });
+        }
+        index.Announcements = infos;
+    }
+
+    /// <summary>Every quiz's facts (never its questions, answers or submissions), merged in by id as pages arrive.</summary>
+    void QuizzesPage(string cls, JsonArray list)
+    {
+        var index = Staged(cls);
+        string destDir = Path.Combine(CanvasDir(cls), "quizzes", "files");
+        foreach (var q in list.OfType<JsonObject>())
+        {
+            long id = (long)(D(q["id"]) ?? 0);
+            if (id == 0) continue;
+            var (description, links) = HtmlText.Convert(S(q["description"]), BuildContext(cls, index.CourseId, Rel(cls, Path.Combine(CanvasDir(cls), "quizzes"))));
+            QueueFileLinks(cls, links, destDir);
+            var info = new QuizInfo
+            {
+                Id = id, Title = Py.Strip(S(q["title"])), QuizType = S(q["quiz_type"]), DueAt = Opt(q["due_at"]),
+                Points = D(q["points_possible"]), TimeLimit = D(q["time_limit"]) is double tl ? (int)tl : null,
+                AllowedAttempts = D(q["allowed_attempts"]) is double aa ? (int)aa : null,
+                QuestionCount = D(q["question_count"]) is double qc ? (int)qc : null, Description = description,
+                AssignmentId = D(q["assignment_id"]) is double aid ? (long)aid : null,
+                Locked = Flag(q["locked_for_user"]), HtmlUrl = S(q["html_url"]),
+            };
+            int at = index.Quizzes.FindIndex(x => x.Id == id);
+            if (at >= 0) index.Quizzes[at] = info; else index.Quizzes.Add(info);
+        }
+    }
+
+    /// <summary>Real (ungraded, or graded-but-folded-into-an-assignment) discussion topics: never their entries or
+    /// views, only the prompt. An item marked <c>is_announcement</c> is one Canvas answered here by mistake (the
+    /// two listings share a Canvas path): skipped, since the announcements listing already has it.</summary>
+    void DiscussionsPage(string cls, JsonArray list)
+    {
+        var index = Staged(cls);
+        string destDir = Path.Combine(CanvasDir(cls), "discussions", "files");
+        foreach (var t in list.OfType<JsonObject>())
+        {
+            long id = (long)(D(t["id"]) ?? 0);
+            if (id == 0 || Flag(t["is_announcement"])) continue;
+            var (prompt, links) = HtmlText.Convert(S(t["message"]), BuildContext(cls, index.CourseId, Rel(cls, Path.Combine(CanvasDir(cls), "discussions"))));
+            QueueFileLinks(cls, links, destDir);
+            var info = new DiscussionInfo
+            {
+                Id = id, Title = Py.Strip(S(t["title"])), Prompt = prompt,
+                AssignmentId = D(t["assignment_id"]) is double aid ? (long)aid : null,
+                TodoDate = Opt(t["todo_date"]), Locked = Flag(t["locked_for_user"]), HtmlUrl = S(t["html_url"]),
+            };
+            int at = index.Discussions.FindIndex(x => x.Id == id);
+            if (at >= 0) index.Discussions[at] = info; else index.Discussions.Add(info);
+        }
+    }
+
+    /// <summary>Canvas's planner, for every linked class at once: an assignment marked done there is noted (applied
+    /// to the index at <see cref="ApplyPlanner"/>, once the assignments listing's own copy is final); anything else
+    /// with a date becomes a to-do. Calendar events aren't coursework, so they're dropped.</summary>
+    void Planner(JsonArray list)
+    {
+        foreach (var item in list.OfType<JsonObject>())
+        {
+            string cls = S(Courses[Num(D(item["course_id"]))]);
+            if (cls.Length == 0) continue; // a course this student takes but Study Stash doesn't sync
+            string type = S(item["plannable_type"]);
+            var plannable = item["plannable"] as JsonObject ?? [];
+            long id = (long)(D(item["plannable_id"]) ?? D(plannable["id"]) ?? 0);
+            if (id == 0 || type == "calendar_event") continue;
+            var over = item["planner_override"] as JsonObject;
+            bool done = Flag(over?["marked_complete"]);
+            if (type == "assignment")
+            {
+                if (!done) continue;
+                (markedDone.TryGetValue(cls, out var have) ? have : markedDone[cls] = [])[id] = Opt(over?["updated_at"]);
+                continue;
+            }
+            string title = Py.Strip(S(plannable["title"])) is { Length: > 0 } t ? t : "untitled";
+            string? todoAt = Opt(item["plannable_date"]) ?? Opt(plannable["todo_date"]);
+            var todo = new TodoInfo { Id = id, Kind = type, Title = title, TodoAt = todoAt, HtmlUrl = S(item["html_url"]), MarkedDone = done };
+            var list2 = Staged(cls).Todos;
+            int at = list2.FindIndex(x => x.Id == id);
+            if (at >= 0) list2[at] = todo; else list2.Add(todo);
+        }
+    }
+
+    /// <summary>Bakes this sync's planner reads into the promoted index: an assignment the planner said (this sync)
+    /// is marked done gets it; one it didn't read (hidden, failed, or a class the planner job never covered) keeps
+    /// what the previous index already knew, since "planner" not being <c>ok</c> means "unknown", not "false".</summary>
+    void ApplyPlanner(string cls, CourseIndex index, CourseIndex? prev)
+    {
+        bool read = index.Sections.GetValueOrDefault("planner") == "ok";
+        var done = markedDone.GetValueOrDefault(cls) ?? [];
+        var before = (prev?.Assignments ?? []).ToDictionary(a => a.Id);
+        foreach (var a in index.Assignments)
+        {
+            if (read)
+            {
+                a.MarkedDone = done.TryGetValue(a.Id, out var at);
+                a.MarkedDoneAt = a.MarkedDone ? at : null;
+            }
+            else if (before.TryGetValue(a.Id, out var old))
+            {
+                a.MarkedDone = old.MarkedDone;
+                a.MarkedDoneAt = old.MarkedDoneAt;
+            }
+        }
     }
 
     // --- the syllabus, pages outside modules, and the front page: rendered when the sync finishes, from what's

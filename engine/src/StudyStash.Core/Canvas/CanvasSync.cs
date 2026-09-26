@@ -119,6 +119,14 @@ public sealed partial class CanvasSync
             // A class's first sync finds everything new: that isn't news.
             if (had.Count > 0 || done.Before.GetValueOrDefault(cls)?.ReadAt.ContainsKey("assignments") == true)
                 changes.AddRange(Assignments.Diff(had, rows, wall));
+            // Same for announcements: a class's first read of them is never news, only what's new since.
+            if (done.Before.GetValueOrDefault(cls)?.ReadAt.ContainsKey("announcements") == true
+                && done.Indexes.GetValueOrDefault(cls) is { } withAnn)
+            {
+                var known = done.Before[cls]!.Announcements.Select(a => a.Id).ToHashSet();
+                foreach (var ann in withAnn.Announcements.Where(a => !known.Contains(a.Id)))
+                    changes.Add(new CanvasChange("announcement", cls, ann.Title, $"Announcement: {cls} · {ann.Title}", AnnouncementId: ann.Id));
+            }
         }
         // A class no longer linked to Canvas isn't news either: its rows just go.
         Assignments.Save(home, items);

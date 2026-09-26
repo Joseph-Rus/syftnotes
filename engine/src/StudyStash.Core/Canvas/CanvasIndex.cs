@@ -214,6 +214,10 @@ public sealed class AssignmentInfo
     /// <summary>Its folder in the class ("Canvas/assignments/Problem set 4"): spec.md, feedback.md, submission/.</summary>
     public string Folder { get; set; } = "";
     public SubmissionInfo? Submission { get; set; }
+    /// <summary>Marked done in Canvas's planner (a student can tick off work with no submission of its own).</summary>
+    public bool MarkedDone { get; set; }
+    /// <summary>When it was marked done, Canvas's UTC ISO; null when it wasn't, or the sync never read the planner.</summary>
+    public string? MarkedDoneAt { get; set; }
 
     static string S(JsonNode? v) => v is JsonValue j && j.GetValueKind() == JsonValueKind.String ? j.GetValue<string>() : "";
     static string? T(JsonNode? v) => S(v) is { Length: > 0 } s ? s : null;

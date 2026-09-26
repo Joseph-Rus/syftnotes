@@ -119,7 +119,10 @@ public static class CanvasView
         DateTime? submitted = a.Submitted.Length > 0 ? DateTime.Parse(a.Submitted, CultureInfo.InvariantCulture) : null;
         DateTime? graded = a.GradedAt.Length > 0 && DateTimeOffset.TryParse(a.GradedAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var g)
             ? TimeZoneInfo.ConvertTime(g, zone).DateTime : null;
-        return submitted is null ? graded : graded is null ? submitted : submitted > graded ? submitted : graded;
+        DateTime? markedDone = a.MarkedDoneAt.Length > 0 && DateTimeOffset.TryParse(a.MarkedDoneAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var m)
+            ? TimeZoneInfo.ConvertTime(m, zone).DateTime : null;
+        DateTime? best = submitted is null ? graded : graded is null ? submitted : submitted > graded ? submitted : graded;
+        return best is null ? markedDone : markedDone is null ? best : markedDone > best ? markedDone : best;
     }
 
     /// <summary>The Due list across every class: overdue, due this week, later, with no due date, and handed in in
