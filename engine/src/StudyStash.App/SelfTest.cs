@@ -145,7 +145,7 @@ public static class SelfTest
         bmp.Render(w);
         using var f = File.Create(Path.Combine(Dir!, name + ".png"));
         bmp.Save(f, PngBitmapEncoderOptions.Default);
-        Say($"{name}: {w.Bounds.Width:0}×{w.Bounds.Height:0} at {w.Position}");
+        Say($"{name}: {w.Bounds.Width:0}×{w.Bounds.Height:0} at {w.Position} (scale {w.RenderScaling:0.0#})");
     }
 
     static async Task Wait(double seconds) => await Task.Delay(TimeSpan.FromSeconds(seconds));
