@@ -55,6 +55,45 @@ public class CanvasShots
         ("Error", view(Status("state-error"))),
     ];
 
+    static FakeLibrary ConnectedLibrary() => new FakeLibrary()
+        .Json(HttpMethod.Get, "/api/v2/canvas/state", "state-connected")
+        .Json(HttpMethod.Get, "/api/v2/canvas", "canvas")
+        .Json(HttpMethod.Get, "/api/v2/canvas/classes", "classes")
+        .Json(HttpMethod.Post, "/api/v2/canvas/courses", "canvas")
+        .Json(HttpMethod.Post, "/api/v2/canvas/scout", "canvas")
+        .Json(HttpMethod.Post, "/api/v2/canvas", "canvas");
+
+    static async Task<CanvasSettingsModel> SettingsAsync()
+    {
+        var m = new CanvasSettingsModel(CanvasFixtures.Context(ConnectedLibrary()));
+        await m.LoadAsync(TestContext.Current.CancellationToken);
+        return m;
+    }
+
+    [AvaloniaFact]
+    public async Task Mac_settings()
+    {
+        var m = await SettingsAsync();
+        foreach (var t in Themes)
+        {
+            Control? built = null;
+            Shot.Take("mac-06-canvas-settings", SkinKind.Mac, t, () => built = CanvasFrames.MacSettings(new MacCanvasSettings { DataContext = m }));
+            AssertIcons(built!);
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Win_settings()
+    {
+        var m = await SettingsAsync();
+        foreach (var t in Themes)
+        {
+            Control? built = null;
+            Shot.Take("win-06-canvas-settings", SkinKind.Win, t, () => built = CanvasFrames.WinSettings(new WinCanvasSettings { DataContext = m }));
+            AssertIcons(built!);
+        }
+    }
+
     [AvaloniaFact]
     public void Mac_states()
     {

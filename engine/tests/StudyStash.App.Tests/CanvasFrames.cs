@@ -148,6 +148,95 @@ public static class CanvasFrames
         return row;
     }
 
+    static readonly (string Glyph, string Label)[] SettingsNav =
+    [
+        ("tune", "General"), ("mic", "Recording"), ("dns", "Library"), ("school", "Canvas"), ("keyboard", "Shortcuts"),
+    ];
+
+    /// <summary>Design 06: Settings' own window — a nav sidebar (General, Recording, Library, Canvas current,
+    /// Shortcuts) around whatever Canvas-section content the test hands in. The real Settings window is WS2/WS6's;
+    /// this is just enough of its look for the pane to sit somewhere plausible.</summary>
+    public static Control MacSettings(Control content) => SettingsWindow(content, mac: true);
+
+    public static Control WinSettings(Control content) => SettingsWindow(content, mac: false);
+
+    static Control SettingsWindow(Control content, bool mac)
+    {
+        var items = new StackPanel { Spacing = 2 };
+        if (mac)
+        {
+            var lights = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(10, 0, 0, 8), Height = 44, VerticalAlignment = VerticalAlignment.Center };
+            foreach (string colour in new[] { "#FF5F57", "#FEBC2E", "#28C840" })
+                lights.Children.Add(new Ellipse { Width = 12, Height = 12, Fill = new SolidColorBrush(Color.Parse(colour)) });
+            items.Children.Add(lights);
+        }
+        foreach (var (glyph, label) in SettingsNav) items.Children.Add(NavRow(glyph, label, current: label == "Canvas", mac));
+
+        Control sidebar;
+        if (mac)
+        {
+            var glass = new Border { Width = 220, Padding = new Thickness(10, 0, 10, 14), Child = items, CornerRadius = new CornerRadius(18) };
+            glass.Bind(Border.BackgroundProperty, glass.GetResourceObservable("Glass"));
+            glass.Bind(Border.BoxShadowProperty, glass.GetResourceObservable("GlassShadow"));
+            sidebar = new Border { Padding = new Thickness(8, 8, 0, 8), Child = glass, ClipToBounds = false };
+        }
+        else
+        {
+            sidebar = new Border { Width = 240, Padding = new Thickness(4, 4, 4, 8), Child = items };
+        }
+
+        var body = new Border { Padding = new Thickness(40, 40, 40, 32), Child = content, ClipToBounds = false };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        Grid.SetColumn(sidebar, 0);
+        Grid.SetColumn(body, 1);
+        grid.Children.Add(sidebar);
+        grid.Children.Add(body);
+
+        var frame = new StackPanel { Spacing = 0 };
+        if (!mac)
+        {
+            var titleBar = new Border { Height = 32, Padding = new Thickness(16, 0) };
+            titleBar.Bind(Border.BackgroundProperty, titleBar.GetResourceObservable("Layer"));
+            var title = new TextBlock { Text = "Study Stash settings", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            title.Bind(TextBlock.ForegroundProperty, title.GetResourceObservable("Fg2"));
+            titleBar.Child = title;
+            frame.Children.Add(titleBar);
+        }
+        frame.Children.Add(grid);
+
+        var window = new Border { Width = 900, Height = mac ? 820 : 990, Child = frame, ClipToBounds = true };
+        if (mac)
+        {
+            window.CornerRadius = new CornerRadius(26);
+            window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Win"));
+            window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("GShadow"));
+        }
+        else
+        {
+            window.CornerRadius = new CornerRadius(8);
+            window.BorderThickness = new Thickness(1);
+            window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Mica"));
+            window.Bind(Border.BorderBrushProperty, window.GetResourceObservable("FlyStroke"));
+            window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("ShadowLg"));
+        }
+        return window;
+    }
+
+    static Control NavRow(string glyph, string label, bool current, bool mac)
+    {
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), Height = mac ? 32 : 40, Margin = new Thickness(mac ? 0 : 4, 1) };
+        if (current) row.Bind(Grid.BackgroundProperty, row.GetResourceObservable(mac ? "Fill2" : "Subtle2"));
+        var icon = new Icon { Glyph = glyph, Size = 16, Margin = new Thickness(10, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+        icon.Bind(Icon.ForegroundProperty, icon.GetResourceObservable(current ? "AccentText" : "Fg2"));
+        Grid.SetColumn(icon, 0);
+        var text = new TextBlock { Text = label, FontSize = mac ? 13 : 14, FontWeight = current && mac ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center };
+        text.Bind(TextBlock.ForegroundProperty, text.GetResourceObservable("Fg"));
+        Grid.SetColumn(text, 1);
+        row.Children.Add(icon);
+        row.Children.Add(text);
+        return row;
+    }
+
     /// <summary>Design 12: a 360-wide card standing in for the dropdown/flyout's own chrome, holding only our
     /// <c>MacNextDue</c>/<c>WinNextDue</c> line — the dropdown itself is WS2/WS6's, so this is just enough of its
     /// look for the line to sit somewhere plausible.</summary>
