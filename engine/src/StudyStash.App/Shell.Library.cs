@@ -317,6 +317,10 @@ public static partial class Shell
         library.Groups.Clear();
         library.CanvasClass = null;
         openCanvasClass = null;
+        // No lecture behind the Due page: its notes stop following a rewrite, and the ask bar goes with it.
+        library.Notes?.Dispose();
+        library.Notes = null;
+        library.Note = null;
         var list = library.DueList is { } open && dueListFor == canvasFor ? open : NewDueList();
         library.DueList = list;
         library.List = LibraryList.Due;

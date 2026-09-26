@@ -13,6 +13,8 @@
     <Setter Property="LineHeight" Value="21" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="TextWrapping" Value="Wrap" />
+    <!-- Held to the left edge under the title even when a MaxWidth leaves room beside it. -->
+    <Setter Property="HorizontalAlignment" Value="Left" />
   </Style>
   <Style Selector="TextBlock.ai-section">
     <Setter Property="FontSize" Value="14" />
@@ -108,6 +110,10 @@
   </Style>
   <Style Selector="Border.ai-select TextBlock">
     <Setter Property="FontSize" Value="14" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-select > Grid">
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="Button.ai-select-btn">
     <Setter Property="Theme" Value="{StaticResource Surface}" />

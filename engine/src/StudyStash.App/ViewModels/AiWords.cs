@@ -142,7 +142,8 @@ public static partial class AiWords
 
     /// <summary>The current notes' byline: "Written by Ollama · Tue 11:52".</summary>
     public static string WrittenByline(string engineName, string updatedAtIso) =>
-        ParseUntil(updatedAtIso) is { } at ? $"Written by {engineName} · {at:ddd H:mm}" : $"Written by {engineName}";
+        engineName.Length == 0 ? "" // an older lecture that doesn't say who wrote its notes
+        : ParseUntil(updatedAtIso) is { } at ? $"Written by {engineName} · {at:ddd H:mm}" : $"Written by {engineName}";
 
     /// <summary>A ready draft's byline: "Claude Code · just now" (or "· 5 min ago", "· 2 h ago", a date).</summary>
     public static string DraftByline(string engineName, string atIso, DateTime now) => $"{engineName} · {History.Ago(atIso, now)}";

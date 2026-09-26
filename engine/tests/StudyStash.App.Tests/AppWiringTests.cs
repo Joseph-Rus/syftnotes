@@ -127,4 +127,11 @@ public class AppWiringTests
         Assert.True(missing.Strong);
         Assert.All(rows.Where(r => r != missing), r => Assert.False(r.Strong));
     }
+
+    [Fact]
+    public void Notes_that_dont_say_who_wrote_them_get_no_byline()
+    {
+        Assert.Equal("", AiWords.WrittenByline("", ""));
+        Assert.Equal("Written by Ollama", AiWords.WrittenByline("Ollama", ""));
+    }
 }
