@@ -144,7 +144,14 @@ public static class GlassBackdrop
     {
         if (!OperatingSystem.IsMacOS()) return false;
         if (window.TryGetPlatformHandle() is not { } handle || handle.Handle == IntPtr.Zero) return false;
-        IntPtr nsWindow = ObjC.Send(handle.Handle, ObjC.Sel("window"));
+        // The handle is the window's NSView, or (depending on the backend) the NSWindow itself: only a view answers
+        // "window" (asking an NSWindow for it throws, and AppKit's exception ends the app).
+        IntPtr nsWindow = handle.HandleDescriptor switch
+        {
+            "NSView" => ObjC.Send(handle.Handle, ObjC.Sel("window")),
+            "NSWindow" => handle.Handle,
+            _ => IntPtr.Zero,
+        };
         if (nsWindow == IntPtr.Zero) return false;
         IntPtr contentView = ObjC.Send(nsWindow, ObjC.Sel("contentView"));
         if (contentView == IntPtr.Zero) return false;

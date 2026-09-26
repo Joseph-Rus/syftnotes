@@ -4,6 +4,7 @@ using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -739,7 +740,7 @@ public static partial class Shell
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacSetup { DataContext = setup, DrawChrome = false } : new WinSetup { DataContext = setup, DrawChrome = false };
         var w = new Window
         {
-            Title = "Set up Study Stash", SizeToContent = SizeToContent.WidthAndHeight, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = view,
+            Title = "Set up Study Stash", Width = view.Width, Height = view.Height, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = view,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? 48 : 32,
         };
         Look.Apply(w);
@@ -758,6 +759,12 @@ public static partial class Shell
             ShowLibrary();
         };
         setup.OnEnter = step => EnterSetupStep(model, step);
+        // The AI and Canvas steps are the design's bigger window (the view sizes itself per step): the window follows.
+        view.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == Layoutable.WidthProperty) w.Width = view.Width;
+            else if (e.Property == Layoutable.HeightProperty) w.Height = view.Height;
+        };
         // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
         setup.LeaveAsync = async step => step != SetupStep.Ai || model.Ai is not { } ai || await ai.SaveAsync();
         w.Closed += (_, _) =>

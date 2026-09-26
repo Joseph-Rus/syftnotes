@@ -258,6 +258,7 @@ public static class SelfTest
         // Canvas is optional: the self-test skips it (there's no Chrome or Canvas here to connect).
         if (m.OnCanvas)
         {
+            await Wait(1); // the window grows to the step's size first
             Shot(Shell.Windows.Setup, "setup-canvas");
             m.SkipCommand.Execute(null);
         }
