@@ -117,11 +117,24 @@ public static partial class Shell
         public static Window? Quick => quickWindow;
         public static Window? Recorder => recorderWindow;
         public static Window? Settings => settingsWindow;
+        /// <summary>Setup's own view model, while its window is open: what the self-test drives (steps, connect,
+        /// find, add a class) the same way the view's bindings would.</summary>
+        public static ViewModels.SetupModel? SetupModel => setup;
         public static void TogglePanel() => Shell.TogglePanel();
         public static void ToggleQuick() => Shell.ToggleQuick();
         public static void Record() => ToggleRecording();
         public static void StopRecording() => Shell.StopRecording();
+        public static void TogglePause() => Shell.TogglePause();
         public static void ShowRecorder(bool expanded) => Shell.ShowRecorder(expanded);
+        /// <summary>Record the way the global shortcut would, so the self-test exercises that path too (setup first,
+        /// if it isn't done).</summary>
+        public static void RecordViaShortcut() => OnShortcut(Shortcut.Record);
+        /// <summary>Opens a lecture's notes (or transcript) in the library window, as clicking it would.</summary>
+        public static void OpenLecture(string id, bool transcript = false) => Shell.OpenLecture(id, transcript);
+        /// <summary>Searches the quick panel, as typing in it would.</summary>
+        public static Task Search(string query) => SearchAsync(query);
+        public static QuickModel QuickModel => quick;
+        public static PanelModel PanelModel => panel;
 
         /// <summary>Opens the dropdown the way clicking the real icon would (a Mac's status item; Windows' tray
         /// otherwise), and how far its centre landed from the icon's own, in points — the self-test's placement

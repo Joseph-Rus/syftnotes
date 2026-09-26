@@ -36,6 +36,9 @@ static class Program
             Log($"[error] a background task failed: {e.Exception}");
             e.SetObserved();
         };
+        // STUDYSTASH_SELFTEST: before Avalonia starts at all, refuse a bad setup (writes why to selftest.txt) or
+        // start the self-test's own library and AI engine, so the run that follows never reaches the real network.
+        if (SelfTest.Prepare(Home) is int refusal) return refusal;
         // One copy at a time: a second one asks the first to show itself (or record), then goes. One started at login
         // has nothing to show, so it just goes.
         if (!Desktop.Claim(Home))

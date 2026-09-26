@@ -185,6 +185,8 @@ public static class Setup
             var cfg = Configs.Load(host.Home);
             var extra = new List<int>();
             if (File.Exists(cfg.ConfigPath)) extra.Add(cfg.WebPort);
+            // The self-test's own library isn't on the usual port (never 8787, so a real one is never mistaken for it).
+            if (Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_LIBRARY_PORT") is { Length: > 0 } sp && int.TryParse(sp, out int p)) extra.Add(p);
             var found = await new LibraryFinder { ExtraPorts = extra }.FindAsync();
             if (found is null)
             {
