@@ -24,6 +24,10 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string?, string?, bool?, AiOverview?>? OnDefaults { get; set; }
     public Func<AskRequest, AskReply?>? OnAsk { get; set; }
     public Func<string, RewriteInfo?>? OnRewrite { get; set; }
+    public Func<string, string, RewriteInfo?>? OnRewriteStart { get; set; }
+    public Func<string, RewriteInfo?>? OnRewriteCancel { get; set; }
+    public Func<string, RewriteInfo?>? OnRewriteKeep { get; set; }
+    public Func<string, RewriteInfo?>? OnRewriteUse { get; set; }
 
     static EngineInfo Row(AiOverview o, string id) => o.Engines.First(e => e.Id == id);
 
@@ -111,25 +115,25 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Task<RewriteInfo?> RewriteStartAsync(string lecture, string engine)
     {
         Calls.Add($"rewrite-start:{lecture}:{engine}");
-        return Task.FromResult<RewriteInfo?>(new RewriteInfo(lecture, "working") { Engine = engine });
+        return Task.FromResult(OnRewriteStart is not null ? OnRewriteStart(lecture, engine) : new RewriteInfo(lecture, "working") { Engine = engine });
     }
 
     public Task<RewriteInfo?> RewriteCancelAsync(string lecture)
     {
         Calls.Add($"rewrite-cancel:{lecture}");
-        return Task.FromResult<RewriteInfo?>(new RewriteInfo(lecture, "cancelled"));
+        return Task.FromResult(OnRewriteCancel is not null ? OnRewriteCancel(lecture) : new RewriteInfo(lecture, "cancelled"));
     }
 
     public Task<RewriteInfo?> RewriteKeepAsync(string lecture)
     {
         Calls.Add($"rewrite-keep:{lecture}");
-        return Task.FromResult<RewriteInfo?>(new RewriteInfo(lecture, "none"));
+        return Task.FromResult(OnRewriteKeep is not null ? OnRewriteKeep(lecture) : new RewriteInfo(lecture, "none"));
     }
 
     public Task<RewriteInfo?> RewriteUseAsync(string lecture)
     {
         Calls.Add($"rewrite-use:{lecture}");
-        return Task.FromResult<RewriteInfo?>(new RewriteInfo(lecture, "none"));
+        return Task.FromResult(OnRewriteUse is not null ? OnRewriteUse(lecture) : new RewriteInfo(lecture, "none"));
     }
 }
 

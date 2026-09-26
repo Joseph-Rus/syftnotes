@@ -22,8 +22,8 @@ public static class AiDemo
     static AiOverview SetupOverview() => Overview() with { Ask = "ollama" };
 
     /// <summary>Answers one fixed <see cref="AiOverview"/> and nothing else: enough to draw the panes, never a real
-    /// library.</summary>
-    sealed class Library(AiOverview overview) : IAiLibrary
+    /// library. <paramref name="rewrite"/> answers every rewrite call, for the notes screen's three states.</summary>
+    sealed class Library(AiOverview overview, Func<string, RewriteInfo?>? rewrite = null) : IAiLibrary
     {
         public Task<AiOverview?> EnginesAsync() => Task.FromResult<AiOverview?>(overview);
         public Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null) => Task.FromResult<AiOverview?>(overview);
@@ -34,11 +34,11 @@ public static class AiDemo
         public Task<AiOverview?> ModelAsync(string engine, string model) => Task.FromResult<AiOverview?>(overview);
         public Task<AiOverview?> DismissAsync(string problemId) => Task.FromResult<AiOverview?>(overview);
         public Task<AskReply?> AskAsync(AskRequest request) => Task.FromResult<AskReply?>(null);
-        public Task<RewriteInfo?> RewriteAsync(string lecture) => Task.FromResult<RewriteInfo?>(null);
-        public Task<RewriteInfo?> RewriteStartAsync(string lecture, string engine) => Task.FromResult<RewriteInfo?>(null);
-        public Task<RewriteInfo?> RewriteCancelAsync(string lecture) => Task.FromResult<RewriteInfo?>(null);
-        public Task<RewriteInfo?> RewriteKeepAsync(string lecture) => Task.FromResult<RewriteInfo?>(null);
-        public Task<RewriteInfo?> RewriteUseAsync(string lecture) => Task.FromResult<RewriteInfo?>(null);
+        public Task<RewriteInfo?> RewriteAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
+        public Task<RewriteInfo?> RewriteStartAsync(string lecture, string engine) => Task.FromResult(rewrite?.Invoke(lecture));
+        public Task<RewriteInfo?> RewriteCancelAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
+        public Task<RewriteInfo?> RewriteKeepAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
+        public Task<RewriteInfo?> RewriteUseAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
     }
 
     /// <summary>The AI engines pane, loaded: notes on Ollama, questions on Claude Code, the fallback on.</summary>
@@ -80,6 +80,95 @@ public static class AiDemo
             Answer = "Recursion traces and call-stack diagrams. Big-O proofs won't be on it.",
             Byline = "Ollama · 18:05, 18:40",
         });
+        return m;
+    }
+
+    // -----------------------------------------------------------------------------------------------------------
+    // 17 · Rewrite the notes: the design's own lecture, "Recursion and the call stack".
+    // -----------------------------------------------------------------------------------------------------------
+
+    const string LectureId = "lec-recursion";
+    static readonly string Now = DateTime.Now.ToString("o");
+
+    static readonly NotesVersion CurrentNotes = new(
+        "# Summary\n\nA recursive function solves a problem by calling itself on a smaller version of it. Each call gets its own frame on the call stack, which holds that call's arguments and local variables.",
+        "Ollama", Now);
+
+    static readonly NotesVersion DraftNotes = new(
+        "# Summary\n\nA recursive function calls itself on a smaller input until it reaches a base case it can answer directly. Every call gets a frame on the call stack holding its own arguments and locals.",
+        "Claude Code", Now);
+
+    static AiNotesModel LoadedNotes(RewriteInfo info)
+    {
+        var m = new AiNotesModel(new Library(Overview(), _ => info));
+        m.Load(LectureId, CurrentNotes.Markdown, "Ollama", CurrentNotes.At).GetAwaiter().GetResult();
+        return m;
+    }
+
+    /// <summary>The notes as they sit before any rewrite, "Rewrite notes with" open on Claude Code (Ollama, the
+    /// writer, shows checked further down; Codex is signed out).</summary>
+    public static AiNotesModel NotesIdle()
+    {
+        var m = LoadedNotes(new RewriteInfo(LectureId, "none") { Current = CurrentNotes });
+        m.Engine = "claude";
+        m.MenuOpen = true;
+        return m;
+    }
+
+    /// <summary>Rewriting with Claude Code: the current notes are exactly as before.</summary>
+    public static AiNotesModel NotesRewriting() =>
+        LoadedNotes(new RewriteInfo(LectureId, "working") { Engine = "claude", EngineName = "Claude Code", Current = CurrentNotes });
+
+    /// <summary>Claude Code's draft is ready to keep, compare or use.</summary>
+    public static AiNotesModel NotesReady() =>
+        LoadedNotes(new RewriteInfo(LectureId, "ready") { Engine = "claude", EngineName = "Claude Code", Current = CurrentNotes, Draft = DraftNotes });
+
+    /// <summary>The ready draft, "Compare" already pressed.</summary>
+    public static AiNotesModel NotesComparing()
+    {
+        var m = NotesReady();
+        m.CompareCommand.Execute(null);
+        return m;
+    }
+
+    /// <summary>Claude Code's rewrite failed: the current notes are unchanged.</summary>
+    public static AiNotesModel NotesFailed() => LoadedNotes(new RewriteInfo(LectureId, "failed")
+    {
+        Engine = "claude", EngineName = "Claude Code", Error = "Claude Code hit its usage limit.", Current = CurrentNotes,
+    });
+
+    // -----------------------------------------------------------------------------------------------------------
+    // 18 · AI problems: the design's six, plus the app's own library-offline and rewrite-failed and a compare view.
+    // -----------------------------------------------------------------------------------------------------------
+
+    /// <summary>The design's six problems, in its own order (row-major into the sheet's two columns).</summary>
+    public static AiProblemsModel Problems()
+    {
+        var overview = Overview() with
+        {
+            Problems =
+            [
+                new AiProblemInfo("engine-offline", "engine_offline", "ollama", "Ollama"),
+                new AiProblemInfo("not-signed-in", "not_signed_in", "codex", "Codex") { FallbackTo = "claude" },
+                new AiProblemInfo("model-missing", "model_missing", "ollama", "Ollama") { SizeGb = 40 },
+                new AiProblemInfo("usage-limit", "usage_limit", "claude", "Claude Code") { Until = DateTime.Today.AddHours(15).ToString("o"), FallbackTo = "ollama" },
+            ],
+        };
+        var m = new AiProblemsModel(new Library(overview));
+        m.Load().GetAwaiter().GetResult();
+        m.AddFellBack("fell-back", "Ollama", "Claude Code didn't respond in time.");
+        m.AddAccessRequest("access-1", "Codex", "Eli's MacBook", () => Task.CompletedTask, () => Task.CompletedTask);
+        return m;
+    }
+
+    /// <summary>The extras the design's six don't show: the library not answering at all, and a rewrite that failed
+    /// (the same words <see cref="NotesFailed"/>'s inline bar uses).</summary>
+    public static AiProblemsModel ProblemsMore()
+    {
+        var m = new AiProblemsModel(new Library(Overview()));
+        m.Load().GetAwaiter().GetResult();
+        m.AddLibraryOffline(() => Task.CompletedTask);
+        m.AddRewriteFailed("rewrite-1", "Claude Code", "Claude Code hit its usage limit.", () => Task.CompletedTask);
         return m;
     }
 }

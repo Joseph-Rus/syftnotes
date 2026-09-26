@@ -408,6 +408,145 @@ public class AiShots
     }
 
     // ---------------------------------------------------------------------------------------------------------
+    // A lecture's notes with "Rewrite notes" (design 17): each panel is the design's own little "page" — a class
+    // dot and meta line, the title, then our real AiNotes control below it. Picture scaffolding only: the real
+    // lecture page (title, meta, the class dot) is another lane's.
+    // ---------------------------------------------------------------------------------------------------------
+
+    static Border NotesPage(SkinKind skin, double width, double height, Control notes)
+    {
+        var dot = new Ellipse { Width = 8, Height = 8, Fill = new SolidColorBrush(Oklch.ToColor(0.62, 0.14, 250)), VerticalAlignment = VerticalAlignment.Center };
+        var meta = new TextBlock { Text = "CS 101 · Tuesday 23 September · 1 h 12 min", FontSize = 12 };
+        Res(meta, TextBlock.ForegroundProperty, meta, "Fg2");
+        var metaRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { dot, meta } };
+
+        var title = new TextBlock
+        {
+            Text = "Recursion and the call stack", FontSize = skin == SkinKind.Mac ? 30 : 28,
+            FontWeight = skin == SkinKind.Mac ? FontWeight.Bold : FontWeight.SemiBold, Margin = new Thickness(0, 8, 0, 0),
+        };
+        Res(title, TextBlock.FontFamilyProperty, title, "DisplayFont");
+
+        var body = new StackPanel { Spacing = 12, Margin = new Thickness(skin == SkinKind.Mac ? 56 : 48, skin == SkinKind.Mac ? 36 : 32, skin == SkinKind.Mac ? 56 : 48, 0), Children = { metaRow, title, notes } };
+        var page = new Border { Width = width, Height = height, ClipToBounds = true, Child = body };
+        if (skin == SkinKind.Mac)
+        {
+            Res(page, Border.BackgroundProperty, page, "Win");
+            page.CornerRadius = new CornerRadius(26);
+            Res(page, Border.BoxShadowProperty, page, "GShadow");
+        }
+        else
+        {
+            Res(page, Border.BackgroundProperty, page, "Mica");
+            page.CornerRadius = new CornerRadius(8);
+            page.BorderThickness = new Thickness(1);
+            Res(page, Border.BorderBrushProperty, page, "FlyStroke");
+            Res(page, Border.BoxShadowProperty, page, "ShadowLg");
+        }
+        return page;
+    }
+
+    static Control RewriteComposition(SkinKind skin)
+    {
+        Control Notes(ViewModels.AiNotesModel m) => skin == SkinKind.Mac ? new MacAiNotes { DataContext = m } : new WinAiNotes { DataContext = m };
+        var right = new StackPanel { Spacing = 32, Children = { NotesPage(skin, 760, 380, Notes(AiDemo.NotesRewriting())), NotesPage(skin, 760, 380, Notes(AiDemo.NotesReady())) } };
+        return new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 40, HorizontalAlignment = HorizontalAlignment.Left,
+            Children = { NotesPage(skin, 760, 420, Notes(AiDemo.NotesIdle())), right },
+        };
+    }
+
+    [AvaloniaFact]
+    public void Mac_ai_rewrite()
+    {
+        foreach (var t in Themes) Shot.Take("mac-17-ai-rewrite", SkinKind.Mac, t, () => RewriteComposition(SkinKind.Mac));
+    }
+
+    [AvaloniaFact]
+    public void Win_ai_rewrite()
+    {
+        foreach (var t in Themes) Shot.Take("win-17-ai-rewrite", SkinKind.Win, t, () => RewriteComposition(SkinKind.Win));
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    // Every AI problem (design 18): the design's own 1000-wide sheet, its six problems in two columns.
+    // ---------------------------------------------------------------------------------------------------------
+
+    static Control ProblemsSheet(SkinKind skin, IEnumerable<ViewModels.AiProblem> problems, double width = 1000)
+    {
+        Control Card(ViewModels.AiProblem p) => skin == SkinKind.Mac
+            ? new MacAiProblem { DataContext = p } : new WinAiProblem { DataContext = p };
+
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,28,*"), RowSpacing = 20 };
+        int row = 0, col = 0;
+        foreach (var p in problems)
+        {
+            while (grid.RowDefinitions.Count <= row) grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            var card = Card(p);
+            Grid.SetRow(card, row);
+            Grid.SetColumn(card, col * 2);
+            grid.Children.Add(card);
+            if (++col == 2) { col = 0; row++; }
+        }
+
+        var sheet = new Border { Width = width, Padding = new Thickness(32), Child = grid };
+        if (skin == SkinKind.Mac)
+        {
+            Res(sheet, Border.BackgroundProperty, sheet, "Win");
+            sheet.CornerRadius = new CornerRadius(26);
+            Res(sheet, Border.BoxShadowProperty, sheet, "GShadow");
+        }
+        else
+        {
+            Res(sheet, Border.BackgroundProperty, sheet, "Mica");
+            sheet.CornerRadius = new CornerRadius(8);
+            sheet.BorderThickness = new Thickness(1);
+            Res(sheet, Border.BorderBrushProperty, sheet, "FlyStroke");
+            Res(sheet, Border.BoxShadowProperty, sheet, "ShadowLg");
+        }
+        return sheet;
+    }
+
+    [AvaloniaFact]
+    public void Mac_ai_problems()
+    {
+        foreach (var t in Themes) Shot.Take("mac-18-ai-problems", SkinKind.Mac, t, () => ProblemsSheet(SkinKind.Mac, AiDemo.Problems().Problems));
+    }
+
+    [AvaloniaFact]
+    public void Win_ai_problems()
+    {
+        foreach (var t in Themes) Shot.Take("win-18-ai-problems", SkinKind.Win, t, () => ProblemsSheet(SkinKind.Win, AiDemo.Problems().Problems));
+    }
+
+    /// <summary>The extras the design's six problems don't show: the library not answering at all, a rewrite that
+    /// failed, and the compare view — each with an explicit size, since none of them is the six-card sheet above.</summary>
+    static Control ProblemsMoreComposition(SkinKind skin)
+    {
+        var cards = new StackPanel { Spacing = 20, Width = 460, Children = { }, VerticalAlignment = VerticalAlignment.Top };
+        foreach (var p in AiDemo.ProblemsMore().Problems)
+            cards.Children.Add(skin == SkinKind.Mac ? new MacAiProblem { DataContext = p } : new WinAiProblem { DataContext = p });
+
+        Control notes = skin == SkinKind.Mac ? new MacAiNotes { DataContext = AiDemo.NotesComparing() } : new WinAiNotes { DataContext = AiDemo.NotesComparing() };
+        var comparePage = NotesPage(skin, 760, 460, notes);
+
+        return new StackPanel { Orientation = Orientation.Horizontal, Spacing = 40, HorizontalAlignment = HorizontalAlignment.Left, Children = { cards, comparePage } };
+    }
+
+    [AvaloniaFact]
+    public void Mac_ai_problems_more()
+    {
+        foreach (var t in Themes) Shot.Take("mac-18-ai-problems-more", SkinKind.Mac, t, () => ProblemsMoreComposition(SkinKind.Mac), size: new Size(1400, 620));
+    }
+
+    [AvaloniaFact]
+    public void Win_ai_problems_more()
+    {
+        foreach (var t in Themes) Shot.Take("win-18-ai-problems-more", SkinKind.Win, t, () => ProblemsMoreComposition(SkinKind.Win), size: new Size(1400, 620));
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
     // The shots.
     // ---------------------------------------------------------------------------------------------------------
 
