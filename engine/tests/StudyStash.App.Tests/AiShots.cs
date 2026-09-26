@@ -446,14 +446,26 @@ public class AiShots
         return page;
     }
 
+    static Control Notes(SkinKind skin, ViewModels.AiNotesModel m) => skin == SkinKind.Mac ? new MacAiNotes { DataContext = m } : new WinAiNotes { DataContext = m };
+
+    /// <summary>The idle panel with "Rewrite notes with" open: the popup never renders into a capture, so it's drawn
+    /// inline here at the design's own offset, over the (already dimmed) notes.</summary>
+    static Control IdlePage(SkinKind skin, ViewModels.AiNotesModel model)
+    {
+        var page = NotesPage(skin, 760, 420, Notes(skin, model));
+        Control menu = skin == SkinKind.Mac
+            ? new MacAiEngineMenu { DataContext = model.Menu, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 196, 56, 0) }
+            : new WinAiEngineMenu { DataContext = model.Menu, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 188, 48, 0) };
+        return new Panel { Width = 760, Height = 420, Children = { page, menu } };
+    }
+
     static Control RewriteComposition(SkinKind skin)
     {
-        Control Notes(ViewModels.AiNotesModel m) => skin == SkinKind.Mac ? new MacAiNotes { DataContext = m } : new WinAiNotes { DataContext = m };
-        var right = new StackPanel { Spacing = 32, Children = { NotesPage(skin, 760, 380, Notes(AiDemo.NotesRewriting())), NotesPage(skin, 760, 380, Notes(AiDemo.NotesReady())) } };
+        var right = new StackPanel { Spacing = 32, Children = { NotesPage(skin, 760, 380, Notes(skin, AiDemo.NotesRewriting())), NotesPage(skin, 760, 380, Notes(skin, AiDemo.NotesReady())) } };
         return new StackPanel
         {
             Orientation = Orientation.Horizontal, Spacing = 40, HorizontalAlignment = HorizontalAlignment.Left,
-            Children = { NotesPage(skin, 760, 420, Notes(AiDemo.NotesIdle())), right },
+            Children = { IdlePage(skin, AiDemo.NotesIdle()), right },
         };
     }
 
@@ -528,8 +540,7 @@ public class AiShots
         foreach (var p in AiDemo.ProblemsMore().Problems)
             cards.Children.Add(skin == SkinKind.Mac ? new MacAiProblem { DataContext = p } : new WinAiProblem { DataContext = p });
 
-        Control notes = skin == SkinKind.Mac ? new MacAiNotes { DataContext = AiDemo.NotesComparing() } : new WinAiNotes { DataContext = AiDemo.NotesComparing() };
-        var comparePage = NotesPage(skin, 760, 460, notes);
+        var comparePage = NotesPage(skin, 760, 460, Notes(skin, AiDemo.NotesComparing()));
 
         return new StackPanel { Orientation = Orientation.Horizontal, Spacing = 40, HorizontalAlignment = HorizontalAlignment.Left, Children = { cards, comparePage } };
     }
