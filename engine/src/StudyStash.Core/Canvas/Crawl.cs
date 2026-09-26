@@ -541,7 +541,7 @@ public sealed partial class Crawl
                 try
                 {
                     before[cls] = CourseIndex.Load(home, cls);
-                    after[cls] = CourseIndex.Promote(home, cls, states, at, index => { Forget(cls, index); FinishPages(cls, index); ApplyPlanner(cls, index, before[cls]); });
+                    after[cls] = CourseIndex.Promote(home, cls, states, at, index => { Forget(cls, index); FinishPages(cls, index); ApplyPlanner(cls, index, before[cls]); SetLocalPaths(cls, index); });
                     Render(cls, after[cls]);
                 }
                 catch (Exception e) when (e is IOException or UnauthorizedAccessException)
@@ -598,13 +598,25 @@ public sealed partial class Crawl
         }
         if (index.Modules.Count > 0) Write(cls, Path.Combine(CanvasDir(cls), "modules.md"), CanvasMarkdown.Modules(cls, index));
         if (index.Announcements.Count > 0) Write(cls, Path.Combine(CanvasDir(cls), "announcements.md"), CanvasMarkdown.Announcements(cls, index, tz));
-        // A quiz or discussion folded into its own assignment's spec.md isn't written again on its own.
+        // A quiz or discussion folded into its own assignment's spec.md isn't written again on its own: SetLocalPaths
+        // (run before the index was saved) already left Local null for those, set for a standalone one.
+        foreach (var q in index.Quizzes.Where(q => q.Local is not null))
+            Write(cls, Path.Combine(classDir(cls), q.Local!), CanvasMarkdown.Quiz(q));
+        foreach (var d in index.Discussions.Where(d => d.Local is not null))
+            Write(cls, Path.Combine(classDir(cls), d.Local!), CanvasMarkdown.Discussion(d));
+    }
+
+    /// <summary>Where a standalone (never folded into an assignment) quiz or discussion will be written, so the API
+    /// and modules.md can link there — set on the index before it's saved, since <see cref="Render"/> (which does
+    /// the actual writing) runs only after.</summary>
+    static void SetLocalPaths(string cls, CourseIndex index)
+    {
         var foldedQuizzes = index.Assignments.Where(a => a.QuizId is not null).Select(a => a.QuizId!.Value).ToHashSet();
-        foreach (var q in index.Quizzes.Where(q => !foldedQuizzes.Contains(q.Id)))
-            Write(cls, Path.Combine(CanvasDir(cls), "quizzes", SafeName(q.Title) + ".md"), CanvasMarkdown.Quiz(q));
+        foreach (var q in index.Quizzes)
+            q.Local = foldedQuizzes.Contains(q.Id) ? null : Path.Combine("Canvas", "quizzes", SafeName(q.Title) + ".md").Replace('\\', '/');
         var foldedDiscussions = index.Assignments.Where(a => a.DiscussionTopicId is not null).Select(a => a.DiscussionTopicId!.Value).ToHashSet();
-        foreach (var d in index.Discussions.Where(d => !foldedDiscussions.Contains(d.Id)))
-            Write(cls, Path.Combine(CanvasDir(cls), "discussions", SafeName(d.Title) + ".md"), CanvasMarkdown.Discussion(d));
+        foreach (var d in index.Discussions)
+            d.Local = foldedDiscussions.Contains(d.Id) ? null : Path.Combine("Canvas", "discussions", SafeName(d.Title) + ".md").Replace('\\', '/');
     }
 
     // --- what each answer becomes ---------------------------------------------------------------------------------
