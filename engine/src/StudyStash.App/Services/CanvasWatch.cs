@@ -47,7 +47,19 @@ public sealed class CanvasWatch(CanvasContext context)
     {
         while (!token.IsCancellationRequested)
         {
-            await RefreshAsync(token);
+            try
+            {
+                await RefreshAsync(token);
+            }
+            catch (Exception e) when (e is HttpRequestException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException
+                                          || (e is TaskCanceledException && !token.IsCancellationRequested))
+            {
+                // The library didn't answer this time: keep what's known, and ask again after the usual wait.
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
             try
             {
                 await Task.Delay(NextDelay, token);

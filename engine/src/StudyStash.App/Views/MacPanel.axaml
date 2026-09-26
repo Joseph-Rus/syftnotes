@@ -5,6 +5,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacPanel"
              x:DataType="vm:PanelModel"
              Width="360" ClipToBounds="False">
@@ -36,8 +37,11 @@
             <c:Icon Glyph="unfold_more" Size="20" Foreground="{DynamicResource Fg}" />
           </Button>
         </Grid>
-        <TextBlock Text="{Binding Hint}" IsVisible="{Binding HasHint}" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="12,0"
-                   TextTrimming="CharacterEllipsis" />
+        <StackPanel Spacing="4" Margin="12,0">
+          <TextBlock Text="{Binding Hint}" IsVisible="{Binding HasHint}" FontSize="11" Foreground="{DynamicResource Fg2}"
+                     TextTrimming="CharacterEllipsis" />
+          <v:MacNextDue DataContext="{Binding NextDue}" IsVisible="{Binding $parent[UserControl].((vm:PanelModel)DataContext).HasNextDue}" />
+        </StackPanel>
       </StackPanel>
 
       <!-- Recording -->

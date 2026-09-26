@@ -237,6 +237,7 @@ public static partial class Shell
         if (quitting) return;
         quitting = true;
         ticker?.Stop();
+        StopCanvas();
         stop.Cancel();
         try
         {
@@ -345,17 +346,24 @@ public static partial class Shell
         quick.OnOpen = OpenQuickRow;
         quick.OnClose = () => quickWindow?.Hide();
 
-        library.OnCloseAnswer = () => chatId = null;
-        library.OnClass = c => _ = c.IsDue ? ShowDueAsync() : ShowClassAsync(c.Name);
-        library.OnLecture = l => _ = ShowLectureAsync(l.Id);
-        library.OnAsk = AskLibrary;
+        library.OnClass = c =>
+        {
+            library.NarrowDetail = false;
+            if (c.IsDue)
+            {
+                dueSelection = null;
+                _ = ShowDueAsync();
+                return;
+            }
+            allLectures = false;
+            _ = ShowClassAsync(c.Name);
+        };
+        library.OnLecture = l => OpenFromList(() => ShowLectureAsync(l.Id));
         library.OnSearch = ToggleQuick;
         library.OnSettings = ShowSettings;
         library.OnMove = MoveLecture;
         library.OnExport = () => _ = ExportAsync();
-        library.OnScope = CycleScope;
         library.OnMore = MoreMenu;
-        library.OnSource = chip => Play(chip.LectureId, chip.At);
     }
 
     // --- recording ----------------------------------------------------------------------------------------------------
@@ -670,7 +678,7 @@ public static partial class Shell
         if (mainWindow is not null) return mainWindow;
         var w = new Window
         {
-            Title = "Study Stash", Width = 1280, Height = 800, MinWidth = 900, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Title = "Study Stash", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? 52 : 48,
         };
         Look.Apply(w);
@@ -761,14 +769,21 @@ public static partial class Shell
         Desktop.Activate();
     }
 
-    public static void ShowSettings()
+    public static void ShowSettings() => ShowSettings(null);
+
+    /// <summary>Settings, open at <paramref name="section"/> when one's given ("AI", "Access", "Canvas"…).</summary>
+    public static void ShowSettings(string? section)
     {
         if (settingsWindow is { IsVisible: true })
         {
+            if (section is not null && settingsWindow.Content is Control { DataContext: SettingsModel open }) open.Section = section;
             settingsWindow.Activate();
             return;
         }
-        var model = SettingsModel.Make(host);
+        var model = SettingsModel.Make(host, canvas: Canvas(), watch: CanvasPoll());
+        model.Canvas.Status.OnConnect = ShowCanvasConnect;
+        model.Canvas.Status.OnShowMeHow = ShowCanvasConnect;
+        if (section is not null) model.Section = section;
         var w = new Window
         {
             Title = "Study Stash settings", Width = 900, Height = Skin.Current == SkinKind.Mac ? 780 : 860, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen,
@@ -798,7 +813,8 @@ public static partial class Shell
     /// <summary>A Mac shows the app in the Dock (and ⌘Tab) while the library, setup or Settings is open, and keeps it
     /// to the menu bar otherwise.</summary>
     static void UpdateDock() =>
-        Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true));
+        Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
+            || canvasConnectWindow?.IsVisible == true));
 
     /// <summary>A notification in the design's look: top right on a Mac, above the tray on Windows. It goes by itself.</summary>
     /// <summary>Toasts on screen right now, oldest first: how they stack, and what stops the same title firing twice
@@ -909,16 +925,8 @@ public static partial class Shell
         var (status, good) = host.Status();
         panel.Status = status;
         panel.StatusGood = good;
-        library.Status = host.Settings.Role != AppRole.Laptop && host.LocalLibrary?.State == LibraryServiceState.Running
-            ? $"Library running on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}"
-            : host.Library switch
-        {
-            LibraryState.Connected => "Library connected",
-            LibraryState.Starting => "Starting your library…",
-            LibraryState.Unreachable => "Can't reach your library",
-            LibraryState.WrongPassword => "Library password changed",
-            _ => "No library yet",
-        };
+        KeepCanvasWatched();
+        library.Status = LibraryStatus();
         library.StatusGood = host.Library == LibraryState.Connected;
         // The library just came back: the window, if it's open, gets its class reloaded so a note written while it
         // was gone shows up without reopening the window.

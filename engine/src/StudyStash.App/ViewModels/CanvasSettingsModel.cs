@@ -62,7 +62,7 @@ public sealed partial class CanvasCourseRow : ObservableObject
 /// every row from them; every button here ends in one save call and a fresh <see cref="LoadAsync"/>, so the screen
 /// always shows what the library actually has, not what the click optimistically assumed.
 /// </summary>
-public sealed partial class CanvasSettingsModel : ObservableObject
+public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
 {
     readonly CanvasContext context;
     readonly CanvasWatch? watch;
@@ -109,6 +109,12 @@ public sealed partial class CanvasSettingsModel : ObservableObject
     void OnWatchChanged()
     {
         if (watch?.State is { } s) Status.Show(s);
+    }
+
+    /// <summary>Stops following the shared watch (Settings closed): the watch outlives this model.</summary>
+    public void Dispose()
+    {
+        if (watch is not null) watch.Changed -= OnWatchChanged;
     }
 
     public async Task LoadAsync(CancellationToken stop = default)

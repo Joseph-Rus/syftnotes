@@ -1,9 +1,12 @@
 <!-- The full app (Surfaces, macOS 04): a glass sidebar (Due, Classes, Unsorted), lectures by week, then the note.
-     Headings in SF Pro Display, reading text in New York. Toolbar and ask bar are glass pills floating over the page. -->
+     Headings in SF Pro Display, reading text in New York. Toolbar and ask bar are glass pills floating over the page.
+     With Canvas (09-11) the middle column is the Due list or a class's own page, and the right an assignment or a
+     Canvas page; the lecture's notes can be rewritten by another engine (17), and the ask bar picks its engine (16). -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacLibrary"
              x:DataType="vm:LibraryModel">
   <UserControl.Styles>
@@ -90,7 +93,7 @@
   </UserControl.Styles>
 
   <Border Name="Chrome" Background="{DynamicResource Win}" ClipToBounds="True" Classes.chrome="{Binding DrawChrome}">
-    <Grid ColumnDefinitions="248,312,*">
+    <Grid ColumnDefinitions="248,Auto,*">
       <!-- Classes: a floating glass panel -->
       <c:Glass CornerRadius="18" BoxShadow="{DynamicResource SideGlassShadow}" Padding="10,0,10,14" Margin="8,8,0,8">
         <DockPanel>
@@ -141,8 +144,9 @@
         </DockPanel>
       </c:Glass>
 
-      <!-- Lectures by week -->
-      <DockPanel Grid.Column="1" Margin="0,8,0,0">
+      <!-- The list: lectures by week, Canvas's Due list, or a linked class's own page -->
+      <Panel Grid.Column="1" Grid.ColumnSpan="{Binding ColumnSpan}" Width="{Binding ListWidth}" IsVisible="{Binding ShowListColumn}">
+      <DockPanel Margin="0,8,0,0" IsVisible="{Binding ShowLectures}">
         <StackPanel DockPanel.Dock="Top" Height="52" VerticalAlignment="Center" Margin="20,0">
           <TextBlock Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold" />
           <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
@@ -177,10 +181,24 @@
           </ScrollViewer>
         </Panel>
       </DockPanel>
+      <Panel IsVisible="{Binding ShowDueList}">
+        <v:MacCanvasDue DataContext="{Binding DueList}" />
+      </Panel>
+      <Panel IsVisible="{Binding ShowCanvasClass}">
+        <v:MacCanvasClass DataContext="{Binding CanvasClass}" />
+      </Panel>
+      </Panel>
 
-      <!-- The lecture -->
-      <Panel Grid.Column="2">
-        <Border Width="1" Background="{DynamicResource Sep}" HorizontalAlignment="Left" />
+      <!-- The right: the lecture, an assignment, or a Canvas page -->
+      <Panel Grid.Column="{Binding DetailColumn}" Grid.ColumnSpan="{Binding ColumnSpan}" IsVisible="{Binding ShowDetailColumn}">
+        <Border Width="1" Background="{DynamicResource Sep}" HorizontalAlignment="Left" IsVisible="{Binding !Narrow}" />
+        <Panel IsVisible="{Binding ShowAssignment}" Margin="1,0,0,0">
+          <v:MacAssignment DataContext="{Binding Assignment}" />
+        </Panel>
+        <Panel IsVisible="{Binding ShowReader}" Margin="1,0,0,0">
+          <v:MacCanvasReader DataContext="{Binding Reader}" />
+        </Panel>
+      <Panel IsVisible="{Binding ShowLecturePage}">
         <ScrollViewer Name="NoteScroll" Margin="1,0,0,0" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasNote}">
           <StackPanel MaxWidth="620" HorizontalAlignment="Left" Margin="64,84,64,140" Spacing="14" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -200,7 +218,12 @@
               </StackPanel>
             </Border>
             <TextBlock IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="13" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="0,12,0,0" />
-            <c:NoteView IsVisible="{Binding ShowNotes}" Markdown="{Binding Markdown}" />
+            <Panel IsVisible="{Binding ShowNotes}">
+              <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasNotes}">
+                <v:MacAiNotes DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes}" />
+              </Panel>
+              <c:NoteView IsVisible="{Binding !$parent[UserControl].((vm:LibraryModel)DataContext).HasNotes}" Markdown="{Binding Markdown}" />
+            </Panel>
             <StackPanel IsVisible="{Binding ShowTranscript}" Margin="0,18,0,0">
               <TextBlock IsVisible="{Binding NoTranscript}" Text="This lecture has no transcript." FontSize="13" Foreground="{DynamicResource Fg2}" />
               <ItemsControl ItemsSource="{Binding Transcript}">
@@ -227,40 +250,6 @@
         <Border Name="TopFade" Height="72" VerticalAlignment="Top" IsHitTestVisible="False" />
         <Border Name="Fade" Height="120" VerticalAlignment="Bottom" IsHitTestVisible="False" />
 
-        <!-- The answer to what you asked, over the page -->
-        <c:Glass IsVisible="{Binding HasAnswer}" Width="540" MaxHeight="420" CornerRadius="24"
-                 VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,80" Padding="18,14,10,14">
-          <DockPanel>
-            <Button DockPanel.Dock="Right" Theme="{StaticResource Surface}" Width="24" Height="24" CornerRadius="12" VerticalAlignment="Top"
-                    HorizontalContentAlignment="Center" Command="{Binding CloseAnswerCommand}" ToolTip.Tip="Close">
-              <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg3}" />
-            </Button>
-            <StackPanel Spacing="8" Margin="0,0,8,0">
-              <TextBlock Text="{Binding AskedQuestion}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
-              <c:Spinner IsVisible="{Binding Thinking}" Width="16" Height="16" HorizontalAlignment="Left" Foreground="{DynamicResource Fg2}" />
-              <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
-                <c:NoteView Markdown="{Binding Answer}" />
-              </ScrollViewer>
-              <ItemsControl ItemsSource="{Binding Sources}" IsVisible="{Binding HasSources}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:SourceChip">
-                    <Button Classes="fill2" Theme="{StaticResource Surface}" Height="24" CornerRadius="6" Padding="8,0" Margin="0,0,6,6"
-                            Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).OpenSourceCommand}" CommandParameter="{Binding}">
-                      <StackPanel Orientation="Horizontal" Spacing="3">
-                        <c:Icon Glyph="play_arrow" Filled="True" Size="15" Foreground="{DynamicResource AccentText}" />
-                        <TextBlock Classes="num" Text="{Binding Label}" FontSize="12" FontWeight="Medium" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
-                      </StackPanel>
-                    </Button>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-            </StackPanel>
-          </DockPanel>
-        </c:Glass>
-
         <!-- Move, export, search: a glass pill and a glass circle -->
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,14,0">
           <c:Glass Height="36" CornerRadius="18" Padding="4,0" BoxShadow="{DynamicResource CtlGlassShadow}">
@@ -280,26 +269,18 @@
           </c:Glass>
         </StackPanel>
 
-        <!-- Ask about this lecture -->
-        <c:Glass Width="540" Height="48" CornerRadius="24" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24" Padding="20,0,8,0">
-          <Grid ColumnDefinitions="*,Auto,8,Auto">
-            <TextBox Classes="bare" Text="{Binding Question}" PlaceholderText="Ask about this lecture" PlaceholderForeground="{DynamicResource Fg2}" FontSize="13">
-              <TextBox.KeyBindings>
-                <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
-              </TextBox.KeyBindings>
-            </TextBox>
-            <Button Grid.Column="1" Classes="fill" Theme="{StaticResource Surface}" Height="30" CornerRadius="15" Padding="12,0,8,0"
-                    Command="{Binding PickScopeCommand}">
-              <StackPanel Orientation="Horizontal" Spacing="2">
-                <TextBlock Text="{Binding Scope}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-                <c:Icon Glyph="unfold_more" Size="16" Foreground="{DynamicResource Fg2}" />
-              </StackPanel>
-            </Button>
-            <Button Grid.Column="3" Classes="fill2" Theme="{StaticResource Surface}" Width="32" Height="32" CornerRadius="16"
-                    HorizontalContentAlignment="Center" Command="{Binding AskCommand}" ToolTip.Tip="Ask">
-              <c:Icon Glyph="arrow_upward" Size="18" Foreground="{DynamicResource Fg2}" />
-            </Button>
-          </Grid>
+        <!-- Ask about this lecture, with any engine -->
+        <Panel IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24">
+          <v:MacAiAskBar DataContext="{Binding Ask}" />
+        </Panel>
+      </Panel>
+
+        <!-- Narrow: back to the list -->
+        <c:Glass IsVisible="{Binding NarrowDetail}" Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}"
+                 HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,14,0,0">
+          <Button Classes="round" Command="{Binding BackCommand}" ToolTip.Tip="Back">
+            <c:Icon Glyph="arrow_back" Size="19" Foreground="{DynamicResource Fg}" />
+          </Button>
         </c:Glass>
       </Panel>
     </Grid>

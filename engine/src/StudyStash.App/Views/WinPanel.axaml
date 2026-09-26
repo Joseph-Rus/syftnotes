@@ -4,6 +4,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.WinPanel"
              x:DataType="vm:PanelModel"
              Width="360" ClipToBounds="False">
@@ -65,6 +66,7 @@
             </Grid>
           </Border>
           <TextBlock Text="{Binding Hint}" IsVisible="{Binding HasHint}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,-4,0,0" />
+          <v:WinNextDue DataContext="{Binding NextDue}" IsVisible="{Binding $parent[UserControl].((vm:PanelModel)DataContext).HasNextDue}" Margin="0,-8,0,0" />
         </StackPanel>
 
         <!-- Recording, in a card -->

@@ -49,6 +49,8 @@ public sealed partial class PanelModel : ObservableObject
     [ObservableProperty] public partial IBrush ClassDot { get; set; } = Brushes.Gray;
     /// <summary>"From your timetable · Tue 10:00–11:15", or null.</summary>
     [ObservableProperty] public partial string? Hint { get; set; }
+    /// <summary>"Next due: Quiz 3 practice · Tomorrow, 9:00 AM" under the hint, once Canvas is linked; null hides it.</summary>
+    [ObservableProperty] public partial NextDueModel? NextDue { get; set; }
     [ObservableProperty] public partial string Elapsed { get; set; } = "00:00";
     [ObservableProperty] public partial IReadOnlyList<double>? Levels { get; set; }
     /// <summary>The last thing Whisper heard, in quotes.</summary>
@@ -70,6 +72,7 @@ public sealed partial class PanelModel : ObservableObject
     public string RecordLabel => ClassName.Length > 0 ? $"Record · {ClassName}" : "Record";
     public string RecordingLabel => (IsPaused ? "Paused · " : "Recording · ") + (ClassName.Length > 0 ? ClassName : "Lecture");
     public bool HasHint => !string.IsNullOrEmpty(Hint);
+    public bool HasNextDue => NextDue is not null;
     public bool HasLastLine => LastLine.Length > 0;
     public bool HasRecent => Recent.Count > 0;
     public string PauseLabel => IsPaused ? "Resume" : "Pause";
@@ -97,6 +100,7 @@ public sealed partial class PanelModel : ObservableObject
     }
 
     partial void OnHintChanged(string? value) => OnPropertyChanged(nameof(HasHint));
+    partial void OnNextDueChanged(NextDueModel? value) => OnPropertyChanged(nameof(HasNextDue));
     partial void OnLastLineChanged(string value) => OnPropertyChanged(nameof(HasLastLine));
     partial void OnProblemTitleChanged(string? value) => OnPropertyChanged(nameof(HasProblem));
 

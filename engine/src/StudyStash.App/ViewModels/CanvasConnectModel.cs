@@ -34,7 +34,7 @@ public sealed partial class ConnectStep : ObservableObject
 /// on its own. Hosted either inside first-run setup (<see cref="ShowFooter"/> false, the wizard's own Next/Finish)
 /// or, from the status card's Connect/Show me how, in a small window of its own (<see cref="ShowFooter"/> true).
 /// </summary>
-public sealed partial class CanvasConnectModel : ObservableObject
+public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
 {
     readonly CanvasContext context;
     readonly CanvasWatch watch;
@@ -199,6 +199,9 @@ public sealed partial class CanvasConnectModel : ObservableObject
             Courses.Add(row);
         }
     }
+
+    /// <summary>Stops following the shared watch once the step or window closes: the watch outlives this model.</summary>
+    public void Dispose() => watch.Changed -= OnWatchChanged;
 
     void OnWatchChanged()
     {
