@@ -1,0 +1,21 @@
+<!-- Every active AI problem, stacked (design 18): wherever the host puts this — Settings → AI engines' top, a
+     lecture's page, the flyout — it's just AiNotesModel.Problems, one WinAiProblem per row. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.WinAiProblems"
+             x:DataType="vm:AiProblemsModel">
+  <ItemsControl ItemsSource="{Binding Problems}">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <StackPanel Spacing="12" />
+      </ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+    <ItemsControl.ItemTemplate>
+      <DataTemplate x:DataType="vm:AiProblem">
+        <v:WinAiProblem />
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+</UserControl>

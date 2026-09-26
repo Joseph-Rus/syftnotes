@@ -380,4 +380,13 @@
     <Setter Property="Margin" Value="0,2,0,0" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
+  <Style Selector="c|Icon.ai-problem-icon">
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="c|Icon.ai-problem-icon.accent">
+    <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="c|Icon.ai-problem-icon.warn">
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+  </Style>
 </Styles>

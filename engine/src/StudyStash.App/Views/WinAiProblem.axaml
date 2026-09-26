@@ -1,0 +1,37 @@
+<!-- One AI problem InfoBar (design 18): a caption, a severity glyph circle (err/warn/info), its title and message,
+     up to two actions and a close. Used both on its own and repeated by WinAiProblems (Settings). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.WinAiProblem"
+             x:DataType="vm:AiProblem">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+  </UserControl.Styles>
+
+  <StackPanel Spacing="8">
+    <TextBlock Classes="ai-problem-caption" Text="{Binding Caption}" />
+    <Border Classes="ai-problem" Classes.err="{Binding Err}" Classes.warn="{Binding Warn}" Classes.info="{Binding Info}">
+      <Grid ColumnDefinitions="Auto,12,*,10,Auto,8,Auto,8,Auto" VerticalAlignment="Top">
+        <Border Classes="ai-problem-glyph" Classes.err="{Binding Err}" Classes.warn="{Binding Warn}" Classes.info="{Binding Info}"
+                VerticalAlignment="Top" Margin="0,3,0,0">
+          <TextBlock Text="{Binding Glyph}" />
+        </Border>
+        <TextBlock Grid.Column="2" Classes="ai-problem-text" Margin="0,1,0,0">
+          <Run FontWeight="SemiBold" Text="{Binding Title}" /><Run Text=" " /><Run Text="{Binding Message}" />
+        </TextBlock>
+        <Button Grid.Column="4" Classes="ai-pillbtn" Command="{Binding SecondaryCommand}"
+                IsVisible="{Binding SecondaryWords, Converter={x:Static c:Converters.NotEmpty}}">
+          <Border Classes="ai-pill"><TextBlock Text="{Binding SecondaryWords}" /></Border>
+        </Button>
+        <Button Grid.Column="6" Classes="ai-pillbtn" Command="{Binding PrimaryCommand}" IsVisible="{Binding HasWinPrimaryButton}">
+          <Border Classes="ai-pill" Classes.primary="{Binding PrimaryIsAccent}"><TextBlock Text="{Binding PrimaryWords}" /></Border>
+        </Button>
+        <Button Grid.Column="8" Classes="ai-close" Command="{Binding CloseCommand}" IsVisible="{Binding CanClose}">
+          <c:Icon Glyph="close" Size="16" />
+        </Button>
+      </Grid>
+    </Border>
+  </StackPanel>
+</UserControl>

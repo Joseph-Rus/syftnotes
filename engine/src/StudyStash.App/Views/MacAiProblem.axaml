@@ -1,0 +1,41 @@
+<!-- One AI problem banner (design 18): a caption, an icon in the kind's colour, its title and message, and up to
+     two actions. Used both on its own (a lecture's page, the dropdown) and repeated by MacAiProblems (Settings). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.MacAiProblem"
+             x:DataType="vm:AiProblem">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/MacAiStyles.axaml" />
+  </UserControl.Styles>
+
+  <StackPanel Spacing="8">
+    <TextBlock Classes="ai-problem-caption" Text="{Binding Caption}" Margin="4,0,0,0" />
+    <Border Classes="ai-problem">
+      <Grid ColumnDefinitions="Auto,12,*,10,Auto,8,Auto" VerticalAlignment="Center">
+        <c:Icon Classes="ai-problem-icon" Classes.accent="{Binding IsAccent}" Classes.warn="{Binding IsWarn}"
+                Glyph="{Binding Icon}" Filled="True" Size="20" />
+        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+          <TextBlock Classes="ai-problem-title" Text="{Binding Title}" />
+          <TextBlock Classes="ai-problem-message" Text="{Binding Message}" />
+        </StackPanel>
+        <Button Grid.Column="4" Classes="ai-textbtn" Command="{Binding SecondaryCommand}"
+                IsVisible="{Binding SecondaryWords, Converter={x:Static c:Converters.NotEmpty}}">
+          <Border Classes="ai-pill-plain"><TextBlock Text="{Binding SecondaryWords}" /></Border>
+        </Button>
+        <Button Grid.Column="6" Classes="ai-pillbtn" Command="{Binding PrimaryCommand}"
+                IsVisible="{Binding PrimaryWords, Converter={x:Static c:Converters.NotEmpty}}">
+          <Panel>
+            <Border Classes="ai-pill" Classes.primary="{Binding PrimaryIsAccent}" IsVisible="{Binding !PrimaryIsPlain}">
+              <TextBlock Text="{Binding PrimaryWords}" />
+            </Border>
+            <Border Classes="ai-pill-plain" IsVisible="{Binding PrimaryIsPlain}">
+              <TextBlock Text="{Binding PrimaryWords}" />
+            </Border>
+          </Panel>
+        </Button>
+      </Grid>
+    </Border>
+  </StackPanel>
+</UserControl>

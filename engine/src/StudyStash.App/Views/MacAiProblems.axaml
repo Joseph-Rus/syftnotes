@@ -1,0 +1,21 @@
+<!-- Every active AI problem, stacked (design 18): wherever the host puts this — Settings → AI engines' top, a
+     lecture's page, the dropdown — it's just AiNotesModel.Problems, one MacAiProblem per row. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.MacAiProblems"
+             x:DataType="vm:AiProblemsModel">
+  <ItemsControl ItemsSource="{Binding Problems}">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate>
+        <StackPanel Spacing="12" />
+      </ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+    <ItemsControl.ItemTemplate>
+      <DataTemplate x:DataType="vm:AiProblem">
+        <v:MacAiProblem />
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+</UserControl>

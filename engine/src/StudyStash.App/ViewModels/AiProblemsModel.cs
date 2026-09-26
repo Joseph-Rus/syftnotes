@@ -16,10 +16,26 @@ public sealed class AiProblem
     public required string Title { get; init; }
     public required string Message { get; init; }
     public required string Icon { get; init; }
-    /// <summary>The Mac icon's colour token (Accent/Warn/Fg2).</summary>
+    /// <summary>The Mac icon's colour token (Accent/Warn/Fg2); <see cref="IsAccent"/>/<see cref="IsWarn"/> are the
+    /// same thing as the style classes a Mac card's icon actually binds.</summary>
     public required string ColorKey { get; init; }
-    /// <summary>The Windows InfoBar's severity (err/warn/info).</summary>
+    public bool IsAccent => ColorKey == "Accent";
+    public bool IsWarn => ColorKey == "Warn";
+    /// <summary>The Windows InfoBar's severity (err/warn/info) — also the style class its card and glyph bind.</summary>
     public required string Severity { get; init; }
+    public bool Err => Severity == "err";
+    public bool Warn => Severity == "warn";
+    public bool Info => Severity == "info";
+    /// <summary>The Windows InfoBar glyph's letter: ✕ err, ! warn, i info.</summary>
+    public string Glyph => Severity switch { "err" => "✕", "warn" => "!", _ => "i" };
+    /// <summary>Usage limit's "Dismiss" is a plain, no-fill button, unlike every other kind's single action
+    /// (Start Ollama, Sign in, Download, Try again), which is a plain Raised pill.</summary>
+    public bool PrimaryIsPlain => Kind == "usage_limit";
+    /// <summary>Only an access request's "Allow" is the tinted, primary pill.</summary>
+    public bool PrimaryIsAccent => Kind == "access_request";
+    /// <summary>Windows draws no separate button for "Dismiss" (usage limit) or the button-less kinds (fell back) —
+    /// its close × already covers those.</summary>
+    public bool HasWinPrimaryButton => PrimaryWords.Length > 0 && !PrimaryIsPlain;
     public string PrimaryWords { get; init; } = "";
     public IAsyncRelayCommand? PrimaryCommand { get; internal set; }
     public string SecondaryWords { get; init; } = "";
