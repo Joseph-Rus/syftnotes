@@ -106,7 +106,12 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/canvas/due", (HttpContext ctx) => Api(ctx, () =>
         {
             var s = Canvas.Settings;
-            return Http.Json(CanvasView.Due(Assignments.Load(cfg.Home), s.LastDone, Canvas.Clock(), Canvas.Zone, Canvas.Crawl.AssignmentFolder));
+            var all = Assignments.Load(cfg.Home).ToList();
+            // A planner to-do with no assignment of its own rides along as a "todo" row (kind, never graded).
+            foreach (string cls in cfg.ClassNames())
+                if (CourseIndex.Load(cfg.Home, cls) is { } index)
+                    all.AddRange(index.Todos.Select(t => Assignments.From(cls, t, Canvas.Zone)));
+            return Http.Json(CanvasView.Due(all, s.LastDone, Canvas.Clock(), Canvas.Zone, Canvas.Crawl.AssignmentFolder));
         }));
         app.MapGet("/api/v2/canvas/assignments", (HttpContext ctx, string? @class) => Api(ctx, () =>
         {

@@ -325,7 +325,9 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
   own planner though nothing was ever handed in (T6, `item.marked_done`) — most recently
   submitted/graded/marked-done first, only the last 7 days). `to_hand_in` is the size of the first four groups
   combined; `next` is the soonest of them that isn't overdue. Canvas's planner also has to-dos with no assignment of
-  their own (an ungraded page or note with a date): kept in `CourseIndex.Todos`, not one of these groups.
+  their own (an ungraded page or note with a date): kept in `CourseIndex.Todos`, and the library folds them into
+  these same groups (`item.kind: "todo"`, LibraryWeb's `/due` handler, since `CanvasView.Due` itself only takes rows
+  already shaped like `Assignment`).
 - `GET /api/v2/canvas/assignments?class=` → `{"class","to_hand_in":[item],"done":[item]}` (soonest due first / most
   recently due first). `item` = `{"class","id","name","kind","due","due_at","points","status","label","score",
   "grade","score_text","late","missing","excused","submitted","graded_at","marked_done","url","folder"}`.
@@ -485,8 +487,10 @@ repeated, `start_date`/`end_date` a wide window around today): `Planner` sorts e
 `course_id` (a small `course id → class` map built at `Start`), an `assignment` item with `planner_override.
 marked_complete` becomes `Assignment.MarkedDone`/`MarkedDoneAt` (applied to the promoted index by `ApplyPlanner`,
 which — like `Submissions`'s section-independence — only overwrites what the planner listing itself read this sync,
-keeping the previous value when it didn't), anything else with a date becomes a `TodoInfo`, and a `calendar_event`
-is dropped (not coursework). `Assignment.Done` now also asks `MarkedDone`, so a student's own tick in Canvas moves
+keeping the previous value when it didn't), anything else with a date becomes a `TodoInfo` in `CourseIndex.Todos`
+(`Assignments.From(class, TodoInfo)` turns one into a Due-list row, kind `todo`, merged in across every linked class
+by `/api/v2/canvas/due`'s handler), and a `calendar_event` is dropped (not coursework). `Assignment.Done` now also
+asks `MarkedDone`, so a student's own tick in Canvas moves
 work to the Due list's Handed-in group even though nothing was ever submitted — the moment it happened
 (`MarkedDoneAt`) sorts it there the same way a submission or a grade would. See `CanvasAnnouncementTests.cs`,
 `CanvasDueTests.cs`.

@@ -48,5 +48,13 @@ public class CanvasDueTests
         Assert.Equal(("wiki_page", "Read: Chapter 4 overview", "2025-09-29T06:59:00Z"), (todo.Kind, todo.Title, todo.TodoAt));
         Assert.DoesNotContain(index.Todos, t => t.Kind == "calendar_event"); // not coursework
         Assert.DoesNotContain(index.Assignments, a => a.MarkedDone); // nobody marked anything done here
+
+        // A to-do rides along in the Due list too (the app merges CourseIndex.Todos in the same way for every
+        // linked class): a "todo" kind row, due Mon 29 Sep, so it's in "This week".
+        var all = Assignments.Load(dir.Path).Append(Assignments.From("CS 101", todo, FakeCanvas.Zone)).ToList();
+        var due = CanvasView.Due(all, "now", FakeCanvas.DesignNow, FakeCanvas.Zone, (_, _) => null);
+        var groups = due["groups"]!.AsArray().ToDictionary(g => g!["key"]!.GetValue<string>(), g => g!["items"]!.AsArray());
+        var row = groups["week"]!.Single(i => i!["kind"]!.GetValue<string>() == "todo")!;
+        Assert.Equal("Read: Chapter 4 overview", row["name"]!.GetValue<string>());
     }
 }

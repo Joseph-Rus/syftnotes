@@ -181,6 +181,11 @@ public class CanvasApiTests
 
         Assert.True(due["to_hand_in"]!.GetValue<int>() >= 3);
         Assert.NotNull(due["next"]);
+
+        // A planner to-do with no assignment of its own (CS 101's default fixture: "Read: Chapter 4 overview",
+        // due Mon 29 Sep) rides along too, as a "todo" kind row.
+        var todoRow = groups["week"]!.Single(i => i!["kind"]!.GetValue<string>() == "todo")!;
+        Assert.Equal("Read: Chapter 4 overview", todoRow["name"]!.GetValue<string>());
     }
 
     [Fact]

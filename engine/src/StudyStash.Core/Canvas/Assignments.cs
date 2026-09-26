@@ -117,6 +117,12 @@ public static class Assignments
             a.DueAt ?? "", s?.Comments.Count(c => !c.Mine) ?? 0, a.MarkedDone, a.MarkedDoneAt ?? "");
     }
 
+    /// <summary>A planner to-do with no assignment of its own (an ungraded page or note Canvas's planner flagged), as
+    /// a row for the Due list: never graded or submitted, so only <c>open</c> or (marked done there) done.</summary>
+    public static Assignment From(string className, TodoInfo t, TimeZoneInfo? zone = null) =>
+        new(className, t.Id, t.Title, Local(t.TodoAt, zone), null, "open", null, "", t.HtmlUrl, Kind: "todo",
+            DueAt: t.TodoAt ?? "", MarkedDone: t.MarkedDone);
+
     public static bool Published(JsonObject a) => a["published"] is not JsonValue p || p.GetValueKind() != JsonValueKind.False;
 
     static string Num(double? d) => (d ?? 0).ToString("0.##", CultureInfo.InvariantCulture);
