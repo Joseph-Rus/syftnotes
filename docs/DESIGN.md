@@ -68,6 +68,38 @@ on a Mac (launchd), the Windows Startup folder, or systemd `--user` on Linux —
 after a restart. Setting it up first removes any service from before the rename (`com.granola-share.*`),
 so only one library ever runs on a computer.
 
+## Installers and updates
+
+- **Four installers, one app per system.** The laptop and library installers hold the same
+  program; only the role preset differs (`StudyStashRole` in the Mac bundle's Info.plist,
+  `study-stash.ini` on Windows). `Apps.RolePreset` reads it once, on first run, so setup already
+  knows which one it is; after that the role lives in the app's own settings.
+- **One Windows app installs as either role.** Both Setup.exe files share one Inno `AppId` and
+  install per-user into `%LOCALAPPDATA%\Programs\Study Stash`; whichever one you run last writes
+  `study-stash.ini`'s `role=`, so installing the other role over an existing install is just an
+  in-place upgrade, never a second copy.
+- **Updates swap the installed copy.** An installed app checks GitHub for a new release, downloads
+  the matching installer, and checks its SHA-256 against `SHA256SUMS.txt`. On a Mac it mounts the
+  DMG, stages the new `.app` beside the old one, swaps them, and restarts any service that runs
+  from the bundle. On Windows it runs the new Setup.exe silently, which closes the running app and
+  relaunches it. Either way, only an installed copy updates itself; a build folder or `dotnet run`
+  never calls GitHub.
+- **The Mac app is one universal bundle**, started by a tiny native launcher
+  (`macos/launcher.c`) at `Contents/MacOS/StudyStash` — the spot macOS reads the real Info.plist
+  from (`LSUIElement`, the microphone usage strings), so it can't be a per-architecture `exec`.
+  The launcher `dlopen`s the matching architecture's `libhostfxr.dylib` under
+  `Contents/MacOS/{arm64,x64}` and starts .NET in-process; a per-arch self-contained publish can't
+  be `lipo`-merged, so this is the trick that makes both look like one program. It's signed ad hoc
+  (no paid Developer ID) with the hardened runtime, `disable-library-validation` (so it can still
+  load its own unsigned dylibs), and a microphone entitlement.
+- The Info.plist carries `NSMicrophoneUsageDescription` and `NSAudioCaptureUsageDescription`
+  (without them macOS kills the app on first mic use), `StudyStashRole` for the role preset, and
+  `CFBundleShortVersionString`/`CFBundleVersion` set to `StudyStashVersion` so an installed copy
+  can report its own version without running .NET.
+- CI tests the engine on macOS, Linux, and Windows, builds and self-tests both apps (a fake
+  microphone, the tiny Whisper model, real windows), installs each with its own installer, and
+  publishes a release only when `StudyStashVersion` in `Directory.Build.props` is new.
+
 ## Security model
 
 - **The library's password** is the only thing standing between its web page (and the laptop's API)
