@@ -393,21 +393,25 @@ public static class CanvasApi
 
     // ---- GET canvas/notifications ----
 
+    /// <summary>Notification ids are the library's own ever-increasing counter (<c>CanvasNotifications</c>), never
+    /// Canvas's, so — unlike everywhere else in this file — they travel as plain numbers, not through
+    /// <see cref="IdConverter"/>: <see cref="Last"/> is the highest id the library knows (0/null when there are
+    /// none), and the same number is what a client sends back as <c>after</c>/<c>up_to</c> next time.</summary>
     public sealed record NotificationsResponse
     {
-        public DateTimeOffset? Last { get; init; }
+        public long? Last { get; init; }
         public IReadOnlyList<NotificationRow> Items { get; init; } = [];
     }
 
     public sealed record NotificationRow
     {
-        [JsonConverter(typeof(IdConverter))] public string Id { get; init; } = "";
+        public long Id { get; init; }
         public string Kind { get; init; } = "";
         public string Title { get; init; } = "";
         public string? Text { get; init; }
         public string? Class { get; init; }
-        [JsonConverter(typeof(IdConverter))] public string? AssignmentId { get; init; }
-        [JsonConverter(typeof(IdConverter))] public string? AnnouncementId { get; init; }
+        public long? AssignmentId { get; init; }
+        public long? AnnouncementId { get; init; }
         public DateTimeOffset At { get; init; }
         public bool Seen { get; init; }
     }

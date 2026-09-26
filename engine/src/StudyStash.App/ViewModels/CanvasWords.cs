@@ -233,6 +233,11 @@ public static class CanvasWords
     public static string LastSyncLine(DateTimeOffset? synced, TimeZoneInfo zone) =>
         synced is { } s ? $"Last sync · {Clock(s, zone)}" : "Not synced yet";
 
+    /// <summary>"Last sync 10:24" — the quick panel's own line for Sync Canvas (no dot, unlike Settings'
+    /// <see cref="LastSyncLine"/>).</summary>
+    public static string QuickLastSyncLine(DateTimeOffset? synced, TimeZoneInfo zone) =>
+        synced is { } s ? $"Last sync {Clock(s, zone)}" : "Not synced yet";
+
     /// <summary>"Connected · last sync 10:24" — Settings' one-line summary.</summary>
     public static string ConnectedSummary(DateTimeOffset? lastSync, TimeZoneInfo zone) =>
         lastSync is { } s ? $"Connected · last sync {Clock(s, zone)}" : "Connected";
