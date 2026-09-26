@@ -117,9 +117,10 @@ public class CanvasToolsTests
         Assert.Contains("CS 101 · Lab 3: recursion traces · To do", text);
     }
 
-    // Crawl.cs's own module and announcement listings (Modules/Announcements) render only the .md mirror today and
-    // never fill CourseIndex.Modules/.Announcements (a gap in T5/T6, outside T8), so these two tests build the index
-    // directly — exactly what a finished sync would leave — to test our formatting rather than that gap.
+    // T5 has Crawl.Modules fill CourseIndex.Modules now (CanvasModulesTests.cs covers a real sync end to end);
+    // Crawl.Announcements still only renders the .md mirror and never fills CourseIndex.Announcements (T6's gap, not
+    // T8's). Both tests here build the index directly — exactly what a finished sync would leave — to test our
+    // formatting on its own.
     [Fact]
     public async Task Class_modules_show_kind_and_where_a_link_was_saved_from()
     {
