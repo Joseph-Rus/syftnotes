@@ -6,6 +6,8 @@
 #   above passes, publish release v<version> with the four installers and SHA256SUMS.txt. Installed copies pick
 #   it up within a few hours (auto_update), or right away with `studystash update`. A version already released
 #   is never published again.
+#   A push to main that only changes the version (and this file), on top of a commit that already passed all of
+#   the above, skips the tests and self-tests: it builds the installers with the new version and publishes them.
 name: ci
 
 on:
@@ -26,6 +28,8 @@ jobs:
   # for byte.
   engine:
     name: C# engine (${{ matrix.os }})
+    needs: [version]
+    if: needs.version.outputs.tested != 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -63,7 +67,8 @@ jobs:
   # windows open, the pretend microphone records, Whisper (Metal) hears the speech from inside the bundle.
   mac-app:
     name: Mac app (DMGs, self-test)
-    needs: [engine]
+    needs: [version, engine]
+    if: ${{ !cancelled() && !failure() }}
     timeout-minutes: 25
     runs-on: macos-latest
     steps:
@@ -97,6 +102,7 @@ jobs:
           softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
           [ "$(env -u DOTNET_ROOT arch -x86_64 "$APP/Contents/MacOS/StudyStash" version)" = "$V" ]
       - name: Self-test (D5) - real windows, the pretend mic, Whisper from inside the bundle
+        if: needs.version.outputs.tested != 'true'
         run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest"
       - name: Both DMGs hold the app with the right role, and no model is bundled (D6)
         run: |
@@ -130,7 +136,8 @@ jobs:
   # checked it runs enough to print its version under Rosetta).
   mac-intel:
     name: Mac app self-test (Intel)
-    needs: [mac-app]
+    needs: [version, mac-app]
+    if: ${{ !cancelled() && !failure() && needs.version.outputs.tested != 'true' }}
     timeout-minutes: 20
     runs-on: macos-15-intel
     steps:
@@ -168,7 +175,8 @@ jobs:
   # silent Setup.exe, and uninstalled without touching lectures or settings outside the install folder.
   windows-app:
     name: Windows app (Setup.exe, self-test, install)
-    needs: [engine]
+    needs: [version, engine]
+    if: ${{ !cancelled() && !failure() }}
     timeout-minutes: 25
     runs-on: windows-latest
     steps:
@@ -213,6 +221,7 @@ jobs:
           $bad = Get-ChildItem dist\windows -Recurse -File -Filter "*.bin" -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1MB }
           if ($bad) { throw "a model file is bundled: $($bad.FullName -join ', ')" }
       - name: Self-test (D5)
+        if: needs.version.outputs.tested != 'true'
         shell: pwsh
         run: |
           $selftestHome = "$env:RUNNER_TEMP\selftest-home"
@@ -230,6 +239,7 @@ jobs:
           if ($lines[-1] -ne "ok") { throw "last line was not ok" }
           if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
       - name: The Laptop installer puts Study Stash on this account, marked laptop
+        if: needs.version.outputs.tested != 'true'
         shell: pwsh
         run: |
           Start-Process "dist\windows\Study-Stash-Laptop-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
@@ -240,6 +250,7 @@ jobs:
           $printed = (& "$app\StudyStash.exe" version | Out-String).Trim()
           if ($printed -ne $env:V) { throw "installed version '$printed', expected '$env:V'" }
       - name: The Library installer, over it, is an in-place upgrade marked library
+        if: needs.version.outputs.tested != 'true'
         shell: pwsh
         run: |
           Start-Process "dist\windows\Study-Stash-Library-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
@@ -249,6 +260,7 @@ jobs:
             Where-Object { $_.DisplayName -eq "Study Stash" })
           if ($entries.Count -ne 1) { throw "expected one uninstall entry for Study Stash, found $($entries.Count)" }
       - name: A silent update (relaunch=1) starts the app again from the same folder
+        if: needs.version.outputs.tested != 'true'
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -268,6 +280,7 @@ jobs:
           if (-not $ok) { throw "no StudyStash.exe from $app running again within 30 s of the silent update" }
           Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Stop-Process -Force
       - name: Uninstalling removes only the app; lectures and settings stay
+        if: needs.version.outputs.tested != 'true'
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -303,6 +316,7 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
       new: ${{ steps.v.outputs.new }}
+      tested: ${{ steps.t.outputs.tested }}
     steps:
       - uses: actions/checkout@v4
       - id: v
@@ -315,13 +329,30 @@ jobs:
           else
             echo "new=false" >> "$GITHUB_OUTPUT"
           fi
+      # "Already tested": a push to main that changes only the version and this workflow, on top of a commit whose
+      # ci run passed. The code is the one that passed, so only the installers are built again, with the new version.
+      - id: t
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          tested=false
+          if [ "${{ github.event_name }}" = push ] && [ "${{ github.ref }}" = refs/heads/main ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
+            git fetch -q --depth=1 origin "$BEFORE" && git fetch -q --deepen=1 origin "${{ github.sha }}" || true
+            changed=$(git diff --name-only "$BEFORE" "${{ github.sha }}" 2>/dev/null || echo unknown)
+            others=$(printf '%s\n' "$changed" | grep -v -x -e engine/Directory.Build.props -e .github/workflows/ci.yml | grep -c . || true)
+            passed=$(gh run list -R "${{ github.repository }}" --workflow ci --commit "$BEFORE" --status success --json databaseId --jq length 2>/dev/null || echo 0)
+            echo "changed since $BEFORE: $(echo $changed); other files: $others; ci passed there: $passed"
+            if [ "$changed" != unknown ] && [ "$others" = 0 ] && [ "${passed:-0}" -gt 0 ]; then tested=true; fi
+          fi
+          echo "tested=$tested" >> "$GITHUB_OUTPUT"
 
   # Publish v<version> the first time it passes everything above, with exactly the four installers and their
   # checksums (D2). A version already tagged (or released) is never published again.
   release:
     name: publish release
     needs: [version, engine, mac-app, mac-intel, windows-app]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.version.outputs.new == 'true'
+    if: ${{ !cancelled() && !failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.version.outputs.new == 'true' && needs.mac-app.result == 'success' && needs.windows-app.result == 'success' }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
