@@ -89,23 +89,12 @@
       <Setter Property="FontSize" Value="14" />
       <Setter Property="Margin" Value="0,0,0,6" />
     </Style>
-    <Style Selector="Button.caption">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="46" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-    </Style>
   </UserControl.Styles>
 
   <Border Background="{DynamicResource Mica}" BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1" CornerRadius="8" BoxShadow="{DynamicResource ShadowLg}" ClipToBounds="True">
     <DockPanel>
-      <Grid DockPanel.Dock="Top" Height="32" ColumnDefinitions="*,Auto" Name="TitleBar">
-        <TextBlock Text="Set up Study Stash" FontSize="12" Margin="16,0,0,0" VerticalAlignment="Center" />
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Name="Captions">
-          <Button Classes="caption"><c:Icon Glyph="remove" Size="15" Foreground="{DynamicResource Fg}" /></Button>
-          <Button Classes="caption"><c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg}" /></Button>
-        </StackPanel>
-      </Grid>
+      <!-- The title bar: drag the window by it; the system's caption buttons sit on its right. -->
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="Set up Study Stash" />
       <Grid ColumnDefinitions="208,*">
         <ItemsControl ItemsSource="{Binding Steps}" Margin="8,12">
           <ItemsControl.ItemsPanel>

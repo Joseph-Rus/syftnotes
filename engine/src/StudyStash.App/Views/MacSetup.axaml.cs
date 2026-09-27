@@ -26,13 +26,14 @@ public partial class MacSetup : UserControl
         Height = m.OnCanvas ? 760 : m.OnAi ? 640 : 480;
     }
 
-    /// <summary>A real window has the system's traffic lights, rounded corners and shadow; screenshots draw all three.</summary>
+    /// <summary>A real window has the system's traffic lights (in its title bar), rounded corners and shadow;
+    /// screenshots draw all three.</summary>
     public bool DrawChrome
     {
-        get => Lights.IsVisible;
+        get => Header.DrawChrome;
         set
         {
-            Lights.IsVisible = value;
+            Header.DrawChrome = value;
             Chrome.Classes.Set("chrome", value);
         }
     }

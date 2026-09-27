@@ -9,6 +9,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using StudyStash.App.Controls;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
@@ -681,6 +682,7 @@ public static partial class Shell
 
     static void ToggleQuick()
     {
+        Program.Log("[probe] ToggleQuick");
         if (quickWindow?.IsVisible == true)
         {
             quickWindow.Hide();
@@ -714,12 +716,13 @@ public static partial class Shell
         var w = new Window
         {
             Title = "Study Stash", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? 52 : 48,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 48,
         };
         Look.Apply(w);
         if (Skin.Current == SkinKind.Mac)
         {
             w.Content = new MacLibrary { DataContext = library };
+            MacTitleBar.Attach(w);
         }
         else
         {
@@ -772,9 +775,10 @@ public static partial class Shell
         var w = new Window
         {
             Title = "Set up Study Stash", Width = view.Width, Height = view.Height, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = view,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? 48 : 32,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
+        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         if (Skin.Current == SkinKind.Win)
         {
             w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
@@ -854,9 +858,10 @@ public static partial class Shell
         {
             Title = "Study Stash settings", Width = 900, Height = Skin.Current == SkinKind.Mac ? 780 : 860, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen,
             Content = new SettingsView { DataContext = model, DrawChrome = false },
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? 52 : 32,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
+        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         if (Skin.Current == SkinKind.Win)
         {
             w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];

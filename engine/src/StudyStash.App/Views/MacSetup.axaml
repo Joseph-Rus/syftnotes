@@ -81,205 +81,204 @@
     </Style>
     <!-- The AI and Canvas steps (07, 15) start a little higher, in their taller window. -->
     <Style Selector="DockPanel.stepcol">
-      <Setter Property="Margin" Value="40,56,40,20" />
+      <Setter Property="Margin" Value="40,12,40,20" />
     </Style>
     <Style Selector="DockPanel.stepcol.wide">
-      <Setter Property="Margin" Value="40,44,40,20" />
+      <Setter Property="Margin" Value="40,4,40,20" />
     </Style>
   </UserControl.Styles>
 
   <Border Name="Chrome" Classes="chrome" Background="{DynamicResource Win}" ClipToBounds="True">
-    <Grid ColumnDefinitions="224,*">
-      <!-- Steps: a floating glass panel -->
-      <c:Glass CornerRadius="18" BoxShadow="{DynamicResource SideGlassShadow}" Padding="10,0" Margin="8,8,0,8">
-        <StackPanel Spacing="2">
-          <StackPanel Name="Lights" Orientation="Horizontal" Spacing="8" Height="44" Margin="8,0,0,0" VerticalAlignment="Center">
-            <Ellipse Width="12" Height="12" Fill="#FF5F57" />
-            <Ellipse Width="12" Height="12" Fill="{DynamicResource Fill2}" />
-            <Ellipse Width="12" Height="12" Fill="{DynamicResource Fill2}" />
-          </StackPanel>
-          <ItemsControl ItemsSource="{Binding Steps}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:StepItem">
-                <Border Classes="step" Classes.current="{Binding Current}" Classes.todo="{Binding Todo}">
-                  <Grid ColumnDefinitions="Auto,10,*,Auto">
-                    <c:Icon IsVisible="{Binding Done}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource AccentText}" />
-                    <Border IsVisible="{Binding ShowNumber}" Classes="num" Width="16" Height="16" Margin="1,0" CornerRadius="8" BorderThickness="1.5">
-                      <TextBlock Text="{Binding Number}" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <TextBlock Grid.Column="2" Classes="title" Text="{Binding Title}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="3" Text="Optional" IsVisible="{Binding ShowOptional}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </StackPanel>
-      </c:Glass>
-
-      <!-- The step -->
-      <DockPanel Grid.Column="1" Classes="stepcol" Classes.wide="{Binding Wide}">
-        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto">
-          <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
-            <TextBlock Text="Skip for now" FontSize="13" Foreground="{DynamicResource Fg2}" />
-          </Button>
-          <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-            <Button Classes="push fill" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}">
-              <TextBlock Text="Back" FontSize="13" />
-            </Button>
-            <Button Classes="push tint" Command="{Binding NextCommand}" IsEnabled="{Binding CanContinue}">
-              <TextBlock Text="{Binding ContinueLabel}" FontSize="13" FontWeight="Medium" />
-            </Button>
-          </StackPanel>
-        </Grid>
-        <StackPanel>
-          <TextBlock Text="{Binding StepLabel}" FontSize="12" Foreground="{DynamicResource Fg2}" />
-
-          <!-- 1: the microphone -->
-          <StackPanel IsVisible="{Binding OnMicrophone}">
-            <TextBlock Text="Let Study Stash hear your lectures" FontFamily="{DynamicResource DisplayFont}" FontSize="26" FontWeight="Bold" c:Typography.Extra="-0.39" Margin="0,6,0,0" />
-            <TextBlock Text="It records with this Mac's microphone. The recording stays on this Mac; only the transcript goes to your library."
-                       FontSize="13" LineHeight="19.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,10,0,0" />
-            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,32,0,0" IsVisible="{Binding MicAllowed}">
-              <c:Icon Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource AccentText}" />
-              <TextBlock Text="The microphone is allowed." FontSize="13" VerticalAlignment="Center" />
-            </StackPanel>
-            <StackPanel IsVisible="{Binding MicAllowed}" Margin="0,16,0,0" Spacing="8">
-              <c:Waveform Height="28" Bars="24" Levels="{Binding MicLevels}" Foreground="{DynamicResource Accent}" HorizontalAlignment="Left" />
-              <TextBlock Text="{Binding MicLine}" FontSize="12" Foreground="{DynamicResource Fg2}" />
-            </StackPanel>
-            <Button Classes="push tint" HorizontalAlignment="Left" Margin="0,32,0,0" Command="{Binding AllowMicCommand}" IsVisible="{Binding !MicAllowed}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <c:Icon Glyph="mic" Filled="True" Size="16" Foreground="{DynamicResource OnAccent}" />
-                <TextBlock Text="Allow the microphone" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-            <StackPanel IsVisible="{Binding MicDenied}" Margin="0,16,0,0" Spacing="8">
-              <TextBlock Text="macOS is keeping the microphone from Study Stash. Turn it on in System Settings → Privacy &amp; Security → Microphone."
-                         FontSize="12" LineHeight="18" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" />
-              <Button Classes="push fill" HorizontalAlignment="Left" Command="{Binding MicSettingsCommand}">
-                <TextBlock Text="Open System Settings" FontSize="13" />
-              </Button>
-            </StackPanel>
-            <Button Theme="{StaticResource Surface}" HorizontalAlignment="Left" Margin="0,20,0,0" CornerRadius="6" Padding="0" Command="{Binding PickOnlyLibraryCommand}">
-              <TextBlock Text="{Binding SkipRecordingText}" FontSize="12" Foreground="{DynamicResource AccentText}" />
-            </Button>
-          </StackPanel>
-
-          <!-- 2: the library -->
-          <StackPanel IsVisible="{Binding OnLibrary}">
-            <TextBlock Text="Where your notes live" FontFamily="{DynamicResource DisplayFont}" FontSize="26" FontWeight="Bold" c:Typography.Extra="-0.39" Margin="0,6,0,0" />
-            <TextBlock Text="Your library is the computer that writes the notes and keeps them: a Mac mini or a PC at home, or this Mac."
-                       FontSize="13" LineHeight="19.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,10,0,0" />
-            <Grid ColumnDefinitions="*,10,*" Margin="0,20,0,0" MaxWidth="440" HorizontalAlignment="Left">
-              <Button Classes="choice" Classes.on="{Binding OtherComputer}" Command="{Binding PickOtherCommand}">
-                <StackPanel Spacing="4">
-                  <c:Icon Glyph="dns" Size="20" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
-                  <TextBlock Text="Another computer" FontSize="13" FontWeight="SemiBold" />
-                  <TextBlock Text="Connect to the library you set up" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
-                </StackPanel>
-              </Button>
-              <Button Grid.Column="2" Classes="choice" Classes.on="{Binding ThisComputer}" Command="{Binding PickThisCommand}">
-                <StackPanel Spacing="4">
-                  <c:Icon Glyph="laptop_mac" Size="20" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
-                  <TextBlock Text="This Mac" FontSize="13" FontWeight="SemiBold" />
-                  <TextBlock Text="Keep the library here too" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
-                </StackPanel>
-              </Button>
-            </Grid>
-            <Grid ColumnDefinitions="*,10,*" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Left" IsVisible="{Binding OtherComputer}">
-              <StackPanel>
-                <TextBlock Classes="label" Text="Address" />
-                <Border Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" FontSize="13" /></Border>
-              </StackPanel>
-              <StackPanel Grid.Column="2">
-                <TextBlock Classes="label" Text="Password" />
-                <Border Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" FontSize="13" /></Border>
-              </StackPanel>
-            </Grid>
-            <Grid ColumnDefinitions="*,10,*" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Left" IsVisible="{Binding ThisComputer}">
-              <StackPanel>
-                <TextBlock Classes="label" Text="Library name" />
-                <Border Classes="field"><TextBox Classes="bare" Text="{Binding LibraryName}" PlaceholderText="Sam's library" FontSize="13" /></Border>
-              </StackPanel>
-              <StackPanel Grid.Column="2">
-                <TextBlock Classes="label" Text="Password" />
-                <Border Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" FontSize="13" /></Border>
-              </StackPanel>
-            </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,14,0,0">
-              <Button Classes="push fill" Command="{Binding ConnectCommand}" IsEnabled="{Binding !Connecting}">
-                <TextBlock Text="{Binding ThisComputer, Converter={x:Static c:Converters.CreateOrConnect}}" FontSize="13" />
-              </Button>
-              <Button Classes="push" Command="{Binding FindCommand}" IsEnabled="{Binding !Finding}" IsVisible="{Binding OtherComputer}">
-                <TextBlock Text="Find it" FontSize="13" />
-              </Button>
-              <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-              <c:Spinner IsVisible="{Binding Finding}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-              <TextBlock IsVisible="{Binding HasLibraryResult}" Text="{Binding LibraryResult}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="300"
-                         Classes="result" Classes.bad="{Binding !LibraryOk}" />
-            </StackPanel>
-            <CheckBox IsChecked="{Binding StartAtLogin}" IsVisible="{Binding ShowStartAtLogin}" Margin="0,12,0,0">
-              <TextBlock Text="Start Study Stash when I log in, so the library keeps running" FontSize="13" />
-            </CheckBox>
-          </StackPanel>
-
-          <!-- 3: the model -->
-          <StackPanel IsVisible="{Binding OnModel}">
-            <TextBlock Text="Download the transcription model" FontFamily="{DynamicResource DisplayFont}" FontSize="26" FontWeight="Bold" c:Typography.Extra="-0.39" Margin="0,6,0,0" />
-            <TextBlock Text="{Binding ModelBody}" FontSize="13" LineHeight="19.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,10,0,0" />
-            <Border Height="8" CornerRadius="4" Background="{DynamicResource Fill2}" MaxWidth="440" HorizontalAlignment="Stretch" Margin="0,36,0,0">
-              <Border Width="{Binding ModelBarWidth}" CornerRadius="4" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
-            </Border>
-            <Grid ColumnDefinitions="*,Auto" MaxWidth="440" Margin="0,8,0,0">
-              <TextBlock Classes="num" Text="{Binding ModelDone}" FontSize="12" Foreground="{DynamicResource Fg2}" />
-              <TextBlock Grid.Column="1" Classes="num" Text="{Binding ModelLeft}" FontSize="12" Foreground="{DynamicResource Fg2}" />
-            </Grid>
-            <TextBlock IsVisible="{Binding ModelDownloading}" Text="You can add your classes while this finishes." FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,24,0,0" />
-            <StackPanel IsVisible="{Binding HasModelProblem}" Orientation="Horizontal" Spacing="10" Margin="0,20,0,0">
-              <TextBlock Text="{Binding ModelProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
-              <Button Classes="push fill" Command="{Binding RetryModelCommand}"><TextBlock Text="Try again" FontSize="13" /></Button>
-            </StackPanel>
-          </StackPanel>
-
-          <!-- 4: classes -->
-          <StackPanel IsVisible="{Binding OnClasses}">
-            <TextBlock Text="Add your classes" FontFamily="{DynamicResource DisplayFont}" FontSize="26" FontWeight="Bold" c:Typography.Extra="-0.39" Margin="0,6,0,0" />
-            <TextBlock Text="With your timetable, Record picks the class that's on, so each lecture lands in the right place. You can skip this."
-                       FontSize="13" LineHeight="19.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,10,0,0" />
-            <ItemsControl ItemsSource="{Binding Classes}" Margin="0,18,0,0" MaxWidth="440" HorizontalAlignment="Left">
+      <DockPanel>
+      <!-- The title bar: drag the window by it; the system's traffic lights sit in it. -->
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="Set up Study Stash" />
+      <Grid ColumnDefinitions="224,*">
+        <!-- Steps: a floating glass panel, below the title bar -->
+        <c:Glass CornerRadius="18" BoxShadow="{DynamicResource SideGlassShadow}" Padding="10,8,10,8" Margin="8,0,0,8">
+          <StackPanel Spacing="2">
+            <ItemsControl ItemsSource="{Binding Steps}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:SetupClass">
-                  <Grid ColumnDefinitions="Auto,10,Auto,10,*" Height="30">
-                    <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="4" Text="{Binding When}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-                  </Grid>
+                <DataTemplate x:DataType="vm:StepItem">
+                  <Border Classes="step" Classes.current="{Binding Current}" Classes.todo="{Binding Todo}">
+                    <Grid ColumnDefinitions="Auto,10,*,Auto">
+                      <c:Icon IsVisible="{Binding Done}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource AccentText}" />
+                      <Border IsVisible="{Binding ShowNumber}" Classes="num" Width="16" Height="16" Margin="1,0" CornerRadius="8" BorderThickness="1.5">
+                        <TextBlock Text="{Binding Number}" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      </Border>
+                      <TextBlock Grid.Column="2" Classes="title" Text="{Binding Title}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Text="Optional" IsVisible="{Binding ShowOptional}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <Grid ColumnDefinitions="140,10,*,10,Auto" Margin="0,10,0,0" MaxWidth="440" HorizontalAlignment="Left">
-              <Border Classes="field"><TextBox Classes="bare" Text="{Binding NewClass}" PlaceholderText="CS 101" FontSize="13" /></Border>
-              <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding NewWhen}" PlaceholderText="Tue Thu 10:00–11:15" FontSize="13" /></Border>
-              <Button Grid.Column="4" Classes="push fill" Command="{Binding AddClassCommand}"><TextBlock Text="Add" FontSize="13" /></Button>
-            </Grid>
-            <TextBlock IsVisible="{Binding HasClassProblem}" Text="{Binding ClassProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="440" HorizontalAlignment="Left" Margin="0,8,0,0" />
           </StackPanel>
+        </c:Glass>
 
-          <!-- The AI engines (15): the pane pads itself, so it sits out to the column's edges -->
-          <Panel IsVisible="{Binding OnAi}" Margin="-40,6,-40,0">
-            <v:MacAiSetup DataContext="{Binding Ai}" />
-          </Panel>
+        <!-- The step -->
+        <DockPanel Grid.Column="1" Classes="stepcol" Classes.wide="{Binding Wide}">
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto">
+            <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
+              <TextBlock Text="Skip for now" FontSize="13" Foreground="{DynamicResource Fg2}" />
+            </Button>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
+              <Button Classes="push fill" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}">
+                <TextBlock Text="Back" FontSize="13" />
+              </Button>
+              <Button Classes="push tint" Command="{Binding NextCommand}" IsEnabled="{Binding CanContinue}">
+                <TextBlock Text="{Binding ContinueLabel}" FontSize="13" FontWeight="Medium" />
+              </Button>
+            </StackPanel>
+          </Grid>
+          <StackPanel>
+            <TextBlock Text="{Binding StepLabel}" FontSize="12" Foreground="{DynamicResource Fg2}" />
 
-          <!-- Canvas (07): its own steps; the footer's Skip for now, Back and Finish are setup's -->
-          <Panel IsVisible="{Binding OnCanvas}" Margin="0,6,0,0">
-            <v:MacCanvasConnect DataContext="{Binding Canvas}" />
-          </Panel>
-        </StackPanel>
-      </DockPanel>
-    </Grid>
+            <!-- 1: the microphone -->
+            <StackPanel IsVisible="{Binding OnMicrophone}">
+              <TextBlock Text="Let Study Stash hear your lectures" FontFamily="{DynamicResource DisplayFont}" FontSize="26" FontWeight="Bold" c:Typography.Extra="-0.39" Margin="0,6,0,0" />
+              <TextBlock Text="It records with this Mac's microphone. The recording stays on this Mac; only the transcript goes to your library."
+                         FontSize="13" LineHeight="19.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,10,0,0" />
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,32,0,0" IsVisible="{Binding MicAllowed}">
+                <c:Icon Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource AccentText}" />
+                <TextBlock Text="The microphone is allowed." FontSize="13" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel IsVisible="{Binding MicAllowed}" Margin="0,16,0,0" Spacing="8">
+                <c:Waveform Height="28" Bars="24" Levels="{Binding MicLevels}" Foreground="{DynamicResource Accent}" HorizontalAlignment="Left" />
+                <TextBlock Text="{Binding MicLine}" FontSize="12" Foreground="{DynamicResource Fg2}" />
+              </StackPanel>
+              <Button Classes="push tint" HorizontalAlignment="Left" Margin="0,32,0,0" Command="{Binding AllowMicCommand}" IsVisible="{Binding !MicAllowed}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Glyph="mic" Filled="True" Size="16" Foreground="{DynamicResource OnAccent}" />
+                  <TextBlock Text="Allow the microphone" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <StackPanel IsVisible="{Binding MicDenied}" Margin="0,16,0,0" Spacing="8">
+                <TextBlock Text="macOS is keeping the microphone from Study Stash. Turn it on in System Settings → Privacy &amp; Security → Microphone."
+                           FontSize="12" LineHeight="18" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" />
+                <Button Classes="push fill" HorizontalAlignment="Left" Command="{Binding MicSettingsCommand}">
+                  <TextBlock Text="Open System Settings" FontSize="13" />
+                </Button>
+              </StackPanel>
+              <Button Theme="{StaticResource Surface}" HorizontalAlignment="Left" Margin="0,20,0,0" CornerRadius="6" Padding="0" Command="{Binding PickOnlyLibraryCommand}">
+                <TextBlock Text="{Binding SkipRecordingText}" FontSize="12" Foreground="{DynamicResource AccentText}" />
+              </Button>
+            </StackPanel>
+
+            <!-- 2: the library -->
+            <StackPanel IsVisible="{Binding OnLibrary}">
+              <TextBlock Text="Where your notes live" FontFamily="{DynamicResource DisplayFont}" FontSize="26" FontWeight="Bold" c:Typography.Extra="-0.39" Margin="0,6,0,0" />
+              <TextBlock Text="Your library is the computer that writes the notes and keeps them: a Mac mini or a PC at home, or this Mac."
+                         FontSize="13" LineHeight="19.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,10,0,0" />
+              <Grid ColumnDefinitions="*,10,*" Margin="0,20,0,0" MaxWidth="440" HorizontalAlignment="Left">
+                <Button Classes="choice" Classes.on="{Binding OtherComputer}" Command="{Binding PickOtherCommand}">
+                  <StackPanel Spacing="4">
+                    <c:Icon Glyph="dns" Size="20" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
+                    <TextBlock Text="Another computer" FontSize="13" FontWeight="SemiBold" />
+                    <TextBlock Text="Connect to the library you set up" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Button>
+                <Button Grid.Column="2" Classes="choice" Classes.on="{Binding ThisComputer}" Command="{Binding PickThisCommand}">
+                  <StackPanel Spacing="4">
+                    <c:Icon Glyph="laptop_mac" Size="20" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
+                    <TextBlock Text="This Mac" FontSize="13" FontWeight="SemiBold" />
+                    <TextBlock Text="Keep the library here too" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+              <Grid ColumnDefinitions="*,10,*" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Left" IsVisible="{Binding OtherComputer}">
+                <StackPanel>
+                  <TextBlock Classes="label" Text="Address" />
+                  <Border Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" FontSize="13" /></Border>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                  <TextBlock Classes="label" Text="Password" />
+                  <Border Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" FontSize="13" /></Border>
+                </StackPanel>
+              </Grid>
+              <Grid ColumnDefinitions="*,10,*" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Left" IsVisible="{Binding ThisComputer}">
+                <StackPanel>
+                  <TextBlock Classes="label" Text="Library name" />
+                  <Border Classes="field"><TextBox Classes="bare" Text="{Binding LibraryName}" PlaceholderText="Sam's library" FontSize="13" /></Border>
+                </StackPanel>
+                <StackPanel Grid.Column="2">
+                  <TextBlock Classes="label" Text="Password" />
+                  <Border Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" FontSize="13" /></Border>
+                </StackPanel>
+              </Grid>
+              <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,14,0,0">
+                <Button Classes="push fill" Command="{Binding ConnectCommand}" IsEnabled="{Binding !Connecting}">
+                  <TextBlock Text="{Binding ThisComputer, Converter={x:Static c:Converters.CreateOrConnect}}" FontSize="13" />
+                </Button>
+                <Button Classes="push" Command="{Binding FindCommand}" IsEnabled="{Binding !Finding}" IsVisible="{Binding OtherComputer}">
+                  <TextBlock Text="Find it" FontSize="13" />
+                </Button>
+                <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                <c:Spinner IsVisible="{Binding Finding}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                <TextBlock IsVisible="{Binding HasLibraryResult}" Text="{Binding LibraryResult}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="300"
+                           Classes="result" Classes.bad="{Binding !LibraryOk}" />
+              </StackPanel>
+              <CheckBox IsChecked="{Binding StartAtLogin}" IsVisible="{Binding ShowStartAtLogin}" Margin="0,12,0,0">
+                <TextBlock Text="Start Study Stash when I log in, so the library keeps running" FontSize="13" />
+              </CheckBox>
+            </StackPanel>
+
+            <!-- 3: the model -->
+            <StackPanel IsVisible="{Binding OnModel}">
+              <TextBlock Text="Download the transcription model" FontFamily="{DynamicResource DisplayFont}" FontSize="26" FontWeight="Bold" c:Typography.Extra="-0.39" Margin="0,6,0,0" />
+              <TextBlock Text="{Binding ModelBody}" FontSize="13" LineHeight="19.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,10,0,0" />
+              <Border Height="8" CornerRadius="4" Background="{DynamicResource Fill2}" MaxWidth="440" HorizontalAlignment="Stretch" Margin="0,36,0,0">
+                <Border Width="{Binding ModelBarWidth}" CornerRadius="4" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
+              </Border>
+              <Grid ColumnDefinitions="*,Auto" MaxWidth="440" Margin="0,8,0,0">
+                <TextBlock Classes="num" Text="{Binding ModelDone}" FontSize="12" Foreground="{DynamicResource Fg2}" />
+                <TextBlock Grid.Column="1" Classes="num" Text="{Binding ModelLeft}" FontSize="12" Foreground="{DynamicResource Fg2}" />
+              </Grid>
+              <TextBlock IsVisible="{Binding ModelDownloading}" Text="You can add your classes while this finishes." FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,24,0,0" />
+              <StackPanel IsVisible="{Binding HasModelProblem}" Orientation="Horizontal" Spacing="10" Margin="0,20,0,0">
+                <TextBlock Text="{Binding ModelProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
+                <Button Classes="push fill" Command="{Binding RetryModelCommand}"><TextBlock Text="Try again" FontSize="13" /></Button>
+              </StackPanel>
+            </StackPanel>
+
+            <!-- 4: classes -->
+            <StackPanel IsVisible="{Binding OnClasses}">
+              <TextBlock Text="Add your classes" FontFamily="{DynamicResource DisplayFont}" FontSize="26" FontWeight="Bold" c:Typography.Extra="-0.39" Margin="0,6,0,0" />
+              <TextBlock Text="With your timetable, Record picks the class that's on, so each lecture lands in the right place. You can skip this."
+                         FontSize="13" LineHeight="19.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,10,0,0" />
+              <ItemsControl ItemsSource="{Binding Classes}" Margin="0,18,0,0" MaxWidth="440" HorizontalAlignment="Left">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:SetupClass">
+                    <Grid ColumnDefinitions="Auto,10,Auto,10,*" Height="30">
+                      <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="4" Text="{Binding When}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Grid ColumnDefinitions="140,10,*,10,Auto" Margin="0,10,0,0" MaxWidth="440" HorizontalAlignment="Left">
+                <Border Classes="field"><TextBox Classes="bare" Text="{Binding NewClass}" PlaceholderText="CS 101" FontSize="13" /></Border>
+                <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding NewWhen}" PlaceholderText="Tue Thu 10:00–11:15" FontSize="13" /></Border>
+                <Button Grid.Column="4" Classes="push fill" Command="{Binding AddClassCommand}"><TextBlock Text="Add" FontSize="13" /></Button>
+              </Grid>
+              <TextBlock IsVisible="{Binding HasClassProblem}" Text="{Binding ClassProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="440" HorizontalAlignment="Left" Margin="0,8,0,0" />
+            </StackPanel>
+
+            <!-- The AI engines (15): the pane pads itself, so it sits out to the column's edges -->
+            <Panel IsVisible="{Binding OnAi}" Margin="-40,6,-40,0">
+              <v:MacAiSetup DataContext="{Binding Ai}" />
+            </Panel>
+
+            <!-- Canvas (07): its own steps; the footer's Skip for now, Back and Finish are setup's -->
+            <Panel IsVisible="{Binding OnCanvas}" Margin="0,6,0,0">
+              <v:MacCanvasConnect DataContext="{Binding Canvas}" />
+            </Panel>
+          </StackPanel>
+        </DockPanel>
+      </Grid>
+    </DockPanel>
   </Border>
 </UserControl>

@@ -44,35 +44,15 @@
       <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
     </Style>
 
-    <!-- Windows' title row: a 16 px accent app mark, the window's name, and (for shots) its own caption buttons. -->
-    <Style Selector="Grid.titlebar">
-      <Setter Property="IsVisible" Value="False" />
-    </Style>
-    <Style Selector=".win Grid.titlebar">
-      <Setter Property="IsVisible" Value="True" />
-    </Style>
-    <Style Selector="Border.appmark">
-      <Setter Property="Width" Value="16" />
-      <Setter Property="Height" Value="16" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Background" Value="{DynamicResource Accent}" />
-    </Style>
-    <Style Selector="Button.caption">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="46" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-    </Style>
-
-    <!-- The sidebar: Mac an inset floating glass panel with traffic-light room; Windows plain, flush on the Mica. -->
+    <!-- The sidebar: Mac an inset floating glass panel below the title bar; Windows plain, flush on the Mica. -->
     <Style Selector="c|Glass.side">
       <Setter Property="ClipToBounds" Value="False" />
     </Style>
     <Style Selector=".mac c|Glass.side">
       <Setter Property="CornerRadius" Value="18" />
       <Setter Property="BoxShadow" Value="{DynamicResource SideGlassShadow}" />
-      <Setter Property="Margin" Value="8,8,0,8" />
-      <Setter Property="Padding" Value="10,0,10,14" />
+      <Setter Property="Margin" Value="8,0,0,8" />
+      <Setter Property="Padding" Value="10,10,10,14" />
     </Style>
     <Style Selector=".win c|Glass.side">
       <Setter Property="Background" Value="Transparent" />
@@ -135,7 +115,7 @@
       <Setter Property="CornerRadius" Value="8,0,0,0" />
     </Style>
     <Style Selector=".mac StackPanel.pagebody">
-      <Setter Property="Margin" Value="40,40,40,32" />
+      <Setter Property="Margin" Value="40,12,40,32" />
       <Setter Property="Spacing" Value="24" />
     </Style>
     <Style Selector=".win StackPanel.pagebody">
@@ -420,26 +400,12 @@
 
   <Border Name="Chrome">
     <DockPanel>
-      <Grid Name="TitleBar" Classes="titlebar" DockPanel.Dock="Top" Height="32" ColumnDefinitions="Auto,*,Auto">
-        <StackPanel Orientation="Horizontal" Spacing="10" Margin="16,0,0,0" VerticalAlignment="Center">
-          <Border Classes="appmark"><c:Icon Glyph="graphic_eq" Size="12" Foreground="{DynamicResource OnAccent}" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
-          <TextBlock Text="Study Stash settings" FontSize="12" VerticalAlignment="Center" />
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Name="Captions" IsVisible="False">
-          <Button Classes="caption"><c:Icon Glyph="remove" Size="15" Foreground="{DynamicResource Fg}" /></Button>
-          <Button Classes="caption"><c:Icon Glyph="crop_square" Size="13" Foreground="{DynamicResource Fg}" /></Button>
-          <Button Classes="caption"><c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg}" /></Button>
-        </StackPanel>
-      </Grid>
+      <!-- The title bar: drag the window by it; the system's window buttons sit in it. -->
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" />
 
       <Grid Name="Cols" ColumnDefinitions="220,*">
         <c:Glass Classes="side">
           <StackPanel Spacing="2">
-            <StackPanel Name="Lights" Orientation="Horizontal" Spacing="8" Height="44" Margin="8,0,0,0" VerticalAlignment="Center" IsVisible="False">
-              <Ellipse Width="12" Height="12" Fill="#FF5F57" />
-              <Ellipse Width="12" Height="12" Fill="{DynamicResource Fill2}" />
-              <Ellipse Width="12" Height="12" Fill="{DynamicResource Fill2}" />
-            </StackPanel>
             <ItemsControl ItemsSource="{Binding NavItems}">
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
