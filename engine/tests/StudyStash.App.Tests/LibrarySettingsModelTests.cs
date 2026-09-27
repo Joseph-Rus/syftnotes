@@ -187,9 +187,37 @@ public class LibrarySettingsModelTests
         await lib.AddClassCommand.ExecuteAsync(null);
         Assert.Equal("PHYS 150", lib.Classes.Last().Name);
         Assert.Equal("", lib.NewClass);
+        Assert.Equal("/Users/sam/Study Stash/Lecture notes/PHYS 150", lib.Classes.Last().Folder); // from the library's answer
+        Assert.Same(cs, lib.Classes[0]);
 
         await lib.RemoveClassCommand.ExecuteAsync(lib.Classes.Single(c => c.Name == "HIST 210"));
         Assert.Equal(["CS 101", "BIO 110", "MATH 221", "PHYS 150"], fake.Settings["classes"]!.AsArray().Select(c => c!["name"]!.GetValue<string>()));
+    }
+
+    [AvaloniaFact]
+    public async Task The_app_hears_when_the_classes_change_and_not_when_the_library_says_no()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Classes";
+        var lib = model.Lib;
+        int heard = 0;
+        lib.ClassesChanged = () => heard++;
+
+        lib.NewClass = "PHYS 150";
+        await lib.AddClassCommand.ExecuteAsync(null);
+        lib.Classes[0].Description = "Recursion";
+        await lib.SaveClassesCommand.ExecuteAsync(null);
+        await lib.RemoveClassCommand.ExecuteAsync(lib.Classes.Single(c => c.Name == "PHYS 150"));
+        Assert.Equal(3, heard);
+
+        fake.Refuse = "There are two classes called CS 101.";
+        lib.NewClass = "CS 101";
+        await lib.AddClassCommand.ExecuteAsync(null);
+        Assert.Equal(3, heard);
     }
 
     [AvaloniaFact]

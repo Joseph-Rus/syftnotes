@@ -89,6 +89,9 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     public Action<string>? Renamed { get; set; }
     /// <summary>The library's password changed here: the app connects with the new one from now on.</summary>
     public Action<string>? PasswordChanged { get; set; }
+    /// <summary>After the library's classes changed here (one added, renamed or removed), so the app's other windows
+    /// show them too.</summary>
+    public Action? ClassesChanged { get; set; }
     public Action<string>? Reveal { get; set; }
     public Action<string>? Copy { get; set; }
     /// <summary>The library's own web page (a fallback for a library too old for these settings).</summary>
@@ -326,6 +329,12 @@ public sealed partial class LibrarySettingsModel : ObservableObject
                 Classes.Clear();
                 foreach (var c in classes) Classes.Add(c);
             }
+            else
+            {
+                // A class just added here gets its folder from the library's answer.
+                for (int k = 0; k < Classes.Count; k++)
+                    if (Classes[k].Folder.Length == 0 && classes[k].Folder.Length > 0) Classes[k] = classes[k];
+            }
 
             var notes = s["notes"];
             WriteNotes = Flag(notes?["write"]);
@@ -499,7 +508,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [RelayCommand]
     async Task SaveClasses()
     {
-        if (!filling && State == LibrarySettingsState.Ready) await SendAsync(ClassesChange(), "The classes");
+        if (!filling && State == LibrarySettingsState.Ready && await SendAsync(ClassesChange(), "The classes")) ClassesChanged?.Invoke();
     }
 
     [RelayCommand]
@@ -508,14 +517,16 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         string name = NewClass.Trim();
         if (name.Length == 0) return;
         Classes.Add(new LibraryClassRow { Name = name, Dot = Skin.ClassDot(Classes.Count) });
-        if (await SendAsync(ClassesChange(), $"{name}")) NewClass = "";
+        if (!await SendAsync(ClassesChange(), $"{name}")) return;
+        NewClass = "";
+        ClassesChanged?.Invoke();
     }
 
     [RelayCommand]
     async Task RemoveClass(LibraryClassRow row)
     {
         Classes.Remove(row);
-        await SendAsync(ClassesChange(), $"{row.Name}");
+        if (await SendAsync(ClassesChange(), $"{row.Name}")) ClassesChanged?.Invoke();
     }
 
     // Notes and sorting

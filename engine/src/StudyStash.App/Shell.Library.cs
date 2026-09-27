@@ -35,6 +35,14 @@ public static partial class Shell
         }, TimeSpan.FromSeconds(1));
     }
 
+    /// <summary>The library's classes changed in Settings: the library window (when open) lists them again, and the
+    /// dropdown's class switcher follows.</summary>
+    static void LibraryClassesChanged()
+    {
+        if (quitting) return;
+        _ = mainWindow?.IsVisible == true ? LoadLibraryAsync() : host.CheckLibraryAsync();
+    }
+
     static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s ?? "" : "";
 
     static DateTimeOffset? Date(string? s) =>
@@ -61,6 +69,8 @@ public static partial class Shell
         library.Classes.Clear();
         foreach (var (name, color, count) in host.Classes())
             library.Classes.Add(new ClassItem { Name = name, Dot = Skin.ClassDot(color), Count = count });
+        // A class removed (in Settings, say) isn't left open.
+        if (openClass is not null && openClass != Configs.Unsorted && library.Classes.All(c => c.Name != openClass)) openClass = null;
         if (host.Library == LibraryState.Connected && !host.OlderLibrary && canvasDue is null) await LoadCanvasAsync();
         if (turn != libraryTurn) return;
         UpdateDueItem();
