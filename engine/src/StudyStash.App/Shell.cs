@@ -168,6 +168,10 @@ public static partial class Shell
         // (to look at them, or when another copy of the app owns the shortcuts).
         else if (message == "panel") TogglePanel();
         else if (message == "quick") ToggleQuick();
+        // "--show settings" opens Settings, "--show settings:Library" at one of its pages.
+        else if (message == "settings" || message.StartsWith("settings:", StringComparison.Ordinal))
+            ShowSettings(message.Length > "settings:".Length ? message["settings:".Length..] : null);
+        else if (message.StartsWith("snap:", StringComparison.Ordinal)) MacSnap.Save(message["snap:".Length..]);
         else ShowLibrary();
     }
 

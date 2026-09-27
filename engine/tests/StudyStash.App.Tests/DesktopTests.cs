@@ -79,6 +79,17 @@ public class DesktopTests
         }
     }
 
+    [Theory]
+    [InlineData("show", true)]
+    [InlineData("settings", true)]
+    [InlineData("settings:Library", true)]
+    [InlineData("settings:Notes", true)]
+    [InlineData("settings:", false)]
+    [InlineData("settings:Nowhere", false)]
+    [InlineData("settings:Library; rm", false)]
+    [InlineData("delete everything", false)]
+    public void Only_known_words_and_settings_pages_are_acted_on(string word, bool known) => Assert.Equal(known, Desktop.IsWord(word));
+
     [Fact]
     public async Task A_second_copy_hands_off_to_the_first()
     {
@@ -98,8 +109,9 @@ public class DesktopTests
             Assert.True(heard.TryTake(out word, TimeSpan.FromSeconds(5)));
             Assert.Equal("show", word);
 
-            // "--show panel" / "--show quick" open the dropdown and the quick panel.
-            foreach (string asked in new[] { "panel", "quick" })
+            // "--show panel" / "--show quick" open the dropdown and the quick panel;
+            // "--show settings" / "--show settings:Library" open Settings, at one of its pages.
+            foreach (string asked in new[] { "panel", "quick", "settings", "settings:Library" })
             {
                 Assert.True(await Task.Run(() => Desktop.HandOff(home.Path, asked)));
                 Assert.True(heard.TryTake(out word, TimeSpan.FromSeconds(5)));

@@ -275,8 +275,18 @@ public static class Desktop
         }
     }
 
-    /// <summary>The words a later copy can hand off: show the library, record, open the dropdown or the quick panel.</summary>
-    static readonly HashSet<string> Words = ["show", "record", "panel", "quick"];
+    /// <summary>The words a later copy can hand off: show the library, record, open the dropdown, the quick panel or
+    /// Settings ("settings", or "settings:Library" for one of its pages).</summary>
+    static readonly HashSet<string> Words = ["show", "record", "panel", "quick", "settings"];
+
+    /// <summary>Settings' pages a later copy can open it at.</summary>
+    static readonly HashSet<string> SettingsPages = ["General", "Appearance", "Recording", "Connection", "Timetable", "Library", "Classes", "Notes", "AI", "Access", "Canvas", "Folders"];
+
+    /// <summary>Whether a later copy's word is one the app acts on; anything else is ignored. ("snap:&lt;name&gt;" only
+    /// while pictures are on: see <see cref="MacSnap"/>.)</summary>
+    public static bool IsWord(string word) =>
+        Words.Contains(word) || (word.StartsWith("settings:", StringComparison.Ordinal) && SettingsPages.Contains(word["settings:".Length..]))
+        || (word.StartsWith("snap:", StringComparison.Ordinal) && MacSnap.Folder is not null && MacSnap.IsName(word["snap:".Length..]));
 
     /// <summary>Listen for later copies handing off (they say "show", or "record"); what they say is passed to
     /// <paramref name="onMessage"/> through <paramref name="post"/> (the UI thread, unless a test says otherwise).
@@ -298,7 +308,7 @@ public static class Desktop
                     await pipe.WaitForConnectionAsync(stop);
                     // Listen again before reading this one: a copy that comes meanwhile waits its turn, not turned away.
                     next = Server(name);
-                    if (await ReadWordAsync(pipe, stop) is { } word && Words.Contains(word)) post(() => onMessage(word));
+                    if (await ReadWordAsync(pipe, stop) is { } word && IsWord(word)) post(() => onMessage(word));
                 }
                 catch (OperationCanceledException)
                 {
