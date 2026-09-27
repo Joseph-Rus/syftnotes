@@ -97,6 +97,14 @@ public class DesktopTests
             Assert.True(await Task.Run(() => Desktop.HandOff(home.Path, "show")));
             Assert.True(heard.TryTake(out word, TimeSpan.FromSeconds(5)));
             Assert.Equal("show", word);
+
+            // "--show panel" / "--show quick" open the dropdown and the quick panel.
+            foreach (string asked in new[] { "panel", "quick" })
+            {
+                Assert.True(await Task.Run(() => Desktop.HandOff(home.Path, asked)));
+                Assert.True(heard.TryTake(out word, TimeSpan.FromSeconds(5)));
+                Assert.Equal(asked, word);
+            }
         }
         finally
         {

@@ -275,8 +275,8 @@ public static class Desktop
         }
     }
 
-    /// <summary>The words a later copy can hand off.</summary>
-    static readonly HashSet<string> Words = ["show", "record"];
+    /// <summary>The words a later copy can hand off: show the library, record, open the dropdown or the quick panel.</summary>
+    static readonly HashSet<string> Words = ["show", "record", "panel", "quick"];
 
     /// <summary>Listen for later copies handing off (they say "show", or "record"); what they say is passed to
     /// <paramref name="onMessage"/> through <paramref name="post"/> (the UI thread, unless a test says otherwise).

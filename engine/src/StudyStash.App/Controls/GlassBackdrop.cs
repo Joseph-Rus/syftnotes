@@ -36,12 +36,15 @@ public static class GlassBackdrop
         public readonly List<IntPtr> Views = [];
         public List<(Rect Rect, CornerRadius Radius)>? Shapes;
         public bool Dark;
+        public double Height;
         public bool Failed;
         public int Logged = -1;
         public DispatcherTimer? Debounce;
     }
 
     static readonly ConditionalWeakTable<Window, State> States = new();
+
+    const string NoHandle = "no window handle";
 
     /// <summary>Put the OS blur under a floating window's glass, and keep it there as the window changes. Safe to call
     /// for every window: it does nothing off macOS, off the Mac skin, or with the opt-out set. The window's
@@ -87,7 +90,12 @@ public static class GlassBackdrop
         if (state.Failed || !window.IsVisible) return;
         try
         {
-            if (!Sync(window, state)) Fail(window, state);
+            if (Sync(window, state) is { } why)
+            {
+                // No handle at all is a window with nothing native behind it (the tests' headless ones): nothing to say.
+                if (why != NoHandle) Program.Log($"[glass] \"{window.Title}\": no system blur ({why}); the glass stays solid");
+                Fail(window, state);
+            }
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or MarshalDirectiveException)
         {
@@ -103,21 +111,36 @@ public static class GlassBackdrop
         if (!window.Classes.Contains("solidglass")) window.Classes.Add("solidglass");
     }
 
-    /// <summary>Make the window's blur views match its visible glass: one each, same place, same corners.</summary>
-    static bool Sync(Window window, State state)
+    /// <summary>Make the window's blur views match its visible glass: one each, same place, same corners. Null when
+    /// it worked, else why not.</summary>
+    static string? Sync(Window window, State state)
     {
-        if (!OperatingSystem.IsMacOS()) return false;
-        if (window.TryGetPlatformHandle() is not { HandleDescriptor: "NSView", Handle: var appView } || appView == IntPtr.Zero) return false;
-        IntPtr viewClass = ObjC.objc_getClass("NSView"), effectClass = ObjC.objc_getClass("NSVisualEffectView");
-        if (viewClass == IntPtr.Zero || effectClass == IntPtr.Zero) return false;
-        if (!ObjC.IsKind(appView, viewClass)) return false;
-        IntPtr container = ObjC.Send(appView, ObjC.Sel("superview"));
-        if (container == IntPtr.Zero || !ObjC.IsKind(container, viewClass)) return false;
+        if (!OperatingSystem.IsMacOS()) return "not a Mac";
+        // Avalonia hands the NSWindow (older backends handed its view): the blur goes in the window's content view,
+        // below everything Avalonia put there.
+        IntPtr windowClass = ObjC.objc_getClass("NSWindow"), viewClass = ObjC.objc_getClass("NSView");
+        IntPtr effectClass = ObjC.objc_getClass("NSVisualEffectView");
+        if (windowClass == IntPtr.Zero || viewClass == IntPtr.Zero || effectClass == IntPtr.Zero) return "no NSVisualEffectView";
+        IntPtr nsWindow = window.TryGetPlatformHandle() switch
+        {
+            { HandleDescriptor: "NSWindow", Handle: var w } => w,
+            { HandleDescriptor: "NSView", Handle: var v } when v != IntPtr.Zero && ObjC.IsKind(v, viewClass) => ObjC.Send(v, ObjC.Sel("window")),
+            _ => IntPtr.Zero,
+        };
+        if (nsWindow == IntPtr.Zero) return NoHandle;
+        if (!ObjC.IsKind(nsWindow, windowClass)) return "the handle isn't a window";
+        IntPtr container = ObjC.Send(nsWindow, ObjC.Sel("contentView"));
+        if (container == IntPtr.Zero || !ObjC.IsKind(container, viewClass)) return "the window has no content view";
 
         bool flipped = ObjC.SendReturnsByte(container, ObjC.Sel("isFlipped")) != 0;
         bool dark = window.ActualThemeVariant == ThemeVariant.Dark;
+        // Until the window has taken its content's size, the glass isn't where it will be: the next layout brings it.
+        if (Math.Abs(window.Bounds.Width - window.ClientSize.Width) > 0.5 || Math.Abs(window.Bounds.Height - window.ClientSize.Height) > 0.5)
+            return null;
         var shapes = CollectGlass(window);
-        if (state.Shapes is { } last && SameShapes(last, shapes) && state.Dark == dark && state.Views.Count == shapes.Count) return true;
+        double height = window.ClientSize.Height;
+        if (state.Shapes is { } last && SameShapes(last, shapes) && state.Dark == dark && state.Height == height &&
+            state.Views.Count == shapes.Count) return null;
 
         while (state.Views.Count > shapes.Count)
         {
@@ -127,17 +150,16 @@ public static class GlassBackdrop
         while (state.Views.Count < shapes.Count)
         {
             IntPtr view = ObjC.Send(ObjC.Send(effectClass, ObjC.Sel("alloc")), ObjC.Sel("init"));
-            if (view == IntPtr.Zero) return false;
+            if (view == IntPtr.Zero) return "couldn't make a blur view";
             ObjC.SendLong(view, ObjC.Sel("setBlendingMode:"), 0); // behind the window: the desktop
             ObjC.SendLong(view, ObjC.Sel("setState:"), 1); // always active: a floating panel is often not the key window
             ObjC.SendLong(view, ObjC.Sel("setMaterial:"), MaterialPopover);
             ObjC.SendByte(view, ObjC.Sel("setWantsLayer:"), 1);
             ObjC.SendULong(view, ObjC.Sel("setAutoresizingMask:"), AutoresizingFor(flipped));
-            ObjC.SendPtrLong(container, ObjC.Sel("addSubview:positioned:relativeTo:"), view, -1, appView); // NSWindowBelow
+            ObjC.SendPtrLong(container, ObjC.Sel("addSubview:positioned:relativeTo:"), view, -1, IntPtr.Zero); // below all
             state.Views.Add(view);
         }
 
-        double height = window.ClientSize.Height;
         IntPtr appearance = Appearance(dark);
         for (int i = 0; i < shapes.Count; i++)
         {
@@ -158,9 +180,10 @@ public static class GlassBackdrop
         }
         state.Shapes = shapes;
         state.Dark = dark;
+        state.Height = height;
         if (shapes.Count > 0) window.Classes.Remove("solidglass");
         Describe(window, state, container, flipped);
-        return true;
+        return null;
     }
 
     /// <summary>Once per window and whenever the count changes: what the blur is sitting in, for the log.</summary>
@@ -180,7 +203,11 @@ public static class GlassBackdrop
             names.Add(state.Views.Contains(child) ? $"{name}(ours)" : hidden ? $"{name}(hidden)" : name);
         }
         string shapes = string.Join(" ", (state.Shapes ?? []).Select(s => $"{s.Rect.Width:0}x{s.Rect.Height:0}@{s.Rect.X:0},{s.Rect.Y:0}"));
-        Program.Log($"[glass] \"{window.Title}\" level={window.ActualTransparencyLevel} blur views: {state.Views.Count} " +
+        IntPtr nsWindow = ObjC.Send(container, ObjC.Sel("window"));
+        bool opaque = nsWindow != IntPtr.Zero && ObjC.SendReturnsByte(nsWindow, ObjC.Sel("isOpaque")) != 0;
+        bool shadow = nsWindow != IntPtr.Zero && ObjC.SendReturnsByte(nsWindow, ObjC.Sel("hasShadow")) != 0;
+        Program.Log($"[glass] \"{window.Title}\" level={window.ActualTransparencyLevel} opaque={opaque} shadow={shadow} " +
+            $"{(state.Dark ? "dark" : "light")} blur views: {state.Views.Count} " +
             $"[{shapes}] in {Marshal.PtrToStringUTF8(ObjC.object_getClassName(container))} (flipped={flipped}, " +
             $"{window.ClientSize.Width:0}x{window.ClientSize.Height:0}) subviews: {string.Join(", ", names)}");
     }

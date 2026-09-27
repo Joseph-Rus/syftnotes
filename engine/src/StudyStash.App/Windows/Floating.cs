@@ -50,8 +50,13 @@ public class Floating : Window
         if (!OperatingSystem.IsMacOS()) return;
         try
         {
-            if (TryGetPlatformHandle() is not { HandleDescriptor: "NSView", Handle: var view } || view == IntPtr.Zero) return;
-            IntPtr nsWindow = objc_msgSend(view, sel_registerName("window"));
+            // Avalonia 12 hands the NSWindow itself; older backends handed its view.
+            IntPtr nsWindow = TryGetPlatformHandle() switch
+            {
+                { HandleDescriptor: "NSWindow", Handle: var w } => w,
+                { HandleDescriptor: "NSView", Handle: var v } when v != IntPtr.Zero => objc_msgSend(v, sel_registerName("window")),
+                _ => IntPtr.Zero,
+            };
             if (nsWindow == IntPtr.Zero) return;
             const nuint canJoinAllSpaces = 1 << 0, fullScreenAuxiliary = 1 << 8;
             objc_msgSend_setCollectionBehavior(nsWindow, sel_registerName("setCollectionBehavior:"), canJoinAllSpaces | fullScreenAuxiliary);
