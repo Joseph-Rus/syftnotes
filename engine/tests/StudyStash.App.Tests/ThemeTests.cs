@@ -146,6 +146,8 @@ public partial class ThemeTests
     [GeneratedRegex(@"GetResourceObservable\(""(\w+)""")] private static partial Regex Observed();
     [GeneratedRegex(@"(?:Fades\.Under\(\w+, |Bind\(\w+, \w+\.\w+Property, |Text\()""(\w+)""")] private static partial Regex Bound();
     [GeneratedRegex(@"\b[Mm]ac \? ""(\w+)"" : ""(\w+)""")] private static partial Regex ByLook();
+    /// <summary>A view for one look only: MacLibrary, WinSetup (not WindowHeader, which is for both).</summary>
+    [GeneratedRegex(@"^(Mac|Win)[A-Z]")] private static partial Regex OneLook();
 
     /// <summary>Every token the views, the styles and the controls ask for, and the look it's asked in (null: the
     /// file's own look, or either one for a file both looks share).</summary>
@@ -183,7 +185,7 @@ public partial class ThemeTests
         foreach (var (file, key, look) in asks)
         {
             string name = Path.GetFileName(file);
-            SkinKind? own = look ?? (name.StartsWith("Mac") ? SkinKind.Mac : name.StartsWith("Win") ? SkinKind.Win : null);
+            SkinKind? own = look ?? (OneLook().IsMatch(name) ? (name.StartsWith("Mac") ? SkinKind.Mac : SkinKind.Win) : null);
             bool there = own switch
             {
                 SkinKind.Mac => In(mac, key),

@@ -32,7 +32,6 @@ public static class MacTitleBar
         try
         {
             string how = Place(window, out double before, out double after);
-            ChromeProbe.Run(window);
             Program.Log($"[chrome] \"{window.Title}\": lights {how}; centre {Describe(before)} → {Describe(after)} from the top " +
                         $"(header {WindowHeader.MacHeight / 2:0} wanted)");
         }

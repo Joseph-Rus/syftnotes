@@ -150,7 +150,6 @@ public sealed class WindowHeader : Panel
     /// it by hand.</summary>
     void OnPressed(object? sender, PointerPressedEventArgs e)
     {
-        Program.Log($"[probe] header pressed clicks={e.ClickCount}");
         if (OperatingSystem.IsMacOS()) return;
         if (TopLevel.GetTopLevel(this) is not Window w || !e.GetCurrentPoint(drag).Properties.IsLeftButtonPressed || e.ClickCount > 1) return;
         w.BeginMoveDrag(e);
@@ -158,7 +157,6 @@ public sealed class WindowHeader : Panel
 
     void OnDoubleTapped(object? sender, TappedEventArgs e)
     {
-        Program.Log("[probe] header double-tapped");
         if (OperatingSystem.IsMacOS()) return;
         if (TopLevel.GetTopLevel(this) is not Window { CanResize: true } w) return;
         w.WindowState = w.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
@@ -171,7 +169,8 @@ public sealed class WindowHeader : Panel
         var icon = new Icon { Glyph = glyph, Size = size };
         icon.Bind(Icon.ForegroundProperty, this.GetResourceObservable("Fg"));
         var b = new Button { Width = CaptionWidth, HorizontalContentAlignment = HorizontalAlignment.Center, Content = icon, Focusable = false };
-        b.Bind(StyledElement.ThemeProperty, this.GetResourceObservable("Surface"));
+        // The app's quiet button look (Styles.axaml), like the rest of the Windows title bar's buttons.
+        if (Application.Current?.TryFindResource("Surface", out var theme) == true && theme is Avalonia.Styling.ControlTheme surface) b.Theme = surface;
         return b;
     }
 }

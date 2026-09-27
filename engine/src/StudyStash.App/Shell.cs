@@ -682,7 +682,6 @@ public static partial class Shell
 
     static void ToggleQuick()
     {
-        Program.Log("[probe] ToggleQuick");
         if (quickWindow?.IsVisible == true)
         {
             quickWindow.Hide();
