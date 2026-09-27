@@ -377,6 +377,20 @@ public class CanvasClientTests
     }
 
     [Fact]
+    public async Task ExtensionAsync_reads_the_folder_and_which_chrome_checked_in()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", """
+            {"key": "test-key-abc123", "canvas": "https://school.instructure.com", "version": "1.4", "protocol": 3,
+             "folder": "/library/chrome-extension", "folder_ready": true, "seen": "2025-09-25T17:20:00Z", "seen_version": "1.4",
+             "seen_protocol": 3, "seen_where": "another_computer", "connected": true}
+            """);
+        var e = await Client(fake).ExtensionAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(("/library/chrome-extension", true, 3), (e!.Folder, e.FolderReady, e.Protocol));
+        Assert.Equal(("2025-09-25T17:20:00Z", "1.4", 3, "another_computer", true), (e.Seen, e.SeenVersion, e.SeenProtocol, e.SeenWhere, e.Connected));
+    }
+
+    [Fact]
     public async Task FindCoursesAsync_posts_with_no_body()
     {
         var fake = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", "canvas");

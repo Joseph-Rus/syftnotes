@@ -31,7 +31,7 @@ public sealed class ByNameOrderer : ITestCaseOrderer
 /// <summary>
 /// The whole Canvas path in a real Chrome: a pretend Canvas over HTTP (<see cref="CanvasServer"/>), a library on real
 /// Kestrel with a throwaway home and classes CS 101 and BIO 110, and Chrome for Testing with the extension folder the
-/// library's "Make it" writes. Skipped unless STUDYSTASH_E2E_CHROME is set (engine/tests/extension-e2e.sh).
+/// library made by itself. Skipped unless STUDYSTASH_E2E_CHROME is set (engine/tests/extension-e2e.sh).
 /// </summary>
 [Collection("ExtensionE2E")]
 [TestCaseOrderer("StudyStash.Core.Tests.ByNameOrderer", "StudyStash.Core.Tests")]
@@ -51,6 +51,9 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         Note($"checked in {rig.SinceChrome.TotalSeconds:0.0} s after Chrome started (waited {sw.Elapsed.TotalSeconds:0.0} s here), version {seen["extension_version"]}");
         Assert.Equal(Extension.Version(), ExtensionRig.S(seen["extension_version"]));
         Assert.False(seen["extension_outdated"]?.GetValue<bool>() ?? false);
+        var about = await rig.GetAsync("/api/v2/canvas/extension");
+        Assert.True(about["folder_ready"]!.GetValue<bool>());
+        Assert.True(about["connected"]!.GetValue<bool>());
     }
 
     [ChromeFact]
@@ -102,6 +105,8 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         var found = await rig.PostAsync("/api/v2/canvas/courses", "{}");
         Note($"Find courses signed out answered in {sw.Elapsed.TotalSeconds:0.0} s: {found["error"]?.ToJsonString()}");
         Assert.Equal("Chrome isn't signed in to Canvas.", ExtensionRig.S(found["error"]));
+        // And the library now knows: the app and Settings say "Sign in to Canvas".
+        Assert.Equal("signed_out", ExtensionRig.S((await rig.GetAsync("/api/v2/canvas/state"))["state"]));
     }
 
     [ChromeFact]
@@ -136,8 +141,9 @@ public sealed class ExtensionRig : IAsyncLifetime
 
     public CanvasServer Canvas { get; private set; } = null!;
     public string Home => dir.Path;
-    /// <summary>The extension folder Chrome loaded.</summary>
-    public string Folder => Extension.Folder(Home);
+    /// <summary>The extension folder Chrome loaded: the library's own, or (with STUDYSTASH_E2E_LIBRARY_HOST) one
+    /// pointing at the library's other address, the way a laptop's is.</summary>
+    public string Folder { get; private set; } = "";
     public TimeSpan SinceChrome => sinceChrome.Elapsed;
     public string ClassDir(string cls) => store!.ClassDir(cls);
 
@@ -175,9 +181,17 @@ public sealed class ExtensionRig : IAsyncLifetime
         api = new HttpClient { BaseAddress = new Uri(libraryUrl), Timeout = TimeSpan.FromMinutes(3) };
         api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Password);
 
-        // What a student does today: type the Canvas address, then "Make it" writes the folder Chrome loads.
+        // No "Make it": the library made its folder on start, and typing the Canvas address points it there.
+        Assert.True(Extension.Ready(Extension.Folder(Home)), "the library didn't make the extension's folder on start");
         await PostAsync("/api/v2/canvas", new JsonObject { ["url"] = Canvas.Url }.ToJsonString());
-        Extension.Prepare(Folder, libraryUrl, CanvasSettings.ExtensionKey(Home), CanvasSettings.Load(Home).Url);
+        Folder = Extension.Folder(Home);
+        if (!IPAddress.IsLoopback(host))
+        {
+            // The library's own folder reaches it on 127.0.0.1, where this one isn't listening: be the laptop instead.
+            Folder = dir["laptop-extension"];
+            Extension.Ensure(Folder, libraryUrl, CanvasSettings.ExtensionKey(Home), CanvasSettings.Load(Home).Url);
+        }
+        Assert.Equal(Canvas.Url, Extension.Connection(Folder)!.Canvas);
 
         chrome = ChromeRunner.Start(Folder, dir["chrome-profile"], Canvas.Url + "/login/e2e", CanvasServer.Host);
         sinceChrome.Start();
