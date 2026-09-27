@@ -67,6 +67,8 @@ public class LibraryWebTests
         store.Enqueue(new Meeting("q1") { Title = "Waiting lecture", Date = "2026-09-04" });
         store.Enqueue(new Meeting("f1") { Title = "Broken lecture", Date = "2026-09-05" });
         Sql(cfg, $"UPDATE notes SET status='failed', error='Summary with big:35b failed: {new string('x', 200)}' WHERE id='f1'");
+        // Queued a moment apart, as they were for Python: Windows' clock can give both the same time.
+        Sql(cfg, "UPDATE notes SET updated_at='2100-01-01T00:00:00+00:00' WHERE id='q1'");
     }
 
     [Fact]
