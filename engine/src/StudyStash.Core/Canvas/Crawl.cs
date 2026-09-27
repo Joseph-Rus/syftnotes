@@ -190,6 +190,31 @@ public sealed partial class Crawl
     /// <summary>Jobs still to do, and being done.</summary>
     public (int Waiting, int Inflight) Left { get { lock (gate) return (Jobs.Count, Inflight.Count); } }
 
+    /// <summary>A class was renamed (its folder moved with it): what's remembered per class (which folder each module
+    /// and assignment has, where each file landed) answers to the new name. Refused (false) while a sync is running or
+    /// its results wait to be taken, when the class's name is in flight.</summary>
+    public bool RenameClass(string from, string to)
+    {
+        lock (gate)
+        {
+            if (Flag(data["active"]) || Flag(data["ready"]) || Jobs.Count > 0 || Inflight.Count > 0) return false;
+            foreach (var (key, value) in Manifest.ToList())
+            {
+                int colon = key.IndexOf(':');
+                if (colon < 0) continue;
+                string type = key[..colon], rest = key[(colon + 1)..];
+                // Keys are "type:class:id": the class is everything between the first colon and the numeric id.
+                if (type == "file" || !rest.StartsWith(from + ":", StringComparison.Ordinal) || !long.TryParse(rest[(from.Length + 1)..], out _)) continue;
+                Manifest.Remove(key);
+                Manifest[$"{type}:{to}:{rest[(from.Length + 1)..]}"] = value?.DeepClone();
+            }
+            foreach (var (id, cls) in Courses.ToList())
+                if (S(cls) == from) Courses[id] = to;
+            Save();
+            return true;
+        }
+    }
+
     /// <summary>Canvas asked to slow down: nothing is handed out before this. Null when the sync isn't paused.</summary>
     public DateTimeOffset? PausedUntil
     {

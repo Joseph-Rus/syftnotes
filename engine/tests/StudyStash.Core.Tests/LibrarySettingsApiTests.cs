@@ -59,6 +59,72 @@ public class LibrarySettingsApiTests
         return (JsonNode.Parse(await r.Content.ReadAsStringAsync()) as JsonObject)?["detail"]?.GetValue<string>() ?? "";
     }
 
+    /// <summary>A library whose one class is named from its Canvas course's code, with a lecture in it.</summary>
+    static (Config Cfg, Store Store) CodeNamedLibrary(TempDir dir)
+    {
+        var (cfg, store) = Library(dir);
+        cfg.Classes.Insert(0, new ClassDef("202710.TS.CSCI321.A"));
+        Configs.Save(cfg);
+        store.Save(new Meeting("m1") { Title = "Requirements", Date = "2026-09-01", Transcript = "Today." }, new Classification("202710.TS.CSCI321.A", 0.9, "folder"));
+        Canvas.CanvasSettings.Update(cfg.Home, c =>
+        {
+            c.Url = "https://school.instructure.com";
+            c.Courses = new() { ["202710.TS.CSCI321.A"] = 4206 };
+            c.Available = new() { ["4206"] = "Software Engineering" };
+            c.CourseInfo = new() { ["4206"] = new Canvas.CourseInfo("202710.TS.CSCI321.A", "Software Engineering", "Fall 2026") };
+        });
+        return (cfg, store);
+    }
+
+    [Fact]
+    public async Task The_app_previews_and_uses_Canvas_course_names_and_the_library_reads_them_back()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = CodeNamedLibrary(dir);
+        using var _s = store;
+        await using var site = await Site(cfg, store);
+
+        var preview = (await Json(await site.Client.SendAsync(Req(HttpMethod.Get, "/api/v2/settings"))))["course_names"]!;
+        Assert.Null(preview["blocked"]);
+        var only = preview["renames"]!.AsArray().Single()!;
+        Assert.Equal(("202710.TS.CSCI321.A", "Software Engineering", "CSCI 321", 1),
+            (only["from"]!.GetValue<string>(), only["to"]!.GetValue<string>(), only["code"]!.GetValue<string>(), only["lectures"]!.GetValue<int>()));
+
+        var done = await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings/course-names", new { })));
+
+        Assert.Equal("Software Engineering", done["renamed"]![0]!["to"]!.GetValue<string>());
+        Assert.Equal(1, done["lectures"]!.GetValue<int>());
+        Assert.Null(done["problem"]);
+        Assert.Empty(done["renames"]!.AsArray());
+        var lib = await Json(await site.Client.SendAsync(Req(HttpMethod.Get, "/api/v2/library")));
+        var first = lib["classes"]![0]!;
+        Assert.Equal(("Software Engineering", 1, "CSCI 321"), (first["name"]!.GetValue<string>(), first["lectures"]!.GetValue<int>(), first["code"]!.GetValue<string>()));
+        Assert.Contains("202710.TS.CSCI321.A", first["aliases"]!.AsArray().Select(a => a!.GetValue<string>()));
+        Assert.Equal("Software Engineering", store.Get("m1")!.ClassName);
+    }
+
+    [Fact]
+    public async Task The_library_page_lists_the_renames_and_does_them_when_asked()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = CodeNamedLibrary(dir);
+        using var _s = store;
+        await using var site = await Site(cfg, store);
+        await site.PostForm("/login", ("password", "pw"), ("next", "/"));
+
+        string page = await site.Text("/settings");
+        Assert.Contains("Use Canvas course names", page, StringComparison.Ordinal);
+        Assert.Contains("202710.TS.CSCI321.A → <strong>Software Engineering</strong>", page, StringComparison.Ordinal);
+        Assert.Contains("data-confirm=\"Rename 1 class to its Canvas course name?", page, StringComparison.Ordinal);
+
+        var r = await site.PostForm("/settings/course-names");
+        Assert.Equal("/settings?renamed=1#classes", r.Headers.Location!.OriginalString);
+        string after = await site.Text("/settings?renamed=1");
+        Assert.Contains("Renamed 1 class to its Canvas course name.", after, StringComparison.Ordinal);
+        Assert.DoesNotContain("→ <strong>", after, StringComparison.Ordinal);
+        Assert.Equal(["Software Engineering", "CS 101", "BIO 110"], Configs.Load(cfg.Home).ClassNames());
+    }
+
     [Fact]
     public async Task The_app_reads_everything_the_settings_page_shows()
     {

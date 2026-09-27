@@ -678,6 +678,79 @@ public sealed class Store : IDisposable
         }
     }
 
+    /// <summary>The folder a class's lectures (and its Canvas files) live in, without making it.</summary>
+    public string ClassFolder(string className) => Path.Combine(PoolDir, Notes.Slugify(className, 60));
+
+    /// <summary>
+    /// Rename a class's lectures: its folder moves whole (its notes and its Canvas files with it), and each lecture's
+    /// row and note file say the new class. Nothing is deleted or rewritten beyond the class lines. A lecture being
+    /// written right now goes back in the queue (the pipeline's result, made under the old name, is dropped) and is
+    /// written again. Throws <see cref="IOException"/> before changing anything when the new folder is already taken.
+    /// Returns how many lectures moved.
+    /// </summary>
+    public int RenameClass(string from, string to)
+    {
+        lock (gate)
+        {
+            string oldDir = ClassFolder(from), newDir = ClassFolder(to);
+            MoveFolder(oldDir, newDir);
+            var rows = Rows("SELECT * FROM notes WHERE class_name=?", from);
+            string now = Now();
+            foreach (var row in rows)
+            {
+                string? path = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
+                if (path is not null && Inside(path, oldDir)) path = Path.Combine(newDir, Path.GetRelativePath(oldDir, path));
+                if (path is not null && File.Exists(path)) RelabelNote(path, from, to);
+                bool working = row.Status == Working;
+                Exec("UPDATE notes SET class_name=?, md_path=?, status=?, updated_at=? WHERE id=?",
+                    to, path, working ? Queued : row.Status, working ? now : row.UpdatedAt, row.Id);
+            }
+            return rows.Count;
+        }
+    }
+
+    static bool Inside(string path, string dir)
+    {
+        string full = Path.GetFullPath(path), root = Path.GetFullPath(dir).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return full.StartsWith(root, OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Move a class folder to its new name. A case-only rename on a disk that ignores case goes through a
+    /// temporary name; an empty folder already at the new name is replaced; a full one stops the rename.</summary>
+    static void MoveFolder(string oldDir, string newDir)
+    {
+        if (!Directory.Exists(oldDir) || oldDir == newDir) return;
+        if (Py.SamePath(oldDir, newDir))
+        {
+            string temp = newDir + ".renaming-" + Guid.NewGuid().ToString("N")[..8];
+            Directory.Move(oldDir, temp);
+            Directory.Move(temp, newDir);
+            return;
+        }
+        if (Directory.Exists(newDir))
+        {
+            if (Directory.EnumerateFileSystemEntries(newDir).Any()) throw new IOException($"There's already a folder called {Path.GetFileName(newDir)} in the library.");
+            Directory.Delete(newDir);
+        }
+        Directory.Move(oldDir, newDir);
+    }
+
+    /// <summary>A note file's class lines (the front matter's <c>class:</c> and the line under the title) say the new class.</summary>
+    static void RelabelNote(string path, string from, string to)
+    {
+        string text = File.ReadAllText(path);
+        string eol = text.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        string updated = ReplaceFirst(text, $"{eol}class: {PyJson.Dumps(from)}{eol}", $"{eol}class: {PyJson.Dumps(to)}{eol}");
+        updated = ReplaceFirst(updated, $"class: **{from}**", $"class: **{to}**");
+        if (updated != text) File.WriteAllText(path, updated, new System.Text.UTF8Encoding(false));
+    }
+
+    static string ReplaceFirst(string text, string find, string with)
+    {
+        int at = text.IndexOf(find, StringComparison.Ordinal);
+        return at < 0 ? text : string.Concat(text.AsSpan(0, at), with, text.AsSpan(at + find.Length));
+    }
+
     public bool Delete(string noteId)
     {
         lock (gate)
