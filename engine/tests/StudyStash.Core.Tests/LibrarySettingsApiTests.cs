@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using StudyStash.Core.Ai;
+using Microsoft.AspNetCore.TestHost;
 using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
@@ -253,5 +254,24 @@ public class LibrarySettingsApiTests
 
         var r = await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings/rewrite-all", new { })));
         Assert.Equal(0, r["queued"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task The_apps_client_reads_and_changes_them_with_the_password()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        await using var site = await Site(cfg, store);
+        var lib = new RemoteLibrary("http://localhost", "pw", new HttpClient(site.App.GetTestServer().CreateHandler()));
+
+        var read = await lib.SettingsAsync(HttpMethod.Get);
+        var changed = await lib.SettingsAsync(HttpMethod.Post, "", new JsonObject { ["notes"] = new JsonObject { ["write"] = false } });
+
+        Assert.Equal("Sam's library", read!["name"]!.GetValue<string>());
+        Assert.False(changed!["notes"]!["write"]!.GetValue<bool>());
+        Assert.False(Configs.Load(cfg.Home).SummaryEnabled);
+        var wrong = new RemoteLibrary("http://localhost", "nope", new HttpClient(site.App.GetTestServer().CreateHandler()));
+        Assert.Equal(401, (await Assert.ThrowsAsync<LibraryRefusedException>(() => wrong.SettingsAsync(HttpMethod.Get))).Status);
     }
 }
