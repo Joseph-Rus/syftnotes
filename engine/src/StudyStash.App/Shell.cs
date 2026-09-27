@@ -159,8 +159,12 @@ public static partial class Shell
     {
         if (quitting) return;
         Program.Log($"[app] another copy said \"{message}\"");
-        if (message == "record" && host.Settings.SetupDone) ToggleRecording();
-        else if (!host.Settings.SetupDone) ShowSetup();
+        if (!host.Settings.SetupDone) ShowSetup();
+        else if (message == "record") ToggleRecording();
+        // "--show panel" / "--show quick": open the dropdown or the quick panel without the menu bar or the shortcut
+        // (to look at them, or when another copy of the app owns the shortcuts).
+        else if (message == "panel") TogglePanel();
+        else if (message == "quick") ToggleQuick();
         else ShowLibrary();
     }
 

@@ -44,7 +44,10 @@ static class Program
         // has nothing to show, so it just goes.
         if (!Desktop.Claim(Home))
         {
-            string? word = args.Contains("--record") ? "record" : Background ? null : "show";
+            int show = Array.IndexOf(args, "--show");
+            string? word = args.Contains("--record") ? "record"
+                : show >= 0 && show + 1 < args.Length ? args[show + 1]
+                : Background ? null : "show";
             Log(word is null ? "[app] Study Stash is already running for this folder; this copy, started at login, goes"
                 : Desktop.HandOff(Home, word) ? $"[app] Study Stash is already running for this folder: handed it \"{word}\""
                 : "[app] Study Stash is already running for this folder but didn't answer in 5 seconds; this copy goes");

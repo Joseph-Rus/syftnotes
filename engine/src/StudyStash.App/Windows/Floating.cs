@@ -42,7 +42,9 @@ public class Floating : Window
     }
 
     /// <summary>A Mac: let this window show over a full-screen app's own Space (a lecture on a full-screen Zoom
-    /// call), instead of being stuck behind it. No-op off a Mac, and in tests (no real NSWindow to ask).</summary>
+    /// call), instead of being stuck behind it, and turn off AppKit's own window shadow — for a clear window it's
+    /// traced from everything drawn, the soft shadow room included, so it would outline a box; the content draws its
+    /// own shadow. No-op off a Mac, and in tests (no real NSWindow to ask).</summary>
     void JoinFullScreenSpaces()
     {
         if (!OperatingSystem.IsMacOS()) return;
@@ -53,6 +55,7 @@ public class Floating : Window
             if (nsWindow == IntPtr.Zero) return;
             const nuint canJoinAllSpaces = 1 << 0, fullScreenAuxiliary = 1 << 8;
             objc_msgSend_setCollectionBehavior(nsWindow, sel_registerName("setCollectionBehavior:"), canJoinAllSpaces | fullScreenAuxiliary);
+            objc_msgSend_setBool(nsWindow, sel_registerName("setHasShadow:"), 0);
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -152,4 +155,7 @@ public class Floating : Window
 
     [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
     static extern void objc_msgSend_setCollectionBehavior(IntPtr receiver, IntPtr selector, nuint behavior);
+
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    static extern void objc_msgSend_setBool(IntPtr receiver, IntPtr selector, byte value);
 }
