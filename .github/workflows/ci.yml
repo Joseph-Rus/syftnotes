@@ -313,6 +313,9 @@ jobs:
   version:
     name: version
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read  # to see whether the commit before this one passed ci
     outputs:
       version: ${{ steps.v.outputs.version }}
       new: ${{ steps.v.outputs.new }}
