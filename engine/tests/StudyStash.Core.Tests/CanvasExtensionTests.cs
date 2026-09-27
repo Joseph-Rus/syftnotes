@@ -119,6 +119,18 @@ public class CanvasExtensionTests
         Assert.Contains("\"canvas\":\"http://canvas2.test:8443\"", File.ReadAllText(dir["config.js"]));
     }
 
+    [Theory]
+    [InlineData("https://mini.tail.ts.net:443", "https://canvas.test:443/", "https://mini.tail.ts.net/*", "https://canvas.test/*")]
+    [InlineData("http://mini.local:80/", "http://canvas.test:80", "http://mini.local/*", "http://canvas.test/*")]
+    [InlineData("https://mini.tail.ts.net:8443", "https://canvas.test:8443", "https://mini.tail.ts.net:8443/*", "https://canvas.test:8443/*")]
+    public void Host_permissions_leave_a_default_port_out_the_way_Chrome_matches(string library, string canvas, string libraryHost, string canvasHost)
+    {
+        using var dir = new TempDir();
+        Extension.Ensure(dir.Path, library, "k3y", canvas);
+        Assert.Equal([canvasHost, "https://*.inscloudgate.net/*", libraryHost], Hosts(dir.Path));
+        Assert.DoesNotContain(Hosts(dir.Path), h => h.Contains(":443/", StringComparison.Ordinal) || h.Contains(":80/", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Ensure_brings_a_1_3_folder_with_only_config_js_up_to_date()
     {
