@@ -43,12 +43,11 @@ public class AutostartTests
     }
 
     [Fact]
-    public void A_service_file_from_before_the_rename_still_counts_as_a_service()
+    public void Only_the_service_s_own_variable_says_it_runs_as_the_service()
     {
         Assert.False(Autostart.UnderService(_ => null));
         Assert.True(Autostart.UnderService(name => name == Autostart.ServiceEnv ? "1" : null));
-        Assert.True(Autostart.UnderService(name => name == Autostart.LegacyServiceEnv ? "1" : null));
-        Assert.False(Autostart.UnderService(name => name == Autostart.LegacyServiceEnv ? "0" : null));
+        Assert.False(Autostart.UnderService(name => name == Autostart.ServiceEnv ? "0" : null));
     }
 
     [Fact]
@@ -93,46 +92,6 @@ public class AutostartTests
         Assert.Equal(["systemctl", "--user", "disable", "--now", "study-stash-server.service"], run.Calls[^1]);
     }
 
-    /// <summary>Where a service from before the app's rename lived, for each system.</summary>
-    static (string Server, string Client) LegacyPaths(TempDir dir, string system) => system switch
-    {
-        "Darwin" => (Path.Combine(dir["agents"], "com.granola-share.server.plist"), Path.Combine(dir["agents"], "com.granola-share.client.plist")),
-        "Windows" => (Path.Combine(dir["startup"], "granola-share-server.cmd"), Path.Combine(dir["startup"], "granola-share-client.cmd")),
-        _ => (Path.Combine(dir["systemd"], "granola-share-server.service"), Path.Combine(dir["systemd"], "granola-share-client.service")),
-    };
-
-    [Theory]
-    [InlineData("Darwin")]
-    [InlineData("Windows")]
-    [InlineData("Linux")]
-    public void Installing_the_library_retires_the_services_from_before_the_rename(string system)
-    {
-        using var dir = new TempDir();
-        var places = Places(dir);
-        var (legacyServer, legacyClient) = LegacyPaths(dir, system);
-        Directory.CreateDirectory(Path.GetDirectoryName(legacyServer)!);
-        File.WriteAllText(legacyServer, "old");
-        File.WriteAllText(legacyClient, "old");
-        var run = new FakeRunner();
-        string installed = Autostart.Install("server", dir["home"], places, run.Run, Engine, system, []);
-        Assert.True(File.Exists(installed));
-        Assert.False(File.Exists(legacyServer));
-        Assert.False(File.Exists(legacyClient));
-        switch (system)
-        {
-            case "Darwin":
-                Assert.Equal(2, run.Calls.Count(c => c.Count >= 2 && c[0] == "launchctl" && c[1] == "bootout" && c[^1] != installed));
-                break;
-            case "Windows":
-                Assert.True(run.Calls.Count(c => c[0] == "powershell" && c[^1].Contains("Stop-Process")) >= 2);
-                break;
-            default:
-                Assert.Contains(run.Calls, c => c.SequenceEqual(["systemctl", "--user", "disable", "--now", "granola-share-server.service"]));
-                Assert.Contains(run.Calls, c => c.SequenceEqual(["systemctl", "--user", "disable", "--now", "granola-share-client.service"]));
-                break;
-        }
-    }
-
     [Fact]
     public void Status_and_restart()
     {
@@ -171,38 +130,23 @@ public class AutostartTests
     }
 
     /// <summary>PowerShell's -match is .NET's regex, case-insensitive: this is the test Windows itself runs.</summary>
-    static string Service(string commandLine)
-    {
-        bool client = Regex.IsMatch(commandLine, Autostart.ClientRun, RegexOptions.IgnoreCase);
-        bool server = Regex.IsMatch(commandLine, Autostart.ServerRun, RegexOptions.IgnoreCase) && !client;
-        return client ? "client" : server ? "server" : "";
-    }
+    static bool IsService(string commandLine) => Regex.IsMatch(commandLine, Autostart.ServiceRun, RegexOptions.IgnoreCase);
 
     [Fact]
-    public void Windows_tells_either_engines_services_apart_from_commands()
+    public void Windows_tells_the_service_apart_from_commands()
     {
         // `autostart install` stops the service it replaces, and `status` counts services: only a command line ending
         // in the service's own command counts, so neither ever stops or counts itself.
-        const string py = "\"C:\\Users\\x\\AppData\\Local\\Programs\\granola-share\\python\\pythonw.exe\"";
-        Assert.Equal("server", Service($"{py} \"-u\" \"-m\" \"granola_share.cli\" \"--home\" \"C:\\Users\\x\\.granola-share\" \"run\""));
-        Assert.Equal("client", Service($"{py} -u -m granola_share.cli --home C:\\x client run"));
-        Assert.Equal("client", Service($"{py} \"-u\" \"-m\" \"granola_share.cli\" \"--home\" \"C:\\x\" \"client\" \"run\""));
         const string cs = "\"C:\\Users\\x\\AppData\\Local\\Programs\\Study Stash Engine\\studystash.exe\"";
-        Assert.Equal("server", Service($"{cs} \"--home\" \"C:\\Users\\x\\.granola-share\" \"run\""));
-        Assert.Equal("server", Service("C:\\x\\StudyStash.exe --home C:\\x run"));
-        Assert.Equal("client", Service($"{cs} \"--home\" \"C:\\x\" \"client\" \"run\""));
+        Assert.True(IsService($"{cs} \"--home\" \"C:\\Users\\x\\.study-stash\" \"run\""));
+        Assert.True(IsService("C:\\x\\StudyStash.exe --home C:\\x run"));
+        Assert.True(IsService($"{cs} --home C:\\x serve"));
         // a build run as `dotnet studystash.dll`
-        Assert.Equal("server", Service("\"C:\\Program Files\\dotnet\\dotnet.exe\" \"C:\\src\\bin\\studystash.dll\" --home C:\\x run"));
-        foreach (string command in new[] { "autostart install --role server", "autostart status --role client", "doctor --role server",
-                     "client open --install --no-browser", "update" })
-        {
-            Assert.Equal("", Service($"{py} -m granola_share.cli --home C:\\x {command}"));
-            Assert.Equal("", Service($"{cs} --home C:\\x {command}"));
-        }
-        Assert.Equal("", Service("\"C:\\Program Files\\Something\\run.exe\" run")); // not ours
-        Assert.Contains(Autostart.ClientRun, Autostart.PsFilter("client"));
-        Assert.Contains($"-notmatch '{Autostart.ClientRun}'", Autostart.PsFilter("server"));
-        Assert.Contains(Autostart.PsFilter("client"), Autostart.PsFilter(null));
+        Assert.True(IsService("\"C:\\Program Files\\dotnet\\dotnet.exe\" \"C:\\src\\bin\\studystash.dll\" --home C:\\x run"));
+        foreach (string command in new[] { "autostart install --role server", "autostart status --role server", "doctor --role server", "update" })
+            Assert.False(IsService($"{cs} --home C:\\x {command}"));
+        Assert.False(IsService("\"C:\\Program Files\\Something\\run.exe\" run")); // not ours
+        Assert.Contains(Autostart.ServiceRun, Autostart.PsFilter);
     }
 
     [Fact]
@@ -261,13 +205,11 @@ public class AutostartTests
         {
             Assert.False(Machine.Run("launchctl", ["print", $"gui/{Machine.Uid()}/{Autostart.Label("server")}"], TimeSpan.FromSeconds(10)) is { ExitCode: 0 },
                 "a library service is loaded on this computer: not touching it");
-            Assert.False(Machine.Run("launchctl", ["print", $"gui/{Machine.Uid()}/com.granola-share.server"], TimeSpan.FromSeconds(10)) is { ExitCode: 0 },
-                "a library service from before the rename is loaded on this computer: not touching it");
         }
         else
         {
             var count = Machine.Run("powershell", ["-NoProfile", "-Command",
-                $"@(Get-CimInstance Win32_Process | Where-Object {{ {Autostart.PsFilter("server")} }}).Count"], TimeSpan.FromSeconds(60));
+                $"@(Get-CimInstance Win32_Process | Where-Object {{ {Autostart.PsFilter} }}).Count"], TimeSpan.FromSeconds(60));
             Assert.True(count is not null && Py.Strip(count.Stdout) == "0", "a library is running on this computer: not touching it");
         }
         string exe = BuiltEngine();

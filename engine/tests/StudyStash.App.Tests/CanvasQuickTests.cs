@@ -45,7 +45,7 @@ public class CanvasQuickTests
 
     [Theory]
     [InlineData("")]
-    [InlineData("granola")]
+    [InlineData("zebra")]
     [InlineData("osmosis")] // that item's already handed in, not something still to do
     public void Matches_nothing_else(string query)
     {

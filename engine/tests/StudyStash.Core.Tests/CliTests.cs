@@ -2,9 +2,8 @@ using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>The engine's commands: the app runs as the engine only for commands that exist, and the ones that are gone
-/// (Granola's sign-in and sync, the laptop's old watcher, the check that compared two engines' config files) open the
-/// app or print the usage instead.</summary>
+/// <summary>The engine's commands: the app runs as the engine only for commands that exist, and ones that don't (an
+/// old sign-in and sync, the laptop's old watcher, a config check) open the app or print the usage instead.</summary>
 public class CliTests
 {
     [Theory]
@@ -45,7 +44,7 @@ public class CliTests
     {
         Assert.StartsWith("usage: studystash ", Cli.Usage);
         foreach (string command in Cli.Commands) Assert.Contains(command, Cli.Usage);
-        foreach (string gone in (string[])["granola", "login", "logout", "sync", "tools", "client run", "client open", "config-check"])
+        foreach (string gone in (string[])["login", "logout", "sync", "tools", "client run", "client open", "config-check"])
             Assert.DoesNotContain(gone, Cli.Usage, StringComparison.OrdinalIgnoreCase);
     }
 }

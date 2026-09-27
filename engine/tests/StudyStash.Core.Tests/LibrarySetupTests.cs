@@ -295,13 +295,10 @@ public class LibrarySetupTests
     }
 
     [Fact]
-    public async Task No_setup_state_mentions_granola()
+    public async Task No_setup_state_offers_a_line_for_a_terminal()
     {
-        foreach (var (name, _, html) in await GoldenStates())
-        {
-            Assert.False(html.Contains("granola", StringComparison.OrdinalIgnoreCase), $"setup page, {name}, mentions Granola");
+        foreach (var (_, _, html) in await GoldenStates())
             Assert.DoesNotContain("install.sh", html); // the laptop gets the app, not a line for a terminal
-        }
     }
 
     /// <summary>The setup page in each state the fixture keeps (fresh, windows, mac-asleep, finished), as this

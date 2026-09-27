@@ -66,18 +66,9 @@ public static class Configs
     /// <summary>Where settings, recordings and the library live on this computer.</summary>
     public static string DefaultHome => HomeFor(Environment.GetEnvironmentVariable, Py.UserHome());
 
-    /// <summary>
-    /// STUDYSTASH_HOME, or GRANOLA_SHARE_HOME (what installs from before the rename set), else ~/.study-stash; but an
-    /// install from before the rename that only has ~/.granola-share keeps using it, so its lectures, passwords and
-    /// service stay where they are. Only looks: it never creates, moves or deletes a folder.
-    /// </summary>
-    internal static string HomeFor(Func<string, string?> env, string userHome)
-    {
-        foreach (string name in (string[])["STUDYSTASH_HOME", "GRANOLA_SHARE_HOME"])
-            if (env(name) is { Length: > 0 } set) return Py.ExpandUser(set);
-        string home = Path.Combine(userHome, ".study-stash"), before = Path.Combine(userHome, ".granola-share");
-        return Py.NormPath(!Directory.Exists(home) && Directory.Exists(before) ? before : home);
-    }
+    /// <summary>STUDYSTASH_HOME when it's set, else ~/.study-stash. Only looks: it never creates a folder.</summary>
+    internal static string HomeFor(Func<string, string?> env, string userHome) =>
+        env("STUDYSTASH_HOME") is { Length: > 0 } set ? Py.ExpandUser(set) : Py.NormPath(Path.Combine(userHome, ".study-stash"));
 
     /// <summary>The folder a new library keeps its lectures in: Documents/Study Stash.</summary>
     public static string DefaultPoolDir

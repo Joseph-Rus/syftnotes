@@ -1,8 +1,8 @@
 namespace StudyStash.Core.Tests;
 
 /// <summary>
-/// The library's config.toml and the laptop's client.toml: they come back byte for byte, a file from before the rename
-/// still loads, and the home folder is the one an install already has.
+/// The library's config.toml and the laptop's client.toml: they come back byte for byte, and the home folder is
+/// ~/.study-stash unless STUDYSTASH_HOME says otherwise.
 /// </summary>
 public class ConfigTests
 {
@@ -83,76 +83,21 @@ public class ConfigTests
     }
 
     [Fact]
-    public void An_old_config_still_loads_and_saves_without_granola_keys()
+    public void Home_is_study_stash_unless_the_variable_says_otherwise()
     {
         using var dir = new TempDir();
-        File.WriteAllText(dir["config.toml"], Golden.Text("config-0.4.toml"));
-        File.WriteAllText(dir["client.toml"], Golden.Text("client-0.4.toml"));
-
-        var cfg = Configs.Load(dir.Path);
-        Assert.Equal("Fall \"26\" \u2014 Caf\u00e9 \\ notes", cfg.PoolName);
-        Assert.Equal(Py.NormPath("/srv/Lecture notes"), cfg.PoolDir);
-        Assert.Equal("maple-otter", cfg.PoolPassword);
-        Assert.Equal(9000, cfg.WebPort);
-        Assert.Equal("qwen3:1.7b", cfg.OllamaModel);
-        Assert.Equal("gemma4:e4b", cfg.SummaryModel);
-        Assert.Equal(16384, cfg.SummaryMaxContext);
-        Assert.Equal(["CS 101", "Bio \U0001f9ec 110", "Calc II"], cfg.ClassNames());
-        Assert.Equal(["cs101", "intro programming"], cfg.Classes[0].Aliases);
-
-        var cc = Configs.LoadClient(dir.Path);
-        Assert.Equal("http://mini.example.ts.net:8787", cc.ServerUrl);
-        Assert.Equal("tulip 2027", cc.PoolKey);
-        Assert.Equal("Fall", cc.PoolName);
-        Assert.Equal("Sam \u2615", cc.DisplayName);
-
-        // The next save is today's file, with the same settings and none of the old keys.
-        string saved = Configs.Dump(cfg), savedClient = Configs.DumpClient(cc);
-        Assert.Equal(Native(Golden.Text("config.toml")), saved);
-        Assert.Equal(Golden.Text("client.toml"), savedClient);
-        foreach (string gone in (string[])["granola", "mcp_url", "oauth", "server_sync", "copy_transcripts", "keep_granola_notes"])
-        {
-            Assert.DoesNotContain(gone, saved, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain(gone, savedClient, StringComparison.OrdinalIgnoreCase);
-        }
-    }
-
-    [Fact]
-    public void Home_is_study_stash_unless_only_the_old_folder_exists()
-    {
-        using var dir = new TempDir();
-        static string? None(string _) => null;
-        string home = Py.NormPath(dir[".study-stash"]), before = Py.NormPath(dir[".granola-share"]);
-
-        Assert.Equal(home, Configs.HomeFor(None, dir.Path));
-        Directory.CreateDirectory(before);
-        Assert.Equal(before, Configs.HomeFor(None, dir.Path)); // an install from before the rename keeps its lectures
-        Directory.CreateDirectory(home);
-        Assert.Equal(home, Configs.HomeFor(None, dir.Path));
-
-        // It only looks: nothing is created, moved or deleted.
-        Directory.Delete(home);
-        Directory.Delete(before);
-        Assert.Equal(home, Configs.HomeFor(None, dir.Path));
-        Assert.Empty(Directory.GetFileSystemEntries(dir.Path));
-    }
-
-    [Fact]
-    public void Either_variable_sets_the_home_folder()
-    {
-        using var dir = new TempDir();
-        Directory.CreateDirectory(dir[".granola-share"]);
         Func<string, string?> Env(params (string Name, string Value)[] set) => name => set.FirstOrDefault(v => v.Name == name).Value;
-        string mine = Py.NormPath(dir["mine"]), old = Py.NormPath(dir["old"]);
+        string home = Py.NormPath(dir[".study-stash"]), mine = Py.NormPath(dir["mine"]);
 
-        Assert.Equal(mine, Configs.HomeFor(Env(("STUDYSTASH_HOME", mine), ("GRANOLA_SHARE_HOME", old)), dir.Path));
+        Assert.Equal(home, Configs.HomeFor(Env(), dir.Path));
         Assert.Equal(mine, Configs.HomeFor(Env(("STUDYSTASH_HOME", mine)), dir.Path));
-        Assert.Equal(old, Configs.HomeFor(Env(("GRANOLA_SHARE_HOME", old)), dir.Path));
-        // Set but empty counts as not set.
-        Assert.Equal(old, Configs.HomeFor(Env(("STUDYSTASH_HOME", ""), ("GRANOLA_SHARE_HOME", old)), dir.Path));
-        Assert.Equal(Py.NormPath(dir[".granola-share"]), Configs.HomeFor(Env(("STUDYSTASH_HOME", ""), ("GRANOLA_SHARE_HOME", "")), dir.Path));
+        Assert.Equal(home, Configs.HomeFor(Env(("STUDYSTASH_HOME", "")), dir.Path)); // set but empty counts as not set
+        Directory.CreateDirectory(dir[".old-app"]);
+        Assert.Equal(home, Configs.HomeFor(Env(), dir.Path)); // another folder next to it changes nothing
+
+        // It only looks: nothing is created.
+        Assert.False(Directory.Exists(home));
         Assert.False(Directory.Exists(mine));
-        Assert.False(Directory.Exists(old));
     }
 
     [Fact]
