@@ -184,7 +184,8 @@ public class CanvasConnectTests
         Assert.True(m.ChromeConnected);
         Assert.False(m.WaitingForChrome);
         Assert.Equal("Connected", m.Step2.Summary);
-        Assert.True(m.Current >= 3, "should have moved past Add to Chrome once Chrome checked in");
+        Assert.Equal("Found 4 courses.", m.CoursesSay); // straight on to finding courses, then matching them
+        Assert.Equal(4, m.Current);
         m.Dispose();
     }
 

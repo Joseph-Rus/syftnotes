@@ -391,6 +391,10 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
             }
             if (connected && Current == 2) await ChromeIsConnectedAsync();
         }
+        catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            // The library stopped answering part-way: the watch's next round tries again.
+        }
         finally
         {
             checkingChrome = false;
@@ -409,7 +413,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
             state = s;
             school = s.School.Length > 0 ? s.School : s.Url;
         }
-        await GoToAsync(Math.Max(3, DecideStep(state, [])), null, stop);
+        await GoToAsync(3, null, stop); // whatever else the library has, a Chrome that's just connected finds courses next
     }
 
     [RelayCommand]
