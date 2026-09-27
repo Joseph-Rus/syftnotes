@@ -17,8 +17,9 @@ public sealed class History(string root, Runner? run = null)
 
     public const string Trailer = "Study-Stash-By";
 
+    // Files go back exactly as they were: git never turns a lecture's line endings into Windows ones on undo.
     string? Git(params string[] args) =>
-        run(AiProvider.Which("git") ?? "git", ["-C", root, .. args], Wait) is { ExitCode: 0 } r ? r.Stdout : null;
+        run(AiProvider.Which("git") ?? "git", ["-c", "core.autocrlf=false", "-C", root, .. args], Wait) is { ExitCode: 0 } r ? r.Stdout : null;
 
     public bool Available => AiProvider.Which("git") is not null;
 
