@@ -2,36 +2,51 @@
 // The library decides what to read (assignments, submissions, modules, pages, files, or whatever a course's
 // scout asks for); this extension only fetches those Canvas URLs with the session you're already
 // signed into and hands the answers back. It never writes to Canvas, and it refuses any URL outside Canvas
-// and its file store. It checks every second or two only while the library has work queued.
-importScripts('config.js'); // STUDY_STASH = {app, key, canvas, files, protocol}, written by Study Stash
+// and its file store. It waits for work with the library (which answers as soon as there is some), and says on its
+// toolbar button when it can't reach the library or Canvas.
+importScripts('connection.js');
+try { importScripts('config.js'); } catch (e) { /* only a folder from before 1.4 needs it: config.json replaced it */ }
 
 const MAX_BYTES = 40 * 1024 * 1024;
 // What this copy of the extension does, told to the library on every visit (docs/canvas.md, "The extension"):
 // 2 = says when Chrome is signed out, passes on Canvas's rate limit, never hands over an error page or an
 // oversized file as a file, reloads itself before taking work when its folder is newer, posts files one at a time.
-const PROTOCOL = 2;
+// 3 = waits for work (wait=), says which library address it uses (a=), reloads itself when its host permissions change.
+const PROTOCOL = 3;
+// How long the library may hold a request for work, in seconds: under the 30 s Chrome allows a fetch without an answer.
+const WAIT = 20;
 // Canvas sent us to its sign-in page, or answered as if nobody were signed in. Canvas's other 401,
 // {"status":"unauthorized"}, only means this student can't see that part of the course.
 const SIGN_IN = /\/login(\/|\?|$)/;
 const UNAUTHENTICATED = /unauthenticated|user authorization required/i;
 
+// Where the library is, the extension's key and the Canvas address (connection.js): read again on every round.
+let conn = typeof STUDY_STASH !== 'undefined' ? STUDY_STASH : null;
+
 // Canvas itself, and the hosts Canvas keeps file bodies on (a download redirects there).
 function allowed(url) {
-  if (url.startsWith(STUDY_STASH.canvas + '/')) return true;
-  if (!Array.isArray(STUDY_STASH.files)) return /^https:\/\/[a-z0-9.-]+\.inscloudgate\.net\//.test(url); // a config.js from before 1.3
+  if (!conn || !conn.canvas) return false;
+  if (url.startsWith(conn.canvas + '/')) return true;
+  if (!Array.isArray(conn.files)) return /^https:\/\/[a-z0-9.-]+\.inscloudgate\.net\//.test(url); // a config.js from before 1.3
   let u;
   try { u = new URL(url); } catch (e) { return false; }
   if (u.protocol !== 'https:' || u.username || u.password || u.port) return false;
-  return STUDY_STASH.files.some(h => h.startsWith('*.') ? u.hostname.endsWith(h.slice(1)) : u.hostname === h);
+  return conn.files.some(h => h.startsWith('*.') ? u.hostname.endsWith(h.slice(1)) : u.hostname === h);
 }
 
-async function app(path, body) {
-  const r = await fetch(STUDY_STASH.app + path, {
+// The library's answer, or an error saying whether it refused this extension's key (refused) or didn't answer.
+async function app(path, body, signal) {
+  const r = await fetch(conn.app + path, {
     method: body ? 'POST' : 'GET',
-    headers: {'X-Study-Stash-Key': STUDY_STASH.key, 'Content-Type': 'application/json'},
+    headers: {'X-Study-Stash-Key': conn.key, 'Content-Type': 'application/json'},
     body: body ? JSON.stringify(body) : undefined,
+    signal,
   });
-  if (!r.ok) throw new Error(`${path}: ${r.status}`);
+  if (!r.ok) {
+    const e = new Error(`${path}: ${r.status}`);
+    e.refused = r.status === 401 || r.status === 403;
+    throw e;
+  }
   return r.json();
 }
 
@@ -47,13 +62,14 @@ function b64(buf) {
 async function viaPublicUrl(url) {
   const m = url.match(/\/files\/(\d+)\/download/);
   if (!m) throw new Error('not a Canvas file');
-  const t = await (await fetch(`${STUDY_STASH.canvas}/api/v1/files/${m[1]}/public_url`, {credentials: 'include'})).text();
+  const t = await (await fetch(`${conn.canvas}/api/v1/files/${m[1]}/public_url`, {credentials: 'include'})).text();
   const signed = JSON.parse(t.replace(/^while\(1\);/, '')).public_url;
   if (!signed || !allowed(signed)) throw new Error('no public link');
   return fetch(signed);
 }
 
 async function run(job) {
+  if (!conn || !conn.canvas) return {id: job.id, error: 'refused: Study Stash has no Canvas address yet'};
   if (!allowed(job.url)) return {id: job.id, error: 'refused: not a Canvas URL'};
   try {
     const headers = job.kind === 'json' ? {Accept: 'application/json'} : {};
@@ -89,33 +105,95 @@ async function run(job) {
   }
 }
 
-// Study Stash rewrites this folder when it updates: when the manifest there isn't the one running, reload to pick up
-// the new files. Checked before asking for work, so a reload never drops work already taken.
-async function newerOnDisk() {
+// Study Stash rewrites this folder when it updates, and when the Canvas or library address changes: when the
+// manifest there isn't the one running (another version, or other hosts it may reach), reload to pick up the new
+// files and permissions. Checked before asking for work, so a reload never drops work already taken; at most once a
+// minute, so a folder Chrome reads differently can't reload it over and over.
+const RELOAD_EVERY = 60 * 1000;
+async function needsReload() {
+  let onDisk;
   try {
-    const onDisk = await (await fetch(chrome.runtime.getURL('manifest.json'), {cache: 'no-store'})).json();
-    return !!onDisk.version && onDisk.version !== chrome.runtime.getManifest().version;
+    onDisk = await (await fetch(chrome.runtime.getURL('manifest.json'), {cache: 'no-store'})).json();
   } catch (e) {
     return false;
   }
+  const running = chrome.runtime.getManifest();
+  const hosts = m => JSON.stringify((m.host_permissions || []).slice().sort());
+  if (!onDisk || !onDisk.version || onDisk.version === running.version && hosts(onDisk) === hosts(running)) return false;
+  try {
+    // Kept in local storage: it outlives the reload it guards.
+    const got = await chrome.storage.local.get('lastReload');
+    if (got && got.lastReload && Date.now() - got.lastReload < RELOAD_EVERY) return false;
+    await chrome.storage.local.set({lastReload: Date.now()});
+  } catch (e) { /* storage unavailable: reload anyway */ }
+  return true;
+}
+
+// How this copy is doing, for the popup and the toolbar button: ok, no_config, library_refused, library_unreachable or
+// signed_out. Written only when it changes.
+let told = null;
+let signedOut = false;
+async function setStatus(state) {
+  if (state === 'ok' && signedOut) state = 'signed_out';
+  const library = conn ? conn.app : '';
+  if (told && told.state === state && told.library === library) return;
+  told = {state, library, at: new Date().toISOString()};
+  try {
+    await chrome.storage.local.set({status: told});
+    await chrome.action.setBadgeText({text: state === 'ok' ? '' : '!'});
+    await chrome.action.setTitle({title: state === 'ok' ? 'Study Stash' : 'Study Stash: ' + statusWords(told)});
+  } catch (e) { /* no toolbar button to update */ }
+}
+
+// Canvas's answers say whether Chrome is signed in: an answer that bounced to sign-in says no, a good one says yes.
+function noteCanvas(results) {
+  if (results.some(r => r.signed_out)) signedOut = true;
+  else if (results.some(r => !r.error && r.status >= 200 && r.status < 300)) signedOut = false;
+}
+
+// Asking the library again at once keeps Chrome from putting this worker to sleep: any extension call resets its timer.
+async function stayAwake() {
+  try { await chrome.storage.session.set({lastPoll: Date.now()}); } catch (e) { /* no session storage */ }
 }
 
 let running = false;
+let again = false;      // asked to sync while a request for work was waiting: ask again, with force
+let waiting = null;     // the waiting request's AbortController
 async function pump(force) {
-  if (running) return;
+  if (running) {
+    if (force) {
+      again = true;
+      if (waiting) waiting.abort();
+    }
+    return;
+  }
   running = true;
   try {
     let idle = 0;
     for (let round = 0; round < 5000; round++) {
-      if (await newerOnDisk()) { chrome.runtime.reload(); return; }
+      if (await needsReload()) { chrome.runtime.reload(); return; }
+      conn = await loadConnection();
+      if (!conn) { await setStatus('no_config'); return; }
+      const forced = force && round === 0 || again;
+      again = false;
       let work;
+      const asked = Date.now();
       try {
-        work = await app('/api/v2/canvas/work?v=' + chrome.runtime.getManifest().version + '&p=' + PROTOCOL
-                         + (force && round === 0 ? '&force=1' : ''));
-      } catch (e) { return; }
+        waiting = typeof AbortController === 'function' ? new AbortController() : null;
+        work = await app('/api/v2/canvas/work?v=' + chrome.runtime.getManifest().version + '&p=' + PROTOCOL + '&wait=' + WAIT
+                         + '&a=' + encodeURIComponent(conn.app) + (forced ? '&force=1' : ''), undefined, waiting && waiting.signal);
+      } catch (e) {
+        if (e && e.name === 'AbortError') continue; // asked to sync: ask again at once, with force
+        await setStatus(e && e.refused ? 'library_refused' : 'library_unreachable');
+        return; // the 30-second alarm tries again
+      } finally {
+        waiting = null;
+      }
+      await stayAwake();
       if (work.jobs.length) {
         idle = 0;
         const results = await Promise.all(work.jobs.map(run));
+        noteCanvas(results);
         // Answers together, but each file on its own: one big file per request stays under the library's limit.
         const files = results.filter((_, i) => work.jobs[i].kind === 'bytes');
         const rest = results.filter((_, i) => work.jobs[i].kind !== 'bytes');
@@ -123,19 +201,30 @@ async function pump(force) {
           if (rest.length) await app('/api/v2/canvas/results', {results: rest});
           for (const f of files) await app('/api/v2/canvas/results', {results: [f]});
         } catch (e) {
-          return; // the library didn't take them: it hands those jobs out again in ten minutes
+          await setStatus(e && e.refused ? 'library_refused' : 'library_unreachable');
+          return; // the library didn't take them: it hands those jobs out again
         }
+        await setStatus('ok');
         continue;
       }
+      await setStatus('ok');
+      // A library that waits for work (protocol 3) is asked again at once, unless it answered straight away with
+      // nothing: then a breath first, so a library that can't wait is never asked in a tight loop.
+      if (work.p >= 3) {
+        if (Date.now() - asked < 1000) await new Promise(r => setTimeout(r, 1500));
+        continue;
+      }
+      // An older library answers at once: check again shortly only while an agent is exploring.
       if (!work.hot || ++idle > 60) return;           // nothing queued and no agent exploring: sleep until the alarm
-      await new Promise(r => setTimeout(r, 1500));   // an agent is exploring: check again shortly
+      await new Promise(r => setTimeout(r, 1500));
     }
   } finally {
     running = false;
   }
 }
 
-function schedule() { chrome.alarms.create('sync', {periodInMinutes: 1}); }
+// Every 30 seconds (Chrome 120 and later): starts the pump again when the worker slept or the library went away.
+function schedule() { chrome.alarms.create('sync', {periodInMinutes: 0.5}); }
 chrome.runtime.onInstalled.addListener(() => { schedule(); pump(true); });
 chrome.runtime.onStartup.addListener(() => { schedule(); pump(false); });
 chrome.alarms.onAlarm.addListener(a => { if (a.name === 'sync') pump(false); });

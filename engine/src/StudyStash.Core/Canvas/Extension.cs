@@ -21,9 +21,11 @@ public static class Extension
 
     /// <summary>What the extension and the library say to each other. 2: the extension says when Chrome is signed
     /// out, passes on Canvas's rate limit, never hands over an error page or an oversized file as a file, reloads
-    /// itself before taking work when its folder is newer, and posts files one at a time. The extension sends its
-    /// own as <c>p</c>; config.js says which one the Study Stash that wrote the folder speaks.</summary>
-    public const int Protocol = 2;
+    /// itself before taking work when its folder is newer, and posts files one at a time. 3: it waits for work (the
+    /// library holds its request until there is some), says which library address it uses, and reloads itself when
+    /// its folder's host permissions change too. The extension sends its own as <c>p</c>; config.json says which one
+    /// the Study Stash that wrote the folder speaks.</summary>
+    public const int Protocol = 3;
 
     static IEnumerable<string> Files() =>
         Here.GetManifestResourceNames().Where(n => n.StartsWith("extension/", StringComparison.Ordinal)).Select(n => n["extension/".Length..]);

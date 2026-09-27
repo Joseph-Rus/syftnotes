@@ -101,10 +101,64 @@ public sealed partial class CanvasSync
             });
         // A fresh extension (installed, reloaded into a new version, or asked to sync) lost whatever its old copy had
         // taken: that goes out again now instead of in ten minutes.
-        if (force) Crawl.Requeue();
+        if (force)
+        {
+            Crawl.Requeue();
+            Agents.Requeue();
+        }
         var jobs = Agents.Take();
         if (jobs.Count == 0) jobs = Crawl.Next();
         return new CanvasWork(jobs, Agents.Hot || Crawl.Active && Crawl.PausedUntil is null, Extension.Version());
+    }
+
+    /// <summary>The longest the library holds the extension's request for work: Chrome gives up on a fetch that has
+    /// had no answer for 30 seconds.</summary>
+    public static readonly TimeSpan LongestWait = TimeSpan.FromSeconds(25);
+
+    /// <summary>While it holds a request, how often the library looks again anyway: a sync falls due by the clock, and
+    /// Canvas's pause runs out, without anyone saying so.</summary>
+    public TimeSpan LookAgainEvery { get; set; } = TimeSpan.FromSeconds(5);
+
+    readonly Wake nudged = new();
+
+    /// <summary>Someone asked for a sync (Settings, the app) or the extension's folder changed: a held request for work
+    /// answers now.</summary>
+    public void Nudge() => nudged.Raise();
+
+    /// <summary>
+    /// <see cref="Work"/>, holding the request while there's nothing to do. An extension of protocol 3 or later that
+    /// says it will <paramref name="wait"/> gets its answer as soon as there is work (an AI's read is queued, someone
+    /// asks for a sync, a sync falls due), or empty after <paramref name="wait"/> (at most <see cref="LongestWait"/>),
+    /// or when <paramref name="ct"/> ends (the request went away, the library is stopping). Older extensions ask on a
+    /// timer and are answered at once.
+    /// </summary>
+    public async Task<CanvasWork> WorkAsync(bool force, string? extVersion, int protocol, string? address, TimeSpan wait, CancellationToken ct = default)
+    {
+        Task woken = Task.WhenAny(Agents.Queued.Next, nudged.Next);
+        var work = Work(force, extVersion, protocol, address);
+        if (work.Jobs.Count > 0 || protocol < 3 || wait <= TimeSpan.Zero) return work;
+        var until = DateTime.UtcNow + (wait < LongestWait ? wait : LongestWait);
+        while (!ct.IsCancellationRequested)
+        {
+            var left = until - DateTime.UtcNow;
+            if (left <= TimeSpan.Zero) break;
+            try
+            {
+                await woken.WaitAsync(left < LookAgainEvery ? left : LookAgainEvery, ct);
+            }
+            catch (TimeoutException)
+            {
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            if (ct.IsCancellationRequested) break; // nobody left to hand work to
+            woken = Task.WhenAny(Agents.Queued.Next, nudged.Next);
+            work = Work(false, extVersion, protocol, address);
+            if (work.Jobs.Count > 0) return work;
+        }
+        return work;
     }
 
     /// <summary>The extension's answers. When the sync has everything, it's finished here.</summary>

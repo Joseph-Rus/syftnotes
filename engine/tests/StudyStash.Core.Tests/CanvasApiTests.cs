@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -436,5 +437,33 @@ public class CanvasApiTests
         Assert.Null(overview["key"]);
         foreach (string field in new[] { "canvas", "version", "protocol", "folder", "folder_ready", "seen", "seen_version", "seen_protocol", "seen_where", "connected" })
             Assert.Equal(e[field]!.ToJsonString(), overview[field]!.ToJsonString());
+    }
+
+    [Fact]
+    public async Task A_waiting_extension_is_answered_as_soon_as_someone_asks_for_a_sync()
+    {
+        var (dir, site, _) = await SyncedAsync();
+        await using var _1 = site;
+        using var _2 = dir;
+        string key = CanvasSettings.ExtensionKey(dir.Path);
+        Task<HttpResponseMessage> Ask(string query) =>
+            site.Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/api/v2/canvas/work?" + query) { Headers = { { "X-Study-Stash-Key", key } } });
+
+        // Just synced: an extension from before 1.4 is told "nothing" at once, as always.
+        var sw = Stopwatch.StartNew();
+        var old = JsonNode.Parse(await (await Ask("v=1.3&p=2")).Content.ReadAsStringAsync())!;
+        Assert.Empty(old["jobs"]!.AsArray());
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(2), $"took {sw.Elapsed}");
+
+        // A 1.4 copy waits; "Sync now" in the app answers it with the sync's first reads.
+        sw.Restart();
+        var held = Ask("v=1.4&p=3&wait=20&a=" + Uri.EscapeDataString("http://127.0.0.1:8787"));
+        await Task.Delay(300);
+        Assert.False(held.IsCompleted);
+        Assert.True((await PostAsync(site, "/api/v2/canvas", """{"sync":true}""")).IsSuccessStatusCode);
+        var work = JsonNode.Parse(await (await held.WaitAsync(TimeSpan.FromSeconds(10))).Content.ReadAsStringAsync())!;
+        Assert.NotEmpty(work["jobs"]!.AsArray());
+        Assert.Equal(3, work["p"]!.GetValue<int>());
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5), $"took {sw.Elapsed}");
     }
 }

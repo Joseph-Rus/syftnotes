@@ -39,11 +39,14 @@ public sealed partial class LibraryWeb
         EnsureHere();
 
         // The extension. It says its version (v), its protocol (p; one from before protocol 2 sends none) and, from
-        // 1.4, the library address it uses (a).
-        app.MapGet("/api/v2/canvas/work", (HttpContext ctx, int? force, string? v, int? p, string? a) =>
+        // 1.4, the library address it uses (a) and how long it will wait for work (wait, in seconds): the request is
+        // held until there's work, so an AI's read reaches Chrome in about a second. A library that's stopping
+        // lets go of it at once.
+        app.MapGet("/api/v2/canvas/work", async (HttpContext ctx, int? force, string? v, int? p, string? a, int? wait) =>
         {
             if (RequireExtension(ctx) is { } no) return no;
-            var w = Canvas.Work(force is 1, v, p ?? 1, a);
+            using var gone = CancellationTokenSource.CreateLinkedTokenSource(ctx.RequestAborted, app.Lifetime.ApplicationStopping);
+            var w = await Canvas.WorkAsync(force is 1, v, p ?? 1, a, TimeSpan.FromSeconds(Math.Clamp(wait ?? 0, 0, 60)), gone.Token);
             return Http.Json(new JsonObject
             {
                 ["jobs"] = new JsonArray(w.Jobs.Select(j => (JsonNode)new JsonObject { ["id"] = j.Id, ["url"] = j.Url, ["kind"] = j.Kind }).ToArray()),
@@ -94,6 +97,7 @@ public sealed partial class LibraryWeb
                     s.ExtensionUpdate = noted with { Dismissed = true };
             });
             if (body?["url"] is not null) EnsureHere(); // the extension may now reach the new Canvas
+            if (body?["sync"] is not null) Canvas.Nudge();
             return Http.Json(CanvasJson());
         })));
         app.MapGet("/api/v2/canvas/state", (HttpContext ctx) => Api(ctx, () => Http.Json(CanvasView.State(Canvas, Canvas.Clock()))));
@@ -242,8 +246,11 @@ public sealed partial class LibraryWeb
         try
         {
             string folder = Extension.Folder(cfg.Home);
-            if (Extension.Ensure(folder, $"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), Canvas.Settings.Url).Changed)
-                Console.WriteLine($"[canvas] the Chrome extension's folder is ready (version {Extension.Version()}): {folder}");
+            if (!Extension.Ensure(folder, $"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), Canvas.Settings.Url).Changed) return;
+            Console.WriteLine($"[canvas] the Chrome extension's folder is ready (version {Extension.Version()}): {folder}");
+            // Chrome's copy is waiting for work with the old folder's permissions: it looks at the folder now, and
+            // reloads itself into the new one.
+            Canvas.Nudge();
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -270,7 +277,6 @@ public sealed partial class LibraryWeb
             var r = await Canvas.FetchAsync(next, "json", timeout: wait);
             if (r["error"] is not null) return page == 0 ? Remember(r) : CanvasJson();
             wait = null;
-            if (r["error"] is not null) return page == 0 ? r : CanvasJson();
             foreach (var c in (JsonNode.Parse(S(r["json"])) as JsonArray ?? []).OfType<JsonObject>())
                 if (c["id"] is JsonValue id && S(c["name"]) is { Length: > 0 } name)
                 {
@@ -539,6 +545,7 @@ public sealed partial class LibraryWeb
             s.SyncNow = true;
         });
         EnsureHere(); // its Canvas address may have changed
+        Canvas.Nudge();
         return Http.SeeOther("/settings?canvas=saved#canvas");
     });
 }
