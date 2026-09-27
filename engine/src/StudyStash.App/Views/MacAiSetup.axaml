@@ -71,13 +71,7 @@
               </Grid>
             </Border>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}">
-                <MenuFlyout.ItemTemplate>
-                  <DataTemplate x:DataType="vm:EngineChoice">
-                    <MenuItem Classes="ai-item" Header="{Binding Name}" Command="{Binding Pick}" />
-                  </DataTemplate>
-                </MenuFlyout.ItemTemplate>
-              </MenuFlyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
             </Button.Flyout>
           </Button>
         </Grid>

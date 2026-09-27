@@ -451,36 +451,16 @@ public static partial class Shell
     /// panel, as it does for its own menus.</summary>
     internal static ContextMenu Menu() => new() { WindowManagerAddShadowHint = OperatingSystem.IsMacOS() };
 
-    /// <summary>The dropdown's class picker, hung under its button.</summary>
+    /// <summary>The dropdown's class picker, hung under its button: a check on what Record will do now, and a pick
+    /// changes Record's label and the line under it at once.</summary>
     static void PickClass()
     {
-        var menu = Menu();
-        var classes = host.Classes();
-        foreach (var (name, color, _) in classes)
+        var menu = ClassPicker.Build([.. host.Classes().Select(c => (c.Name, c.Color))], chosenClass, name =>
         {
-            var item = new MenuItem { Header = name, Icon = new Avalonia.Controls.Shapes.Ellipse { Width = 8, Height = 8, Fill = Skin.ClassDot(color) } };
-            item.Click += (_, _) =>
-            {
-                chosenClass = name;
-                Refresh();
-            };
-            menu.Items.Add(item);
-        }
-        if (classes.Count > 0) menu.Items.Add(new Separator());
-        var sort = new MenuItem { Header = "Let the library sort it" };
-        sort.Click += (_, _) =>
-        {
-            chosenClass = "";
+            chosenClass = name;
+            Program.Log($"[panel] class picked: {(name is null ? "follow the timetable" : name.Length == 0 ? "let the library sort it" : name)}");
             Refresh();
-        };
-        menu.Items.Add(sort);
-        var follow = new MenuItem { Header = "Follow my timetable", IsEnabled = chosenClass is not null };
-        follow.Click += (_, _) =>
-        {
-            chosenClass = null;
-            Refresh();
-        };
-        menu.Items.Add(follow);
+        });
         if (panelWindow is null) return;
         var button = panelWindow.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Command == panel.SwitchClassCommand && b.IsEffectivelyVisible);
         if (button is null)

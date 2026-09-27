@@ -580,13 +580,8 @@ public class SurfaceShots
     /// <summary>The dropdown's class picker as Shell builds it (drawn in place here: a real one is a popup window).</summary>
     internal static ContextMenu ClassMenu()
     {
-        var menu = new ContextMenu { VerticalAlignment = VerticalAlignment.Top };
-        string[] names = ["CS 101", "BIO 110", "CALC II", "HIST 210"];
-        for (int i = 0; i < names.Length; i++)
-            menu.Items.Add(new MenuItem { Header = names[i], Icon = new Avalonia.Controls.Shapes.Ellipse { Width = 8, Height = 8, Fill = Skin.ClassDot(i) } });
-        menu.Items.Add(new Separator());
-        menu.Items.Add(new MenuItem { Header = "Let the library sort it" });
-        menu.Items.Add(new MenuItem { Header = "Follow my timetable", IsEnabled = false });
+        var menu = ClassPicker.Build([("CS 101", 0), ("BIO 110", 1), ("CALC II", 2), ("HIST 210", 3)], null, _ => { });
+        menu.VerticalAlignment = VerticalAlignment.Top;
         return menu;
     }
 

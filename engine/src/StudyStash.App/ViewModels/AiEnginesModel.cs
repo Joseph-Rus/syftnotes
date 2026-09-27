@@ -6,13 +6,21 @@ using StudyStash.Core.Ai;
 
 namespace StudyStash.App.ViewModels;
 
-/// <summary>An engine in a select or a menu: what's shown, and picking it (each list makes its own <see cref="Pick"/>,
-/// so a menu's item binds it straight without reaching back to the model that built the list).</summary>
-public sealed class EngineChoice(string id, string name)
+/// <summary>An engine in a select or a menu: what's shown, picking it (each list makes its own <see cref="Pick"/>,
+/// so a menu's item binds it straight without reaching back to the model that built the list), and whether it's the
+/// one picked now (the menu's check).</summary>
+public sealed partial class EngineChoice(string id, string name) : ObservableObject
 {
     public string Id { get; } = id;
     public string Name { get; } = name;
     public IRelayCommand Pick { get; internal set; } = null!;
+    [ObservableProperty] public partial bool Current { get; set; }
+
+    /// <summary>Checks the choice whose id is <paramref name="id"/>, and only that one.</summary>
+    public static void Mark(IEnumerable<EngineChoice> choices, string id)
+    {
+        foreach (var c in choices) c.Current = c.Id == id;
+    }
 }
 
 /// <summary>One of an engine row's models, in its Options menu: picking it, and whether it's the one running now.</summary>
@@ -92,12 +100,14 @@ public sealed partial class AiEnginesModel : ObservableObject
 
     partial void OnSelectedNotesChanged(string value)
     {
+        EngineChoice.Mark(NotesChoices, value);
         OnPropertyChanged(nameof(SelectedNotesName));
         if (!loading) _ = PostDefaultsAsync(notes: value);
     }
 
     partial void OnSelectedAskChanged(string value)
     {
+        EngineChoice.Mark(AskChoices, value);
         OnPropertyChanged(nameof(SelectedAskName));
         if (!loading) _ = PostDefaultsAsync(ask: value);
     }
@@ -147,6 +157,8 @@ public sealed partial class AiEnginesModel : ObservableObject
             OnPropertyChanged(nameof(AskChoices));
             SelectedNotes = overview.Notes;
             SelectedAsk = overview.Ask;
+            EngineChoice.Mark(NotesChoices, SelectedNotes);
+            EngineChoice.Mark(AskChoices, SelectedAsk);
             Fallback = overview.Fallback;
 
             Engines.Clear();
