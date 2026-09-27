@@ -302,6 +302,62 @@ public class CanvasTests
         Assert.Equal("", CanvasSettings.Load(dir.Path).ExtensionWhere);
     }
 
+    [Fact]
+    public void Two_chromes_taking_turns_are_each_written_down_every_15_seconds_and_are_no_update()
+    {
+        // The library's own Chrome and the laptop's both run the extension, one still on 1.3. Asking in turns, each
+        // is written at most every 15 seconds (not on every visit), and 1.3 → 1.4 → 1.3 is never "updated itself".
+        using var dir = new TempDir();
+        var now = Now;
+        var sync = FakeCanvas.Library(dir, () => now);
+        CanvasSettings.Update(dir.Path, s => s.Courses.Clear());
+        const string Here = "http://127.0.0.1:8787", Laptop = "https://mini.tail.ts.net";
+
+        sync.Work(false, "1.4", 3, Here);
+        sync.Work(false, "1.3.9", 3, Laptop);
+        var written = File.GetLastWriteTimeUtc(CanvasSettings.PathIn(dir.Path));
+        Thread.Sleep(20);
+        for (int i = 1; i <= 10; i++)
+        {
+            now = Now.AddSeconds(i);
+            sync.Work(false, "1.4", 3, Here);
+            sync.Work(false, "1.3.9", 3, Laptop);
+        }
+        Assert.Equal(written, File.GetLastWriteTimeUtc(CanvasSettings.PathIn(dir.Path)));
+        var s = CanvasSettings.Load(dir.Path);
+        Assert.Null(s.ExtensionUpdate);
+        Assert.Equal(new ExtensionCopy(At(Now), "1.4", 3), s.ExtensionCopies["this_computer"]);
+        Assert.Equal(new ExtensionCopy(At(Now), "1.3.9", 3), s.ExtensionCopies["another_computer"]);
+
+        // The laptop's reloads into 1.4: that one is an update.
+        now = Now.AddSeconds(20);
+        sync.Work(false, "1.4", 3, Laptop);
+        s = CanvasSettings.Load(dir.Path);
+        Assert.Equal(new ExtensionUpdate("1.3.9", "1.4", At(now), false), s.ExtensionUpdate);
+        Assert.Equal(("1.4", "another_computer"), (s.ExtensionVersion, s.ExtensionWhere));
+    }
+
+    [Fact]
+    public void A_chrome_from_before_1_4_that_reloads_and_says_where_it_is_is_an_update()
+    {
+        // 1.3 didn't say where it is; after reloading into 1.4 it does. Same Chrome: "updated itself", and its old
+        // unplaced entry goes. A canvas.json from before copies were kept counts its one version as that Chrome's.
+        using var dir = new TempDir();
+        var sync = FakeCanvas.Library(dir, () => Now);
+        CanvasSettings.Update(dir.Path, s => s.Courses.Clear());
+        sync.Work(false, "1.3", 2);
+        sync.Work(false, "1.4", 3, "http://127.0.0.1:8787");
+        var s = CanvasSettings.Load(dir.Path);
+        Assert.Equal(new ExtensionUpdate("1.3", "1.4", At(Now), false), s.ExtensionUpdate);
+        Assert.Equal(["this_computer"], s.ExtensionCopies.Keys);
+
+        using var old = new TempDir();
+        var oldSync = FakeCanvas.Library(old, () => Now);
+        CanvasSettings.Update(old.Path, st => { st.Courses.Clear(); st.ExtensionVersion = "1.3"; st.ExtensionSeen = At(Now.AddDays(-1)); });
+        oldSync.Work(false, "1.4", 3, "http://127.0.0.1:8787");
+        Assert.Equal("1.3", CanvasSettings.Load(old.Path).ExtensionUpdate!.From);
+    }
+
     [Theory]
     [InlineData("http://127.0.0.1:8787", "this_computer")]
     [InlineData("http://localhost:8787", "this_computer")]

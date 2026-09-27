@@ -64,20 +64,32 @@ public sealed partial class CanvasSync
         string at = now.ToString("o", CultureInfo.InvariantCulture);
         string where = CanvasSettings.WhereFrom(address);
         var s = CanvasSettings.Load(home);
-        // A check-in that changes nothing but the time is written at most every 15 seconds: an extension that asks
-        // all the time would otherwise rewrite canvas.json on every visit.
-        bool news = extVersion is { Length: > 0 } && extVersion != s.ExtensionVersion || protocol != s.ExtensionProtocol || where != s.ExtensionWhere;
-        bool stale = !DateTimeOffset.TryParse(s.ExtensionSeen, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var seen)
+        // A check-in that changes nothing but the time is written at most every 15 seconds per Chrome: an extension
+        // that asks all the time (or two, the library's Chrome and the laptop's) would otherwise rewrite canvas.json on
+        // every visit.
+        var copy = s.ExtensionCopies.GetValueOrDefault(where);
+        bool news = copy is null || extVersion is { Length: > 0 } && extVersion != copy.Version || protocol != copy.Protocol;
+        bool stale = copy is null || !DateTimeOffset.TryParse(copy.Seen, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var seen)
             || now - seen >= CanvasSettings.SeenEvery || now < seen;
         if (news || stale)
             s = CanvasSettings.Update(home, st =>
             {
+                var had = st.ExtensionCopies.GetValueOrDefault(where);
+                // This Chrome's version before now: the same Chrome from before 1.4 didn't say where it is, and a
+                // canvas.json from before copies were kept has only the last one.
+                string before = had?.Version
+                    ?? (where.Length > 0 ? st.ExtensionCopies.GetValueOrDefault("")?.Version : null)
+                    ?? (st.ExtensionCopies.Count == 0 ? st.ExtensionVersion : "");
+                if (had is null && where.Length > 0) st.ExtensionCopies.Remove(""); // it says where it is now
+                string version = extVersion is { Length: > 0 } ? extVersion : had?.Version ?? "";
+                st.ExtensionCopies[where] = new ExtensionCopy(at, version, protocol);
                 st.ExtensionSeen = at;
                 st.ExtensionProtocol = protocol;
                 st.ExtensionWhere = where;
-                if (extVersion is not { Length: > 0 } || extVersion == st.ExtensionVersion) return;
-                // Chrome reloaded a newer copy from the folder Study Stash keeps up to date: worth a word, once.
-                if (Extension.IsOlder(st.ExtensionVersion, extVersion)) st.ExtensionUpdate = new ExtensionUpdate(st.ExtensionVersion, extVersion, at, false);
+                if (extVersion is not { Length: > 0 }) return;
+                // Chrome reloaded a newer copy from the folder Study Stash keeps up to date: worth a word, once. Two
+                // Chromes on different versions taking turns aren't an update.
+                if (before.Length > 0 && Extension.IsOlder(before, extVersion)) st.ExtensionUpdate = new ExtensionUpdate(before, extVersion, at, false);
                 st.ExtensionVersion = extVersion;
             });
         if (protocol < 1) return new CanvasWork([], false, Extension.Version()); // nothing this library knows how to hand it

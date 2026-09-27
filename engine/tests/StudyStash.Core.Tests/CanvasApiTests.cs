@@ -435,12 +435,15 @@ public class CanvasApiTests
         now = now.AddMinutes(2);
         e = await GetAsync(site, "/api/v2/canvas/extension");
         Assert.Equal(("another_computer", false), (e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
+        // Both Chromes are listed.
+        Assert.Equal(["another_computer", "this_computer"], e["copies"]!.AsArray().Select(c => c!["where"]!.GetValue<string>()).Order());
+        Assert.All(e["copies"]!.AsArray(), c => Assert.Equal(("1.4", 3, false), (c!["version"]!.GetValue<string>(), c["protocol"]!.GetValue<int>(), c["connected"]!.GetValue<bool>())));
 
         // The overview has the same, without the key.
         var overview = (await GetAsync(site, "/api/v2/canvas"))["extension"]!.AsObject();
         Assert.Null(overview["key"]);
         Assert.Null(overview["connection_code"]); // it holds the key
-        foreach (string field in new[] { "canvas", "version", "protocol", "folder", "folder_ready", "seen", "seen_version", "seen_protocol", "seen_where", "connected" })
+        foreach (string field in new[] { "canvas", "version", "protocol", "folder", "folder_ready", "seen", "seen_version", "seen_protocol", "seen_where", "connected", "copies" })
             Assert.Equal(e[field]!.ToJsonString(), overview[field]!.ToJsonString());
     }
 

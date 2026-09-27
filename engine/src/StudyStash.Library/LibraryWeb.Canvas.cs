@@ -302,17 +302,26 @@ public sealed partial class LibraryWeb
     }
 
     /// <summary>The extension's folder here and the last Chrome that checked in, for the app's "Add to Chrome" →
-    /// "Connected" (without the key; <c>/api/v2/canvas/extension</c> adds it).</summary>
+    /// "Connected" (without the key; <c>/api/v2/canvas/extension</c> adds it), and every Chrome that checks in
+    /// (<c>copies</c>: this computer's and another's can both run it).</summary>
     JsonObject ExtensionJson()
     {
         var s = Canvas.Settings;
+        var now = Canvas.Clock();
         string folder = Extension.Folder(cfg.Home);
+        var copies = new JsonArray();
+        foreach (var (where, c) in s.ExtensionCopies.OrderByDescending(kv => kv.Value.Seen, StringComparer.Ordinal))
+            copies.Add(new JsonObject
+            {
+                ["where"] = where, ["seen"] = c.Seen, ["version"] = c.Version, ["protocol"] = c.Protocol,
+                ["connected"] = CanvasSettings.Connected(c.Seen, c.Protocol, now),
+            });
         return new JsonObject
         {
             ["canvas"] = s.Url, ["version"] = Extension.Version(), ["protocol"] = Extension.Protocol,
             ["folder"] = folder, ["folder_ready"] = Extension.Ready(folder),
             ["seen"] = s.ExtensionSeen, ["seen_version"] = s.ExtensionVersion, ["seen_protocol"] = s.ExtensionProtocol,
-            ["seen_where"] = s.ExtensionWhere, ["connected"] = s.ExtensionConnected(Canvas.Clock()),
+            ["seen_where"] = s.ExtensionWhere, ["connected"] = s.ExtensionConnected(now), ["copies"] = copies,
         };
     }
 
