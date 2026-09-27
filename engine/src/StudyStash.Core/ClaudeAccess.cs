@@ -7,14 +7,19 @@ using StudyStash.Core.Ai;
 
 namespace StudyStash.Core;
 
-/// <summary>An app that registered to sign in to the library (claude.ai, or Claude Code): OAuth dynamic client
-/// registration.</summary>
+/// <summary>An app that may sign in to the library (claude.ai, or Claude Code): one that registered (OAuth dynamic
+/// client registration), or one whose client_id is the https address of a document describing it (CIMD).</summary>
 public sealed class ClaudeClient
 {
     public required string ClientId { get; init; }
+    /// <summary>What the app calls itself. Anyone can claim any name, so the sign-in page leads with <see cref="Host"/>
+    /// when there is one.</summary>
     public string Name { get; init; } = "";
     public List<string> RedirectUris { get; init; } = [];
     public double Created { get; init; }
+    /// <summary>For a CIMD client, the host its document is on (claude.ai): the one name nobody else can use.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Host { get; init; }
 }
 
 /// <summary>
@@ -32,10 +37,26 @@ public sealed class ClaudeGrant
     public string RefreshHash { get; set; } = "";
     public double Created { get; init; }
     public double LastUsed { get; set; }
+    /// <summary>The MCP address the tokens are for (RFC 8707), canonical; "" reads through any of the library's
+    /// addresses (a token from Settings, or a sign-in from before this was kept, until its next refresh).</summary>
+    public string Resource { get; set; } = "";
+    /// <summary>Where the app that signed in lives (claude.ai), for the list of connections.</summary>
+    public string ClientHost { get; set; } = "";
+    /// <summary>When the refresh token stops working if it isn't used (it moves on with every use); 0 before this was
+    /// kept, counted from <see cref="LastUsed"/>.</summary>
+    public double RefreshExpires { get; set; }
+    /// <summary>The refresh token just replaced, still good for a moment, so a retried refresh whose answer was lost
+    /// doesn't end the sign-in.</summary>
+    public string PreviousRefreshHash { get; set; } = "";
+    public double PreviousRefreshUntil { get; set; }
 }
 
-/// <summary>An authorization code waiting to be exchanged: whose it is, where it goes, and its PKCE challenge.</summary>
-public sealed record ClaudeCode(string ClientId, string RedirectUri, string Challenge, string Resource, double Expires);
+/// <summary>An authorization code waiting to be exchanged: whose it is, where it goes (exactly as asked), its PKCE
+/// challenge, and the MCP address its tokens will be for.</summary>
+public sealed record ClaudeCode(string ClientId, string RedirectUri, string Challenge, string Resource, double Expires, string ClientName = "", string ClientHost = "");
+
+/// <summary>What /token answers when it gives no tokens: the OAuth error, and a few words on why.</summary>
+public sealed record ClaudeRefusal(string Error, string Description);
 
 /// <summary>What /token hands back.</summary>
 public sealed record ClaudeTokens(string AccessToken, string RefreshToken, int ExpiresIn);
@@ -47,7 +68,8 @@ public sealed record ClaudeTokens(string AccessToken, string RefreshToken, int E
 /// </summary>
 public sealed class ClaudeAccess
 {
-    public const double AccessSeconds = 3600, CodeSeconds = 600;
+    public const double AccessSeconds = 3600, CodeSeconds = 300, RefreshIdleSeconds = 30 * 86400, RefreshGraceSeconds = 60;
+    public const int MaxRedirects = 10, MaxRedirectLength = 2000;
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
     sealed class State
@@ -71,6 +93,12 @@ public sealed class ClaudeAccess
     readonly List<double> failures = [];
     State state;
     DateTime loadedAt;
+
+    /// <summary>Reads a CIMD client's document. Tests always pass a fake: the real one reaches the internet.</summary>
+    public Func<Uri, CancellationToken, Task<string?>> FetchClientDocument { get; init; } = (url, ct) =>
+        Environment.GetEnvironmentVariable("STUDYSTASH_TESTS") == "1"
+            ? throw new InvalidOperationException("A test tried to fetch a client document from the internet; give ClaudeAccess a fake.")
+            : ClientDocuments.Shared.FetchAsync(url, ct);
 
     public ClaudeAccess(string home, Func<DateTimeOffset>? clock = null)
     {
@@ -158,8 +186,8 @@ public sealed class ClaudeAccess
         }
     }
 
-    /// <summary>Off stops every connected tool at once (<see cref="Check"/> answers null while it's off), without
-    /// forgetting who's connected.</summary>
+    /// <summary>Off stops every connected tool at once, without forgetting who's connected (the MCP door refuses
+    /// while it's off; <see cref="Check"/> still says whose a token is).</summary>
     public bool ToolsOn
     {
         get
@@ -215,6 +243,8 @@ public sealed class ClaudeAccess
     {
         var uris = redirectUris.ToList();
         if (uris.Count == 0 || !uris.All(GoodRedirect)) throw new ArgumentException("redirect_uris must be https, or http on localhost");
+        if (uris.Count > MaxRedirects || uris.Any(u => u.Length > MaxRedirectLength))
+            throw new ArgumentException($"At most {MaxRedirects} redirect_uris, each under {MaxRedirectLength} characters");
         var client = new ClaudeClient { ClientId = "ssc_" + Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12)), Name = name.Trim(), RedirectUris = uris, Created = Now };
         lock (gate)
         {
@@ -229,6 +259,7 @@ public sealed class ClaudeAccess
         return client;
     }
 
+    /// <summary>A client that registered here.</summary>
     public ClaudeClient? Client(string clientId)
     {
         lock (gate)
@@ -236,6 +267,66 @@ public sealed class ClaudeAccess
             Fresh();
             return state.Clients.FirstOrDefault(c => c.ClientId == clientId);
         }
+    }
+
+    /// <summary>A client_id that is the address of a client metadata document (CIMD): https, with a path, and nothing
+    /// that could make two addresses mean one document.</summary>
+    public static bool IsDocumentClientId(string clientId) =>
+        clientId.StartsWith("https://", StringComparison.Ordinal)
+        && Uri.TryCreate(clientId, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps
+        && u.AbsolutePath.Length > 1 && u.Fragment.Length == 0 && u.UserInfo.Length == 0
+        && !clientId.Contains("/./", StringComparison.Ordinal) && !clientId.Contains("/../", StringComparison.Ordinal)
+        && !clientId.EndsWith("/.", StringComparison.Ordinal) && !clientId.EndsWith("/..", StringComparison.Ordinal);
+
+    /// <summary>Whether /token knows this client: one that registered, or a CIMD client (which can only hold a code
+    /// or a sign-in once its document checked out).</summary>
+    public bool KnownClient(string clientId) => IsDocumentClientId(clientId) || Client(clientId) is not null;
+
+    /// <summary>The client asking to sign in, from the store or from its document; or, in plain words, why not.</summary>
+    public async Task<(ClaudeClient? Client, string? Problem)> ClientForAsync(string clientId, CancellationToken ct = default)
+    {
+        if (!IsDocumentClientId(clientId))
+            return Client(clientId) is { } registered ? (registered, null)
+                : (null, "This sign-in link isn't one Study Stash knows. Start again from Claude.");
+        var url = new Uri(clientId);
+        string host = url.IdnHost.ToLowerInvariant();
+        string? text = await FetchClientDocument(url, ct);
+        if (text is null) return (null, $"Study Stash couldn't read the app's details from {host}. Try again in a minute, or start again from Claude.");
+        System.Text.Json.Nodes.JsonObject? doc;
+        try
+        {
+            doc = System.Text.Json.Nodes.JsonNode.Parse(text) as System.Text.Json.Nodes.JsonObject;
+        }
+        catch (JsonException)
+        {
+            doc = null;
+        }
+        string? Str(string key) => doc?[key] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue(out string? x) ? x : null;
+        string bad = $"The app's details at {host} aren't right, so Study Stash won't sign it in. Start again from Claude.";
+        if (doc is null || Str("client_id") != clientId) return (null, bad);
+        var uris = (doc["redirect_uris"] as System.Text.Json.Nodes.JsonArray ?? []).Select(n => n is System.Text.Json.Nodes.JsonValue v && v.TryGetValue(out string? x) ? x : "").ToList();
+        if (uris.Count == 0 || !uris.All(GoodRedirect)) return (null, bad);
+        if (doc["token_endpoint_auth_method"] is not null && Str("token_endpoint_auth_method") != "none") return (null, bad);
+        string name = (Str("client_name") ?? "").Trim();
+        return (new ClaudeClient { ClientId = clientId, Name = name.Length > 0 ? Py.Head(name, 80) : host, RedirectUris = uris, Created = Now, Host = host }, null);
+    }
+
+    static readonly string[] Loopbacks = ["localhost", "127.0.0.1", "[::1]"];
+
+    static string HostOf(Uri u) => u.HostNameType == UriHostNameType.IPv6 && !u.IdnHost.StartsWith('[') ? $"[{u.IdnHost}]" : u.IdnHost.ToLowerInvariant();
+
+    /// <summary>Whether a sign-in may go back to <paramref name="requested"/>, given a redirect the client listed: the
+    /// same address exactly, or, for an app on this computer (Claude Code's callback), the same loopback host and path
+    /// on any port, since it listens wherever a port is free (RFC 8252 §7.3).</summary>
+    public static bool RedirectMatches(string registered, string requested)
+    {
+        if (string.Equals(registered, requested, StringComparison.Ordinal)) return true;
+        if (!Uri.TryCreate(registered, UriKind.Absolute, out var a) || !Uri.TryCreate(requested, UriKind.Absolute, out var b)) return false;
+        if (a.Scheme != Uri.UriSchemeHttp || b.Scheme != Uri.UriSchemeHttp || a.UserInfo.Length > 0 || b.UserInfo.Length > 0) return false;
+        if (a.Fragment.Length > 0 || b.Fragment.Length > 0) return false;
+        string ha = HostOf(a), hb = HostOf(b);
+        return ha == hb && Loopbacks.Contains(ha)
+            && string.Equals(a.AbsolutePath, b.AbsolutePath, StringComparison.Ordinal) && string.Equals(a.Query, b.Query, StringComparison.Ordinal);
     }
 
     // --- signing in -------------------------------------------------------------------------------------------------
@@ -255,55 +346,94 @@ public sealed class ClaudeAccess
         lock (gate) failures.Add(Now);
     }
 
-    public string NewCode(string clientId, string redirectUri, string challenge, string resource)
+    /// <summary>A code for a sign-in just allowed: for this client, back to the redirect exactly as asked, for the MCP
+    /// address <paramref name="resource"/>.</summary>
+    public string NewCode(ClaudeClient client, string redirectUri, string challenge, string resource)
     {
         foreach (var (k, c) in codes)
             if (c.Expires < Now) codes.TryRemove(k, out _);
         string code = NewToken("sscode_");
-        codes[code] = new ClaudeCode(clientId, redirectUri, challenge, resource, Now + CodeSeconds);
+        string host = client.Host ?? (Uri.TryCreate(redirectUri, UriKind.Absolute, out var r) && !Loopbacks.Contains(HostOf(r)) ? HostOf(r) : "");
+        codes[code] = new ClaudeCode(client.ClientId, redirectUri, challenge, resource, Now + CodeSeconds, client.Name, host);
         return code;
     }
 
     static string S256(string verifier) =>
         Convert.ToBase64String(SHA256.HashData(Encoding.ASCII.GetBytes(verifier))).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-    /// <summary>A code for tokens (once), if the client, the redirect and the PKCE verifier all match. Else the
-    /// OAuth error.</summary>
-    public (ClaudeTokens? Tokens, string? Error) Exchange(string code, string verifier, string clientId, string redirectUri)
+    /// <summary>A PKCE verifier as RFC 7636 has it: 43 to 128 unreserved characters.</summary>
+    static bool GoodVerifier(string v) =>
+        v.Length is >= 43 and <= 128 && v.All(ch => char.IsAsciiLetterOrDigit(ch) || ch is '-' or '.' or '_' or '~');
+
+    /// <summary>A code for tokens (once), if the client, the redirect and the PKCE verifier all match, and the MCP
+    /// address asked for (when one is) is the one the code is for. Else why not.</summary>
+    public (ClaudeTokens? Tokens, ClaudeRefusal? Refusal) Exchange(string code, string verifier, string clientId, string redirectUri, string? resource = null)
     {
-        if (!codes.TryRemove(code, out var c) || c.Expires < Now) return (null, "invalid_grant");
-        if (c.ClientId != clientId || c.RedirectUri != redirectUri) return (null, "invalid_grant");
-        if (verifier.Length < 43 || !CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(S256(verifier)), Encoding.ASCII.GetBytes(c.Challenge)))
-            return (null, "invalid_grant");
+        if (!codes.TryRemove(code, out var c) || c.Expires < Now) return (null, new("invalid_grant", "That sign-in code is used up or too old. Sign in again."));
+        if (c.ClientId != clientId) return (null, new("invalid_grant", "That sign-in code is for another app."));
+        if (c.RedirectUri != redirectUri) return (null, new("invalid_grant", "redirect_uri isn't the one the code was given for."));
+        if (!GoodVerifier(verifier) || !CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(S256(verifier)), Encoding.ASCII.GetBytes(c.Challenge)))
+            return (null, new("invalid_grant", "The PKCE code_verifier doesn't match."));
+        if (resource is not null && resource != c.Resource) return (null, new("invalid_target", "That isn't the address this sign-in is for."));
         string access = NewToken("ssa_"), refresh = NewToken("ssr_");
         lock (gate)
         {
             Fresh();
-            var client = state.Clients.FirstOrDefault(x => x.ClientId == clientId);
+            state.Grants.RemoveAll(g => g.Kind == "signin" && RefreshEnds(g) < Now);
             state.Grants.Add(new ClaudeGrant
             {
                 Id = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6)), Kind = "signin", ClientId = clientId,
-                Name = client?.Name is { Length: > 0 } n ? n : "Claude", AccessHash = Hash(access), AccessExpires = Now + AccessSeconds,
-                RefreshHash = Hash(refresh), Created = Now, LastUsed = Now,
+                Name = c.ClientName.Length > 0 ? c.ClientName : "Claude", AccessHash = Hash(access), AccessExpires = Now + AccessSeconds,
+                RefreshHash = Hash(refresh), RefreshExpires = Now + RefreshIdleSeconds, Created = Now, LastUsed = Now,
+                Resource = c.Resource, ClientHost = c.ClientHost,
             });
             Save();
         }
         return (new ClaudeTokens(access, refresh, (int)AccessSeconds), null);
     }
 
-    /// <summary>A refresh token for a new pair; the old refresh token stops working (rotation).</summary>
-    public (ClaudeTokens? Tokens, string? Error) Refresh(string refreshToken, string clientId)
+    static double RefreshEnds(ClaudeGrant g) => g.RefreshExpires > 0 ? g.RefreshExpires : g.LastUsed + RefreshIdleSeconds;
+
+    /// <summary>
+    /// A refresh token for a new pair (rotation). The token just replaced still works for a minute, and using it then
+    /// rotates again: an answer lost on the way (a network blip) mustn't end the sign-in, which would have the student
+    /// connect Claude again. After that minute it's refused, but the sign-in isn't ended for it either. A refresh
+    /// token unused for 30 days has run out. A sign-in from before audiences were kept is bound on its next refresh:
+    /// to <paramref name="resource"/> when asked for, else to <paramref name="here"/>.
+    /// </summary>
+    public (ClaudeTokens? Tokens, ClaudeRefusal? Refusal) Refresh(string refreshToken, string clientId, string? resource = null, string here = "")
     {
         string h = Hash(refreshToken);
         lock (gate)
         {
             Fresh();
+            bool retried = false;
             var g = state.Grants.FirstOrDefault(x => x.Kind == "signin" && x.RefreshHash == h);
-            if (g is null || (clientId.Length > 0 && g.ClientId != clientId)) return (null, "invalid_grant");
+            if (g is null && refreshToken.Length > 0)
+            {
+                g = state.Grants.FirstOrDefault(x => x.Kind == "signin" && x.PreviousRefreshHash == h && x.PreviousRefreshUntil >= Now);
+                retried = g is not null;
+            }
+            if (g is null) return (null, new("invalid_grant", "That refresh token isn't current. Sign in again."));
+            if (RefreshEnds(g) < Now)
+            {
+                state.Grants.Remove(g);
+                Save();
+                return (null, new("invalid_grant", "This sign-in wasn't used for 30 days, so it ended. Sign in again."));
+            }
+            if (clientId.Length > 0 && g.ClientId != clientId) return (null, new("invalid_grant", "That refresh token is for another app."));
+            if (resource is not null && g.Resource.Length > 0 && g.Resource != resource) return (null, new("invalid_target", "That isn't the address this sign-in is for."));
+            if (g.Resource.Length == 0) g.Resource = resource ?? here;
             string access = NewToken("ssa_"), refresh = NewToken("ssr_");
+            if (!retried)
+            {
+                g.PreviousRefreshHash = g.RefreshHash;
+                g.PreviousRefreshUntil = Now + RefreshGraceSeconds;
+            }
             g.AccessHash = Hash(access);
             g.AccessExpires = Now + AccessSeconds;
             g.RefreshHash = Hash(refresh);
+            g.RefreshExpires = Now + RefreshIdleSeconds;
             g.LastUsed = Now;
             Save();
             return (new ClaudeTokens(access, refresh, (int)AccessSeconds), null);
@@ -328,24 +458,40 @@ public sealed class ClaudeAccess
         return (token, g);
     }
 
-    /// <summary>The connection a bearer token belongs to, if it may read now. Null while tool access is off, even
-    /// for a token that would otherwise still work: that's what turns every connected tool off at once.</summary>
-    public ClaudeGrant? Check(string bearer)
+    /// <summary>The connection a bearer token belongs to, if it may read now through the MCP address
+    /// <paramref name="resource"/> (when given): known, not expired, and for that address (or for any). Whether tool
+    /// access is on is for the caller: an off switch shouldn't look like a bad token.</summary>
+    public ClaudeGrant? Check(string bearer, string? resource = null)
     {
         if (bearer.Length == 0) return null;
         string h = Hash(bearer);
         lock (gate)
         {
             Fresh();
-            if (!state.ToolsOn) return null;
             var g = state.Grants.FirstOrDefault(x => CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(x.AccessHash), Encoding.ASCII.GetBytes(h)));
             if (g is null || g.AccessExpires < Now) return null;
+            if (resource is not null && g.Resource.Length > 0 && g.Resource != resource) return null;
             if (Now - g.LastUsed > 60)
             {
                 g.LastUsed = Now;
                 Save();
             }
             return g;
+        }
+    }
+
+    /// <summary>An app signing out (RFC 7009): the connection an access or refresh token belongs to ends. Only its
+    /// own client may do that, when it says who it is. Whether anything ended isn't told.</summary>
+    public void RevokeToken(string token, string clientId = "")
+    {
+        if (token.Length == 0) return;
+        string h = Hash(token);
+        lock (gate)
+        {
+            Fresh();
+            int n = state.Grants.RemoveAll(g => (g.AccessHash == h || g.RefreshHash == h || (g.PreviousRefreshHash == h && g.PreviousRefreshUntil >= Now))
+                && (clientId.Length == 0 || g.ClientId == clientId));
+            if (n > 0) Save();
         }
     }
 

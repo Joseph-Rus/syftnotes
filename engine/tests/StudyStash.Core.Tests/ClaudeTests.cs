@@ -355,10 +355,11 @@ public class ClaudeTests
             Assert.Contains("Study Stash", mcp.ServerInstructions);
         }
 
-        // Refresh gives a new pair and retires the old refresh token; disconnecting ends it.
+        // Refresh gives a new pair and retires the old access token (the old refresh token has a minute's grace:
+        // ConnectorTests); disconnecting ends it.
         var renewed = await Json(await c.PostAsync("/token", Form(("grant_type", "refresh_token"), ("refresh_token", refresh), ("client_id", clientId))));
         Assert.NotEqual(accessToken, renewed["access_token"]!.GetValue<string>());
-        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsync("/token", Form(("grant_type", "refresh_token"), ("refresh_token", refresh), ("client_id", clientId)))).StatusCode);
+        Assert.NotEqual(refresh, renewed["refresh_token"]!.GetValue<string>());
         Assert.Null(access.Check(accessToken));
         var grant = access.Grants().Single();
         Assert.Equal("Claude", grant.Name);

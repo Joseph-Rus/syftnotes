@@ -104,15 +104,17 @@ public class AiToolAccessTests
     }
 
     [Fact]
-    public void Turning_tools_off_makes_a_working_token_check_null()
+    public void Turning_tools_off_keeps_a_working_token_known()
     {
         using var dir = new TempDir();
         var access = new ClaudeAccess(dir["home"]);
         var (token, _) = access.CreateToken("Cursor");
         Assert.NotNull(access.Check(token));
 
+        // Off is the door's to say, not a bad token: the token still checks out, so Claude isn't told to sign in again.
         access.ToolsOn = false;
-        Assert.Null(access.Check(token));
+        Assert.NotNull(access.Check(token));
+        Assert.False(new ClaudeAccess(dir["home"]).ToolsOn);
 
         access.ToolsOn = true;
         Assert.NotNull(access.Check(token));
