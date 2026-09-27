@@ -32,8 +32,12 @@ public static class Golden
 {
     static readonly Lazy<JsonObject> cases = new(() => (JsonObject)JsonNode.Parse(Text("cases.json"))!);
     static readonly Lazy<JsonObject> library = new(() => (JsonObject)JsonNode.Parse(Text("library.json"))!);
-    static readonly Lazy<JsonObject> pages = new(() => (JsonObject)JsonNode.Parse(Text("pages.json"))!);
-    static readonly Lazy<JsonObject> platform = new(() => (JsonObject)JsonNode.Parse(Text("platform.json"))!);
+    static readonly Lazy<JsonObject> pages = new(() => (JsonObject)JsonNode.Parse(ThisVersion(Text("pages.json")))!);
+    static readonly Lazy<JsonObject> platform = new(() => (JsonObject)JsonNode.Parse(ThisVersion(Text("platform.json")))!);
+
+    /// <summary>The pages and doctor's answers were recorded when the engine was 0.4.4: every "0.4.4" there is the
+    /// engine's own version (the newer and older releases in them are other numbers), so it reads as today's.</summary>
+    static string ThisVersion(string recorded) => recorded.Replace("0.4.4", Engine.Version, StringComparison.Ordinal);
 
     public static string Text(string name) =>
         new UTF8Encoding(false).GetString(File.ReadAllBytes(System.IO.Path.Combine(AppContext.BaseDirectory, "Golden", name)));
