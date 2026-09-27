@@ -46,7 +46,7 @@ public class StateShots
                 {
                     var m = SetupModel.For(skin, AppRole.Laptop);
                     m.Go(SetupStep.Library);
-                    m.Address = "http://mac-mini.tailnet-demo.ts.net:8787";
+                    m.Address = "http://mac-mini.example.ts.net:8787";
                     m.LibraryResult = "Found mac-mini on your Tailscale network. Type its password.";
                     return View(skin, m);
                 }, size: new Size(850, 608));

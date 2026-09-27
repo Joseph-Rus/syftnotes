@@ -128,6 +128,8 @@ public sealed partial class SetupModel : ObservableObject
     /// <summary>The password fields show what's typed.</summary>
     [ObservableProperty] public partial bool ShowPassword { get; set; }
     [ObservableProperty] public partial string? LibraryResult { get; set; }
+    /// <summary>The laptop's last page: "Connected to Ada's library", as a value in a list (no full stop).</summary>
+    public string LibrarySummary => LibraryResult?.TrimEnd('.') ?? "";
     /// <summary>This flow's library is ready: created here (library) or connected to (laptop).</summary>
     [ObservableProperty] public partial bool LibraryOk { get; set; }
     [ObservableProperty] public partial bool Connecting { get; set; }
@@ -152,7 +154,7 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial bool ModelReady { get; set; }
     [ObservableProperty] public partial string? ModelProblem { get; set; }
     /// <summary>The laptop's last page: the model's state in a few words.</summary>
-    public string ModelSummary => ModelReady ? "Ready" : HasModelProblem ? "Not downloaded yet" : "Still downloading; it finishes in the background";
+    public string ModelSummary => ModelReady ? "Ready" : HasModelProblem ? "Not downloaded yet" : "Downloading in the background";
 
     // Classes
     public ObservableCollection<SetupClass> Classes { get; } = [];
@@ -318,7 +320,11 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnMicHeardChanged(bool value) => OnPropertyChanged(nameof(MicLine));
 
-    partial void OnLibraryResultChanged(string? value) => OnPropertyChanged(nameof(HasLibraryResult));
+    partial void OnLibraryResultChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasLibraryResult));
+        OnPropertyChanged(nameof(LibrarySummary));
+    }
 
     partial void OnLibraryOkChanged(bool value)
     {

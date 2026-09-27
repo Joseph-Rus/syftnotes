@@ -280,7 +280,7 @@ public sealed class SetupTests
         using var home = new TempHome();
         using var host = Host(home);
         var copied = new List<string>();
-        var m = Setup.Make(host, AppRole.Library, tailscale: () => new TailscaleInfo(Installed: true, Running: true, Dns: "mac-mini.tailnet-demo.ts.net"),
+        var m = Setup.Make(host, AppRole.Library, tailscale: () => new TailscaleInfo(Installed: true, Running: true, Dns: "mac-mini.example.ts.net"),
             hostName: () => "mac-mini.local");
         m.OnCopy = copied.Add;
         m.Password = "correct-horse";
@@ -289,7 +289,7 @@ public sealed class SetupTests
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
         while (m.Addresses.Count < 2 && DateTime.UtcNow < deadline) await Task.Delay(10, TestContext.Current.CancellationToken);
 
-        Assert.Equal([new SetupAddress("At home", "http://mac-mini.local:8787"), new SetupAddress("With Tailscale", "http://mac-mini.tailnet-demo.ts.net:8787")],
+        Assert.Equal([new SetupAddress("At home", "http://mac-mini.local:8787"), new SetupAddress("With Tailscale", "http://mac-mini.example.ts.net:8787")],
             m.Addresses);
         Assert.DoesNotContain("correct-horse", m.PasswordText); // hidden until Show
         m.ToggleShowPasswordCommand.Execute(null);

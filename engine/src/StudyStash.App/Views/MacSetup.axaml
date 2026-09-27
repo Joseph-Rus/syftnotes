@@ -283,7 +283,7 @@
                 <TextBlock Grid.Row="1" Classes="caption" Classes.here="{Binding IsLaptop}" Text="{Binding LaptopCaption}" />
                 <TextBlock Grid.Row="1" Grid.Column="2" Classes="caption" Classes.here="{Binding IsLibrary}" Text="{Binding LibraryCaption}" />
               </Grid>
-              <Grid IsVisible="{Binding Asking}" ColumnDefinitions="*,10,*" Margin="0,20,0,0" MaxWidth="440" HorizontalAlignment="Left">
+              <Grid IsVisible="{Binding Asking}" ColumnDefinitions="*,10,*" Margin="0,20,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
                 <Button Classes="choice" Classes.on="{Binding IsLaptop}" Command="{Binding ChooseLaptopCommand}" VerticalAlignment="Stretch" VerticalContentAlignment="Top">
                   <StackPanel Spacing="4">
                     <c:Icon Glyph="laptop_mac" Size="22" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
@@ -308,7 +308,7 @@
             <StackPanel IsVisible="{Binding OnPassword}">
               <TextBlock Classes="h1" Text="Give your library a password" />
               <TextBlock Classes="lede" Text="Your laptop uses it to connect. Anyone with it can read your notes." />
-              <Grid ColumnDefinitions="*,10,*" Margin="0,24,0,0" MaxWidth="440" HorizontalAlignment="Left" IsEnabled="{Binding CanEditLibrary}">
+              <Grid ColumnDefinitions="*,10,*" Margin="0,24,0,0" MaxWidth="440" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEditLibrary}">
                 <StackPanel>
                   <TextBlock Classes="label" Text="Library name" />
                   <Border Classes="field"><TextBox Classes="bare" Text="{Binding LibraryName}" PlaceholderText="Sam's library" FontSize="13" /></Border>
@@ -337,7 +337,7 @@
             <StackPanel IsVisible="{Binding OnLibrary}">
               <TextBlock Classes="h1" Text="Connect to your library" />
               <TextBlock Classes="lede" Text="Your library is the computer at home that keeps your lectures. Type the address and password its setup showed, or let Study Stash look for it." />
-              <Grid ColumnDefinitions="*,10,Auto" RowDefinitions="Auto,Auto,14,Auto,Auto" Margin="0,24,0,0" MaxWidth="440" HorizontalAlignment="Left">
+              <Grid ColumnDefinitions="*,10,Auto" RowDefinitions="Auto,Auto,14,Auto,Auto" Margin="0,24,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
                 <TextBlock Classes="label" Text="Address" />
                 <Border Grid.Row="1" Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" FontSize="13" /></Border>
                 <Button Grid.Row="1" Grid.Column="2" Classes="push fill" Command="{Binding FindCommand}" IsEnabled="{Binding !Finding}">
@@ -422,7 +422,7 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <Grid ColumnDefinitions="140,10,*,10,Auto" Margin="0,10,0,0" MaxWidth="440" HorizontalAlignment="Left">
+              <Grid ColumnDefinitions="140,10,*,10,Auto" Margin="0,10,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
                 <Border Classes="field"><TextBox Classes="bare" Text="{Binding NewClass}" PlaceholderText="CS 101" FontSize="13" /></Border>
                 <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding NewWhen}" PlaceholderText="Tue Thu 10:00–11:15" FontSize="13" /></Border>
                 <Button Grid.Column="4" Classes="push fill" Command="{Binding AddClassCommand}"><TextBlock Text="Add" FontSize="13" /></Button>
@@ -438,7 +438,7 @@
                 <Grid Classes="row" ColumnDefinitions="*,12,Auto" Height="56">
                   <StackPanel VerticalAlignment="Center" Spacing="2">
                     <TextBlock Text="Start Study Stash when I log in" FontSize="13" />
-                    <TextBlock Text="Recommended for a library. You can change it later in Settings." FontSize="12" Foreground="{DynamicResource Fg2}" />
+                    <TextBlock Text="Recommended for a library." FontSize="12" Foreground="{DynamicResource Fg2}" />
                   </StackPanel>
                   <ToggleButton Grid.Column="2" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
                 </Grid>
@@ -455,9 +455,9 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:SetupAddress">
                         <StackPanel>
-                          <Grid Classes="row" ColumnDefinitions="112,*,8,Auto">
+                          <Grid Classes="row" ColumnDefinitions="104,*,8,Auto">
                             <TextBlock Classes="key" Text="{Binding Where}" />
-                            <SelectableTextBlock Grid.Column="1" Text="{Binding Url}" FontSize="13" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Classes="value" Text="{Binding Url}" ToolTip.Tip="{Binding Url}" />
                             <Button Grid.Column="3" Classes="mini fill" Command="{Binding $parent[ItemsControl].((vm:SetupModel)DataContext).CopyCommand}" CommandParameter="{Binding Url}">
                               <TextBlock Text="Copy" />
                             </Button>
@@ -467,7 +467,7 @@
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
                   </ItemsControl>
-                  <Grid Classes="row" ColumnDefinitions="112,*,8,Auto">
+                  <Grid Classes="row" ColumnDefinitions="104,*,8,Auto">
                     <TextBlock Classes="key" Text="Password" />
                     <TextBlock Grid.Column="1" Classes="value" Text="{Binding PasswordText}" />
                     <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
@@ -486,13 +486,13 @@
               <TextBlock Classes="lede" Text="{Binding RecordHint}" />
               <Border Classes="group" Margin="0,24,0,0">
                 <StackPanel>
-                  <Grid Classes="row" ColumnDefinitions="Auto,10,140,*">
+                  <Grid Classes="row" ColumnDefinitions="Auto,10,136,*">
                     <c:Icon Glyph="check_circle" Filled="True" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2" Classes="key" Text="Your library" />
-                    <TextBlock Grid.Column="3" Classes="value" Text="{Binding LibraryResult}" />
+                    <TextBlock Grid.Column="3" Classes="value" Text="{Binding LibrarySummary}" />
                   </Grid>
                   <Border Classes="rule" />
-                  <Grid Classes="row" ColumnDefinitions="Auto,10,140,*">
+                  <Grid Classes="row" ColumnDefinitions="Auto,10,136,*">
                     <Panel Width="16">
                       <c:Icon IsVisible="{Binding ModelReady}" Glyph="check_circle" Filled="True" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
                       <c:Icon IsVisible="{Binding !ModelReady}" Glyph="hourglass_top" Size="16" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />

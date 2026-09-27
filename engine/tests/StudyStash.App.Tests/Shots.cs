@@ -463,7 +463,7 @@ public class SurfaceShots
         m.ModelDone = "1.9 GB of 3.1 GB";
         m.ModelLeft = "About 4 minutes left";
         m.Addresses.Add(new SetupAddress("At home", "http://mac-mini.local:8787"));
-        m.Addresses.Add(new SetupAddress("With Tailscale", "http://mac-mini.tailnet-demo.ts.net:8787"));
+        m.Addresses.Add(new SetupAddress("With Tailscale", "http://mac-mini.example.ts.net:8787"));
         if (step > SetupStep.Library)
         {
             m.LibraryOk = true;
