@@ -25,7 +25,12 @@ static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        if (StudyStash.Library.Cli.IsCommand(args)) return StudyStash.Library.Cli.RunAsync(args).GetAwaiter().GetResult();
+        if (StudyStash.Library.Cli.IsCommand(args))
+        {
+            // The library this app runs starts at login the way the app does: its login item, only when asked.
+            StudyStash.Library.Cli.LoginItems = home => new(() => Desktop.StartsAtLogin(home), on => Desktop.StartAtLogin(on, home));
+            return StudyStash.Library.Cli.RunAsync(args).GetAwaiter().GetResult();
+        }
         int at = Array.IndexOf(args, "--home");
         if (at >= 0 && at + 1 < args.Length) Home = Path.GetFullPath(Py.ExpandUser(args[at + 1]));
         Background = args.Contains("--background");

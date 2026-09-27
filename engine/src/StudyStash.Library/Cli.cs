@@ -23,6 +23,10 @@ public static class Cli
         + "       | mcp   (the MCP server for Claude, over stdin and stdout)\n"
         + "       | ai [use PROVIDER [--job notes|sort|ask|agent] [--model M] | test [PROVIDER] | ask QUESTION]   (each takes --home DIR)";
 
+    /// <summary>The app's login item for a settings folder, handed in by the app's own Main: the library it runs then
+    /// lets Settings (on this computer or a laptop) turn starting at login on and off. Null: `serve` offers none.</summary>
+    public static Func<string, LoginSwitch>? LoginItems { get; set; }
+
     /// <summary>True when these arguments name a command (options may come first: <c>--home DIR run</c>).</summary>
     public static bool IsCommand(IReadOnlyList<string> args)
     {
@@ -153,6 +157,7 @@ public static class Cli
                 Apply = (rel, h) => Updates.ApplyAsync(rel, h, UpdateHost.ThisComputer()), Claude = access, Reach = ClaudeReach.ThisComputer(),
                 AskChat = ai.Ask(() => cfg), Ai = ai, Canvas = canvas, Scout = scout, Files = fileIndex,
                 Inbox = new Inbox(cfg.PoolDir, () => cfg.ClassNames(), c => store.ClassDir(c), ai, new History(cfg.PoolDir)),
+                StartAtLogin = LoginItems?.Invoke(home),
             });
             await app.StartAsync(stop.Token);
             // Claude's door: MCP and its sign-in, on this computer only; Tailscale Serve or Funnel passes it on when that's on.

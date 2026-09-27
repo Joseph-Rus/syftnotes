@@ -1,0 +1,218 @@
+using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using StudyStash.Core;
+using StudyStash.Core.Ai;
+
+namespace StudyStash.Library;
+
+/// <summary>Starting the library when its computer starts: the app's login item there. The library alone (`serve`
+/// from a terminal) has none to offer.</summary>
+public sealed record LoginSwitch(Func<bool> IsOn, Action<bool> Set);
+
+/// <summary>
+/// /api/v2/settings: everything the library's Settings page holds, for the app, so a laptop changes its library
+/// from its own Settings and the web page is only a fallback. The name and password, the classes (other names, what
+/// each covers, its folder), writing and sorting notes and the local models, the folders it may read, how laptops
+/// reach it, starting at login on its computer, and updates. (The AI engines, AI tool access and Canvas have routes
+/// of their own.) Every call takes the laptop's key, like the rest of /api/v2.
+/// </summary>
+public sealed partial class LibraryWeb
+{
+    void MapSettings(WebApplication app)
+    {
+        app.MapGet("/api/v2/settings", Http.Handle(ctx => ApiAsync(ctx, async () => Http.Json(await SettingsJsonAsync()))));
+        app.MapPost("/api/v2/settings", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            if (body is null) return Http.Detail(422, "send the settings to change as a JSON object");
+            return ChangeSettings(body) is { } refused ? refused : Http.Json(await SettingsJsonAsync());
+        })));
+        app.MapPost("/api/v2/settings/password", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            string password = (await Http.JsonBodyAsync(ctx.Request))?["password"] is JsonValue v && v.TryGetValue(out string? p) ? p.Trim() : "";
+            if (password.Length < 4) return Http.Detail(400, "Use a password of at least 4 characters.");
+            string old = cfg.PoolPassword;
+            cfg.PoolPassword = password;
+            Configs.Save(cfg);
+            // The library's own computer reaches it with the password too: keep that working.
+            var here = Configs.LoadClient(cfg.Home);
+            if (here.ServerUrl.Length > 0 && here.PoolKey == old && old.Length > 0)
+            {
+                here.PoolKey = password;
+                Configs.SaveClient(here);
+            }
+            return Http.Json(new JsonObject { ["has_password"] = true });
+        })));
+        app.MapPost("/api/v2/settings/update", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var rel = await options.Latest(0);
+            bool updating = Updates.IsNewer(rel) && options.Apply is not null;
+            if (updating) _ = Task.Run(() => options.Apply!(rel!, cfg.Home));
+            return Http.Json(new JsonObject { ["updating"] = updating, ["latest"] = rel?.Tag });
+        })));
+        app.MapPost("/api/v2/settings/rewrite-all", (HttpContext ctx) => Api(ctx, () =>
+        {
+            int n = store.RequeueAll();
+            pipeline.Wake();
+            return Http.Json(new JsonObject { ["queued"] = n });
+        }));
+    }
+
+    async Task<JsonObject> SettingsJsonAsync()
+    {
+        var models = await options.ListModels(cfg.OllamaHost);
+        var ts = options.Tailscale();
+        var rel = await options.Latest(3600);
+        var picked = AiSettings.Load(cfg.Home);
+        var counts = store.ClassesSummary().ToDictionary(c => c.ClassName, c => c.Count);
+        bool? atLogin = null;
+        try
+        {
+            atLogin = options.StartAtLogin?.IsOn();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+        }
+        return new JsonObject
+        {
+            ["name"] = cfg.PoolName,
+            ["has_password"] = cfg.PoolPassword.Length > 0,
+            ["notes_folder"] = cfg.PoolDir,
+            ["lectures"] = counts.Values.Sum(),
+            ["classes"] = new JsonArray(cfg.Classes.Select(c => (JsonNode?)new JsonObject
+            {
+                ["name"] = c.Name, ["aliases"] = new JsonArray(c.Aliases.Select(a => (JsonNode?)a).ToArray()), ["description"] = c.Description,
+                ["folder"] = store.ClassDir(c.Name), ["lectures"] = counts.GetValueOrDefault(c.Name, 0),
+            }).ToArray()),
+            ["notes"] = new JsonObject
+            {
+                ["write"] = cfg.SummaryEnabled, ["sort"] = cfg.OllamaEnabled, ["min_confidence"] = cfg.MinConfidence, ["writer"] = NotesWriter,
+            },
+            ["ollama"] = new JsonObject
+            {
+                ["host"] = cfg.OllamaHost,
+                ["answering"] = models is not null,
+                ["models"] = new JsonArray((models ?? []).Select(m => (JsonNode?)new JsonObject { ["name"] = m.Name, ["size"] = Ollama.SizeLabel(m.SizeGb) }).ToArray()),
+                ["summary_model"] = cfg.SummaryModel,
+                ["sort_model"] = cfg.OllamaModel,
+                ["recommended"] = Ollama.RecommendedModel(options.RamGb()),
+            },
+            ["terminal"] = new JsonObject
+            {
+                ["current"] = picked.Terminal,
+                ["choices"] = new JsonArray(Terminal.Available().Select(t => (JsonNode?)new JsonObject { ["id"] = t.Id, ["name"] = t.Name }).ToArray()),
+            },
+            ["folders"] = new JsonArray(Folders.Load(cfg.Home).Select(f => (JsonNode?)new JsonObject
+            {
+                ["name"] = f.Name, ["path"] = f.Path, ["ai"] = f.Ai, ["private"] = f.Private,
+            }).ToArray()),
+            ["files"] = Files.Files,
+            ["reach"] = new JsonObject
+            {
+                ["addresses"] = new JsonArray(HostInfo.ServerUrls(cfg.WebPort, ts, options.HostName()).Select(u => (JsonNode?)u).ToArray()),
+                ["tailscale"] = ts.Running,
+                ["port"] = cfg.WebPort,
+            },
+            ["start_at_login"] = atLogin,
+            ["updates"] = new JsonObject
+            {
+                ["version"] = Engine.Version,
+                ["latest"] = rel?.Tag,
+                ["newer"] = Updates.IsNewer(rel),
+                ["page"] = rel?.Page,
+                ["auto"] = cfg.AutoUpdate,
+                ["can_update"] = options.Apply is not null,
+            },
+        };
+    }
+
+    static bool? Bool(JsonNode? node) => node is JsonValue v && v.TryGetValue(out bool b) ? b : null;
+
+    static string? Text(JsonNode? node) => node is JsonValue v && v.TryGetValue(out string? s) ? s.Trim() : null;
+
+    /// <summary>Changes what the body names and leaves the rest; null when done, or why not (nothing is changed then).</summary>
+    IResult? ChangeSettings(JsonObject body)
+    {
+        // Check everything first, so a refused change leaves the library as it was.
+        string? name = Text(body["name"]);
+        if (name is not null && (name.Length == 0 || name.Length > 80)) return Http.Detail(400, "Give the library a name (up to 80 characters).");
+        List<ClassDef>? classes = null;
+        if (body["classes"] is JsonArray list)
+        {
+            classes = [];
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in list.OfType<JsonObject>())
+            {
+                string cls = Text(item["name"]) ?? "";
+                if (cls.Length == 0) continue;
+                if (cls.Length > 60) return Http.Detail(400, $"“{cls[..20]}…” is too long for a class name (up to 60 characters).");
+                if (cls.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)) return Http.Detail(400, $"“{Configs.Unsorted}” is taken: lectures wait there to be filed.");
+                if (!seen.Add(cls)) return Http.Detail(400, $"There are two classes called {cls}.");
+                var aliases = (item["aliases"] as JsonArray)?.Select(Text).OfType<string>().Where(a => a.Length > 0).Distinct().ToList() ?? [];
+                classes.Add(new ClassDef(cls, aliases, Text(item["description"]) ?? ""));
+            }
+        }
+        double? confidence = body["notes"]?["min_confidence"] is JsonValue cv && cv.TryGetValue(out double d) && !double.IsNaN(d) ? Math.Clamp(d, 0, 1) : null;
+        string? terminal = Text(body["terminal"]);
+        if (terminal is not null && Terminal.Available().All(t => t.Id != terminal)) return Http.Detail(400, $"There's no terminal called {terminal} on the library's computer.");
+        bool? atLogin = Bool(body["start_at_login"]);
+        if (atLogin is not null && options.StartAtLogin is null)
+            return Http.Detail(409, "This library runs without the Study Stash app, so it can't start at login from here.");
+        List<ReadFolder>? folders = null;
+        if (body["folders"] is JsonArray folderList || body["add_folder"] is not null)
+        {
+            var had = Folders.Load(cfg.Home);
+            folders = body["folders"] is JsonArray given
+                ? [.. given.OfType<JsonObject>().Select(f => (Path: Text(f["path"]) ?? "", Ai: Bool(f["ai"]), Private: Bool(f["private"])))
+                    .Select(f => had.FirstOrDefault(h => h.Path == f.Path) is { } h ? h with { Ai = f.Ai ?? h.Ai, Private = f.Private ?? h.Private } : null)
+                    .OfType<ReadFolder>()]
+                : had;
+            if (Text(body["add_folder"]) is { Length: > 0 } typed)
+            {
+                string full = Path.GetFullPath(Py.ExpandUser(typed));
+                if (!Directory.Exists(full)) return Http.Detail(400, "There's no folder there on the library's computer.");
+                if (folders.All(x => Path.GetFullPath(x.Path) != full)) folders.Add(new ReadFolder(full, Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar))));
+            }
+        }
+
+        if (atLogin is { } on)
+        {
+            try
+            {
+                options.StartAtLogin!.Set(on);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException or System.Security.SecurityException)
+            {
+                return Http.Detail(409, $"The library's computer didn't let it change starting at login: {e.Message}");
+            }
+        }
+        if (name is not null) cfg.PoolName = name;
+        if (classes is not null) cfg.Classes = classes;
+        if (body["notes"] is JsonObject notes)
+        {
+            if (Bool(notes["write"]) is { } write) cfg.SummaryEnabled = write;
+            if (Bool(notes["sort"]) is { } sort) cfg.OllamaEnabled = sort;
+            if (confidence is { } c) cfg.MinConfidence = c;
+        }
+        if (body["ollama"] is JsonObject ollama)
+        {
+            if (Text(ollama["summary_model"]) is { } summary) cfg.SummaryModel = summary;
+            if (Text(ollama["sort_model"]) is { Length: > 0 } sortModel) cfg.OllamaModel = sortModel;
+        }
+        if (Bool(body["auto_update"]) is { } auto) cfg.AutoUpdate = auto;
+        Configs.Save(cfg);
+        if (terminal is not null)
+        {
+            var picked = AiSettings.Load(cfg.Home);
+            picked.Terminal = terminal;
+            picked.Save(cfg.Home);
+        }
+        if (folders is not null)
+        {
+            Folders.Save(cfg.Home, folders);
+            _ = Files.UpdateAsync(Console.WriteLine);
+        }
+        return null;
+    }
+}
