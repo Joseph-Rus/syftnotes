@@ -25,8 +25,8 @@ public sealed partial class LectureItem : ObservableObject
     [ObservableProperty] public partial bool Problem { get; set; }
 
     public bool HasProgress => Progress is not null;
-    public double ProgressWidth => (Progress ?? 0) * 140;
-    public double ProgressWidthWin => (Progress ?? 0) * 160;
+    public double ProgressWidth => (Progress ?? 0) * 120;
+    public double ProgressWidthWin => (Progress ?? 0) * 140;
 
     partial void OnProgressChanged(double? value)
     {
