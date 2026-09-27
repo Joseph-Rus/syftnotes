@@ -583,7 +583,7 @@ public class ExtensionScriptTests
         Extension.Ensure(dir.Path, "https://mini.tail.ts.net", "k3y", "https://school.instructure.com/");
         var folderHosts = JsonNode.Parse(File.ReadAllText(Path.Combine(dir.Path, "manifest.json")))!["host_permissions"]!.AsArray().Select(h => h!.GetValue<string>());
         Assert.Equal(folderHosts, JsonNode.Parse(w.Eval("JSON.stringify(originsFor(decodeCode(" + JsonSerializer.Serialize(code) + ")))").AsString())!.AsArray().Select(h => h!.GetValue<string>()));
-        Assert.Equal(Hosts, JsonNode.Parse(w.Eval("JSON.stringify(originsFor(conn))").AsString())!.AsArray().Select(h => h!.GetValue<string>()));
+        Assert.Equal(Worker.Hosts, JsonNode.Parse(w.Eval("JSON.stringify(originsFor(" + Worker.DefaultConfig + "))").AsString())!.AsArray().Select(h => h!.GetValue<string>()));
     }
 
     [Theory]
@@ -604,7 +604,7 @@ public class ExtensionScriptTests
         string stored = $$"""{"app":"http://mini.test:8787","key":"k3y","canvas":"{{Canvas}}","files":["*.inscloudgate.net"],"protocol":3}""";
         var w = new Worker(config: null, stored: stored, granted: false);
         w.Eval("pump(true)");
-        Assert.Empty(w.Fetched.Where(f => f.Url.StartsWith("http://mini.test:8787", StringComparison.Ordinal)));
+        Assert.DoesNotContain(w.Fetched, f => f.Url.StartsWith("http://mini.test:8787", StringComparison.Ordinal));
         Assert.Equal("no_access", w.Status);
         Assert.Equal("!", w.Button.Badge);
         Assert.Contains("choose Allow", w.Button.Title);
