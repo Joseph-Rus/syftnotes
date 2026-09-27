@@ -250,13 +250,16 @@ jobs:
           if ($entries.Count -ne 1) { throw "expected one uninstall entry for Study Stash, found $($entries.Count)" }
       - name: A silent update (relaunch=1) starts the app again from the same folder
         shell: pwsh
+        timeout-minutes: 5
         run: |
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
           $updateHome = "$env:RUNNER_TEMP\update-home"
           New-Item -ItemType Directory -Force -Path $updateHome | Out-Null
           Start-Process -FilePath "$app\StudyStash.exe" -ArgumentList "--home", $updateHome, "--background" | Out-Null
           Start-Sleep 3
-          Start-Process "dist\windows\Study-Stash-Library-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/relaunch=1" -Wait
+          # Wait for the installer only: -Wait would also wait for the app it relaunches, which keeps running.
+          $setup = Start-Process "dist\windows\Study-Stash-Library-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/relaunch=1" -PassThru
+          $setup.WaitForExit()
           $ok = $false
           for ($i = 0; $i -lt 30; $i++) {
             if (Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq "$app\StudyStash.exe" }) { $ok = $true; break }
@@ -266,6 +269,7 @@ jobs:
           Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Stop-Process -Force
       - name: Uninstalling removes only the app; lectures and settings stay
         shell: pwsh
+        timeout-minutes: 5
         run: |
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
           $settingsKeep = "$env:USERPROFILE\.study-stash\keep.txt"
