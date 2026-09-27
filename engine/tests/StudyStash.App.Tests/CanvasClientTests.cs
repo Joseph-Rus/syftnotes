@@ -377,6 +377,83 @@ public class CanvasClientTests
     }
 
     [Fact]
+    public async Task OverviewAsync_reads_course_info_the_way_the_library_sends_it_keyed_by_id()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", """
+            {"url": "https://school.instructure.com", "available": {"4201": "Intro to Programming", "4202": "Cell Biology"},
+             "course_info": {"4201": {"code": "COMP 101", "name": "Intro to Programming", "term": "Fall 2025"},
+                             "4202": {"code": "BIO 110", "name": "Cell Biology", "term": "Fall 2025"}}}
+            """);
+        var o = await Client(fake).FindCoursesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["4201 COMP 101", "4202 BIO 110"], o!.CourseInfo.Select(c => $"{c.Id} {c.Code}").Order());
+    }
+
+    // ---- the extension adapter (one method, both shapes the library sends) ----
+
+    const string NewShape = """
+        {"url": "https://school.instructure.com", "extension_seen": "",
+         "extension": {"connected": true, "folder": "/library-home/chrome-extension", "version": "1.4"}}
+        """;
+
+    [Fact]
+    public async Task ExtensionStatusAsync_takes_a_library_that_says_at_its_word_and_makes_a_laptops_own_folder()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", NewShape).Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var asked = new List<string>();
+
+        var s = await Client(fake).ExtensionStatusAsync((key, canvas) => { asked.Add($"{key} {canvas}"); return "/laptop-home/chrome-extension"; },
+            TestContext.Current.CancellationToken);
+
+        Assert.True(s!.Connected); // extension.connected, even though the old extension_seen is empty
+        Assert.Equal("1.4", s.Version);
+        Assert.Equal("/laptop-home/chrome-extension", s.Folder); // the library's folder is on another computer
+        Assert.Equal(["test-key-abc123 https://school.instructure.com"], asked);
+    }
+
+    [Fact]
+    public async Task ExtensionStatusAsync_uses_the_librarys_own_folder_when_the_library_is_this_computer()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", NewShape);
+        var here = new CanvasClient("http://127.0.0.1:8787", "test-key", fake.Client());
+
+        var s = await here.ExtensionStatusAsync((_, _) => throw new InvalidOperationException("nothing to make"), TestContext.Current.CancellationToken);
+
+        Assert.Equal("/library-home/chrome-extension", s!.Folder);
+        Assert.DoesNotContain(fake.Requests, r => r.Path == "/api/v2/canvas/extension");
+    }
+
+    [Fact]
+    public async Task ExtensionStatusAsync_reads_an_older_library_from_extension_seen_and_prepares_the_folder_here()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", "canvas").Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+
+        var s = await Client(fake).ExtensionStatusAsync((key, canvas) => $"/home/{key}", TestContext.Current.CancellationToken);
+
+        Assert.True(s!.Connected); // the fixture's extension_seen is set
+        Assert.Equal("1.4", s.Version);
+        Assert.Equal("/home/test-key-abc123", s.Folder);
+    }
+
+    [Fact]
+    public async Task ExtensionStatusAsync_without_prepare_writes_nothing_and_asks_only_for_the_overview()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", """{"url": "https://school.instructure.com", "extension_seen": ""}""");
+
+        var s = await Client(fake).ExtensionStatusAsync(stop: TestContext.Current.CancellationToken);
+
+        Assert.False(s!.Connected);
+        Assert.Null(s.Folder);
+        Assert.Equal("/api/v2/canvas", Assert.Single(fake.Requests).Path);
+    }
+
+    [Fact]
+    public async Task ExtensionStatusAsync_is_null_for_a_library_with_no_canvas_api()
+    {
+        Assert.Null(await Client(new FakeLibrary()).ExtensionStatusAsync(stop: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task FindCoursesAsync_posts_with_no_body()
     {
         var fake = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", "canvas");

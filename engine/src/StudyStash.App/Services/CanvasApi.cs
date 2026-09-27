@@ -87,7 +87,9 @@ public static class CanvasApi
         public IReadOnlyDictionary<string, double> Courses { get; init; } = new Dictionary<string, double>();
         /// <summary>Old key: course id (as a string) → its name.</summary>
         public IReadOnlyDictionary<string, string> Available { get; init; } = new Dictionary<string, string>();
-        public IReadOnlyList<Course> CourseInfo { get; init; } = [];
+        /// <summary>Every course Find my courses found, with its code and term. The library sends it keyed by course id
+        /// (an older fixture as a list); either reads as a list.</summary>
+        [JsonConverter(typeof(CourseInfoConverter))] public IReadOnlyList<Course> CourseInfo { get; init; } = [];
         public IReadOnlyList<ChangeRow> LastChanges { get; init; } = [];
         public int PollMinutes { get; init; }
         public string ExtensionSeen { get; init; } = "";
@@ -421,5 +423,41 @@ public static class CanvasApi
     public sealed record TextFile
     {
         public string Text { get; init; } = "";
+    }
+
+    // ---- the Chrome extension, for setup's and Settings' "Add to Chrome" ----
+
+    /// <summary>Whether a Chrome with the extension is talking to the library now, the folder to load it from on this
+    /// computer (null until one is ready), and the extension's version. Read by
+    /// <see cref="CanvasClient.ExtensionStatusAsync"/> from whichever shape the library sends.</summary>
+    public sealed record ExtensionStatus
+    {
+        public bool Connected { get; init; }
+        public string? Folder { get; init; }
+        public string? Version { get; init; }
+    }
+
+    /// <summary><c>course_info</c> as the library sends it (<c>{"4201": {"code": …, "name": …, "term": …}}</c>) or as a
+    /// list of courses: both read as a list, the key becoming each course's id.</summary>
+    public sealed class CourseInfoConverter : JsonConverter<IReadOnlyList<Course>>
+    {
+        public override IReadOnlyList<Course> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.Null:
+                    return [];
+                case JsonTokenType.StartArray:
+                    return JsonSerializer.Deserialize<List<Course>>(ref reader, options) ?? [];
+                case JsonTokenType.StartObject:
+                    var byId = JsonSerializer.Deserialize<Dictionary<string, Course>>(ref reader, options) ?? [];
+                    return [.. byId.Select(kv => kv.Value with { Id = kv.Value.Id.Length > 0 ? kv.Value.Id : kv.Key })];
+                default:
+                    throw new JsonException($"Expected course_info as an object or a list, got {reader.TokenType}.");
+            }
+        }
+
+        public override void Write(Utf8JsonWriter writer, IReadOnlyList<Course> value, JsonSerializerOptions options) =>
+            JsonSerializer.Serialize(writer, value.ToList(), options);
     }
 }
