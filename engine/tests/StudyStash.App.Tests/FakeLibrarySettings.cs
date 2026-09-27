@@ -35,6 +35,7 @@ public sealed class FakeLibrarySettings
             ("POST", "/password") => Remember(body!),
             ("POST", "/rewrite-all") => new JsonObject { ["queued"] = Settings["lectures"]!.GetValue<int>() },
             ("POST", "/update") => new JsonObject { ["updating"] = true, ["latest"] = "v0.6.0" },
+            ("POST", "/course-names") => UseCourseNames(),
             _ => null,
         };
         return Task.FromResult(answer?.DeepClone() as JsonObject);
@@ -82,6 +83,41 @@ public sealed class FakeLibrarySettings
             }
         }
         return Settings;
+    }
+
+    /// <summary>Renames every class in the preview, as the library does, and answers what it did.</summary>
+    JsonObject UseCourseNames()
+    {
+        var renames = (Settings["course_names"]?["renames"] as JsonArray ?? []).OfType<JsonObject>().ToList();
+        int lectures = 0;
+        foreach (var r in renames)
+            foreach (var c in ((JsonArray)Settings["classes"]!).OfType<JsonObject>().Where(c => c["name"]!.GetValue<string>() == r["from"]!.GetValue<string>()))
+            {
+                c["name"] = r["to"]!.DeepClone();
+                c["folder"] = "/Users/sam/Study Stash/Lecture notes/" + r["to"]!.GetValue<string>();
+                lectures += r["lectures"]!.GetValue<int>();
+            }
+        Settings["course_names"] = new JsonObject { ["blocked"] = null, ["renames"] = new JsonArray() };
+        return new JsonObject
+        {
+            ["blocked"] = null, ["renames"] = new JsonArray(), ["lectures"] = lectures, ["problem"] = null,
+            ["renamed"] = new JsonArray(renames.Select(r => (JsonNode?)new JsonObject { ["from"] = r["from"]!.DeepClone(), ["to"] = r["to"]!.DeepClone() }).ToArray()),
+        };
+    }
+
+    /// <summary>A library set up before course names: two of its classes are named from Canvas course codes.</summary>
+    public static JsonObject CodeNamed()
+    {
+        var s = Demo();
+        var classes = (JsonArray)s["classes"]!;
+        classes[0]!["name"] = "202710.TS.CSCI321.A";
+        classes[1]!["name"] = "202710.TS.ENGR401.A";
+        s["course_names"] = JsonNode.Parse("""
+            {"blocked": null, "renames": [
+              {"from": "202710.TS.CSCI321.A", "to": "Software Engineering", "code": "CSCI 321", "lectures": 18},
+              {"from": "202710.TS.ENGR401.A", "to": "Senior Design", "code": "ENGR 401", "lectures": 14}]}
+            """);
+        return s;
     }
 
     /// <summary>The design's example library: Sam's, on a Mac mini, with four classes and two folders.</summary>

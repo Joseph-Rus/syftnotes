@@ -147,6 +147,61 @@ public class LibrarySettingsModelTests
     }
 
     [AvaloniaFact]
+    public async Task Classes_named_from_course_codes_are_previewed_then_renamed_and_the_timetable_follows()
+    {
+        var fake = new FakeLibrarySettings { Settings = FakeLibrarySettings.CodeNamed() };
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        var t = host.Timetable;
+        t.Classes.Add(new TimetableClass("202710.TS.CSCI321.A", ClassTime.ParseMany("Tue Thu 10:00-11:15")!));
+        host.SaveTimetable(t);
+        model.Section = "Classes";
+        var lib = model.Lib;
+        int heard = 0;
+        lib.ClassesChanged = () => heard++;
+
+        Assert.True(lib.HasCourseNames);
+        Assert.True(lib.CanUseCourseNames);
+        Assert.Equal("2 classes are named from course codes. Their lectures move with them.", lib.CourseNamesSub);
+        Assert.Equal("Rename 2 classes", lib.RenameLabel);
+        Assert.False(lib.ConfirmingCourseNames);
+        lib.AskUseCourseNamesCommand.Execute(null);
+        Assert.True(lib.ConfirmingCourseNames); // the preview: each class, its new name, and what moves with it
+        Assert.Equal([("Software Engineering", "Now 202710.TS.CSCI321.A", "18 lectures move with it"), ("Senior Design", "Now 202710.TS.ENGR401.A", "14 lectures move with it")],
+            lib.CourseNames.Select(r => (r.To, r.Now, r.Meta)));
+        Assert.DoesNotContain(fake.Calls, c => c.Path == "/course-names"); // nothing renamed until asked
+
+        await lib.UseCourseNamesCommand.ExecuteAsync(null);
+
+        Assert.Contains(fake.Calls, c => (c.Method, c.Path) == ("POST", "/course-names"));
+        Assert.Equal("Renamed 2 classes to their Canvas course names; 32 lectures moved with them.", lib.Say);
+        Assert.Equal(["Software Engineering", "Senior Design", "HIST 210", "MATH 221"], lib.Classes.Select(c => c.Name));
+        Assert.False(lib.HasCourseNames);
+        Assert.False(lib.ConfirmingCourseNames);
+        Assert.Equal(1, heard);
+        Assert.Equal(["Software Engineering"], host.Timetable.Classes.Select(c => c.Name));
+        Assert.Equal(["Software Engineering"], Timetable.Load(home.Path).Classes.Select(c => c.Name));
+    }
+
+    [AvaloniaFact]
+    public void While_Canvas_syncs_the_rename_waits_and_says_why()
+    {
+        var fake = new FakeLibrarySettings { Settings = FakeLibrarySettings.CodeNamed() };
+        fake.Settings["course_names"]!["blocked"] = "Canvas is syncing. Try again when it's done.";
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Classes";
+
+        Assert.True(model.Lib.HasCourseNames);
+        Assert.False(model.Lib.CanUseCourseNames);
+        Assert.Equal("Canvas is syncing. Try again when it's done.", model.Lib.CourseNamesSub);
+    }
+
+    [AvaloniaFact]
     public async Task A_refused_change_goes_back_and_says_why()
     {
         var fake = new FakeLibrarySettings();

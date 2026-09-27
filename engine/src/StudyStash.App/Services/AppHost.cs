@@ -435,6 +435,13 @@ public sealed class AppHost : IDisposable, IProblemSource
                     }
                     Library = LibraryState.Connected;
                     var names = (Overview["classes"] as JsonArray ?? []).Select(c => c?["name"]?.GetValue<string>() ?? "").ToList();
+                    // A class renamed in the library keeps its old name among its other names: follow it here
+                    // before anything no longer in the library drops out of the timetable.
+                    foreach (var c in (Overview["classes"] as JsonArray ?? []).OfType<JsonObject>())
+                        foreach (var alias in (c["aliases"] as JsonArray ?? []).Select(a => a is JsonValue v && v.TryGetValue(out string? t) ? t : null).OfType<string>())
+                            if (c["name"] is JsonValue nv && nv.TryGetValue(out string? name) && name is not null && !names.Contains(alias)
+                                && (Timetable.Classes.Any(t => t.Name == alias) || Lectures.All().Any(l => l.ClassName == alias || l.FiledClass == alias)))
+                                FollowRename(alias, name);
                     lock (timetableLock)
                         if (!OlderLibrary && names.Count > 0 && Timetable.KeepOnly(names)) Timetable.Save(Home);
                 }
@@ -515,6 +522,22 @@ public sealed class AppHost : IDisposable, IProblemSource
             Problem?.Invoke("Your settings couldn't be saved", e.Message);
         }
         Changed?.Invoke();
+    }
+
+    /// <summary>A class was renamed in the library: this computer's timetable and the lectures recorded here under the
+    /// old name follow it, so Record keeps picking it and they file where it went.</summary>
+    public void FollowRename(string from, string to)
+    {
+        lock (timetableLock)
+            if (Timetable.Classes.Any(c => c.Name == from))
+                SaveTimetable(new Timetable { Classes = [.. Timetable.Classes.Select(c => c.Name == from ? c with { Name = to } : c)] });
+        foreach (var l in Lectures.All().Where(l => l.ClassName == from || l.FiledClass == from))
+            Lectures.Update(l.Id, x =>
+            {
+                if (x.ClassName == from) x.ClassName = to;
+                if (x.FiledClass == from) x.FiledClass = to;
+            });
+        log($"[app] {from} is now {to} in the library: the timetable and lectures here follow it");
     }
 
     public void SaveTimetable(Timetable t)

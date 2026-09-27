@@ -568,15 +568,19 @@ public class SurfaceShots
         // The library's own pages read the design's example library (Sam's, on a Mac mini); "Unreachable" shows the
         // Library page when it doesn't answer.
         var library = new FakeLibrarySettings { Down = section == "Unreachable" };
+        bool renaming = section == "Rename";
+        if (renaming) library.Settings = FakeLibrarySettings.CodeNamed();
         if (section == "Unreachable") section = "Library";
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
-        model.Section = section;
+        model.Section = renaming ? "Classes" : section;
+        // "Use Canvas course names", its preview open.
+        if (renaming) model.Lib.ConfirmingCourseNames = true;
         return (model, host, home);
     }
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Notes", "Folders", "Unreachable" })
+        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable" })
         {
             var (model, host, home) = MakeSettings(section);
             try

@@ -22,6 +22,15 @@ public sealed partial class LibraryClassRow : ObservableObject
     public string Meta => (Lectures == 1 ? "1 lecture" : $"{Lectures} lectures") + (Folder.Length > 0 ? " · " + Folder : "");
 }
 
+/// <summary>A class "Use Canvas course names" would rename: from its name now to its Canvas course's name.</summary>
+public sealed record CourseNameRow(string From, string To, int Lectures)
+{
+    /// <summary>"Now 202710.TS.CSCI321.A", under the new name.</summary>
+    public string Now => $"Now {From}";
+    /// <summary>"12 lectures move with it".</summary>
+    public string Meta => (Lectures == 1 ? "1 lecture" : $"{Lectures} lectures") + " move with it";
+}
+
 /// <summary>A folder the library may read: search finds files in it; the AI reads them unless it's private.</summary>
 public sealed partial class ReadFolderRow : ObservableObject
 {
@@ -155,6 +164,21 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     // Classes
     public ObservableCollection<LibraryClassRow> Classes { get; } = [];
     [ObservableProperty] public partial string NewClass { get; set; } = "";
+    /// <summary>The classes named from Canvas course codes, each with its course's name ("Use Canvas course names").</summary>
+    public ObservableCollection<CourseNameRow> CourseNames { get; } = [];
+    /// <summary>Why they can't be renamed right now ("Canvas is syncing…"), or null.</summary>
+    [ObservableProperty] public partial string? CourseNamesBlocked { get; set; }
+    /// <summary>The preview is open: the list, and Cancel / Rename.</summary>
+    [ObservableProperty] public partial bool ConfirmingCourseNames { get; set; }
+    [ObservableProperty] public partial bool RenamingClasses { get; set; }
+    /// <summary>The library renamed classes (old → new): this computer's timetable and waiting lectures follow.</summary>
+    public Action<IReadOnlyList<(string From, string To)>>? ClassesRenamed { get; set; }
+    public bool HasCourseNames => CourseNames.Count > 0;
+    public bool CanUseCourseNames => HasCourseNames && CourseNamesBlocked is null && !RenamingClasses;
+    public string CourseNamesSub => CourseNamesBlocked ?? (CourseNames.Count == 1
+        ? "1 class is named from its course code. Its lectures move with it."
+        : $"{CourseNames.Count} classes are named from course codes. Their lectures move with them.");
+    public string RenameLabel => CourseNames.Count == 1 ? "Rename 1 class" : $"Rename {CourseNames.Count} classes";
 
     // Notes and sorting
     [ObservableProperty] public partial bool WriteNotes { get; set; }
@@ -335,6 +359,8 @@ public sealed partial class LibrarySettingsModel : ObservableObject
                 for (int k = 0; k < Classes.Count; k++)
                     if (Classes[k].Folder.Length == 0 && classes[k].Folder.Length > 0) Classes[k] = classes[k];
             }
+
+            FillCourseNames(s["course_names"]);
 
             var notes = s["notes"];
             WriteNotes = Flag(notes?["write"]);
@@ -527,6 +553,76 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     {
         Classes.Remove(row);
         if (await SendAsync(ClassesChange(), $"{row.Name}")) ClassesChanged?.Invoke();
+    }
+
+    // Use Canvas course names: the preview, then the renames.
+
+    void FillCourseNames(JsonNode? names)
+    {
+        var rows = (names?["renames"] as JsonArray ?? []).OfType<JsonObject>()
+            .Select(r => new CourseNameRow(Str(r["from"]), Str(r["to"]), r["lectures"] is JsonValue v && v.TryGetValue(out int n) ? n : 0))
+            .Where(r => r.From.Length > 0 && r.To.Length > 0).ToList();
+        CourseNames.Clear();
+        foreach (var r in rows) CourseNames.Add(r);
+        CourseNamesBlocked = Str(names?["blocked"]) is { Length: > 0 } why ? why : null;
+        if (rows.Count == 0) ConfirmingCourseNames = false;
+        foreach (string p in new[] { nameof(HasCourseNames), nameof(CanUseCourseNames), nameof(CourseNamesSub), nameof(RenameLabel) }) OnPropertyChanged(p);
+    }
+
+    partial void OnCourseNamesBlockedChanged(string? value)
+    {
+        OnPropertyChanged(nameof(CanUseCourseNames));
+        OnPropertyChanged(nameof(CourseNamesSub));
+    }
+
+    partial void OnRenamingClassesChanged(bool value) => OnPropertyChanged(nameof(CanUseCourseNames));
+
+    [RelayCommand] void AskUseCourseNames() => ConfirmingCourseNames = true;
+
+    [RelayCommand] void CancelUseCourseNames() => ConfirmingCourseNames = false;
+
+    /// <summary>Rename every class in the preview to its Canvas course name, on the library.</summary>
+    [RelayCommand]
+    async Task UseCourseNames()
+    {
+        if (connect() is not { } call || !CanUseCourseNames) return;
+        RenamingClasses = true;
+        try
+        {
+            var r = await call(HttpMethod.Post, "/course-names", new JsonObject());
+            if (r is null)
+            {
+                Say = "Your library runs an older Study Stash: update it to use Canvas course names.";
+                return;
+            }
+            var renamed = (r["renamed"] as JsonArray ?? []).OfType<JsonObject>().Select(x => (Str(x["from"]), Str(x["to"]))).ToList();
+            int moved = r["lectures"] is JsonValue lv && lv.TryGetValue(out int n) ? n : 0;
+            string problem = Str(r["problem"]);
+            Say = renamed.Count == 0 ? (problem.Length > 0 ? problem : "Nothing was renamed.")
+                : $"Renamed {(renamed.Count == 1 ? "1 class" : $"{renamed.Count} classes")} to {(renamed.Count == 1 ? "its Canvas course name" : "their Canvas course names")}; {(moved == 1 ? "1 lecture" : $"{moved} lectures")} moved with them."
+                  + (problem.Length > 0 ? " " + problem : "");
+            ConfirmingCourseNames = false;
+            if (renamed.Count > 0)
+            {
+                ClassesRenamed?.Invoke(renamed);
+                ClassesChanged?.Invoke();
+            }
+            string said = Say;
+            await Load();
+            Say = said;
+        }
+        catch (LibraryRefusedException e)
+        {
+            Say = e.Message.Length > 0 ? e.Message : "The classes weren't renamed: the library said no.";
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidOperationException)
+        {
+            Say = "The classes weren't renamed: the library didn't answer.";
+        }
+        finally
+        {
+            RenamingClasses = false;
+        }
     }
 
     // Notes and sorting
