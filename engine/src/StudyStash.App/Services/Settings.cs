@@ -39,28 +39,40 @@ public sealed partial class NavItem : ObservableObject
 }
 
 /// <summary>
-/// Settings: General, Appearance (the colour theme), Recording (the model, language, the computer's sound, how long
-/// audio stays), Library (where it is; this computer's own), Classes (the timetable), AI engines (who writes the notes
-/// and answers questions), AI tool access (what Claude Code, Codex and other MCP tools may read) and Canvas.
+/// Settings, in two groups. This laptop (or this Mac/PC): General, Appearance (the colour theme), Recording (the
+/// model, language, the computer's sound, how long audio stays), Connection (which library; this computer's own) and
+/// Timetable (when classes meet). Your library, changed through its API: Library (name, password, how laptops reach
+/// it, start at login, updates), Classes, Notes and sorting, AI engines (who writes the notes and answers questions),
+/// AI tool access (what Claude Code, Codex and other MCP tools may read), Canvas, and the Folders it may read.
 /// </summary>
 public sealed partial class SettingsModel : ObservableObject, IDisposable
 {
     readonly AppHost host;
 
-    [ObservableProperty] public partial string Section { get; set; } = "Library";
+    [ObservableProperty] public partial string Section { get; set; } = "Connection";
 
-    /// <summary>The sidebar's rows, in the design's order: General, Appearance, then the rest as they were.</summary>
-    public IReadOnlyList<NavItem> NavItems { get; } =
+    /// <summary>The sidebar's first group: this computer's own settings (General, Appearance, then recording and the
+    /// connection to the library; a library-only computer doesn't record, so it has no Recording or Timetable).</summary>
+    public IReadOnlyList<NavItem> ComputerNav { get; }
+
+    /// <summary>The sidebar's second group: the library's own settings, read and changed through its API, so its web
+    /// page is never needed.</summary>
+    public IReadOnlyList<NavItem> LibraryNav { get; } =
     [
-        new() { Id = "General", Glyph = "tune", Label = "General" },
-        new() { Id = "Appearance", Glyph = "palette", Label = "Appearance" },
-        new() { Id = "Recording", Glyph = "mic", Label = "Recording" },
         new() { Id = "Library", Glyph = "dns", Label = "Library" },
-        new() { Id = "Classes", Glyph = "schedule", Label = "Classes" },
+        new() { Id = "Classes", Glyph = "book_2", Label = "Classes" },
+        new() { Id = "Notes", Glyph = "edit_note", Label = "Notes and sorting" },
         new() { Id = "AI", Glyph = "auto_awesome", Label = "AI engines" },
         new() { Id = "Access", Glyph = "hub", Label = "AI tool access" },
         new() { Id = "Canvas", Glyph = "school", Label = "Canvas" },
+        new() { Id = "Folders", Glyph = "folder", Label = "Folders" },
     ];
+
+    /// <summary>Every row of the sidebar, both groups.</summary>
+    public IEnumerable<NavItem> NavItems => ComputerNav.Concat(LibraryNav);
+
+    /// <summary>The first group's heading: "This laptop" on a laptop, this Mac or PC where the library runs.</summary>
+    public string ComputerNavTitle { get; }
 
     /// <summary>Whether this window draws the Mac's round swatches or Windows' squared ones.</summary>
     public bool ShowMacSwatch => Skin.Current == SkinKind.Mac;
@@ -104,14 +116,31 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public AiProblemsModel AiProblems { get; }
     public AiAccessModel Access { get; }
     public CanvasSettingsModel Canvas { get; }
+    /// <summary>The library's own settings (Library, Classes, Notes and sorting, Folders).</summary>
+    public LibrarySettingsModel Lib { get; }
 
     // General
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
     public string Version => Engine.Version;
 
-    public bool OnLibrary => Section == "Library";
+    public bool OnConnection => Section == "Connection";
     public bool OnRecording => Section == "Recording";
+    public bool OnTimetable => Section == "Timetable";
+    public bool OnLibrary => Section == "Library";
     public bool OnClasses => Section == "Classes";
+    public bool OnNotes => Section == "Notes";
+    public bool OnFolders => Section == "Folders";
+    /// <summary>One of the library's own pages, which share a heading and what to say when the library can't be reached.</summary>
+    public bool OnLibraryPage => OnLibrary || OnClasses || OnNotes || OnFolders;
+    /// <summary>The page's heading, above the library's own pages.</summary>
+    public string LibraryPageTitle => Section switch { "Classes" => "Classes", "Notes" => "Notes and sorting", "Folders" => "Folders", _ => "Library" };
+    public string LibraryPageLine => Section switch
+    {
+        "Classes" => "The classes your library files lectures into. A lecture recorded for a class, or whose title matches one of its names, is filed without asking the AI.",
+        "Notes" => "How your library writes the notes for each lecture and sorts it into a class.",
+        "Folders" => "Folders on the library's computer that search, and the AI when you chat, may read.",
+        _ => Lib.IsHere ? $"Your library, on this {(OperatingSystem.IsWindows() ? "PC" : "Mac")}." : "Your library, on the computer that keeps your lectures.",
+    };
     public bool OnAi => Section == "AI";
     public bool OnCanvas => Section == "Canvas";
     public bool OnAccess => Section == "Access";
@@ -130,8 +159,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>Settings over <paramref name="host"/>. The AI panes read <paramref name="ai"/> (the connected library's
     /// AI when not given); Canvas reads <paramref name="canvas"/> and follows <paramref name="watch"/>, the app's one
     /// shared Canvas poll (none in a test or a shot, so nothing there polls).</summary>
-    public static SettingsModel Make(AppHost host, IAiLibrary? ai = null, CanvasContext? canvas = null, CanvasWatch? watch = null) =>
-        new(host, ai, canvas, watch);
+    public static SettingsModel Make(AppHost host, IAiLibrary? ai = null, CanvasContext? canvas = null, CanvasWatch? watch = null,
+        Func<LibrarySettingsModel.Call?>? library = null) =>
+        new(host, ai, canvas, watch, library);
 
     /// <summary>True while the constructor fills in what's already set: nothing is saved, and starting at login isn't
     /// touched, until the student changes something.</summary>
@@ -139,9 +169,40 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>Putting the box back after the login item couldn't be changed.</summary>
     bool settingLogin;
 
-    SettingsModel(AppHost host, IAiLibrary? ai, CanvasContext? canvas, CanvasWatch? watch)
+    SettingsModel(AppHost host, IAiLibrary? ai, CanvasContext? canvas, CanvasWatch? watch, Func<LibrarySettingsModel.Call?>? library)
     {
         this.host = host;
+        bool records = host.Settings.Role != AppRole.Library;
+        ComputerNav =
+        [
+            new() { Id = "General", Glyph = "tune", Label = "General" },
+            new() { Id = "Appearance", Glyph = "palette", Label = "Appearance" },
+            .. records ? new NavItem[] { new() { Id = "Recording", Glyph = "mic", Label = "Recording" } } : [],
+            new() { Id = "Connection", Glyph = "link", Label = "Connection" },
+            .. records ? new NavItem[] { new() { Id = "Timetable", Glyph = "schedule", Label = "Timetable" } } : [],
+        ];
+        string device = OperatingSystem.IsWindows() ? "PC" : "Mac";
+        ComputerNavTitle = host.Settings.Role == AppRole.Laptop ? "This laptop" : $"This {device}";
+        Lib = new LibrarySettingsModel(library ?? (() => host.Remote() is { } lib ? (m, path, body) => lib.SettingsAsync(m, path, body) : null))
+        {
+            IsHere = host.Settings.LibraryHere,
+            Renamed = name =>
+            {
+                var c = host.Client();
+                c.PoolName = name;
+                host.SaveClient(c);
+            },
+            PasswordChanged = password =>
+            {
+                var c = host.Client();
+                c.PoolKey = password;
+                host.SaveClient(c);
+            },
+            Reveal = dir => Machine.Open(dir),
+            OpenPage = OpenLibraryPage,
+        };
+        // A library-only computer opens on its library.
+        if (!records) Section = "Library";
         var cc = host.Client();
         ai ??= new AiRemote(cc.ServerUrl, cc.PoolKey);
         Engines = new AiEnginesModel(ai) { OpenUrl = url => Dialogs.OpenUrl(url) };
@@ -214,6 +275,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             case "Canvas":
                 _ = Canvas.LoadAsync();
                 break;
+            case "Library" or "Classes" or "Notes" or "Folders":
+                _ = Lib.Load();
+                break;
         }
     }
 
@@ -265,7 +329,12 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     partial void OnSectionChanged(string value)
     {
-        foreach (string p in new[] { nameof(OnLibrary), nameof(OnRecording), nameof(OnClasses), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage), nameof(OnGeneral), nameof(OnAppearance) })
+        foreach (string p in new[]
+                 {
+                     nameof(OnConnection), nameof(OnRecording), nameof(OnTimetable), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
+                     nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage),
+                     nameof(OnGeneral), nameof(OnAppearance),
+                 })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;
         LoadSection(value);

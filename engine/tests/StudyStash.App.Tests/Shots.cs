@@ -542,14 +542,16 @@ public class SurfaceShots
     {
         string home = Path.Combine(Path.GetTempPath(), "studystash-settings-" + Guid.NewGuid().ToString("N"));
         var host = new Services.AppHost(home);
-        var model = Services.SettingsModel.Make(host);
+        // The library's own pages read the design's example library (Sam's, on a Mac mini).
+        var library = new FakeLibrarySettings();
+        var model = Services.SettingsModel.Make(host, library: () => library.Call);
         model.Section = section;
         return (model, host, home);
     }
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance" })
+        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Notes", "Folders" })
         {
             var (model, host, home) = MakeSettings(section);
             try
