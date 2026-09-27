@@ -15,6 +15,9 @@ using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 
 [assembly: AvaloniaTestApplication(typeof(StudyStash.App.Tests.TestApp))]
+// Every test on Avalonia's one UI thread, plain [Fact]s too: a plain test touching Avalonia first can otherwise
+// make a worker thread the UI thread, and the pictures drawn after it fail (it happened on Windows CI).
+[assembly: AvaloniaTestFramework]
 
 namespace StudyStash.App.Tests;
 
