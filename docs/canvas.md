@@ -193,6 +193,12 @@ the app's). The engine carries it as embedded resources (`extension/<file>` in `
 (`background.js`, `connection.js`, the popup), a manifest, and `config.json` + `config.js`. The library keeps its own
 folder (`<home>/chrome-extension`) ready by itself: on start, and whenever the Canvas address changes.
 
+The same files also pack as a **Chrome Web Store** zip (`StudyStash extension-zip OUT.zip`, `Extension.PackForStore`):
+no config files, no `host_permissions`, `optional_host_permissions` for any site instead. A store copy connects by a
+pasted code (`connection_code`, base64url of `config.json`) and asks Chrome for its three sites in that click. Its
+extra status is `no_access` (connected, but Chrome hasn't allowed the sites). See
+[chrome-web-store.md](chrome-web-store.md); nothing is published.
+
 **Permissions stay minimal.** `permissions` is `["alarms", "storage"]` (the 30-second alarm; the extension's own status
 and reload guard) and nothing else: no tabs, cookies or content scripts. `host_permissions` is empty in the repo;
 `Ensure` fills in exactly three kinds (no Canvas one while there's no Canvas address): the
@@ -573,4 +579,8 @@ both mapped to 127.0.0.1), a library on real Kestrel with a throwaway home, and 
 The stories, in order: the extension checks in; Find my courses (under 5 s); a linked class syncs; signed out says so;
 a newer manifest on disk reloads it; a new Canvas address reloads it and Find works there with no human step; a
 restarted library is found again within 40 s; three idle minutes with the worker awake throughout; and a folder as
-0.5.0 left it (1.3, `Fixtures/extension-1.3`) updates itself to 1.4.
+0.5.0 left it (1.3, `Fixtures/extension-1.3`) updates itself to 1.4. Then `S9b`: the Chrome Web Store build, unzipped from `PackForStore`,
+registers with no connection (`no_config`), no sites and a popup asking for the code, and after the library's code is
+pasted (without Chrome's permission, which headless Chrome can't give) it says `no_access` and asks nothing of Canvas
+or the library. `ChromeRunner.EvaluateAsync` runs JavaScript in the extension's worker or one of its pages over
+DevTools (`--remote-debugging-port=0`).

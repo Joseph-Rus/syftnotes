@@ -280,7 +280,9 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
             await rig.EvaluateAsync("pump(true).then(() => chrome.storage.local.get('status')).then(s => s.status.state)") is "\"no_access\"" ? "" : null,
             TimeSpan.FromSeconds(30), "the store copy to wait for Chrome's permission");
         string kept = await rig.EvaluateAsync("chrome.storage.local.get('connection').then(c => c.connection.app + ' ' + c.connection.canvas)");
-        Assert.Equal(System.Text.Json.JsonSerializer.Serialize($"{Extension.Connection(Extension.Folder(rig.Home))!.App} {rig.Canvas.Url}"), kept);
+        var pasted = Extension.ReadConnectionCode(code)!;
+        Assert.Equal((Extension.Connection(Extension.Folder(rig.Home))!.App, CanvasSettings.Load(rig.Home).Url), (pasted.App, pasted.Canvas));
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize($"{pasted.App} {pasted.Canvas}"), kept);
         Assert.Equal(before, ApiHits()); // nothing asked the pretend Canvas
     }
 }
