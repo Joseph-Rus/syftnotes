@@ -28,16 +28,27 @@ public sealed partial class LibraryWeb
 
     static string? Str(JsonObject? body, string key) => body?[key] is JsonValue v && v.TryGetValue(out string? s) && !string.IsNullOrWhiteSpace(s) ? s.Trim() : null;
 
+    /// <summary>How long a deleted lecture waits in the trash, so the app's Undo can bring it back.</summary>
+    public static readonly TimeSpan TrashKeeps = TimeSpan.FromMinutes(10);
+
+    /// <summary>Lectures deleted longer ago than <see cref="TrashKeeps"/> are gone for good.</summary>
+    void EmptyOldTrash() => store.EmptyTrash(DateTimeOffset.UtcNow - TrashKeeps);
+
     void MapApp(WebApplication app)
     {
         if (store.IndexMissing() is int n and > 0) Console.WriteLine($"[library] indexed {n} lecture(s) for search");
+        // The trash lasts while the library runs: what was deleted before it started again is gone.
+        if (store.EmptyTrash() is int t and > 0) Console.WriteLine($"[library] emptied the trash ({t} lecture(s))");
 
         app.MapGet("/api/v2/library", (HttpContext ctx) => Api(ctx, () =>
         {
             // Another computer asking (with the password) is a laptop reaching the library: its dropdown says so.
             if (!IsLocal(ctx)) Laptops.Seen(ctx.Request.Headers[LaptopsSeen.Header].ToString(), ctx.Connection.RemoteIpAddress?.ToString(), DateTimeOffset.UtcNow);
+            EmptyOldTrash();
             var overview = Reader.Overview();
             overview["laptops"] = Laptops.Json();
+            // Deleted for good: a laptop drops its own recording of these.
+            overview["gone"] = new JsonArray([.. store.Gone().Select(id => (JsonNode)id)]);
             return Http.Json(overview);
         }));
         app.MapGet("/api/v2/lectures", (HttpContext ctx, string? @class, int? limit, string? before) =>
@@ -59,8 +70,22 @@ public sealed partial class LibraryWeb
             pipeline.Wake();
             return Http.Json(new JsonObject { ["id"] = id, ["status"] = Store.Queued });
         }));
-        app.MapDelete("/api/v2/lectures/{id}", (HttpContext ctx, string id) =>
-            Api(ctx, () => store.Delete(id) ? Http.Json(new JsonObject { ["deleted"] = id }) : Http.Detail(404, "no such lecture")));
+        // Delete a lecture (its notes, transcript and search passages), into the trash for a few minutes so the app can
+        // undo it; then it's gone for good.
+        app.MapDelete("/api/v2/lectures/{id}", (HttpContext ctx, string id) => Api(ctx, () =>
+        {
+            EmptyOldTrash();
+            return store.Trash(id)
+                ? Http.Json(new JsonObject { ["deleted"] = id, ["undo_minutes"] = (int)TrashKeeps.TotalMinutes })
+                : Http.Detail(404, "no such lecture");
+        }));
+        app.MapPost("/api/v2/lectures/{id}/restore", (HttpContext ctx, string id) => Api(ctx, () =>
+        {
+            EmptyOldTrash();
+            if (!store.Restore(id)) return Http.Detail(404, "It's no longer in the trash, so it can't come back.");
+            pipeline.Wake();
+            return Reader.Lecture(id) is { } l ? Http.Json(l) : Http.Json(new JsonObject { ["id"] = id });
+        }));
         app.MapGet("/api/v2/search", (HttpContext ctx, string? q, string? @class, int? limit) =>
             Api(ctx, () => Http.Json(Reader.Search(q ?? "", @class, Math.Clamp(limit ?? 8, 1, 50)))));
         app.MapPost("/api/v2/ask", Http.Handle(ctx => ApiAsync(ctx, async () =>

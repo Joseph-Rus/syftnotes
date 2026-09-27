@@ -156,7 +156,13 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
 
     public async Task RewriteAsync(string id) => await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/rewrite", new JsonObject());
 
-    public async Task DeleteAsync(string id) => await SendAsync(HttpMethod.Delete, $"/lectures/{Q(id)}");
+    /// <summary>Deletes a lecture on the library: its notes, transcript and search passages. It waits in the
+    /// library's trash for a few minutes, so <see cref="RestoreAsync"/> can undo it. False: there's no such lecture.</summary>
+    public async Task<bool> DeleteAsync(string id) => await SendAsync(HttpMethod.Delete, $"/lectures/{Q(id)}") is not null;
+
+    /// <summary>Brings a deleted lecture back from the library's trash. Null: it isn't there any more (the trash was
+    /// emptied, or the library runs a Study Stash without one).</summary>
+    public async Task<JsonObject?> RestoreAsync(string id) => await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/restore", new JsonObject()) as JsonObject;
 
     public async Task<JsonObject> AddClassAsync(string name) =>
         (JsonObject)(await SendAsync(HttpMethod.Post, "/classes", new JsonObject { ["name"] = name }))!;
