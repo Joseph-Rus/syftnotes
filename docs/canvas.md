@@ -638,13 +638,20 @@ stops, nothing more reaches Canvas, state `signed_out`, and after signing in a s
 is never downloaded: modules.md links to it on Canvas ("not saved: too big"). Then `S9b`: the Chrome Web Store build, unzipped from `PackForStore`,
 registers with no connection (`no_config`), no sites and a popup asking for the code, and after the library's code is
 pasted (without Chrome's permission, which headless Chrome can't give) it says `no_access` and asks nothing of Canvas
-or the library. `ChromeRunner.EvaluateAsync` runs JavaScript in the extension's worker or one of its pages over
+or the library. Then, from the app's side (`LaptopChromeE2ETests`, in the app's tests): a library that has never
+synced, the laptop app's own connect steps (`CanvasConnectModel` over its `CanvasClient`, with the library password)
+from the school's address, the extension folder the laptop app makes pointing at the library as `library.test`,
+Chrome checking in as `another_computer` with the library's key, Find my courses, matching, a sync, and every Canvas
+screen's read afterwards, down to a submitted file's bytes. Without Chrome, `LibraryCanvasTests` runs the same steps
+against a real library with a pretend extension over HTTP, and checks that no Canvas answer has a date as `""`.
+`ChromeRunner.EvaluateAsync` runs JavaScript in the extension's worker or one of its pages over
 DevTools (`--remote-debugging-port=0`).
 
 Run it with `TMPDIR` pointing somewhere disposable (Chrome's profiles and the library's home go there and are
 removed). `STUDYSTASH_E2E_LIBRARY_HOST=<an address of this computer, like its LAN one>` makes the library listen there
 too and the laptop's Chrome use it instead of `library.test` (Chrome's Local Network Access checks don't block the
 worker's fetch to a LAN address). `STUDYSTASH_E2E_CHROME=<binary>` skips the download. The whole run takes about six
-minutes, three of them the idle story. Last proven: 13 of 13 green three runs in a row (Chrome for Testing 154, with
+minutes, three of them the idle story. Last proven with keys written down and the laptop story: 13 + 1 green
+(Chrome for Testing 154). Before that: 13 of 13 green three runs in a row (Chrome for Testing 154, with
 the full suite between runs), and the wrong-key and two-Chromes stories again with the laptop's Chrome on the Mac's LAN
 address.
