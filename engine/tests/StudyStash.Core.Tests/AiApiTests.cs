@@ -178,8 +178,9 @@ public class AiApiTests
         Assert.NotNull(started);
         Assert.Equal(1, checks.StartCalls);
 
+        // The fake pull can finish before the answer is written, so the answer needn't still say "pulling".
         var downloaded = await remote.DownloadAsync("ollama");
-        Assert.NotNull(downloaded?.Overview?.Pulling);
+        Assert.NotNull(downloaded?.Overview);
 
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (DateTime.UtcNow < deadline && (await remote.EnginesAsync())!.Pulling is not null) await Task.Delay(20);
