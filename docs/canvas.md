@@ -356,7 +356,10 @@ plain text, CSV or JSON come back as Canvas sent them (Marginalia's rule, bug 16
 Every route below is under the library password, `Authorization: Bearer <password>`, like the rest of `/api/v2`
 (`LibraryWeb.Api`/`ApiAsync`). A class name goes in the query (`?class=CS%20101`), never the path, since class names
 may hold `/`. `*_at` fields are Canvas's own UTC ISO timestamps; `due` (and `synced`, `last_sync`, `posted_at` when
-they come from a saved index) are as `AssignmentInfo`/`CourseIndex` keep them. `Core/Canvas/CanvasView.cs` builds
+they come from a saved index) are as `AssignmentInfo`/`CourseIndex` keep them. A date the library doesn't have (a
+library that has never synced, Chrome never seen, nothing submitted) is `null`, never `""` (`CanvasView.When`), and
+the app reads any date it can't parse as none (`CanvasApi.ReadWhen`): one odd field never breaks a screen. An item's
+`marked_done` is when it was ticked off in Canvas's planner, or `null`. `Core/Canvas/CanvasView.cs` builds
 every answer below from `CanvasSettings`, a class's `CourseIndex` (`home/canvas/<class>.json`) and the crawl's live
 state; `Library/LibraryWeb.Canvas.cs` only maps routes onto it, so `LocalLibrary` (Claude's tools, T8) can call the
 same builders without going through HTTP.

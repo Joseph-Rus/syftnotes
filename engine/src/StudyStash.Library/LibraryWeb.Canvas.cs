@@ -28,6 +28,9 @@ public sealed partial class LibraryWeb
 
     static string S(JsonNode? v) => v is JsonValue j && j.TryGetValue(out string? s) ? s : "";
 
+    /// <summary>A date for the JSON: null, never "", when there isn't one (<see cref="CanvasView.When"/>).</summary>
+    static JsonNode? W(string? iso) => CanvasView.When(iso);
+
     /// <summary>The most one post of the extension's answers may carry: a 40 MiB file is about 56 MB of base64, and an
     /// extension from before protocol 2 posts up to six answers together.</summary>
     const long ResultsLimit = 256L * 1024 * 1024;
@@ -73,7 +76,7 @@ public sealed partial class LibraryWeb
             var (waiting, inflight) = Canvas.Crawl.Left;
             return Http.Json(new JsonObject
             {
-                ["synced"] = s.LastSync, ["error"] = s.Error,
+                ["synced"] = W(s.LastSync), ["error"] = s.Error,
                 ["busy"] = Canvas.Crawl.Active ? $"Syncing Canvas… {waiting + inflight} left" : "",
             });
         });
@@ -317,14 +320,14 @@ public sealed partial class LibraryWeb
         foreach (var (where, c) in s.ExtensionCopies.OrderByDescending(kv => kv.Value.Seen, StringComparer.Ordinal))
             copies.Add(new JsonObject
             {
-                ["where"] = where, ["seen"] = c.Seen, ["version"] = c.Version, ["protocol"] = c.Protocol,
+                ["where"] = where, ["seen"] = W(c.Seen), ["version"] = c.Version, ["protocol"] = c.Protocol,
                 ["connected"] = CanvasSettings.Connected(c.Seen, c.Protocol, now),
             });
         return new JsonObject
         {
             ["canvas"] = s.Url, ["version"] = Extension.Version(), ["protocol"] = Extension.Protocol,
             ["folder"] = folder, ["folder_ready"] = Extension.Ready(folder),
-            ["seen"] = s.ExtensionSeen, ["seen_version"] = s.ExtensionVersion, ["seen_protocol"] = s.ExtensionProtocol,
+            ["seen"] = W(s.ExtensionSeen), ["seen_version"] = s.ExtensionVersion, ["seen_protocol"] = s.ExtensionProtocol,
             ["seen_where"] = s.ExtensionWhere, ["connected"] = s.ExtensionConnected(now), ["copies"] = copies,
         };
     }
@@ -340,12 +343,12 @@ public sealed partial class LibraryWeb
 
     JsonObject AssignmentJson(Assignment a) => new()
     {
-        ["class"] = a.ClassName, ["id"] = a.Id, ["name"] = a.Name, ["due"] = a.Due, ["points"] = a.Points, ["status"] = a.Status,
-        ["score"] = a.Score, ["submitted"] = a.Submitted, ["url"] = a.Url, ["done"] = a.Done,
+        ["class"] = a.ClassName, ["id"] = a.Id, ["name"] = a.Name, ["due"] = W(a.Due), ["points"] = a.Points, ["status"] = a.Status,
+        ["score"] = a.Score, ["submitted"] = W(a.Submitted), ["url"] = a.Url, ["done"] = a.Done,
         ["folder"] = Canvas.Crawl.AssignmentFolder(a.ClassName, a.Id),
         ["label"] = Assignments.Label(a.Status, a.Late), ["score_text"] = Assignments.ScoreText(a), ["grade"] = a.Grade,
-        ["late"] = a.Late, ["missing"] = a.Missing, ["excused"] = a.Excused, ["graded_at"] = a.GradedAt, ["kind"] = a.Kind,
-        ["due_at"] = a.DueAt, ["comments"] = a.Comments ?? 0,
+        ["late"] = a.Late, ["missing"] = a.Missing, ["excused"] = a.Excused, ["graded_at"] = W(a.GradedAt), ["kind"] = a.Kind,
+        ["due_at"] = W(a.DueAt), ["comments"] = a.Comments ?? 0,
     };
 
     JsonObject CanvasJson()
@@ -360,15 +363,15 @@ public sealed partial class LibraryWeb
         foreach (var (id, info) in s.CourseInfo) courseInfo[id] = new JsonObject { ["code"] = info.Code, ["name"] = info.Name, ["term"] = info.Term };
         return new JsonObject
         {
-            ["url"] = s.Url, ["courses"] = courses, ["available"] = available, ["last_sync"] = s.LastSync, ["error"] = s.Error,
-            ["needs_login"] = s.NeedsLogin, ["extension_seen"] = s.ExtensionSeen, ["extension_version"] = s.ExtensionVersion,
+            ["url"] = s.Url, ["courses"] = courses, ["available"] = available, ["last_sync"] = W(s.LastSync), ["error"] = s.Error,
+            ["needs_login"] = s.NeedsLogin, ["extension_seen"] = W(s.ExtensionSeen), ["extension_version"] = s.ExtensionVersion,
             ["extension_latest"] = Extension.Version(), ["extension_outdated"] = s.ExtensionOutdated,
-            ["extension_update"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = up.At } : null,
+            ["extension_update"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = W(up.At) } : null,
             ["state"] = CanvasView.State(Canvas, Canvas.Clock()), ["course_info"] = courseInfo,
             ["syncing"] = Canvas.Crawl.Active, ["left"] = waiting + inflight, ["extension"] = ExtensionJson(),
             ["exploring"] = options.Scout?.Running, ["scouts"] = new JsonObject(s.Scouts.Select(kv => KeyValuePair.Create(kv.Key, (JsonNode?)new JsonObject
             {
-                ["ok"] = kv.Value.Ok, ["report"] = kv.Value.Report, ["when"] = kv.Value.When, ["files"] = kv.Value.Files,
+                ["ok"] = kv.Value.Ok, ["report"] = kv.Value.Report, ["when"] = W(kv.Value.When), ["files"] = kv.Value.Files,
             }))), ["changes"] = new JsonArray(s.Changes.Select(c => (JsonNode)c).ToArray()),
             ["last_changes"] = new JsonArray(s.LastChanges.Select(c => (JsonNode)new JsonObject
             {

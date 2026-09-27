@@ -12,15 +12,13 @@
     "4203": "MATH 142 · Calculus II",
     "4204": "HIST 210 · Modern World History"
   },
-  "course_info": [
-    {
-      "id": "4201",
+  "course_info": {
+    "4201": {
       "code": "COMP 101",
       "name": "COMP 101 · Intro to Programming",
-      "term": "Fall 2025",
-      "url": "https://school.instructure.com/courses/4201"
+      "term": "Fall 2025"
     }
-  ],
+  },
   "last_changes": [
     {
       "kind": "new",

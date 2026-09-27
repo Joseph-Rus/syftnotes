@@ -418,7 +418,8 @@ public class CanvasApiTests
         var e = await GetAsync(site, "/api/v2/canvas/extension");
         Assert.Equal((key, "https://canvas.test", Extension.Version(), Extension.Protocol), (e["key"]!.GetValue<string>(), e["canvas"]!.GetValue<string>(), e["version"]!.GetValue<string>(), e["protocol"]!.GetValue<int>()));
         Assert.Equal((Extension.Folder(cfg.Home), true), (e["folder"]!.GetValue<string>(), e["folder_ready"]!.GetValue<bool>()));
-        Assert.Equal(("", "", 0, "", false), (e["seen"]!.GetValue<string>(), e["seen_version"]!.GetValue<string>(), e["seen_protocol"]!.GetValue<int>(), e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
+        Assert.Null(e["seen"]); // never "": a date the library doesn't have is null
+        Assert.Equal(("", 0, "", false), (e["seen_version"]!.GetValue<string>(), e["seen_protocol"]!.GetValue<int>(), e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
         // A Chrome Web Store copy in this computer's Chrome connects with the code: this folder's connection.
         Assert.Equal(new ExtensionConnection("http://127.0.0.1:" + cfg.WebPort, key, "https://canvas.test"),
             Extension.ReadConnectionCode(e["connection_code"]!.GetValue<string>()));

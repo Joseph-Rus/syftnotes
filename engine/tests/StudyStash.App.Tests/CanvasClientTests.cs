@@ -359,7 +359,7 @@ public class CanvasClientTests
         Assert.Equal(4201, o!.Courses["CS 101"]);
         Assert.Equal(0, o.Courses["HIST 210"]);
         Assert.Equal("COMP 101 · Intro to Programming", o.Available["4201"]);
-        Assert.Single(o.CourseInfo);
+        Assert.Equal("Fall 2025", Assert.Single(o.CourseInfo).Value.Term); // keyed by course id, as the library sends it
         Assert.Equal(3, o.LastChanges.Count);
         Assert.Equal("new", o.LastChanges[0].Kind);
         Assert.Equal("graded", o.LastChanges[2].Kind);
@@ -428,5 +428,51 @@ public class CanvasClientTests
 
         Assert.Equal("That isn't a web address.", e.Message);
         Assert.Equal(400, e.Status);
+    }
+
+    // ---- one odd field never breaks a whole screen ----
+
+    [Fact]
+    public async Task Blank_null_or_garbage_dates_read_as_no_date()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/state", """
+            {"state": "no_extension", "school": null, "url": null, "last_sync": "", "next_sync": "not a date", "paused_until": 5,
+             "poll_minutes": null, "extension": {"seen": "", "version": "1.4", "outdated": null, "updated": {"from": "1.3", "to": "1.4", "at": ""}},
+             "error": {"text": "Couldn't reach Canvas.", "at": {"odd": true}}, "warnings": []}
+            """);
+        var s = await Client(fake).StateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("no_extension", s!.Status);
+        Assert.Equal(("", ""), (s.School, s.Url));
+        Assert.Null(s.LastSync);
+        Assert.Null(s.NextSync);
+        Assert.Null(s.PausedUntil);
+        Assert.Equal(0, s.PollMinutes);
+        Assert.Null(s.Extension?.Seen);
+        Assert.False(s.Extension?.Outdated);
+        Assert.Equal(default(DateTimeOffset), s.Extension?.Updated?.At);
+        Assert.Equal(default(DateTimeOffset), s.Error?.At);
+        Assert.Equal("Couldn't reach Canvas.", s.Error?.Text);
+    }
+
+    [Fact]
+    public async Task An_item_reads_the_library_s_own_shapes_for_its_flags_and_dates()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/assignments", """
+            {"class": "CS 101", "to_hand_in": [], "done": [
+              {"class": "CS 101", "id": 9001, "name": "Lab 3", "due": null, "due_at": "", "submitted": "", "graded_at": null,
+               "marked_done": "2025-09-24T20:00:00Z", "points": "10", "late": null, "missing": 0, "status": "marked_done"}]}
+            """);
+        var a = await Client(fake).AssignmentsAsync("CS 101", TestContext.Current.CancellationToken);
+
+        var item = Assert.Single(a!.Done);
+        Assert.Equal("9001", item.Id);
+        Assert.Null(item.Due);
+        Assert.Null(item.DueAt);
+        Assert.Null(item.Submitted);
+        Assert.Equal(new DateTimeOffset(2025, 9, 24, 20, 0, 0, TimeSpan.Zero), item.MarkedDone);
+        Assert.Equal(10, item.Points);
+        Assert.False(item.Late);
+        Assert.False(item.Missing);
     }
 }

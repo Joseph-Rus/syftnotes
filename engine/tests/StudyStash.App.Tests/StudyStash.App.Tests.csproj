@@ -31,4 +31,11 @@
     <None Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- The library's own pretend Canvas, so the app's Canvas client is tested against what a real library sends. -->
+  <ItemGroup>
+    <Compile Include="..\StudyStash.Core.Tests\FakeCanvas.cs" Link="Library\FakeCanvas.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\TestUtil.cs" Link="Library\TestUtil.cs" />
+    <None Include="..\StudyStash.Core.Tests\Fixtures\canvas\**" Link="Fixtures\canvas\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -298,6 +298,11 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         {
             CoursesSay = e.Message;
         }
+        catch (Exception e) when (e is System.Text.Json.JsonException or HttpRequestException or TaskCanceledException)
+        {
+            // Said, never swallowed: a step that fails quietly just looks stuck.
+            CoursesSay = "Your library didn't answer.";
+        }
         finally
         {
             FindingCourses = false;
