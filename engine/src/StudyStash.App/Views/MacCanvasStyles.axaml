@@ -588,37 +588,4 @@
     <Setter Property="Padding" Value="0" />
   </Style>
 
-  <!-- design 12: a Canvas notification toast -->
-  <Style Selector="Border.cv-toast-tile">
-    <Setter Property="Width" Value="36" />
-    <Setter Property="Height" Value="36" />
-    <Setter Property="CornerRadius" Value="9" />
-    <Setter Property="Background" Value="{DynamicResource Accent}" />
-  </Style>
-  <Style Selector="TextBlock.cv-toast-title">
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-  </Style>
-  <Style Selector="TextBlock.cv-toast-when">
-    <Setter Property="FontSize" Value="11" />
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-  </Style>
-  <Style Selector="TextBlock.cv-toast-text">
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="LineHeight" Value="17.55" />
-    <Setter Property="TextWrapping" Value="Wrap" />
-  </Style>
-  <Style Selector="Button.cv-toast-btn">
-    <Setter Property="Theme" Value="{StaticResource Surface}" />
-    <Setter Property="Height" Value="30" />
-    <Setter Property="CornerRadius" Value="15" />
-    <Setter Property="Padding" Value="14,0" />
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="Background" Value="{DynamicResource Fill2}" />
-  </Style>
-  <Style Selector="Button.cv-toast-btn /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
-  </Style>
-
 </Styles>

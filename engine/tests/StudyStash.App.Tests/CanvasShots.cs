@@ -427,7 +427,7 @@ public class CanvasShots
             {
                 var nextDue = CanvasQuick.NextDue(due, CanvasFixtures.Zone, CanvasFixtures.Now, _ => { })!;
                 var toasts = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
-                foreach (var toast in ToastGallery()) toasts.Children.Add(new MacCanvasToast { DataContext = toast });
+                foreach (var toast in ToastGallery()) toasts.Children.Add(ToastView.For(toast));
                 return built = Shot.Side(
                     CanvasFrames.MacDropdownLine(new MacNextDue { DataContext = nextDue }),
                     new MacQuick { DataContext = QuickWithDue() },
@@ -448,7 +448,7 @@ public class CanvasShots
             {
                 var nextDue = CanvasQuick.NextDue(due, CanvasFixtures.Zone, CanvasFixtures.Now, _ => { })!;
                 var toasts = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
-                foreach (var toast in ToastGallery()) toasts.Children.Add(new WinCanvasToast { DataContext = toast });
+                foreach (var toast in ToastGallery()) toasts.Children.Add(ToastView.For(toast));
                 return built = Shot.Side(
                     CanvasFrames.WinDropdownLine(new WinNextDue { DataContext = nextDue }),
                     new WinQuick { DataContext = QuickWithDue() },

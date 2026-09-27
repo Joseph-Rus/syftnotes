@@ -408,7 +408,7 @@ public static partial class Shell
     static void MoreMenu()
     {
         if (mainWindow?.Content is not Control anchor) return;
-        var menu = new ContextMenu();
+        var menu = Menu();
         string? cls = dueOpen ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
         if (host.Remote() is { } lib && Uri.TryCreate(lib.ServerUrl, UriKind.Absolute, out var u) && (u.IsLoopback || host.Settings.LibraryHere))
         {
@@ -445,7 +445,7 @@ public static partial class Shell
     static void MoveLecture()
     {
         if (library.Note is not { } note || mainWindow?.Content is not Control anchor) return;
-        var menu = new ContextMenu();
+        var menu = Menu();
         foreach (var (name, color, _) in host.Classes().Where(c => c.Name != note.ClassName).Append((Configs.Unsorted, -1, 0)))
         {
             var item = new MenuItem { Header = name };

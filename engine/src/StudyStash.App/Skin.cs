@@ -72,6 +72,8 @@ public static class Skin
             d["SerifFont"] = new FontFamily("New York, Charter, Georgia, avares://StudyStash/Assets/Fonts#Inter");
             d["RadiusPanel"] = new CornerRadius(14);
             d["RadiusControl"] = new CornerRadius(6);
+            d["RadiusMenu"] = new CornerRadius(10);
+            d["PopupStrokeWidth"] = new Thickness(0.5);
         }
         else
         {
@@ -83,6 +85,8 @@ public static class Skin
             d["SerifFont"] = new FontFamily("Segoe UI Variable Text, Segoe UI, avares://StudyStash/Assets/Fonts#Inter");
             d["RadiusPanel"] = new CornerRadius(8);
             d["RadiusControl"] = new CornerRadius(4);
+            d["RadiusMenu"] = new CornerRadius(8);
+            d["PopupStrokeWidth"] = new Thickness(1);
         }
         d.ThemeDictionaries[ThemeVariant.Light] = light;
         d.ThemeDictionaries[ThemeVariant.Dark] = dark;
@@ -121,6 +125,10 @@ public static class Skin
             B("Press", Black(0.08));
             // Not in the design: a floating window's glass when there's no blur behind it, solid enough to read.
             B("GlassSolid", t.Neutral(0.97, 2, 0.94));
+            // Not in the design: notifications and menus, plain and opaque like the system's own.
+            B("PopupBg", Hex("#F6F6F6"));
+            B("PopupStroke", Black(0.1));
+            r["PopupShadow"] = Shadows([Outer(0, 8, 24, 0, Black(0.12)), Outer(0, 1, 3, 0, Black(0.06))]);
             r["GlassFilter"] = new GlassFilter(22, 2.0, 1.04);
             edge = [Inset(0, 1, 0, 0, White(0.85)), Inset(0, 0, 0, 0.5, White(0.6)), Inset(0, -1, 1, 0, White(0.25))];
             edgeSoft = [Inset(0, 1, 0, 0, White(0.6)), Inset(0, 0, 0, 0.5, Black(0.04))];
@@ -153,6 +161,9 @@ public static class Skin
             B("Hover", White(0.05));
             B("Press", White(0.1));
             B("GlassSolid", t.Neutral(0.26, 1.5, 0.94));
+            B("PopupBg", Hex("#2C2C2E"));
+            B("PopupStroke", White(0.1));
+            r["PopupShadow"] = Shadows([Outer(0, 8, 24, 0, Black(0.4)), Outer(0, 1, 3, 0, Black(0.3))]);
             r["GlassFilter"] = new GlassFilter(22, 1.8, 1.0);
             edge = [Inset(0, 1, 0, 0, White(0.2)), Inset(0, 0, 0, 0.5, White(0.16)), Inset(0, -1, 1, 0, White(0.05))];
             edgeSoft = [Inset(0, 1, 0, 0, White(0.1)), Inset(0, 0, 0, 0.5, White(0.06))];
@@ -212,6 +223,10 @@ public static class Skin
             B("OnAccent", lt ? Ink : Colors.White);
             B("Hl", Oklch.ToColor(0.88, 0.16, t.Hl, 0.5));
             B("Taskbar", t.Neutral(0.94, 1));
+            // Not in the design: a Windows 11 toast's or menu's plain, opaque panel.
+            B("PopupBg", Hex("#F9F9F9"));
+            B("PopupStroke", Black(0.1));
+            r["PopupShadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.14))]);
             r["Shadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.14))]);
             r["ShadowLg"] = Shadows([Outer(0, 32, 64, 0, Black(0.18)), Outer(0, 2, 21, 0, Black(0.14))]);
             B("Mini", Colors.White);
@@ -255,6 +270,9 @@ public static class Skin
             B("OnAccent", Ink);
             B("Hl", Oklch.ToColor(0.75, 0.15, t.Hl, 0.3));
             B("Taskbar", t.Neutral(0.2, 1.5));
+            B("PopupBg", Hex("#2C2C2C"));
+            B("PopupStroke", White(0.09));
+            r["PopupShadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.3))]);
             r["Shadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.3))]);
             r["ShadowLg"] = Shadows([Outer(0, 32, 64, 0, Black(0.4)), Outer(0, 2, 21, 0, Black(0.3))]);
             B("Mini", Hex("#2B2B2B"));
@@ -286,20 +304,20 @@ public static class Skin
     static readonly string[] MacBrushes =
     [
         "Glass", "GlassSolid", "Win", "Raised", "Group", "Fg", "Fg2", "Fg3", "Sep", "Fill", "Fill2", "Mini", "Accent", "AccentText",
-        "Tint", "OnAccent", "AccentTint", "Hl", "Warn", "Ok", "Good", "Hover", "Press",
+        "Tint", "OnAccent", "AccentTint", "Hl", "Warn", "Ok", "Good", "Hover", "Press", "PopupBg", "PopupStroke",
     ];
     static readonly string[] MacShadows =
     [
         "Edge", "EdgeSoft", "EdgeTint", "GShadow", "SideShadow", "CtlShadow", "GlassShadow", "SideGlassShadow", "CtlGlassShadow",
-        "RaisedShadow", "SegShadow", "WindowShadow", "OnAccentRing",
+        "RaisedShadow", "SegShadow", "WindowShadow", "OnAccentRing", "PopupShadow",
     ];
     static readonly string[] WinBrushes =
     [
         "Ground", "Mica", "Layer", "LayerStroke", "Acrylic", "FlyStroke", "Footer", "Card", "CardStroke", "Fg", "Fg2", "Fg3", "Sep",
         "Subtle", "Subtle2", "Ctrl", "CtrlStroke", "CtrlBottom", "CtrlBorder", "Accent", "AccentText", "OnAccent", "Hl", "Taskbar",
-        "Mini", "Ok", "Warn", "IbInfo", "IbOk", "IbWarn", "IbErr", "IcInfo", "IcOk", "IcWarn", "IcErr", "IbGlyph", "Good", "Hover", "Press",
+        "Mini", "Ok", "Warn", "PopupBg", "PopupStroke", "IbInfo", "IbOk", "IbWarn", "IbErr", "IcInfo", "IcOk", "IcWarn", "IcErr", "IbGlyph", "Good", "Hover", "Press",
     ];
-    static readonly string[] WinShadows = ["Shadow", "ShadowLg"];
+    static readonly string[] WinShadows = ["Shadow", "ShadowLg", "PopupShadow"];
 
     /// <summary>Every token the design gives a look, and what it is (a brush, shadows, the glass's filter, a font, a
     /// radius): what <see cref="Build(SkinKind, ColourTheme)"/> must make, light and dark.</summary>
@@ -310,7 +328,8 @@ public static class Skin
         foreach (var k in mac ? MacShadows : WinShadows) yield return (k, typeof(BoxShadows));
         if (mac) yield return ("GlassFilter", typeof(GlassFilter));
         foreach (var k in new[] { "TextFont", "DisplayFont", "SerifFont" }) yield return (k, typeof(FontFamily));
-        foreach (var k in new[] { "RadiusPanel", "RadiusControl" }) yield return (k, typeof(CornerRadius));
+        foreach (var k in new[] { "RadiusPanel", "RadiusControl", "RadiusMenu" }) yield return (k, typeof(CornerRadius));
+        yield return ("PopupStrokeWidth", typeof(Thickness));
     }
 
     /// <summary>"Library connected" green, oklch(0.7 0.15 150): the same in both looks, light and dark.</summary>

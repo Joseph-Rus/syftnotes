@@ -510,4 +510,61 @@ public class SurfaceShots
 
     [AvaloniaFact]
     public void Win_settings() => SettingsShots(SkinKind.Win, new Size(1700, 988));
+
+    /// <summary>The dropdown's class picker as Shell builds it (drawn in place here: a real one is a popup window).</summary>
+    internal static ContextMenu ClassMenu()
+    {
+        var menu = new ContextMenu { VerticalAlignment = VerticalAlignment.Top };
+        string[] names = ["CS 101", "BIO 110", "CALC II", "HIST 210"];
+        for (int i = 0; i < names.Length; i++)
+            menu.Items.Add(new MenuItem { Header = names[i], Icon = new Avalonia.Controls.Shapes.Ellipse { Width = 8, Height = 8, Fill = Skin.ClassDot(i) } });
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = "Let the library sort it" });
+        menu.Items.Add(new MenuItem { Header = "Follow my timetable", IsEnabled = false });
+        return menu;
+    }
+
+    [AvaloniaFact]
+    public void Class_menu()
+    {
+        foreach (var t in Themes)
+        {
+            Shot.Take("mac-01-dropdown-menu", SkinKind.Mac, t, () => Shot.Side(
+                new MacPanel { DataContext = Demo.Panel(recording: false), VerticalAlignment = VerticalAlignment.Top },
+                new Border { Margin = new Thickness(-80, 72, 0, 0), Child = ClassMenu() }));
+            Shot.Take("win-01-flyout-menu", SkinKind.Win, t, () => Shot.Side(
+                new WinPanel { DataContext = Demo.Panel(recording: false), VerticalAlignment = VerticalAlignment.Top },
+                new Border { Margin = new Thickness(-80, 72, 0, 0), Child = ClassMenu() }));
+        }
+    }
+
+    /// <summary>Notifications: the plain ones the app says (one line, two, with a button, with words too long to fit)
+    /// and a stack of Canvas ones, the freshest with its buttons.</summary>
+    static StackPanel Toasts()
+    {
+        var plain = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
+        plain.Children.Add(new ToastView { Title = "Filed in CS 101", Text = "Recursion and the call stack" , ActionLabel = "Open" });
+        plain.Children.Add(new ToastView { Title = "Recording saved", Text = "Study Stash is writing it down; the library files it and writes your notes." });
+        plain.Children.Add(new ToastView { Title = "The model isn't downloaded yet", Text = "Download it in Settings → Recording.", ActionLabel = "Settings" });
+        plain.Children.Add(new ToastView
+        {
+            Title = "Your library didn't answer, and this title is far too long to fit on one line",
+            Text = "Study Stash keeps the recording here and sends it when the library is back. It tries again every few minutes, so there's nothing to do.",
+        });
+        var canvas = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
+        foreach (var toast in CanvasShots.ToastGallery()) canvas.Children.Add(ToastView.For(toast));
+        return Shot.Side(plain, canvas);
+    }
+
+    [AvaloniaFact]
+    public void Mac_toast()
+    {
+        foreach (var t in Themes) Shot.Take("mac-12-toast", SkinKind.Mac, t, Toasts, size: new Size(1000, 560));
+    }
+
+    [AvaloniaFact]
+    public void Win_toast()
+    {
+        foreach (var t in Themes) Shot.Take("win-12-toast", SkinKind.Win, t, Toasts, size: new Size(1000, 620));
+    }
 }

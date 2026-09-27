@@ -8,6 +8,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
@@ -177,8 +178,8 @@ public static partial class Shell
         lastOops = DateTime.UtcNow;
         try
         {
-            string first = e.Exception.Message.Split('\n', 2)[0].Trim();
-            Toast("Something went wrong", first.Length > 0 ? first : e.Exception.GetType().Name, null, null);
+            // The exception is in the log already; the student gets what happened, not the stack's words.
+            Toast("Something went wrong", "Study Stash carried on. If something looks wrong, quit it and open it again.", null, null);
         }
         catch (Exception again)
         {
@@ -431,9 +432,14 @@ public static partial class Shell
         Refresh();
     }
 
+    /// <summary>A menu in the app's look (Styles.axaml): on a Mac the system draws its soft shadow round the rounded
+    /// panel, as it does for its own menus.</summary>
+    internal static ContextMenu Menu() => new() { WindowManagerAddShadowHint = OperatingSystem.IsMacOS() };
+
+    /// <summary>The dropdown's class picker, hung under its button.</summary>
     static void PickClass()
     {
-        var menu = new ContextMenu();
+        var menu = Menu();
         var classes = host.Classes();
         foreach (var (name, color, _) in classes)
         {
@@ -460,7 +466,17 @@ public static partial class Shell
             Refresh();
         };
         menu.Items.Add(follow);
-        if (panelWindow?.Content is Control c) menu.Open(c);
+        if (panelWindow is null) return;
+        var button = panelWindow.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Command == panel.SwitchClassCommand && b.IsEffectivelyVisible);
+        if (button is null)
+        {
+            if (panelWindow.Content is Control c) menu.Open(c);
+            return;
+        }
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.BottomEdgeAlignedRight;
+        menu.VerticalOffset = 6;
+        menu.Open(button);
     }
 
     /// <summary>The panel's Fix button: what to do depends on which problem is showing right now.</summary>
@@ -855,14 +871,18 @@ public static partial class Shell
         Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
             || canvasConnectWindow?.IsVisible == true));
 
-    /// <summary>A notification in the design's look: top right on a Mac, above the tray on Windows. It goes by itself.</summary>
     /// <summary>Toasts on screen right now, oldest first: how they stack, and what stops the same title firing twice
     /// in a row.</summary>
     static readonly List<(string Title, DateTime At, Floating Window)> toasts = [];
 
+    /// <summary>A notification like the system's: top right on a Mac, above the tray on Windows. It goes by itself.
+    /// Error codes in the words go to the log, not on screen.</summary>
     public static void Toast(string title, string text, string? action, Action? run)
     {
         if (quitting) return;
+        if (ToastWords.HadCodes(title) || ToastWords.HadCodes(text)) Program.Log($"[toast] {title}: {text}");
+        title = ToastWords.Plain(title) is { Length: > 0 } plain ? plain : "Study Stash";
+        text = ToastWords.Plain(text);
         var now = DateTime.UtcNow;
         toasts.RemoveAll(t => !t.Window.IsVisible);
         if (toasts.Any(t => t.Title == title && now - t.At < TimeSpan.FromSeconds(10))) return;

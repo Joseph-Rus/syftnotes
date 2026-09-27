@@ -244,7 +244,7 @@ public static partial class Shell
             toasts[0].Window.Close();
             toasts.RemoveAt(0);
         }
-        Control view = Skin.Current == SkinKind.Mac ? new MacCanvasToast { DataContext = toast } : new WinCanvasToast { DataContext = toast };
+        var view = ToastView.For(toast);
         var w = new Floating { Content = view, Title = toast.Title, ShowActivated = false };
         void Close() => Dispatcher.UIThread.Post(w.Close);
         toast.OpenCommand.PropertyChanged += (_, e) =>

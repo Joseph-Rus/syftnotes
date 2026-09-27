@@ -178,7 +178,7 @@ public partial class ThemeTests
         bool In(ResourceDictionary d, string key) => Variants.All(v => d.TryGetResource(key, v, out _));
         var asks = Asks(src).ToList();
         Assert.Contains(asks, a => a.Key == "Accent");
-        Assert.Contains(asks, a => a.Key == "Acrylic" && a.Look == SkinKind.Win);
+        Assert.Contains(asks, a => a.Key == "TextFont" && a.Look == SkinKind.Win);
         var missing = new List<string>();
         foreach (var (file, key, look) in asks)
         {
