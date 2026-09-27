@@ -30,6 +30,7 @@ public static unsafe class MacStatusItem
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern nint SendGetLong(IntPtr r, IntPtr sel);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern nuint SendGetULong(IntPtr r, IntPtr sel);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern IntPtr SendDouble(IntPtr r, IntPtr sel, double a);
+    [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern IntPtr SendDoubleDouble(IntPtr r, IntPtr sel, double a, double b);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern void SendSize(IntPtr r, IntPtr sel, CGSize a);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern bool SendPopUp(IntPtr r, IntPtr sel, IntPtr item, CGPoint at, IntPtr view);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")] static extern IntPtr SendData(IntPtr r, IntPtr sel, byte* bytes, nuint len);
@@ -121,8 +122,9 @@ public static unsafe class MacStatusItem
         SendVoidLong(item, sel_registerName("setTag:"), tag);
     }
 
-    /// <summary>The icon: a template image (the menu bar tints it) at 18×18pt, with a red dot while recording.</summary>
-    public static void SetIcon(byte[] png)
+    /// <summary>The icon at 18×18 pt: the "S." as a template image (the menu bar tints it), or — while recording, when
+    /// its red dot must stay red — an ordinary one drawn in the menu bar's own ink (see <see cref="DarkMenuBar"/>).</summary>
+    public static void SetIcon(byte[] png, bool template = true)
     {
         if (button == IntPtr.Zero) return;
         fixed (byte* p = png)
@@ -130,10 +132,40 @@ public static unsafe class MacStatusItem
             IntPtr data = SendData(objc_getClass("NSData"), sel_registerName("dataWithBytes:length:"), p, (nuint)png.Length);
             IntPtr image = SendId(Send(objc_getClass("NSImage"), sel_registerName("alloc")), sel_registerName("initWithData:"), data);
             if (image == IntPtr.Zero) return;
-            SendVoidBool(image, sel_registerName("setTemplate:"), true);
+            SendVoidBool(image, sel_registerName("setTemplate:"), template);
             SendSize(image, sel_registerName("setSize:"), new CGSize { Width = 18, Height = 18 });
             SendVoidId(button, sel_registerName("setImage:"), image);
         }
+    }
+
+    static string shownTitle = "";
+
+    /// <summary>The time beside the icon while recording ("24:18"), in the menu bar's font with even-width digits so it
+    /// doesn't jiggle as it counts; "" for the icon alone.</summary>
+    public static void ShowElapsed(string text)
+    {
+        if (button == IntPtr.Zero || text == shownTitle) return;
+        if (shownTitle.Length == 0 && text.Length > 0)
+        {
+            IntPtr font = SendDoubleDouble(objc_getClass("NSFont"), sel_registerName("monospacedDigitSystemFontOfSize:weight:"), 13, 0);
+            if (font != IntPtr.Zero) SendVoidId(button, sel_registerName("setFont:"), font);
+        }
+        shownTitle = text;
+        SendVoidId(button, sel_registerName("setTitle:"), NSString(text));
+        SendVoidLong(button, sel_registerName("setImagePosition:"), text.Length > 0 ? 2 /* NSImageLeft */ : 1 /* NSImageOnly */);
+    }
+
+    /// <summary>The menu bar behind the icon is dark (Dark Mode, or a dark desktop picture showing through): an icon
+    /// that isn't a template image is drawn white on it.</summary>
+    public static bool DarkMenuBar()
+    {
+        if (button == IntPtr.Zero) return false;
+        IntPtr appearance = Send(button, sel_registerName("effectiveAppearance"));
+        if (appearance == IntPtr.Zero) return false;
+        IntPtr names = SendId(objc_getClass("NSArray"), sel_registerName("arrayWithObject:"), NSString("NSAppearanceNameAqua"));
+        names = SendId(names, sel_registerName("arrayByAddingObject:"), NSString("NSAppearanceNameDarkAqua"));
+        IntPtr best = SendId(appearance, sel_registerName("bestMatchFromAppearancesWithNames:"), names);
+        return best != IntPtr.Zero && Marshal.PtrToStringUTF8(Send(best, sel_registerName("UTF8String"))) == "NSAppearanceNameDarkAqua";
     }
 
     /// <summary>The icon's window frame, in Cocoa points (origin bottom left, like <c>NSEvent.mouseLocation</c>).

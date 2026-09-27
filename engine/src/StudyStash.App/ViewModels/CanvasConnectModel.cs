@@ -442,9 +442,9 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
             }
             Found = FoundFrom(answer);
             CoursesSay = answer.Available.Count == 1 ? "Found 1 course." : $"Found {answer.Available.Count} courses.";
+            Steps[2].Summary = CoursesSay.TrimEnd('.');
             if (ForSetup)
             {
-                Steps[2].Summary = CoursesSay.TrimEnd('.');
                 await GoToAsync(Steps.Count + 1, null, stop);
                 return;
             }

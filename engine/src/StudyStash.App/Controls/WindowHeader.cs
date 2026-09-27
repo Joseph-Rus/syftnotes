@@ -82,9 +82,7 @@ public sealed class WindowHeader : Panel
         }
         else
         {
-            var mark = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4), Child = new Icon { Glyph = "graphic_eq", Size = 12 } };
-            mark.Bind(Border.BackgroundProperty, mark.GetResourceObservable("Accent"));
-            ((Icon)mark.Child).Bind(Icon.ForegroundProperty, mark.GetResourceObservable("OnAccent"));
+            var mark = new AppIcon { VerticalAlignment = VerticalAlignment.Center };
             title.FontSize = 12;
             titleRow.Margin = new Thickness(16, 0, 0, 0);
             titleRow.HorizontalAlignment = HorizontalAlignment.Left;

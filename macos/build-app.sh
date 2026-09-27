@@ -3,7 +3,7 @@
 # executable works on Apple silicon and Intel) for the laptop and library roles, then both DMGs (D2):
 #   sh macos/build-app.sh [out-dir]      default: dist/mac
 # Needs the .NET 10 SDK and the Xcode command line tools (clang, lipo, codesign, hdiutil, PlistBuddy, iconutil,
-# xcrun swift, vtool, ditto). Publishing both architectures downloads their runtime packs on first use.
+# xcrun swift, vtool, ditto, SetFile, osascript). Publishing both architectures downloads their runtime packs on first use.
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -58,7 +58,8 @@ MINOS=$( { tree_minos "$MACOS/arm64"; tree_minos "$MACOS/x64"; } | sort -t. -k1,
 # The launcher: the one universal binary in the bundle, built for both trees' minimum OS (D1).
 clang -O2 -Wall -Werror -arch arm64 -arch x86_64 -mmacosx-version-min="$MINOS" -o "$MACOS/StudyStash" "$HERE/launcher.c"
 
-# Icon.
+# Icon: the cream "S." (macos/make_icon.swift draws every size from its one mark). Light only: an asset catalog's
+# dark appearance is dropped for Mac app icons (macOS 26's dark and tinted icons need an Icon Composer file).
 xcrun swift "$HERE/make_icon.swift" "$OUT/AppIcon.iconset"
 iconutil -c icns "$OUT/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
 rm -rf "$OUT/AppIcon.iconset"
@@ -100,18 +101,33 @@ codesign --verify --deep --strict --verbose=2 "$LIBAPP"
 echo "Library copy:"
 du -sh "$LIBAPP"
 
-# Both DMGs (D2): a stage folder per role with the app plus a link to /Applications.
+# Both DMGs (D2): a stage folder per role with the app plus a link to /Applications. The disk shows the app's icon
+# when it opens (.VolumeIcon.icns, flagged on the volume, which only a mounted read-write copy can take), and the .dmg
+# file itself wears it too.
 stage_dmg() {
   app_path=$1
   role_name=$2
   volname=$3
   stage="$OUT/stage-$role_name"
-  rm -rf "$stage"
-  mkdir -p "$stage"
+  rw="$OUT/stage-$role_name.dmg"
+  mnt="$OUT/mount-$role_name"
+  dmg="$OUT/Study-Stash-$role_name.dmg"
+  rm -rf "$stage" "$rw" "$mnt"
+  mkdir -p "$stage" "$mnt"
   ditto "$app_path" "$stage/Study Stash.app"
   ln -s /Applications "$stage/Applications"
-  hdiutil create -quiet -volname "$volname" -srcfolder "$stage" -ov -format UDZO "$OUT/Study-Stash-$role_name.dmg"
-  rm -rf "$stage"
+  cp "$app_path/Contents/Resources/AppIcon.icns" "$stage/.VolumeIcon.icns"
+  SetFile -c icnC "$stage/.VolumeIcon.icns" 2>/dev/null || true
+  hdiutil create -quiet -volname "$volname" -srcfolder "$stage" -ov -format UDRW "$rw"
+  if hdiutil attach -quiet -nobrowse -mountpoint "$mnt" "$rw"; then
+    SetFile -a C "$mnt" 2>/dev/null || true
+    hdiutil detach -quiet "$mnt"
+  fi
+  rm -f "$dmg"
+  hdiutil convert -quiet "$rw" -format UDZO -o "$dmg"
+  osascript -l JavaScript -e 'ObjC.import("AppKit"); function run(a) { $.NSWorkspace.sharedWorkspace.setIconForFileOptions($.NSImage.alloc.initWithContentsOfFile(a[0]), a[1], 0); }' \
+    "$app_path/Contents/Resources/AppIcon.icns" "$dmg" >/dev/null 2>&1 || true
+  rm -rf "$stage" "$rw" "$mnt"
 }
 stage_dmg "$APP" "Laptop" "Study Stash"
 stage_dmg "$LIBAPP" "Library" "Study Stash Library"

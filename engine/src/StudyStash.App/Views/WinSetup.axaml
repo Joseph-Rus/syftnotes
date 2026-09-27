@@ -550,7 +550,7 @@
                         <StackPanel Orientation="Horizontal" Spacing="2">
                           <Panel Width="32" Height="32"><c:Icon Glyph="cloud" Size="16" Foreground="{DynamicResource Fg3}" /></Panel>
                           <Border Width="32" Height="32" CornerRadius="4" BorderBrush="{DynamicResource Accent}" BorderThickness="2">
-                            <c:Icon Glyph="graphic_eq" Size="17" Foreground="{DynamicResource Fg}" />
+                            <c:AppMarkGlyph Width="17" Height="17" Foreground="{DynamicResource Fg}" />
                           </Border>
                           <Panel Width="32" Height="32"><c:Icon Glyph="bluetooth" Size="16" Foreground="{DynamicResource Fg3}" /></Panel>
                         </StackPanel>

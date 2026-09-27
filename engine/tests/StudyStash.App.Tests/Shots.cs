@@ -254,7 +254,7 @@ public class SurfaceShots
     /// </summary>
     static Border TaskbarStrip(bool recording, string time, string date)
     {
-        var appButton = new Border { Width = 36, Height = 40, CornerRadius = new CornerRadius(4), Child = TaskbarIcon("graphic_eq", 19, "Fg") };
+        var appButton = new Border { Width = 36, Height = 40, CornerRadius = new CornerRadius(4), Child = new AppIcon { Width = 22, Height = 22 } };
         appButton.Bind(Border.BackgroundProperty, appButton.GetResourceObservable("Subtle2"));
         if (recording)
         {
@@ -265,7 +265,7 @@ public class SurfaceShots
                 Width = 8, Height = 8, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Color.Parse("#E5484D")),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 4, 6),
             };
-            appButton.Child = new Panel { Children = { TaskbarIcon("graphic_eq", 19, "Fg"), ring, dot } };
+            appButton.Child = new Panel { Children = { new AppIcon { Width = 22, Height = 22 }, ring, dot } };
         }
 
         var icons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(10, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -315,8 +315,7 @@ public class SurfaceShots
         var gridButton = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(4), Child = grid };
         var searchButton = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(4), Child = TaskbarIcon("search", 20, "Fg2") };
 
-        var accentIcon = new Border { Width = 22, Height = 22, CornerRadius = new CornerRadius(5), Child = TaskbarIcon("graphic_eq", 15, "OnAccent") };
-        accentIcon.Bind(Border.BackgroundProperty, accentIcon.GetResourceObservable("Accent"));
+        var accentIcon = new AppIcon { Width = 22, Height = 22 };
         var track = new Border { Width = 28, Height = 3, CornerRadius = new CornerRadius(2) };
         track.Bind(Border.BackgroundProperty, track.GetResourceObservable("Fg3"));
         var fill = new Border { Width = 28 * 0.42, Height = 3, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.Parse("#4CAF50")), HorizontalAlignment = HorizontalAlignment.Left };

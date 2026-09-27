@@ -266,24 +266,19 @@ public static partial class Shell
 
     // --- the tray ---------------------------------------------------------------------------------------------------
 
-    /// <summary>The icon, as PNG bytes: the waveform glyph (a template image on a Mac, which the menu bar tints),
-    /// with a red dot while recording.</summary>
+    /// <summary>The icon, as PNG bytes: the "S." mark — black on a Mac (a template image the menu bar tints, or, while
+    /// recording, in the menu bar's own ink so its red dot stays red), black or white on Windows by theme — with a red
+    /// dot while recording.</summary>
     static byte[] TrayImageBytes(bool recording)
     {
-        const int size = 44;
-        var bmp = new RenderTargetBitmap(new PixelSize(size, size), new Vector(96, 96));
-        using (var ctx = bmp.CreateDrawingContext())
-        {
-            IBrush ink = OperatingSystem.IsMacOS() ? Brushes.Black : Application.Current?.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Light ? Brushes.Black : Brushes.White;
-            if (Controls.Icon.Find("graphic_eq", false) is { } g)
-                using (ctx.PushTransform(Matrix.CreateScale(size / 24.0, size / 24.0)))
-                    ctx.DrawGeometry(ink, null, g);
-            if (recording) ctx.DrawEllipse(new SolidColorBrush(Color.Parse("#E5484D")), null, new Point(size - 9, size - 9), 8, 8);
-        }
-        var stream = new MemoryStream();
-        bmp.Save(stream, PngBitmapEncoderOptions.Default);
-        return stream.ToArray();
+        if (OperatingSystem.IsMacOS())
+            return TrayMark.Png(36, recording && (trayDark = MacStatusItem.DarkMenuBar()) ? Brushes.White : Brushes.Black, recording);
+        IBrush ink = Application.Current?.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Light ? Brushes.Black : Brushes.White;
+        return TrayMark.Png(32, ink, recording);
     }
+
+    /// <summary>The Mac menu bar was dark when the recording icon was last drawn.</summary>
+    static bool trayDark;
 
     static WindowIcon TrayImage(bool recording)
     {
@@ -974,6 +969,17 @@ public static partial class Shell
         var levels = host.Recorder.Levels();
         panel.Elapsed = recorder.Elapsed = elapsed;
         panel.Levels = recorder.Levels = levels;
+        // The menu bar shows the time beside the icon (the tray, on hover); a menu bar that turned dark or light since
+        // gets the recording icon in its new ink.
+        if (OperatingSystem.IsMacOS())
+        {
+            MacStatusItem.ShowElapsed(elapsed);
+            if (trayRecording && MacStatusItem.DarkMenuBar() != trayDark) MacStatusItem.SetIcon(TrayImageBytes(true), template: false);
+        }
+        else if (tray is not null)
+        {
+            tray.ToolTipText = $"Study Stash · recording {elapsed}";
+        }
     }
 
     static DateTime lastRefreshAt = DateTime.MinValue;
@@ -1050,8 +1056,16 @@ public static partial class Shell
         if (trayRecording != recording)
         {
             trayRecording = recording;
-            if (OperatingSystem.IsMacOS()) MacStatusItem.SetIcon(TrayImageBytes(recording));
-            else if (tray is not null) tray.Icon = TrayImage(recording);
+            if (OperatingSystem.IsMacOS())
+            {
+                MacStatusItem.SetIcon(TrayImageBytes(recording), template: !recording);
+                if (!recording) MacStatusItem.ShowElapsed("");
+            }
+            else if (tray is not null)
+            {
+                tray.Icon = TrayImage(recording);
+                if (!recording) tray.ToolTipText = "Study Stash";
+            }
         }
         if (OperatingSystem.IsWindows()) UpdateTaskbar(problem);
         if (setup is not null) Setup.Refresh(setup, host);
