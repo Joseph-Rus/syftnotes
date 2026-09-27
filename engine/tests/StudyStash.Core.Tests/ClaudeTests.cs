@@ -124,6 +124,8 @@ public class ClaudeTests
 
         var lib = await Json(await c.SendAsync(Req(HttpMethod.Get, "/api/v2/library")));
         Assert.Equal("Sam's library", lib["name"]!.GetValue<string>());
+        // This computer's own app asking isn't a laptop.
+        Assert.Equal("[]", lib["laptops"]!.ToJsonString());
         Assert.Equal("[{\"name\":\"CS 101\",\"lectures\":1,\"color\":0},{\"name\":\"BIO 110\",\"lectures\":1,\"color\":1}]", lib["classes"]!.ToJsonString());
 
         var list = (JsonArray)await Json(await c.SendAsync(Req(HttpMethod.Get, "/api/v2/lectures?class=CS%20101")));
@@ -144,6 +146,46 @@ public class ClaudeTests
         Assert.Contains(passages, p => p!["at"] is JsonValue v && v.GetValue<double>() >= 1085);
         var cls = await Json(await c.SendAsync(Req(HttpMethod.Get, "/api/v2/search?q=bio")));
         Assert.Equal("BIO 110", cls["classes"]![0]!["name"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task The_library_says_which_laptops_reach_it()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        await using var site = await Site(cfg, store);
+        var c = site.Client;
+        // A laptop over the network (a forwarded request isn't this computer), named by its app; one that names
+        // nothing is known by its address; a wrong password isn't a laptop at all.
+        var laptop = Req(HttpMethod.Get, "/api/v2/library");
+        laptop.Headers.Add("X-Forwarded-For", "100.64.0.7");
+        laptop.Headers.Add("X-Study-Stash-Computer", "Sam's MacBook Air");
+        await c.SendAsync(laptop);
+        var stranger = Req(HttpMethod.Get, "/api/v2/library", key: "wrong");
+        stranger.Headers.Add("X-Forwarded-For", "100.64.0.9");
+        stranger.Headers.Add("X-Study-Stash-Computer", "Not a laptop");
+        await c.SendAsync(stranger);
+        var lib = await Json(await c.SendAsync(Req(HttpMethod.Get, "/api/v2/library")));
+        var seen = Assert.Single(lib["laptops"]!.AsArray())!;
+        Assert.Equal("Sam's MacBook Air", seen["name"]!.GetValue<string>());
+        Assert.True(DateTimeOffset.UtcNow - DateTimeOffset.Parse(seen["seen"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture) < TimeSpan.FromMinutes(1));
+    }
+
+    [Fact]
+    public void Laptops_seen_are_named_latest_first_and_kept_few()
+    {
+        var seen = new StudyStash.Library.LaptopsSeen();
+        var t = new DateTimeOffset(2026, 9, 21, 10, 0, 0, TimeSpan.Zero);
+        seen.Seen("Sam's MacBook Air", "100.64.0.7", t);
+        seen.Seen("", "100.64.0.8", t.AddMinutes(1));
+        seen.Seen(new string('x', 80), null, t.AddMinutes(2));
+        seen.Seen("  ", null, t.AddMinutes(3)); // nothing to name it by
+        var names = seen.Json().Select(n => n!["name"]!.GetValue<string>()).ToList();
+        Assert.Equal([new string('x', 64), "100.64.0.8", "Sam's MacBook Air"], names);
+        for (int i = 0; i < 40; i++) seen.Seen($"laptop {i}", null, t.AddHours(1).AddMinutes(i));
+        Assert.Equal(32, seen.Json().Count);
+        Assert.DoesNotContain(seen.Json(), n => n!["name"]!.GetValue<string>() == "Sam's MacBook Air");
     }
 
     [Fact]

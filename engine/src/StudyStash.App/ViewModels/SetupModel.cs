@@ -148,8 +148,37 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial bool Connecting { get; set; }
     /// <summary>Looking for a library on this computer or your Tailscale network ("Find it").</summary>
     [ObservableProperty] public partial bool Finding { get; set; }
-    /// <summary>Start Study Stash when the student logs in: off unless they tick it.</summary>
+    /// <summary>Start Study Stash when the student logs in: off unless they tick it (or the library was already here,
+    /// or it already started at login).</summary>
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
+    /// <summary>This computer already has a library (setup run again): the password step keeps what it has.</summary>
+    [ObservableProperty] public partial bool ExistingLibrary { get; set; }
+    /// <summary>Where the library keeps its notes: the one it already has, or Documents/Study Stash for a new one.</summary>
+    [ObservableProperty] public partial string NotesFolder { get; set; } = "";
+    public string PasswordTitle => ExistingLibrary ? "Your library is already here" : "Give your library a password";
+    public string PasswordLede => ExistingLibrary
+        ? "It keeps its name, password and notes. Change them here if you like; your laptop connects with this password."
+        : "Your laptop uses it to connect. Anyone with it can read your notes.";
+    /// <summary>"Keeps its notes in ~/Documents/Lecture notes" (a library already here) or "Keeps its notes in
+    /// ~/Documents/Study Stash".</summary>
+    public string NotesFolderWords => NotesFolder.Length == 0 ? "" : $"{(ExistingLibrary ? "Its notes stay in" : "Keeps its notes in")} {Tilde(NotesFolder)}";
+
+    /// <summary>A folder in the student's home written from "~" (shorter, and it doesn't spell out the account name).</summary>
+    public static string Tilde(string path)
+    {
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return home.Length > 0 && path.StartsWith(home, StringComparison.Ordinal) ? "~" + path[home.Length..] : path;
+    }
+
+    partial void OnExistingLibraryChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ContinueLabel));
+        OnPropertyChanged(nameof(PasswordTitle));
+        OnPropertyChanged(nameof(PasswordLede));
+        OnPropertyChanged(nameof(NotesFolderWords));
+    }
+
+    partial void OnNotesFolderChanged(string value) => OnPropertyChanged(nameof(NotesFolderWords));
     /// <summary>Where a laptop reaches this library, for the library's last page (the host fills it in).</summary>
     public ObservableCollection<SetupAddress> Addresses { get; } = [];
     public string PasswordText => ShowPassword ? Password : new string('•', Math.Clamp(Password.Length, 8, 16));
@@ -201,7 +230,7 @@ public sealed partial class SetupModel : ObservableObject
         : $"Step {Index} of {Count}";
     public string ContinueLabel =>
         IsLast ? "Open Study Stash"
-        : OnPassword && !LibraryOk ? "Create library"
+        : OnPassword && !LibraryOk ? (ExistingLibrary ? "Start library" : "Create library")
         : OnLibrary && !LibraryOk ? "Connect"
         : "Continue";
     public bool CanGoBack => Index > 1;

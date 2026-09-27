@@ -126,6 +126,27 @@ public static class Demo
         return m;
     }
 
+    /// <summary>A library-only computer's dropdown (the Mac mini at home): running, 21 lectures, Canvas synced ten
+    /// minutes ago, one laptop connected; no Record.</summary>
+    public static PanelModel LibraryPanel()
+    {
+        var now = new DateTimeOffset(2026, 9, 21, 15, 0, 0, TimeSpan.Zero);
+        var overview = new System.Text.Json.Nodes.JsonObject
+        {
+            ["classes"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["name"] = "CS 101", ["lectures"] = 12 },
+                new System.Text.Json.Nodes.JsonObject { ["name"] = "BIO 110", ["lectures"] = 7 }),
+            ["unsorted"] = 2,
+            ["laptops"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject { ["name"] = "Sam's MacBook Air", ["seen"] = now.AddSeconds(-20).ToString("o") }),
+        };
+        string device = Skin.Current == SkinKind.Mac ? "Mac" : "PC";
+        return new PanelModel
+        {
+            LibraryOnly = true,
+            Status = $"Library running on this {device}",
+            Library = LibraryPanelWords.From(true, false, device, overview, new Services.CanvasApi.State { Status = "connected", LastSync = now.AddMinutes(-10) }, now, TimeZoneInfo.Utc),
+        };
+    }
+
     public static PanelModel Panel(bool recording)
     {
         var p = new PanelModel

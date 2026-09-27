@@ -92,4 +92,45 @@ public sealed class LibraryHereTests
         await Assert.ThrowsAsync<ArgumentException>(() => here.CreateAsync(host, "Ada's library", "abc", "Ada"));
         Assert.Null(host.LocalLibrary);
     }
+
+    [Fact]
+    public async Task A_library_already_here_keeps_its_folder_port_reach_name_and_password()
+    {
+        string exe = BuiltEngine();
+        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
+        using var home = new TempHome();
+        string notes = home["Lecture notes"];
+        int port;
+        using (var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
+        {
+            probe.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            port = ((IPEndPoint)probe.LocalEndPoint!).Port;
+        }
+        Configs.Save(new Config(home.Path, notes) { PoolName = "Sam's library", PoolPassword = "kept-password", WebHost = "127.0.0.1", WebPort = port });
+        using var host = Host(home.Path);
+        var here = new LibraryHere { Command = [exe] };
+        try
+        {
+            // What Settings' "make this the library" asks for: nothing new.
+            await here.CreateAsync(host, null, null, "Sam");
+            var cfg = Configs.Load(home.Path);
+            Assert.Equal(Path.GetFullPath(notes), Path.GetFullPath(cfg.PoolDir));
+            Assert.Equal("127.0.0.1", cfg.WebHost);
+            Assert.Equal(port, cfg.WebPort);
+            Assert.Equal("Sam's library", cfg.PoolName);
+            Assert.Equal("kept-password", cfg.PoolPassword);
+        }
+        finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
+    }
+
+    [Fact]
+    public void Only_a_readable_config_counts_as_a_library_already_here()
+    {
+        using var home = new TempHome();
+        Assert.Null(LibraryHere.Existing(home.Path));
+        Configs.Save(new Config(home.Path, home["Notes"]) { PoolName = "Sam's library", PoolPassword = "pw-1234" });
+        Assert.Equal("Sam's library", LibraryHere.Existing(home.Path)!.PoolName);
+        File.WriteAllText(home["config.toml"], "this isn't [ toml");
+        Assert.Null(LibraryHere.Existing(home.Path));
+    }
 }

@@ -171,4 +171,12 @@ public class ProblemsTests
     [InlineData(LibraryState.NotSetUp, false, false, null, "No library yet · No transcription model")]
     public void The_dropdowns_status_line_reads_exactly(LibraryState library, bool localLibraryRunning, bool modelReady, DownloadProgress? downloading, string expected) =>
         Assert.Equal(expected, AppHost.StatusText(library, localLibraryRunning, modelReady, downloading));
+
+    [Fact]
+    public void A_library_only_computers_status_line_never_mentions_the_transcription_model()
+    {
+        string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
+        Assert.Equal($"Library running on this {device}", AppHost.StatusText(LibraryState.Connected, true, false, null, records: false));
+        Assert.Equal("Starting your library…", AppHost.StatusText(LibraryState.Starting, false, false, null, records: false));
+    }
 }

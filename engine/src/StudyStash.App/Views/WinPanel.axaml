@@ -34,21 +34,54 @@
       <!-- Footer band -->
       <Border DockPanel.Dock="Bottom" Height="44" Background="{DynamicResource Footer}" BorderBrush="{DynamicResource Sep}" BorderThickness="0,1,0,0"
               Padding="12,0,6,0">
-        <Grid ColumnDefinitions="Auto,8,*,Auto">
-          <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-          <Button Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0" Command="{Binding OpenAppCommand}">
+        <Grid ColumnDefinitions="Auto,8,*,Auto,2,Auto">
+          <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" IsVisible="{Binding ShowStatus}" />
+          <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" IsVisible="{Binding ShowStatus}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          <Button Name="OpenApp" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0" Command="{Binding OpenAppCommand}">
             <TextBlock Text="Open Study Stash" FontSize="13" VerticalAlignment="Center" />
+          </Button>
+          <!-- Quick Settings' own gear, at the footer's right -->
+          <Button Name="Settings" AutomationProperties.Name="Settings" Grid.Column="5" Theme="{StaticResource Surface}" Width="32" Height="32" CornerRadius="4" Padding="0"
+                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding SettingsCommand}" ToolTip.Tip="{Binding SettingsTip}">
+            <c:Icon Glyph="settings" Size="16" Foreground="{DynamicResource Fg}" />
           </Button>
         </Grid>
       </Border>
 
       <StackPanel Spacing="10" Margin="12">
+        <!-- A library-only computer: no Record; what the library is doing instead, in a card -->
+        <Border Name="LibraryCard" IsVisible="{Binding LibraryOnly}" Background="{DynamicResource Card}" BorderBrush="{DynamicResource CardStroke}"
+                BorderThickness="1" CornerRadius="8" Padding="12,10">
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="16,8,*">
+              <Ellipse Width="8" Height="8" Classes="status" Classes.warn="{Binding !Library.RunningGood, FallbackValue=False}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding Library.Running, FallbackValue=''}" FontSize="14" FontWeight="SemiBold"
+                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            </Grid>
+            <Grid ColumnDefinitions="16,8,*">
+              <c:Icon Glyph="notes" Size="14" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding Library.Lectures, FallbackValue=''}" FontSize="12" Foreground="{DynamicResource Fg2}"
+                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            </Grid>
+            <Grid ColumnDefinitions="16,8,*" IsVisible="{Binding HasCanvasLine}">
+              <c:Icon Glyph="school" Size="14" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding Library.Canvas, FallbackValue=''}" FontSize="12" Foreground="{DynamicResource Fg2}"
+                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            </Grid>
+            <Grid ColumnDefinitions="16,8,*" IsVisible="{Binding HasLaptopsLine}">
+              <c:Icon Glyph="laptop_mac" Size="14" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding Library.Laptops, FallbackValue=''}" FontSize="12" Foreground="{DynamicResource Fg2}"
+                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
         <!-- Idle: Record as a split button -->
-        <StackPanel Spacing="6" IsVisible="{Binding IsIdle}">
+        <StackPanel Spacing="6" IsVisible="{Binding ShowRecord}">
           <Border Height="36" CornerRadius="4" Background="{DynamicResource Accent}" ClipToBounds="True">
             <Grid ColumnDefinitions="*,1,36">
-              <Button Name="Record" Theme="{StaticResource Surface}" Foreground="{DynamicResource OnAccent}" Padding="12,0" Command="{Binding RecordCommand}"
+              <Button Name="Record" AutomationProperties.Name="Record" Theme="{StaticResource Surface}" Foreground="{DynamicResource OnAccent}" Padding="12,0" Command="{Binding RecordCommand}"
                       IsEnabled="{Binding CanRecord}" ToolTip.Tip="Start recording">
                 <Grid ColumnDefinitions="Auto,8,*,Auto">
                   <c:Icon Glyph="fiber_manual_record" Filled="True" Size="14" Foreground="{DynamicResource OnAccent}" />
@@ -57,7 +90,7 @@
                 </Grid>
               </Button>
               <Border Grid.Column="1" Background="{DynamicResource OnAccent}" Opacity="0.25" />
-              <Button Name="SwitchClass" Grid.Column="2" Theme="{StaticResource Surface}" HorizontalContentAlignment="Center" Command="{Binding SwitchClassCommand}" ToolTip.Tip="Switch class">
+              <Button Name="SwitchClass" AutomationProperties.Name="Switch class" Grid.Column="2" Theme="{StaticResource Surface}" HorizontalContentAlignment="Center" Command="{Binding SwitchClassCommand}" ToolTip.Tip="Switch class">
                 <c:Icon Glyph="expand_more" Size="16" Foreground="{DynamicResource OnAccent}" />
               </Button>
             </Grid>
@@ -102,7 +135,7 @@
         </Border>
 
         <!-- Recent -->
-        <StackPanel IsVisible="{Binding HasRecent}" Spacing="4">
+        <StackPanel IsVisible="{Binding ShowRecent}" Spacing="4">
           <TextBlock Text="Recent" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" Margin="0,2,0,0" />
           <ItemsControl ItemsSource="{Binding Recent}" Margin="-6,0,-6,0">
             <ItemsControl.ItemsPanel>
@@ -137,7 +170,7 @@
         </StackPanel>
 
         <!-- Search: a Fluent text box look -->
-        <Button Name="Search" Classes="control" Height="32" Padding="11,0,8,0" HorizontalContentAlignment="Stretch" Command="{Binding SearchCommand}">
+        <Button Name="Search" AutomationProperties.Name="Search notes and lectures" Classes="control" Height="32" Padding="11,0,8,0" HorizontalContentAlignment="Stretch" Command="{Binding SearchCommand}">
           <Grid ColumnDefinitions="*,Auto,Auto">
             <TextBlock Text="Search notes and lectures" FontSize="14" Foreground="{DynamicResource Fg3}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
             <TextBlock Grid.Column="1" Text="{Binding SearchShortcut}" FontSize="11" Foreground="{DynamicResource Fg3}" Margin="8,0,0,0" VerticalAlignment="Center" />

@@ -17,6 +17,9 @@ public sealed partial class LibraryWeb
 
     LibraryReader Reader => reader ??= new LibraryReader(cfg, store);
 
+    /// <summary>The laptops that have reached this library since it started, and when each last did.</summary>
+    public LaptopsSeen Laptops { get; } = new();
+
     public ClaudeAccess Claude => claude ??= options.Claude ?? new ClaudeAccess(cfg.Home);
 
     IResult Api(HttpContext ctx, Func<IResult> answer) => RequireKey(ctx) ?? answer();
@@ -29,7 +32,14 @@ public sealed partial class LibraryWeb
     {
         if (store.IndexMissing() is int n and > 0) Console.WriteLine($"[library] indexed {n} lecture(s) for search");
 
-        app.MapGet("/api/v2/library", (HttpContext ctx) => Api(ctx, () => Http.Json(Reader.Overview())));
+        app.MapGet("/api/v2/library", (HttpContext ctx) => Api(ctx, () =>
+        {
+            // Another computer asking (with the password) is a laptop reaching the library: its dropdown says so.
+            if (!IsLocal(ctx)) Laptops.Seen(ctx.Request.Headers[LaptopsSeen.Header].ToString(), ctx.Connection.RemoteIpAddress?.ToString(), DateTimeOffset.UtcNow);
+            var overview = Reader.Overview();
+            overview["laptops"] = Laptops.Json();
+            return Http.Json(overview);
+        }));
         app.MapGet("/api/v2/lectures", (HttpContext ctx, string? @class, int? limit, string? before) =>
             Api(ctx, () => Http.Json(Reader.Lectures(@class, limit ?? 50, before))));
         app.MapGet("/api/v2/lectures/{id}", (HttpContext ctx, string id) =>

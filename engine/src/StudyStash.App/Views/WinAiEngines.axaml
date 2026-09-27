@@ -38,13 +38,7 @@
               </Grid>
             </Border>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding NotesChoices}">
-                <MenuFlyout.ItemTemplate>
-                  <DataTemplate x:DataType="vm:EngineChoice">
-                    <MenuItem Classes="ai-item" Header="{Binding Name}" Command="{Binding Pick}" />
-                  </DataTemplate>
-                </MenuFlyout.ItemTemplate>
-              </MenuFlyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding NotesChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
             </Button.Flyout>
           </Button>
         </Grid>
@@ -64,13 +58,7 @@
               </Grid>
             </Border>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}">
-                <MenuFlyout.ItemTemplate>
-                  <DataTemplate x:DataType="vm:EngineChoice">
-                    <MenuItem Classes="ai-item" Header="{Binding Name}" Command="{Binding Pick}" />
-                  </DataTemplate>
-                </MenuFlyout.ItemTemplate>
-              </MenuFlyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
             </Button.Flyout>
           </Button>
         </Grid>
@@ -82,17 +70,13 @@
         <Button Grid.Column="1" Classes="ai-textbtn" IsVisible="{Binding HasAddChoices}">
           <TextBlock Classes="ai-link" Text="Add an engine" />
           <Button.Flyout>
-            <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AddChoices}">
+            <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AddChoices}" ItemContainerTheme="{StaticResource AiAddItem}">
               <MenuFlyout.ItemTemplate>
                 <DataTemplate x:DataType="vm:AiEngineRow">
-                  <MenuItem Classes="ai-item" Command="{Binding AddCommand}">
-                    <MenuItem.Header>
                       <StackPanel Spacing="2">
                         <TextBlock Text="{Binding Name, StringFormat='Get {0}'}" FontSize="14" />
                         <TextBlock Text="{Binding About}" FontSize="12" Foreground="{DynamicResource Fg2}" />
                       </StackPanel>
-                    </MenuItem.Header>
-                  </MenuItem>
                 </DataTemplate>
               </MenuFlyout.ItemTemplate>
             </MenuFlyout>
@@ -125,18 +109,8 @@
                     </Border>
                     <Button.Flyout>
                       <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}">
-                        <MenuItem Classes="ai-item" Header="Check it works" Command="{Binding CheckCommand}" />
-                        <MenuItem Classes="ai-item" Header="Models" ItemsSource="{Binding ModelChoices}" IsVisible="{Binding HasModels}">
-                          <MenuItem.ItemTemplate>
-                            <DataTemplate x:DataType="vm:AiModelChoice">
-                              <MenuItem Classes="ai-item" Header="{Binding Label}" Command="{Binding Pick}">
-                                <MenuItem.Icon>
-                                  <c:Icon Glyph="check" Size="14" IsVisible="{Binding Current}" />
-                                </MenuItem.Icon>
-                              </MenuItem>
-                            </DataTemplate>
-                          </MenuItem.ItemTemplate>
-                        </MenuItem>
+                        <MenuItem Theme="{StaticResource AiMenuItem}" Header="Check it works" Command="{Binding CheckCommand}" />
+                        <MenuItem Theme="{StaticResource AiMenuItem}" Header="Models" ItemsSource="{Binding ModelChoices}" IsVisible="{Binding HasModels}" ItemContainerTheme="{StaticResource AiModelItem}" />
                       </MenuFlyout>
                     </Button.Flyout>
                   </Button>

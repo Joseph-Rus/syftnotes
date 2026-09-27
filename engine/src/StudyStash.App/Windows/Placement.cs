@@ -114,4 +114,10 @@ public static class Placement
         int y = mac ? s.WorkingArea.Y + gap - room + step : s.WorkingArea.Bottom - size.Height - gap + room - step;
         return new PixelPoint(x, y);
     }
+
+    /// <summary>Where a Mac's menu bar should put the S. so it shows, as its "preferred position" (points in from the
+    /// screen's right edge): just right of the camera notch when there is one (the stretch of menu bar right of it,
+    /// less room for the icon), else halfway along.</summary>
+    public static double MenuBarPosition(double screenWidth, double rightOfNotch) =>
+        Math.Max(40, (rightOfNotch > 0 ? rightOfNotch : screenWidth / 2) - 64);
 }

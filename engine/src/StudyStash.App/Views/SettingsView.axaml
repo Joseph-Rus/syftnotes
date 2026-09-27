@@ -440,12 +440,6 @@
     <Style Selector=".win TextBlock.swatchname">
       <Setter Property="FontSize" Value="12" />
     </Style>
-    <Style Selector="MenuItem.pick">
-      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
-      <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
-      <Setter Property="Padding" Value="10,5" />
-    </Style>
     <Style Selector=".mac Button.select TextBlock">
       <Setter Property="FontSize" Value="13" />
     </Style>
@@ -487,9 +481,16 @@
         </Panel>
       </Button>
     </DataTemplate>
-    <DataTemplate x:Key="PickItem" x:DataType="vm:SettingChoice">
-      <MenuItem Classes="pick" Header="{Binding Label}" Command="{Binding Pick}" />
-    </DataTemplate>
+    <!-- A select's item: the menu's own item, bound to its choice (a MenuItem inside an item template would sit in the
+         real item's header, and picking it did nothing). -->
+    <ControlTheme x:Key="PickItem" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SettingChoice">
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="Padding" Value="10,5" />
+      <Setter Property="Header" Value="{Binding Label}" />
+      <Setter Property="Command" Value="{Binding Pick}" />
+    </ControlTheme>
   </UserControl.Resources>
 
   <Border Name="Chrome">
@@ -879,7 +880,7 @@
                                 <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
                               </Grid>
                               <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SortEngineChoices}" ItemTemplate="{StaticResource PickItem}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SortEngineChoices}" ItemContainerTheme="{StaticResource PickItem}" />
                               </Button.Flyout>
                             </Button>
                           </Grid>
@@ -897,7 +898,7 @@
                                 <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
                               </Grid>
                               <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.ConfidenceChoices}" ItemTemplate="{StaticResource PickItem}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.ConfidenceChoices}" ItemContainerTheme="{StaticResource PickItem}" />
                               </Button.Flyout>
                             </Button>
                           </Grid>
@@ -920,7 +921,7 @@
                                 <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
                               </Grid>
                               <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SummaryChoices}" ItemTemplate="{StaticResource PickItem}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SummaryChoices}" ItemContainerTheme="{StaticResource PickItem}" />
                               </Button.Flyout>
                             </Button>
                           </Grid>
@@ -938,7 +939,7 @@
                                 <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
                               </Grid>
                               <Button.Flyout>
-                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SortChoices}" ItemTemplate="{StaticResource PickItem}" />
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SortChoices}" ItemContainerTheme="{StaticResource PickItem}" />
                               </Button.Flyout>
                             </Button>
                           </Grid>
@@ -961,7 +962,7 @@
                               <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
                             </Grid>
                             <Button.Flyout>
-                              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.TerminalChoices}" ItemTemplate="{StaticResource PickItem}" />
+                              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.TerminalChoices}" ItemContainerTheme="{StaticResource PickItem}" />
                             </Button.Flyout>
                           </Button>
                         </Grid>

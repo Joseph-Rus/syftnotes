@@ -2,7 +2,9 @@
      state dot, a toggle switch and a radio, all Windows 11 Fluent. Included from each AI UserControl, never from
      Styles.axaml (WS2's). -->
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:StudyStash.App.ViewModels"
+        xmlns:c="using:StudyStash.App.Controls">
   <Style Selector="TextBlock.ai-title">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
     <Setter Property="FontSize" Value="28" />
@@ -121,14 +123,39 @@
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
 
-  <Style Selector="MenuItem.ai-item">
-    <Setter Property="CornerRadius" Value="4" />
-    <Setter Property="Padding" Value="12,6" />
-    <Setter Property="FontSize" Value="14" />
-  </Style>
-
   <Styles.Resources>
-    <ControlTheme x:Key="AiMenuFlyout" TargetType="MenuFlyoutPresenter">
+    <!-- A menu's item. A menu built from a list gets its item's command through these container themes, never from a
+         MenuItem inside the item template: that one would sit inside the real item's header, and picking it did nothing. -->
+    <ControlTheme x:Key="AiMenuItem" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="FontSize" Value="14" />
+    </ControlTheme>
+    <!-- An engine (or a scope) in a select: its name, a check on the one picked now. -->
+    <ControlTheme x:Key="AiChoiceItem" TargetType="MenuItem" BasedOn="{StaticResource AiMenuItem}" x:DataType="vm:EngineChoice">
+      <Setter Property="Header" Value="{Binding Name}" />
+      <Setter Property="Command" Value="{Binding Pick}" />
+      <Setter Property="Icon">
+        <Template>
+          <c:Icon Glyph="check" Size="13" IsVisible="{Binding Current}" />
+        </Template>
+      </Setter>
+    </ControlTheme>
+    <!-- One of an engine's models: its label, a check on the one running now. -->
+    <ControlTheme x:Key="AiModelItem" TargetType="MenuItem" BasedOn="{StaticResource AiMenuItem}" x:DataType="vm:AiModelChoice">
+      <Setter Property="Header" Value="{Binding Label}" />
+      <Setter Property="Command" Value="{Binding Pick}" />
+      <Setter Property="Icon">
+        <Template>
+          <c:Icon Glyph="check" Size="13" IsVisible="{Binding Current}" />
+        </Template>
+      </Setter>
+    </ControlTheme>
+    <!-- An engine to add ("Get Codex"): the item template draws its two lines. -->
+    <ControlTheme x:Key="AiAddItem" TargetType="MenuItem" BasedOn="{StaticResource AiMenuItem}" x:DataType="vm:AiEngineRow">
+      <Setter Property="Command" Value="{Binding AddCommand}" />
+    </ControlTheme>
+    <ControlTheme x:Key="AiMenuFlyout" TargetType="MenuFlyoutPresenter" BasedOn="{StaticResource {x:Type MenuFlyoutPresenter}}">
       <Setter Property="Background" Value="{DynamicResource Acrylic}" />
       <Setter Property="BorderBrush" Value="{DynamicResource FlyStroke}" />
       <Setter Property="BorderThickness" Value="1" />

@@ -108,10 +108,15 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
 
     public string ServerUrl { get; } = serverUrl.TrimEnd('/');
 
+    /// <summary>This computer's name, sent with every request so the library can say which laptops reach it ("" sends
+    /// none: Claude's MCP server on the library itself, and tests).</summary>
+    public static string Computer { get; set; } = "";
+
     async Task<JsonNode?> SendAsync(HttpMethod method, string path, JsonNode? body = null, CancellationToken stop = default)
     {
         using var request = new HttpRequestMessage(method, root + path);
         if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        if (Computer.Length > 0) request.Headers.TryAddWithoutValidation("X-Study-Stash-Computer", Computer);
         if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var r = await client.SendAsync(request, stop);
         if (r.StatusCode == HttpStatusCode.NotFound) return null;
