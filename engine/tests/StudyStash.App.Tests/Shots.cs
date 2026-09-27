@@ -542,8 +542,10 @@ public class SurfaceShots
     {
         string home = Path.Combine(Path.GetTempPath(), "studystash-settings-" + Guid.NewGuid().ToString("N"));
         var host = new Services.AppHost(home);
-        // The library's own pages read the design's example library (Sam's, on a Mac mini).
-        var library = new FakeLibrarySettings();
+        // The library's own pages read the design's example library (Sam's, on a Mac mini); "Unreachable" shows the
+        // Library page when it doesn't answer.
+        var library = new FakeLibrarySettings { Down = section == "Unreachable" };
+        if (section == "Unreachable") section = "Library";
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
         model.Section = section;
         return (model, host, home);
@@ -551,7 +553,7 @@ public class SurfaceShots
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Notes", "Folders" })
+        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Notes", "Folders", "Unreachable" })
         {
             var (model, host, home) = MakeSettings(section);
             try
