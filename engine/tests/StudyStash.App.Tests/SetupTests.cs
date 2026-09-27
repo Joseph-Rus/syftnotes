@@ -332,6 +332,58 @@ public sealed class SetupTests
     }
 
     [Fact]
+    public void Setup_run_again_on_the_library_keeps_its_name_password_and_notes_and_starts_it_at_login()
+    {
+        using var home = new TempHome();
+        string notes = home["Lecture notes"];
+        Configs.Save(new Config(home.Path, notes) { PoolName = "Sam's library", PoolPassword = "kept-password" });
+        var login = new CountingLoginItems();
+        using var host = Host(home, login: login);
+        var m = Setup.Make(host, AppRole.Library);
+        Assert.True(m.ExistingLibrary);
+        Assert.Equal("Sam's library", m.LibraryName);
+        Assert.Equal("kept-password", m.Password);
+        Assert.Equal(Path.GetFullPath(notes), Path.GetFullPath(m.NotesFolder));
+        Assert.StartsWith("Its notes stay in", m.NotesFolderWords, StringComparison.Ordinal);
+        Assert.Equal("Your library is already here", m.PasswordTitle);
+        m.Go(SetupStep.Password);
+        m.LibraryOk = false;
+        Assert.Equal("Start library", m.ContinueLabel);
+        // The login item is written afresh when setup finishes: one pointing at an older copy of the app works again.
+        Assert.True(m.StartAtLogin);
+        Setup.Finish(m, host);
+        Assert.Equal([true], login.Calls);
+    }
+
+    [Fact]
+    public void A_new_library_starts_at_login_only_when_asked_unless_it_already_did()
+    {
+        using var home = new TempHome();
+        using (var host = Host(home))
+        {
+            var m = Setup.Make(host, AppRole.Library);
+            Assert.False(m.ExistingLibrary);
+            Assert.False(m.StartAtLogin);
+            Assert.Equal(LibraryHere.DefaultFolder, m.NotesFolder);
+            Assert.Equal("Give your library a password", m.PasswordTitle);
+        }
+        using (var host = Host(home, login: new CountingLoginItems(starts: true)))
+            Assert.True(Setup.Make(host, AppRole.Library).StartAtLogin);
+    }
+
+    [Fact]
+    public void A_laptops_setup_never_changes_its_login_items()
+    {
+        using var home = new TempHome();
+        var login = new CountingLoginItems(starts: true);
+        using var host = Host(home, login: login);
+        var m = Setup.Make(host, AppRole.Laptop);
+        Assert.True(m.StartAtLogin);
+        Setup.Finish(m, host);
+        Assert.Empty(login.Calls);
+    }
+
+    [Fact]
     public void Installers_name_their_role_and_a_build_that_doesnt_asks()
     {
         Assert.Equal(AppRole.Library, Setup.Preset("library"));

@@ -446,7 +446,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         LibrarySay = "Starting your library…";
         try
         {
-            string done = await Services.LibraryHere.ThisComputer().CreateAsync(host, $"{DisplayName}'s library", StudyStash.Library.Http.TokenUrlSafe(12), DisplayName);
+            // A library that was here before comes back with its own name, password and notes.
+            bool had = Services.LibraryHere.Existing(host.Home) is not null;
+            string done = await Services.LibraryHere.ThisComputer().CreateAsync(host, had ? null : $"{DisplayName}'s library", null, DisplayName);
             LibraryHere = true;
             LibrarySay = done;
         }

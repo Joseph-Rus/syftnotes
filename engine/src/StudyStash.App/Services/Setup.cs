@@ -44,6 +44,18 @@ public static class Setup
         var cc = host.Client();
         m.Address = cc.ServerUrl;
         m.LibraryName = $"{Person()}'s library";
+        m.NotesFolder = LibraryHere.DefaultFolder;
+        // Setup run again on the library: it keeps its name, password and notes folder, and it starts at login as it
+        // should (Finish writes the login item afresh, pointing at this copy of the app).
+        if (LibraryHere.Existing(host.Home) is { } here)
+        {
+            m.ExistingLibrary = true;
+            if (here.PoolName.Length > 0) m.LibraryName = here.PoolName;
+            m.Password = here.PoolPassword;
+            m.NotesFolder = here.PoolDir;
+            m.StartAtLogin = true;
+        }
+        if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;
         m.ModelName = host.Model.Name;
         m.ModelSize = About(host.Model.Bytes);
         if (cc.ServerUrl.Length > 0 && host.Library == LibraryState.Connected && (m.IsLaptop || host.LocalLibrary is not null))
@@ -112,7 +124,8 @@ public static class Setup
     public static string About(long bytes) => bytes >= 2_500_000_000 ? $"{Math.Round(bytes / 1e9)} GB" : WhisperModel.SizeOf(bytes);
 
     /// <summary>Saves what setup decided (the role, that it's done) and, only if the box was ticked, starts Study
-    /// Stash at login. Never touches login items otherwise: that would change this computer unasked.</summary>
+    /// Stash at login: the login item is written afresh, so one left pointing at an older copy of the app works again.
+    /// Never touches login items otherwise: that would change this computer unasked.</summary>
     public static void Finish(SetupModel m, AppHost host)
     {
         host.Save(s =>
@@ -120,7 +133,8 @@ public static class Setup
             s.Role = m.Role;
             s.SetupDone = true;
         });
-        if (m.StartAtLogin)
+        // Only the library's flows ask; a laptop's setup never changes its login items.
+        if (m.StartAtLogin && m.Steps.Any(s => s.Step == SetupStep.StartAtLogin))
         {
             try
             {

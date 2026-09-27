@@ -469,6 +469,13 @@ public class SurfaceShots
                     Shot.Take($"{look}-05-setup-laptop-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
                         size: size);
             }
+            // Setup run again on the library: it keeps its name, password and notes folder.
+            var again = await SetupPage(skin, AppRole.Library, SetupStep.Password);
+            again.ExistingLibrary = true;
+            again.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Lecture notes");
+            foreach (var t in Themes)
+                Shot.Take($"{look}-05-setup-library-password-existing", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = again, DrawChrome = true } : new WinSetup { DataContext = again, DrawChrome = true },
+                    size: new Size(850, 608));
             var ask = SetupModel.For(skin);
             ask.ChooseLibraryCommand.Execute(null);
             foreach (var t in Themes)
@@ -491,6 +498,7 @@ public class SurfaceShots
         m.ModelLeft = "About 4 minutes left";
         m.Addresses.Add(new SetupAddress("At home", "http://mac-mini.local:8787"));
         m.Addresses.Add(new SetupAddress("With Tailscale", "http://mac-mini.example.ts.net:8787"));
+        m.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Study Stash");
         if (step > SetupStep.Library)
         {
             m.LibraryOk = true;

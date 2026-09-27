@@ -318,8 +318,8 @@
 
           <!-- The library: its name and password (Continue creates it) -->
           <StackPanel IsVisible="{Binding OnPassword}">
-            <TextBlock Classes="h1" Text="Give your library a password" />
-            <TextBlock Classes="lede" Text="Your laptop uses it to connect. Anyone with it can read your notes." />
+            <TextBlock Classes="h1" Text="{Binding PasswordTitle}" />
+            <TextBlock Classes="lede" Text="{Binding PasswordLede}" />
             <Grid ColumnDefinitions="*,10,*" Margin="0,20,0,0" MaxWidth="440" HorizontalAlignment="Stretch" IsEnabled="{Binding CanEditLibrary}">
               <StackPanel>
                 <TextBlock Classes="label" Text="Library name" />
@@ -336,6 +336,12 @@
                   </Grid>
                 </Border>
               </StackPanel>
+            </Grid>
+            <!-- Where the notes live: the folder a library already here keeps, or where a new one's go -->
+            <Grid Name="NotesFolderRow" ColumnDefinitions="16,6,*" Margin="0,12,0,0" MaxWidth="440" HorizontalAlignment="Left">
+              <c:Icon Glyph="folder" Size="14" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding NotesFolderWords}" ToolTip.Tip="{Binding NotesFolder}" FontSize="12" Foreground="{DynamicResource Fg2}"
+                         TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
             </Grid>
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0" Height="18">
               <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
