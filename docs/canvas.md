@@ -630,4 +630,6 @@ Run it with `TMPDIR` pointing somewhere disposable (Chrome's profiles and the li
 removed). `STUDYSTASH_E2E_LIBRARY_HOST=<an address of this computer, like its LAN one>` makes the library listen there
 too and the laptop's Chrome use it instead of `library.test` (Chrome's Local Network Access checks don't block the
 worker's fetch to a LAN address). `STUDYSTASH_E2E_CHROME=<binary>` skips the download. The whole run takes about six
-minutes, three of them the idle story.
+minutes, three of them the idle story. Last proven: 13 of 13 green three runs in a row (Chrome for Testing 154, with
+the full suite between runs), and the wrong-key and two-Chromes stories again with the laptop's Chrome on the Mac's LAN
+address.
