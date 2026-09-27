@@ -14,16 +14,17 @@ public partial class MacSetup : UserControl
             Fit(m);
             m.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName == nameof(SetupModel.Step)) Fit(m);
+                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses)) Fit(m);
             };
         };
     }
 
-    /// <summary>The design's own size for each step: 900×760 for Canvas, 900×640 for the AI engines, 720×480 for the rest.</summary>
+    /// <summary>The design's own size for each step: 900×660 for Canvas, 900×640 for the AI engines, 720×600 for
+    /// Classes made from Canvas courses, 720×480 for the rest.</summary>
     void Fit(SetupModel m)
     {
         Width = m.Wide ? 900 : 720;
-        Height = m.OnCanvas ? 760 : m.OnAi ? 640 : 480;
+        Height = m.OnCanvas ? 660 : m.OnAi ? 640 : m.OnClasses && m.HasCourses ? 600 : 480;
     }
 
     /// <summary>A real window has the system's traffic lights (in its title bar), rounded corners and shadow;

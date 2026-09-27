@@ -106,7 +106,7 @@ public class CanvasConnectTests
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
 
         Assert.Equal(2, m.Current);
-        Assert.Equal("Add to Chrome", m.Step2.Title);
+        Assert.Equal("Chrome extension", m.Step2.Title);
         Assert.True(m.ShowAddToChrome);
         Assert.False(m.ShowChromeStatus);
         Assert.Empty(log);
@@ -219,7 +219,7 @@ public class CanvasConnectTests
 
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), [], TestContext.Current.CancellationToken);
 
-        Assert.Equal(["School address", "Add to Chrome", "Find my courses"], m.Steps.Select(s => s.Title));
+        Assert.Equal(["School address", "Chrome extension", "Your courses"], m.Steps.Select(s => s.Title));
         Assert.False(m.ShowMatchAndSync);
         Assert.True(m.AllDone);
         Assert.All(m.Steps, s => Assert.True(s.IsDone));

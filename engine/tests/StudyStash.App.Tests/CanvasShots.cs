@@ -299,6 +299,34 @@ public class CanvasShots
         return m;
     }
 
+    /// <summary>Found my courses, as a library sends them (course_info keyed by id).</summary>
+    internal const string FoundCourses = """
+        {"url": "https://school.instructure.com",
+         "available": {"4201": "Intro to Programming", "4202": "Cell and Molecular Biology", "4203": "Calculus II", "4204": "Modern World History", "4205": "Study Skills"},
+         "course_info": {"4201": {"code": "CS 101", "name": "Intro to Programming", "term": "Fall 2025"},
+                         "4202": {"code": "BIO 110", "name": "Cell and Molecular Biology", "term": "Fall 2025"},
+                         "4203": {"code": "CALC II", "name": "Calculus II", "term": "Fall 2025"},
+                         "4204": {"code": "HIST 210", "name": "Modern World History", "term": "Fall 2025"},
+                         "4205": {"code": "", "name": "Study Skills", "term": "Fall 2025"}}}
+        """;
+
+    /// <summary>Setup's Canvas step: "chrome" (Add to Chrome, not pressed yet), "waiting" (pressed: the folder and
+    /// Chrome are open), or "found" (Chrome connected and five courses found).</summary>
+    internal static async Task<CanvasConnectModel> SetupStepAsync(string at)
+    {
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", at == "found" ? "state-connected" : "state-no-extension")
+            .Json(HttpMethod.Get, "/api/v2/canvas", """{"url": "https://school.instructure.com", "extension_seen": ""}""")
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension")
+            .Json(HttpMethod.Post, "/api/v2/canvas/courses", FoundCourses);
+        var context = CanvasFixtures.Context(handler, "the-home");
+        var m = new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true);
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>(at == "found" ? "state-connected" : "state-no-extension"), []);
+        if (at == "waiting") await m.AddToChromeCommand.ExecuteAsync(null);
+        m.Dispose(); // a still picture: the watch needn't keep asking
+        return m;
+    }
+
     static async Task<CanvasConnectModel> SchoolStepAsync()
     {
         var m = Connect(new FakeLibrary());
@@ -364,6 +392,36 @@ public class CanvasShots
         Shot.Take("mac-07-canvas-connect-signed-out", SkinKind.Mac, ThemeVariant.Light, () => CanvasFrames.MacSetup(new MacCanvasConnect { DataContext = signedOut }));
         Shot.Take("mac-07-canvas-connect-match", SkinKind.Mac, ThemeVariant.Light, () => CanvasFrames.MacSetup(new MacCanvasConnect { DataContext = match }));
         Shot.Take("mac-07-canvas-connect-syncing", SkinKind.Mac, ThemeVariant.Light, () => CanvasFrames.MacSetup(new MacCanvasConnect { DataContext = syncing }));
+    }
+
+    [AvaloniaFact]
+    public async Task Mac_connect_setup()
+    {
+        foreach (var at in new[] { "chrome", "waiting", "found" })
+        {
+            var m = await SetupStepAsync(at);
+            foreach (var t in Themes)
+            {
+                Control? built = null;
+                Shot.Take($"mac-07-canvas-connect-setup-{at}", SkinKind.Mac, t, () => built = CanvasFrames.MacSetup(new MacCanvasConnect { DataContext = m }));
+                AssertIcons(built!);
+            }
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Win_connect_setup()
+    {
+        foreach (var at in new[] { "chrome", "waiting", "found" })
+        {
+            var m = await SetupStepAsync(at);
+            foreach (var t in Themes)
+            {
+                Control? built = null;
+                Shot.Take($"win-07-canvas-connect-setup-{at}", SkinKind.Win, t, () => built = CanvasFrames.WinSetup(new WinCanvasConnect { DataContext = m }));
+                AssertIcons(built!);
+            }
+        }
     }
 
     [AvaloniaFact]

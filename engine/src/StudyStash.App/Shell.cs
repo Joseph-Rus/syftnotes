@@ -839,7 +839,8 @@ public static partial class Shell
             else if (e.Property == Layoutable.HeightProperty) w.Height = view.Height;
         };
         // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
-        setup.LeaveAsync = async step => step != SetupStep.Ai || model.Ai is not { } ai || await ai.SaveAsync();
+        var leave = setup.LeaveAsync;
+        setup.LeaveAsync = async step => step == SetupStep.Ai ? model.Ai is not { } ai || await ai.SaveAsync() : leave is null || await leave(step);
         w.Closed += (_, _) =>
         {
             setupWindow = null;

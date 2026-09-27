@@ -64,6 +64,8 @@ public static class Setup
         m.OnConnect = () => ConnectAsync(m, host);
         m.OnFind = () => FindAsync(m, host);
         m.OnAddClass = () => AddClassAsync(m, host);
+        // Leaving Classes adds the Canvas courses that are ticked (and links them); a time that can't be read stays.
+        m.LeaveAsync = step => step == SetupStep.Classes ? AddCoursesAsync(m, host) : Task.FromResult(true);
         m.CanLeave = step =>
         {
             if (step is SetupStep.Password or SetupStep.Library && !m.LibraryOk)
@@ -235,6 +237,94 @@ public static class Setup
         finally
         {
             m.Finding = false;
+        }
+    }
+
+    /// <summary>
+    /// Classes' Continue with Canvas courses found: every ticked course becomes a class (in the library and the
+    /// timetable, with its times when typed), each is linked to its course, and Canvas is asked to sync in the
+    /// background. Every "when" is read first, so one that can't be read stops the step (false, saying how to write it)
+    /// before anything changes. <paramref name="canvas"/> is the library's Canvas API (tests give their own).
+    /// </summary>
+    public static async Task<bool> AddCoursesAsync(SetupModel m, AppHost host, CanvasClient? canvas = null)
+    {
+        var ticked = m.Courses.Where(c => c.Ticked && c.Name.Trim().Length > 0).ToList();
+        if (ticked.Count == 0) return true;
+        var times = new Dictionary<SetupCourse, List<ClassTime>>();
+        foreach (var c in ticked)
+        {
+            if (c.When.Trim().Length == 0)
+            {
+                times[c] = [];
+            }
+            else if (ClassTime.ParseMany(c.When) is { } parsed)
+            {
+                times[c] = parsed;
+            }
+            else
+            {
+                m.ClassProblem = $"Write when {c.Name} meets like “Tue Thu 10:00–11:15” or “MWF 9–9:50”.";
+                return false;
+            }
+        }
+        m.ClassProblem = null;
+        m.AddingCourses = true;
+        try
+        {
+            var t = host.Timetable;
+            var lib = host.Remote();
+            foreach (var c in ticked)
+            {
+                string name = c.Name.Trim();
+                if (lib is not null && !t.Classes.Any(x => x.Name == name))
+                {
+                    try
+                    {
+                        await lib.AddClassAsync(name);
+                    }
+                    catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+                    {
+                        // An older library can't take classes over its API: the timetable still has it.
+                    }
+                }
+                t.Classes.RemoveAll(x => x.Name == name);
+                t.Classes.Add(new TimetableClass(name, times[c]));
+            }
+            host.SaveTimetable(t);
+            var cc = host.Client();
+            canvas ??= cc.ServerUrl.Length > 0 ? new CanvasClient(cc.ServerUrl, cc.PoolKey) : null;
+            if (canvas is not null)
+            {
+                try
+                {
+                    await canvas.SaveAsync(courses: ticked.ToDictionary(c => c.Name.Trim(), c => double.Parse(c.Id, CultureInfo.InvariantCulture)));
+                    _ = SyncSoonAsync(canvas, host);
+                }
+                catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException or FormatException)
+                {
+                    // The classes are in; Settings → Canvas can link them later.
+                    host.Log($"[canvas] setup couldn't link the courses: {e.Message}");
+                }
+            }
+            await host.CheckLibraryAsync();
+            return true;
+        }
+        finally
+        {
+            m.AddingCourses = false;
+        }
+    }
+
+    /// <summary>The first sync, asked for without waiting: it takes minutes, and setup moves on.</summary>
+    static async Task SyncSoonAsync(CanvasClient canvas, AppHost host)
+    {
+        try
+        {
+            await canvas.SaveAsync(sync: true);
+        }
+        catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            host.Log($"[canvas] setup couldn't start the first sync: {e.Message}");
         }
     }
 

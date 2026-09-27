@@ -66,6 +66,19 @@ public sealed partial class SetupClass : ObservableObject
     public IBrush Dot { get; init; } = Brushes.Gray;
 }
 
+/// <summary>A Canvas course setup found, as the class it would become: ticked to add it, and when it meets (optional).</summary>
+public sealed partial class SetupCourse : ObservableObject
+{
+    public string Id { get; init; } = "";
+    /// <summary>The class's name: the course's code ("CS 101"), or its name when it has no code.</summary>
+    public string Name { get; init; } = "";
+    /// <summary>The course's name on Canvas ("Intro to Programming"), under the class's.</summary>
+    public string CourseName { get; init; } = "";
+    public bool HasCourseName => CourseName.Length > 0 && CourseName != Name;
+    [ObservableProperty] public partial bool Ticked { get; set; } = true;
+    [ObservableProperty] public partial string When { get; set; } = "";
+}
+
 /// <summary>
 /// First-run setup, as one of two flows. The library (a computer at home): a password, the AI engines, Canvas, your
 /// classes, starting at login, and how to connect your laptop. The laptop: your library, the microphone, the
@@ -158,6 +171,15 @@ public sealed partial class SetupModel : ObservableObject
 
     // Classes
     public ObservableCollection<SetupClass> Classes { get; } = [];
+    /// <summary>The courses the Canvas step found, each a class to add (ticked) with an optional "when"; empty when
+    /// Canvas was skipped, and then Classes is the plain add-your-own step.</summary>
+    public ObservableCollection<SetupCourse> Courses { get; } = [];
+    public bool HasCourses => Courses.Count > 0;
+    public string ClassesLede => HasCourses
+        ? "Your Canvas courses become your classes. Add when each meets, so Record picks the class that's on, and untick any you don't record."
+        : "With your timetable, Record picks the class that's on, so each lecture lands in the right place. You can skip this.";
+    /// <summary>Continue on Classes is adding the ticked courses and linking them to Canvas.</summary>
+    [ObservableProperty] public partial bool AddingCourses { get; set; }
     [ObservableProperty] public partial string NewClass { get; set; } = "";
     [ObservableProperty] public partial string NewWhen { get; set; } = "";
     /// <summary>The times typed couldn't be read: how to write them.</summary>
@@ -176,13 +198,12 @@ public sealed partial class SetupModel : ObservableObject
     public string StepLabel =>
         OnWelcome ? (Asking ? "Welcome" : FlowName)
         : OnAi && IsLibrary ? $"Library setup · step {Index} of {Count}"
-        : OnCanvas ? $"Step {Index} of {Count} · Optional"
         : $"Step {Index} of {Count}";
     public string ContinueLabel =>
         IsLast ? "Open Study Stash"
         : OnPassword && !LibraryOk ? "Create library"
         : OnLibrary && !LibraryOk ? "Connect"
-        : OnCanvas ? "Next" : "Continue";
+        : "Continue";
     public bool CanGoBack => Index > 1;
 
     public bool OnWelcome => Step == SetupStep.Welcome;
@@ -206,7 +227,7 @@ public sealed partial class SetupModel : ObservableObject
     public bool Wide => OnAi || OnCanvas;
     /// <summary>Continue waits while Canvas is finding courses or linking one, and while the library is being made or
     /// reached.</summary>
-    public bool CanContinue => (!OnCanvas || Canvas?.CanFinish != false) && !Connecting;
+    public bool CanContinue => (!OnCanvas || Canvas?.CanFinish != false) && !Connecting && !AddingCourses;
     public bool HasLibraryResult => !string.IsNullOrEmpty(LibraryResult);
     /// <summary>The library's name and password can't change once it's made here (Settings changes them later).</summary>
     public bool CanEditLibrary => !LibraryOk && !Connecting;
@@ -310,12 +331,28 @@ public sealed partial class SetupModel : ObservableObject
     {
         if (oldValue is not null) oldValue.PropertyChanged -= OnCanvasPropertyChanged;
         if (newValue is not null) newValue.PropertyChanged += OnCanvasPropertyChanged;
+        if (newValue is { Found.Count: > 0 }) TakeCourses(newValue.Found);
         OnPropertyChanged(nameof(CanContinue));
     }
 
     void OnCanvasPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(CanvasConnectModel.CanFinish)) OnPropertyChanged(nameof(CanContinue));
+        if (e.PropertyName == nameof(CanvasConnectModel.Found) && sender is CanvasConnectModel c) TakeCourses(c.Found);
+    }
+
+    partial void OnAddingCoursesChanged(bool value) => OnPropertyChanged(nameof(CanContinue));
+
+    /// <summary>The Canvas step found courses: each becomes a ticked row on Classes. A course already shown keeps its
+    /// tick and times; one no longer found goes.</summary>
+    public void TakeCourses(IReadOnlyList<FoundCourse> found)
+    {
+        var had = Courses.ToDictionary(c => c.Id);
+        Courses.Clear();
+        foreach (var f in found)
+            Courses.Add(had.TryGetValue(f.Id, out var row) ? row : new SetupCourse { Id = f.Id, Name = f.ClassName, CourseName = f.Name });
+        OnPropertyChanged(nameof(HasCourses));
+        OnPropertyChanged(nameof(ClassesLede));
     }
 
     partial void OnMicHeardChanged(bool value) => OnPropertyChanged(nameof(MicLine));
@@ -445,10 +482,12 @@ public sealed partial class SetupModel : ObservableObject
         if (i >= 0) Go(Steps[i].Step);
     }
 
-    /// <summary>Canvas's "Skip for now": on to the next step (or finish), saving nothing more.</summary>
+    /// <summary>Canvas's "Skip for now": on to the next step (or finish), saving nothing more. Skipping Canvas leaves
+    /// Classes as the plain add-your-own step.</summary>
     [RelayCommand]
     void Skip()
     {
+        if (OnCanvas) TakeCourses([]);
         if (IsLast)
         {
             OnFinish?.Invoke();

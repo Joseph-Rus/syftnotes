@@ -79,13 +79,13 @@ public sealed class SetupTests
     }
 
     [Fact]
-    public void Canvas_comes_before_classes_and_its_label_says_it_is_optional()
+    public void Canvas_comes_before_classes_and_its_page_says_continue()
     {
         var mac = SetupModel.For(SkinKind.Mac);
         mac.Go(SetupStep.Canvas);
-        Assert.True(mac.Steps.Single(s => s.Step == SetupStep.Canvas).Optional);
-        Assert.Equal("Step 5 of 7 · Optional", mac.StepLabel);
-        Assert.Equal("Next", mac.ContinueLabel);
+        Assert.True(mac.Steps.Single(s => s.Step == SetupStep.Canvas).Optional); // the sidebar still says so
+        Assert.Equal("Step 5 of 7", mac.StepLabel);
+        Assert.Equal("Continue", mac.ContinueLabel);
         Assert.True(mac.Wide);
         Assert.Equal(SetupStep.Classes, mac.Steps[mac.Index].Step);
 
@@ -398,6 +398,117 @@ public sealed class SetupTests
         {
             await app.DisposeAsync();
         }
+    }
+
+    // ---- Classes from Canvas courses ----
+
+    static CanvasConnectModel FoundCourses(FakeLibrary? handler = null)
+    {
+        handler ??= new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", CanvasShots.FoundCourses);
+        var context = CanvasFixtures.Context(handler);
+        return new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true);
+    }
+
+    [Fact]
+    public async Task Courses_found_on_the_Canvas_step_become_ticked_classes_and_skipping_Canvas_leaves_Classes_manual()
+    {
+        var m = SetupModel.For(SkinKind.Mac);
+        m.Go(SetupStep.Canvas);
+        var canvas = FoundCourses();
+        m.Canvas = canvas;
+
+        await canvas.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), [], TestContext.Current.CancellationToken);
+
+        Assert.True(m.HasCourses);
+        Assert.Equal(["BIO 110", "CALC II", "CS 101", "HIST 210", "Study Skills"], m.Courses.Select(c => c.Name));
+        Assert.All(m.Courses, c => Assert.True(c.Ticked));
+        Assert.Equal("Intro to Programming", m.Courses.Single(c => c.Name == "CS 101").CourseName);
+        Assert.Contains("Canvas courses", m.ClassesLede);
+
+        m.SkipCommand.Execute(null);
+
+        Assert.Equal(SetupStep.Classes, m.Step);
+        Assert.False(m.HasCourses);
+        Assert.StartsWith("With your timetable", m.ClassesLede);
+    }
+
+    /// <summary>A pretend library on a free port that takes classes (POST /classes) and Canvas saves (POST
+    /// /api/v2/canvas), and keeps what it was sent.</summary>
+    static async Task<(string Url, WebApplication App, List<string> Classes, List<string> CanvasBodies)> CoursesServerAsync()
+    {
+        var classes = new List<string>();
+        var bodies = new List<string>();
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Logging.ClearProviders();
+        WebHostBuilderKestrelExtensions.ConfigureKestrel(builder.WebHost, k => k.Listen(IPAddress.Loopback, 0));
+        var app = builder.Build();
+        app.MapPost("/api/v2/classes", async (HttpRequest r) =>
+        {
+            var body = await System.Text.Json.JsonDocument.ParseAsync(r.Body);
+            lock (classes) classes.Add(body.RootElement.GetProperty("name").GetString()!);
+            return Results.Ok(new { });
+        });
+        app.MapPost("/api/v2/canvas", async (HttpRequest r) =>
+        {
+            using var reader = new StreamReader(r.Body);
+            string text = await reader.ReadToEndAsync();
+            lock (bodies) bodies.Add(text);
+            return Results.Text(CanvasFixtures.Text("canvas"), "application/json");
+        });
+        await app.StartAsync();
+        string url = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+        return (url, app, classes, bodies);
+    }
+
+    [Fact]
+    public async Task Continue_on_Classes_adds_the_ticked_courses_links_each_to_its_course_and_asks_for_a_sync()
+    {
+        var (url, app, posted, bodies) = await CoursesServerAsync();
+        try
+        {
+            using var home = new TempHome();
+            using var host = Host(home);
+            var cc = host.Client();
+            cc.ServerUrl = url;
+            Configs.SaveClient(cc);
+            var m = Setup.Make(host, AppRole.Laptop);
+            m.TakeCourses([new FoundCourse("4201", "CS 101", "Intro to Programming"), new FoundCourse("4202", "BIO 110", "Cell Biology"),
+                new FoundCourse("4205", "", "Study Skills")]);
+            m.Courses[0].When = "Tue Thu 10:00-11:15";
+            m.Courses[2].Ticked = false;
+
+            Assert.True(await Setup.AddCoursesAsync(m, host));
+
+            Assert.Equal(["BIO 110", "CS 101"], host.Timetable.Classes.Select(c => c.Name).Order());
+            Assert.Contains(host.Timetable.Classes.Single(c => c.Name == "CS 101").Times, t => t.Describe().Contains("Tue", StringComparison.Ordinal));
+            Assert.Empty(host.Timetable.Classes.Single(c => c.Name == "BIO 110").Times);
+            Assert.Equal(["BIO 110", "CS 101"], posted.Order());
+            for (int i = 0; i < 50 && bodies.Count < 2; i++) await Task.Delay(20, TestContext.Current.CancellationToken); // the sync is asked for without waiting
+            Assert.Equal("{\"courses\":{\"CS 101\":4201,\"BIO 110\":4202}}", bodies[0]);
+            Assert.Equal("{\"sync\":true}", bodies[1]);
+            Assert.False(m.AddingCourses);
+        }
+        finally
+        {
+            await app.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_when_that_cant_be_read_keeps_Classes_open_and_adds_nothing()
+    {
+        using var home = new TempHome();
+        using var host = Host(home);
+        var m = Setup.Make(host, AppRole.Laptop);
+        m.TakeCourses([new FoundCourse("4201", "CS 101", "Intro to Programming")]);
+        m.Courses[0].When = "whenever";
+        m.Go(SetupStep.Classes);
+
+        await m.NextCommand.ExecuteAsync(null);
+
+        Assert.Equal(SetupStep.Classes, m.Step);
+        Assert.Contains("CS 101", m.ClassProblem);
+        Assert.Empty(host.Timetable.Classes);
     }
 
     [Fact]

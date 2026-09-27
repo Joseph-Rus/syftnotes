@@ -442,6 +442,15 @@ public class SurfaceShots
                         Shot.Take(name, skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
                             size: size);
                 }
+            // Canvas once Chrome is connected and the courses are found, and Classes made from those courses.
+            foreach (var (step, what) in new[] { (SetupStep.Canvas, "canvas-found"), (SetupStep.Classes, "classes-canvas") })
+            {
+                var m = await SetupPage(skin, AppRole.Laptop, step, canvasFound: true);
+                var size = step == SetupStep.Canvas ? new Size(1100, 928) : new Size(850, 768);
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-laptop-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
+                        size: size);
+            }
             var ask = SetupModel.For(skin);
             ask.ChooseLibraryCommand.Execute(null);
             foreach (var t in Themes)
@@ -451,7 +460,7 @@ public class SurfaceShots
     }
 
     /// <summary>One page of a setup, filled in the way a student would have it by then.</summary>
-    static async Task<SetupModel> SetupPage(SkinKind skin, AppRole role, SetupStep step)
+    static async Task<SetupModel> SetupPage(SkinKind skin, AppRole role, SetupStep step, bool canvasFound = false)
     {
         var m = SetupModel.For(skin, role);
         m.LibraryName = "Ada's library";
@@ -470,11 +479,21 @@ public class SurfaceShots
             m.LibraryResult = role == AppRole.Laptop ? "Connected to Ada's library." : $"Ada's library is ready on this {m.DeviceWord}.";
         }
         if (step == SetupStep.Ai) m.Ai = AiDemo.Setup();
-        if (step == SetupStep.Canvas)
+        if (step == SetupStep.Canvas || canvasFound)
         {
-            m.Canvas = await CanvasShots.Step2Async();
+            // Setup's own Canvas: Add to Chrome pressed and waiting for Chrome, or everything done and the courses found.
+            m.Canvas = await CanvasShots.SetupStepAsync(canvasFound ? "found" : "waiting");
             m.Canvas.StepLabel = "";
             m.Canvas.ShowFooter = false;
+        }
+        if (canvasFound && step == SetupStep.Classes)
+        {
+            m.Classes.Clear();
+            m.Classes.Add(new SetupClass { Name = "Chapel", When = "Wed 10:00–10:50", Dot = Skin.ClassDot(4) });
+            m.Courses[0].When = "Tue Thu 11:00–12:30";
+            m.Courses[1].When = "MWF 9:00–9:50";
+            m.Courses[3].When = "Tue Thu 10:00–11:15";
+            m.Courses[4].Ticked = false;
         }
         m.Go(step);
         return m;

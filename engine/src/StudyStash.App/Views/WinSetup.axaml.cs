@@ -14,16 +14,17 @@ public partial class WinSetup : UserControl
             Fit(m);
             m.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName == nameof(SetupModel.Step)) Fit(m);
+                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses)) Fit(m);
             };
         };
     }
 
-    /// <summary>The design's own size for each step: 900×800 for Canvas, 900×680 for the AI engines, 720×480 for the rest.</summary>
+    /// <summary>The design's own size for each step: 900×700 for Canvas, 900×680 for the AI engines, 720×640 for
+    /// Classes made from Canvas courses, 720×480 for the rest.</summary>
     void Fit(SetupModel m)
     {
         Width = m.Wide ? 900 : 720;
-        Height = m.OnCanvas ? 800 : m.OnAi ? 680 : 480;
+        Height = m.OnCanvas ? 700 : m.OnAi ? 680 : m.OnClasses && m.HasCourses ? 640 : 480;
     }
 
     /// <summary>A real window has the system's caption buttons in its title bar; screenshots draw their own.</summary>

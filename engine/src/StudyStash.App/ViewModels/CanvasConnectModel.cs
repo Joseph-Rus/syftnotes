@@ -65,16 +65,16 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
             ?
             [
                 new ConnectStep { Number = 1, Title = "School address" },
-                new ConnectStep { Number = 2, Title = "Add to Chrome" },
-                new ConnectStep { Number = 3, Title = "Find my courses" },
+                new ConnectStep { Number = 2, Title = "Chrome extension" },
+                new ConnectStep { Number = 3, Title = "Your courses" },
             ]
             :
             [
                 new ConnectStep { Number = 1, Title = "School address" },
-                new ConnectStep { Number = 2, Title = "Add to Chrome" },
-                new ConnectStep { Number = 3, Title = "Find my courses" },
+                new ConnectStep { Number = 2, Title = "Chrome extension" },
+                new ConnectStep { Number = 3, Title = "Your courses" },
                 new ConnectStep { Number = 4, Title = "Match each class to a course" },
-                new ConnectStep { Number = 5, Title = "Sync now" },
+                new ConnectStep { Number = 5, Title = "First sync" },
             ];
         watch.Changed += OnWatchChanged;
     }
@@ -109,7 +109,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// <summary>The folder Chrome loads the extension from on this computer, once Add to Chrome has asked for it.</summary>
     [ObservableProperty] public partial string? ExtensionFolder { get; set; }
     /// <summary>Add to Chrome has been pressed: the button gives way to quiet links and the "Waiting for Chrome…" row.</summary>
-    [NotifyPropertyChangedFor(nameof(WaitingForChrome), nameof(ShowChromeStatus), nameof(ShowAddToChrome))]
+    [NotifyPropertyChangedFor(nameof(WaitingForChrome), nameof(ShowChromeStatus), nameof(ShowAddToChrome), nameof(ChromeHelp))]
     [ObservableProperty]
     public partial bool AddedToChrome { get; set; }
     [NotifyPropertyChangedFor(nameof(CanFinish))]
@@ -121,6 +121,10 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public partial bool ChromeConnected { get; set; }
     [ObservableProperty] public partial string? ChromeError { get; set; }
     public bool ShowAddToChrome => !AddedToChrome && !ChromeConnected;
+    /// <summary>The line above the three pictures: what the button does, then (once pressed) what's open now.</summary>
+    public string ChromeHelp => AddedToChrome
+        ? "Chrome’s extensions page is open, and the folder is showing. In Chrome:"
+        : "Study Stash reads Canvas through your own sign-in in Chrome. Add to Chrome shows you the extension’s folder and opens Chrome’s extensions page. There:";
     public bool WaitingForChrome => AddedToChrome && !ChromeConnected;
     public bool ShowChromeStatus => AddedToChrome || ChromeConnected;
 
