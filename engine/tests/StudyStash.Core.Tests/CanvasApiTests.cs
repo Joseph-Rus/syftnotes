@@ -419,6 +419,10 @@ public class CanvasApiTests
         Assert.Equal((key, "https://canvas.test", Extension.Version(), Extension.Protocol), (e["key"]!.GetValue<string>(), e["canvas"]!.GetValue<string>(), e["version"]!.GetValue<string>(), e["protocol"]!.GetValue<int>()));
         Assert.Equal((Extension.Folder(cfg.Home), true), (e["folder"]!.GetValue<string>(), e["folder_ready"]!.GetValue<bool>()));
         Assert.Equal(("", "", 0, "", false), (e["seen"]!.GetValue<string>(), e["seen_version"]!.GetValue<string>(), e["seen_protocol"]!.GetValue<int>(), e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
+        // A Chrome Web Store copy in this computer's Chrome connects with the code: this folder's connection.
+        Assert.Equal(new ExtensionConnection("http://127.0.0.1:" + cfg.WebPort, key, "https://canvas.test"),
+            Extension.ReadConnectionCode(e["connection_code"]!.GetValue<string>()));
+        Assert.Equal(Extension.Connection(Extension.Folder(cfg.Home)), Extension.ReadConnectionCode(e["connection_code"]!.GetValue<string>()));
 
         // This computer's Chrome, long-polling (1.4, protocol 3).
         await CheckIn("v=1.4&p=3&a=" + Uri.EscapeDataString("http://127.0.0.1:" + cfg.WebPort));
@@ -435,6 +439,7 @@ public class CanvasApiTests
         // The overview has the same, without the key.
         var overview = (await GetAsync(site, "/api/v2/canvas"))["extension"]!.AsObject();
         Assert.Null(overview["key"]);
+        Assert.Null(overview["connection_code"]); // it holds the key
         foreach (string field in new[] { "canvas", "version", "protocol", "folder", "folder_ready", "seen", "seen_version", "seen_protocol", "seen_where", "connected" })
             Assert.Equal(e[field]!.ToJsonString(), overview[field]!.ToJsonString());
     }

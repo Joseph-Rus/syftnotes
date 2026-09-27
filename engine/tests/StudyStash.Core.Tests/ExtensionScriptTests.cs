@@ -62,8 +62,9 @@ public class ExtensionScriptTests
         /// <param name="stored">chrome.storage.local's connection (a store copy's), as JSON; null for none.</param>
         /// <param name="legacy">A folder from before 1.4: config.js's STUDY_STASH, as JSON; null when there's no config.js.</param>
         /// <param name="runningHosts">The host permissions Chrome is running with; <paramref name="diskHosts"/>, the folder's.</param>
+        /// <param name="granted">What chrome.permissions.contains answers: whether the student allowed a store copy's sites.</param>
         public Worker(string running = "1.4", string? onDisk = null, string? config = DefaultConfig, string? stored = null, string? legacy = null,
-            string[]? runningHosts = null, string[]? diskHosts = null)
+            string[]? runningHosts = null, string[]? diskHosts = null, bool granted = true)
         {
             runningHosts ??= Hosts;
             Route("chrome-extension://study-stash/manifest.json", _ => new FakeResponse
@@ -74,9 +75,11 @@ public class ExtensionScriptTests
             js = new Jint.Engine(o => o.TimeoutInterval(TimeSpan.FromSeconds(20)));
             js.SetValue("__net", this);
             js.SetValue("btoa", new Func<string, string>(s => Convert.ToBase64String(Encoding.Latin1.GetBytes(s))));
+            js.SetValue("atob", new Func<string, string>(s => Encoding.Latin1.GetString(Convert.FromBase64String(s))));
             js.Execute($$$"""
                 var __legacy = {{{legacy ?? "null"}}};
                 var __reloads = 0;
+                var __granted = {{{(granted ? "true" : "false")}}}, __checked = [];
                 var __badge = '', __title = 'Study Stash';
                 function importScripts(name) {
                   if (name === 'connection.js') return; // already run, below
@@ -99,6 +102,7 @@ public class ExtensionScriptTests
                     onInstalled: listeners, onStartup: listeners, onMessage: listeners,
                   },
                   alarms: {create() {}, onAlarm: listeners},
+                  permissions: {contains: async o => { __checked.push(o.origins); return __granted; }, onAdded: listeners},
                   storage: {local: area({{{(stored is null ? "{}" : $"{{connection: {stored}}}")}}}), session: area({})},
                   action: {setBadgeText: async o => { __badge = o.text; }, setTitle: async o => { __title = o.title; }},
                 };
@@ -170,6 +174,10 @@ public class ExtensionScriptTests
         public bool Allowed(string url) => Eval($"allowed({JsonSerializer.Serialize(url)})").AsBoolean();
 
         public int Reloads => (int)js.Evaluate("__reloads").AsNumber();
+
+        /// <summary>Each list of sites the script asked Chrome whether it may reach (chrome.permissions.contains).</summary>
+        public List<string[]> Checked =>
+            JsonNode.Parse(js.Evaluate("JSON.stringify(__checked)").AsString())!.AsArray().Select(a => a!.AsArray().Select(o => o!.GetValue<string>()).ToArray()).ToList();
 
         /// <summary>The toolbar button's badge and title.</summary>
         public (string Badge, string Title) Button => (js.Evaluate("__badge").AsString(), js.Evaluate("__title").AsString());
@@ -562,6 +570,61 @@ public class ExtensionScriptTests
     }
 
     [Fact]
+    public void A_store_copy_reads_the_code_study_stash_makes()
+    {
+        var w = new Worker();
+        string code = Extension.ConnectionCode("https://mini.tail.ts.net", "k3y", "https://school.instructure.com/");
+        var c = JsonNode.Parse(w.Eval($"JSON.stringify(decodeCode({JsonSerializer.Serialize("  " + code[..20] + "\n" + code[20..] + " ")}))").AsString())!.AsObject();
+        Assert.Equal(("https://mini.tail.ts.net", "k3y", "https://school.instructure.com", Extension.Protocol),
+            (S(c, "app"), S(c, "key"), S(c, "canvas"), c["protocol"]!.GetValue<int>()));
+        Assert.Equal(["*.inscloudgate.net"], c["files"]!.AsArray().Select(f => f!.GetValue<string>()));
+        // The sites it asks Chrome for are the ones Study Stash writes into a folder's manifest for the same connection.
+        using var dir = new TempDir();
+        Extension.Ensure(dir.Path, "https://mini.tail.ts.net", "k3y", "https://school.instructure.com/");
+        var folderHosts = JsonNode.Parse(File.ReadAllText(Path.Combine(dir.Path, "manifest.json")))!["host_permissions"]!.AsArray().Select(h => h!.GetValue<string>());
+        Assert.Equal(folderHosts, JsonNode.Parse(w.Eval("JSON.stringify(originsFor(decodeCode(" + JsonSerializer.Serialize(code) + ")))").AsString())!.AsArray().Select(h => h!.GetValue<string>()));
+        Assert.Equal(Hosts, JsonNode.Parse(w.Eval("JSON.stringify(originsFor(conn))").AsString())!.AsArray().Select(h => h!.GetValue<string>()));
+    }
+
+    [Theory]
+    [InlineData("", "That isn't a code from Study Stash.")]
+    [InlineData("hello there", "That isn't a code from Study Stash.")]
+    [InlineData("eyJhcHAiOiJodHRwOi8vbWluaS50ZXN0In0", "That isn't a code from Study Stash.")] // {"app":"http://mini.test"}: no key
+    [InlineData("eyJhcHAiOiJodHRwOi8vbWluaS50ZXN0Iiwia2V5IjoiazN5IiwiY2FudmFzIjoiIn0", "Add your school's Canvas address in Study Stash first")] // no Canvas yet
+    public void A_code_that_isn_t_one_says_so(string code, string words)
+    {
+        var w = new Worker();
+        Assert.StartsWith(words, w.Eval($"(() => {{ try {{ decodeCode({JsonSerializer.Serialize(code)}); return 'decoded'; }} catch (e) {{ return e.message; }} }})()").AsString());
+        Assert.False(Extension.ReadConnectionCode(code) is { Canvas.Length: > 0 }); // nor one Study Stash would hand out
+    }
+
+    [Fact]
+    public void A_store_copy_the_student_hasn_t_allowed_says_so_and_asks_nobody()
+    {
+        string stored = $$"""{"app":"http://mini.test:8787","key":"k3y","canvas":"{{Canvas}}","files":["*.inscloudgate.net"],"protocol":3}""";
+        var w = new Worker(config: null, stored: stored, granted: false);
+        w.Eval("pump(true)");
+        Assert.Empty(w.Fetched.Where(f => f.Url.StartsWith("http://mini.test:8787", StringComparison.Ordinal)));
+        Assert.Equal("no_access", w.Status);
+        Assert.Equal("!", w.Button.Badge);
+        Assert.Contains("choose Allow", w.Button.Title);
+        Assert.Equal([[Canvas + "/*", "https://*.inscloudgate.net/*", "http://mini.test:8787/*"]], w.Checked);
+
+        // Allowed: it goes to its library.
+        var allowed = new Worker(config: null, stored: stored);
+        allowed.Route("http://mini.test:8787/api/v2/canvas/work", new FakeResponse { Throws = true });
+        allowed.Eval("pump(true)");
+        Assert.StartsWith("http://mini.test:8787/api/v2/canvas/work?", allowed.Fetched.Last().Url);
+        Assert.Equal("library_unreachable", allowed.Status);
+
+        // A folder's copy has its sites in its manifest: Chrome isn't asked.
+        var folder = WithLibrary(new Worker(granted: false), [], rounds: 1);
+        folder.Eval("pump(false)");
+        Assert.Empty(folder.Checked);
+        Assert.NotEmpty(folder.Asks);
+    }
+
+    [Fact]
     public void The_popup_s_words_for_each_state()
     {
         var w = new Worker();
@@ -571,5 +634,7 @@ public class ExtensionScriptTests
         Assert.Equal("This extension's key was refused. Open Study Stash and add the extension again.", Say("library_refused"));
         Assert.Equal("Sign in to Canvas in Chrome.", Say("signed_out"));
         Assert.StartsWith("This extension isn't connected", Say("no_config"));
+        Assert.Contains("paste the code from Study Stash", Say("no_config"));
+        Assert.StartsWith("Chrome hasn't allowed this extension", Say("no_access"));
     }
 }

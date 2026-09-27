@@ -36,6 +36,9 @@ public class ExtensionKeeperTests
         Assert.True(keeper.FolderReady);
         Assert.True(keeper.Connected);
         Assert.Equal("another_computer", keeper.SeenWhere);
+        // A Chrome Web Store copy here connects with a code for the library as this laptop reaches it.
+        Assert.Equal(new ExtensionConnection("https://mini.tail.ts.net", "test-key-abc123", "https://school.instructure.com"),
+            Extension.ReadConnectionCode(keeper.ConnectionCode));
         Assert.Equal(1, changed);
         var config = Config(keeper.LocalFolder);
         Assert.Equal("https://mini.tail.ts.net", config["app"]!.GetValue<string>());
