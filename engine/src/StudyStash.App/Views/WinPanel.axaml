@@ -81,7 +81,7 @@
         <StackPanel Spacing="6" IsVisible="{Binding ShowRecord}">
           <Border Height="36" CornerRadius="4" Background="{DynamicResource Accent}" ClipToBounds="True">
             <Grid ColumnDefinitions="*,1,36">
-              <Button Name="Record" Theme="{StaticResource Surface}" Foreground="{DynamicResource OnAccent}" Padding="12,0" Command="{Binding RecordCommand}"
+              <Button Name="Record" AutomationProperties.Name="Record" Theme="{StaticResource Surface}" Foreground="{DynamicResource OnAccent}" Padding="12,0" Command="{Binding RecordCommand}"
                       IsEnabled="{Binding CanRecord}" ToolTip.Tip="Start recording">
                 <Grid ColumnDefinitions="Auto,8,*,Auto">
                   <c:Icon Glyph="fiber_manual_record" Filled="True" Size="14" Foreground="{DynamicResource OnAccent}" />
@@ -170,7 +170,7 @@
         </StackPanel>
 
         <!-- Search: a Fluent text box look -->
-        <Button Name="Search" Classes="control" Height="32" Padding="11,0,8,0" HorizontalContentAlignment="Stretch" Command="{Binding SearchCommand}">
+        <Button Name="Search" AutomationProperties.Name="Search notes and lectures" Classes="control" Height="32" Padding="11,0,8,0" HorizontalContentAlignment="Stretch" Command="{Binding SearchCommand}">
           <Grid ColumnDefinitions="*,Auto,Auto">
             <TextBlock Text="Search notes and lectures" FontSize="14" Foreground="{DynamicResource Fg3}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
             <TextBlock Grid.Column="1" Text="{Binding SearchShortcut}" FontSize="11" Foreground="{DynamicResource Fg3}" Margin="8,0,0,0" VerticalAlignment="Center" />

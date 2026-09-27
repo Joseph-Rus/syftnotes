@@ -20,7 +20,9 @@ public static class LibraryPanelWords
         string runningWords = running ? $"Library running on this {device}" : starting ? "Starting your library…" : "Your library isn't running";
         var (canvasWords, canvasGood) = Canvas(canvas, now, zone);
         var (laptopWords, laptopsGood) = Laptops(overview?["laptops"] as JsonArray, now, zone);
-        return new LibraryPanelLines(runningWords, running, Lectures(overview), canvasWords, canvasGood, laptopWords, laptopsGood);
+        // Not running and nothing read from it: the one thing to say is where to start it.
+        string lectures = overview is null && !running && !starting ? "Start it in Settings → Your library" : Lectures(overview);
+        return new LibraryPanelLines(runningWords, running, lectures, canvasWords, canvasGood, laptopWords, laptopsGood);
     }
 
     /// <summary>"128 lectures in 6 classes", "1 lecture in 1 class", "No lectures yet", with "· writing 2" while notes

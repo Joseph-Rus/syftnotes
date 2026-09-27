@@ -40,7 +40,11 @@ public class LibraryPanelTests
         Assert.Equal("Canvas synced 10 min ago", lines.Canvas);
         Assert.Equal("2 laptops connected", lines.Laptops);
 
-        Assert.Equal("Your library isn't running", LibraryPanelWords.From(false, false, "PC", null, null, Now, TimeZoneInfo.Utc).Running);
+        var stopped = LibraryPanelWords.From(false, false, "PC", null, null, Now, TimeZoneInfo.Utc);
+        Assert.Equal("Your library isn't running", stopped.Running);
+        Assert.Equal("Start it in Settings → Your library", stopped.Lectures);
+        Assert.Null(stopped.Canvas);
+        Assert.Null(stopped.Laptops);
         Assert.Equal("Starting your library…", LibraryPanelWords.From(false, true, "PC", null, null, Now, TimeZoneInfo.Utc).Running);
     }
 

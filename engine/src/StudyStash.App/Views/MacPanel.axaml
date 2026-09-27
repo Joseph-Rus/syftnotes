@@ -51,7 +51,7 @@
       <!-- Idle: Record, and the class switcher -->
       <StackPanel Spacing="6" IsVisible="{Binding ShowRecord}">
         <Grid ColumnDefinitions="*,6,32">
-          <Button Name="Record" Classes="tint" Theme="{StaticResource Surface}" Height="32" CornerRadius="16" Padding="12,0"
+          <Button Name="Record" AutomationProperties.Name="Record" Classes="tint" Theme="{StaticResource Surface}" Height="32" CornerRadius="16" Padding="12,0"
                   Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}" ToolTip.Tip="Start recording">
             <Grid ColumnDefinitions="Auto,8,*,Auto">
               <Ellipse Width="10" Height="10" Fill="{DynamicResource OnAccent}" VerticalAlignment="Center" />
@@ -135,7 +135,7 @@
       </StackPanel>
 
       <!-- Search -->
-      <Button Name="Search" Classes="fill" Theme="{StaticResource Surface}" Height="28" CornerRadius="14" Padding="10,0" Command="{Binding SearchCommand}">
+      <Button Name="Search" AutomationProperties.Name="Search notes and lectures" Classes="fill" Theme="{StaticResource Surface}" Height="28" CornerRadius="14" Padding="10,0" Command="{Binding SearchCommand}">
         <Grid ColumnDefinitions="Auto,6,*,Auto">
           <c:Icon Glyph="search" Size="14" Foreground="{DynamicResource Fg2}" />
           <TextBlock Grid.Column="2" Text="Search notes and lectures" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
