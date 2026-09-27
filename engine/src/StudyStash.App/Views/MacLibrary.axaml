@@ -163,7 +163,7 @@
       </c:WindowHeader>
       <Grid ColumnDefinitions="248,Auto,*">
         <!-- Classes: a floating glass panel, below the title bar -->
-        <c:Glass CornerRadius="18" BoxShadow="{DynamicResource SideGlassShadow}" Padding="10,6,10,14" Margin="8,0,0,8">
+        <c:Glass Name="Sidebar" CornerRadius="18" BoxShadow="{DynamicResource SideGlassShadow}" Padding="10,6,10,14" Margin="8,0,0,8" c:WindowHeader.MovesWindow="True">
           <DockPanel>
             <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,8,*" Margin="10,0,10,4">
               <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Top" Margin="0,5,0,0" />

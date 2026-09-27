@@ -25,6 +25,25 @@ public sealed class WindowHeader : Panel
     public static readonly StyledProperty<string?> TitleProperty = AvaloniaProperty.Register<WindowHeader, string?>(nameof(Title));
     public static readonly StyledProperty<bool> DrawChromeProperty = AvaloniaProperty.Register<WindowHeader, bool>(nameof(DrawChrome));
     public static readonly StyledProperty<bool> CanResizeProperty = AvaloniaProperty.Register<WindowHeader, bool>(nameof(CanResize), true);
+    /// <summary>Empty space in a sidebar moves the window too, like the title bar does (a press on the panel itself,
+    /// not on a row or a label in it; a double-click there doesn't zoom).</summary>
+    public static readonly AttachedProperty<bool> MovesWindowProperty = AvaloniaProperty.RegisterAttached<WindowHeader, Control, bool>("MovesWindow");
+
+    public static bool GetMovesWindow(Control control) => control.GetValue(MovesWindowProperty);
+
+    public static void SetMovesWindow(Control control, bool value) => control.SetValue(MovesWindowProperty, value);
+
+    static WindowHeader() => MovesWindowProperty.Changed.AddClassHandler<Control>((c, e) =>
+    {
+        c.PointerPressed -= MoveFromEmptySpace;
+        if (e.NewValue is true) c.PointerPressed += MoveFromEmptySpace;
+    });
+
+    static void MoveFromEmptySpace(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control c || e.Source != c || e.ClickCount > 1 || !e.GetCurrentPoint(c).Properties.IsLeftButtonPressed) return;
+        if (TopLevel.GetTopLevel(c) is Window { WindowState: not WindowState.FullScreen } w) w.BeginMoveDrag(e);
+    }
 
     readonly bool mac = Skin.Current == SkinKind.Mac;
     readonly Border drag = new() { Name = "Drag" };
