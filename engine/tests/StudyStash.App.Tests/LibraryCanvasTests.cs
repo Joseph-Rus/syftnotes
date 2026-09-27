@@ -171,4 +171,70 @@ public class LibraryCanvasTests
         await NoBlankDatesAsync(rig, EveryRead);
         await NoBlankDatesAsync(rig, all.Select(a => $"/api/v2/canvas/assignment?class=CS%20101&id={a.Id}").ToArray());
     }
+
+    /// <summary>What happened on a real library: an old Chrome registration (seen a minute ago, from before keys were
+    /// written down, or with a key the library no longer gives out) made the app skip the extension step, and Find my
+    /// courses then had no Chrome to ask. Only a Chrome with the current key moves it on.</summary>
+    [Fact]
+    public async Task An_old_chrome_registration_or_another_key_never_skips_the_extension_step()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        var stop = TestContext.Current.CancellationToken;
+        string lately = DateTimeOffset.Now.AddMinutes(-1).ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+        CanvasSettings.Update(rig.Home, s =>
+        {
+            s.Url = FakeCanvas.Base;
+            s.ExtensionSeen = lately;
+            s.ExtensionVersion = "1.4";
+            s.ExtensionProtocol = 3;
+            s.ExtensionCopies["this_computer"] = new ExtensionCopy(lately, "1.4", 3);
+        });
+        var context = rig.Context();
+        var client = context.Client!;
+        var watch = new CanvasWatch(context);
+        using var m = new CanvasConnectModel(context, watch);
+
+        var state = (await client.StateAsync(stop))!;
+        Assert.Equal("no_extension", state.Status);
+        Assert.False(state.Extension?.Connected);
+        Assert.False(state.Extension?.KeyMatches);
+        Assert.NotNull(state.Extension?.LastSeen);
+        await m.StartAsync(state, (await client.ClassesAsync(stop))!, stop);
+        Assert.Equal(2, m.Current);
+
+        // A Chrome still holding another key knocks: turned away, and the app can say to connect it again.
+        Assert.Equal(-1, await rig.VisitAsync("a-key-from-an-old-install", stop: stop));
+        await watch.RefreshAsync(stop);
+        Assert.Equal(2, m.Current);
+        state = (await client.StateAsync(stop))!;
+        Assert.NotNull(state.Extension?.RefusedAt);
+        var extension = (await client.ExtensionAsync(stop))!;
+        Assert.False(extension.Connected);
+        Assert.NotNull(extension.RefusedAt);
+
+        // The student's Chrome with this library's key checks in: now it moves on, all the way to matching.
+        using var chrome = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        var running = rig.RunExtensionAsync(chrome.Token);
+        try
+        {
+            await Until(async () =>
+            {
+                await watch.RefreshAsync(stop);
+                return m.Current == 4;
+            }, "the extension step to see Chrome");
+        }
+        finally
+        {
+            chrome.Cancel();
+            await running;
+        }
+        state = (await client.StateAsync(stop))!;
+        Assert.True(state.Extension?.Connected);
+        Assert.True(state.Extension?.KeyMatches);
+        Assert.Null(state.Extension?.RefusedAt);
+        extension = (await client.ExtensionAsync(stop))!;
+        Assert.True(extension.Connected);
+        Assert.True(extension.KeyMatches);
+        Assert.NotNull(extension.SeenWithKey);
+    }
 }

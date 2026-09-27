@@ -377,11 +377,23 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
 ### State
 
 - `GET /api/v2/canvas/state` (also embedded as `state` in `GET /api/v2/canvas`): `{"state", "school", "url",
-  "extension":{"seen","version","latest","outdated","updated":{"from","to","at"}|null}, "last_sync" (when the last
+  "extension":{"seen","version","latest","outdated","updated":{"from","to","at"}|null,"connected","key_matches",
+  "last_seen","refused_at"}, "last_sync" (when the last
   sync finished), "next_sync", "poll_minutes", "syncing":{"left","total","classes":[…]}|null, "paused_until"|null,
   "error":{"text","at"}|null, "warnings":[…]}`. `state` is decided by `CanvasView.StateOf` in this order: `not_set_up`
-  (no Canvas address) > `no_extension` (Chrome has never checked in) > `signed_out` > `chrome_away` (not seen for
-  over 5 minutes) > `syncing` > `error` (the last sync ended with one) > `connected`. `syncing.left`/`total` count
+  (no Canvas address) > `no_extension` (no Chrome has ever checked in with this library's **current** extension key)
+  > `signed_out` > `chrome_away` (no Chrome with the current key is checking in now: 90 s of quiet for a long-polling
+  extension, 5 minutes for an older one) > `syncing` > `error` (the last sync ended with one) > `connected`.
+  "Connected" is only ever a check-in with the current key: each check-in is written down with a fingerprint of the
+  key it came with (`CanvasSettings.KeyId`, never the key), so a registration from an old install, from before keys
+  were written down, or from before the key changed never counts, and one that came with the library password gets
+  its work but isn't the extension. `extension.seen` is when a Chrome last checked in with the current key,
+  `extension.connected` whether one is checking in now, `key_matches` whether the Chrome that asked last had the
+  current key, `last_seen` when any Chrome last asked, and `refused_at` when a Chrome with another key was last turned
+  away (`/api/v2/canvas/work` answers such a key 401 "Wrong key." even on a library without a password). The app
+  moves past its extension step only on `extension.connected`, and asks to "Connect Chrome again" for an old key.
+  `GET /api/v2/canvas/extension` carries the same `connected`, `key_matches`, `seen_with_key` and `refused_at`, and
+  each of `copies` its own `key_matches`. `syncing.left`/`total` count
   classes, not jobs (`total` = classes in this sync, `left` = classes whose four listings haven't all finished);
   `classes` names them, straight from the crawl's live section states — no new state kept for this.
 - `POST /api/v2/canvas` (unchanged routes, wider body): also takes `poll_minutes` (15–1440, clamped) and

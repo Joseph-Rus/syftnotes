@@ -19,16 +19,16 @@ public static class CanvasView
 
     // --- state ---------------------------------------------------------------------------------------------------
 
-    /// <summary>How things stand with Canvas, in priority order: not set up, no extension has ever checked in, Chrome
-    /// isn't signed in, Chrome hasn't checked in for a while, a sync is running, the last sync had an error, or all
-    /// is well.</summary>
+    /// <summary>How things stand with Canvas, in priority order: not set up, no extension has ever checked in with
+    /// this library's current key (one with an old key, or from before keys were written down, doesn't count), Chrome
+    /// isn't signed in, Chrome isn't checking in now (<see cref="CanvasSettings.ExtensionConnected"/>), a sync is
+    /// running, the last sync had an error, or all is well.</summary>
     public static string StateOf(CanvasSettings s, bool syncing, DateTimeOffset now)
     {
         if (!s.On) return "not_set_up";
-        if (s.ExtensionSeen.Length == 0) return "no_extension";
+        if (s.SeenWithKey.Length == 0) return "no_extension";
         if (s.NeedsLogin) return "signed_out";
-        if (!DateTimeOffset.TryParse(s.ExtensionSeen, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var seen) || now - seen > TimeSpan.FromMinutes(5))
-            return "chrome_away";
+        if (!s.ExtensionConnected(now)) return "chrome_away";
         if (syncing) return "syncing";
         if (s.Error.Length > 0) return "error";
         return "connected";
@@ -42,7 +42,11 @@ public static class CanvasView
         return courses.Keys.Where(cls => !Done(cls)).ToList();
     }
 
-    public static JsonObject State(CanvasSync sync, DateTimeOffset now)
+    /// <summary>The state, for the app's Canvas screens. <c>extension.connected</c> is a Chrome checking in now with
+    /// this library's current key; <c>seen</c> is when one last did (null: never); <c>key_matches</c> says whether the
+    /// Chrome that checked in last used that key (false: it has an old one, so it needs connecting again); and
+    /// <c>refused_at</c> is when a Chrome with another key last knocked (<paramref name="refusedAt"/>).</summary>
+    public static JsonObject State(CanvasSync sync, DateTimeOffset now, string? refusedAt = null)
     {
         var s = sync.Settings;
         bool active = sync.Crawl.Active;
@@ -57,7 +61,9 @@ public static class CanvasView
             ["url"] = s.Url,
             ["extension"] = new JsonObject
             {
-                ["seen"] = When(s.ExtensionSeen), ["version"] = s.ExtensionVersion, ["latest"] = Extension.Version(), ["outdated"] = s.ExtensionOutdated,
+                ["seen"] = When(s.SeenWithKey), ["version"] = s.ExtensionVersion, ["latest"] = Extension.Version(), ["outdated"] = s.ExtensionOutdated,
+                ["connected"] = s.ExtensionConnected(now), ["key_matches"] = s.LastKeyMatches, ["last_seen"] = When(s.ExtensionSeen),
+                ["refused_at"] = When(refusedAt),
                 ["updated"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = When(up.At) } : null,
             },
             ["last_sync"] = When(s.LastDone),

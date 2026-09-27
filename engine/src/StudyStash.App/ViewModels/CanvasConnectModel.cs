@@ -118,7 +118,8 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     [RelayCommand] void Finish() => OnFinish?.Invoke();
 
     /// <summary>Opens the flow at whichever step the library's state still needs: not connected at all → the
-    /// school address; the extension missing → set it up; signed out, or no class linked yet → find courses;
+    /// school address; no Chrome checking in now with the library's current key → the extension (a Chrome that was
+    /// connected once, or has an old key, doesn't skip it); signed out, or no class linked yet → find courses;
     /// otherwise the whole thing already works, so → sync now.</summary>
     public Task StartAsync(CanvasApi.State s, IReadOnlyList<CanvasApi.ClassRow> classes, CancellationToken stop = default)
     {
@@ -131,10 +132,15 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     static int DecideStep(CanvasApi.State s, IReadOnlyList<CanvasApi.ClassRow> classes) => s.Status switch
     {
         "not_set_up" => 1,
-        "no_extension" => 2,
+        _ when !ExtensionConnected(s) => 2,
         "signed_out" => 3,
         _ => classes.Count > 0 && classes.All(c => !c.Linked) ? 3 : 5,
     };
+
+    /// <summary>Chrome is checking in now with the library's current key. Only that moves past the extension step:
+    /// an old registration, or a Chrome that was here once, can't find courses. A library older than the
+    /// <c>connected</c> field goes by its state instead.</summary>
+    static bool ExtensionConnected(CanvasApi.State s) => s.Extension?.Connected ?? s.Status is not ("no_extension" or "chrome_away");
 
     async Task GoToAsync(int step, IReadOnlyList<CanvasApi.ClassRow>? classes, CancellationToken stop)
     {
@@ -207,7 +213,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     {
         if (watch.State is not { } s) return;
         state = s;
-        if (Current == 2 && s.Status != "no_extension")
+        if (Current == 2 && s.Status != "not_set_up" && ExtensionConnected(s))
         {
             _ = RefreshAndAdvanceAsync();
         }

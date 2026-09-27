@@ -185,6 +185,7 @@ public sealed partial class FakeCanvas
     /// given clock, in California's time zone. Class folders are under <c>pool/</c> in the temp folder.</summary>
     public static CanvasSync Library(TempDir dir, Func<DateTimeOffset> clock, params (string Class, long Course)[] courses)
     {
+        CanvasSettings.ExtensionKey(dir.Path); // the library's extension key, before this pretend extension checks in with it
         CanvasSettings.Update(dir.Path, s =>
         {
             s.Url = Base;

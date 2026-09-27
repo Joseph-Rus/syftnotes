@@ -5,7 +5,7 @@ namespace StudyStash.Core.Canvas;
 /// <summary>
 /// Why "Find my courses" came back the way it did, in one word the Settings page turns into a sentence: found,
 /// noaddress (no Canvas address yet), signedout (Chrome isn't signed in to Canvas), noextension (no extension has
-/// ever checked in), away (the extension has checked in before but didn't answer this time), or other (Canvas's own
+/// ever checked in with this library's current key), away (the extension has checked in before but didn't answer this time), or other (Canvas's own
 /// words).
 /// </summary>
 public static class FindOutcome
@@ -20,7 +20,7 @@ public static class FindOutcome
         if (result["error"] is not JsonValue e || !e.TryGetValue(out string? error) || error.Length == 0) return Found;
         if (!settings.On || error == CanvasSync.NotCanvas || error == LibraryNoAddress) return NoAddress;
         if (error == CanvasSync.SignedOutAnswer) return SignedOut;
-        if (settings.ExtensionSeen.Length == 0) return NoExtension;
+        if (settings.SeenWithKey.Length == 0) return NoExtension;
         if (error == AgentQueue.NoAnswer || !settings.ExtensionConnected(now)) return Away;
         return Other;
     }

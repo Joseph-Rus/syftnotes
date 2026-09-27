@@ -174,9 +174,17 @@ public static class CanvasApi
         public IReadOnlyList<string> Warnings { get; init; } = [];
     }
 
+    /// <summary>The Chrome extension as the library sees it. <see cref="Seen"/> is when a Chrome last checked in with
+    /// the library's current key; <see cref="Connected"/> is one checking in now with it (null from a library older
+    /// than this field: go by the state); <see cref="KeyMatches"/> false means the Chrome that asked last has an old
+    /// key and needs connecting again; <see cref="RefusedAt"/> is when a Chrome with another key was turned away.</summary>
     public sealed record ExtensionInfo
     {
         public DateTimeOffset? Seen { get; init; }
+        public bool? Connected { get; init; }
+        public bool? KeyMatches { get; init; }
+        public DateTimeOffset? LastSeen { get; init; }
+        public DateTimeOffset? RefusedAt { get; init; }
         public string Version { get; init; } = "";
         public string? Latest { get; init; }
         public bool Outdated { get; init; }
@@ -253,7 +261,14 @@ public static class CanvasApi
         public int SeenProtocol { get; init; }
         /// <summary>"this_computer", "another_computer", or "" (the extension didn't say).</summary>
         public string SeenWhere { get; init; } = "";
+        /// <summary>A Chrome is checking in now with the library's current key.</summary>
         public bool Connected { get; init; }
+        /// <summary>The Chrome that checked in last used the library's current key (false: an old registration).</summary>
+        public bool KeyMatches { get; init; }
+        /// <summary>When a Chrome last checked in with the current key.</summary>
+        public DateTimeOffset? SeenWithKey { get; init; }
+        /// <summary>When a Chrome with another key was last turned away.</summary>
+        public DateTimeOffset? RefusedAt { get; init; }
     }
 
     // ---- GET canvas/classes ----
