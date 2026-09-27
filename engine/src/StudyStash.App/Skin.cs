@@ -121,6 +121,8 @@ public static class Skin
             B("Hl", Oklch.ToColor(0.88, 0.16, t.Hl, 0.55));
             B("Warn", Oklch.ToColor(0.68, 0.15, 65));
             B("Ok", Oklch.ToColor(0.62, 0.14, 150));
+            // Not in the design: the recording dot, the system's own red (the menu bar's badge is the same).
+            B("Rec", Hex("#FF3B30"));
             B("Hover", Black(0.04));
             B("Press", Black(0.08));
             // Not in the design: a floating window's glass when there's no blur behind it, solid enough to read.
@@ -158,6 +160,7 @@ public static class Skin
             B("Hl", Oklch.ToColor(0.75, 0.15, t.Hl, 0.35));
             B("Warn", Oklch.ToColor(0.8, 0.14, 75));
             B("Ok", Oklch.ToColor(0.74, 0.15, 150));
+            B("Rec", Hex("#FF453A"));
             B("Hover", White(0.05));
             B("Press", White(0.1));
             B("GlassSolid", t.Neutral(0.26, 1.5, 0.94));
@@ -232,6 +235,8 @@ public static class Skin
             B("Mini", Colors.White);
             B("Ok", Hex("#0F7B0F"));
             B("Warn", Hex("#9D5D00"));
+            // Not in the design: the recording dot, the tray icon's red.
+            B("Rec", Hex("#E5484D"));
             B("IbInfo", Hex("#F6F6F6"));
             B("IbOk", Hex("#DFF6DD"));
             B("IbWarn", Hex("#FFF4CE"));
@@ -278,6 +283,7 @@ public static class Skin
             B("Mini", Hex("#2B2B2B"));
             B("Ok", Hex("#6CCB5F"));
             B("Warn", Hex("#FCE100"));
+            B("Rec", Hex("#E5484D"));
             B("IbInfo", Hex("#2B2B2B"));
             B("IbOk", Hex("#393D1B"));
             B("IbWarn", Hex("#433519"));
@@ -304,7 +310,7 @@ public static class Skin
     static readonly string[] MacBrushes =
     [
         "Glass", "GlassSolid", "Win", "Raised", "Group", "Fg", "Fg2", "Fg3", "Sep", "Fill", "Fill2", "Mini", "Accent", "AccentText",
-        "Tint", "OnAccent", "AccentTint", "Hl", "Warn", "Ok", "Good", "Hover", "Press", "PopupBg", "PopupStroke",
+        "Tint", "OnAccent", "AccentTint", "Hl", "Warn", "Ok", "Rec", "Good", "Hover", "Press", "PopupBg", "PopupStroke",
     ];
     static readonly string[] MacShadows =
     [
@@ -315,7 +321,7 @@ public static class Skin
     [
         "Ground", "Mica", "Layer", "LayerStroke", "Acrylic", "FlyStroke", "Footer", "Card", "CardStroke", "Fg", "Fg2", "Fg3", "Sep",
         "Subtle", "Subtle2", "Ctrl", "CtrlStroke", "CtrlBottom", "CtrlBorder", "Accent", "AccentText", "OnAccent", "Hl", "Taskbar",
-        "Mini", "Ok", "Warn", "PopupBg", "PopupStroke", "IbInfo", "IbOk", "IbWarn", "IbErr", "IcInfo", "IcOk", "IcWarn", "IcErr", "IbGlyph", "Good", "Hover", "Press",
+        "Mini", "Ok", "Warn", "Rec", "PopupBg", "PopupStroke", "IbInfo", "IbOk", "IbWarn", "IbErr", "IcInfo", "IcOk", "IcWarn", "IcErr", "IbGlyph", "Good", "Hover", "Press",
     ];
     static readonly string[] WinShadows = ["Shadow", "ShadowLg", "PopupShadow"];
 

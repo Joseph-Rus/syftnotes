@@ -635,12 +635,44 @@ public static partial class Shell
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
         var w = new Floating { Content = view, Title = "Study Stash recorder" };
         // Drag it anywhere by its background; where it lands is saved once the drag ends, not on every pixel moved.
+        // The small pill moves by hand, so a press that never moves is a click, which opens the recorder.
+        Point? pressed = null;
+        bool moved = false;
         view.PointerPressed += (_, e) =>
         {
             if (e.Source is TextBox || !e.GetCurrentPoint(view).Properties.IsLeftButtonPressed) return;
-            w.BeginMoveDrag(e);
+            if (recorder.Expanded)
+            {
+                w.BeginMoveDrag(e);
+                return;
+            }
+            pressed = e.GetPosition(view);
+            moved = false;
+            e.Pointer.Capture(view);
         };
-        view.PointerReleased += (_, _) => SaveRecorderPosition();
+        view.PointerMoved += (_, e) =>
+        {
+            if (pressed is not { } from) return;
+            var by = e.GetPosition(view) - from;
+            if (!moved && Math.Abs(by.X) + Math.Abs(by.Y) < 4) return;
+            moved = true;
+            // The window follows the pointer, so the pointer stays over the same spot of the pill.
+            w.Position += new PixelVector((int)Math.Round(by.X * w.DesktopScaling), (int)Math.Round(by.Y * w.DesktopScaling));
+        };
+        view.PointerReleased += (_, e) =>
+        {
+            if (pressed is not null)
+            {
+                pressed = null;
+                e.Pointer.Capture(null);
+                if (!moved)
+                {
+                    recorder.ToggleCommand.Execute(null);
+                    return;
+                }
+            }
+            SaveRecorderPosition();
+        };
         w.Closing += (_, e) =>
         {
             if (quitting) return;
