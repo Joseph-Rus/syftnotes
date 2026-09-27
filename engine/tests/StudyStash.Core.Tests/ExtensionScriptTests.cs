@@ -370,6 +370,8 @@ public class ExtensionScriptTests
     static JsonObject Job(string id, string path, string kind) => new() { ["id"] = id, ["url"] = Canvas + path, ["kind"] = kind };
 
     const string Ask = Library + "/api/v2/canvas/work?v=1.4&p=3&wait=20&a=http%3A%2F%2F127.0.0.1%3A8787";
+    /// <summary>A pump's first ask: answered at once, so its status is up to date straight away.</summary>
+    const string AskNow = Library + "/api/v2/canvas/work?v=1.4&p=3&wait=0&a=http%3A%2F%2F127.0.0.1%3A8787";
 
     [Fact]
     public void It_waits_for_work_with_the_library_and_posts_each_file_on_its_own()
@@ -382,9 +384,9 @@ public class ExtensionScriptTests
             .Route(Canvas + "/files/8801/download", new FakeResponse { Body = "%PDF-1.4 ps4 answers" });
         w.Eval("pump(true)");
 
-        // Its version, protocol 3, how long the library may hold the request, and the library address it uses; a
-        // library that waits is asked again at once, until it stops answering.
-        Assert.Equal([Ask + "&force=1", Ask, Ask, Ask], w.Asks);
+        // Its version, protocol 3, how long the library may hold the request (not at all the first time), and the
+        // library address it uses; a library that waits is asked again at once, until it stops answering.
+        Assert.Equal([AskNow + "&force=1", Ask, Ask, Ask], w.Asks);
         var posts = w.Posts.Select(p => string.Join(",", p.Select(r => S(r!.AsObject(), "id")))).ToList();
         Assert.Equal(["1,3", "2", "4"], posts); // the answers together, then one file per post
         Assert.All(w.Fetched.Where(f => f.Url.StartsWith(Library, StringComparison.Ordinal)), f => Assert.DoesNotContain("k3y", f.Url));
@@ -402,7 +404,7 @@ public class ExtensionScriptTests
     {
         var w = WithLibrary(new Worker(), [], protocol: 2, rounds: 10);
         w.Eval("pump(false)");
-        Assert.Equal([Ask], w.Asks); // nothing queued, nobody exploring: sleep until the alarm
+        Assert.Equal([AskNow], w.Asks); // nothing queued, nobody exploring: sleep until the alarm
         Assert.Equal("ok", w.Status);
 
         var hot = WithLibrary(new Worker(), [], protocol: 2, rounds: 3, hot: true);
@@ -426,7 +428,7 @@ public class ExtensionScriptTests
         Assert.Equal(Legacy, old.Eval("conn.app").AsString());
         old.Route(Legacy + "/api/v2/canvas/work", new FakeResponse { Throws = true });
         old.Eval("pump(false)");
-        Assert.StartsWith(Legacy + "/api/v2/canvas/work?v=1.4&p=3&wait=20&a=http%3A%2F%2Fold.test%3A8787", old.Fetched.Last().Url);
+        Assert.StartsWith(Legacy + "/api/v2/canvas/work?v=1.4&p=3&wait=0&a=http%3A%2F%2Fold.test%3A8787", old.Fetched.Last().Url);
     }
 
     [Fact]

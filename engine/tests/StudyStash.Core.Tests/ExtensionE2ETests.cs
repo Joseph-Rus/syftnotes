@@ -177,6 +177,10 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         Note($"checked in with the restarted library {sw.Elapsed.TotalSeconds:0.0} s after it came back");
         var found = await rig.PostAsync("/api/v2/canvas/courses", "{}");
         Assert.Equal("", ExtensionRig.S(found["error"]));
+        // A sync the restart cut off (S6's new address started one) carries on: the library handed out again what
+        // Chrome held when it stopped.
+        await rig.UntilAsync(async () => (await rig.GetAsync("/api/v2/canvas/state"))["syncing"] is null ? "" : null,
+            TimeSpan.FromSeconds(30), "a sync cut off by the restart to finish");
     }
 
     [ChromeFact]
@@ -296,6 +300,10 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         // The student signs out of Canvas while a sync is running (here, the moment it asks for the course's pages,
         // after the first listings came in). The sync stops, keeps what the class had, and the library says "Sign in
         // to Canvas"; signing in again and syncing finishes the job.
+        // Whatever sync the stories before started has finished (a sync handed to a Chrome that never answered would
+        // hold up every other for ten minutes).
+        await rig.UntilAsync(async () => (await rig.GetAsync("/api/v2/canvas/state"))["syncing"] is null ? "" : null,
+            TimeSpan.FromSeconds(30), "the last sync to finish");
         var before = CanvasSettings.Load(rig.Home);
         int assignments = Assignments.Load(rig.Home).Count(a => a.ClassName == "CS 101");
         rig.Canvas.SignOutWhenAsked("/api/v1/courses/4201/pages");
@@ -433,6 +441,8 @@ public sealed class ExtensionRig : IAsyncLifetime
     /// <summary>A second Chrome, the laptop's (<see cref="StartLaptopChrome"/>).</summary>
     public ChromeRunner? Laptop { get; private set; }
 
+    readonly System.Collections.Concurrent.ConcurrentQueue<string> asked = new();
+
     public CanvasServer Canvas { get; private set; } = null!;
     public string Home => dir.Path;
     /// <summary>The extension folder Chrome loaded: the library's own.</summary>
@@ -513,6 +523,15 @@ public sealed class ExtensionRig : IAsyncLifetime
             if (elsewhere is not null) k.Listen(elsewhere, cfg.WebPort, o => o.Protocols = HttpProtocols.Http1);
         });
         library = LibraryWeb.Build(builder, cfg!, store!, new Pipeline(cfg!, store!, log: _ => { }), options!);
+        library.Use(async (ctx, next) =>
+        {
+            // What the extensions asked the library, for a failing test's message.
+            var at = DateTimeOffset.Now;
+            var sw = Stopwatch.StartNew();
+            await next();
+            if (ctx.Request.Path.StartsWithSegments("/api/v2/canvas/work") || ctx.Request.Path.StartsWithSegments("/api/v2/canvas/results"))
+                asked.Enqueue($"{at:HH:mm:ss.f} {ctx.Request.Method} {ctx.Request.Path}{ctx.Request.QueryString} → {ctx.Response.StatusCode} in {sw.Elapsed.TotalSeconds:0.0} s");
+        });
         await library.StartAsync();
     }
 
@@ -593,12 +612,14 @@ public sealed class ExtensionRig : IAsyncLifetime
         throw new XunitException($"Waited {sw.Elapsed.TotalSeconds:0} s for {what}.\nCanvas saw:\n"
             + string.Join('\n', Canvas.Hits.TakeLast(15).Select(h => $"  {h.Method} {h.Host}{h.PathAndQuery} cookie={h.Cookie} signed_in={h.SignedIn} → {h.Status}"))
             + $"\nThe library's sync: {CrawlNow()}"
-            + $"\nChrome{(chrome!.Exited ? " (exited)" : "")}:\n{chrome.Tail()}");
+            + $"\nThe extensions asked (latest last):\n  {string.Join("\n  ", asked.TakeLast(20))}"
+            + $"\nChrome{(chrome!.Exited ? " (exited)" : "")}:\n{chrome.Tail()}"
+            + (Laptop is { } laptop ? $"\nThe laptop's Chrome{(laptop.Exited ? " (exited)" : "")}:\n{laptop.Tail(20)}" : ""));
     }
 
     /// <summary>How the library's sync stands (crawl.json): running or not, where, and what's waiting or out with
     /// Chrome, for a failing test's message.</summary>
-    string CrawlNow()
+    public string CrawlNow()
     {
         try
         {

@@ -37,6 +37,10 @@ public sealed partial class LibraryWeb
         // The extension's folder is ready before anyone asks for it, and an updated Study Stash brings it up to date:
         // Chrome's copy reloads itself from it.
         EnsureHere();
+        // A sync's jobs that were out with Chrome when the library stopped: their answers found nobody to take them,
+        // so they go out again at once rather than after the ten minutes a job is given (a sync mid-way through a
+        // restart carries on as soon as Chrome asks again). An answer that still comes for one is simply asked again.
+        Canvas.Crawl.Requeue();
 
         // The extension. It says its version (v), its protocol (p; one from before protocol 2 sends none) and, from
         // 1.4, the library address it uses (a) and how long it will wait for work (wait, in seconds): the request is

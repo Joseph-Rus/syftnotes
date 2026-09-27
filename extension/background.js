@@ -183,7 +183,9 @@ async function pump(force) {
       const asked = Date.now();
       try {
         waiting = typeof AbortController === 'function' ? new AbortController() : null;
-        work = await app('/api/v2/canvas/work?v=' + chrome.runtime.getManifest().version + '&p=' + PROTOCOL + '&wait=' + WAIT
+        // The first ask is answered at once, so the toolbar button says how things stand now (a key put right, a
+        // library back) rather than after a held request.
+        work = await app('/api/v2/canvas/work?v=' + chrome.runtime.getManifest().version + '&p=' + PROTOCOL + '&wait=' + (round === 0 ? 0 : WAIT)
                          + '&a=' + encodeURIComponent(conn.app) + (forced ? '&force=1' : ''), undefined, waiting && waiting.signal);
       } catch (e) {
         if (e && e.name === 'AbortError') continue; // asked to sync: ask again at once, with force
@@ -215,10 +217,11 @@ async function pump(force) {
         continue;
       }
       await setStatus('ok');
-      // A library that waits for work (protocol 3) is asked again at once, unless it answered straight away with
-      // nothing: then a breath first, so a library that can't wait is never asked in a tight loop.
+      // A library that waits for work (protocol 3) is asked again at once, unless it answered a request it could
+      // have held straight away with nothing: then a breath first, so a library that can't wait is never asked in a
+      // tight loop.
       if (work.p >= 3) {
-        if (Date.now() - asked < 1000) await new Promise(r => setTimeout(r, 1500));
+        if (round > 0 && Date.now() - asked < 1000) await new Promise(r => setTimeout(r, 1500));
         continue;
       }
       // An older library answers at once: check again shortly only while an agent is exploring.

@@ -448,6 +448,30 @@ public class CanvasApiTests
     }
 
     [Fact]
+    public async Task A_sync_cut_off_by_a_library_restart_carries_on_as_soon_as_chrome_asks_again()
+    {
+        // Chrome took the sync's first reads, then the library stopped: its answers found nobody. The library that
+        // starts next hands them out again at once, not ten minutes later, and the sync finishes.
+        using var dir = new TempDir();
+        var now = FakeCanvas.DesignNow;
+        var before = FakeCanvas.Library(dir, () => now);
+        var taken = before.Work(force: true, Extension.Version(), Extension.Protocol).Jobs;
+        Assert.Equal((1, 6), before.Crawl.Left);
+
+        var after = new CanvasSync(dir.Path, c => FakeCanvas.ClassDir(dir, c), _ => { }) { Clock = () => now, Zone = FakeCanvas.Zone };
+        var (cfg, store, options) = LibraryFor(dir, after);
+        await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), options));
+        Assert.Equal((7, 0), after.Crawl.Left);
+        var again = after.Work(force: false, Extension.Version(), Extension.Protocol).Jobs;
+        Assert.Equal(taken.Select(j => j.Url), again.Select(j => j.Url));
+        var canvas = FakeCanvas.Cs101();
+        after.Results(again.Select(canvas.Answer).ToList());
+        Assert.True(canvas.Run(after, force: false));
+        Assert.Equal("", CanvasSettings.Load(dir.Path).Error);
+        Assert.Equal(5, Assignments.Load(dir.Path).Count);
+    }
+
+    [Fact]
     public async Task A_waiting_extension_is_answered_as_soon_as_someone_asks_for_a_sync()
     {
         var (dir, site, _) = await SyncedAsync();

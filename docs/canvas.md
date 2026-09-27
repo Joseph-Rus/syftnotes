@@ -180,7 +180,8 @@ sync's; `TakeFinished` hands them to `CanvasSync.Finish`.
 - A class no longer linked to Canvas isn't reported as "Removed".
 
 **Other rules.** Every listing follows Canvas's `Link: <…>; rel="next"` header. Jobs the extension took and never
-answered go back in the queue after 10 minutes, or at once when the extension starts afresh (`force`). A spec.md
+answered go back in the queue after 10 minutes, or at once when the extension starts afresh (`force`) or the library
+starts (a sync cut off by a restart carries on; measured end to end). A spec.md
 without `generated_by: study-stash` was written by hand and is never overwritten. AI reads use the same
 classification: a hidden tab comes back as Canvas said it (status 401 and its JSON), only a real sign-out is the
 error "Chrome isn't signed in to Canvas.", and a file read that Canvas refused saves nothing.
@@ -223,7 +224,7 @@ the Study Stash that wrote the folder speaks; the extension sends its own.
 
 | Who | What |
 |---|---|
-| extension → library | `GET /api/v2/canvas/work?v=<its version>&p=<its protocol>&wait=20&a=<the library address it uses>[&force=1]`, header `X-Study-Stash-Key` (or the library password). 1.2 and earlier send no `p`, read as 1; 1.3 sends no `wait` or `a`. `force=1` comes from a fresh start (installed, reloaded, the popup's "Sync Canvas now"). |
+| extension → library | `GET /api/v2/canvas/work?v=<its version>&p=<its protocol>&wait=20&a=<the library address it uses>[&force=1]`, header `X-Study-Stash-Key` (or the library password). 1.2 and earlier send no `p`, read as 1; 1.3 sends no `wait` or `a`. The first ask each time the pump starts (installed, reloaded, the alarm after a failure) sends `wait=0` and is answered at once, so the status and badge are right straight away. `force=1` comes from a fresh start (installed, reloaded, the popup's "Sync Canvas now"). |
 | library → extension | `{"jobs":[{"id","url","kind":"json\|text\|bytes"}], "hot": bool, "ext": "<the library's extension version>", "p": 3}`. With `p ≥ 3` and `wait`, the library **holds the request** until there is work (an AI's read or Find my courses is queued, someone asks for a sync, a sync falls due, Canvas's pause runs out: it looks again every 5 s) or `min(wait, 25)` seconds pass (Chrome drops a fetch with no answer after 30), or the request goes away, or the library is stopping. Older protocols are answered at once, and `hot` (ask again in 1.5 s: an AI is reading) is for them. |
 | extension → library | `POST /api/v2/canvas/results {"results":[result]}`; result = `{"id","status","link","type","final","text" or "b64","error","signed_out","rate","retry_after"}`. The last three are new in protocol 2; the library reads their absence as an old extension. |
 
@@ -280,7 +281,8 @@ What protocol 2 (1.3) does, answer by answer (all kept in 1.4):
   fetches the signed link, only if that link is on a file host.
 - **Posting.** A round's JSON and text answers go in one POST; each file answer goes in a POST of its own (one big
   body per request). A POST the library refuses stops the pump: those jobs go out again after the ten-minute in-flight
-  timeout, and the next alarm pumps again.
+  timeout (at once when the library was restarting: a library hands out again, when it starts, every job that was
+  out with Chrome), and the next alarm pumps again.
 
 ### Versions, updates and reload
 
