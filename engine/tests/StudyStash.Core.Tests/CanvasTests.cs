@@ -187,4 +187,130 @@ public class CanvasTests
         Assert.True(File.Exists(dir["background.js"]));
         Assert.Equal(manifest["version"]!.GetValue<string>(), Extension.Version());
     }
+
+    // --- Find my courses: what really went wrong --------------------------------------------------------------
+
+    static CanvasSettings Seen(string when, int protocol = 2) => new() { Url = "https://canvas.test", ExtensionSeen = when, ExtensionProtocol = protocol };
+
+    static string At(DateTimeOffset t) => t.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+
+    [Fact]
+    public void Find_says_found_when_canvas_answered()
+    {
+        Assert.Equal(FindOutcome.Found, FindOutcome.Of(A("""{"url":"https://canvas.test","available":{}}"""), Seen(At(Now)), Now));
+    }
+
+    [Theory]
+    [InlineData("Add your school's Canvas address first.", "", "", FindOutcome.NoAddress)] // the library didn't ask Chrome
+    [InlineData("Chrome didn't answer. Is Chrome open, with the Study Stash extension on?", "", "", FindOutcome.NoAddress)] // no address, whatever Chrome did
+    [InlineData("Chrome isn't signed in to Canvas.", "https://canvas.test", "now", FindOutcome.SignedOut)]
+    [InlineData("Chrome didn't answer. Is Chrome open, with the Study Stash extension on?", "https://canvas.test", "", FindOutcome.NoExtension)]
+    [InlineData("TypeError: Failed to fetch", "https://canvas.test", "", FindOutcome.NoExtension)]
+    [InlineData("Chrome didn't answer. Is Chrome open, with the Study Stash extension on?", "https://canvas.test", "now", FindOutcome.Away)]
+    [InlineData("TypeError: Failed to fetch", "https://canvas.test", "an hour ago", FindOutcome.Away)]
+    [InlineData("TypeError: Failed to fetch", "https://canvas.test", "now", FindOutcome.Other)]
+    [InlineData("refused: not a Canvas URL", "https://canvas.test", "now", FindOutcome.Other)]
+    public void Find_says_what_went_wrong(string error, string url, string seen, string outcome)
+    {
+        var s = new CanvasSettings
+        {
+            Url = url, ExtensionProtocol = 2,
+            ExtensionSeen = seen switch { "now" => At(Now), "an hour ago" => At(Now.AddHours(-1)), _ => "" },
+        };
+        Assert.Equal(outcome, FindOutcome.Of(new JsonObject { ["error"] = error }, s, Now));
+    }
+
+    [Fact]
+    public void Each_find_outcome_has_its_own_sentence()
+    {
+        string[] all = [FindOutcome.Found, FindOutcome.NoAddress, FindOutcome.SignedOut, FindOutcome.NoExtension, FindOutcome.Away, FindOutcome.Other];
+        Assert.Equal(all.Length, all.Select(o => FindOutcome.Say(o)).Distinct().Count());
+        Assert.Equal("Couldn't find your courses: Canvas answered 503", FindOutcome.Say(FindOutcome.Other, "Canvas answered 503"));
+    }
+
+    // --- the extension checking in -----------------------------------------------------------------------------
+
+    [Fact]
+    public async Task An_ai_read_that_finds_chrome_signed_out_says_sign_in_until_an_answer_says_otherwise()
+    {
+        using var dir = new TempDir();
+        var sync = FakeCanvas.Library(dir, () => Now);
+        CanvasSettings.Update(dir.Path, s => s.Courses.Clear()); // no sync in the way: only the AI's read
+        async Task<JsonObject> Read(Func<CanvasJob, CanvasResult> answer)
+        {
+            var reading = sync.FetchAsync("/api/v1/users/self", "json");
+            var job = Assert.Single(sync.Work(false, "1.3", 2).Jobs);
+            sync.Results([answer(job)]);
+            return await reading;
+        }
+
+        var r = await Read(j => new CanvasResult(j.Id, 401, "", """{"status":"unauthenticated","errors":[{"message":"user authorization required"}]}""", "", "", j.Url));
+        Assert.Equal("Chrome isn't signed in to Canvas.", r["error"]!.GetValue<string>());
+        var st = CanvasSettings.Load(dir.Path);
+        Assert.True(st.NeedsLogin);
+        Assert.Equal(CanvasSync.SignInError, st.Error);
+        Assert.Equal("signed_out", CanvasView.State(sync, Now)["state"]!.GetValue<string>());
+
+        // Signed in again: the next good answer clears it.
+        r = await Read(j => new CanvasResult(j.Id, 200, "", """{"id":1}""", "", "", j.Url));
+        Assert.Null(r["error"]);
+        st = CanvasSettings.Load(dir.Path);
+        Assert.False(st.NeedsLogin);
+        Assert.Equal("", st.Error);
+        Assert.Equal("connected", CanvasView.State(sync, Now)["state"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void A_check_in_is_written_down_at_most_every_15_seconds_unless_something_changed()
+    {
+        using var dir = new TempDir();
+        var now = Now;
+        var sync = FakeCanvas.Library(dir, () => now);
+        CanvasSettings.Update(dir.Path, s => s.Courses.Clear());
+
+        sync.Work(false, "1.4", 3, "http://127.0.0.1:8787");
+        var s = CanvasSettings.Load(dir.Path);
+        Assert.Equal((At(Now), "1.4", 3, "this_computer"), (s.ExtensionSeen, s.ExtensionVersion, s.ExtensionProtocol, s.ExtensionWhere));
+        Assert.True(s.ExtensionConnected(Now));
+
+        var written = File.GetLastWriteTimeUtc(CanvasSettings.PathIn(dir.Path));
+        Thread.Sleep(20);
+        now = Now.AddSeconds(10);
+        sync.Work(false, "1.4", 3, "http://127.0.0.1:8787");
+        Assert.Equal(written, File.GetLastWriteTimeUtc(CanvasSettings.PathIn(dir.Path)));
+        Assert.Equal(At(Now), CanvasSettings.Load(dir.Path).ExtensionSeen);
+
+        // Another computer's Chrome: written at once.
+        sync.Work(false, "1.4", 3, "http://100.64.0.7:8787");
+        s = CanvasSettings.Load(dir.Path);
+        Assert.Equal((At(now), "another_computer"), (s.ExtensionSeen, s.ExtensionWhere));
+
+        // Quiet but 15 s on: written again.
+        now = now.AddSeconds(15);
+        sync.Work(false, "1.4", 3, "http://100.64.0.7:8787");
+        Assert.Equal(At(now), CanvasSettings.Load(dir.Path).ExtensionSeen);
+
+        // A long-polling extension quiet for 90 s is gone; an older one gets five minutes.
+        s = CanvasSettings.Load(dir.Path);
+        Assert.False(s.ExtensionConnected(now.AddSeconds(91)));
+        s.ExtensionProtocol = 2;
+        Assert.True(s.ExtensionConnected(now.AddSeconds(91)));
+        Assert.False(s.ExtensionConnected(now.AddMinutes(6)));
+
+        // One from before 1.4 doesn't say where it is.
+        sync.Work(false, "1.3", 2);
+        Assert.Equal("", CanvasSettings.Load(dir.Path).ExtensionWhere);
+    }
+
+    [Theory]
+    [InlineData("http://127.0.0.1:8787", "this_computer")]
+    [InlineData("http://localhost:8787", "this_computer")]
+    [InlineData("http://[::1]:8787", "this_computer")]
+    [InlineData("https://mini.tail.ts.net", "another_computer")]
+    [InlineData("http://192.168.1.20:8787", "another_computer")]
+    [InlineData("", "")]
+    [InlineData(null, "")]
+    [InlineData("not an address", "")]
+    public void Where_a_chrome_is_comes_from_the_address_it_uses(string? address, string where) =>
+        Assert.Equal(where, CanvasSettings.WhereFrom(address));
 }

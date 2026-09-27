@@ -396,4 +396,45 @@ public class CanvasApiTests
         var one = arr.First(a => a!["name"]!.GetValue<string>() == "Problem set 4")!.AsObject();
         foreach (string key in new[] { "class", "id", "name", "due", "points", "status", "score", "submitted", "url", "done", "folder" }) Assert.True(one.ContainsKey(key), key);
     }
+
+    [Fact]
+    public async Task The_extension_endpoint_says_where_its_folder_is_and_which_chrome_checked_in()
+    {
+        using var dir = new TempDir();
+        var now = FakeCanvas.DesignNow;
+        var sync = FakeCanvas.Library(dir, () => now);
+        var (cfg, store, options) = LibraryFor(dir, sync);
+        using var _1 = store;
+        await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), options));
+        string key = CanvasSettings.ExtensionKey(cfg.Home);
+        async Task CheckIn(string query)
+        {
+            var ask = new HttpRequestMessage(HttpMethod.Get, "/api/v2/canvas/work?" + query) { Headers = { { "X-Study-Stash-Key", key } } };
+            Assert.True((await site.Client.SendAsync(ask)).IsSuccessStatusCode);
+        }
+
+        // Before any Chrome: the folder is ready, nothing has checked in.
+        var e = await GetAsync(site, "/api/v2/canvas/extension");
+        Assert.Equal((key, "https://canvas.test", Extension.Version(), Extension.Protocol), (e["key"]!.GetValue<string>(), e["canvas"]!.GetValue<string>(), e["version"]!.GetValue<string>(), e["protocol"]!.GetValue<int>()));
+        Assert.Equal((Extension.Folder(cfg.Home), true), (e["folder"]!.GetValue<string>(), e["folder_ready"]!.GetValue<bool>()));
+        Assert.Equal(("", "", 0, "", false), (e["seen"]!.GetValue<string>(), e["seen_version"]!.GetValue<string>(), e["seen_protocol"]!.GetValue<int>(), e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
+
+        // This computer's Chrome, long-polling (1.4, protocol 3).
+        await CheckIn("v=1.4&p=3&a=" + Uri.EscapeDataString("http://127.0.0.1:" + cfg.WebPort));
+        e = await GetAsync(site, "/api/v2/canvas/extension");
+        Assert.Equal((now.ToString("o", System.Globalization.CultureInfo.InvariantCulture), "1.4", 3, "this_computer", true),
+            (e["seen"]!.GetValue<string>(), e["seen_version"]!.GetValue<string>(), e["seen_protocol"]!.GetValue<int>(), e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
+
+        // The laptop's, reaching the library from elsewhere; then quiet for two minutes.
+        await CheckIn("v=1.4&p=3&a=" + Uri.EscapeDataString("https://mini.tail.ts.net"));
+        now = now.AddMinutes(2);
+        e = await GetAsync(site, "/api/v2/canvas/extension");
+        Assert.Equal(("another_computer", false), (e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
+
+        // The overview has the same, without the key.
+        var overview = (await GetAsync(site, "/api/v2/canvas"))["extension"]!.AsObject();
+        Assert.Null(overview["key"]);
+        foreach (string field in new[] { "canvas", "version", "protocol", "folder", "folder_ready", "seen", "seen_version", "seen_protocol", "seen_where", "connected" })
+            Assert.Equal(e[field]!.ToJsonString(), overview[field]!.ToJsonString());
+    }
 }
