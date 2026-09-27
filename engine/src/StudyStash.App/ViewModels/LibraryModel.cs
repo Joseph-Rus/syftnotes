@@ -132,6 +132,8 @@ public sealed partial class LibraryModel : ObservableObject
     public bool ShowLecturePage => Assignment is null && Reader is null;
     public bool HasNotes => Notes is not null;
     public bool HasAsk => Ask is not null && HasNote && ShowLecturePage;
+    /// <summary>An answer to show above the ask bar: the page gives it its own room, and the notes end above it.</summary>
+    public bool HasAnswer => HasAsk && Ask?.HasLatest == true;
 
     /// <summary>The list column: the design's 312 (Mac) or 320 (Windows) for lectures, 340 for Canvas's lists (360
     /// for a Windows class page), and the whole window when it's narrow.</summary>
@@ -168,7 +170,18 @@ public sealed partial class LibraryModel : ObservableObject
     partial void OnAssignmentChanged(AssignmentModel? value) => DetailChanged();
     partial void OnReaderChanged(CanvasReaderModel? value) => DetailChanged();
     partial void OnNotesChanged(AiNotesModel? value) => OnPropertyChanged(nameof(HasNotes));
-    partial void OnAskChanged(AiAskModel? value) => OnPropertyChanged(nameof(HasAsk));
+    partial void OnAskChanged(AiAskModel? oldValue, AiAskModel? newValue)
+    {
+        if (oldValue is not null) oldValue.PropertyChanged -= AskPropertyChanged;
+        if (newValue is not null) newValue.PropertyChanged += AskPropertyChanged;
+        OnPropertyChanged(nameof(HasAsk));
+        OnPropertyChanged(nameof(HasAnswer));
+    }
+
+    void AskPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AiAskModel.HasLatest)) OnPropertyChanged(nameof(HasAnswer));
+    }
 
     void DetailChanged()
     {
@@ -176,6 +189,7 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(ShowReader));
         OnPropertyChanged(nameof(ShowLecturePage));
         OnPropertyChanged(nameof(HasAsk));
+        OnPropertyChanged(nameof(HasAnswer));
     }
 
     partial void OnNarrowChanged(bool value)
@@ -218,6 +232,7 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(HasNote));
         OnPropertyChanged(nameof(NoNote));
         OnPropertyChanged(nameof(HasAsk));
+        OnPropertyChanged(nameof(HasAnswer));
     }
 
     partial void OnEmptyChanged(string? value) => OnPropertyChanged(nameof(HasEmpty));

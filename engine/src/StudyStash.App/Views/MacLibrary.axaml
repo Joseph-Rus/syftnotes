@@ -128,6 +128,13 @@
     <Style Selector="Border.seg.on TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource Fg}" />
     </Style>
+    <!-- The notes fade out under the floating ask bar; with an answer open they end above it, so a short fade will do. -->
+    <Style Selector="Border.fade">
+      <Setter Property="Height" Value="120" />
+    </Style>
+    <Style Selector="Border.fade.answer">
+      <Setter Property="Height" Value="40" />
+    </Style>
   </UserControl.Styles>
 
   <Border Name="Chrome" Background="{DynamicResource Win}" ClipToBounds="True" Classes.chrome="{Binding DrawChrome}">
@@ -276,7 +283,10 @@
           <Panel IsVisible="{Binding ShowReader}" Margin="1,0,0,0">
             <v:MacCanvasReader DataContext="{Binding Reader}" />
           </Panel>
-        <Panel IsVisible="{Binding ShowLecturePage}">
+        <!-- The notes, and under them the latest answer in its own room: the notes end above it, never under it. The
+             ask bar floats over the bottom of the page (the notes fade out under it, as designed) -->
+        <Grid IsVisible="{Binding ShowLecturePage}" RowDefinitions="*,Auto" ClipToBounds="False">
+          <Panel>
           <ScrollViewer Name="NoteScroll" Margin="1,0,0,0" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasNote}">
             <StackPanel MaxWidth="620" HorizontalAlignment="Left" Margin="64,28,64,140" Spacing="14" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
               <StackPanel Orientation="Horizontal" Spacing="8">
@@ -324,15 +334,21 @@
           <TextBlock IsVisible="{Binding NoNote}" Text="Choose a lecture to read its notes." FontSize="13" Foreground="{DynamicResource Fg3}"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
 
-          <!-- The page fades under the title bar, and out under the ask bar -->
+          <!-- The page fades under the title bar, and out under the ask bar (or above the answer) -->
           <Border Name="TopFade" Height="20" VerticalAlignment="Top" IsHitTestVisible="False" />
-          <Border Name="Fade" Height="120" VerticalAlignment="Bottom" IsHitTestVisible="False" />
+          <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" />
+          </Panel>
+
+          <!-- The latest answer, just above the ask bar -->
+          <Panel Name="AnswerRoom" Grid.Row="1" IsVisible="{Binding HasAnswer}" HorizontalAlignment="Center" Margin="0,8,0,84" ClipToBounds="False">
+            <v:MacAiAnswer DataContext="{Binding Ask}" />
+          </Panel>
 
           <!-- Ask about this lecture, with any engine -->
-          <Panel IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24">
+          <Panel Name="AskRoom" Grid.RowSpan="2" IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24">
             <v:MacAiAskBar DataContext="{Binding Ask}" />
           </Panel>
-        </Panel>
+        </Grid>
 
           <!-- Narrow: back to the list -->
           <c:Glass IsVisible="{Binding NarrowDetail}" Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}"

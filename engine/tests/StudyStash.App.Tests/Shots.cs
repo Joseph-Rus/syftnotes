@@ -417,6 +417,19 @@ public class SurfaceShots
         Shot.Take("mac-04-full-app-due", SkinKind.Mac, ThemeVariant.Light, () => new MacLibrary { DataContext = Demo.Library(due: true), Width = 1280, Height = 800 });
     }
 
+    /// <summary>A long answer above the ask bar: a solid card in its own room, scrolling inside, the notes ending above it.</summary>
+    [AvaloniaFact]
+    public void Mac_app_answer()
+    {
+        foreach (var t in Themes) Shot.Take("mac-04-full-app-answer", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(answered: true), Width = 1280, Height = 800 });
+    }
+
+    [AvaloniaFact]
+    public void Win_app_answer()
+    {
+        foreach (var t in Themes) Shot.Take("win-04-full-app-answer", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(answered: true), Width = 1280, Height = 800 });
+    }
+
     [AvaloniaFact]
     public void Win_app()
     {

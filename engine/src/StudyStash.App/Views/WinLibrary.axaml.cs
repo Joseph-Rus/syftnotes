@@ -14,7 +14,7 @@ public partial class WinLibrary : UserControl
         {
             if (DataContext is LibraryModel m) m.Narrow = e.NewSize.Width < LibraryModel.NarrowBelow;
         };
-        Fades.Under(Fade, "Mica", 0.75);
+        Fades.Under(Fade, "Mica", "Layer", 0.75);
     }
 
     void OnNotesTab(object? sender, PointerPressedEventArgs e)

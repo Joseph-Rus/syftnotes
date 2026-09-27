@@ -81,8 +81,8 @@ public static class Demo
         """;
 
     /// <summary>The sample library; with <paramref name="due"/> a "Due" item heads the sidebar (nothing selected), to
-    /// eyeball it against the Canvas Due screen.</summary>
-    public static LibraryModel Library(bool due = false)
+    /// eyeball it against the Canvas Due screen; with <paramref name="answered"/> a long answer sits above the ask bar.</summary>
+    public static LibraryModel Library(bool due = false, bool answered = false)
     {
         var m = new LibraryModel { ClassTitle = "CS 101", ClassCount = "12 lectures", Status = "Library connected", DrawChrome = true };
         if (due) m.Classes.Add(new ClassItem { Name = "Due", IsDue = true, Count = 3 });
@@ -105,6 +105,18 @@ public static class Demo
             ClassName = "CS 101", Dot = Cs, Meta = "CS 101 · Tuesday 23 September · 1 h 12 min", Title = "Recursion and the call stack", Markdown = Notes,
         };
         m.Ask = AiDemo.AskIdle();
+        if (answered)
+            m.Ask.Turns.Add(new AiTurn("What should I practise before the midterm?", "Claude Code")
+            {
+                Answer = "Practise tracing recursion by hand. She said the midterm asks you to draw the call stack for a small "
+                    + "recursive function at its deepest point, so work through factorial(4) and fib(4) frame by frame, writing "
+                    + "each call's argument and what it returns. Then check what happens when the base case is wrong: calling "
+                    + "factorial(0) with a base case of n == 1 never stops, and the stack overflows. She also said Big-O proofs "
+                    + "won't be on it, but you should be able to say why each call waits for the one it made, and why the most "
+                    + "recent call finishes first. Last, reread the definitions of call stack, stack frame and base case: two "
+                    + "of the short questions come straight from them.",
+                Byline = "Claude Code · 12:40, 31:05, 58:20",
+            });
         return m;
     }
 
