@@ -33,7 +33,7 @@ public sealed class WindowsSound(bool withComputerAudio) : IAudioSource
         using (var devices = new MMDeviceEnumerator())
         {
             if (!devices.TryGetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications, out var input) || input is null)
-                throw new InvalidOperationException("There's no microphone. Plug one in, or check Settings → System → Sound.");
+                throw new MicrophoneException(MicTrouble.NoDevice(windows: true));
         }
         // Windows converts to 16 kHz mono itself; the resampler covers a driver that won't.
         var wanted = WaveFormat.CreateIeeeFloatWaveFormat(Sound.Rate, 1);
@@ -67,7 +67,11 @@ public sealed class WindowsSound(bool withComputerAudio) : IAudioSource
         catch (Exception e) when (e is COMException or UnauthorizedAccessException)
         {
             Stop();
-            throw new InvalidOperationException(Explain(e));
+            // E_ACCESSDENIED: the privacy switch is off; E_NOTFOUND: there's no default microphone.
+            var trouble = e is UnauthorizedAccessException || (uint)e.HResult == 0x80070005 ? MicTrouble.Denied(windows: true)
+                : (uint)e.HResult == 0x80070490 ? MicTrouble.NoDevice(windows: true)
+                : MicTrouble.Other(windows: true);
+            throw new MicrophoneException(trouble, e.HResult);
         }
     }
 

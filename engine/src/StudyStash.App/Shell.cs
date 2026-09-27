@@ -374,42 +374,53 @@ public static partial class Shell
 
     static string RecordClass() => chosenClass ?? host.ClassNow()?.Name ?? "";
 
-    static void ToggleRecording()
+    /// <summary>Record is waiting on macOS's microphone prompt: another press does nothing until it's answered.</summary>
+    static bool askingForMic;
+
+    static async void ToggleRecording()
     {
         if (host.Recorder.Current is not null)
         {
             StopRecording();
             return;
         }
+        if (askingForMic) return;
         if (!host.ModelReady)
         {
             Toast("The model isn't downloaded yet", host.Downloading is not null ? "It's downloading: Record works once it's done." : "Download it in Settings → Recording.",
                 "Settings", ShowSettings);
             return;
         }
-        var mic = host.MicAccess();
-        if (mic is MicAccess.Denied or MicAccess.Restricted)
-        {
-            var p = Problems.For(host);
-            Toast(p?.Title ?? "Study Stash can't use the microphone", p?.Detail ?? "", p is { HasAction: true } ? p.ActionLabel : null,
-                () => Dialogs.OpenUrl(host.MicSettingsUrl));
-            return;
-        }
-        // Not asked yet: ask now, and start recording anyway (the watchdog catches a refusal once it comes).
-        if (mic == MicAccess.NotAsked) host.AskMic();
+        RecordStart start;
+        askingForMic = true;
         try
         {
-            var l = host.StartRecording(RecordClass());
+            // Not asked yet: macOS's own prompt is all the student sees until they answer; recording starts after.
+            start = await host.RecordAsync(RecordClass());
+        }
+        catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException)
+        {
+            Toast("Couldn't start recording", e.Message, null, null);
+            Refresh();
+            return;
+        }
+        finally
+        {
+            askingForMic = false;
+        }
+        if (start.Trouble is { } trouble)
+        {
+            Toast(trouble.Title, trouble.Detail, trouble.HasAction ? trouble.ActionLabel : null,
+                trouble.ActionUrl.Length > 0 ? () => Dialogs.OpenUrl(trouble.ActionUrl) : null);
+        }
+        else if (start.Lecture is { } l)
+        {
             liveId = l.Id;
             recorder.Lines.Clear();
             recorder.Ask = LiveAsk();
             recorder.Waiting = "What's said shows here a few seconds after it's said.";
             panelWindow?.Hide();
             ShowRecorder(expanded: false);
-        }
-        catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException)
-        {
-            Toast("Couldn't start recording", e.Message, null, null);
         }
         Refresh();
     }

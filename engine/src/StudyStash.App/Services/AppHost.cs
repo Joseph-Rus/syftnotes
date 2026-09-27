@@ -71,6 +71,9 @@ public sealed class AppSettings
     }
 }
 
+/// <summary>What pressing Record came to: the lecture now recording, or why the microphone didn't start.</summary>
+public sealed record RecordStart(Lecture? Lecture, MicTrouble? Trouble);
+
 /// <summary>How the library answered lately.</summary>
 public enum LibraryState
 {
@@ -92,6 +95,7 @@ public sealed class AppHost : IDisposable, IProblemSource
     readonly CancellationTokenSource stop = new();
     readonly Action<string> log;
     readonly Func<IAudioSource>? pretendMic;
+    readonly IMicPermissions mics;
     readonly List<Task> running = [];
     Timer? watchdog;
     int checking;
@@ -159,11 +163,12 @@ public sealed class AppHost : IDisposable, IProblemSource
     /// </summary>
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
         Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
-        Func<LibraryService>? localLibrary = null)
+        Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null)
     {
         Home = home;
         this.log = log ?? (s => Console.WriteLine(s));
         pretendMic = microphone ?? MicFromEnvironment();
+        mics = micPermissions ?? (pretendMic is not null ? MicPermissions.Pretend : MicPermissions.System);
         this.models = models ?? ModelSetting.FromEnvironment();
         this.http = http;
         this.localLibrary = localLibrary;
@@ -257,13 +262,11 @@ public sealed class AppHost : IDisposable, IProblemSource
     public bool PretendMic => pretendMic is not null;
 
     /// <summary>Whether Study Stash may use the microphone (a pretend one always may).</summary>
-    public MicAccess MicAccess() => PretendMic ? Audio.MicAccess.Allowed : Microphones.Access();
+    public MicAccess MicAccess() => mics.Access();
 
-    /// <summary>Have the system ask the student (a Mac asks once; the answer comes later). Nothing to ask for a pretend one.</summary>
-    public void AskMic()
-    {
-        if (!PretendMic) Microphones.Ask();
-    }
+    /// <summary>Have the system ask the student (a Mac asks once, with its own prompt) and wait for the answer.
+    /// Nothing is asked for a pretend microphone.</summary>
+    public Task<MicAccess> AskMicAsync() => mics.AskAsync();
 
     /// <summary>The microphone to record from (and on Windows, if asked, what the computer plays too).</summary>
     public IAudioSource OpenMic() => pretendMic is { } pretend ? pretend() : Microphones.Open(Settings.ComputerAudio);
@@ -522,6 +525,33 @@ public sealed class AppHost : IDisposable, IProblemSource
 
     /// <summary>The class Record means now, from the timetable: its name and "Tue 10:00–11:15", or nothing.</summary>
     public ClassNow? ClassNow() => Timetable.Now(DateTime.Now);
+
+    /// <summary>
+    /// Record's whole start: ask for the microphone if the system hasn't asked yet (and wait for the answer), then
+    /// start. A microphone that isn't allowed, isn't there or won't start comes back as <see cref="MicTrouble"/>
+    /// instead of a lecture; the model or the disk not being ready still throws, as <see cref="StartRecording"/> does.
+    /// </summary>
+    public async Task<RecordStart> RecordAsync(string className)
+    {
+        var access = MicAccess();
+        if (access == Audio.MicAccess.NotAsked)
+        {
+            log("[app] asking for the microphone");
+            access = await AskMicAsync();
+            log($"[app] the microphone: {access}");
+        }
+        if (access is Audio.MicAccess.Denied or Audio.MicAccess.Restricted or Audio.MicAccess.NotAsked)
+            return new RecordStart(null, MicTrouble.Denied());
+        try
+        {
+            return new RecordStart(StartRecording(className), null);
+        }
+        catch (MicrophoneException e)
+        {
+            log($"[app] the microphone didn't start: {e.Message}");
+            return new RecordStart(null, e.Trouble);
+        }
+    }
 
     public Lecture StartRecording(string className)
     {

@@ -63,10 +63,10 @@ public static class Problems
 
         var mic = host.MicAccess();
         if (mic is MicAccess.Denied or MicAccess.Restricted)
-            return OperatingSystem.IsMacOS()
-                ? new(ProblemKind.MicDenied, "Study Stash can't use the microphone",
-                    "Turn it on in System Settings → Privacy & Security → Microphone.", "Open System Settings")
-                : new(ProblemKind.MicDenied, "Study Stash can't use the microphone", RecordingWords.CantHearWindows, "Open Settings");
+        {
+            var denied = MicTrouble.Denied();
+            return new(ProblemKind.MicDenied, denied.Title, denied.Detail, denied.ActionLabel);
+        }
 
         if (host.RecorderProblem == RecordingWords.MicStopped)
             return new(ProblemKind.NoMic, "No microphone", "Plug one in, or check the sound settings.", "");

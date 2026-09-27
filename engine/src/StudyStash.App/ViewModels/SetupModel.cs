@@ -248,7 +248,7 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnModelSizeChanged(string value) => OnPropertyChanged(nameof(ModelBody));
 
-    public Action? OnAllowMic { get; set; }
+    public Func<Task>? OnAllowMic { get; set; }
     public Action? OnMicSettings { get; set; }
     public Func<Task>? OnConnect { get; set; }
     public Func<Task>? OnFind { get; set; }
@@ -262,7 +262,7 @@ public sealed partial class SetupModel : ObservableObject
     public Action<SetupStep>? OnEnter { get; set; }
     public Action? OnFinish { get; set; }
 
-    [RelayCommand] void AllowMic() => OnAllowMic?.Invoke();
+    [RelayCommand] Task AllowMic() => OnAllowMic?.Invoke() ?? Task.CompletedTask;
     [RelayCommand] void MicSettings() => OnMicSettings?.Invoke();
     [RelayCommand] void RetryModel() => OnRetryModel?.Invoke();
     [RelayCommand] void TaskbarSettings() => OnTaskbarSettings?.Invoke();

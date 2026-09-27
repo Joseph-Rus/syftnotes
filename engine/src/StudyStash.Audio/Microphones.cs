@@ -23,13 +23,46 @@ public static class Microphones
         return MicAccess.Unknown;
     }
 
-    /// <summary>Make the system ask the person, where it asks (a Mac). The answer comes later.</summary>
-    public static void Ask()
+    /// <summary>Have the system ask the person, where it asks (a Mac, once), and wait for the answer. Elsewhere, or
+    /// asked already, it's the answer there is now.</summary>
+    public static Task<MicAccess> AskAsync()
     {
-        if (OperatingSystem.IsMacOS()) MacPermissions.AskForMicrophone();
+        if (OperatingSystem.IsMacOS()) return MacPermissions.RequestMicrophoneAsync();
+        return Task.FromResult(Access());
     }
 
     /// <summary>Where the person turns the microphone on for Study Stash.</summary>
     public static string SettingsUrl => OperatingSystem.IsWindows() ? WindowsPermissions.MicrophoneSettings
         : OperatingSystem.IsMacOS() ? MacPermissions.MicrophoneSettingsUrl : "";
+}
+
+/// <summary>Asking the system about the microphone: whether Study Stash may use it, and having it ask the student.
+/// The app goes through this so a test can stand in for the system's answers.</summary>
+public interface IMicPermissions
+{
+    MicAccess Access();
+
+    /// <summary>Has the system ask (only when it hasn't yet) and waits for the answer.</summary>
+    Task<MicAccess> AskAsync();
+}
+
+public static class MicPermissions
+{
+    /// <summary>This computer's own answers.</summary>
+    public static readonly IMicPermissions System = new SystemMic();
+
+    /// <summary>A pretend microphone's: always allowed, and nothing is ever asked of the system.</summary>
+    public static readonly IMicPermissions Pretend = new PretendMic();
+
+    sealed class SystemMic : IMicPermissions
+    {
+        public MicAccess Access() => Microphones.Access();
+        public Task<MicAccess> AskAsync() => Microphones.AskAsync();
+    }
+
+    sealed class PretendMic : IMicPermissions
+    {
+        public MicAccess Access() => MicAccess.Allowed;
+        public Task<MicAccess> AskAsync() => Task.FromResult(MicAccess.Allowed);
+    }
 }

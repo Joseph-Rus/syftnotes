@@ -37,18 +37,12 @@ public static class Setup
             m.LibraryResult = $"Connected to {cc.PoolName}.";
         }
 
-        m.OnAllowMic = () => Task.Run(async () =>
+        m.OnAllowMic = async () =>
         {
-            host.AskMic();
-            // A Mac answers the permission dialog later, in its own time: keep checking for up to a minute.
-            for (int i = 0; i < 60; i++)
-            {
-                await Task.Delay(1000);
-                bool answered = host.MicAccess() != MicAccess.NotAsked;
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => Refresh(m, host));
-                if (answered) return;
-            }
-        });
+            // macOS shows its own prompt once; the step shows the answer as soon as there is one.
+            await host.AskMicAsync();
+            Refresh(m, host);
+        };
         m.OnMicSettings = () => Dialogs.OpenUrl(host.MicSettingsUrl);
         m.OnTaskbarSettings = () => Dialogs.OpenUrl("ms-settings:taskbar");
         m.OnRetryModel = () => _ = host.DownloadModelAsync();
