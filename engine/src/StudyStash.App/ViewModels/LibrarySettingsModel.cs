@@ -436,7 +436,12 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         }
     }
 
-    [RelayCommand] void CopyAddress(string address) => Copy?.Invoke(address);
+    [RelayCommand]
+    void CopyAddress(string address)
+    {
+        Copy?.Invoke(address);
+        Say = $"Copied {address}.";
+    }
 
     [RelayCommand]
     void ShowNotesFolder()

@@ -929,6 +929,7 @@ public static partial class Shell
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
+        model.Lib.Copy = text => _ = w.Clipboard?.SetTextAsync(text);
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         if (Skin.Current == SkinKind.Win)
         {
