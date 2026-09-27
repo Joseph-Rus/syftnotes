@@ -74,13 +74,13 @@ public static class MacTitleBar
                     {
                         ObjC.SendByte(ns, ObjC.Sel("setTitlebarAppearsTransparent:"), 1);
                         int n = ClearFullScreenStrip(ns);
-                        if (n > 0) Program.Log($"[chrome] \"{window.Title}\": full screen's title strip is clear ({n} background views hidden)");
+                        if (n > 0) Program.Log($"[chrome] \"{window.Title}\": full screen's title strip is clear ({n} backgrounds and shadows hidden)");
                     }
                     catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or MarshalDirectiveException)
                     {
                     }
                 }, TimeSpan.FromMilliseconds(ms));
-            if (hasToolbar) return $"come down with the menu bar in full screen, centred in the header on a clear strip ({cleared} background views hidden now)";
+            if (hasToolbar) return $"come down with the menu bar in full screen, centred in the header on a clear strip ({cleared} backgrounds and shadows hidden now)";
         }
         before = LightsCentre(ns);
         if (!hasToolbar)
@@ -98,15 +98,23 @@ public static class MacTitleBar
     }
 
     /// <summary>In full screen the toolbar and the lights live in a strip of their own that slides down with the menu
-    /// bar, painted grey (its title bar background and the line under it): hide those two, so the strip shows only the
-    /// lights over the window's own header. How many views it hid; 0 before the strip exists, or once they're hidden.
+    /// bar, painted grey (its title bar background and the line under it) and casting a shadow: hide those two and the
+    /// shadow, so the strip shows only the lights over the window's own header. How many it hid; 0 before the strip
+    /// exists, or once they're hidden.
     /// (Out of full screen the title bar is clear anyway, so the hidden background changes nothing there.)</summary>
     static int ClearFullScreenStrip(IntPtr ns)
     {
         IntPtr viewClass = ObjC.objc_getClass("NSView");
         IntPtr close = ObjC.SendLongReturnsPtr(ns, ObjC.Sel("standardWindowButton:"), 0);
-        if (close == IntPtr.Zero || viewClass == IntPtr.Zero || ObjC.Send(close, ObjC.Sel("window")) == ns) return 0;
+        IntPtr strip = close == IntPtr.Zero ? IntPtr.Zero : ObjC.Send(close, ObjC.Sel("window"));
+        if (strip == IntPtr.Zero || viewClass == IntPtr.Zero || strip == ns) return 0;
         int hidden = 0;
+        // The strip's own shadow would still draw its edge across the window when it comes down: it casts none.
+        if (ObjC.SendReturnsByte(strip, ObjC.Sel("hasShadow")) != 0)
+        {
+            ObjC.SendByte(strip, ObjC.Sel("setHasShadow:"), 0);
+            hidden++;
+        }
         // The lights' title bar view, then its container: each holds one of the two painted views.
         IntPtr bar = ObjC.Send(close, ObjC.Sel("superview"));
         foreach (IntPtr v in new[] { bar, bar == IntPtr.Zero ? IntPtr.Zero : ObjC.Send(bar, ObjC.Sel("superview")) })
@@ -123,8 +131,31 @@ public static class MacTitleBar
                 hidden++;
             }
         }
+        // And the shadow it draws under the header: a plain layer of its own in the strip's spare height below the
+        // title bar, which would lay a dark edge across the window. (Rectangles are only read on Apple silicon.)
+        IntPtr content = ObjC.Send(strip, ObjC.Sel("contentView"));
+        IntPtr stripLayer = content == IntPtr.Zero ? IntPtr.Zero : ObjC.Send(content, ObjC.Sel("layer"));
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64 && bar != IntPtr.Zero && stripLayer != IntPtr.Zero)
+        {
+            double barHeight = ObjC.RectOf(bar, ObjC.Sel("frame")).H;
+            IntPtr layers = ObjC.Send(stripLayer, ObjC.Sel("sublayers"));
+            long count = layers == IntPtr.Zero ? 0 : (long)ObjC.Send(layers, ObjC.Sel("count"));
+            for (long i = 0; i < count; i++)
+            {
+                IntPtr layer = ObjC.SendLongReturnsPtr(layers, ObjC.Sel("objectAtIndex:"), i);
+                if (!IsShadowUnderBar(ObjC.ClassName(layer), ObjC.RectOf(layer, ObjC.Sel("frame")).Y, barHeight)) continue;
+                if (ObjC.SendReturnsByte(layer, ObjC.Sel("isHidden")) != 0) continue;
+                ObjC.SendByte(layer, ObjC.Sel("setHidden:"), 1);
+                hidden++;
+            }
+        }
         return hidden;
     }
+
+    /// <summary>The full-screen strip's shadow under the header: a plain CALayer (no view of its own) lying wholly below
+    /// the title bar. Never the title bar's own layers, which start at its top.</summary>
+    internal static bool IsShadowUnderBar(string className, double top, double barHeight) =>
+        className == "CALayer" && barHeight > 0 && top >= barHeight - 0.5;
 
     /// <summary>The two views that paint the full-screen strip grey: its title bar background, and the line under it
     /// (AppKit's own classes, sometimes under a KVO subclass's name). Never the lights, the toolbar or anything else.</summary>
@@ -146,9 +177,9 @@ public static class MacTitleBar
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    readonly record struct CGRect(double X, double Y, double W, double H);
+    internal readonly record struct CGRect(double X, double Y, double W, double H);
 
-    static class ObjC
+    internal static class ObjC
     {
         const string Lib = "/usr/lib/libobjc.A.dylib";
 
