@@ -181,8 +181,6 @@ public class ExtensionScriptTests
         /// <summary>The status the script told the popup ("ok", "no_config", …), or "" before any.</summary>
         public string Status => Stored("status")?["state"]?.GetValue<string>() ?? "";
 
-        public void Store(string key, string json, string area = "local") => js.Execute($"chrome.storage.{area}.items[{JsonSerializer.Serialize(key)}] = {json};");
-
         /// <summary>The library's side of what the script sent: the work it asked for and the results it posted.</summary>
         public List<string> Asks => Fetched.Where(f => f.Url.StartsWith(Library + "/api/v2/canvas/work", StringComparison.Ordinal)).Select(f => f.Url).ToList();
 
@@ -472,9 +470,10 @@ public class ExtensionScriptTests
     }
 
     [Fact]
-    public void A_folder_that_may_reach_other_hosts_reloads_it_but_not_more_than_once_a_minute()
+    public void A_folder_that_may_reach_other_hosts_reloads_it_but_not_over_and_over()
     {
         string[] canvas2 = ["http://canvas2.test:5050/*", "https://*.inscloudgate.net/*", Library + "/*"];
+        string[] canvas3 = ["http://canvas3.test:5050/*", "https://*.inscloudgate.net/*", Library + "/*"];
         var w = WithLibrary(new Worker(diskHosts: canvas2), [], rounds: 1);
         w.Eval("pump(false)");
         Assert.Equal(1, w.Reloads); // same version, new Canvas: the running copy can't reach it until it reloads
@@ -487,9 +486,19 @@ public class ExtensionScriptTests
         Assert.NotEmpty(w.Asks); // it works with what it has instead
 
         // A minute on, it tries again.
-        w.Store("lastReload", "Date.now() - 61000");
+        w.Eval("chrome.storage.local.items.lastReload.at -= 61000");
         w.Eval("pump(false)");
         Assert.Equal(2, w.Reloads);
+
+        // The folder changed again (another Canvas address) within the minute: that reloads at once.
+        var moved = WithLibrary(new Worker(diskHosts: canvas2), [], rounds: 1);
+        moved.Eval("pump(false)");
+        moved.Route("chrome-extension://study-stash/manifest.json", Json(new JsonObject
+        {
+            ["version"] = "1.4", ["host_permissions"] = new JsonArray(canvas3.Select(h => (JsonNode)h).ToArray()),
+        }.ToJsonString()));
+        moved.Eval("pump(false)");
+        Assert.Equal(2, moved.Reloads);
 
         // The same hosts in another order are the same permissions.
         var same = WithLibrary(new Worker(diskHosts: Worker.Hosts.Reverse().ToArray()), [], rounds: 1);

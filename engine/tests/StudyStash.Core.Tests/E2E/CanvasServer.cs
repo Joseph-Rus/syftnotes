@@ -20,16 +20,20 @@ namespace StudyStash.Core.Tests.E2E;
 public sealed class CanvasServer : IAsyncDisposable
 {
     /// <summary>One request as it arrived: whether it carried a session cookie, and whether that session was good.</summary>
-    public sealed record Hit(string Method, string PathAndQuery, bool Cookie, bool SignedIn, int Status);
+    public sealed record Hit(string Method, string PathAndQuery, bool Cookie, bool SignedIn, int Status, string Host = CanvasServer.Host);
 
     readonly WebApplication app;
     readonly ConcurrentDictionary<string, bool> sessions = new();
+    volatile bool signedOut;
 
     public FakeCanvas Canvas { get; }
     public int Port { get; }
     /// <summary>The address Chrome and the library use for this Canvas.</summary>
     public string Url => $"http://{Host}:{Port}";
     public const string Host = "canvas.test";
+    /// <summary>The same Canvas under another name, for a school whose Canvas address changes.</summary>
+    public const string OtherHost = "canvas2.test";
+    public string OtherUrl => $"http://{OtherHost}:{Port}";
     /// <summary>Every request, in order.</summary>
     public ConcurrentQueue<Hit> Hits { get; } = new();
 
@@ -53,8 +57,12 @@ public sealed class CanvasServer : IAsyncDisposable
         return self;
     }
 
-    /// <summary>Every session Chrome has stops working, as if the student signed out of Canvas.</summary>
-    public void SignOut() => sessions.Clear();
+    /// <summary>Every session Chrome has stops working, as if the student signed out of Canvas (until
+    /// <see cref="SignIn"/>).</summary>
+    public void SignOut() => signedOut = true;
+
+    /// <summary>Chrome's sessions work again, as if the student signed back in.</summary>
+    public void SignIn() => signedOut = false;
 
     /// <summary>The requests that reached a path (any query).</summary>
     public IEnumerable<Hit> HitsTo(string path) => Hits.Where(h => h.PathAndQuery.Split('?')[0] == path);
@@ -64,7 +72,8 @@ public sealed class CanvasServer : IAsyncDisposable
         var req = ctx.Request;
         string pathAndQuery = req.Path + req.QueryString;
         string? cookie = req.Cookies["canvas_session"];
-        bool signedIn = cookie is not null && sessions.ContainsKey(cookie);
+        bool signedIn = cookie is not null && sessions.ContainsKey(cookie) && !signedOut;
+        string here = $"http://{req.Host.Host}:{Port}";
         var res = ctx.Response;
         try
         {
@@ -73,12 +82,26 @@ public sealed class CanvasServer : IAsyncDisposable
                 string id = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16));
                 sessions[id] = true;
                 res.Headers.SetCookie = $"canvas_session={id}; Path=/; HttpOnly; SameSite=Lax";
+                // Signed in under this name, then on to the other one (headless Chrome opens a single tab): Chrome
+                // keeps a cookie set on a redirect.
+                if (req.Host.Host == Host)
+                {
+                    res.StatusCode = 302;
+                    res.Headers.Location = OtherUrl + "/login/e2e";
+                    return;
+                }
                 await Html(res, 200, "<h1>Signed in to the pretend Canvas</h1>");
                 return;
             }
             if (req.Path == "/_e2e/sign-out" && HttpMethods.IsPost(req.Method))
             {
                 SignOut();
+                res.StatusCode = 204;
+                return;
+            }
+            if (req.Path == "/_e2e/sign-in" && HttpMethods.IsPost(req.Method))
+            {
+                SignIn();
                 res.StatusCode = 204;
                 return;
             }
@@ -98,7 +121,7 @@ public sealed class CanvasServer : IAsyncDisposable
                 else
                 {
                     res.StatusCode = 302;
-                    res.Headers.Location = Url + "/login/canvas";
+                    res.Headers.Location = here + "/login/canvas";
                 }
                 return;
             }
@@ -106,21 +129,21 @@ public sealed class CanvasServer : IAsyncDisposable
             var reply = Canvas.Serve(FakeCanvas.Base + pathAndQuery);
             res.StatusCode = reply.Status;
             res.ContentType = reply.Type;
-            if (reply.Link.Length > 0) res.Headers["Link"] = Local(reply.Link);
+            if (reply.Link.Length > 0) res.Headers["Link"] = Local(reply.Link, here);
             if (reply.Rate is { } rate) res.Headers["X-Rate-Limit-Remaining"] = rate.ToString(System.Globalization.CultureInfo.InvariantCulture);
             if (reply.RetryAfter is { } wait) res.Headers.RetryAfter = wait.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            byte[] body = reply.Type.Contains("octet-stream", StringComparison.Ordinal) ? reply.Body : Encoding.UTF8.GetBytes(Local(Encoding.UTF8.GetString(reply.Body)));
+            byte[] body = reply.Type.Contains("octet-stream", StringComparison.Ordinal) ? reply.Body : Encoding.UTF8.GetBytes(Local(Encoding.UTF8.GetString(reply.Body), here));
             res.ContentLength = body.Length;
             await res.Body.WriteAsync(body);
         }
         finally
         {
-            Hits.Enqueue(new Hit(req.Method, pathAndQuery, cookie is not null, signedIn, res.StatusCode));
+            Hits.Enqueue(new Hit(req.Method, pathAndQuery, cookie is not null, signedIn, res.StatusCode, req.Host.Host));
         }
     }
 
-    /// <summary>The fixtures' Canvas address as this server's.</summary>
-    string Local(string text) => text.Replace(FakeCanvas.Base, Url, StringComparison.Ordinal);
+    /// <summary>The fixtures' Canvas address as this server's, under the name it was asked by.</summary>
+    static string Local(string text, string here) => text.Replace(FakeCanvas.Base, here, StringComparison.Ordinal);
 
     static Task Html(HttpResponse res, int status, string body)
     {

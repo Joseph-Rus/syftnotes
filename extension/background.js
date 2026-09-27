@@ -107,8 +107,9 @@ async function run(job) {
 
 // Study Stash rewrites this folder when it updates, and when the Canvas or library address changes: when the
 // manifest there isn't the one running (another version, or other hosts it may reach), reload to pick up the new
-// files and permissions. Checked before asking for work, so a reload never drops work already taken; at most once a
-// minute, so a folder Chrome reads differently can't reload it over and over.
+// files and permissions. Checked before asking for work, so a reload never drops work already taken. Reloading for
+// the same folder again (Chrome came back still running something else) waits a minute, so a folder Chrome reads
+// differently can't reload it over and over; a folder that changed again reloads at once.
 const RELOAD_EVERY = 60 * 1000;
 async function needsReload() {
   let onDisk;
@@ -120,11 +121,12 @@ async function needsReload() {
   const running = chrome.runtime.getManifest();
   const hosts = m => JSON.stringify((m.host_permissions || []).slice().sort());
   if (!onDisk || !onDisk.version || onDisk.version === running.version && hosts(onDisk) === hosts(running)) return false;
+  const want = onDisk.version + ' ' + hosts(onDisk);
   try {
     // Kept in local storage: it outlives the reload it guards.
-    const got = await chrome.storage.local.get('lastReload');
-    if (got && got.lastReload && Date.now() - got.lastReload < RELOAD_EVERY) return false;
-    await chrome.storage.local.set({lastReload: Date.now()});
+    const last = (await chrome.storage.local.get('lastReload')).lastReload;
+    if (last && last.want === want && Date.now() - last.at < RELOAD_EVERY) return false;
+    await chrome.storage.local.set({lastReload: {at: Date.now(), want}});
   } catch (e) { /* storage unavailable: reload anyway */ }
   return true;
 }
@@ -192,6 +194,10 @@ async function pump(force) {
       await stayAwake();
       if (work.jobs.length) {
         idle = 0;
+        // The folder may have changed while the library held the request (a new Canvas address): work taken now
+        // is done by the new copy, which the library hands it to again when it starts.
+        if (await needsReload()) { chrome.runtime.reload(); return; }
+        conn = await loadConnection() || conn;
         const results = await Promise.all(work.jobs.map(run));
         noteCanvas(results);
         // Answers together, but each file on its own: one big file per request stays under the library's limit.
