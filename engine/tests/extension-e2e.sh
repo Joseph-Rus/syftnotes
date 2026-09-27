@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs the Canvas extension end to end in a real Chrome: a pretend Canvas, a test library, and the extension loaded
-# into Chrome for Testing (branded Google Chrome no longer loads an extension from the command line).
+# into Chrome for Testing (branded Google Chrome no longer loads an extension from the command line); then the laptop
+# app's own connect steps against a library that has never synced, through the same Chrome.
 #
 #   bash engine/tests/extension-e2e.sh [--chrome-dir DIR]
 #
@@ -55,4 +56,6 @@ if [ -z "${STUDYSTASH_E2E_CHROME:-}" ]; then
 fi
 
 echo "Chrome: $STUDYSTASH_E2E_CHROME"
-exec dotnet test "$here/StudyStash.Core.Tests" --filter "FullyQualifiedName~ExtensionE2E" --logger "console;verbosity=detailed"
+dotnet test "$here/StudyStash.Core.Tests" --filter "FullyQualifiedName~ExtensionE2E" --logger "console;verbosity=detailed"
+# The laptop app's own connect steps against a library that has never synced, through the same Chrome.
+exec dotnet test "$here/StudyStash.App.Tests" --filter "FullyQualifiedName~LaptopChromeE2E" --logger "console;verbosity=detailed"

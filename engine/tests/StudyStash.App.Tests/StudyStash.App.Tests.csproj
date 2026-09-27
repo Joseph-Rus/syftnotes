@@ -35,6 +35,9 @@
   <ItemGroup>
     <Compile Include="..\StudyStash.Core.Tests\FakeCanvas.cs" Link="Library\FakeCanvas.cs" />
     <Compile Include="..\StudyStash.Core.Tests\TestUtil.cs" Link="Library\TestUtil.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\E2E\FakeCanvasHttp.cs" Link="Library\FakeCanvasHttp.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\E2E\CanvasServer.cs" Link="Library\CanvasServer.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\E2E\ChromeRunner.cs" Link="Library\ChromeRunner.cs" />
     <None Include="..\StudyStash.Core.Tests\Fixtures\canvas\**" Link="Fixtures\canvas\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

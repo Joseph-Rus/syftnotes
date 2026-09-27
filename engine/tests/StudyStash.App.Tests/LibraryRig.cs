@@ -47,6 +47,15 @@ public sealed class LibraryRig : IAsyncDisposable
         .Json("/api/v1/courses/4202/assignments", "[]").Json("/api/v1/courses/4202/students/submissions", "[]")
         .Json("/api/v1/courses/4202/modules", "[]").Json("/api/v1/courses/4202/discussion_topics", "[]");
 
+    /// <summary>A class's folder in the library.</summary>
+    public string ClassDir(string cls) => store!.ClassDir(cls);
+
+    /// <summary>A place for a test's own files, removed with the rest.</summary>
+    public string Scratch(string name) => dir[name];
+
+    /// <summary>The library's port on this computer.</summary>
+    public int Port => new Uri(Url).Port;
+
     /// <summary>The key the library gave its extension.</summary>
     public string ExtensionKey => CanvasSettings.ExtensionKey(Home);
 
