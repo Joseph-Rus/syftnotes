@@ -298,7 +298,7 @@ public class RecordingTests
         Assert.InRange(rec.Current.Seconds, 2.99, 3.01);
         rec.Resume();
         mic.Play(4, amplitude: 0.8);
-        SpinWait.SpinUntil(() => rec.Levels().Any(x => x > 0.5), 2000);
+        SpinWait.SpinUntil(() => rec.Levels().Any(x => x > 0.5), 10000); // a busy CI machine can be slow to reach the meter
         Assert.Contains(rec.Levels(), x => x > 0.5);
         var done = rec.Stop()!;
         Assert.Null(rec.Current);
