@@ -95,6 +95,10 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         Assert.Equal("%PDF-1.4 ps4 answers", File.ReadAllText(Path.Combine(root, "assignments", "Problem set 4", "submission", "ps4-answers.pdf")));
         string slides = Directory.EnumerateFiles(root, "recursion-slides.pdf", SearchOption.AllDirectories).First();
         Assert.Equal("%PDF-1.4 recursion slides", File.ReadAllText(slides));
+        // A 60 MB file is never downloaded: modules.md links to it on Canvas and says why.
+        Assert.Empty(rig.Canvas.HitsTo("/files/556/download"));
+        Assert.Contains("lecture-recording.zip (not saved: too big, on Canvas: http://" + CanvasServer.Host, File.ReadAllText(Path.Combine(root, "modules.md")), StringComparison.Ordinal);
+        Assert.Empty(Directory.EnumerateFiles(root, "lecture-recording.zip", SearchOption.AllDirectories));
         Assert.All(rig.Canvas.Hits.Where(h => !h.PathAndQuery.StartsWith("/login", StringComparison.Ordinal)),
             h => Assert.True(h.SignedIn, $"{h.PathAndQuery} came without Chrome's Canvas session"));
     }
@@ -207,6 +211,124 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
     }
 
     [ChromeFact]
+    public async Task S8a_a_wrong_key_says_the_library_refused_it_and_changes_nothing()
+    {
+        // The laptop's folder holds a key this library never made (the library was set up again, say). Its Chrome
+        // says so on the toolbar button and in the popup; the library takes no notice of it. Once the laptop app
+        // writes the right key, the extension is back within its 30-second alarm, with no reload.
+        string folder = rig.Scratch("laptop-extension"), canvasUrl = CanvasSettings.Load(rig.Home).Url, key = CanvasSettings.ExtensionKey(rig.Home);
+        Extension.Ensure(folder, rig.LaptopUrl, "a-key-from-another-library", canvasUrl);
+        int ApiHits() => rig.Canvas.Hits.Count(h => h.PathAndQuery.StartsWith("/api/", StringComparison.Ordinal));
+        int canvasHits = ApiHits(); // its Chrome signing in to the pretend Canvas isn't the extension reading it
+        var laptop = rig.StartLaptopChrome("chrome-profile-laptop", folder);
+        var sw = Stopwatch.StartNew();
+        await rig.UntilAsync(async () =>
+            await laptop.EvaluateAsync("chrome.storage.local.get('status').then(s => s.status ? s.status.state : '')") is "\"library_refused\"" ? "" : null,
+            TimeSpan.FromSeconds(30), "the laptop's extension to say its key was refused");
+        Note($"a wrong key said library_refused {sw.Elapsed.TotalSeconds:0.0} s after the laptop's Chrome started");
+        Assert.Equal("\"!\"", await laptop.EvaluateAsync("chrome.action.getBadgeText({})"));
+        string popup = await laptop.EvaluateAsync("new Promise(r => setTimeout(() => r(document.getElementById('s').textContent), 500))", "popup.html");
+        Assert.Equal("This extension's key was refused. Open Study Stash and add the extension again.", JsonNode.Parse(popup)!.GetValue<string>());
+        var s = CanvasSettings.Load(rig.Home);
+        Assert.False(s.ExtensionCopies.ContainsKey("another_computer"), "the library wrote down a Chrome whose key it refused");
+        Assert.Equal(key, CanvasSettings.ExtensionKey(rig.Home));
+        Assert.Equal(canvasHits, ApiHits()); // it took no work, so it read nothing
+
+        Extension.Ensure(folder, rig.LaptopUrl, key, canvasUrl);
+        sw.Restart();
+        await rig.UntilAsync(async () =>
+            (await rig.GetAsync("/api/v2/canvas/extension"))["copies"]!.AsArray().Any(c => ExtensionRig.S(c!["where"]) == "another_computer") ? "" : null,
+            TimeSpan.FromSeconds(45), "the laptop's extension to check in with the right key");
+        Note($"with the right key it checked in {sw.Elapsed.TotalSeconds:0.0} s later");
+        await rig.UntilAsync(async () =>
+            await laptop.EvaluateAsync("chrome.storage.local.get('status').then(s => s.status.state)") is "\"ok\"" ? "" : null,
+            TimeSpan.FromSeconds(10), "the laptop's extension to say all is well");
+    }
+
+    [ChromeFact]
+    public async Task S8b_the_library_s_chrome_and_the_laptop_s_both_check_in_and_either_does_the_work()
+    {
+        // Two Chromes wait for work with one library: this computer's (loopback) and the laptop's (another address).
+        // Both are listed and connected, canvas.json isn't rewritten on every visit, and a Find is answered at once
+        // by whichever is waiting.
+        Assert.NotNull(rig.Laptop); // S8a started it
+        var about = await rig.UntilAsync(async () =>
+        {
+            var e = await rig.GetAsync("/api/v2/canvas/extension");
+            var copies = e["copies"]!.AsArray();
+            return copies.Count(c => c!["connected"]!.GetValue<bool>() && ExtensionRig.S(c["version"]) == Extension.Version()) == 2 ? e : null;
+        }, TimeSpan.FromSeconds(45), "both Chromes to be connected");
+        Assert.Equal(["another_computer", "this_computer"], about["copies"]!.AsArray().Select(c => ExtensionRig.S(c!["where"])).Order());
+
+        // Thirty quiet seconds: each Chrome is written down about every 15 s, not on each of its visits, and the two
+        // taking turns never look like an update.
+        var update = CanvasSettings.Load(rig.Home).ExtensionUpdate;
+        string file = CanvasSettings.PathIn(rig.Home);
+        var sw = Stopwatch.StartNew();
+        var last = File.GetLastWriteTimeUtc(file);
+        int writes = 0;
+        while (sw.Elapsed < TimeSpan.FromSeconds(30))
+        {
+            await Task.Delay(100);
+            var now = File.GetLastWriteTimeUtc(file);
+            if (now != last) writes++;
+            last = now;
+        }
+        Note($"two Chromes, 30 s: canvas.json written {writes} times");
+        Assert.InRange(writes, 1, 8);
+        Assert.Equal(update, CanvasSettings.Load(rig.Home).ExtensionUpdate);
+
+        for (int i = 0; i < 3; i++)
+        {
+            sw.Restart();
+            var found = await rig.PostAsync("/api/v2/canvas/courses", "{}");
+            Assert.Equal("", ExtensionRig.S(found["error"]));
+            Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5), $"Find took {sw.Elapsed.TotalSeconds:0.0} s with two Chromes waiting");
+        }
+        var hosts = rig.Canvas.HitsTo("/api/v1/courses").Select(h => h.Host).Distinct().ToList();
+        Note($"three Finds with two Chromes answered; Canvas asked under {string.Join(", ", hosts)}");
+        rig.StopLaptopChrome();
+    }
+
+    [ChromeFact]
+    public async Task S8c_signed_out_mid_sync_stops_the_sync_and_signing_in_again_resumes_it()
+    {
+        // The student signs out of Canvas while a sync is running (here, the moment it asks for the course's pages,
+        // after the first listings came in). The sync stops, keeps what the class had, and the library says "Sign in
+        // to Canvas"; signing in again and syncing finishes the job.
+        var before = CanvasSettings.Load(rig.Home);
+        int assignments = Assignments.Load(rig.Home).Count(a => a.ClassName == "CS 101");
+        rig.Canvas.SignOutWhenAsked("/api/v1/courses/4201/pages");
+        var sw = Stopwatch.StartNew();
+        await rig.PostAsync("/api/v2/canvas", """{"sync":true}""");
+        await rig.UntilAsync(async () => ExtensionRig.S((await rig.GetAsync("/api/v2/canvas/state"))["state"]) == "signed_out" ? "" : null,
+            TimeSpan.FromSeconds(60), "the library to say Chrome is signed out");
+        Note($"signed out mid-sync: the library said so {sw.Elapsed.TotalSeconds:0.0} s after the sync was asked for");
+        var s = CanvasSettings.Load(rig.Home);
+        Assert.True(s.NeedsLogin);
+        Assert.Equal(CanvasSync.SignInError, s.Error);
+        Assert.Equal(before.LastDone, s.LastDone); // it didn't finish, so nothing was filed as a sync
+        Assert.Equal(assignments, Assignments.Load(rig.Home).Count(a => a.ClassName == "CS 101"));
+        // Stopped: nothing more goes to Canvas while Chrome is signed out.
+        await Task.Delay(TimeSpan.FromSeconds(3));
+        int hits = rig.Canvas.Hits.Count;
+        await Task.Delay(TimeSpan.FromSeconds(5));
+        Assert.Equal(hits, rig.Canvas.Hits.Count);
+
+        rig.Canvas.SignIn();
+        sw.Restart();
+        await rig.PostAsync("/api/v2/canvas", """{"sync":true}""");
+        await rig.UntilAsync(() => Task.FromResult(CanvasSettings.Load(rig.Home).LastDone != before.LastDone ? "" : null),
+            TimeSpan.FromSeconds(60), "the sync to finish after signing in again");
+        s = CanvasSettings.Load(rig.Home);
+        Note($"signed in again: the sync finished {sw.Elapsed.TotalSeconds:0.0} s later, error '{s.Error}'");
+        Assert.False(s.NeedsLogin);
+        Assert.Equal("", s.Error);
+        Assert.NotEqual("signed_out", ExtensionRig.S((await rig.GetAsync("/api/v2/canvas/state"))["state"]));
+        Assert.Equal(assignments, Assignments.Load(rig.Home).Count(a => a.ClassName == "CS 101"));
+    }
+
+    [ChromeFact]
     public async Task S9_a_1_3_folder_updates_itself_to_the_new_version()
     {
         // A student's Chrome still runs the extension as Study Stash 0.5.0 left it (1.3: config.js, no config.json,
@@ -298,15 +420,22 @@ public sealed class ExtensionRig : IAsyncLifetime
     Store? store;
     Config? cfg;
     LibraryWebOptions? options;
-    IPAddress host = IPAddress.Loopback;
+    IPAddress? elsewhere;
     WebApplication? library;
     ChromeRunner? chrome;
     HttpClient? api;
 
+    /// <summary>What a laptop's Chrome calls the library: a name only its Chrome knows (library.test, mapped to this
+    /// computer), or with STUDYSTASH_E2E_LIBRARY_HOST this computer's other address (its LAN one, say), which the
+    /// library then listens on too.</summary>
+    public const string LaptopHost = "library.test";
+    public string LaptopUrl => $"http://{(elsewhere is null ? LaptopHost : elsewhere.ToString())}:{cfg!.WebPort}";
+    /// <summary>A second Chrome, the laptop's (<see cref="StartLaptopChrome"/>).</summary>
+    public ChromeRunner? Laptop { get; private set; }
+
     public CanvasServer Canvas { get; private set; } = null!;
     public string Home => dir.Path;
-    /// <summary>The extension folder Chrome loaded: the library's own, or (with STUDYSTASH_E2E_LIBRARY_HOST) one
-    /// pointing at the library's other address, the way a laptop's is.</summary>
+    /// <summary>The extension folder Chrome loaded: the library's own.</summary>
     public string Folder { get; private set; } = "";
     public TimeSpan SinceChrome => sinceChrome.Elapsed;
     public string ClassDir(string cls) => store!.ClassDir(cls);
@@ -316,7 +445,7 @@ public sealed class ExtensionRig : IAsyncLifetime
     public async Task InitializeAsync()
     {
         if (ChromeRunner.Binary.Length == 0) return;
-        Canvas = await CanvasServer.StartAsync(FakeCanvas.Cs101().Json("/api/v1/courses", """
+        Canvas = await CanvasServer.StartAsync(WithBigFile(FakeCanvas.Cs101()).Json("/api/v1/courses", """
             [{"id": 4201, "name": "CS 101 · Intro to Computer Science", "course_code": "CS 101", "term": {"name": "Fall 2025"}},
              {"id": 4202, "name": "BIO 110 · Cells and Systems", "course_code": "BIO 110", "term": {"name": "Fall 2025"}}]
             """));
@@ -333,26 +462,44 @@ public sealed class ExtensionRig : IAsyncLifetime
             Latest = _ => Task.FromResult<Release?>(null), RamGb = () => 16, HostName = () => "library-pc",
         };
         // The way `serve` runs it: Kestrel, HTTP/1, on this computer's loopback. STUDYSTASH_E2E_LIBRARY_HOST (an
-        // address of this computer's, like its LAN one) puts it there instead, the way Chrome on a laptop reaches a
-        // library on another computer.
-        host = IPAddress.Parse(Environment.GetEnvironmentVariable("STUDYSTASH_E2E_LIBRARY_HOST") is { Length: > 0 } h ? h : "127.0.0.1");
+        // address of this computer's, like its LAN one) adds that too, the way Chrome on a laptop reaches a library
+        // on another computer.
+        if (Environment.GetEnvironmentVariable("STUDYSTASH_E2E_LIBRARY_HOST") is { Length: > 0 } h && !IPAddress.IsLoopback(IPAddress.Parse(h)))
+            elsewhere = IPAddress.Parse(h);
         await StartLibraryAsync();
-        string libraryUrl = $"http://{host}:{cfg.WebPort}";
-        api = new HttpClient { BaseAddress = new Uri(libraryUrl), Timeout = TimeSpan.FromMinutes(3) };
+        api = new HttpClient { BaseAddress = new Uri($"http://127.0.0.1:{cfg.WebPort}"), Timeout = TimeSpan.FromMinutes(3) };
         api.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", Password);
 
         // No "Make it": the library made its folder on start, and typing the Canvas address points it there.
         Assert.True(Extension.Ready(Extension.Folder(Home)), "the library didn't make the extension's folder on start");
         await PostAsync("/api/v2/canvas", new JsonObject { ["url"] = Canvas.Url }.ToJsonString());
         Folder = Extension.Folder(Home);
-        if (!IPAddress.IsLoopback(host))
-        {
-            // The library's own folder reaches it on 127.0.0.1, where this one isn't listening: be the laptop instead.
-            Folder = dir["laptop-extension"];
-            Extension.Ensure(Folder, libraryUrl, CanvasSettings.ExtensionKey(Home), CanvasSettings.Load(Home).Url);
-        }
         Assert.Equal(Canvas.Url, Extension.Connection(Folder)!.Canvas);
         StartChrome("chrome-profile");
+    }
+
+    /// <summary>A module file far over the 40 MB a sync saves (lecture-recording.zip, 60 MB by Canvas's say-so), in
+    /// Week 4 beside the slides.</summary>
+    static FakeCanvas WithBigFile(FakeCanvas canvas)
+    {
+        var modules = JsonNode.Parse(FakeCanvas.Fixture("cs101-modules.json"))!.AsArray();
+        var week4 = modules.First(m => (int)m!["id"]! == 302)!["items"]!.AsArray();
+        week4.Add(new JsonObject
+        {
+            ["id"] = 3029, ["module_id"] = 302, ["position"] = 9, ["title"] = "lecture-recording.zip", ["indent"] = 0, ["type"] = "File",
+            ["content_id"] = 556, ["html_url"] = FakeCanvas.Base + "/courses/4201/modules/items/3029",
+            ["url"] = FakeCanvas.Base + "/api/v1/courses/4201/files/556", ["published"] = true,
+        });
+        var file = JsonNode.Parse(FakeCanvas.Fixture("cs101-file-555.json"))!.AsObject();
+        file["id"] = 556;
+        file["display_name"] = "lecture-recording.zip";
+        file["filename"] = "lecture-recording.zip";
+        file["content-type"] = "application/zip";
+        file["url"] = FakeCanvas.Base + "/files/556/download?download_frd=1&verifier=v556";
+        file["size"] = 60L * 1024 * 1024;
+        return canvas.Json("/api/v1/courses/4201/modules", modules.ToJsonString())
+            .Json("/api/v1/courses/4201/files/556", file.ToJsonString())
+            .Bytes("/files/556/download", Encoding.UTF8.GetBytes("PK never asked for"));
     }
 
     /// <summary>The library, the way `serve` builds it, on its port (again, after <see cref="StopLibraryAsync"/>).</summary>
@@ -360,7 +507,11 @@ public sealed class ExtensionRig : IAsyncLifetime
     {
         var builder = WebApplication.CreateSlimBuilder();
         builder.Logging.ClearProviders();
-        builder.WebHost.ConfigureKestrel(k => k.Listen(host, cfg!.WebPort, o => o.Protocols = HttpProtocols.Http1));
+        builder.WebHost.ConfigureKestrel(k =>
+        {
+            k.Listen(IPAddress.Loopback, cfg!.WebPort, o => o.Protocols = HttpProtocols.Http1);
+            if (elsewhere is not null) k.Listen(elsewhere, cfg.WebPort, o => o.Protocols = HttpProtocols.Http1);
+        });
         library = LibraryWeb.Build(builder, cfg!, store!, new Pipeline(cfg!, store!, log: _ => { }), options!);
         await library.StartAsync();
     }
@@ -379,6 +530,17 @@ public sealed class ExtensionRig : IAsyncLifetime
     {
         chrome = ChromeRunner.Start(folder ?? Folder, dir[profile], Canvas.Url + "/login/e2e", CanvasServer.Host, CanvasServer.OtherHost);
         sinceChrome.Restart();
+    }
+
+    /// <summary>A second Chrome, the laptop's, beside the library's: its own profile, signed in to the pretend Canvas,
+    /// with the extension in <paramref name="folder"/> (one pointing at <see cref="LaptopUrl"/>).</summary>
+    public ChromeRunner StartLaptopChrome(string profile, string folder) =>
+        Laptop = ChromeRunner.Start(folder, dir[profile], Canvas.Url + "/login/e2e", CanvasServer.Host, CanvasServer.OtherHost, LaptopHost);
+
+    public void StopLaptopChrome()
+    {
+        Laptop?.Dispose();
+        Laptop = null;
     }
 
     /// <summary>Run JavaScript in the extension Chrome is running (<see cref="ChromeRunner.EvaluateAsync"/>).</summary>
@@ -429,13 +591,33 @@ public sealed class ExtensionRig : IAsyncLifetime
             await Task.Delay(250);
         }
         throw new XunitException($"Waited {sw.Elapsed.TotalSeconds:0} s for {what}.\nCanvas saw:\n"
-            + string.Join('\n', Canvas.Hits.TakeLast(15).Select(h => $"  {h.Method} {h.PathAndQuery} cookie={h.Cookie} signed_in={h.SignedIn} → {h.Status}"))
+            + string.Join('\n', Canvas.Hits.TakeLast(15).Select(h => $"  {h.Method} {h.Host}{h.PathAndQuery} cookie={h.Cookie} signed_in={h.SignedIn} → {h.Status}"))
+            + $"\nThe library's sync: {CrawlNow()}"
             + $"\nChrome{(chrome!.Exited ? " (exited)" : "")}:\n{chrome.Tail()}");
+    }
+
+    /// <summary>How the library's sync stands (crawl.json): running or not, where, and what's waiting or out with
+    /// Chrome, for a failing test's message.</summary>
+    string CrawlNow()
+    {
+        try
+        {
+            var c = JsonNode.Parse(File.ReadAllText(Path.Combine(Home, "crawl.json")))!.AsObject();
+            string Paths(JsonNode? n) => string.Join(", ", (n is JsonArray a ? a.Select(j => j!["url"]) : n is JsonObject o ? o.Select(kv => kv.Value!["job"]!["url"]) : [])
+                .Select(u => new Uri(S(u)).AbsolutePath).Take(8));
+            return $"active={c["active"]} ready={c["ready"]} signed_out={c["signed_out"]} base={c["base"]} started={c["started"]}"
+                + $"\n  waiting: {Paths(c["jobs"])}\n  with Chrome: {Paths(c["inflight"])}\n  settings: {File.ReadAllText(CanvasSettings.PathIn(Home)).Length} bytes, error '{CanvasSettings.Load(Home).Error}'";
+        }
+        catch (Exception e) when (e is IOException or System.Text.Json.JsonException or UriFormatException or InvalidOperationException)
+        {
+            return "unreadable: " + e.Message;
+        }
     }
 
     public async Task DisposeAsync()
     {
         chrome?.Dispose();
+        Laptop?.Dispose();
         api?.Dispose();
         await StopLibraryAsync();
         if (Canvas is not null) await Canvas.DisposeAsync();

@@ -155,7 +155,7 @@ Each job's answer is classified (`Crawl.Classify`) before anything is filed:
 
 | Answer | Means | What the sync does |
 |---|---|---|
-| `signed_out: true` from the extension, or 401 whose body isn't Canvas's `"unauthorized"` JSON (an empty body from a sign-in bounce, `{"status":"unauthenticated"}`, an HTML page) | Chrome isn't signed in to Canvas | Stops: the queue is cleared, Settings says "Chrome isn't signed in to Canvas", the next good answer clears it. |
+| `signed_out: true` from the extension, or 401 whose body isn't Canvas's `"unauthorized"` JSON (an empty body from a sign-in bounce, `{"status":"unauthenticated"}`, an HTML page) | Chrome isn't signed in to Canvas | Stops: the queue is cleared and nothing more goes to Canvas, the sync isn't filed (no `last_sync`, every class keeps what it had), state is `signed_out` and Settings says "Chrome isn't signed in to Canvas". The next good answer clears it: the next sync (within the hour, or at once with Sync now) starts afresh (measured end to end: signed out mid-sync, then signed in and synced again, it finishes with no error). |
 | 401 with `{"status":"unauthorized"}` ("user not authorized to perform that action"), any other 403, 404 | The student can't see this (a hidden tab, a locked page, something removed) | Skipped quietly; a listing's section becomes `hidden`. |
 | 403 or 429 with "Rate Limit Exceeded", or with `X-Rate-Limit-Remaining` ≤ 0 | Canvas asks the sync to slow down | The job goes back to the front of the queue and nothing is handed out for 30 s, doubling (60, 120 … up to 10 min) each time a job sent after the last pause is refused again; `Retry-After` wins when longer. The rest of the burst that caused a pause doesn't lengthen it. While paused, `Work` answers `hot: false`, so the extension sleeps until its next alarm. The back-off resets when a job sent after the pause comes back fine. |
 | An OK answer with `X-Rate-Limit-Remaining` ≤ 0 | The answer is good; the next ones wouldn't be | Filed, then a 30 s pause. |
@@ -251,6 +251,17 @@ What protocol 3 (1.4) adds:
   library at mini.local:8787.", "Sign in to Canvas in Chrome.") and keeps Sync Canvas now / Open.
 - **Its address.** `a` is the library address from its config; the library records whether that's this computer's
   loopback (`seen_where: this_computer`) or another address (`another_computer`).
+- **Two Chromes.** The library's own Chrome and the laptop's may both run the extension (each from its own folder).
+  Both wait for work, jobs go to whichever asks first (a job is handed out once), and each is kept on its own in
+  `canvas.json` `extension_copies` (`where` → `{seen, version, protocol}`), written at most every 15 s per Chrome.
+  `seen`, `seen_version`, `seen_protocol` and `seen_where` are the one that asked last; `copies` in
+  `/api/v2/canvas/extension` lists them all, each with `connected`. "Updated itself" is noted only when one Chrome's
+  own version goes up (two Chromes on different versions taking turns aren't an update); a 1.3 copy (no `a`) that
+  reloads into 1.4 is the same Chrome. Measured end to end: with both waiting, `canvas.json` is written about four
+  times in 30 s and Find is answered at once.
+- **A wrong key.** The library answers 401 before anything else, so a Chrome with a key it didn't make is never
+  written down, takes no work and reads nothing on Canvas; the extension says `library_refused`. Once the right key is
+  in its folder, the next alarm (within 30 s) connects it, with no reload: the key is read every round.
 
 What protocol 2 (1.3) does, answer by answer (all kept in 1.4):
 
@@ -284,12 +295,12 @@ What protocol 2 (1.3) does, answer by answer (all kept in 1.4):
   still running something else) waits a minute (`chrome.storage.local.lastReload = {at, want}`), so the extension can
   never reload itself in a loop. (1.2 only looked at its folder after the library's `ext` differed, so it may take one batch before
   reloading; the new copy's forced ask brings that batch back at once.)
-- **The library keeps its folder current.** `Extension.Refresh(dir)` rewrites the scripts and pages and rebuilds
-  `manifest.json` with this engine's version and the folder's own `host_permissions`, and leaves `config.js` (the key,
-  the library's address) alone; it does nothing to a folder without both `manifest.json` and `config.js`, rewrites
-  only files that differ, and returns whether the version changed. The library ensures `<home>/chrome-extension` when
-  it maps its routes (`LibraryWeb.MapCanvas`), so a library update reaches Chrome on its next ask (a running 1.3
-  reloads into 1.4 by itself, measured end to end).
+- **The library keeps its folder current.** `Extension.Refresh(dir)` brings a folder up to this engine's version,
+  keeping what it connects to (`Extension.Connection`: config.json, or a legacy config.js): scripts, pages, icons and
+  manifest are rewritten, and config.json + config.js with the same library address, key and Canvas. It leaves alone a
+  folder without `manifest.json` or a readable connection, rewrites only files that differ, and returns whether the
+  version changed. The library ensures `<home>/chrome-extension` when it maps its routes (`LibraryWeb.MapCanvas`), so
+  a library update reaches Chrome on its next ask (a running 1.3 reloads into 1.4 by itself, measured end to end).
 - **The update is noted once.** Each visit records the running version (`canvas.json` `extension_version`). When it
   goes up from a known older version, `extension_update = {from, to, at, dismissed}` is set, and `GET /api/v2/canvas`
   shows `"extension_update": {"from","to","at"}` until `POST /api/v2/canvas {"dismiss_update": true}` (design 08's
@@ -297,10 +308,32 @@ What protocol 2 (1.3) does, answer by answer (all kept in 1.4):
   version is `to`). `extension_latest` is the library's version and
   `extension_outdated` is true while the running one is older, compared as versions (1.10 is newer than 1.9).
 
-**For WS3/WS6 (the app).** The laptop app makes its own folder with `Extension.Prepare(Extension.Folder(home),
-serverUrl, key, canvasUrl)` (unchanged). It should also call `Extension.Refresh(Extension.Folder(home))` once when it
-starts (catching `IOException` and `UnauthorizedAccessException`), so a new app version reaches Chrome without the
-student making the folder again. The Canvas screens read `extension_version`, `extension_latest`,
+### Setting it up, and the folder's life
+
+There is no "Make it" step anywhere: each computer's folder is written and kept by Study Stash itself.
+
+1. **The library** makes `<home>/chrome-extension` when it starts (`EnsureHere`, even before there's a Canvas address:
+   then its manifest has no Canvas host and every job is refused), and writes it again when the Canvas address is
+   saved (Settings, `POST /api/v2/canvas {"url"}`, Find my courses with an address typed); every start also brings
+   it up to a new engine version. Its config points at `http://127.0.0.1:<port>`.
+2. **The laptop app** keeps `<app home>/chrome-extension` with `ExtensionKeeper.KeepAsync`: it asks the library
+   (`GET /api/v2/canvas/extension`) and, once the library has a Canvas address, writes the folder pointing at the
+   library as the laptop reaches it (`CanvasClient.ServerUrl`), the key and the Canvas address. It writes again when
+   any of those or the extension version changes, and never when nothing did. When the app and the library share a
+   computer and a folder, it only reports the library's own.
+3. **The student** loads the folder once in Chrome (chrome://extensions, Developer mode, Load unpacked), or installs
+   the Chrome Web Store copy and pastes the code (`connection_code`, `ExtensionKeeper.ConnectionCode`). The screens
+   can show "Add to Chrome" until `connected` (a check-in within 90 s for protocol 3), then which Chrome it is
+   (`seen_where`).
+4. **After that, nothing by hand.** A folder rewritten with new host permissions or a new version reloads the running
+   copy by itself (the library also nudges the waiting request, so it happens at once); a new key or library address
+   in config.json is read on the next round without a reload. Chrome only has to keep running with Developer mode on
+   (Chrome turns off an unpacked extension that reloads itself once Developer mode is off: the store copy avoids that).
+
+**Find my courses** saves a typed address first, then asks Chrome; `FindOutcome` names what went wrong (no address,
+Chrome signed out, no extension has checked in, Chrome away, or the error itself) instead of "Chrome didn't answer".
+
+**For WS3/WS6 (the app).** The Canvas screens read `extension_version`, `extension_latest`,
 `extension_outdated` and `extension_update` from `GET /api/v2/canvas` (T7 also puts them in `/api/v2/canvas/state`)
 and dismiss the update with `POST /api/v2/canvas {"dismiss_update": true}`.
 
@@ -578,9 +611,21 @@ runs `ExtensionE2ETests` (skipped in the normal suite): a pretend Canvas over HT
 both mapped to 127.0.0.1), a library on real Kestrel with a throwaway home, and the folder the library made by itself.
 The stories, in order: the extension checks in; Find my courses (under 5 s); a linked class syncs; signed out says so;
 a newer manifest on disk reloads it; a new Canvas address reloads it and Find works there with no human step; a
-restarted library is found again within 40 s; three idle minutes with the worker awake throughout; and a folder as
-0.5.0 left it (1.3, `Fixtures/extension-1.3`) updates itself to 1.4. Then `S9b`: the Chrome Web Store build, unzipped from `PackForStore`,
+restarted library is found again within 40 s; three idle minutes with the worker awake throughout; `S8a` a laptop's
+Chrome (a second Chrome, reaching the library as `library.test`) whose folder has a wrong key says `library_refused`
+(badge, popup) while the library records nothing, and connects within the alarm once the key is right; `S8b` both
+Chromes connected and listed in `copies`, `canvas.json` not rewritten on every visit, Find answered at once; `S8c`
+signed out in the middle of a sync (the pretend Canvas signs out when the course's pages are asked for): the sync
+stops, nothing more reaches Canvas, state `signed_out`, and after signing in a sync finishes cleanly; and a folder as
+0.5.0 left it (1.3, `Fixtures/extension-1.3`) updates itself to 1.4. The sync story also has a 60 MB module file that
+is never downloaded: modules.md links to it on Canvas ("not saved: too big"). Then `S9b`: the Chrome Web Store build, unzipped from `PackForStore`,
 registers with no connection (`no_config`), no sites and a popup asking for the code, and after the library's code is
 pasted (without Chrome's permission, which headless Chrome can't give) it says `no_access` and asks nothing of Canvas
 or the library. `ChromeRunner.EvaluateAsync` runs JavaScript in the extension's worker or one of its pages over
 DevTools (`--remote-debugging-port=0`).
+
+Run it with `TMPDIR` pointing somewhere disposable (Chrome's profiles and the library's home go there and are
+removed). `STUDYSTASH_E2E_LIBRARY_HOST=<an address of this computer, like its LAN one>` makes the library listen there
+too and the laptop's Chrome use it instead of `library.test` (Chrome's Local Network Access checks don't block the
+worker's fetch to a LAN address). `STUDYSTASH_E2E_CHROME=<binary>` skips the download. The whole run takes about six
+minutes, three of them the idle story.

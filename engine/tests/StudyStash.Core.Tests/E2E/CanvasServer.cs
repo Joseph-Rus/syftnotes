@@ -25,6 +25,7 @@ public sealed class CanvasServer : IAsyncDisposable
     readonly WebApplication app;
     readonly ConcurrentDictionary<string, bool> sessions = new();
     volatile bool signedOut;
+    volatile string? signOutAt;
 
     public FakeCanvas Canvas { get; }
     public int Port { get; }
@@ -64,6 +65,10 @@ public sealed class CanvasServer : IAsyncDisposable
     /// <summary>Chrome's sessions work again, as if the student signed back in.</summary>
     public void SignIn() => signedOut = false;
 
+    /// <summary>The student signs out the moment a request for <paramref name="path"/> arrives (that one already
+    /// finds Chrome signed out): a sign-out in the middle of a sync, at a known point.</summary>
+    public void SignOutWhenAsked(string path) => signOutAt = path;
+
     /// <summary>The requests that reached a path (any query).</summary>
     public IEnumerable<Hit> HitsTo(string path) => Hits.Where(h => h.PathAndQuery.Split('?')[0] == path);
 
@@ -71,6 +76,11 @@ public sealed class CanvasServer : IAsyncDisposable
     {
         var req = ctx.Request;
         string pathAndQuery = req.Path + req.QueryString;
+        if (signOutAt is { } at && req.Path == at)
+        {
+            signOutAt = null;
+            SignOut();
+        }
         string? cookie = req.Cookies["canvas_session"];
         bool signedIn = cookie is not null && sessions.ContainsKey(cookie) && !signedOut;
         string here = $"http://{req.Host.Host}:{Port}";
