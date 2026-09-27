@@ -19,7 +19,7 @@ public class AppHostTests
     }
 
     [Fact]
-    public void A_sound_file_stands_in_for_the_microphone()
+    public async Task A_sound_file_stands_in_for_the_microphone()
     {
         using var home = new TempHome();
         string before = Environment.GetEnvironmentVariable("STUDYSTASH_MIC_FILE") ?? "";
@@ -29,7 +29,7 @@ public class AppHostTests
             using var host = Host(home.Path);
             Assert.True(host.PretendMic);
             Assert.Equal(MicAccess.Allowed, host.MicAccess());
-            host.AskMic();
+            Assert.Equal(MicAccess.Allowed, await host.AskMicAsync());
             using var mic = host.OpenMic();
             Assert.IsType<FileMicrophone>(mic);
         }
@@ -198,4 +198,130 @@ public class AppHostTests
         Assert.True(took.Elapsed < TimeSpan.FromSeconds(3.5), $"took {took.Elapsed}");
         host.Dispose();
     }
+
+    // --- pressing Record: asking for the microphone ---------------------------------------------------------------
+
+    /// <summary>The system's answers about the microphone, made up: what it says now, and what the student answers
+    /// when asked.</summary>
+    sealed class FakeMics(MicAccess now, MicAccess answer = MicAccess.Allowed) : IMicPermissions
+    {
+        public MicAccess Now = now;
+        public int Asked;
+
+        public MicAccess Access() => Now;
+
+        public Task<MicAccess> AskAsync()
+        {
+            Asked++;
+            if (Now == MicAccess.NotAsked) Now = answer;
+            return Task.FromResult(Now);
+        }
+    }
+
+    /// <summary>A microphone the system won't start.</summary>
+    sealed class BrokenMic(MicTrouble trouble) : IAudioSource
+    {
+        public string Name => "Broken";
+        public int SampleRate => Sound.Rate;
+        public int Channels => 1;
+        public event Action<float[]>? Samples { add { } remove { } }
+        public event Action<string>? Failed { add { } remove { } }
+        public void Start() => throw new MicrophoneException(trouble, MicTrouble.InvalidDevice);
+        public void Stop() { }
+        public void Dispose() { }
+    }
+
+    static AppHost Recording(TempHome home, IMicPermissions mics, Func<IAudioSource>? mic = null, List<string>? log = null)
+    {
+        string wav = Wav(home);
+        return new AppHost(home.Path, mic ?? (() => new FileMicrophone(wav)), () => throw new InvalidOperationException("no model here"), log: s =>
+            {
+                if (log is not null) lock (log) log.Add(s);
+            }, loginItems: new CountingLoginItems(), models: new ModelSetting(File: home["model.bin"]), micPermissions: mics);
+    }
+
+    [Fact]
+    public async Task Not_asked_yet_asks_then_records_once_the_student_says_yes()
+    {
+        using var home = new TempHome();
+        var mics = new FakeMics(MicAccess.NotAsked, answer: MicAccess.Allowed);
+        using var host = Recording(home, mics);
+        var start = await host.RecordAsync("CS 101");
+        Assert.Equal(1, mics.Asked);
+        Assert.Null(start.Trouble);
+        Assert.NotNull(start.Lecture);
+        Assert.Same(host.Recorder.Current, start.Lecture);
+        Assert.Single(host.Lectures.All());
+        host.StopRecording();
+    }
+
+    [Fact]
+    public async Task Not_asked_yet_and_refused_records_nothing_and_says_where_to_allow_it()
+    {
+        using var home = new TempHome();
+        var mics = new FakeMics(MicAccess.NotAsked, answer: MicAccess.Denied);
+        using var host = Recording(home, mics, () => throw new InvalidOperationException("the microphone was opened"));
+        var start = await host.RecordAsync("CS 101");
+        Assert.Equal(1, mics.Asked);
+        Assert.Null(start.Lecture);
+        Assert.Null(host.Recorder.Current);
+        Assert.Equal(MicTroubleKind.Denied, start.Trouble!.Kind);
+        Assert.Equal("Study Stash can't use the microphone", start.Trouble.Title);
+        Assert.Equal(OperatingSystem.IsWindows() ? "Open Settings" : "Open System Settings", start.Trouble.ActionLabel);
+    }
+
+    [Theory]
+    [InlineData(MicAccess.Denied)]
+    [InlineData(MicAccess.Restricted)]
+    public async Task Denied_asks_nothing_and_opens_nothing(MicAccess access)
+    {
+        using var home = new TempHome();
+        var mics = new FakeMics(access);
+        using var host = Recording(home, mics, () => throw new InvalidOperationException("the microphone was opened"));
+        var start = await host.RecordAsync("CS 101");
+        Assert.Equal(0, mics.Asked);
+        Assert.Null(start.Lecture);
+        Assert.Equal(MicTroubleKind.Denied, start.Trouble!.Kind);
+    }
+
+    [Fact]
+    public async Task Allowed_or_unknown_just_records_without_asking()
+    {
+        foreach (var access in new[] { MicAccess.Allowed, MicAccess.Unknown })
+        {
+            using var home = new TempHome();
+            var mics = new FakeMics(access);
+            using var host = Recording(home, mics);
+            var start = await host.RecordAsync("");
+            Assert.Equal(0, mics.Asked);
+            Assert.NotNull(start.Lecture);
+            host.StopRecording();
+        }
+    }
+
+    [Fact]
+    public async Task No_microphone_says_so_in_plain_words_and_logs_the_code()
+    {
+        using var home = new TempHome();
+        var log = new List<string>();
+        using var host = Recording(home, new FakeMics(MicAccess.Allowed), () => new BrokenMic(MicTrouble.NoDevice()), log);
+        var start = await host.RecordAsync("CS 101");
+        Assert.Null(start.Lecture);
+        Assert.Null(host.Recorder.Current);
+        Assert.Empty(host.Lectures.All());
+        Assert.Equal("No microphone found", start.Trouble!.Title);
+        Assert.Equal("Open Sound settings", start.Trouble.ActionLabel);
+        Assert.DoesNotContain("66680", start.Trouble.Title + start.Trouble.Detail);
+        lock (log) Assert.Contains(log, l => l.Contains("-66680"));
+    }
+
+    [Fact]
+    public async Task A_pretend_microphone_never_asks_the_system()
+    {
+        using var home = new TempHome();
+        using var host = Host(home.Path, () => new FileMicrophone(Wav(home)));
+        Assert.Equal(MicAccess.Allowed, host.MicAccess());
+        Assert.Equal(MicAccess.Allowed, await host.AskMicAsync());
+    }
+
 }

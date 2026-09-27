@@ -16,7 +16,7 @@
   $Slug = "Joseph-Rus/study-stash"
 
   # The old server/client wording still works; STUDYSTASH_ROLE is the new name.
-  $Role = if ($env:STUDYSTASH_ROLE) { $env:STUDYSTASH_ROLE } elseif ($env:GRANOLA_SHARE_ROLE) { $env:GRANOLA_SHARE_ROLE } else { "laptop" }
+  $Role = if ($env:STUDYSTASH_ROLE) { $env:STUDYSTASH_ROLE } else { "laptop" }
   $Name = if ($Role -in @("library", "server")) { "Study-Stash-Library-Setup.exe" } else { "Study-Stash-Laptop-Setup.exe" }
 
   function Fail($Message) {
@@ -27,7 +27,7 @@
 
   # Older releases connected a laptop with an address and password passed as env vars; Study
   # Stash's own setup asks for them now, in the app, so this just points you at them.
-  $Addr = if ($env:STUDYSTASH_SERVER) { $env:STUDYSTASH_SERVER } else { $env:GRANOLA_SHARE_SERVER }
+  $Addr = $env:STUDYSTASH_SERVER
   if ($Addr) { Write-Host "Type this address in setup: $Addr" }
 
   $Setup = $env:STUDYSTASH_SETUP

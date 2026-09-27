@@ -96,9 +96,7 @@ public class AiShots
     static Border WinSettingsFrame(string selected, Control pane)
     {
         var titleBar = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"), Height = 32, Margin = new Thickness(16, 0, 0, 0) };
-        var badge = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4), VerticalAlignment = VerticalAlignment.Center, Child = new Icon { Glyph = "graphic_eq", Size = 12 } };
-        Res(badge, Border.BackgroundProperty, badge, "Accent");
-        Res((Icon)badge.Child!, Icon.ForegroundProperty, badge, "OnAccent");
+        var badge = new AppIcon { VerticalAlignment = VerticalAlignment.Center };
         titleBar.Children.Add(badge);
         var titleText = new TextBlock { Text = "Study Stash settings", FontSize = 12, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(titleText, 1);
@@ -262,9 +260,7 @@ public class AiShots
     static Border WinSetupFrame(Control pane)
     {
         var titleBar = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"), Height = 32, Margin = new Thickness(16, 0, 0, 0) };
-        var badge = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4), VerticalAlignment = VerticalAlignment.Center, Child = new Icon { Glyph = "graphic_eq", Size = 12 } };
-        Res(badge, Border.BackgroundProperty, badge, "Accent");
-        Res((Icon)badge.Child!, Icon.ForegroundProperty, badge, "OnAccent");
+        var badge = new AppIcon { VerticalAlignment = VerticalAlignment.Center };
         titleBar.Children.Add(badge);
         var titleText = new TextBlock { Text = "Set up your library", FontSize = 12, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
         Grid.SetColumn(titleText, 1);

@@ -499,6 +499,64 @@
   <Style Selector="TextBlock.cv-step-title.cv-todo">
     <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
   </Style>
+  <!-- One step, one row: marker | title | summary or action, all on one centre line and every row the same height;
+       buttons in a row are as tall as a text field, so they never stretch it. -->
+  <Style Selector="Grid.cv-srow">
+    <Setter Property="Height" Value="46" />
+    <Setter Property="Margin" Value="16,0" />
+  </Style>
+  <Style Selector="Grid.cv-srow TextBlock.cv-step-title">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Panel.cv-marker">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="StackPanel.cv-action">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="8" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+  </Style>
+  <Style Selector="StackPanel.cv-action > TextBlock, StackPanel.cv-action > c|Icon, StackPanel.cv-action > c|Spinner">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- The open step's help, pictures and lists: under its title, in the title's column. -->
+  <Style Selector=":is(Control).cv-body">
+    <Setter Property="Margin" Value="48,0,16,16" />
+  </Style>
+  <Style Selector="Button.cv-pill.cv-mini">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.cv-field">
+    <Setter Property="Height" Value="28" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="{DynamicResource Raised}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+    <Setter Property="Padding" Value="8,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.cv-value.cv-good">
+    <Setter Property="Foreground" Value="{DynamicResource Ok}" />
+  </Style>
+  <Style Selector="TextBlock.cv-help">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Button.cv-quiet">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="TextBlock.cv-link-sep">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
+  </Style>
   <Style Selector="Grid.cv-step-row">
     <Setter Property="MinHeight" Value="44" />
     <Setter Property="Margin" Value="16,8" />
@@ -586,39 +644,6 @@
   <Style Selector="Button.cv-skip">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Padding" Value="0" />
-  </Style>
-
-  <!-- design 12: a Canvas notification toast -->
-  <Style Selector="Border.cv-toast-tile">
-    <Setter Property="Width" Value="36" />
-    <Setter Property="Height" Value="36" />
-    <Setter Property="CornerRadius" Value="9" />
-    <Setter Property="Background" Value="{DynamicResource Accent}" />
-  </Style>
-  <Style Selector="TextBlock.cv-toast-title">
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
-  </Style>
-  <Style Selector="TextBlock.cv-toast-when">
-    <Setter Property="FontSize" Value="11" />
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-  </Style>
-  <Style Selector="TextBlock.cv-toast-text">
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="LineHeight" Value="17.55" />
-    <Setter Property="TextWrapping" Value="Wrap" />
-  </Style>
-  <Style Selector="Button.cv-toast-btn">
-    <Setter Property="Theme" Value="{StaticResource Surface}" />
-    <Setter Property="Height" Value="30" />
-    <Setter Property="CornerRadius" Value="15" />
-    <Setter Property="Padding" Value="14,0" />
-    <Setter Property="FontSize" Value="13" />
-    <Setter Property="Background" Value="{DynamicResource Fill2}" />
-  </Style>
-  <Style Selector="Button.cv-toast-btn /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
   </Style>
 
 </Styles>

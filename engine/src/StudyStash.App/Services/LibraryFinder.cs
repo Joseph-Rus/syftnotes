@@ -38,7 +38,7 @@ public sealed class LibraryFinder
             {
             }
             string name = Py.AsString(body?["pool_name"]) ?? "";
-            if (r.Headers.Contains("X-Granola-Share") || r.Headers.Contains("X-Study-Stash")) return (true, name);
+            if (r.Headers.Contains("X-Study-Stash")) return (true, name);
             if (r.StatusCode == HttpStatusCode.Unauthorized)
             {
                 string detail = Py.AsString(body?["detail"]) ?? "";

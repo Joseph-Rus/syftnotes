@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -395,5 +396,107 @@ public class CanvasApiTests
         var arr = JsonNode.Parse(await list.Content.ReadAsStringAsync())!.AsArray();
         var one = arr.First(a => a!["name"]!.GetValue<string>() == "Problem set 4")!.AsObject();
         foreach (string key in new[] { "class", "id", "name", "due", "points", "status", "score", "submitted", "url", "done", "folder" }) Assert.True(one.ContainsKey(key), key);
+    }
+
+    [Fact]
+    public async Task The_extension_endpoint_says_where_its_folder_is_and_which_chrome_checked_in()
+    {
+        using var dir = new TempDir();
+        var now = FakeCanvas.DesignNow;
+        var sync = FakeCanvas.Library(dir, () => now);
+        var (cfg, store, options) = LibraryFor(dir, sync);
+        using var _1 = store;
+        await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), options));
+        string key = CanvasSettings.ExtensionKey(cfg.Home);
+        async Task CheckIn(string query)
+        {
+            var ask = new HttpRequestMessage(HttpMethod.Get, "/api/v2/canvas/work?" + query) { Headers = { { "X-Study-Stash-Key", key } } };
+            Assert.True((await site.Client.SendAsync(ask)).IsSuccessStatusCode);
+        }
+
+        // Before any Chrome: the folder is ready, nothing has checked in.
+        var e = await GetAsync(site, "/api/v2/canvas/extension");
+        Assert.Equal((key, "https://canvas.test", Extension.Version(), Extension.Protocol), (e["key"]!.GetValue<string>(), e["canvas"]!.GetValue<string>(), e["version"]!.GetValue<string>(), e["protocol"]!.GetValue<int>()));
+        Assert.Equal((Extension.Folder(cfg.Home), true), (e["folder"]!.GetValue<string>(), e["folder_ready"]!.GetValue<bool>()));
+        Assert.Null(e["seen"]); // never "": a date the library doesn't have is null
+        Assert.Equal(("", 0, "", false), (e["seen_version"]!.GetValue<string>(), e["seen_protocol"]!.GetValue<int>(), e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
+        // A Chrome Web Store copy in this computer's Chrome connects with the code: this folder's connection.
+        Assert.Equal(new ExtensionConnection("http://127.0.0.1:" + cfg.WebPort, key, "https://canvas.test"),
+            Extension.ReadConnectionCode(e["connection_code"]!.GetValue<string>()));
+        Assert.Equal(Extension.Connection(Extension.Folder(cfg.Home)), Extension.ReadConnectionCode(e["connection_code"]!.GetValue<string>()));
+
+        // This computer's Chrome, long-polling (1.4, protocol 3).
+        await CheckIn("v=1.4&p=3&a=" + Uri.EscapeDataString("http://127.0.0.1:" + cfg.WebPort));
+        e = await GetAsync(site, "/api/v2/canvas/extension");
+        Assert.Equal((now.ToString("o", System.Globalization.CultureInfo.InvariantCulture), "1.4", 3, "this_computer", true),
+            (e["seen"]!.GetValue<string>(), e["seen_version"]!.GetValue<string>(), e["seen_protocol"]!.GetValue<int>(), e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
+
+        // The laptop's, reaching the library from elsewhere; then quiet for two minutes.
+        await CheckIn("v=1.4&p=3&a=" + Uri.EscapeDataString("https://mini.tail.ts.net"));
+        now = now.AddMinutes(2);
+        e = await GetAsync(site, "/api/v2/canvas/extension");
+        Assert.Equal(("another_computer", false), (e["seen_where"]!.GetValue<string>(), e["connected"]!.GetValue<bool>()));
+        // Both Chromes are listed.
+        Assert.Equal(["another_computer", "this_computer"], e["copies"]!.AsArray().Select(c => c!["where"]!.GetValue<string>()).Order());
+        Assert.All(e["copies"]!.AsArray(), c => Assert.Equal(("1.4", 3, false), (c!["version"]!.GetValue<string>(), c["protocol"]!.GetValue<int>(), c["connected"]!.GetValue<bool>())));
+
+        // The overview has the same, without the key.
+        var overview = (await GetAsync(site, "/api/v2/canvas"))["extension"]!.AsObject();
+        Assert.Null(overview["key"]);
+        Assert.Null(overview["connection_code"]); // it holds the key
+        foreach (string field in new[] { "canvas", "version", "protocol", "folder", "folder_ready", "seen", "seen_version", "seen_protocol", "seen_where", "connected", "copies" })
+            Assert.Equal(e[field]!.ToJsonString(), overview[field]!.ToJsonString());
+    }
+
+    [Fact]
+    public async Task A_sync_cut_off_by_a_library_restart_carries_on_as_soon_as_chrome_asks_again()
+    {
+        // Chrome took the sync's first reads, then the library stopped: its answers found nobody. The library that
+        // starts next hands them out again at once, not ten minutes later, and the sync finishes.
+        using var dir = new TempDir();
+        var now = FakeCanvas.DesignNow;
+        var before = FakeCanvas.Library(dir, () => now);
+        var taken = before.Work(force: true, Extension.Version(), Extension.Protocol).Jobs;
+        Assert.Equal((1, 6), before.Crawl.Left);
+
+        var after = new CanvasSync(dir.Path, c => FakeCanvas.ClassDir(dir, c), _ => { }) { Clock = () => now, Zone = FakeCanvas.Zone };
+        var (cfg, store, options) = LibraryFor(dir, after);
+        await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), options));
+        Assert.Equal((7, 0), after.Crawl.Left);
+        var again = after.Work(force: false, Extension.Version(), Extension.Protocol).Jobs;
+        Assert.Equal(taken.Select(j => j.Url), again.Select(j => j.Url));
+        var canvas = FakeCanvas.Cs101();
+        after.Results(again.Select(canvas.Answer).ToList());
+        Assert.True(canvas.Run(after, force: false));
+        Assert.Equal("", CanvasSettings.Load(dir.Path).Error);
+        Assert.Equal(5, Assignments.Load(dir.Path).Count);
+    }
+
+    [Fact]
+    public async Task A_waiting_extension_is_answered_as_soon_as_someone_asks_for_a_sync()
+    {
+        var (dir, site, _) = await SyncedAsync();
+        await using var _1 = site;
+        using var _2 = dir;
+        string key = CanvasSettings.ExtensionKey(dir.Path);
+        Task<HttpResponseMessage> Ask(string query) =>
+            site.Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/api/v2/canvas/work?" + query) { Headers = { { "X-Study-Stash-Key", key } } });
+
+        // Just synced: an extension from before 1.4 is told "nothing" at once, as always.
+        var sw = Stopwatch.StartNew();
+        var old = JsonNode.Parse(await (await Ask("v=1.3&p=2")).Content.ReadAsStringAsync())!;
+        Assert.Empty(old["jobs"]!.AsArray());
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(2), $"took {sw.Elapsed}");
+
+        // A 1.4 copy waits; "Sync now" in the app answers it with the sync's first reads.
+        sw.Restart();
+        var held = Ask("v=1.4&p=3&wait=20&a=" + Uri.EscapeDataString("http://127.0.0.1:8787"));
+        await Task.Delay(300);
+        Assert.False(held.IsCompleted);
+        Assert.True((await PostAsync(site, "/api/v2/canvas", """{"sync":true}""")).IsSuccessStatusCode);
+        var work = JsonNode.Parse(await (await held.WaitAsync(TimeSpan.FromSeconds(10))).Content.ReadAsStringAsync())!;
+        Assert.NotEmpty(work["jobs"]!.AsArray());
+        Assert.Equal(3, work["p"]!.GetValue<int>());
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5), $"took {sw.Elapsed}");
     }
 }

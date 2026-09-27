@@ -1,17 +1,34 @@
 <!-- An assignment's detail (design 09/10): meta, title, tiles, instructions, rubric and submission, under a floating
-     glass toolbar. Draws no outer padding or window — the library window's detail column gives the frame. -->
+     glass toolbar. Draws no outer padding or window — the library window's detail column gives the frame. In the
+     library window ("inwindow") the toolbar lives in the window's title bar instead, so the page starts higher. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacAssignment"
              x:DataType="vm:AssignmentModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
+    <Style Selector="StackPanel.page">
+      <Setter Property="Margin" Value="56,80,56,48" />
+    </Style>
+    <Style Selector="Border#TopFade">
+      <Setter Property="Height" Value="72" />
+    </Style>
+    <Style Selector="v|MacAssignment.inwindow StackPanel.page">
+      <Setter Property="Margin" Value="56,28,56,48" />
+    </Style>
+    <Style Selector="v|MacAssignment.inwindow StackPanel.toolbar">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="v|MacAssignment.inwindow Border#TopFade">
+      <Setter Property="Height" Value="20" />
+    </Style>
   </UserControl.Styles>
   <Panel ClipToBounds="True">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-      <StackPanel MaxWidth="600" Margin="56,80,56,48" Spacing="12" HorizontalAlignment="Left">
+      <StackPanel Classes="page" MaxWidth="600" Spacing="12" HorizontalAlignment="Left">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
           <TextBlock Classes="cv-meta" Text="{Binding Meta}" />
@@ -96,10 +113,10 @@
       </StackPanel>
     </ScrollViewer>
 
-    <Border x:Name="TopFade" Height="72" VerticalAlignment="Top" IsHitTestVisible="False" />
+    <Border x:Name="TopFade" VerticalAlignment="Top" IsHitTestVisible="False" />
     <Border x:Name="BottomFade" Height="72" VerticalAlignment="Bottom" IsHitTestVisible="False" />
 
-    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,14,0">
+    <StackPanel Classes="toolbar" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,14,0">
       <Button Classes="cv-toolbtn" Command="{Binding OpenInCanvasCommand}">
         <StackPanel Orientation="Horizontal" Spacing="6">
           <c:Icon Glyph="open_in_new" Size="16" />

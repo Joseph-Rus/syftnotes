@@ -105,6 +105,40 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
     public Task<CanvasApi.ExtensionKey?> ExtensionAsync(CancellationToken stop = default) =>
         SendAsync<CanvasApi.ExtensionKey>(HttpMethod.Get, canvasRoot + "/extension", null, stop);
 
+    /// <summary>The library runs on this computer (the app reaches it at 127.0.0.1): then the extension folder it keeps
+    /// is this computer's too.</summary>
+    public bool LibraryHere =>
+        Uri.TryCreate(ServerUrl, UriKind.Absolute, out var u) && (u.IsLoopback || u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// "Add to Chrome"'s one question: is a Chrome with the extension talking to the library, and which folder does
+    /// Chrome load it from on this computer. A library that says (<c>"extension": {"connected", "folder", "version"}</c>
+    /// in GET canvas) is taken at its word, its folder used only when the library is on this computer. An older one
+    /// is read the old way: connected once the extension has ever checked in, and the folder made here by
+    /// <paramref name="prepare"/> (key, Canvas address) from GET canvas/extension, pointing at this library as this
+    /// computer reaches it. Without <paramref name="prepare"/> nothing is written and a laptop's folder stays null.
+    /// Null for a library too old to have GET canvas at all.
+    /// </summary>
+    public async Task<CanvasApi.ExtensionStatus?> ExtensionStatusAsync(Func<string, string, string>? prepare = null, CancellationToken stop = default)
+    {
+        var o = await SendAsync<JsonObject>(HttpMethod.Get, canvasRoot, null, stop);
+        if (o is null) return null;
+        var ext = o["extension"] as JsonObject;
+        bool? said = ext?["connected"] is JsonValue c && c.TryGetValue(out bool on) ? on : null;
+        // The library keeps its own folder ready (folder_ready); one that isn't ready yet is made here instead.
+        bool ready = ext?["folder_ready"] is not JsonValue r || !r.TryGetValue(out bool isReady) || isReady;
+        string? folder = said is not null && LibraryHere && ready ? Text(ext!["folder"]) : null;
+        if (string.IsNullOrEmpty(folder) && prepare is not null && await ExtensionAsync(stop) is { } made) folder = prepare(made.Key, made.Canvas);
+        return new CanvasApi.ExtensionStatus
+        {
+            Connected = said ?? Text(o["extension_seen"]) is { Length: > 0 },
+            Folder = string.IsNullOrEmpty(folder) ? null : folder,
+            Version = said is not null ? Text(ext!["version"]) : Text(o["extension_version"]),
+        };
+    }
+
+    static string? Text(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s : null;
+
     public Task<CanvasApi.Overview?> FindCoursesAsync(CancellationToken stop = default) =>
         SendAsync<CanvasApi.Overview>(HttpMethod.Post, canvasRoot + "/courses", null, stop);
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json.Nodes;
 using StudyStash.Core.Canvas;
@@ -342,4 +343,108 @@ public class CanvasSyncTests
         Assert.Empty(s.Changes);
         Assert.Equal("", s.Error);
     }
+
+    // --- the extension waits for work (protocol 3) --------------------------------------------------------------
+
+    /// <summary>A library that has just synced CS 101: nothing is due, so a request for work finds nothing.</summary>
+    static CanvasSync Quiet(TempDir dir)
+    {
+        var sync = FakeCanvas.Library(dir, () => FakeCanvas.DesignNow);
+        CanvasSettings.Update(dir.Path, s => s.LastSync = FakeCanvas.DesignNow.ToString("o", System.Globalization.CultureInfo.InvariantCulture));
+        Assert.Empty(sync.Work(false).Jobs);
+        return sync;
+    }
+
+    static readonly TimeSpan Long = TimeSpan.FromSeconds(20);
+
+    [Fact]
+    public async Task Work_that_is_there_is_handed_over_at_once()
+    {
+        using var dir = new TempDir();
+        var sync = FakeCanvas.Library(dir, () => FakeCanvas.DesignNow); // never synced: a sync is due
+        var sw = Stopwatch.StartNew();
+        var work = await sync.WorkAsync(false, "1.4", 3, "http://127.0.0.1:8787", Long);
+        Assert.NotEmpty(work.Jobs);
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(2), $"took {sw.Elapsed}");
+    }
+
+    [Fact]
+    public async Task A_waiting_extension_gets_an_ai_s_read_as_soon_as_it_is_queued()
+    {
+        using var dir = new TempDir();
+        var sync = Quiet(dir);
+        var sw = Stopwatch.StartNew();
+        var waiting = sync.WorkAsync(false, "1.4", 3, "http://127.0.0.1:8787", Long);
+        await Task.Delay(300);
+        Assert.False(waiting.IsCompleted); // nothing to do: the request is held
+        var read = sync.FetchAsync("/api/v1/courses", "json", timeout: TimeSpan.FromSeconds(10));
+        var work = await waiting.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(3), $"took {sw.Elapsed}");
+        var job = Assert.Single(work.Jobs);
+        Assert.Equal(FakeCanvas.Base + "/api/v1/courses", job.Url);
+
+        sync.Results([new CanvasResult(job.Id, 200, "", "[]", "", "", "")]);
+        Assert.Equal("[]", S((await read)["json"]));
+    }
+
+    [Fact]
+    public async Task A_sync_asked_for_wakes_a_waiting_extension()
+    {
+        using var dir = new TempDir();
+        var sync = Quiet(dir);
+        var waiting = sync.WorkAsync(false, "1.4", 3, "", Long);
+        await Task.Delay(300);
+        Assert.False(waiting.IsCompleted);
+        CanvasSettings.Update(dir.Path, s => s.SyncNow = true);
+        sync.Nudge();
+        Assert.NotEmpty((await waiting.WaitAsync(TimeSpan.FromSeconds(5))).Jobs);
+    }
+
+    [Fact]
+    public async Task With_nothing_to_do_it_answers_empty_when_the_wait_is_over()
+    {
+        using var dir = new TempDir();
+        var sync = Quiet(dir);
+        sync.LookAgainEvery = TimeSpan.FromMilliseconds(200);
+        var sw = Stopwatch.StartNew();
+        var work = await sync.WorkAsync(false, "1.4", 3, "", TimeSpan.FromSeconds(1));
+        Assert.Empty(work.Jobs);
+        Assert.InRange(sw.Elapsed, TimeSpan.FromSeconds(0.9), TimeSpan.FromSeconds(4));
+
+        // A request that goes away (or a library that stops) lets go at once.
+        using var gone = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
+        sw.Restart();
+        Assert.Empty((await sync.WorkAsync(false, "1.4", 3, "", Long, gone.Token)).Jobs);
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(3), $"took {sw.Elapsed}");
+
+        // Never longer than Chrome waits for an answer, whatever the extension asks for.
+        Assert.True(CanvasSync.LongestWait < TimeSpan.FromSeconds(30));
+    }
+
+    [Fact]
+    public async Task An_older_extension_is_answered_at_once()
+    {
+        using var dir = new TempDir();
+        var sync = Quiet(dir);
+        var sw = Stopwatch.StartNew();
+        Assert.Empty((await sync.WorkAsync(false, "1.3", 2, null, Long)).Jobs);
+        Assert.Empty((await sync.WorkAsync(false, "1.4", 3, "", TimeSpan.Zero)).Jobs); // one that doesn't say it will wait
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(1), $"took {sw.Elapsed}");
+    }
+
+    [Fact]
+    public async Task A_read_an_old_copy_took_goes_out_again_when_the_new_copy_starts()
+    {
+        using var dir = new TempDir();
+        var sync = Quiet(dir);
+        var read = sync.FetchAsync("/api/v1/courses", "json", timeout: TimeSpan.FromSeconds(10));
+        var taken = Assert.Single(sync.Work(false).Jobs);
+        Assert.Empty(sync.Work(false).Jobs);
+        // The copy that took it reloaded (a new folder) and asks afresh, with force: the read is handed out again.
+        var again = Assert.Single((await sync.WorkAsync(true, "1.4", 3, "", Long)).Jobs, j => j.Id == taken.Id);
+        sync.Results([new CanvasResult(again.Id, 200, "", "[]", "", "", "")]);
+        Assert.Equal("[]", S((await read)["json"]));
+    }
+
+    static string S(JsonNode? v) => v is JsonValue j && j.TryGetValue(out string? s) ? s : "";
 }

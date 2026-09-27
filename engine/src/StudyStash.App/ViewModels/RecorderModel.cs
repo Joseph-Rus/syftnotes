@@ -35,8 +35,9 @@ public sealed partial class ChatMessage : ObservableObject
 }
 
 /// <summary>
-/// The floating recorder: a pill with the time, the waveform, the class, Pause and Stop; expanded, the transcript
-/// as it comes in, fading upward, and a chat about the lecture so far (with any engine).
+/// The floating recorder: while it's small, a tiny pill that only says it's recording (the red dot, the time and a
+/// small level meter; the pointer over it swaps the meter for Stop, and a click opens it); open, the class, Pause and
+/// Stop, the transcript as it comes in, fading upward, and a chat about the lecture so far (with any engine).
 /// </summary>
 public sealed partial class RecorderModel : ObservableObject
 {
@@ -46,6 +47,8 @@ public sealed partial class RecorderModel : ObservableObject
     [ObservableProperty] public partial bool IsPaused { get; set; }
     [ObservableProperty] public partial IReadOnlyList<double>? Levels { get; set; }
     [ObservableProperty] public partial bool Expanded { get; set; }
+    /// <summary>The pointer is over the small pill: Stop takes the level meter's place.</summary>
+    [ObservableProperty] public partial bool Hovered { get; set; }
     /// <summary>Whisper hasn't anything yet: what the transcript area says instead.</summary>
     [ObservableProperty] public partial string Waiting { get; set; } = "What's said shows here a few seconds after it's said.";
 
@@ -54,6 +57,9 @@ public sealed partial class RecorderModel : ObservableObject
     [ObservableProperty] public partial AiAskModel? Ask { get; set; }
 
     public bool IsRunning => !IsPaused;
+    /// <summary>The pill's last slot: the level meter while recording, a pause mark while paused, Stop under the pointer.</summary>
+    public bool ShowMeter => IsRunning && !Hovered;
+    public bool ShowPausedMark => IsPaused && !Hovered;
     public string PauseGlyph => IsPaused ? "play_arrow" : "pause";
     public string PauseTip => IsPaused ? "Resume" : "Pause";
     public bool NoLines => Lines.Count == 0;
@@ -67,11 +73,19 @@ public sealed partial class RecorderModel : ObservableObject
     partial void OnIsPausedChanged(bool value)
     {
         OnPropertyChanged(nameof(IsRunning));
+        OnPropertyChanged(nameof(ShowMeter));
+        OnPropertyChanged(nameof(ShowPausedMark));
         OnPropertyChanged(nameof(PauseGlyph));
         OnPropertyChanged(nameof(PauseTip));
     }
 
     partial void OnClassNameChanged(string value) => OnPropertyChanged(nameof(DisplayClass));
+
+    partial void OnHoveredChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowMeter));
+        OnPropertyChanged(nameof(ShowPausedMark));
+    }
 
     public Action? OnPause { get; set; }
     public Action? OnStop { get; set; }
@@ -84,6 +98,7 @@ public sealed partial class RecorderModel : ObservableObject
     void Toggle()
     {
         Expanded = !Expanded;
+        Hovered = false;
         OnExpand?.Invoke(Expanded);
     }
 }

@@ -11,6 +11,7 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using SkiaSharp;
 using StudyStash.App.Controls;
+using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 
@@ -230,6 +231,21 @@ public class SurfaceShots
                 new MacPanel { DataContext = Demo.Panel(recording: true), VerticalAlignment = VerticalAlignment.Top }));
     }
 
+    /// <summary>A library-only computer's dropdown: the library's state instead of Record.</summary>
+    [AvaloniaFact]
+    public void Mac_dropdown_library()
+    {
+        foreach (var t in Themes)
+            Shot.Take("mac-01-dropdown-library", SkinKind.Mac, t, () => new MacPanel { DataContext = Demo.LibraryPanel(), VerticalAlignment = VerticalAlignment.Top });
+    }
+
+    [AvaloniaFact]
+    public void Win_flyout_library()
+    {
+        foreach (var t in Themes)
+            Shot.Take("win-01-dropdown-library", SkinKind.Win, t, () => OverTaskbar(new WinPanel { DataContext = Demo.LibraryPanel(), VerticalAlignment = VerticalAlignment.Top }, false, "12:34", "25/09/2026"));
+    }
+
     /// <summary>Windows-only, shots-only: a flyout/recorder mockup sits over a taskbar strip in the design's
     /// pictures for context (not part of the app) — <see cref="TaskbarStrip"/> right-aligned under it.</summary>
     static StackPanel OverTaskbar(Control surface, bool recording, string time, string date) => new()
@@ -253,7 +269,7 @@ public class SurfaceShots
     /// </summary>
     static Border TaskbarStrip(bool recording, string time, string date)
     {
-        var appButton = new Border { Width = 36, Height = 40, CornerRadius = new CornerRadius(4), Child = TaskbarIcon("graphic_eq", 19, "Fg") };
+        var appButton = new Border { Width = 36, Height = 40, CornerRadius = new CornerRadius(4), Child = new AppIcon { Width = 22, Height = 22 } };
         appButton.Bind(Border.BackgroundProperty, appButton.GetResourceObservable("Subtle2"));
         if (recording)
         {
@@ -264,7 +280,7 @@ public class SurfaceShots
                 Width = 8, Height = 8, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Color.Parse("#E5484D")),
                 HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 4, 6),
             };
-            appButton.Child = new Panel { Children = { TaskbarIcon("graphic_eq", 19, "Fg"), ring, dot } };
+            appButton.Child = new Panel { Children = { new AppIcon { Width = 22, Height = 22 }, ring, dot } };
         }
 
         var icons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Margin = new Thickness(10, 0), VerticalAlignment = VerticalAlignment.Center };
@@ -314,8 +330,7 @@ public class SurfaceShots
         var gridButton = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(4), Child = grid };
         var searchButton = new Border { Width = 40, Height = 40, CornerRadius = new CornerRadius(4), Child = TaskbarIcon("search", 20, "Fg2") };
 
-        var accentIcon = new Border { Width = 22, Height = 22, CornerRadius = new CornerRadius(5), Child = TaskbarIcon("graphic_eq", 15, "OnAccent") };
-        accentIcon.Bind(Border.BackgroundProperty, accentIcon.GetResourceObservable("Accent"));
+        var accentIcon = new AppIcon { Width = 22, Height = 22 };
         var track = new Border { Width = 28, Height = 3, CornerRadius = new CornerRadius(2) };
         track.Bind(Border.BackgroundProperty, track.GetResourceObservable("Fg3"));
         var fill = new Border { Width = 28 * 0.42, Height = 3, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.Parse("#4CAF50")), HorizontalAlignment = HorizontalAlignment.Left };
@@ -348,6 +363,10 @@ public class SurfaceShots
     {
         var pills = new StackPanel { Spacing = 32, VerticalAlignment = VerticalAlignment.Top };
         pills.Children.Add(view(Demo.Recorder()));
+        // The pointer over it: Stop in the level meter's place.
+        var hovered = Demo.Recorder();
+        hovered.Hovered = true;
+        pills.Children.Add(view(hovered));
         pills.Children.Add(view(Demo.Recorder(paused: true)));
         if (extra is not null) pills.Children.Add(extra);
         return Shot.Side(pills, view(Demo.Recorder(expanded: true)));
@@ -423,21 +442,87 @@ public class SurfaceShots
         foreach (var t in Themes) Shot.Take("win-05-setup", SkinKind.Win, t, () => new WinSetup { DataContext = Demo.Setup(SkinKind.Win), DrawChrome = true });
     }
 
-    /// <summary>The steps the design doesn't show, in both looks.</summary>
+    /// <summary>Every page of both setups, the library's and the laptop's, in both looks, light and dark (plus the
+    /// welcome a build with no installer role shows): "mac-05-setup-library-password-light.png" and so on.</summary>
     [AvaloniaFact]
-    public void Setup_steps()
+    public async Task Setup_steps()
     {
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
-            foreach (var step in new[] { SetupStep.Microphone, SetupStep.Library, SetupStep.Classes })
-                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-05-setup-{step.ToString().ToLowerInvariant()}", skin, ThemeVariant.Light, () =>
+        {
+            string look = skin == SkinKind.Mac ? "mac" : "win";
+            foreach (var role in new[] { AppRole.Library, AppRole.Laptop })
+                foreach (var step in SetupModel.StepsFor(role, skin))
                 {
-                    var m = SetupModel.For(skin);
-                    m.Go(step);
-                    m.Address = "http://mac-mini:8787";
-                    m.Classes.Add(new SetupClass { Name = "CS 101", When = "Tue Thu 10:00–11:15", Dot = Skin.ClassDot(0) });
-                    m.Classes.Add(new SetupClass { Name = "BIO 110", When = "Tue 11:00–12:30", Dot = Skin.ClassDot(1) });
-                    return skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true };
-                });
+                    var m = await SetupPage(skin, role, step);
+                    var size = step switch { SetupStep.Canvas => new Size(1100, 928), SetupStep.Ai => new Size(1100, 808), _ => new Size(850, 608) };
+                    string name = $"{look}-05-setup-{(role == AppRole.Library ? "library" : "laptop")}-{step.ToString().ToLowerInvariant()}";
+                    foreach (var t in Themes)
+                        Shot.Take(name, skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
+                            size: size);
+                }
+            // Canvas once Chrome is connected and the courses are found, and Classes made from those courses.
+            foreach (var (step, what) in new[] { (SetupStep.Canvas, "canvas-found"), (SetupStep.Classes, "classes-canvas") })
+            {
+                var m = await SetupPage(skin, AppRole.Laptop, step, canvasFound: true);
+                var size = step == SetupStep.Canvas ? new Size(1100, 928) : new Size(850, 768);
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-laptop-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
+                        size: size);
+            }
+            // Setup run again on the library: it keeps its name, password and notes folder.
+            var again = await SetupPage(skin, AppRole.Library, SetupStep.Password);
+            again.ExistingLibrary = true;
+            again.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Lecture notes");
+            foreach (var t in Themes)
+                Shot.Take($"{look}-05-setup-library-password-existing", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = again, DrawChrome = true } : new WinSetup { DataContext = again, DrawChrome = true },
+                    size: new Size(850, 608));
+            var ask = SetupModel.For(skin);
+            ask.ChooseLibraryCommand.Execute(null);
+            foreach (var t in Themes)
+                Shot.Take($"{look}-05-setup-welcome-ask", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = ask, DrawChrome = true } : new WinSetup { DataContext = ask, DrawChrome = true },
+                    size: new Size(850, 608));
+        }
+    }
+
+    /// <summary>One page of a setup, filled in the way a student would have it by then.</summary>
+    static async Task<SetupModel> SetupPage(SkinKind skin, AppRole role, SetupStep step, bool canvasFound = false)
+    {
+        var m = SetupModel.For(skin, role);
+        m.LibraryName = "Ada's library";
+        m.Password = "correct-horse";
+        m.Address = "http://mac-mini:8787";
+        m.Classes.Add(new SetupClass { Name = "CS 101", When = "Tue Thu 10:00–11:15", Dot = Skin.ClassDot(0) });
+        m.Classes.Add(new SetupClass { Name = "BIO 110", When = "Tue 11:00–12:30", Dot = Skin.ClassDot(1) });
+        m.ModelProgress = 0.62;
+        m.ModelDone = "1.9 GB of 3.1 GB";
+        m.ModelLeft = "About 4 minutes left";
+        m.Addresses.Add(new SetupAddress("At home", "http://mac-mini.local:8787"));
+        m.Addresses.Add(new SetupAddress("With Tailscale", "http://mac-mini.example.ts.net:8787"));
+        m.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Study Stash");
+        if (step > SetupStep.Library)
+        {
+            m.LibraryOk = true;
+            m.LibraryResult = role == AppRole.Laptop ? "Connected to Ada's library." : $"Ada's library is ready on this {m.DeviceWord}.";
+        }
+        if (step == SetupStep.Ai) m.Ai = AiDemo.Setup();
+        if (step == SetupStep.Canvas || canvasFound)
+        {
+            // Setup's own Canvas: Add to Chrome pressed and waiting for Chrome, or everything done and the courses found.
+            m.Canvas = await CanvasShots.SetupStepAsync(canvasFound ? "found" : "waiting");
+            m.Canvas.StepLabel = "";
+            m.Canvas.ShowFooter = false;
+        }
+        if (canvasFound && step == SetupStep.Classes)
+        {
+            m.Classes.Clear();
+            m.Classes.Add(new SetupClass { Name = "Chapel", When = "Wed 10:00–10:50", Dot = Skin.ClassDot(4) });
+            m.Courses[0].When = "Tue Thu 11:00–12:30";
+            m.Courses[1].When = "MWF 9:00–9:50";
+            m.Courses[3].When = "Tue Thu 10:00–11:15";
+            m.Courses[4].Ticked = false;
+        }
+        m.Go(step);
+        return m;
     }
 
     /// <summary>The idle dropdown (or flyout) in every colour theme, five to a row: each cell gets its own theme's
@@ -480,14 +565,18 @@ public class SurfaceShots
     {
         string home = Path.Combine(Path.GetTempPath(), "studystash-settings-" + Guid.NewGuid().ToString("N"));
         var host = new Services.AppHost(home);
-        var model = Services.SettingsModel.Make(host);
+        // The library's own pages read the design's example library (Sam's, on a Mac mini); "Unreachable" shows the
+        // Library page when it doesn't answer.
+        var library = new FakeLibrarySettings { Down = section == "Unreachable" };
+        if (section == "Unreachable") section = "Library";
+        var model = Services.SettingsModel.Make(host, library: () => library.Call);
         model.Section = section;
         return (model, host, home);
     }
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance" })
+        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Notes", "Folders", "Unreachable" })
         {
             var (model, host, home) = MakeSettings(section);
             try
@@ -510,4 +599,56 @@ public class SurfaceShots
 
     [AvaloniaFact]
     public void Win_settings() => SettingsShots(SkinKind.Win, new Size(1700, 988));
+
+    /// <summary>The dropdown's class picker as Shell builds it (drawn in place here: a real one is a popup window).</summary>
+    internal static ContextMenu ClassMenu()
+    {
+        var menu = ClassPicker.Build([("CS 101", 0), ("BIO 110", 1), ("CALC II", 2), ("HIST 210", 3)], null, _ => { });
+        menu.VerticalAlignment = VerticalAlignment.Top;
+        return menu;
+    }
+
+    [AvaloniaFact]
+    public void Class_menu()
+    {
+        foreach (var t in Themes)
+        {
+            Shot.Take("mac-01-dropdown-menu", SkinKind.Mac, t, () => Shot.Side(
+                new MacPanel { DataContext = Demo.Panel(recording: false), VerticalAlignment = VerticalAlignment.Top },
+                new Border { Margin = new Thickness(-80, 72, 0, 0), Child = ClassMenu() }));
+            Shot.Take("win-01-flyout-menu", SkinKind.Win, t, () => Shot.Side(
+                new WinPanel { DataContext = Demo.Panel(recording: false), VerticalAlignment = VerticalAlignment.Top },
+                new Border { Margin = new Thickness(-80, 72, 0, 0), Child = ClassMenu() }));
+        }
+    }
+
+    /// <summary>Notifications: the plain ones the app says (one line, two, with a button, with words too long to fit)
+    /// and a stack of Canvas ones, the freshest with its buttons.</summary>
+    static StackPanel Toasts()
+    {
+        var plain = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
+        plain.Children.Add(new ToastView { Title = "Filed in CS 101", Text = "Recursion and the call stack" , ActionLabel = "Open" });
+        plain.Children.Add(new ToastView { Title = "Recording saved", Text = "Study Stash is writing it down; the library files it and writes your notes." });
+        plain.Children.Add(new ToastView { Title = "The model isn't downloaded yet", Text = "Download it in Settings → Recording.", ActionLabel = "Settings" });
+        plain.Children.Add(new ToastView
+        {
+            Title = "Your library didn't answer, and this title is far too long to fit on one line",
+            Text = "Study Stash keeps the recording here and sends it when the library is back. It tries again every few minutes, so there's nothing to do.",
+        });
+        var canvas = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
+        foreach (var toast in CanvasShots.ToastGallery()) canvas.Children.Add(ToastView.For(toast));
+        return Shot.Side(plain, canvas);
+    }
+
+    [AvaloniaFact]
+    public void Mac_toast()
+    {
+        foreach (var t in Themes) Shot.Take("mac-12-toast", SkinKind.Mac, t, Toasts, size: new Size(1000, 560));
+    }
+
+    [AvaloniaFact]
+    public void Win_toast()
+    {
+        foreach (var t in Themes) Shot.Take("win-12-toast", SkinKind.Win, t, Toasts, size: new Size(1000, 620));
+    }
 }

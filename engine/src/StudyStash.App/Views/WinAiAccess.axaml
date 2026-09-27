@@ -101,9 +101,9 @@
               <TextBlock Text="Other…" FontSize="14" />
               <Button.Flyout>
                 <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}">
-                  <MenuItem Classes="ai-item" Header="Claude Desktop: add it for me" Command="{Binding AddClaudeDesktopCommand}" />
-                  <MenuItem Classes="ai-item" Header="Claude on the web: turn on its address" Command="{Binding TurnOnClaudeWebCommand}" />
-                  <MenuItem Classes="ai-item" Header="Another tool: copy the JSON" Command="{Binding CopyOtherCommand}" />
+                  <MenuItem Theme="{StaticResource AiMenuItem}" Header="Claude Desktop: add it for me" Command="{Binding AddClaudeDesktopCommand}" />
+                  <MenuItem Theme="{StaticResource AiMenuItem}" Header="Claude on the web: turn on its address" Command="{Binding TurnOnClaudeWebCommand}" />
+                  <MenuItem Theme="{StaticResource AiMenuItem}" Header="Another tool: copy the JSON" Command="{Binding CopyOtherCommand}" />
                 </MenuFlyout>
               </Button.Flyout>
             </Button>

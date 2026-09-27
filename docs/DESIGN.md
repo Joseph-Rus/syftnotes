@@ -48,8 +48,7 @@ laptop                                          library (a Mac mini, say — any
 
 ## Files
 
-Everything lives under one home folder (`~/.study-stash`, `--home`, or `STUDYSTASH_HOME`; an
-install from before that folder was renamed keeps using `~/.granola-share` instead):
+Everything lives under one home folder (`~/.study-stash`, `--home`, or `STUDYSTASH_HOME`):
 
 | File | What |
 |---|---|
@@ -65,8 +64,8 @@ install from before that folder was renamed keeps using `~/.granola-share` inste
 
 The library installs itself as this computer's own background service — `com.study-stash.server`
 on a Mac (launchd), the Windows Startup folder, or systemd `--user` on Linux — so it comes back
-after a restart. Setting it up first removes any service from before the rename (`com.granola-share.*`),
-so only one library ever runs on a computer.
+after a restart. Setting it up again stops the copy already running first, so only one library ever
+runs on a computer.
 
 ## Installers and updates
 

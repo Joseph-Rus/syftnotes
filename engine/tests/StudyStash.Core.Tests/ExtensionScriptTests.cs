@@ -43,7 +43,8 @@ public class ExtensionScriptTests
         }
     }
 
-    /// <summary>background.js in a Jint engine, with importScripts, chrome.*, fetch, btoa, URL and setTimeout stood in for.</summary>
+    /// <summary>background.js (with connection.js) in a Jint engine, with importScripts, chrome.* (runtime, alarms,
+    /// storage, action), fetch, btoa, URL and setTimeout stood in for.</summary>
     public sealed class Worker
     {
         readonly Jint.Engine js;
@@ -52,29 +53,58 @@ public class ExtensionScriptTests
         /// <summary>Every fetch the script made: address, method and body.</summary>
         public List<(string Url, string Method, string Body)> Fetched { get; } = [];
 
+        public const string DefaultConfig = $$"""{"app":"{{Library}}","key":"k3y","canvas":"{{Canvas}}","files":["*.inscloudgate.net"],"protocol":3}""";
+        public static readonly string[] Hosts = [Canvas + "/*", "https://*.inscloudgate.net/*", Library + "/*"];
+
         /// <param name="running">The version Chrome is running.</param>
         /// <param name="onDisk">The version in the extension's folder (what chrome.runtime.getURL('manifest.json') reads).</param>
-        /// <param name="config">config.js's STUDY_STASH; Prepare's by default.</param>
-        public Worker(string running = "1.3", string? onDisk = null, string? config = null)
+        /// <param name="config">config.json in the folder (Ensure's by default); null for none.</param>
+        /// <param name="stored">chrome.storage.local's connection (a store copy's), as JSON; null for none.</param>
+        /// <param name="legacy">A folder from before 1.4: config.js's STUDY_STASH, as JSON; null when there's no config.js.</param>
+        /// <param name="runningHosts">The host permissions Chrome is running with; <paramref name="diskHosts"/>, the folder's.</param>
+        /// <param name="granted">What chrome.permissions.contains answers: whether the student allowed a store copy's sites.</param>
+        public Worker(string running = "1.4", string? onDisk = null, string? config = DefaultConfig, string? stored = null, string? legacy = null,
+            string[]? runningHosts = null, string[]? diskHosts = null, bool granted = true)
         {
-            config ??= $$"""{"app":"{{Library}}","key":"k3y","canvas":"{{Canvas}}","files":["*.inscloudgate.net"],"protocol":2}""";
-            Route("chrome-extension://study-stash/manifest.json", _ => new FakeResponse { Body = $$"""{"version":"{{onDisk ?? running}}"}""" });
+            runningHosts ??= Hosts;
+            Route("chrome-extension://study-stash/manifest.json", _ => new FakeResponse
+            {
+                Body = new JsonObject { ["version"] = onDisk ?? running, ["host_permissions"] = new JsonArray((diskHosts ?? runningHosts).Select(h => (JsonNode)h).ToArray()) }.ToJsonString(),
+            });
+            if (config is not null) Route("chrome-extension://study-stash/config.json", Json(config));
             js = new Jint.Engine(o => o.TimeoutInterval(TimeSpan.FromSeconds(20)));
             js.SetValue("__net", this);
             js.SetValue("btoa", new Func<string, string>(s => Convert.ToBase64String(Encoding.Latin1.GetBytes(s))));
+            js.SetValue("atob", new Func<string, string>(s => Encoding.Latin1.GetString(Convert.FromBase64String(s))));
             js.Execute($$$"""
-                var __config = {{{config}}};
+                var __legacy = {{{legacy ?? "null"}}};
                 var __reloads = 0;
-                function importScripts(name) { if (name === 'config.js') globalThis.STUDY_STASH = __config; }
+                var __granted = {{{(granted ? "true" : "false")}}}, __checked = [];
+                var __badge = '', __title = 'Study Stash';
+                function importScripts(name) {
+                  if (name === 'connection.js') return; // already run, below
+                  if (name === 'config.js' && __legacy) { globalThis.STUDY_STASH = __legacy; return; }
+                  throw new Error('NetworkError: Failed to execute importScripts: ' + name);
+                }
                 const listeners = {addListener() {}};
+                function area(items) {
+                  return {
+                    items,
+                    get: async key => (key in items ? {[key]: JSON.parse(JSON.stringify(items[key]))} : {}),
+                    set: async o => { for (const k in o) items[k] = JSON.parse(JSON.stringify(o[k])); },
+                  };
+                }
                 var chrome = {
                   runtime: {
-                    getManifest: () => ({version: '{{{running}}}'}),
+                    getManifest: () => ({version: '{{{running}}}', host_permissions: {{{JsonSerializer.Serialize(runningHosts)}}}}),
                     getURL: p => 'chrome-extension://study-stash/' + p,
                     reload: () => { __reloads++; },
                     onInstalled: listeners, onStartup: listeners, onMessage: listeners,
                   },
                   alarms: {create() {}, onAlarm: listeners},
+                  permissions: {contains: async o => { __checked.push(o.origins); return __granted; }, onAdded: listeners},
+                  storage: {local: area({{{(stored is null ? "{}" : $"{{connection: {stored}}}")}}}), session: area({})},
+                  action: {setBadgeText: async o => { __badge = o.text; }, setTitle: async o => { __title = o.title; }},
                 };
                 function setTimeout(f) { f(); return 0; }
                 function URL(u) {
@@ -100,8 +130,17 @@ public class ExtensionScriptTests
                   };
                 }
                 """);
-            using var script = typeof(Extension).Assembly.GetManifestResourceStream("extension/background.js")!;
-            js.Execute(new StreamReader(script).ReadToEnd());
+            js.Execute(Source("connection.js"));
+            js.Execute(Source("background.js"));
+            // What a round of the pump does first: read the connection. Tests of run() start from there.
+            Eval("(async () => { conn = await loadConnection(); })()");
+            Fetched.Clear();
+        }
+
+        static string Source(string name)
+        {
+            using var script = typeof(Extension).Assembly.GetManifestResourceStream("extension/" + name)!;
+            return new StreamReader(script).ReadToEnd();
         }
 
         /// <summary>Answer an address (exactly, or without its query) like this.</summary>
@@ -135,6 +174,20 @@ public class ExtensionScriptTests
         public bool Allowed(string url) => Eval($"allowed({JsonSerializer.Serialize(url)})").AsBoolean();
 
         public int Reloads => (int)js.Evaluate("__reloads").AsNumber();
+
+        /// <summary>Each list of sites the script asked Chrome whether it may reach (chrome.permissions.contains).</summary>
+        public List<string[]> Checked =>
+            JsonNode.Parse(js.Evaluate("JSON.stringify(__checked)").AsString())!.AsArray().Select(a => a!.AsArray().Select(o => o!.GetValue<string>()).ToArray()).ToList();
+
+        /// <summary>The toolbar button's badge and title.</summary>
+        public (string Badge, string Title) Button => (js.Evaluate("__badge").AsString(), js.Evaluate("__title").AsString());
+
+        /// <summary>What the script keeps in chrome.storage.local (or .session), as JSON.</summary>
+        public JsonNode? Stored(string key, string area = "local") =>
+            JsonNode.Parse(js.Evaluate($"JSON.stringify(chrome.storage.{area}.items[{JsonSerializer.Serialize(key)}] ?? null)").AsString());
+
+        /// <summary>The status the script told the popup ("ok", "no_config", …), or "" before any.</summary>
+        public string Status => Stored("status")?["state"]?.GetValue<string>() ?? "";
 
         /// <summary>The library's side of what the script sent: the work it asked for and the results it posted.</summary>
         public List<string> Asks => Fetched.Where(f => f.Url.StartsWith(Library + "/api/v2/canvas/work", StringComparison.Ordinal)).Select(f => f.Url).ToList();
@@ -301,46 +354,209 @@ public class ExtensionScriptTests
         Assert.Equal("TypeError: Failed to fetch", S(new Worker().Route(Canvas + "/api/v1/courses", new FakeResponse { Throws = true }).Run(Canvas + "/api/v1/courses"), "error"));
     }
 
-    /// <summary>A library that hands out one batch of jobs, then nothing; results answer with <paramref name="results"/>.</summary>
-    static Worker WithLibrary(Worker w, JsonArray jobs, int results = 200)
+    /// <summary>A library (protocol 3) that hands out one batch of jobs, then nothing, then stops answering after
+    /// <paramref name="rounds"/> asks (so the pump, which keeps asking a library that waits, ends); results answer
+    /// with <paramref name="results"/>.</summary>
+    static Worker WithLibrary(Worker w, JsonArray jobs, int results = 200, int rounds = 2, int protocol = Extension.Protocol, bool hot = false)
     {
         int asked = 0;
-        return w.Route(Library + "/api/v2/canvas/work", _ => Json(new JsonObject
+        return w.Route(Library + "/api/v2/canvas/work", _ => ++asked > rounds ? new FakeResponse { Throws = true } : Json(new JsonObject
         {
-            ["jobs"] = asked++ == 0 ? jobs.DeepClone() : new JsonArray(), ["hot"] = false, ["ext"] = Extension.Version(), ["p"] = Extension.Protocol,
+            ["jobs"] = asked == 1 ? jobs.DeepClone() : new JsonArray(), ["hot"] = hot, ["ext"] = Extension.Version(), ["p"] = protocol,
         }.ToJsonString()))
             .Route(Library + "/api/v2/canvas/results", _ => Json("""{"ok":true}""", results));
     }
 
     static JsonObject Job(string id, string path, string kind) => new() { ["id"] = id, ["url"] = Canvas + path, ["kind"] = kind };
 
+    const string Ask = Library + "/api/v2/canvas/work?v=1.4&p=3&wait=20&a=http%3A%2F%2F127.0.0.1%3A8787";
+    /// <summary>A pump's first ask: answered at once, so its status is up to date straight away.</summary>
+    const string AskNow = Library + "/api/v2/canvas/work?v=1.4&p=3&wait=0&a=http%3A%2F%2F127.0.0.1%3A8787";
+
     [Fact]
-    public void It_says_its_version_and_protocol_and_posts_each_file_on_its_own()
+    public void It_waits_for_work_with_the_library_and_posts_each_file_on_its_own()
     {
         var w = WithLibrary(new Worker(), [Job("1", "/api/v1/courses/4201/modules", "json"), Job("2", "/files/555/download", "bytes"),
-            Job("3", "/api/v1/courses/4201/discussion_topics", "json"), Job("4", "/files/8801/download", "bytes")])
+            Job("3", "/api/v1/courses/4201/discussion_topics", "json"), Job("4", "/files/8801/download", "bytes")], rounds: 3)
             .Route(Canvas + "/api/v1/courses/4201/modules", Json("[]"))
             .Route(Canvas + "/api/v1/courses/4201/discussion_topics", Json("[]"))
             .Route(Canvas + "/files/555/download", new FakeResponse { Body = "%PDF-1.4 recursion slides" })
             .Route(Canvas + "/files/8801/download", new FakeResponse { Body = "%PDF-1.4 ps4 answers" });
         w.Eval("pump(true)");
 
-        Assert.Equal([$"{Library}/api/v2/canvas/work?v=1.3&p={Extension.Protocol}&force=1", $"{Library}/api/v2/canvas/work?v=1.3&p={Extension.Protocol}"], w.Asks);
+        // Its version, protocol 3, how long the library may hold the request (not at all the first time), and the
+        // library address it uses; a library that waits is asked again at once, until it stops answering.
+        Assert.Equal([AskNow + "&force=1", Ask, Ask, Ask], w.Asks);
         var posts = w.Posts.Select(p => string.Join(",", p.Select(r => S(r!.AsObject(), "id")))).ToList();
         Assert.Equal(["1,3", "2", "4"], posts); // the answers together, then one file per post
         Assert.All(w.Fetched.Where(f => f.Url.StartsWith(Library, StringComparison.Ordinal)), f => Assert.DoesNotContain("k3y", f.Url));
         Assert.Equal(0, w.Reloads);
         Assert.Equal(Extension.Protocol, (int)w.Eval("PROTOCOL").AsNumber());
+        Assert.Equal(3, Extension.Protocol);
+        // Each answer touches Chrome's session storage: that keeps the worker awake between requests.
+        Assert.NotNull(w.Stored("lastPoll", "session"));
+        Assert.False(w.Eval("running").AsBoolean()); // the 30-second alarm can pump again
+        Assert.Equal("library_unreachable", w.Status);
+    }
+
+    [Fact]
+    public void An_older_library_that_answers_at_once_is_asked_on_the_alarm_as_before()
+    {
+        var w = WithLibrary(new Worker(), [], protocol: 2, rounds: 10);
+        w.Eval("pump(false)");
+        Assert.Equal([AskNow], w.Asks); // nothing queued, nobody exploring: sleep until the alarm
+        Assert.Equal("ok", w.Status);
+
+        var hot = WithLibrary(new Worker(), [], protocol: 2, rounds: 3, hot: true);
+        hot.Eval("pump(false)");
+        Assert.Equal(4, hot.Asks.Count); // an agent is exploring: asks again shortly, until the library stops answering
+    }
+
+    [Fact]
+    public void It_reads_its_connection_from_config_json_first_then_storage_then_config_js()
+    {
+        string Other(string app) => $$"""{"app":"{{app}}","key":"k3y","canvas":"{{Canvas}}","files":["*.inscloudgate.net"],"protocol":3}""";
+        const string Stored = "http://mini.test:8787", Legacy = "http://old.test:8787";
+
+        var all = new Worker(stored: Other(Stored), legacy: Other(Legacy));
+        Assert.Equal(Library, all.Eval("conn.app").AsString());
+
+        var store = new Worker(config: null, stored: Other(Stored), legacy: Other(Legacy));
+        Assert.Equal(Stored, store.Eval("conn.app").AsString());
+
+        var old = new Worker(config: null, legacy: Other(Legacy));
+        Assert.Equal(Legacy, old.Eval("conn.app").AsString());
+        old.Route(Legacy + "/api/v2/canvas/work", new FakeResponse { Throws = true });
+        old.Eval("pump(false)");
+        Assert.StartsWith(Legacy + "/api/v2/canvas/work?v=1.4&p=3&wait=0&a=http%3A%2F%2Fold.test%3A8787", old.Fetched.Last().Url);
+    }
+
+    [Fact]
+    public void A_new_key_or_address_on_disk_is_used_on_the_next_round_without_a_reload()
+    {
+        const string moved = "http://mini.test:8787";
+        var w = WithLibrary(new Worker(), [], rounds: 1);
+        w.Eval("pump(false)");
+        w.Route("chrome-extension://study-stash/config.json", Json($$"""{"app":"{{moved}}","key":"n3w","canvas":"{{Canvas}}","files":["*.inscloudgate.net"],"protocol":3}"""));
+        w.Route(moved + "/api/v2/canvas/work", new FakeResponse { Throws = true });
+        w.Eval("pump(false)");
+        Assert.StartsWith(moved + "/api/v2/canvas/work?", w.Fetched.Last().Url);
+        Assert.Equal(0, w.Reloads);
+        Assert.Equal(("!", "Study Stash: Can't reach your library at mini.test:8787."), w.Button);
+    }
+
+    [Fact]
+    public void Without_any_connection_it_says_so_and_asks_nobody()
+    {
+        var w = new Worker(config: null); // no config.json, nothing stored, no config.js: importScripts('config.js') throws, and loading goes on
+        w.Eval("pump(true)");
+        Assert.Empty(w.Asks);
+        Assert.Equal("no_config", w.Status);
+        Assert.Equal("!", w.Button.Badge);
+        Assert.Contains("isn't connected to Study Stash", w.Button.Title);
+        // A job that somehow arrives is refused with a reason, never fetched.
+        Assert.Equal("refused: Study Stash has no Canvas address yet", S(w.Run(Canvas + "/api/v1/courses"), "error"));
+        Assert.DoesNotContain(w.Fetched, f => f.Url.StartsWith(Canvas, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Without_a_canvas_address_every_job_is_refused_with_a_reason()
+    {
+        var w = new Worker(config: $$"""{"app":"{{Library}}","key":"k3y","canvas":"","files":["*.inscloudgate.net"],"protocol":3}""");
+        Assert.Equal("refused: Study Stash has no Canvas address yet", S(w.Run("https://cluster1.inscloudgate.net/files/9", "bytes"), "error"));
+        Assert.False(w.Allowed("https://cluster1.inscloudgate.net/files/9"));
+        Assert.Empty(w.Fetched);
     }
 
     [Fact]
     public void Before_taking_work_it_reloads_into_a_newer_folder()
     {
-        var w = WithLibrary(new Worker(running: "1.2", onDisk: "1.3"), [Job("1", "/api/v1/courses/4201/modules", "json")]);
+        // A running 1.3 sees 1.4 on disk (its own check was the version): the same happens from 1.4 on.
+        var w = WithLibrary(new Worker(running: "1.3", onDisk: "1.4"), [Job("1", "/api/v1/courses/4201/modules", "json")]);
         w.Eval("pump(false)");
         Assert.Equal(1, w.Reloads);
         Assert.Empty(w.Asks); // nothing taken that the reload would drop
         Assert.Equal(["chrome-extension://study-stash/manifest.json"], w.Fetched.Select(f => f.Url));
+    }
+
+    [Fact]
+    public void A_folder_that_may_reach_other_hosts_reloads_it_but_not_over_and_over()
+    {
+        string[] canvas2 = ["http://canvas2.test:5050/*", "https://*.inscloudgate.net/*", Library + "/*"];
+        string[] canvas3 = ["http://canvas3.test:5050/*", "https://*.inscloudgate.net/*", Library + "/*"];
+        var w = WithLibrary(new Worker(diskHosts: canvas2), [], rounds: 1);
+        w.Eval("pump(false)");
+        Assert.Equal(1, w.Reloads); // same version, new Canvas: the running copy can't reach it until it reloads
+        Assert.Empty(w.Asks);
+        Assert.NotNull(w.Stored("lastReload"));
+
+        // Chrome still runs the old hosts a moment later (say it read the folder differently): no reload loop.
+        w.Eval("pump(false)");
+        Assert.Equal(1, w.Reloads);
+        Assert.NotEmpty(w.Asks); // it works with what it has instead
+
+        // A minute on, it tries again.
+        w.Eval("chrome.storage.local.items.lastReload.at -= 61000");
+        w.Eval("pump(false)");
+        Assert.Equal(2, w.Reloads);
+
+        // The folder changed again (another Canvas address) within the minute: that reloads at once.
+        var moved = WithLibrary(new Worker(diskHosts: canvas2), [], rounds: 1);
+        moved.Eval("pump(false)");
+        moved.Route("chrome-extension://study-stash/manifest.json", Json(new JsonObject
+        {
+            ["version"] = "1.4", ["host_permissions"] = new JsonArray(canvas3.Select(h => (JsonNode)h).ToArray()),
+        }.ToJsonString()));
+        moved.Eval("pump(false)");
+        Assert.Equal(2, moved.Reloads);
+
+        // The same hosts in another order are the same permissions.
+        var same = WithLibrary(new Worker(diskHosts: Worker.Hosts.Reverse().ToArray()), [], rounds: 1);
+        same.Eval("pump(false)");
+        Assert.Equal(0, same.Reloads);
+    }
+
+    [Fact]
+    public void A_refused_key_or_a_library_that_doesn_t_answer_shows_on_the_button()
+    {
+        var refused = new Worker().Route(Library + "/api/v2/canvas/work", Json("""{"detail":"Wrong key."}""", 401));
+        refused.Eval("pump(true)");
+        Assert.Equal("library_refused", refused.Status);
+        Assert.Equal(("!", "Study Stash: This extension's key was refused. Open Study Stash and add the extension again."), refused.Button);
+
+        var away = new Worker().Route(Library + "/api/v2/canvas/work", new FakeResponse { Throws = true });
+        away.Eval("pump(true)");
+        Assert.Equal("library_unreachable", away.Status);
+        Assert.Equal(("!", "Study Stash: Can't reach your library at 127.0.0.1:8787."), away.Button);
+        Assert.Equal(Library, away.Stored("status")!["library"]!.GetValue<string>());
+
+        // The library answers again: the button clears.
+        WithLibrary(away, [], protocol: 2, rounds: 5);
+        away.Eval("pump(false)");
+        Assert.Equal("ok", away.Status);
+        Assert.Equal(("", "Study Stash"), away.Button);
+    }
+
+    [Fact]
+    public void Canvas_signed_out_shows_on_the_button_until_canvas_answers_again()
+    {
+        int round = 0;
+        var w = new Worker()
+            .Route(Library + "/api/v2/canvas/work", _ => Json(new JsonObject
+            {
+                ["jobs"] = new JsonArray(Job($"a{++round}", "/api/v1/courses", "json")), ["hot"] = false, ["ext"] = "1.4", ["p"] = 2,
+            }.ToJsonString()))
+            .Route(Library + "/api/v2/canvas/results", Json("""{"ok":true}"""))
+            .Route(Canvas + "/api/v1/courses", new FakeResponse { Url = Canvas + "/login/canvas", Body = "<html>Log in</html>", Headers = { ["content-type"] = "text/html" } });
+        // An older library (p 2, not hot) hands out one job per pump.
+        w.Eval("pump(false)");
+        Assert.Equal("signed_out", w.Status);
+        Assert.Equal(("!", "Study Stash: Sign in to Canvas in Chrome."), w.Button);
+
+        w.Route(Canvas + "/api/v1/courses", Json("[]"));
+        w.Eval("pump(false)");
+        Assert.Equal("ok", w.Status);
+        Assert.Equal("", w.Button.Badge);
     }
 
     [Fact]
@@ -353,5 +569,74 @@ public class ExtensionScriptTests
         Assert.Single(w.Posts); // the first file was refused: the second isn't sent, and no more work is asked for
         Assert.Single(w.Asks);
         Assert.False(w.Eval("running").AsBoolean()); // the next alarm can pump again
+    }
+
+    [Fact]
+    public void A_store_copy_reads_the_code_study_stash_makes()
+    {
+        var w = new Worker();
+        string code = Extension.ConnectionCode("https://mini.tail.ts.net", "k3y", "https://school.instructure.com/");
+        var c = JsonNode.Parse(w.Eval($"JSON.stringify(decodeCode({JsonSerializer.Serialize("  " + code[..20] + "\n" + code[20..] + " ")}))").AsString())!.AsObject();
+        Assert.Equal(("https://mini.tail.ts.net", "k3y", "https://school.instructure.com", Extension.Protocol),
+            (S(c, "app"), S(c, "key"), S(c, "canvas"), c["protocol"]!.GetValue<int>()));
+        Assert.Equal(["*.inscloudgate.net"], c["files"]!.AsArray().Select(f => f!.GetValue<string>()));
+        // The sites it asks Chrome for are the ones Study Stash writes into a folder's manifest for the same connection.
+        using var dir = new TempDir();
+        Extension.Ensure(dir.Path, "https://mini.tail.ts.net", "k3y", "https://school.instructure.com/");
+        var folderHosts = JsonNode.Parse(File.ReadAllText(Path.Combine(dir.Path, "manifest.json")))!["host_permissions"]!.AsArray().Select(h => h!.GetValue<string>());
+        Assert.Equal(folderHosts, JsonNode.Parse(w.Eval("JSON.stringify(originsFor(decodeCode(" + JsonSerializer.Serialize(code) + ")))").AsString())!.AsArray().Select(h => h!.GetValue<string>()));
+        Assert.Equal(Worker.Hosts, JsonNode.Parse(w.Eval("JSON.stringify(originsFor(" + Worker.DefaultConfig + "))").AsString())!.AsArray().Select(h => h!.GetValue<string>()));
+    }
+
+    [Theory]
+    [InlineData("", "That isn't a code from Study Stash.")]
+    [InlineData("hello there", "That isn't a code from Study Stash.")]
+    [InlineData("eyJhcHAiOiJodHRwOi8vbWluaS50ZXN0In0", "That isn't a code from Study Stash.")] // {"app":"http://mini.test"}: no key
+    [InlineData("eyJhcHAiOiJodHRwOi8vbWluaS50ZXN0Iiwia2V5IjoiazN5IiwiY2FudmFzIjoiIn0", "Add your school's Canvas address in Study Stash first")] // no Canvas yet
+    public void A_code_that_isn_t_one_says_so(string code, string words)
+    {
+        var w = new Worker();
+        Assert.StartsWith(words, w.Eval($"(() => {{ try {{ decodeCode({JsonSerializer.Serialize(code)}); return 'decoded'; }} catch (e) {{ return e.message; }} }})()").AsString());
+        Assert.False(Extension.ReadConnectionCode(code) is { Canvas.Length: > 0 }); // nor one Study Stash would hand out
+    }
+
+    [Fact]
+    public void A_store_copy_the_student_hasn_t_allowed_says_so_and_asks_nobody()
+    {
+        string stored = $$"""{"app":"http://mini.test:8787","key":"k3y","canvas":"{{Canvas}}","files":["*.inscloudgate.net"],"protocol":3}""";
+        var w = new Worker(config: null, stored: stored, granted: false);
+        w.Eval("pump(true)");
+        Assert.DoesNotContain(w.Fetched, f => f.Url.StartsWith("http://mini.test:8787", StringComparison.Ordinal));
+        Assert.Equal("no_access", w.Status);
+        Assert.Equal("!", w.Button.Badge);
+        Assert.Contains("choose Allow", w.Button.Title);
+        Assert.Equal([[Canvas + "/*", "https://*.inscloudgate.net/*", "http://mini.test:8787/*"]], w.Checked);
+
+        // Allowed: it goes to its library.
+        var allowed = new Worker(config: null, stored: stored);
+        allowed.Route("http://mini.test:8787/api/v2/canvas/work", new FakeResponse { Throws = true });
+        allowed.Eval("pump(true)");
+        Assert.StartsWith("http://mini.test:8787/api/v2/canvas/work?", allowed.Fetched.Last().Url);
+        Assert.Equal("library_unreachable", allowed.Status);
+
+        // A folder's copy has its sites in its manifest: Chrome isn't asked.
+        var folder = WithLibrary(new Worker(granted: false), [], rounds: 1);
+        folder.Eval("pump(false)");
+        Assert.Empty(folder.Checked);
+        Assert.NotEmpty(folder.Asks);
+    }
+
+    [Fact]
+    public void The_popup_s_words_for_each_state()
+    {
+        var w = new Worker();
+        string Say(string state) => w.Eval($"statusWords({{state: '{state}', library: 'http://mini.test:8787'}})").AsString();
+        Assert.Equal("", Say("ok"));
+        Assert.Equal("Can't reach your library at mini.test:8787.", Say("library_unreachable"));
+        Assert.Equal("This extension's key was refused. Open Study Stash and add the extension again.", Say("library_refused"));
+        Assert.Equal("Sign in to Canvas in Chrome.", Say("signed_out"));
+        Assert.StartsWith("This extension isn't connected", Say("no_config"));
+        Assert.Contains("paste the code from Study Stash", Say("no_config"));
+        Assert.StartsWith("Chrome hasn't allowed this extension", Say("no_access"));
     }
 }

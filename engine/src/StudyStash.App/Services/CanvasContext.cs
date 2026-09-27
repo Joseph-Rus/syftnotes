@@ -36,7 +36,7 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
             OpenChromeExtensions: () => OpenInChrome("chrome://extensions"),
             RevealFolder: dir => Machine.Open(dir),
             OpenFile: path => Machine.Open(path),
-            PrepareExtension: (key, canvasUrl) => Core.Canvas.Extension.Prepare(Core.Canvas.Extension.Folder(host.Home), cc.ServerUrl, key, canvasUrl));
+            PrepareExtension: (key, canvasUrl) => Core.Canvas.Extension.Ensure(Core.Canvas.Extension.Folder(host.Home), cc.ServerUrl, key, canvasUrl).Path);
         return new CanvasContext(client, new CanvasClock(() => DateTimeOffset.Now, TimeZoneInfo.Local), cls => Skin.ClassDot(host.ColorOf(cls)), actions, host.Home);
     }
 

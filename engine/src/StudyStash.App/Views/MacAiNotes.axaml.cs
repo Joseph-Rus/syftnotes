@@ -5,7 +5,14 @@ namespace StudyStash.App.Views;
 
 public partial class MacAiNotes : UserControl
 {
-    public MacAiNotes() => InitializeComponent();
+    public MacAiNotes()
+    {
+        InitializeComponent();
+        DataContextChanged += (_, _) =>
+        {
+            if (DataContext is AiNotesModel m) m.CloseMenu = () => RewriteButton.Flyout?.Hide();
+        };
+    }
 
     // The "Rewrite notes with" popup dims the notes behind it (17); a Popup never renders into a shot, so nothing
     // here runs during a screenshot — AiShots sets AiNotesModel.MenuOpen directly for that picture instead.

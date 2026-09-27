@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Threading;
+using StudyStash.App.Controls;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
@@ -40,8 +41,8 @@ public static partial class Shell
         }
         canvasWatching = false;
         canvasFor = key;
-        canvas = CanvasContext.For(host);
-        canvasWatch = new CanvasWatch(canvas);
+        var context = canvas = CanvasContext.For(host);
+        canvasWatch = new CanvasWatch(context) { Extension = new ExtensionKeeper(host.Home, () => context.Client, host.Log) };
         canvasWatch.Changed += OnCanvasChanged;
         canvasNotifier = new CanvasNotifier(canvas) { OnOpen = OpenCanvasNotification };
         canvasDue = null;
@@ -244,7 +245,7 @@ public static partial class Shell
             toasts[0].Window.Close();
             toasts.RemoveAt(0);
         }
-        Control view = Skin.Current == SkinKind.Mac ? new MacCanvasToast { DataContext = toast } : new WinCanvasToast { DataContext = toast };
+        var view = ToastView.For(toast);
         var w = new Floating { Content = view, Title = toast.Title, ShowActivated = false };
         void Close() => Dispatcher.UIThread.Post(w.Close);
         toast.OpenCommand.PropertyChanged += (_, e) =>
@@ -279,13 +280,19 @@ public static partial class Shell
         var watch = CanvasPoll();
         var model = new CanvasConnectModel(Canvas(), watch) { ShowFooter = true, FinishLabel = "Finish", StepLabel = "" };
         Control view = Skin.Current == SkinKind.Mac ? new MacCanvasConnect { DataContext = model } : new WinCanvasConnect { DataContext = model };
+        // The same title bar as the library and Settings: drag it by it, the window buttons sit in it.
+        var header = new WindowHeader { Title = "Connect Canvas" };
+        DockPanel.SetDock(header, Dock.Top);
         var w = new Window
         {
-            Title = "Canvas", Width = 640, Height = 640, WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            Content = new Border { Padding = new Avalonia.Thickness(32, 40, 32, 24), Child = view },
+            Title = "Canvas", Width = 640, Height = 680, WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
+            Content = new DockPanel { Children = { header, new Border { Padding = new Avalonia.Thickness(32, 12, 32, 24), Child = view } } },
         };
         w.Bind(Window.BackgroundProperty, w.GetResourceObservable(Skin.Current == SkinKind.Mac ? "Win" : "Layer"));
         Look.Apply(w);
+        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
+        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         model.OnSkip = w.Close;
         model.OnBack = w.Close;
         model.OnFinish = () =>

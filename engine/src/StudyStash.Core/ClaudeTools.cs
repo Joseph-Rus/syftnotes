@@ -108,10 +108,15 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
 
     public string ServerUrl { get; } = serverUrl.TrimEnd('/');
 
+    /// <summary>This computer's name, sent with every request so the library can say which laptops reach it ("" sends
+    /// none: Claude's MCP server on the library itself, and tests).</summary>
+    public static string Computer { get; set; } = "";
+
     async Task<JsonNode?> SendAsync(HttpMethod method, string path, JsonNode? body = null, CancellationToken stop = default)
     {
         using var request = new HttpRequestMessage(method, root + path);
         if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        if (Computer.Length > 0) request.Headers.TryAddWithoutValidation("X-Study-Stash-Computer", Computer);
         if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         using var r = await client.SendAsync(request, stop);
         if (r.StatusCode == HttpStatusCode.NotFound) return null;
@@ -158,6 +163,11 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
 
     public async Task<JsonObject?> ClaudeAsync(HttpMethod method, string path = "", JsonObject? body = null) =>
         await SendAsync(method, "/claude" + path, body) as JsonObject;
+
+    /// <summary>The library's own settings (GET), a change to them (POST), or one of their actions ("/password",
+    /// "/update", "/rewrite-all"). Null: a library older than these routes.</summary>
+    public async Task<JsonObject?> SettingsAsync(HttpMethod method, string path = "", JsonObject? body = null) =>
+        await SendAsync(method, "/settings" + path, body) as JsonObject;
 
     public bool HasCanvas => true; // a library from before Canvas answers each tool with why not
 

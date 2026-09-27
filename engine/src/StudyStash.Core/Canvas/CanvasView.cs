@@ -13,18 +13,22 @@ public readonly record struct ScoutState(string State, int Files, string When, s
 /// </summary>
 public static class CanvasView
 {
+    /// <summary>A date for the JSON: the saved ISO text, or null when there isn't one. Never "": no date reader takes
+    /// it, and one blank date used to break the app's whole Canvas screen (a library that never synced has several).</summary>
+    public static JsonNode? When(string? iso) => string.IsNullOrWhiteSpace(iso) ? null : iso;
+
     // --- state ---------------------------------------------------------------------------------------------------
 
-    /// <summary>How things stand with Canvas, in priority order: not set up, no extension has ever checked in, Chrome
-    /// isn't signed in, Chrome hasn't checked in for a while, a sync is running, the last sync had an error, or all
-    /// is well.</summary>
+    /// <summary>How things stand with Canvas, in priority order: not set up, no extension has ever checked in with
+    /// this library's current key (one with an old key, or from before keys were written down, doesn't count), Chrome
+    /// isn't signed in, Chrome isn't checking in now (<see cref="CanvasSettings.ExtensionConnected"/>), a sync is
+    /// running, the last sync had an error, or all is well.</summary>
     public static string StateOf(CanvasSettings s, bool syncing, DateTimeOffset now)
     {
         if (!s.On) return "not_set_up";
-        if (s.ExtensionSeen.Length == 0) return "no_extension";
+        if (s.SeenWithKey.Length == 0) return "no_extension";
         if (s.NeedsLogin) return "signed_out";
-        if (!DateTimeOffset.TryParse(s.ExtensionSeen, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var seen) || now - seen > TimeSpan.FromMinutes(5))
-            return "chrome_away";
+        if (!s.ExtensionConnected(now)) return "chrome_away";
         if (syncing) return "syncing";
         if (s.Error.Length > 0) return "error";
         return "connected";
@@ -38,7 +42,11 @@ public static class CanvasView
         return courses.Keys.Where(cls => !Done(cls)).ToList();
     }
 
-    public static JsonObject State(CanvasSync sync, DateTimeOffset now)
+    /// <summary>The state, for the app's Canvas screens. <c>extension.connected</c> is a Chrome checking in now with
+    /// this library's current key; <c>seen</c> is when one last did (null: never); <c>key_matches</c> says whether the
+    /// Chrome that checked in last used that key (false: it has an old one, so it needs connecting again); and
+    /// <c>refused_at</c> is when a Chrome with another key last knocked (<paramref name="refusedAt"/>).</summary>
+    public static JsonObject State(CanvasSync sync, DateTimeOffset now, string? refusedAt = null)
     {
         var s = sync.Settings;
         bool active = sync.Crawl.Active;
@@ -53,16 +61,18 @@ public static class CanvasView
             ["url"] = s.Url,
             ["extension"] = new JsonObject
             {
-                ["seen"] = s.ExtensionSeen, ["version"] = s.ExtensionVersion, ["latest"] = Extension.Version(), ["outdated"] = s.ExtensionOutdated,
-                ["updated"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = up.At } : null,
+                ["seen"] = When(s.SeenWithKey), ["version"] = s.ExtensionVersion, ["latest"] = Extension.Version(), ["outdated"] = s.ExtensionOutdated,
+                ["connected"] = s.ExtensionConnected(now), ["key_matches"] = s.LastKeyMatches, ["last_seen"] = When(s.ExtensionSeen),
+                ["refused_at"] = When(refusedAt),
+                ["updated"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = When(up.At) } : null,
             },
-            ["last_sync"] = s.LastDone,
+            ["last_sync"] = When(s.LastDone),
             ["next_sync"] = s.LastDone.Length > 0 && DateTimeOffset.TryParse(s.LastDone, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var done)
                 ? done.AddMinutes(s.PollMinutes).ToString("o", CultureInfo.InvariantCulture) : null,
             ["poll_minutes"] = s.PollMinutes,
             ["syncing"] = active ? new JsonObject { ["left"] = left.Count, ["total"] = s.Courses.Count, ["classes"] = new JsonArray(left.Select(c => (JsonNode)c).ToArray()) } : null,
             ["paused_until"] = sync.Crawl.PausedUntil?.ToString("o", CultureInfo.InvariantCulture),
-            ["error"] = s.Error.Length > 0 ? new JsonObject { ["text"] = s.Error, ["at"] = s.ErrorAt } : null,
+            ["error"] = s.Error.Length > 0 ? new JsonObject { ["text"] = s.Error, ["at"] = When(s.ErrorAt) } : null,
             ["warnings"] = warnings,
         };
     }
@@ -84,14 +94,14 @@ public static class CanvasView
                 ["id"] = id, ["code"] = index?.Code ?? "", ["name"] = index?.Name ?? "", ["term"] = index?.Term ?? "", ["url"] = index?.HtmlUrl ?? "",
             },
             ["suggested"] = suggested is { } sug ? new JsonObject { ["id"] = sug.Id, ["name"] = sug.Name } : null,
-            ["last_sync"] = index?.SyncedAt ?? "",
+            ["last_sync"] = When(index?.SyncedAt),
             ["counts"] = new JsonObject
             {
                 ["to_hand_in"] = toHandIn, ["done"] = done, ["modules"] = index?.Modules.Count ?? 0, ["files"] = index?.Files.Count ?? 0,
                 ["announcements"] = index?.Announcements.Count ?? 0, ["announcements_new"] = newAnnouncements,
             },
             ["files_hidden"] = index?.FilesHidden ?? false,
-            ["scout"] = new JsonObject { ["state"] = scout.State, ["files"] = scout.Files, ["when"] = scout.When, ["report"] = scout.Report },
+            ["scout"] = new JsonObject { ["state"] = scout.State, ["files"] = scout.Files, ["when"] = When(scout.When), ["report"] = scout.Report },
         };
     }
 
@@ -103,10 +113,12 @@ public static class CanvasView
     /// <summary>One assignment (or quiz/discussion folded into one), as the app's lists show it.</summary>
     public static JsonObject ItemJson(Assignment a, string? folder) => new()
     {
-        ["class"] = a.ClassName, ["id"] = a.Id, ["name"] = a.Name, ["kind"] = a.Kind, ["due"] = a.Due, ["due_at"] = a.DueAt,
+        ["class"] = a.ClassName, ["id"] = a.Id, ["name"] = a.Name, ["kind"] = a.Kind, ["due"] = When(a.Due), ["due_at"] = When(a.DueAt),
         ["points"] = a.Points, ["status"] = a.Status, ["label"] = Assignments.Label(a.Status, a.Late), ["score"] = a.Score,
         ["grade"] = a.Grade, ["score_text"] = Assignments.ScoreText(a), ["late"] = a.Late, ["missing"] = a.Missing,
-        ["excused"] = a.Excused, ["submitted"] = a.Submitted, ["graded_at"] = a.GradedAt, ["marked_done"] = a.MarkedDone,
+        ["excused"] = a.Excused, ["submitted"] = When(a.Submitted), ["graded_at"] = When(a.GradedAt),
+        // When the student ticked it off in Canvas's planner (the flag is the status "marked_done"); null otherwise.
+        ["marked_done"] = a.MarkedDone ? When(a.MarkedDoneAt) : null,
         ["url"] = a.Url, ["folder"] = folder,
     };
 
@@ -154,7 +166,7 @@ public static class CanvasView
             groups.Add(new JsonObject { ["key"] = key, ["label"] = label, ["items"] = new JsonArray(items.Select(Row).ToArray()) });
         }
         var next = toHandIn.Where(a => DueOf(a) is not { } d || d >= now).OrderBy(a => DueOf(a) ?? DateTime.MaxValue).FirstOrDefault();
-        return new JsonObject { ["synced"] = synced, ["to_hand_in"] = toHandIn.Count, ["next"] = next is null ? null : Row(next), ["groups"] = groups };
+        return new JsonObject { ["synced"] = When(synced), ["to_hand_in"] = toHandIn.Count, ["next"] = next is null ? null : Row(next), ["groups"] = groups };
     }
 
     /// <summary>One class's assignments: still to hand in (soonest first), and done (most recently due first).</summary>
@@ -206,12 +218,12 @@ public static class CanvasView
 
     static JsonObject SubmissionJson(SubmissionInfo s) => new()
     {
-        ["state"] = s.State, ["attempt"] = s.Attempt, ["submitted_at"] = s.SubmittedAt, ["graded_at"] = s.GradedAt, ["score"] = s.Score,
+        ["state"] = s.State, ["attempt"] = s.Attempt, ["submitted_at"] = When(s.SubmittedAt), ["graded_at"] = When(s.GradedAt), ["score"] = s.Score,
         ["grade"] = s.Grade, ["late"] = s.Late, ["points_deducted"] = s.PointsDeducted, ["body"] = s.Body,
         ["files"] = new JsonArray(s.Files.Select(f => (JsonNode)FileJson(f)).ToArray()),
         ["attempts"] = new JsonArray(s.Attempts.Select(t => (JsonNode)new JsonObject
         {
-            ["attempt"] = t.Attempt, ["submitted_at"] = t.SubmittedAt, ["late"] = t.Late, ["files"] = new JsonArray(t.Files.Select(f => (JsonNode)FileJson(f)).ToArray()),
+            ["attempt"] = t.Attempt, ["submitted_at"] = When(t.SubmittedAt), ["late"] = t.Late, ["files"] = new JsonArray(t.Files.Select(f => (JsonNode)FileJson(f)).ToArray()),
         }).ToArray()),
     };
 
@@ -222,8 +234,8 @@ public static class CanvasView
         if (index?.Assignments.FirstOrDefault(a => a.Id == id) is not { } a) return null;
         var row = ItemJson(Assignments.From(index.Class, a, now), folder ?? a.Folder);
         row["instructions"] = a.Instructions;
-        row["unlock_at"] = a.UnlockAt;
-        row["lock_at"] = a.LockAt;
+        row["unlock_at"] = When(a.UnlockAt);
+        row["lock_at"] = When(a.LockAt);
         row["submission_types"] = new JsonArray(a.SubmissionTypes.Select(t => (JsonNode)t).ToArray());
         row["allowed_attempts"] = a.AllowedAttempts;
         row["grading_type"] = a.GradingType;
@@ -232,7 +244,7 @@ public static class CanvasView
         row["submission"] = a.Submission is { } s ? SubmissionJson(s) : null;
         row["comments"] = new JsonArray((a.Submission?.Comments ?? []).Select(c => (JsonNode)new JsonObject
         {
-            ["author"] = c.Author, ["at"] = c.At, ["text"] = c.Text, ["files"] = new JsonArray(c.Files.Select(f => (JsonNode)FileJson(f)).ToArray()), ["media_url"] = c.MediaUrl,
+            ["author"] = c.Author, ["at"] = When(c.At), ["text"] = c.Text, ["files"] = new JsonArray(c.Files.Select(f => (JsonNode)FileJson(f)).ToArray()), ["media_url"] = c.MediaUrl,
         }).ToArray());
         row["quiz"] = a.QuizId is { } qid && index.Quizzes.FirstOrDefault(q => q.Id == qid) is { } quiz ? new JsonObject
         {
@@ -258,7 +270,7 @@ public static class CanvasView
         ["count"] = index?.Modules.Count ?? 0,
         ["modules"] = new JsonArray((index?.Modules ?? []).Select(m => (JsonNode)new JsonObject
         {
-            ["id"] = m.Id, ["name"] = m.Name, ["position"] = m.Position, ["state"] = m.State, ["unlock_at"] = m.UnlockAt,
+            ["id"] = m.Id, ["name"] = m.Name, ["position"] = m.Position, ["state"] = m.State, ["unlock_at"] = When(m.UnlockAt),
             ["items_count"] = m.ItemsCount, ["items"] = new JsonArray(m.Items.Select(it => (JsonNode)ModuleItemJson(it)).ToArray()),
         }).ToArray()),
     };
@@ -269,7 +281,7 @@ public static class CanvasView
         ["files"] = new JsonArray((index?.Files ?? []).Select(f => (JsonNode)new JsonObject
         {
             ["id"] = f.Id, ["folder"] = f.Folder, ["name"] = f.Name, ["size"] = f.Size, ["content_type"] = f.ContentType,
-            ["format"] = f.Format ?? FormatOf(f.ContentType, f.Name), ["updated_at"] = f.UpdatedAt, ["local"] = f.Local, ["skipped"] = f.Skipped,
+            ["format"] = f.Format ?? FormatOf(f.ContentType, f.Name), ["updated_at"] = When(f.UpdatedAt), ["local"] = f.Local, ["skipped"] = f.Skipped,
         }).ToArray()),
     };
 
@@ -279,7 +291,7 @@ public static class CanvasView
         ["new"] = index?.Announcements.Count(a => !a.ReadOnCanvas && !seenHere.Contains(a.Id)) ?? 0,
         ["items"] = new JsonArray((index?.Announcements ?? []).OrderByDescending(a => a.PostedAt, StringComparer.Ordinal).Select(a => (JsonNode)new JsonObject
         {
-            ["id"] = a.Id, ["title"] = a.Title, ["posted_at"] = a.PostedAt, ["author"] = a.Author,
+            ["id"] = a.Id, ["title"] = a.Title, ["posted_at"] = When(a.PostedAt), ["author"] = a.Author,
             ["new"] = !a.ReadOnCanvas && !seenHere.Contains(a.Id), ["read_on_canvas"] = a.ReadOnCanvas, ["body"] = a.Body,
             ["files"] = new JsonArray(a.Files.Select(f => (JsonNode)FileJson(f)).ToArray()), ["url"] = a.HtmlUrl,
         }).ToArray()),
@@ -287,7 +299,7 @@ public static class CanvasView
 
     static JsonObject PageJson(PageInfo p) => new()
     {
-        ["title"] = p.Title, ["url"] = p.Url, ["updated_at"] = p.UpdatedAt, ["local"] = p.Local, ["in_module"] = p.InModule,
+        ["title"] = p.Title, ["url"] = p.Url, ["updated_at"] = When(p.UpdatedAt), ["local"] = p.Local, ["in_module"] = p.InModule,
     };
 
     public static JsonObject Pages(CourseIndex? index) => new()
@@ -297,7 +309,7 @@ public static class CanvasView
         ["pages"] = new JsonArray((index?.Pages ?? []).Select(p => (JsonNode)PageJson(p)).ToArray()),
         ["quizzes"] = new JsonArray((index?.Quizzes ?? []).Select(q => (JsonNode)new JsonObject
         {
-            ["id"] = q.Id, ["title"] = q.Title, ["due_at"] = q.DueAt, ["points"] = q.Points, ["locked"] = q.Locked, ["local"] = q.Local, ["url"] = q.HtmlUrl,
+            ["id"] = q.Id, ["title"] = q.Title, ["due_at"] = When(q.DueAt), ["points"] = q.Points, ["locked"] = q.Locked, ["local"] = q.Local, ["url"] = q.HtmlUrl,
         }).ToArray()),
         ["discussions"] = new JsonArray((index?.Discussions ?? []).Select(d => (JsonNode)new JsonObject
         {
@@ -313,7 +325,7 @@ public static class CanvasView
         ["items"] = new JsonArray(items.Select(n => (JsonNode)new JsonObject
         {
             ["id"] = n.Id, ["kind"] = n.Kind, ["title"] = n.Title, ["text"] = n.Text, ["class"] = n.Class, ["assignment_id"] = n.AssignmentId,
-            ["announcement_id"] = n.AnnouncementId, ["at"] = n.At, ["seen"] = n.Seen,
+            ["announcement_id"] = n.AnnouncementId, ["at"] = When(n.At), ["seen"] = n.Seen,
         }).ToArray()),
     };
 }

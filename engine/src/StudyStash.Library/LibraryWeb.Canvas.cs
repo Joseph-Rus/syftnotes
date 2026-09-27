@@ -22,11 +22,33 @@ public sealed partial class LibraryWeb
         KnownClass = c => cfg.ClassNames().Contains(c),
     };
 
-    /// <summary>The extension's key (X-Study-Stash-Key), or the library password like the rest of the API.</summary>
-    IResult? RequireExtension(HttpContext ctx) =>
-        CanvasSettings.KeyMatches(cfg.Home, ctx.Request.Headers["X-Study-Stash-Key"].ToString()) ? null : RequireKey(ctx);
+    /// <summary>The extension's key (X-Study-Stash-Key), or the library password like the rest of the API. An
+    /// extension with another key (an old registration, or another library's) is turned away even when the library
+    /// has no password: it would otherwise look connected while the student's Chrome can't be told apart from a
+    /// stale one. When it last knocked is kept, so the app can say to connect it again.</summary>
+    IResult? RequireExtension(HttpContext ctx)
+    {
+        string given = ctx.Request.Headers["X-Study-Stash-Key"].ToString();
+        if (CanvasSettings.KeyMatches(cfg.Home, given)) return null;
+        if (given.Length > 0 && !(cfg.PoolPassword.Length > 0 && Same(given, cfg.PoolPassword)))
+        {
+            refusedAt = Canvas.Clock().ToString("o", CultureInfo.InvariantCulture);
+            return Http.Detail(401, "Wrong key.");
+        }
+        return RequireKey(ctx);
+    }
+
+    /// <summary>When a Chrome with a key that isn't this library's last asked for work (ISO); null since the library
+    /// started, or since one with the right key checked in.</summary>
+    string? refusedAt;
+
+    /// <summary>The request came with the extension's current key (not the library password).</summary>
+    bool WithExtensionKey(HttpContext ctx) => CanvasSettings.KeyMatches(cfg.Home, ctx.Request.Headers["X-Study-Stash-Key"].ToString());
 
     static string S(JsonNode? v) => v is JsonValue j && j.TryGetValue(out string? s) ? s : "";
+
+    /// <summary>A date for the JSON: null, never "", when there isn't one (<see cref="CanvasView.When"/>).</summary>
+    static JsonNode? W(string? iso) => CanvasView.When(iso);
 
     /// <summary>The most one post of the extension's answers may carry: a 40 MiB file is about 56 MB of base64, and an
     /// extension from before protocol 2 posts up to six answers together.</summary>
@@ -34,21 +56,25 @@ public sealed partial class LibraryWeb
 
     void MapCanvas(WebApplication app)
     {
-        // An updated Study Stash brings the extension folder it made up to date; Chrome's copy reloads itself from it.
-        try
-        {
-            if (Extension.Refresh(Extension.Folder(cfg.Home))) Console.WriteLine($"[canvas] the Chrome extension's folder is now version {Extension.Version()}");
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            Console.WriteLine($"[canvas] couldn't update the Chrome extension's folder: {e.Message}");
-        }
+        // The extension's folder is ready before anyone asks for it, and an updated Study Stash brings it up to date:
+        // Chrome's copy reloads itself from it.
+        EnsureHere();
+        // A sync's jobs that were out with Chrome when the library stopped: their answers found nobody to take them,
+        // so they go out again at once rather than after the ten minutes a job is given (a sync mid-way through a
+        // restart carries on as soon as Chrome asks again). An answer that still comes for one is simply asked again.
+        Canvas.Crawl.Requeue();
 
-        // The extension. It says its version (v) and protocol (p); one from before protocol 2 sends no p.
-        app.MapGet("/api/v2/canvas/work", (HttpContext ctx, int? force, string? v, int? p) =>
+        // The extension. It says its version (v), its protocol (p; one from before protocol 2 sends none) and, from
+        // 1.4, the library address it uses (a) and how long it will wait for work (wait, in seconds): the request is
+        // held until there's work, so an AI's read reaches Chrome in about a second. A library that's stopping
+        // lets go of it at once.
+        app.MapGet("/api/v2/canvas/work", async (HttpContext ctx, int? force, string? v, int? p, string? a, int? wait) =>
         {
             if (RequireExtension(ctx) is { } no) return no;
-            var w = Canvas.Work(force is 1, v, p ?? 1);
+            using var gone = CancellationTokenSource.CreateLinkedTokenSource(ctx.RequestAborted, app.Lifetime.ApplicationStopping);
+            bool withKey = WithExtensionKey(ctx);
+            if (withKey) refusedAt = null; // the student's Chrome has the right key now
+            var w = await Canvas.WorkAsync(force is 1, v, p ?? 1, a, TimeSpan.FromSeconds(Math.Clamp(wait ?? 0, 0, 60)), gone.Token, withKey);
             return Http.Json(new JsonObject
             {
                 ["jobs"] = new JsonArray(w.Jobs.Select(j => (JsonNode)new JsonObject { ["id"] = j.Id, ["url"] = j.Url, ["kind"] = j.Kind }).ToArray()),
@@ -71,7 +97,7 @@ public sealed partial class LibraryWeb
             var (waiting, inflight) = Canvas.Crawl.Left;
             return Http.Json(new JsonObject
             {
-                ["synced"] = s.LastSync, ["error"] = s.Error,
+                ["synced"] = W(s.LastSync), ["error"] = s.Error,
                 ["busy"] = Canvas.Crawl.Active ? $"Syncing Canvas… {waiting + inflight} left" : "",
             });
         });
@@ -98,9 +124,11 @@ public sealed partial class LibraryWeb
                 if (body?["dismiss_update"] is JsonValue dv && dv.TryGetValue(out bool dismiss) && dismiss && s.ExtensionUpdate is { } noted)
                     s.ExtensionUpdate = noted with { Dismissed = true };
             });
+            if (body?["url"] is not null) EnsureHere(); // the extension may now reach the new Canvas
+            if (body?["sync"] is not null) Canvas.Nudge();
             return Http.Json(CanvasJson());
         })));
-        app.MapGet("/api/v2/canvas/state", (HttpContext ctx) => Api(ctx, () => Http.Json(CanvasView.State(Canvas, Canvas.Clock()))));
+        app.MapGet("/api/v2/canvas/state", (HttpContext ctx) => Api(ctx, () => Http.Json(CanvasView.State(Canvas, Canvas.Clock(), refusedAt))));
         app.MapGet("/api/v2/canvas/classes", (HttpContext ctx) => Api(ctx, () =>
             Http.Json(CanvasView.Classes(cfg.ClassNames(), Canvas.Settings, cfg.Home, ScoutOf, Canvas.Clock()))));
         app.MapGet("/api/v2/canvas/due", (HttpContext ctx) => Api(ctx, () =>
@@ -166,10 +194,16 @@ public sealed partial class LibraryWeb
             if (!full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal) || !File.Exists(full)) return Http.Detail(404, "no such file");
             return Results.File(full, "application/octet-stream", Path.GetFileName(full));
         }));
-        app.MapGet("/api/v2/canvas/extension", (HttpContext ctx) => Api(ctx, () => Http.Json(new JsonObject
+        app.MapGet("/api/v2/canvas/extension", (HttpContext ctx) => Api(ctx, () =>
         {
-            ["key"] = CanvasSettings.ExtensionKey(cfg.Home), ["canvas"] = Canvas.Settings.Url, ["version"] = Extension.Version(),
-        })));
+            var about = ExtensionJson();
+            string key = CanvasSettings.ExtensionKey(cfg.Home);
+            about["key"] = key;
+            // For a Chrome Web Store copy in this computer's Chrome: what this folder's config.json says, as a code to
+            // paste. A laptop makes its own from the same key and Canvas, with the library address it uses.
+            about["connection_code"] = Extension.ConnectionCode($"http://127.0.0.1:{cfg.WebPort}", key, Canvas.Settings.Url);
+            return Http.Json(about);
+        }));
         app.MapPost("/api/v2/canvas/courses", Http.Handle(ctx => ApiAsync(ctx, async () => Http.Json(await FindCoursesAsync()))));
         app.MapPost("/api/v2/canvas/fetch", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
@@ -214,34 +248,67 @@ public sealed partial class LibraryWeb
         app.MapGet("/due", (HttpContext ctx) => WithMember(ctx, DuePage));
         app.MapGet("/files/{cls}/{**path}", (HttpContext ctx, string cls, string path) => WithMember(ctx, role => FilePage(role, RouteName(cls), path)));
         app.MapPost("/settings/canvas", Http.Handle(SaveCanvas));
+        // The Canvas address as typed goes in first (Find sits in the same form as Save), then Chrome is asked.
         app.MapPost("/settings/canvas/find", Http.Handle(ctx => WithMemberAsync(ctx, async _ =>
         {
-            var found = await FindCoursesAsync();
-            return Http.SeeOther("/settings?canvas=" + (found["error"] is null ? "found" : "unreachable") + "#canvas");
+            var f = await Http.FormAsync(ctx.Request);
+            string typed = Py.Strip(f.Get("canvas_url"));
+            string? clean = CanvasSettings.CleanUrl(typed);
+            if (f.ContainsKey("canvas_url") && (typed.Length == 0 || clean is not null))
+            {
+                CanvasSettings.Update(cfg.Home, s => s.Url = clean ?? "");
+                EnsureHere();
+            }
+            string outcome = typed.Length > 0 && clean is null ? FindOutcome.NoAddress
+                : FindOutcome.Of(await FindCoursesAsync(), Canvas.Settings, Canvas.Clock());
+            return Http.SeeOther("/settings?canvas=" + outcome + "#canvas");
         })));
+        // The folder is made by the library itself now; an old page's "Make it" just goes back to Settings.
         app.MapPost("/settings/canvas/extension", Http.Handle(ctx => WithMemberAsync(ctx, _ =>
         {
-            PrepareExtensionHere();
-            return Task.FromResult(Http.SeeOther("/settings?canvas=extension#canvas"));
+            EnsureHere();
+            return Task.FromResult(Http.SeeOther("/settings#canvas"));
         })));
     }
 
-    /// <summary>The extension's folder on this computer, pointing at this library.</summary>
-    string PrepareExtensionHere() =>
-        Extension.Prepare(Extension.Folder(cfg.Home), $"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), Canvas.Settings.Url);
+    /// <summary>Make (or bring up to date) the extension's folder on this computer, pointing at this library and this
+    /// Canvas. Never fatal: a folder that can't be written is logged, and Settings says it isn't ready.</summary>
+    void EnsureHere()
+    {
+        try
+        {
+            string folder = Extension.Folder(cfg.Home);
+            if (!Extension.Ensure(folder, $"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), Canvas.Settings.Url).Changed) return;
+            Console.WriteLine($"[canvas] the Chrome extension's folder is ready (version {Extension.Version()}): {folder}");
+            // Chrome's copy is waiting for work with the old folder's permissions: it looks at the folder now, and
+            // reloads itself into the new one.
+            Canvas.Nudge();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Console.WriteLine($"[canvas] couldn't write the Chrome extension's folder: {e.Message}");
+        }
+    }
+
+    /// <summary>What went wrong with the last find, in Canvas's own words, for the Settings page's "other".</summary>
+    string lastFindError = "";
 
     /// <summary>Ask Canvas (through the extension) which courses the person is in, and keep the list (with each
-    /// course's code and term, for <see cref="CourseMatch"/>) for Settings. Follows every page.</summary>
+    /// course's code and term, for <see cref="CourseMatch"/>) for Settings. Follows every page. Works before any class
+    /// exists. While no extension has ever checked in, Chrome gets a short while to turn up rather than two minutes.</summary>
     async Task<JsonObject> FindCoursesAsync()
     {
-        if (!Canvas.Settings.On) return new JsonObject { ["error"] = "Add your school's Canvas address first." };
+        var settings = Canvas.Settings;
+        if (!settings.On) return Remember(new JsonObject { ["error"] = FindOutcome.LibraryNoAddress });
+        TimeSpan? wait = settings.SeenWithKey.Length == 0 ? Canvas.FirstContactWait : null;
         var found = new Dictionary<string, string>();
         var info = new Dictionary<string, CourseInfo>();
         string? next = "/api/v1/courses?enrollment_state=active&include[]=term&per_page=100";
         for (int page = 0; page < 20 && next is not null; page++)
         {
-            var r = await Canvas.FetchAsync(next, "json");
-            if (r["error"] is not null) return page == 0 ? r : CanvasJson();
+            var r = await Canvas.FetchAsync(next, "json", timeout: wait);
+            if (r["error"] is not null) return page == 0 ? Remember(r) : CanvasJson();
+            wait = null;
             foreach (var c in (JsonNode.Parse(S(r["json"])) as JsonArray ?? []).OfType<JsonObject>())
                 if (c["id"] is JsonValue id && S(c["name"]) is { Length: > 0 } name)
                 {
@@ -252,7 +319,40 @@ public sealed partial class LibraryWeb
             next = r["next_page"] is JsonValue nv ? S(nv) : null;
         }
         CanvasSettings.Update(cfg.Home, s => { s.Available = found; s.CourseInfo = info; });
+        lastFindError = "";
         return CanvasJson();
+    }
+
+    JsonObject Remember(JsonObject failed)
+    {
+        lastFindError = S(failed["error"]);
+        return failed;
+    }
+
+    /// <summary>The extension's folder here and the last Chrome that checked in, for the app's "Add to Chrome" →
+    /// "Connected" (without the key; <c>/api/v2/canvas/extension</c> adds it), and every Chrome that checks in
+    /// (<c>copies</c>: this computer's and another's can both run it).</summary>
+    JsonObject ExtensionJson()
+    {
+        var s = Canvas.Settings;
+        var now = Canvas.Clock();
+        string folder = Extension.Folder(cfg.Home);
+        var copies = new JsonArray();
+        foreach (var (where, c) in s.ExtensionCopies.OrderByDescending(kv => kv.Value.Seen, StringComparer.Ordinal))
+            copies.Add(new JsonObject
+            {
+                ["where"] = where, ["seen"] = W(c.Seen), ["version"] = c.Version, ["protocol"] = c.Protocol,
+                ["key_matches"] = c.Key == s.CurrentKeyId,
+                ["connected"] = c.Key == s.CurrentKeyId && CanvasSettings.Connected(c.Seen, c.Protocol, now),
+            });
+        return new JsonObject
+        {
+            ["canvas"] = s.Url, ["version"] = Extension.Version(), ["protocol"] = Extension.Protocol,
+            ["folder"] = folder, ["folder_ready"] = Extension.Ready(folder),
+            ["seen"] = W(s.ExtensionSeen), ["seen_version"] = s.ExtensionVersion, ["seen_protocol"] = s.ExtensionProtocol,
+            ["seen_where"] = s.ExtensionWhere, ["key_matches"] = s.LastKeyMatches, ["seen_with_key"] = W(s.SeenWithKey),
+            ["refused_at"] = W(refusedAt), ["connected"] = s.ExtensionConnected(now), ["copies"] = copies,
+        };
     }
 
     /// <summary>Where the course scout stands on a class, for <c>/api/v2/canvas/classes</c>.</summary>
@@ -266,12 +366,12 @@ public sealed partial class LibraryWeb
 
     JsonObject AssignmentJson(Assignment a) => new()
     {
-        ["class"] = a.ClassName, ["id"] = a.Id, ["name"] = a.Name, ["due"] = a.Due, ["points"] = a.Points, ["status"] = a.Status,
-        ["score"] = a.Score, ["submitted"] = a.Submitted, ["url"] = a.Url, ["done"] = a.Done,
+        ["class"] = a.ClassName, ["id"] = a.Id, ["name"] = a.Name, ["due"] = W(a.Due), ["points"] = a.Points, ["status"] = a.Status,
+        ["score"] = a.Score, ["submitted"] = W(a.Submitted), ["url"] = a.Url, ["done"] = a.Done,
         ["folder"] = Canvas.Crawl.AssignmentFolder(a.ClassName, a.Id),
         ["label"] = Assignments.Label(a.Status, a.Late), ["score_text"] = Assignments.ScoreText(a), ["grade"] = a.Grade,
-        ["late"] = a.Late, ["missing"] = a.Missing, ["excused"] = a.Excused, ["graded_at"] = a.GradedAt, ["kind"] = a.Kind,
-        ["due_at"] = a.DueAt, ["comments"] = a.Comments ?? 0,
+        ["late"] = a.Late, ["missing"] = a.Missing, ["excused"] = a.Excused, ["graded_at"] = W(a.GradedAt), ["kind"] = a.Kind,
+        ["due_at"] = W(a.DueAt), ["comments"] = a.Comments ?? 0,
     };
 
     JsonObject CanvasJson()
@@ -286,15 +386,15 @@ public sealed partial class LibraryWeb
         foreach (var (id, info) in s.CourseInfo) courseInfo[id] = new JsonObject { ["code"] = info.Code, ["name"] = info.Name, ["term"] = info.Term };
         return new JsonObject
         {
-            ["url"] = s.Url, ["courses"] = courses, ["available"] = available, ["last_sync"] = s.LastSync, ["error"] = s.Error,
-            ["needs_login"] = s.NeedsLogin, ["extension_seen"] = s.ExtensionSeen, ["extension_version"] = s.ExtensionVersion,
+            ["url"] = s.Url, ["courses"] = courses, ["available"] = available, ["last_sync"] = W(s.LastSync), ["error"] = s.Error,
+            ["needs_login"] = s.NeedsLogin, ["extension_seen"] = W(s.ExtensionSeen), ["extension_version"] = s.ExtensionVersion,
             ["extension_latest"] = Extension.Version(), ["extension_outdated"] = s.ExtensionOutdated,
-            ["extension_update"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = up.At } : null,
-            ["state"] = CanvasView.State(Canvas, Canvas.Clock()), ["course_info"] = courseInfo,
-            ["syncing"] = Canvas.Crawl.Active, ["left"] = waiting + inflight,
+            ["extension_update"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = W(up.At) } : null,
+            ["state"] = CanvasView.State(Canvas, Canvas.Clock(), refusedAt), ["course_info"] = courseInfo,
+            ["syncing"] = Canvas.Crawl.Active, ["left"] = waiting + inflight, ["extension"] = ExtensionJson(),
             ["exploring"] = options.Scout?.Running, ["scouts"] = new JsonObject(s.Scouts.Select(kv => KeyValuePair.Create(kv.Key, (JsonNode?)new JsonObject
             {
-                ["ok"] = kv.Value.Ok, ["report"] = kv.Value.Report, ["when"] = kv.Value.When, ["files"] = kv.Value.Files,
+                ["ok"] = kv.Value.Ok, ["report"] = kv.Value.Report, ["when"] = W(kv.Value.When), ["files"] = kv.Value.Files,
             }))), ["changes"] = new JsonArray(s.Changes.Select(c => (JsonNode)c).ToArray()),
             ["last_changes"] = new JsonArray(s.LastChanges.Select(c => (JsonNode)new JsonObject
             {
@@ -414,9 +514,9 @@ public sealed partial class LibraryWeb
         var s = Canvas.Settings;
         string say = flash switch
         {
-            "found" => "<div class=\"notice good\"><div>Found your Canvas courses. Pick one for each class.</div></div>",
-            "unreachable" => "<div class=\"notice\"><div>Chrome didn't answer. Set up the extension below, keep Chrome open and signed in to Canvas, then try again.</div></div>",
-            "extension" => "<div class=\"notice good\"><div>The extension's folder is ready. Load it in Chrome as below.</div></div>",
+            FindOutcome.Found => $"<div class=\"notice good\"><div>{Ui.Esc(FindOutcome.Say(FindOutcome.Found))}</div></div>",
+            FindOutcome.NoAddress or FindOutcome.SignedOut or FindOutcome.NoExtension or FindOutcome.Away or FindOutcome.Other =>
+                $"<div class=\"notice\"><div>{Ui.Esc(FindOutcome.Say(flash, flash == FindOutcome.Other ? lastFindError : ""))}</div></div>",
             "saved" => "<div class=\"notice good\"><div>Saved. Canvas syncs within a minute while Chrome is open.</div></div>",
             "scout" => "<div class=\"notice good\"><div>Exploring. It takes a few minutes; what it finds lands in the class's Canvas folder.</div></div>",
             _ => "",
@@ -451,8 +551,11 @@ public sealed partial class LibraryWeb
                 + "outside modules, links to Box or Google Drive), saves what the sync misses, and writes a short guide to where things are.</p>";
         }
         string synced = DateTimeOffset.TryParse(s.LastSync, out var t) ? t.LocalDateTime.ToString("ddd d MMM, h:mm tt", CultureInfo.InvariantCulture) : "Never";
-        string seen = DateTimeOffset.TryParse(s.ExtensionSeen, out var e) && DateTimeOffset.Now - e < TimeSpan.FromMinutes(5) ? "Connected" : s.ExtensionSeen.Length > 0 ? "Not lately (is Chrome open?)" : "Not set up";
+        string seen = s.ExtensionConnected(DateTimeOffset.Now) ? "Connected"
+            : refusedAt is not null || s.ExtensionSeen.Length > 0 && !s.LastKeyMatches ? "Chrome has an old key: connect it again"
+            : s.SeenWithKey.Length > 0 ? "Not lately (is Chrome open?)" : "Not set up";
         string folder = Extension.Folder(cfg.Home);
+        string where = Extension.Ready(folder) ? $"<code>{Ui.Esc(folder)}</code>" : $"<code>{Ui.Esc(folder)}</code> (not ready: restart Study Stash)";
         return $"<div class=\"group-head\" id=\"canvas\">Canvas</div>{say}<form method=\"post\" action=\"/settings/canvas\"><div class=\"group\">"
             + $"<div class=\"row\"><label class=\"grow\" for=\"canvas_url\">Your school's Canvas</label><input id=\"canvas_url\" name=\"canvas_url\" type=\"text\" value=\"{Ui.Esc(s.Url)}\" placeholder=\"school.instructure.com\" style=\"width:16rem\"></div>"
             + rows
@@ -464,9 +567,9 @@ public sealed partial class LibraryWeb
             + "assignments and instructions, your submissions and feedback, modules, files and announcements, into each class's Canvas folder.</p>"
             + scouts
             + "<details class=\"help\"><summary>Set up the Chrome extension on this computer</summary><div class=\"group\">"
-            + "<form class=\"row\" method=\"post\" action=\"/settings/canvas/extension\"><span class=\"grow\">1. Make the extension's folder</span><button>Make it</button></form>"
-            + "<div class=\"row\"><span class=\"grow\">2. In Chrome, open chrome://extensions and turn on Developer mode</span></div>"
-            + $"<div class=\"row\"><span class=\"grow\">3. Click Load unpacked and pick <code>{Ui.Esc(folder)}</code></span></div>"
+            + $"<div class=\"row\"><span class=\"grow\">The extension's folder is ready: {where}</span></div>"
+            + "<div class=\"row\"><span class=\"grow\">1. In Chrome, open chrome://extensions and turn on Developer mode</span></div>"
+            + "<div class=\"row\"><span class=\"grow\">2. Click Load unpacked and pick that folder</span></div>"
             + "</div><p class=\"group-foot\">On a laptop that reaches this library from elsewhere, set it up from the Study Stash app's Settings instead.</p></details>";
     }
 
@@ -486,7 +589,8 @@ public sealed partial class LibraryWeb
             }
             s.SyncNow = true;
         });
-        if (Directory.Exists(Extension.Folder(cfg.Home))) PrepareExtensionHere(); // its Canvas address may have changed
+        EnsureHere(); // its Canvas address may have changed
+        Canvas.Nudge();
         return Http.SeeOther("/settings?canvas=saved#canvas");
     });
 }

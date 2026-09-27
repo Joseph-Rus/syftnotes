@@ -10,7 +10,7 @@ namespace StudyStash.App;
 /// </summary>
 static class Program
 {
-    /// <summary>Where settings, recordings and the model live (~/.study-stash, an older ~/.granola-share, or --home).</summary>
+    /// <summary>Where settings, recordings and the model live (~/.study-stash, or --home).</summary>
     public static string Home { get; private set; } = Configs.DefaultHome;
 
     /// <summary>Started at login: stay in the menu bar or tray, open no window.</summary>
@@ -25,7 +25,12 @@ static class Program
     [STAThread]
     public static int Main(string[] args)
     {
-        if (StudyStash.Library.Cli.IsCommand(args)) return StudyStash.Library.Cli.RunAsync(args).GetAwaiter().GetResult();
+        if (StudyStash.Library.Cli.IsCommand(args))
+        {
+            // The library this app runs starts at login the way the app does: its login item, only when asked.
+            StudyStash.Library.Cli.LoginItems = home => new(() => Desktop.StartsAtLogin(home), on => Desktop.StartAtLogin(on, home));
+            return StudyStash.Library.Cli.RunAsync(args).GetAwaiter().GetResult();
+        }
         int at = Array.IndexOf(args, "--home");
         if (at >= 0 && at + 1 < args.Length) Home = Path.GetFullPath(Py.ExpandUser(args[at + 1]));
         Background = args.Contains("--background");
@@ -44,7 +49,10 @@ static class Program
         // has nothing to show, so it just goes.
         if (!Desktop.Claim(Home))
         {
-            string? word = args.Contains("--record") ? "record" : Background ? null : "show";
+            int show = Array.IndexOf(args, "--show");
+            string? word = args.Contains("--record") ? "record"
+                : show >= 0 && show + 1 < args.Length ? args[show + 1]
+                : Background ? null : "show";
             Log(word is null ? "[app] Study Stash is already running for this folder; this copy, started at login, goes"
                 : Desktop.HandOff(Home, word) ? $"[app] Study Stash is already running for this folder: handed it \"{word}\""
                 : "[app] Study Stash is already running for this folder but didn't answer in 5 seconds; this copy goes");

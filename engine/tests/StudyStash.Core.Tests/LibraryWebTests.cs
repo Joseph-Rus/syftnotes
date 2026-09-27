@@ -106,7 +106,7 @@ public class LibraryWebTests
     }
 
     [Fact]
-    public async Task No_page_mentions_granola()
+    public async Task Every_page_opens_and_a_lecture_says_it_was_recorded()
     {
         using var dir = new TempDir();
         var cfg = new Config(dir["home"], dir["pool"])
@@ -141,9 +141,6 @@ public class LibraryWebTests
             Assert.True(r.StatusCode == HttpStatusCode.OK, $"{path}: {(int)r.StatusCode}");
             pages[path] = await r.Content.ReadAsStringAsync();
         }
-        foreach (var (path, html) in pages)
-            Assert.False(html.Contains("granola", StringComparison.OrdinalIgnoreCase), $"{path} mentions Granola");
-
         // Each lecture says where its notes came from, in a recording's terms.
         string recorded = pages["/note/r1"];
         Assert.Contains("<dt>Summary</dt><dd>No study notes yet</dd>", recorded);
@@ -259,7 +256,6 @@ public class LibraryWebTests
         Assert.Contains("<span class=\"value\">pw</span>", s);
         Assert.Contains("/Study-Stash-Laptop.dmg\">Mac</a>", s);
         Assert.Contains("/Study-Stash-Laptop-Setup.exe\">Windows</a>", s);
-        Assert.DoesNotContain("GRANOLA", s);
         Assert.Contains("Rewrite summary", await c.Text("/note/n1"));
 
         var r = await c.PostForm("/settings",

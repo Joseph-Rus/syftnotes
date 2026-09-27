@@ -293,12 +293,16 @@ public static class CanvasWords
     /// library sends — it's connected with an extension update still to show.</summary>
     public static StateCopy Describe(CanvasApi.State s, TimeZoneInfo zone)
     {
-        string status = s.Status == "connected" && s.Extension?.Updated is not null ? "updated" : s.Status;
+        string status = s.Status == "connected" && s.Extension?.Updated is not null ? "updated"
+            // A Chrome from an earlier setup, with a key this library no longer takes: it needs adding again.
+            : s.Status == "no_extension" && (s.Extension?.RefusedAt is not null || s.Extension is { KeyMatches: false, LastSeen: not null }) ? "old_key"
+            : s.Status;
         string C(DateTimeOffset? at) => at is { } a ? Clock(a, zone) : "";
         return status switch
         {
             "not_set_up" => new StateCopy("Connect Canvas", "Bring in assignments, due dates and course files next to your lectures."),
             "no_extension" => new StateCopy("Finish setting up the Chrome extension", "It takes three clicks in Chrome."),
+            "old_key" => new StateCopy("Connect Chrome again", "Chrome has the extension from an earlier setup. Add it again from this library so Canvas can sync."),
             "chrome_away" => new StateCopy("Is Chrome open?", $"Chrome last checked in at {C(s.Extension?.Seen)}. Canvas syncs only while Chrome is open."),
             "signed_out" => new StateCopy("Sign in to Canvas in Chrome", "Syncing waits until you do."),
             "syncing" => new StateCopy($"Syncing… {s.Syncing?.Left ?? 0} left", $"{JoinAnd(s.Syncing?.Classes ?? [])}."),

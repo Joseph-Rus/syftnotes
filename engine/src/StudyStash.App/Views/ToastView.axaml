@@ -1,27 +1,85 @@
-<!-- A notification in the design's look: "Filed in CS 101", with a button to open what it's about. -->
+<!-- A notification that looks like the system's own: one plain panel, the app's icon, a title, a line or two, and at
+     most two quiet buttons. On a Mac, a banner (the × shows when the pointer is over it); on Windows, a Windows 11
+     toast (the app's name and × along the top). Every toast the app shows, Canvas's included, is one of these. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.ToastView"
+             x:DataType="v:ToastView"
              x:Name="Root"
-             Width="340" ClipToBounds="False">
-  <Border Name="Card" Padding="14,12" ClipToBounds="False">
-    <Grid ColumnDefinitions="Auto,12,*,Auto">
-      <Border Width="32" Height="32" CornerRadius="8" Background="{DynamicResource Accent}" VerticalAlignment="Top">
-        <c:Icon Glyph="graphic_eq" Size="20" Foreground="{DynamicResource OnAccent}" />
-      </Border>
-      <StackPanel Grid.Column="2" Spacing="2">
-        <TextBlock Name="TitleText" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" />
-        <TextBlock Name="BodyText" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" LineHeight="17" />
-        <Button Name="ActionButton" Theme="{StaticResource Surface}" HorizontalAlignment="Left" Margin="0,6,0,0" Padding="10,0" Height="26" CornerRadius="6"
-                Background="{DynamicResource Fill2}">
-          <TextBlock Name="ActionText" FontSize="12" FontWeight="Medium" VerticalAlignment="Center" />
+             Width="356" ClipToBounds="False">
+  <UserControl.Styles>
+    <Style Selector="Button.toast-btn">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="MinWidth" Value="64" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="{DynamicResource Fill2}" />
+    </Style>
+    <Style Selector="v|ToastView.win Button.toast-btn">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="{DynamicResource Subtle2}" />
+    </Style>
+    <!-- Windows' × is in its header. A Mac banner shows its × only under the pointer, where the time was. -->
+    <Style Selector="v|ToastView.win Button#MacClose">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="v|ToastView.mac Button#MacClose">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="v|ToastView.mac:pointerover Button#MacClose">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="v|ToastView.mac:pointerover TextBlock#WhenText">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+  </UserControl.Styles>
+  <Border Name="Card" ClipToBounds="False">
+    <StackPanel>
+      <!-- Windows: the app's name along the top, with the × -->
+      <Grid Name="WinHeader" ColumnDefinitions="Auto,8,*,Auto" Margin="0,0,0,10" IsVisible="False">
+        <Image Source="avares://StudyStash/Assets/icon.png" Width="16" Height="16" RenderOptions.BitmapInterpolationMode="HighQuality"
+               VerticalAlignment="Center" />
+        <TextBlock Grid.Column="2" Text="Study Stash" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+        <Button Name="WinClose" Grid.Column="3" Theme="{StaticResource Surface}" Width="24" Height="24" CornerRadius="4" Margin="0,-4,-6,-4"
+                HorizontalContentAlignment="Center" ToolTip.Tip="Dismiss">
+          <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
         </Button>
-      </StackPanel>
-      <Button Name="CloseButton" Grid.Column="3" Theme="{StaticResource Surface}" Width="22" Height="22" CornerRadius="11" VerticalAlignment="Top"
-              HorizontalContentAlignment="Center" ToolTip.Tip="Dismiss">
-        <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg3}" />
-      </Button>
-    </Grid>
+      </Grid>
+      <Grid ColumnDefinitions="Auto,*">
+        <Border Name="MacIcon" Width="32" Height="32" CornerRadius="7" ClipToBounds="True" Margin="0,1,10,0" VerticalAlignment="Top">
+          <Image Source="avares://StudyStash/Assets/icon.png" RenderOptions.BitmapInterpolationMode="HighQuality" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="1">
+          <Grid ColumnDefinitions="*,Auto" MinHeight="18">
+            <TextBlock Name="TitleText" Text="{Binding #Root.Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center" />
+            <Panel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+              <TextBlock Name="WhenText" Text="{Binding #Root.When}" IsVisible="{Binding #Root.When, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                         FontSize="12" Foreground="{DynamicResource Fg3}" HorizontalAlignment="Right" VerticalAlignment="Center" />
+              <Button Name="MacClose" Theme="{StaticResource Surface}" Width="18" Height="18" CornerRadius="9" Margin="0,0,-4,0"
+                      HorizontalAlignment="Right" HorizontalContentAlignment="Center" Background="{DynamicResource Fill2}" ToolTip.Tip="Dismiss">
+                <c:Icon Glyph="close" Size="12" Foreground="{DynamicResource Fg2}" />
+              </Button>
+            </Panel>
+          </Grid>
+          <TextBlock Name="BodyText" Text="{Binding #Root.Text}" IsVisible="{Binding #Root.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                     FontSize="12" LineHeight="16" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+          <Grid Name="Actions" Margin="0,8,0,0">
+            <Button Name="ActionButton" Classes="toast-btn">
+              <TextBlock Text="{Binding #Root.ActionLabel}" FontSize="12" FontWeight="Medium" />
+            </Button>
+            <Button Name="SecondButton" Classes="toast-btn">
+              <TextBlock Text="{Binding #Root.SecondLabel}" FontSize="12" FontWeight="Medium" />
+            </Button>
+          </Grid>
+        </StackPanel>
+      </Grid>
+    </StackPanel>
   </Border>
 </UserControl>

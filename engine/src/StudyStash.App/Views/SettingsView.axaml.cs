@@ -1,5 +1,7 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
+using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
 
 namespace StudyStash.App.Views;
@@ -18,21 +20,41 @@ public partial class SettingsView : UserControl
         // shape as a by-look DynamicResource pair and would otherwise treat "mac"/"win" as token names.
         if (mac) Classes.Add("mac"); else Classes.Add("win");
         Cols.ColumnDefinitions[0].Width = new GridLength(mac ? 220 : 240);
+        Header.Title = mac ? "Settings" : "Study Stash settings";
         // Fixed, like the design's canvas: set here (not by a style on the root matching itself) so it always wins.
         Width = 900;
         Height = mac ? 780 : 860;
+        // The library's fields save when they're left, or on Return.
+        LibraryName.LostFocus += (_, _) => Run(m => m.Lib.SaveNameCommand);
+        OnReturn(LibraryName, m => m.Lib.SaveNameCommand);
+        OnReturn(NewPassword, m => m.Lib.SavePasswordCommand);
+        OnReturn(NewLibraryClass, m => m.Lib.AddClassCommand);
+        OnReturn(NewFolder, m => m.Lib.AddFolderCommand);
     }
 
-    /// <summary>A real window has the system's traffic lights (Mac) or caption buttons (Windows); screenshots draw
-    /// their own mockups instead.</summary>
+    void Run(Func<SettingsModel, IAsyncRelayCommand> command)
+    {
+        if (DataContext is SettingsModel m) command(m).Execute(null);
+    }
+
+    void OnReturn(TextBox box, Func<SettingsModel, IAsyncRelayCommand> command) => box.KeyDown += (_, e) =>
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        Run(command);
+    };
+
+    void OnClassLostFocus(object? sender, RoutedEventArgs e) => Run(m => m.Lib.SaveClassesCommand);
+
+    /// <summary>A real window has the system's traffic lights (Mac) or caption buttons (Windows) in its title bar;
+    /// screenshots draw their own there instead.</summary>
     public bool DrawChrome
     {
         get => drawChrome;
         set
         {
             drawChrome = value;
-            Lights.IsVisible = value && Skin.Current == SkinKind.Mac;
-            Captions.IsVisible = value && Skin.Current == SkinKind.Win;
+            Header.DrawChrome = value;
             // The Mac's own radius/shadow are for a screenshot only (a real window is already rounded by the OS).
             Chrome.Classes.Set("chrome", value);
         }

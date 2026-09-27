@@ -58,6 +58,15 @@
     </ControlTheme>
   </Styles.Resources>
 
+  <!-- A ticked box takes the colour theme's accent, not the system's blue. -->
+  <Style Selector="CheckBox:checked /template/ Border#NormalRectangle, CheckBox:checked:pointerover /template/ Border#NormalRectangle, CheckBox:checked:pressed /template/ Border#NormalRectangle">
+    <Setter Property="Background" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="CheckBox:checked /template/ Path#CheckGlyph, CheckBox:checked:pointerover /template/ Path#CheckGlyph, CheckBox:checked:pressed /template/ Path#CheckGlyph">
+    <Setter Property="Fill" Value="{DynamicResource OnAccent}" />
+  </Style>
+
   <Style Selector="TextBlock">
     <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
   </Style>
@@ -146,5 +155,27 @@
   <Style Selector="Border.fill2">
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
     <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
+  </Style>
+
+  <!-- Menus (the dropdown's class picker, the library's ••• and Move): one plain, neutral panel like the system's, the
+       look's own radius, no colour. -->
+  <Style Selector="ContextMenu">
+    <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
+    <Setter Property="BorderThickness" Value="{DynamicResource PopupStrokeWidth}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusMenu}" />
+    <Setter Property="Padding" Value="5" />
+    <Setter Property="MinWidth" Value="200" />
+    <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+  </Style>
+  <Style Selector="ContextMenu MenuItem">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    <Setter Property="Padding" Value="10,5" />
+  </Style>
+  <Style Selector="ContextMenu Separator">
+    <Setter Property="Background" Value="{DynamicResource Sep}" />
+    <Setter Property="Margin" Value="8,4" />
   </Style>
 </Styles>

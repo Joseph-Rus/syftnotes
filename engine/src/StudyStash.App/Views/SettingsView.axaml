@@ -19,6 +19,7 @@
              xmlns:app="using:StudyStash.App"
              xmlns:c="using:StudyStash.App.Controls"
              xmlns:v="using:StudyStash.App.Views"
+             xmlns:vm="using:StudyStash.App.ViewModels"
              x:Class="StudyStash.App.Views.SettingsView"
              x:DataType="s:SettingsModel"
              ClipToBounds="False">
@@ -44,35 +45,15 @@
       <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
     </Style>
 
-    <!-- Windows' title row: a 16 px accent app mark, the window's name, and (for shots) its own caption buttons. -->
-    <Style Selector="Grid.titlebar">
-      <Setter Property="IsVisible" Value="False" />
-    </Style>
-    <Style Selector=".win Grid.titlebar">
-      <Setter Property="IsVisible" Value="True" />
-    </Style>
-    <Style Selector="Border.appmark">
-      <Setter Property="Width" Value="16" />
-      <Setter Property="Height" Value="16" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Background" Value="{DynamicResource Accent}" />
-    </Style>
-    <Style Selector="Button.caption">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="46" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
-    </Style>
-
-    <!-- The sidebar: Mac an inset floating glass panel with traffic-light room; Windows plain, flush on the Mica. -->
+    <!-- The sidebar: Mac an inset floating glass panel below the title bar; Windows plain, flush on the Mica. -->
     <Style Selector="c|Glass.side">
       <Setter Property="ClipToBounds" Value="False" />
     </Style>
     <Style Selector=".mac c|Glass.side">
       <Setter Property="CornerRadius" Value="18" />
       <Setter Property="BoxShadow" Value="{DynamicResource SideGlassShadow}" />
-      <Setter Property="Margin" Value="8,8,0,8" />
-      <Setter Property="Padding" Value="10,0,10,14" />
+      <Setter Property="Margin" Value="8,0,0,8" />
+      <Setter Property="Padding" Value="10,10,10,14" />
     </Style>
     <Style Selector=".win c|Glass.side">
       <Setter Property="Background" Value="Transparent" />
@@ -127,6 +108,27 @@
       <Setter Property="IsVisible" Value="True" />
     </Style>
 
+    <!-- The sidebar's two groups: this computer's settings, then the library's own. -->
+    <Style Selector="TextBlock.navgroup">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector=".mac TextBlock.navgroup">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
+      <Setter Property="Margin" Value="10,4,0,4" />
+    </Style>
+    <Style Selector=".win TextBlock.navgroup">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="Margin" Value="12,6,0,4" />
+    </Style>
+    <Style Selector=".mac TextBlock.navgroup.second">
+      <Setter Property="Margin" Value="10,16,0,4" />
+    </Style>
+    <Style Selector=".win TextBlock.navgroup.second">
+      <Setter Property="Margin" Value="12,18,0,4" />
+    </Style>
+
     <!-- The content page: Mac sits right on the window's Win colour; Windows is an inset Layer with its own corner. -->
     <Style Selector=".win Border.page">
       <Setter Property="Background" Value="{DynamicResource Layer}" />
@@ -135,7 +137,7 @@
       <Setter Property="CornerRadius" Value="8,0,0,0" />
     </Style>
     <Style Selector=".mac StackPanel.pagebody">
-      <Setter Property="Margin" Value="40,40,40,32" />
+      <Setter Property="Margin" Value="40,12,40,32" />
       <Setter Property="Spacing" Value="24" />
     </Style>
     <Style Selector=".win StackPanel.pagebody">
@@ -204,6 +206,20 @@
     <Style Selector=".win TextBlock.section">
       <Setter Property="FontSize" Value="14" />
     </Style>
+    <!-- A header that starts a new part of a page: a little more room above it than between its own rows. -->
+    <Style Selector=".mac TextBlock.section.gap">
+      <Setter Property="Margin" Value="4,10,4,0" />
+    </Style>
+    <Style Selector=".win TextBlock.section.gap">
+      <Setter Property="Margin" Value="0,10,0,0" />
+    </Style>
+    <!-- A list's rows in one group: a hairline above every row but the first. -->
+    <Style Selector="Border.itemsep">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="ContentPresenter:nth-child(n+2) Border.itemsep">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
 
     <!-- A group of rows: Mac one rounded card; Windows nothing itself (its rows are each their own card, "choice"). -->
     <Style Selector="Border.group">
@@ -249,6 +265,25 @@
     </Style>
     <Style Selector=".win TextBlock.row-sub">
       <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- A hairline between two rows of a group, from the rows' text edge to the right. -->
+    <Style Selector="Border.rowsep">
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Background" Value="{DynamicResource Sep}" />
+      <Setter Property="Margin" Value="16,0,0,0" />
+    </Style>
+    <Style Selector=".mac Border.rowsep">
+      <Setter Property="Height" Value="0.5" />
+    </Style>
+    <!-- A row's action column: whatever sits there (a switch, a select, a button) lines up at the right edge and on
+         the row's centre line. -->
+    <Style Selector="Border.row > Grid > :is(Control).act">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="TextBlock.plain">
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
 
     <!-- A small button (Options, Add, Save…), "primary" for the section's default action. -->
@@ -405,6 +440,13 @@
     <Style Selector=".win TextBlock.swatchname">
       <Setter Property="FontSize" Value="12" />
     </Style>
+    <Style Selector=".mac Button.select TextBlock">
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector=".win Button.select TextBlock">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+
     <!-- An engine's problems sit above the AI engines pane, lined up with its own padding. -->
     <Style Selector=".mac UserControl.problems">
       <Setter Property="Margin" Value="40,32,40,-16" />
@@ -418,43 +460,54 @@
     </Style>
   </UserControl.Styles>
 
+  <UserControl.Resources>
+    <!-- A select's menu: one plain, neutral panel, like the menus elsewhere in the app. -->
+    <ControlTheme x:Key="SettingsMenu" TargetType="MenuFlyoutPresenter" BasedOn="{StaticResource {x:Type MenuFlyoutPresenter}}">
+      <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource PopupStrokeWidth}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusMenu}" />
+      <Setter Property="Padding" Value="5" />
+      <Setter Property="MinWidth" Value="180" />
+    </ControlTheme>
+    <DataTemplate x:Key="NavRow" x:DataType="s:NavItem">
+      <Button Classes="nav" Classes.on="{Binding On}" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).GoCommand}" CommandParameter="{Binding Id}">
+        <Panel>
+          <Border Classes="indicator" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" Margin="-12,0,0,0" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <c:Icon Classes="navicon" Glyph="{Binding Glyph}" Size="16" />
+            <TextBlock Classes="navlabel" Text="{Binding Label}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Panel>
+      </Button>
+    </DataTemplate>
+    <!-- A select's item: the menu's own item, bound to its choice (a MenuItem inside an item template would sit in the
+         real item's header, and picking it did nothing). -->
+    <ControlTheme x:Key="PickItem" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:SettingChoice">
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="Padding" Value="10,5" />
+      <Setter Property="Header" Value="{Binding Label}" />
+      <Setter Property="Command" Value="{Binding Pick}" />
+    </ControlTheme>
+  </UserControl.Resources>
+
   <Border Name="Chrome">
     <DockPanel>
-      <Grid Name="TitleBar" Classes="titlebar" DockPanel.Dock="Top" Height="32" ColumnDefinitions="Auto,*,Auto">
-        <StackPanel Orientation="Horizontal" Spacing="10" Margin="16,0,0,0" VerticalAlignment="Center">
-          <Border Classes="appmark"><c:Icon Glyph="graphic_eq" Size="12" Foreground="{DynamicResource OnAccent}" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border>
-          <TextBlock Text="Study Stash settings" FontSize="12" VerticalAlignment="Center" />
-        </StackPanel>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" Name="Captions" IsVisible="False">
-          <Button Classes="caption"><c:Icon Glyph="remove" Size="15" Foreground="{DynamicResource Fg}" /></Button>
-          <Button Classes="caption"><c:Icon Glyph="crop_square" Size="13" Foreground="{DynamicResource Fg}" /></Button>
-          <Button Classes="caption"><c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg}" /></Button>
-        </StackPanel>
-      </Grid>
+      <!-- The title bar: drag the window by it; the system's window buttons sit in it. -->
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" />
 
       <Grid Name="Cols" ColumnDefinitions="220,*">
         <c:Glass Classes="side">
           <StackPanel Spacing="2">
-            <StackPanel Name="Lights" Orientation="Horizontal" Spacing="8" Height="44" Margin="8,0,0,0" VerticalAlignment="Center" IsVisible="False">
-              <Ellipse Width="12" Height="12" Fill="#FF5F57" />
-              <Ellipse Width="12" Height="12" Fill="{DynamicResource Fill2}" />
-              <Ellipse Width="12" Height="12" Fill="{DynamicResource Fill2}" />
-            </StackPanel>
-            <ItemsControl ItemsSource="{Binding NavItems}">
+            <TextBlock Classes="navgroup" Text="{Binding ComputerNavTitle}" />
+            <ItemsControl ItemsSource="{Binding ComputerNav}" ItemTemplate="{StaticResource NavRow}">
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="s:NavItem">
-                  <Button Classes="nav" Classes.on="{Binding On}" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).GoCommand}" CommandParameter="{Binding Id}">
-                    <Panel>
-                      <Border Classes="indicator" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" Margin="-12,0,0,0" />
-                      <StackPanel Orientation="Horizontal" Spacing="10">
-                        <c:Icon Classes="navicon" Glyph="{Binding Glyph}" Size="16" />
-                        <TextBlock Classes="navlabel" Text="{Binding Label}" VerticalAlignment="Center" />
-                      </StackPanel>
-                    </Panel>
-                  </Button>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="navgroup second" Text="Your library" />
+            <ItemsControl ItemsSource="{Binding LibraryNav}" ItemTemplate="{StaticResource NavRow}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
             </ItemsControl>
           </StackPanel>
         </c:Glass>
@@ -527,9 +580,9 @@
                 <TextBlock Classes="say" Text="The accent for buttons, the selection and highlights. Your class colours stay the same." />
               </StackPanel>
 
-              <!-- Library -->
-              <StackPanel IsVisible="{Binding OnLibrary}" Spacing="8">
-                <TextBlock Classes="h" Text="Library" />
+              <!-- Connection: which library this computer uses (and, where it runs one, that library's process) -->
+              <StackPanel IsVisible="{Binding OnConnection}" Spacing="8">
+                <TextBlock Classes="h" Text="Connection" />
                 <TextBlock Classes="body" Text="{Binding LibraryLine}" />
                 <TextBlock Classes="section" Text="Connect to a library" />
                 <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left">
@@ -543,7 +596,7 @@
                 <TextBlock Classes="say" Text="{Binding LibrarySay}" IsVisible="{Binding LibrarySay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <TextBlock Classes="section" Text="Your name in the library" />
                 <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding DisplayName}" FontSize="13" /></Border>
-                <TextBlock Classes="say" IsVisible="{Binding LibraryHere}" Text="This computer is a library too: it runs while Study Stash is open. Turn on Start at login in General to keep it running. The page above has its own settings (the notes model, classes, the password)." />
+                <TextBlock Classes="say" IsVisible="{Binding LibraryHere}" Text="This computer is a library too: it runs while Study Stash is open. Turn on Start at login in General to keep it running. Its own settings are under Your library." />
                 <TextBlock Classes="say" IsVisible="{Binding LibraryHere}" Text="{Binding LibraryServiceLine}" />
                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0" IsVisible="{Binding LibraryHere}">
                   <Button Classes="pill" Command="{Binding StartLibraryCommand}" IsVisible="{Binding CanStartLibrary}"><TextBlock Text="Start" FontSize="13" /></Button>
@@ -593,9 +646,9 @@
                 </CheckBox>
               </StackPanel>
 
-              <!-- Classes -->
-              <StackPanel IsVisible="{Binding OnClasses}" Spacing="8">
-                <TextBlock Classes="h" Text="Classes" />
+              <!-- Timetable -->
+              <StackPanel IsVisible="{Binding OnTimetable}" Spacing="8">
+                <TextBlock Classes="h" Text="Timetable" />
                 <TextBlock Classes="body" Text="When your classes meet: Record picks the one that's on. Write the days and times like “Tue Thu 10:00–11:15”." />
                 <ItemsControl ItemsSource="{Binding Rows}" Margin="0,8,0,0" MaxWidth="520" HorizontalAlignment="Left">
                   <ItemsControl.ItemTemplate>
@@ -620,6 +673,368 @@
                   <Button Grid.Column="4" Classes="pill" Command="{Binding AddClassCommand}"><TextBlock Text="Add" FontSize="13" /></Button>
                 </Grid>
                 <TextBlock Classes="say" Text="{Binding ClassesSay}" IsVisible="{Binding ClassesSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              </StackPanel>
+
+              <!-- Your library: its own settings, through its API (Library, Classes, Notes and sorting, Folders). Every
+                   row is one grid: its words on the left, its control in the right column on the row's centre line. -->
+              <StackPanel IsVisible="{Binding OnLibraryPage}" Spacing="8">
+                <TextBlock Classes="h" Text="{Binding LibraryPageTitle}" />
+                <TextBlock Classes="body" Text="{Binding LibraryPageLine}" />
+                <TextBlock Classes="say" Text="Asking your library…" IsVisible="{Binding Lib.IsLoading}" />
+                <Border Classes="group" IsVisible="{Binding Lib.ShowProblem}">
+                  <Border Classes="row">
+                    <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+                      <c:Icon Glyph="info" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Lib.Problem}" TextWrapping="Wrap" />
+                      <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Classes="pill" Command="{Binding Lib.LoadCommand}" IsVisible="{Binding Lib.CanRetry}"><TextBlock Text="Try again" FontSize="13" /></Button>
+                        <Button Classes="pill" Command="{Binding Lib.OpenLibraryPageCommand}" IsVisible="{Binding Lib.CanOpenPage}"><TextBlock Text="Open its page" FontSize="13" /></Button>
+                        <Button Classes="pill" Command="{Binding GoCommand}" CommandParameter="Connection" IsVisible="{Binding Lib.IsNoLibrary}"><TextBlock Text="Connection" FontSize="13" /></Button>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </Border>
+                <TextBlock Classes="say" Text="{Binding Lib.Say}" IsVisible="{Binding Lib.Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <StackPanel IsVisible="{Binding Lib.IsReady}" Spacing="8">
+                  <!-- Library -->
+                  <StackPanel IsVisible="{Binding OnLibrary}" Spacing="8">
+                    <TextBlock Classes="section gap" Text="Name and password" />
+                    <Border Classes="group">
+                      <StackPanel>
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Name" />
+                              <TextBlock Classes="row-sub" Text="What your laptop and the library's pages call it" />
+                            </StackPanel>
+                            <Border Grid.Column="1" Classes="field act" Width="220">
+                              <TextBox Name="LibraryName" Classes="bare" Text="{Binding Lib.Name}" FontSize="13" VerticalAlignment="Center" />
+                            </Border>
+                          </Grid>
+                        </Border>
+                        <Border Classes="rowsep" />
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Password" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.PasswordLine}" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.ChangePasswordCommand}" IsVisible="{Binding !Lib.ChangingPassword}"><TextBlock Text="Change…" FontSize="13" /></Button>
+                            <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Lib.ChangingPassword}">
+                              <Border Classes="field" Width="180">
+                                <TextBox Name="NewPassword" Classes="bare" Text="{Binding Lib.NewPassword}" PasswordChar="•" PlaceholderText="New password" FontSize="13" VerticalAlignment="Center" />
+                              </Border>
+                              <Button Classes="pill" Command="{Binding Lib.ChangePasswordCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
+                              <Button Classes="pill primary" Command="{Binding Lib.SavePasswordCommand}"><TextBlock Text="Save" FontSize="13" FontWeight="Medium" /></Button>
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                      </StackPanel>
+                    </Border>
+                    <TextBlock Classes="say" Text="{Binding Lib.PasswordSay}" IsVisible="{Binding Lib.PasswordSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                    <TextBlock Classes="section gap" Text="How your laptop reaches it" />
+                    <Border Classes="group">
+                      <ItemsControl ItemsSource="{Binding Lib.Addresses}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="x:String">
+                            <StackPanel>
+                            <Border Classes="rowsep itemsep" />
+                            <Border Classes="row">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <SelectableTextBlock Classes="row-title" Text="{Binding}" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Classes="pill act" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.CopyAddressCommand}" CommandParameter="{Binding}">
+                                  <TextBlock Text="Copy" FontSize="13" />
+                                </Button>
+                              </Grid>
+                            </Border>
+                            </StackPanel>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </Border>
+                    <TextBlock Classes="say" Text="{Binding Lib.ReachLine}" />
+
+                    <TextBlock Classes="section gap" Text="On its computer" />
+                    <Border Classes="group">
+                      <StackPanel>
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="{Binding Lib.StartAtLoginTitle}" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.StartAtLoginSub}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.StartAtLoginOn}" IsEnabled="{Binding Lib.CanStartAtLogin}" Margin="12,0,0,0" />
+                          </Grid>
+                        </Border>
+                        <Border Classes="rowsep" />
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Notes folder" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.NotesFolder}" TextTrimming="PrefixCharacterEllipsis" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.ShowNotesFolderCommand}" IsVisible="{Binding Lib.IsHere}" Margin="12,0,0,0">
+                              <TextBlock Text="{Binding Lib.RevealLabel}" FontSize="13" />
+                            </Button>
+                          </Grid>
+                        </Border>
+                      </StackPanel>
+                    </Border>
+
+                    <TextBlock Classes="section gap" Text="Updates" />
+                    <Border Classes="group">
+                      <StackPanel>
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="row-title" Text="{Binding Lib.UpdateLine}" TextWrapping="Wrap" />
+                            <Button Grid.Column="1" Classes="pill primary act" Command="{Binding Lib.UpdateNowCommand}" IsVisible="{Binding Lib.CanUpdateNow}" Margin="12,0,0,0">
+                              <TextBlock Text="Update now" FontSize="13" FontWeight="Medium" />
+                            </Button>
+                          </Grid>
+                        </Border>
+                        <Border Classes="rowsep" />
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Update automatically" />
+                              <TextBlock Classes="row-sub" Text="The library installs each new version by itself" />
+                            </StackPanel>
+                            <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.AutoUpdate}" />
+                          </Grid>
+                        </Border>
+                      </StackPanel>
+                    </Border>
+                  </StackPanel>
+
+                  <!-- Classes: each its own card, the name, other names and what it covers lined up in columns -->
+                  <StackPanel IsVisible="{Binding OnClasses}" Spacing="8">
+                    <ItemsControl ItemsSource="{Binding Lib.Classes}" Margin="0,8,0,0">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LibraryClassRow">
+                          <Border Classes="group" Margin="0" Padding="16,12">
+                            <Grid ColumnDefinitions="Auto,12,160,8,*,8,Auto" RowDefinitions="Auto,6,Auto,6,Auto">
+                              <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                              <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
+                              <Border Grid.Column="4" Classes="field"><TextBox Classes="bare" Text="{Binding Aliases}" PlaceholderText="Other names, like cs101" FontSize="13" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
+                              <Button Grid.Column="6" Theme="{StaticResource Surface}" Width="30" Height="30" CornerRadius="{DynamicResource RadiusControl}" HorizontalContentAlignment="Center"
+                                      Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.RemoveClassCommand}" CommandParameter="{Binding}" ToolTip.Tip="Remove the class (its lectures stay)">
+                                <c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg3}" />
+                              </Button>
+                              <Border Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="3" Classes="field">
+                                <TextBox Classes="bare" Text="{Binding Description}" PlaceholderText="What it covers (it helps the AI sort)" FontSize="13" VerticalAlignment="Center" LostFocus="OnClassLostFocus" />
+                              </Border>
+                              <TextBlock Grid.Row="4" Grid.Column="2" Grid.ColumnSpan="3" Classes="row-sub" Text="{Binding Meta}" TextTrimming="PrefixCharacterEllipsis" />
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Border Classes="group" Margin="0" Padding="16,12">
+                      <Grid ColumnDefinitions="Auto,12,160,8,*,8,Auto">
+                        <Ellipse Width="8" Height="8" Fill="{DynamicResource Fill2}" VerticalAlignment="Center" />
+                        <Border Grid.Column="2" Classes="field"><TextBox Name="NewLibraryClass" Classes="bare" Text="{Binding Lib.NewClass}" PlaceholderText="A new class" FontSize="13" VerticalAlignment="Center" /></Border>
+                        <TextBlock Grid.Column="4" Classes="row-sub" Text="Its other names and what it covers come next." VerticalAlignment="Center" />
+                        <Button Grid.Column="6" Classes="pill" Command="{Binding Lib.AddClassCommand}" VerticalAlignment="Center"><TextBlock Text="Add" FontSize="13" /></Button>
+                      </Grid>
+                    </Border>
+                    <TextBlock Classes="say" Text="Renaming or removing a class keeps its lectures where they are." />
+                  </StackPanel>
+
+                  <!-- Notes and sorting -->
+                  <StackPanel IsVisible="{Binding OnNotes}" Spacing="8">
+                    <TextBlock Classes="section gap" Text="Notes" />
+                    <Border Classes="group">
+                      <StackPanel>
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Write study notes from each lecture" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.WriteNotesSub}" />
+                            </StackPanel>
+                            <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.WriteNotes}" />
+                          </Grid>
+                        </Border>
+                        <Border Classes="rowsep" />
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Sort lectures into classes with AI" />
+                              <TextBlock Classes="row-sub" Text="Otherwise only the class it was recorded for, or its title, sorts it" />
+                            </StackPanel>
+                            <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.SortWithAi}" />
+                          </Grid>
+                        </Border>
+                        <Border Classes="rowsep" IsVisible="{Binding Lib.SortWithAi}" />
+                        <Border Classes="row" IsVisible="{Binding Lib.SortWithAi}">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Sorts them with" />
+                              <TextBlock Classes="row-sub" Text="The AI that reads a lecture to pick its class" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="select act" MaxWidth="260">
+                              <Grid ColumnDefinitions="*,6,Auto">
+                                <TextBlock Classes="plain" Text="{Binding Lib.SortEngineLabel}" VerticalAlignment="Center" />
+                                <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
+                              </Grid>
+                              <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SortEngineChoices}" ItemContainerTheme="{StaticResource PickItem}" />
+                              </Button.Flyout>
+                            </Button>
+                          </Grid>
+                        </Border>
+                        <Border Classes="rowsep" />
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Files a lecture when the AI is at least" />
+                              <TextBlock Classes="row-sub" Text="Less sure, and the lecture waits in Unsorted for you" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="select act" MinWidth="90">
+                              <Grid ColumnDefinitions="*,6,Auto">
+                                <TextBlock Text="{Binding Lib.ConfidenceLabel}" VerticalAlignment="Center" />
+                                <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
+                              </Grid>
+                              <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.ConfidenceChoices}" ItemContainerTheme="{StaticResource PickItem}" />
+                              </Button.Flyout>
+                            </Button>
+                          </Grid>
+                        </Border>
+                      </StackPanel>
+                    </Border>
+
+                    <TextBlock Classes="section gap" Text="Local models" />
+                    <Border Classes="group">
+                      <StackPanel>
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Writes the notes" />
+                              <TextBlock Classes="row-sub" Text="When Ollama writes them" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="select act" MaxWidth="260">
+                              <Grid ColumnDefinitions="*,6,Auto">
+                                <TextBlock Classes="plain" Text="{Binding Lib.SummaryLabel}" VerticalAlignment="Center" />
+                                <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
+                              </Grid>
+                              <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SummaryChoices}" ItemContainerTheme="{StaticResource PickItem}" />
+                              </Button.Flyout>
+                            </Button>
+                          </Grid>
+                        </Border>
+                        <Border Classes="rowsep" />
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Sorts lectures into classes" />
+                              <TextBlock Classes="row-sub" Text="When Ollama sorts them" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="select act" MaxWidth="260">
+                              <Grid ColumnDefinitions="*,6,Auto">
+                                <TextBlock Classes="plain" Text="{Binding Lib.SortLabel}" VerticalAlignment="Center" />
+                                <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
+                              </Grid>
+                              <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SortChoices}" ItemContainerTheme="{StaticResource PickItem}" />
+                              </Button.Flyout>
+                            </Button>
+                          </Grid>
+                        </Border>
+                      </StackPanel>
+                    </Border>
+                    <TextBlock Classes="say" Text="{Binding Lib.OllamaLine}" />
+
+                    <TextBlock Classes="section gap" Text="Open in a terminal" IsVisible="{Binding Lib.HasTerminals}" />
+                    <Border Classes="group" IsVisible="{Binding Lib.HasTerminals}">
+                      <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="row-title" Text="Opens a class with Claude Code, Codex or Gemini in" />
+                            <TextBlock Classes="row-sub" Text="On the library's computer" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Classes="select act">
+                            <Grid ColumnDefinitions="*,6,Auto">
+                              <TextBlock Text="{Binding Lib.TerminalLabel}" VerticalAlignment="Center" />
+                              <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
+                            </Grid>
+                            <Button.Flyout>
+                              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.TerminalChoices}" ItemContainerTheme="{StaticResource PickItem}" />
+                            </Button.Flyout>
+                          </Button>
+                        </Grid>
+                      </Border>
+                    </Border>
+
+                    <TextBlock Classes="section gap" Text="Rewrite every summary" />
+                    <Border Classes="group">
+                      <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="row-title" Text="{Binding Lib.RewriteTitle}" />
+                            <TextBlock Classes="row-sub" Text="{Binding Lib.RewriteSub}" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.AskRewriteAllCommand}" IsVisible="{Binding !Lib.ConfirmingRewrite}"><TextBlock Text="Rewrite all…" FontSize="13" /></Button>
+                          <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Lib.ConfirmingRewrite}">
+                            <Button Classes="pill" Command="{Binding Lib.CancelRewriteAllCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
+                            <Button Classes="pill primary" Command="{Binding Lib.RewriteAllCommand}"><TextBlock Text="Rewrite them all" FontSize="13" FontWeight="Medium" /></Button>
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                    </Border>
+                    <TextBlock Classes="say" Text="Useful after switching models. It can take a while." />
+                  </StackPanel>
+
+                  <!-- Folders it may read -->
+                  <StackPanel IsVisible="{Binding OnFolders}" Spacing="8">
+                    <Border Classes="group" Margin="0,8,0,0">
+                      <StackPanel>
+                        <Border Classes="row" IsVisible="{Binding Lib.NoFolders}">
+                          <TextBlock Classes="row-title" Text="No folders yet." Foreground="{DynamicResource Fg2}" />
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding Lib.Folders}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ReadFolderRow">
+                              <StackPanel>
+                              <Border Classes="rowsep itemsep" />
+                              <Border Classes="row">
+                                <Grid ColumnDefinitions="Auto,12,*,16,Auto,8,Auto,16,Auto,8,Auto,8,Auto">
+                                  <c:Icon Glyph="folder" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                  <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                    <TextBlock Classes="row-title" Text="{Binding Name}" />
+                                    <TextBlock Classes="row-sub" Text="{Binding Path}" TextTrimming="PrefixCharacterEllipsis" />
+                                  </StackPanel>
+                                  <TextBlock Grid.Column="4" Classes="row-sub" Text="AI reads" VerticalAlignment="Center" />
+                                  <ToggleButton Grid.Column="6" Classes="switch" IsChecked="{Binding Ai}" VerticalAlignment="Center" />
+                                  <TextBlock Grid.Column="8" Classes="row-sub" Text="Private" VerticalAlignment="Center" />
+                                  <ToggleButton Grid.Column="10" Classes="switch" IsChecked="{Binding Private}" VerticalAlignment="Center" />
+                                  <Button Grid.Column="12" Theme="{StaticResource Surface}" Width="30" Height="30" CornerRadius="{DynamicResource RadiusControl}" HorizontalContentAlignment="Center" VerticalAlignment="Center"
+                                          Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.RemoveFolderCommand}" CommandParameter="{Binding}" ToolTip.Tip="Stop reading this folder">
+                                    <c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg3}" />
+                                  </Button>
+                                </Grid>
+                              </Border>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
+                    <Border Classes="group" Margin="0">
+                      <Border Classes="row">
+                        <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+                          <c:Icon Glyph="add" Size="18" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
+                          <Border Grid.Column="2" Classes="field"><TextBox Name="NewFolder" Classes="bare" Text="{Binding Lib.NewFolder}" PlaceholderText="A folder on the library's computer, like ~/Documents/School" FontSize="13" VerticalAlignment="Center" /></Border>
+                          <Button Grid.Column="4" Classes="pill" Command="{Binding Lib.AddFolderCommand}" VerticalAlignment="Center"><TextBlock Text="Add" FontSize="13" /></Button>
+                        </Grid>
+                      </Border>
+                    </Border>
+                    <TextBlock Classes="say" Text="{Binding Lib.FilesLine}" />
+                  </StackPanel>
+                </StackPanel>
               </StackPanel>
 
               <!-- Canvas: its own pane (design 06), in the page's margins like every other section -->

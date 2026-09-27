@@ -41,6 +41,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     /// <summary>The "Rewrite notes with" menu's pick, before a rewrite starts (starts on the writer).</summary>
     [ObservableProperty] public partial string Engine { get; set; } = "ollama";
     [ObservableProperty] public partial bool MenuOpen { get; set; }
+    /// <summary>Closes the "Rewrite notes with" popup once an engine is picked; the view wires this to the real flyout.</summary>
+    public Action? CloseMenu { get; set; }
     [ObservableProperty] public partial bool Busy { get; set; }
     /// <summary>A refusal from the library (already installed, already running, …): a passing word, not a card.</summary>
     [ObservableProperty] public partial string? Say { get; set; }
@@ -254,6 +256,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         Busy = true;
         Say = null;
         lastEngine = engine;
+        // The pick shows as picked, and the menu goes: the bar under the notes says what happens next.
+        Engine = engine;
+        CloseMenu?.Invoke();
         try
         {
             var info = await library.RewriteStartAsync(LectureId, engine);

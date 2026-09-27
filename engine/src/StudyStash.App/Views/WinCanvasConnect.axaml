@@ -1,5 +1,7 @@
-<!-- Connecting Canvas (design 07): the school, the Chrome extension, signing in, matching classes, the first sync.
-     Draws no outer padding or window — the setup wizard or a small dialog (integration) gives the margins. -->
+<!-- Connecting Canvas (design 07): the school, Add to Chrome, finding your courses, and (Settings' window only)
+     matching classes and the first sync. Every step is one row of the same height: its marker, its title, and on the
+     right its summary or its one action; the open step's help, pictures and lists sit under its title.
+     Draws no outer padding or window — the setup wizard or a small dialog gives the margins. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -9,70 +11,78 @@
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinCanvasStyles.axaml" />
   </UserControl.Styles>
-  <StackPanel Spacing="4">
-    <TextBlock FontSize="12" Foreground="{DynamicResource Fg2}" Text="{Binding StepLabel}" IsVisible="{Binding StepLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+  <StackPanel Spacing="6">
+    <TextBlock Classes="cv-step-label" Text="{Binding StepLabel}" IsVisible="{Binding StepLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
     <TextBlock Classes="cv-h1" Text="{x:Static vm:CanvasConnectModel.Title}" />
-    <TextBlock Classes="cv-intro" Margin="0,0,0,8" Text="{x:Static vm:CanvasConnectModel.Intro}" />
+    <TextBlock Classes="cv-intro" Text="{x:Static vm:CanvasConnectModel.Intro}" Margin="0,0,0,10" />
 
-    <!-- 1 School address -->
-    <Border Classes="cv-step">
+    <Border Classes="cv-group">
       <StackPanel>
-        <Grid ColumnDefinitions="Auto,*,Auto">
-          <Border Classes="cv-num" Classes.cv-current="{Binding Step1.IsCurrent}" IsVisible="{Binding !Step1.IsDone}" VerticalAlignment="Center">
-            <TextBlock Text="1" />
-          </Border>
-          <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step1.IsDone}" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Classes="cv-step-title" Classes.cv-current="{Binding Step1.IsCurrent}" Classes.cv-todo="{Binding Step1.IsToDo}"
-                     Text="{Binding Step1.Title}" Margin="10,0" VerticalAlignment="Center" />
-          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" IsVisible="{Binding Step1.IsDone}">
-            <TextBlock Classes="cv-value" Text="{Binding Step1.Summary}" VerticalAlignment="Center" />
-            <Button Classes="cv-btn" Command="{Binding ChangeSchoolCommand}"><TextBlock Text="Change" /></Button>
+
+        <!-- 1 School address -->
+        <Grid Classes="cv-srow" ColumnDefinitions="20,12,*,Auto">
+          <Panel Classes="cv-marker">
+            <Border Classes="cv-num" Classes.cv-current="{Binding Step1.IsCurrent}" IsVisible="{Binding !Step1.IsDone}"><TextBlock Text="1" /></Border>
+            <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step1.IsDone}" />
+          </Panel>
+          <TextBlock Grid.Column="2" Classes="cv-step-title" Classes.cv-current="{Binding Step1.IsCurrent}" Classes.cv-todo="{Binding Step1.IsToDo}" Text="{Binding Step1.Title}" />
+          <StackPanel Grid.Column="3" Classes="cv-action" IsVisible="{Binding Step1.IsDone}">
+            <TextBlock Classes="cv-value" Text="{Binding Step1.Summary}" />
+            <Button Classes="cv-btn cv-mini" Command="{Binding ChangeSchoolCommand}"><TextBlock Text="Change" /></Button>
+          </StackPanel>
+          <StackPanel Grid.Column="3" Classes="cv-action" IsVisible="{Binding Step1.IsCurrent}">
+            <Border Classes="cv-field" Width="220">
+              <TextBox Classes="bare" Text="{Binding SchoolField}" PlaceholderText="school.instructure.com" FontSize="14" />
+            </Border>
+            <Button Classes="cv-btn cv-mini cv-primary" IsEnabled="{Binding !SavingSchool}" Command="{Binding ContinueCommand}"><TextBlock Text="Continue" /></Button>
           </StackPanel>
         </Grid>
-        <StackPanel Spacing="10" Margin="30,10,0,0" IsVisible="{Binding Step1.IsCurrent}">
-          <TextBox Text="{Binding SchoolField}" PlaceholderText="school.instructure.com" Width="240" HorizontalAlignment="Left" />
-          <Button Classes="cv-btn cv-primary" IsEnabled="{Binding !SavingSchool}" Command="{Binding ContinueCommand}" HorizontalAlignment="Left"><TextBlock Text="Continue" /></Button>
-          <TextBlock Classes="cv-link" Text="{Binding SchoolError}" IsVisible="{Binding SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-        </StackPanel>
-      </StackPanel>
-    </Border>
+        <TextBlock Classes="cv-help cv-body" Text="{Binding SchoolError}" IsVisible="{Binding SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <Border Classes="cv-sep" />
 
-    <!-- 2 Set up the Chrome extension -->
-    <Border Classes="cv-step">
-      <StackPanel>
-        <Grid ColumnDefinitions="Auto,*,Auto">
-          <Border Classes="cv-num" Classes.cv-current="{Binding Step2.IsCurrent}" IsVisible="{Binding !Step2.IsDone}" VerticalAlignment="Center">
-            <TextBlock Text="2" />
-          </Border>
-          <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step2.IsDone}" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Classes="cv-step-title" Classes.cv-current="{Binding Step2.IsCurrent}" Classes.cv-todo="{Binding Step2.IsToDo}"
-                     Text="{Binding Step2.Title}" Margin="10,0" VerticalAlignment="Center" />
-          <c:Icon Grid.Column="2" Classes="cv-chevron" Glyph="{Binding Step2.IsCurrent, Converter={x:Static vm:CanvasConverters.Chevron}}" />
+        <!-- 2 Add to Chrome -->
+        <Grid Classes="cv-srow" ColumnDefinitions="20,12,*,Auto">
+          <Panel Classes="cv-marker">
+            <Border Classes="cv-num" Classes.cv-current="{Binding Step2.IsCurrent}" IsVisible="{Binding !Step2.IsDone}"><TextBlock Text="2" /></Border>
+            <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step2.IsDone}" />
+          </Panel>
+          <TextBlock Grid.Column="2" Classes="cv-step-title" Classes.cv-current="{Binding Step2.IsCurrent}" Classes.cv-todo="{Binding Step2.IsToDo}" Text="{Binding Step2.Title}" />
+          <TextBlock Grid.Column="3" Classes="cv-value cv-good" Text="{Binding Step2.Summary}" VerticalAlignment="Center" IsVisible="{Binding Step2.IsDone}" />
+          <Panel Grid.Column="3" IsVisible="{Binding Step2.IsCurrent}" VerticalAlignment="Center">
+            <Button Classes="cv-btn cv-mini cv-primary" IsVisible="{Binding ShowAddToChrome}" IsEnabled="{Binding !AddingToChrome}" Command="{Binding AddToChromeCommand}">
+              <TextBlock Text="Add to Chrome" />
+            </Button>
+            <StackPanel Classes="cv-action" IsVisible="{Binding WaitingForChrome}">
+              <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" />
+              <TextBlock Classes="cv-value" Text="Waiting for Chrome…" />
+            </StackPanel>
+            <StackPanel Classes="cv-action" IsVisible="{Binding ChromeConnected}">
+              <c:Icon Glyph="check" Size="16" Foreground="{DynamicResource Ok}" />
+              <TextBlock Classes="cv-value cv-good" Text="Connected" />
+            </StackPanel>
+          </Panel>
         </Grid>
-        <StackPanel Spacing="14" Margin="30,12,0,0" IsVisible="{Binding Step2.IsCurrent}">
-          <TextBlock Classes="cv-step-body" Text="Study Stash reads Canvas through your own sign-in in Chrome. Chrome’s extensions page is open and the folder is ready." />
-
-          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
-            <Border Classes="cv-illus" Height="88">
+        <StackPanel Classes="cv-body" Spacing="12" IsVisible="{Binding Step2.IsCurrent}">
+          <TextBlock Classes="cv-step-body" Text="{Binding ChromeHelp}" />
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+            <Border Classes="cv-illus" Height="84">
               <StackPanel Spacing="10">
-                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
-                  <TextBlock Classes="cv-illus-title" Text="Extensions" />
-                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
-                    <TextBlock Classes="cv-illus-row" Text="Developer mode" VerticalAlignment="Center" />
-                    <Border Classes="cv-illus-toggle"><Ellipse Classes="cv-illus-knob" /></Border>
-                  </StackPanel>
-                </Grid>
+                <!-- Chrome's extensions page, its Developer mode switch at the top right -->
+                <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right">
+                  <TextBlock Classes="cv-illus-row" Text="Developer mode" VerticalAlignment="Center" />
+                  <Border Classes="cv-illus-toggle"><Ellipse Classes="cv-illus-knob" /></Border>
+                </StackPanel>
                 <Border Height="6" CornerRadius="3" Background="{DynamicResource Subtle}" Margin="0,4,20,0" />
                 <Border Height="6" CornerRadius="3" Background="{DynamicResource Subtle}" Margin="0,0,40,0" />
               </StackPanel>
             </Border>
-            <Border Grid.Column="1" Classes="cv-illus" Height="88">
+            <Border Grid.Column="1" Classes="cv-illus" Height="84">
               <StackPanel Spacing="10">
                 <TextBlock Classes="cv-illus-title" Text="Extensions" />
                 <Border Classes="cv-illus-load" HorizontalAlignment="Left"><TextBlock Text="Load unpacked" /></Border>
               </StackPanel>
             </Border>
-            <Border Grid.Column="2" Classes="cv-illus" Height="88">
+            <Border Grid.Column="2" Classes="cv-illus" Height="84">
               <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
                 <TextBlock Classes="cv-illus-row" Text="Downloads" />
                 <Border Grid.Row="1" Classes="cv-illus-row cv-highlight" Padding="4,2"><TextBlock Classes="cv-illus-row cv-highlight" Text="Study Stash Extension" /></Border>
@@ -81,144 +91,133 @@
               </Grid>
             </Border>
           </Grid>
-
-          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="12">
-            <Grid ColumnDefinitions="Auto,*"><TextBlock Classes="cv-caption-num" Text="1" Margin="0,0,4,0" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Turn on Developer mode, top right" TextWrapping="Wrap" /></Grid>
-            <Grid Grid.Column="1" ColumnDefinitions="Auto,*"><TextBlock Classes="cv-caption-num" Text="2" Margin="0,0,4,0" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Click Load unpacked" TextWrapping="Wrap" /></Grid>
-            <Grid Grid.Column="2" ColumnDefinitions="Auto,*"><TextBlock Classes="cv-caption-num" Text="3" Margin="0,0,4,0" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Pick the Study Stash Extension folder" TextWrapping="Wrap" /></Grid>
+          <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="1" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Turn on Developer mode, top right" TextWrapping="Wrap" /></Grid>
+            <Grid Grid.Column="1" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="2" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Click Load unpacked" TextWrapping="Wrap" /></Grid>
+            <Grid Grid.Column="2" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Pick the Study Stash Extension folder" TextWrapping="Wrap" /></Grid>
           </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding AddedToChrome}">
+            <Button Classes="cv-quiet" Command="{Binding ShowFolderCommand}"><TextBlock Classes="cv-link" Text="Show the folder again" /></Button>
+            <TextBlock Classes="cv-link-sep" Text="·" />
+            <Button Classes="cv-quiet" Command="{Binding OpenChromeExtensionsCommand}"><TextBlock Classes="cv-link" Text="Open Chrome extensions" /></Button>
+          </StackPanel>
+          <TextBlock Classes="cv-help" Text="{Binding ChromeError}" IsVisible="{Binding ChromeError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+        <Border Classes="cv-sep" />
 
-          <Grid ColumnDefinitions="*,Auto,Auto">
-            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-              <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" />
-              <TextBlock Classes="cv-waiting" Text="Waiting for the extension…" />
+        <!-- 3 Find my courses -->
+        <Grid Classes="cv-srow" ColumnDefinitions="20,12,*,Auto">
+          <Panel Classes="cv-marker">
+            <Border Classes="cv-num" Classes.cv-current="{Binding Step3.IsCurrent}" IsVisible="{Binding !Step3.IsDone}"><TextBlock Text="3" /></Border>
+            <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step3.IsDone}" />
+          </Panel>
+          <TextBlock Grid.Column="2" Classes="cv-step-title" Classes.cv-current="{Binding Step3.IsCurrent}" Classes.cv-todo="{Binding Step3.IsToDo}" Text="{Binding Step3.Title}" />
+          <TextBlock Grid.Column="3" Classes="cv-value" Text="{Binding Step3.Summary}" VerticalAlignment="Center" IsVisible="{Binding Step3.IsDone}" />
+          <Panel Grid.Column="3" IsVisible="{Binding Step3.IsCurrent}" VerticalAlignment="Center">
+            <Button Classes="cv-btn cv-mini cv-primary" IsVisible="{Binding SignedOut}" Command="{Binding OpenCanvasCommand}"><TextBlock Text="Open Canvas" /></Button>
+            <StackPanel Classes="cv-action" IsVisible="{Binding !SignedOut}">
+              <c:Spinner IsVisible="{Binding FindingCourses}" Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" />
+              <TextBlock Classes="cv-value" Text="Looking…" IsVisible="{Binding FindingCourses}" />
+              <Button Classes="cv-btn cv-mini cv-primary" IsVisible="{Binding !FindingCourses}" Command="{Binding FindCoursesCommand}"><TextBlock Text="Find my courses" /></Button>
             </StackPanel>
-            <Button Grid.Column="1" Classes="cv-btn" Margin="0,0,8,0" Command="{Binding ShowFolderCommand}"><TextBlock Text="Show folder" /></Button>
-            <Button Grid.Column="2" Classes="cv-btn" Command="{Binding OpenChromeExtensionsCommand}"><TextBlock Text="Open Chrome extensions" /></Button>
+          </Panel>
+        </Grid>
+        <StackPanel Classes="cv-body" IsVisible="{Binding Step3.IsCurrent}">
+          <TextBlock Classes="cv-step-body" Text="Sign in to Canvas in Chrome. Study Stash looks again by itself once you have." IsVisible="{Binding SignedOut}" />
+          <TextBlock Classes="cv-step-body" Text="{Binding CoursesSay}" IsVisible="{Binding CoursesSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+
+        <!-- 4 Match each class to a course (Settings' window only) -->
+        <StackPanel IsVisible="{Binding ShowMatchAndSync}">
+          <Border Classes="cv-sep" />
+          <Grid Classes="cv-srow" ColumnDefinitions="20,12,*,Auto">
+            <Panel Classes="cv-marker">
+              <Border Classes="cv-num" Classes.cv-current="{Binding Step4.IsCurrent}" IsVisible="{Binding !Step4.IsDone}"><TextBlock Text="4" /></Border>
+              <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step4.IsDone}" />
+            </Panel>
+            <TextBlock Grid.Column="2" Classes="cv-step-title" Classes.cv-current="{Binding Step4.IsCurrent}" Classes.cv-todo="{Binding Step4.IsToDo}" Text="{Binding Step4.Title}" />
+            <Button Grid.Column="3" Classes="cv-btn cv-mini cv-primary" VerticalAlignment="Center" IsVisible="{Binding Step4.IsCurrent}" IsEnabled="{Binding !Linking}"
+                    Command="{Binding LinkTheseCommand}"><TextBlock Text="Link these" /></Button>
           </Grid>
-        </StackPanel>
-      </StackPanel>
-    </Border>
-
-    <!-- 3 Find my courses -->
-    <Border Classes="cv-step">
-      <StackPanel>
-        <Grid ColumnDefinitions="Auto,*,Auto">
-          <Border Classes="cv-num" Classes.cv-current="{Binding Step3.IsCurrent}" IsVisible="{Binding !Step3.IsDone}" VerticalAlignment="Center">
-            <TextBlock Text="3" />
-          </Border>
-          <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step3.IsDone}" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Classes="cv-step-title" Classes.cv-current="{Binding Step3.IsCurrent}" Classes.cv-todo="{Binding Step3.IsToDo}"
-                     Text="{Binding Step3.Title}" Margin="10,0" VerticalAlignment="Center" />
-          <c:Icon Grid.Column="2" Classes="cv-chevron" Glyph="{Binding Step3.IsCurrent, Converter={x:Static vm:CanvasConverters.Chevron}}" />
-        </Grid>
-        <StackPanel Spacing="10" Margin="30,12,0,0" IsVisible="{Binding Step3.IsCurrent}">
-          <StackPanel Spacing="10" IsVisible="{Binding SignedOut}">
-            <TextBlock Classes="cv-step-body" Text="Sign in to Canvas in Chrome" />
-            <Button Classes="cv-btn cv-primary" Command="{Binding OpenCanvasCommand}" HorizontalAlignment="Left"><TextBlock Text="Open Canvas" /></Button>
+          <StackPanel Classes="cv-body" IsVisible="{Binding Step4.IsCurrent}">
+            <ItemsControl ItemsSource="{Binding Courses}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CanvasCourseRow">
+                  <Grid ColumnDefinitions="*,Auto" Height="34">
+                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                      <Ellipse Classes="cv-dot" Fill="{Binding Dot}" />
+                      <TextBlock Classes="cv-dot-label" Text="{Binding Class}" />
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="cv-select" Width="240" VerticalAlignment="Center">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding Selected.Label}" TextTrimming="CharacterEllipsis"
+                                   Classes.cv-placeholder="{Binding Selected.Id, Converter={x:Static ObjectConverters.IsNull}}" />
+                        <c:Icon Grid.Column="1" Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" Margin="6,0,0,0" />
+                      </Grid>
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedRight">
+                          <ItemsControl ItemsSource="{Binding Choices}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:CourseChoice">
+                                <Button Classes="cv-select-item"
+                                        Command="{Binding $parent[ItemsControl].((vm:CanvasCourseRow)DataContext).PickCommand}"
+                                        CommandParameter="{Binding}">
+                                  <TextBlock Text="{Binding Label}" />
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Classes="cv-help" Text="{Binding LinkError}" IsVisible="{Binding LinkError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           </StackPanel>
-          <StackPanel Spacing="10" IsVisible="{Binding !SignedOut}">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-              <Button Classes="cv-btn cv-primary" IsEnabled="{Binding !FindingCourses}" Command="{Binding FindCoursesCommand}"><TextBlock Text="Find my courses" /></Button>
-              <c:Spinner IsVisible="{Binding FindingCourses}" Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-            </StackPanel>
-            <TextBlock Classes="cv-step-body" Text="{Binding CoursesSay}" IsVisible="{Binding CoursesSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-          </StackPanel>
-        </StackPanel>
-      </StackPanel>
-    </Border>
 
-    <!-- 4 Match each class to a course -->
-    <Border Classes="cv-step">
-      <StackPanel>
-        <Grid ColumnDefinitions="Auto,*,Auto">
-          <Border Classes="cv-num" Classes.cv-current="{Binding Step4.IsCurrent}" IsVisible="{Binding !Step4.IsDone}" VerticalAlignment="Center">
-            <TextBlock Text="4" />
-          </Border>
-          <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step4.IsDone}" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Classes="cv-step-title" Classes.cv-current="{Binding Step4.IsCurrent}" Classes.cv-todo="{Binding Step4.IsToDo}"
-                     Text="{Binding Step4.Title}" Margin="10,0" VerticalAlignment="Center" />
-          <c:Icon Grid.Column="2" Classes="cv-chevron" Glyph="{Binding Step4.IsCurrent, Converter={x:Static vm:CanvasConverters.Chevron}}" />
-        </Grid>
-        <StackPanel Spacing="10" Margin="30,12,0,0" IsVisible="{Binding Step4.IsCurrent}">
-          <ItemsControl ItemsSource="{Binding Courses}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:CanvasCourseRow">
-                <Grid ColumnDefinitions="*,Auto" Margin="0,6">
-                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Ellipse Classes="cv-dot" Fill="{Binding Dot}" />
-                    <TextBlock Classes="cv-dot-label" Text="{Binding Class}" />
-                  </StackPanel>
-                  <Button Grid.Column="1" Classes="cv-select" Width="220" VerticalAlignment="Center">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Text="{Binding Selected.Label}" TextTrimming="CharacterEllipsis"
-                                 Classes.cv-placeholder="{Binding Selected.Id, Converter={x:Static ObjectConverters.IsNull}}" />
-                      <c:Icon Grid.Column="1" Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" Margin="6,0,0,0" />
-                    </Grid>
-                    <Button.Flyout>
-                      <Flyout Placement="BottomEdgeAlignedRight">
-                        <ItemsControl ItemsSource="{Binding Choices}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:CourseChoice">
-                              <Button Classes="cv-select-item"
-                                      Command="{Binding $parent[ItemsControl].((vm:CanvasCourseRow)DataContext).PickCommand}"
-                                      CommandParameter="{Binding}">
-                                <TextBlock Text="{Binding Label}" />
-                              </Button>
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </Flyout>
-                    </Button.Flyout>
-                  </Button>
+          <!-- 5 Sync now -->
+          <Border Classes="cv-sep" />
+          <Grid Classes="cv-srow" ColumnDefinitions="20,12,*,Auto">
+            <Panel Classes="cv-marker">
+              <Border Classes="cv-num" Classes.cv-current="{Binding Step5.IsCurrent}" IsVisible="{Binding !Step5.IsDone}"><TextBlock Text="5" /></Border>
+              <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step5.IsDone}" />
+            </Panel>
+            <TextBlock Grid.Column="2" Classes="cv-step-title" Classes.cv-current="{Binding Step5.IsCurrent}" Classes.cv-todo="{Binding Step5.IsToDo}" Text="{Binding Step5.Title}" />
+            <TextBlock Grid.Column="3" Classes="cv-value" Text="The first sync takes a few minutes" VerticalAlignment="Center" IsVisible="{Binding Step5.IsToDo}" />
+            <Panel Grid.Column="3" VerticalAlignment="Center" IsVisible="{Binding Step5.IsCurrent}">
+              <Button Classes="cv-btn cv-mini cv-primary" IsVisible="{Binding !Syncing}" Command="{Binding SyncNowCommand}"><TextBlock Text="Sync now" /></Button>
+              <StackPanel Classes="cv-action" IsVisible="{Binding Syncing}">
+                <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" />
+                <TextBlock Classes="cv-value" Text="Syncing…" />
+              </StackPanel>
+            </Panel>
+          </Grid>
+          <StackPanel Classes="cv-body" IsVisible="{Binding Step5.IsCurrent}">
+            <StackPanel Spacing="4" IsVisible="{Binding Syncing}">
+              <TextBlock Classes="cv-step-body" Text="The first sync takes a few minutes" />
+              <Border Classes="cv-track">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="{Binding SyncProgress, Converter={x:Static vm:CanvasConverters.FillStar}}" />
+                    <ColumnDefinition Width="{Binding SyncProgress, Converter={x:Static vm:CanvasConverters.RestStar}}" />
+                  </Grid.ColumnDefinitions>
+                  <Border Classes="cv-bar-fill" />
+                  <Border Grid.Column="1" Classes="cv-bar-rest" />
                 </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <Button Classes="cv-btn cv-primary" IsEnabled="{Binding !Linking}" Command="{Binding LinkTheseCommand}" HorizontalAlignment="Left"><TextBlock Text="Link these" /></Button>
-          <TextBlock Classes="cv-link" Text="{Binding LinkError}" IsVisible="{Binding LinkError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-        </StackPanel>
-      </StackPanel>
-    </Border>
-
-    <!-- 5 Sync now -->
-    <Border Classes="cv-step">
-      <StackPanel>
-        <Grid ColumnDefinitions="Auto,*,Auto">
-          <Border Classes="cv-num" Classes.cv-current="{Binding Step5.IsCurrent}" IsVisible="{Binding !Step5.IsDone}" VerticalAlignment="Center">
-            <TextBlock Text="5" />
-          </Border>
-          <c:Icon Classes="cv-num-done" Glyph="check_circle" IsVisible="{Binding Step5.IsDone}" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="1" Classes="cv-step-title" Classes.cv-current="{Binding Step5.IsCurrent}" Classes.cv-todo="{Binding Step5.IsToDo}"
-                     Text="{Binding Step5.Title}" Margin="10,0" VerticalAlignment="Center" />
-          <TextBlock Grid.Column="2" Classes="cv-value" Text="The first sync takes a few minutes" IsVisible="{Binding Step5.IsToDo}" />
-          <c:Icon Grid.Column="2" Classes="cv-chevron" Glyph="{Binding Step5.IsCurrent, Converter={x:Static vm:CanvasConverters.Chevron}}" IsVisible="{Binding !Step5.IsToDo}" />
-        </Grid>
-        <StackPanel Spacing="10" Margin="30,12,0,0" IsVisible="{Binding Step5.IsCurrent}">
-          <StackPanel Spacing="8" IsVisible="{Binding Syncing}">
-            <TextBlock Classes="cv-step-body" Text="The first sync takes a few minutes" />
-            <Border Classes="cv-track">
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="{Binding SyncProgress, Converter={x:Static vm:CanvasConverters.FillStar}}" />
-                  <ColumnDefinition Width="{Binding SyncProgress, Converter={x:Static vm:CanvasConverters.RestStar}}" />
-                </Grid.ColumnDefinitions>
-                <Border Classes="cv-bar-fill" />
-                <Border Grid.Column="1" Classes="cv-bar-rest" />
-              </Grid>
-            </Border>
+              </Border>
+            </StackPanel>
+            <TextBlock Classes="cv-step-body" Text="{Binding SyncedLine}" IsVisible="{Binding SyncedLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           </StackPanel>
-          <TextBlock Classes="cv-step-body" Text="{Binding SyncedLine}" IsVisible="{Binding SyncedLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-          <Button Classes="cv-btn cv-primary" IsEnabled="{Binding !Syncing}" Command="{Binding SyncNowCommand}" HorizontalAlignment="Left"
-                  IsVisible="{Binding !Syncing}"><TextBlock Text="Sync now" /></Button>
         </StackPanel>
+
       </StackPanel>
     </Border>
 
-    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,10,0,0" IsVisible="{Binding ShowFooter}">
-      <Button Classes="cv-link" Theme="{StaticResource Surface}" Padding="0" VerticalAlignment="Center" Command="{Binding SkipCommand}">
-        <TextBlock Classes="cv-link" Text="Skip for now" />
-      </Button>
+    <!-- The small window's own footer: Skip for now on the left; Back and Finish on the right, one height, one line -->
+    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,18,0,0" IsVisible="{Binding ShowFooter}">
+      <Button Classes="cv-skip" VerticalAlignment="Center" Command="{Binding SkipCommand}"><TextBlock Classes="cv-link" Text="Skip for now" /></Button>
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
         <Button Classes="cv-btn" Command="{Binding BackCommand}"><TextBlock Text="Back" /></Button>
         <Button Classes="cv-btn cv-primary" IsEnabled="{Binding CanFinish}" Command="{Binding FinishCommand}"><TextBlock Text="{Binding FinishLabel}" /></Button>

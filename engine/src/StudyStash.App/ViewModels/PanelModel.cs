@@ -25,8 +25,8 @@ public sealed partial class LectureItem : ObservableObject
     [ObservableProperty] public partial bool Problem { get; set; }
 
     public bool HasProgress => Progress is not null;
-    public double ProgressWidth => (Progress ?? 0) * 140;
-    public double ProgressWidthWin => (Progress ?? 0) * 160;
+    public double ProgressWidth => (Progress ?? 0) * 120;
+    public double ProgressWidthWin => (Progress ?? 0) * 140;
 
     partial void OnProgressChanged(double? value)
     {
@@ -69,6 +69,12 @@ public sealed partial class PanelModel : ObservableObject
 
     public ObservableCollection<LectureItem> Recent { get; } = [];
 
+    /// <summary>This computer is only the library: no Record, no transcription model, no lectures of its own; the
+    /// dropdown shows the library's state instead (<see cref="Library"/>).</summary>
+    [ObservableProperty] public partial bool LibraryOnly { get; set; }
+    /// <summary>The library's lines, for a library-only computer: running, lectures, Canvas, laptops.</summary>
+    [ObservableProperty] public partial LibraryPanelLines? Library { get; set; }
+
     public string RecordLabel => ClassName.Length > 0 ? $"Record · {ClassName}" : "Record";
     public string RecordingLabel => (IsPaused ? "Paused · " : "Recording · ") + (ClassName.Length > 0 ? ClassName : "Lecture");
     public bool HasHint => !string.IsNullOrEmpty(Hint);
@@ -78,11 +84,36 @@ public sealed partial class PanelModel : ObservableObject
     public string PauseLabel => IsPaused ? "Resume" : "Pause";
     public string PauseGlyph => IsPaused ? "play_arrow" : "pause";
     public bool IsIdle => !IsRecording;
+    /// <summary>Record and the class switcher: a computer that records, while it isn't.</summary>
+    public bool ShowRecord => IsIdle && !LibraryOnly;
+    public bool ShowRecent => HasRecent && !LibraryOnly;
+    /// <summary>The status line above Open Study Stash: the library's own lines say it on a library-only computer.</summary>
+    public bool ShowStatus => !LibraryOnly;
+    public bool HasCanvasLine => Library?.Canvas is not null;
+    public bool HasLaptopsLine => Library?.Laptops is not null;
 
     public string RecordShortcut => Skin.Current == SkinKind.Mac ? "⌥⇧R" : "Ctrl+Alt+R";
     public string SearchShortcut => Skin.Current == SkinKind.Mac ? "⌥Space" : "Alt+Shift+Space";
+    public string SettingsTip => Skin.Current == SkinKind.Mac ? "Settings (⌘,)" : "Settings (Ctrl+,)";
 
-    public PanelModel() => Recent.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecent));
+    public PanelModel() => Recent.CollectionChanged += (_, _) =>
+    {
+        OnPropertyChanged(nameof(HasRecent));
+        OnPropertyChanged(nameof(ShowRecent));
+    };
+
+    partial void OnLibraryOnlyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowRecord));
+        OnPropertyChanged(nameof(ShowRecent));
+        OnPropertyChanged(nameof(ShowStatus));
+    }
+
+    partial void OnLibraryChanged(LibraryPanelLines? value)
+    {
+        OnPropertyChanged(nameof(HasCanvasLine));
+        OnPropertyChanged(nameof(HasLaptopsLine));
+    }
 
     partial void OnClassNameChanged(string value)
     {
@@ -90,7 +121,11 @@ public sealed partial class PanelModel : ObservableObject
         OnPropertyChanged(nameof(RecordingLabel));
     }
 
-    partial void OnIsRecordingChanged(bool value) => OnPropertyChanged(nameof(IsIdle));
+    partial void OnIsRecordingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsIdle));
+        OnPropertyChanged(nameof(ShowRecord));
+    }
 
     partial void OnIsPausedChanged(bool value)
     {
@@ -112,6 +147,7 @@ public sealed partial class PanelModel : ObservableObject
     public Action? OnShowRecorder { get; set; }
     public Action? OnSearch { get; set; }
     public Action? OnOpenApp { get; set; }
+    public Action? OnSettings { get; set; }
     public Action<LectureItem>? OnOpenLecture { get; set; }
     public Action? OnFixProblem { get; set; }
 
@@ -123,5 +159,6 @@ public sealed partial class PanelModel : ObservableObject
     [RelayCommand] void ShowRecorder() => OnShowRecorder?.Invoke();
     [RelayCommand] void Search() => OnSearch?.Invoke();
     [RelayCommand] void OpenApp() => OnOpenApp?.Invoke();
+    [RelayCommand] void Settings() => OnSettings?.Invoke();
     [RelayCommand] void OpenLecture(LectureItem item) => OnOpenLecture?.Invoke(item);
 }

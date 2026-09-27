@@ -34,7 +34,7 @@ public class Floating : Window
         Look.Apply(this);
         Deactivated += (_, _) =>
         {
-            if (!CloseOnDeactivate || !IsVisible) return;
+            if (!CloseOnDeactivate || !IsVisible || HoldOpen) return;
             Hide();
             LastDeactivateHide = DateTime.UtcNow;
         };
@@ -42,17 +42,25 @@ public class Floating : Window
     }
 
     /// <summary>A Mac: let this window show over a full-screen app's own Space (a lecture on a full-screen Zoom
-    /// call), instead of being stuck behind it. No-op off a Mac, and in tests (no real NSWindow to ask).</summary>
+    /// call), instead of being stuck behind it, and turn off AppKit's own window shadow — for a clear window it's
+    /// traced from everything drawn, the soft shadow room included, so it would outline a box; the content draws its
+    /// own shadow. No-op off a Mac, and in tests (no real NSWindow to ask).</summary>
     void JoinFullScreenSpaces()
     {
         if (!OperatingSystem.IsMacOS()) return;
         try
         {
-            if (TryGetPlatformHandle() is not { HandleDescriptor: "NSView", Handle: var view } || view == IntPtr.Zero) return;
-            IntPtr nsWindow = objc_msgSend(view, sel_registerName("window"));
+            // Avalonia 12 hands the NSWindow itself; older backends handed its view.
+            IntPtr nsWindow = TryGetPlatformHandle() switch
+            {
+                { HandleDescriptor: "NSWindow", Handle: var w } => w,
+                { HandleDescriptor: "NSView", Handle: var v } when v != IntPtr.Zero => objc_msgSend(v, sel_registerName("window")),
+                _ => IntPtr.Zero,
+            };
             if (nsWindow == IntPtr.Zero) return;
             const nuint canJoinAllSpaces = 1 << 0, fullScreenAuxiliary = 1 << 8;
             objc_msgSend_setCollectionBehavior(nsWindow, sel_registerName("setCollectionBehavior:"), canJoinAllSpaces | fullScreenAuxiliary);
+            objc_msgSend_setBool(nsWindow, sel_registerName("setHasShadow:"), 0);
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -75,6 +83,10 @@ public class Floating : Window
 
     /// <summary>Close when you click elsewhere (the dropdown, the quick panel).</summary>
     public bool CloseOnDeactivate { get; init; }
+
+    /// <summary>A menu of its own is open (the dropdown's class picker): clicking in that menu mustn't close this
+    /// window underneath it, or the pick would be lost with it.</summary>
+    public bool HoldOpen { get; set; }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -152,4 +164,7 @@ public class Floating : Window
 
     [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
     static extern void objc_msgSend_setCollectionBehavior(IntPtr receiver, IntPtr selector, nuint behavior);
+
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    static extern void objc_msgSend_setBool(IntPtr receiver, IntPtr selector, byte value);
 }

@@ -15,9 +15,8 @@ public static class Look
         // A Mac doesn't hint type (hinting also snaps letters to whole pixels, so words run wide); Windows does.
         TextOptions.SetTextHintingMode(window, Skin.Current == SkinKind.Mac ? TextHintingMode.None : TextHintingMode.Light);
         RenderOptions.SetBitmapInterpolationMode(window, Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality);
-        // A clear window on the Mac (the dropdown, the recorder, the quick panel) starts with the bare desktop
-        // behind its glass, not a blur: its glass is solid, so it stays readable over anything, until (if) the real
-        // OS blur, masked to the glass shapes, takes over.
+        // A clear window on the Mac (the dropdown, the recorder, the quick panel) stays clear: its glass starts solid,
+        // so it's readable over anything, until (if) the system's blur is put under each glass, and only there.
         if (Skin.Current == SkinKind.Mac && window.TransparencyLevelHint.Contains(WindowTransparencyLevel.Transparent))
         {
             window.Classes.Add("solidglass");

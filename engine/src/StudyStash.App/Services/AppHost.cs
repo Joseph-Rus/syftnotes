@@ -40,6 +40,8 @@ public sealed class AppSettings
     public bool Shortcuts { get; set; } = true;
     public double? RecorderX { get; set; }
     public double? RecorderY { get; set; }
+    /// <summary>Where the library window was left, and its size (or that it was zoomed), so it opens there again.</summary>
+    public WindowPlace? LibraryWindow { get; set; }
     /// <summary>The colour theme's name (Settings → Appearance): "Lagoon", "Plum"…</summary>
     public string Theme { get; set; } = "Lagoon";
 
@@ -71,6 +73,13 @@ public sealed class AppSettings
     }
 }
 
+/// <summary>A window's spot (in the screen's pixels, as Avalonia gives a window's position), its size in the
+/// window's own units, and whether it was zoomed to fill the display.</summary>
+public sealed record WindowPlace(int X, int Y, double Width, double Height, bool Zoomed = false);
+
+/// <summary>What pressing Record came to: the lecture now recording, or why the microphone didn't start.</summary>
+public sealed record RecordStart(Lecture? Lecture, MicTrouble? Trouble);
+
 /// <summary>How the library answered lately.</summary>
 public enum LibraryState
 {
@@ -92,6 +101,7 @@ public sealed class AppHost : IDisposable, IProblemSource
     readonly CancellationTokenSource stop = new();
     readonly Action<string> log;
     readonly Func<IAudioSource>? pretendMic;
+    readonly IMicPermissions mics;
     readonly List<Task> running = [];
     Timer? watchdog;
     int checking;
@@ -159,11 +169,12 @@ public sealed class AppHost : IDisposable, IProblemSource
     /// </summary>
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
         Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
-        Func<LibraryService>? localLibrary = null)
+        Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null)
     {
         Home = home;
         this.log = log ?? (s => Console.WriteLine(s));
         pretendMic = microphone ?? MicFromEnvironment();
+        mics = micPermissions ?? (pretendMic is not null ? MicPermissions.Pretend : MicPermissions.System);
         this.models = models ?? ModelSetting.FromEnvironment();
         this.http = http;
         this.localLibrary = localLibrary;
@@ -257,13 +268,11 @@ public sealed class AppHost : IDisposable, IProblemSource
     public bool PretendMic => pretendMic is not null;
 
     /// <summary>Whether Study Stash may use the microphone (a pretend one always may).</summary>
-    public MicAccess MicAccess() => PretendMic ? Audio.MicAccess.Allowed : Microphones.Access();
+    public MicAccess MicAccess() => mics.Access();
 
-    /// <summary>Have the system ask the student (a Mac asks once; the answer comes later). Nothing to ask for a pretend one.</summary>
-    public void AskMic()
-    {
-        if (!PretendMic) Microphones.Ask();
-    }
+    /// <summary>Have the system ask the student (a Mac asks once, with its own prompt) and wait for the answer.
+    /// Nothing is asked for a pretend microphone.</summary>
+    public Task<MicAccess> AskMicAsync() => mics.AskAsync();
 
     /// <summary>The microphone to record from (and on Windows, if asked, what the computer plays too).</summary>
     public IAudioSource OpenMic() => pretendMic is { } pretend ? pretend() : Microphones.Open(Settings.ComputerAudio);
@@ -465,7 +474,7 @@ public sealed class AppHost : IDisposable, IProblemSource
 
     /// <summary>"Library connected · Model ready", or what needs doing: pure, so a test needn't drive a real library
     /// or download to check the words.</summary>
-    public static string StatusText(LibraryState library, bool localLibraryRunning, bool modelReady, DownloadProgress? downloading)
+    public static string StatusText(LibraryState library, bool localLibraryRunning, bool modelReady, DownloadProgress? downloading, bool records = true)
     {
         string lib = localLibraryRunning
             ? $"Library running on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}"
@@ -477,14 +486,19 @@ public sealed class AppHost : IDisposable, IProblemSource
             LibraryState.WrongPassword => "Library password changed",
             _ => "No library yet",
         };
+        // A library-only computer never records, so its transcription model isn't worth a word.
+        if (!records) return lib;
         string model = modelReady ? "Model ready" : downloading is { } d ? $"Model {Math.Round(d.Fraction * 100)}%" : "No transcription model";
         return $"{lib} · {model}";
     }
 
     /// <summary>"Library connected · Model ready", or what needs doing, and whether all is well.</summary>
-    public (string Text, bool Good) Status() =>
-        (StatusText(Library, Settings.Role != AppRole.Laptop && LocalLibrary?.State == LibraryServiceState.Running, ModelReady, Downloading),
-            Library == LibraryState.Connected && ModelReady);
+    public (string Text, bool Good) Status()
+    {
+        bool records = Settings.Role != AppRole.Library;
+        return (StatusText(Library, Settings.Role != AppRole.Laptop && LocalLibrary?.State == LibraryServiceState.Running, ModelReady, Downloading, records),
+            Library == LibraryState.Connected && (ModelReady || !records));
+    }
 
     /// <summary>Change the settings and write them to app.json. A full disk (or a folder it can't write) is said, not
     /// thrown: the change still holds until the app quits.</summary>
@@ -522,6 +536,33 @@ public sealed class AppHost : IDisposable, IProblemSource
 
     /// <summary>The class Record means now, from the timetable: its name and "Tue 10:00–11:15", or nothing.</summary>
     public ClassNow? ClassNow() => Timetable.Now(DateTime.Now);
+
+    /// <summary>
+    /// Record's whole start: ask for the microphone if the system hasn't asked yet (and wait for the answer), then
+    /// start. A microphone that isn't allowed, isn't there or won't start comes back as <see cref="MicTrouble"/>
+    /// instead of a lecture; the model or the disk not being ready still throws, as <see cref="StartRecording"/> does.
+    /// </summary>
+    public async Task<RecordStart> RecordAsync(string className)
+    {
+        var access = MicAccess();
+        if (access == Audio.MicAccess.NotAsked)
+        {
+            log("[app] asking for the microphone");
+            access = await AskMicAsync();
+            log($"[app] the microphone: {access}");
+        }
+        if (access is Audio.MicAccess.Denied or Audio.MicAccess.Restricted or Audio.MicAccess.NotAsked)
+            return new RecordStart(null, MicTrouble.Denied());
+        try
+        {
+            return new RecordStart(StartRecording(className), null);
+        }
+        catch (MicrophoneException e)
+        {
+            log($"[app] the microphone didn't start: {e.Message}");
+            return new RecordStart(null, e.Trouble);
+        }
+    }
 
     public Lecture StartRecording(string className)
     {

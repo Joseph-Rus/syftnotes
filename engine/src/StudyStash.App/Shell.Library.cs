@@ -35,6 +35,14 @@ public static partial class Shell
         }, TimeSpan.FromSeconds(1));
     }
 
+    /// <summary>The library's classes changed in Settings: the library window (when open) lists them again, and the
+    /// dropdown's class switcher follows.</summary>
+    static void LibraryClassesChanged()
+    {
+        if (quitting) return;
+        _ = mainWindow?.IsVisible == true ? LoadLibraryAsync() : host.CheckLibraryAsync();
+    }
+
     static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s ?? "" : "";
 
     static DateTimeOffset? Date(string? s) =>
@@ -61,6 +69,8 @@ public static partial class Shell
         library.Classes.Clear();
         foreach (var (name, color, count) in host.Classes())
             library.Classes.Add(new ClassItem { Name = name, Dot = Skin.ClassDot(color), Count = count });
+        // A class removed (in Settings, say) isn't left open.
+        if (openClass is not null && openClass != Configs.Unsorted && library.Classes.All(c => c.Name != openClass)) openClass = null;
         if (host.Library == LibraryState.Connected && !host.OlderLibrary && canvasDue is null) await LoadCanvasAsync();
         if (turn != libraryTurn) return;
         UpdateDueItem();
@@ -408,7 +418,7 @@ public static partial class Shell
     static void MoreMenu()
     {
         if (mainWindow?.Content is not Control anchor) return;
-        var menu = new ContextMenu();
+        var menu = Menu();
         string? cls = dueOpen ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
         if (host.Remote() is { } lib && Uri.TryCreate(lib.ServerUrl, UriKind.Absolute, out var u) && (u.IsLoopback || host.Settings.LibraryHere))
         {
@@ -445,7 +455,7 @@ public static partial class Shell
     static void MoveLecture()
     {
         if (library.Note is not { } note || mainWindow?.Content is not Control anchor) return;
-        var menu = new ContextMenu();
+        var menu = Menu();
         foreach (var (name, color, _) in host.Classes().Where(c => c.Name != note.ClassName).Append((Configs.Unsorted, -1, 0)))
         {
             var item = new MenuItem { Header = name };

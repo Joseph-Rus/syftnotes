@@ -21,7 +21,7 @@ if [ "$(uname -s)" != Darwin ]; then
 fi
 
 # The old server/client wording still works; STUDYSTASH_ROLE and a plain argument do too.
-ROLE="${1:-${STUDYSTASH_ROLE:-${GRANOLA_SHARE_ROLE:-laptop}}}"
+ROLE="${1:-${STUDYSTASH_ROLE:-laptop}}"
 case "$ROLE" in
   library | server) NAME=Study-Stash-Library.dmg ;;
   *) NAME=Study-Stash-Laptop.dmg ;;
@@ -36,7 +36,7 @@ fail() {
 
 # Older releases connected a laptop with an address and password passed as env vars; Study
 # Stash's own setup asks for them now, in the app, so this just points you at them.
-ADDR="${STUDYSTASH_SERVER:-${GRANOLA_SHARE_SERVER:-}}"
+ADDR="${STUDYSTASH_SERVER:-}"
 [ -n "$ADDR" ] && say "Type this address in setup: $ADDR"
 
 WORK=$(mktemp -d "${TMPDIR:-/tmp}/study-stash-install.XXXXXX")

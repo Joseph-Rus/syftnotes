@@ -50,7 +50,11 @@ public sealed partial class AiSetupModel : ObservableObject
     public string SelectedAskName => AskChoices.FirstOrDefault(c => c.Id == SelectedAsk)?.Name ?? SelectedAsk;
     public string OlderLibraryWords => AiWords.OlderLibraryWords;
 
-    partial void OnSelectedAskChanged(string value) => OnPropertyChanged(nameof(SelectedAskName));
+    partial void OnSelectedAskChanged(string value)
+    {
+        EngineChoice.Mark(AskChoices, value);
+        OnPropertyChanged(nameof(SelectedAskName));
+    }
 
     /// <summary>Reads the library's AI once and fills the rows: called when the step opens.</summary>
     public async Task Load()
@@ -82,6 +86,7 @@ public sealed partial class AiSetupModel : ObservableObject
         SelectedAsk = overview.Ask == overview.Notes ? SameAsNotes : overview.Ask;
         AskChoices = [new EngineChoice(SameAsNotes, "Same as notes"), .. overview.Engines.Select(e => new EngineChoice(e.Id, e.Name))];
         foreach (var c in AskChoices) c.Pick = new RelayCommand(() => SelectedAsk = c.Id);
+        EngineChoice.Mark(AskChoices, SelectedAsk);
         OnPropertyChanged(nameof(AskChoices));
         OnPropertyChanged(nameof(SelectedAskName));
 

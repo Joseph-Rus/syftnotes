@@ -139,9 +139,7 @@ notes directly:
 
 Everything is under `~/.study-stash` (or `--home`, or the `STUDYSTASH_HOME` environment
 variable): `config.toml` or `client.toml`, the lecture database, and the notes themselves as plain
-Markdown files under a class folder you can open, back up, or sync however you like. An install
-from before this folder was renamed keeps using `~/.granola-share` instead, so nothing has to
-move.
+Markdown files under a class folder you can open, back up, or sync however you like.
 
 ## Build from source
 

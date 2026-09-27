@@ -40,22 +40,62 @@ public sealed partial class CanvasSync
 
     public CanvasSettings Settings => CanvasSettings.Load(home);
 
+    /// <summary>How long a find waits for Chrome while no extension has ever checked in: a freshly added one checks
+    /// in at once, so longer only keeps the student waiting (tests shorten it).</summary>
+    public TimeSpan FirstContactWait { get; set; } = TimeSpan.FromSeconds(20);
+
+    /// <summary>What Settings says while Chrome isn't signed in to Canvas.</summary>
+    public const string SignInError = "Chrome isn't signed in to Canvas. Open Canvas in Chrome and sign in; it syncs again within the hour.";
+
+    /// <summary>What an AI's read (or Find my courses) gets back when Chrome answered as if nobody were signed in.</summary>
+    public const string SignedOutAnswer = "Chrome isn't signed in to Canvas.";
+
+    /// <summary>What an AI's read gets back while there's no Canvas address, or the address isn't Canvas's.</summary>
+    public const string NotCanvas = "Only Canvas addresses (or /api/v1/... paths) can be read.";
+
     /// <summary>The extension asks for work: start a sync when one is due (or asked for), then give it the AI's
     /// reads first and the sync's after. While Canvas has asked the sync to slow down, it isn't told to hurry back.
     /// <paramref name="extVersion"/> and <paramref name="protocol"/> are the extension's own (an extension from
-    /// before protocol 2 sends none); every extension so far can do every job, whatever its version.</summary>
-    public CanvasWork Work(bool force, string? extVersion = null, int protocol = 1)
+    /// before protocol 2 sends none), and <paramref name="address"/> the library address it uses (its <c>a</c>; before
+    /// 1.4, none); every extension so far can do every job, whatever its version. <paramref name="withKey"/> is false
+    /// when it came with the library password rather than the extension's current key: it gets its work, but never
+    /// counts as the extension being connected.</summary>
+    public CanvasWork Work(bool force, string? extVersion = null, int protocol = 1, string? address = null, bool withKey = true)
     {
         var now = Clock();
         string at = now.ToString("o", CultureInfo.InvariantCulture);
-        var s = CanvasSettings.Update(home, st =>
-        {
-            st.ExtensionSeen = at;
-            if (extVersion is not { Length: > 0 } || extVersion == st.ExtensionVersion) return;
-            // Chrome reloaded a newer copy from the folder Study Stash keeps up to date: worth a word, once.
-            if (Extension.IsOlder(st.ExtensionVersion, extVersion)) st.ExtensionUpdate = new ExtensionUpdate(st.ExtensionVersion, extVersion, at, false);
-            st.ExtensionVersion = extVersion;
-        });
+        string where = CanvasSettings.WhereFrom(address);
+        var s = CanvasSettings.Load(home);
+        string keyId = withKey ? s.CurrentKeyId : CanvasSettings.PasswordKeyId;
+        // A check-in that changes nothing but the time is written at most every 15 seconds per Chrome: an extension
+        // that asks all the time (or two, the library's Chrome and the laptop's) would otherwise rewrite canvas.json on
+        // every visit.
+        var copy = s.ExtensionCopies.GetValueOrDefault(where);
+        bool news = copy is null || extVersion is { Length: > 0 } && extVersion != copy.Version || protocol != copy.Protocol || keyId != copy.Key;
+        bool stale = copy is null || !DateTimeOffset.TryParse(copy.Seen, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var seen)
+            || now - seen >= CanvasSettings.SeenEvery || now < seen;
+        if (news || stale)
+            s = CanvasSettings.Update(home, st =>
+            {
+                var had = st.ExtensionCopies.GetValueOrDefault(where);
+                // This Chrome's version before now: the same Chrome from before 1.4 didn't say where it is, and a
+                // canvas.json from before copies were kept has only the last one.
+                string before = had?.Version
+                    ?? (where.Length > 0 ? st.ExtensionCopies.GetValueOrDefault("")?.Version : null)
+                    ?? (st.ExtensionCopies.Count == 0 ? st.ExtensionVersion : "");
+                if (had is null && where.Length > 0) st.ExtensionCopies.Remove(""); // it says where it is now
+                string version = extVersion is { Length: > 0 } ? extVersion : had?.Version ?? "";
+                st.ExtensionCopies[where] = new ExtensionCopy(at, version, protocol, keyId);
+                st.ExtensionSeen = at;
+                st.ExtensionKeyId = keyId;
+                st.ExtensionProtocol = protocol;
+                st.ExtensionWhere = where;
+                if (extVersion is not { Length: > 0 }) return;
+                // Chrome reloaded a newer copy from the folder Study Stash keeps up to date: worth a word, once. Two
+                // Chromes on different versions taking turns aren't an update.
+                if (before.Length > 0 && Extension.IsOlder(before, extVersion)) st.ExtensionUpdate = new ExtensionUpdate(before, extVersion, at, false);
+                st.ExtensionVersion = extVersion;
+            });
         if (protocol < 1) return new CanvasWork([], false, Extension.Version()); // nothing this library knows how to hand it
         // A sync that finished just before the library stopped is filed now, before the next one can start.
         if (Crawl.Ready) Finish();
@@ -73,14 +113,68 @@ public sealed partial class CanvasSync
             CanvasSettings.Update(home, st =>
             {
                 st.NeedsLogin = true;
-                st.Error = "Chrome isn't signed in to Canvas. Open Canvas in Chrome and sign in; it syncs again within the hour.";
+                st.Error = SignInError;
             });
         // A fresh extension (installed, reloaded into a new version, or asked to sync) lost whatever its old copy had
         // taken: that goes out again now instead of in ten minutes.
-        if (force) Crawl.Requeue();
+        if (force)
+        {
+            Crawl.Requeue();
+            Agents.Requeue();
+        }
         var jobs = Agents.Take();
         if (jobs.Count == 0) jobs = Crawl.Next();
         return new CanvasWork(jobs, Agents.Hot || Crawl.Active && Crawl.PausedUntil is null, Extension.Version());
+    }
+
+    /// <summary>The longest the library holds the extension's request for work: Chrome gives up on a fetch that has
+    /// had no answer for 30 seconds.</summary>
+    public static readonly TimeSpan LongestWait = TimeSpan.FromSeconds(25);
+
+    /// <summary>While it holds a request, how often the library looks again anyway: a sync falls due by the clock, and
+    /// Canvas's pause runs out, without anyone saying so.</summary>
+    public TimeSpan LookAgainEvery { get; set; } = TimeSpan.FromSeconds(5);
+
+    readonly Wake nudged = new();
+
+    /// <summary>Someone asked for a sync (Settings, the app) or the extension's folder changed: a held request for work
+    /// answers now.</summary>
+    public void Nudge() => nudged.Raise();
+
+    /// <summary>
+    /// <see cref="Work"/>, holding the request while there's nothing to do. An extension of protocol 3 or later that
+    /// says it will <paramref name="wait"/> gets its answer as soon as there is work (an AI's read is queued, someone
+    /// asks for a sync, a sync falls due), or empty after <paramref name="wait"/> (at most <see cref="LongestWait"/>),
+    /// or when <paramref name="ct"/> ends (the request went away, the library is stopping). Older extensions ask on a
+    /// timer and are answered at once.
+    /// </summary>
+    public async Task<CanvasWork> WorkAsync(bool force, string? extVersion, int protocol, string? address, TimeSpan wait, CancellationToken ct = default, bool withKey = true)
+    {
+        Task woken = Task.WhenAny(Agents.Queued.Next, nudged.Next);
+        var work = Work(force, extVersion, protocol, address, withKey);
+        if (work.Jobs.Count > 0 || protocol < 3 || wait <= TimeSpan.Zero) return work;
+        var until = DateTime.UtcNow + (wait < LongestWait ? wait : LongestWait);
+        while (!ct.IsCancellationRequested)
+        {
+            var left = until - DateTime.UtcNow;
+            if (left <= TimeSpan.Zero) break;
+            try
+            {
+                await woken.WaitAsync(left < LookAgainEvery ? left : LookAgainEvery, ct);
+            }
+            catch (TimeoutException)
+            {
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            if (ct.IsCancellationRequested) break; // nobody left to hand work to
+            woken = Task.WhenAny(Agents.Queued.Next, nudged.Next);
+            work = Work(false, extVersion, protocol, address, withKey);
+            if (work.Jobs.Count > 0) return work;
+        }
+        return work;
     }
 
     /// <summary>The extension's answers. When the sync has everything, it's finished here.</summary>
@@ -191,19 +285,35 @@ public sealed partial class CanvasSync
 
     /// <summary>
     /// Read Canvas for an AI: <c>json</c> (the API, as text), <c>text</c> (a web page as Markdown) or <c>bytes</c>
-    /// (a file, saved into a class's folder). <paramref name="saveTo"/> is "Class name/path inside its folder".
+    /// (a file, saved into a class's folder). <paramref name="saveTo"/> is "Class name/path inside its folder";
+    /// <paramref name="timeout"/> how long to wait for Chrome (two minutes when not given).
     /// </summary>
-    public async Task<JsonObject> FetchAsync(string given, string kind, string saveTo = "", CancellationToken ct = default)
+    public async Task<JsonObject> FetchAsync(string given, string kind, string saveTo = "", CancellationToken ct = default, TimeSpan? timeout = null)
     {
-        if (CanvasUrl(given) is not string url) return new JsonObject { ["error"] = "Only Canvas addresses (or /api/v1/... paths) can be read." };
+        if (CanvasUrl(given) is not string url) return new JsonObject { ["error"] = NotCanvas };
         if (DeniesOtherPeople(url)) return new JsonObject { ["error"] = "Study Stash doesn't read other people's Canvas data." };
         string? dest = null;
         if (kind == "bytes" && (dest = SavePath(saveTo)) is null)
             return new JsonObject { ["error"] = "save_to must be \"<class>/<path in its folder>\", with a class this library has." };
-        var r = await Agents.FetchAsync(url, kind == "text" ? "text" : kind, ct: ct);
+        var r = await Agents.FetchAsync(url, kind == "text" ? "text" : kind, timeout, ct);
         if (r.Error.Length > 0) return new JsonObject { ["error"] = r.Error };
-        // A 401 for a tab this student can't see comes back as Canvas said it; only a real sign-out is an error.
-        if (Crawl.Classify(r) == CanvasAnswer.SignedOut) return new JsonObject { ["error"] = "Chrome isn't signed in to Canvas." };
+        // A 401 for a tab this student can't see comes back as Canvas said it; only a real sign-out is an error, and
+        // it's the library's news too: Settings and the app say "Sign in to Canvas" until an answer says otherwise.
+        if (Crawl.Classify(r) == CanvasAnswer.SignedOut)
+        {
+            CanvasSettings.Update(home, st =>
+            {
+                st.NeedsLogin = true;
+                st.Error = SignInError;
+            });
+            return new JsonObject { ["error"] = SignedOutAnswer };
+        }
+        if (Settings.NeedsLogin)
+            CanvasSettings.Update(home, st =>
+            {
+                st.NeedsLogin = false;
+                if (st.Error == SignInError) st.Error = "";
+            });
         if (kind == "bytes" && r.Status >= 400) return new JsonObject { ["error"] = $"Canvas answered {r.Status}, so nothing was saved.", ["status"] = r.Status };
         var result = new JsonObject { ["status"] = r.Status, ["url"] = r.Final.Length > 0 ? r.Final : url };
         if (NextLink().Match(r.Link) is { Success: true } m) result["next_page"] = m.Groups[1].Value;

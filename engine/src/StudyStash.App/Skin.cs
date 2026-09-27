@@ -72,6 +72,8 @@ public static class Skin
             d["SerifFont"] = new FontFamily("New York, Charter, Georgia, avares://StudyStash/Assets/Fonts#Inter");
             d["RadiusPanel"] = new CornerRadius(14);
             d["RadiusControl"] = new CornerRadius(6);
+            d["RadiusMenu"] = new CornerRadius(10);
+            d["PopupStrokeWidth"] = new Thickness(0.5);
         }
         else
         {
@@ -83,6 +85,8 @@ public static class Skin
             d["SerifFont"] = new FontFamily("Segoe UI Variable Text, Segoe UI, avares://StudyStash/Assets/Fonts#Inter");
             d["RadiusPanel"] = new CornerRadius(8);
             d["RadiusControl"] = new CornerRadius(4);
+            d["RadiusMenu"] = new CornerRadius(8);
+            d["PopupStrokeWidth"] = new Thickness(1);
         }
         d.ThemeDictionaries[ThemeVariant.Light] = light;
         d.ThemeDictionaries[ThemeVariant.Dark] = dark;
@@ -95,7 +99,7 @@ public static class Skin
         void B(string key, Color c) => r[key] = new SolidColorBrush(c);
         double L = t.L, c = t.C;
         bool lt = t.IsLight;
-        Color onAccent = lt ? Ink : Colors.White, sep, accentTint;
+        Color onAccent = lt ? Ink : Colors.White, sep;
         BoxShadow[] edge, edgeSoft, edgeTint, gshadow, sideShadow, ctlShadow;
         if (!dark)
         {
@@ -113,18 +117,25 @@ public static class Skin
             B("Accent", t.O(L, c));
             B("AccentText", lt ? t.O(0.45, c * 0.9) : t.O(Math.Min(L - 0.1, 0.48), c));
             B("Tint", lt ? t.O(L, c, 0.92) : t.O(L, c, 0.88));
-            B("AccentTint", accentTint = t.O(L, c, 0.2));
+            B("AccentTint", t.O(L, c, 0.2));
             B("Hl", Oklch.ToColor(0.88, 0.16, t.Hl, 0.55));
             B("Warn", Oklch.ToColor(0.68, 0.15, 65));
             B("Ok", Oklch.ToColor(0.62, 0.14, 150));
+            // Not in the design: the recording dot, the system's own red (the menu bar's badge is the same).
+            B("Rec", Hex("#FF3B30"));
             B("Hover", Black(0.04));
             B("Press", Black(0.08));
             // Not in the design: a floating window's glass when there's no blur behind it, solid enough to read.
             B("GlassSolid", t.Neutral(0.97, 2, 0.94));
+            // Not in the design: notifications and menus, plain and opaque like the system's own.
+            B("PopupBg", Hex("#F6F6F6"));
+            B("PopupStroke", Black(0.1));
+            r["PopupShadow"] = Shadows([Outer(0, 8, 24, 0, Black(0.12)), Outer(0, 1, 3, 0, Black(0.06))]);
             r["GlassFilter"] = new GlassFilter(22, 2.0, 1.04);
             edge = [Inset(0, 1, 0, 0, White(0.85)), Inset(0, 0, 0, 0.5, White(0.6)), Inset(0, -1, 1, 0, White(0.25))];
             edgeSoft = [Inset(0, 1, 0, 0, White(0.6)), Inset(0, 0, 0, 0.5, Black(0.04))];
-            edgeTint = [Inset(0, 1, 0, 0, White(0.45)), Inset(0, 0, 0, 0.5, White(0.25)), Outer(0, 2, 8, 0, t.O(L, c, 0.3))];
+            // The design lifts accent fills with a glow of their own colour; the app keeps clean edges, so only the highlights.
+            edgeTint = [Inset(0, 1, 0, 0, White(0.45)), Inset(0, 0, 0, 0.5, White(0.25))];
             gshadow = [Outer(0, 18, 50, 0, Black(0.16)), Outer(0, 2, 8, 0, Black(0.06))];
             sideShadow = [Outer(0, 4, 16, 0, Black(0.08))];
             ctlShadow = [Outer(0, 4, 12, 0, Black(0.1))];
@@ -145,17 +156,21 @@ public static class Skin
             B("Accent", lt ? t.O(L, c) : t.O(Math.Min(L + 0.08, 0.72), c));
             B("AccentText", lt ? t.O(L, c) : t.O(0.8, c * 0.8));
             B("Tint", lt ? t.O(L, c, 0.9) : t.O(Math.Min(L + 0.04, 0.68), c, 0.85));
-            B("AccentTint", accentTint = t.O(0.7, c, 0.26));
+            B("AccentTint", t.O(0.7, c, 0.26));
             B("Hl", Oklch.ToColor(0.75, 0.15, t.Hl, 0.35));
             B("Warn", Oklch.ToColor(0.8, 0.14, 75));
             B("Ok", Oklch.ToColor(0.74, 0.15, 150));
+            B("Rec", Hex("#FF453A"));
             B("Hover", White(0.05));
             B("Press", White(0.1));
             B("GlassSolid", t.Neutral(0.26, 1.5, 0.94));
+            B("PopupBg", Hex("#2C2C2E"));
+            B("PopupStroke", White(0.1));
+            r["PopupShadow"] = Shadows([Outer(0, 8, 24, 0, Black(0.4)), Outer(0, 1, 3, 0, Black(0.3))]);
             r["GlassFilter"] = new GlassFilter(22, 1.8, 1.0);
             edge = [Inset(0, 1, 0, 0, White(0.2)), Inset(0, 0, 0, 0.5, White(0.16)), Inset(0, -1, 1, 0, White(0.05))];
             edgeSoft = [Inset(0, 1, 0, 0, White(0.1)), Inset(0, 0, 0, 0.5, White(0.06))];
-            edgeTint = [Inset(0, 1, 0, 0, White(0.3)), Inset(0, 0, 0, 0.5, White(0.18)), Outer(0, 2, 10, 0, t.O(0.7, c, 0.3))];
+            edgeTint = [Inset(0, 1, 0, 0, White(0.3)), Inset(0, 0, 0, 0.5, White(0.18))];
             gshadow = [Outer(0, 18, 50, 0, Black(0.5)), Outer(0, 2, 8, 0, Black(0.3))];
             sideShadow = [Outer(0, 4, 16, 0, Black(0.3))];
             ctlShadow = [Outer(0, 4, 12, 0, Black(0.35))];
@@ -174,9 +189,8 @@ public static class Skin
         r["RaisedShadow"] = Shadows([.. edge, Outer(0, 0, 0, 0.5, sep), Outer(0, 1, 2, 0, Black(0.08))]);
         r["SegShadow"] = Shadows([.. edge, Outer(0, 1, 3, 0, Black(0.12))]);
         r["WindowShadow"] = Shadows([.. gshadow, Outer(0, 0, 0, 0.5, sep)]);
-        r["Ring3"] = Shadows([Outer(0, 0, 0, 3, accentTint)]);
-        r["Ring4"] = Shadows([Outer(0, 0, 0, 4, accentTint)]);
-        r["OnAccentRing"] = Shadows([Outer(0, 0, 0, 1.5, onAccent)]);
+        // The dot's ring on a highlighted row: white on a dark accent, near-black ink on a light one — never a tint.
+        r["OnAccentRing"] = Shadows([Outer(0, 0, 0, 1.5, lt ? Rgba(0x17, 0x17, 0x17, 1) : Colors.White)]);
         B("Ground", dark ? Hex("#161616") : Hex("#E4E2DF"));
     }
 
@@ -212,11 +226,17 @@ public static class Skin
             B("OnAccent", lt ? Ink : Colors.White);
             B("Hl", Oklch.ToColor(0.88, 0.16, t.Hl, 0.5));
             B("Taskbar", t.Neutral(0.94, 1));
+            // Not in the design: a Windows 11 toast's or menu's plain, opaque panel.
+            B("PopupBg", Hex("#F9F9F9"));
+            B("PopupStroke", Black(0.1));
+            r["PopupShadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.14))]);
             r["Shadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.14))]);
             r["ShadowLg"] = Shadows([Outer(0, 32, 64, 0, Black(0.18)), Outer(0, 2, 21, 0, Black(0.14))]);
             B("Mini", Colors.White);
             B("Ok", Hex("#0F7B0F"));
             B("Warn", Hex("#9D5D00"));
+            // Not in the design: the recording dot, the tray icon's red.
+            B("Rec", Hex("#E5484D"));
             B("IbInfo", Hex("#F6F6F6"));
             B("IbOk", Hex("#DFF6DD"));
             B("IbWarn", Hex("#FFF4CE"));
@@ -255,11 +275,15 @@ public static class Skin
             B("OnAccent", Ink);
             B("Hl", Oklch.ToColor(0.75, 0.15, t.Hl, 0.3));
             B("Taskbar", t.Neutral(0.2, 1.5));
+            B("PopupBg", Hex("#2C2C2C"));
+            B("PopupStroke", White(0.09));
+            r["PopupShadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.3))]);
             r["Shadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.3))]);
             r["ShadowLg"] = Shadows([Outer(0, 32, 64, 0, Black(0.4)), Outer(0, 2, 21, 0, Black(0.3))]);
             B("Mini", Hex("#2B2B2B"));
             B("Ok", Hex("#6CCB5F"));
             B("Warn", Hex("#FCE100"));
+            B("Rec", Hex("#E5484D"));
             B("IbInfo", Hex("#2B2B2B"));
             B("IbOk", Hex("#393D1B"));
             B("IbWarn", Hex("#433519"));
@@ -286,20 +310,20 @@ public static class Skin
     static readonly string[] MacBrushes =
     [
         "Glass", "GlassSolid", "Win", "Raised", "Group", "Fg", "Fg2", "Fg3", "Sep", "Fill", "Fill2", "Mini", "Accent", "AccentText",
-        "Tint", "OnAccent", "AccentTint", "Hl", "Warn", "Ok", "Good", "Hover", "Press",
+        "Tint", "OnAccent", "AccentTint", "Hl", "Warn", "Ok", "Rec", "Good", "Hover", "Press", "PopupBg", "PopupStroke",
     ];
     static readonly string[] MacShadows =
     [
         "Edge", "EdgeSoft", "EdgeTint", "GShadow", "SideShadow", "CtlShadow", "GlassShadow", "SideGlassShadow", "CtlGlassShadow",
-        "RaisedShadow", "SegShadow", "WindowShadow", "Ring3", "Ring4", "OnAccentRing",
+        "RaisedShadow", "SegShadow", "WindowShadow", "OnAccentRing", "PopupShadow",
     ];
     static readonly string[] WinBrushes =
     [
         "Ground", "Mica", "Layer", "LayerStroke", "Acrylic", "FlyStroke", "Footer", "Card", "CardStroke", "Fg", "Fg2", "Fg3", "Sep",
         "Subtle", "Subtle2", "Ctrl", "CtrlStroke", "CtrlBottom", "CtrlBorder", "Accent", "AccentText", "OnAccent", "Hl", "Taskbar",
-        "Mini", "Ok", "Warn", "IbInfo", "IbOk", "IbWarn", "IbErr", "IcInfo", "IcOk", "IcWarn", "IcErr", "IbGlyph", "Good", "Hover", "Press",
+        "Mini", "Ok", "Warn", "Rec", "PopupBg", "PopupStroke", "IbInfo", "IbOk", "IbWarn", "IbErr", "IcInfo", "IcOk", "IcWarn", "IcErr", "IbGlyph", "Good", "Hover", "Press",
     ];
-    static readonly string[] WinShadows = ["Shadow", "ShadowLg"];
+    static readonly string[] WinShadows = ["Shadow", "ShadowLg", "PopupShadow"];
 
     /// <summary>Every token the design gives a look, and what it is (a brush, shadows, the glass's filter, a font, a
     /// radius): what <see cref="Build(SkinKind, ColourTheme)"/> must make, light and dark.</summary>
@@ -310,7 +334,8 @@ public static class Skin
         foreach (var k in mac ? MacShadows : WinShadows) yield return (k, typeof(BoxShadows));
         if (mac) yield return ("GlassFilter", typeof(GlassFilter));
         foreach (var k in new[] { "TextFont", "DisplayFont", "SerifFont" }) yield return (k, typeof(FontFamily));
-        foreach (var k in new[] { "RadiusPanel", "RadiusControl" }) yield return (k, typeof(CornerRadius));
+        foreach (var k in new[] { "RadiusPanel", "RadiusControl", "RadiusMenu" }) yield return (k, typeof(CornerRadius));
+        yield return ("PopupStrokeWidth", typeof(Thickness));
     }
 
     /// <summary>"Library connected" green, oklch(0.7 0.15 150): the same in both looks, light and dark.</summary>

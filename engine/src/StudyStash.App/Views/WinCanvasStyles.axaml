@@ -103,27 +103,6 @@
     <Setter Property="VerticalAlignment" Value="Top" />
   </Style>
 
-  <!-- design 12: a Canvas notification toast -->
-  <Style Selector="Border.cv-toast-mark">
-    <Setter Property="Width" Value="16" />
-    <Setter Property="Height" Value="16" />
-    <Setter Property="CornerRadius" Value="4" />
-    <Setter Property="Background" Value="{DynamicResource Accent}" />
-  </Style>
-  <Style Selector="TextBlock.cv-toast-brand">
-    <Setter Property="FontSize" Value="12" />
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-  </Style>
-  <Style Selector="TextBlock.cv-toast-title">
-    <Setter Property="FontSize" Value="14" />
-    <Setter Property="FontWeight" Value="SemiBold" />
-  </Style>
-  <Style Selector="TextBlock.cv-toast-text">
-    <Setter Property="FontSize" Value="14" />
-    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-    <Setter Property="TextWrapping" Value="Wrap" />
-  </Style>
-
   <!-- design 06: Settings -> Canvas -->
   <Style Selector="TextBlock.cv-h1">
     <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
@@ -526,6 +505,75 @@
     <Setter Property="FontSize" Value="13" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
     <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- One card of steps, one row per step: marker | title | summary or action, on one centre line and one height;
+       a row's button is a text field's height (Fluent's 32), so it never stretches the row. -->
+  <Style Selector="Border.cv-group">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource Card}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Border.cv-sep">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Sep}" />
+  </Style>
+  <Style Selector="Grid.cv-srow">
+    <Setter Property="Height" Value="52" />
+    <Setter Property="Margin" Value="16,0" />
+  </Style>
+  <Style Selector="Grid.cv-srow TextBlock.cv-step-title">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Panel.cv-marker">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="StackPanel.cv-action">
+    <Setter Property="Orientation" Value="Horizontal" />
+    <Setter Property="Spacing" Value="8" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+  </Style>
+  <Style Selector="StackPanel.cv-action > TextBlock, StackPanel.cv-action > c|Icon, StackPanel.cv-action > c|Spinner">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector=":is(Control).cv-body">
+    <Setter Property="Margin" Value="48,0,16,16" />
+  </Style>
+  <Style Selector="Button.cv-btn.cv-mini">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.cv-field">
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="11,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.cv-value.cv-good">
+    <Setter Property="Foreground" Value="{DynamicResource Ok}" />
+  </Style>
+  <Style Selector="TextBlock.cv-help">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Button.cv-quiet">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="TextBlock.cv-link-sep">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
+  </Style>
+  <Style Selector="Button.cv-skip">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Padding" Value="0" />
   </Style>
   <Style Selector="c|Icon.cv-chevron">
     <Setter Property="Size" Value="16" />

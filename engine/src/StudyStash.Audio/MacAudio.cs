@@ -6,7 +6,8 @@ namespace StudyStash.Audio;
 
 /// <summary>
 /// The Mac's microphone, through AudioToolbox's audio queue: it hands over 16 kHz mono floats, converting from
-/// whatever the hardware runs at. The first time, macOS asks the person whether Study Stash may use the microphone.
+/// whatever the hardware runs at. Ask for permission first (<see cref="MacPermissions.RequestMicrophoneAsync"/>): a
+/// queue opened while macOS's prompt is still up is refused.
 /// </summary>
 [SupportedOSPlatform("macos")]
 public sealed unsafe class MacMicrophone : IAudioSource
@@ -64,9 +65,51 @@ public sealed unsafe class MacMicrophone : IAudioSource
     public event Action<float[]>? Samples;
     public event Action<string>? Failed;
 
+    [StructLayout(LayoutKind.Sequential)]
+    struct PropertyAddress
+    {
+        public uint Selector, Scope, Element;
+    }
+
+    [DllImport("/System/Library/Frameworks/CoreAudio.framework/CoreAudio")]
+    static extern int AudioObjectGetPropertyData(uint objectId, PropertyAddress* address, uint qualifierSize, IntPtr qualifier, uint* size, void* data);
+
+    /// <summary>Whether macOS has an input device to record from (a Mac mini with nothing plugged in doesn't). Null
+    /// when it can't tell, which counts as yes.</summary>
+    public static bool? HasInputDevice()
+    {
+        // kAudioObjectSystemObject, kAudioHardwarePropertyDefaultInputDevice ('dIn '), kAudioObjectPropertyScopeGlobal ('glob').
+        var address = new PropertyAddress { Selector = 0x64496E20, Scope = 0x676C6F62, Element = 0 };
+        uint device = 0, size = sizeof(uint);
+        try
+        {
+            return AudioObjectGetPropertyData(1, &address, 0, IntPtr.Zero, &size, &device) == 0 ? device != 0 : null;
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Starts the microphone. Throws <see cref="MicrophoneException"/> with the student's words when it
+    /// can't: no microphone, not allowed, or macOS not handing it over. A start that fails is tried once more after a
+    /// moment, since a device switching over (AirPods connecting) can refuse the first one.</summary>
     public void Start()
     {
         if (queue != IntPtr.Zero) return;
+        if (HasInputDevice() == false) throw new MicrophoneException(MicTrouble.NoDevice(windows: false));
+        int status = TryStart();
+        if (status == 0) return;
+        Thread.Sleep(300);
+        status = TryStart();
+        if (status == 0) return;
+        throw new MicrophoneException(MicTrouble.From(status, MacPermissions.Microphone()), status);
+    }
+
+    /// <summary>One try at opening and starting the audio queue: 0, or the status it failed with (everything it
+    /// opened is closed again).</summary>
+    int TryStart()
+    {
         var format = new StreamFormat
         {
             SampleRate = Sound.Rate, FormatId = LinearPcm, FormatFlags = FloatPacked, BytesPerPacket = 4, FramesPerPacket = 1,
@@ -78,7 +121,7 @@ public sealed unsafe class MacMicrophone : IAudioSource
         if (err != 0)
         {
             self.Free();
-            throw new InvalidOperationException($"The microphone didn't open (error {err}). Check it's allowed in System Settings → Privacy & Security → Microphone.");
+            return err;
         }
         queue = q;
         for (int i = 0; i < Buffers; i++)
@@ -88,11 +131,8 @@ public sealed unsafe class MacMicrophone : IAudioSource
         }
         running = true;
         err = AudioQueueStart(queue, IntPtr.Zero);
-        if (err != 0)
-        {
-            Stop();
-            throw new InvalidOperationException($"The microphone didn't start (error {err}).");
-        }
+        if (err != 0) Stop();
+        return err;
     }
 
     [UnmanagedCallersOnly]
@@ -155,7 +195,7 @@ public static class MacPermissions
     [DllImport(ObjC, EntryPoint = "objc_msgSend")]
     static extern long SendLong(IntPtr receiver, IntPtr selector, IntPtr arg);
 
-    public const string MicrophoneSettingsUrl = "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone";
+    public const string MicrophoneSettingsUrl = MicTrouble.MacPrivacyUrl;
 
     public static MicAccess Microphone()
     {
@@ -172,22 +212,82 @@ public static class MacPermissions
         }
     }
 
-    /// <summary>Opens the microphone for a moment, which makes macOS ask the person (once). The answer comes later:
-    /// look at <see cref="Microphone"/> again.</summary>
-    public static void AskForMicrophone()
+    // [AVCaptureDevice requestAccessForMediaType:completionHandler:] takes an Objective-C block. A global block (one
+    // that captures nothing) is a fixed struct: built once in native memory that never moves or is freed, macOS's
+    // Block_copy hands back the same pointer, and its invoke function completes whichever request is waiting.
+    [StructLayout(LayoutKind.Sequential)]
+    struct BlockDescriptor
     {
-        var mic = new MacMicrophone();
+        public nuint Reserved, Size;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    unsafe struct Block
+    {
+        public IntPtr Isa;
+        public int Flags, Reserved;
+        public IntPtr Invoke;
+        public BlockDescriptor* Descriptor;
+    }
+
+    const int BlockIsGlobal = 1 << 28;
+    static readonly Lock asking = new();
+    static unsafe Block* answerBlock;
+    static TaskCompletionSource<bool>? answer;
+
+    [DllImport(ObjC, EntryPoint = "objc_msgSend")]
+    static extern unsafe void SendAsk(IntPtr receiver, IntPtr selector, IntPtr mediaType, Block* handler);
+
+    [UnmanagedCallersOnly]
+    static unsafe void OnAnswer(Block* block, byte granted) => Volatile.Read(ref answer)?.TrySetResult(granted != 0);
+
+    /// <summary>
+    /// Has macOS ask the student for the microphone (its own prompt, once) and waits up to a minute for the answer;
+    /// asked already, it answers straight away with what the student said then. Nothing is opened: recording starts
+    /// only once the answer is yes.
+    /// </summary>
+    public static async Task<MicAccess> RequestMicrophoneAsync(TimeSpan? wait = null)
+    {
+        var now = Microphone();
+        if (now != MicAccess.NotAsked) return now;
+        Task<bool> answered;
         try
         {
-            mic.Start();
-            Thread.Sleep(300);
+            answered = Ask();
         }
-        catch (InvalidOperationException)
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
+            return MicAccess.Unknown;
         }
-        finally
+        await Task.WhenAny(answered, Task.Delay(wait ?? TimeSpan.FromMinutes(1)));
+        var after = Microphone();
+        if (after == MicAccess.NotAsked && answered.IsCompletedSuccessfully) return answered.Result ? MicAccess.Allowed : MicAccess.Denied;
+        return after;
+    }
+
+    /// <summary>Sends the request, unless one is already waiting for its answer: the task its answer completes.</summary>
+    static unsafe Task<bool> Ask()
+    {
+        lock (asking)
         {
-            mic.Dispose();
+            if (answer is { Task.IsCompleted: false } waiting) return waiting.Task;
+            IntPtr av = NativeLibrary.Load("/System/Library/Frameworks/AVFoundation.framework/AVFoundation");
+            IntPtr audio = Marshal.ReadIntPtr(NativeLibrary.GetExport(av, "AVMediaTypeAudio"));
+            if (answerBlock is null)
+            {
+                var descriptor = (BlockDescriptor*)NativeMemory.AllocZeroed((nuint)sizeof(BlockDescriptor));
+                descriptor->Size = (nuint)sizeof(Block);
+                var block = (Block*)NativeMemory.AllocZeroed((nuint)sizeof(Block));
+                block->Isa = NativeLibrary.GetExport(NativeLibrary.Load("/usr/lib/libSystem.B.dylib"), "_NSConcreteGlobalBlock");
+                block->Flags = BlockIsGlobal;
+                block->Invoke = (IntPtr)(delegate* unmanaged<Block*, byte, void>)&OnAnswer;
+                block->Descriptor = descriptor;
+                answerBlock = block;
+            }
+            var fresh = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Volatile.Write(ref answer, fresh);
+            SendAsk(objc_getClass("AVCaptureDevice"), sel_registerName("requestAccessForMediaType:completionHandler:"), audio, answerBlock);
+            return fresh.Task;
         }
     }
 }

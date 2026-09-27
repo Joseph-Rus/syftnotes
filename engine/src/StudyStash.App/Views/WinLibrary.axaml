@@ -109,54 +109,33 @@
     <Style Selector="Border.seg.on Border.underline">
       <Setter Property="IsVisible" Value="True" />
     </Style>
-    <Style Selector="Grid.titlebar">
+    <Style Selector="c|WindowHeader.titlebar">
       <Setter Property="Height" Value="48" />
     </Style>
-    <Style Selector="Grid.titlebar.narrow">
+    <Style Selector="c|WindowHeader.titlebar.narrow">
       <Setter Property="Height" Value="32" />
-    </Style>
-    <Style Selector="Button.caption">
-      <Setter Property="Height" Value="48" />
-    </Style>
-    <Style Selector="Grid.titlebar.narrow Button.caption">
-      <Setter Property="Height" Value="32" />
-    </Style>
-    <Style Selector="Button.caption">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="46" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
   </UserControl.Styles>
 
   <Border Background="{DynamicResource Mica}" BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1" CornerRadius="8" BoxShadow="{DynamicResource ShadowLg}"
           ClipToBounds="True" Name="Frame">
     <DockPanel>
-      <!-- Title bar -->
-      <!-- Narrow (design 11), the title bar is a plain 32 px row: no room for the search box in it. -->
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,*" Name="TitleBar" Classes="titlebar" Classes.narrow="{Binding Narrow}">
-        <StackPanel Orientation="Horizontal" Spacing="12" Margin="16,0,0,0" VerticalAlignment="Center">
-          <Border Width="16" Height="16" CornerRadius="4" Background="{DynamicResource Accent}">
-            <c:Icon Glyph="graphic_eq" Size="12" Foreground="{DynamicResource OnAccent}" />
-          </Border>
-          <TextBlock Text="Study Stash" FontSize="12" VerticalAlignment="Center" />
-        </StackPanel>
-        <Border Grid.Column="1" Width="400" Height="32" CornerRadius="4" Background="{DynamicResource Ctrl}" BorderBrush="{DynamicResource CtrlBorder}" BorderThickness="1"
-                Padding="11,0,8,0" IsVisible="{Binding !Narrow}">
+      <!-- The title bar: drag the window by it; the search box in its middle, the system's caption buttons on its
+           right. Narrow (design 11), it's a plain 32 px row: no room for the search box in it. -->
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" Title="Study Stash" DrawChrome="{Binding DrawChrome}" Classes="titlebar" Classes.narrow="{Binding Narrow}">
+        <!-- Centred on the whole window: the caption buttons' room on the right is matched on the left. -->
+        <Border Width="400" Height="32" CornerRadius="4" Background="{DynamicResource Ctrl}" BorderBrush="{DynamicResource CtrlBorder}" BorderThickness="1"
+                Padding="11,0,8,0" Margin="138,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !Narrow}">
           <Grid ColumnDefinitions="*,Auto">
             <TextBox Classes="bare" Text="{Binding SearchText}" PlaceholderText="Search notes and lectures" FontSize="14" Name="Search" />
             <c:Icon Grid.Column="1" Glyph="search" Size="16" Foreground="{DynamicResource Fg2}" />
           </Grid>
         </Border>
-        <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" IsVisible="{Binding DrawChrome}">
-          <Button Classes="caption"><c:Icon Glyph="remove" Size="16" Foreground="{DynamicResource Fg}" /></Button>
-          <Button Classes="caption"><c:Icon Glyph="crop_square" Size="14" Foreground="{DynamicResource Fg}" /></Button>
-          <Button Classes="caption"><c:Icon Glyph="close" Size="16" Foreground="{DynamicResource Fg}" /></Button>
-        </StackPanel>
-      </Grid>
+      </c:WindowHeader>
 
       <!-- Navigation: classes -->
       <!-- With Canvas (design 09) the pane is 280 in all, and each row is led by a 16 px slot. -->
-      <DockPanel DockPanel.Dock="Left" Classes="navpane" Classes.canvas="{Binding HasDue}" Margin="4,4,4,8">
+      <DockPanel Name="Sidebar" DockPanel.Dock="Left" Classes="navpane" Classes.canvas="{Binding HasDue}" Margin="4,4,4,8" Background="Transparent" c:WindowHeader.MovesWindow="True">
         <Button DockPanel.Dock="Bottom" Classes="nav" Padding="12,0" Command="{Binding SettingsCommand}">
           <StackPanel Classes="settingsrow" Orientation="Horizontal">
             <c:Icon Glyph="settings" Size="16" Foreground="{DynamicResource Fg2}" />

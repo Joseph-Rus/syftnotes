@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace StudyStash.App.Services;
 
@@ -16,7 +17,116 @@ public static class CanvasApi
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         NumberHandling = JsonNumberHandling.AllowReadingFromString,
+        // Tolerant readers: a field the library sends as null, "" or another shape reads as nothing, never an error.
+        Converters = { new WhenConverter(), new MaybeWhenConverter(), new FlagConverter(), new IntConverter(), new LongConverter(), new DoubleConverter() },
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { NullTextIsEmpty } },
     };
+
+    /// <summary>A text field the records promise is never null (<c>string</c>, not <c>string?</c>) reads a null
+    /// from the library as "": a library with no Canvas address sends <c>"school": null</c>, for one.</summary>
+    static void NullTextIsEmpty(JsonTypeInfo type)
+    {
+        foreach (var p in type.Properties)
+            if (p.PropertyType == typeof(string) && !p.IsSetNullable && p.Set is { } set)
+                p.Set = (target, value) => set(target, value ?? "");
+    }
+
+    /// <summary>A date as the library may send it: ISO text, or "", null, or something that isn't a date at all (a
+    /// library that never synced sent "" for several). Anything but a real date reads as null, so one odd field
+    /// never breaks a whole screen.</summary>
+    public static DateTimeOffset? ReadWhen(ref Utf8JsonReader reader)
+    {
+        if (reader.TokenType is JsonTokenType.StartObject or JsonTokenType.StartArray)
+        {
+            reader.Skip();
+            return null;
+        }
+        if (reader.TokenType != JsonTokenType.String) return null;
+        if (reader.TryGetDateTimeOffset(out var exact)) return exact;
+        string text = reader.GetString() ?? "";
+        return text.Trim().Length > 0 && DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out var loose) ? loose : null;
+    }
+
+    /// <summary><see cref="ReadWhen"/> for a <see cref="DateTimeOffset"/>? field.</summary>
+    public sealed class MaybeWhenConverter : JsonConverter<DateTimeOffset?>
+    {
+        public override bool HandleNull => true;
+
+        public override DateTimeOffset? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ReadWhen(ref reader);
+
+        public override void Write(Utf8JsonWriter writer, DateTimeOffset? value, JsonSerializerOptions options)
+        {
+            if (value is { } v) writer.WriteStringValue(v);
+            else writer.WriteNullValue();
+        }
+    }
+
+    /// <summary><see cref="ReadWhen"/> for a <see cref="DateTimeOffset"/> field: no date reads as the default.</summary>
+    public sealed class WhenConverter : JsonConverter<DateTimeOffset>
+    {
+        public override bool HandleNull => true;
+
+        public override DateTimeOffset Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ReadWhen(ref reader) ?? default;
+
+        public override void Write(Utf8JsonWriter writer, DateTimeOffset value, JsonSerializerOptions options) => writer.WriteStringValue(value);
+    }
+
+    /// <summary>A yes/no as the library may send it: true/false, or text that says something (a saved copy's path
+    /// for <c>local</c>, why a file wasn't saved for <c>skipped</c>) or nothing, or a number, or null.</summary>
+    public sealed class FlagConverter : JsonConverter<bool>
+    {
+        public override bool HandleNull => true;
+
+        public override bool Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.True: return true;
+                case JsonTokenType.String: return (reader.GetString() ?? "").Trim().Length > 0;
+                case JsonTokenType.Number: return reader.TryGetDouble(out double d) && d != 0;
+                case JsonTokenType.StartObject or JsonTokenType.StartArray: reader.Skip(); return false;
+                default: return false;
+            }
+        }
+
+        public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options) => writer.WriteBooleanValue(value);
+    }
+
+    /// <summary>A number as the library may send it: a number, a number in text, or null or anything else (0).</summary>
+    public static double ReadNumber(ref Utf8JsonReader reader)
+    {
+        switch (reader.TokenType)
+        {
+            case JsonTokenType.Number: return reader.TryGetDouble(out double d) ? d : 0;
+            case JsonTokenType.String:
+                return double.TryParse(reader.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double t) ? t : 0;
+            case JsonTokenType.StartObject or JsonTokenType.StartArray: reader.Skip(); return 0;
+            default: return 0;
+        }
+    }
+
+    public sealed class IntConverter : JsonConverter<int>
+    {
+        public override bool HandleNull => true;
+        public override int Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.TokenType == JsonTokenType.Number && reader.TryGetInt32(out int i) ? i : (int)Math.Clamp(ReadNumber(ref reader), int.MinValue, int.MaxValue);
+        public override void Write(Utf8JsonWriter writer, int value, JsonSerializerOptions options) => writer.WriteNumberValue(value);
+    }
+
+    public sealed class LongConverter : JsonConverter<long>
+    {
+        public override bool HandleNull => true;
+        public override long Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            reader.TokenType == JsonTokenType.Number && reader.TryGetInt64(out long l) ? l : (long)Math.Clamp(ReadNumber(ref reader), long.MinValue, long.MaxValue);
+        public override void Write(Utf8JsonWriter writer, long value, JsonSerializerOptions options) => writer.WriteNumberValue(value);
+    }
+
+    public sealed class DoubleConverter : JsonConverter<double>
+    {
+        public override bool HandleNull => true;
+        public override double Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => ReadNumber(ref reader);
+        public override void Write(Utf8JsonWriter writer, double value, JsonSerializerOptions options) => writer.WriteNumberValue(value);
+    }
 
     /// <summary>Canvas ids travel as numbers or strings depending on the library version; we always want a string.</summary>
     public sealed class IdConverter : JsonConverter<string>
@@ -26,8 +136,23 @@ public static class CanvasApi
             JsonTokenType.String => reader.GetString(),
             JsonTokenType.Number => reader.TryGetInt64(out long l) ? l.ToString(CultureInfo.InvariantCulture) : reader.GetDouble().ToString(CultureInfo.InvariantCulture),
             JsonTokenType.Null => null,
+            JsonTokenType.StartObject => IdOf(ref reader, options),
             _ => throw new JsonException($"Expected a Canvas id (a string or a number), got {reader.TokenType}."),
         };
+
+        /// <summary>An object that carries its id, like the library's <c>suggested</c> course (<c>{"id","name"}</c>).</summary>
+        string? IdOf(ref Utf8JsonReader reader, JsonSerializerOptions options)
+        {
+            string? id = null;
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+            {
+                bool isId = reader.ValueTextEquals("id");
+                reader.Read();
+                if (isId) id = Read(ref reader, typeof(string), options);
+                else reader.Skip();
+            }
+            return id;
+        }
 
         public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options) => writer.WriteStringValue(value);
     }
@@ -49,9 +174,17 @@ public static class CanvasApi
         public IReadOnlyList<string> Warnings { get; init; } = [];
     }
 
+    /// <summary>The Chrome extension as the library sees it. <see cref="Seen"/> is when a Chrome last checked in with
+    /// the library's current key; <see cref="Connected"/> is one checking in now with it (null from a library older
+    /// than this field: go by the state); <see cref="KeyMatches"/> false means the Chrome that asked last has an old
+    /// key and needs connecting again; <see cref="RefusedAt"/> is when a Chrome with another key was turned away.</summary>
     public sealed record ExtensionInfo
     {
         public DateTimeOffset? Seen { get; init; }
+        public bool? Connected { get; init; }
+        public bool? KeyMatches { get; init; }
+        public DateTimeOffset? LastSeen { get; init; }
+        public DateTimeOffset? RefusedAt { get; init; }
         public string Version { get; init; } = "";
         public string? Latest { get; init; }
         public bool Outdated { get; init; }
@@ -87,7 +220,9 @@ public static class CanvasApi
         public IReadOnlyDictionary<string, double> Courses { get; init; } = new Dictionary<string, double>();
         /// <summary>Old key: course id (as a string) → its name.</summary>
         public IReadOnlyDictionary<string, string> Available { get; init; } = new Dictionary<string, string>();
-        public IReadOnlyList<Course> CourseInfo { get; init; } = [];
+        /// <summary>Every course Find my courses found, with its code and term. The library sends it keyed by course id
+        /// (an older fixture as a list); either reads as a list.</summary>
+        [JsonConverter(typeof(CourseInfoConverter))] public IReadOnlyList<Course> CourseInfo { get; init; } = [];
         public IReadOnlyList<ChangeRow> LastChanges { get; init; } = [];
         public int PollMinutes { get; init; }
         public string ExtensionSeen { get; init; } = "";
@@ -98,6 +233,8 @@ public static class CanvasApi
         public string Error { get; init; } = "";
         public DateTimeOffset? LastSync { get; init; }
         public ExtensionUpdate? ExtensionUpdate { get; init; }
+        /// <summary>The same as GET canvas/extension, without the key.</summary>
+        public ExtensionKey? Extension { get; init; }
     }
 
     public sealed record ChangeRow
@@ -109,11 +246,30 @@ public static class CanvasApi
 
     // ---- GET canvas/extension ----
 
+    /// <summary>The library's extension: its key, the Canvas it points at, this library's version and protocol, the
+    /// folder the library keeps ready, and the Chrome that last checked in (which computer, whether it's connected
+    /// now). A library from before these fields leaves them empty.</summary>
     public sealed record ExtensionKey
     {
         public string Key { get; init; } = "";
         public string Canvas { get; init; } = "";
         public string Version { get; init; } = "";
+        public int Protocol { get; init; }
+        public string Folder { get; init; } = "";
+        public bool FolderReady { get; init; }
+        public string Seen { get; init; } = "";
+        public string SeenVersion { get; init; } = "";
+        public int SeenProtocol { get; init; }
+        /// <summary>"this_computer", "another_computer", or "" (the extension didn't say).</summary>
+        public string SeenWhere { get; init; } = "";
+        /// <summary>A Chrome is checking in now with the library's current key.</summary>
+        public bool Connected { get; init; }
+        /// <summary>The Chrome that checked in last used the library's current key (false: an old registration).</summary>
+        public bool KeyMatches { get; init; }
+        /// <summary>When a Chrome last checked in with the current key.</summary>
+        public DateTimeOffset? SeenWithKey { get; init; }
+        /// <summary>When a Chrome with another key was last turned away.</summary>
+        public DateTimeOffset? RefusedAt { get; init; }
     }
 
     // ---- GET canvas/classes ----
@@ -245,7 +401,7 @@ public static class CanvasApi
         public IReadOnlyList<RubricRow> Rubric { get; init; } = [];
         public SubmissionInfo? Submission { get; init; }
         public IReadOnlyList<CommentInfo> Comments { get; init; } = [];
-        public string? Quiz { get; init; }
+        public QuizInfo? Quiz { get; init; }
         public string? Spec { get; init; }
         public string? Feedback { get; init; }
     }
@@ -297,7 +453,26 @@ public static class CanvasApi
         public double? PointsDeducted { get; init; }
         public string? Body { get; init; }
         public IReadOnlyList<AssignmentFile> Files { get; init; } = [];
-        public int? Attempts { get; init; }
+        /// <summary>Every attempt handed in, oldest first.</summary>
+        public IReadOnlyList<AttemptInfo> Attempts { get; init; } = [];
+    }
+
+    public sealed record AttemptInfo
+    {
+        public int? Attempt { get; init; }
+        public DateTimeOffset? SubmittedAt { get; init; }
+        public bool Late { get; init; }
+        public IReadOnlyList<AssignmentFile> Files { get; init; } = [];
+    }
+
+    /// <summary>A graded quiz's own facts, when the assignment is one.</summary>
+    public sealed record QuizInfo
+    {
+        [JsonConverter(typeof(IdConverter))] public string Id { get; init; } = "";
+        public string? QuizType { get; init; }
+        public double? TimeLimit { get; init; }
+        public int? AllowedAttempts { get; init; }
+        public int? QuestionCount { get; init; }
     }
 
     public sealed record CommentInfo
@@ -421,5 +596,41 @@ public static class CanvasApi
     public sealed record TextFile
     {
         public string Text { get; init; } = "";
+    }
+
+    // ---- the Chrome extension, for setup's and Settings' "Add to Chrome" ----
+
+    /// <summary>Whether a Chrome with the extension is talking to the library now, the folder to load it from on this
+    /// computer (null until one is ready), and the extension's version. Read by
+    /// <see cref="CanvasClient.ExtensionStatusAsync"/> from whichever shape the library sends.</summary>
+    public sealed record ExtensionStatus
+    {
+        public bool Connected { get; init; }
+        public string? Folder { get; init; }
+        public string? Version { get; init; }
+    }
+
+    /// <summary><c>course_info</c> as the library sends it (<c>{"4201": {"code": …, "name": …, "term": …}}</c>) or as a
+    /// list of courses: both read as a list, the key becoming each course's id.</summary>
+    public sealed class CourseInfoConverter : JsonConverter<IReadOnlyList<Course>>
+    {
+        public override IReadOnlyList<Course> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.Null:
+                    return [];
+                case JsonTokenType.StartArray:
+                    return JsonSerializer.Deserialize<List<Course>>(ref reader, options) ?? [];
+                case JsonTokenType.StartObject:
+                    var byId = JsonSerializer.Deserialize<Dictionary<string, Course>>(ref reader, options) ?? [];
+                    return [.. byId.Select(kv => kv.Value with { Id = kv.Value.Id.Length > 0 ? kv.Value.Id : kv.Key })];
+                default:
+                    throw new JsonException($"Expected course_info as an object or a list, got {reader.TokenType}.");
+            }
+        }
+
+        public override void Write(Utf8JsonWriter writer, IReadOnlyList<Course> value, JsonSerializerOptions options) =>
+            JsonSerializer.Serialize(writer, value.ToList(), options);
     }
 }

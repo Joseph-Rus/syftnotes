@@ -70,7 +70,7 @@
     <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
       <TextBlock Classes="ai-notes-title" Text="Summary" />
       <TextBlock Grid.Column="1" Classes="ai-notes-byline" Margin="10,0,0,0" Text="{Binding ShownByline}" />
-      <Button Grid.Column="3" Classes="ai-pillbtn" IsVisible="{Binding ShowRewriteButton}">
+      <Button Name="RewriteButton" Grid.Column="3" Classes="ai-pillbtn" IsVisible="{Binding ShowRewriteButton}">
         <Border Classes="ai-pill">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <c:Icon Glyph="refresh" Size="16" />

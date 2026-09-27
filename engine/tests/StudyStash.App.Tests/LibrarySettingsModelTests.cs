@@ -1,0 +1,323 @@
+using System.Text.Json.Nodes;
+using Avalonia.Headless.XUnit;
+using StudyStash.App.Services;
+using StudyStash.App.ViewModels;
+using StudyStash.Core;
+
+namespace StudyStash.App.Tests;
+
+/// <summary>Settings → Your library: the library's own settings, read when a page opens and changed one at a time
+/// through its API, so the laptop needs nothing else to change its library.</summary>
+public class LibrarySettingsModelTests
+{
+    static (SettingsModel Model, AppHost Host, TempHome Home) Open(FakeLibrarySettings fake, AppRole role = AppRole.Laptop)
+    {
+        var home = new TempHome();
+        new AppSettings { SetupDone = true, Role = role }.Save(home.Path);
+        var cc = Configs.LoadClient(home.Path);
+        cc.ServerUrl = "http://mac-mini:8787";
+        cc.PoolKey = "pw";
+        cc.PoolName = "Sam's library";
+        Configs.SaveClient(cc);
+        var host = new AppHost(home.Path, log: _ => { });
+        return (SettingsModel.Make(host, library: () => fake.Call), host, home);
+    }
+
+    [AvaloniaFact]
+    public void The_sidebar_keeps_this_laptop_and_your_library_apart()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+
+        Assert.Equal("This laptop", model.ComputerNavTitle);
+        Assert.Equal(["General", "Appearance", "Recording", "Connection", "Timetable"], model.ComputerNav.Select(n => n.Label));
+        Assert.Equal(["Library", "Classes", "Notes and sorting", "AI engines", "AI tool access", "Canvas", "Folders"], model.LibraryNav.Select(n => n.Label));
+        Assert.Empty(fake.Calls); // nothing asked before a library page opens
+    }
+
+    [AvaloniaFact]
+    public void The_librarys_own_computer_has_no_recording_and_opens_on_its_library()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake, AppRole.Library);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+
+        Assert.Equal(["General", "Appearance", "Connection"], model.ComputerNav.Select(n => n.Label));
+        Assert.True(model.OnLibrary);
+        Assert.True(model.Lib.IsHere);
+        Assert.True(model.Lib.IsReady);
+    }
+
+    [AvaloniaFact]
+    public void Opening_a_library_page_reads_everything_and_changes_nothing()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+
+        model.Section = "Library";
+
+        Assert.Equal([("GET", "")], fake.Calls.Select(c => (c.Method, c.Path)));
+        var lib = model.Lib;
+        Assert.True(lib.IsReady);
+        Assert.Equal("Sam's library", lib.Name);
+        Assert.Equal(3, lib.Addresses.Count);
+        Assert.False(lib.StartAtLoginOn);
+        Assert.True(lib.CanStartAtLogin);
+        Assert.Equal(["CS 101", "BIO 110", "HIST 210", "MATH 221"], lib.Classes.Select(c => c.Name));
+        Assert.Equal("cs101, intro to cs", lib.Classes[0].Aliases);
+        Assert.Equal("60% sure", lib.ConfidenceLabel);
+        Assert.Equal("Same as the sorting model", lib.SummaryLabel);
+        Assert.Equal("Ghostty", lib.TerminalLabel);
+        Assert.Equal(2, lib.Folders.Count);
+        Assert.Equal("Rewrite all 42 summaries", lib.RewriteTitle);
+    }
+
+    [AvaloniaFact]
+    public async Task Each_change_is_sent_by_itself_as_its_made()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Notes";
+        var lib = model.Lib;
+
+        lib.WriteNotes = false;
+        lib.ConfidenceChoices.Single(c => c.Label == "80% sure").Pick.Execute(null);
+        lib.SortChoices.Single(c => c.Id == "qwen3:1.7b").Pick.Execute(null);
+        Assert.Equal("Ollama (the library's main AI)", lib.SortEngineLabel);
+        lib.SortEngineChoices.Single(c => c.Id == "claude").Pick.Execute(null);
+        lib.StartAtLoginOn = true;
+        lib.AutoUpdate = false;
+        await Task.Yield();
+
+        var sent = fake.Calls.Where(c => c.Method == "POST").Select(c => c.Body!.ToJsonString()).ToList();
+        Assert.Equal(
+        [
+            """{"notes":{"write":false}}""",
+            """{"notes":{"min_confidence":0.8}}""",
+            """{"ollama":{"sort_model":"qwen3:1.7b"}}""",
+            """{"sort_engine":"claude"}""",
+            """{"start_at_login":true}""",
+            """{"auto_update":false}""",
+        ], sent);
+        Assert.Equal("80% sure", lib.ConfidenceLabel);
+        Assert.Equal("qwen3:1.7b", lib.SortLabel);
+        Assert.Equal("Claude", lib.SortEngineLabel);
+        Assert.Contains(lib.SortEngineChoices, c => c.Label == "ChatGPT (not installed)");
+        Assert.True(lib.StartAtLoginOn);
+    }
+
+    [AvaloniaFact]
+    public async Task A_new_name_and_password_keep_this_laptop_connected()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Library";
+        var lib = model.Lib;
+
+        lib.Name = "Lecture notes";
+        await lib.SaveNameCommand.ExecuteAsync(null);
+        Assert.Equal("Lecture notes", host.Client().PoolName);
+
+        lib.ChangePasswordCommand.Execute(null);
+        lib.NewPassword = "ab";
+        await lib.SavePasswordCommand.ExecuteAsync(null);
+        Assert.Null(fake.Password); // too short: never sent
+        Assert.Contains("at least 4", lib.PasswordSay);
+
+        lib.NewPassword = "correct horse";
+        await lib.SavePasswordCommand.ExecuteAsync(null);
+        Assert.Equal("correct horse", fake.Password);
+        Assert.Equal("correct horse", host.Client().PoolKey);
+        Assert.False(lib.ChangingPassword);
+        Assert.Contains("other computers need the new password", lib.PasswordSay);
+    }
+
+    [AvaloniaFact]
+    public async Task A_refused_change_goes_back_and_says_why()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Classes";
+        var lib = model.Lib;
+
+        fake.Refuse = "There are two classes called CS 101.";
+        lib.Classes[1].Name = "CS 101";
+        await lib.SaveClassesCommand.ExecuteAsync(null);
+
+        Assert.Equal("There are two classes called CS 101.", lib.Say);
+        Assert.Equal("BIO 110", lib.Classes[1].Name); // read again from the library
+    }
+
+    [AvaloniaFact]
+    public async Task Classes_are_added_edited_and_removed_and_a_row_being_typed_in_stays()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Classes";
+        var lib = model.Lib;
+        var cs = lib.Classes[0];
+
+        cs.Aliases = "cs101,  intro to cs, CS1";
+        await lib.SaveClassesCommand.ExecuteAsync(null);
+        var sent = fake.Calls.Last().Body!["classes"]![0]!;
+        Assert.Equal(["cs101", "intro to cs", "CS1"], sent["aliases"]!.AsArray().Select(a => a!.GetValue<string>()));
+        Assert.Same(cs, lib.Classes[0]); // the echo doesn't rebuild the rows under the pointer
+
+        lib.NewClass = "PHYS 150";
+        await lib.AddClassCommand.ExecuteAsync(null);
+        Assert.Equal("PHYS 150", lib.Classes.Last().Name);
+        Assert.Equal("", lib.NewClass);
+        Assert.Equal("/Users/sam/Study Stash/Lecture notes/PHYS 150", lib.Classes.Last().Folder); // from the library's answer
+        Assert.Same(cs, lib.Classes[0]);
+
+        await lib.RemoveClassCommand.ExecuteAsync(lib.Classes.Single(c => c.Name == "HIST 210"));
+        Assert.Equal(["CS 101", "BIO 110", "MATH 221", "PHYS 150"], fake.Settings["classes"]!.AsArray().Select(c => c!["name"]!.GetValue<string>()));
+    }
+
+    [AvaloniaFact]
+    public async Task The_app_hears_when_the_classes_change_and_not_when_the_library_says_no()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Classes";
+        var lib = model.Lib;
+        int heard = 0;
+        lib.ClassesChanged = () => heard++;
+
+        lib.NewClass = "PHYS 150";
+        await lib.AddClassCommand.ExecuteAsync(null);
+        lib.Classes[0].Description = "Recursion";
+        await lib.SaveClassesCommand.ExecuteAsync(null);
+        await lib.RemoveClassCommand.ExecuteAsync(lib.Classes.Single(c => c.Name == "PHYS 150"));
+        Assert.Equal(3, heard);
+
+        fake.Refuse = "There are two classes called CS 101.";
+        lib.NewClass = "CS 101";
+        await lib.AddClassCommand.ExecuteAsync(null);
+        Assert.Equal(3, heard);
+    }
+
+    [AvaloniaFact]
+    public async Task Folders_it_may_read_change_from_here()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Folders";
+        var lib = model.Lib;
+
+        lib.Folders[0].Private = true;
+        await Task.Yield();
+        Assert.Equal("""{"folders":[{"path":"/Users/sam/Documents/School","ai":true,"private":true},{"path":"/Users/sam/Documents/Journal","ai":false,"private":true}]}""",
+            fake.Calls.Last().Body!.ToJsonString());
+
+        lib.NewFolder = "/Users/sam/Documents/Papers";
+        await lib.AddFolderCommand.ExecuteAsync(null);
+        Assert.Equal("/Users/sam/Documents/Papers", fake.Calls.Last().Body!["add_folder"]!.GetValue<string>());
+        Assert.Equal(3, lib.Folders.Count);
+
+        await lib.RemoveFolderCommand.ExecuteAsync(lib.Folders[1]);
+        Assert.Equal(["School", "Papers"], lib.Folders.Select(f => f.Name));
+    }
+
+    [AvaloniaFact]
+    public async Task Rewriting_every_summary_asks_first()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Notes";
+        var lib = model.Lib;
+
+        lib.AskRewriteAllCommand.Execute(null);
+        Assert.True(lib.ConfirmingRewrite);
+        Assert.DoesNotContain(fake.Calls, c => c.Path == "/rewrite-all");
+        await lib.RewriteAllCommand.ExecuteAsync(null);
+
+        Assert.Contains(fake.Calls, c => c.Path == "/rewrite-all");
+        Assert.Equal("42 lectures are queued for a new summary.", lib.Say);
+    }
+
+    [AvaloniaFact]
+    public async Task A_library_that_cant_be_reached_or_is_older_says_so_and_changes_nothing()
+    {
+        var fake = new FakeLibrarySettings { Down = true };
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+
+        model.Section = "Library";
+        await Task.Yield();
+        Assert.Equal(LibrarySettingsState.Unreachable, model.Lib.State);
+        Assert.True(model.Lib.CanRetry);
+        Assert.False(model.Lib.IsReady);
+
+        fake.Down = false;
+        await model.Lib.LoadCommand.ExecuteAsync(null);
+        Assert.True(model.Lib.IsReady);
+
+        fake.Older = true;
+        await model.Lib.LoadCommand.ExecuteAsync(null);
+        Assert.Equal(LibrarySettingsState.Older, model.Lib.State);
+        Assert.True(model.Lib.CanOpenPage);
+    }
+
+    [AvaloniaFact]
+    public void Without_a_library_its_pages_say_where_to_connect()
+    {
+        using var home = new TempHome();
+        using var host = new AppHost(home.Path, log: _ => { });
+        using var model = SettingsModel.Make(host);
+
+        model.Section = "Classes";
+
+        Assert.Equal(LibrarySettingsState.NoLibrary, model.Lib.State);
+        Assert.Contains("Connection", model.Lib.Problem);
+    }
+
+    [AvaloniaFact]
+    public void A_library_run_without_the_app_cant_start_at_login_from_here()
+    {
+        var fake = new FakeLibrarySettings();
+        fake.Settings["start_at_login"] = null;
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Library";
+
+        model.Lib.StartAtLoginOn = true;
+
+        Assert.False(model.Lib.CanStartAtLogin);
+        Assert.DoesNotContain(fake.Calls, c => c.Method == "POST");
+        Assert.Contains("without the Study Stash app", model.Lib.StartAtLoginSub);
+    }
+}

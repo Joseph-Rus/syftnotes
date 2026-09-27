@@ -359,7 +359,7 @@ public class CanvasClientTests
         Assert.Equal(4201, o!.Courses["CS 101"]);
         Assert.Equal(0, o.Courses["HIST 210"]);
         Assert.Equal("COMP 101 · Intro to Programming", o.Available["4201"]);
-        Assert.Single(o.CourseInfo);
+        Assert.Equal("Fall 2025", Assert.Single(o.CourseInfo).Term); // keyed by course id, as the library sends it
         Assert.Equal(3, o.LastChanges.Count);
         Assert.Equal("new", o.LastChanges[0].Kind);
         Assert.Equal("graded", o.LastChanges[2].Kind);
@@ -374,6 +374,112 @@ public class CanvasClientTests
 
         Assert.Equal("test-key-abc123", e!.Key);
         Assert.Equal("1.3", e.Version);
+    }
+
+    [Fact]
+    public async Task OverviewAsync_reads_course_info_the_way_the_library_sends_it_keyed_by_id()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", """
+            {"url": "https://school.instructure.com", "available": {"4201": "Intro to Programming", "4202": "Cell Biology"},
+             "course_info": {"4201": {"code": "COMP 101", "name": "Intro to Programming", "term": "Fall 2025"},
+                             "4202": {"code": "BIO 110", "name": "Cell Biology", "term": "Fall 2025"}}}
+            """);
+        var o = await Client(fake).FindCoursesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["4201 COMP 101", "4202 BIO 110"], o!.CourseInfo.Select(c => $"{c.Id} {c.Code}").Order());
+    }
+
+    // ---- the extension adapter (one method, both shapes the library sends) ----
+
+    const string NewShape = """
+        {"url": "https://school.instructure.com", "extension_seen": "",
+         "extension": {"connected": true, "folder": "/library-home/chrome-extension", "version": "1.4"}}
+        """;
+
+    [Fact]
+    public async Task ExtensionStatusAsync_takes_a_library_that_says_at_its_word_and_makes_a_laptops_own_folder()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", NewShape).Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var asked = new List<string>();
+
+        var s = await Client(fake).ExtensionStatusAsync((key, canvas) => { asked.Add($"{key} {canvas}"); return "/laptop-home/chrome-extension"; },
+            TestContext.Current.CancellationToken);
+
+        Assert.True(s!.Connected); // extension.connected, even though the old extension_seen is empty
+        Assert.Equal("1.4", s.Version);
+        Assert.Equal("/laptop-home/chrome-extension", s.Folder); // the library's folder is on another computer
+        Assert.Equal(["test-key-abc123 https://school.instructure.com"], asked);
+    }
+
+    [Fact]
+    public async Task ExtensionStatusAsync_uses_the_librarys_own_folder_when_the_library_is_this_computer()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", NewShape);
+        var here = new CanvasClient("http://127.0.0.1:8787", "test-key", fake.Client());
+
+        var s = await here.ExtensionStatusAsync((_, _) => throw new InvalidOperationException("nothing to make"), TestContext.Current.CancellationToken);
+
+        Assert.Equal("/library-home/chrome-extension", s!.Folder);
+        Assert.DoesNotContain(fake.Requests, r => r.Path == "/api/v2/canvas/extension");
+    }
+
+    [Fact]
+    public async Task ExtensionStatusAsync_makes_the_folder_here_when_the_librarys_own_isnt_ready()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", """
+            {"url": "https://school.instructure.com",
+             "extension": {"connected": false, "folder": "/library-home/chrome-extension", "folder_ready": false, "version": "1.4"}}
+            """).Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var here = new CanvasClient("http://127.0.0.1:8787", "test-key", fake.Client());
+
+        var s = await here.ExtensionStatusAsync((_, _) => "/made-here/chrome-extension", TestContext.Current.CancellationToken);
+
+        Assert.Equal("/made-here/chrome-extension", s!.Folder);
+        Assert.False(s.Connected);
+    }
+
+    [Fact]
+    public async Task ExtensionStatusAsync_reads_an_older_library_from_extension_seen_and_prepares_the_folder_here()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", "canvas").Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+
+        var s = await Client(fake).ExtensionStatusAsync((key, canvas) => $"/home/{key}", TestContext.Current.CancellationToken);
+
+        Assert.True(s!.Connected); // the fixture's extension_seen is set
+        Assert.Equal("1.4", s.Version);
+        Assert.Equal("/home/test-key-abc123", s.Folder);
+    }
+
+    [Fact]
+    public async Task ExtensionStatusAsync_without_prepare_writes_nothing_and_asks_only_for_the_overview()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", """{"url": "https://school.instructure.com", "extension_seen": ""}""");
+
+        var s = await Client(fake).ExtensionStatusAsync(stop: TestContext.Current.CancellationToken);
+
+        Assert.False(s!.Connected);
+        Assert.Null(s.Folder);
+        Assert.Equal("/api/v2/canvas", Assert.Single(fake.Requests).Path);
+    }
+
+    [Fact]
+    public async Task ExtensionStatusAsync_is_null_for_a_library_with_no_canvas_api()
+    {
+        Assert.Null(await Client(new FakeLibrary()).ExtensionStatusAsync(stop: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ExtensionAsync_reads_the_folder_and_which_chrome_checked_in()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", """
+            {"key": "test-key-abc123", "canvas": "https://school.instructure.com", "version": "1.4", "protocol": 3,
+             "folder": "/library/chrome-extension", "folder_ready": true, "seen": "2025-09-25T17:20:00Z", "seen_version": "1.4",
+             "seen_protocol": 3, "seen_where": "another_computer", "connected": true}
+            """);
+        var e = await Client(fake).ExtensionAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(("/library/chrome-extension", true, 3), (e!.Folder, e.FolderReady, e.Protocol));
+        Assert.Equal(("2025-09-25T17:20:00Z", "1.4", 3, "another_computer", true), (e.Seen, e.SeenVersion, e.SeenProtocol, e.SeenWhere, e.Connected));
     }
 
     [Fact]
@@ -414,5 +520,51 @@ public class CanvasClientTests
 
         Assert.Equal("That isn't a web address.", e.Message);
         Assert.Equal(400, e.Status);
+    }
+
+    // ---- one odd field never breaks a whole screen ----
+
+    [Fact]
+    public async Task Blank_null_or_garbage_dates_read_as_no_date()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/state", """
+            {"state": "no_extension", "school": null, "url": null, "last_sync": "", "next_sync": "not a date", "paused_until": 5,
+             "poll_minutes": null, "extension": {"seen": "", "version": "1.4", "outdated": null, "updated": {"from": "1.3", "to": "1.4", "at": ""}},
+             "error": {"text": "Couldn't reach Canvas.", "at": {"odd": true}}, "warnings": []}
+            """);
+        var s = await Client(fake).StateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("no_extension", s!.Status);
+        Assert.Equal(("", ""), (s.School, s.Url));
+        Assert.Null(s.LastSync);
+        Assert.Null(s.NextSync);
+        Assert.Null(s.PausedUntil);
+        Assert.Equal(0, s.PollMinutes);
+        Assert.Null(s.Extension?.Seen);
+        Assert.False(s.Extension?.Outdated);
+        Assert.Equal(default(DateTimeOffset), s.Extension?.Updated?.At);
+        Assert.Equal(default(DateTimeOffset), s.Error?.At);
+        Assert.Equal("Couldn't reach Canvas.", s.Error?.Text);
+    }
+
+    [Fact]
+    public async Task An_item_reads_the_library_s_own_shapes_for_its_flags_and_dates()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/assignments", """
+            {"class": "CS 101", "to_hand_in": [], "done": [
+              {"class": "CS 101", "id": 9001, "name": "Lab 3", "due": null, "due_at": "", "submitted": "", "graded_at": null,
+               "marked_done": "2025-09-24T20:00:00Z", "points": "10", "late": null, "missing": 0, "status": "marked_done"}]}
+            """);
+        var a = await Client(fake).AssignmentsAsync("CS 101", TestContext.Current.CancellationToken);
+
+        var item = Assert.Single(a!.Done);
+        Assert.Equal("9001", item.Id);
+        Assert.Null(item.Due);
+        Assert.Null(item.DueAt);
+        Assert.Null(item.Submitted);
+        Assert.Equal(new DateTimeOffset(2025, 9, 24, 20, 0, 0, TimeSpan.Zero), item.MarkedDone);
+        Assert.Equal(10, item.Points);
+        Assert.False(item.Late);
+        Assert.False(item.Missing);
     }
 }

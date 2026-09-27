@@ -1,4 +1,5 @@
 using Avalonia;
+using StudyStash.App.Services;
 using StudyStash.App.Windows;
 
 namespace StudyStash.App.Tests;
@@ -124,5 +125,55 @@ public class PlacementTests
         var firstWin = Placement.ToastSpot([s], 0, Small, mac: false);
         var secondWin = Placement.ToastSpot([s], 1, Small, mac: false);
         Assert.True(secondWin.Y < firstWin.Y);
+    }
+
+    [Fact]
+    public void The_library_window_opens_where_it_was_left()
+    {
+        var at = Placement.Restore(new PixelPoint(300, 200), new PixelSize(1280, 800), SideBySide, out var size);
+        Assert.Equal(new PixelPoint(300, 200), at);
+        Assert.Equal(new PixelSize(1280, 800), size);
+    }
+
+    [Fact]
+    public void The_library_window_left_hanging_off_an_edge_stays_there_but_not_under_the_menu_bar()
+    {
+        var at = Placement.Restore(new PixelPoint(1500, 200), new PixelSize(1280, 800), [Left], out _);
+        Assert.Equal(new PixelPoint(1500, 200), at);
+        at = Placement.Restore(new PixelPoint(300, 10), new PixelSize(1280, 800), [Left], out _);
+        Assert.Equal(new PixelPoint(300, Left.WorkingArea.Y), at);
+    }
+
+    [Fact]
+    public void The_library_window_left_on_an_unplugged_display_opens_centred_instead()
+    {
+        // It was on the second display, which is gone now.
+        Assert.Null(Placement.Restore(new PixelPoint(2400, 300), new PixelSize(1280, 800), [Left], out _));
+    }
+
+    [Fact]
+    public void The_library_window_dragged_half_off_a_display_comes_back_whole_and_fits_a_smaller_one()
+    {
+        // Its title bar still shows on the laptop's screen, but it's bigger than the screen and hangs off the right.
+        var at = Placement.Restore(new PixelPoint(1300, 1100), new PixelSize(1600, 1000), Stacked, out var size);
+        Assert.NotNull(at);
+        Assert.Equal(new PixelSize(1440, 864), size);
+        Assert.Equal(new PixelPoint(0, 1080), at);
+    }
+
+    [Fact]
+    public void A_library_window_saved_with_no_size_opens_centred()
+    {
+        Assert.Null(Placement.Restore(new PixelPoint(100, 100), new PixelSize(0, 0), SideBySide, out _));
+    }
+
+    [Fact]
+    public void The_library_windows_place_is_kept_in_app_json()
+    {
+        using var home = new TempHome();
+        Assert.Null(AppSettings.Load(home.Path).LibraryWindow);
+        new AppSettings { LibraryWindow = new WindowPlace(120, 80, 1100.5, 700, Zoomed: true) }.Save(home.Path);
+        Assert.Contains("\"library_window\"", File.ReadAllText(AppSettings.PathIn(home.Path)));
+        Assert.Equal(new WindowPlace(120, 80, 1100.5, 700, true), AppSettings.Load(home.Path).LibraryWindow);
     }
 }

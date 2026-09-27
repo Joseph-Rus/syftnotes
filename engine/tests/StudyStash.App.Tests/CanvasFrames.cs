@@ -72,11 +72,7 @@ public static class CanvasFrames
     /// with Canvas selected, the content pane on a Layer background holding whatever's given.</summary>
     public static Control WinSettings(Control content)
     {
-        var mark = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4), Margin = new Thickness(16, 0, 10, 0) };
-        mark.Bind(Border.BackgroundProperty, mark.GetResourceObservable("Accent"));
-        var markIcon = new Icon { Glyph = "graphic_eq", Size = 11 };
-        markIcon.Bind(Icon.ForegroundProperty, markIcon.GetResourceObservable("OnAccent"));
-        mark.Child = markIcon;
+        var mark = new AppIcon { Margin = new Thickness(16, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
         var titleText = new TextBlock { Text = "Study Stash settings", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
         var titleBar = new Grid { Height = 32, ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Children = { mark, titleText } };
         Grid.SetColumn(titleText, 1);
@@ -248,11 +244,7 @@ public static class CanvasFrames
     /// screen use its own list width (the class page's 360, instead of the Due list's 340).</summary>
     public static Control WinApp(string selected, Control list, Control? detail = null, double width = 1280, double listWidth = 340)
     {
-        var mark = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4), Margin = new Thickness(16, 0, 12, 0) };
-        mark.Bind(Border.BackgroundProperty, mark.GetResourceObservable("Accent"));
-        var markIcon = new Icon { Glyph = "graphic_eq", Size = 12 };
-        markIcon.Bind(Icon.ForegroundProperty, markIcon.GetResourceObservable("OnAccent"));
-        mark.Child = markIcon;
+        var mark = new AppIcon { Margin = new Thickness(16, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
         var appName = new TextBlock { Text = "Study Stash", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
         var left = new StackPanel { Orientation = Orientation.Horizontal, Children = { mark, appName } };
 

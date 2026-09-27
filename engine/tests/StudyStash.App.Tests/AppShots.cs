@@ -181,8 +181,7 @@ public class AppShots
     /// <summary>Library setup at the AI engines (design 15).</summary>
     static SetupModel SetupAi(SkinKind skin)
     {
-        var m = SetupModel.For(skin);
-        m.SetRole(AppRole.Library, skin);
+        var m = SetupModel.For(skin, AppRole.Library);
         m.Ai = AiDemo.Setup();
         m.Go(SetupStep.Ai);
         return m;

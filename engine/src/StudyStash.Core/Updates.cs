@@ -87,9 +87,26 @@ public static partial class Updates
         return http;
     }
 
-    /// <summary>The newest published release, or null when there is none yet.</summary>
+    /// <summary>STUDYSTASH_LATEST, for a copy under test that mustn't ask GitHub: "off" means no check (no release
+    /// known), a version such as "v0.6.0" pretends that's the newest release. Unset or empty, GitHub is asked.</summary>
+    public const string LatestVariable = "STUDYSTASH_LATEST";
+
+    /// <summary>What <see cref="LatestVariable"/> says: (false, null) when it's unset, so GitHub is asked; (true, null)
+    /// for "off"; (true, a release) for a version. A pretend release has nothing to download, so nothing installs.</summary>
+    public static (bool Set, Release? Release) Pretend(string? value)
+    {
+        string v = (value ?? "").Trim();
+        if (v.Length == 0) return (false, null);
+        if (v.Equals("off", StringComparison.OrdinalIgnoreCase) || v.Equals("none", StringComparison.OrdinalIgnoreCase)) return (true, null);
+        string tag = v.StartsWith('v') ? v : "v" + v;
+        return (true, new Release(tag, ParseVersion(tag), "", ""));
+    }
+
+    /// <summary>The newest published release, or null when there is none yet. With no client of its own to use,
+    /// <see cref="LatestVariable"/> can turn the check off or pretend an answer.</summary>
     public static async Task<Release?> LatestAsync(HttpClient? http = null)
     {
+        if (http is null && Pretend(Environment.GetEnvironmentVariable(LatestVariable)) is (true, var pretend)) return pretend;
         using var request = new HttpRequestMessage(HttpMethod.Get, LatestApi);
         request.Headers.TryAddWithoutValidation("Accept", "application/vnd.github+json");
         using var r = await (http ?? Http).SendAsync(request);

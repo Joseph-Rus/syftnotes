@@ -68,6 +68,27 @@ public class UpdaterTests
         Assert.Null(await Updates.LatestAsync(none.Client()));
     }
 
+    [Theory]
+    [InlineData(null, false, null)]
+    [InlineData("", false, null)]
+    [InlineData("  ", false, null)]
+    [InlineData("off", true, null)]
+    [InlineData("OFF", true, null)]
+    [InlineData("none", true, null)]
+    [InlineData("0.6.0", true, "v0.6.0")]
+    [InlineData("v0.6.0", true, "v0.6.0")]
+    public void A_copy_under_test_can_skip_or_pretend_the_update_check(string? value, bool set, string? tag)
+    {
+        var (isSet, rel) = Updates.Pretend(value);
+        Assert.Equal(set, isSet);
+        Assert.Equal(tag, rel?.Tag);
+        if (rel is null) return;
+        // Nothing to download, so a pretend release never installs.
+        Assert.Equal("", rel.Url);
+        Assert.Empty(rel.Assets ?? new Dictionary<string, string>());
+        Assert.True(Updates.IsNewer(rel, "0.5.0"));
+    }
+
     [Fact]
     public void Checksums_parse_shasum_output()
     {

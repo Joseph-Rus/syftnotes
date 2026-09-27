@@ -4,10 +4,13 @@ using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using StudyStash.App.Controls;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
@@ -86,6 +89,8 @@ public static partial class Shell
             };
         else if (OperatingSystem.IsMacOS())
             Program.Log("[app] this Mac doesn't say when the app is opened again; a second copy still hands off");
+        // The library's dropdown names the laptops that reach it.
+        RemoteLibrary.Computer = Environment.MachineName;
         host = new AppHost(home, laptop: new LaptopHost(), log: Program.Log);
         Skin.UseTheme(ColourThemes.Find(host.Settings.Theme));
         host.Changed += RequestRefresh;
@@ -102,6 +107,8 @@ public static partial class Shell
         host.Start();
         AppUpdates.Start(host, stop.Token);
         MakeTray();
+        // A Mac's app menu (About, Settings… ⌘,, and the system's Hide and Quit ⌘Q) while a window is in front.
+        if (OperatingSystem.IsMacOS()) AppMenu.Use(app, AppMenu.ShowAbout, SettingsFromAnywhere);
         ApplyShortcutsSetting(force: true);
         ticker = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Tick());
         ticker.Start();
@@ -159,8 +166,16 @@ public static partial class Shell
     {
         if (quitting) return;
         Program.Log($"[app] another copy said \"{message}\"");
-        if (message == "record" && host.Settings.SetupDone) ToggleRecording();
-        else if (!host.Settings.SetupDone) ShowSetup();
+        if (!host.Settings.SetupDone) ShowSetup();
+        else if (message == "record") ToggleRecording();
+        // "--show panel" / "--show quick": open the dropdown or the quick panel without the menu bar or the shortcut
+        // (to look at them, or when another copy of the app owns the shortcuts).
+        else if (message == "panel") TogglePanel();
+        else if (message == "quick") ToggleQuick();
+        // "--show settings" opens Settings, "--show settings:Library" at one of its pages.
+        else if (message == "settings" || message.StartsWith("settings:", StringComparison.Ordinal))
+            ShowSettings(message.Length > "settings:".Length ? message["settings:".Length..] : null);
+        else if (message.StartsWith("snap:", StringComparison.Ordinal)) MacSnap.Save(message["snap:".Length..]);
         else ShowLibrary();
     }
 
@@ -173,8 +188,8 @@ public static partial class Shell
         lastOops = DateTime.UtcNow;
         try
         {
-            string first = e.Exception.Message.Split('\n', 2)[0].Trim();
-            Toast("Something went wrong", first.Length > 0 ? first : e.Exception.GetType().Name, null, null);
+            // The exception is in the log already; the student gets what happened, not the stack's words.
+            Toast("Something went wrong", "Study Stash carried on. If something looks wrong, quit it and open it again.", null, null);
         }
         catch (Exception again)
         {
@@ -252,30 +267,28 @@ public static partial class Shell
         tray = null;
         if (OperatingSystem.IsMacOS()) MacStatusItem.Destroy();
         Player.Stop();
+        SaveLibraryPlace();
         host.Save(_ => { });
         Program.Log("[app] quitting");
     }
 
     // --- the tray ---------------------------------------------------------------------------------------------------
 
-    /// <summary>The icon, as PNG bytes: the waveform glyph (a template image on a Mac, which the menu bar tints),
-    /// with a red dot while recording.</summary>
+    /// <summary>The icon, as PNG bytes: the "S." mark — black on a Mac (a template image the menu bar tints, or, while
+    /// recording, in the menu bar's own ink so its red dot stays red), black or white on Windows by theme — with a red
+    /// dot while recording.</summary>
     static byte[] TrayImageBytes(bool recording)
     {
-        const int size = 44;
-        var bmp = new RenderTargetBitmap(new PixelSize(size, size), new Vector(96, 96));
-        using (var ctx = bmp.CreateDrawingContext())
-        {
-            IBrush ink = OperatingSystem.IsMacOS() ? Brushes.Black : Application.Current?.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Light ? Brushes.Black : Brushes.White;
-            if (Controls.Icon.Find("graphic_eq", false) is { } g)
-                using (ctx.PushTransform(Matrix.CreateScale(size / 24.0, size / 24.0)))
-                    ctx.DrawGeometry(ink, null, g);
-            if (recording) ctx.DrawEllipse(new SolidColorBrush(Color.Parse("#E5484D")), null, new Point(size - 9, size - 9), 8, 8);
-        }
-        var stream = new MemoryStream();
-        bmp.Save(stream, PngBitmapEncoderOptions.Default);
-        return stream.ToArray();
+        if (OperatingSystem.IsMacOS())
+            return TrayMark.Png(36, recording && (trayDark = MacStatusItem.DarkMenuBar()) ? Brushes.White : Brushes.Black, recording);
+        IBrush ink = Application.Current?.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Light ? Brushes.Black : Brushes.White;
+        return TrayMark.Png(32, ink, recording);
     }
+
+    /// <summary>The Mac menu bar was dark when the recording icon was last drawn.</summary>
+    static bool trayDark;
+    /// <summary>This recording's menu bar icon has been written to the log once.</summary>
+    static bool trayLogged;
 
     static WindowIcon TrayImage(bool recording)
     {
@@ -289,8 +302,10 @@ public static partial class Shell
         {
             // Avalonia's own TrayIcon never raises Clicked on macOS, so the menu bar icon is a real NSStatusItem.
             MacStatusItem.Create(leftClick: x => TogglePanel(new PixelPoint((int)x, 0)),
-                record: ToggleRecording, search: ToggleQuick, open: ShowLibrary, settings: ShowSettings, quit: () => Quit());
+                record: host.Settings.Role == AppRole.Library ? null : ToggleRecording, search: ToggleQuick, open: ShowLibrary, settings: SettingsFromAnywhere, quit: () => Quit());
             MacStatusItem.SetIcon(TrayImageBytes(false));
+            // Once the menu bar has laid it out: where it is, and whether the student can see it at all.
+            DispatcherTimer.RunOnce(CheckMenuBarIcon, TimeSpan.FromSeconds(2));
             return;
         }
         tray = new TrayIcon { Icon = TrayImage(false), ToolTipText = "Study Stash", IsVisible = true };
@@ -302,16 +317,50 @@ public static partial class Shell
             i.Click += (_, _) => act();
             menu.Add(i);
         }
-        Item("Record", ToggleRecording);
+        if (host.Settings.Role != AppRole.Library) Item("Record", ToggleRecording);
         Item("Search notes and lectures", ToggleQuick);
         Item("Open Study Stash", ShowLibrary);
-        Item("Settings…", ShowSettings);
+        Item("Settings…", SettingsFromAnywhere);
         menu.Add(new NativeMenuItemSeparator());
         Item("Quit Study Stash", () => Quit());
         tray.Menu = menu;
         TrayIcon.SetIcons(app, new TrayIcons { tray });
         // The tray's ink is black or white depending on the theme; redraw it when that changes.
         app.ActualThemeVariantChanged += (_, _) => tray.Icon = TrayImage(trayRecording);
+    }
+
+    /// <summary>The menu bar had no room to show the S. when it was last checked.</summary>
+    static bool iconHidden;
+
+    /// <summary>Writes where the menu bar icon is to the log; one the menu bar hides (full, or behind the camera notch)
+    /// is said once, with how to reach the app anyway, when setup's done.</summary>
+    static void CheckMenuBarIcon()
+    {
+        if (quitting || !OperatingSystem.IsMacOS() || MacStatusItem.Check() is not { } p) return;
+        Program.Log($"[tray] menu bar icon: {p}");
+        bool hidden = !p.Seen;
+        if (hidden && !iconHidden && host.Settings.SetupDone) SayWhereTheIconIs();
+        iconHidden = hidden;
+    }
+
+    /// <summary>The hidden S.'s "Show it": the menu bar puts it just right of the notch (and remembers that), and the
+    /// log says where it landed.</summary>
+    static void MoveIconIntoView()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        MacStatusItem.MoveIntoView();
+        Program.Log("[tray] moving the menu bar icon into view");
+        DispatcherTimer.RunOnce(CheckMenuBarIcon, TimeSpan.FromSeconds(1.5));
+    }
+
+    /// <summary>A notification saying where the S. lives (after setup, and when a full menu bar hides it).</summary>
+    static void SayWhereTheIconIs()
+    {
+        bool mac = OperatingSystem.IsMacOS();
+        bool hidden = mac && MacStatusItem.Check() is { Seen: false };
+        var (title, text) = IconWords.WhereItIs(mac, hidden);
+        // Longer than most: it's the one way to find the app when its icon can't be seen.
+        Toast(title, text, hidden ? IconWords.ShowIt : null, hidden ? MoveIconIntoView : null, TimeSpan.FromSeconds(hidden ? 30 : 12));
     }
 
     // --- what the buttons do ---------------------------------------------------------------------------------------
@@ -332,6 +381,7 @@ public static partial class Shell
             panelWindow?.Hide();
             ShowLibrary();
         };
+        panel.OnSettings = SettingsFromAnywhere;
         panel.OnSwitchClass = PickClass;
         panel.OnFixProblem = FixProblem;
         panel.OnOpenLecture = OpenRecentLecture;
@@ -369,11 +419,20 @@ public static partial class Shell
 
     static string RecordClass() => chosenClass ?? host.ClassNow()?.Name ?? "";
 
-    static void ToggleRecording()
+    /// <summary>Record is waiting on macOS's microphone prompt: another press does nothing until it's answered.</summary>
+    static bool askingForMic;
+
+    static async void ToggleRecording()
     {
         if (host.Recorder.Current is not null)
         {
             StopRecording();
+            return;
+        }
+        if (askingForMic) return;
+        if (host.Settings.Role == AppRole.Library)
+        {
+            Toast("This computer is your library", "Record on your laptop: this one keeps the lectures and writes the notes.", "Settings", SettingsFromAnywhere);
             return;
         }
         if (!host.ModelReady)
@@ -382,29 +441,36 @@ public static partial class Shell
                 "Settings", ShowSettings);
             return;
         }
-        var mic = host.MicAccess();
-        if (mic is MicAccess.Denied or MicAccess.Restricted)
-        {
-            var p = Problems.For(host);
-            Toast(p?.Title ?? "Study Stash can't use the microphone", p?.Detail ?? "", p is { HasAction: true } ? p.ActionLabel : null,
-                () => Dialogs.OpenUrl(host.MicSettingsUrl));
-            return;
-        }
-        // Not asked yet: ask now, and start recording anyway (the watchdog catches a refusal once it comes).
-        if (mic == MicAccess.NotAsked) host.AskMic();
+        RecordStart start;
+        askingForMic = true;
         try
         {
-            var l = host.StartRecording(RecordClass());
+            // Not asked yet: macOS's own prompt is all the student sees until they answer; recording starts after.
+            start = await host.RecordAsync(RecordClass());
+        }
+        catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException)
+        {
+            Toast("Couldn't start recording", e.Message, null, null);
+            Refresh();
+            return;
+        }
+        finally
+        {
+            askingForMic = false;
+        }
+        if (start.Trouble is { } trouble)
+        {
+            Toast(trouble.Title, trouble.Detail, trouble.HasAction ? trouble.ActionLabel : null,
+                trouble.ActionUrl.Length > 0 ? () => Dialogs.OpenUrl(trouble.ActionUrl) : null);
+        }
+        else if (start.Lecture is { } l)
+        {
             liveId = l.Id;
             recorder.Lines.Clear();
             recorder.Ask = LiveAsk();
             recorder.Waiting = "What's said shows here a few seconds after it's said.";
             panelWindow?.Hide();
             ShowRecorder(expanded: false);
-        }
-        catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException)
-        {
-            Toast("Couldn't start recording", e.Message, null, null);
         }
         Refresh();
     }
@@ -427,36 +493,44 @@ public static partial class Shell
         Refresh();
     }
 
+    /// <summary>A menu in the app's look (Styles.axaml): on a Mac the system draws its soft shadow round the rounded
+    /// panel, as it does for its own menus.</summary>
+    internal static ContextMenu Menu() => new() { WindowManagerAddShadowHint = OperatingSystem.IsMacOS() };
+
+    /// <summary>The dropdown's class picker, hung under its button: a check on what Record will do now, and a pick
+    /// changes Record's label and the line under it at once.</summary>
     static void PickClass()
     {
-        var menu = new ContextMenu();
-        var classes = host.Classes();
-        foreach (var (name, color, _) in classes)
+        var menu = ClassPicker.Build([.. host.Classes().Select(c => (c.Name, c.Color))], chosenClass, name =>
         {
-            var item = new MenuItem { Header = name, Icon = new Avalonia.Controls.Shapes.Ellipse { Width = 8, Height = 8, Fill = Skin.ClassDot(color) } };
-            item.Click += (_, _) =>
+            chosenClass = name;
+            Program.Log($"[panel] class picked: {(name is null ? "follow the timetable" : name.Length == 0 ? "let the library sort it" : name)}");
+            Refresh();
+            // The dropdown stays up, showing Record's new label and the line under it.
+            panelWindow?.Activate();
+        });
+        if (panelWindow is null) return;
+        var dropdown = panelWindow;
+        dropdown.HoldOpen = true;
+        menu.Closed += (_, _) =>
+        {
+            dropdown.HoldOpen = false;
+            // Closed by a click somewhere else altogether: the dropdown goes too, as it would have.
+            DispatcherTimer.RunOnce(() =>
             {
-                chosenClass = name;
-                Refresh();
-            };
-            menu.Items.Add(item);
+                if (dropdown.IsVisible && !dropdown.IsActive) dropdown.Hide();
+            }, TimeSpan.FromMilliseconds(150));
+        };
+        var button = panelWindow.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Command == panel.SwitchClassCommand && b.IsEffectivelyVisible);
+        if (button is null)
+        {
+            if (panelWindow.Content is Control c) menu.Open(c);
+            return;
         }
-        if (classes.Count > 0) menu.Items.Add(new Separator());
-        var sort = new MenuItem { Header = "Let the library sort it" };
-        sort.Click += (_, _) =>
-        {
-            chosenClass = "";
-            Refresh();
-        };
-        menu.Items.Add(sort);
-        var follow = new MenuItem { Header = "Follow my timetable", IsEnabled = chosenClass is not null };
-        follow.Click += (_, _) =>
-        {
-            chosenClass = null;
-            Refresh();
-        };
-        menu.Items.Add(follow);
-        if (panelWindow?.Content is Control c) menu.Open(c);
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.BottomEdgeAlignedRight;
+        menu.VerticalOffset = 6;
+        menu.Open(button);
     }
 
     /// <summary>The panel's Fix button: what to do depends on which problem is showing right now.</summary>
@@ -574,7 +648,11 @@ public static partial class Shell
         }
         // The click that opens it follows the deactivate that just closed it (one gesture, two events): don't reopen.
         if (panelWindow is not null && DateTime.UtcNow - panelWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
-        panelWindow ??= new Floating { Content = PanelView(), CloseOnDeactivate = true, Title = "Study Stash" };
+        if (panelWindow is null)
+        {
+            panelWindow = new Floating { Content = PanelView(), CloseOnDeactivate = true, Title = "Study Stash" };
+            AppMenu.AddSettingsKey(panelWindow, SettingsFromAnywhere);
+        }
         Refresh();
         // NSEvent's mouse location is in points, in the same coordinate space Avalonia's screens report: no
         // rescaling (a display's own scale factor doesn't change where its menu bar sits in that shared space).
@@ -603,13 +681,46 @@ public static partial class Shell
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
         var w = new Floating { Content = view, Title = "Study Stash recorder" };
+        AppMenu.AddSettingsKey(w, SettingsFromAnywhere);
         // Drag it anywhere by its background; where it lands is saved once the drag ends, not on every pixel moved.
+        // The small pill moves by hand, so a press that never moves is a click, which opens the recorder.
+        Point? pressed = null;
+        bool moved = false;
         view.PointerPressed += (_, e) =>
         {
             if (e.Source is TextBox || !e.GetCurrentPoint(view).Properties.IsLeftButtonPressed) return;
-            w.BeginMoveDrag(e);
+            if (recorder.Expanded)
+            {
+                w.BeginMoveDrag(e);
+                return;
+            }
+            pressed = e.GetPosition(view);
+            moved = false;
+            e.Pointer.Capture(view);
         };
-        view.PointerReleased += (_, _) => SaveRecorderPosition();
+        view.PointerMoved += (_, e) =>
+        {
+            if (pressed is not { } from) return;
+            var by = e.GetPosition(view) - from;
+            if (!moved && Math.Abs(by.X) + Math.Abs(by.Y) < 4) return;
+            moved = true;
+            // The window follows the pointer, so the pointer stays over the same spot of the pill.
+            w.Position += new PixelVector((int)Math.Round(by.X * w.DesktopScaling), (int)Math.Round(by.Y * w.DesktopScaling));
+        };
+        view.PointerReleased += (_, e) =>
+        {
+            if (pressed is not null)
+            {
+                pressed = null;
+                e.Pointer.Capture(null);
+                if (!moved)
+                {
+                    recorder.ToggleCommand.Execute(null);
+                    return;
+                }
+            }
+            SaveRecorderPosition();
+        };
         w.Closing += (_, e) =>
         {
             if (quitting) return;
@@ -661,6 +772,7 @@ public static partial class Shell
         {
             view = Skin.Current == SkinKind.Mac ? new MacQuick { DataContext = quick } : new WinQuick { DataContext = quick };
             quickWindow = new Floating { Content = view, CloseOnDeactivate = true, Title = "Study Stash search" };
+            AppMenu.AddSettingsKey(quickWindow, SettingsFromAnywhere);
         }
         quick.Answering = false;
         quick.Query = "";
@@ -683,12 +795,13 @@ public static partial class Shell
         var w = new Window
         {
             Title = "Study Stash", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? 52 : 48,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 48,
         };
         Look.Apply(w);
         if (Skin.Current == SkinKind.Mac)
         {
             w.Content = new MacLibrary { DataContext = library };
+            MacTitleBar.Attach(w);
         }
         else
         {
@@ -697,14 +810,57 @@ public static partial class Shell
             w.Content = new WinLibrary { DataContext = library };
             w.Opened += (_, _) => MicaIfAvailable(w);
         }
+        PutWhereLeft(w);
+        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
+        // The menu bar, read back once, so the log shows the app menu really has Settings… ⌘, and Quit ⌘Q.
+        if (OperatingSystem.IsMacOS())
+        {
+            bool described = false;
+            w.Activated += (_, _) =>
+            {
+                if (described) return;
+                described = true;
+                DispatcherTimer.RunOnce(() => Program.Log($"[menu] {AppMenu.Describe()}"), TimeSpan.FromMilliseconds(500));
+            };
+        }
         w.Closing += (_, e) =>
         {
             if (quitting) return;
+            SaveLibraryPlace();
             e.Cancel = true;
             w.Hide();
             UpdateDock();
         };
         return mainWindow = w;
+    }
+
+    /// <summary>The library window opens where it was left, at the size it was left (or zoomed), if that spot is
+    /// still on a display; otherwise centred at its usual size.</summary>
+    static void PutWhereLeft(Window w)
+    {
+        if (host.Settings.LibraryWindow is not { } place) return;
+        var screens = w.Screens.All.Select(s => new ScreenGeometry(s.Bounds, s.WorkingArea, s.Scaling, s.IsPrimary)).ToList();
+        var at = new PixelPoint(place.X, place.Y);
+        double scale = Placement.Pick(screens, at).Scaling;
+        var size = new PixelSize((int)(Math.Max(place.Width, w.MinWidth) * scale), (int)(Math.Max(place.Height, w.MinHeight) * scale));
+        if (Placement.Restore(at, size, screens, out var fitted) is not { } spot) return;
+        w.WindowStartupLocation = WindowStartupLocation.Manual;
+        w.Position = spot;
+        w.Width = fitted.Width / scale;
+        w.Height = fitted.Height / scale;
+        if (place.Zoomed) w.Opened += (_, _) => w.WindowState = WindowState.Maximized;
+    }
+
+    /// <summary>Remembers where the library window is and its size, so it opens there next time (it's being hidden,
+    /// or the app is quitting). Zoomed, it keeps the size it had before, and full screen isn't remembered.</summary>
+    static void SaveLibraryPlace()
+    {
+        if (mainWindow is not { IsVisible: true } w || w.WindowState is WindowState.FullScreen or WindowState.Minimized) return;
+        bool zoomed = w.WindowState == WindowState.Maximized;
+        var place = zoomed && host.Settings.LibraryWindow is { } before
+            ? before with { Zoomed = true }
+            : new WindowPlace(w.Position.X, w.Position.Y, w.ClientSize.Width, w.ClientSize.Height, zoomed);
+        host.Save(s => s.LibraryWindow = place);
     }
 
     /// <summary>Windows 11's Mica shows through where the design has its Mica color; elsewhere the color stands in.</summary>
@@ -740,10 +896,12 @@ public static partial class Shell
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacSetup { DataContext = setup, DrawChrome = false } : new WinSetup { DataContext = setup, DrawChrome = false };
         var w = new Window
         {
-            Title = "Set up Study Stash", Width = view.Width, Height = view.Height, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = view,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? 48 : 32,
+            Title = setup.HeaderTitle, Width = view.Width, Height = view.Height, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = view,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
+        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
+        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         if (Skin.Current == SkinKind.Win)
         {
             w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
@@ -757,8 +915,16 @@ public static partial class Shell
             Setup.Finish(model, host);
             w.Close();
             ShowLibrary();
+            // The first run ends by saying where the S. lives (or that a full menu bar hides it).
+            DispatcherTimer.RunOnce(SayWhereTheIconIs, TimeSpan.FromSeconds(1));
         };
         setup.OnEnter = step => EnterSetupStep(model, step);
+        setup.OnCopy = text => _ = w.Clipboard?.SetTextAsync(text);
+        // The library's setup and the laptop's have their own names: the window's follows the flow.
+        setup.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SetupModel.HeaderTitle)) w.Title = model.HeaderTitle;
+        };
         // The AI and Canvas steps are the design's bigger window (the view sizes itself per step): the window follows.
         view.PropertyChanged += (_, e) =>
         {
@@ -766,7 +932,8 @@ public static partial class Shell
             else if (e.Property == Layoutable.HeightProperty) w.Height = view.Height;
         };
         // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
-        setup.LeaveAsync = async step => step != SetupStep.Ai || model.Ai is not { } ai || await ai.SaveAsync();
+        var leave = setup.LeaveAsync;
+        setup.LeaveAsync = async step => step == SetupStep.Ai ? model.Ai is not { } ai || await ai.SaveAsync() : leave is null || await leave(step);
         w.Closed += (_, _) =>
         {
             setupWindow = null;
@@ -795,7 +962,7 @@ public static partial class Shell
                 break;
             case SetupStep.Canvas when model.Canvas is null:
                 var watch = CanvasPoll();
-                var connect = new CanvasConnectModel(Canvas(), watch) { ShowFooter = false, FinishLabel = model.ContinueLabel };
+                var connect = new CanvasConnectModel(Canvas(), watch, forSetup: true) { ShowFooter = false, FinishLabel = model.ContinueLabel };
                 connect.OnSkip = () => model.SkipCommand.Execute(null);
                 connect.OnFinish = () => model.NextCommand.Execute(null);
                 model.Canvas = connect;
@@ -805,6 +972,22 @@ public static partial class Shell
     }
 
     public static void ShowSettings() => ShowSettings(null);
+
+    /// <summary>The app menu's Settings… (⌘,): see <see cref="SettingsFromAnywhere"/>.</summary>
+    public static void SettingsFromMenu()
+    {
+        if (host is not null) SettingsFromAnywhere();
+    }
+
+    /// <summary>Settings from the dropdown's gear, the app menu or ⌘, (Ctrl+,) anywhere: the dropdown and the quick
+    /// panel make way for it; before setup's done, setup comes forward instead.</summary>
+    static void SettingsFromAnywhere()
+    {
+        panelWindow?.Hide();
+        quickWindow?.Hide();
+        if (!host.Settings.SetupDone) ShowSetup();
+        else ShowSettings();
+    }
 
     /// <summary>Settings, open at <paramref name="section"/> when one's given ("AI", "Access", "Canvas"…).</summary>
     public static void ShowSettings(string? section)
@@ -823,9 +1006,13 @@ public static partial class Shell
         {
             Title = "Study Stash settings", Width = 900, Height = Skin.Current == SkinKind.Mac ? 780 : 860, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen,
             Content = new SettingsView { DataContext = model, DrawChrome = false },
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? 52 : 32,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
+        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
+        model.Lib.Copy = text => _ = w.Clipboard?.SetTextAsync(text);
+        model.Lib.ClassesChanged = LibraryClassesChanged;
+        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         if (Skin.Current == SkinKind.Win)
         {
             w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
@@ -851,14 +1038,18 @@ public static partial class Shell
         Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
             || canvasConnectWindow?.IsVisible == true));
 
-    /// <summary>A notification in the design's look: top right on a Mac, above the tray on Windows. It goes by itself.</summary>
     /// <summary>Toasts on screen right now, oldest first: how they stack, and what stops the same title firing twice
     /// in a row.</summary>
     static readonly List<(string Title, DateTime At, Floating Window)> toasts = [];
 
-    public static void Toast(string title, string text, string? action, Action? run)
+    /// <summary>A notification like the system's: top right on a Mac, above the tray on Windows. It goes by itself.
+    /// Error codes in the words go to the log, not on screen.</summary>
+    public static void Toast(string title, string text, string? action, Action? run, TimeSpan? stay = null)
     {
         if (quitting) return;
+        if (ToastWords.HadCodes(title) || ToastWords.HadCodes(text)) Program.Log($"[toast] {title}: {text}");
+        title = ToastWords.Plain(title) is { Length: > 0 } plain ? plain : "Study Stash";
+        text = ToastWords.Plain(text);
         var now = DateTime.UtcNow;
         toasts.RemoveAll(t => !t.Window.IsVisible);
         if (toasts.Any(t => t.Title == title && now - t.At < TimeSpan.FromSeconds(10))) return;
@@ -881,7 +1072,7 @@ public static partial class Shell
         DispatcherTimer.RunOnce(() =>
         {
             if (w.IsVisible && !view.IsPointerOver) w.Close();
-        }, TimeSpan.FromSeconds(7));
+        }, stay ?? TimeSpan.FromSeconds(7));
     }
 
     // --- keeping it all up to date ------------------------------------------------------------------------------------
@@ -895,6 +1086,22 @@ public static partial class Shell
         var levels = host.Recorder.Levels();
         panel.Elapsed = recorder.Elapsed = elapsed;
         panel.Levels = recorder.Levels = levels;
+        // The menu bar shows the time beside the icon (the tray, on hover); a menu bar that turned dark or light since
+        // gets the recording icon in its new ink.
+        if (OperatingSystem.IsMacOS())
+        {
+            MacStatusItem.ShowElapsed(elapsed);
+            if (trayRecording && MacStatusItem.DarkMenuBar() != trayDark) MacStatusItem.SetIcon(TrayImageBytes(true), template: false);
+            if (trayRecording && !trayLogged)
+            {
+                trayLogged = true;
+                Program.Log($"[tray] recording: the S. with its red dot, {(trayDark ? "white on a dark" : "black on a light")} menu bar, \"{MacStatusItem.Title()}\" beside it");
+            }
+        }
+        else if (tray is not null)
+        {
+            tray.ToolTipText = $"Study Stash · recording {elapsed}";
+        }
     }
 
     static DateTime lastRefreshAt = DateTime.MinValue;
@@ -960,6 +1167,13 @@ public static partial class Shell
         var (status, good) = host.Status();
         panel.Status = status;
         panel.StatusGood = good;
+        // A library-only computer doesn't record: its dropdown says what the library is doing instead.
+        panel.LibraryOnly = host.Settings.Role == AppRole.Library;
+        panel.Library = panel.LibraryOnly
+            ? LibraryPanelWords.From(host.Library == LibraryState.Connected || host.LocalLibrary?.State is LibraryServiceState.Running or LibraryServiceState.Elsewhere,
+                host.Library == LibraryState.Starting || host.LocalLibrary?.State == LibraryServiceState.Starting,
+                OperatingSystem.IsMacOS() ? "Mac" : "PC", host.Overview, canvasWatch?.State, DateTimeOffset.Now, TimeZoneInfo.Local)
+            : null;
         KeepCanvasWatched();
         library.Status = LibraryStatus();
         library.StatusGood = host.Library == LibraryState.Connected;
@@ -971,8 +1185,21 @@ public static partial class Shell
         if (trayRecording != recording)
         {
             trayRecording = recording;
-            if (OperatingSystem.IsMacOS()) MacStatusItem.SetIcon(TrayImageBytes(recording));
-            else if (tray is not null) tray.Icon = TrayImage(recording);
+            if (OperatingSystem.IsMacOS())
+            {
+                MacStatusItem.SetIcon(TrayImageBytes(recording), template: !recording);
+                if (!recording)
+                {
+                    MacStatusItem.ShowElapsed("");
+                    trayLogged = false;
+                    Program.Log($"[tray] idle: the S. mark as a template image, \"{MacStatusItem.Title()}\" beside it");
+                }
+            }
+            else if (tray is not null)
+            {
+                tray.Icon = TrayImage(recording);
+                if (!recording) tray.ToolTipText = "Study Stash";
+            }
         }
         if (OperatingSystem.IsWindows()) UpdateTaskbar(problem);
         if (setup is not null) Setup.Refresh(setup, host);

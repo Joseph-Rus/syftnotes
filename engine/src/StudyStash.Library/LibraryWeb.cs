@@ -40,6 +40,8 @@ public sealed class LibraryWebOptions
     public StudyStash.Core.Ai.FileIndex? Files { get; init; }
     /// <summary>Capture's Inbox. Null: made here.</summary>
     public StudyStash.Core.Ai.Inbox? Inbox { get; init; }
+    /// <summary>Starting at login on the library's computer (the app's login item). Null: not offered.</summary>
+    public LoginSwitch? StartAtLogin { get; init; }
 }
 
 /// <summary>Small pieces of HTTP the Python engine got from its web framework.</summary>
@@ -390,6 +392,7 @@ public sealed partial class LibraryWeb
         MapChat(app);
         MapFiles(app);
         MapInbox(app);
+        MapSettings(app);
         app.MapFallback(() => Http.Detail(404, "Not Found"));
     }
 

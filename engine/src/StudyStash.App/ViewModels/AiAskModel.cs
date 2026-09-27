@@ -72,6 +72,7 @@ public sealed partial class AiAskModel : ObservableObject
     {
         this.library = library;
         foreach (var c in ScopeChoices) c.Pick = new RelayCommand(() => Scope = c.Id);
+        EngineChoice.Mark(ScopeChoices, Scope);
     }
 
     /// <summary>Set by the host: the lecture or class this ask bar is under (whichever the current scope needs).</summary>
@@ -118,6 +119,7 @@ public sealed partial class AiAskModel : ObservableObject
 
     partial void OnScopeChanged(string value)
     {
+        EngineChoice.Mark(ScopeChoices, value);
         OnPropertyChanged(nameof(ScopeName));
         OnPropertyChanged(nameof(Placeholder));
     }
