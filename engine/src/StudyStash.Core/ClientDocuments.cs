@@ -85,7 +85,7 @@ public sealed class ClientDocuments
             kept[key] = (body, Clock() + (age < Shortest ? Shortest : age > Longest ? Longest : age));
             return body;
         }
-        catch (Exception e) when (e is HttpRequestException or SocketException or IOException or OperationCanceledException && !ct.IsCancellationRequested)
+        catch (Exception e) when ((e is HttpRequestException or SocketException or IOException or ArgumentException) || (e is OperationCanceledException && !ct.IsCancellationRequested))
         {
             return null;
         }
