@@ -243,6 +243,46 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         var found = await rig.PostAsync("/api/v2/canvas/courses", "{}");
         Assert.Equal("", ExtensionRig.S(found["error"]));
     }
+
+    [ChromeFact]
+    public async Task S9b_the_chrome_web_store_build_loads_and_waits_for_its_code()
+    {
+        // The zip for the Chrome Web Store, unzipped the way Chrome installs it: no folder for Study Stash to write,
+        // no sites until the student pastes the code and allows them.
+        rig.StopChrome();
+        string zip = rig.Scratch("store.zip"), store = rig.Scratch("store-extension");
+        Extension.PackForStore(zip);
+        System.IO.Compression.ZipFile.ExtractToDirectory(zip, store);
+        rig.StartChrome("chrome-profile-store", store);
+        int ApiHits() => rig.Canvas.Hits.Count(h => h.PathAndQuery.StartsWith("/api/", StringComparison.Ordinal));
+        int before = ApiHits();
+
+        var status = await rig.UntilAsync(async () =>
+        {
+            string s = await rig.EvaluateAsync("chrome.storage.local.get('status').then(s => s.status ? s.status.state : '')");
+            return s is "\"no_config\"" ? s : null;
+        }, TimeSpan.FromSeconds(30), "the store copy to say it has no connection");
+        Note($"store copy registered and said no_config {rig.SinceChrome.TotalSeconds:0.0} s after Chrome started");
+        Assert.Equal("[]", await rig.EvaluateAsync("chrome.permissions.getAll().then(p => p.origins)"));
+        Assert.Equal("\"!\"", await rig.EvaluateAsync("chrome.action.getBadgeText({})"));
+
+        // Its popup asks for the code.
+        // Its popup asks for the code (once it has looked for a connection).
+        Assert.Equal("false", await rig.EvaluateAsync(
+            "new Promise(r => setTimeout(() => r(document.getElementById('connect').hidden), 500))", "popup.html"));
+
+        // The library's code, pasted: the connection is kept, but without Chrome's say-so (a click on Allow, which
+        // headless Chrome can't give) it reaches neither Canvas nor the library.
+        string code = ExtensionRig.S((await rig.GetAsync("/api/v2/canvas/extension"))["connection_code"]);
+        Assert.NotEqual("", code);
+        await rig.EvaluateAsync($"connectWithCode({System.Text.Json.JsonSerializer.Serialize(code)}).catch(e => 'asked')", "popup.html");
+        await rig.UntilAsync(async () =>
+            await rig.EvaluateAsync("pump(true).then(() => chrome.storage.local.get('status')).then(s => s.status.state)") is "\"no_access\"" ? "" : null,
+            TimeSpan.FromSeconds(30), "the store copy to wait for Chrome's permission");
+        string kept = await rig.EvaluateAsync("chrome.storage.local.get('connection').then(c => c.connection.app + ' ' + c.connection.canvas)");
+        Assert.Equal(System.Text.Json.JsonSerializer.Serialize($"{Extension.Connection(Extension.Folder(rig.Home))!.App} {rig.Canvas.Url}"), kept);
+        Assert.Equal(before, ApiHits()); // nothing asked the pretend Canvas
+    }
 }
 
 /// <summary>One pretend Canvas, one library and one Chrome for all the end-to-end tests, started once (and only
@@ -331,13 +371,19 @@ public sealed class ExtensionRig : IAsyncLifetime
         library = null;
     }
 
-    /// <summary>Chrome with the extension folder, signed in to the pretend Canvas under both its names, on a fresh
-    /// profile.</summary>
-    public void StartChrome(string profile)
+    /// <summary>Chrome with the extension folder (or <paramref name="folder"/>), signed in to the pretend Canvas under
+    /// both its names, on a fresh profile.</summary>
+    public void StartChrome(string profile, string? folder = null)
     {
-        chrome = ChromeRunner.Start(Folder, dir[profile], Canvas.Url + "/login/e2e", CanvasServer.Host, CanvasServer.OtherHost);
+        chrome = ChromeRunner.Start(folder ?? Folder, dir[profile], Canvas.Url + "/login/e2e", CanvasServer.Host, CanvasServer.OtherHost);
         sinceChrome.Restart();
     }
+
+    /// <summary>Run JavaScript in the extension Chrome is running (<see cref="ChromeRunner.EvaluateAsync"/>).</summary>
+    public Task<string> EvaluateAsync(string expression, string? page = null) => chrome!.EvaluateAsync(expression, page);
+
+    /// <summary>A place for a test's own files, removed with the rest.</summary>
+    public string Scratch(string name) => dir[name];
 
     public void StopChrome()
     {
