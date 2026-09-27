@@ -35,7 +35,7 @@
     <!-- The pill -->
     <c:Glass IsVisible="{Binding !Expanded}" Width="320" Height="56" CornerRadius="28" Padding="18,0,8,0">
       <Grid ColumnDefinitions="Auto,10,Auto,10,Auto,10,Auto,*,Auto">
-        <Border Width="10" Height="10" CornerRadius="5" Background="{DynamicResource Accent}" BoxShadow="{DynamicResource Ring4}" VerticalAlignment="Center"
+        <Border Width="10" Height="10" CornerRadius="5" Background="{DynamicResource Accent}" VerticalAlignment="Center"
                 IsVisible="{Binding IsRunning}" />
         <Border Width="10" Height="10" CornerRadius="5" Background="{DynamicResource Fg3}" VerticalAlignment="Center" IsVisible="{Binding IsPaused}" />
         <TextBlock Grid.Column="2" Classes="num" Text="{Binding Elapsed}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center"
@@ -66,7 +66,7 @@
       <Border CornerRadius="28" ClipToBounds="True">
         <DockPanel>
           <Grid DockPanel.Dock="Top" Height="60" Margin="20,0,12,0" ColumnDefinitions="Auto,10,Auto,10,Auto,*,Auto">
-            <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource Accent}" BoxShadow="{DynamicResource Ring3}" VerticalAlignment="Center"
+            <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource Accent}" VerticalAlignment="Center"
                     IsVisible="{Binding IsRunning}" />
             <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource Fg3}" VerticalAlignment="Center" IsVisible="{Binding IsPaused}" />
             <TextBlock Grid.Column="2" Text="{Binding DisplayClass}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />

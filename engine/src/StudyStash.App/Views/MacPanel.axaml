@@ -48,7 +48,7 @@
       <Border Classes="fill" IsVisible="{Binding IsRecording}" CornerRadius="16" Padding="16,14">
         <StackPanel Spacing="10">
           <Grid ColumnDefinitions="Auto,8,*,Auto">
-            <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource Accent}" BoxShadow="{DynamicResource Ring3}" VerticalAlignment="Center" />
+            <Border Width="8" Height="8" CornerRadius="4" Background="{DynamicResource Accent}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="2" Text="{Binding RecordingLabel}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
             <Button Grid.Column="3" Theme="{StaticResource Surface}" CornerRadius="6" Padding="4,1" Margin="0,-1,-4,-1" Command="{Binding ShowRecorderCommand}">
               <TextBlock Text="Show recorder" FontSize="12" Foreground="{DynamicResource Fg2}" />

@@ -54,10 +54,8 @@ public partial class ThemeTests
             var kind = row.Look.StartsWith("mac") ? SkinKind.Mac : SkinKind.Win;
             var variant = row.Look.EndsWith('D') ? ThemeVariant.Dark : ThemeVariant.Light;
             if (!built.TryGetValue((row.Theme, kind), out var d)) built[(row.Theme, kind)] = d = Skin.Build(kind, theme);
-            string key = row.Token == "EdgeTintGlow" ? "EdgeTint" : row.Token;
-            Assert.True(d.TryGetResource(key, variant, out var v), $"{row.Theme} {row.Look}: no {key}");
-            // EdgeTint's glow is its last shadow: 0 2px 8px o(L, c, .3).
-            Color got = v is BoxShadows s ? s[s.Count - 1].Color : ((ISolidColorBrush)v!).Color;
+            Assert.True(d.TryGetResource(row.Token, variant, out var v), $"{row.Theme} {row.Look}: no {row.Token}");
+            Color got = ((ISolidColorBrush)v!).Color;
             string what = $"{row.Theme} {row.Look} {row.Token}: {got}, the design's {row.Rgb} at {row.Alpha}";
             Assert.True(Close(got, Color.Parse(row.Rgb)), what);
             Assert.True(got.A == row.Alpha, what);
@@ -78,6 +76,49 @@ public partial class ThemeTests
                         Assert.True(type.IsInstanceOfType(v), $"{theme.Name} {kind} {variant}: {key} is {v?.GetType().Name}, not {type.Name}");
                     }
             }
+    }
+
+    static bool Neutral(Color c) => Math.Abs(c.R - c.G) <= 1 && Math.Abs(c.G - c.B) <= 1 && Math.Abs(c.R - c.B) <= 1;
+
+    /// <summary>No coloured glow anywhere: every shadow token, in both looks, light and dark, for every colour theme, is
+    /// grey (black, white or in between), so the accent never bleeds round a button, a row or a dot.</summary>
+    [AvaloniaFact]
+    public void Every_shadow_is_grey()
+    {
+        var coloured = new List<string>();
+        foreach (var theme in ColourThemes.All)
+            foreach (var kind in Looks)
+            {
+                var d = Skin.Build(kind, theme);
+                foreach (var variant in Variants)
+                    foreach (var (key, type) in Skin.Keys(kind))
+                    {
+                        if (type != typeof(BoxShadows)) continue;
+                        Assert.True(d.TryGetResource(key, variant, out var v) && v is BoxShadows, $"{theme.Name} {kind} {variant}: no {key}");
+                        foreach (var s in (BoxShadows)v!)
+                            if (!Neutral(s.Color)) coloured.Add($"{theme.Name} {kind} {variant} {key}: {s.Color}");
+                    }
+            }
+        Assert.Empty(coloured);
+    }
+
+    [GeneratedRegex(@"(?:BoxShadow=""|Property=""BoxShadow""\s+Value="")([^""{]+)""")] private static partial Regex LiteralShadow();
+
+    /// <summary>...and no view writes a coloured shadow of its own either.</summary>
+    [Fact]
+    public void No_view_draws_a_coloured_shadow()
+    {
+        var coloured = new List<string>();
+        var files = Directory.GetFiles(Path.Combine(Source(), "Views"), "*.axaml").Append(Path.Combine(Source(), "Styles.axaml"));
+        foreach (var file in files)
+            foreach (Match m in LiteralShadow().Matches(File.ReadAllText(file)))
+            {
+                string value = m.Groups[1].Value.Trim();
+                if (value == "none") continue;
+                foreach (var s in BoxShadows.Parse(value))
+                    if (!Neutral(s.Color)) coloured.Add($"{Path.GetFileName(file)}: {value}");
+            }
+        Assert.Empty(coloured);
     }
 
     /// <summary>A light accent (Chalkboard, Highlighter) takes dark ink; so does every accent on dark Windows.</summary>
