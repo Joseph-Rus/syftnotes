@@ -7,11 +7,20 @@ body{margin:0;width:260px;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-se
 .h img{width:20px;height:20px;border-radius:5px}
 .s{color:GrayText;margin:0 0 12px}
 .row{display:flex;gap:6px}
+label{display:block;font-weight:500;margin:0 0 6px}
+textarea{box-sizing:border-box;width:100%;margin:0 0 10px;padding:7px 9px;border:1px solid rgba(127,127,127,.35);border-radius:8px;
+  font:11px/1.35 ui-monospace,Menlo,monospace;color:CanvasText;background:transparent;resize:none;word-break:break-all}
 button{flex:1;appearance:none;border:0;border-radius:980px;padding:7px 10px;font:500 12px -apple-system,sans-serif;cursor:pointer;
   background:rgba(127,127,127,.18);color:CanvasText}
 button.p{background:#e5484d;color:#fff}
+button:disabled{opacity:.5;cursor:default}
+[hidden]{display:none!important}
 </style></head>
-<body><div class="w"><div class="h"><img src="icon.png" alt=""><span>Study Stash</span></div>
+<body><div class="w"><div class="h"><img src="icon-48.png" alt=""><span>Study Stash</span></div>
 <p class="s" id="s">Checking…</p>
-<div class="row"><button class="p" id="sync">Sync Canvas now</button><button id="open">Open</button></div></div>
+<div id="connect" hidden><label for="code">Paste the code from Study Stash</label>
+<textarea id="code" rows="4" spellcheck="false" autocomplete="off"></textarea>
+<div class="row"><button class="p" id="go">Connect</button></div></div>
+<div class="row" id="allow-row" hidden><button class="p" id="allow">Allow</button></div>
+<div class="row" id="main" hidden><button class="p" id="sync">Sync Canvas now</button><button id="open">Open</button></div></div>
 <script src="connection.js"></script><script src="popup.js"></script></body></html>

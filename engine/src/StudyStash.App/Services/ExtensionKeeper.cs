@@ -30,7 +30,13 @@ public sealed class ExtensionKeeper(string home, Func<CanvasClient?> client, Act
     /// or "" (none yet, or a library from before it said).</summary>
     public string SeenWhere { get; private set; } = "";
 
-    /// <summary>Raised when <see cref="FolderReady"/>, <see cref="Connected"/> or <see cref="SeenWhere"/> changes.</summary>
+    /// <summary>The code a Chrome Web Store copy of the extension on this computer is connected with (pasted into its
+    /// popup): this computer's address for the library, the key and the Canvas address. Empty until the library has a
+    /// Canvas address.</summary>
+    public string ConnectionCode { get; private set; } = "";
+
+    /// <summary>Raised when <see cref="FolderReady"/>, <see cref="Connected"/>, <see cref="SeenWhere"/> or
+    /// <see cref="ConnectionCode"/> changes.</summary>
     public event Action? Changed;
 
     /// <summary>
@@ -78,7 +84,9 @@ public sealed class ExtensionKeeper(string home, Func<CanvasClient?> client, Act
             }
         }
 
-        bool changed = ready != FolderReady || info.Connected != Connected || info.SeenWhere != SeenWhere;
+        string code = Extension.ConnectionCode(c.ServerUrl, info.Key, info.Canvas);
+        bool changed = ready != FolderReady || info.Connected != Connected || info.SeenWhere != SeenWhere || code != ConnectionCode;
+        ConnectionCode = code;
         FolderReady = ready;
         Connected = info.Connected;
         SeenWhere = info.SeenWhere;

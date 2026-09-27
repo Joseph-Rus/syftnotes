@@ -169,7 +169,11 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/canvas/extension", (HttpContext ctx) => Api(ctx, () =>
         {
             var about = ExtensionJson();
-            about["key"] = CanvasSettings.ExtensionKey(cfg.Home);
+            string key = CanvasSettings.ExtensionKey(cfg.Home);
+            about["key"] = key;
+            // For a Chrome Web Store copy in this computer's Chrome: what this folder's config.json says, as a code to
+            // paste. A laptop makes its own from the same key and Canvas, with the library address it uses.
+            about["connection_code"] = Extension.ConnectionCode($"http://127.0.0.1:{cfg.WebPort}", key, Canvas.Settings.Url);
             return Http.Json(about);
         }));
         app.MapPost("/api/v2/canvas/courses", Http.Handle(ctx => ApiAsync(ctx, async () => Http.Json(await FindCoursesAsync()))));

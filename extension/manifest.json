@@ -1,12 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Study Stash · Canvas",
+  "name": "Study Stash for Canvas",
+  "short_name": "Study Stash",
   "version": "1.4",
-  "description": "Lets your Study Stash library read your Canvas courses (assignments, your submissions, modules, files) with your own sign-in. Read-only.",
+  "description": "Copies your Canvas courses (assignments, submissions, modules, files) into your Study Stash library. Read-only, your own sign-in.",
   "minimum_chrome_version": "120",
   "permissions": ["alarms", "storage"],
   "host_permissions": [],
   "background": {"service_worker": "background.js"},
-  "icons": {"128": "icon.png"},
-  "action": {"default_title": "Study Stash", "default_popup": "popup.html"}
+  "icons": {"16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png"},
+  "action": {
+    "default_title": "Study Stash",
+    "default_popup": "popup.html",
+    "default_icon": {"16": "icon-16.png", "32": "icon-32.png"}
+  }
 }

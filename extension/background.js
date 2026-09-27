@@ -131,8 +131,8 @@ async function needsReload() {
   return true;
 }
 
-// How this copy is doing, for the popup and the toolbar button: ok, no_config, library_refused, library_unreachable or
-// signed_out. Written only when it changes.
+// How this copy is doing, for the popup and the toolbar button: ok, no_config, no_access, library_refused,
+// library_unreachable or signed_out. Written only when it changes.
 let told = null;
 let signedOut = false;
 async function setStatus(state) {
@@ -176,6 +176,7 @@ async function pump(force) {
       if (await needsReload()) { chrome.runtime.reload(); return; }
       conn = await loadConnection();
       if (!conn) { await setStatus('no_config'); return; }
+      if (!(await hasAccess(conn))) { await setStatus('no_access'); return; } // a store copy the student hasn't allowed yet
       const forced = force && round === 0 || again;
       again = false;
       let work;
@@ -234,6 +235,8 @@ function schedule() { chrome.alarms.create('sync', {periodInMinutes: 0.5}); }
 chrome.runtime.onInstalled.addListener(() => { schedule(); pump(true); });
 chrome.runtime.onStartup.addListener(() => { schedule(); pump(false); });
 chrome.alarms.onAlarm.addListener(a => { if (a.name === 'sync') pump(false); });
+// a store copy was just allowed to reach Canvas and the library: start at once rather than at the next alarm
+if (chrome.permissions && chrome.permissions.onAdded) chrome.permissions.onAdded.addListener(() => pump(true));
 // the toolbar popup asks for a sync
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   if (msg && msg.sync) { pump(true); reply({ok: true}); }

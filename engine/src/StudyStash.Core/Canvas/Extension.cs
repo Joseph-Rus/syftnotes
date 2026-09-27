@@ -74,15 +74,92 @@ public static class Extension
         Directory.CreateDirectory(dir);
         bool changed = WriteScripts(dir);
         changed |= WriteManifest(dir, Hosts(library, canvasUrl));
-        var config = new JsonObject
-        {
-            ["app"] = library.TrimEnd('/'), ["key"] = key, ["canvas"] = canvasUrl.TrimEnd('/'),
-            ["files"] = new JsonArray(FileHosts.Select(h => (JsonNode)h).ToArray()), ["protocol"] = Protocol,
-        };
-        string json = config.ToJsonString();
+        string json = ConfigJson(library, key, canvasUrl);
         changed |= WriteOwnerOnly(Path.Combine(dir, "config.json"), json + "\n");
         changed |= WriteOwnerOnly(Path.Combine(dir, "config.js"), $"const STUDY_STASH = {json};\n");
         return new EnsureResult(changed, dir);
+    }
+
+    /// <summary>config.json's text: where the library is, the extension's key, the Canvas address, Canvas's file
+    /// store and the protocol.</summary>
+    static string ConfigJson(string library, string key, string canvasUrl) => new JsonObject
+    {
+        ["app"] = library.TrimEnd('/'), ["key"] = key, ["canvas"] = canvasUrl.TrimEnd('/'),
+        ["files"] = new JsonArray(FileHosts.Select(h => (JsonNode)h).ToArray()), ["protocol"] = Protocol,
+    }.ToJsonString();
+
+    /// <summary>
+    /// The code a copy from the Chrome Web Store is connected with (it has no folder for Study Stash to write): the
+    /// config.json <see cref="Ensure"/> would write for this library address, key and Canvas, in base64url so it
+    /// survives being copied and pasted. The popup decodes it (connection.js <c>decodeCode</c>). Empty while there's
+    /// no Canvas address: the extension couldn't ask Chrome for Canvas yet.
+    /// </summary>
+    public static string ConnectionCode(string library, string key, string canvasUrl) =>
+        canvasUrl.Trim().Length == 0 || key.Length == 0 || library.Trim().Length == 0 ? ""
+            : System.Buffers.Text.Base64Url.EncodeToString(System.Text.Encoding.UTF8.GetBytes(ConfigJson(library.Trim(), key, canvasUrl.Trim())));
+
+    /// <summary>What a connection code connects to; null when the text isn't one (whitespace from copying is fine).</summary>
+    public static ExtensionConnection? ReadConnectionCode(string code)
+    {
+        string text = string.Concat(code.Where(c => !char.IsWhiteSpace(c))).TrimEnd('=');
+        if (text.Length == 0 || !System.Buffers.Text.Base64Url.IsValid(text)) return null;
+        try
+        {
+            if (JsonNode.Parse(System.Buffers.Text.Base64Url.DecodeFromChars(text)) is not JsonObject o) return null;
+            static string Str(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s : "";
+            return Str(o["app"]) is { Length: > 0 } app && Str(o["key"]) is { Length: > 0 } key ? new ExtensionConnection(app, key, Str(o["canvas"])) : null;
+        }
+        catch (Exception e) when (e is JsonException or FormatException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>What the Chrome Web Store copy may reach once the student allows it: any https or http site, asked
+    /// for one by one when they paste a code (their school's Canvas and their library aren't known when it's
+    /// published). Nothing is granted at install.</summary>
+    public static readonly IReadOnlyList<string> StoreOptionalHosts = ["https://*/*", "http://*/*"];
+
+    /// <summary>The manifest of the Chrome Web Store copy: this engine's, with no host permissions (it asks for its
+    /// Canvas and library when connected by code, <see cref="StoreOptionalHosts"/>).</summary>
+    public static JsonObject StoreManifest()
+    {
+        var manifest = JsonNode.Parse(Read("manifest.json"))!.AsObject();
+        manifest.Remove("host_permissions");
+        manifest["optional_host_permissions"] = new JsonArray(StoreOptionalHosts.Select(h => (JsonNode)h).ToArray());
+        return manifest;
+    }
+
+    /// <summary>The files the Chrome Web Store copy is made of: this engine's scripts, pages and icons (never a
+    /// config: a store copy is connected by code), in name order.</summary>
+    public static IReadOnlyList<string> StoreFiles() =>
+        [.. Files().Where(f => f is not ("config.js" or "config.json")).Order(StringComparer.Ordinal)];
+
+    /// <summary>
+    /// Write the zip to upload to the Chrome Web Store: <see cref="StoreFiles"/> at its top level with
+    /// <see cref="StoreManifest"/>. The same engine always makes the same bytes (fixed order, times and compression),
+    /// so a new zip differs only when the extension did. Returns the names in it.
+    /// </summary>
+    public static IReadOnlyList<string> PackForStore(string zipPath)
+    {
+        var names = StoreFiles();
+        var stamp = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        using var buffer = new MemoryStream();
+        using (var zip = new System.IO.Compression.ZipArchive(buffer, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (string name in names)
+            {
+                byte[] bytes = name == "manifest.json"
+                    ? System.Text.Encoding.UTF8.GetBytes(StoreManifest().ToJsonString(Indented) + "\n") : Read(name);
+                var entry = zip.CreateEntry(name, System.IO.Compression.CompressionLevel.Optimal);
+                entry.LastWriteTime = stamp;
+                using var into = entry.Open();
+                into.Write(bytes);
+            }
+        }
+        if (Path.GetDirectoryName(Path.GetFullPath(zipPath)) is { } parent) Directory.CreateDirectory(parent);
+        File.WriteAllBytes(zipPath, buffer.ToArray());
+        return names;
     }
 
     /// <summary><see cref="Ensure"/>, for callers that only want the folder back.</summary>
