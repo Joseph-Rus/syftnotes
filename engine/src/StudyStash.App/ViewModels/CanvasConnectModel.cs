@@ -27,12 +27,22 @@ public sealed partial class ConnectStep : ObservableObject
     public bool IsToDo => State == StepState.ToDo;
 }
 
+/// <summary>A course Find my courses found: its Canvas id, its code ("COMP 101", or "" when Canvas has none) and its
+/// name ("Intro to Programming").</summary>
+public sealed record FoundCourse(string Id, string Code, string Name)
+{
+    /// <summary>What the course is called as a class: its code, or its name when it has no code.</summary>
+    public string ClassName => Code.Length > 0 ? Code : Name;
+}
+
 /// <summary>
-/// Connecting Canvas (design 07): the school address, the Chrome extension, signing in, matching each class to a
-/// course, and the first sync — one step open at a time, the rest Done or To do. Shares its <see cref="CanvasWatch"/>
-/// with the status card and Settings, so it moves along the moment Chrome or Canvas answers back rather than polling
-/// on its own. Hosted either inside first-run setup (<see cref="ShowFooter"/> false, the wizard's own Next/Finish)
-/// or, from the status card's Connect/Show me how, in a small window of its own (<see cref="ShowFooter"/> true).
+/// Connecting Canvas (design 07): the school address, adding the extension to Chrome, finding your courses, and — in
+/// Settings' own window — matching each class to a course and the first sync; one step open at a time, the rest Done
+/// or To do. In setup (<see cref="ForSetup"/>) it stops after Find my courses: setup's next step, Classes, makes the
+/// found courses your classes. Shares its <see cref="CanvasWatch"/> with the status card and Settings, and hurries it
+/// while Add to Chrome shows, so it moves along the moment Chrome answers rather than polling on its own. Hosted
+/// either inside first-run setup (<see cref="ShowFooter"/> false, the wizard's own Next/Finish) or, from the status
+/// card's Connect/Show me how, in a small window of its own (<see cref="ShowFooter"/> true).
 /// </summary>
 public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
 {
@@ -41,29 +51,46 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     CanvasApi.State state = new();
     CanvasApi.Overview? found;
     string school = "";
+    /// <summary>The watch polls every few seconds while this is held: only while Add to Chrome shows.</summary>
+    IDisposable? hurry;
+    bool checkingChrome;
+    static readonly ConnectStep Hidden = new() { Number = 0, Title = "" };
 
-    public CanvasConnectModel(CanvasContext context, CanvasWatch watch)
+    public CanvasConnectModel(CanvasContext context, CanvasWatch watch, bool forSetup = false)
     {
         this.context = context;
         this.watch = watch;
-        Steps =
-        [
-            new ConnectStep { Number = 1, Title = "School address" },
-            new ConnectStep { Number = 2, Title = "Set up the Chrome extension" },
-            new ConnectStep { Number = 3, Title = "Find my courses" },
-            new ConnectStep { Number = 4, Title = "Match each class to a course" },
-            new ConnectStep { Number = 5, Title = "Sync now" },
-        ];
+        ForSetup = forSetup;
+        Steps = forSetup
+            ?
+            [
+                new ConnectStep { Number = 1, Title = "School address" },
+                new ConnectStep { Number = 2, Title = "Add to Chrome" },
+                new ConnectStep { Number = 3, Title = "Find my courses" },
+            ]
+            :
+            [
+                new ConnectStep { Number = 1, Title = "School address" },
+                new ConnectStep { Number = 2, Title = "Add to Chrome" },
+                new ConnectStep { Number = 3, Title = "Find my courses" },
+                new ConnectStep { Number = 4, Title = "Match each class to a course" },
+                new ConnectStep { Number = 5, Title = "Sync now" },
+            ];
         watch.Changed += OnWatchChanged;
     }
 
+    /// <summary>Setup's three parts (school, Chrome, courses); the classes come in setup's own next step.</summary>
+    public bool ForSetup { get; }
+    /// <summary>Settings' window also matches classes to courses and runs the first sync.</summary>
+    public bool ShowMatchAndSync => !ForSetup;
+
     public IReadOnlyList<ConnectStep> Steps { get; }
-    // Named steps for the views: simpler for compiled bindings than an indexer, and the same five objects always.
+    // Named steps for the views: simpler for compiled bindings than an indexer. Setup has no 4 and 5 (their rows hide).
     public ConnectStep Step1 => Steps[0];
     public ConnectStep Step2 => Steps[1];
     public ConnectStep Step3 => Steps[2];
-    public ConnectStep Step4 => Steps[3];
-    public ConnectStep Step5 => Steps[4];
+    public ConnectStep Step4 => Steps.Count > 3 ? Steps[3] : Hidden;
+    public ConnectStep Step5 => Steps.Count > 4 ? Steps[4] : Hidden;
 
     [ObservableProperty] public partial int Current { get; set; } = 1;
 
@@ -78,9 +105,24 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool SavingSchool { get; set; }
 
-    // ---- step 2: the Chrome extension ----
+    // ---- step 2: Add to Chrome ----
+    /// <summary>The folder Chrome loads the extension from on this computer, once Add to Chrome has asked for it.</summary>
     [ObservableProperty] public partial string? ExtensionFolder { get; set; }
-    [ObservableProperty] public partial bool WaitingForExtension { get; set; }
+    /// <summary>Add to Chrome has been pressed: the button gives way to quiet links and the "Waiting for Chrome…" row.</summary>
+    [NotifyPropertyChangedFor(nameof(WaitingForChrome), nameof(ShowChromeStatus), nameof(ShowAddToChrome))]
+    [ObservableProperty]
+    public partial bool AddedToChrome { get; set; }
+    [NotifyPropertyChangedFor(nameof(CanFinish))]
+    [ObservableProperty]
+    public partial bool AddingToChrome { get; set; }
+    /// <summary>A Chrome with the extension is talking to the library.</summary>
+    [NotifyPropertyChangedFor(nameof(WaitingForChrome), nameof(ShowChromeStatus), nameof(ShowAddToChrome))]
+    [ObservableProperty]
+    public partial bool ChromeConnected { get; set; }
+    [ObservableProperty] public partial string? ChromeError { get; set; }
+    public bool ShowAddToChrome => !AddedToChrome && !ChromeConnected;
+    public bool WaitingForChrome => AddedToChrome && !ChromeConnected;
+    public bool ShowChromeStatus => AddedToChrome || ChromeConnected;
 
     // ---- step 3: find my courses ----
     [ObservableProperty] public partial bool SignedOut { get; set; }
@@ -88,6 +130,8 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial bool FindingCourses { get; set; }
     [ObservableProperty] public partial string? CoursesSay { get; set; }
+    /// <summary>Every course Find my courses found, in the library's order of names (setup makes them classes).</summary>
+    [ObservableProperty] public partial IReadOnlyList<FoundCourse> Found { get; set; } = [];
 
     // ---- step 4: match each class to a course ----
     public ObservableCollection<CanvasCourseRow> Courses { get; } = [];
@@ -108,7 +152,9 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string StepLabel { get; set; } = "";
     [ObservableProperty] public partial bool ShowFooter { get; set; }
     [ObservableProperty] public partial string FinishLabel { get; set; } = "Finish";
-    public bool CanFinish => !SavingSchool && !FindingCourses && !Linking && !Syncing;
+    public bool CanFinish => !SavingSchool && !AddingToChrome && !FindingCourses && !Linking && !Syncing;
+    /// <summary>Every step is done (setup: the courses are found).</summary>
+    public bool AllDone => Current > Steps.Count;
     public Action? OnSkip { get; set; }
     public Action? OnBack { get; set; }
     public Action? OnFinish { get; set; }
@@ -128,11 +174,14 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         return GoToAsync(DecideStep(s, classes), classes, stop);
     }
 
-    static int DecideStep(CanvasApi.State s, IReadOnlyList<CanvasApi.ClassRow> classes) => s.Status switch
+    /// <summary>The step the library's state still needs. Setup always finds courses once Chrome is connected (its next
+    /// step makes them classes), so it never goes past 3 on its own.</summary>
+    int DecideStep(CanvasApi.State s, IReadOnlyList<CanvasApi.ClassRow> classes) => s.Status switch
     {
         "not_set_up" => 1,
         "no_extension" => 2,
         "signed_out" => 3,
+        _ when ForSetup => 3,
         _ => classes.Count > 0 && classes.All(c => !c.Linked) ? 3 : 5,
     };
 
@@ -141,15 +190,25 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         bool entering = step != Current;
         for (int i = 0; i < Steps.Count; i++) Steps[i].State = i + 1 < step ? StepState.Done : i + 1 == step ? StepState.Current : StepState.ToDo;
         if (step > 1) Steps[0].Summary = school;
+        if (step > 2) Steps[1].Summary = "Connected";
         Current = step;
+        if (step != 2) StopHurrying();
         if (step == 5 && state.LastSync is { } synced) SyncedLine = $"Canvas synced {CanvasWords.Clock(synced, context.Clock.Zone)}.";
         if (!entering) return;
         switch (step)
         {
-            case 2: await EnterExtensionStepAsync(stop); break;
+            case 2: EnterExtensionStep(); break;
             case 3: await EnterCoursesStepAsync(stop); break;
-            case 4: EnterMatchStep(classes ?? []); break;
+            case 4 when !ForSetup: EnterMatchStep(classes ?? []); break;
         }
+    }
+
+    partial void OnCurrentChanged(int value) => OnPropertyChanged(nameof(AllDone));
+
+    void StopHurrying()
+    {
+        hurry?.Dispose();
+        hurry = null;
     }
 
     /// <summary>Re-reads the library and moves on if it now needs a later step than the one showing (a step never
@@ -165,15 +224,13 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         await GoToAsync(step, classes, stop);
     }
 
-    async Task EnterExtensionStepAsync(CancellationToken stop)
+    /// <summary>Add to Chrome shows: nothing on the computer changes until the button is pressed, but the watch asks
+    /// the library every few seconds, so an extension already loaded turns up by itself.</summary>
+    void EnterExtensionStep()
     {
-        WaitingForExtension = true;
-        if (context.Client is not { } client) return;
-        if (await client.ExtensionAsync(stop) is { } key)
-        {
-            ExtensionFolder = context.Actions.PrepareExtension(key.Key, key.Canvas);
-            context.Actions.OpenChromeExtensions();
-        }
+        ChromeConnected = false;
+        ChromeError = null;
+        hurry ??= watch.Hurry();
     }
 
     async Task EnterCoursesStepAsync(CancellationToken stop)
@@ -201,22 +258,26 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     }
 
     /// <summary>Stops following the shared watch once the step or window closes: the watch outlives this model.</summary>
-    public void Dispose() => watch.Changed -= OnWatchChanged;
+    public void Dispose()
+    {
+        watch.Changed -= OnWatchChanged;
+        StopHurrying();
+    }
 
     void OnWatchChanged()
     {
         if (watch.State is not { } s) return;
         state = s;
-        if (Current == 2 && s.Status != "no_extension")
+        if (Current == 2)
         {
-            _ = RefreshAndAdvanceAsync();
+            _ = CheckChromeAsync(s);
         }
         else if (Current == 3 && SignedOut && s.Status != "signed_out")
         {
             SignedOut = false;
             _ = FindCoursesInternalAsync();
         }
-        else if (Current == 5)
+        else if (Current == 5 && !ForSetup)
         {
             Syncing = s.Status == "syncing";
             SyncProgress = s.Syncing is { Total: > 0 } sy ? (double)(sy.Total - sy.Left) / sy.Total : null;
@@ -254,12 +315,97 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         for (int i = 1; i < Steps.Count; i++) Steps[i].State = StepState.ToDo;
         Steps[0].State = StepState.Current;
         Current = 1;
+        StopHurrying();
     }
 
+    /// <summary>
+    /// Add to Chrome: gets the extension's folder ready on this computer (the library's own when it runs here, else
+    /// one made here pointing at the library), shows it in Finder/Explorer, and opens Chrome's extensions page — the
+    /// three illustrated steps say what to do there. After that the button gives way to quiet links, and the watch
+    /// says "Connected" as soon as Chrome checks in.
+    /// </summary>
+    [RelayCommand]
+    async Task AddToChrome()
+    {
+        if (context.Client is not { } client) return;
+        AddingToChrome = true;
+        ChromeError = null;
+        try
+        {
+            var status = await client.ExtensionStatusAsync(context.Actions.PrepareExtension);
+            if (status?.Folder is not { } folder)
+            {
+                ChromeError = status is null
+                    ? "Your library runs an older Study Stash: update it to add Canvas."
+                    : "The extension's folder isn't ready yet. Try again in a moment.";
+                return;
+            }
+            ExtensionFolder = folder;
+            context.Actions.RevealFolder(folder);
+            context.Actions.OpenChromeExtensions();
+            AddedToChrome = true;
+            if (Current == 2) hurry ??= watch.Hurry();
+            if (status.Connected) await ChromeIsConnectedAsync();
+        }
+        catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or System.Text.Json.JsonException or IOException or UnauthorizedAccessException
+                                      or TaskCanceledException)
+        {
+            ChromeError = e is CanvasLibraryException { Message.Length: > 0 } ? e.Message : "Your library didn't answer. Try again in a moment.";
+        }
+        finally
+        {
+            AddingToChrome = false;
+        }
+    }
+
+    /// <summary>"Show the folder again", after Add to Chrome.</summary>
     [RelayCommand]
     void ShowFolder()
     {
         if (ExtensionFolder is { } f) context.Actions.RevealFolder(f);
+    }
+
+    /// <summary>The watch heard from the library while Add to Chrome shows: Chrome counts as connected once the state
+    /// is past "no extension", or the library says a Chrome is checking in now.</summary>
+    async Task CheckChromeAsync(CanvasApi.State s)
+    {
+        if (checkingChrome || ChromeConnected) return;
+        checkingChrome = true;
+        try
+        {
+            bool connected = s.Status is not ("not_set_up" or "no_extension" or "");
+            if (!connected && context.Client is { } client)
+            {
+                try
+                {
+                    connected = (await client.ExtensionStatusAsync())?.Connected == true;
+                }
+                catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+                {
+                    // Ask again on the watch's next round.
+                }
+            }
+            if (connected && Current == 2) await ChromeIsConnectedAsync();
+        }
+        finally
+        {
+            checkingChrome = false;
+        }
+    }
+
+    /// <summary>Chrome answered: the row says Connected (a flat check, no glow) and the flow moves on to finding
+    /// courses by itself.</summary>
+    async Task ChromeIsConnectedAsync(CancellationToken stop = default)
+    {
+        ChromeConnected = true;
+        Steps[1].Summary = "Connected";
+        StopHurrying();
+        if (context.Client is { } client && await client.StateAsync(stop) is { } s)
+        {
+            state = s;
+            school = s.School.Length > 0 ? s.School : s.Url;
+        }
+        await GoToAsync(Math.Max(3, DecideStep(state, [])), null, stop);
     }
 
     [RelayCommand]
@@ -290,7 +436,14 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
                 CoursesSay = answer.Error;
                 return;
             }
-            CoursesSay = $"Found {answer.Available.Count} courses.";
+            Found = FoundFrom(answer);
+            CoursesSay = answer.Available.Count == 1 ? "Found 1 course." : $"Found {answer.Available.Count} courses.";
+            if (ForSetup)
+            {
+                Steps[2].Summary = CoursesSay.TrimEnd('.');
+                await GoToAsync(Steps.Count + 1, null, stop);
+                return;
+            }
             var classes = await client.ClassesAsync(stop) ?? [];
             await GoToAsync(4, classes, stop);
         }
@@ -302,6 +455,27 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         {
             FindingCourses = false;
         }
+    }
+
+    /// <summary>The found courses, each with its code: from <c>course_info</c> when the library sent it, else the part
+    /// of its name before " · " when it has one ("COMP 101 · Intro to Programming").</summary>
+    static IReadOnlyList<FoundCourse> FoundFrom(CanvasApi.Overview o)
+    {
+        var info = o.CourseInfo.Where(c => c.Id.Length > 0).GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First());
+        var list = new List<FoundCourse>();
+        foreach (var (id, label) in o.Available)
+        {
+            string code = info.TryGetValue(id, out var c) ? c.Code.Trim() : "";
+            string name = label;
+            int dot = label.IndexOf(" · ", StringComparison.Ordinal);
+            if (dot > 0)
+            {
+                if (code.Length == 0) code = label[..dot].Trim();
+                name = label[(dot + 3)..].Trim();
+            }
+            list.Add(new FoundCourse(id, code, name));
+        }
+        return [.. list.OrderBy(f => f.ClassName, StringComparer.OrdinalIgnoreCase)];
     }
 
     [RelayCommand]

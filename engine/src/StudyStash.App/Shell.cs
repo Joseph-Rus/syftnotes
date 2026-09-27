@@ -868,7 +868,7 @@ public static partial class Shell
                 break;
             case SetupStep.Canvas when model.Canvas is null:
                 var watch = CanvasPoll();
-                var connect = new CanvasConnectModel(Canvas(), watch) { ShowFooter = false, FinishLabel = model.ContinueLabel };
+                var connect = new CanvasConnectModel(Canvas(), watch, forSetup: true) { ShowFooter = false, FinishLabel = model.ContinueLabel };
                 connect.OnSkip = () => model.SkipCommand.Execute(null);
                 connect.OnFinish = () => model.NextCommand.Execute(null);
                 model.Canvas = connect;
