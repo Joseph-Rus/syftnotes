@@ -1,4 +1,5 @@
 using Avalonia.Media;
+using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 
 namespace StudyStash.App;
@@ -109,7 +110,7 @@ public static class Demo
 
     public static SetupModel Setup(SkinKind skin)
     {
-        var m = SetupModel.For(skin);
+        var m = SetupModel.For(skin, AppRole.Laptop);
         if (skin == SkinKind.Mac)
         {
             m.Go(SetupStep.Model);

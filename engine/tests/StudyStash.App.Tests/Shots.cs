@@ -11,6 +11,7 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using SkiaSharp;
 using StudyStash.App.Controls;
+using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 
@@ -423,21 +424,60 @@ public class SurfaceShots
         foreach (var t in Themes) Shot.Take("win-05-setup", SkinKind.Win, t, () => new WinSetup { DataContext = Demo.Setup(SkinKind.Win), DrawChrome = true });
     }
 
-    /// <summary>The steps the design doesn't show, in both looks.</summary>
+    /// <summary>Every page of both setups, the library's and the laptop's, in both looks, light and dark (plus the
+    /// welcome a build with no installer role shows): "mac-05-setup-library-password-light.png" and so on.</summary>
     [AvaloniaFact]
-    public void Setup_steps()
+    public async Task Setup_steps()
     {
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
-            foreach (var step in new[] { SetupStep.Microphone, SetupStep.Library, SetupStep.Classes })
-                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-05-setup-{step.ToString().ToLowerInvariant()}", skin, ThemeVariant.Light, () =>
+        {
+            string look = skin == SkinKind.Mac ? "mac" : "win";
+            foreach (var role in new[] { AppRole.Library, AppRole.Laptop })
+                foreach (var step in SetupModel.StepsFor(role, skin))
                 {
-                    var m = SetupModel.For(skin);
-                    m.Go(step);
-                    m.Address = "http://mac-mini:8787";
-                    m.Classes.Add(new SetupClass { Name = "CS 101", When = "Tue Thu 10:00–11:15", Dot = Skin.ClassDot(0) });
-                    m.Classes.Add(new SetupClass { Name = "BIO 110", When = "Tue 11:00–12:30", Dot = Skin.ClassDot(1) });
-                    return skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true };
-                });
+                    var m = await SetupPage(skin, role, step);
+                    var size = step switch { SetupStep.Canvas => new Size(1100, 928), SetupStep.Ai => new Size(1100, 808), _ => new Size(850, 608) };
+                    string name = $"{look}-05-setup-{(role == AppRole.Library ? "library" : "laptop")}-{step.ToString().ToLowerInvariant()}";
+                    foreach (var t in Themes)
+                        Shot.Take(name, skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
+                            size: size);
+                }
+            var ask = SetupModel.For(skin);
+            ask.ChooseLibraryCommand.Execute(null);
+            foreach (var t in Themes)
+                Shot.Take($"{look}-05-setup-welcome-ask", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = ask, DrawChrome = true } : new WinSetup { DataContext = ask, DrawChrome = true },
+                    size: new Size(850, 608));
+        }
+    }
+
+    /// <summary>One page of a setup, filled in the way a student would have it by then.</summary>
+    static async Task<SetupModel> SetupPage(SkinKind skin, AppRole role, SetupStep step)
+    {
+        var m = SetupModel.For(skin, role);
+        m.LibraryName = "Ada's library";
+        m.Password = "correct-horse";
+        m.Address = "http://mac-mini:8787";
+        m.Classes.Add(new SetupClass { Name = "CS 101", When = "Tue Thu 10:00–11:15", Dot = Skin.ClassDot(0) });
+        m.Classes.Add(new SetupClass { Name = "BIO 110", When = "Tue 11:00–12:30", Dot = Skin.ClassDot(1) });
+        m.ModelProgress = 0.62;
+        m.ModelDone = "1.9 GB of 3.1 GB";
+        m.ModelLeft = "About 4 minutes left";
+        m.Addresses.Add(new SetupAddress("At home", "http://mac-mini.local:8787"));
+        m.Addresses.Add(new SetupAddress("With Tailscale", "http://mac-mini.tailnet-demo.ts.net:8787"));
+        if (step > SetupStep.Library)
+        {
+            m.LibraryOk = true;
+            m.LibraryResult = role == AppRole.Laptop ? "Connected to Ada's library." : $"Ada's library is ready on this {m.DeviceWord}.";
+        }
+        if (step == SetupStep.Ai) m.Ai = AiDemo.Setup();
+        if (step == SetupStep.Canvas)
+        {
+            m.Canvas = await CanvasShots.Step2Async();
+            m.Canvas.StepLabel = "";
+            m.Canvas.ShowFooter = false;
+        }
+        m.Go(step);
+        return m;
     }
 
     /// <summary>The idle dropdown (or flyout) in every colour theme, five to a row: each cell gets its own theme's

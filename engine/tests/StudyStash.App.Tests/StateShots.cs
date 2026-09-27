@@ -8,7 +8,8 @@ using StudyStash.App.Views;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>Setup states the static design doesn't show: hearing the microphone, and a library "Find it" turned up.</summary>
+/// <summary>Setup states the static design doesn't show: hearing the microphone, a library "Find it" turned up, and
+/// one made here.</summary>
 public class StateShots
 {
     static readonly ThemeVariant[] Themes = [ThemeVariant.Light, ThemeVariant.Dark];
@@ -27,7 +28,8 @@ public class StateShots
             foreach (var t in Themes)
                 Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-setup-microphone-check", skin, t, () =>
                 {
-                    var m = SetupModel.For(skin);
+                    var m = SetupModel.For(skin, AppRole.Laptop);
+                    m.Go(SetupStep.Microphone);
                     m.MicAllowed = true;
                     m.MicLevels = Wave;
                     m.MicHeard = true;
@@ -42,24 +44,27 @@ public class StateShots
             foreach (var t in Themes)
                 Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-setup-library-found", skin, t, () =>
                 {
-                    var m = SetupModel.For(skin);
+                    var m = SetupModel.For(skin, AppRole.Laptop);
                     m.Go(SetupStep.Library);
+                    m.Address = "http://mac-mini.tailnet-demo.ts.net:8787";
                     m.LibraryResult = "Found mac-mini on your Tailscale network. Type its password.";
                     return View(skin, m);
                 }, size: new Size(850, 608));
     }
 
     [AvaloniaFact]
-    public void Setup_library_this_computer()
+    public void Setup_library_created()
     {
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
             foreach (var t in Themes)
-                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-setup-library-this-computer", skin, t, () =>
+                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-setup-library-created", skin, t, () =>
                 {
-                    var m = SetupModel.For(skin);
-                    m.Go(SetupStep.Library);
-                    m.PickThisCommand.Execute(null);
+                    var m = SetupModel.For(skin, AppRole.Library);
+                    m.Go(SetupStep.Password);
                     m.LibraryName = "Ada's library";
+                    m.Password = "correct-horse";
+                    m.LibraryOk = true;
+                    m.LibraryResult = $"Ada's library is ready on this {m.DeviceWord}.";
                     return View(skin, m);
                 }, size: new Size(850, 608));
     }

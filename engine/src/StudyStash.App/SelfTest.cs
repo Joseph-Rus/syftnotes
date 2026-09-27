@@ -209,10 +209,9 @@ public static class SelfTest
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
 
-        // Microphone: the pretend mic is already "allowed", so the level check should hear the looped fixture.
-        bool heard = await Until(() => m.MicHeard, 10);
-        Say(heard ? "microphone heard" : "microphone: nothing heard in 10 s");
-        Shot(Shell.Windows.Setup, "setup-microphone");
+        // Welcome: a build with no installer role asks, and starts on the laptop (which the self-test is).
+        Say($"welcome: {m.FlowName}, {m.Steps.Count} steps");
+        Shot(Shell.Windows.Setup, "setup-welcome");
         m.NextCommand.Execute(null);
 
         // Library: find it (our own, on its own port, never 8787), a wrong password, then the right one.
@@ -232,6 +231,12 @@ public static class SelfTest
         if (!m.LibraryOk) throw new InvalidOperationException("setup couldn't connect to the self-test's library");
         m.NextCommand.Execute(null);
 
+        // Microphone: the pretend mic is already "allowed", so the level check should hear the looped fixture.
+        bool heard = await Until(() => m.MicHeard, 10);
+        Say(heard ? "microphone heard" : "microphone: nothing heard in 10 s");
+        Shot(Shell.Windows.Setup, "setup-microphone");
+        m.NextCommand.Execute(null);
+
         // Model: entering the step starts the download from our own mirror (never Hugging Face).
         bool downloading = await Until(() => m.ModelProgress is > 0.05 and < 0.95, 20);
         Say(downloading ? $"model downloading: {m.ModelDone} {m.ModelLeft}" : "model: no progress seen in 20 s");
@@ -241,6 +246,14 @@ public static class SelfTest
         Shot(Shell.Windows.Setup, "setup-model-ready");
         if (!ready) throw new InvalidOperationException("the model never finished downloading");
         m.NextCommand.Execute(null);
+
+        // Canvas is optional: the self-test skips it (there's no Chrome or Canvas here to connect).
+        if (m.OnCanvas)
+        {
+            await Wait(1); // the window grows to the step's size first
+            Shot(Shell.Windows.Setup, "setup-canvas");
+            m.SkipCommand.Execute(null);
+        }
 
         // Classes: CS 101, with a time covering right now, so recording follows the timetable straight to it.
         var now = DateTime.Now;
@@ -255,21 +268,14 @@ public static class SelfTest
         if (m.ClassProblem is not null) throw new InvalidOperationException(m.ClassProblem);
         m.NextCommand.Execute(null);
 
-        // Canvas is optional: the self-test skips it (there's no Chrome or Canvas here to connect).
-        if (m.OnCanvas)
-        {
-            await Wait(1); // the window grows to the step's size first
-            Shot(Shell.Windows.Setup, "setup-canvas");
-            m.SkipCommand.Execute(null);
-        }
-
         if (m.OnTaskbar)
         {
             Shot(Shell.Windows.Setup, "setup-taskbar");
             m.NextCommand.Execute(null);
         }
 
-        // Finish: role stays Laptop (we never picked "this computer"); no login item is touched (the box is unticked).
+        // Done: how to record, then Open Study Stash. The role stays Laptop; no login item is touched.
+        if (m.OnDone) Shot(Shell.Windows.Setup, "setup-done");
         if (Shell.Windows.Setup is not null && m.IsLast) m.NextCommand.Execute(null);
         bool closed = await Until(() => Shell.Windows.Setup is null, 10);
         Say(closed ? $"setup finished: role {host.Settings.Role}, setup done {host.Settings.SetupDone}" : "setup: the window never closed");

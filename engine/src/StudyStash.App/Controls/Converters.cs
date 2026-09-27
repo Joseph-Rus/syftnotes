@@ -7,9 +7,6 @@ namespace StudyStash.App.Controls;
 
 public static class Converters
 {
-    /// <summary>Setup's library button: make one here, or connect to one elsewhere.</summary>
-    public static readonly IValueConverter CreateOrConnect = new FuncValueConverter<bool, string>(here => here ? "Create the library" : "Connect");
-
     /// <summary>The quick panel's rows but its actions (which the Mac draws as chips below them).</summary>
     public static readonly IValueConverter NotActions =
         new FuncValueConverter<ObservableCollection<QuickRow>?, FilteredRows?>(rows => rows is null ? null : new FilteredRows(rows, r => !r.IsAction));

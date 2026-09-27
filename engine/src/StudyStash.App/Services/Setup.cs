@@ -22,19 +22,34 @@ public static class Setup
     static string Person() =>
         Environment.UserName is { Length: > 0 } u ? char.ToUpper(u[0], CultureInfo.InvariantCulture) + u[1..] : "Me";
 
-    public static SetupModel Make(AppHost host)
+    /// <summary>The role an installer was made for ("library" or "laptop" in its Info.plist or study-stash.ini), or
+    /// null for a build that doesn't say.</summary>
+    public static AppRole? Preset(string? preset) => preset switch
     {
-        var m = SetupModel.For(Skin.Current);
-        if (Apps.RolePreset() == "library") m.ThisComputer = true; // a library installer opens on "this computer is the library"
+        "library" => AppRole.Library,
+        "laptop" => AppRole.Laptop,
+        _ => null,
+    };
+
+    /// <summary>Setup for this computer: the installer's flow (or, with none, the welcome asks), with what's already
+    /// known filled in. <paramref name="tailscale"/> and <paramref name="hostName"/> say where a laptop can reach a
+    /// library made here (tests give their own).</summary>
+    public static SetupModel Make(AppHost host, AppRole? preset = null, Func<TailscaleInfo>? tailscale = null, Func<string>? hostName = null)
+    {
+        preset ??= Preset(Apps.RolePreset());
+        var m = SetupModel.For(Skin.Current, preset);
+        // A run that stopped part-way picks up the flow it was in, if the installer allows it.
+        var was = host.Settings.Role;
+        if (preset != AppRole.Laptop && was != AppRole.Laptop) m.SetRole(was);
         var cc = host.Client();
         m.Address = cc.ServerUrl;
         m.LibraryName = $"{Person()}'s library";
         m.ModelName = host.Model.Name;
         m.ModelSize = About(host.Model.Bytes);
-        if (cc.ServerUrl.Length > 0 && host.Library == LibraryState.Connected)
+        if (cc.ServerUrl.Length > 0 && host.Library == LibraryState.Connected && (m.IsLaptop || host.LocalLibrary is not null))
         {
             m.LibraryOk = true;
-            m.LibraryResult = $"Connected to {cc.PoolName}.";
+            m.LibraryResult = m.IsLaptop ? $"Connected to {cc.PoolName}." : $"{cc.PoolName} is ready on this {m.DeviceWord}.";
         }
 
         m.OnAllowMic = async () =>
@@ -51,16 +66,18 @@ public static class Setup
         m.OnAddClass = () => AddClassAsync(m, host);
         m.CanLeave = step =>
         {
-            if (step == SetupStep.Library && !m.LibraryOk)
+            if (step is SetupStep.Password or SetupStep.Library && !m.LibraryOk)
             {
-                m.LibraryResult = m.ThisComputer ? "Create the library first." : "Connect to your library first.";
+                m.LibraryResult = m.IsLibrary ? "Create the library first." : "Connect to your library first.";
                 return false;
             }
             return true;
         };
         m.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(SetupModel.Step) && m.Step == SetupStep.Model) _ = host.DownloadModelAsync();
+            if (e.PropertyName != nameof(SetupModel.Step)) return;
+            if (m.Step == SetupStep.Model) _ = host.DownloadModelAsync();
+            if (m.Step == SetupStep.Done && m.IsLibrary) _ = FillAddressesAsync(m, host, tailscale ?? (() => HostInfo.Tailscale()), hostName ?? LanName);
         };
         foreach (var c in host.Timetable.Classes)
             m.Classes.Add(new SetupClass { Name = c.Name, When = string.Join(", ", c.Times.Select(t => t.Describe())), Dot = Skin.ClassDot(Math.Max(0, host.ColorOf(c.Name))) });
@@ -114,6 +131,26 @@ public static class Setup
         }
     }
 
+    /// <summary>This computer's name on the home network: "mac-mini.local" on a Mac (Bonjour answers it), its plain
+    /// name on Windows.</summary>
+    static string LanName()
+    {
+        string name = Machine.HostName();
+        return OperatingSystem.IsMacOS() && !name.Contains('.', StringComparison.Ordinal) ? name + ".local" : name;
+    }
+
+    /// <summary>The library's last page: its address at home straight away, then its Tailscale one if Tailscale is on
+    /// (asking Tailscale takes a moment, so it comes second).</summary>
+    public static async Task FillAddressesAsync(SetupModel m, AppHost host, Func<TailscaleInfo> tailscale, Func<string> hostName)
+    {
+        int port = Configs.Load(host.Home).WebPort;
+        m.Addresses.Clear();
+        m.Addresses.Add(new SetupAddress("At home", $"http://{hostName()}:{port}"));
+        var ts = await Task.Run(tailscale);
+        if (ts.Running && ts.Dns.Length > 0 && m.Addresses.All(a => a.Where != "With Tailscale"))
+            m.Addresses.Add(new SetupAddress("With Tailscale", $"http://{ts.Dns}:{port}"));
+    }
+
     /// <summary>Every tick while setup's window is open: the microphone is open exactly while its step shows, it's
     /// allowed, and nothing is recording; copies its levels and whether it's heard anything into the model.</summary>
     public static void TickMic(SetupModel m, AppHost host, MicCheck mic)
@@ -130,7 +167,7 @@ public static class Setup
         m.LibraryResult = null;
         try
         {
-            if (m.ThisComputer)
+            if (m.IsLibrary)
             {
                 string done = await LibraryHere.ThisComputer().CreateAsync(host, m.LibraryName, m.Password, Person(), m.Role);
                 m.LibraryOk = true;

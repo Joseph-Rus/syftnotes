@@ -1,6 +1,6 @@
-<!-- First-run setup (Surfaces, Windows 11 05): the same steps as the Mac's (the AI engines when this PC is the library,
-     15; Canvas, optional, 07), plus one for Windows: pin the tray icon out of the overflow, with a shortcut to taskbar
-     settings. The AI and Canvas steps widen the window to the design's 900. -->
+<!-- First-run setup (Surfaces, Windows 11 05): the Mac's two flows, the library's and the laptop's, each with its own
+     name, sidebar caption and welcome picture, plus one step for Windows where Study Stash records: pin the tray icon
+     out of the overflow. The AI and Canvas steps widen the window to the design's 900. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -89,14 +89,141 @@
       <Setter Property="FontSize" Value="14" />
       <Setter Property="Margin" Value="0,0,0,6" />
     </Style>
+    <!-- Every page's title and the line under it. -->
+    <Style Selector="TextBlock.h1">
+      <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
+      <Setter Property="FontSize" Value="28" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,4,0,0" />
+    </Style>
+    <Style Selector="TextBlock.lede">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="LineHeight" Value="21" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="MaxWidth" Value="420" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+      <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
+    <!-- The welcome's picture: the laptop sends recordings to the library; this computer's tile is the filled one. -->
+    <Style Selector="Border.tile">
+      <Setter Property="Width" Value="56" />
+      <Setter Property="Height" Value="56" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="{DynamicResource Card}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.tile c|Icon">
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    </Style>
+    <Style Selector="Border.tile.here">
+      <Setter Property="Background" Value="{DynamicResource Accent}" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Border.tile.here c|Icon">
+      <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    </Style>
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,8,0,0" />
+    </Style>
+    <Style Selector="TextBlock.caption.here">
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- A settings card: one row height, label | value | actions, the actions right-aligned. -->
+    <Style Selector="Border.group">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Background" Value="{DynamicResource Card}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="MaxWidth" Value="440" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Grid.row">
+      <Setter Property="Height" Value="44" />
+      <Setter Property="Margin" Value="16,0,12,0" />
+    </Style>
+    <Style Selector="Grid.row TextBlock.key">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Grid.row TextBlock.value">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="Border.rule">
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Background" Value="{DynamicResource Sep}" />
+    </Style>
+    <!-- Small buttons inside a row: shorter than a field, so every row stays one height. -->
+    <Style Selector="Button.mini">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.mini TextBlock">
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <!-- "Show" inside a password field, and the welcome's "Setting up your laptop instead?". -->
+    <Style Selector="Button.link">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.link TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <!-- An accent-track, white-knob toggle, as Settings draws it. -->
+    <Style Selector="ToggleButton.switch">
+      <Setter Property="Width" Value="40" />
+      <Setter Property="Height" Value="20" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Panel>
+            <Border Name="Track" CornerRadius="10" Background="{DynamicResource Fill2}" />
+            <Border Name="Knob" Width="14" Height="14" CornerRadius="7" Background="{DynamicResource Mini}"
+                    HorizontalAlignment="Left" Margin="3,0,0,0" BoxShadow="0 1 2 0 #40000000" />
+          </Panel>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+    <Style Selector="ToggleButton.switch:checked /template/ Border#Track">
+      <Setter Property="Background" Value="{DynamicResource Accent}" />
+    </Style>
+    <Style Selector="ToggleButton.switch:checked /template/ Border#Knob">
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="Margin" Value="0,0,3,0" />
+    </Style>
   </UserControl.Styles>
 
   <Border Background="{DynamicResource Mica}" BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1" CornerRadius="8" BoxShadow="{DynamicResource ShadowLg}" ClipToBounds="True">
     <DockPanel>
       <!-- The title bar: drag the window by it; the system's caption buttons sit on its right. -->
-      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="Set up Study Stash" />
+      <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="{Binding HeaderTitle}" />
       <Grid ColumnDefinitions="208,*">
-        <ItemsControl ItemsSource="{Binding Steps}" Margin="8,12">
+        <StackPanel Margin="8,8,8,12" Spacing="2">
+        <!-- Which setup this is: the library's or the laptop's -->
+        <StackPanel Orientation="Horizontal" Spacing="8" Height="28" Margin="12,0,12,4">
+          <c:Icon Glyph="{Binding FlowIcon}" Size="16" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+          <TextBlock Text="{Binding FlowName}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+        </StackPanel>
+        <ItemsControl ItemsSource="{Binding Steps}">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
@@ -118,6 +245,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        </StackPanel>
 
         <Border Grid.Column="1" Background="{DynamicResource Layer}" BorderBrush="{DynamicResource LayerStroke}" BorderThickness="1,1,0,0" CornerRadius="8,0,0,0">
           <DockPanel>
@@ -125,6 +253,9 @@
               <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                 <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
                   <TextBlock Text="Skip for now" FontSize="14" Foreground="{DynamicResource AccentText}" />
+                </Button>
+                <Button Classes="link" IsVisible="{Binding ShowSwitch}" Command="{Binding SwitchFlowCommand}">
+                  <TextBlock Text="{Binding SwitchText}" FontSize="14" />
                 </Button>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                   <Button Classes="push" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}"><TextBlock Text="Back" FontSize="14" /></Button>
@@ -136,11 +267,111 @@
             <StackPanel Margin="36,30,36,4">
               <TextBlock Text="{Binding StepLabel}" FontSize="12" Foreground="{DynamicResource Fg2}" />
 
-          <!-- 1: the microphone -->
+          <!-- Welcome: which computer this is. An installer knows (and shows its flow's picture); a build that
+               doesn't asks with two cards. -->
+          <StackPanel IsVisible="{Binding OnWelcome}">
+            <TextBlock Classes="h1" Text="{Binding WelcomeTitle}" />
+            <TextBlock Classes="lede" Text="{Binding WelcomeBody}" />
+            <Grid IsVisible="{Binding !Asking}" ColumnDefinitions="96,72,96" RowDefinitions="Auto,Auto" Margin="0,28,0,0" HorizontalAlignment="Left">
+              <Border Classes="tile" Classes.here="{Binding IsLaptop}" HorizontalAlignment="Center">
+                <c:Icon Glyph="laptop_mac" Size="28" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                <TextBlock Text="recordings" FontSize="12" Foreground="{DynamicResource Fg3}" HorizontalAlignment="Center" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <Border Height="1" Background="{DynamicResource Fg3}" VerticalAlignment="Center" />
+                  <c:Icon Grid.Column="1" Glyph="chevron_right" Size="14" Foreground="{DynamicResource Fg3}" Margin="-6,0,0,0" />
+                </Grid>
+              </StackPanel>
+              <Border Grid.Column="2" Classes="tile" Classes.here="{Binding IsLibrary}" HorizontalAlignment="Center">
+                <c:Icon Glyph="dns" Size="28" HorizontalAlignment="Center" VerticalAlignment="Center" />
+              </Border>
+              <TextBlock Grid.Row="1" Classes="caption" Classes.here="{Binding IsLaptop}" Text="{Binding LaptopCaption}" />
+              <TextBlock Grid.Row="1" Grid.Column="2" Classes="caption" Classes.here="{Binding IsLibrary}" Text="{Binding LibraryCaption}" />
+            </Grid>
+            <Grid IsVisible="{Binding Asking}" ColumnDefinitions="*,10,*" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Left">
+              <Button Classes="choice" Classes.on="{Binding IsLaptop}" Command="{Binding ChooseLaptopCommand}" VerticalAlignment="Stretch" VerticalContentAlignment="Top">
+                <StackPanel Spacing="4">
+                  <c:Icon Glyph="laptop_mac" Size="22" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
+                  <TextBlock Text="This is my laptop" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0" />
+                  <TextBlock Text="It records lectures" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Button>
+              <Button Grid.Column="2" Classes="choice" Classes.on="{Binding IsLibrary}" Command="{Binding ChooseLibraryCommand}" VerticalAlignment="Stretch" VerticalContentAlignment="Top">
+                <StackPanel Spacing="4">
+                  <c:Icon Glyph="dns" Size="22" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
+                  <TextBlock Text="This is my library" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0" />
+                  <TextBlock Text="A computer at home that keeps and writes the notes" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                </StackPanel>
+              </Button>
+            </Grid>
+            <CheckBox IsVisible="{Binding IsLibrary}" IsChecked="{Binding AlsoRecord}" Margin="0,16,0,0">
+              <TextBlock Text="{Binding AlsoRecordText}" FontSize="14" />
+            </CheckBox>
+          </StackPanel>
+
+          <!-- The library: its name and password (Continue creates it) -->
+          <StackPanel IsVisible="{Binding OnPassword}">
+            <TextBlock Classes="h1" Text="Give your library a password" />
+            <TextBlock Classes="lede" Text="Your laptop uses it to connect. Anyone with it can read your notes." />
+            <Grid ColumnDefinitions="*,10,*" Margin="0,20,0,0" MaxWidth="440" HorizontalAlignment="Left" IsEnabled="{Binding CanEditLibrary}">
+              <StackPanel>
+                <TextBlock Classes="label" Text="Library name" />
+                <Border Classes="field"><TextBox Classes="bare" Text="{Binding LibraryName}" PlaceholderText="Sam's library" FontSize="14" /></Border>
+              </StackPanel>
+              <StackPanel Grid.Column="2">
+                <TextBlock Classes="label" Text="Password" />
+                <Border Classes="field">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" RevealPassword="{Binding ShowPassword}" FontSize="14" />
+                    <Button Grid.Column="1" Classes="link" Command="{Binding ToggleShowPasswordCommand}" Margin="6,0,0,0">
+                      <TextBlock Text="{Binding ShowPasswordText}" />
+                    </Button>
+                  </Grid>
+                </Border>
+              </StackPanel>
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0" Height="18">
+              <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+              <c:Icon IsVisible="{Binding LibraryOk}" Glyph="check_circle" Filled="True" Size="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+              <TextBlock IsVisible="{Binding HasLibraryResult}" Text="{Binding LibraryResult}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="400"
+                         Classes="result" Classes.bad="{Binding !LibraryOk}" />
+            </StackPanel>
+          </StackPanel>
+
+          <!-- The laptop: find and connect to your library (Continue connects) -->
+          <StackPanel IsVisible="{Binding OnLibrary}">
+            <TextBlock Classes="h1" Text="Connect to your library" />
+            <TextBlock Classes="lede" Text="Your library is the computer at home that keeps your lectures. Type the address and password its setup showed, or let Study Stash look for it." />
+            <Grid ColumnDefinitions="*,8,Auto" RowDefinitions="Auto,Auto,12,Auto,Auto" Margin="0,20,0,0" MaxWidth="440" HorizontalAlignment="Left">
+              <TextBlock Classes="label" Text="Address" />
+              <Border Grid.Row="1" Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" FontSize="14" /></Border>
+              <Button Grid.Row="1" Grid.Column="2" Classes="push" Command="{Binding FindCommand}" IsEnabled="{Binding !Finding}">
+                <TextBlock Text="Find it" FontSize="14" />
+              </Button>
+              <TextBlock Grid.Row="3" Classes="label" Text="Password" />
+              <Border Grid.Row="4" Classes="field">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" RevealPassword="{Binding ShowPassword}" FontSize="14" />
+                  <Button Grid.Column="1" Classes="link" Command="{Binding ToggleShowPasswordCommand}" Margin="6,0,0,0">
+                    <TextBlock Text="{Binding ShowPasswordText}" />
+                  </Button>
+                </Grid>
+              </Border>
+            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,14,0,0" Height="18">
+              <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+              <c:Spinner IsVisible="{Binding Finding}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+              <c:Icon IsVisible="{Binding LibraryOk}" Glyph="check_circle" Filled="True" Size="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+              <TextBlock IsVisible="{Binding HasLibraryResult}" Text="{Binding LibraryResult}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="400"
+                         Classes="result" Classes.bad="{Binding !LibraryOk}" />
+            </StackPanel>
+          </StackPanel>
+
+          <!-- The microphone -->
           <StackPanel IsVisible="{Binding OnMicrophone}">
-            <TextBlock Text="Let Study Stash hear your lectures" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
-            <TextBlock Text="It records with this PC's microphone. The recording stays on this PC; only the transcript goes to your library."
-                       FontSize="14" LineHeight="21" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,8,0,0" />
+            <TextBlock Classes="h1" Text="Let Study Stash hear your lectures" />
+            <TextBlock Classes="lede" Text="It records with this PC's microphone. The recording stays on this PC; only the transcript goes to your library." />
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,32,0,0" IsVisible="{Binding MicAllowed}">
               <c:Icon Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Accent}" />
               <TextBlock Text="The microphone is allowed." FontSize="14" VerticalAlignment="Center" />
@@ -162,73 +393,12 @@
                 <TextBlock Text="Open microphone settings" FontSize="14" />
               </Button>
             </StackPanel>
-            <Button Theme="{StaticResource Surface}" HorizontalAlignment="Left" Margin="0,20,0,0" CornerRadius="4" Padding="0" Command="{Binding PickOnlyLibraryCommand}">
-              <TextBlock Text="{Binding SkipRecordingText}" FontSize="14" Foreground="{DynamicResource AccentText}" />
-            </Button>
           </StackPanel>
 
-          <!-- 2: the library -->
-          <StackPanel IsVisible="{Binding OnLibrary}">
-            <TextBlock Text="Where your notes live" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
-            <TextBlock Text="Your library is the computer that writes the notes and keeps them: a Mac mini or a PC at home, or this PC."
-                       FontSize="14" LineHeight="21" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,8,0,0" />
-            <Grid ColumnDefinitions="*,10,*" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Left">
-              <Button Classes="choice" Classes.on="{Binding OtherComputer}" Command="{Binding PickOtherCommand}">
-                <StackPanel Spacing="4">
-                  <c:Icon Glyph="dns" Size="20" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
-                  <TextBlock Text="Another computer" FontSize="14" FontWeight="SemiBold" />
-                  <TextBlock Text="Connect to the library you set up" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
-                </StackPanel>
-              </Button>
-              <Button Grid.Column="2" Classes="choice" Classes.on="{Binding ThisComputer}" Command="{Binding PickThisCommand}">
-                <StackPanel Spacing="4">
-                  <c:Icon Glyph="desktop_windows" Size="20" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
-                  <TextBlock Text="This PC" FontSize="14" FontWeight="SemiBold" />
-                  <TextBlock Text="Keep the library here too" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
-                </StackPanel>
-              </Button>
-            </Grid>
-            <Grid ColumnDefinitions="*,10,*" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Left" IsVisible="{Binding OtherComputer}">
-              <StackPanel>
-                <TextBlock Classes="label" Text="Address" />
-                <Border Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" FontSize="14" /></Border>
-              </StackPanel>
-              <StackPanel Grid.Column="2">
-                <TextBlock Classes="label" Text="Password" />
-                <Border Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" FontSize="14" /></Border>
-              </StackPanel>
-            </Grid>
-            <Grid ColumnDefinitions="*,10,*" Margin="0,10,0,0" MaxWidth="440" HorizontalAlignment="Left" IsVisible="{Binding ThisComputer}">
-              <StackPanel>
-                <TextBlock Classes="label" Text="Library name" />
-                <Border Classes="field"><TextBox Classes="bare" Text="{Binding LibraryName}" PlaceholderText="Sam's library" FontSize="14" /></Border>
-              </StackPanel>
-              <StackPanel Grid.Column="2">
-                <TextBlock Classes="label" Text="Password" />
-                <Border Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" FontSize="14" /></Border>
-              </StackPanel>
-            </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
-              <Button Classes="push" Command="{Binding ConnectCommand}" IsEnabled="{Binding !Connecting}">
-                <TextBlock Text="{Binding ThisComputer, Converter={x:Static c:Converters.CreateOrConnect}}" FontSize="14" />
-              </Button>
-              <Button Classes="push" Command="{Binding FindCommand}" IsEnabled="{Binding !Finding}" IsVisible="{Binding OtherComputer}">
-                <TextBlock Text="Find it" FontSize="14" />
-              </Button>
-              <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-              <c:Spinner IsVisible="{Binding Finding}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-              <TextBlock IsVisible="{Binding HasLibraryResult}" Text="{Binding LibraryResult}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="170"
-                         Classes="result" Classes.bad="{Binding !LibraryOk}" />
-            </StackPanel>
-            <CheckBox IsChecked="{Binding StartAtLogin}" IsVisible="{Binding ShowStartAtLogin}" Margin="0,6,0,0">
-              <TextBlock Text="Start Study Stash when I log in, so the library keeps running" FontSize="14" />
-            </CheckBox>
-          </StackPanel>
-
-          <!-- 3: the model -->
+          <!-- The transcription model -->
           <StackPanel IsVisible="{Binding OnModel}">
-            <TextBlock Text="Download the transcription model" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
-            <TextBlock Text="{Binding ModelBody}" FontSize="14" LineHeight="21" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,8,0,0" />
+            <TextBlock Classes="h1" Text="Download the transcription model" />
+            <TextBlock Classes="lede" Text="{Binding ModelBody}" />
             <Border Height="4" MaxWidth="440" HorizontalAlignment="Stretch" Margin="0,32,0,0">
               <Grid ColumnDefinitions="Auto,*"><Border Width="{Binding ModelBarWidthWin}" Height="4" CornerRadius="2" Background="{DynamicResource Accent}" /><Border Grid.Column="1" Height="1" Background="{DynamicResource Fg3}" VerticalAlignment="Center" /></Grid>
             </Border>
@@ -236,18 +406,17 @@
               <TextBlock Classes="num" Text="{Binding ModelDone}" FontSize="12" Foreground="{DynamicResource Fg2}" />
               <TextBlock Grid.Column="1" Classes="num" Text="{Binding ModelLeft}" FontSize="12" Foreground="{DynamicResource Fg2}" />
             </Grid>
-            <TextBlock IsVisible="{Binding ModelDownloading}" Text="You can add your classes while this finishes." FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,24,0,0" />
+            <TextBlock IsVisible="{Binding ModelDownloading}" Text="You can carry on while this finishes." FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,24,0,0" />
             <StackPanel IsVisible="{Binding HasModelProblem}" Orientation="Horizontal" Spacing="10" Margin="0,20,0,0">
               <TextBlock Text="{Binding ModelProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
               <Button Classes="push" Command="{Binding RetryModelCommand}"><TextBlock Text="Try again" FontSize="14" /></Button>
             </StackPanel>
           </StackPanel>
 
-          <!-- 4: classes -->
+          <!-- Classes -->
           <StackPanel IsVisible="{Binding OnClasses}">
-            <TextBlock Text="Add your classes" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
-            <TextBlock Text="With your timetable, Record picks the class that's on, so each lecture lands in the right place. You can skip this."
-                       FontSize="14" LineHeight="21" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,8,0,0" />
+            <TextBlock Classes="h1" Text="Add your classes" />
+            <TextBlock Classes="lede" Text="With your timetable, Record picks the class that's on, so each lecture lands in the right place. You can skip this." />
             <ItemsControl ItemsSource="{Binding Classes}" Margin="0,18,0,0" MaxWidth="440" HorizontalAlignment="Left">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:SetupClass">
@@ -267,11 +436,84 @@
             <TextBlock IsVisible="{Binding HasClassProblem}" Text="{Binding ClassProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="440" HorizontalAlignment="Left" Margin="0,8,0,0" />
           </StackPanel>
 
-              <!-- 5: the taskbar -->
+          <!-- The library: start at login (off unless switched on) -->
+          <StackPanel IsVisible="{Binding OnStartAtLogin}">
+            <TextBlock Classes="h1" Text="Keep your library running" />
+            <TextBlock Classes="lede" Text="Start Study Stash when this computer starts, so your laptop can always reach it." />
+            <Border Classes="group" Margin="0,24,0,0">
+              <Grid Classes="row" ColumnDefinitions="*,12,Auto" Height="64">
+                <StackPanel VerticalAlignment="Center" Spacing="2">
+                  <TextBlock Text="Start Study Stash when I sign in" FontSize="14" />
+                  <TextBlock Text="Recommended for a library. You can change it later in Settings." FontSize="12" Foreground="{DynamicResource Fg2}" />
+                </StackPanel>
+                <ToggleButton Grid.Column="2" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
+              </Grid>
+            </Border>
+          </StackPanel>
+
+          <!-- The library's last page: how to connect your laptop -->
+          <StackPanel IsVisible="{Binding OnLibraryDone}">
+            <TextBlock Classes="h1" Text="Your library is ready" />
+            <TextBlock Classes="lede" Text="Connect your laptop: install Study Stash on it, choose “This is my laptop”, and enter:" />
+            <Border Classes="group" Margin="0,16,0,0">
+              <StackPanel>
+                <ItemsControl ItemsSource="{Binding Addresses}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SetupAddress">
+                      <StackPanel>
+                        <Grid Classes="row" ColumnDefinitions="120,*,8,Auto">
+                          <TextBlock Classes="key" Text="{Binding Where}" />
+                          <SelectableTextBlock Grid.Column="1" Text="{Binding Url}" FontSize="14" VerticalAlignment="Center" />
+                          <Button Grid.Column="3" Classes="mini" Command="{Binding $parent[ItemsControl].((vm:SetupModel)DataContext).CopyCommand}" CommandParameter="{Binding Url}">
+                            <TextBlock Text="Copy" />
+                          </Button>
+                        </Grid>
+                        <Border Classes="rule" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid Classes="row" ColumnDefinitions="120,*,8,Auto">
+                  <TextBlock Classes="key" Text="Password" />
+                  <TextBlock Grid.Column="1" Classes="value" Text="{Binding PasswordText}" />
+                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
+                    <Button Classes="mini" Command="{Binding ToggleShowPasswordCommand}"><TextBlock Text="{Binding ShowPasswordText}" /></Button>
+                    <Button Classes="mini" Command="{Binding CopyPasswordCommand}"><TextBlock Text="Copy" /></Button>
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+            </Border>
+            <TextBlock IsVisible="{Binding OnBothDone}" Text="{Binding RecordHint}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,14,0,0" />
+          </StackPanel>
+
+          <!-- The laptop's last page: how to record -->
+          <StackPanel IsVisible="{Binding OnLaptopDone}">
+            <TextBlock Classes="h1" Text="You're set" />
+            <TextBlock Classes="lede" Text="{Binding RecordHint}" />
+            <Border Classes="group" Margin="0,20,0,0">
+              <StackPanel>
+                <Grid Classes="row" ColumnDefinitions="Auto,10,160,*">
+                  <c:Icon Glyph="check_circle" Filled="True" Size="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Classes="key" Text="Your library" />
+                  <TextBlock Grid.Column="3" Classes="value" Text="{Binding LibraryResult}" />
+                </Grid>
+                <Border Classes="rule" />
+                <Grid Classes="row" ColumnDefinitions="Auto,10,160,*">
+                  <Panel Width="16">
+                    <c:Icon IsVisible="{Binding ModelReady}" Glyph="check_circle" Filled="True" Size="16" Foreground="{DynamicResource Accent}" VerticalAlignment="Center" />
+                    <c:Icon IsVisible="{Binding !ModelReady}" Glyph="hourglass_top" Size="16" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                  </Panel>
+                  <TextBlock Grid.Column="2" Classes="key" Text="Transcription model" />
+                  <TextBlock Grid.Column="3" Classes="value" Text="{Binding ModelSummary}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+              <!-- The taskbar (where Study Stash records) -->
               <StackPanel IsVisible="{Binding OnTaskbar}">
-                <TextBlock Text="Keep Study Stash on the taskbar" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
-                <TextBlock Text="Windows tucks new icons away under ^. Drag Study Stash next to the clock so Record is always one click away."
-                           FontSize="14" LineHeight="21" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                <TextBlock Classes="h1" Text="Keep Study Stash on the taskbar" />
+                <TextBlock Classes="lede" Text="Windows tucks new icons away under ^. Drag Study Stash next to the clock so Record is always one click away." />
                 <Border Margin="0,24,0,0" Padding="20" CornerRadius="8" Background="{DynamicResource Card}" BorderBrush="{DynamicResource CardStroke}" BorderThickness="1">
                   <Grid ColumnDefinitions="Auto,16,*">
                     <StackPanel Spacing="6" VerticalAlignment="Bottom">
