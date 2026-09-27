@@ -866,6 +866,24 @@
                             <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.SortWithAi}" />
                           </Grid>
                         </Border>
+                        <Border Classes="rowsep" IsVisible="{Binding Lib.SortWithAi}" />
+                        <Border Classes="row" IsVisible="{Binding Lib.SortWithAi}">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Sorts them with" />
+                              <TextBlock Classes="row-sub" Text="The AI that reads a lecture to pick its class" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="select act" MaxWidth="260">
+                              <Grid ColumnDefinitions="*,6,Auto">
+                                <TextBlock Classes="plain" Text="{Binding Lib.SortEngineLabel}" VerticalAlignment="Center" />
+                                <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
+                              </Grid>
+                              <Button.Flyout>
+                                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource SettingsMenu}" ItemsSource="{Binding Lib.SortEngineChoices}" ItemTemplate="{StaticResource PickItem}" />
+                              </Button.Flyout>
+                            </Button>
+                          </Grid>
+                        </Border>
                         <Border Classes="rowsep" />
                         <Border Classes="row">
                           <Grid ColumnDefinitions="*,Auto">

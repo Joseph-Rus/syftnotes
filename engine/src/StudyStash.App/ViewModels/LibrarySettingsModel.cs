@@ -165,6 +165,9 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [ObservableProperty] public partial IReadOnlyList<SettingChoice> SummaryChoices { get; set; } = [];
     [ObservableProperty] public partial IReadOnlyList<SettingChoice> SortChoices { get; set; } = [];
     [ObservableProperty] public partial IReadOnlyList<SettingChoice> TerminalChoices { get; set; } = [];
+    /// <summary>Which AI sorts lectures into classes: its id, or "" for the library's main AI.</summary>
+    [ObservableProperty] public partial string SortEngine { get; set; } = "";
+    [ObservableProperty] public partial IReadOnlyList<SettingChoice> SortEngineChoices { get; set; } = [];
     [ObservableProperty] public partial string Terminal { get; set; } = "";
     [ObservableProperty] public partial int Lectures { get; set; }
     [ObservableProperty] public partial bool ConfirmingRewrite { get; set; }
@@ -175,6 +178,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     public string SummaryLabel => SummaryModel.Length > 0 ? SummaryModel : "Same as the sorting model";
     public string SortLabel => SortModel.Length > 0 ? SortModel : "None";
     public string TerminalLabel => TerminalChoices.FirstOrDefault(c => c.Id == Terminal)?.Label ?? Terminal;
+    public string SortEngineLabel => SortEngineChoices.FirstOrDefault(c => c.Id == SortEngine)?.Label ?? SortEngine;
     public bool HasTerminals => TerminalChoices.Count > 0;
     public string OllamaLine => OllamaAnswering
         ? "Ollama runs on the library's computer; notes and sorting stay there and cost nothing."
@@ -217,6 +221,10 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     partial void OnSortModelChanged(string value) => OnPropertyChanged(nameof(SortLabel));
 
     partial void OnTerminalChanged(string value) => OnPropertyChanged(nameof(TerminalLabel));
+
+    partial void OnSortEngineChanged(string value) => OnPropertyChanged(nameof(SortEngineLabel));
+
+    partial void OnSortEngineChoicesChanged(IReadOnlyList<SettingChoice> value) => OnPropertyChanged(nameof(SortEngineLabel));
 
     partial void OnTerminalChoicesChanged(IReadOnlyList<SettingChoice> value)
     {
@@ -338,6 +346,14 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             }
             SummaryChoices = [new SettingChoice("", "Same as the sorting model", PickSummary), .. ModelChoices(SummaryModel, PickSummary)];
             SortChoices = ModelChoices(SortModel, PickSort);
+            var sorting = s["sorting"];
+            SortEngine = Str(sorting?["engine"]);
+            SortEngineChoices =
+            [
+                new SettingChoice("", $"{Str(sorting?["default"])} (the library's main AI)", PickSortEngine),
+                .. (sorting?["engines"] as JsonArray ?? []).OfType<JsonObject>()
+                    .Select(e => new SettingChoice(Str(e["id"]), Str(e["name"]) + (Flag(e["installed"]) ? "" : " (not installed)"), PickSortEngine)),
+            ];
             var terminal = s["terminal"];
             Terminal = Str(terminal?["current"]);
             TerminalChoices = [.. (terminal?["choices"] as JsonArray ?? []).OfType<JsonObject>().Select(t => new SettingChoice(Str(t["id"]), Str(t["name"]), PickTerminal))];
@@ -514,6 +530,12 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     {
         SortModel = model;
         _ = SendAsync(new JsonObject { ["ollama"] = new JsonObject { ["sort_model"] = model } }, "The sorting model");
+    }
+
+    void PickSortEngine(string id)
+    {
+        SortEngine = id;
+        _ = SendAsync(new JsonObject { ["sort_engine"] = id }, "The sorting AI");
     }
 
     void PickTerminal(string id)

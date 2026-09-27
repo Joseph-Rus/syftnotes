@@ -54,9 +54,10 @@ public sealed class FakeLibrarySettings
                 foreach (var (k, v) in inner) section[k] = v?.DeepClone();
             else if (key == "add_folder")
                 ((JsonArray)Settings["folders"]!).Add(new JsonObject { ["name"] = Path.GetFileName(value!.GetValue<string>()), ["path"] = value.GetValue<string>(), ["ai"] = true, ["private"] = false });
-            else if (key == "start_at_login" || key == "name" || key == "terminal" || key == "auto_update")
+            else if (key == "start_at_login" || key == "name" || key == "terminal" || key == "auto_update" || key == "sort_engine")
             {
                 if (key == "terminal") Settings["terminal"]!["current"] = value?.DeepClone();
+                else if (key == "sort_engine") Settings["sorting"]!["engine"] = value?.DeepClone();
                 else if (key == "auto_update") Settings["updates"]!["auto"] = value?.DeepClone();
                 else Settings[key] = value?.DeepClone();
             }
@@ -97,6 +98,7 @@ public sealed class FakeLibrarySettings
           "ollama": {"host": "http://localhost:11434", "answering": true,
                      "models": [{"name": "gemma4:e4b", "size": "9.6 GB"}, {"name": "qwen3:1.7b", "size": "1.4 GB"}],
                      "summary_model": "", "sort_model": "gemma4:e4b", "recommended": "gemma4:e4b"},
+          "sorting": {"engine": "", "default": "Ollama", "engines": [{"id": "ollama", "name": "Ollama", "installed": true}, {"id": "claude", "name": "Claude", "installed": true}, {"id": "codex", "name": "ChatGPT", "installed": false}]},
           "terminal": {"current": "ghostty", "choices": [{"id": "terminal", "name": "Terminal"}, {"id": "ghostty", "name": "Ghostty"}]},
           "folders": [
             {"name": "School", "path": "/Users/sam/Documents/School", "ai": true, "private": false},

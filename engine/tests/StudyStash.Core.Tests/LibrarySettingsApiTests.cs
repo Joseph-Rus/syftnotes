@@ -119,9 +119,12 @@ public class LibrarySettingsApiTests
             notes = new { write = false, sort = true, min_confidence = 0.75 },
             ollama = new { summary_model = "gemma4:e4b", sort_model = "qwen3:1.7b" },
             auto_update = false,
+            sort_engine = "claude",
         })));
 
         Assert.Equal("Lecture notes", s["name"]!.GetValue<string>());
+        Assert.Equal("claude", s["sorting"]!["engine"]!.GetValue<string>());
+        Assert.Equal("claude", AiSettings.Load(cfg.Home).ByJob["sort"].Provider);
         var saved = Configs.Load(cfg.Home);
         Assert.Equal("Lecture notes", saved.PoolName);
         Assert.Equal(["CS 101", "HIST 210"], saved.Classes.Select(c => c.Name));
@@ -134,6 +137,10 @@ public class LibrarySettingsApiTests
         Assert.Equal("qwen3:1.7b", saved.OllamaModel);
         Assert.False(saved.AutoUpdate);
         Assert.Equal("pw", saved.PoolPassword); // untouched: only what was sent changes
+
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new { sort_engine = "" })));
+        Assert.False(AiSettings.Load(cfg.Home).ByJob.ContainsKey("sort")); // back to the library's main AI
+        await Refused(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new { sort_engine = "hal9000" })), HttpStatusCode.BadRequest);
     }
 
     [Fact]

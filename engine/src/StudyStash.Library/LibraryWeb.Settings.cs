@@ -98,6 +98,16 @@ public sealed partial class LibraryWeb
                 ["sort_model"] = cfg.OllamaModel,
                 ["recommended"] = Ollama.RecommendedModel(options.RamGb()),
             },
+            // Which AI sorts lectures into classes (the web page's "Sorts lectures"): its own, or "" for the library's main one.
+            ["sorting"] = new JsonObject
+            {
+                ["engine"] = picked.ByJob.TryGetValue("sort", out var sorts) ? sorts.Provider : "",
+                ["default"] = AiProviders.All(() => cfg.OllamaHost).FirstOrDefault(p => p.Id == picked.Provider)?.Name ?? picked.Provider,
+                ["engines"] = new JsonArray(AiProviders.All(() => cfg.OllamaHost).Select(p => (JsonNode?)new JsonObject
+                {
+                    ["id"] = p.Id, ["name"] = p.Name, ["installed"] = p.Available(),
+                }).ToArray()),
+            },
             ["terminal"] = new JsonObject
             {
                 ["current"] = picked.Terminal,
@@ -154,6 +164,8 @@ public sealed partial class LibraryWeb
             }
         }
         double? confidence = body["notes"]?["min_confidence"] is JsonValue cv && cv.TryGetValue(out double d) && !double.IsNaN(d) ? Math.Clamp(d, 0, 1) : null;
+        string? sortEngine = Text(body["sort_engine"]);
+        if (sortEngine is { Length: > 0 } && AiProviders.All().All(p => p.Id != sortEngine)) return Http.Detail(400, $"There's no AI called {sortEngine}.");
         string? terminal = Text(body["terminal"]);
         if (terminal is not null && Terminal.Available().All(t => t.Id != terminal)) return Http.Detail(400, $"There's no terminal called {terminal} on the library's computer.");
         bool? atLogin = Bool(body["start_at_login"]);
@@ -202,10 +214,12 @@ public sealed partial class LibraryWeb
         }
         if (Bool(body["auto_update"]) is { } auto) cfg.AutoUpdate = auto;
         Configs.Save(cfg);
-        if (terminal is not null)
+        if (terminal is not null || sortEngine is not null)
         {
             var picked = AiSettings.Load(cfg.Home);
-            picked.Terminal = terminal;
+            if (terminal is not null) picked.Terminal = terminal;
+            if (sortEngine is { Length: > 0 }) picked.ByJob["sort"] = new AiChoice(sortEngine);
+            else if (sortEngine is not null) picked.ByJob.Remove("sort");
             picked.Save(cfg.Home);
         }
         if (folders is not null)

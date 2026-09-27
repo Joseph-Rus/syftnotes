@@ -94,6 +94,8 @@ public class LibrarySettingsModelTests
         lib.WriteNotes = false;
         lib.ConfidenceChoices.Single(c => c.Label == "80% sure").Pick.Execute(null);
         lib.SortChoices.Single(c => c.Id == "qwen3:1.7b").Pick.Execute(null);
+        Assert.Equal("Ollama (the library's main AI)", lib.SortEngineLabel);
+        lib.SortEngineChoices.Single(c => c.Id == "claude").Pick.Execute(null);
         lib.StartAtLoginOn = true;
         lib.AutoUpdate = false;
         await Task.Yield();
@@ -104,11 +106,14 @@ public class LibrarySettingsModelTests
             """{"notes":{"write":false}}""",
             """{"notes":{"min_confidence":0.8}}""",
             """{"ollama":{"sort_model":"qwen3:1.7b"}}""",
+            """{"sort_engine":"claude"}""",
             """{"start_at_login":true}""",
             """{"auto_update":false}""",
         ], sent);
         Assert.Equal("80% sure", lib.ConfidenceLabel);
         Assert.Equal("qwen3:1.7b", lib.SortLabel);
+        Assert.Equal("Claude", lib.SortEngineLabel);
+        Assert.Contains(lib.SortEngineChoices, c => c.Label == "ChatGPT (not installed)");
         Assert.True(lib.StartAtLoginOn);
     }
 
