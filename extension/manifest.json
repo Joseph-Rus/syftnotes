@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Study Stash for Canvas",
   "short_name": "Study Stash",
-  "version": "1.4",
+  "version": "1.5",
   "description": "Copies your Canvas courses (assignments, submissions, modules, files) into your Study Stash library. Read-only, your own sign-in.",
   "minimum_chrome_version": "120",
   "permissions": ["alarms", "storage"],
