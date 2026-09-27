@@ -279,6 +279,8 @@ public static partial class Shell
 
     /// <summary>The Mac menu bar was dark when the recording icon was last drawn.</summary>
     static bool trayDark;
+    /// <summary>This recording's menu bar icon has been written to the log once.</summary>
+    static bool trayLogged;
 
     static WindowIcon TrayImage(bool recording)
     {
@@ -975,6 +977,11 @@ public static partial class Shell
         {
             MacStatusItem.ShowElapsed(elapsed);
             if (trayRecording && MacStatusItem.DarkMenuBar() != trayDark) MacStatusItem.SetIcon(TrayImageBytes(true), template: false);
+            if (trayRecording && !trayLogged)
+            {
+                trayLogged = true;
+                Program.Log($"[tray] recording: the S. with its red dot, {(trayDark ? "white on a dark" : "black on a light")} menu bar, \"{MacStatusItem.Title()}\" beside it");
+            }
         }
         else if (tray is not null)
         {
@@ -1059,7 +1066,12 @@ public static partial class Shell
             if (OperatingSystem.IsMacOS())
             {
                 MacStatusItem.SetIcon(TrayImageBytes(recording), template: !recording);
-                if (!recording) MacStatusItem.ShowElapsed("");
+                if (!recording)
+                {
+                    MacStatusItem.ShowElapsed("");
+                    trayLogged = false;
+                    Program.Log($"[tray] idle: the S. mark as a template image, \"{MacStatusItem.Title()}\" beside it");
+                }
             }
             else if (tray is not null)
             {

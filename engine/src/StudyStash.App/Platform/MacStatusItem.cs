@@ -155,6 +155,14 @@ public static unsafe class MacStatusItem
         SendVoidLong(button, sel_registerName("setImagePosition:"), text.Length > 0 ? 2 /* NSImageLeft */ : 1 /* NSImageOnly */);
     }
 
+    /// <summary>The text the menu bar shows beside the icon now, read back from AppKit (for the log).</summary>
+    public static string Title()
+    {
+        if (button == IntPtr.Zero) return "";
+        IntPtr title = Send(button, sel_registerName("title"));
+        return title == IntPtr.Zero ? "" : Marshal.PtrToStringUTF8(Send(title, sel_registerName("UTF8String"))) ?? "";
+    }
+
     /// <summary>The menu bar behind the icon is dark (Dark Mode, or a dark desktop picture showing through): an icon
     /// that isn't a template image is drawn white on it.</summary>
     public static bool DarkMenuBar()
