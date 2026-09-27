@@ -40,6 +40,8 @@ public sealed class AppSettings
     public bool Shortcuts { get; set; } = true;
     public double? RecorderX { get; set; }
     public double? RecorderY { get; set; }
+    /// <summary>Where the library window was left, and its size (or that it was zoomed), so it opens there again.</summary>
+    public WindowPlace? LibraryWindow { get; set; }
     /// <summary>The colour theme's name (Settings → Appearance): "Lagoon", "Plum"…</summary>
     public string Theme { get; set; } = "Lagoon";
 
@@ -70,6 +72,10 @@ public sealed class AppSettings
         File.Move(tmp, path, overwrite: true);
     }
 }
+
+/// <summary>A window's spot (in the screen's pixels, as Avalonia gives a window's position), its size in the
+/// window's own units, and whether it was zoomed to fill the display.</summary>
+public sealed record WindowPlace(int X, int Y, double Width, double Height, bool Zoomed = false);
 
 /// <summary>What pressing Record came to: the lecture now recording, or why the microphone didn't start.</summary>
 public sealed record RecordStart(Lecture? Lecture, MicTrouble? Trouble);

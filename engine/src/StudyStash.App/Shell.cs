@@ -258,6 +258,7 @@ public static partial class Shell
         tray = null;
         if (OperatingSystem.IsMacOS()) MacStatusItem.Destroy();
         Player.Stop();
+        SaveLibraryPlace();
         host.Save(_ => { });
         Program.Log("[app] quitting");
     }
@@ -730,14 +731,45 @@ public static partial class Shell
             w.Content = new WinLibrary { DataContext = library };
             w.Opened += (_, _) => MicaIfAvailable(w);
         }
+        PutWhereLeft(w);
         w.Closing += (_, e) =>
         {
             if (quitting) return;
+            SaveLibraryPlace();
             e.Cancel = true;
             w.Hide();
             UpdateDock();
         };
         return mainWindow = w;
+    }
+
+    /// <summary>The library window opens where it was left, at the size it was left (or zoomed), if that spot is
+    /// still on a display; otherwise centred at its usual size.</summary>
+    static void PutWhereLeft(Window w)
+    {
+        if (host.Settings.LibraryWindow is not { } place) return;
+        var screens = w.Screens.All.Select(s => new ScreenGeometry(s.Bounds, s.WorkingArea, s.Scaling, s.IsPrimary)).ToList();
+        var at = new PixelPoint(place.X, place.Y);
+        double scale = Placement.Pick(screens, at).Scaling;
+        var size = new PixelSize((int)(Math.Max(place.Width, w.MinWidth) * scale), (int)(Math.Max(place.Height, w.MinHeight) * scale));
+        if (Placement.Restore(at, size, screens, out var fitted) is not { } spot) return;
+        w.WindowStartupLocation = WindowStartupLocation.Manual;
+        w.Position = spot;
+        w.Width = fitted.Width / scale;
+        w.Height = fitted.Height / scale;
+        if (place.Zoomed) w.Opened += (_, _) => w.WindowState = WindowState.Maximized;
+    }
+
+    /// <summary>Remembers where the library window is and its size, so it opens there next time (it's being hidden,
+    /// or the app is quitting). Zoomed, it keeps the size it had before, and full screen isn't remembered.</summary>
+    static void SaveLibraryPlace()
+    {
+        if (mainWindow is not { IsVisible: true } w || w.WindowState is WindowState.FullScreen or WindowState.Minimized) return;
+        bool zoomed = w.WindowState == WindowState.Maximized;
+        var place = zoomed && host.Settings.LibraryWindow is { } before
+            ? before with { Zoomed = true }
+            : new WindowPlace(w.Position.X, w.Position.Y, w.ClientSize.Width, w.ClientSize.Height, zoomed);
+        host.Save(s => s.LibraryWindow = place);
     }
 
     /// <summary>Windows 11's Mica shows through where the design has its Mica color; elsewhere the color stands in.</summary>

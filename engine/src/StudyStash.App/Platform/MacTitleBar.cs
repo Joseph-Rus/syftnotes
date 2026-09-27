@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Avalonia.Controls;
+using Avalonia.Threading;
 using StudyStash.App.Controls;
 
 namespace StudyStash.App.Platform;
@@ -7,6 +8,8 @@ namespace StudyStash.App.Platform;
 /// <summary>A Mac window with its own 52 px title bar (<see cref="WindowHeader"/>): the traffic lights sit centred in
 /// it, the way a Finder or Notes window has them. Avalonia leaves them at the plain title bar's spot, near the top
 /// edge; an empty unified toolbar is the system's own way to give a window the taller bar, so that's what it adds.
+/// In full screen the toolbar comes off again: macOS would otherwise pin it across the top as a grey band over the
+/// header, where a native window keeps its own toolbar row and shows the lights only when the menu bar slides down.
 /// Anything missing (another OS, no window handle) leaves the window as it was.</summary>
 public static class MacTitleBar
 {
@@ -14,8 +17,8 @@ public static class MacTitleBar
     /// (NSWindowTitleHidden): the header draws its own.</summary>
     const long ToolbarStyleUnified = 3, TitleHidden = 1;
 
-    /// <summary>Put the lights in the header now and whenever the window comes back from full screen or is shown
-    /// again. Call before the window is shown.</summary>
+    /// <summary>Put the lights in the header now, and again whenever the window goes into or out of full screen or
+    /// zooms. Call before the window is shown.</summary>
     public static void Attach(Window window)
     {
         if (!OperatingSystem.IsMacOS()) return;
@@ -26,14 +29,14 @@ public static class MacTitleBar
         };
     }
 
-    /// <summary>Where the lights are, and which way they got there, go to the log once per window.</summary>
+    /// <summary>What the lights do now, and which way they got there, goes to the log.</summary>
     static void Apply(Window window)
     {
         try
         {
             string how = Place(window, out double before, out double after);
-            Program.Log($"[chrome] \"{window.Title}\": lights {how}; centre {Describe(before)} → {Describe(after)} from the top " +
-                        $"(header {WindowHeader.MacHeight / 2:0} wanted)");
+            Program.Log($"[chrome] \"{window.Title}\" ({window.WindowState}): lights {how}; centre {Describe(before)} → {Describe(after)} " +
+                        $"from the top (header {WindowHeader.MacHeight / 2:0} wanted)");
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or MarshalDirectiveException)
         {
@@ -51,13 +54,22 @@ public static class MacTitleBar
         IntPtr ns = window.TryGetPlatformHandle() is { HandleDescriptor: "NSWindow", Handle: var h } ? h : IntPtr.Zero;
         if (ns == IntPtr.Zero || !ObjC.IsKind(ns, windowClass)) return "left alone (no NSWindow)";
 
-        before = LightsCentre(ns);
-        if (Math.Abs(before - WindowHeader.MacHeight / 2) <= 2)
+        bool hasToolbar = ObjC.Send(ns, ObjC.Sel("toolbar")) != IntPtr.Zero;
+        if (window.WindowState == WindowState.FullScreen)
         {
-            after = before;
-            return "already centred by Avalonia";
+            if (hasToolbar) ObjC.Send(ns, ObjC.Sel("setToolbar:"), IntPtr.Zero);
+            // Full screen from the green button makes the title bar opaque again (a grey strip whenever it shows):
+            // keep it clear, so the lights sit on the header like they do in a window. Once more after the
+            // system's own full-screen switch has run, which can come after this.
+            ObjC.SendByte(ns, ObjC.Sel("setTitlebarAppearsTransparent:"), 1);
+            DispatcherTimer.RunOnce(() =>
+            {
+                if (window is { IsVisible: true, WindowState: WindowState.FullScreen }) ObjC.SendByte(ns, ObjC.Sel("setTitlebarAppearsTransparent:"), 1);
+            }, TimeSpan.FromMilliseconds(800));
+            return "come down with the menu bar in full screen (no toolbar, so no grey band over the header)";
         }
-        if (ObjC.Send(ns, ObjC.Sel("toolbar")) == IntPtr.Zero)
+        before = LightsCentre(ns);
+        if (!hasToolbar)
         {
             IntPtr toolbar = ObjC.Send(ObjC.Send(toolbarClass, ObjC.Sel("alloc")), ObjC.Sel("initWithIdentifier:"), ObjC.Str("StudyStashHeader"));
             if (toolbar == IntPtr.Zero) return "left alone (no toolbar)";
@@ -68,7 +80,7 @@ public static class MacTitleBar
         if (ObjC.Responds(ns, "setToolbarStyle:")) ObjC.SendLong(ns, ObjC.Sel("setToolbarStyle:"), ToolbarStyleUnified);
         ObjC.SendLong(ns, ObjC.Sel("setTitleVisibility:"), TitleHidden);
         after = LightsCentre(ns);
-        return "centred by an empty unified toolbar";
+        return hasToolbar ? "kept centred by the unified toolbar" : "centred by an empty unified toolbar";
     }
 
     /// <summary>The close button's centre, in points down from the window's top edge. Only read on Apple silicon,
@@ -77,7 +89,8 @@ public static class MacTitleBar
     {
         if (RuntimeInformation.ProcessArchitecture != Architecture.Arm64) return double.NaN;
         IntPtr close = ObjC.SendLongReturnsPtr(ns, ObjC.Sel("standardWindowButton:"), 0);
-        if (close == IntPtr.Zero) return double.NaN;
+        // Coming out of full screen the buttons are still in the system's own full-screen title bar window.
+        if (close == IntPtr.Zero || ObjC.Send(close, ObjC.Sel("window")) != ns) return double.NaN;
         // The button's own bounds, into the window's (bottom-up) coordinates: that handles the button being flipped.
         var inWindow = ObjC.Convert(close, ObjC.Sel("convertRect:toView:"), ObjC.RectOf(close, ObjC.Sel("bounds")), IntPtr.Zero);
         var frame = ObjC.RectOf(ns, ObjC.Sel("frame"));
