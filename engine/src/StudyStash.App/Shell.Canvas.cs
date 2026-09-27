@@ -41,8 +41,8 @@ public static partial class Shell
         }
         canvasWatching = false;
         canvasFor = key;
-        canvas = CanvasContext.For(host);
-        canvasWatch = new CanvasWatch(canvas);
+        var context = canvas = CanvasContext.For(host);
+        canvasWatch = new CanvasWatch(context) { Extension = new ExtensionKeeper(host.Home, () => context.Client, host.Log) };
         canvasWatch.Changed += OnCanvasChanged;
         canvasNotifier = new CanvasNotifier(canvas) { OnOpen = OpenCanvasNotification };
         canvasDue = null;

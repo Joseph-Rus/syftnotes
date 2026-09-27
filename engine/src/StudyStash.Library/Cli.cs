@@ -14,13 +14,14 @@ namespace StudyStash.Library;
 public static class Cli
 {
     /// <summary>The words that make the app the engine instead of opening its windows.</summary>
-    public static readonly string[] Commands = ["run", "serve", "setup", "init", "doctor", "update", "autostart", "version", "mcp", "ai"];
+    public static readonly string[] Commands = ["run", "serve", "setup", "init", "doctor", "update", "autostart", "version", "mcp", "ai", "extension-zip"];
 
     /// <summary>What a command the engine doesn't know prints: every command there is.</summary>
     public const string Usage = "usage: studystash run | serve | setup --page [--no-browser] | init\n"
         + "       | doctor [--role server|client] | update [--check] [--force]\n"
         + "       | autostart install|uninstall|status --role server | version\n"
         + "       | mcp   (the MCP server for Claude, over stdin and stdout)\n"
+        + "       | extension-zip OUT.zip   (the Canvas extension, packed for the Chrome Web Store)\n"
         + "       | ai [use PROVIDER [--job notes|sort|ask|agent] [--model M] | test [PROVIDER] | ask QUESTION]   (each takes --home DIR)";
 
     /// <summary>The app's login item for a settings folder, handed in by the app's own Main: the library it runs then
@@ -46,6 +47,7 @@ public static class Cli
         //   The library:   run | serve | setup --page | init
         //   Claude and AI: mcp | ai
         //   Both:          doctor | update | autostart | version
+        //   Publishing:    extension-zip
         string[] valued = ["--home", "--role"];
         string? Option(string name) => Array.IndexOf(args, name) is int i and >= 0 && i + 1 < args.Length ? args[i + 1] : null;
         bool Flag(string name) => args.Contains(name);
@@ -69,7 +71,7 @@ public static class Cli
         });
 
         string command = words.FirstOrDefault() ?? "";
-        if (command is not ("version" or "")) Directory.CreateDirectory(home);
+        if (command is not ("version" or "extension-zip" or "")) Directory.CreateDirectory(home);
         return command switch
         {
             "run" => await Library(updates: true),
@@ -82,6 +84,7 @@ public static class Cli
             "update" => await Update(),
             "autostart" => AutostartCommand(),
             "version" => Print(Engine.Version),
+            "extension-zip" => ExtensionZip(words.ElementAtOrDefault(1)),
             _ => Print(Usage, 2),
         };
 
@@ -92,6 +95,16 @@ public static class Cli
             if (cc.ServerUrl.Length > 0) return (cc.ServerUrl, cc.PoolKey);
             var cfg = Configs.Load(home);
             return File.Exists(cfg.ConfigPath) ? ($"http://127.0.0.1:{cfg.WebPort}", cfg.PoolPassword) : (null, "");
+        }
+
+        // The zip to upload to the Chrome Web Store (docs/chrome-web-store.md): the extension without a connection, which
+        // a student's copy gets by pasting a code from Study Stash.
+        static int ExtensionZip(string? output)
+        {
+            if (output is null) return Print("usage: studystash extension-zip OUT.zip", 2);
+            string path = Path.GetFullPath(Py.ExpandUser(output));
+            var names = StudyStash.Core.Canvas.Extension.PackForStore(path);
+            return Print($"Packed Study Stash for Canvas {StudyStash.Core.Canvas.Extension.Version()} for the Chrome Web Store: {path}\n  {string.Join(", ", names)}");
         }
 
         static int Print(string text, int code = 0)

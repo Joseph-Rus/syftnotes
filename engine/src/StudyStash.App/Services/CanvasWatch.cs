@@ -27,6 +27,10 @@ public sealed class CanvasWatch(CanvasContext context)
     /// actually changed — a host that only cares about a real change can compare <see cref="State"/> itself.</summary>
     public event Action? Changed;
 
+    /// <summary>Keeps this computer's Chrome extension folder current on every refresh (on start, and whenever the
+    /// library's Canvas address or key changes), and says whether Chrome is connected. Null: leave the folder alone.</summary>
+    public ExtensionKeeper? Extension { get; init; }
+
     /// <summary>3 seconds while a screen waits for Chrome (<see cref="Hurry"/>); 5 while syncing or the extension hasn't
     /// checked in yet; a minute otherwise.</summary>
     public TimeSpan NextDelay => hurrying > 0 ? Waiting : State?.Status is "syncing" or "no_extension" ? Fast : Slow;
@@ -72,6 +76,7 @@ public sealed class CanvasWatch(CanvasContext context)
     {
         if (context.Client is not { } client) return;
         State = await client.StateAsync(stop);
+        if (Extension is { } keeper) await keeper.KeepAsync(stop);
         Changed?.Invoke();
     }
 

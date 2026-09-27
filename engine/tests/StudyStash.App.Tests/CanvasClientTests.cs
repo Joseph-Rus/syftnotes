@@ -424,6 +424,21 @@ public class CanvasClientTests
     }
 
     [Fact]
+    public async Task ExtensionStatusAsync_makes_the_folder_here_when_the_librarys_own_isnt_ready()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", """
+            {"url": "https://school.instructure.com",
+             "extension": {"connected": false, "folder": "/library-home/chrome-extension", "folder_ready": false, "version": "1.4"}}
+            """).Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var here = new CanvasClient("http://127.0.0.1:8787", "test-key", fake.Client());
+
+        var s = await here.ExtensionStatusAsync((_, _) => "/made-here/chrome-extension", TestContext.Current.CancellationToken);
+
+        Assert.Equal("/made-here/chrome-extension", s!.Folder);
+        Assert.False(s.Connected);
+    }
+
+    [Fact]
     public async Task ExtensionStatusAsync_reads_an_older_library_from_extension_seen_and_prepares_the_folder_here()
     {
         var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", "canvas").Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
@@ -451,6 +466,20 @@ public class CanvasClientTests
     public async Task ExtensionStatusAsync_is_null_for_a_library_with_no_canvas_api()
     {
         Assert.Null(await Client(new FakeLibrary()).ExtensionStatusAsync(stop: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task ExtensionAsync_reads_the_folder_and_which_chrome_checked_in()
+    {
+        var fake = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", """
+            {"key": "test-key-abc123", "canvas": "https://school.instructure.com", "version": "1.4", "protocol": 3,
+             "folder": "/library/chrome-extension", "folder_ready": true, "seen": "2025-09-25T17:20:00Z", "seen_version": "1.4",
+             "seen_protocol": 3, "seen_where": "another_computer", "connected": true}
+            """);
+        var e = await Client(fake).ExtensionAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(("/library/chrome-extension", true, 3), (e!.Folder, e.FolderReady, e.Protocol));
+        Assert.Equal(("2025-09-25T17:20:00Z", "1.4", 3, "another_computer", true), (e.Seen, e.SeenVersion, e.SeenProtocol, e.SeenWhere, e.Connected));
     }
 
     [Fact]

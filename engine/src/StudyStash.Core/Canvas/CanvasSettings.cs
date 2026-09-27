@@ -28,9 +28,20 @@ public sealed class CanvasSettings
     public string LastDone { get; set; } = "";
     /// <summary>When the current <see cref="Error"/> started (ISO); "" while there's no error.</summary>
     public string ErrorAt { get; set; } = "";
+    /// <summary>When the extension last asked for work (ISO); "" when it never has. Written at most every
+    /// <see cref="SeenEvery"/> while nothing else about it changes.</summary>
     public string ExtensionSeen { get; set; } = "";
     /// <summary>The version of the extension Chrome last ran ("1.3").</summary>
     public string ExtensionVersion { get; set; } = "";
+    /// <summary>The protocol the extension that last checked in speaks (1 for one from before protocol 2).</summary>
+    public int ExtensionProtocol { get; set; }
+    /// <summary>Which Chrome last checked in, from the library address the extension says it uses:
+    /// "this_computer" (a loopback address), "another_computer", or "" when it didn't say.</summary>
+    public string ExtensionWhere { get; set; } = "";
+    /// <summary>Every Chrome that checks in, by where it is ("this_computer", "another_computer", or "" for one from
+    /// before 1.4 that doesn't say): when it last asked, and its version and protocol. The library's Chrome and the
+    /// laptop's can both run the extension; the fields above are the one that asked last.</summary>
+    public Dictionary<string, ExtensionCopy> ExtensionCopies { get; set; } = [];
     /// <summary>Chrome's extension updated itself (it reloads from a folder Study Stash keeps up to date): Settings
     /// says so ("The Chrome extension updated itself. Now version 1.3.") until it's dismissed.</summary>
     public ExtensionUpdate? ExtensionUpdate { get; set; }
@@ -52,6 +63,30 @@ public sealed class CanvasSettings
     /// <summary>The extension Chrome runs is older than this library's: its folder wasn't brought up to date (one the
     /// laptop app made, say), so it can't reload into the new version by itself.</summary>
     [JsonIgnore] public bool ExtensionOutdated => Extension.IsOlder(ExtensionVersion, Extension.Version());
+
+    /// <summary>How often a check-in that changes nothing else is written down.</summary>
+    public static readonly TimeSpan SeenEvery = TimeSpan.FromSeconds(15);
+
+    /// <summary>The extension is checking in: lately enough that it's running now. One that long-polls (protocol 3
+    /// and later) asks all the time, so 90 seconds of quiet means it's gone; an older one only asks every minute or
+    /// so while idle, and gets five.</summary>
+    public bool ExtensionConnected(DateTimeOffset now) => Connected(ExtensionSeen, ExtensionProtocol, now);
+
+    /// <summary>Whether an extension that last asked at <paramref name="seen"/> (ISO) speaking <paramref name="protocol"/>
+    /// is running now (<see cref="ExtensionConnected"/>).</summary>
+    public static bool Connected(string seen, int protocol, DateTimeOffset now) =>
+        DateTimeOffset.TryParse(seen, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var at)
+        && now - at <= (protocol >= 3 ? TimeSpan.FromSeconds(90) : TimeSpan.FromMinutes(5));
+
+    /// <summary>"this_computer" when the library address the extension uses is this computer's own (loopback),
+    /// "another_computer" for any other address, "" when it didn't say (<paramref name="address"/> is the
+    /// extension's <c>a</c>).</summary>
+    public static string WhereFrom(string? address)
+    {
+        if (string.IsNullOrWhiteSpace(address)) return "";
+        if (!Uri.TryCreate(address.Trim(), UriKind.Absolute, out var u)) return "";
+        return u.IsLoopback || u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase) ? "this_computer" : "another_computer";
+    }
 
     public static string PathIn(string home) => Path.Combine(home, "canvas.json");
 
@@ -140,3 +175,6 @@ public sealed record CourseInfo(string Code, string Name, string Term);
 /// <summary>Chrome's extension went from one version to a newer one at <paramref name="At"/> (ISO); dismissed once the
 /// student has seen it.</summary>
 public sealed record ExtensionUpdate(string From, string To, string At, bool Dismissed);
+
+/// <summary>One Chrome's extension as it last checked in: when (ISO), its version and its protocol.</summary>
+public sealed record ExtensionCopy(string Seen, string Version, int Protocol);

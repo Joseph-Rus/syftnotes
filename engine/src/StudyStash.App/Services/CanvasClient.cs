@@ -121,12 +121,13 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
     /// </summary>
     public async Task<CanvasApi.ExtensionStatus?> ExtensionStatusAsync(Func<string, string, string>? prepare = null, CancellationToken stop = default)
     {
-        // extension-fix: reconcile
         var o = await SendAsync<JsonObject>(HttpMethod.Get, canvasRoot, null, stop);
         if (o is null) return null;
         var ext = o["extension"] as JsonObject;
         bool? said = ext?["connected"] is JsonValue c && c.TryGetValue(out bool on) ? on : null;
-        string? folder = said is not null && LibraryHere ? Text(ext!["folder"]) : null;
+        // The library keeps its own folder ready (folder_ready); one that isn't ready yet is made here instead.
+        bool ready = ext?["folder_ready"] is not JsonValue r || !r.TryGetValue(out bool isReady) || isReady;
+        string? folder = said is not null && LibraryHere && ready ? Text(ext!["folder"]) : null;
         if (string.IsNullOrEmpty(folder) && prepare is not null && await ExtensionAsync(stop) is { } made) folder = prepare(made.Key, made.Canvas);
         return new CanvasApi.ExtensionStatus
         {

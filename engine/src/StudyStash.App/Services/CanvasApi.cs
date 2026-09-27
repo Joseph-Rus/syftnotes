@@ -100,6 +100,8 @@ public static class CanvasApi
         public string Error { get; init; } = "";
         public DateTimeOffset? LastSync { get; init; }
         public ExtensionUpdate? ExtensionUpdate { get; init; }
+        /// <summary>The same as GET canvas/extension, without the key.</summary>
+        public ExtensionKey? Extension { get; init; }
     }
 
     public sealed record ChangeRow
@@ -111,11 +113,23 @@ public static class CanvasApi
 
     // ---- GET canvas/extension ----
 
+    /// <summary>The library's extension: its key, the Canvas it points at, this library's version and protocol, the
+    /// folder the library keeps ready, and the Chrome that last checked in (which computer, whether it's connected
+    /// now). A library from before these fields leaves them empty.</summary>
     public sealed record ExtensionKey
     {
         public string Key { get; init; } = "";
         public string Canvas { get; init; } = "";
         public string Version { get; init; } = "";
+        public int Protocol { get; init; }
+        public string Folder { get; init; } = "";
+        public bool FolderReady { get; init; }
+        public string Seen { get; init; } = "";
+        public string SeenVersion { get; init; } = "";
+        public int SeenProtocol { get; init; }
+        /// <summary>"this_computer", "another_computer", or "" (the extension didn't say).</summary>
+        public string SeenWhere { get; init; } = "";
+        public bool Connected { get; init; }
     }
 
     // ---- GET canvas/classes ----
