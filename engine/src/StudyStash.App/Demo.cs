@@ -90,7 +90,7 @@ public static class Demo
         m.Classes.Add(new ClassItem { Name = "BIO 110", Dot = Bio, Count = 9 });
         m.Classes.Add(new ClassItem { Name = "CALC II", Dot = Calc, Count = 11 });
         m.Classes.Add(new ClassItem { Name = "HIST 210", Dot = Hist, Count = 7 });
-        m.Unsorted = new ClassItem { Name = "Unsorted", IsUnsorted = true, Count = 2 };
+        m.Unsorted.Count = 2;
         var week = new LectureGroup { Label = "This week", First = true };
         week.Items.Add(new LectureCard { Title = "Recursion and the call stack", Meta = "Tue 23 Sep · 1 h 12 min", Summary = "A recursive function solves a problem by calling itself on a smaller version of it.", Selected = true });
         week.Items.Add(new LectureCard { Title = "Stack frames and scope", Meta = "Thu 18 Sep · 1 h 14 min", Summary = "Where a variable lives decides who can see it, and for how long." });

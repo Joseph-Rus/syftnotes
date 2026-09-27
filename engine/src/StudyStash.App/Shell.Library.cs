@@ -76,7 +76,7 @@ public static partial class Shell
         UpdateDueItem();
         UpdateNextDue();
         int unsorted = host.Overview?["unsorted"]?.GetValue<int>() ?? 0;
-        library.Unsorted = unsorted > 0 ? new ClassItem { Name = Configs.Unsorted, IsUnsorted = true, Count = unsorted } : null;
+        library.Unsorted.Count = unsorted;
         if (host.Library != LibraryState.Connected || host.OlderLibrary)
         {
             ShowLectureList();
@@ -110,7 +110,7 @@ public static partial class Shell
         dueOpen = false;
         dueSelection = null;
         foreach (var c in library.Classes) c.Selected = c.Name == name && !c.IsDue;
-        if (library.Unsorted is { } u) u.Selected = name == Configs.Unsorted;
+        library.Unsorted.Selected = name == Configs.Unsorted;
         library.ClassTitle = name;
         if (host.Remote() is not { } lib) return;
         JsonArray list;
@@ -321,7 +321,7 @@ public static partial class Shell
         int turn = ++libraryTurn;
         dueOpen = true;
         foreach (var c in library.Classes) c.Selected = c.IsDue;
-        if (library.Unsorted is { } u) u.Selected = false;
+        library.Unsorted.Selected = false;
         library.ClassTitle = "Due";
         library.Empty = null;
         library.Groups.Clear();

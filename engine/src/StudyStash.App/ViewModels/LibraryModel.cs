@@ -3,6 +3,7 @@ using System.Linq;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.Core;
 
 namespace StudyStash.App.ViewModels;
 
@@ -83,7 +84,9 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>What's due soon, if Canvas has anything: the sidebar draws it above "Classes".</summary>
     public ClassItem? Due => Classes.FirstOrDefault(c => c.IsDue);
     public bool HasDue => Due is not null;
-    [ObservableProperty] public partial ClassItem? Unsorted { get; set; }
+    /// <summary>Where lectures the library couldn't place wait: always in the sidebar under the classes, even
+    /// empty, so they're one click away.</summary>
+    [ObservableProperty] public partial ClassItem Unsorted { get; set; } = new() { Name = Configs.Unsorted, IsUnsorted = true };
     public ObservableCollection<LectureGroup> Groups { get; } = [];
     [ObservableProperty] public partial string ClassTitle { get; set; } = "";
     [ObservableProperty] public partial string ClassCount { get; set; } = "";
