@@ -80,8 +80,9 @@ public static unsafe class MacStatusItem
     static readonly Action?[] menuActions = new Action?[5];
     static Action<double>? onLeftClick;
 
-    /// <summary>Puts the icon in the menu bar, wired to what the tray's menu items do. Call once, at startup.</summary>
-    public static void Create(Action<double> leftClick, Action record, Action search, Action open, Action settings, Action quit)
+    /// <summary>Puts the icon in the menu bar, wired to what the tray's menu items do (no Record when
+    /// <paramref name="record"/> is null). Call once, at startup.</summary>
+    public static void Create(Action<double> leftClick, Action? record, Action search, Action open, Action settings, Action quit)
     {
         onLeftClick = leftClick;
         menuActions[0] = record;
@@ -98,7 +99,8 @@ public static unsafe class MacStatusItem
         MakeItem();
 
         menu = Send(Send(objc_getClass("NSMenu"), sel_registerName("alloc")), sel_registerName("init"));
-        MenuItem("Record", 0);
+        // A library-only computer doesn't record: no Record in its menu.
+        if (record is not null) MenuItem("Record", 0);
         MenuItem("Search notes and lectures", 1);
         MenuItem("Open Study Stash", 2);
         MenuItem("Settings…", 3);

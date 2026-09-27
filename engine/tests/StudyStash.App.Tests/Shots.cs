@@ -231,6 +231,21 @@ public class SurfaceShots
                 new MacPanel { DataContext = Demo.Panel(recording: true), VerticalAlignment = VerticalAlignment.Top }));
     }
 
+    /// <summary>A library-only computer's dropdown: the library's state instead of Record.</summary>
+    [AvaloniaFact]
+    public void Mac_dropdown_library()
+    {
+        foreach (var t in Themes)
+            Shot.Take("mac-01-dropdown-library", SkinKind.Mac, t, () => new MacPanel { DataContext = Demo.LibraryPanel(), VerticalAlignment = VerticalAlignment.Top });
+    }
+
+    [AvaloniaFact]
+    public void Win_flyout_library()
+    {
+        foreach (var t in Themes)
+            Shot.Take("win-01-dropdown-library", SkinKind.Win, t, () => OverTaskbar(new WinPanel { DataContext = Demo.LibraryPanel(), VerticalAlignment = VerticalAlignment.Top }, false, "12:34", "25/09/2026"));
+    }
+
     /// <summary>Windows-only, shots-only: a flyout/recorder mockup sits over a taskbar strip in the design's
     /// pictures for context (not part of the app) — <see cref="TaskbarStrip"/> right-aligned under it.</summary>
     static StackPanel OverTaskbar(Control surface, bool recording, string time, string date) => new()

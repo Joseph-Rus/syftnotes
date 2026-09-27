@@ -89,6 +89,8 @@ public static partial class Shell
             };
         else if (OperatingSystem.IsMacOS())
             Program.Log("[app] this Mac doesn't say when the app is opened again; a second copy still hands off");
+        // The library's dropdown names the laptops that reach it.
+        RemoteLibrary.Computer = Environment.MachineName;
         host = new AppHost(home, laptop: new LaptopHost(), log: Program.Log);
         Skin.UseTheme(ColourThemes.Find(host.Settings.Theme));
         host.Changed += RequestRefresh;
@@ -300,7 +302,7 @@ public static partial class Shell
         {
             // Avalonia's own TrayIcon never raises Clicked on macOS, so the menu bar icon is a real NSStatusItem.
             MacStatusItem.Create(leftClick: x => TogglePanel(new PixelPoint((int)x, 0)),
-                record: ToggleRecording, search: ToggleQuick, open: ShowLibrary, settings: ShowSettings, quit: () => Quit());
+                record: host.Settings.Role == AppRole.Library ? null : ToggleRecording, search: ToggleQuick, open: ShowLibrary, settings: SettingsFromAnywhere, quit: () => Quit());
             MacStatusItem.SetIcon(TrayImageBytes(false));
             // Once the menu bar has laid it out: where it is, and whether the student can see it at all.
             DispatcherTimer.RunOnce(CheckMenuBarIcon, TimeSpan.FromSeconds(2));
@@ -315,10 +317,10 @@ public static partial class Shell
             i.Click += (_, _) => act();
             menu.Add(i);
         }
-        Item("Record", ToggleRecording);
+        if (host.Settings.Role != AppRole.Library) Item("Record", ToggleRecording);
         Item("Search notes and lectures", ToggleQuick);
         Item("Open Study Stash", ShowLibrary);
-        Item("Settings…", ShowSettings);
+        Item("Settings…", SettingsFromAnywhere);
         menu.Add(new NativeMenuItemSeparator());
         Item("Quit Study Stash", () => Quit());
         tray.Menu = menu;
@@ -428,6 +430,11 @@ public static partial class Shell
             return;
         }
         if (askingForMic) return;
+        if (host.Settings.Role == AppRole.Library)
+        {
+            Toast("This computer is your library", "Record on your laptop: this one keeps the lectures and writes the notes.", "Settings", SettingsFromAnywhere);
+            return;
+        }
         if (!host.ModelReady)
         {
             Toast("The model isn't downloaded yet", host.Downloading is not null ? "It's downloading: Record works once it's done." : "Download it in Settings → Recording.",
@@ -1147,6 +1154,13 @@ public static partial class Shell
         var (status, good) = host.Status();
         panel.Status = status;
         panel.StatusGood = good;
+        // A library-only computer doesn't record: its dropdown says what the library is doing instead.
+        panel.LibraryOnly = host.Settings.Role == AppRole.Library;
+        panel.Library = panel.LibraryOnly
+            ? LibraryPanelWords.From(host.Library == LibraryState.Connected || host.LocalLibrary?.State is LibraryServiceState.Running or LibraryServiceState.Elsewhere,
+                host.Library == LibraryState.Starting || host.LocalLibrary?.State == LibraryServiceState.Starting,
+                OperatingSystem.IsMacOS() ? "Mac" : "PC", host.Overview, canvasWatch?.State, DateTimeOffset.Now, TimeZoneInfo.Local)
+            : null;
         KeepCanvasWatched();
         library.Status = LibraryStatus();
         library.StatusGood = host.Library == LibraryState.Connected;

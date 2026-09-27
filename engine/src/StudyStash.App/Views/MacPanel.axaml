@@ -20,8 +20,36 @@
   <c:Glass CornerRadius="16" Padding="8">
     <StackPanel Spacing="8">
 
+      <!-- A library-only computer: no Record; what the library is doing instead. One column of 16 pt markers, the
+           words beside them all starting at the same place. -->
+      <Border Name="LibraryCard" Classes="fill" IsVisible="{Binding LibraryOnly}" CornerRadius="10" Padding="10,8">
+        <StackPanel Spacing="5">
+          <Grid ColumnDefinitions="16,6,*">
+            <Ellipse Width="7" Height="7" Classes="status" Classes.warn="{Binding !Library.RunningGood, FallbackValue=False}"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="{Binding Library.Running, FallbackValue=''}" FontSize="12" FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          </Grid>
+          <Grid ColumnDefinitions="16,6,*">
+            <c:Icon Glyph="notes" Size="13" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="{Binding Library.Lectures, FallbackValue=''}" FontSize="11" Foreground="{DynamicResource Fg2}"
+                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          </Grid>
+          <Grid ColumnDefinitions="16,6,*" IsVisible="{Binding HasCanvasLine}">
+            <c:Icon Glyph="school" Size="13" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="{Binding Library.Canvas, FallbackValue=''}" FontSize="11" Foreground="{DynamicResource Fg2}"
+                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          </Grid>
+          <Grid ColumnDefinitions="16,6,*" IsVisible="{Binding HasLaptopsLine}">
+            <c:Icon Glyph="laptop_mac" Size="13" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="{Binding Library.Laptops, FallbackValue=''}" FontSize="11" Foreground="{DynamicResource Fg2}"
+                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
       <!-- Idle: Record, and the class switcher -->
-      <StackPanel Spacing="6" IsVisible="{Binding IsIdle}">
+      <StackPanel Spacing="6" IsVisible="{Binding ShowRecord}">
         <Grid ColumnDefinitions="*,6,32">
           <Button Name="Record" Classes="tint" Theme="{StaticResource Surface}" Height="32" CornerRadius="16" Padding="12,0"
                   Command="{Binding RecordCommand}" IsEnabled="{Binding CanRecord}" ToolTip.Tip="Start recording">
@@ -81,7 +109,7 @@
       </Border>
 
       <!-- Recent lectures -->
-      <StackPanel IsVisible="{Binding HasRecent}">
+      <StackPanel IsVisible="{Binding ShowRecent}">
         <TextBlock Text="Recent" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" Margin="8,2,8,0" />
         <ItemsControl ItemsSource="{Binding Recent}" Margin="0,3,0,0">
           <ItemsControl.ItemTemplate>
@@ -117,7 +145,7 @@
 
       <!-- Status, then the app and its Settings as the last row (like a menu bar extra's "… Settings" row) -->
       <StackPanel Spacing="4">
-        <Grid ColumnDefinitions="Auto,6,*" Margin="8,0">
+        <Grid ColumnDefinitions="Auto,6,*" Margin="8,0" IsVisible="{Binding ShowStatus}">
           <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" />
           <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
         </Grid>

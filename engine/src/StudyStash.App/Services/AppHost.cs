@@ -474,7 +474,7 @@ public sealed class AppHost : IDisposable, IProblemSource
 
     /// <summary>"Library connected · Model ready", or what needs doing: pure, so a test needn't drive a real library
     /// or download to check the words.</summary>
-    public static string StatusText(LibraryState library, bool localLibraryRunning, bool modelReady, DownloadProgress? downloading)
+    public static string StatusText(LibraryState library, bool localLibraryRunning, bool modelReady, DownloadProgress? downloading, bool records = true)
     {
         string lib = localLibraryRunning
             ? $"Library running on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}"
@@ -486,14 +486,19 @@ public sealed class AppHost : IDisposable, IProblemSource
             LibraryState.WrongPassword => "Library password changed",
             _ => "No library yet",
         };
+        // A library-only computer never records, so its transcription model isn't worth a word.
+        if (!records) return lib;
         string model = modelReady ? "Model ready" : downloading is { } d ? $"Model {Math.Round(d.Fraction * 100)}%" : "No transcription model";
         return $"{lib} · {model}";
     }
 
     /// <summary>"Library connected · Model ready", or what needs doing, and whether all is well.</summary>
-    public (string Text, bool Good) Status() =>
-        (StatusText(Library, Settings.Role != AppRole.Laptop && LocalLibrary?.State == LibraryServiceState.Running, ModelReady, Downloading),
-            Library == LibraryState.Connected && ModelReady);
+    public (string Text, bool Good) Status()
+    {
+        bool records = Settings.Role != AppRole.Library;
+        return (StatusText(Library, Settings.Role != AppRole.Laptop && LocalLibrary?.State == LibraryServiceState.Running, ModelReady, Downloading, records),
+            Library == LibraryState.Connected && (ModelReady || !records));
+    }
 
     /// <summary>Change the settings and write them to app.json. A full disk (or a folder it can't write) is said, not
     /// thrown: the change still holds until the app quits.</summary>
