@@ -81,6 +81,7 @@ public sealed partial class PanelModel : ObservableObject
 
     public string RecordShortcut => Skin.Current == SkinKind.Mac ? "⌥⇧R" : "Ctrl+Alt+R";
     public string SearchShortcut => Skin.Current == SkinKind.Mac ? "⌥Space" : "Alt+Shift+Space";
+    public string SettingsTip => Skin.Current == SkinKind.Mac ? "Settings (⌘,)" : "Settings (Ctrl+,)";
 
     public PanelModel() => Recent.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasRecent));
 
@@ -112,6 +113,7 @@ public sealed partial class PanelModel : ObservableObject
     public Action? OnShowRecorder { get; set; }
     public Action? OnSearch { get; set; }
     public Action? OnOpenApp { get; set; }
+    public Action? OnSettings { get; set; }
     public Action<LectureItem>? OnOpenLecture { get; set; }
     public Action? OnFixProblem { get; set; }
 
@@ -123,5 +125,6 @@ public sealed partial class PanelModel : ObservableObject
     [RelayCommand] void ShowRecorder() => OnShowRecorder?.Invoke();
     [RelayCommand] void Search() => OnSearch?.Invoke();
     [RelayCommand] void OpenApp() => OnOpenApp?.Invoke();
+    [RelayCommand] void Settings() => OnSettings?.Invoke();
     [RelayCommand] void OpenLecture(LectureItem item) => OnOpenLecture?.Invoke(item);
 }

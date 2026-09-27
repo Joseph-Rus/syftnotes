@@ -32,7 +32,7 @@
               <TextBlock Grid.Column="3" Text="{Binding RecordShortcut}" FontSize="11" Opacity="0.7" Margin="8,0,0,0" VerticalAlignment="Center" />
             </Grid>
           </Button>
-          <Button Name="SwitchClass" Grid.Column="2" Classes="fill" Theme="{StaticResource Surface}" Width="32" Height="32" CornerRadius="16"
+          <Button Name="SwitchClass" AutomationProperties.Name="Switch class" Grid.Column="2" Classes="fill" Theme="{StaticResource Surface}" Width="32" Height="32" CornerRadius="16"
                   HorizontalContentAlignment="Center" Command="{Binding SwitchClassCommand}" ToolTip.Tip="Switch class">
             <c:Icon Glyph="unfold_more" Size="16" Foreground="{DynamicResource Fg}" />
           </Button>
@@ -115,16 +115,24 @@
         </Grid>
       </Button>
 
-      <!-- Status, then the app as the last menu item (like a menu bar extra's "… Settings" row) -->
+      <!-- Status, then the app and its Settings as the last row (like a menu bar extra's "… Settings" row) -->
       <StackPanel Spacing="4">
         <Grid ColumnDefinitions="Auto,6,*" Margin="8,0">
           <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" />
           <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
         </Grid>
         <Border Height="1" Background="{DynamicResource Sep}" Margin="8,2" />
-        <Button Name="OpenApp" Classes="row" Padding="8,3" HorizontalContentAlignment="Stretch" Command="{Binding OpenAppCommand}">
-          <TextBlock Text="Open Study Stash" FontSize="13" />
-        </Button>
+        <!-- The app and its Settings, like a menu bar extra's last row: the gear's right edge is the search field's. -->
+        <Grid ColumnDefinitions="*,4,Auto">
+          <Button Name="OpenApp" Classes="row" Padding="8,3" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
+                  Command="{Binding OpenAppCommand}">
+            <TextBlock Text="Open Study Stash" FontSize="13" />
+          </Button>
+          <Button Name="Settings" AutomationProperties.Name="Settings" Grid.Column="2" Classes="row" Width="26" Height="26" Padding="0" HorizontalContentAlignment="Center"
+                  VerticalContentAlignment="Center" Command="{Binding SettingsCommand}" ToolTip.Tip="{Binding SettingsTip}">
+            <c:Icon Glyph="settings" Size="15" Foreground="{DynamicResource Fg2}" />
+          </Button>
+        </Grid>
       </StackPanel>
     </StackPanel>
   </c:Glass>

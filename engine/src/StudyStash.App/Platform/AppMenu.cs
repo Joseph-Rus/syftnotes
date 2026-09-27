@@ -1,0 +1,174 @@
+using System.Runtime.InteropServices;
+using System.Text;
+using Avalonia.Controls;
+using Avalonia.Input;
+using CommunityToolkit.Mvvm.Input;
+using StudyStash.Core;
+
+namespace StudyStash.App.Platform;
+
+/// <summary>
+/// Settings from anywhere. On a Mac, while a Study Stash window is in front, the menu bar has the app's own menu
+/// (About Study Stash, Settings… ⌘, and the system's Hide and Quit ⌘Q) and a Window menu; every window, the dropdown
+/// and the quick panel included, opens Settings with ⌘, (Ctrl+, on Windows, where the tray's menu has Settings too).
+/// </summary>
+public static class AppMenu
+{
+    /// <summary>⌘, on a Mac, Ctrl+, on Windows.</summary>
+    public static KeyGesture SettingsGesture => new(Key.OemComma, OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control);
+
+    /// <summary>The app menu's own items; the system adds Services, Hide and Quit ⌘Q after them.</summary>
+    public static NativeMenu Build(Action about, Action settings)
+    {
+        var menu = new NativeMenu();
+        Fill(menu, about, settings);
+        return menu;
+    }
+
+    /// <summary>Makes <paramref name="menu"/> the app menu's own items (About Study Stash, Settings… ⌘,), in place: the
+    /// menu bar follows a menu it already shows (Avalonia's default, "About Avalonia", if the app's was set too late).</summary>
+    public static void Fill(NativeMenu menu, Action about, Action settings)
+    {
+        menu.Items.Clear();
+        menu.Add(Item("About Study Stash", about));
+        menu.Add(new NativeMenuItemSeparator());
+        menu.Add(Item("Settings…", settings, SettingsGesture));
+    }
+
+    /// <summary>The app's menu is Study Stash's own: set on the app before the menu bar first reads it, or filled in
+    /// where it already shows Avalonia's default.</summary>
+    public static void Use(Avalonia.Application app, Action about, Action settings)
+    {
+        if (NativeMenu.GetMenu(app) is { } shown)
+        {
+            if (!shown.Items.OfType<NativeMenuItem>().Any(i => i.Header == "Settings…")) Fill(shown, about, settings);
+            return;
+        }
+        NativeMenu.SetMenu(app, Build(about, settings));
+    }
+
+    /// <summary>The menu bar's menus while <paramref name="window"/> is in front: Window (Minimize ⌘M, Zoom, Close ⌘W,
+    /// then the library and Settings).</summary>
+    public static NativeMenu ForWindow(Window window, Action library, Action settings)
+    {
+        var items = new NativeMenu();
+        items.Add(Item("Minimize", () => window.WindowState = WindowState.Minimized, new KeyGesture(Key.M, KeyModifiers.Meta)));
+        items.Add(Item("Zoom", () =>
+        {
+            if (window.CanResize) window.WindowState = window.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        }));
+        items.Add(Item("Close", window.Close, new KeyGesture(Key.W, KeyModifiers.Meta)));
+        items.Add(new NativeMenuItemSeparator());
+        items.Add(Item("Study Stash library", library));
+        items.Add(Item("Settings…", settings));
+        var bar = new NativeMenu();
+        bar.Add(new NativeMenuItem("Window") { Menu = items });
+        return bar;
+    }
+
+    /// <summary>⌘, (Ctrl+,) opens Settings from <paramref name="window"/>, and on a Mac the menu bar gets its Window
+    /// menu while it's in front.</summary>
+    public static void Attach(Window window, Action library, Action settings)
+    {
+        AddSettingsKey(window, settings);
+        if (OperatingSystem.IsMacOS()) NativeMenu.SetMenu(window, ForWindow(window, library, settings));
+    }
+
+    /// <summary>⌘, (Ctrl+,) opens Settings from <paramref name="window"/> (the dropdown, the quick panel, the recorder).</summary>
+    public static void AddSettingsKey(Window window, Action settings) =>
+        window.KeyBindings.Add(new KeyBinding { Gesture = SettingsGesture, Command = new RelayCommand(settings) });
+
+    static NativeMenuItem Item(string header, Action act, KeyGesture? gesture = null)
+    {
+        var item = new NativeMenuItem(header) { Gesture = gesture };
+        item.Click += (_, _) => act();
+        return item;
+    }
+
+    // --- a Mac's own About panel, and reading the menu bar back for the log --------------------------------------
+
+    const string Lib = "/usr/lib/libobjc.A.dylib";
+    [DllImport(Lib)] static extern IntPtr objc_getClass(string name);
+    [DllImport(Lib)] static extern IntPtr sel_registerName(string name);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern IntPtr Send(IntPtr r, IntPtr sel);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern IntPtr SendId(IntPtr r, IntPtr sel, IntPtr a);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern void SendIdId(IntPtr r, IntPtr sel, IntPtr a, IntPtr b);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern IntPtr SendLong(IntPtr r, IntPtr sel, nint a);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern nint GetLong(IntPtr r, IntPtr sel);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern nuint GetULong(IntPtr r, IntPtr sel);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern byte GetBool(IntPtr r, IntPtr sel);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")]
+    static extern IntPtr SendString(IntPtr r, IntPtr sel, [MarshalAs(UnmanagedType.LPUTF8Str)] string s);
+
+    static IntPtr App => Send(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
+    static IntPtr NS(string s) => SendString(objc_getClass("NSString"), sel_registerName("stringWithUTF8String:"), s);
+
+    static string Str(IntPtr nsString) =>
+        nsString == IntPtr.Zero ? "" : Marshal.PtrToStringUTF8(Send(nsString, sel_registerName("UTF8String"))) ?? "";
+
+    /// <summary>A Mac's standard About panel, named Study Stash with this version (a copy run from the build folder
+    /// would otherwise say dotnet).</summary>
+    public static void ShowAbout()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        try
+        {
+            var options = Send(objc_getClass("NSMutableDictionary"), sel_registerName("dictionary"));
+            SendIdId(options, sel_registerName("setObject:forKey:"), NS("Study Stash"), NS("ApplicationName"));
+            SendIdId(options, sel_registerName("setObject:forKey:"), NS(Engine.Version), NS("ApplicationVersion"));
+            SendIdId(options, sel_registerName("setObject:forKey:"), NS(""), NS("Version"));
+            Desktop.Activate();
+            SendId(App, sel_registerName("orderFrontStandardAboutPanelWithOptions:"), options);
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
+
+    /// <summary>What the Mac's menu bar holds right now, for the log: each menu's title and its items, with their
+    /// shortcuts ("Study Stash: About Study Stash, Settings… ⌘, …, Quit Study Stash ⌘Q | Window: …").</summary>
+    public static string Describe()
+    {
+        if (!OperatingSystem.IsMacOS()) return "";
+        try
+        {
+            var main = Send(App, sel_registerName("mainMenu"));
+            if (main == IntPtr.Zero) return "(no menu bar)";
+            var menus = new List<string>();
+            nint count = GetLong(main, sel_registerName("numberOfItems"));
+            for (nint i = 0; i < count; i++)
+            {
+                var top = SendLong(main, sel_registerName("itemAtIndex:"), i);
+                var sub = Send(top, sel_registerName("submenu"));
+                if (sub == IntPtr.Zero) continue;
+                var items = new List<string>();
+                nint n = GetLong(sub, sel_registerName("numberOfItems"));
+                for (nint j = 0; j < n; j++)
+                {
+                    var item = SendLong(sub, sel_registerName("itemAtIndex:"), j);
+                    if (GetBool(item, sel_registerName("isSeparatorItem")) != 0) continue;
+                    string key = Str(Send(item, sel_registerName("keyEquivalent")));
+                    items.Add(key.Length > 0 ? $"{Str(Send(item, sel_registerName("title")))} {Modifiers(GetULong(item, sel_registerName("keyEquivalentModifierMask")))}{key.ToUpperInvariant()}"
+                        : Str(Send(item, sel_registerName("title"))));
+                }
+                string title = Str(Send(sub, sel_registerName("title")));
+                menus.Add($"{(title.Length > 0 ? title : Str(Send(top, sel_registerName("title"))))}: {string.Join(", ", items)}");
+            }
+            return string.Join(" | ", menus);
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return "";
+        }
+    }
+
+    static string Modifiers(nuint mask)
+    {
+        var s = new StringBuilder();
+        if ((mask & (1 << 18)) != 0) s.Append('⌃');
+        if ((mask & (1 << 19)) != 0) s.Append('⌥');
+        if ((mask & (1 << 17)) != 0) s.Append('⇧');
+        if ((mask & (1 << 20)) != 0) s.Append('⌘');
+        return s.ToString();
+    }
+}

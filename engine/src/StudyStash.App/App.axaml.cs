@@ -11,6 +11,8 @@ public partial class App : Application
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
+        // Before the menu bar first reads it: otherwise a Mac shows Avalonia's own "About Avalonia" menu.
+        if (OperatingSystem.IsMacOS()) Platform.AppMenu.Use(this, Platform.AppMenu.ShowAbout, Shell.SettingsFromMenu);
         Resources.MergedDictionaries.Add(Skin.Build(Skin.Current));
         UseSkin(Skin.Current);
     }

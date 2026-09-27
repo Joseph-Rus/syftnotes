@@ -291,6 +291,7 @@ public static partial class Shell
         };
         w.Bind(Window.BackgroundProperty, w.GetResourceObservable(Skin.Current == SkinKind.Mac ? "Win" : "Layer"));
         Look.Apply(w);
+        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         model.OnSkip = w.Close;
         model.OnBack = w.Close;
