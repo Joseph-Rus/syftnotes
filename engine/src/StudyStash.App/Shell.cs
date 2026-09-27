@@ -506,8 +506,21 @@ public static partial class Shell
             chosenClass = name;
             Program.Log($"[panel] class picked: {(name is null ? "follow the timetable" : name.Length == 0 ? "let the library sort it" : name)}");
             Refresh();
+            // The dropdown stays up, showing Record's new label and the line under it.
+            panelWindow?.Activate();
         });
         if (panelWindow is null) return;
+        var dropdown = panelWindow;
+        dropdown.HoldOpen = true;
+        menu.Closed += (_, _) =>
+        {
+            dropdown.HoldOpen = false;
+            // Closed by a click somewhere else altogether: the dropdown goes too, as it would have.
+            DispatcherTimer.RunOnce(() =>
+            {
+                if (dropdown.IsVisible && !dropdown.IsActive) dropdown.Hide();
+            }, TimeSpan.FromMilliseconds(150));
+        };
         var button = panelWindow.GetVisualDescendants().OfType<Button>().FirstOrDefault(b => b.Command == panel.SwitchClassCommand && b.IsEffectivelyVisible);
         if (button is null)
         {

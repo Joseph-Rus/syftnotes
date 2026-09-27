@@ -34,7 +34,7 @@ public class Floating : Window
         Look.Apply(this);
         Deactivated += (_, _) =>
         {
-            if (!CloseOnDeactivate || !IsVisible) return;
+            if (!CloseOnDeactivate || !IsVisible || HoldOpen) return;
             Hide();
             LastDeactivateHide = DateTime.UtcNow;
         };
@@ -83,6 +83,10 @@ public class Floating : Window
 
     /// <summary>Close when you click elsewhere (the dropdown, the quick panel).</summary>
     public bool CloseOnDeactivate { get; init; }
+
+    /// <summary>A menu of its own is open (the dropdown's class picker): clicking in that menu mustn't close this
+    /// window underneath it, or the pick would be lost with it.</summary>
+    public bool HoldOpen { get; set; }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
