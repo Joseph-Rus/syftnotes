@@ -55,7 +55,9 @@ public class AiTests
         Assert.Contains("Edit", ro.SkipWhile(a => a != "--disallowedTools"));
         Assert.DoesNotContain("--include-partial-messages", ro);
         var rw = claude.Command(new AiRequest("hi", "/lib") { Write = true, Tools = true, McpCommand = ["/app/studystash", "mcp"], Model = "sonnet" }, stream: true);
-        Assert.Contains("Edit(//lib/**)", rw);
+        Assert.Contains("Edit(/" + ClaudeProvider.ClaudePath(Path.GetFullPath("/lib")) + "/**)", rw);
+        Assert.Equal("/c/Users/sam/lib", ClaudeProvider.ClaudePath(@"C:\Users\sam\lib"));
+        Assert.Equal("/lib", ClaudeProvider.ClaudePath("/lib"));
         Assert.Contains("mcp__study-stash", rw);
         Assert.Equal("sonnet", rw[rw.IndexOf("--model") + 1]);
         Assert.Contains("\"study-stash\"", rw[rw.IndexOf("--mcp-config") + 1]);

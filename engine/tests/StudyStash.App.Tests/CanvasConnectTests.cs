@@ -292,6 +292,7 @@ public class CanvasConnectTests
     [Fact]
     public void Chrome_asks_for_the_url_it_was_given()
     {
+        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsWindows()) return; // the app opens Chrome on a Mac or Windows
         string? exe = null;
         IReadOnlyList<string>? args = null;
         string? result = Chrome.Open("https://school.instructure.com", (e, a, _) =>
@@ -309,6 +310,7 @@ public class CanvasConnectTests
     [Fact]
     public void Chrome_extensions_opens_the_extensions_page()
     {
+        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsWindows()) return; // the app opens Chrome on a Mac or Windows
         IReadOnlyList<string>? args = null;
         Chrome.OpenExtensions((_, a, _) =>
         {

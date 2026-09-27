@@ -131,7 +131,7 @@ public class UpdaterTests
     [Fact]
     public void A_bare_host_changes_nothing()
     {
-        var bare = new UpdateHost();
+        var bare = new UpdateHost { System = "Darwin" }; // a system that updates, so what's missing is the app folder
         Assert.Throws<InvalidOperationException>(() => bare.Run("launchctl", [], TimeSpan.Zero));
         Assert.Throws<InvalidOperationException>(() => bare.SpawnDetached(["cmd"]));
         Assert.Throws<InvalidOperationException>(() => bare.VersionOf("StudyStash"));
@@ -229,7 +229,7 @@ public class UpdaterTests
     [Fact]
     public async Task A_mac_update_swaps_the_app_in_and_restarts_its_services()
     {
-        if (OperatingSystem.IsWindows()) return; // a fake hdiutil stands in for the DMG
+        if (!OperatingSystem.IsMacOS()) return; // a fake hdiutil stands in for the DMG, but the real ditto copies the app
         using var dir = new TempDir();
         string appsFolder = dir["Applications"];
         string oldApp = Path.Combine(appsFolder, "Study Stash.app");

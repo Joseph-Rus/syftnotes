@@ -23,7 +23,7 @@ public class ClaudeSetupTests
         Assert.Equal($"""
             [mcp_servers.{ClaudeTools.ServerName}]
             command = "/usr/local/bin/studystash"
-            args = ["--home", "{home.Path}", "mcp"]
+            args = ["--home", "{home.Path.Replace("\\", "\\\\")}", "mcp"]
             """, setup.CodexSetup);
     }
 

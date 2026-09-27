@@ -15,7 +15,7 @@ public sealed partial class FakeCanvas
     /// <summary>The design's "now": Thu 25 Sep 2025, 10:24 in California.</summary>
     public static readonly DateTimeOffset DesignNow = new(2025, 9, 25, 17, 24, 0, TimeSpan.Zero);
     /// <summary>The design's time zone: California's.</summary>
-    public static readonly TimeZoneInfo Zone = TimeZoneInfo.FindSystemTimeZoneById("America/Los_Angeles");
+    public static readonly TimeZoneInfo Zone = TimeZoneInfo.FindSystemTimeZoneById(OperatingSystem.IsWindows() ? "Pacific Standard Time" : "America/Los_Angeles"); // Windows knows it by its own name
 
     /// <summary>One answer: status, body, paging link, and what the extension passes on from the headers.</summary>
     public sealed record Reply(int Status, byte[] Body, string Link = "", double? Rate = null, double? RetryAfter = null,

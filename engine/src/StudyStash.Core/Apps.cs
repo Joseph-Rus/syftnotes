@@ -97,7 +97,7 @@ public static class Apps
         baseDir ??= AppContext.BaseDirectory;
         problem = "not-installed";
         if (EnclosingMacBundle(baseDir) is not { } app) return null;
-        if (app.Contains("/AppTranslocation/", StringComparison.Ordinal))
+        if (app.Replace('\\', '/').Contains("/AppTranslocation/", StringComparison.Ordinal))
         {
             problem = "translocated";
             return null;

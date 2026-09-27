@@ -221,10 +221,15 @@ public sealed class ClaudeProvider : AiProvider
     public override IReadOnlyList<(string Id, string Label)> Models =>
         [("sonnet", "Sonnet: fast, great for studying"), ("opus", "Opus: strongest, costs more"), ("haiku", "Haiku: fastest, cheapest")];
 
+    /// <summary>A folder as Claude Code's rules spell it: "/Users/x" stays; Windows' "C:\Users\x" is "/c/Users/x".</summary>
+    internal static string ClaudePath(string full) =>
+        full.Length > 1 && full[1] == ':' ? "/" + char.ToLowerInvariant(full[0]) + full[2..].Replace('\\', '/').TrimEnd('/')
+            : "/" + full.TrimStart('/');
+
     public override List<string> Command(AiRequest req, bool stream)
     {
         // Edit and Write are allowed only inside the working folder: "//" makes the rule an absolute path.
-        string root = "/" + Path.GetFullPath(req.Cwd).TrimStart('/');
+        string root = ClaudePath(Path.GetFullPath(req.Cwd));
         var allowed = new List<string> { "Read", "Grep", "Glob" };
         var never = new List<string> { "Bash", "NotebookEdit", "WebFetch", "WebSearch", "Task" };
         if (req.Write) allowed.AddRange([$"Edit(/{root}/**)", $"Write(/{root}/**)"]);

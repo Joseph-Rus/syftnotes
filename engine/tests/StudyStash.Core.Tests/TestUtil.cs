@@ -17,9 +17,11 @@ public sealed class TempDir : IDisposable
     {
         try
         {
+            // Git and some tools leave read-only files, which Windows won't delete as they are.
+            foreach (var f in new DirectoryInfo(Path).EnumerateFiles("*", SearchOption.AllDirectories)) f.Attributes = FileAttributes.Normal;
             Directory.Delete(Path, recursive: true);
         }
-        catch (IOException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
         }
     }

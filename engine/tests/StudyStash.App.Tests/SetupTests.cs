@@ -18,7 +18,7 @@ namespace StudyStash.App.Tests;
 public sealed class SetupTests
 {
     static AppHost Host(TempHome home, Func<IAudioSource>? mic = null, ILoginItems? login = null) =>
-        new(home.Path, mic, log: _ => { }, loginItems: login ?? new CountingLoginItems());
+        new(home.Path, mic, log: _ => { }, loginItems: login ?? new CountingLoginItems(), models: ModelSetting.None); // not CI's tiny model
 
     /// <summary>A minimal server on a free port that always answers /api/health with one status: enough to check
     /// what Setup says about it, with no real library behind it.</summary>
