@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>tests/test_store_classify.py, plus the note files and prompts compared with Python's own.</summary>
+/// <summary>Saving and sorting a lecture, plus the note files and prompts compared with the Python engine's own.</summary>
 public class StoreClassifyTests
 {
     static Config CfgFor(TempDir dir) => new(dir["home"], dir["pool"])
@@ -18,7 +18,7 @@ public class StoreClassifyTests
     static List<ClassDef> GoldenClasses() => Golden.Cases("classes")
         .Select(c => new ClassDef(c![0].S(), c[1]!.AsArray().Select(a => a.S()).ToList(), c[2].S())).ToList();
 
-    static Meeting GoldenMeeting() => Granola.MeetingFromJson(Golden.Case("meeting"));
+    static Meeting GoldenMeeting() => Wire.MeetingFromJson(Golden.Case("meeting"));
 
     static SortChatFn Answer(string json) => (_, _, _) => Task.FromResult(json);
 
@@ -28,8 +28,10 @@ public class StoreClassifyTests
         Assert.Equal("Lec 3 Loops while", Notes.Slugify("Lec 3: \"Loops\" / while?"));
         foreach (var c in Golden.Cases("slugify"))
             Assert.Equal(c![2].S(), Notes.Slugify(c[0].S(), c[1]!.GetValue<int>()));
+        // A date that isn't in the input is "today" when the golden file was made: the clock's, not the code's.
         foreach (var c in Golden.Cases("date_prefix"))
-            if (c![1].S() != DateTime.UtcNow.ToString("yyyy-MM-dd")) Assert.Equal(c[1].S(), Notes.DatePrefix(c[0].S()));
+            if (c![0].S().Contains(c[1].S(), StringComparison.Ordinal)) Assert.Equal(c[1].S(), Notes.DatePrefix(c[0].S()));
+        Assert.Equal(DateTime.UtcNow.ToString("yyyy-MM-dd"), Notes.DatePrefix(""));
     }
 
     [Fact]
@@ -52,7 +54,7 @@ public class StoreClassifyTests
         var classes = GoldenClasses();
         foreach (var c in Golden.Cases("rules"))
         {
-            var got = Classify.ByRules(Granola.MeetingFromJson(c![0]), classes);
+            var got = Classify.ByRules(Wire.MeetingFromJson(c![0]), classes);
             if (c[1] is null)
             {
                 Assert.Null(got);
@@ -126,7 +128,7 @@ public class StoreClassifyTests
         var c = new Classification("CS 101", 0.875, "ollama", "Recursion and trees", ["recursion", "trees", "base case"]);
         Assert.Equal(Golden.Text("note-notes.md"), Notes.Render(m, c));
         string summary = "## Overview\nWe met recursion.\n\n```\n## not a heading\n```\n\n#### Deep\n###### Six";
-        Assert.Equal(Golden.Text("note-summary.md"), Notes.Render(m, c, summary, "big:35b", keepGranola: true));
+        Assert.Equal(Golden.Text("note-summary.md"), Notes.Render(m, c, summary, "big:35b"));
         Assert.Equal(Golden.Text("note-bare.md"), Notes.Render(new Meeting("x") { Title = "Untitled" },
             new Classification("Unsorted", 0.125, "none")));
     }

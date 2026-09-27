@@ -7,7 +7,7 @@ using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>tests/test_sync_web.py's web tests and tests/test_ingest.py, plus every page compared with the Python engine's.</summary>
+/// <summary>The library's web pages and the laptop's ingest API, plus every page compared with the Python engine's own text.</summary>
 public class LibraryWebTests
 {
     static readonly List<(string, double)> Models = [("qwen3:1.7b", 1.4), ("gemma4:e4b", 9.6)];
@@ -53,7 +53,7 @@ public class LibraryWebTests
 
     // --- every page, as the Python engine serves it ------------------------------------------------------------
 
-    /// <summary>golden.py's seed_library, lecture for lecture.</summary>
+    /// <summary>The Python engine's own fixed library, lecture for lecture.</summary>
     static void SeedLibrary(Config cfg, Store store)
     {
         void Save(string id, string title, string date, string cls, string by, double conf, List<string> topics, string notes = "", string transcript = "") =>
@@ -67,6 +67,8 @@ public class LibraryWebTests
         store.Enqueue(new Meeting("q1") { Title = "Waiting lecture", Date = "2026-09-04" });
         store.Enqueue(new Meeting("f1") { Title = "Broken lecture", Date = "2026-09-05" });
         Sql(cfg, $"UPDATE notes SET status='failed', error='Summary with big:35b failed: {new string('x', 200)}' WHERE id='f1'");
+        // Queued a moment apart, as they were for Python: Windows' clock can give both the same time.
+        Sql(cfg, "UPDATE notes SET updated_at='2100-01-01T00:00:00+00:00' WHERE id='q1'");
     }
 
     [Fact]
@@ -90,6 +92,8 @@ public class LibraryWebTests
         foreach (var (key, want) in pages)
         {
             if (key.StartsWith("open:", StringComparison.Ordinal)) continue;
+            // Settings has the AI picker (Claude, ChatGPT, Gemini), which only this engine has: it's checked on its own below.
+            if (key.Contains("/settings", StringComparison.Ordinal)) continue;
             var (s, path) = key.StartsWith("no-ollama:", StringComparison.Ordinal) ? (noOllama, key[10..]) : (site, key);
             var r = await s.Get(path);
             Assert.True((int)r.StatusCode == want!["status"]!.GetValue<int>(), $"{key}: {(int)r.StatusCode}");
@@ -101,6 +105,78 @@ public class LibraryWebTests
         Assert.Equal(pages["open:/"]!["html"].S(), await (await site.Stranger().GetAsync("/")).Content.ReadAsStringAsync());
     }
 
+    [Fact]
+    public async Task No_page_mentions_granola()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"])
+        {
+            PoolPassword = "pw", SummaryModel = "gemma4:e4b",
+            Classes = [new ClassDef("CS 101", ["cs101"]), new ClassDef("Bio 110"), new ClassDef("Calc II")],
+        };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        SeedLibrary(cfg, store);
+        // A lecture the laptop recorded: filed under the class it was recorded for, a transcript, no notes of its own,
+        // and notes that failed to write.
+        const string failed = "Summary with gemma4:e4b failed: the model is not installed";
+        store.Save(new Meeting("r1") { Title = "Recursion", Date = "2026-09-11T10:00:00", Folder = "CS 101",
+                Transcript = "today we trace a recursive call down to its base case" },
+            new Classification("CS 101", 1.0, "folder", "Recursion and the call stack", ["recursion"]), error: failed);
+        // One that came with notes typed in class, whose study notes also failed.
+        store.Save(new Meeting("r2") { Title = "Osmosis", Date = "2026-09-12T09:00:00", Folder = "Bio 110",
+                NotesMarkdown = "water follows salt", Transcript = "water crosses the membrane toward more salt" },
+            new Classification("Bio 110", 1.0, "folder", "", []), error: failed);
+        await using var site = await Site(cfg, store);
+        var login = await site.Stranger().GetAsync("/login");
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var pages = new Dictionary<string, string> { ["/login"] = await login.Content.ReadAsStringAsync() };
+        await site.PostForm("/login", ("password", "pw"), ("next", "/"));
+
+        string[] paths = ["/", "/unsorted", "/search?q=cells", "/settings",
+            .. new[] { "CS 101", "Bio 110", "Calc II", "History 9" }.Select(Ui.ClassUrl),
+            .. new[] { "n1", "n2", "n3", "n4", "q1", "f1", "r1", "r2" }.Select(id => $"/note/{id}")];
+        foreach (string path in paths)
+        {
+            var r = await site.Get(path);
+            Assert.True(r.StatusCode == HttpStatusCode.OK, $"{path}: {(int)r.StatusCode}");
+            pages[path] = await r.Content.ReadAsStringAsync();
+        }
+        foreach (var (path, html) in pages)
+            Assert.False(html.Contains("granola", StringComparison.OrdinalIgnoreCase), $"{path} mentions Granola");
+
+        // Each lecture says where its notes came from, in a recording's terms.
+        string recorded = pages["/note/r1"];
+        Assert.Contains("<dt>Summary</dt><dd>No study notes yet</dd>", recorded);
+        Assert.Contains("Sorted by the class it was recorded for", recorded);
+        Assert.Contains(failed + ".", recorded);
+        Assert.DoesNotContain("Showing the notes it came with", recorded); // there are none to show instead
+        Assert.Contains("<dt>Summary</dt><dd>The notes it came with</dd>", pages["/note/r2"]);
+        Assert.Contains(failed + ". Showing the notes it came with.", pages["/note/r2"]);
+        Assert.Contains("<section id=\"notes\" role=\"tabpanel\">", pages["/note/r2"]);
+        Assert.Contains("<dt>Summary</dt><dd>No transcript, so no study notes</dd>", pages["/note/n3"]);
+        Assert.Contains("No notes for this lecture yet.", pages["/note/n3"]);
+    }
+
+    [Fact]
+    public async Task Settings_picks_the_ai_for_everything_and_for_each_kind_of_work()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { PoolPassword = "pw", Classes = [new ClassDef("CS 101")] };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        await using var site = await Site(cfg, store);
+        await site.PostForm("/login", ("password", "pw"), ("next", "/"));
+        string page = await site.Text("/settings");
+        Assert.Contains("Does the work", page);
+        Assert.Contains("<option value=\"claude\"", page);
+        var r = await site.PostForm("/settings", ("ai_provider", "claude"), ("ai_job_sort", "ollama"), ("ai_job_notes", ""),
+            ("class_name_0", "CS 101"), ("summary_enabled", "1"), ("ollama_enabled", "1"));
+        Assert.Equal(HttpStatusCode.SeeOther, r.StatusCode);
+        var ai = StudyStash.Core.Ai.AiSettings.Load(cfg.Home);
+        Assert.Equal("claude", ai.For("notes").Provider);
+        Assert.True(ai.Local("sort"));
+        Assert.Contains("Writes study notes", await site.Text("/settings"));
+    }
+
     static string FirstDifference(string want, string got)
     {
         int i = 0;
@@ -109,7 +185,7 @@ public class LibraryWebTests
         return $"python: …{want[from..Math.Min(want.Length, i + 80)]}\nc#:     …{got[from..Math.Min(got.Length, i + 80)]}";
     }
 
-    // --- tests/test_sync_web.py ---------------------------------------------------------------------------------
+    // --- the library's own web pages ----------------------------------------------------------------------------
 
     [Fact]
     public async Task Login_browse_move_download()
@@ -179,7 +255,11 @@ public class LibraryWebTests
         string s = await c.Text("/settings");
         Assert.Contains("qwen3:1.7b", s);
         Assert.Contains("Connect your laptop", s);
-        Assert.Contains("GRANOLA_SHARE_SERVER=http://mini.tail.ts.net:8787", s);
+        Assert.Contains("<span class=\"value\">http://mini.tail.ts.net:8787</span>", s);
+        Assert.Contains("<span class=\"value\">pw</span>", s);
+        Assert.Contains("/Study-Stash-Laptop.dmg\">Mac</a>", s);
+        Assert.Contains("/Study-Stash-Laptop-Setup.exe\">Windows</a>", s);
+        Assert.DoesNotContain("GRANOLA", s);
         Assert.Contains("Rewrite summary", await c.Text("/note/n1"));
 
         var r = await c.PostForm("/settings",
@@ -191,7 +271,7 @@ public class LibraryWebTests
             ("class_name_3", ""), ("class_aliases_3", ""), ("class_desc_3", ""));
         Assert.Equal((HttpStatusCode.SeeOther, "/settings?saved=1"), (r.StatusCode, r.Headers.Location!.OriginalString));
         var back = Configs.Load(cfg.Home);
-        Assert.Equal(("qwen3:1.7b", 0.7, false), (back.SummaryModel, back.MinConfidence, back.KeepGranolaNotes));
+        Assert.Equal(("qwen3:1.7b", 0.7), (back.SummaryModel, back.MinConfidence));
         Assert.Equal(["CS 101", "Chem 1A"], back.ClassNames());
         Assert.Equal(["cs101", "intro"], back.Classes[0].Aliases);
         Assert.Equal(["CS 101", "Chem 1A"], cfg.ClassNames()); // the running app sees it right away
@@ -286,7 +366,7 @@ public class LibraryWebTests
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
     }
 
-    // --- tests/test_ingest.py: the API the laptop talks to ------------------------------------------------------------
+    // --- the API the laptop talks to -----------------------------------------------------------------------------
 
     static HttpRequestMessage Req(HttpMethod method, string path, string? key = null, object? json = null)
     {
@@ -312,7 +392,7 @@ public class LibraryWebTests
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse($$"""{"ok": true, "pool_name": "Fall pool", "classes": ["CS 101", "Bio 110"], "notes": 0, "version": "{{Engine.Version}}"}"""),
             JsonNode.Parse(await r.Content.ReadAsStringAsync())));
-        Assert.Equal(Engine.Version, r.Headers.GetValues("X-Granola-Share").Single());
+        Assert.Equal(Engine.Version, r.Headers.GetValues("X-Study-Stash").Single());
     }
 
     [Fact]
@@ -397,11 +477,13 @@ public class LibraryWebTests
         Assert.Equal((HttpStatusCode.NotFound, "{\"detail\":\"Not Found\"}"), (missing.StatusCode, await missing.Content.ReadAsStringAsync()));
     }
 
+    /// <summary>The repo's assets/ folder. It looks for the icon file, not the folder: on a case-insensitive disk
+    /// StudyStash.App/Assets would pass for it.</summary>
     static string RepoAssets()
     {
         for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)
-            if (Directory.Exists(Path.Combine(d.FullName, "granola_share", "assets"))) return Path.Combine(d.FullName, "granola_share", "assets");
-        throw new DirectoryNotFoundException("granola_share/assets");
+            if (File.Exists(Path.Combine(d.FullName, "assets", "study-stash.ico"))) return Path.Combine(d.FullName, "assets");
+        throw new FileNotFoundException("assets/study-stash.ico");
     }
 
     [Fact]

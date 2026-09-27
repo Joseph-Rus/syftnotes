@@ -20,16 +20,16 @@ public static class ClaudeWeb
 
     public static int PortFor(Config cfg) => cfg.WebPort + 1;
 
-    public static WebApplication Build(WebApplicationBuilder builder, Config cfg, LibraryReader reader, ClaudeAccess access)
+    public static WebApplication Build(WebApplicationBuilder builder, Config cfg, LibraryReader reader, ClaudeAccess access, StudyStash.Core.Canvas.CanvasSync? canvas = null, StudyStash.Core.Ai.FileIndex? files = null)
     {
-        var source = new LocalLibrary(reader);
+        var source = new LocalLibrary(reader, canvas, cfg.Home, files);
         builder.Services.AddMcpServer(o =>
         {
             o.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = ClaudeTools.ServerName, Title = "Study Stash", Version = Engine.Version };
             o.ServerInstructions = ClaudeTools.Instructions;
         })
             .WithHttpTransport(o => o.Stateless = true)
-            .WithTools(ClaudeTools.Tools(source))
+            .WithTools(StudyStash.Core.Ai.ToolAccess.Guard(ClaudeTools.Tools(source), () => Task.FromResult((access.ToolsOn, access.Reading))))
             .WithPrompts(ClaudeTools.Prompts());
         var app = builder.Build();
 
@@ -41,6 +41,11 @@ public static class ClaudeWeb
             if (!ctx.Request.Path.StartsWithSegments(McpPath))
             {
                 await next();
+                return;
+            }
+            if (!access.ToolsOn)
+            {
+                await Http.Detail(403, "AI tool access is off in Study Stash.").ExecuteAsync(ctx);
                 return;
             }
             string auth = ctx.Request.Headers.Authorization.ToString();

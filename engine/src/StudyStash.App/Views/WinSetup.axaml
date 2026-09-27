@@ -1,9 +1,11 @@
-<!-- First-run setup (Surfaces, Windows 11 05): the same four steps, plus one for Windows: pin the tray icon out of the
-     overflow, with a shortcut to taskbar settings. -->
+<!-- First-run setup (Surfaces, Windows 11 05): the same steps as the Mac's (the AI engines when this PC is the library,
+     15; Canvas, optional, 07), plus one for Windows: pin the tray icon out of the overflow, with a shortcut to taskbar
+     settings. The AI and Canvas steps widen the window to the design's 900. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.WinSetup"
              x:DataType="vm:SetupModel"
              Width="720" Height="480">
@@ -66,7 +68,7 @@
     <Style Selector="Button.choice">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Padding" Value="14,12" />
+      <Setter Property="Padding" Value="14,10" />
       <Setter Property="Background" Value="{DynamicResource Card}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
       <Setter Property="BorderThickness" Value="1" />
@@ -120,7 +122,7 @@
                       <TextBlock Text="{Binding Number}" FontSize="10" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                     <TextBlock Grid.Column="2" Classes="title" Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="3" Text="Optional" IsVisible="{Binding Optional}" FontSize="12" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="3" Text="Optional" IsVisible="{Binding ShowOptional}" FontSize="12" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
                   </Grid>
                 </Panel>
               </Border>
@@ -131,12 +133,18 @@
         <Border Grid.Column="1" Background="{DynamicResource Layer}" BorderBrush="{DynamicResource LayerStroke}" BorderThickness="1,1,0,0" CornerRadius="8,0,0,0">
           <DockPanel>
             <Border DockPanel.Dock="Bottom" Height="64" Background="{DynamicResource Footer}" BorderBrush="{DynamicResource Sep}" BorderThickness="0,1,0,0" Padding="24,0">
-              <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" VerticalAlignment="Center">
-                <Button Classes="push" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}"><TextBlock Text="Back" FontSize="14" /></Button>
-                <Button Classes="push default" Command="{Binding NextCommand}"><TextBlock Text="{Binding ContinueLabel}" FontSize="14" /></Button>
-              </StackPanel>
+              <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
+                  <TextBlock Text="Skip for now" FontSize="14" Foreground="{DynamicResource AccentText}" />
+                </Button>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                  <Button Classes="push" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}"><TextBlock Text="Back" FontSize="14" /></Button>
+                  <Button Classes="push default" Command="{Binding NextCommand}" IsEnabled="{Binding CanContinue}"><TextBlock Text="{Binding ContinueLabel}" FontSize="14" /></Button>
+                </StackPanel>
+              </Grid>
             </Border>
-            <StackPanel Margin="36,36,36,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="36,30,36,4">
               <TextBlock Text="{Binding StepLabel}" FontSize="12" Foreground="{DynamicResource Fg2}" />
 
           <!-- 1: the microphone -->
@@ -147,6 +155,10 @@
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,32,0,0" IsVisible="{Binding MicAllowed}">
               <c:Icon Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Accent}" />
               <TextBlock Text="The microphone is allowed." FontSize="14" VerticalAlignment="Center" />
+            </StackPanel>
+            <StackPanel IsVisible="{Binding MicAllowed}" Margin="0,16,0,0" Spacing="8">
+              <c:Waveform Height="28" Bars="24" Levels="{Binding MicLevels}" Foreground="{DynamicResource Accent}" HorizontalAlignment="Left" />
+              <TextBlock Text="{Binding MicLine}" FontSize="12" Foreground="{DynamicResource Fg2}" />
             </StackPanel>
             <Button Classes="push default" HorizontalAlignment="Left" Margin="0,32,0,0" Command="{Binding AllowMicCommand}" IsVisible="{Binding !MicAllowed}">
               <StackPanel Orientation="Horizontal" Spacing="6">
@@ -161,6 +173,9 @@
                 <TextBlock Text="Open microphone settings" FontSize="14" />
               </Button>
             </StackPanel>
+            <Button Theme="{StaticResource Surface}" HorizontalAlignment="Left" Margin="0,20,0,0" CornerRadius="4" Padding="0" Command="{Binding PickOnlyLibraryCommand}">
+              <TextBlock Text="{Binding SkipRecordingText}" FontSize="14" Foreground="{DynamicResource AccentText}" />
+            </Button>
           </StackPanel>
 
           <!-- 2: the library -->
@@ -168,7 +183,7 @@
             <TextBlock Text="Where your notes live" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="SemiBold" Margin="0,4,0,0" />
             <TextBlock Text="Your library is the computer that writes the notes and keeps them: a Mac mini or a PC at home, or this PC."
                        FontSize="14" LineHeight="21" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="420" HorizontalAlignment="Left" Margin="0,8,0,0" />
-            <Grid ColumnDefinitions="*,10,*" Margin="0,20,0,0" MaxWidth="440" HorizontalAlignment="Left">
+            <Grid ColumnDefinitions="*,10,*" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Left">
               <Button Classes="choice" Classes.on="{Binding OtherComputer}" Command="{Binding PickOtherCommand}">
                 <StackPanel Spacing="4">
                   <c:Icon Glyph="dns" Size="20" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Left" />
@@ -194,7 +209,7 @@
                 <Border Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" FontSize="14" /></Border>
               </StackPanel>
             </Grid>
-            <Grid ColumnDefinitions="*,10,*" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Left" IsVisible="{Binding ThisComputer}">
+            <Grid ColumnDefinitions="*,10,*" Margin="0,10,0,0" MaxWidth="440" HorizontalAlignment="Left" IsVisible="{Binding ThisComputer}">
               <StackPanel>
                 <TextBlock Classes="label" Text="Library name" />
                 <Border Classes="field"><TextBox Classes="bare" Text="{Binding LibraryName}" PlaceholderText="Sam's library" FontSize="14" /></Border>
@@ -204,14 +219,21 @@
                 <Border Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" FontSize="14" /></Border>
               </StackPanel>
             </Grid>
-            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,14,0,0">
+            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
               <Button Classes="push" Command="{Binding ConnectCommand}" IsEnabled="{Binding !Connecting}">
                 <TextBlock Text="{Binding ThisComputer, Converter={x:Static c:Converters.CreateOrConnect}}" FontSize="14" />
               </Button>
+              <Button Classes="push" Command="{Binding FindCommand}" IsEnabled="{Binding !Finding}" IsVisible="{Binding OtherComputer}">
+                <TextBlock Text="Find it" FontSize="14" />
+              </Button>
               <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-              <TextBlock IsVisible="{Binding HasLibraryResult}" Text="{Binding LibraryResult}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="300"
-                         Foreground="{Binding LibraryOk, Converter={x:Static c:Converters.OkText}}" />
+              <c:Spinner IsVisible="{Binding Finding}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+              <TextBlock IsVisible="{Binding HasLibraryResult}" Text="{Binding LibraryResult}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="170"
+                         Classes="result" Classes.bad="{Binding !LibraryOk}" />
             </StackPanel>
+            <CheckBox IsChecked="{Binding StartAtLogin}" IsVisible="{Binding ShowStartAtLogin}" Margin="0,6,0,0">
+              <TextBlock Text="Start Study Stash when I log in, so the library keeps running" FontSize="14" />
+            </CheckBox>
           </StackPanel>
 
           <!-- 3: the model -->
@@ -292,7 +314,17 @@
                   <TextBlock Text="Open taskbar settings instead" FontSize="14" Foreground="{DynamicResource AccentText}" />
                 </Button>
               </StackPanel>
+              <!-- The AI engines (15): the pane pads itself, so it sits out to the column's edges -->
+              <Panel IsVisible="{Binding OnAi}" Margin="-32,4,-32,0">
+                <v:WinAiSetup DataContext="{Binding Ai}" />
+              </Panel>
+
+              <!-- Canvas (07): its own steps; the footer's Skip for now, Back and Next are setup's -->
+              <Panel IsVisible="{Binding OnCanvas}" Margin="0,4,0,0">
+                <v:WinCanvasConnect DataContext="{Binding Canvas}" />
+              </Panel>
             </StackPanel>
+            </ScrollViewer>
           </DockPanel>
         </Border>
       </Grid>

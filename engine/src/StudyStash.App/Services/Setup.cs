@@ -25,26 +25,35 @@ public static class Setup
     public static SetupModel Make(AppHost host)
     {
         var m = SetupModel.For(Skin.Current);
+        if (Apps.RolePreset() == "library") m.ThisComputer = true; // a library installer opens on "this computer is the library"
         var cc = host.Client();
         m.Address = cc.ServerUrl;
         m.LibraryName = $"{Person()}'s library";
         m.ModelName = host.Model.Name;
-        m.ModelSize = host.Model.Size.Replace(".0 ", " ");
+        m.ModelSize = About(host.Model.Bytes);
         if (cc.ServerUrl.Length > 0 && host.Library == LibraryState.Connected)
         {
             m.LibraryOk = true;
             m.LibraryResult = $"Connected to {cc.PoolName}.";
         }
 
-        m.OnAllowMic = () => Task.Run(() =>
+        m.OnAllowMic = () => Task.Run(async () =>
         {
-            Microphones.Ask();
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => Refresh(m, host));
+            host.AskMic();
+            // A Mac answers the permission dialog later, in its own time: keep checking for up to a minute.
+            for (int i = 0; i < 60; i++)
+            {
+                await Task.Delay(1000);
+                bool answered = host.MicAccess() != MicAccess.NotAsked;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => Refresh(m, host));
+                if (answered) return;
+            }
         });
-        m.OnMicSettings = () => Dialogs.OpenUrl(Microphones.SettingsUrl);
+        m.OnMicSettings = () => Dialogs.OpenUrl(host.MicSettingsUrl);
         m.OnTaskbarSettings = () => Dialogs.OpenUrl("ms-settings:taskbar");
         m.OnRetryModel = () => _ = host.DownloadModelAsync();
         m.OnConnect = () => ConnectAsync(m, host);
+        m.OnFind = () => FindAsync(m, host);
         m.OnAddClass = () => AddClassAsync(m, host);
         m.CanLeave = step =>
         {
@@ -67,7 +76,7 @@ public static class Setup
 
     public static void Refresh(SetupModel m, AppHost host)
     {
-        var mic = Microphones.Access();
+        var mic = host.MicAccess();
         m.MicAllowed = mic == MicAccess.Allowed;
         m.MicDenied = mic is MicAccess.Denied or MicAccess.Restricted;
         m.ModelReady = host.ModelReady;
@@ -81,12 +90,45 @@ public static class Setup
         else if (host.Downloading is { } d)
         {
             m.ModelProgress = d.Fraction;
-            m.ModelDone = $"{Gb(d.Done)} of {Gb(d.Total)}";
+            m.ModelDone = d.Amount;
             m.ModelLeft = d.Left() ?? "";
         }
     }
 
-    static string Gb(long bytes) => bytes >= 1_000_000_000 ? $"{bytes / 1e9:0.0} GB" : $"{bytes / 1e6:0} MB";
+    /// <summary>A model's size for "The model is about 3 GB": whole gigabytes for the big ones, as the design says it.</summary>
+    public static string About(long bytes) => bytes >= 2_500_000_000 ? $"{Math.Round(bytes / 1e9)} GB" : WhisperModel.SizeOf(bytes);
+
+    /// <summary>Saves what setup decided (the role, that it's done) and, only if the box was ticked, starts Study
+    /// Stash at login. Never touches login items otherwise: that would change this computer unasked.</summary>
+    public static void Finish(SetupModel m, AppHost host)
+    {
+        host.Save(s =>
+        {
+            s.Role = m.Role;
+            s.SetupDone = true;
+        });
+        if (m.StartAtLogin)
+        {
+            try
+            {
+                host.LoginItems.StartAtLogin(true, host.Home);
+            }
+            catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
+            {
+                host.Log($"[app] start at login: {e.Message}");
+            }
+        }
+    }
+
+    /// <summary>Every tick while setup's window is open: the microphone is open exactly while its step shows, it's
+    /// allowed, and nothing is recording; copies its levels and whether it's heard anything into the model.</summary>
+    public static void TickMic(SetupModel m, AppHost host, MicCheck mic)
+    {
+        if (m.OnMicrophone && m.MicAllowed && host.Recorder.Current is null) mic.Open(host.OpenMic);
+        else mic.Close();
+        if (mic.Heard) m.MicHeard = true;
+        m.MicLevels = mic.Levels();
+    }
 
     static async Task ConnectAsync(SetupModel m, AppHost host)
     {
@@ -96,8 +138,7 @@ public static class Setup
         {
             if (m.ThisComputer)
             {
-                string done = await LibraryHere.ThisComputer().CreateAsync(host.Home, m.LibraryName, m.Password, Person());
-                host.Save(s => s.LibraryHere = true);
+                string done = await LibraryHere.ThisComputer().CreateAsync(host, m.LibraryName, m.Password, Person(), m.Role);
                 m.LibraryOk = true;
                 m.LibraryResult = done;
             }
@@ -111,7 +152,7 @@ public static class Setup
                 cc.PoolKey = m.Password.Trim();
                 cc.PoolName = health["pool_name"]?.GetValue<string>() ?? "";
                 if (cc.DisplayName.Length == 0) cc.DisplayName = Person();
-                Configs.SaveClient(cc);
+                host.SaveClient(cc);
                 m.Address = url;
                 m.LibraryOk = true;
                 m.LibraryResult = $"Connected to {cc.PoolName}.";
@@ -134,6 +175,38 @@ public static class Setup
         }
     }
 
+    /// <summary>"Find it": looks for a library on this computer or your Tailscale network, with no password, and
+    /// fills in the address (and, for a Tailscale one, says its name so you know whose password to type).</summary>
+    static async Task FindAsync(SetupModel m, AppHost host)
+    {
+        m.Finding = true;
+        m.LibraryResult = null;
+        try
+        {
+            var cfg = Configs.Load(host.Home);
+            var extra = new List<int>();
+            if (File.Exists(cfg.ConfigPath)) extra.Add(cfg.WebPort);
+            // The self-test's own library isn't on the usual port (never 8787, so a real one is never mistaken for it).
+            if (Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_LIBRARY_PORT") is { Length: > 0 } sp && int.TryParse(sp, out int p)) extra.Add(p);
+            var found = await new LibraryFinder { ExtraPorts = extra }.FindAsync();
+            if (found is null)
+            {
+                m.LibraryResult = "No library answered. Type its address, like http://mac-mini:8787.";
+            }
+            else
+            {
+                m.Address = found.Url;
+                m.LibraryResult = found.Local ? $"Found a library on this {m.DeviceWord}."
+                    : found.Name.Length > 0 ? $"Found {found.Name} on your Tailscale network. Type its password."
+                    : "Found a library on your Tailscale network. Type its password.";
+            }
+        }
+        finally
+        {
+            m.Finding = false;
+        }
+    }
+
     static async Task AddClassAsync(SetupModel m, AppHost host)
     {
         string name = m.NewClass.Trim();
@@ -149,7 +222,8 @@ public static class Setup
             times = parsed;
         }
         m.ClassProblem = null;
-        if (host.Remote() is { } lib)
+        bool existing = host.Timetable.Classes.Any(c => c.Name == name);
+        if (!existing && host.Remote() is { } lib)
         {
             try
             {
@@ -165,7 +239,10 @@ public static class Setup
         t.Classes.RemoveAll(c => c.Name == name);
         t.Classes.Add(new TimetableClass(name, times));
         host.SaveTimetable(t);
-        m.Classes.Add(new SetupClass { Name = name, When = string.Join(", ", times.Select(x => x.Describe())), Dot = Skin.ClassDot(Math.Max(0, host.ColorOf(name))) });
+        string when = string.Join(", ", times.Select(x => x.Describe()));
+        var dot = Skin.ClassDot(Math.Max(0, host.ColorOf(name)));
+        if (m.Classes.FirstOrDefault(c => c.Name == name) is { } row) row.When = when;
+        else m.Classes.Add(new SetupClass { Name = name, When = when, Dot = dot });
         m.NewClass = "";
         m.NewWhen = "";
     }

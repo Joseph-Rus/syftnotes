@@ -3,9 +3,10 @@ using System.Text.Json.Nodes;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using StudyStash.App.Platform;
 using StudyStash.Audio;
 using StudyStash.Core;
+using StudyStash.Core.Ai;
+using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Services;
 
@@ -28,24 +29,45 @@ public sealed partial class TimetableRow : ObservableObject
     public Avalonia.Media.IBrush Dot { get; init; } = Avalonia.Media.Brushes.Gray;
 }
 
-/// <summary>A connection Claude has to the library, for the Claude section's list.</summary>
-public sealed class ClaudeConnection
+/// <summary>One row in the settings sidebar: its section id, icon and label, and whether it's the one showing.</summary>
+public sealed partial class NavItem : ObservableObject
 {
-    public string Id { get; init; } = "";
-    public string Name { get; init; } = "";
-    public string Detail { get; init; } = "";
+    public required string Id { get; init; }
+    public required string Glyph { get; init; }
+    public required string Label { get; init; }
+    [ObservableProperty] public partial bool On { get; set; }
 }
 
 /// <summary>
-/// Settings: Library (where it is; this computer's own), Recording (the model, language, the computer's sound, how
-/// long audio stays), Classes (the timetable), Claude (Claude Code, Claude Desktop, and Claude on the web) and General.
+/// Settings: General, Appearance (the colour theme), Recording (the model, language, the computer's sound, how long
+/// audio stays), Library (where it is; this computer's own), Classes (the timetable), AI engines (who writes the notes
+/// and answers questions), AI tool access (what Claude Code, Codex and other MCP tools may read) and Canvas.
 /// </summary>
 public sealed partial class SettingsModel : ObservableObject, IDisposable
 {
     readonly AppHost host;
-    readonly ClaudeSetup claude;
 
     [ObservableProperty] public partial string Section { get; set; } = "Library";
+
+    /// <summary>The sidebar's rows, in the design's order: General, Appearance, then the rest as they were.</summary>
+    public IReadOnlyList<NavItem> NavItems { get; } =
+    [
+        new() { Id = "General", Glyph = "tune", Label = "General" },
+        new() { Id = "Appearance", Glyph = "palette", Label = "Appearance" },
+        new() { Id = "Recording", Glyph = "mic", Label = "Recording" },
+        new() { Id = "Library", Glyph = "dns", Label = "Library" },
+        new() { Id = "Classes", Glyph = "schedule", Label = "Classes" },
+        new() { Id = "AI", Glyph = "auto_awesome", Label = "AI engines" },
+        new() { Id = "Access", Glyph = "hub", Label = "AI tool access" },
+        new() { Id = "Canvas", Glyph = "school", Label = "Canvas" },
+    ];
+
+    /// <summary>Whether this window draws the Mac's round swatches or Windows' squared ones.</summary>
+    public bool ShowMacSwatch => Skin.Current == SkinKind.Mac;
+
+    // Appearance
+    public IReadOnlyList<ThemeSwatch> Themes { get; } = [.. ColourThemes.All.Select(t => new ThemeSwatch(t))];
+    [ObservableProperty] public partial string ColourTheme { get; set; } = "";
 
     // Library
     [ObservableProperty] public partial string LibraryLine { get; set; } = "";
@@ -53,6 +75,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string Password { get; set; } = "";
     [ObservableProperty] public partial string? LibrarySay { get; set; }
     [ObservableProperty] public partial bool LibraryHere { get; set; }
+    /// <summary>How this computer's own library is doing (Both/Library roles only): running, starting, stopped,
+    /// already running from elsewhere, its port taken, or why it stopped.</summary>
+    [ObservableProperty] public partial string LibraryServiceLine { get; set; } = "";
     [ObservableProperty] public partial string DisplayName { get; set; } = "";
 
     // Recording
@@ -62,7 +87,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool ComputerAudio { get; set; }
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
     [ObservableProperty] public partial bool Shortcuts { get; set; }
-    public bool CanRecordComputerAudio => Microphones.CanRecordComputerAudio;
+    /// <summary>Which shortcut (if either) another app already has, once the toggle's had a moment to try them.</summary>
+    [ObservableProperty] public partial string? ShortcutsSay { get; set; }
+    public bool CanRecordComputerAudio => host.CanRecordComputerAudio;
 
     // Classes
     public ObservableCollection<TimetableRow> Rows { get; } = [];
@@ -70,15 +97,13 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string NewTimes { get; set; } = "";
     [ObservableProperty] public partial string? ClassesSay { get; set; }
 
-    // Claude
-    [ObservableProperty] public partial string? ClaudeSay { get; set; }
-    [ObservableProperty] public partial string ClaudeCommand { get; set; } = "";
-    [ObservableProperty] public partial bool WebOn { get; set; }
-    [ObservableProperty] public partial string? WebUrl { get; set; }
-    [ObservableProperty] public partial string? WebSay { get; set; }
-    [ObservableProperty] public partial bool WebBusy { get; set; }
-    public ObservableCollection<ClaudeConnection> Connections { get; } = [];
-    [ObservableProperty] public partial bool ClaudeNeedsNewLibrary { get; set; }
+    // AI engines, AI tool access and Canvas: each is its own pane over its own model, read when it's opened.
+    public AiEnginesModel Engines { get; }
+    /// <summary>What's wrong with an engine right now (offline, signed out, a model missing, a usage limit), above
+    /// the engines.</summary>
+    public AiProblemsModel AiProblems { get; }
+    public AiAccessModel Access { get; }
+    public CanvasSettingsModel Canvas { get; }
 
     // General
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
@@ -87,18 +112,42 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public bool OnLibrary => Section == "Library";
     public bool OnRecording => Section == "Recording";
     public bool OnClasses => Section == "Classes";
-    public bool OnClaude => Section == "Claude";
+    public bool OnAi => Section == "AI";
+    public bool OnCanvas => Section == "Canvas";
+    public bool OnAccess => Section == "Access";
+    /// <summary>The AI panes scroll and pad themselves; every other section sits in the page's own scroller.</summary>
+    public bool OnPlainPage => !OnAi && !OnAccess;
+    public bool IsMac => Skin.Current == SkinKind.Mac;
+    public bool IsWin => !IsMac;
     public bool OnGeneral => Section == "General";
-    public bool HasWebUrl => !string.IsNullOrEmpty(WebUrl);
-    public bool HasConnections => Connections.Count > 0;
+    public bool OnAppearance => Section == "Appearance";
+    /// <summary>This computer's own library isn't running (or couldn't), and its role calls for one.</summary>
+    public bool CanStartLibrary => host.Settings.Role != AppRole.Laptop
+        && host.LocalLibrary?.State is null or LibraryServiceState.Stopped or LibraryServiceState.Failed or LibraryServiceState.PortTaken;
+    /// <summary>This computer's own library is ours to stop (started by us, not one already running elsewhere).</summary>
+    public bool CanStopLibrary => host.LocalLibrary?.State == LibraryServiceState.Running;
 
-    public static SettingsModel Make(AppHost host) => new(host);
+    /// <summary>Settings over <paramref name="host"/>. The AI panes read <paramref name="ai"/> (the connected library's
+    /// AI when not given); Canvas reads <paramref name="canvas"/> and follows <paramref name="watch"/>, the app's one
+    /// shared Canvas poll (none in a test or a shot, so nothing there polls).</summary>
+    public static SettingsModel Make(AppHost host, IAiLibrary? ai = null, CanvasContext? canvas = null, CanvasWatch? watch = null) =>
+        new(host, ai, canvas, watch);
 
-    SettingsModel(AppHost host)
+    /// <summary>True while the constructor fills in what's already set: nothing is saved, and starting at login isn't
+    /// touched, until the student changes something.</summary>
+    readonly bool loading = true;
+    /// <summary>Putting the box back after the login item couldn't be changed.</summary>
+    bool settingLogin;
+
+    SettingsModel(AppHost host, IAiLibrary? ai, CanvasContext? canvas, CanvasWatch? watch)
     {
         this.host = host;
-        claude = ClaudeSetup.ThisComputer(host.Home);
         var cc = host.Client();
+        ai ??= new AiRemote(cc.ServerUrl, cc.PoolKey);
+        Engines = new AiEnginesModel(ai) { OpenUrl = url => Dialogs.OpenUrl(url) };
+        AiProblems = new AiProblemsModel(ai);
+        Access = MakeAccess(ai, host);
+        Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch);
         Address = cc.ServerUrl;
         DisplayName = cc.DisplayName;
         LibraryHere = host.Settings.LibraryHere;
@@ -106,18 +155,66 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         ComputerAudio = host.Settings.ComputerAudio;
         KeepAudio = host.Settings.KeepAudioDays.ToString(System.Globalization.CultureInfo.InvariantCulture);
         Shortcuts = host.Settings.Shortcuts;
-        StartAtLogin = Desktop.StartsAtLogin();
-        ClaudeCommand = claude.ClaudeCodeCommand;
-        foreach (var m in WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id))
+        StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
+        ColourTheme = host.Settings.Theme;
+        // Whisper tiny is only for trying things out: listed only when it's the one in use.
+        foreach (var m in WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == host.Model.Id))
             Models.Add(new ModelChoice { Model = m, Chosen = m.Id == host.Model.Id, Here = WhisperModels.IsDownloaded(host.Home, m) });
         foreach (var c in host.Timetable.Classes)
             Rows.Add(new TimetableRow { Name = c.Name, Times = string.Join(", ", c.Times.Select(t => t.Describe())), Dot = Skin.ClassDot(Math.Max(0, host.ColorOf(c.Name))) });
         foreach (var (name, color, _) in host.Classes().Where(c => Rows.All(r => r.Name != c.Name)))
             Rows.Add(new TimetableRow { Name = name, Dot = Skin.ClassDot(color) });
-        Connections.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasConnections));
         host.Changed += OnHostChanged;
+        foreach (var n in NavItems) n.On = n.Id == Section;
+        foreach (var t in Themes) t.Chosen = t.Name == ColourTheme;
+        loading = false;
         Refresh();
-        _ = LoadClaudeAsync();
+    }
+
+    /// <summary>AI tool access, with this computer's own Claude Code, Claude Desktop and Codex setup, and the
+    /// library's Claude routes for turning on the web address and removing a connection.</summary>
+    static AiAccessModel MakeAccess(IAiLibrary ai, AppHost host)
+    {
+        var setup = ClaudeSetup.ThisComputer(host.Home);
+        return new AiAccessModel(ai)
+        {
+            ClaudeCodeCommand = setup.ClaudeCodeCommand,
+            CodexSetup = setup.CodexSetup,
+            McpJson = setup.McpJson,
+            CheckInClaudeCode = setup.InClaudeCode,
+            CheckInClaudeDesktop = setup.InClaudeDesktop,
+            AddToClaudeDesktop = () => Task.FromResult(setup.AddToClaudeDesktop()),
+            RemoveFromClaudeDesktopHook = () => Task.FromResult(setup.RemoveFromClaudeDesktop()),
+            TurnOnWeb = async () =>
+            {
+                if (host.Remote() is not { } lib) return null;
+                var r = await lib.ClaudeAsync(HttpMethod.Post, "/reach", new JsonObject { ["internet"] = true, ["on"] = true });
+                return r?["public_url"]?.GetValue<string>();
+            },
+            RevokeConnection = async id =>
+            {
+                if (host.Remote() is not { } lib) return false;
+                return await lib.ClaudeAsync(HttpMethod.Delete, "/connections/" + Uri.EscapeDataString(id)) is not null;
+            },
+        };
+    }
+
+    /// <summary>The panes that read the library do so when they're opened (and each time again), not before.</summary>
+    void LoadSection(string section)
+    {
+        switch (section)
+        {
+            case "AI":
+                _ = Engines.Load();
+                _ = AiProblems.Load();
+                break;
+            case "Access":
+                _ = Access.Load();
+                break;
+            case "Canvas":
+                _ = Canvas.LoadAsync();
+                break;
+        }
     }
 
     void OnHostChanged() => Dispatcher.UIThread.Post(Refresh);
@@ -129,13 +226,25 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         {
             LibraryState.Connected when host.OlderLibrary => $"Connected to {cc.PoolName}. It runs an older Study Stash: update it to browse, search and ask from here.",
             LibraryState.Connected => $"Connected to {cc.PoolName} at {cc.ServerUrl}.",
+            LibraryState.Starting => "Starting your library…",
             LibraryState.Unreachable => $"Can't reach {cc.ServerUrl} right now. Lectures wait here until it's back.",
             LibraryState.WrongPassword => "The library's password changed. Type the new one below.",
             _ => "No library yet.",
         };
-        ModelLine = host.ModelReady ? $"{host.Model.Name} is ready."
-            : host.Downloading is { } d ? $"Downloading {host.Model.Name}: {Math.Round(d.Fraction * 100)}%. {d.Left()}"
-            : host.DownloadProblem ?? $"{host.Model.Name} isn't downloaded yet.";
+        string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
+        LibraryServiceLine = host.Settings.Role == AppRole.Laptop ? "" : host.LocalLibrary?.State switch
+        {
+            LibraryServiceState.Running => $"Your library runs on this {device}, on port {host.LocalLibrary.Cfg.WebPort}.",
+            LibraryServiceState.Starting => "Starting your library…",
+            LibraryServiceState.Elsewhere => $"A library is already running on this {device}.",
+            LibraryServiceState.PortTaken => host.LocalLibrary.Failure ?? "Its port is taken by another program.",
+            LibraryServiceState.Failed => $"It stopped: {host.LocalLibrary.Failure}",
+            _ => "Stopped.",
+        };
+        OnPropertyChanged(nameof(CanStartLibrary));
+        OnPropertyChanged(nameof(CanStopLibrary));
+        ShortcutsSay = Shell.ShortcutsSay();
+        ModelLine = ModelWords(host);
         foreach (var m in Models)
         {
             m.Chosen = m.Model.Id == host.Model.Id;
@@ -143,28 +252,78 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         }
     }
 
-    partial void OnSectionChanged(string value)
+    /// <summary>Settings → Recording's line about the model: ready, "Downloading Whisper large-v3: 1.9 GB of 3.1 GB.
+    /// About 4 minutes left.", why the download stopped, or not downloaded yet.</summary>
+    public static string ModelWords(AppHost host)
     {
-        foreach (string p in new[] { nameof(OnLibrary), nameof(OnRecording), nameof(OnClasses), nameof(OnClaude), nameof(OnGeneral) }) OnPropertyChanged(p);
+        if (host.ModelReady) return $"{host.Model.Name} is ready.";
+        if (host.DownloadProblem is { } problem) return problem;
+        if (host.Downloading is { } d)
+            return $"Downloading {(host.DownloadingModel ?? host.Model).Name}: {d.Amount}." + (d.Left() is { } left ? $" {left}." : "");
+        return $"{host.Model.Name} isn't downloaded yet.";
     }
 
-    partial void OnWebUrlChanged(string? value) => OnPropertyChanged(nameof(HasWebUrl));
-    partial void OnLanguageChanged(string value) => host.Save(s => s.Language = value.Trim());
-    partial void OnComputerAudioChanged(bool value) => host.Save(s => s.ComputerAudio = value);
-    partial void OnShortcutsChanged(bool value) => host.Save(s => s.Shortcuts = value);
-    partial void OnStartAtLoginChanged(bool value) => Desktop.StartAtLogin(value, host.Home);
+    partial void OnSectionChanged(string value)
+    {
+        foreach (string p in new[] { nameof(OnLibrary), nameof(OnRecording), nameof(OnClasses), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage), nameof(OnGeneral), nameof(OnAppearance) })
+            OnPropertyChanged(p);
+        foreach (var n in NavItems) n.On = n.Id == value;
+        LoadSection(value);
+    }
+
+    partial void OnColourThemeChanged(string value)
+    {
+        if (!loading) host.Save(s => s.Theme = value);
+        Skin.UseTheme(ColourThemes.Find(value));
+        foreach (var t in Themes) t.Chosen = t.Name == value;
+    }
+
+    [RelayCommand] void PickTheme(string name) => ColourTheme = name;
+
+    partial void OnLanguageChanged(string value)
+    {
+        if (!loading) host.Save(s => s.Language = value.Trim());
+    }
+
+    partial void OnComputerAudioChanged(bool value)
+    {
+        if (!loading) host.Save(s => s.ComputerAudio = value);
+    }
+
+    partial void OnShortcutsChanged(bool value)
+    {
+        if (!loading) host.Save(s => s.Shortcuts = value);
+    }
+
+    /// <summary>Only the student's own tick adds (or takes away) the login item.</summary>
+    partial void OnStartAtLoginChanged(bool value)
+    {
+        if (loading || settingLogin) return;
+        try
+        {
+            host.LoginItems.StartAtLogin(value, host.Home);
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.Security.SecurityException)
+        {
+            host.Log($"[app] start at login: {e.Message}");
+            settingLogin = true;
+            StartAtLogin = !value;
+            settingLogin = false;
+        }
+    }
 
     partial void OnKeepAudioChanged(string value)
     {
-        if (int.TryParse(value, out int days) && days >= 0) host.Save(s => s.KeepAudioDays = days);
+        if (!loading && int.TryParse(value, out int days) && days >= 0) host.Save(s => s.KeepAudioDays = days);
     }
 
     partial void OnDisplayNameChanged(string value)
     {
+        if (loading) return;
         var cc = host.Client();
         if (cc.DisplayName == value.Trim()) return;
         cc.DisplayName = value.Trim();
-        Configs.SaveClient(cc);
+        host.SaveClient(cc);
     }
 
     [RelayCommand] void Go(string section) => Section = section;
@@ -181,7 +340,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             cc.ServerUrl = url;
             cc.PoolKey = Password.Trim();
             cc.PoolName = health["pool_name"]?.GetValue<string>() ?? "";
-            Configs.SaveClient(cc);
+            host.SaveClient(cc);
             Address = url;
             Password = "";
             LibrarySay = $"Connected to {cc.PoolName}.";
@@ -200,15 +359,49 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         if (cc.ServerUrl.Length > 0) Dialogs.OpenUrl(cc.ServerUrl);
     }
 
+    /// <summary>Start this computer's own library again (after Stop, or a problem such as a taken port).</summary>
+    [RelayCommand]
+    void StartLibrary() => _ = host.RefreshLocalLibraryAsync();
+
+    /// <summary>Stop this computer's own library. Only the one we started or adopted: never a library from elsewhere.</summary>
+    [RelayCommand]
+    async Task StopLibrary()
+    {
+        if (host.LocalLibrary is { } svc) await svc.StopAsync();
+    }
+
+    /// <summary>A plain laptop decides, from Settings, to also run the library on this computer.</summary>
+    [RelayCommand]
+    async Task MakeThisTheLibrary()
+    {
+        LibrarySay = "Starting your library…";
+        try
+        {
+            string done = await Services.LibraryHere.ThisComputer().CreateAsync(host, $"{DisplayName}'s library", StudyStash.Library.Http.TokenUrlSafe(12), DisplayName);
+            LibraryHere = true;
+            LibrarySay = done;
+        }
+        catch (Exception e) when (e is InvalidOperationException or ArgumentException)
+        {
+            LibrarySay = e.Message;
+        }
+    }
+
     [RelayCommand]
     void PickModel(ModelChoice choice)
     {
         host.Save(s => s.Model = choice.Model.Id);
         Refresh();
-        if (!WhisperModels.IsDownloaded(host.Home, choice.Model)) _ = host.DownloadModelAsync(choice.Model);
+        // One already here needs nothing, and a download of another one is no longer wanted.
+        if (WhisperModels.IsDownloaded(host.Home, choice.Model)) host.StopDownload();
+        else _ = host.DownloadModelAsync(choice.Model);
     }
 
+    /// <summary>Download (or try again now).</summary>
     [RelayCommand] void DownloadModel() => _ = host.DownloadModelAsync();
+
+    /// <summary>Whisper couldn't start with the model: throw it away and download it again.</summary>
+    [RelayCommand] void RedownloadModel() => _ = host.RedownloadModel();
 
     [RelayCommand]
     async Task AddClass()
@@ -260,86 +453,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         ClassesSay = bad ? "Some times couldn't be read (marked): write them like “Tue Thu 10:00–11:15”." : "Saved.";
     }
 
-    [RelayCommand]
-    void AddToClaudeCode() => ClaudeSay = claude.AddToClaudeCode();
-
-    [RelayCommand]
-    void AddToClaudeDesktop() => ClaudeSay = claude.AddToClaudeDesktop();
-
-    async Task LoadClaudeAsync()
-    {
-        if (host.Remote() is not { } lib) return;
-        try
-        {
-            ShowClaude(await lib.ClaudeAsync(HttpMethod.Get));
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
-        {
-            ClaudeNeedsNewLibrary = e is LibraryRefusedException { Status: 404 };
-        }
-    }
-
-    void ShowClaude(JsonObject? c)
-    {
-        if (c is null)
-        {
-            ClaudeNeedsNewLibrary = true;
-            return;
-        }
-        WebUrl = c["public_url"]?.GetValue<string>();
-        WebOn = WebUrl is not null;
-        Connections.Clear();
-        foreach (var g in (c["connections"] as JsonArray ?? []).OfType<JsonObject>())
-        {
-            double? used = g["last_used"] is JsonValue v && v.TryGetValue(out double t) ? t : null;
-            Connections.Add(new ClaudeConnection
-            {
-                Id = g["id"]?.GetValue<string>() ?? "", Name = g["name"]?.GetValue<string>() ?? "Claude",
-                Detail = used is double u ? $"Last used {Shell.When(DateTimeOffset.FromUnixTimeSeconds((long)u).LocalDateTime)}" : "Not used yet",
-            });
-        }
-    }
-
-    [RelayCommand]
-    async Task ToggleWeb()
-    {
-        if (host.Remote() is not { } lib) return;
-        WebBusy = true;
-        WebSay = null;
-        try
-        {
-            ShowClaude(await lib.ClaudeAsync(HttpMethod.Post, "/reach", new JsonObject { ["internet"] = true, ["on"] = !WebOn }));
-            WebSay = WebOn ? "Claude on the web can reach your library now." : "Turned off: only your own devices reach the library.";
-        }
-        catch (LibraryRefusedException e)
-        {
-            WebSay = e.Message;
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
-        {
-            WebSay = "Your library didn't answer.";
-        }
-        finally
-        {
-            WebBusy = false;
-        }
-    }
-
-    [RelayCommand]
-    async Task Disconnect(ClaudeConnection c)
-    {
-        if (host.Remote() is not { } lib) return;
-        try
-        {
-            ShowClaude(await lib.ClaudeAsync(HttpMethod.Delete, "/connections/" + Uri.EscapeDataString(c.Id)));
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
-        {
-            WebSay = "Couldn't disconnect it: the library didn't answer.";
-        }
-    }
-
     [RelayCommand] static void Quit() => Shell.Quit();
 
-    public void Dispose() => host.Changed -= OnHostChanged;
+    public void Dispose()
+    {
+        host.Changed -= OnHostChanged;
+        Canvas.Dispose();
+    }
 }

@@ -1,0 +1,14 @@
+[
+  {
+    "context_type": "Course", "course_id": 4201, "plannable_type": "wiki_page", "plannable_id": 6601,
+    "plannable_date": "2025-09-29T06:59:00Z", "html_url": "https://canvas.test/courses/4201/pages/read-chapter-4",
+    "plannable": {"id": 6601, "title": "Read: Chapter 4 overview", "todo_date": "2025-09-29T06:59:00Z"},
+    "planner_override": null
+  },
+  {
+    "context_type": "Course", "course_id": 4201, "plannable_type": "calendar_event", "plannable_id": 6602,
+    "plannable_date": "2025-09-30T17:00:00Z", "html_url": "https://canvas.test/courses/4201/calendar_events/6602",
+    "plannable": {"id": 6602, "title": "Guest lecture: compilers"},
+    "planner_override": null
+  }
+]

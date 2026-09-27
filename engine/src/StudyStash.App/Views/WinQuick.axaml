@@ -37,6 +37,13 @@
     <Style Selector="Button.qrow.selected c|Icon.source">
       <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
     </Style>
+    <Style Selector="TextBlock.meta.lecture">
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    </Style>
+    <Style Selector="TextBlock.meta.lecture.strong">
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
     <Style Selector="TextBlock.header">
       <Setter Property="Margin" Value="16,12,16,6" />
     </Style>
@@ -95,7 +102,7 @@
                   <Grid IsVisible="{Binding IsLecture}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
                     <Border Classes="dot" Width="8" Height="8" CornerRadius="4" Background="{Binding Dot}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                    <TextBlock Grid.Column="3" Classes="meta lecture" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />
                   </Grid>
                   <!-- A passage from notes -->
                   <Grid IsVisible="{Binding IsPassage}" Margin="12,8" ColumnDefinitions="Auto,12,*">

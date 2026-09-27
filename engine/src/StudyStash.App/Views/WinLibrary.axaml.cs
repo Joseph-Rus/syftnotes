@@ -9,6 +9,11 @@ public partial class WinLibrary : UserControl
     public WinLibrary()
     {
         InitializeComponent();
+        // Below 900 px the right column has no room: the list fills the window, and what's opened takes its place.
+        SizeChanged += (_, e) =>
+        {
+            if (DataContext is LibraryModel m) m.Narrow = e.NewSize.Width < LibraryModel.NarrowBelow;
+        };
         Fades.Under(Fade, "Mica", 0.75);
     }
 

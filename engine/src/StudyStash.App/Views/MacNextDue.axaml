@@ -1,0 +1,15 @@
+<!-- The dropdown's own line (design 12), under the timetable hint: "Next due: Quiz 3 practice · Tomorrow, 9:00 AM".
+     Nothing when there's nothing due — the host only shows this row when CanvasQuick.NextDue found one. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.MacNextDue"
+             x:DataType="vm:NextDueModel">
+  <Button Theme="{StaticResource Surface}" Padding="0" HorizontalContentAlignment="Left" Click="OnClick">
+    <StackPanel Orientation="Horizontal" Spacing="6">
+      <c:Icon Glyph="event_upcoming" Size="13" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+      <TextBlock Text="{Binding Text}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+    </StackPanel>
+  </Button>
+</UserControl>

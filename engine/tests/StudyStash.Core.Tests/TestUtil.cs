@@ -17,19 +17,20 @@ public sealed class TempDir : IDisposable
     {
         try
         {
+            // Git and some tools leave read-only files, which Windows won't delete as they are.
+            foreach (var f in new DirectoryInfo(Path).EnumerateFiles("*", SearchOption.AllDirectories)) f.Attributes = FileAttributes.Normal;
             Directory.Delete(Path, recursive: true);
         }
-        catch (IOException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
         }
     }
 }
 
-/// <summary>What the Python engine wrote (engine/tests/golden.py), to compare against.</summary>
+/// <summary>Fixed expectations, first written by the retired Python engine, to compare against.</summary>
 public static class Golden
 {
     static readonly Lazy<JsonObject> cases = new(() => (JsonObject)JsonNode.Parse(Text("cases.json"))!);
-    static readonly Lazy<JsonObject> granola = new(() => (JsonObject)JsonNode.Parse(Text("granola.json"))!);
     static readonly Lazy<JsonObject> library = new(() => (JsonObject)JsonNode.Parse(Text("library.json"))!);
     static readonly Lazy<JsonObject> pages = new(() => (JsonObject)JsonNode.Parse(Text("pages.json"))!);
     static readonly Lazy<JsonObject> platform = new(() => (JsonObject)JsonNode.Parse(Text("platform.json"))!);
@@ -40,9 +41,6 @@ public static class Golden
     public static JsonArray Cases(string name) => (JsonArray)cases.Value[name]!;
 
     public static JsonNode Case(string name) => cases.Value[name]!;
-
-    /// <summary>Stage 2's cases: Granola's replies, and signing in.</summary>
-    public static JsonNode? Granola(string name) => granola.Value[name];
 
     /// <summary>Stage 3's cases: the pieces the library's pages are made of.</summary>
     public static JsonNode? Library(string name) => library.Value[name];

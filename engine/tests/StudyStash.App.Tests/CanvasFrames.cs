@@ -1,0 +1,477 @@
+using System.Globalization;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
+using Avalonia.Layout;
+using Avalonia.Media;
+using StudyStash.App.Controls;
+
+namespace StudyStash.App.Tests;
+
+/// <summary>
+/// The real windows the Canvas screens sit in belong to WS2/WS6, so shots wrap our panes in a close copy of the
+/// design's frame, built here from tokens: a design-08 panel (<see cref="MacStates"/>/<see cref="WinStates"/>) and a
+/// design-06 settings window with its General/Recording/Library/Canvas/Shortcuts sidebar
+/// (<see cref="MacSettings"/>/<see cref="WinSettings"/>). Kept simple and token-based — they're here so a pane lines
+/// up with its ref picture, not to be reviewed as UI.
+/// </summary>
+public static class CanvasFrames
+{
+    /// <summary>Design 08: a 1000-wide rounded card, two columns, one grey label over each state's card.</summary>
+    public static Control MacStates(params (string Label, Control Card)[] cards) => StatesPanel(cards, mac: true);
+
+    public static Control WinStates(params (string Label, Control Card)[] cards) => StatesPanel(cards, mac: false);
+
+    static readonly (string Glyph, string Label)[] SettingsNav =
+    [
+        ("tune", "General"), ("mic", "Recording"), ("dns", "Library"), ("school", "Canvas"), ("keyboard", "Shortcuts"),
+    ];
+
+    /// <summary>Design 06: a 900×820 Mac settings window, its glass sidebar showing the same sections as the real
+    /// app with Canvas selected, the content pane holding whatever's given.</summary>
+    public static Control MacSettings(Control content)
+    {
+        var nav = new StackPanel { Spacing = 2, Margin = new Thickness(0, 0, 0, 14) };
+        nav.Children.Add(new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Height = 44, Spacing = 8, Margin = new Thickness(10, 0, 0, 0),
+            Children =
+            {
+                Dot("#FF5F57"), Dot("#FEBC2E"), Dot("#28C840"),
+            },
+        });
+        foreach (var (glyph, label) in SettingsNav)
+        {
+            bool on = label == "Canvas";
+            var row = new Border { Height = 32, CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 0) };
+            if (on) row.Bind(Border.BackgroundProperty, row.GetResourceObservable("Fill2"));
+            var icon = new Icon { Glyph = glyph, Size = 16 };
+            icon.Bind(Icon.ForegroundProperty, icon.GetResourceObservable(on ? "AccentText" : "Fg2"));
+            var text = new TextBlock { Text = label, FontSize = 13, FontWeight = on ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center };
+            row.Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { icon, text } };
+            nav.Children.Add(row);
+        }
+        var sidebar = new Border { CornerRadius = new CornerRadius(18), Padding = new Thickness(0, 0, 0, 0), Child = nav };
+        sidebar.Bind(Border.BackgroundProperty, sidebar.GetResourceObservable("Glass"));
+        var sidebarPad = new Border { Padding = new Thickness(8, 8, 0, 8), Child = sidebar };
+
+        var pane = new Border { Width = 220, Child = sidebarPad };
+        var body = new Border { Height = 820, ClipToBounds = true, Padding = new Thickness(40, 40, 40, 32), Child = content };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("220,*"), RowDefinitions = new RowDefinitions("*"), Children = { pane, body } };
+        Grid.SetColumn(body, 1);
+
+        var window = new Border { Width = 900, Height = 820, CornerRadius = new CornerRadius(26), ClipToBounds = true, Child = grid };
+        window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Win"));
+        window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("GShadow"));
+        return window;
+    }
+
+    static Border Dot(string hex) => new() { Width = 12, Height = 12, CornerRadius = new CornerRadius(6), Background = Brush.Parse(hex) };
+
+    /// <summary>Design 06: a 900×990 Windows settings window, its title bar and nav column matching the real app
+    /// with Canvas selected, the content pane on a Layer background holding whatever's given.</summary>
+    public static Control WinSettings(Control content)
+    {
+        var mark = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4), Margin = new Thickness(16, 0, 10, 0) };
+        mark.Bind(Border.BackgroundProperty, mark.GetResourceObservable("Accent"));
+        var markIcon = new Icon { Glyph = "graphic_eq", Size = 11 };
+        markIcon.Bind(Icon.ForegroundProperty, markIcon.GetResourceObservable("OnAccent"));
+        mark.Child = markIcon;
+        var titleText = new TextBlock { Text = "Study Stash settings", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        var titleBar = new Grid { Height = 32, ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Children = { mark, titleText } };
+        Grid.SetColumn(titleText, 1);
+        var caps = new StackPanel { Orientation = Orientation.Horizontal, Children = { CapBtn("remove"), CapBtn("crop_square"), CapBtn("close") } };
+        Grid.SetColumn(caps, 2);
+        titleBar.Children.Add(caps);
+
+        var nav = new StackPanel { Spacing = 4, Margin = new Thickness(4, 4, 4, 8) };
+        foreach (var (glyph, label) in SettingsNav)
+        {
+            bool on = label == "Canvas";
+            var row = new Border { Height = 40, Margin = new Thickness(0, 0, 0, 0), CornerRadius = new CornerRadius(4), Padding = new Thickness(12, 0) };
+            if (on) row.Bind(Border.BackgroundProperty, row.GetResourceObservable("Subtle"));
+            var icon = new Icon { Glyph = glyph, Size = 16, Width = 16 };
+            var text = new TextBlock { Text = label, FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
+            row.Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, Children = { icon, text } };
+            nav.Children.Add(row);
+        }
+        var navPane = new Border { Width = 240, Child = nav };
+
+        var layer = new Border { Height = 956, ClipToBounds = true, Padding = new Thickness(28, 28, 36, 28), BorderThickness = new Thickness(1, 1, 0, 0), Child = content };
+        layer.Bind(Border.BackgroundProperty, layer.GetResourceObservable("Layer"));
+        layer.Bind(Border.BorderBrushProperty, layer.GetResourceObservable("LayerStroke"));
+
+        var below = new Grid { ColumnDefinitions = new ColumnDefinitions("240,*"), RowDefinitions = new RowDefinitions("*"), Children = { navPane, layer } };
+        Grid.SetColumn(layer, 1);
+        var stack = new DockPanel();
+        DockPanel.SetDock(titleBar, Dock.Top);
+        stack.Children.Add(titleBar);
+        stack.Children.Add(below);
+
+        var window = new Border { Width = 900, Height = 990, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), ClipToBounds = true, Child = stack };
+        window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Mica"));
+        window.Bind(Border.BorderBrushProperty, window.GetResourceObservable("FlyStroke"));
+        window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("ShadowLg"));
+        return window;
+    }
+
+    static Border CapBtn(string glyph)
+    {
+        var icon = new Icon { Glyph = glyph, Size = 14 };
+        return new Border { Width = 46, Child = icon, HorizontalAlignment = HorizontalAlignment.Center };
+    }
+
+    static readonly (string Class, int Count)[] SidebarClasses = [("CS 101", 12), ("BIO 110", 9), ("CALC II", 11), ("HIST 210", 7)];
+
+    static IBrush ClassDot(int i) => new SolidColorBrush(Color.Parse(StudyStash.Core.ClassColors.Hex(StudyStash.Core.ClassColors.For(i))));
+
+    static StackPanel SidebarRow(string glyph, string label, string count, bool on, double height, double fontSize, bool bold = false)
+    {
+        var icon = new Icon { Glyph = glyph, Size = 16 };
+        if (bold) icon.Bind(Icon.ForegroundProperty, icon.GetResourceObservable("AccentText"));
+        var text = new TextBlock { Text = label, FontSize = fontSize, FontWeight = bold ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center };
+        var countText = new TextBlock { Text = count, FontSize = fontSize - 1, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(8, 0, 0, 0) };
+        countText.Bind(TextBlock.ForegroundProperty, countText.GetResourceObservable("Fg2"));
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("16,*,Auto"), Height = height, Margin = new Thickness(12, 0) };
+        Grid.SetColumn(text, 1);
+        Grid.SetColumn(countText, 2);
+        row.Children.Add(icon);
+        row.Children.Add(text);
+        row.Children.Add(countText);
+        var wrap = new StackPanel { Children = { row } };
+        return wrap;
+    }
+
+    static Border SidebarRowBorder(string glyph, string label, string count, bool on, bool mac)
+    {
+        var content = SidebarRow(glyph, label, count, on, mac ? 32 : 40, 13, on);
+        var border = new Border { CornerRadius = new CornerRadius(mac ? 10 : 4), Child = content, Margin = new Thickness(mac ? 0 : 4, 0) };
+        if (on) border.Bind(Border.BackgroundProperty, border.GetResourceObservable(mac ? "Fill2" : "Subtle"));
+        return border;
+    }
+
+    static Control SidebarDot(string cls, int i, int count, bool mac, bool on)
+    {
+        var dot = new Ellipse { Width = 8, Height = 8, Fill = ClassDot(i), VerticalAlignment = VerticalAlignment.Center };
+        var text = new TextBlock { Text = cls, FontSize = 13, FontWeight = on && mac ? FontWeight.SemiBold : FontWeight.Normal, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        var countText = new TextBlock { Text = count.ToString(System.Globalization.CultureInfo.InvariantCulture), FontSize = 12, HorizontalAlignment = HorizontalAlignment.Right };
+        countText.Bind(TextBlock.ForegroundProperty, countText.GetResourceObservable("Fg2"));
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Height = mac ? 32 : 40, Margin = new Thickness(12, 0) };
+        Grid.SetColumn(text, 1);
+        Grid.SetColumn(countText, 2);
+        row.Children.Add(dot);
+        row.Children.Add(text);
+        row.Children.Add(countText);
+        var border = new Border { CornerRadius = new CornerRadius(mac ? 10 : 4), Child = row, Margin = new Thickness(mac ? 0 : 4, 0) };
+        if (on) border.Bind(Border.BackgroundProperty, border.GetResourceObservable(mac ? "Fill2" : "Subtle"));
+        if (!on || mac) return border;
+        var indicator = new Border { Width = 3, Height = 16, CornerRadius = new CornerRadius(2), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+        indicator.Bind(Border.BackgroundProperty, indicator.GetResourceObservable("Accent"));
+        return new Grid { Children = { border, indicator } };
+    }
+
+    static Control SidebarBody(string selected, bool mac)
+    {
+        var stack = new StackPanel { Spacing = 2 };
+        stack.Children.Add(SidebarRowBorder("event_upcoming", "Due", "3", selected == "Due", mac));
+        var classesLabel = new TextBlock { Text = "Classes", FontSize = mac ? 11 : 14, FontWeight = FontWeight.SemiBold, Margin = new Thickness(mac ? 10 : 16, 10, 0, 4) };
+        stack.Children.Add(classesLabel);
+        for (int i = 0; i < SidebarClasses.Length; i++)
+            stack.Children.Add(SidebarDot(SidebarClasses[i].Class, i, SidebarClasses[i].Count, mac, selected == SidebarClasses[i].Class));
+        stack.Children.Add(new Border { Height = 8 });
+        stack.Children.Add(SidebarRowBorder("inbox", "Unsorted", "2", selected == "Unsorted", mac));
+        var status = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(mac ? 10 : 16, 12, 0, mac ? 0 : 8) };
+        var goodDot = new Ellipse { Width = 6, Height = 6 };
+        goodDot.Bind(Ellipse.FillProperty, goodDot.GetResourceObservable("Good"));
+        var statusText = new TextBlock { Text = "Library connected · Canvas synced 10:24", FontSize = mac ? 11 : 12 };
+        statusText.Bind(TextBlock.ForegroundProperty, statusText.GetResourceObservable("Fg2"));
+        status.Children.Add(goodDot);
+        status.Children.Add(statusText);
+        var dock = new DockPanel();
+        DockPanel.SetDock(status, Dock.Bottom);
+        dock.Children.Add(status);
+        var scroller = new StackPanel { Spacing = 2, Children = { stack } };
+        dock.Children.Add(scroller);
+        return dock;
+    }
+
+    /// <summary>Design 09/10: a 1280×800 Mac library window (grid 248 | 340 | *), the Due sidebar item (or a class)
+    /// selected, the given list and (optionally) detail panes filling the rest. <paramref name="width"/> narrows the
+    /// whole window for the no-detail Sections layout (design 11: 588 wide, so the list pane reads 340 like every
+    /// other one) instead of letting the list stretch to fill 1280.</summary>
+    public static Control MacApp(string selected, Control list, Control? detail = null, double width = 1280)
+    {
+        var trafficLights = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Height = 44, Spacing = 8, Margin = new Thickness(10, 0, 0, 0),
+            Children = { Dot("#FF5F57"), Dot("#FEBC2E"), Dot("#28C840") },
+        };
+        var nav = new DockPanel();
+        DockPanel.SetDock(trafficLights, Dock.Top);
+        nav.Children.Add(trafficLights);
+        nav.Children.Add(SidebarBody(selected, mac: true)); // fills the rest, so its status line docks to the true bottom
+        var sidebar = new Border { CornerRadius = new CornerRadius(18), Padding = new Thickness(0, 0, 0, 10), Child = nav };
+        sidebar.Bind(Border.BackgroundProperty, sidebar.GetResourceObservable("Glass"));
+        var sidebarPad = new Border { Padding = new Thickness(8, 8, 0, 8), Child = sidebar };
+        var sidebarPane = new Border { Width = 248, Child = sidebarPad };
+
+        var columns = detail is null ? $"248,{width - 248}" : "248,340,*";
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(columns), Height = 800 };
+        Grid.SetColumn(sidebarPane, 0);
+        grid.Children.Add(sidebarPane);
+        if (detail is null)
+        {
+            var only = new Border { Child = list };
+            Grid.SetColumn(only, 1);
+            grid.Children.Add(only);
+        }
+        else
+        {
+            var listPane = new Border { Width = 340, BorderThickness = new Thickness(0, 0, 1, 0), Child = list };
+            listPane.Bind(Border.BorderBrushProperty, listPane.GetResourceObservable("Sep"));
+            Grid.SetColumn(listPane, 1);
+            grid.Children.Add(listPane);
+            var detailPane = new Border { ClipToBounds = true, Child = detail };
+            Grid.SetColumn(detailPane, 2);
+            grid.Children.Add(detailPane);
+        }
+
+        var window = new Border { Width = width, Height = 800, CornerRadius = new CornerRadius(26), ClipToBounds = true, Child = grid };
+        window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Win"));
+        window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("GShadow"));
+        return window;
+    }
+
+    /// <summary>Design 09/10: a 1280×800 Windows library window (title bar, nav 280, list 340, detail *).
+    /// <paramref name="width"/> narrows the whole window for a no-detail layout (design 11: 640 wide, nav stays 280
+    /// so the content pane reads 360 the way the design draws it); <paramref name="listWidth"/> lets a detail-column
+    /// screen use its own list width (the class page's 360, instead of the Due list's 340).</summary>
+    public static Control WinApp(string selected, Control list, Control? detail = null, double width = 1280, double listWidth = 340)
+    {
+        var mark = new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(4), Margin = new Thickness(16, 0, 12, 0) };
+        mark.Bind(Border.BackgroundProperty, mark.GetResourceObservable("Accent"));
+        var markIcon = new Icon { Glyph = "graphic_eq", Size = 12 };
+        markIcon.Bind(Icon.ForegroundProperty, markIcon.GetResourceObservable("OnAccent"));
+        mark.Child = markIcon;
+        var appName = new TextBlock { Text = "Study Stash", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        var left = new StackPanel { Orientation = Orientation.Horizontal, Children = { mark, appName } };
+
+        var search = new Border { Width = 400, Height = 32, CornerRadius = new CornerRadius(4) };
+        search.Bind(Border.BackgroundProperty, search.GetResourceObservable("Ctrl"));
+        search.Bind(Border.BorderBrushProperty, search.GetResourceObservable("CtrlBorder"));
+        search.BorderThickness = new Thickness(1);
+        var searchText = new TextBlock { Text = "Search notes and lectures", FontSize = 14, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(11, 0, 0, 0) };
+        searchText.Bind(TextBlock.ForegroundProperty, searchText.GetResourceObservable("Fg3"));
+        search.Child = searchText;
+
+        var caps = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Children = { CapBtn("remove"), CapBtn("crop_square"), CapBtn("close") } };
+        var titleBar = new Grid { Height = 48, ColumnDefinitions = new ColumnDefinitions("*,400,*") };
+        Grid.SetColumn(search, 1);
+        Grid.SetColumn(caps, 2);
+        titleBar.Children.Add(left);
+        titleBar.Children.Add(search);
+        titleBar.Children.Add(caps);
+
+        var navBody = SidebarBody(selected, mac: false);
+        var settingsRow = SidebarRowBorder("settings", "Settings", "", false, mac: false);
+        var navDock = new DockPanel();
+        DockPanel.SetDock(settingsRow, Dock.Bottom);
+        navDock.Children.Add(settingsRow);
+        navDock.Children.Add(navBody);
+        var navPane = new Border { Width = 280, Padding = new Thickness(4, 4, 4, 8), Child = navDock };
+
+        Control layerContent;
+        if (detail is null)
+        {
+            layerContent = list;
+        }
+        else
+        {
+            var listPane = new Border { Width = listWidth, BorderThickness = new Thickness(0, 0, 1, 0), Child = list };
+            listPane.Bind(Border.BorderBrushProperty, listPane.GetResourceObservable("Sep"));
+            var layerGrid = new Grid { ColumnDefinitions = new ColumnDefinitions($"{listWidth},*") };
+            Grid.SetColumn(listPane, 0);
+            var detailPane = new Border { ClipToBounds = true, Child = detail };
+            Grid.SetColumn(detailPane, 1);
+            layerGrid.Children.Add(listPane);
+            layerGrid.Children.Add(detailPane);
+            layerContent = layerGrid;
+        }
+        var layer = new Border
+        {
+            ClipToBounds = true, BorderThickness = new Thickness(1, 1, 0, 0), Child = layerContent,
+        };
+        layer.Bind(Border.BackgroundProperty, layer.GetResourceObservable("Layer"));
+        layer.Bind(Border.BorderBrushProperty, layer.GetResourceObservable("LayerStroke"));
+
+        var below = new Grid { ColumnDefinitions = new ColumnDefinitions("280,*"), Height = 752 };
+        Grid.SetColumn(navPane, 0);
+        Grid.SetColumn(layer, 1);
+        below.Children.Add(navPane);
+        below.Children.Add(layer);
+
+        var stack = new DockPanel();
+        DockPanel.SetDock(titleBar, Dock.Top);
+        stack.Children.Add(titleBar);
+        stack.Children.Add(below);
+
+        var window = new Border { Width = width, Height = 800, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1), ClipToBounds = true, Child = stack };
+        window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Mica"));
+        window.Bind(Border.BorderBrushProperty, window.GetResourceObservable("FlyStroke"));
+        window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("ShadowLg"));
+        return window;
+    }
+
+    static Control StatesPanel((string Label, Control Card)[] cards, bool mac)
+    {
+        int rows = (cards.Length + 1) / 2;
+        var grid = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("*,*"),
+            RowDefinitions = new RowDefinitions(string.Join(",", Enumerable.Repeat("Auto", rows))),
+            ColumnSpacing = 28,
+            RowSpacing = 20,
+        };
+        for (int i = 0; i < cards.Length; i++)
+        {
+            var (label, card) = cards[i];
+            var lbl = new TextBlock { Text = label, FontSize = mac ? 11 : 12 };
+            lbl.Bind(TextBlock.ForegroundProperty, lbl.GetResourceObservable("Fg3"));
+            var column = new StackPanel { Spacing = 8, MinWidth = 0, Children = { lbl, card } };
+            Grid.SetColumn(column, i % 2);
+            Grid.SetRow(column, i / 2);
+            grid.Children.Add(column);
+        }
+        var border = new Border { Width = 1000, Padding = new Thickness(32), Child = grid, ClipToBounds = false };
+        if (mac)
+        {
+            border.CornerRadius = new CornerRadius(26);
+            border.Bind(Border.BackgroundProperty, border.GetResourceObservable("Win"));
+            border.Bind(Border.BoxShadowProperty, border.GetResourceObservable("GShadow"));
+        }
+        else
+        {
+            border.CornerRadius = new CornerRadius(8);
+            border.BorderThickness = new Thickness(1);
+            border.Bind(Border.BackgroundProperty, border.GetResourceObservable("Mica"));
+            border.Bind(Border.BorderBrushProperty, border.GetResourceObservable("FlyStroke"));
+            border.Bind(Border.BoxShadowProperty, border.GetResourceObservable("ShadowLg"));
+        }
+        return border;
+    }
+
+    /// <summary>Design 07: the setup wizard's own frame — a sidebar of already-done steps (Microphone, Library,
+    /// Transcription model, Classes) with Canvas current (and, on Windows, Taskbar still to do) — around whatever
+    /// step content the test hands in.</summary>
+    public static Control MacSetup(Control content) => SetupWindow(content, mac: true, winTaskbar: false);
+
+    public static Control WinSetup(Control content) => SetupWindow(content, mac: false, winTaskbar: true);
+
+    static Control SetupWindow(Control content, bool mac, bool winTaskbar)
+    {
+        var sidebar = new StackPanel { Width = 220, Spacing = 4 };
+        if (mac)
+        {
+            var lights = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 0, 0, 20) };
+            foreach (string colour in new[] { "#FF5F57", "#FEBC2E", "#28C840" })
+                lights.Children.Add(new Ellipse { Width = 12, Height = 12, Fill = new SolidColorBrush(Color.Parse(colour)) });
+            sidebar.Children.Add(lights);
+        }
+        string[] before = ["Microphone", "Library", "Transcription model", "Classes"];
+        for (int i = 0; i < before.Length; i++) sidebar.Children.Add(SidebarRow(i + 1, before[i], done: true, current: false));
+        sidebar.Children.Add(SidebarRow(before.Length + 1, "Canvas", done: false, current: true, trailing: "Optional"));
+        if (winTaskbar) sidebar.Children.Add(SidebarRow(before.Length + 2, "Taskbar", done: false, current: false));
+
+        var body = new Border { Padding = new Thickness(40, 40, 40, 32), Child = content, ClipToBounds = false };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        Grid.SetColumn(sidebar, 0);
+        Grid.SetColumn(body, 1);
+        grid.Children.Add(sidebar);
+        grid.Children.Add(body);
+
+        var frame = new StackPanel { Spacing = 0 };
+        if (!mac)
+        {
+            var titleBar = new Border { Height = 32, Padding = new Thickness(12, 0) };
+            titleBar.Bind(Border.BackgroundProperty, titleBar.GetResourceObservable("Layer"));
+            var title = new TextBlock { Text = "Set up Study Stash", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            title.Bind(TextBlock.ForegroundProperty, title.GetResourceObservable("Fg2"));
+            titleBar.Child = title;
+            frame.Children.Add(titleBar);
+        }
+        frame.Children.Add(grid);
+
+        var window = new Border { Width = 900, Height = mac ? 760 : 800, Child = frame, ClipToBounds = false };
+        if (mac)
+        {
+            window.CornerRadius = new CornerRadius(26);
+            window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Win"));
+            window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("GShadow"));
+            window.Padding = new Thickness(32, 24, 0, 24);
+        }
+        else
+        {
+            window.CornerRadius = new CornerRadius(8);
+            window.BorderThickness = new Thickness(1);
+            window.Bind(Border.BackgroundProperty, window.GetResourceObservable("Mica"));
+            window.Bind(Border.BorderBrushProperty, window.GetResourceObservable("FlyStroke"));
+            window.Bind(Border.BoxShadowProperty, window.GetResourceObservable("ShadowLg"));
+        }
+        return window;
+    }
+
+    static Control SidebarRow(int number, string title, bool done, bool current, string? trailing = null)
+    {
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Height = 32, Margin = new Thickness(0, 2) };
+        Control mark = done
+            ? new Icon { Glyph = "check_circle", Size = 16, Filled = true }
+            : new Border { Width = 16, Height = 16, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1.2) };
+        if (mark is Icon markIcon) markIcon.Bind(Icon.ForegroundProperty, markIcon.GetResourceObservable("AccentText"));
+        if (mark is Border markBorder)
+        {
+            markBorder.Bind(Border.BorderBrushProperty, markBorder.GetResourceObservable(current ? "Fg" : "Fg3"));
+            var num = new TextBlock { Text = number.ToString(CultureInfo.InvariantCulture), FontSize = 9, FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            num.Bind(TextBlock.ForegroundProperty, num.GetResourceObservable(current ? "Fg" : "Fg3"));
+            markBorder.Child = num;
+        }
+        Grid.SetColumn(mark, 0);
+        var label = new TextBlock { Text = title, FontSize = 13, FontWeight = current ? FontWeight.SemiBold : FontWeight.Normal, Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        label.Bind(TextBlock.ForegroundProperty, label.GetResourceObservable(current ? "Fg" : done ? "Fg2" : "Fg3"));
+        Grid.SetColumn(label, 1);
+        row.Children.Add(mark);
+        row.Children.Add(label);
+        if (trailing is not null)
+        {
+            var tag = new TextBlock { Text = trailing, FontSize = 11, VerticalAlignment = VerticalAlignment.Center };
+            tag.Bind(TextBlock.ForegroundProperty, tag.GetResourceObservable("Fg3"));
+            Grid.SetColumn(tag, 2);
+            row.Children.Add(tag);
+        }
+        return row;
+    }
+
+    /// <summary>Design 12: a 360-wide card standing in for the dropdown/flyout's own chrome, holding only our
+    /// <c>MacNextDue</c>/<c>WinNextDue</c> line — the dropdown itself is WS2/WS6's, so this is just enough of its
+    /// look for the line to sit somewhere plausible.</summary>
+    public static Control MacDropdownLine(Control content)
+    {
+        content.VerticalAlignment = VerticalAlignment.Top;
+        var card = new Border { Width = 360, Padding = new Thickness(16), Child = content, ClipToBounds = false, CornerRadius = new CornerRadius(22) };
+        card.Bind(Border.BackgroundProperty, card.GetResourceObservable("Glass"));
+        card.Bind(Border.BoxShadowProperty, card.GetResourceObservable("GlassShadow"));
+        return card;
+    }
+
+    public static Control WinDropdownLine(Control content)
+    {
+        content.VerticalAlignment = VerticalAlignment.Top;
+        var card = new Border
+        {
+            Width = 360, Padding = new Thickness(16), Child = content, ClipToBounds = false, CornerRadius = new CornerRadius(8), BorderThickness = new Thickness(1),
+        };
+        card.Bind(Border.BackgroundProperty, card.GetResourceObservable("Acrylic"));
+        card.Bind(Border.BorderBrushProperty, card.GetResourceObservable("FlyStroke"));
+        card.Bind(Border.BoxShadowProperty, card.GetResourceObservable("ShadowLg"));
+        return card;
+    }
+}

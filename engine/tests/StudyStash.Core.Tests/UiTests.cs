@@ -43,18 +43,13 @@ public class UiTests
     }
 
     [Fact]
-    public void Hosts_and_install_lines_match_python()
+    public void Hosts_and_versions_match_python()
     {
         foreach (var c in L("tailscale_problem"))
         {
             var t = c![0]!.AsObject();
             var ts = new TailscaleInfo(t["installed"]?.GetValue<bool>() ?? false, t["running"]?.GetValue<bool>() ?? false, t["state"]?.S() ?? "");
             Assert.Equal(c[1].S(), HostInfo.TailscaleProblem(ts));
-        }
-        foreach (var c in L("invite"))
-        {
-            var (mac, windows) = HostInfo.InviteCommands(c![0].S(), c[1].S());
-            Assert.Equal((c[2]!["mac"].S(), c[2]!["windows"].S()), (mac, windows));
         }
         foreach (var c in L("parse_version"))
             Assert.Equal(c![1]!.AsArray().Select(n => n!.GetValue<int>()), Updates.ParseVersion(c[0].S()));
@@ -112,6 +107,44 @@ public class UiTests
     }
 
     [Fact]
+    public async Task A_library_from_any_version_on_the_port_counts_as_ours()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Any, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        try
+        {
+            async Task<string> Answering(System.Net.HttpStatusCode status, string body, string? header = null)
+            {
+                using var http = new HttpClient(new HealthAnswer(status, body, header));
+                return await HostInfo.PortStatusAsync(port, http);
+            }
+            Assert.Equal("ours", await Answering(System.Net.HttpStatusCode.OK, "{}", "X-Study-Stash"));
+            // Libraries from before say so by what their health check answers: their details, or their password refusal.
+            Assert.Equal("ours", await Answering(System.Net.HttpStatusCode.OK, """{"ok": true, "pool_name": "Fall", "classes": ["CS 101"]}"""));
+            Assert.Equal("ours", await Answering(System.Net.HttpStatusCode.Unauthorized, """{"detail": "wrong password"}"""));
+            Assert.Equal("ours", await Answering(System.Net.HttpStatusCode.Unauthorized, """{"detail": "bad pool password"}"""));
+            Assert.Equal("busy", await Answering(System.Net.HttpStatusCode.Unauthorized, """{"detail": "sign in first"}"""));
+            Assert.Equal("busy", await Answering(System.Net.HttpStatusCode.OK, """{"ok": true}"""));
+        }
+        finally
+        {
+            listener.Stop();
+        }
+    }
+
+    /// <summary>Answers every request with one status, JSON body and optional marker header.</summary>
+    sealed class HealthAnswer(System.Net.HttpStatusCode status, string body, string? header) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            var r = new HttpResponseMessage(status) { Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json") };
+            if (header is not null) r.Headers.Add(header, "0.4.4");
+            return Task.FromResult(r);
+        }
+    }
+
+    [Fact]
     public void Releases_compare_like_python_tuples()
     {
         var v9 = new Release("v9.9.9", [9, 9, 9], "", "");
@@ -121,20 +154,5 @@ public class UiTests
         Assert.True(Updates.IsNewer(new Release("v0.4.4.1", [0, 4, 4, 1], "", ""), "0.4.4"));
         Assert.False(Updates.IsNewer(new Release("v0.4", [0, 4], "", ""), "0.4.0"));
     }
-
-    [Fact]
-    public async Task The_newest_release_is_read_from_github()
-    {
-        var github = new FakeOllama((path, _) => path == "/repos/Joseph-Rus/study-stash/releases/latest" ? JsonNode.Parse("""
-            {"tag_name": "v0.5.0", "html_url": "https://github.com/Joseph-Rus/study-stash/releases/tag/v0.5.0",
-             "assets": [{"name": "Study-Stash-mac.zip", "browser_download_url": "https://dl/mac.zip"},
-                        {"name": "Study-Stash-helper-windows.zip", "browser_download_url": "https://dl/win.zip"}]}
-            """)! : (System.Net.HttpStatusCode.NotFound, "{}"));
-        var rel = await Updates.LatestAsync(github.Client());
-        Assert.Equal(("v0.5.0", "https://dl/mac.zip", "https://dl/win.zip", ""), (rel!.Tag, rel.MacApp, rel.WindowsHelper, rel.WindowsApp));
-        Assert.Equal([0, 5, 0], rel.Version);
-        Assert.Equal("https://github.com/Joseph-Rus/study-stash/archive/refs/tags/v0.5.0.tar.gz", rel.Url);
-        var none = new FakeOllama((_, _) => (System.Net.HttpStatusCode.NotFound, "{}"));
-        Assert.Null(await Updates.LatestAsync(none.Client()));
-    }
+    // The newest release is parsed from GitHub: UpdaterTests (T3), with the four installers instead of the old zips.
 }

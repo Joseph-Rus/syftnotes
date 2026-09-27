@@ -1,5 +1,6 @@
 <Styles xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:StudyStash.App.Controls">
   <Styles.Resources>
     <!-- A button that is only its background: the design's buttons, rows and chips. Hover and press lay a faint
          wash over it, the way both systems do. -->
@@ -35,6 +36,25 @@
       <Style Selector="^:disabled">
         <Setter Property="Opacity" Value="0.4" />
       </Style>
+      <!-- The Mac's fills, as on the Borders below: a button round as its height reads as a pill. The tinted one
+           glows past its edge, which a button would otherwise cut off. -->
+      <Style Selector="^.tint">
+        <Setter Property="Background" Value="{DynamicResource Tint}" />
+        <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+        <Setter Property="ClipToBounds" Value="False" />
+      </Style>
+      <Style Selector="^.tint /template/ Border#PART_Bg">
+        <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
+      </Style>
+      <Style Selector="^.fill">
+        <Setter Property="Background" Value="{DynamicResource Fill}" />
+      </Style>
+      <Style Selector="^.fill2">
+        <Setter Property="Background" Value="{DynamicResource Fill2}" />
+      </Style>
+      <Style Selector="^.fill /template/ Border#PART_Bg, ^.fill2 /template/ Border#PART_Bg">
+        <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
+      </Style>
     </ControlTheme>
   </Styles.Resources>
 
@@ -68,8 +88,13 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
   </Style>
+  <!-- Its placeholder is the colour the view gives it (Fg3 unless it says otherwise), at full strength and the same
+       when hovered or focused: Fluent would halve it and swap in its own. -->
+  <Style Selector="TextBox.bare /template/ TextBlock#PART_Placeholder">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
   <Style Selector="TextBox.bare:pointerover /template/ TextBlock#PART_Placeholder, TextBox.bare:focus /template/ TextBlock#PART_Placeholder">
-    <Setter Property="Foreground" Value="{DynamicResource Fg3}" />
+    <Setter Property="Foreground" Value="{Binding $parent[TextBox].PlaceholderForeground}" />
   </Style>
   <Style Selector="TextBox.bare:pointerover, TextBox.bare:focus">
     <Setter Property="Foreground" Value="{DynamicResource Fg}" />
@@ -77,5 +102,49 @@
 
   <Style Selector="TextBlock.num">
     <Setter Property="FontFeatures" Value="+tnum" />
+  </Style>
+
+  <!-- Status by class, so it follows the look, light and dark: a dot that's green when all is well and amber when
+       something needs you, and a result line that says whether it worked. -->
+  <Style Selector="Ellipse.status">
+    <Setter Property="Fill" Value="{DynamicResource Good}" />
+  </Style>
+  <Style Selector="Ellipse.status.warn">
+    <Setter Property="Fill" Value="{DynamicResource Warn}" />
+  </Style>
+  <Style Selector="TextBlock.result">
+    <Setter Property="Foreground" Value="{DynamicResource Ok}" />
+  </Style>
+  <Style Selector="TextBlock.result.bad">
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+  </Style>
+
+  <!-- The Mac's glass: views give it only its corners and padding (and the side panel's or toolbar's shadow), so the
+       fill can change per window below. Its shadow falls outside it, so it never clips. -->
+  <Style Selector="c|Glass">
+    <Setter Property="Background" Value="{DynamicResource Glass}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource GlassShadow}" />
+    <Setter Property="Filter" Value="{DynamicResource GlassFilter}" />
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <!-- A floating window (the dropdown, the recorder, the quick panel) is clear, with the desktop right behind it:
+       see-through glass there would be hard to read, so it's solid until the system's blur sits under it. -->
+  <Style Selector=".solidglass c|Glass">
+    <Setter Property="Background" Value="{DynamicResource GlassSolid}" />
+  </Style>
+  <!-- What lies on the Mac's glass, each with its edge highlight: "tint" is the accent seen through glass, glowing a
+       little (Record, Stop, your own chat bubble), "fill" a pale pane (cards, fields, the chosen row) and "fill2" a
+       greyer one (Pause, source chips). Surface buttons take the same classes. -->
+  <Style Selector="Border.tint">
+    <Setter Property="Background" Value="{DynamicResource Tint}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
+  </Style>
+  <Style Selector="Border.fill">
+    <Setter Property="Background" Value="{DynamicResource Fill}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
+  </Style>
+  <Style Selector="Border.fill2">
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
   </Style>
 </Styles>

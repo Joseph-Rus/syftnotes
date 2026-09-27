@@ -4,6 +4,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.WinRecorder"
              x:DataType="vm:RecorderModel"
              ClipToBounds="False">
@@ -83,61 +84,9 @@
           </StackPanel>
         </Grid>
 
-        <!-- Ask about this lecture -->
+        <!-- Ask about this lecture, with any engine (design 16) -->
         <Border DockPanel.Dock="Bottom" Background="{DynamicResource Footer}" BorderBrush="{DynamicResource Sep}" BorderThickness="0,1,0,0">
-        <StackPanel Spacing="10" Margin="16,14,16,16">
-          <ItemsControl ItemsSource="{Binding Chat}">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:ChatMessage">
-                <Panel>
-                  <Border IsVisible="{Binding Mine}" HorizontalAlignment="Right" MaxWidth="281" CornerRadius="8" Background="{DynamicResource Accent}" Padding="12,8">
-                    <TextBlock Text="{Binding Text}" FontSize="14" LineHeight="19.6" TextWrapping="Wrap" Foreground="{DynamicResource OnAccent}" />
-                  </Border>
-                  <Border IsVisible="{Binding !Mine}" HorizontalAlignment="Left" MaxWidth="324" CornerRadius="8" Background="{DynamicResource Card}"
-                          BorderBrush="{DynamicResource CardStroke}" BorderThickness="1" Padding="12,10">
-                    <StackPanel Spacing="8">
-                      <c:Spinner IsVisible="{Binding Thinking}" Width="14" Height="14" HorizontalAlignment="Left" Foreground="{DynamicResource Fg2}" />
-                      <TextBlock Text="{Binding Text}" FontSize="14" LineHeight="20.3" TextWrapping="Wrap" />
-                      <ItemsControl ItemsSource="{Binding Sources}" IsVisible="{Binding HasSources}" Margin="-8,0,0,0">
-                        <ItemsControl.ItemsPanel>
-                          <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:SourceChip">
-                            <Button Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0"
-                                    Command="{Binding $parent[UserControl].((vm:RecorderModel)DataContext).PlayCommand}" CommandParameter="{Binding}"
-                                    ToolTip.Tip="Play from here">
-                              <StackPanel Orientation="Horizontal" Spacing="4">
-                                <c:Icon Glyph="play_arrow" Filled="True" Size="16" Foreground="{DynamicResource AccentText}" />
-                                <TextBlock Classes="num" Text="{Binding Label}" FontSize="14" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
-                              </StackPanel>
-                            </Button>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                    </StackPanel>
-                  </Border>
-                </Panel>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <Border Height="40" CornerRadius="4" Background="{DynamicResource Ctrl}" BorderBrush="{DynamicResource CtrlBorder}" BorderThickness="1" Padding="11,0,4,0">
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBox Classes="bare" Text="{Binding Question}" PlaceholderText="Ask about this lecture" FontSize="14">
-                <TextBox.KeyBindings>
-                  <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
-                </TextBox.KeyBindings>
-              </TextBox>
-              <Button Grid.Column="1" Theme="{StaticResource Surface}" Width="32" Height="30" CornerRadius="4"
-                      HorizontalContentAlignment="Center" Command="{Binding AskCommand}" ToolTip.Tip="Ask">
-                <c:Icon Glyph="send" Size="18" Foreground="{DynamicResource Fg3}" />
-              </Button>
-            </Grid>
-          </Border>
-        </StackPanel>
+          <v:WinAiAskChat Name="AskChat" Margin="16,14,16,16" DataContext="{Binding Ask}" />
         </Border>
 
         <!-- What's been said, newest at the bottom, fading out toward the top -->
