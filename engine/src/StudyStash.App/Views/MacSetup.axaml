@@ -419,8 +419,8 @@
               </StackPanel>
             </StackPanel>
 
-            <!-- Classes: the Canvas courses found (ticked, each with an optional "when"), the ones added so far, and a
-                 row to add one; every row on the same four columns: marker | name | when | action. -->
+            <!-- Classes: the Canvas courses found (ticked), the library's classes so far, and a row to add one; every
+                 row on the same four columns: marker | name | what it covers | action. -->
             <StackPanel IsVisible="{Binding OnClasses}">
               <TextBlock Classes="h1" Text="Add your classes" />
               <TextBlock Classes="lede" Text="{Binding ClassesLede}" />
@@ -430,14 +430,10 @@
                     <DataTemplate x:DataType="vm:SetupCourse">
                       <Grid Classes="classrow" ColumnDefinitions="20,10,150,10,*,10,Auto" Height="44">
                         <CheckBox Classes="tick" IsChecked="{Binding Ticked}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="1">
-                          <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Text="{Binding CourseName}" IsVisible="{Binding HasCourseName}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis"
-                                     ToolTip.Tip="{Binding CourseName}" />
-                        </StackPanel>
-                        <Border Grid.Column="4" Grid.ColumnSpan="3" Classes="field" IsEnabled="{Binding Ticked}">
-                          <TextBox Classes="bare" Text="{Binding When}" PlaceholderText="When, like Tue Thu 10:00–11:15" FontSize="13" />
-                        </Border>
+                        <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding Name}" />
+                        <TextBlock Grid.Column="4" Grid.ColumnSpan="3" Text="{Binding CourseName}" IsVisible="{Binding HasCourseName}" FontSize="12" Foreground="{DynamicResource Fg2}"
+                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CourseName}" />
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
@@ -448,8 +444,8 @@
                   <DataTemplate x:DataType="vm:SetupClass">
                     <Grid ColumnDefinitions="20,10,150,10,*" Height="30">
                       <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                      <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
-                      <TextBlock Grid.Column="4" Text="{Binding When}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Grid.Column="4" Text="{Binding About}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -457,7 +453,7 @@
               <Grid ColumnDefinitions="20,10,150,10,*,10,Auto" Margin="0,8,0,0" MaxWidth="460" HorizontalAlignment="Stretch">
                 <c:Icon Glyph="add" Size="16" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                 <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding NewClass}" PlaceholderText="CS 101" FontSize="13" /></Border>
-                <Border Grid.Column="4" Classes="field"><TextBox Classes="bare" Text="{Binding NewWhen}" PlaceholderText="Tue Thu 10:00–11:15" FontSize="13" /></Border>
+                <Border Grid.Column="4" Classes="field"><TextBox Classes="bare" Text="{Binding NewAbout}" PlaceholderText="What it covers" FontSize="13" /></Border>
                 <Button Grid.Column="6" Classes="push fill" Command="{Binding AddClassCommand}"><TextBlock Text="Add" FontSize="13" /></Button>
               </Grid>
               <TextBlock IsVisible="{Binding HasClassProblem}" Text="{Binding ClassProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="460" HorizontalAlignment="Left" Margin="30,8,0,0" />

@@ -105,14 +105,25 @@ public sealed partial class LibraryWeb
                 return Http.Detail(503, $"The library's model didn't answer: {e.Message}");
             }
         })));
+        // A new class, and optionally what it covers (the AI reads it to sort lectures); an existing class with nothing
+        // said about it yet takes the description.
         app.MapPost("/api/v2/classes", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
-            string? name = Str(await Http.JsonBodyAsync(ctx.Request), "name");
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string? name = Str(body, "name");
+            string about = Str(body, "description") ?? "";
             if (name is null || name.Length > 60) return Http.Detail(400, "a class needs a name (up to 60 characters)");
             if (name.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)) return Http.Detail(400, "that name is taken");
-            if (!cfg.ClassNames().Any(c => c.Equals(name, StringComparison.OrdinalIgnoreCase)))
+            if (about.Length > 500) about = about[..500];
+            var known = cfg.Classes.FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (known is null)
             {
-                cfg.Classes.Add(new ClassDef(name, []));
+                cfg.Classes.Add(new ClassDef(name, [], about));
+                Configs.Save(cfg);
+            }
+            else if (known.Description.Length == 0 && about.Length > 0)
+            {
+                known.Description = about;
                 Configs.Save(cfg);
             }
             return Http.Json(Reader.Overview());

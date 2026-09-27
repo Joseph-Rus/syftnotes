@@ -214,8 +214,8 @@ public class MenuPickTests
         try
         {
             (string, int)[] classes = [("CS 101", 0), ("BIO 110", 1)];
-            string? picked = "unset";
-            ContextMenu Open(string? chosen)
+            string? picked = null;
+            ContextMenu Open(string chosen)
             {
                 var menu = ClassPicker.Build(classes, chosen, name => picked = name);
                 menu.Open(anchor);
@@ -224,30 +224,31 @@ public class MenuPickTests
                 return menu;
             }
 
-            // Following the timetable: that's checked, and every row can be picked.
-            var menu = Open(null);
-            Assert.True(Checked(Item(menu, "Follow my timetable")));
-            Assert.All(menu.GetLogicalDescendants().OfType<MenuItem>(), i => Assert.True(i.IsEnabled));
-            Click(Item(menu, "Let the library sort it"));
-            Assert.Equal("", picked);
-            Assert.False(menu.IsOpen);
-
-            menu = Open("");
+            // Letting the library sort it is the default: first, checked, and every row can be picked.
+            var menu = Open("");
+            var labels = menu.Items.OfType<MenuItem>().Select(i => (string)i.Tag!).ToList();
+            Assert.Equal(["Let the library sort it", "CS 101", "BIO 110"], labels);
             Assert.True(Checked(Item(menu, "Let the library sort it")));
-            Assert.False(Checked(Item(menu, "Follow my timetable")));
+            Assert.All(menu.GetLogicalDescendants().OfType<MenuItem>(), i => Assert.True(i.IsEnabled));
             Click(Item(menu, "BIO 110"));
             Assert.Equal("BIO 110", picked);
+            Assert.False(menu.IsOpen);
 
             menu = Open("BIO 110");
             Assert.True(Checked(Item(menu, "BIO 110")));
-            Click(Item(menu, "Follow my timetable"));
-            Assert.Null(picked);
+            Assert.False(Checked(Item(menu, "Let the library sort it")));
+            Click(Item(menu, "Let the library sort it"));
+            Assert.Equal("", picked);
+
+            // A class the library no longer has: the library sorts it, and says so.
+            menu = Open("HIST 210");
+            Assert.True(Checked(Item(menu, "Let the library sort it")));
+            menu.Close();
 
             // Every label starts at the same place, with a dot or without.
-            menu = Open(null);
+            menu = Open("");
             double Left(string text) => Item(menu, text).GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == text).TranslatePoint(default, menu)!.Value.X;
             Assert.Equal(Left("CS 101"), Left("Let the library sort it"), 1);
-            Assert.Equal(Left("CS 101"), Left("Follow my timetable"), 1);
             menu.Close();
         }
         finally

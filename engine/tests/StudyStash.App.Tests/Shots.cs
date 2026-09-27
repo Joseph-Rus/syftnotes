@@ -525,8 +525,8 @@ public class SurfaceShots
         m.LibraryName = "Ada's library";
         m.Password = "correct-horse";
         m.Address = "http://mac-mini:8787";
-        m.Classes.Add(new SetupClass { Name = "CS 101", When = "Tue Thu 10:00–11:15", Dot = Skin.ClassDot(0) });
-        m.Classes.Add(new SetupClass { Name = "BIO 110", When = "Tue 11:00–12:30", Dot = Skin.ClassDot(1) });
+        m.Classes.Add(new SetupClass { Name = "CS 101", About = "Recursion, the call stack and Big-O", Dot = Skin.ClassDot(0) });
+        m.Classes.Add(new SetupClass { Name = "BIO 110", About = "Cells, membranes and genetics", Dot = Skin.ClassDot(1) });
         m.ModelProgress = 0.62;
         m.ModelDone = "1.9 GB of 3.1 GB";
         m.ModelLeft = "About 4 minutes left";
@@ -549,10 +549,7 @@ public class SurfaceShots
         if (canvasFound && step == SetupStep.Classes)
         {
             m.Classes.Clear();
-            m.Classes.Add(new SetupClass { Name = "Chapel", When = "Wed 10:00–10:50", Dot = Skin.ClassDot(4) });
-            m.Courses[0].When = "Tue Thu 11:00–12:30";
-            m.Courses[1].When = "MWF 9:00–9:50";
-            m.Courses[3].When = "Tue Thu 10:00–11:15";
+            m.Classes.Add(new SetupClass { Name = "Chapel", About = "Weekly chapel talks", Dot = Skin.ClassDot(4) });
             m.Courses[4].Ticked = false;
         }
         m.Go(step);
@@ -634,10 +631,11 @@ public class SurfaceShots
     [AvaloniaFact]
     public void Win_settings() => SettingsShots(SkinKind.Win, new Size(1700, 988));
 
-    /// <summary>The dropdown's class picker as Shell builds it (drawn in place here: a real one is a popup window).</summary>
+    /// <summary>The dropdown's class picker as Shell builds it, CS 101 picked as in the dropdown beside it (drawn in
+    /// place here: a real one is a popup window).</summary>
     internal static ContextMenu ClassMenu()
     {
-        var menu = ClassPicker.Build([("CS 101", 0), ("BIO 110", 1), ("CALC II", 2), ("HIST 210", 3)], null, _ => { });
+        var menu = ClassPicker.Build([("CS 101", 0), ("BIO 110", 1), ("CALC II", 2), ("HIST 210", 3)], "CS 101", _ => { });
         menu.VerticalAlignment = VerticalAlignment.Top;
         return menu;
     }

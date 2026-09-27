@@ -164,8 +164,9 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     /// emptied, or the library runs a Study Stash without one).</summary>
     public async Task<JsonObject?> RestoreAsync(string id) => await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/restore", new JsonObject()) as JsonObject;
 
-    public async Task<JsonObject> AddClassAsync(string name) =>
-        (JsonObject)(await SendAsync(HttpMethod.Post, "/classes", new JsonObject { ["name"] = name }))!;
+    /// <summary>Adds a class to the library, with what it covers when given (the AI reads it to sort lectures).</summary>
+    public async Task<JsonObject> AddClassAsync(string name, string? description = null) =>
+        (JsonObject)(await SendAsync(HttpMethod.Post, "/classes", new JsonObject { ["name"] = name, ["description"] = description }))!;
 
     public async Task<JsonObject?> ClaudeAsync(HttpMethod method, string path = "", JsonObject? body = null) =>
         await SendAsync(method, "/claude" + path, body) as JsonObject;

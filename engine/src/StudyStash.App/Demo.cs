@@ -167,7 +167,7 @@ public static class Demo
     {
         var p = new PanelModel
         {
-            ClassName = "CS 101", ClassDot = Cs, Hint = "From your timetable · Tue 10:00–11:15", Status = "Library connected · Model ready",
+            ClassName = "CS 101", ClassDot = Cs, Hint = "Picked by you", Status = "Library connected · Model ready",
             IsRecording = recording, Elapsed = "24:18", Levels = Wave, LastLine = "“…and when we hit the base case, the frames come off one by one.”",
         };
         if (!recording)

@@ -255,15 +255,11 @@ public static class SelfTest
             m.SkipCommand.Execute(null);
         }
 
-        // Classes: CS 101, with a time covering right now, so recording follows the timetable straight to it.
-        var now = DateTime.Now;
-        var end = now.AddMinutes(80);
-        var midnight = now.Date.AddDays(1).AddSeconds(-1);
-        if (end > midnight) end = midnight;
+        // Classes: CS 101 and what it covers. Record picks no class, so the library sorts the lecture by what was said.
         m.NewClass = "CS 101";
-        string when = m.NewWhen = $"{Day(now.DayOfWeek)} {now.AddMinutes(-10):HH:mm}-{end:HH:mm}";
+        m.NewAbout = "Intro to computer science: recursion, the call stack, the midterm";
         await m.AddClassCommand.ExecuteAsync(null);
-        Say(m.ClassProblem is null ? $"class added: {when}" : $"class problem: {m.ClassProblem}");
+        Say(m.ClassProblem is null ? "class added: CS 101" : $"class problem: {m.ClassProblem}");
         Shot(Shell.Windows.Setup, "setup-classes");
         if (m.ClassProblem is not null) throw new InvalidOperationException(m.ClassProblem);
         m.NextCommand.Execute(null);
@@ -283,12 +279,6 @@ public static class SelfTest
         Shot(Shell.Windows.Main, "library-empty");
     }
 
-    static string Day(DayOfWeek d) => d switch
-    {
-        DayOfWeek.Monday => "Mon", DayOfWeek.Tuesday => "Tue", DayOfWeek.Wednesday => "Wed", DayOfWeek.Thursday => "Thu",
-        DayOfWeek.Friday => "Fri", DayOfWeek.Saturday => "Sat", _ => "Sun",
-    };
-
     // --- recording -----------------------------------------------------------------------------------------------
 
     static async Task RunRecordingAsync(AppHost host)
@@ -298,7 +288,7 @@ public static class SelfTest
 
         Shell.Windows.RecordViaShortcut();
         var live = host.Recorder.Current;
-        Say(live is null ? "recording didn't start" : $"recording {live.Id} for {live.ClassName}");
+        Say(live is null ? "recording didn't start" : $"recording {live.Id} for {(live.ClassName.Length > 0 ? live.ClassName : "the library to sort")}");
         if (live is null) throw new InvalidOperationException("Record didn't start a lecture");
         await Wait(1.5);
         Shot(Shell.Windows.Recorder, "recorder-pill");

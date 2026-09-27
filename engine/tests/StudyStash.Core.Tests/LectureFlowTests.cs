@@ -106,40 +106,68 @@ public class LectureFlowTests
     }
 
     [Fact]
-    public async Task A_lecture_recorded_with_no_class_goes_under_the_class_the_timetable_says_was_on()
+    public async Task A_lecture_recorded_with_no_class_goes_unclassified_and_the_library_files_it_by_what_was_said()
     {
         using var dir = new TempDir();
-        // Bio lab starts at midnight on Friday 11 Sep; the timetable has Bio 110 then.
-        new Timetable { Classes = [new TimetableClass("Bio 110", ClassTime.ParseMany("Fri 0:00-1:00")!)] }.Save(dir.Path);
-        var store = new LectureStore(dir.Path);
-        var said = new List<Spoken> { new(0, 4, "Today: cell membranes.") };
-        foreach (var (id, started, cls) in new[]
+        var cfg = new Config(dir["library"], dir["pool"])
         {
-            ("rec-20260911-001000-aaaaaa", "2026-09-11T00:10:00-07:00", ""),
-            ("rec-20260910-001000-bbbbbb", "2026-09-10T00:10:00-07:00", ""),
-            ("rec-20260911-170000-dddddd", "2026-09-11T17:00:00-07:00", ""),
-            ("rec-20260911-002000-cccccc", "2026-09-11T00:20:00-07:00", "CS 101"),
-        })
-            store.Add(new Lecture { Id = id, Started = started, ClassName = cls, State = LectureState.Sending, Seconds = 4, TranscribedSeconds = 4, Segments = said });
-        var posted = new Dictionary<string, JsonObject>();
+            PoolName = "Sam's library", PoolPassword = "pw", OllamaEnabled = true,
+            // A class named by its code on Canvas, as a school's course list has it, and one the student named.
+            Classes = [new ClassDef("202710.TS.CSCI321-A", [], "Data structures and recursion"), new ClassDef("BIO 110", [], "Cells and membranes")],
+        };
+        Directory.CreateDirectory(cfg.Home);
+        new Canvas.CourseIndex { Class = "202710.TS.CSCI321-A", CourseId = 4201, Code = "202710.TS.CSCI321-A", Name = "Algorithms and Data Structures" }.Save(cfg.Home);
+        using var db = new Store(cfg.DbPath, cfg.PoolDir);
+        string? prompt = null;
+        var pipeline = new Pipeline(cfg, db, (_, p, _) =>
+            {
+                prompt = p;
+                return Task.FromResult("""{"class_name":"202710.TS.CSCI321-A","confidence":0.9,"lecture_title":"Recursion and the call stack","topics":["recursion"]}""");
+            },
+            (_, _) => Task.FromResult(Notes), log: _ => { });
+        await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, db, pipeline, new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(), Latest = _ => Task.FromResult<Release?>(null),
+        }));
+
+        // The laptop: Record with no class picked (the library sorts it).
+        var store = new LectureStore(dir["laptop"]);
+        var heard = Heard();
+        var lecture = store.Add(new Lecture
+        {
+            Id = "rec-20260923-100212-d4e5f6", Started = "2026-09-23T10:02:12-07:00", ClassName = "", State = LectureState.Sending,
+            Seconds = heard[^1].End, TranscribedSeconds = heard[^1].End, Segments = heard, Language = "en",
+        });
+        var through = Through(site);
+        JsonObject? sent = null;
         var host = new LaptopHost
         {
             Post = (url, body, key) =>
             {
-                var sent = (JsonObject)JsonNode.Parse(body)!;
-                posted[sent["id"].S()] = sent;
-                return Task.FromResult(new JsonObject { ["ok"] = true });
+                sent = (JsonObject)JsonNode.Parse(body)!;
+                return through.Post(url, body, key);
             },
-            Get = (url, key) => Task.FromResult<JsonObject?>(new JsonObject { ["status"] = "queued" }),
+            Get = through.Get,
         };
-        var cc = new ClientConfig(dir.Path) { ServerUrl = "http://mini:8787", PoolKey = "pw" };
+        var cc = new ClientConfig(dir["laptop"]) { ServerUrl = "http://localhost", PoolKey = "pw", PoolName = "Sam's library", DisplayName = "Sam" };
+        var sender = new LectureSender(store, () => cc, host);
 
-        Assert.Equal(4, await new LectureSender(store, () => cc, host).StepAsync());
-        Assert.Equal("Bio 110", posted["rec-20260911-001000-aaaaaa"]["folder"].S()); // ten minutes into Bio lab
-        Assert.Equal("", posted["rec-20260910-001000-bbbbbb"]["folder"].S()); // Thursday, nothing on: the library sorts it
-        Assert.Equal("", posted["rec-20260911-170000-dddddd"]["folder"].S()); // Friday evening, long after it
-        Assert.Equal("CS 101", posted["rec-20260911-002000-cccccc"]["folder"].S()); // recorded for a class: it stays there
-        Assert.Equal("", store.Get("rec-20260911-001000-aaaaaa")!.ClassName); // the laptop's own record is left as recorded
+        Assert.Equal(1, await sender.StepAsync());
+        Assert.Equal("", sent!["folder"].S()); // unclassified: nothing on the laptop guesses
+        Assert.Equal(1, await pipeline.RunPendingAsync());
+
+        // The library read it against each class: its name, what it covers, and its course's name on Canvas.
+        Assert.Contains("Recorded for: (none)", prompt);
+        Assert.Contains("- 202710.TS.CSCI321-A \u2014 Data structures and recursion (on Canvas: Algorithms and Data Structures)", prompt);
+        Assert.Contains("- BIO 110 \u2014 Cells and membranes", prompt);
+        Assert.Contains("base case", prompt);
+        var row = db.Get(lecture.Id)!;
+        Assert.Equal(("202710.TS.CSCI321-A", "ollama"), (row.ClassName, row.ClassifiedBy));
+
+        Assert.Equal(1, await sender.StepAsync());
+        Assert.Equal(LectureState.Filed, store.Get(lecture.Id)!.State);
+        Assert.Equal("202710.TS.CSCI321-A", store.Get(lecture.Id)!.FiledClass);
+        Assert.Equal("", store.Get(lecture.Id)!.ClassName); // the laptop's own record is left as recorded
     }
 
     [Fact]

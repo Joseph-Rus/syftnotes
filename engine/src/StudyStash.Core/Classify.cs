@@ -47,6 +47,41 @@ public static partial class Classify
         return null;
     }
 
+    /// <summary>
+    /// The classes as the AI sees them when it sorts: a class linked to a Canvas course also says what the course is
+    /// called there ("on Canvas: Software Engineering"), so a class named by a code like "202710.TS.CSCI321-A" still says
+    /// what it's about. Classes without a synced course are as they are.
+    /// </summary>
+    public static List<ClassDef> WithCanvas(IReadOnlyList<ClassDef> classes, string home)
+    {
+        var result = new List<ClassDef>(classes.Count);
+        foreach (var c in classes)
+        {
+            Canvas.CourseIndex? course;
+            try
+            {
+                course = Canvas.CourseIndex.Load(home, c.Name);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                course = null;
+            }
+            var said = new[] { course?.Name ?? "", course?.Code ?? "" }
+                .Select(n => n.Trim())
+                .Where(n => n.Length > 0 && Norm(n) != Norm(c.Name) && !c.Description.Contains(n, StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (said.Count == 0)
+            {
+                result.Add(c);
+                continue;
+            }
+            string canvas = $"on Canvas: {string.Join(" · ", said)}";
+            result.Add(new ClassDef(c.Name, c.Aliases, c.Description.Length > 0 ? $"{c.Description} ({canvas})" : canvas));
+        }
+        return result;
+    }
+
     public static JsonObject Schema(IEnumerable<string> classNames) => new()
     {
         ["type"] = "object",
@@ -162,13 +197,16 @@ public static partial class Classify
         }
     }
 
-    public static async Task<Classification> ClassifyAsync(Meeting m, Config cfg, SortChatFn? chat = null)
+    /// <summary>The class a lecture goes in: the one it was recorded for or whose name its title carries, else the
+    /// one the AI reads it's about (from <paramref name="classes"/>, the config's own by default), else Unsorted.</summary>
+    public static async Task<Classification> ClassifyAsync(Meeting m, Config cfg, SortChatFn? chat = null, IReadOnlyList<ClassDef>? classes = null)
     {
-        var c = ByRules(m, cfg.Classes);
+        classes ??= cfg.Classes;
+        var c = ByRules(m, classes);
         if (c is not null) return c;
-        if (cfg.OllamaEnabled && cfg.Classes.Count > 0)
+        if (cfg.OllamaEnabled && classes.Count > 0)
         {
-            c = await WithOllamaAsync(m, cfg.Classes, cfg, chat);
+            c = await WithOllamaAsync(m, classes, cfg, chat);
             if (c is not null) return c;
         }
         return new Classification(Configs.Unsorted, 0.0, "none", m.Title);

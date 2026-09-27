@@ -37,7 +37,7 @@ public sealed partial class LectureItem : ObservableObject
 }
 
 /// <summary>
-/// The menu bar dropdown (Mac) or tray flyout (Windows): Record for the class on now, or the lecture recording
+/// The menu bar dropdown (Mac) or tray flyout (Windows): Record (the library sorts it, or the class you picked), or the lecture recording
 /// right now; the latest lectures and where each is; search; and whether the library and the model are ready.
 /// </summary>
 public sealed partial class PanelModel : ObservableObject
@@ -47,7 +47,7 @@ public sealed partial class PanelModel : ObservableObject
     /// <summary>The class Record will file under ("" lets the library sort it).</summary>
     [ObservableProperty] public partial string ClassName { get; set; } = "";
     [ObservableProperty] public partial IBrush ClassDot { get; set; } = Brushes.Gray;
-    /// <summary>"From your timetable · Tue 10:00–11:15", or null.</summary>
+    /// <summary>The line under Record: "Picked by you", "The library sorts it by what's said", or null.</summary>
     [ObservableProperty] public partial string? Hint { get; set; }
     /// <summary>"Next due: Quiz 3 practice · Tomorrow, 9:00 AM" under the hint, once Canvas is linked; null hides it.</summary>
     [ObservableProperty] public partial NextDueModel? NextDue { get; set; }
@@ -57,7 +57,7 @@ public sealed partial class PanelModel : ObservableObject
     [ObservableProperty] public partial string LastLine { get; set; } = "";
     [ObservableProperty] public partial string Status { get; set; } = "";
     [ObservableProperty] public partial bool StatusGood { get; set; } = true;
-    /// <summary>Record can't start yet (no model, no microphone): why, in place of the timetable hint.</summary>
+    /// <summary>Record can't start yet (no model, no microphone): why, in place of the hint.</summary>
     [ObservableProperty] public partial bool CanRecord { get; set; } = true;
 
     /// <summary>What's wrong right now (from <see cref="Services.Problems"/>), for the dropdown's own words and a

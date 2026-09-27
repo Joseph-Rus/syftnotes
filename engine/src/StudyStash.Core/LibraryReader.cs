@@ -22,7 +22,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         var classes = new JsonArray();
         int index = 0;
         foreach (var c in Cfg.Classes)
-            classes.Add(new JsonObject { ["name"] = c.Name, ["lectures"] = counts.GetValueOrDefault(c.Name), ["color"] = index++ });
+            classes.Add(new JsonObject { ["name"] = c.Name, ["lectures"] = counts.GetValueOrDefault(c.Name), ["color"] = index++, ["description"] = c.Description });
         // Lectures filed under a class since removed from the config still show, after the rest.
         foreach (var (name, n) in counts.Where(kv => kv.Key != Configs.Unsorted && Cfg.Classes.All(c => c.Name != kv.Key)))
             classes.Add(new JsonObject { ["name"] = name, ["lectures"] = n, ["color"] = index++ });
