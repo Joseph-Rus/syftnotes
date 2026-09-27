@@ -166,7 +166,7 @@ public sealed class WindowHeader : Panel
     }
 
     /// <summary>Where the platform doesn't move the window from the drag area itself, the press reaches here: move
-    /// it by hand.</summary>
+    /// it by hand. A Mac moves and zooms it natively from the title bar role, so a second drag here would fight it.</summary>
     void OnPressed(object? sender, PointerPressedEventArgs e)
     {
         if (OperatingSystem.IsMacOS()) return;
@@ -174,6 +174,7 @@ public sealed class WindowHeader : Panel
         w.BeginMoveDrag(e);
     }
 
+    /// <summary>A double-click zooms the window (a Mac's own title bar does this itself, as its settings say).</summary>
     void OnDoubleTapped(object? sender, TappedEventArgs e)
     {
         if (OperatingSystem.IsMacOS()) return;
