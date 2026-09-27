@@ -40,7 +40,10 @@ public static class MacSnap
                 string file = Path.Combine(dir, $"{name}-{++n}.png");
                 bool saved = SavePng(CGWindowListCreateImage(Null, IncludingWindow, (uint)number, IgnoreFraming | BestResolution), file);
                 var f = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? MacTitleBar.ObjC.RectOf(w, MacTitleBar.ObjC.Sel("frame")) : default;
-                Program.Log($"[snap] {name}-{n}: {MacTitleBar.ObjC.ClassName(w)} #{number} at {f.X:0},{f.Y:0} {f.W:0}×{f.H:0}{(saved ? "" : " (no picture)")}");
+                bool here = MacTitleBar.ObjC.SendReturnsByte(w, MacTitleBar.ObjC.Sel("isOnActiveSpace")) != 0;
+                long occlusion = (long)MacTitleBar.ObjC.Send(w, MacTitleBar.ObjC.Sel("occlusionState"));
+                Program.Log($"[snap] {name}-{n}: {MacTitleBar.ObjC.ClassName(w)} #{number} at {f.X:0},{f.Y:0} {f.W:0}×{f.H:0}" +
+                            $"{(here ? "" : " (on another Space)")}{((occlusion & 2) != 0 ? "" : " (not on screen)")}{(saved ? "" : " (no picture)")}");
                 // The system's own full-screen windows: what they're made of, view by view.
                 if (MacTitleBar.ObjC.ClassName(w).Contains("FullScreen", StringComparison.Ordinal))
                     Views(MacTitleBar.ObjC.Send(MacTitleBar.ObjC.Send(w, MacTitleBar.ObjC.Sel("contentView")), MacTitleBar.ObjC.Sel("superview")), 1);
