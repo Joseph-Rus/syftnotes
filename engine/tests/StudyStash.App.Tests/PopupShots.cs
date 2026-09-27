@@ -225,12 +225,12 @@ public class PopupShots
                 Assert.Equal(panel.Bounds.Size, glass.Bounds.Size);
             }
 
-            // Rounded, and nothing square behind it: the corners are see-through (all but the panel's own soft shadow),
-            // the edges are the panel's.
+            // Rounded, and nothing square behind it: the corners are see-through (no box, and no drawn shadow, which in
+            // a popup's own window would only fill them), the edges are the panel's.
             var alone = Alone(panel);
             int w = alone.PixelSize.Width, h = alone.PixelSize.Height;
             foreach (var (x, y) in new[] { (1, 1), (w - 2, 1), (1, h - 2), (w - 2, h - 2) })
-                Assert.True(AlphaAt(alone, x, y) < 100, $"{label}: its corner ({x},{y}) isn't rounded off: there's a box behind the panel");
+                Assert.True(AlphaAt(alone, x, y) < 8, $"{label}: its corner ({x},{y}) isn't see-through: a box or a drawn shadow fills it");
             foreach (var (x, y) in new[] { (w / 2, 1), (w / 2, h - 2), (1, h / 2), (w - 2, h / 2) })
                 Assert.True(AlphaAt(alone, x, y) > 60, $"{label}: ({x},{y}) is empty: the panel doesn't reach the popup's edge");
 

@@ -57,10 +57,11 @@
       </Style>
     </ControlTheme>
 
-    <!-- Popups: every menu, flyout and context menu is one rounded panel with its soft shadow, nothing round it.
-         These replace Fluent's presenters (a square-ish box of its own, with padding, that showed round the app's
-         rounded menus); the app's own menu themes (AiMenuFlyout, SettingsMenu) build on them. LayoutRoot draws the
-         panel and its shadow, Clip keeps what's inside to the rounded corners. -->
+    <!-- Popups: every menu, flyout and context menu is one rounded panel, nothing round it. These replace Fluent's
+         presenters (a square-ish box of its own, with padding, that showed round the app's rounded menus); the app's
+         own menu themes (AiMenuFlyout, SettingsMenu) build on them. LayoutRoot draws the panel, Clip keeps what's
+         inside to its rounded corners. No drawn shadow: a popup is a window exactly the panel's size, so one would
+         only fill its corners; on a Mac the system draws the soft shadow round the panel (MacPopupShadow). -->
     <ControlTheme x:Key="{x:Type FlyoutPresenter}" TargetType="FlyoutPresenter">
       <Setter Property="Background" Value="{DynamicResource PopupBg}" />
       <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
@@ -75,8 +76,7 @@
       <Setter Property="Template">
         <ControlTemplate>
           <Border Name="LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
-                  BoxShadow="{DynamicResource PopupShadow}">
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
             <Border Name="Clip" CornerRadius="{TemplateBinding CornerRadius}" ClipToBounds="True">
               <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
@@ -96,9 +96,6 @@
         <Setter Property="Padding" Value="0" />
         <Setter Property="CornerRadius" Value="0" />
       </Style>
-      <Style Selector="^.bare /template/ Border#LayoutRoot">
-        <Setter Property="BoxShadow" Value="none" />
-      </Style>
       <Style Selector="^.bare /template/ Border#Clip">
         <Setter Property="ClipToBounds" Value="False" />
       </Style>
@@ -116,8 +113,7 @@
       <Setter Property="Template">
         <ControlTemplate>
           <Border Name="LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
-                  BoxShadow="{DynamicResource PopupShadow}">
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
             <Border Name="Clip" CornerRadius="{TemplateBinding CornerRadius}" ClipToBounds="True">
               <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="{TemplateBinding Padding}"
@@ -144,8 +140,7 @@
       <Setter Property="Template">
         <ControlTemplate>
           <Border Name="LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
-                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
-                  BoxShadow="{DynamicResource PopupShadow}">
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}">
             <Border Name="Clip" CornerRadius="{TemplateBinding CornerRadius}" ClipToBounds="True">
               <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                 <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="{TemplateBinding Padding}"
@@ -241,6 +236,11 @@
   <Style Selector=".solidglass c|Glass">
     <Setter Property="Background" Value="{DynamicResource GlassSolid}" />
   </Style>
+  <!-- Glass that is a popup's own panel (the "Answer with" menu): its edges, not its drop shadow, which would only
+       fill the popup window's corners. -->
+  <Style Selector="FlyoutPresenter c|Glass">
+    <Setter Property="BoxShadow" Value="{DynamicResource Edge}" />
+  </Style>
   <!-- What lies on the Mac's glass, each with its edge highlight: "tint" is the accent seen through glass, glowing a
        little (Record, Stop, your own chat bubble), "fill" a pale pane (cards, fields, the chosen row) and "fill2" a
        greyer one (Pause, source chips). Surface buttons take the same classes. -->
@@ -264,7 +264,6 @@
     <Setter Property="BorderThickness" Value="{DynamicResource PopupStrokeWidth}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusMenu}" />
     <Setter Property="Padding" Value="5" />
-    <Setter Property="BoxShadow" Value="{DynamicResource PopupShadow}" />
   </Style>
   <Style Selector="MenuItem /template/ Popup#PART_Popup > Border > ScrollViewer > ItemsPresenter">
     <Setter Property="Margin" Value="0" />
