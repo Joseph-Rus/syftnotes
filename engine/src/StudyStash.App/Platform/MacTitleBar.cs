@@ -8,8 +8,9 @@ namespace StudyStash.App.Platform;
 /// <summary>A Mac window with its own 52 px title bar (<see cref="WindowHeader"/>): the traffic lights sit centred in
 /// it, the way a Finder or Notes window has them. Avalonia leaves them at the plain title bar's spot, near the top
 /// edge; an empty unified toolbar is the system's own way to give a window the taller bar, so that's what it adds.
-/// In full screen the toolbar comes off again: macOS would otherwise pin it across the top as a grey band over the
-/// header, where a native window keeps its own toolbar row and shows the lights only when the menu bar slides down.
+/// In full screen the toolbar stays, the way a native window keeps its own toolbar row: macOS shows the lights only when
+/// the menu bar slides down, on a strip of the toolbar's height, which it would paint grey across the header. That
+/// strip is cleared, so at rest the header is just the header and on the reveal the lights sit centred in it.
 /// Anything missing (another OS, no window handle) leaves the window as it was.</summary>
 public static class MacTitleBar
 {
@@ -57,16 +58,29 @@ public static class MacTitleBar
         bool hasToolbar = ObjC.Send(ns, ObjC.Sel("toolbar")) != IntPtr.Zero;
         if (window.WindowState == WindowState.FullScreen)
         {
-            if (hasToolbar) ObjC.Send(ns, ObjC.Sel("setToolbar:"), IntPtr.Zero);
-            // Full screen from the green button makes the title bar opaque again (a grey strip whenever it shows):
-            // keep it clear, so the lights sit on the header like they do in a window. Once more after the
-            // system's own full-screen switch has run, which can come after this.
+            // Full screen keeps the unified toolbar, so the strip the lights come down on with the menu bar is the
+            // header's own height: the lights land centred in the header, as in Finder or Notes. That strip is a
+            // window of its own (made during the system's switch), painted grey; clear it, so at rest the header
+            // shows as it is and on the reveal only the lights appear. Again a little later, as the switch can
+            // outlast the first try. The title bar stays clear too (full screen from the green button would make
+            // it opaque again).
             ObjC.SendByte(ns, ObjC.Sel("setTitlebarAppearsTransparent:"), 1);
-            DispatcherTimer.RunOnce(() =>
-            {
-                if (window is { IsVisible: true, WindowState: WindowState.FullScreen }) ObjC.SendByte(ns, ObjC.Sel("setTitlebarAppearsTransparent:"), 1);
-            }, TimeSpan.FromMilliseconds(800));
-            return "come down with the menu bar in full screen (no toolbar, so no grey band over the header)";
+            int cleared = ClearFullScreenStrip(ns);
+            foreach (int ms in new[] { 800, 2000 })
+                DispatcherTimer.RunOnce(() =>
+                {
+                    if (window is not { IsVisible: true, WindowState: WindowState.FullScreen }) return;
+                    try
+                    {
+                        ObjC.SendByte(ns, ObjC.Sel("setTitlebarAppearsTransparent:"), 1);
+                        int n = ClearFullScreenStrip(ns);
+                        if (n > 0) Program.Log($"[chrome] \"{window.Title}\": full screen's title strip is clear ({n} background views hidden)");
+                    }
+                    catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or MarshalDirectiveException)
+                    {
+                    }
+                }, TimeSpan.FromMilliseconds(ms));
+            if (hasToolbar) return $"come down with the menu bar in full screen, centred in the header on a clear strip ({cleared} background views hidden now)";
         }
         before = LightsCentre(ns);
         if (!hasToolbar)
@@ -82,6 +96,40 @@ public static class MacTitleBar
         after = LightsCentre(ns);
         return hasToolbar ? "kept centred by the unified toolbar" : "centred by an empty unified toolbar";
     }
+
+    /// <summary>In full screen the toolbar and the lights live in a strip of their own that slides down with the menu
+    /// bar, painted grey (its title bar background and the line under it): hide those two, so the strip shows only the
+    /// lights over the window's own header. How many views it hid; 0 before the strip exists, or once they're hidden.
+    /// (Out of full screen the title bar is clear anyway, so the hidden background changes nothing there.)</summary>
+    static int ClearFullScreenStrip(IntPtr ns)
+    {
+        IntPtr viewClass = ObjC.objc_getClass("NSView");
+        IntPtr close = ObjC.SendLongReturnsPtr(ns, ObjC.Sel("standardWindowButton:"), 0);
+        if (close == IntPtr.Zero || viewClass == IntPtr.Zero || ObjC.Send(close, ObjC.Sel("window")) == ns) return 0;
+        int hidden = 0;
+        // The lights' title bar view, then its container: each holds one of the two painted views.
+        IntPtr bar = ObjC.Send(close, ObjC.Sel("superview"));
+        foreach (IntPtr v in new[] { bar, bar == IntPtr.Zero ? IntPtr.Zero : ObjC.Send(bar, ObjC.Sel("superview")) })
+        {
+            if (v == IntPtr.Zero || !ObjC.IsKind(v, viewClass)) continue;
+            IntPtr subviews = ObjC.Send(v, ObjC.Sel("subviews"));
+            long count = subviews == IntPtr.Zero ? 0 : (long)ObjC.Send(subviews, ObjC.Sel("count"));
+            for (long i = 0; i < count; i++)
+            {
+                IntPtr sub = ObjC.SendLongReturnsPtr(subviews, ObjC.Sel("objectAtIndex:"), i);
+                if (!ObjC.IsKind(sub, viewClass) || !PaintsTheStrip(ObjC.ClassName(sub))) continue;
+                if (ObjC.SendReturnsByte(sub, ObjC.Sel("isHidden")) != 0) continue;
+                ObjC.SendByte(sub, ObjC.Sel("setHidden:"), 1);
+                hidden++;
+            }
+        }
+        return hidden;
+    }
+
+    /// <summary>The two views that paint the full-screen strip grey: its title bar background, and the line under it
+    /// (AppKit's own classes, sometimes under a KVO subclass's name). Never the lights, the toolbar or anything else.</summary>
+    internal static bool PaintsTheStrip(string className) =>
+        className.EndsWith("NSTitlebarBackgroundView", StringComparison.Ordinal) || className.EndsWith("NSTitlebarDecorationView", StringComparison.Ordinal);
 
     /// <summary>The close button's centre, in points down from the window's top edge. Only read on Apple silicon,
     /// where AppKit hands rectangles back in registers; elsewhere it's not known (and the toolbar goes on anyway).</summary>
@@ -114,6 +162,11 @@ public static class MacTitleBar
 
         public static bool IsKind(IntPtr obj, IntPtr cls) => SendPtrReturnsByte(obj, Sel("isKindOfClass:"), cls) != 0;
 
+        [DllImport(Lib)]
+        static extern IntPtr object_getClassName(IntPtr obj);
+
+        public static string ClassName(IntPtr obj) => obj == IntPtr.Zero ? "" : Marshal.PtrToStringAnsi(object_getClassName(obj)) ?? "";
+
         public static bool Responds(IntPtr obj, string selector) => SendPtrReturnsByte(obj, Sel("respondsToSelector:"), Sel(selector)) != 0;
 
         public static IntPtr Str(string s)
@@ -140,6 +193,9 @@ public static class MacTitleBar
 
         [DllImport(Lib, EntryPoint = "objc_msgSend")]
         static extern byte SendPtrReturnsByte(IntPtr receiver, IntPtr selector, IntPtr arg);
+
+        [DllImport(Lib, EntryPoint = "objc_msgSend")]
+        public static extern byte SendReturnsByte(IntPtr receiver, IntPtr selector);
 
         [DllImport(Lib, EntryPoint = "objc_msgSend")]
         public static extern void SendByte(IntPtr receiver, IntPtr selector, byte value);
