@@ -76,7 +76,7 @@
           </StackPanel>
         </Border>
         <Button.Flyout>
-          <Flyout Placement="BottomEdgeAlignedRight" ShowMode="Standard"
+          <Flyout Placement="BottomEdgeAlignedRight" ShowMode="Standard" FlyoutPresenterClasses="bare"
                   Opened="OnMenuOpened" Closed="OnMenuClosed">
             <ContentControl Content="{Binding Menu}">
               <ContentControl.ContentTemplate>

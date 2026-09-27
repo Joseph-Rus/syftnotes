@@ -56,6 +56,106 @@
         <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
       </Style>
     </ControlTheme>
+
+    <!-- Popups: every menu, flyout and context menu is one rounded panel with its soft shadow, nothing round it.
+         These replace Fluent's presenters (a square-ish box of its own, with padding, that showed round the app's
+         rounded menus); the app's own menu themes (AiMenuFlyout, SettingsMenu) build on them. LayoutRoot draws the
+         panel and its shadow, Clip keeps what's inside to the rounded corners. -->
+    <ControlTheme x:Key="{x:Type FlyoutPresenter}" TargetType="FlyoutPresenter">
+      <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource PopupStrokeWidth}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusMenu}" />
+      <Setter Property="Padding" Value="5" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+      <Setter Property="MaxHeight" Value="640" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+                  BoxShadow="{DynamicResource PopupShadow}">
+            <Border Name="Clip" CornerRadius="{TemplateBinding CornerRadius}" ClipToBounds="True">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                                  Padding="{TemplateBinding Padding}"
+                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+              </ScrollViewer>
+            </Border>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <!-- A flyout whose content is already its own panel (the "Answer with" / "Rewrite notes with" glass): the
+           presenter shows nothing of its own. -->
+      <Style Selector="^.bare">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="CornerRadius" Value="0" />
+      </Style>
+      <Style Selector="^.bare /template/ Border#LayoutRoot">
+        <Setter Property="BoxShadow" Value="none" />
+      </Style>
+      <Style Selector="^.bare /template/ Border#Clip">
+        <Setter Property="ClipToBounds" Value="False" />
+      </Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="{x:Type MenuFlyoutPresenter}" TargetType="MenuFlyoutPresenter">
+      <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource PopupStrokeWidth}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusMenu}" />
+      <Setter Property="Padding" Value="5" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+      <Setter Property="MaxHeight" Value="640" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+                  BoxShadow="{DynamicResource PopupShadow}">
+            <Border Name="Clip" CornerRadius="{TemplateBinding CornerRadius}" ClipToBounds="True">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="{TemplateBinding Padding}"
+                                KeyboardNavigation.TabNavigation="Continue" Grid.IsSharedSizeScope="True" />
+              </ScrollViewer>
+            </Border>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
+
+    <!-- Menus (the dropdown's class picker, the library's ••• and Move): the same panel, the look's own radius. -->
+    <ControlTheme x:Key="{x:Type ContextMenu}" TargetType="ContextMenu">
+      <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource PopupStrokeWidth}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusMenu}" />
+      <Setter Property="Padding" Value="5" />
+      <Setter Property="MinWidth" Value="200" />
+      <Setter Property="MaxHeight" Value="640" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+      <Setter Property="Focusable" Value="True" />
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+                  BoxShadow="{DynamicResource PopupShadow}">
+            <Border Name="Clip" CornerRadius="{TemplateBinding CornerRadius}" ClipToBounds="True">
+              <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <ItemsPresenter Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" Margin="{TemplateBinding Padding}"
+                                KeyboardNavigation.TabNavigation="Continue" Grid.IsSharedSizeScope="True" />
+              </ScrollViewer>
+            </Border>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+    </ControlTheme>
   </Styles.Resources>
 
   <!-- A ticked box takes the colour theme's accent, not the system's blue. -->
@@ -157,17 +257,20 @@
     <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
   </Style>
 
-  <!-- Menus (the dropdown's class picker, the library's ••• and Move): one plain, neutral panel like the system's, the
-       look's own radius, no colour. -->
-  <Style Selector="ContextMenu">
+  <!-- A submenu (an engine's Models) opens as the same panel as the menu it hangs off. -->
+  <Style Selector="MenuItem /template/ Popup#PART_Popup > Border">
     <Setter Property="Background" Value="{DynamicResource PopupBg}" />
     <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
     <Setter Property="BorderThickness" Value="{DynamicResource PopupStrokeWidth}" />
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusMenu}" />
     <Setter Property="Padding" Value="5" />
-    <Setter Property="MinWidth" Value="200" />
-    <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource PopupShadow}" />
   </Style>
+  <Style Selector="MenuItem /template/ Popup#PART_Popup > Border > ScrollViewer > ItemsPresenter">
+    <Setter Property="Margin" Value="0" />
+  </Style>
+
+  <!-- A menu's rows: one plain, neutral panel like the system's, no colour. -->
   <Style Selector="ContextMenu MenuItem">
     <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
     <Setter Property="FontSize" Value="13" />
