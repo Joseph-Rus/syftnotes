@@ -293,7 +293,8 @@ public class CanvasTests
         // A long-polling extension quiet for 90 s is gone; an older one gets five minutes.
         s = CanvasSettings.Load(dir.Path);
         Assert.False(s.ExtensionConnected(now.AddSeconds(91)));
-        s.ExtensionProtocol = 2;
+        sync.Work(false, "1.3", 2, "http://100.64.0.7:8787");
+        s = CanvasSettings.Load(dir.Path);
         Assert.True(s.ExtensionConnected(now.AddSeconds(91)));
         Assert.False(s.ExtensionConnected(now.AddMinutes(6)));
 
@@ -326,8 +327,8 @@ public class CanvasTests
         Assert.Equal(written, File.GetLastWriteTimeUtc(CanvasSettings.PathIn(dir.Path)));
         var s = CanvasSettings.Load(dir.Path);
         Assert.Null(s.ExtensionUpdate);
-        Assert.Equal(new ExtensionCopy(At(Now), "1.4", 3), s.ExtensionCopies["this_computer"]);
-        Assert.Equal(new ExtensionCopy(At(Now), "1.3.9", 3), s.ExtensionCopies["another_computer"]);
+        Assert.Equal(new ExtensionCopy(At(Now), "1.4", 3, s.CurrentKeyId), s.ExtensionCopies["this_computer"]);
+        Assert.Equal(new ExtensionCopy(At(Now), "1.3.9", 3, s.CurrentKeyId), s.ExtensionCopies["another_computer"]);
 
         // The laptop's reloads into 1.4: that one is an update.
         now = Now.AddSeconds(20);

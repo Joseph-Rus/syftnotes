@@ -150,7 +150,14 @@
         "url": "https://school.instructure.com/files/f9002b"
       }
     ],
-    "attempts": 1
+    "attempts": [
+      {
+        "attempt": 1,
+        "submitted_at": "2025-09-18T21:40:00Z",
+        "late": false,
+        "files": []
+      }
+    ]
   },
   "comments": [
     {

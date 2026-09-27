@@ -35,6 +35,10 @@ public sealed class CanvasSettings
     public string ExtensionVersion { get; set; } = "";
     /// <summary>The protocol the extension that last checked in speaks (1 for one from before protocol 2).</summary>
     public int ExtensionProtocol { get; set; }
+    /// <summary>Which key the Chrome that last checked in used (<see cref="KeyId"/>): the extension's key as it was
+    /// then, or "password" for one that came with the library password instead. "" in a canvas.json from before keys
+    /// were written down.</summary>
+    public string ExtensionKeyId { get; set; } = "";
     /// <summary>Which Chrome last checked in, from the library address the extension says it uses:
     /// "this_computer" (a loopback address), "another_computer", or "" when it didn't say.</summary>
     public string ExtensionWhere { get; set; } = "";
@@ -60,6 +64,23 @@ public sealed class CanvasSettings
 
     [JsonIgnore] public bool On => Url.Length > 0;
 
+    /// <summary>The <see cref="KeyId"/> of the key this library gives its extension now (canvas_key), filled in by
+    /// <see cref="Load"/>; "" while there's no key yet.</summary>
+    [JsonIgnore] public string CurrentKeyId { get; set; } = "";
+
+    /// <summary>The Chromes that checked in with the key this library gives its extension now. A registration from
+    /// before the key changed, or from before keys were written down, isn't one of them: it can't hand Canvas to this
+    /// library, so it never counts as connected.</summary>
+    IEnumerable<ExtensionCopy> WithCurrentKey() => ExtensionCopies.Count > 0
+        ? ExtensionCopies.Values.Where(c => c.Key == CurrentKeyId)
+        : ExtensionKeyId == CurrentKeyId && ExtensionSeen.Length > 0 ? [new ExtensionCopy(ExtensionSeen, ExtensionVersion, ExtensionProtocol, ExtensionKeyId)] : [];
+
+    /// <summary>When a Chrome last checked in with the current key (ISO); "" when none ever has.</summary>
+    [JsonIgnore] public string SeenWithKey => WithCurrentKey().Select(c => c.Seen).DefaultIfEmpty("").Max(StringComparer.Ordinal)!;
+
+    /// <summary>The Chrome that checked in last used the current key.</summary>
+    [JsonIgnore] public bool LastKeyMatches => ExtensionSeen.Length > 0 && ExtensionKeyId == CurrentKeyId;
+
     /// <summary>The extension Chrome runs is older than this library's: its folder wasn't brought up to date (one the
     /// laptop app made, say), so it can't reload into the new version by itself.</summary>
     [JsonIgnore] public bool ExtensionOutdated => Extension.IsOlder(ExtensionVersion, Extension.Version());
@@ -67,10 +88,10 @@ public sealed class CanvasSettings
     /// <summary>How often a check-in that changes nothing else is written down.</summary>
     public static readonly TimeSpan SeenEvery = TimeSpan.FromSeconds(15);
 
-    /// <summary>The extension is checking in: lately enough that it's running now. One that long-polls (protocol 3
-    /// and later) asks all the time, so 90 seconds of quiet means it's gone; an older one only asks every minute or
-    /// so while idle, and gets five.</summary>
-    public bool ExtensionConnected(DateTimeOffset now) => Connected(ExtensionSeen, ExtensionProtocol, now);
+    /// <summary>An extension with the current key is checking in: lately enough that it's running now. One that
+    /// long-polls (protocol 3 and later) asks all the time, so 90 seconds of quiet means it's gone; an older one only
+    /// asks every minute or so while idle, and gets five. A check-in with an old key never counts.</summary>
+    public bool ExtensionConnected(DateTimeOffset now) => WithCurrentKey().Any(c => Connected(c.Seen, c.Protocol, now));
 
     /// <summary>Whether an extension that last asked at <paramref name="seen"/> (ISO) speaking <paramref name="protocol"/>
     /// is running now (<see cref="ExtensionConnected"/>).</summary>
@@ -98,14 +119,16 @@ public sealed class CanvasSettings
         lock (Gate)
         {
             string p = PathIn(home);
-            if (!File.Exists(p)) return new CanvasSettings();
+            if (!File.Exists(p)) return new CanvasSettings { CurrentKeyId = KeyIdIn(home) };
             try
             {
-                return JsonSerializer.Deserialize<CanvasSettings>(File.ReadAllText(p), Options) ?? new CanvasSettings();
+                var s = JsonSerializer.Deserialize<CanvasSettings>(File.ReadAllText(p), Options) ?? new CanvasSettings();
+                s.CurrentKeyId = KeyIdIn(home);
+                return s;
             }
             catch (JsonException)
             {
-                return new CanvasSettings();
+                return new CanvasSettings { CurrentKeyId = KeyIdIn(home) };
             }
         }
     }
@@ -161,6 +184,27 @@ public sealed class CanvasSettings
         return Py.Strip(File.ReadAllText(p));
     }
 
+    /// <summary>A short fingerprint of an extension key, written down with each check-in so the key itself never is.</summary>
+    public static string KeyId(string key) =>
+        key.Length == 0 ? "" : Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(key)))[..16];
+
+    /// <summary>What a check-in that came with the library password (not the extension's key) is written down as.</summary>
+    public const string PasswordKeyId = "password";
+
+    /// <summary>The <see cref="KeyId"/> of this library's extension key, without making one; "" when there's none.</summary>
+    public static string KeyIdIn(string home)
+    {
+        string p = Path.Combine(home, "canvas_key");
+        try
+        {
+            return File.Exists(p) ? KeyId(Py.Strip(File.ReadAllText(p))) : "";
+        }
+        catch (IOException)
+        {
+            return "";
+        }
+    }
+
     public static bool KeyMatches(string home, string? given) =>
         !string.IsNullOrEmpty(given) && File.Exists(Path.Combine(home, "canvas_key"))
         && CryptographicOperations.FixedTimeEquals(System.Text.Encoding.UTF8.GetBytes(given), System.Text.Encoding.UTF8.GetBytes(ExtensionKey(home)));
@@ -176,5 +220,6 @@ public sealed record CourseInfo(string Code, string Name, string Term);
 /// student has seen it.</summary>
 public sealed record ExtensionUpdate(string From, string To, string At, bool Dismissed);
 
-/// <summary>One Chrome's extension as it last checked in: when (ISO), its version and its protocol.</summary>
-public sealed record ExtensionCopy(string Seen, string Version, int Protocol);
+/// <summary>One Chrome's extension as it last checked in: when (ISO), its version, its protocol, and which key it came
+/// with (<see cref="CanvasSettings.KeyId"/>; "" from before keys were written down).</summary>
+public sealed record ExtensionCopy(string Seen, string Version, int Protocol, string Key = "");

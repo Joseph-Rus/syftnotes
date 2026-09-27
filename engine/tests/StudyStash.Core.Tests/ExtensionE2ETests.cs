@@ -56,6 +56,14 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         Assert.True(about["folder_ready"]!.GetValue<bool>());
         Assert.True(about["connected"]!.GetValue<bool>());
         Assert.Equal(Extension.Protocol, about["seen_protocol"]!.GetValue<int>()); // it waits for work with the library
+        Assert.True(about["key_matches"]!.GetValue<bool>());
+        // A library that has never synced: connected, and no date it doesn't have is sent as "".
+        var state = await rig.GetAsync("/api/v2/canvas/state");
+        Assert.Equal("connected", ExtensionRig.S(state["state"]));
+        Assert.True(state["extension"]!["connected"]!.GetValue<bool>());
+        Assert.Null(state["last_sync"]);
+        Assert.Null(state["next_sync"]);
+        Assert.Null((await rig.GetAsync("/api/v2/canvas"))["last_sync"]);
     }
 
     [ChromeFact]

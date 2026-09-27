@@ -29,6 +29,19 @@ public class CanvasConnectTests
         Assert.Equal(step, m.Current);
     }
 
+    [Theory]
+    [InlineData("""{"state": "chrome_away", "url": "https://canvas.test", "extension": {"seen": "2025-09-20T10:00:00Z", "connected": false, "key_matches": true}}""")]
+    [InlineData("""{"state": "no_extension", "url": "https://canvas.test", "extension": {"seen": null, "connected": false, "key_matches": false, "last_seen": "2025-09-25T17:23:00Z"}}""")]
+    [InlineData("""{"state": "connected", "url": "https://canvas.test", "extension": {"seen": "2025-09-25T17:23:00Z", "connected": false}}""")]
+    public async Task A_chrome_that_is_not_checking_in_now_with_the_current_key_opens_at_the_extension_step(string json)
+    {
+        var handler = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var m = Model(handler);
+        var linked = new List<CanvasApi.ClassRow> { new() { Class = "CS 101", Linked = true } };
+        await m.StartAsync(JsonSerializer.Deserialize<CanvasApi.State>(json, CanvasApi.Json)!, linked, TestContext.Current.CancellationToken);
+        Assert.Equal(2, m.Current);
+    }
+
     [Fact]
     public async Task With_no_class_linked_it_finds_courses_itself_and_lands_on_match()
     {

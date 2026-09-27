@@ -356,7 +356,10 @@ plain text, CSV or JSON come back as Canvas sent them (Marginalia's rule, bug 16
 Every route below is under the library password, `Authorization: Bearer <password>`, like the rest of `/api/v2`
 (`LibraryWeb.Api`/`ApiAsync`). A class name goes in the query (`?class=CS%20101`), never the path, since class names
 may hold `/`. `*_at` fields are Canvas's own UTC ISO timestamps; `due` (and `synced`, `last_sync`, `posted_at` when
-they come from a saved index) are as `AssignmentInfo`/`CourseIndex` keep them. `Core/Canvas/CanvasView.cs` builds
+they come from a saved index) are as `AssignmentInfo`/`CourseIndex` keep them. A date the library doesn't have (a
+library that has never synced, Chrome never seen, nothing submitted) is `null`, never `""` (`CanvasView.When`), and
+the app reads any date it can't parse as none (`CanvasApi.ReadWhen`): one odd field never breaks a screen. An item's
+`marked_done` is when it was ticked off in Canvas's planner, or `null`. `Core/Canvas/CanvasView.cs` builds
 every answer below from `CanvasSettings`, a class's `CourseIndex` (`home/canvas/<class>.json`) and the crawl's live
 state; `Library/LibraryWeb.Canvas.cs` only maps routes onto it, so `LocalLibrary` (Claude's tools, T8) can call the
 same builders without going through HTTP.
@@ -374,11 +377,23 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
 ### State
 
 - `GET /api/v2/canvas/state` (also embedded as `state` in `GET /api/v2/canvas`): `{"state", "school", "url",
-  "extension":{"seen","version","latest","outdated","updated":{"from","to","at"}|null}, "last_sync" (when the last
+  "extension":{"seen","version","latest","outdated","updated":{"from","to","at"}|null,"connected","key_matches",
+  "last_seen","refused_at"}, "last_sync" (when the last
   sync finished), "next_sync", "poll_minutes", "syncing":{"left","total","classes":[…]}|null, "paused_until"|null,
   "error":{"text","at"}|null, "warnings":[…]}`. `state` is decided by `CanvasView.StateOf` in this order: `not_set_up`
-  (no Canvas address) > `no_extension` (Chrome has never checked in) > `signed_out` > `chrome_away` (not seen for
-  over 5 minutes) > `syncing` > `error` (the last sync ended with one) > `connected`. `syncing.left`/`total` count
+  (no Canvas address) > `no_extension` (no Chrome has ever checked in with this library's **current** extension key)
+  > `signed_out` > `chrome_away` (no Chrome with the current key is checking in now: 90 s of quiet for a long-polling
+  extension, 5 minutes for an older one) > `syncing` > `error` (the last sync ended with one) > `connected`.
+  "Connected" is only ever a check-in with the current key: each check-in is written down with a fingerprint of the
+  key it came with (`CanvasSettings.KeyId`, never the key), so a registration from an old install, from before keys
+  were written down, or from before the key changed never counts, and one that came with the library password gets
+  its work but isn't the extension. `extension.seen` is when a Chrome last checked in with the current key,
+  `extension.connected` whether one is checking in now, `key_matches` whether the Chrome that asked last had the
+  current key, `last_seen` when any Chrome last asked, and `refused_at` when a Chrome with another key was last turned
+  away (`/api/v2/canvas/work` answers such a key 401 "Wrong key." even on a library without a password). The app
+  moves past its extension step only on `extension.connected`, and asks to "Connect Chrome again" for an old key.
+  `GET /api/v2/canvas/extension` carries the same `connected`, `key_matches`, `seen_with_key` and `refused_at`, and
+  each of `copies` its own `key_matches`. `syncing.left`/`total` count
   classes, not jobs (`total` = classes in this sync, `left` = classes whose four listings haven't all finished);
   `classes` names them, straight from the crawl's live section states — no new state kept for this.
 - `POST /api/v2/canvas` (unchanged routes, wider body): also takes `poll_minutes` (15–1440, clamped) and
@@ -623,13 +638,20 @@ stops, nothing more reaches Canvas, state `signed_out`, and after signing in a s
 is never downloaded: modules.md links to it on Canvas ("not saved: too big"). Then `S9b`: the Chrome Web Store build, unzipped from `PackForStore`,
 registers with no connection (`no_config`), no sites and a popup asking for the code, and after the library's code is
 pasted (without Chrome's permission, which headless Chrome can't give) it says `no_access` and asks nothing of Canvas
-or the library. `ChromeRunner.EvaluateAsync` runs JavaScript in the extension's worker or one of its pages over
+or the library. Then, from the app's side (`LaptopChromeE2ETests`, in the app's tests): a library that has never
+synced, the laptop app's own connect steps (`CanvasConnectModel` over its `CanvasClient`, with the library password)
+from the school's address, the extension folder the laptop app makes pointing at the library as `library.test`,
+Chrome checking in as `another_computer` with the library's key, Find my courses, matching, a sync, and every Canvas
+screen's read afterwards, down to a submitted file's bytes. Without Chrome, `LibraryCanvasTests` runs the same steps
+against a real library with a pretend extension over HTTP, and checks that no Canvas answer has a date as `""`.
+`ChromeRunner.EvaluateAsync` runs JavaScript in the extension's worker or one of its pages over
 DevTools (`--remote-debugging-port=0`).
 
 Run it with `TMPDIR` pointing somewhere disposable (Chrome's profiles and the library's home go there and are
 removed). `STUDYSTASH_E2E_LIBRARY_HOST=<an address of this computer, like its LAN one>` makes the library listen there
 too and the laptop's Chrome use it instead of `library.test` (Chrome's Local Network Access checks don't block the
 worker's fetch to a LAN address). `STUDYSTASH_E2E_CHROME=<binary>` skips the download. The whole run takes about six
-minutes, three of them the idle story. Last proven: 13 of 13 green three runs in a row (Chrome for Testing 154, with
+minutes, three of them the idle story. Last proven with keys written down and the laptop story: 13 + 1 green
+(Chrome for Testing 154). Before that: 13 of 13 green three runs in a row (Chrome for Testing 154, with
 the full suite between runs), and the wrong-key and two-Chromes stories again with the laptop's Chrome on the Mac's LAN
 address.

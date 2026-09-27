@@ -57,18 +57,21 @@ public sealed partial class CanvasSync
     /// reads first and the sync's after. While Canvas has asked the sync to slow down, it isn't told to hurry back.
     /// <paramref name="extVersion"/> and <paramref name="protocol"/> are the extension's own (an extension from
     /// before protocol 2 sends none), and <paramref name="address"/> the library address it uses (its <c>a</c>; before
-    /// 1.4, none); every extension so far can do every job, whatever its version.</summary>
-    public CanvasWork Work(bool force, string? extVersion = null, int protocol = 1, string? address = null)
+    /// 1.4, none); every extension so far can do every job, whatever its version. <paramref name="withKey"/> is false
+    /// when it came with the library password rather than the extension's current key: it gets its work, but never
+    /// counts as the extension being connected.</summary>
+    public CanvasWork Work(bool force, string? extVersion = null, int protocol = 1, string? address = null, bool withKey = true)
     {
         var now = Clock();
         string at = now.ToString("o", CultureInfo.InvariantCulture);
         string where = CanvasSettings.WhereFrom(address);
         var s = CanvasSettings.Load(home);
+        string keyId = withKey ? s.CurrentKeyId : CanvasSettings.PasswordKeyId;
         // A check-in that changes nothing but the time is written at most every 15 seconds per Chrome: an extension
         // that asks all the time (or two, the library's Chrome and the laptop's) would otherwise rewrite canvas.json on
         // every visit.
         var copy = s.ExtensionCopies.GetValueOrDefault(where);
-        bool news = copy is null || extVersion is { Length: > 0 } && extVersion != copy.Version || protocol != copy.Protocol;
+        bool news = copy is null || extVersion is { Length: > 0 } && extVersion != copy.Version || protocol != copy.Protocol || keyId != copy.Key;
         bool stale = copy is null || !DateTimeOffset.TryParse(copy.Seen, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var seen)
             || now - seen >= CanvasSettings.SeenEvery || now < seen;
         if (news || stale)
@@ -82,8 +85,9 @@ public sealed partial class CanvasSync
                     ?? (st.ExtensionCopies.Count == 0 ? st.ExtensionVersion : "");
                 if (had is null && where.Length > 0) st.ExtensionCopies.Remove(""); // it says where it is now
                 string version = extVersion is { Length: > 0 } ? extVersion : had?.Version ?? "";
-                st.ExtensionCopies[where] = new ExtensionCopy(at, version, protocol);
+                st.ExtensionCopies[where] = new ExtensionCopy(at, version, protocol, keyId);
                 st.ExtensionSeen = at;
+                st.ExtensionKeyId = keyId;
                 st.ExtensionProtocol = protocol;
                 st.ExtensionWhere = where;
                 if (extVersion is not { Length: > 0 }) return;
@@ -144,10 +148,10 @@ public sealed partial class CanvasSync
     /// or when <paramref name="ct"/> ends (the request went away, the library is stopping). Older extensions ask on a
     /// timer and are answered at once.
     /// </summary>
-    public async Task<CanvasWork> WorkAsync(bool force, string? extVersion, int protocol, string? address, TimeSpan wait, CancellationToken ct = default)
+    public async Task<CanvasWork> WorkAsync(bool force, string? extVersion, int protocol, string? address, TimeSpan wait, CancellationToken ct = default, bool withKey = true)
     {
         Task woken = Task.WhenAny(Agents.Queued.Next, nudged.Next);
-        var work = Work(force, extVersion, protocol, address);
+        var work = Work(force, extVersion, protocol, address, withKey);
         if (work.Jobs.Count > 0 || protocol < 3 || wait <= TimeSpan.Zero) return work;
         var until = DateTime.UtcNow + (wait < LongestWait ? wait : LongestWait);
         while (!ct.IsCancellationRequested)
@@ -167,7 +171,7 @@ public sealed partial class CanvasSync
             }
             if (ct.IsCancellationRequested) break; // nobody left to hand work to
             woken = Task.WhenAny(Agents.Queued.Next, nudged.Next);
-            work = Work(false, extVersion, protocol, address);
+            work = Work(false, extVersion, protocol, address, withKey);
             if (work.Jobs.Count > 0) return work;
         }
         return work;

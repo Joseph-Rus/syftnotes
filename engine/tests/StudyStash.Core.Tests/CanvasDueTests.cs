@@ -22,7 +22,7 @@ public class CanvasDueTests
         var groups = due["groups"]!.AsArray().ToDictionary(g => g!["key"]!.GetValue<string>(), g => g!["items"]!.AsArray());
         Assert.DoesNotContain(groups["week"]!, i => i!["name"]!.GetValue<string>().Contains("Lab 3"));
         var handedIn = groups["handed_in"]!.Single(i => i!["name"]!.GetValue<string>().Contains("Lab 3"))!;
-        Assert.True(handedIn["marked_done"]!.GetValue<bool>());
+        Assert.Equal("2025-09-24T20:00:00Z", handedIn["marked_done"]!.GetValue<string>()); // when, not just that
         Assert.Equal("To do", handedIn["label"]!.GetValue<string>()); // marked done says nothing about being graded or submitted
 
         // The index keeps it (ApplyPlanner bakes the planner's read into the promoted index).

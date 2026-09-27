@@ -391,4 +391,15 @@ public class CanvasWordsTests
         Assert.Equal(title, copy.Title);
         Assert.Equal(text, copy.Text);
     }
+
+    [Theory]
+    [InlineData("""{"state": "no_extension", "extension": {"connected": false, "key_matches": false, "last_seen": "2025-09-25T17:20:00Z"}}""")]
+    [InlineData("""{"state": "no_extension", "extension": {"connected": false, "refused_at": "2025-09-25T17:20:00Z"}}""")]
+    public void A_chrome_with_an_old_key_is_asked_to_connect_again(string json)
+    {
+        var s = System.Text.Json.JsonSerializer.Deserialize<CanvasApi.State>(json, CanvasApi.Json)!;
+        var copy = CanvasWords.Describe(s, Zone);
+        Assert.Equal("Connect Chrome again", copy.Title);
+        Assert.Contains("earlier setup", copy.Text, StringComparison.Ordinal);
+    }
 }
