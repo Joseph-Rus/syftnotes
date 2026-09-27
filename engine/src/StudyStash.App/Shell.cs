@@ -411,6 +411,8 @@ public static partial class Shell
         library.OnSearch = ToggleQuick;
         library.OnSettings = ShowSettings;
         library.OnMove = MoveLecture;
+        library.OnDelete = DeleteLectureAsync;
+        library.OnUndo = UndoDeleteAsync;
         library.OnExport = () => _ = ExportAsync();
         library.OnMore = MoreMenu;
     }

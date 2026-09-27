@@ -430,6 +430,27 @@ public class SurfaceShots
         foreach (var t in Themes) Shot.Take("win-04-full-app-answer", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(answered: true), Width = 1280, Height = 800 });
     }
 
+    /// <summary>Deleting a lecture: the window asks first, then "Deleted · Undo" shows under the list.</summary>
+    [AvaloniaFact]
+    public void Mac_app_delete()
+    {
+        foreach (var t in Themes)
+        {
+            Shot.Take("mac-04-full-app-delete", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(deleting: true), Width = 1280, Height = 800 });
+            Shot.Take("mac-04-full-app-deleted", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(deleted: true), Width = 1280, Height = 800 });
+        }
+    }
+
+    [AvaloniaFact]
+    public void Win_app_delete()
+    {
+        foreach (var t in Themes)
+        {
+            Shot.Take("win-04-full-app-delete", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(deleting: true), Width = 1280, Height = 800 });
+            Shot.Take("win-04-full-app-deleted", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(deleted: true), Width = 1280, Height = 800 });
+        }
+    }
+
     [AvaloniaFact]
     public void Win_app()
     {

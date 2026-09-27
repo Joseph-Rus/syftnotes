@@ -434,6 +434,7 @@ public sealed class AppHost : IDisposable, IProblemSource
                         OlderLibrary = true;
                     }
                     Library = LibraryState.Connected;
+                    DropGone(Overview["gone"] as JsonArray);
                     var names = (Overview["classes"] as JsonArray ?? []).Select(c => c?["name"]?.GetValue<string>() ?? "").ToList();
                     lock (timetableLock)
                         if (!OlderLibrary && names.Count > 0 && Timetable.KeepOnly(names)) Timetable.Save(Home);
@@ -462,6 +463,18 @@ public sealed class AppHost : IDisposable, IProblemSource
         finally
         {
             libraryCheck.Release();
+        }
+    }
+
+    /// <summary>Lectures the library has deleted for good (their time in its trash is up): this laptop drops its own
+    /// recording of them, the audio and what Whisper wrote, once the library had filed them.</summary>
+    void DropGone(JsonArray? gone)
+    {
+        foreach (var n in gone ?? [])
+        {
+            if (n is not JsonValue v || !v.TryGetValue(out string? id) || Lectures.Get(id) is not { State: LectureState.Filed }) continue;
+            Lectures.Delete(id);
+            log($"[app] dropped the recording of {id}: it was deleted from the library");
         }
     }
 

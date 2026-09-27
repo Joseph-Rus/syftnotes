@@ -27,6 +27,8 @@ public sealed partial class LectureCard : ObservableObject
     public string Title { get; init; } = "";
     public string Meta { get; init; } = "";
     public string Summary { get; init; } = "";
+    /// <summary>The class it's filed under (the class showing, unless the list mixes classes).</summary>
+    public string ClassName { get; init; } = "";
     public bool Last { get; init; }
     [ObservableProperty] public partial bool Selected { get; set; }
     public bool HasSummary => Summary.Length > 0;
@@ -63,6 +65,16 @@ public sealed partial class NoteModel : ObservableObject
 
     [RelayCommand] void Notes() => ShowTranscript = false;
     [RelayCommand] void Transcripts() => ShowTranscript = true;
+}
+
+/// <summary>A lecture the student is deleting: which, and its title and class, for the confirmation and the "Deleted ·
+/// Undo" toast.</summary>
+public sealed record LectureDeletion(string Id, string Title, string ClassName)
+{
+    /// <summary>"Deleted “Recursion and the call stack”".</summary>
+    public string Said => $"Deleted “{Title}”";
+    /// <summary>What the confirmation says goes: everywhere, notes and all, with a way back for a few minutes.</summary>
+    public string Warning => $"“{Title}” is removed from your library on every computer: its notes, transcript and recording. You can undo it for a few minutes.";
 }
 
 /// <summary>What the middle column lists: a class's lectures by week, Canvas's Due list, or a class linked to
@@ -236,6 +248,104 @@ public sealed partial class LibraryModel : ObservableObject
     }
 
     partial void OnEmptyChanged(string? value) => OnPropertyChanged(nameof(HasEmpty));
+
+    // --- deleting a lecture ---------------------------------------------------------------------------------------
+
+    /// <summary>The lecture being deleted, while the window asks "Delete this lecture?"; null when it isn't asking.</summary>
+    [ObservableProperty] public partial LectureDeletion? Deleting { get; set; }
+    /// <summary>The lecture just deleted, while the "Deleted · Undo" toast shows.</summary>
+    [ObservableProperty] public partial LectureDeletion? Deleted { get; set; }
+    public bool AskingDelete => Deleting is not null;
+    public bool HasDeleted => Deleted is not null;
+    /// <summary>How long "Deleted · Undo" stays (the library keeps the lecture in its trash for longer).</summary>
+    public TimeSpan UndoShows { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>Deletes the lecture on the library (the host calls its API); false if the library refused.</summary>
+    public Func<LectureDeletion, Task<bool>>? OnDelete { get; set; }
+    /// <summary>Brings the lecture back from the library's trash (the host calls its API and lists it again).</summary>
+    public Func<LectureDeletion, Task>? OnUndo { get; set; }
+
+    partial void OnDeletingChanged(LectureDeletion? value) => OnPropertyChanged(nameof(AskingDelete));
+    partial void OnDeletedChanged(LectureDeletion? value) => OnPropertyChanged(nameof(HasDeleted));
+
+    /// <summary>Asks before deleting a lecture: a row's (its context menu) or, with none, the open one (its header).</summary>
+    [RelayCommand]
+    void Delete(LectureCard? card)
+    {
+        if (card is not null) Deleting = new LectureDeletion(card.Id, card.Title, card.ClassName.Length > 0 ? card.ClassName : ClassTitle);
+        else if (Note is { } n) Deleting = new LectureDeletion(n.Id, n.Title, n.ClassName);
+    }
+
+    [RelayCommand]
+    void CancelDelete() => Deleting = null;
+
+    /// <summary>Delete, confirmed: the lecture leaves the list at once (the next one opens in its place), the
+    /// library deletes it, and "Deleted · Undo" shows for a few seconds. If the library refuses, the host lists
+    /// the class again.</summary>
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    async Task ConfirmDelete()
+    {
+        if (Deleting is not { } d) return;
+        Deleting = null;
+        var next = Remove(d);
+        Deleted = d;
+        if (next is not null && !Narrow) OnLecture?.Invoke(next);
+        bool ok = OnDelete is null || await OnDelete(d);
+        if (!ok)
+        {
+            if (Deleted == d) Deleted = null;
+            return;
+        }
+        _ = HideDeletedAfterAWhile(d);
+    }
+
+    async Task HideDeletedAfterAWhile(LectureDeletion d)
+    {
+        await Task.Delay(UndoShows);
+        if (Deleted == d) Deleted = null;
+    }
+
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    async Task Undo()
+    {
+        if (Deleted is not { } d) return;
+        Deleted = null;
+        if (OnUndo is not null) await OnUndo(d);
+    }
+
+    [RelayCommand]
+    void DismissDeleted() => Deleted = null;
+
+    /// <summary>Takes a lecture out of the list and the counts, and closes it if it's open. Hands back the lecture to
+    /// open in its place: the one after it, or before it at the end.</summary>
+    public LectureCard? Remove(LectureDeletion d)
+    {
+        var cards = Groups.SelectMany(g => g.Items).ToList();
+        int at = cards.FindIndex(c => c.Id == d.Id);
+        LectureCard? next = null;
+        if (at >= 0)
+        {
+            next = at + 1 < cards.Count ? cards[at + 1] : at > 0 ? cards[at - 1] : null;
+            foreach (var g in Groups.ToList())
+            {
+                if (g.Items.FirstOrDefault(c => c.Id == d.Id) is not { } card) continue;
+                g.Items.Remove(card);
+                if (g.Items.Count == 0) Groups.Remove(g);
+            }
+            int left = cards.Count - 1;
+            ClassCount = $"{left} lecture{(left == 1 ? "" : "s")}";
+            if (left == 0) Empty = $"No lectures in {ClassTitle} yet. Record one and it lands here.";
+        }
+        var cls = d.ClassName == Unsorted.Name ? Unsorted : Classes.FirstOrDefault(c => c.Name == d.ClassName && !c.IsDue);
+        if (cls is { Count: > 0 }) cls.Count--;
+        bool open = Note?.Id == d.Id;
+        if (open)
+        {
+            Note = null;
+            NarrowDetail = false;
+        }
+        return open ? next : null;
+    }
 
     public Action<ClassItem>? OnClass { get; set; }
     public Action<LectureCard>? OnLecture { get; set; }
