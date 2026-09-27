@@ -131,7 +131,7 @@ jobs:
   mac-intel:
     name: Mac app self-test (Intel)
     needs: [mac-app]
-    timeout-minutes: 15
+    timeout-minutes: 20
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v4

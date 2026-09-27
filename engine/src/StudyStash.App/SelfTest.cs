@@ -176,8 +176,8 @@ public static class SelfTest
         try
         {
             var script = Script();
-            if (await Task.WhenAny(script, Task.Delay(TimeSpan.FromMinutes(8))) != script)
-                throw new TimeoutException("the self-test ran past 8 minutes");
+            if (await Task.WhenAny(script, Task.Delay(TimeSpan.FromMinutes(12))) != script)
+                throw new TimeoutException("the self-test ran past 12 minutes");
             await script;
             Say("ok");
         }
@@ -319,7 +319,7 @@ public static class SelfTest
         Shot(Shell.Windows.Recorder, "recorder-expanded");
 
         Shell.Windows.StopRecording();
-        bool transcribed = await Until(() => host.Lectures.Get(live.Id)?.State is LectureState.Sending or LectureState.Writing or LectureState.Filed or LectureState.Failed, 120);
+        bool transcribed = await Until(() => host.Lectures.Get(live.Id)?.State is LectureState.Sending or LectureState.Writing or LectureState.Filed or LectureState.Failed, 300); // a CI Mac has no GPU: Whisper works through the rest of the lecture on its CPU
         l = host.Lectures.Get(live.Id);
         Say($"after stopping: {l?.State} ({l?.Segments.Count} lines, {TimedText.Clock(l?.Seconds ?? 0)})");
         if (!transcribed) throw new InvalidOperationException("Whisper never finished the lecture");
