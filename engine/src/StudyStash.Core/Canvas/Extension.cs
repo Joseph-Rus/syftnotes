@@ -101,7 +101,7 @@ public static class Extension
     /// <summary>What a connection code connects to; null when the text isn't one (whitespace from copying is fine).</summary>
     public static ExtensionConnection? ReadConnectionCode(string code)
     {
-        string text = string.Concat(code.Where(c => !char.IsWhiteSpace(c))).TrimEnd('=');
+        string text = string.Concat(code.Where(c => !char.IsWhiteSpace(c))).Trim('"', '\'').TrimEnd('=');
         if (text.Length == 0 || !System.Buffers.Text.Base64Url.IsValid(text)) return null;
         try
         {

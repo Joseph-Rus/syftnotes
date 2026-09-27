@@ -37,6 +37,7 @@ async function show() {
     return;
   }
   only(main);
+  $('recode').hidden = !conn.stored; // a store copy takes a new code when the library moves or its key changes
   let r;
   try {
     r = await fetch(conn.app + '/api/v2/canvas/status', {headers: {'X-Study-Stash-Key': conn.key}});
@@ -72,6 +73,11 @@ $('allow').onclick = () => allowAccess(conn).then(granted => {
   if (granted) wake();
   return show();
 }, () => show());
+$('recode').onclick = () => {
+  only(connect);
+  s.textContent = 'Paste the new code from Study Stash.';
+  code.focus();
+};
 $('sync').onclick = () => {
   wake();
   s.textContent = 'Syncing… you can close this.';
