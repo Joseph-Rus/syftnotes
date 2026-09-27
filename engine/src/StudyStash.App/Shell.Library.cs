@@ -582,7 +582,7 @@ public static partial class Shell
                         rows.Add(new QuickRow { Kind = QuickKind.Class, Title = S(c["name"]), ClassName = S(c["name"]), Dot = Skin.ClassDot(c["color"]?.GetValue<int>() ?? 0), Meta = $"{n} lecture{(n == 1 ? "" : "s")}" });
                     }
                 }
-                if (rows.Count == 0) quick.Note = $"Nothing matches “{query.Trim()}”. {(Skin.Current == SkinKind.Mac ? "⌘↩" : "Ctrl+Enter")} asks your notes instead.";
+                if (rows.Count == 0) quick.Note = $"Nothing matches “{query.Trim()}”. {(Skin.Current == SkinKind.Mac ? "⌘" + ViewModels.QuickModel.Return : "Ctrl+Enter")} asks your notes instead.";
             }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
             {
