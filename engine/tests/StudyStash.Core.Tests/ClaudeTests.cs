@@ -126,7 +126,8 @@ public class ClaudeTests
         Assert.Equal("Sam's library", lib["name"]!.GetValue<string>());
         // This computer's own app asking isn't a laptop.
         Assert.Equal("[]", lib["laptops"]!.ToJsonString());
-        Assert.Equal("[{\"name\":\"CS 101\",\"lectures\":1,\"color\":0},{\"name\":\"BIO 110\",\"lectures\":1,\"color\":1}]", lib["classes"]!.ToJsonString());
+        Assert.Equal("[{\"name\":\"CS 101\",\"lectures\":1,\"color\":0,\"code\":\"\",\"aliases\":[\"cs101\"]},{\"name\":\"BIO 110\",\"lectures\":1,\"color\":1,\"code\":\"\",\"aliases\":[]}]",
+            lib["classes"]!.ToJsonString());
 
         var list = (JsonArray)await Json(await c.SendAsync(Req(HttpMethod.Get, "/api/v2/lectures?class=CS%20101")));
         var one = list.Single()!;

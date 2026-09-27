@@ -70,11 +70,11 @@ public sealed partial class SetupClass : ObservableObject
 public sealed partial class SetupCourse : ObservableObject
 {
     public string Id { get; init; } = "";
-    /// <summary>The class's name: the course's code ("CS 101"), or its name when it has no code.</summary>
+    /// <summary>The class's name: the course's name on Canvas ("Intro to Programming"), cleaned of term codes.</summary>
     public string Name { get; init; } = "";
-    /// <summary>The course's name on Canvas ("Intro to Programming"), under the class's.</summary>
-    public string CourseName { get; init; } = "";
-    public bool HasCourseName => CourseName.Length > 0 && CourseName != Name;
+    /// <summary>The course's short code ("CS 101"), under the class's name; "" when it has none worth showing.</summary>
+    public string Code { get; init; } = "";
+    public bool HasCode => Code.Length > 0 && !Name.Contains(Code, StringComparison.OrdinalIgnoreCase);
     [ObservableProperty] public partial bool Ticked { get; set; } = true;
     [ObservableProperty] public partial string When { get; set; } = "";
 }
@@ -379,7 +379,7 @@ public sealed partial class SetupModel : ObservableObject
         var had = Courses.ToDictionary(c => c.Id);
         Courses.Clear();
         foreach (var f in found)
-            Courses.Add(had.TryGetValue(f.Id, out var row) ? row : new SetupCourse { Id = f.Id, Name = f.ClassName, CourseName = f.Name });
+            Courses.Add(had.TryGetValue(f.Id, out var row) ? row : new SetupCourse { Id = f.Id, Name = f.ClassName, Code = f.Code });
         OnPropertyChanged(nameof(HasCourses));
         OnPropertyChanged(nameof(ClassesLede));
     }

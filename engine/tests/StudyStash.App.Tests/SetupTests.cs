@@ -472,9 +472,10 @@ public sealed class SetupTests
         await canvas.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), [], TestContext.Current.CancellationToken);
 
         Assert.True(m.HasCourses);
-        Assert.Equal(["BIO 110", "CALC II", "CS 101", "HIST 210", "Study Skills"], m.Courses.Select(c => c.Name));
+        Assert.Equal(["Calculus II", "Cell and Molecular Biology", "Intro to Programming", "Modern World History", "Study Skills"], m.Courses.Select(c => c.Name));
         Assert.All(m.Courses, c => Assert.True(c.Ticked));
-        Assert.Equal("Intro to Programming", m.Courses.Single(c => c.Name == "CS 101").CourseName);
+        Assert.Equal("CS 101", m.Courses.Single(c => c.Name == "Intro to Programming").Code);
+        Assert.False(m.Courses.Single(c => c.Name == "Study Skills").HasCode);
         Assert.Contains("Canvas courses", m.ClassesLede);
 
         m.SkipCommand.Execute(null);
@@ -531,12 +532,12 @@ public sealed class SetupTests
 
             Assert.True(await Setup.AddCoursesAsync(m, host));
 
-            Assert.Equal(["BIO 110", "CS 101"], host.Timetable.Classes.Select(c => c.Name).Order());
-            Assert.Contains(host.Timetable.Classes.Single(c => c.Name == "CS 101").Times, t => t.Describe().Contains("Tue", StringComparison.Ordinal));
-            Assert.Empty(host.Timetable.Classes.Single(c => c.Name == "BIO 110").Times);
-            Assert.Equal(["BIO 110", "CS 101"], posted.Order());
+            Assert.Equal(["Cell Biology", "Intro to Programming"], host.Timetable.Classes.Select(c => c.Name).Order());
+            Assert.Contains(host.Timetable.Classes.Single(c => c.Name == "Intro to Programming").Times, t => t.Describe().Contains("Tue", StringComparison.Ordinal));
+            Assert.Empty(host.Timetable.Classes.Single(c => c.Name == "Cell Biology").Times);
+            Assert.Equal(["Cell Biology", "Intro to Programming"], posted.Order());
             for (int i = 0; i < 50 && bodies.Count < 2; i++) await Task.Delay(20, TestContext.Current.CancellationToken); // the sync is asked for without waiting
-            Assert.Equal("{\"courses\":{\"CS 101\":4201,\"BIO 110\":4202}}", bodies[0]);
+            Assert.Equal("{\"courses\":{\"Intro to Programming\":4201,\"Cell Biology\":4202}}", bodies[0]);
             Assert.Equal("{\"sync\":true}", bodies[1]);
             Assert.False(m.AddingCourses);
         }
@@ -559,7 +560,7 @@ public sealed class SetupTests
         await m.NextCommand.ExecuteAsync(null);
 
         Assert.Equal(SetupStep.Classes, m.Step);
-        Assert.Contains("CS 101", m.ClassProblem);
+        Assert.Contains("Intro to Programming", m.ClassProblem);
         Assert.Empty(host.Timetable.Classes);
     }
 

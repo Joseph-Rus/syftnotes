@@ -439,8 +439,8 @@
                       <CheckBox Classes="tick" IsChecked="{Binding Ticked}" VerticalAlignment="Center" />
                       <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="1">
                         <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <TextBlock Text="{Binding CourseName}" IsVisible="{Binding HasCourseName}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis"
-                                   ToolTip.Tip="{Binding CourseName}" />
+                        <TextBlock Text="{Binding Code}" IsVisible="{Binding HasCode}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding Code}" />
                       </StackPanel>
                       <Border Grid.Column="4" Grid.ColumnSpan="3" Classes="field" IsEnabled="{Binding Ticked}">
                         <TextBox Classes="bare" Text="{Binding When}" PlaceholderText="When, like Tue Thu 10:00–11:15" FontSize="14" />
