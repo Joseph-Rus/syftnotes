@@ -282,6 +282,7 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         Assert.InRange(writes, 1, 8);
         Assert.Equal(update, CanvasSettings.Load(rig.Home).ExtensionUpdate);
 
+        int mark = rig.Canvas.Hits.Count;
         for (int i = 0; i < 3; i++)
         {
             sw.Restart();
@@ -289,8 +290,7 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
             Assert.Equal("", ExtensionRig.S(found["error"]));
             Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5), $"Find took {sw.Elapsed.TotalSeconds:0.0} s with two Chromes waiting");
         }
-        var hosts = rig.Canvas.HitsTo("/api/v1/courses").Select(h => h.Host).Distinct().ToList();
-        Note($"three Finds with two Chromes answered; Canvas asked under {string.Join(", ", hosts)}");
+        Note($"three Finds with two Chromes answered, each at once ({rig.Canvas.Hits.Skip(mark).Count(h => h.PathAndQuery.StartsWith("/api/v1/courses?", StringComparison.Ordinal))} course listings read)");
         rig.StopLaptopChrome();
     }
 
