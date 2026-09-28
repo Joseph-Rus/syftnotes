@@ -434,4 +434,31 @@ public class NoteViewRichTests
         bool rgba = frame.Format == Avalonia.Platform.PixelFormats.Rgba8888;
         return rgba ? Color.FromArgb(buffer[3], buffer[0], buffer[1], buffer[2]) : Color.FromArgb(buffer[3], buffer[2], buffer[1], buffer[0]);
     }
+
+    /// <summary>A Markdown table is shown, not dropped: its header in semibold, each row's cells in their columns
+    /// with the alignment the Markdown gave them, and a formula in a cell typeset.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void A_table_shows_its_header_and_rows_with_formulas_typeset_in_its_cells(SkinKind skin)
+    {
+        var note = new NoteView
+        {
+            Markdown = "## Values\n\n| Measure | Normal |\n|---|---:|\n| Mean arterial pressure | $\\text{DBP} + \\frac{1}{3}(\\text{SBP} - \\text{DBP})$ |\n| Heart rate | 60–100 |\n\nAfter the table.",
+        };
+        var window = Show(note, skin);
+        var words = note.GetVisualDescendants().OfType<TextBlock>().ToList();
+        string Of(TextBlock t) => t.Text ?? string.Concat(t.Inlines?.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text) ?? []);
+        var header = words.Single(t => Of(t) == "Measure");
+        Assert.Equal(FontWeight.SemiBold, header.FontWeight);
+        var rate = words.Single(t => Of(t) == "Heart rate");
+        var range = words.Single(t => Of(t) == "60–100");
+        Assert.Equal(TextAlignment.Right, range.TextAlignment);
+        Assert.True(range.TranslatePoint(default, note)!.Value.X > rate.TranslatePoint(default, note)!.Value.X + 100, "the second column sits to the right of the first");
+        var formula = Assert.Single(note.GetVisualDescendants().OfType<MathView>());
+        Assert.Null(formula.ErrorMessage);
+        Assert.True(formula.Bounds.Width > 40);
+        Assert.Contains(words, t => Of(t) == "After the table.");
+        window.Close();
+    }
 }

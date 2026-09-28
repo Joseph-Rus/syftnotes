@@ -62,6 +62,18 @@ jobs:
         env:
           # Windows: also run the library as a real background service, from the Startup folder with no window.
           STUDYSTASH_LIVE_SERVICE: ${{ runner.os == 'Windows' && '1' || '' }}
+          # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
+          # draws them (its own fonts), in the Windows look, light and dark, at 100% and 150%.
+          STUDYSTASH_SHOTS: ${{ runner.os == 'Windows' && format('{0}\shots', runner.temp) || '' }}
+      - name: The notes' formulas and diagrams, as Windows draws them
+        if: ${{ always() && runner.os == 'Windows' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-rich-notes
+          path: |
+            ${{ runner.temp }}\shots\richwin-*
+            ${{ runner.temp }}\shots\rich-*-win-*
+          if-no-files-found: error
 
   # The Mac app: one universal bundle for Apple silicon and Intel, started by its own launcher (D1); ad hoc
   # signed with the microphone entitlement; both roles' DMGs (D2). Proved with the real self-test (D5): real
@@ -177,8 +189,9 @@ jobs:
           name: mac-intel-selftest
           path: ${{ runner.temp }}/selftest
 
-  # The Windows app: one AppId for both roles (D2/D3), self-tested (D5) as a laptop and as just this computer, installed, updated in place with a
-  # silent Setup.exe, and uninstalled without touching lectures or settings outside the install folder.
+  # The Windows app: one AppId for both roles (D2/D3), self-tested (D5) as just this computer, installed, self-tested as a laptop from the
+  # installed copy (so what Setup.exe put there, native code and all, is what runs), updated in place with a silent Setup.exe, and uninstalled
+  # without touching lectures or settings outside the install folder.
   windows-app:
     name: Windows app (Setup.exe, self-test, install)
     needs: [version, engine]
@@ -226,24 +239,22 @@ jobs:
           echo "V=$V" >> $env:GITHUB_ENV
           $bad = Get-ChildItem dist\windows -Recurse -File -Filter "*.bin" -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1MB }
           if ($bad) { throw "a model file is bundled: $($bad.FullName -join ', ')" }
-      - name: Self-test (D5)
-        if: needs.version.outputs.tested != 'true'
+      - name: Both trees carry the notes' formula and diagram code, its native parts built for their own processor, and no debug symbols
         shell: pwsh
         run: |
-          $selftestHome = "$env:RUNNER_TEMP\selftest-home"
-          $out = "$env:RUNNER_TEMP\selftest"
-          New-Item -ItemType Directory -Force -Path $selftestHome, $out | Out-Null
-          $env:STUDYSTASH_SELFTEST = $out
-          $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
-          $env:STUDYSTASH_MIC_SPEED = "4"
-          $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
-          $p = Start-Process -FilePath "dist\windows\win-x64\StudyStash.exe" -ArgumentList "--home", $selftestHome -PassThru
-          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Study Stash didn't exit within 480 s" }
-          $lines = Get-Content "$out\selftest.txt"
-          $lines | Write-Host
-          if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }
-          if ($lines[-1] -ne "ok") { throw "last line was not ok" }
-          if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
+          foreach ($tree in @(@("win-x64", 0x8664), @("win-arm64", 0xAA64))) {
+            $rid = $tree[0]; $machine = $tree[1]
+            foreach ($f in "CSharpMath.SkiaSharp.dll", "CSharpMath.Rendering.dll", "Svg.Skia.dll", "Microsoft.Msagl.dll", "Markdig.dll", "SkiaSharp.dll", "HarfBuzzSharp.dll") {
+              if (-not (Test-Path "dist\windows\$rid\$f")) { throw "$rid has no $f" }
+            }
+            foreach ($f in "libSkiaSharp.dll", "libHarfBuzzSharp.dll") {
+              $bytes = [IO.File]::ReadAllBytes("dist\windows\$rid\$f")
+              $built = [BitConverter]::ToUInt16($bytes, [BitConverter]::ToInt32($bytes, 0x3C) + 4)
+              if ($built -ne $machine) { throw "$rid\$f is built for machine 0x$('{0:X}' -f $built), not 0x$('{0:X}' -f $machine)" }
+            }
+            $symbols = @(Get-ChildItem "dist\windows\$rid" -Recurse -File -Filter "*.pdb")
+            if ($symbols.Count -gt 0) { throw "$rid carries debug symbols: $($symbols.Name -join ', ')" }
+          }
       - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and quitting stops it
         if: needs.version.outputs.tested != 'true'
         shell: pwsh
@@ -287,6 +298,26 @@ jobs:
           if (-not (Select-String -Path "$app\study-stash.ini" -Pattern "role\s*=\s*laptop" -Quiet)) { throw "not marked laptop" }
           $printed = (& "$app\StudyStash.exe" version | Out-String).Trim()
           if ($printed -ne $env:V) { throw "installed version '$printed', expected '$env:V'" }
+      - name: Self-test (D5), from the copy the Laptop installer put there - its native code came with it, and a lecture's formulas and flowchart draw
+        if: needs.version.outputs.tested != 'true'
+        shell: pwsh
+        run: |
+          $selftestHome = "$env:RUNNER_TEMP\selftest-home"
+          $out = "$env:RUNNER_TEMP\selftest"
+          New-Item -ItemType Directory -Force -Path $selftestHome, $out | Out-Null
+          $env:STUDYSTASH_SELFTEST = $out
+          $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
+          $env:STUDYSTASH_MIC_SPEED = "4"
+          $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
+          $p = Start-Process -FilePath "$env:LOCALAPPDATA\Programs\Study Stash\StudyStash.exe" -ArgumentList "--home", $selftestHome -PassThru
+          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Study Stash didn't exit within 480 s" }
+          $lines = Get-Content "$out\selftest.txt"
+          $lines | Write-Host
+          if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }
+          if ($lines[-1] -ne "ok") { throw "last line was not ok" }
+          if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
+          if (-not ($lines -match "^rich notes: .* typeset; a flowchart laid out")) { throw "the self-test didn't see the notes' formulas and flowchart drawn" }
+          if (-not ($lines -match "^opened larger: ")) { throw "the self-test didn't open the flowchart larger" }
       - name: The Library installer, over it, is an in-place upgrade marked library
         if: needs.version.outputs.tested != 'true'
         shell: pwsh

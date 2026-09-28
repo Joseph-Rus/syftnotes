@@ -52,7 +52,10 @@ public abstract class AiProvider
     /// <summary>Models to offer: id ("" is the provider's own default) and what it's good for.</summary>
     public virtual IReadOnlyList<(string Id, string Label)> Models => [("", "Its default model")];
 
-    public virtual string? Exe() => Which(Binary);
+    /// <summary>Where its command is, when that's not where <see cref="Which"/> looks (a test's stand-in).</summary>
+    public string? At { get; init; }
+
+    public virtual string? Exe() => At ?? Which(Binary);
     public virtual bool Available() => Exe() is not null;
 
     /// <summary>The prompt goes in on the command's input, not its command line (for the CLIs that read it there: see
@@ -156,14 +159,17 @@ public abstract class AiProvider
     protected static async IAsyncEnumerable<AiEvent> Spawn(List<string> cmd, string cwd, TimeSpan timeout,
         Func<string, IEnumerable<AiEvent>> parse, string? input = null, [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var psi = new ProcessStartInfo(cmd[0])
+        // On Windows an npm-installed CLI is a .cmd, which cmd.exe would mangle the arguments of: see WindowsCommand.
+        var launch = OperatingSystem.IsWindows() ? WindowsCommand.For(cmd) : new Launch(cmd[0], cmd[1..]);
+        var psi = new ProcessStartInfo(launch.FileName)
         {
             WorkingDirectory = cwd, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true,
             UseShellExecute = false, CreateNoWindow = true, StandardOutputEncoding = Encoding.UTF8,
             // UTF-8 with no byte-order mark: Windows would otherwise send the prompt in its old code page.
             StandardInputEncoding = new UTF8Encoding(false),
         };
-        foreach (string a in cmd.Skip(1)) psi.ArgumentList.Add(a);
+        if (launch.CommandLine is { } whole) psi.Arguments = whole;
+        else foreach (string a in launch.Arguments) psi.ArgumentList.Add(a);
         psi.Environment["PATH"] = SearchPath();
         psi.Environment.Remove("CLAUDECODE"); // started from inside Claude Code, claude would refuse to nest
         Process? p;
@@ -287,7 +293,8 @@ public sealed class ClaudeProvider : AiProvider
         var never = new List<string> { "Bash", "NotebookEdit", "WebFetch", "WebSearch", "Task" };
         if (req.Write) allowed.AddRange([$"Edit(/{root}/**)", $"Write(/{root}/**)"]);
         else never.AddRange(["Edit", "Write"]);
-        var cmd = new List<string> { Exe() ?? "claude", "-p" };
+        string exe = Exe() ?? "claude";
+        var cmd = new List<string> { exe, "-p" };
         if (!PromptOnInput) cmd.Add(req.Prompt);
         cmd.AddRange(["--output-format", "stream-json", "--verbose"]);
         if (stream) cmd.Add("--include-partial-messages");
@@ -301,15 +308,21 @@ public sealed class ClaudeProvider : AiProvider
         cmd.AddRange(allowed);
         cmd.Add("--disallowedTools");
         cmd.AddRange(never);
-        if (req.System.Length > 0) cmd.AddRange(["--append-system-prompt", req.System]);
+        if (req.System.Length > 0 && !SystemOnInput(exe)) cmd.AddRange(["--append-system-prompt", req.System]);
         foreach (string d in req.ReadDirs) cmd.AddRange(["--add-dir", d]);
         if (req.Model.Length > 0) cmd.AddRange(["--model", req.Model]);
         if (req.Session.Length > 0) cmd.AddRange(["--resume", req.Session]);
         return cmd;
     }
 
-    /// <summary>`claude -p` with no prompt on its command line reads it from its input.</summary>
-    public override string? Input(AiRequest req) => PromptOnInput ? req.Prompt : null;
+    /// <summary>`claude -p` with no prompt on its command line reads it from its input, the system brief first when it
+    /// can't go on the command line (<see cref="SystemOnInput"/>).</summary>
+    public override string? Input(AiRequest req) => !PromptOnInput ? null : SystemOnInput(Exe() ?? "claude") ? WithSystem(req) : req.Prompt;
+
+    /// <summary>Whether the system brief goes in on the input, ahead of the prompt, instead of on the command line:
+    /// only for a claude that would run through cmd.exe (a claude.cmd that isn't an npm shim
+    /// <see cref="WindowsCommand"/> can see through), where a brief of several lines would be cut at its first.</summary>
+    bool SystemOnInput(string exe) => PromptOnInput && WindowsCommand.ThroughCmd(exe);
 
     public override IEnumerable<AiEvent> Parse(string line)
     {

@@ -533,7 +533,7 @@ public static partial class Shell
         if (library.Note is not { } note || mainWindow?.Content is not Control anchor || mainWindow is null || host.Remote() is not { } lib) return;
         string? cls = dueOpen ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
         DownloadMenu.Build(cls, host.Settings.DownloadTranscripts,
-            download: () => _ = NotesDownload.LectureAsync(mainWindow, lib, note.Id, Notes.Slugify(note.Title) + ".md", host.Settings.DownloadTranscripts, MermaidSvg()),
+            download: () => _ = NotesDownload.LectureAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title), host.Settings.DownloadTranscripts, MermaidSvg()),
             downloadClass: () => _ = NotesDownload.ClassAsync(mainWindow, lib, cls!, host.Settings.DownloadTranscripts, MermaidSvg()),
             toggleTranscripts: () => host.Save(s => s.DownloadTranscripts = !s.DownloadTranscripts)).Open(anchor);
     }
