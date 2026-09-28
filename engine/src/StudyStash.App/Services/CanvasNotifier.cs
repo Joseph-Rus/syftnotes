@@ -6,8 +6,8 @@ namespace StudyStash.App.Services;
 /// <summary>
 /// Watches for new Canvas notifications and turns them into toasts (design 12). The very first poll a laptop ever
 /// makes only records where the library's list currently ends — a fresh install shouldn't dump every notification
-/// Canvas has ever produced as toasts — and every poll after that turns what's new since the last one into up to
-/// three toasts, the most recent one <see cref="CanvasToastModel.Expanded"/>. Remembers the bookmark in
+/// Canvas has ever produced as toasts — and every poll after that turns what's new since the last one (and not seen
+/// already, somewhere else) into up to three toasts, the most recent one <see cref="CanvasToastModel.Expanded"/>. Remembers the bookmark in
 /// <c>&lt;home&gt;/canvas-notified.json</c> so a restart carries on rather than starting over.
 /// </summary>
 public sealed class CanvasNotifier(CanvasContext context)
@@ -56,14 +56,18 @@ public sealed class CanvasNotifier(CanvasContext context)
         bool firstRun = after is null;
         var resp = await client.NotificationsAsync(after, stop);
         if (resp is null) return [];
+        // The library's list ends before the bookmark: it isn't the list the bookmark was for (another library, or one
+        // started afresh). Like a first poll, that only marks where it ends now: none of it is new to this laptop.
+        bool startedOver = after is { } mark && resp.Last is { } last && last < mark;
         after = resp.Last ?? after;
         Save();
-        if (firstRun) return [];
+        if (firstRun || startedOver) return [];
 
         var zone = context.Clock.Zone;
         var now = context.Clock.Now();
-        // The library lists oldest first; the most recently posted is the one we make prominent, at most three.
-        var newest = resp.Items.TakeLast(3).Reverse().ToList();
+        // The library lists oldest first; the most recently posted is the one we make prominent, at most three. One
+        // already seen (opened on the library's page, or on another laptop) isn't news here.
+        var newest = resp.Items.Where(n => !n.Seen).TakeLast(3).Reverse().ToList();
         var toasts = new List<CanvasToastModel>(newest.Count);
         for (int i = 0; i < newest.Count; i++)
         {

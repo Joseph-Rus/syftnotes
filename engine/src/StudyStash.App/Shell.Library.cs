@@ -178,6 +178,12 @@ public static partial class Shell
             {
             }
             if (turn != libraryTurn) return;
+            // A notification's announcement: its own reader, not a lecture.
+            if (announcementToOpen is { } announcement)
+            {
+                announcementToOpen = null;
+                if (page.OpenAnnouncement(announcement.ToString(CultureInfo.InvariantCulture))) return;
+            }
         }
         else ShowLectureList();
         string? pick = openLecture is not null && lectures.Any(l => S(l["id"]) == openLecture) ? openLecture : lectures.Select(l => S(l["id"])).FirstOrDefault();
@@ -248,7 +254,8 @@ public static partial class Shell
         {
             return;
         }
-        if (l is null) return;
+        // Another lecture was asked for while this one loaded (a notification's Open note, a click): that one shows.
+        if (l is null || openLecture != id) return;
         var date = Date(S(l["date"]))?.LocalDateTime;
         string meta = string.Join(" · ", new[]
         {
@@ -397,6 +404,8 @@ public static partial class Shell
 
     static void OpenLecture(string id, bool transcript = false)
     {
+        // Whichever load of the window finishes last (its class, or this lecture's) shows this lecture.
+        openLecture = id;
         ShowLibrary();
         _ = OpenLectureAsync(id, transcript);
     }

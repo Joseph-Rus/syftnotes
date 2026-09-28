@@ -39,7 +39,62 @@ public class Floating : Window
             LastDeactivateHide = DateTime.UtcNow;
         };
         Opened += (_, _) => JoinFullScreenSpaces();
+        PositionChanged += (_, _) => SayClearAreaChanged();
     }
+
+    /// <summary>Notifications step out of this window's way (the dropdown, the recorder, the quick panel): they never
+    /// cover it.</summary>
+    public bool KeepClear { get; init; }
+
+    /// <summary>A window that <see cref="KeepClear"/>s showed, hid, moved or changed size: notifications look again at
+    /// where they can go.</summary>
+    public static event Action? ClearAreaChanged;
+
+    void SayClearAreaChanged()
+    {
+        if (KeepClear) ClearAreaChanged?.Invoke();
+    }
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == IsVisibleProperty || change.Property == ClientSizeProperty) SayClearAreaChanged();
+    }
+
+    /// <summary>The panel it shows, on screen in pixels (the window less its shadow room); null while it's hidden.</summary>
+    public PixelRect? Panel()
+    {
+        if (!IsVisible) return null;
+        double scale = DesktopScaling;
+        int room = (int)(ShadowRoom * scale);
+        var size = PixelSize.FromSize(ClientSize, scale);
+        return new PixelRect(Position.X + room, Position.Y + room, Math.Max(0, size.Width - 2 * room), Math.Max(0, size.Height - 2 * room));
+    }
+
+    /// <summary>Clicking it never takes the keyboard from the app you're typing in (Windows: it isn't activated by a
+    /// click, as the system's own notifications aren't). A Mac is looked after by <see cref="Platform.MacFocus"/>.</summary>
+    public bool NoActivate
+    {
+        get => noActivate;
+        init
+        {
+            noActivate = value;
+            if (value && OperatingSystem.IsWindows()) Win32Properties.AddWndProcHookCallback(this, NoActivateHook);
+        }
+    }
+
+    readonly bool noActivate;
+
+    const uint WmMouseActivate = 0x0021;
+    const int MaNoActivate = 3;
+
+    /// <summary>WM_MOUSEACTIVATE answered "don't activate": the click still lands on the button under it.</summary>
+    static readonly Win32Properties.CustomWndProcHookCallback NoActivateHook = (IntPtr _, uint msg, IntPtr _, IntPtr _, ref bool handled) =>
+    {
+        if (msg != WmMouseActivate) return IntPtr.Zero;
+        handled = true;
+        return MaNoActivate;
+    };
 
     /// <summary>A Mac: let this window show over a full-screen app's own Space (a lecture on a full-screen Zoom
     /// call), instead of being stuck behind it, and turn off AppKit's own window shadow — for a clear window it's

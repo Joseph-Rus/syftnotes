@@ -5,9 +5,13 @@ namespace StudyStash.App.Tests;
 
 public class CanvasNotifierTests
 {
-    static FakeLibrary Library() => new FakeLibrary()
-        .Json(HttpMethod.Get, "/api/v2/canvas/notifications", "notifications")
+    /// <summary>The library's three notifications (<c>notifications.json</c>), none seen yet unless
+    /// <paramref name="asFixture"/> keeps the fixture's own (the first two seen, somewhere else).</summary>
+    static FakeLibrary Library(bool asFixture = false) => new FakeLibrary()
+        .Json(HttpMethod.Get, "/api/v2/canvas/notifications", asFixture ? "notifications" : Unseen())
         .Json(HttpMethod.Post, "/api/v2/canvas/notifications/seen", "{}");
+
+    static string Unseen() => CanvasFixtures.Text("notifications").Replace("\"seen\": true", "\"seen\": false");
 
     [Fact]
     public async Task The_first_poll_ever_is_quiet_it_only_marks_where_the_library_s_list_currently_ends()
@@ -89,6 +93,34 @@ public class CanvasNotifierTests
         Assert.False(opened);
         var seen = fake.Requests.Single(r => r.Path == "/api/v2/canvas/notifications/seen");
         Assert.Contains("\"up_to\":2", seen.Body);
+    }
+
+    [Fact]
+    public async Task One_already_seen_somewhere_else_isnt_news_here()
+    {
+        using var home = new TempHome();
+        var notifier = new CanvasNotifier(CanvasFixtures.Context(Library(asFixture: true), home.Path));
+        await notifier.PollAsync(TestContext.Current.CancellationToken);
+
+        var toasts = await notifier.PollAsync(TestContext.Current.CancellationToken);
+
+        // The fixture's first two were seen (on the library's page, or another laptop): only the new score shows.
+        Assert.Equal("New score", Assert.Single(toasts).Title);
+        Assert.True(toasts[0].Expanded);
+    }
+
+    [Fact]
+    public async Task A_library_whose_list_ends_before_the_bookmark_is_a_new_list_and_starts_quietly()
+    {
+        using var home = new TempHome();
+        // A bookmark from another library, far past the end of this one's list (which ends at 3).
+        File.WriteAllText(home["canvas-notified.json"], """{"After": 250}""");
+        var notifier = new CanvasNotifier(CanvasFixtures.Context(Library(), home.Path));
+
+        Assert.Empty(await notifier.PollAsync(TestContext.Current.CancellationToken));
+        Assert.Contains("\"After\":3", File.ReadAllText(home["canvas-notified.json"]));
+        // From here on, it's news as usual (the fake answers with the same three).
+        Assert.Equal(3, (await notifier.PollAsync(TestContext.Current.CancellationToken)).Count);
     }
 
     [Fact]

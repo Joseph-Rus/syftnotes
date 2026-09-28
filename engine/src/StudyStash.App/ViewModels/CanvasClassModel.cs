@@ -177,12 +177,14 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         AnnouncementsCountText = CanvasWords.AnnouncementsCountText(AnnouncementsCount, AnnouncementsNew);
         OnPropertyChanged(nameof(HasAnnouncementsNew));
         Announcements.Clear();
+        announcementItems.Clear();
         foreach (var a in announcements.Items)
         {
             var row = new AnnouncementRow { Title = a.Title, When = CanvasWords.Day(a.PostedAt, zone), New = a.New };
             var apiItem = a;
             row.OnOpen = _ => OpenAnnouncement(row, apiItem);
             Announcements.Add(row);
+            announcementItems[a.Id] = (row, a);
         }
     }
 
@@ -294,6 +296,18 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
         if (await client.DownloadAsync(cls, path, dest)) context.Actions.OpenFile(dest);
     }
+
+    /// <summary>Opens the announcement with Canvas id <paramref name="id"/> in its reader, on the Announcements tab
+    /// (a notification's Open); false when this class hasn't got it (any more).</summary>
+    public bool OpenAnnouncement(string id)
+    {
+        if (!announcementItems.TryGetValue(id, out var found)) return false;
+        Tab = ClassTab.Announcements;
+        OpenAnnouncement(found.Row, found.Item);
+        return true;
+    }
+
+    readonly Dictionary<string, (AnnouncementRow Row, CanvasApi.AnnouncementRow Item)> announcementItems = [];
 
     void OpenAnnouncement(AnnouncementRow row, CanvasApi.AnnouncementRow a)
     {
