@@ -189,8 +189,9 @@ jobs:
           name: mac-intel-selftest
           path: ${{ runner.temp }}/selftest
 
-  # The Windows app: one AppId for both roles (D2/D3), self-tested (D5) as a laptop and as just this computer, installed, updated in place with a
-  # silent Setup.exe, and uninstalled without touching lectures or settings outside the install folder.
+  # The Windows app: one AppId for both roles (D2/D3), self-tested (D5) as just this computer, installed, self-tested as a laptop from the
+  # installed copy (so what Setup.exe put there, native code and all, is what runs), updated in place with a silent Setup.exe, and uninstalled
+  # without touching lectures or settings outside the install folder.
   windows-app:
     name: Windows app (Setup.exe, self-test, install)
     needs: [version, engine]
@@ -238,24 +239,6 @@ jobs:
           echo "V=$V" >> $env:GITHUB_ENV
           $bad = Get-ChildItem dist\windows -Recurse -File -Filter "*.bin" -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1MB }
           if ($bad) { throw "a model file is bundled: $($bad.FullName -join ', ')" }
-      - name: Self-test (D5)
-        if: needs.version.outputs.tested != 'true'
-        shell: pwsh
-        run: |
-          $selftestHome = "$env:RUNNER_TEMP\selftest-home"
-          $out = "$env:RUNNER_TEMP\selftest"
-          New-Item -ItemType Directory -Force -Path $selftestHome, $out | Out-Null
-          $env:STUDYSTASH_SELFTEST = $out
-          $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
-          $env:STUDYSTASH_MIC_SPEED = "4"
-          $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
-          $p = Start-Process -FilePath "dist\windows\win-x64\StudyStash.exe" -ArgumentList "--home", $selftestHome -PassThru
-          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Study Stash didn't exit within 480 s" }
-          $lines = Get-Content "$out\selftest.txt"
-          $lines | Write-Host
-          if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }
-          if ($lines[-1] -ne "ok") { throw "last line was not ok" }
-          if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
       - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and quitting stops it
         if: needs.version.outputs.tested != 'true'
         shell: pwsh
@@ -299,6 +282,26 @@ jobs:
           if (-not (Select-String -Path "$app\study-stash.ini" -Pattern "role\s*=\s*laptop" -Quiet)) { throw "not marked laptop" }
           $printed = (& "$app\StudyStash.exe" version | Out-String).Trim()
           if ($printed -ne $env:V) { throw "installed version '$printed', expected '$env:V'" }
+      - name: Self-test (D5), from the copy the Laptop installer put there - its native code came with it, and a lecture's formulas and flowchart draw
+        if: needs.version.outputs.tested != 'true'
+        shell: pwsh
+        run: |
+          $selftestHome = "$env:RUNNER_TEMP\selftest-home"
+          $out = "$env:RUNNER_TEMP\selftest"
+          New-Item -ItemType Directory -Force -Path $selftestHome, $out | Out-Null
+          $env:STUDYSTASH_SELFTEST = $out
+          $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
+          $env:STUDYSTASH_MIC_SPEED = "4"
+          $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
+          $p = Start-Process -FilePath "$env:LOCALAPPDATA\Programs\Study Stash\StudyStash.exe" -ArgumentList "--home", $selftestHome -PassThru
+          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Study Stash didn't exit within 480 s" }
+          $lines = Get-Content "$out\selftest.txt"
+          $lines | Write-Host
+          if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }
+          if ($lines[-1] -ne "ok") { throw "last line was not ok" }
+          if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
+          if (-not ($lines -match "^rich notes: .* typeset; a flowchart laid out")) { throw "the self-test didn't see the notes' formulas and flowchart drawn" }
+          if (-not ($lines -match "^opened larger: ")) { throw "the self-test didn't open the flowchart larger" }
       - name: The Library installer, over it, is an in-place upgrade marked library
         if: needs.version.outputs.tested != 'true'
         shell: pwsh
