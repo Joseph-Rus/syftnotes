@@ -58,7 +58,12 @@ public static class EngineSetupWords
         {
             ("ollama", "not_installed") =>
             [
-                new HowToStep($"Download Ollama from ollama.com and open it", Note: $"It's free and runs on this {(windows ? "PC" : "Mac")}: nothing you record leaves it."),
+                new HowToStep("Download Ollama from ollama.com and open it", Note: $"It's free and runs on this {(windows ? "PC" : "Mac")}: nothing you record leaves it."),
+            ],
+            ("ollama", "not_running") => [new HowToStep("Open the Ollama app, or start it from here")],
+            ("ollama", "model_missing") =>
+            [
+                new HowToStep("Download the model it writes notes with", Note: $"A few gigabytes, once. It runs on this {(windows ? "PC" : "Mac")}: nothing you record leaves it."),
             ],
             ("claude" or "codex", "not_installed") =>
             [

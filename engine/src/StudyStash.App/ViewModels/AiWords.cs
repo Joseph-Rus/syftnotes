@@ -71,7 +71,13 @@ public static partial class AiWords
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup
     /// the library is this computer.</summary>
     public static string SetupAbout(string id, string state, string device = "computer") => id == "ollama"
-        ? state == "not_installed" ? $"Free and private, but not on this {device} yet." : "Private. Runs here, nothing leaves this computer."
+        ? state switch
+        {
+            "not_installed" => $"Free and private, but not on this {device} yet.",
+            "not_running" => "Installed. Start it to write notes.",
+            "model_missing" => "Installed. It needs the model it writes notes with.",
+            _ => "Private. Runs here, nothing leaves this computer.",
+        }
         : state switch
         {
             "ready" => "Signed in on this computer.",

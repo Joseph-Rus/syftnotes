@@ -191,7 +191,14 @@ public sealed partial class AiSetupModel : ObservableObject
                     Number = i + 1, Title = h.Title, Command = h.Command, Note = h.Note,
                     CopyCommand = new RelayCommand(() => Copy?.Invoke(h.Command)),
                 })],
-                OpenLabel = e.Id == "ollama" ? "Get Ollama" : e.State == "not_signed_in" ? $"Sign in in {terminal}" : $"Open {terminal}",
+                OpenLabel = (e.Id, e.State) switch
+                {
+                    ("ollama", "not_running") => "Start Ollama",
+                    ("ollama", "model_missing") => "Download the model",
+                    ("ollama", _) => "Get Ollama",
+                    (_, "not_signed_in") => $"Sign in in {terminal}",
+                    _ => $"Open {terminal}",
+                },
                 ShowHelp = open.Contains(e.Id) && steps.Count > 0,
                 HelpChanged = () => HelpOpen = Engines.Any(r => r.ShowHelp),
             };
@@ -232,6 +239,11 @@ public sealed partial class AiSetupModel : ObservableObject
 
     async Task OpenAsync(AiSetupRow row)
     {
+        if (row.Id == "ollama" && row.State is "not_running" or "model_missing")
+        {
+            await ActAsync(() => row.State == "not_running" ? library.StartAsync("ollama") : library.DownloadAsync("ollama"));
+            return;
+        }
         if (row.Id == "ollama")
         {
             OpenUrl?.Invoke("https://ollama.com/download");
@@ -276,9 +288,17 @@ public sealed partial class AiSetupModel : ObservableObject
             string name = row?.Name ?? Core.Ai.Engines.Name(id);
             if (row is { CanWrite: true })
             {
-                ShowHelpOf(row, false);
                 SelectedNotes = id;
-                Say = $"{name} is ready. It writes your notes.";
+                if (row.HasHelp)
+                {
+                    // Ollama's here, but still needs starting or its model: the next step shows.
+                    Say = $"{name} is here. {row.About}";
+                }
+                else
+                {
+                    ShowHelpOf(row, false);
+                    Say = $"{name} is ready. It writes your notes.";
+                }
             }
             else
             {
@@ -301,12 +321,16 @@ public sealed partial class AiSetupModel : ObservableObject
         }
     }
 
-    async Task SignInAsync(string id)
+    Task SignInAsync(string id) => ActAsync(() => library.SignInAsync(id));
+
+    /// <summary>One of the library's engine actions (sign in, start Ollama, download its model): what it said, and
+    /// the rows as they are after it.</summary>
+    async Task ActAsync(Func<Task<AiSaid?>> act)
     {
         Busy = true;
         try
         {
-            var said = await library.SignInAsync(id);
+            var said = await act();
             if (said is null) { OlderLibrary = true; return; }
             Say = said.Said;
             if (said.Overview is not null) Apply(said.Overview);

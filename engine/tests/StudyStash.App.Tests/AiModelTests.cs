@@ -458,6 +458,38 @@ public class AiSetupModelTests
     }
 
     [AvaloniaFact]
+    public async Task Ollama_once_installed_offers_to_start_or_fetch_its_model_from_setup()
+    {
+        var lib = new FakeAiLibrary { Overview = With(("ollama", "not_installed")) };
+        var opened = new List<string>();
+        var model = new AiSetupModel(lib) { Windows = false, OpenUrl = opened.Add };
+        await model.Load();
+        var ollama = model.Engines.Single(r => r.Id == "ollama");
+        Assert.Equal("Get Ollama", ollama.OpenLabel);
+        await ollama.OpenCommand.ExecuteAsync(null);
+        Assert.Equal(["https://ollama.com/download"], opened);
+
+        // Installed now, but without the model it writes notes with.
+        lib.Overview = With(("ollama", "model_missing"));
+        await model.Engines.Single(r => r.Id == "ollama").CheckAgainCommand.ExecuteAsync(null);
+        ollama = model.Engines.Single(r => r.Id == "ollama");
+        Assert.Equal("ollama", model.SelectedNotes);
+        Assert.Equal("Installed. It needs the model it writes notes with.", ollama.About);
+        Assert.Equal("Ollama is here. Installed. It needs the model it writes notes with.", model.Say);
+        Assert.Equal("Download the model", ollama.OpenLabel);
+
+        await ollama.OpenCommand.ExecuteAsync(null);
+        Assert.Contains("download:ollama", lib.Calls);
+        Assert.Equal("Private. Runs here, nothing leaves this computer.", model.Engines.Single(r => r.Id == "ollama").About);
+
+        lib.Overview = With(("ollama", "not_running"));
+        await model.Load();
+        Assert.Equal("Start Ollama", model.Engines.Single(r => r.Id == "ollama").OpenLabel);
+        await model.Engines.Single(r => r.Id == "ollama").OpenCommand.ExecuteAsync(null);
+        Assert.Contains("start:ollama", lib.Calls);
+    }
+
+    [AvaloniaFact]
     public async Task No_AI_is_only_offered_where_the_host_can_turn_notes_off()
     {
         var model = new AiSetupModel(new FakeAiLibrary { Overview = With(("ollama", "not_installed")) });
