@@ -96,6 +96,16 @@ public sealed partial class LibraryWeb
                 ["library"] = new JsonObject { ["name"] = cfg.PoolName, ["version"] = Engine.Version },
             });
         });
+        // A lecture's notes drawn for the phone: its diagrams as pictures and its formulas ready for KaTeX.
+        app.MapGet("/api/v2/lectures/{id}/rendered", (HttpContext ctx, string id) => Api(ctx, () =>
+        {
+            if (Reader.Lecture(id) is not { } l) return Http.Detail(404, "no such lecture");
+            return Http.Json(new JsonObject
+            {
+                ["id"] = id, ["title"] = l["title"]?.DeepClone(), ["class"] = l["class"]?.DeepClone(), ["date"] = l["date"]?.DeepClone(),
+                ["html"] = PhoneNotes.Render(l["notes"] is JsonValue v && v.TryGetValue(out string? notes) ? notes : ""),
+            });
+        }));
         // The app's pages need no sign-in (they're the same for everyone); what they show asks /api/v2, which does.
         // Routing takes "/app" and "/app/" as one: only the one without the slash moves, so the app's own addresses
         // (and its service worker's scope) are always under /app/.
