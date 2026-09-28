@@ -392,6 +392,7 @@
               <TextBlock IsVisible="{Binding NoNote}" Text="Choose a lecture to read its notes." FontSize="14" Foreground="{DynamicResource Fg3}"
                          HorizontalAlignment="Center" VerticalAlignment="Center" />
 
+              <!-- Where the notes fade out (the code-behind masks them over this strip; it paints nothing itself). -->
               <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" />
               </Panel>
               <!-- The latest answer, just above the ask bar -->

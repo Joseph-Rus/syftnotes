@@ -944,7 +944,7 @@ public static partial class Shell
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacSetup { DataContext = setup, DrawChrome = false } : new WinSetup { DataContext = setup, DrawChrome = false };
         var w = new Window
         {
-            Title = setup.HeaderTitle, CanResize = false, Content = view,
+            Title = setup.HeaderTitle, CanResize = false, CanMaximize = false, Content = view,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
@@ -1089,11 +1089,12 @@ public static partial class Shell
         if (section is not null) model.Section = section;
         var w = new Window
         {
-            Title = "Study Stash settings", CanResize = false,
+            Title = "Study Stash settings", CanResize = false, CanMaximize = false,
             Content = new SettingsView { DataContext = model, DrawChrome = false },
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
-        OpenCentred(w, new Size(900, Skin.Current == SkinKind.Mac ? 780 : 860));
+        // The view's own size (900 × 860 on Windows), smaller on a small screen: its pages scroll inside.
+        FollowView(w, (Control)w.Content!);
         Look.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         model.Lib.Copy = text => _ = w.Clipboard?.SetTextAsync(text);

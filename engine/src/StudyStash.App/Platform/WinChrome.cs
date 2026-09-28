@@ -134,6 +134,20 @@ public static class WinChrome
     [DllImport("dwmapi.dll")]
     static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref Margins margins);
 
+    /// <summary>
+    /// The design's Windows tokens as Windows can show them. Its acrylic (the dropdown, the quick panel, the recorder,
+    /// the ask bar, menus) is a little see-through over a blur; nothing blurs behind these on Windows (they're drawn on
+    /// clear windows, or over the page), so the window or text behind showed through as ghosted words. Here it's the
+    /// same colour, solid.
+    /// </summary>
+    public static ResourceDictionary ForWindows(ResourceDictionary tokens)
+    {
+        foreach (var variant in tokens.ThemeDictionaries.Values.OfType<ResourceDictionary>())
+            if (variant.TryGetValue("Acrylic", out var acrylic) && acrylic is ISolidColorBrush { Color: var c } && c.A < 255)
+                variant["Acrylic"] = new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
+        return tokens;
+    }
+
     static ControlTheme? decorations;
 
     /// <summary>

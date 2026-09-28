@@ -204,10 +204,10 @@ public class WinChromeTests
         }
     }
 
-    /// <summary>Over the real Mica (the Mica token clear) the notes don't fade to a guessed colour: that guess was the
-    /// pale band over the bottom of the page.</summary>
+    /// <summary>The notes fade out under the ask bar by a mask, not a colour laid over them: over the real Mica (the
+    /// Mica token clear) a guessed colour was the pale band over the bottom of the page.</summary>
     [AvaloniaFact]
-    public void The_notes_fade_is_left_out_over_the_real_mica()
+    public void The_notes_fade_out_by_a_mask_whatever_is_behind_the_page()
     {
         try
         {
@@ -215,11 +215,43 @@ public class WinChromeTests
             var view = new WinLibrary { DataContext = Demo.Library(), Width = 1280, Height = 800 };
             var window = new Window { Width = 1280, Height = 800, Content = view };
             window.Show();
+            window.UpdateLayout();
             var fade = view.FindControl<Border>("Fade")!;
-            Assert.IsType<LinearGradientBrush>(fade.Background);
-            window.Resources["Mica"] = Brushes.Transparent;
+            var notes = view.FindControl<ScrollViewer>("NoteScroll")!;
             Assert.Null(fade.Background);
+            var mask = Assert.IsType<LinearGradientBrush>(notes.OpacityMask);
+            // Clear from the fade's top to the page's bottom: 120 px, gone for the last quarter.
+            Assert.Equal(notes.Bounds.Height - fade.Bounds.Height, mask.StartPoint.Point.Y, 0.5);
+            Assert.Equal(notes.Bounds.Height, mask.EndPoint.Point.Y, 0.5);
+            Assert.Equal(0, mask.GradientStops[1].Color.A);
+            window.Resources["Mica"] = Brushes.Transparent;
+            window.UpdateLayout();
+            Assert.Null(fade.Background);
+            Assert.NotNull(notes.OpacityMask);
             window.Close();
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    /// <summary>Nothing blurs behind a Windows panel, so the design's slightly see-through acrylic is solid: the
+    /// window behind the quick panel no longer shows through it as ghosted words.</summary>
+    [AvaloniaFact]
+    public void Windows_acrylic_is_solid()
+    {
+        try
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Win);
+            foreach (var variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+            {
+                Assert.True(Application.Current!.TryFindResource("Acrylic", variant, out var acrylic));
+                Assert.Equal(255, ((ISolidColorBrush)acrylic!).Color.A);
+                Assert.True(Skin.Build(SkinKind.Win).TryGetResource("Acrylic", variant, out var design));
+                var d = ((ISolidColorBrush)design!).Color;
+                Assert.Equal(Color.FromRgb(d.R, d.G, d.B), ((ISolidColorBrush)acrylic).Color);
+            }
         }
         finally
         {

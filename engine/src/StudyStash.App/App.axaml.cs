@@ -22,7 +22,7 @@ public partial class App : Application
     public void UseSkin(SkinKind kind)
     {
         Skin.Current = kind;
-        Resources.MergedDictionaries[0] = Skin.Build(kind);
+        Resources.MergedDictionaries[0] = kind == SkinKind.Win ? Platform.WinChrome.ForWindows(Skin.Build(kind)) : Skin.Build(kind);
         if (tracking is not null) Styles.Remove(tracking);
         tracking = kind == SkinKind.Mac ? Controls.Typography.MacStyle() : null;
         if (tracking is not null) Styles.Add(tracking);
