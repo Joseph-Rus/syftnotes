@@ -104,6 +104,11 @@ jobs:
       - name: Self-test (D5) - real windows, the pretend mic, Whisper from inside the bundle
         if: needs.version.outputs.tested != 'true'
         run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest"
+      - name: Self-test, just this computer - setup makes the app's own library, and the notes are written here
+        if: needs.version.outputs.tested != 'true'
+        env:
+          STUDYSTASH_SELFTEST_FLOW: one-computer
+        run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
       - name: Both DMGs hold the app with the right role, and no model is bundled (D6)
         run: |
           for pair in Laptop:laptop Library:library; do

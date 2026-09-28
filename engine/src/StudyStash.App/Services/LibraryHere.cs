@@ -16,8 +16,16 @@ public sealed class LibraryHere
     public IReadOnlyList<string>? Command { get; init; }
     /// <summary>Where a new library keeps its notes: <see cref="DefaultFolder"/> unless a test gives its own.</summary>
     public string? Folder { get; init; }
+    /// <summary>The first port a new library tries (then the next free pair): 8787 unless a test gives its own.</summary>
+    public int FirstPort { get; init; } = 8787;
 
-    public static LibraryHere ThisComputer() => new();
+    /// <summary>This computer's library maker. A copy under test (the self-test) keeps a new library's notes and port
+    /// away from the real ones: STUDYSTASH_NOTES_DIR and STUDYSTASH_LIBRARY_PORT say where.</summary>
+    public static LibraryHere ThisComputer() => new()
+    {
+        Folder = Environment.GetEnvironmentVariable("STUDYSTASH_NOTES_DIR") is { Length: > 0 } dir ? dir : null,
+        FirstPort = Environment.GetEnvironmentVariable("STUDYSTASH_LIBRARY_PORT") is { Length: > 0 } p && int.TryParse(p, out int port) ? port : 8787,
+    };
 
     /// <summary>The folder a new library keeps its notes in: Documents/Study Stash.</summary>
     public static string DefaultFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Study Stash");
@@ -79,9 +87,9 @@ public sealed class LibraryHere
     }
 
     /// <summary>8787 if it (and 8788, for Claude) are free; otherwise the next pair that both are.</summary>
-    static int FreePortPair()
+    static int FreePortPair(int first)
     {
-        for (int port = 8787; port < 8787 + 200; port++)
+        for (int port = first; port < first + 200; port++)
             if (IsFree(port) && IsFree(port + 1))
                 return port;
         throw new InvalidOperationException("No free ports found for the library.");
@@ -119,7 +127,7 @@ public sealed class LibraryHere
         if (existing is null)
         {
             cfg.PoolDir = Folder ?? DefaultFolder;
-            cfg.WebPort = FreePortPair();
+            cfg.WebPort = FreePortPair(FirstPort);
             cfg.WebHost = localOnly ? "127.0.0.1" : "0.0.0.0";
         }
         else if (localOnly)

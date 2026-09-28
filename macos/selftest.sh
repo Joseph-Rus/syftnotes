@@ -5,6 +5,8 @@
 #   sh macos/selftest.sh "<path>/Study Stash.app" [out-dir]
 # STUDYSTASH_WHISPER_MODEL must already be set, to a small model file (the tiny one, so this stays fast and needs no
 # download). STUDYSTASH_ARCH=x86_64 runs the bundle's Intel tree through Rosetta instead of natively.
+# STUDYSTASH_SELFTEST_FLOW=one-computer proves Just this computer instead of a laptop with a library elsewhere: setup
+# makes the app's own library, and the lecture is recorded, written down and given its notes all on this computer.
 set -eu
 
 APP=${1:?"usage: sh macos/selftest.sh \"<path>/Study Stash.app\" [out-dir]"}
@@ -28,6 +30,7 @@ run_app() {
     STUDYSTASH_SELFTEST="$OUT" \
     STUDYSTASH_MIC_FILE="$SPEECH" \
     STUDYSTASH_MIC_SPEED="${STUDYSTASH_MIC_SPEED:-4}" \
+    STUDYSTASH_SELFTEST_FLOW="${STUDYSTASH_SELFTEST_FLOW:-}" \
     STUDYSTASH_WHISPER_MODEL="$STUDYSTASH_WHISPER_MODEL" \
     STUDYSTASH_MODEL_FILE="$STUDYSTASH_WHISPER_MODEL" \
     "$@" --home "$HOME_DIR"
