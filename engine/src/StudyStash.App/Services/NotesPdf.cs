@@ -323,7 +323,8 @@ public static class NotesPdf
     /// <summary>
     /// Where each page starts and ends in the laid-out <paramref name="column"/>, each holding up to
     /// <paramref name="pageHeight"/> pixels of it. A page ends between blocks — the top of a paragraph, a list's item,
-    /// a table's row — as far down as fits, but never just after a heading or a table's header row. A block taller
+    /// a table's row — as far down as fits, but never just after a heading, a table's header row or a line leading
+    /// into what follows it (one ending in a colon), unless nothing else fits. A block taller
     /// than a page (a long code block or paragraph) goes on from as far down the page as its lines fill. No page ends
     /// through a line of text, a formula or a diagram, unless one is taller than a whole page.
     /// </summary>
