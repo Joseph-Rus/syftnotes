@@ -227,6 +227,7 @@ public static class SelfTest
 
         // Welcome: three choices, starting on just this computer; the self-test is a laptop with its own library.
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps");
+        await Wait(1); // the window lays out its steps first
         Shot(Shell.Windows.Setup, "setup-welcome");
         m.ChooseLaptopCommand.Execute(null);
         Say($"chose the laptop: {m.FlowName}, {m.Steps.Count} steps");
@@ -308,6 +309,7 @@ public static class SelfTest
 
         m.ChooseOneComputerCommand.Execute(null);
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps: {string.Join(", ", m.Steps.Select(x => x.Title))}");
+        await Wait(1); // the sidebar lists the chosen setup's steps first
         Shot(Shell.Windows.Setup, "setup-welcome");
         await m.NextCommand.ExecuteAsync(null);
         Say($"library made here: {m.LibraryResult}");
