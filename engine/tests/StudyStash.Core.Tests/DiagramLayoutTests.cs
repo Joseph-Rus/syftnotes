@@ -410,7 +410,9 @@ public class DiagramLayoutTests
         var watch = Stopwatch.StartNew();
         var s = DiagramLayout.Lay(chart, Measure);
         Assert.Equal(60, s.Nodes.Count);
-        Assert.True(watch.ElapsedMilliseconds < 3000, $"{watch.ElapsedMilliseconds} ms");
+        // A guard against a layout that hangs, not a benchmark: this worst case (random arrows everywhere) takes about
+        // half a second in a release build, and several times that in a debug build beside the rest of the suite.
+        Assert.True(watch.ElapsedMilliseconds < 10_000, $"{watch.ElapsedMilliseconds} ms");
         // Random arrows repeat and cross: still the same picture every time.
         Assert.Equal(DiagramSvg.Render(s), DiagramSvg.Render(DiagramLayout.Lay(chart, Measure)));
     }

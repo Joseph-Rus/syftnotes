@@ -79,7 +79,7 @@ public sealed partial class NoteView : StackPanel
         Spacing = Mac ? 14 : 12;
         previous = diagrams;
         diagrams = [];
-        string markdown = Markdown ?? "";
+        string markdown = source = Markdown ?? "";
         var doc = Markdig.Markdown.Parse(markdown, Pipeline);
         bool first = true;
         string section = "";
@@ -102,10 +102,16 @@ public sealed partial class NoteView : StackPanel
                     control = Definitions(list);
                     break;
                 case HtmlBlock html when IsSvg(html.Lines.ToString()):
-                    // A drawing written straight into the Markdown ends at its first blank line; take it to </svg>.
+                    // A drawing written straight into the Markdown ends at its first blank line; take it to </svg>
+                    // (unless a code fence comes first: then it's only what its own lines hold).
                     int from = html.Span.Start, close = markdown.IndexOf("</svg>", from, StringComparison.OrdinalIgnoreCase);
-                    if (close >= 0) skipUntil = close + "</svg>".Length;
-                    control = close < 0 ? Pending() : Diagram(DiagramKind.Svg, markdown[from..skipUntil]);
+                    int fence = markdown.IndexOf("\n```", from, StringComparison.Ordinal);
+                    if (close >= 0 && (fence < 0 || fence > close))
+                    {
+                        skipUntil = close + "</svg>".Length;
+                        control = Diagram(DiagramKind.Svg, markdown[from..skipUntil]);
+                    }
+                    else control = BlockControl(block);
                     break;
                 default:
                     control = BlockControl(block);
@@ -116,6 +122,19 @@ public sealed partial class NoteView : StackPanel
             else if (!first) first = false;
         }
         previous.Clear();
+    }
+
+    /// <summary>The Markdown being built.</summary>
+    string source = "";
+
+    /// <summary>Whether a block runs to the end of the notes: an unfinished diagram there is still arriving; one
+    /// earlier on never will, and says it can't be drawn.</summary>
+    bool AtEnd(LeafBlock block)
+    {
+        // An unclosed fence's span covers only its opening line; its last line says where it really ends.
+        int end = block.Span.End;
+        if (block.Lines.Count > 0 && block.Lines.Lines[block.Lines.Count - 1] is var last) end = System.Math.Max(end, last.Position + last.Slice.Length - 1);
+        return end >= source.TrimEnd().Length - 1;
     }
 
     /// <summary>A block of the notes as the page shows it (or null for one it doesn't): the same at the top level and
@@ -132,12 +151,12 @@ public sealed partial class NoteView : StackPanel
                 return List(list);
             case FencedCodeBlock fence when KindOf(fence) is { } kind:
                 // A diagram still being written (an answer arriving in pieces) is drawn once its fence closes.
-                return fence.ClosingFencedCharCount == 0 ? Pending() : Diagram(kind, fence.Lines.ToString());
+                return fence.ClosingFencedCharCount == 0 && AtEnd(fence) ? Pending() : Diagram(kind, fence.Lines.ToString());
             case FencedCodeBlock or CodeBlock:
                 return Code(((LeafBlock)block).Lines.ToString());
             case HtmlBlock html when IsSvg(html.Lines.ToString()):
                 string svg = html.Lines.ToString();
-                return svg.Contains("</svg>", StringComparison.OrdinalIgnoreCase) ? Diagram(DiagramKind.Svg, svg) : Pending();
+                return !svg.Contains("</svg>", StringComparison.OrdinalIgnoreCase) && AtEnd(html) ? Pending() : Diagram(DiagramKind.Svg, svg);
             case QuoteBlock q:
                 var quote = Body();
                 quote.Text = string.Join(" ", q.Descendants<ParagraphBlock>().Select(x => Plain(x.Inline)));

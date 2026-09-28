@@ -170,6 +170,20 @@ public class NoteViewRichTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public void An_unfinished_diagram_before_the_end_is_drawn_as_far_as_it_goes_not_left_waiting()
+    {
+        var note = new NoteView
+        {
+            Markdown = "- In a bullet:\n\n  ```mermaid\n  flowchart LR\n  A[Assess] --> B[Act]\n\nAfter the list.\n\n"
+                + "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 10 10\">\n<rect width=\"10\" height=\"10\"/>\n\n```mermaid\nflowchart LR\n  C --> D\n```\n\nThe end.",
+        };
+        var window = Show(note);
+        Assert.Equal([typeof(DiagramView), typeof(DiagramCard), typeof(DiagramView)], Pieces(note).Select(p => p.GetType()));
+        Assert.StartsWith("This drawing isn't well-formed SVG", ((DiagramCard)Pieces(note)[1]).Reason);
+        window.Close();
+    }
+
     static void Click(Visual target, Point? at = null)
     {
         var top = TopLevel.GetTopLevel(target)!;
