@@ -167,7 +167,7 @@ public static class Cli
             };
             var app = LibraryWeb.Build(builder, cfg, store, pipeline, new LibraryWebOptions
             {
-                Apply = (rel, h) => Updates.ApplyAsync(rel, h, UpdateHost.ThisComputer()), Claude = access, Reach = ClaudeReach.ThisComputer(),
+                Apply = (rel, h) => Updates.ApplyAsync(rel, h, UpdateHost.ThisComputer()), Claude = access, Reach = ClaudeReach.ThisComputer(), WebCheck = ReachCheck.ThisComputer(),
                 AskChat = ai.Ask(() => cfg), Ai = ai, Canvas = canvas, Scout = scout, Files = fileIndex,
                 Inbox = new Inbox(cfg.PoolDir, () => cfg.ClassNames(), c => store.ClassDir(c), ai, new History(cfg.PoolDir)),
                 StartAtLogin = LoginItems?.Invoke(home),

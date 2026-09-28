@@ -469,24 +469,25 @@ public class ClaudeTests
     public async Task Tailscale_puts_the_door_on_the_tailnet_or_the_internet()
     {
         var ran = new List<string>();
-        ProcResult? ok = new(0, "");
+        WatchResult? ok = new(0, "");
         var reach = new ClaudeReach
         {
             Tailscale = () => new TailscaleInfo(true, true, "Running", "mini.tail1234.ts.net.", ["100.64.0.9"], "/usr/local/bin/tailscale"),
-            Run = (exe, args, _) =>
+            Watch = (exe, args, _, _) =>
             {
                 ran.Add(string.Join(" ", args));
                 return ok;
             },
         };
-        Assert.Equal(("https://mini.tail1234.ts.net", (string?)null), reach.Set(8001, internet: true, on: true));
+        Assert.Equal(("https://mini.tail1234.ts.net", (ReachProblem?)null), reach.Set(8001, internet: true, on: true));
         Assert.Equal("funnel --bg --https=443 http://127.0.0.1:8001", ran[^1]);
         reach.Set(8001, internet: false, on: false);
         Assert.Equal("serve --https=443 off", ran[^1]);
         ok = new(1, "Funnel is not enabled on your tailnet.\nTo enable, visit:\n\n         https://login.tailscale.com/f/funnel?node=abc\n");
-        Assert.Equal("Tailscale needs permission first: open https://login.tailscale.com/f/funnel?node=abc, allow it, then try again.",
-            reach.Set(8001, true, true).Problem);
-        Assert.Contains("isn't running", new ClaudeReach { Tailscale = () => new TailscaleInfo(true, false, Exe: "ts") }.Set(8001, true, true).Problem);
+        Assert.Equal(new ReachProblem(ReachKind.NeedsPermission,
+            "Your tailnet doesn't allow Funnel yet. Open the page below, allow it for this computer, then turn this on again.",
+            "https://login.tailscale.com/f/funnel?node=abc"), reach.Set(8001, true, true).Problem);
+        Assert.Contains("isn't running", new ClaudeReach { Tailscale = () => new TailscaleInfo(true, false, Exe: "ts") }.Set(8001, true, true).Problem!.Words);
 
         // Through the API: the address it's on is kept, and the sign-in names it.
         using var dir = new TempDir();

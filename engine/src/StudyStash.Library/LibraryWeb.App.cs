@@ -139,7 +139,7 @@ public sealed partial class LibraryWeb
             bool on = body?["on"] is not JsonValue ov || !ov.TryGetValue(out bool o) || o;
             if (on && cfg.PoolPassword.Length == 0) return Http.Detail(400, "Set a library password first, so only you can let Claude in.");
             var (url, problem) = options.Reach.Set(ClaudeWeb.PortFor(cfg), internet, on);
-            if (problem is not null) return Http.Detail(409, problem);
+            if (problem is not null) return Http.Detail(409, problem.Words);
             if (internet) Claude.PublicUrl = url ?? "";
             else Claude.TailnetUrl = url;
             return Http.Json(ClaudeJson());

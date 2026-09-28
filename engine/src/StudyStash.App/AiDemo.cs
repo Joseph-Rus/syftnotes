@@ -27,9 +27,12 @@ public static class AiDemo
         Connections:
         [
             new ToolConnection("tok-1", "Cursor", "token") { Created = 1_726_000_000 },
-            new ToolConnection("sam-web", "Claude", "signin") { Created = 1_726_000_000, LastUsed = 1_726_600_000 },
+            new ToolConnection("sam-web", "Claude", "signin") { ClientHost = "claude.ai", Created = 1_726_000_000, LastUsed = 1_726_600_000 },
         ])
-    { PublicUrl = "https://sams-mini.tailnet.ts.net", HasPassword = true };
+    {
+        PublicUrl = "https://sams-mini.tailnet.ts.net", HasPassword = true,
+        Web = new WebReach(true, "Study Stash", "https://sams-mini.tailnet.ts.net/mcp", null, null, true, Core.ReachCheck.Answers, 1_726_600_000, true),
+    };
 
     /// <summary>Answers one fixed <see cref="AiOverview"/> and nothing else: enough to draw the panes, never a real
     /// library. <paramref name="rewrite"/> answers every rewrite call, for the notes screen's three states.</summary>
@@ -51,6 +54,8 @@ public static class AiDemo
         public Task<RewriteInfo?> RewriteUseAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
         public Task<ToolAccessInfo?> AccessAsync() => Task.FromResult<ToolAccessInfo?>(Access());
         public Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null) => Task.FromResult<ToolAccessInfo?>(Access());
+        public Task<ToolAccessInfo?> SetWebAsync(bool on) => Task.FromResult<ToolAccessInfo?>(Access());
+        public Task<ToolAccessInfo?> CheckWebAsync() => Task.FromResult<ToolAccessInfo?>(Access());
     }
 
     /// <summary>A library's AI that answers the design's overview (and no rewrite running): what the settings window

@@ -28,6 +28,8 @@ public sealed class LibraryWebOptions
     public ClaudeAccess? Claude { get; init; }
     /// <summary>Putting the Claude port on the tailnet or the internet (off unless the service turns it on).</summary>
     public ClaudeReach Reach { get; init; } = new();
+    /// <summary>Checking the Claude address from the internet (off unless the service turns it on).</summary>
+    public ReachCheck WebCheck { get; init; } = new();
     /// <summary>Asking your notes: the model's answer to a prompt. Null asks the library's Ollama.</summary>
     public LibraryReader.AskChatFn? AskChat { get; init; }
     /// <summary>The AI picked for each kind of work (ai.json): Settings shows and tests it. Null: kept beside the config.</summary>

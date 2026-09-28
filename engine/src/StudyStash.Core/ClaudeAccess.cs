@@ -521,38 +521,3 @@ public sealed class ClaudeAccess
         }
     }
 }
-
-/// <summary>
-/// Putting the Claude port where Claude can reach it, with Tailscale: Serve (HTTPS on your tailnet only: Claude Code
-/// on your other computers) or Funnel (HTTPS on the internet: claude.ai and the Claude apps). Off unless
-/// <see cref="ThisComputer"/> is used, so a test can't publish anything.
-/// </summary>
-public sealed class ClaudeReach
-{
-    public Func<TailscaleInfo> Tailscale { get; init; } = () => new TailscaleInfo();
-    public Runner Run { get; init; } = (_, _, _) => throw new InvalidOperationException("Changing Tailscale is off here.");
-
-    public static ClaudeReach ThisComputer() => new() { Tailscale = () => HostInfo.Tailscale(), Run = Machine.Run };
-
-    /// <summary>Serve (tailnet) or Funnel (internet) the Claude port on https://&lt;this computer&gt;.ts.net, or turn it off.
-    /// The address, or why not.</summary>
-    public (string? Url, string? Problem) Set(int port, bool internet, bool on)
-    {
-        var ts = Tailscale();
-        if (!ts.Installed || ts.Exe.Length == 0) return (null, "Tailscale isn't installed on the library's computer.");
-        if (!ts.Running) return (null, "Tailscale isn't running on the library's computer. Open it and sign in.");
-        if (ts.Dns.Length == 0) return (null, "Tailscale hasn't given this computer a name yet. Turn on MagicDNS in the Tailscale admin console.");
-        string verb = internet ? "funnel" : "serve";
-        string[] args = on ? [verb, "--bg", "--https=443", $"http://127.0.0.1:{port}"] : [verb, "--https=443", "off"];
-        var p = Run(ts.Exe, args, TimeSpan.FromSeconds(60));
-        if (p is not { ExitCode: 0 })
-        {
-            string said = Py.Strip(p?.Stdout ?? "");
-            // Funnel's first use needs a tailnet admin to allow it: Tailscale prints the page for that.
-            var link = System.Text.RegularExpressions.Regex.Match(said, @"https://login\.tailscale\.com/\S+");
-            return (null, link.Success ? $"Tailscale needs permission first: open {link.Value}, allow it, then try again."
-                : $"Tailscale said: {Py.Head(said, 300)}");
-        }
-        return (on ? $"https://{ts.Dns.TrimEnd('.')}" : null, null);
-    }
-}

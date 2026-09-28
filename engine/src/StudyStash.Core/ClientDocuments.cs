@@ -91,7 +91,7 @@ public sealed class ClientDocuments
         }
     }
 
-    static SocketsHttpHandler PinnedTo(IPAddress ip) => new()
+    internal static SocketsHttpHandler PinnedTo(IPAddress ip) => new()
     {
         AllowAutoRedirect = false, UseProxy = false, UseCookies = false, ConnectTimeout = Wait,
         ConnectCallback = async (_, ct) =>
