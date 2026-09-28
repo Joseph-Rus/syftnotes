@@ -226,4 +226,44 @@ public class DiagramViewTests
         Assert.InRange(ink[2].Height, ink[1].Height * 2 - 8, ink[1].Height * 2 + 8);
         window.Close();
     }
+
+    /// <summary>Before a test's app goes (and its fonts with it), the layout under way finishes and the ones queued
+    /// behind it never start: nothing measures words with fonts that are gone.</summary>
+    [AvaloniaFact]
+    public void Forgetting_the_charts_waits_for_the_layout_under_way_and_drops_the_ones_queued()
+    {
+        string stamp = Guid.NewGuid().ToString("N")[..6];
+        var first = Flowchart.Parse($"flowchart TD\n  A[First {stamp}] --> B[Done]");
+        var second = Flowchart.Parse($"flowchart TD\n  A[Second {stamp}] --> B[Done]");
+        var started = new System.Collections.Concurrent.ConcurrentQueue<Flowchart>();
+        using var release = new ManualResetEventSlim(false);
+        SceneCache.Laying = chart =>
+        {
+            started.Enqueue(chart);
+            release.Wait(TimeSpan.FromSeconds(30));
+        };
+        try
+        {
+            Assert.NotNull(SceneCache.Find(first, first.ToSource(), FontFamily.Default, null).Laying);
+            Assert.NotNull(SceneCache.Find(second, second.ToSource(), FontFamily.Default, null).Laying);
+            var until = DateTime.UtcNow.AddSeconds(10);
+            while (started.IsEmpty && DateTime.UtcNow < until) Thread.Sleep(5);
+
+            Assert.False(SceneCache.Forget(TimeSpan.FromMilliseconds(100)));
+            release.Set();
+            Assert.True(SceneCache.Forget(TimeSpan.FromSeconds(30)));
+            Assert.Same(first, Assert.Single(started));
+            Assert.False(SceneCache.Busy);
+
+            // Asked for again, a forgotten chart is laid out afresh.
+            SceneCache.Laying = null;
+            var again = SceneCache.Find(first, first.ToSource(), FontFamily.Default, null);
+            Assert.True(again.Laying is Task<DiagramScene?> job && job.Wait(TimeSpan.FromSeconds(30)) && job.Result is not null);
+        }
+        finally
+        {
+            SceneCache.Laying = null;
+            release.Set();
+        }
+    }
 }
