@@ -107,7 +107,7 @@ public class LibrarySetupTests
         string done = await c.Text("/");
         Assert.Contains("http://pc.tail.ts.net:8791", done);
         Assert.Contains("maple-otter", done);
-        Assert.Contains("Study-Stash-Laptop-Setup.exe", done);
+        Assert.Contains("Study-Stash-Setup.exe", done);
         Assert.False(File.Exists(Path.Combine(dir["home"], "setup_draft.json")));
         var state = await Json(await c.Get("/api/state"));
         Assert.Equal((true, Engine.Version), (state["finished"]!.GetValue<bool>(), state["version"].S()));

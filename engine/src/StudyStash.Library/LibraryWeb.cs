@@ -44,6 +44,12 @@ public sealed class LibraryWebOptions
     public StudyStash.Core.Ai.Inbox? Inbox { get; init; }
     /// <summary>Starting at login on the library's computer (the app's login item). Null: not offered.</summary>
     public LoginSwitch? StartAtLogin { get; init; }
+    /// <summary>The phones paired with the library (devices.json). Null: kept beside the config.</summary>
+    public Devices? Devices { get; init; }
+    /// <summary>The phone app's files (web/dist). Null: STUDYSTASH_WEB_DIR, else web/ beside the app.</summary>
+    public string? PhoneApp { get; init; }
+    /// <summary>Reads an attachment's words (path → text, or null). Null: <see cref="StudyStash.Core.Ai.DocumentText"/>.</summary>
+    public Func<string, CancellationToken, Task<string?>>? ReadDocument { get; init; }
 }
 
 /// <summary>Small pieces of HTTP the Python engine got from its web framework.</summary>
@@ -210,6 +216,7 @@ public sealed partial class LibraryWeb
     /// <summary>The laptop's key: Authorization: Bearer &lt;password&gt;. Null when it may come in.</summary>
     IResult? RequireKey(HttpContext ctx)
     {
+        if (PhoneOf(ctx) is not null) return null; // a paired phone, on /api/v2
         if (cfg.PoolPassword.Length == 0) return null;
         string h = ctx.Request.Headers.Authorization.ToString();
         string key = h.StartsWith("bearer ", StringComparison.OrdinalIgnoreCase) ? h[7..].Trim() : ctx.Request.Headers["x-pool-key"].ToString();
@@ -396,11 +403,15 @@ public sealed partial class LibraryWeb
         })));
 
         MapApp(app);
+        MapAttachments(app);
         MapCanvas(app);
         MapChat(app);
         MapFiles(app);
         MapInbox(app);
+        MapMove(app);
         MapSettings(app);
+        MapCalendar(app);
+        MapPhone(app);
         app.MapFallback(() => Http.Detail(404, "Not Found"));
     }
 
@@ -465,6 +476,7 @@ public sealed partial class LibraryWeb
             + $"<span class=\"value\">{x.Count}</span></a>"));
         string body = $"<h1>{Ui.Esc(cfg.PoolName)}</h1>" + (lede.Length > 0 ? $"<p class=\"sub\">{lede}</p>" : "")
             + $"<div class=\"only-narrow\">{Ui.SearchBox()}<h2>Classes</h2><div class=\"group\">{folders}</div></div>"
+            + ComingUpHtml()
             + QueuePanel(role == "admin")
             + (rows.Count > 0 ? $"<h2>Recent lectures</h2>{Ui.NoteList(rows, "", "")}" : empty);
         return Show(cfg.PoolName, body, c);
@@ -474,7 +486,7 @@ public sealed partial class LibraryWeb
     {
         var c = Context(role, current, ("/", cfg.PoolName));
         var rows = store.ListNotes(name);
-        string canvasPart = ClassCanvas(name) + ClassFiles(name);
+        string canvasPart = ClassCanvas(name) + ClassFiles(name) + AttachmentsPart(name, null, role == "admin");
         // On the library's own computer, a class can open in a terminal with the AI (Claude Code by default).
         string open = terminal
             ? $"<form method=\"post\" action=\"/terminal\"><input type=\"hidden\" name=\"class\" value=\"{Ui.Esc(name)}\"><button>Open in {Ui.Esc(AgentCli)}</button></form>"
@@ -591,7 +603,7 @@ public sealed partial class LibraryWeb
         string body = $"<a class=\"back only-wide\" href=\"{back.Item1}\">{Ui.Esc(back.cls)}</a>"
             + $"<h1>{Ui.Esc(title)}</h1><dl class=\"about\">{aboutHtml}</dl>"
             + $"<div class=\"toolbar\">{string.Concat(actions)}</div>"
-            + $"<div style=\"height:1.4rem\"></div>{notice}{tabbar}<div class=\"sheet\">{panes}</div>";
+            + $"<div style=\"height:1.4rem\"></div>{notice}{tabbar}<div class=\"sheet\">{panes}</div>{AttachmentsPart(null, noteId, role == "admin")}";
         return Show(title, body, c, math: true);
     }
 
@@ -776,7 +788,7 @@ public sealed partial class LibraryWeb
             + $"<div class=\"row\"><span class=\"grow\">Address</span><span class=\"value\">{Ui.Esc(url)}</span></div>"
             + $"<div class=\"row\"><span class=\"grow\">Password</span><span class=\"value\">{Ui.Esc(cfg.PoolPassword.Length > 0 ? cfg.PoolPassword : "none")}</span></div>"
             + "<div class=\"row\"><span class=\"grow\">Study Stash for the laptop</span><span class=\"value\">"
-            + $"<a href=\"{dl}/Study-Stash-Laptop.dmg\">Mac</a> · <a href=\"{dl}/Study-Stash-Laptop-Setup.exe\">Windows</a>"
+            + $"<a href=\"{dl}/{Updates.MacAsset}\">Mac</a> · <a href=\"{dl}/{Updates.WindowsAsset}\">Windows</a>"
             + "</span></div></div><p class=\"group-foot\">On the computer you record lectures on, install Study Stash, "
             + "open it, and enter this address and password.</p>";
 
@@ -808,7 +820,7 @@ public sealed partial class LibraryWeb
         string canvasGroup = CanvasOn || canvas is not null || Canvas.Settings.On ? CanvasSettingsGroup(canvas)
             : "<div class=\"group-head\" id=\"canvas\">Canvas</div><div class=\"group\"><form class=\"row\" method=\"get\" action=\"/settings#canvas\">"
               + "<input type=\"hidden\" name=\"canvas\" value=\"start\"><span class=\"grow\">Bring in assignments, feedback and course files from Canvas</span><button>Set up Canvas</button></form></div>";
-        string body = $"<h1>Settings</h1>{flash}{form}{canvasGroup}{FoldersSettingsGroup(folders)}{invite}{maintenance}";
+        string body = $"<h1>Settings</h1>{flash}{form}{canvasGroup}{FoldersSettingsGroup(folders)}{invite}{PhoneSettingsGroup(ctx, c.Nonce)}{maintenance}";
         return Show("Settings", body, c);
     });
 

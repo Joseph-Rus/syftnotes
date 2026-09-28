@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Data.Sqlite;
+using StudyStash.Core.Calendar;
 using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
@@ -254,8 +255,8 @@ public class LibraryWebTests
         Assert.Contains("Connect your laptop", s);
         Assert.Contains("<span class=\"value\">http://mini.tail.ts.net:8787</span>", s);
         Assert.Contains("<span class=\"value\">pw</span>", s);
-        Assert.Contains("/Study-Stash-Laptop.dmg\">Mac</a>", s);
-        Assert.Contains("/Study-Stash-Laptop-Setup.exe\">Windows</a>", s);
+        Assert.Contains("/Study-Stash.dmg\">Mac</a>", s);
+        Assert.Contains("/Study-Stash-Setup.exe\">Windows</a>", s);
         Assert.Contains("Rewrite summary", await c.Text("/note/n1"));
 
         var r = await c.PostForm("/settings",
@@ -494,5 +495,41 @@ public class LibraryWebTests
         var r = await c.Get(Ui.ClassUrl("Lab / A"));
         Assert.Equal(HttpStatusCode.OK, r.StatusCode);
         Assert.Contains("Titration", await r.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task The_home_page_shows_coming_up_with_its_class_once_a_laptop_has_sent_some()
+    {
+        using var dir = new TempDir();
+        var cfg = MakeCfg(dir, password: "pw");
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var now = DateTimeOffset.Now;
+        LibraryCalendar.Save(cfg.Home, new System.Text.Json.Nodes.JsonObject
+        {
+            ["events"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+            {
+                ["id"] = "1", ["title"] = "cs101 lecture", ["start"] = now.AddMinutes(10).ToString("o"), ["end"] = now.AddHours(1).ToString("o"),
+            }),
+        }, now);
+        await using var site = await Site(cfg, store);
+        await site.PostForm("/login", ("password", "pw"), ("next", "/"));
+
+        string home = await site.Text("/");
+
+        Assert.Contains("Coming up", home);
+        Assert.Contains("cs101 lecture", home);
+        Assert.Contains("CS 101", home); // matched from the event's title via the class's other name
+    }
+
+    [Fact]
+    public async Task The_home_page_says_nothing_about_calendars_with_none_sent()
+    {
+        using var dir = new TempDir();
+        var cfg = MakeCfg(dir, password: "pw");
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        await using var site = await Site(cfg, store);
+        await site.PostForm("/login", ("password", "pw"), ("next", "/"));
+
+        Assert.DoesNotContain("Coming up", await site.Text("/"));
     }
 }

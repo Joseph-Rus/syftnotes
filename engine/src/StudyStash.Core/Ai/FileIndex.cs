@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using System.Net;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -13,8 +12,9 @@ public sealed record FileHit(string Root, string Path, string Title, string Snip
 /// <summary>
 /// Full-text search over everything in the library that isn't a lecture (the Canvas mirror with its PDFs and
 /// slides, files the AI wrote, your own notes) and the folders Study Stash may read (SQLite FTS5 in files.db,
-/// brought up to date in the background). Markdown, code, notebooks, PDFs (with pdftotext), Word and RTF (with
-/// textutil on a Mac) and PowerPoint's slide text are read in full; a private folder by file name only.
+/// brought up to date in the background). Markdown, code and notebooks are read as they are; PDFs, Word, PowerPoint
+/// (and RTF on a Mac) by <see cref="DocumentText"/>, handwritten and scanned pages too; photos and scans (png, jpg,
+/// heic) in the library only, so a folder of holiday photos isn't read through. A private folder by file name only.
 /// </summary>
 public sealed partial class FileIndex
 {
@@ -28,6 +28,7 @@ public sealed partial class FileIndex
     const int MaxText = 400_000;
 
     readonly string dbPath;
+    readonly DocumentTextOptions documents;
     readonly Func<IReadOnlyList<(string Name, string Path, bool Private)>> roots;
     readonly Func<IReadOnlyCollection<string>> lectures;
     readonly SemaphoreSlim busy = new(1, 1);
@@ -40,6 +41,7 @@ public sealed partial class FileIndex
     public FileIndex(string home, Func<IReadOnlyList<(string Name, string Path, bool Private)>> roots, Func<IReadOnlyCollection<string>> lectures)
     {
         dbPath = System.IO.Path.Combine(home, "files.db");
+        documents = new DocumentTextOptions { CacheDir = System.IO.Path.Combine(home, "cache", "text") };
         this.roots = roots;
         this.lectures = lectures;
         using var db = Open();
@@ -96,46 +98,23 @@ public sealed partial class FileIndex
         }
     }
 
-    [GeneratedRegex(@"ppt/slides/slide(\d+)\.xml$")]
-    private static partial Regex Slide();
-
-    [GeneratedRegex("<a:t>([^<]*)</a:t>")]
-    private static partial Regex SlideText();
-
-    /// <summary>The words in a file, or "" when it can't be read.</summary>
-    public static string TextOf(string path)
+    /// <summary>The words in a file, or "" when it can't be read. PDFs, pictures, Word and PowerPoint are read by
+    /// <see cref="DocumentText"/> (handwriting too), and what it read is kept in <paramref name="documents"/>'s cache.</summary>
+    public static string TextOf(string path, DocumentTextOptions? documents = null)
     {
         string ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
         try
         {
             if (Text.Contains(ext) || (Data.Contains(ext) && new FileInfo(path).Length < 300_000))
                 return Py.Head(File.ReadAllText(path), MaxText);
-            switch (ext)
-            {
-                case ".ipynb":
-                    return Py.Head(string.Join("\n\n", (JsonNode.Parse(File.ReadAllText(path))?["cells"] as JsonArray ?? [])
-                        .Select(c => string.Concat((c?["source"] as JsonArray ?? []).Select(x => x?.GetValue<string>() ?? "")))), MaxText);
-                case ".pdf" when AiProvider.Which("pdftotext") is { } pdf:
-                    return Py.Head(Machine.Run(pdf, ["-l", "40", "-q", path, "-"], TimeSpan.FromSeconds(25))?.Stdout ?? "", MaxText);
-                case ".docx" or ".doc" or ".rtf" when OperatingSystem.IsMacOS():
-                    return Py.Head(Machine.Run("textutil", ["-convert", "txt", "-stdout", path], TimeSpan.FromSeconds(25))?.Stdout ?? "", MaxText);
-                case ".docx":
-                    using (var z = ZipFile.OpenRead(path))
-                    using (var r = new StreamReader(z.GetEntry("word/document.xml")!.Open()))
-                        return Py.Head(WebUtility.HtmlDecode(Regex.Replace(r.ReadToEnd().Replace("</w:p>", "\n"), "<[^>]+>", "")), MaxText);
-                case ".pptx":
-                    using (var z = ZipFile.OpenRead(path))
-                        return Py.Head(string.Join("\n\n", z.Entries.Where(e => Slide().IsMatch(e.FullName))
-                            .OrderBy(e => int.Parse(Slide().Match(e.FullName).Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))
-                            .Select(e =>
-                            {
-                                using var r = new StreamReader(e.Open());
-                                return string.Join(" ", SlideText().Matches(r.ReadToEnd()).Select(m => WebUtility.HtmlDecode(m.Groups[1].Value)));
-                            })), MaxText);
-            }
+            if (ext == ".ipynb")
+                return Py.Head(string.Join("\n\n", (JsonNode.Parse(File.ReadAllText(path))?["cells"] as JsonArray ?? [])
+                    .Select(c => string.Concat((c?["source"] as JsonArray ?? []).Select(x => x?.GetValue<string>() ?? "")))), MaxText);
+            if (DocumentText.CanRead(path))
+                return Py.Head(DocumentText.ExtractAsync(path, documents ?? DocumentTextOptions.Default, CancellationToken.None).GetAwaiter().GetResult() ?? "", MaxText);
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException or System.Text.Json.JsonException
-                                      or InvalidOperationException or NullReferenceException or FormatException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException
+                                      or InvalidOperationException or FormatException)
         {
         }
         return "";
@@ -180,7 +159,7 @@ public sealed partial class FileIndex
                 // A readable folder that holds the library doesn't index it twice.
                 if (!isLibrary && f.StartsWith(library + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
                 string ext = System.IO.Path.GetExtension(f).ToLowerInvariant();
-                if (!Text.Contains(ext) && !Data.Contains(ext) && !Docs.Contains(ext)) continue;
+                if (!Text.Contains(ext) && !Data.Contains(ext) && !Docs.Contains(ext) && !(isLibrary && DocumentText.Images.Contains(ext))) continue;
                 if (isLibrary && lectureFiles.Contains(f)) continue;
                 FileInfo fi;
                 try
@@ -195,7 +174,7 @@ public sealed partial class FileIndex
                 seen.Add(f);
                 double mtime = (fi.LastWriteTimeUtc - DateTime.UnixEpoch).TotalSeconds;
                 if (known.TryGetValue(f, out var k) && k == (mtime, fi.Length)) continue;
-                string body = priv ? "" : TextOf(f);
+                string body = priv ? "" : TextOf(f, documents);
                 string stem = System.IO.Path.GetFileNameWithoutExtension(f);
                 // "spec", "feedback" and "README" say little alone: name them after their folder.
                 string title = stem.ToLowerInvariant() is "spec" or "feedback" or "readme" or "index" or "notes"

@@ -1,26 +1,17 @@
-; One app, one AppId, two Setup.exe (built by windows/build.ps1 with Inno Setup 6):
-;   Study-Stash-Laptop-Setup.exe   (Role=laptop)   the computer you record lectures on.
-;   Study-Stash-Library-Setup.exe  (Role=library)  the computer that keeps your library.
-; The same AppId for both means installing the other role's Setup.exe over an existing install is an
-; in-place upgrade: it lands in the same folder and just rewrites study-stash.ini's role, so a student who
-; picks the wrong one (or repurposes a computer) never ends up with two copies.
+; Study-Stash-Setup.exe, the one Windows download (built by windows/build.ps1 with Inno Setup 6). The app has no
+; role of its own: setup asks what this computer is for, and Settings can change it later (docs/one-download.md).
+; The AppId is the one the old Laptop and Library Setup.exe had, so installing over any earlier copy is an in-place
+; upgrade: same folder, and its study-stash.ini keeps the role= line an old Setup.exe wrote (Apps.RolePreset reads it
+; for a copy that never finished setup), so nothing changes for a computer already set up.
 ; Per-user install (no admin rights), so [Files] copies the tree for whichever processor this Windows is
 ; (an arm64 Windows can also run the x64 tree under emulation, but its own tree is faster).
-;   ISCC /Qp /DAppVersion=0.4.4 /DSource=<dist\windows, holding win-x64\ and win-arm64\> /DRole=laptop|library /Odist\windows setup.iss
+;   ISCC /Qp /DAppVersion=0.9.0 /DSource=<dist\windows, holding win-x64\ and win-arm64\> /Odist\windows setup.iss
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
 #endif
 #ifndef Source
   #define Source "..\dist\windows"
-#endif
-#ifndef Role
-  #define Role "laptop"
-#endif
-#if Role == "library"
-  #define Output "Study-Stash-Library-Setup"
-#else
-  #define Output "Study-Stash-Laptop-Setup"
 #endif
 
 [Setup]
@@ -38,7 +29,7 @@ DisableProgramGroupPage=yes
 DisableReadyPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
-OutputBaseFilename={#Output}
+OutputBaseFilename=Study-Stash-Setup
 SetupIconFile=..\assets\study-stash.ico
 UninstallDisplayIcon={app}\StudyStash.exe
 UninstallDisplayName=Study Stash
@@ -56,8 +47,7 @@ Source: "{#Source}\win-arm64\*"; DestDir: "{app}"; Flags: ignoreversion recurses
 Source: "{#Source}\win-x64\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: not IsArm64
 
 [INI]
-; setup starts from this; after first run the role lives in the app's own settings (Apps.RolePreset)
-Filename: "{app}\study-stash.ini"; Section: "app"; Key: "role"; String: "{#Role}"
+; the version an installed copy reports without running .NET (Updates.InstalledVersion); no role: setup asks
 Filename: "{app}\study-stash.ini"; Section: "app"; Key: "version"; String: "{#AppVersion}"
 
 [Icons]

@@ -83,6 +83,30 @@ public class AiRewriteTests
     }
 
     [Fact]
+    public async Task A_rewrite_is_written_with_the_lectures_attachments_and_using_it_counts_them_used()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        Seed(store);
+        File.WriteAllText(Path.Combine(store.AttachmentsDir("Bio 110"), "my notes.pdf"), "x");
+        store.AddAttachment(new Attachment("a1", "my notes.pdf", "my notes.pdf", "Bio 110", "lec-1", 1, "application/pdf", "2026-09-01T00:00:00Z"));
+        store.SetAttachmentText("a1", "Sodium-potassium pump: 3 Na out, 2 K in.");
+        Assert.True(store.AttachmentsUnused("lec-1"));
+        var claude = new ScriptedAi("claude", "Claude") { Script = [new AiEvent("final", "Notes with the pump.")] };
+        var ai = new AiJobs(cfg.Home) { Providers = _ => claude, Checks = new FakeChecks().Installed("claude").Build() };
+        await using var site = await Site(cfg, store, ai);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+
+        await remote.RewriteStartAsync("lec-1", "claude");
+        await UntilAsync(remote, "lec-1", i => i.State == "ready");
+        Assert.Contains(claude.Prompts, p => p.Contains("The student's own notes (my notes.pdf):\nSodium-potassium pump: 3 Na out, 2 K in."));
+        Assert.True(store.AttachmentsUnused("lec-1")); // a draft isn't the notes yet
+        await remote.RewriteUseAsync("lec-1");
+        Assert.False(store.AttachmentsUnused("lec-1"));
+    }
+
+    [Fact]
     public async Task Keep_old_drops_the_draft_and_leaves_the_notes_exactly_as_they_were()
     {
         using var dir = new TempDir();

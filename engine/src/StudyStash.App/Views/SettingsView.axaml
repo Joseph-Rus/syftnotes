@@ -699,6 +699,42 @@
                 <Button Classes="pill" HorizontalAlignment="Left" Margin="0,10,0,0" IsVisible="{Binding !LibraryHere}" Command="{Binding MakeThisTheLibraryCommand}">
                   <TextBlock Text="Make this computer the library too" FontSize="13" />
                 </Button>
+
+                <!-- This computer's role, switched any time after setup (docs/one-download.md) -->
+                <TextBlock Classes="section gap" Text="This computer" />
+                <TextBlock Classes="body" Text="{Binding RoleWords}" />
+                <StackPanel Spacing="8" IsVisible="{Binding IsLaptopRole}">
+                  <Button Classes="pill" HorizontalAlignment="Left" IsVisible="{Binding !ConfirmingBecomeLibrary}"
+                          Command="{Binding AskBecomeLibraryCommand}">
+                    <TextBlock Text="Also be your library" FontSize="13" />
+                  </Button>
+                  <StackPanel Spacing="8" IsVisible="{Binding ConfirmingBecomeLibrary}">
+                    <TextBlock Classes="say" Margin="0" Text="{Binding BecomeLibraryQuestion}" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="pill" Command="{Binding CancelBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" FontSize="13" /></Button>
+                      <Button Classes="pill primary" Command="{Binding ConfirmBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Switch" FontSize="13" FontWeight="Medium" /></Button>
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+                <StackPanel Spacing="8" IsVisible="{Binding IsLibraryRole}">
+                  <TextBlock Classes="row-sub" Text="Send its lectures to another library and become a laptop that records for it." />
+                  <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left" IsVisible="{Binding !ConfirmingBecomeLaptop}">
+                    <Border Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopAddress}" PlaceholderText="http://mac-mini:8787" FontSize="13" /></Border>
+                    <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopPassword}" PasswordChar="•" PlaceholderText="Its password" FontSize="13" /></Border>
+                  </Grid>
+                  <Button Classes="pill" HorizontalAlignment="Left" IsVisible="{Binding !ConfirmingBecomeLaptop}" Command="{Binding AskBecomeLaptopCommand}">
+                    <TextBlock Text="Become a laptop" FontSize="13" />
+                  </Button>
+                  <StackPanel Spacing="8" IsVisible="{Binding ConfirmingBecomeLaptop}">
+                    <TextBlock Classes="say" Margin="0"
+                               Text="This library's lectures go to that address first, so nothing is left behind. Then this computer stops being the library: its lectures, notes and settings stay right where they are, ready for it to be the library again any time." />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Classes="pill" Command="{Binding CancelBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" FontSize="13" /></Button>
+                      <Button Classes="pill primary" Command="{Binding ConfirmBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Switch" FontSize="13" FontWeight="Medium" /></Button>
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+                <TextBlock Classes="say" Text="{Binding SwitchSay}" IsVisible="{Binding SwitchSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
 
               <!-- Recording -->
@@ -1201,6 +1237,18 @@
                 <Panel IsVisible="{Binding IsWin}">
                   <v:WinCanvasSettings DataContext="{Binding Canvas}" />
                 </Panel>
+              </Panel>
+
+              <!-- Phone: adding one, and the phones already added -->
+              <Panel IsVisible="{Binding OnPhone}">
+                <v:MacPhones DataContext="{Binding Phones}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
+                <v:WinPhones DataContext="{Binding Phones}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
+              </Panel>
+
+              <!-- Calendars: pasting a feed, Connect buttons for kinds that offer one, and the sources already added -->
+              <Panel IsVisible="{Binding OnCalendars}">
+                <v:MacCalendarSettings DataContext="{Binding Calendars}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
+                <v:WinCalendarSettings DataContext="{Binding Calendars}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
               </Panel>
             </StackPanel>
           </ScrollViewer>

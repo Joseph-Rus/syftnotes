@@ -24,8 +24,18 @@ Free and open source, for Mac and Windows, and everything stays on your own comp
   from your notes and transcripts, with the engine you pick for that question.
 - **Finds anything in a second.** The quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows)
   searches lectures, passages in your notes, and classes, and asks your notes a question.
+- **Knows what's coming up.** Paste your calendar's link (Google's secret iCal address, iCloud,
+  Outlook or your school's) in Settings → Calendars and pick which calendars to share. Upcoming
+  classes show in the menu bar, the quick panel and the library, and a lecture recorded during one
+  is named after it and filed under its class.
+- **Takes your own notes and slides too.** Attach iPad handwriting, slides, PDFs or photos to a
+  lecture or class (drag them in). Their words, handwriting included, are read on your computer
+  and go into the lecture's notes, Ask and Claude.
 - **Brings in Canvas.** What's due across your classes, each assignment's instructions, rubric,
   your submission and feedback, module files and pages, announcements, quizzes and discussions.
+- **Comes with you on your phone.** Your library serves a phone app over Tailscale: read your
+  notes, see what's coming up, search, and add photos and PDFs to a lecture from your iPhone or
+  iPad. Settings → Your library → Phone shows a code to pair it ([docs/phone.md](docs/phone.md)).
 - **Lets Claude read your library** over MCP: Claude Code, Claude Desktop and claude.ai.
 - **Looks at home on your computer.** A native Mac look (Liquid Glass) and Windows 11's, light and
   dark, with ten colour themes in Settings → Appearance.
@@ -59,16 +69,14 @@ your laptop                                  your library (this laptop, or a com
 
 ## Install
 
-Download the installer from the [latest release](https://github.com/Joseph-Rus/study-stash/releases/latest):
+One download for every computer, on the [latest release](https://github.com/Joseph-Rus/study-stash/releases/latest):
 
-| | Laptop (records lectures) | Library (the computer that stays on) |
-|---|---|---|
-| **Mac** | [Study-Stash-Laptop.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop.dmg) | [Study-Stash-Library.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library.dmg) |
-| **Windows** | [Study-Stash-Laptop-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop-Setup.exe) | [Study-Stash-Library-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library-Setup.exe) |
+| Mac | Windows |
+|---|---|
+| [Study-Stash.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash.dmg) | [Study-Stash-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Setup.exe) |
 
-Both are the same app; the installer only picks where setup starts. For **one computer**, use the
-laptop download and keep setup's first choice, **Just this computer**. You can add a laptop later
-in **Settings → Your library → Add a laptop**, with nothing to reinstall.
+It's the same app either way; what a computer is for is chosen when you first open it, not when
+you download it.
 
 - **Mac:** open the DMG and drag **Study Stash** into Applications. Study Stash isn't signed with a
   paid Apple Developer ID yet, so the first time macOS asks: click **Done**, then **System Settings
@@ -86,14 +94,19 @@ Then open **Study Stash** and follow setup. It asks how you'll use it:
 - **This is my laptop:** find your library (or type its address and password), check the microphone,
   download the transcription model, Canvas, and your classes.
 
+Changed your mind, or your plans changed? Switch any time in **Settings → Connection → This
+computer**: a laptop can also become your library (bringing over whatever it was connected to
+before), and a library can become a laptop, sending its own lectures to the new one first so
+nothing is left behind. Nothing to reinstall or redownload.
+
 Or install from a terminal:
 
 ```bash
-# Mac (Terminal): add "-s -- library" for the library
+# Mac (Terminal)
 curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.sh | sh
 ```
 ```powershell
-# Windows (PowerShell): set $env:STUDYSTASH_ROLE='library' first for the library
+# Windows (PowerShell)
 irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
 ```
 
@@ -194,21 +207,24 @@ per class, which you can open, back up or sync however you like.
 
 ## Build from source
 
-You need the [.NET 10 SDK](https://dotnet.microsoft.com).
+You need the [.NET 10 SDK](https://dotnet.microsoft.com), and [Node](https://nodejs.org) (22 or later) for the
+phone app in `web/`.
 
 ```sh
 dotnet build engine/StudyStash.slnx
 dotnet test engine/StudyStash.slnx
 dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
+(cd web && npm ci && npm test && npm run build)   # the phone app, into web/dist, which the app then carries
 ```
 
-`macos/build-app.sh` builds "Study Stash.app" and its DMGs (with Xcode's command line tools), and
-`windows/build.ps1` the Windows installers. `engine/README.md` has more on the projects and tests.
+`macos/build-app.sh` builds "Study Stash.app" and `Study-Stash.dmg` (with Xcode's command line tools), and
+`windows/build.ps1` `Study-Stash-Setup.exe`; both build the phone app into it first. `engine/README.md` has more on the projects and tests.
 
 Releases come from CI (`.github/workflows/ci.yml`): every change is tested on macOS, Linux and
 Windows, and both apps are built, self-tested and installed. To ship a release, bump
-`StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI publishes the four
-installers and `SHA256SUMS.txt`. A push that only changes the version, on top of a commit that
+`StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI publishes
+`Study-Stash.dmg`, `Study-Stash-Setup.exe` (and copies under the old installers' names, so older copies
+still update) and `SHA256SUMS.txt`. A push that only changes the version, on top of a commit that
 already passed, skips the tests and just builds and publishes.
 
 ## License

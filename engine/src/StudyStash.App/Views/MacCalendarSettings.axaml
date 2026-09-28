@@ -1,0 +1,92 @@
+<!-- Settings -> Calendars, Mac: paste a calendar feed's address to add it, a Connect button for every kind that offers
+     one (none yet, so a quiet note says Apple/Google/Outlook are coming), then each source with a switch per
+     calendar and Remove. Draws no outer padding — SettingsView gives the margins, as it does every section's. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:cal="using:StudyStash.Core.Calendar"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.MacCalendarSettings"
+             x:DataType="vm:CalendarSettingsModel">
+  <StackPanel Spacing="8">
+    <TextBlock Classes="h" Text="{x:Static vm:CalendarWords.Title}" />
+    <TextBlock Classes="body" Text="{x:Static vm:CalendarWords.Lede}" />
+
+    <!-- Add a calendar feed -->
+    <Border Classes="group">
+      <Border Classes="row">
+        <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+          <c:Icon Glyph="link" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+          <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+            <TextBlock Classes="row-title" Text="{x:Static vm:CalendarWords.AddFeedTitle}" />
+            <TextBlock Classes="row-sub" Text="{x:Static vm:CalendarWords.AddFeedLine}" TextWrapping="Wrap" />
+            <Border Classes="field" Width="360" HorizontalAlignment="Left" Margin="0,4,0,0">
+              <TextBox Classes="bare" Text="{Binding FeedUrl}" PlaceholderText="{x:Static vm:CalendarWords.FeedPlaceholder}" FontSize="13" />
+            </Border>
+          </StackPanel>
+          <Button Grid.Column="4" Classes="pill primary" IsEnabled="{Binding !Adding}" Command="{Binding AddFeedCommand}" VerticalAlignment="Center">
+            <TextBlock Text="Add" FontSize="13" FontWeight="Medium" />
+          </Button>
+        </Grid>
+      </Border>
+    </Border>
+    <TextBlock Classes="say" Text="{Binding FeedError}" IsVisible="{Binding FeedError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+
+    <!-- Connect buttons, one per registered kind; a quiet note while there are none -->
+    <StackPanel IsVisible="{Binding HasConnectable}" Spacing="8">
+      <ItemsControl ItemsSource="{Binding Connectable}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="cal:CalendarKind">
+            <Button Classes="pill" Margin="0,0,8,0" Command="{Binding $parent[ItemsControl].((vm:CalendarSettingsModel)DataContext).ConnectCommand}" CommandParameter="{Binding}">
+              <TextBlock Text="{Binding ConnectLabel}" FontSize="13" />
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+    <TextBlock Classes="say" Text="{x:Static vm:CalendarWords.MoreComingSoon}" IsVisible="{Binding !HasConnectable}" TextWrapping="Wrap" />
+
+    <!-- Sources already added, each with its calendars -->
+    <TextBlock Classes="section gap" Text="Calendars" IsVisible="{Binding HasSources}" />
+    <TextBlock Classes="say" Text="{x:Static vm:CalendarWords.NoSources}" IsVisible="{Binding !HasSources}" />
+    <ItemsControl ItemsSource="{Binding Sources}" IsVisible="{Binding HasSources}">
+      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:CalendarSourceRow">
+          <Border Classes="group">
+            <StackPanel>
+              <Border Classes="row">
+                <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+                  <c:Icon Glyph="{Binding Glyph}" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="row-sub" Text="{Binding Problem}" TextWrapping="Wrap" IsVisible="{Binding HasProblem}" Foreground="{DynamicResource Warn}" />
+                  </StackPanel>
+                  <Button Grid.Column="4" Classes="pill" VerticalAlignment="Center" Command="{Binding RemoveCommand}">
+                    <TextBlock Text="Remove" FontSize="13" />
+                  </Button>
+                </Grid>
+              </Border>
+              <ItemsControl ItemsSource="{Binding Calendars}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CalendarRow">
+                    <StackPanel>
+                      <Border Classes="rowsep itemsep" />
+                      <Border Classes="row">
+                        <Grid ColumnDefinitions="Auto,10,*,12,Auto">
+                          <Ellipse Width="10" Height="10" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          <ToggleButton Grid.Column="4" Classes="switch" IsChecked="{Binding On}" VerticalAlignment="Center" />
+                        </Grid>
+                      </Border>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+          </Border>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

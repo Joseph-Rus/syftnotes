@@ -1,0 +1,49 @@
+# The website (site/), published to Firebase Hosting (study-stash-app) when a change to it reaches main. A pull
+# request that changes it is checked (site/check.mjs) but not published. See site/README.md.
+name: Website
+
+on:
+  push:
+    branches: [main]
+    paths: ["site/**", "firebase.json", ".firebaserc", ".github/workflows/site.yml"]
+  pull_request:
+    paths: ["site/**", "firebase.json", ".firebaserc", ".github/workflows/site.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One publish at a time; a newer push waits rather than cancelling one halfway through.
+concurrency:
+  group: website
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check every page, link and download
+        run: node site/check.mjs
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Say why nothing is published
+        if: env.HAS_KEY != 'true'
+        run: echo "::notice::No FIREBASE_SERVICE_ACCOUNT secret, so the website was checked but not published (see site/README.md)."
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        if: env.HAS_KEY == 'true'
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: study-stash-app
+          channelId: live

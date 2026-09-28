@@ -1,6 +1,7 @@
 #!/bin/sh
 # Builds "Study Stash.app": one universal bundle (D1: macos/launcher.c hosts .NET in-process, so the same running
-# executable works on Apple silicon and Intel) for the laptop and library roles, then both DMGs (D2):
+# executable works on Apple silicon and Intel), then the one download, Study-Stash.dmg. The app has no role of its own:
+# setup asks what the computer is for, and Settings can change it later (docs/one-download.md).
 #   sh macos/build-app.sh [out-dir]      default: dist/mac
 # Needs the .NET 10 SDK and the Xcode command line tools (clang, lipo, codesign, hdiutil, PlistBuddy, iconutil,
 # xcrun swift, vtool, ditto, SetFile, osascript). Publishing both architectures downloads their runtime packs on first use.
@@ -17,6 +18,13 @@ MACOS="$APP/Contents/MacOS"
 
 rm -rf "$OUT"
 mkdir -p "$MACOS" "$APP/Contents/Resources"
+
+# The phone app (web/) is built first, so each publish carries it beside the app as web/ (the library serves it at
+# /app/). It needs Node and npm; without them the build stops rather than ship a library whose Add a phone leads
+# nowhere.
+command -v npm >/dev/null || { echo "build-app.sh: npm is needed to build the phone app (web/)" >&2; exit 1; }
+(cd "$ROOT/web" && npm ci --no-audit --no-fund --silent && npm run build --silent)
+[ -f "$ROOT/web/dist/index.html" ] || { echo "build-app.sh: the phone app didn't build (web/dist)" >&2; exit 1; }
 
 # One self-contained publish per architecture; the two trees can't be lipo-merged (System.Private.CoreLib and the
 # R2R framework assemblies differ), so both ship whole and macos/launcher.c picks its tree at run time (D1).
@@ -64,8 +72,8 @@ xcrun swift "$HERE/make_icon.swift" "$OUT/AppIcon.iconset"
 iconutil -c icns "$OUT/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
 rm -rf "$OUT/AppIcon.iconset"
 
-# Info.plist (laptop role by default), PkgInfo.
-sed -e "s/__VERSION__/$VERSION/g" -e "s/__MINOS__/$MINOS/g" -e "s/__ROLE__/laptop/g" \
+# Info.plist, PkgInfo.
+sed -e "s/__VERSION__/$VERSION/g" -e "s/__MINOS__/$MINOS/g" \
   "$HERE/Info.plist" > "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
@@ -90,28 +98,16 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 echo "Built Study Stash $VERSION (universal, min $MINOS):"
 du -sh "$APP"
 
-# The library copy: the same signed app, its role flipped. Editing Info.plist invalidates the outer seal, so the
-# bundle (not the Mach-Os inside, untouched) is re-signed.
-LIBAPP="$OUT/library/Study Stash.app"
-mkdir -p "$OUT/library"
-ditto "$APP" "$LIBAPP"
-/usr/libexec/PlistBuddy -c "Set :StudyStashRole library" "$LIBAPP/Contents/Info.plist"
-codesign --force --options runtime --entitlements "$HERE/StudyStash.entitlements" --sign - "$LIBAPP"
-codesign --verify --deep --strict --verbose=2 "$LIBAPP"
-echo "Library copy:"
-du -sh "$LIBAPP"
-
-# Both DMGs (D2): a stage folder per role with the app plus a link to /Applications. The disk shows the app's icon
-# when it opens (.VolumeIcon.icns, flagged on the volume, which only a mounted read-write copy can take), and the .dmg
-# file itself wears it too.
+# The DMG: a stage folder with the app plus a link to /Applications. The disk shows the app's icon when it opens
+# (.VolumeIcon.icns, flagged on the volume, which only a mounted read-write copy can take), and the .dmg file itself
+# wears it too.
 stage_dmg() {
   app_path=$1
-  role_name=$2
-  volname=$3
-  stage="$OUT/stage-$role_name"
-  rw="$OUT/stage-$role_name.dmg"
-  mnt="$OUT/mount-$role_name"
-  dmg="$OUT/Study-Stash-$role_name.dmg"
+  volname=$2
+  dmg=$3
+  stage="$OUT/stage"
+  rw="$OUT/stage.dmg"
+  mnt="$OUT/mount"
   rm -rf "$stage" "$rw" "$mnt"
   mkdir -p "$stage" "$mnt"
   ditto "$app_path" "$stage/Study Stash.app"
@@ -129,8 +125,7 @@ stage_dmg() {
     "$app_path/Contents/Resources/AppIcon.icns" "$dmg" >/dev/null 2>&1 || true
   rm -rf "$stage" "$rw" "$mnt"
 }
-stage_dmg "$APP" "Laptop" "Study Stash"
-stage_dmg "$LIBAPP" "Library" "Study Stash Library"
+stage_dmg "$APP" "Study Stash" "$OUT/Study-Stash.dmg"
 
-echo "DMGs:"
-du -sh "$OUT"/*.dmg
+echo "DMG:"
+du -sh "$OUT/Study-Stash.dmg"

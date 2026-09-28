@@ -50,6 +50,8 @@ public sealed class Lecture
     /// <summary>When a send last failed, so the next try waits (seconds since 1970).</summary>
     public double? RetryAt { get; set; }
     public int Tries { get; set; }
+    /// <summary>The calendar event it was recorded during (its title named the lecture); null when there was none.</summary>
+    public Calendar.RecordedEvent? Event { get; set; }
 
     [JsonIgnore]
     public double Progress => Seconds <= 0 ? 0 : Math.Clamp(TranscribedSeconds / Seconds, 0, 1);
@@ -69,6 +71,11 @@ public sealed class Lecture
         string title = Title.Length > 0 ? Title
             : ClassName.Length > 0 ? $"{ClassName} lecture, {StartedAt.ToString("ddd d MMM", CultureInfo.InvariantCulture)}"
             : $"Lecture, {StartedAt.ToString("ddd d MMM", CultureInfo.InvariantCulture)}";
+        var raw = new System.Text.Json.Nodes.JsonObject
+        {
+            ["source"] = "recorder", ["seconds"] = Math.Round(Seconds, 1), ["language"] = Language,
+        };
+        if (Event is not null) raw["event"] = Event.Json();
         return new System.Text.Json.Nodes.JsonObject
         {
             ["id"] = Id,
@@ -77,10 +84,7 @@ public sealed class Lecture
             ["owner"] = Owner,
             ["folder"] = ClassName,
             ["transcript"] = Transcript(),
-            ["raw"] = new System.Text.Json.Nodes.JsonObject
-            {
-                ["source"] = "recorder", ["seconds"] = Math.Round(Seconds, 1), ["language"] = Language,
-            },
+            ["raw"] = raw,
         };
     }
 }

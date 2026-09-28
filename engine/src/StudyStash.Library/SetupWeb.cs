@@ -157,7 +157,7 @@ public static class SetupWeb
         if (s.Finished)
         {
             var info = await s.ConnectInfoAsync();
-            string exe = $"{LibrarySetup.Releases}/Study-Stash-Laptop-Setup.exe", dmg = $"{LibrarySetup.Releases}/Study-Stash-Laptop.dmg";
+            string exe = $"{LibrarySetup.Releases}/{Updates.WindowsAsset}", dmg = $"{LibrarySetup.Releases}/{Updates.MacAsset}";
             finish = "<p>Your library is running. Open it here, or from your laptop and phone:</p>"
                 + $"<p class=\"addr\">{Ui.Esc(info.Urls[0])}</p><p>Password: <span class=\"addr\">{Ui.Esc(info.Password)}</span></p>"
                 + $"<div class=\"toolbar\"><a class=\"btn primary\" href=\"http://127.0.0.1:{cfg.WebPort}/\">Open your library</a></div>"

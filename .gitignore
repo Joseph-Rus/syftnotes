@@ -13,3 +13,6 @@ windows/obj/
 # the C# engine (engine/)
 engine/**/bin/
 engine/**/obj/
+
+# Firebase CLI deploy cache
+.firebase/
