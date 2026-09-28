@@ -38,6 +38,15 @@ public sealed partial class NavItem : ObservableObject
     [ObservableProperty] public partial bool On { get; set; }
 }
 
+/// <summary>One choice in the Appearance mode picker: "Match system", "Light" or "Dark", and whether it's the one in
+/// use.</summary>
+public sealed partial class AppearanceOption : ObservableObject
+{
+    public required AppAppearance Mode { get; init; }
+    public required string Label { get; init; }
+    [ObservableProperty] public partial bool Chosen { get; set; }
+}
+
 /// <summary>
 /// Settings, in two groups. This laptop (or this Mac/PC): General, Appearance (the colour theme), Recording (the
 /// model, language, the computer's sound, how long audio stays), Connection (which library; this computer's own) and
@@ -80,6 +89,16 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     // Appearance
     public IReadOnlyList<ThemeSwatch> Themes { get; } = [.. ColourThemes.All.Select(t => new ThemeSwatch(t))];
     [ObservableProperty] public partial string ColourTheme { get; set; } = "";
+    public IReadOnlyList<AppearanceOption> AppearanceOptions { get; } =
+    [
+        new() { Mode = AppAppearance.System, Label = "Match system" },
+        new() { Mode = AppAppearance.Light, Label = "Light" },
+        new() { Mode = AppAppearance.Dark, Label = "Dark" },
+    ];
+    [ObservableProperty] public partial AppAppearance Appearance { get; set; } = AppAppearance.System;
+    public bool AppearanceIsSystem => Appearance == AppAppearance.System;
+    public bool AppearanceIsLight => Appearance == AppAppearance.Light;
+    public bool AppearanceIsDark => Appearance == AppAppearance.Dark;
 
     // Library
     [ObservableProperty] public partial string LibraryLine { get; set; } = "";
@@ -218,6 +237,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Shortcuts = host.Settings.Shortcuts;
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
         ColourTheme = host.Settings.Theme;
+        Appearance = host.Settings.Appearance;
         // Whisper tiny is only for trying things out: listed only when it's the one in use.
         foreach (var m in WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == host.Model.Id))
             Models.Add(new ModelChoice { Model = m, Chosen = m.Id == host.Model.Id, Here = WhisperModels.IsDownloaded(host.Home, m) });
@@ -228,6 +248,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         host.Changed += OnHostChanged;
         foreach (var n in NavItems) n.On = n.Id == Section;
         foreach (var t in Themes) t.Chosen = t.Name == ColourTheme;
+        foreach (var o in AppearanceOptions) o.Chosen = o.Mode == Appearance;
         loading = false;
         Refresh();
     }
@@ -348,6 +369,18 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     }
 
     [RelayCommand] void PickTheme(string name) => ColourTheme = name;
+
+    partial void OnAppearanceChanged(AppAppearance value)
+    {
+        if (!loading) host.Save(s => s.Appearance = value);
+        Skin.UseAppearance(value);
+        foreach (var o in AppearanceOptions) o.Chosen = o.Mode == value;
+        OnPropertyChanged(nameof(AppearanceIsSystem));
+        OnPropertyChanged(nameof(AppearanceIsLight));
+        OnPropertyChanged(nameof(AppearanceIsDark));
+    }
+
+    [RelayCommand] void PickAppearance(AppAppearance mode) => Appearance = mode;
 
     partial void OnLanguageChanged(string value)
     {

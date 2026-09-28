@@ -373,6 +373,36 @@
       <Setter Property="BorderThickness" Value="2" />
     </Style>
 
+    <!-- Settings → Appearance's mode: Mac a three-way segmented pill (System Settings' own Appearance control) — one
+         rounded track holding three equal buttons, the chosen one raised. -->
+    <Style Selector="Border.seg">
+      <Setter Property="Padding" Value="3" />
+    </Style>
+    <Style Selector=".mac Border.seg">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="{DynamicResource Group}" />
+    </Style>
+    <Style Selector="Button.seg-item">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector=".mac Button.seg-item">
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    </Style>
+    <Style Selector=".mac Button.seg-item.on">
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="Background" Value="{DynamicResource Raised}" />
+    </Style>
+    <Style Selector=".mac Button.seg-item.on /template/ Border#PART_Bg">
+      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+    </Style>
+
     <!-- An accent-track, white-knob toggle: a plain ToggleButton, not the Fluent ToggleSwitch (which doesn't follow
          the colour theme). -->
     <Style Selector="ToggleButton.switch">
@@ -547,7 +577,51 @@
               <StackPanel IsVisible="{Binding OnAppearance}" Spacing="8">
                 <TextBlock Classes="h" Text="Appearance" />
                 <TextBlock Classes="body" Text="Pick how Study Stash looks." />
-                <TextBlock Classes="section" Text="Colour theme" />
+                <TextBlock Classes="section" Text="Mode" />
+                <!-- Mac: a three-way segmented pill, System Settings' own way of choosing an appearance. -->
+                <Border Classes="seg" IsVisible="{Binding IsMac}" HorizontalAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="2">
+                    <Button Classes="seg-item" Classes.on="{Binding AppearanceIsSystem}"
+                            Command="{Binding PickAppearanceCommand}" CommandParameter="{x:Static s:AppAppearance.System}">
+                      <TextBlock Text="Match system" />
+                    </Button>
+                    <Button Classes="seg-item" Classes.on="{Binding AppearanceIsLight}"
+                            Command="{Binding PickAppearanceCommand}" CommandParameter="{x:Static s:AppAppearance.Light}">
+                      <TextBlock Text="Light" />
+                    </Button>
+                    <Button Classes="seg-item" Classes.on="{Binding AppearanceIsDark}"
+                            Command="{Binding PickAppearanceCommand}" CommandParameter="{x:Static s:AppAppearance.Dark}">
+                      <TextBlock Text="Dark" />
+                    </Button>
+                  </StackPanel>
+                </Border>
+                <!-- Windows: a vertical list of radio rows, each the full row wide. -->
+                <Border Classes="group" IsVisible="{Binding IsWin}">
+                  <ItemsControl ItemsSource="{Binding AppearanceOptions}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="s:AppearanceOption">
+                        <StackPanel>
+                          <Border Classes="rowsep itemsep" />
+                          <Button Theme="{StaticResource Surface}" HorizontalContentAlignment="Stretch"
+                                  Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).PickAppearanceCommand}" CommandParameter="{Binding Mode}">
+                            <Border Classes="row">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Classes="row-title" Text="{Binding Label}" />
+                                <Panel Grid.Column="1" Classes="act" Width="16" Height="16">
+                                  <Ellipse Width="16" Height="16" Stroke="{DynamicResource Fg3}" StrokeThickness="1.3" IsVisible="{Binding !Chosen}" />
+                                  <Ellipse Width="16" Height="16" Stroke="{DynamicResource Accent}" StrokeThickness="1.3" IsVisible="{Binding Chosen}" />
+                                  <Ellipse Width="8" Height="8" Fill="{DynamicResource Accent}" IsVisible="{Binding Chosen}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Panel>
+                              </Grid>
+                            </Border>
+                          </Button>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Border>
+                <TextBlock Classes="say" Text="Light and dark set the whole app at once: the dropdown, quick panel, recorder, library and setup." />
+                <TextBlock Classes="section gap" Text="Colour theme" />
                 <Border Classes="group" Padding="16">
                   <ItemsControl ItemsSource="{Binding Themes}">
                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="5" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
