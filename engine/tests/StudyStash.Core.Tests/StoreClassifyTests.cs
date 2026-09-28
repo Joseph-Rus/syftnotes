@@ -105,7 +105,7 @@ public class StoreClassifyTests
     }
 
     [Fact]
-    public void The_prompts_are_word_for_word_the_python_ones()
+    public void The_prompts_are_word_for_word_the_saved_ones()
     {
         var prompts = Golden.Case("prompts");
         var m = GoldenMeeting();

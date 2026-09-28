@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using StudyStash.Core.Rich;
 
 namespace StudyStash.Core;
 
@@ -24,6 +25,8 @@ public static partial class Passages
     [GeneratedRegex(@"^\s*(?:[-*+]|\d+[.)])\s+")]
     private static partial Regex ListItem();
 
+    /// <summary>A lecture's notes as passages: each bullet, each paragraph, and each block (code, a formula, a
+    /// diagram as its words) one passage, under the heading it sits beneath.</summary>
     public static List<Passage> FromNotes(string noteId, string markdown)
     {
         var result = new List<Passage>();
@@ -35,9 +38,18 @@ public static partial class Passages
             para.Clear();
             if (t.Length > 0) result.Add(new Passage(noteId, Passage.NotesKind, section, null, t));
         }
-        foreach (string raw in markdown.ReplaceLineEndings("\n").Split('\n'))
+        string[] lines = NoteBlocks.Lines(markdown);
+        var blocks = NoteBlocks.Find(lines).ToDictionary(b => b.First);
+        for (int k = 0; k < lines.Length; k++)
         {
-            string line = raw.TrimEnd();
+            if (blocks.TryGetValue(k, out var block))
+            {
+                Flush();
+                if (Words(block) is { Length: > 0 } words) result.Add(new Passage(noteId, Passage.NotesKind, section, null, words));
+                k = block.Last;
+                continue;
+            }
+            string line = lines[k].TrimEnd();
             var h = Heading().Match(line.Trim());
             if (h.Success)
             {
@@ -63,6 +75,37 @@ public static partial class Passages
         }
         Flush();
         return result;
+    }
+
+    static readonly HashSet<string> MermaidWords = new(StringComparer.OrdinalIgnoreCase)
+        { "flowchart", "graph", "td", "tb", "bt", "lr", "rl", "subgraph", "end", "class", "classdef", "style", "direction" };
+
+    /// <summary>What search and Ask read of a block: a diagram's words (never its markup), a formula's LaTeX, code
+    /// as written.</summary>
+    static string Words(NoteBlock block)
+    {
+        switch (block.Kind)
+        {
+            case NoteBlockKind.Mermaid:
+                try
+                {
+                    var labels = Flowchart.Parse(block.Text).Labels();
+                    return labels.Count == 0 ? "" : "Diagram: " + string.Join(", ", labels);
+                }
+                catch (MermaidException)
+                {
+                    // Not a flowchart that can be drawn: its words still find it.
+                    var words = Words(block.Text).Where(w => !MermaidWords.Contains(w) && w.Length > 1).ToList();
+                    return words.Count == 0 ? "" : "Diagram: " + string.Join(" ", words);
+                }
+            case NoteBlockKind.Svg:
+                var drawing = SafeSvg.Clean(block.Text);
+                var texts = drawing.Texts.Where(t => t.Trim().Length > 0).ToList();
+                if (drawing.Title.Length > 0 && !texts.Contains(drawing.Title)) texts.Insert(0, drawing.Title);
+                return texts.Count == 0 ? "" : "Diagram: " + string.Join(", ", texts);
+            default:
+                return block.Text.Trim();
+        }
     }
 
     /// <summary>A transcript in stretches of about a minute; a timed one's stretches start where a line does.</summary>

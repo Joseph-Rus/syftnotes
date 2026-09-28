@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using StudyStash.Core.Rich;
 
 namespace StudyStash.Core;
 
@@ -185,6 +186,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             You answer a student's question from their own lecture notes and transcripts, numbered below.
             Use only these sources. If they don't answer the question, say so in one sentence.
             Answer in one to three plain sentences, the way a classmate who took good notes would. Don't mention the sources by number in the answer.
+            Write any formula in LaTeX between $ signs; in the JSON, write each backslash twice (\\frac). If the student asks you to draw or show something, or the answer is a short process, you may add one small Mermaid flowchart after the sentences, in a ```mermaid block (flowchart LR or TD, a few words per box).
             Return JSON: answer (the answer), sources (the numbers of the sources you used, most important first).
 
             """);
@@ -201,8 +203,8 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         List<int> used;
         try
         {
-            var data = JsonNode.Parse(text) as JsonObject;
-            answer = Py.Strip(Py.AsString(data?["answer"]) ?? "");
+            var data = ParseAnswer(text);
+            answer = Py.Strip(MathText.RepairJsonEscapes(Py.AsString(data?["answer"]) ?? ""));
             used = (data?["sources"] as JsonArray ?? []).Select(n => n is JsonValue v && v.TryGetValue(out int k) ? k : 0).ToList();
         }
         catch (System.Text.Json.JsonException)
@@ -221,6 +223,20 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             });
         }
         return new JsonObject { ["answer"] = answer, ["sources"] = sources };
+    }
+
+    /// <summary>The answer's JSON; when it doesn't parse because its LaTeX kept single backslashes, it parses with
+    /// them doubled.</summary>
+    static JsonObject? ParseAnswer(string text)
+    {
+        try
+        {
+            return JsonNode.Parse(text) as JsonObject;
+        }
+        catch (System.Text.Json.JsonException) when (text.Contains('\\'))
+        {
+            return JsonNode.Parse(MathText.DoubleLoneBackslashes(text)) as JsonObject;
+        }
     }
 
     static string Title(NoteRow n) => !string.IsNullOrEmpty(n.LectureTitle) ? n.LectureTitle : n.Title ?? "";

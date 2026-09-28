@@ -248,6 +248,34 @@ public class SafeSvgTests
                 Assert.Equal(attr.Value, (string?)a.Attribute(attr.Name));
     }
 
+    /// <summary>The drawing the notes' prompt shows the CLI engines is what they imitate: it must come through as
+    /// written, and every colour in it must have a partner for dark.</summary>
+    [Fact]
+    public void The_prompts_own_example_passes_untouched_but_for_its_colours()
+    {
+        string svg = Summarize.SvgExample;
+        var r = Clean(svg);
+        Assert.Null(r.Problem);
+        var before = XDocument.Parse(svg).Root!;
+        var after = XDocument.Parse(r.Svg!).Root!;
+        foreach (string name in new[] { "viewBox", "font-size", "fill" })
+            Assert.Equal((string?)before.Attribute(name), (string?)after.Attribute(name));
+        Assert.Equal(before.Descendants().Select(e => e.Name.LocalName), after.Descendants().Select(e => e.Name.LocalName));
+        foreach (var (b, a) in before.Descendants().Zip(after.Descendants()))
+        {
+            foreach (var attr in b.Attributes().Where(x => !x.IsNamespaceDeclaration))
+                Assert.Equal(attr.Value, (string?)a.Attribute(attr.Name));
+            Assert.Equal(b.Nodes().OfType<XText>().Select(t => t.Value), a.Nodes().OfType<XText>().Select(t => t.Value));
+        }
+
+        var dark = Clean(svg, new SafeSvgOptions { Palette = Dark, Dark = true });
+        Harmless(dark);
+        var written = SvgPalette.Written.Tones.Values.SelectMany(t => new[] { t.Stroke, t.Fill })
+            .Concat([SvgPalette.Written.Ink, SvgPalette.Written.Secondary, SvgPalette.Written.LightLines]);
+        foreach (string hex in written) Assert.DoesNotContain(hex, dark.Svg!, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("#F5F5F7", (string?)XDocument.Parse(dark.Svg!).Root!.Attribute("fill"));
+    }
+
     [Fact]
     public void Random_and_garbled_input_never_throws()
     {

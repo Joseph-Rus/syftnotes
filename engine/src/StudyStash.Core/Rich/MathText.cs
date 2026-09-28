@@ -408,6 +408,26 @@ public static class MathText
         return sb.ToString();
     }
 
+    /// <summary>JSON whose writer forgot to double LaTeX's backslashes (<c>"\sqrt{x}"</c>, which no JSON reader
+    /// takes): every backslash that doesn't start a JSON escape is doubled, so the text parses. The ones that did
+    /// happen to start one (<c>\frac</c> read as a form feed) are put back by <see cref="RepairJsonEscapes"/>.</summary>
+    public static string DoubleLoneBackslashes(string json)
+    {
+        if (string.IsNullOrEmpty(json) || json.IndexOf('\\') < 0) return json ?? "";
+        var sb = new StringBuilder(json.Length + 8);
+        for (int i = 0; i < json.Length; i++)
+        {
+            char c = json[i];
+            if (c != '\\') { sb.Append(c); continue; }
+            char next = i + 1 < json.Length ? json[i + 1] : '\0';
+            bool escape = next is '"' or '\\' or '/' or 'b' or 'f' or 'n' or 'r' or 't'
+                || (next == 'u' && i + 5 < json.Length && json.AsSpan(i + 2, 4).ToString().All(Uri.IsHexDigit));
+            if (escape) { sb.Append(c).Append(next); i++; }
+            else sb.Append("\\\\");
+        }
+        return sb.ToString();
+    }
+
     static readonly HashSet<string> NewlineWords = new(StringComparer.Ordinal)
         { "nu", "nabla", "neq", "ne", "neg", "not", "ni", "notin", "newline" };
 
