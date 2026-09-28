@@ -173,7 +173,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
 /// The library over its API (/api/v2), with the laptop's password: what the Study Stash app shows, and what Claude
 /// reads through <c>Study Stash mcp</c> on a laptop.
 /// </summary>
-public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http = null) : ILibrarySource
+public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http = null) : ILibrarySource, IAttachmentLibrary
 {
     static readonly HttpClient Shared = new() { Timeout = TimeSpan.FromSeconds(150) };
     readonly HttpClient client = http ?? Shared;

@@ -222,3 +222,15 @@ public static partial class Attachments
         _ => $"{bytes} bytes",
     };
 }
+
+/// <summary>What the app asks of its library about attachments (<see cref="RemoteLibrary"/>; a test's fake).</summary>
+public interface IAttachmentLibrary
+{
+    /// <summary>{attachments, rewrite} for a lecture, or {attachments} for a class; null from a library older than attachments.</summary>
+    Task<JsonObject?> AttachmentListAsync(string? className, string? lectureId, CancellationToken stop = default);
+    Task<JsonArray> AttachAsync(IEnumerable<string> paths, string? className, string? lectureId, CancellationToken stop = default);
+    Task<bool> RemoveAttachmentAsync(string id);
+    Task DownloadAttachmentAsync(string id, string path, CancellationToken stop = default);
+    /// <summary>Writes the lecture's notes again (the library's own notes engine), now with its attachments.</summary>
+    Task RewriteAsync(string id);
+}
