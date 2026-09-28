@@ -153,7 +153,14 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
 
     // ---- step 2: Add to Chrome ----
     /// <summary>The folder Chrome loads the extension from on this computer, once Add to Chrome has asked for it.</summary>
-    [ObservableProperty] public partial string? ExtensionFolder { get; set; }
+    [NotifyPropertyChangedFor(nameof(FolderName), nameof(PickCaption))]
+    [ObservableProperty]
+    public partial string? ExtensionFolder { get; set; }
+    /// <summary>The folder's own name, as Chrome's picker and Finder/Explorer show it ("Chrome extension" on a Mac,
+    /// in the Study Stash folder in your home); "Chrome extension" until Add to Chrome has found it.</summary>
+    public string FolderName => ExtensionFolder is { Length: > 0 } f ? Path.GetFileName(f.TrimEnd('/', '\\')) : "Chrome extension";
+    /// <summary>The third picture's caption: pick the folder, or (with Developer mode on) drag it onto the page.</summary>
+    public string PickCaption => $"Pick the {FolderName} folder, or drag it onto the page";
     /// <summary>Add to Chrome has been pressed: the button gives way to quiet links and the "Waiting for Chrome…" row.</summary>
     [NotifyPropertyChangedFor(nameof(WaitingForChrome), nameof(ShowChromeStatus), nameof(ShowAddToChrome), nameof(ChromeHelp))]
     [ObservableProperty]

@@ -17,8 +17,9 @@ public sealed class ExtensionKeeper(string home, Func<CanvasClient?> client, Act
     /// engine's extension version, hashed so the key isn't kept here): the same again means nothing to do.</summary>
     string keptFor = "";
 
-    /// <summary>The folder Chrome loads the extension from on this computer ("Load unpacked").</summary>
-    public string LocalFolder => Extension.Folder(home);
+    /// <summary>The folder Chrome loads the extension from on this computer ("Load unpacked"). The one an older
+    /// Study Stash wrote inside the home is kept up to date alongside it, for a Chrome that loaded that one.</summary>
+    public string LocalFolder { get; init; } = Extension.Folder(home);
 
     /// <summary>The folder is there, complete, and points at the paired library and its Canvas.</summary>
     public bool FolderReady { get; private set; }
@@ -71,7 +72,7 @@ public sealed class ExtensionKeeper(string home, Func<CanvasClient?> client, Act
             {
                 try
                 {
-                    wrote = Extension.Ensure(folder, c.ServerUrl, info.Key, info.Canvas).Changed;
+                    wrote = Extension.EnsureFor(home, folder, c.ServerUrl, info.Key, info.Canvas).Changed;
                     keptFor = wanted;
                     if (wrote) log?.Invoke($"[canvas] the Chrome extension's folder on this computer is ready (version {Extension.Version()}): {folder}");
                 }

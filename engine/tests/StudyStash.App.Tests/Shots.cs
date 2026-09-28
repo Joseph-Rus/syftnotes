@@ -581,7 +581,7 @@ public class SurfaceShots
         if (step == SetupStep.Canvas || canvasFound)
         {
             // Setup's own Canvas: Add to Chrome pressed and waiting for Chrome, or everything done and the courses found.
-            m.Canvas = await CanvasShots.SetupStepAsync(canvasFound ? "found" : "waiting");
+            m.Canvas = await CanvasShots.SetupStepAsync(canvasFound ? "found" : "waiting", mac: skin == SkinKind.Mac);
             m.Canvas.StepLabel = "";
             m.Canvas.ShowFooter = false;
         }

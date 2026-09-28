@@ -36,20 +36,24 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
             OpenChromeExtensions: () => OpenInChrome("chrome://extensions"),
             RevealFolder: Reveal,
             OpenFile: path => Machine.Open(path),
-            PrepareExtension: (key, canvasUrl) => Core.Canvas.Extension.Ensure(Core.Canvas.Extension.Folder(host.Home), cc.ServerUrl, key, canvasUrl).Path);
+            PrepareExtension: (key, canvasUrl) => Core.Canvas.Extension.EnsureFor(host.Home, cc.ServerUrl, key, canvasUrl).Path);
         return new CanvasContext(client, new CanvasClock(() => DateTimeOffset.Now, TimeZoneInfo.Local), cls => Skin.ClassDot(host.ColorOf(cls)), actions, host.Home);
     }
 
-    /// <summary>Shows the extension's folder for Chrome's Load unpacked. On Windows it's shown selected in the folder
-    /// that holds it, so it can be dragged onto Chrome's extensions page or its path copied into Chrome's picker
-    /// (which starts somewhere else entirely); elsewhere the folder opens.</summary>
+    /// <summary>Shows the extension's folder for Chrome's Load unpacked. On a Mac and on Windows it's shown selected
+    /// in the folder that holds it (Finder, Explorer), so it can be dragged onto Chrome's extensions page or its path
+    /// copied into Chrome's picker; elsewhere the folder opens.</summary>
     static void Reveal(string dir)
     {
-        if (OperatingSystem.IsWindows())
+        var select = OperatingSystem.IsWindows() ? new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{dir}\"")
+            : OperatingSystem.IsMacOS() ? new System.Diagnostics.ProcessStartInfo("open", ["-R", dir])
+            : null;
+        if (select is not null)
         {
             try
             {
-                using var _ = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{dir}\"") { UseShellExecute = false });
+                select.UseShellExecute = false;
+                using var _ = System.Diagnostics.Process.Start(select);
                 return;
             }
             catch (System.ComponentModel.Win32Exception)

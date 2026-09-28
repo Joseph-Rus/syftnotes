@@ -351,16 +351,18 @@ public sealed class AppHost : IDisposable, IProblemSource
     }
 
     /// <summary>
-    /// A lighter model to suggest, once: the student records with a model heavier than the one for this computer
-    /// (large-v3 on a PC with no graphics card Whisper can use), and hasn't heard about it before. Null otherwise, and
-    /// always when the environment names the model. Waits for the hardware probe, never on the UI thread.
+    /// A lighter model to suggest, once: the student records with a model heavier than this computer keeps up with
+    /// (large-v3 on a PC with no graphics card Whisper can use), and hasn't heard about it before. A bigger model than
+    /// the compact one a computer starts on, but one it handles (large-v3 on Apple silicon), is the student's call: no
+    /// word about it. Null otherwise, and always when the environment names the model. Waits for the hardware probe,
+    /// never on the UI thread.
     /// </summary>
     public async Task<ModelAdvice?> ModelSuggestionAsync()
     {
         var hw = await hardware.ConfigureAwait(false);
         if (ModelFromEnvironment || !Settings.SetupDone || Settings.Role == AppRole.Library) return null;
-        var advice = WhisperModels.Advise(hw);
-        return WhisperModels.Heavier(Model, advice.Model) && Settings.ModelSuggested != advice.Model.Id ? advice : null;
+        var heaviest = WhisperModels.Heaviest(hw);
+        return WhisperModels.Heavier(Model, heaviest.Model) && Settings.ModelSuggested != heaviest.Model.Id ? heaviest : null;
     }
 
     /// <summary>The suggestion was made (or the student picked a model knowing the one for this computer): not again.</summary>
