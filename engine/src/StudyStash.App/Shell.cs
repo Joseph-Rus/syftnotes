@@ -964,17 +964,24 @@ public static partial class Shell
         switch (step)
         {
             case SetupStep.Ai:
-                model.Ai ??= new AiSetupModel(Ai())
+                // Made afresh when setup changed its mind about which computer this is (the library may have been
+                // made again, with another password), so the step reads the library as it is now.
+                var aiNow = (model.Role, host.Client().PoolKey);
+                if (model.Ai is null || aiMadeFor != aiNow)
                 {
-                    Lede = model.IsOneComputer
-                        ? $"They run on this {model.DeviceWord}, as part of your library. You can change this later in Settings."
-                        : "This computer is your library, so the engines run here. You can change this later from any of your computers.",
-                    Windows = Skin.Current == SkinKind.Win,
-                    Copy = text => model.OnCopy?.Invoke(text),
-                    OpenTerminal = TerminalApp.Open,
-                    OpenUrl = url => Dialogs.OpenUrl(url),
-                    WriteNotes = WriteNotesAsync,
-                };
+                    aiMadeFor = aiNow;
+                    model.Ai = new AiSetupModel(Ai())
+                    {
+                        Lede = model.IsOneComputer
+                            ? $"They run on this {model.DeviceWord}, as part of your library. You can change this later in Settings."
+                            : "This computer is your library, so the engines run here. You can change this later from any of your computers.",
+                        Windows = Skin.Current == SkinKind.Win,
+                        Copy = text => model.OnCopy?.Invoke(text),
+                        OpenTerminal = TerminalApp.Open,
+                        OpenUrl = url => Dialogs.OpenUrl(url),
+                        WriteNotes = WriteNotesAsync,
+                    };
+                }
                 _ = model.Ai.Load();
                 break;
             case SetupStep.Canvas when model.Canvas is null:
@@ -987,6 +994,9 @@ public static partial class Shell
                 break;
         }
     }
+
+    /// <summary>Which flow, and which library password, setup's AI step was made for.</summary>
+    static (AppRole Role, string Key)? aiMadeFor;
 
     /// <summary>Setup's "No AI for now" (and picking an engine after it): the library writes notes, and sorts with AI,
     /// or doesn't. True when the library took it.</summary>
