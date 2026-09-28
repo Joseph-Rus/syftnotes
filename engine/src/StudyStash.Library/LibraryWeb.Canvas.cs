@@ -116,8 +116,13 @@ public sealed partial class LibraryWeb
                 if (body?["courses"] is JsonObject cs)
                     foreach (var (cls, id) in cs)
                     {
-                        if (id is JsonValue n && n.TryGetValue(out long cid) && cid > 0) s.Courses[cls] = cid;
-                        else s.Courses.Remove(cls);
+                        if (id is JsonValue n && n.TryGetValue(out long cid) && cid > 0)
+                        {
+                            s.Courses[cls] = cid;
+                            s.Choose(cid); // linking a class to a course brings the course in
+                        }
+                        else if (s.Courses.Remove(cls, out long was) && !s.Courses.ContainsValue(was))
+                            s.Chosen?.Remove(was.ToString(CultureInfo.InvariantCulture));
                     }
                 // Sync now while a sync is running is that sync: another straight after it would read it all again.
                 if (body?["sync"] is JsonValue sv && sv.TryGetValue(out bool now) && now && !Canvas.Crawl.Active) s.SyncNow = true;
@@ -206,6 +211,30 @@ public sealed partial class LibraryWeb
             return Http.Json(about);
         }));
         app.MapPost("/api/v2/canvas/courses", Http.Handle(ctx => ApiAsync(ctx, async () => Http.Json(await FindCoursesAsync()))));
+        // Which courses to bring in (every course id the student ticked): a class for each new one, and each one no
+        // longer ticked stops syncing, its class and files kept ("keep": true, the default) or removed (a class with
+        // lectures always stays). "match": true links a new course to a class of this library it seems to be first.
+        app.MapPost("/api/v2/canvas/choose", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            if (body?["courses"] is not JsonArray list) return Http.Detail(400, "Say which courses to bring in.");
+            var ids = list.Select(n => n is JsonValue v ? v.TryGetValue(out string? t) ? t : v.TryGetValue(out long l) ? l.ToString(CultureInfo.InvariantCulture) : null : null)
+                .OfType<string>().ToList();
+            bool keep = body["keep"] is not JsonValue kv || !kv.TryGetValue(out bool k) || k;
+            bool match = body["match"] is JsonValue mv && mv.TryGetValue(out bool m) && m;
+            if (!keep && CourseChoices.Blocked(Canvas.Crawl) is { } busy) return Http.Detail(409, busy);
+            var outcome = CourseChoices.Apply(cfg, store, ids, keep, match, Canvas.Crawl);
+            if (outcome.Added.Count > 0) Canvas.Nudge();
+            var result = CanvasJson();
+            result["outcome"] = new JsonObject
+            {
+                ["added"] = new JsonArray(outcome.Added.Select(c => (JsonNode)c).ToArray()),
+                ["stopped"] = new JsonArray(outcome.Stopped.Select(c => (JsonNode)c).ToArray()),
+                ["removed"] = new JsonArray(outcome.Removed.Select(c => (JsonNode)c).ToArray()),
+                ["kept_for_lectures"] = new JsonArray(outcome.KeptForLectures.Select(c => (JsonNode)c).ToArray()),
+            };
+            return Http.Json(result);
+        })));
         app.MapPost("/api/v2/canvas/fetch", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
@@ -315,7 +344,8 @@ public sealed partial class LibraryWeb
                 {
                     string sid = id.ToJsonString();
                     found[sid] = name;
-                    info[sid] = new CourseInfo(S(c["course_code"]), name, S(c["term"]?["name"]));
+                    info[sid] = new CourseInfo(S(c["course_code"]), name, S(c["term"]?["name"]),
+                        TermStart: S(c["term"]?["start_at"]), TermEnd: S(c["term"]?["end_at"]), CourseStart: S(c["start_at"]), CourseEnd: S(c["end_at"]));
                 }
             next = r["next_page"] is JsonValue nv ? S(nv) : null;
         }
@@ -393,15 +423,25 @@ public sealed partial class LibraryWeb
         foreach (var (id, name) in CourseNames.Of(s)) available[id] = name;
         var (waiting, inflight) = Canvas.Crawl.Left;
         var courseInfo = new JsonObject();
+        var classOf = s.Courses.GroupBy(kv => kv.Value.ToString(CultureInfo.InvariantCulture)).ToDictionary(g => g.Key, g => g.First().Key);
+        var now = Canvas.Clock();
         foreach (var (id, info) in s.CourseInfo)
+        {
+            var (ticked, why) = CourseChoices.Suggest(info, now);
             courseInfo[id] = new JsonObject
             {
                 ["code"] = info.Code, ["name"] = info.Name, ["term"] = info.Term,
                 ["title"] = available[id]?.GetValue<string>() ?? CourseNames.Title(info.Name, info.Code), ["short_code"] = CourseNames.ShortCode(info.Code, info.Name),
+                // Brought in now (chosen, or linked in a library from before the choice), and whether the picker
+                // would tick it for a student choosing afresh, and why not.
+                ["chosen"] = s.Chosen?.Contains(id) ?? classOf.ContainsKey(id), ["suggested"] = ticked, ["why"] = why,
+                ["class"] = classOf.GetValueOrDefault(id),
             };
+        }
         return new JsonObject
         {
             ["url"] = s.Url, ["courses"] = courses, ["available"] = available, ["last_sync"] = W(s.LastSync), ["error"] = s.Error,
+            ["chosen"] = s.Chosen is null ? null : new JsonArray(s.Chosen.Select(id => (JsonNode)id).ToArray()),
             ["needs_login"] = s.NeedsLogin, ["extension_seen"] = W(s.ExtensionSeen), ["extension_version"] = s.ExtensionVersion,
             ["extension_latest"] = Extension.Version(), ["extension_outdated"] = s.ExtensionOutdated,
             ["extension_update"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = W(up.At) } : null,

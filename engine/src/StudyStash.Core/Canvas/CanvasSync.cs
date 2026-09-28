@@ -99,15 +99,16 @@ public sealed partial class CanvasSync
         if (protocol < 1) return new CanvasWork([], false, Extension.Version()); // nothing this library knows how to hand it
         // A sync that finished just before the library stopped is filed now, before the next one can start.
         if (Crawl.Ready) Finish();
-        if (!Crawl.Active && !Crawl.Ready && (force || s.Due(now)) && s.On && s.Courses.Count > 0
-            && Crawl.Start(s.Url, s.Courses))
+        var synced = s.Synced;
+        if (!Crawl.Active && !Crawl.Ready && (force || s.Due(now)) && s.On && synced.Count > 0
+            && Crawl.Start(s.Url, synced))
         {
             CanvasSettings.Update(home, st =>
             {
                 st.SyncNow = false;
                 st.LastSync = at;
             });
-            log($"[canvas] syncing {s.Courses.Count} class(es)");
+            log($"[canvas] syncing {synced.Count} class(es)");
         }
         if (Crawl.TakeSignedOut())
             CanvasSettings.Update(home, st =>
