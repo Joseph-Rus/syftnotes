@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace StudyStash.Core;
 
-/// <summary>A published release: where its page is, and every asset it holds by file name (the four installers and
+/// <summary>A published release: where its page is, and every asset it holds by file name (the installers and
 /// SHA256SUMS.txt - see <see cref="Updates.Installers"/>).</summary>
 public sealed record Release(string Tag, int[] Version, string Url, string Page, IReadOnlyDictionary<string, string>? Assets = null);
 
@@ -36,23 +36,29 @@ public static partial class Updates
     public const string RepoSlug = "Joseph-Rus/study-stash";
     public const string LatestApi = $"https://api.github.com/repos/{RepoSlug}/releases/latest";
 
-    // D2's four installers, plus the checksums that cover them.
+    // One download per system: the same app whatever the computer is for (setup asks, and Settings can change it).
+    public const string MacAsset = "Study-Stash.dmg";
+    public const string WindowsAsset = "Study-Stash-Setup.exe";
+    public const string ChecksumsAsset = "SHA256SUMS.txt";
+
+    // D2's four role installers. Copies 0.8.x and older ask for by name, when they update themselves and on an old
+    // library's "Connect your laptop" links, so every release still carries them: byte for byte the one download.
     public const string MacLaptopAsset = "Study-Stash-Laptop.dmg";
     public const string MacLibraryAsset = "Study-Stash-Library.dmg";
     public const string WindowsLaptopAsset = "Study-Stash-Laptop-Setup.exe";
     public const string WindowsLibraryAsset = "Study-Stash-Library-Setup.exe";
-    public const string ChecksumsAsset = "SHA256SUMS.txt";
 
-    public static readonly IReadOnlyList<string> Installers = [MacLaptopAsset, MacLibraryAsset, WindowsLaptopAsset, WindowsLibraryAsset];
+    /// <summary>What a release holds for installing: the two downloads, then the four old names kept for older copies.</summary>
+    public static readonly IReadOnlyList<string> Installers = [MacAsset, WindowsAsset, .. OldInstallers()];
 
-    /// <summary>The installer this computer's role downloads, or null when this system doesn't update itself (Linux)
-    /// or the role isn't laptop or library.</summary>
-    public static string? Installer(string system, string? role) => (system, role) switch
+    static string[] OldInstallers() => [MacLaptopAsset, MacLibraryAsset, WindowsLaptopAsset, WindowsLibraryAsset];
+
+    /// <summary>The download this system installs from, whatever the computer is for, or null when it doesn't update
+    /// itself (Linux).</summary>
+    public static string? Installer(string system) => system switch
     {
-        ("Darwin", "laptop") => MacLaptopAsset,
-        ("Darwin", "library") => MacLibraryAsset,
-        ("Windows", "laptop") => WindowsLaptopAsset,
-        ("Windows", "library") => WindowsLibraryAsset,
+        "Darwin" => MacAsset,
+        "Windows" => WindowsAsset,
         _ => null,
     };
 

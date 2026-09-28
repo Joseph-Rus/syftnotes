@@ -1,9 +1,8 @@
 #!/bin/sh
 # Study Stash installer (Mac only; on Windows, run install.ps1 instead).
-#   The computer that keeps the library:
-#     curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.sh | sh -s -- library
-#   Your laptop (the library's setup shows this line, with its address filled in):
 #     curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.sh | sh
+# The same app for every computer: when it opens, setup asks whether it's just this computer, your laptop or your
+# library. (An old "library" or "laptop" argument is still accepted, and changes nothing.)
 #
 # Downloads the newest release's Mac installer (a signed DMG holding one universal app, for Apple
 # silicon and Intel), checks it against the release's SHA256SUMS.txt when there is one, and drags
@@ -20,12 +19,8 @@ if [ "$(uname -s)" != Darwin ]; then
   exit 1
 fi
 
-# The old server/client wording still works; STUDYSTASH_ROLE and a plain argument do too.
-ROLE="${1:-${STUDYSTASH_ROLE:-laptop}}"
-case "$ROLE" in
-  library | server) NAME=Study-Stash-Library.dmg ;;
-  *) NAME=Study-Stash-Laptop.dmg ;;
-esac
+# One download for every role: setup asks. A role argument or STUDYSTASH_ROLE from an older line is ignored.
+NAME=Study-Stash.dmg
 SLUG=Joseph-Rus/study-stash
 
 say() { printf '%s\n' "$*"; }

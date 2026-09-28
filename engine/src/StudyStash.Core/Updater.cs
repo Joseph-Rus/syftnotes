@@ -31,8 +31,6 @@ public sealed class UpdateHost
     /// <summary>A pid to wait for before reopening the app after a Mac swap; 0 means don't.</summary>
     public int RelaunchPid { get; init; }
     public IReadOnlyList<string> RelaunchArgs { get; init; } = [];
-    /// <summary>Which installer an update fetches: this copy's own role preset, until Settings knows better (D3).</summary>
-    public string? Role { get; init; } = Apps.RolePreset();
     /// <summary>Where a download stages: a real temp folder unless a test points it elsewhere.</summary>
     public string TempDir { get; init; } = Path.GetTempPath();
 
@@ -59,7 +57,7 @@ public sealed class UpdateHost
         }
         return new UpdateHost
         {
-            System = system, AppDir = appDir, NotInstalledReason = reason, Role = Apps.RolePreset(baseDir, system),
+            System = system, AppDir = appDir, NotInstalledReason = reason,
             Run = Machine.Run, Places = ServicePlaces.Default, VersionOf = Updates.VersionOf, SpawnDetached = Updates.SpawnDetached,
         };
     }
@@ -67,7 +65,7 @@ public sealed class UpdateHost
 
 /// <summary>
 /// Installing a release (D4). Only an installed copy updates: a Mac bundle swaps in the new one from its DMG, a
-/// Windows install runs the role's Setup.exe quietly and lets it relaunch the app. Both check the download's
+/// Windows install runs the Setup.exe quietly and lets it relaunch the app. Both check the download's
 /// SHA-256 against the release's SHA256SUMS.txt first.
 /// </summary>
 public static partial class Updates
@@ -233,7 +231,7 @@ public static partial class Updates
         }
     }
 
-    /// <summary>Windows path of D4: hand the role's Setup.exe the quiet, self-relaunching arguments and return - Setup
+    /// <summary>Windows path of D4: hand the Setup.exe the quiet, self-relaunching arguments and return - Setup
     /// closes this copy, installs over it, and starts it again.</summary>
     static async Task<bool> ApplyWindowsAsync(Release release, string home, UpdateHost host, string asset, string url,
         IReadOnlyDictionary<string, string>? checksums, Action<string> log)
@@ -268,7 +266,7 @@ public static partial class Updates
         return true;
     }
 
-    /// <summary>Install `release` for this host's role. Downloads its installer, checks it against SHA256SUMS.txt,
+    /// <summary>Install `release` on this computer. Downloads its installer, checks it against SHA256SUMS.txt,
     /// then swaps it in (Mac) or hands off to it (Windows).</summary>
     public static async Task<bool> ApplyAsync(Release release, string home, UpdateHost host, Action<string>? log = null, bool restartServices = true)
     {
@@ -278,8 +276,7 @@ public static partial class Updates
             log(problem);
             return false;
         }
-        string? asset = Installer(host.System, host.Role);
-        if (asset is null)
+        if (Installer(host.System) is not { } asset)
         {
             log("Study Stash updates itself on a Mac or a Windows PC.");
             return false;

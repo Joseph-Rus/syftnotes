@@ -33,26 +33,26 @@ public class UpdaterTests
     static string Sha256Sums(string name, byte[] bytes) => $"{Convert.ToHexStringLower(SHA256.HashData(bytes))}  {name}\n";
 
     [Fact]
-    public void Installer_names_come_from_the_system_and_role()
+    public void Every_Mac_and_PC_installs_from_its_one_download()
     {
-        Assert.Equal("Study-Stash-Laptop.dmg", Updates.Installer("Darwin", "laptop"));
-        Assert.Equal("Study-Stash-Library.dmg", Updates.Installer("Darwin", "library"));
-        Assert.Equal("Study-Stash-Laptop-Setup.exe", Updates.Installer("Windows", "laptop"));
-        Assert.Equal("Study-Stash-Library-Setup.exe", Updates.Installer("Windows", "library"));
-        Assert.Null(Updates.Installer("Linux", "laptop"));
-        Assert.Null(Updates.Installer("Linux", "library"));
-        Assert.Null(Updates.Installer("Darwin", null));
-        Assert.Null(Updates.Installer("Darwin", "unknown"));
-        Assert.Equal(4, Updates.Installers.Count);
-        Assert.Equal(4, Updates.Installers.Distinct().Count());
+        Assert.Equal("Study-Stash.dmg", Updates.Installer("Darwin"));
+        Assert.Equal("Study-Stash-Setup.exe", Updates.Installer("Windows"));
+        Assert.Null(Updates.Installer("Linux"));
+        Assert.Null(Updates.Installer(""));
+        // The two downloads, then the four role names older copies still fetch, each once.
+        Assert.Equal(["Study-Stash.dmg", "Study-Stash-Setup.exe", "Study-Stash-Laptop.dmg", "Study-Stash-Library.dmg",
+            "Study-Stash-Laptop-Setup.exe", "Study-Stash-Library-Setup.exe"], Updates.Installers);
+        Assert.Equal(6, Updates.Installers.Distinct().Count());
     }
 
     [Fact]
-    public async Task The_newest_release_lists_the_four_installers_and_their_checksums()
+    public async Task The_newest_release_lists_every_installer_and_their_checksums()
     {
         var github = new FakeOllama((path, _) => path == "/repos/Joseph-Rus/study-stash/releases/latest" ? System.Text.Json.Nodes.JsonNode.Parse("""
             {"tag_name": "v0.5.0", "html_url": "https://github.com/Joseph-Rus/study-stash/releases/tag/v0.5.0",
-             "assets": [{"name": "Study-Stash-Laptop.dmg", "browser_download_url": "https://dl/laptop.dmg"},
+             "assets": [{"name": "Study-Stash.dmg", "browser_download_url": "https://dl/study-stash.dmg"},
+                        {"name": "Study-Stash-Setup.exe", "browser_download_url": "https://dl/setup.exe"},
+                        {"name": "Study-Stash-Laptop.dmg", "browser_download_url": "https://dl/laptop.dmg"},
                         {"name": "Study-Stash-Library.dmg", "browser_download_url": "https://dl/library.dmg"},
                         {"name": "Study-Stash-Laptop-Setup.exe", "browser_download_url": "https://dl/laptop.exe"},
                         {"name": "Study-Stash-Library-Setup.exe", "browser_download_url": "https://dl/library.exe"},
@@ -167,10 +167,10 @@ public class UpdaterTests
         using var dir = new TempDir();
         string appDir = dir["Study Stash.app"];
         Directory.CreateDirectory(appDir);
-        var host = new UpdateHost { System = "Darwin", AppDir = appDir, Role = "laptop" };
+        var host = new UpdateHost { System = "Darwin", AppDir = appDir };
         var said = new List<string>();
         Assert.False(await Updates.ApplyAsync(Rel("v9.9.8"), dir["home"], host, said.Add));
-        Assert.Equal($"v9.9.8 has no {Updates.MacLaptopAsset} yet; the next check tries again.", said.Single());
+        Assert.Equal($"v9.9.8 has no {Updates.MacAsset} yet; the next check tries again.", said.Single());
     }
 
     [Fact]
@@ -184,21 +184,21 @@ public class UpdaterTests
         var downloads = new FakeDownloads(new()
         {
             ["https://dl/laptop.dmg"] = dmg,
-            ["https://dl/wrong-sums.txt"] = Encoding.UTF8.GetBytes($"{new string('0', 64)}  {Updates.MacLaptopAsset}\n"),
+            ["https://dl/wrong-sums.txt"] = Encoding.UTF8.GetBytes($"{new string('0', 64)}  {Updates.MacAsset}\n"),
         });
         var host = new UpdateHost
         {
-            System = "Darwin", AppDir = appDir, Role = "laptop", Http = downloads.Client(),
+            System = "Darwin", AppDir = appDir, Http = downloads.Client(),
             Run = (_, _, _) => throw new InvalidOperationException("must not mount an unverified download"),
         };
         var said = new List<string>();
         Assert.False(await Updates.ApplyAsync(Rel("v9.9.9", new()
         {
-            [Updates.MacLaptopAsset] = "https://dl/laptop.dmg", [Updates.ChecksumsAsset] = "https://dl/wrong-sums.txt",
+            [Updates.MacAsset] = "https://dl/laptop.dmg", [Updates.ChecksumsAsset] = "https://dl/wrong-sums.txt",
         }), dir["home"], host, said.Add));
         Assert.Equal("The download didn't match its checksum, so this version stays.", said[^1]);
         // no SHA256SUMS.txt at all: still refuses, rather than trust an unverified download
-        Assert.False(await Updates.ApplyAsync(Rel("v9.9.9", new() { [Updates.MacLaptopAsset] = "https://dl/laptop.dmg" }), dir["home"], host, said.Add));
+        Assert.False(await Updates.ApplyAsync(Rel("v9.9.9", new() { [Updates.MacAsset] = "https://dl/laptop.dmg" }), dir["home"], host, said.Add));
         Assert.Equal("The download didn't match its checksum, so this version stays.", said[^1]);
         Assert.Equal("old", File.ReadAllText(Path.Combine(appDir, "Contents", "MacOS", "StudyStash")));
     }
@@ -213,7 +213,7 @@ public class UpdaterTests
         Directory.CreateDirectory(Path.Combine(oldApp, "Contents", "MacOS"));
         File.WriteAllText(Path.Combine(oldApp, "Contents", "MacOS", "StudyStash"), "keep");
         byte[] dmg = [1, 2, 3];
-        var downloads = new FakeDownloads(new() { ["https://dl/laptop.dmg"] = dmg, ["https://dl/sums.txt"] = Encoding.UTF8.GetBytes(Sha256Sums(Updates.MacLaptopAsset, dmg)) });
+        var downloads = new FakeDownloads(new() { ["https://dl/laptop.dmg"] = dmg, ["https://dl/sums.txt"] = Encoding.UTF8.GetBytes(Sha256Sums(Updates.MacAsset, dmg)) });
         // the mounted volume says it's a different version than the release claims
         Runner run = (exe, args, t) =>
         {
@@ -228,11 +228,11 @@ public class UpdaterTests
             }
             return exe == "ditto" ? Machine.Run(exe, args, t) : new ProcResult(0, "");
         };
-        var host = new UpdateHost { System = "Darwin", AppDir = oldApp, Role = "laptop", Http = downloads.Client(), Run = run, VersionOf = Updates.VersionOf };
+        var host = new UpdateHost { System = "Darwin", AppDir = oldApp, Http = downloads.Client(), Run = run, VersionOf = Updates.VersionOf };
         var said = new List<string>();
         Assert.False(await Updates.ApplyAsync(Rel("v9.9.9", new()
         {
-            [Updates.MacLaptopAsset] = "https://dl/laptop.dmg", [Updates.ChecksumsAsset] = "https://dl/sums.txt",
+            [Updates.MacAsset] = "https://dl/laptop.dmg", [Updates.ChecksumsAsset] = "https://dl/sums.txt",
         }), dir["home"], host, said.Add));
         Assert.Equal("The v9.9.9 download didn't run on this Mac, so this version stays.", said[^1]);
         Assert.Equal("keep", File.ReadAllText(Path.Combine(oldApp, "Contents", "MacOS", "StudyStash")));
@@ -262,7 +262,7 @@ public class UpdaterTests
         var places = new ServicePlaces(dir["agents"], dir["startup"], dir["systemd"]);
         Service(places, "Darwin", "server", Path.Combine(oldApp, "Contents", "MacOS", "StudyStash"));
         byte[] dmg = [1, 2, 3];
-        var downloads = new FakeDownloads(new() { ["https://dl/laptop.dmg"] = dmg, ["https://dl/sums.txt"] = Encoding.UTF8.GetBytes(Sha256Sums(Updates.MacLaptopAsset, dmg)) });
+        var downloads = new FakeDownloads(new() { ["https://dl/laptop.dmg"] = dmg, ["https://dl/sums.txt"] = Encoding.UTF8.GetBytes(Sha256Sums(Updates.MacAsset, dmg)) });
         var calls = new List<List<string>>();
         Runner run = (exe, args, t) =>
         {
@@ -281,13 +281,13 @@ public class UpdaterTests
         var spawned = new List<IReadOnlyList<string>>();
         var host = new UpdateHost
         {
-            System = "Darwin", AppDir = oldApp, Role = "laptop", Http = downloads.Client(), Run = run, Places = places,
+            System = "Darwin", AppDir = oldApp, Http = downloads.Client(), Run = run, Places = places,
             VersionOf = Updates.VersionOf, RelaunchPid = Environment.ProcessId, RelaunchArgs = ["--background"], SpawnDetached = spawned.Add,
         };
         var said = new List<string>();
         bool ok = await Updates.ApplyAsync(Rel("v9.9.9", new()
         {
-            [Updates.MacLaptopAsset] = "https://dl/laptop.dmg", [Updates.ChecksumsAsset] = "https://dl/sums.txt",
+            [Updates.MacAsset] = "https://dl/laptop.dmg", [Updates.ChecksumsAsset] = "https://dl/sums.txt",
         }), dir["home"], host, said.Add);
         Assert.True(ok, string.Join(" | ", said));
         Assert.Equal("#!/bin/sh\necho 9.9.9\n", File.ReadAllText(Path.Combine(oldApp, "Contents", "MacOS", "StudyStash")));
@@ -307,44 +307,48 @@ public class UpdaterTests
     }
 
     [Fact]
-    public async Task Windows_downloads_the_roles_setup_and_runs_it_quietly()
+    public async Task Windows_downloads_the_one_setup_and_runs_it_quietly()
     {
         using var dir = new TempDir();
         byte[] setup = [1, 2, 3, 4, 5];
         var downloads = new FakeDownloads(new()
         {
-            ["https://dl/library-setup.exe"] = setup, ["https://dl/sums.txt"] = Encoding.UTF8.GetBytes(Sha256Sums(Updates.WindowsLibraryAsset, setup)),
+            ["https://dl/setup.exe"] = setup, ["https://dl/sums.txt"] = Encoding.UTF8.GetBytes(Sha256Sums(Updates.WindowsAsset, setup)),
         });
         var spawned = new List<IReadOnlyList<string>>();
         var host = new UpdateHost
         {
-            System = "Windows", AppDir = dir["install"], Role = "library", Http = downloads.Client(), SpawnDetached = spawned.Add, TempDir = dir["temp"],
+            System = "Windows", AppDir = dir["install"], Http = downloads.Client(), SpawnDetached = spawned.Add, TempDir = dir["temp"],
         };
         Directory.CreateDirectory(host.AppDir);
         var said = new List<string>();
         string home = dir["home"];
         var rel = Rel("v9.9.9", new()
         {
-            [Updates.WindowsLibraryAsset] = "https://dl/library-setup.exe", [Updates.ChecksumsAsset] = "https://dl/sums.txt",
+            [Updates.WindowsAsset] = "https://dl/setup.exe", [Updates.WindowsLibraryAsset] = "https://dl/library-setup.exe",
+            [Updates.ChecksumsAsset] = "https://dl/sums.txt",
         });
         Assert.True(await Updates.ApplyAsync(rel, home, host, said.Add));
         var args = Assert.Single(spawned);
-        string setupPath = Path.Combine(dir["temp"], "Study Stash update", Updates.WindowsLibraryAsset);
+        string setupPath = Path.Combine(dir["temp"], "Study Stash update", Updates.WindowsAsset);
         Assert.Equal(setup, await File.ReadAllBytesAsync(setupPath));
         Assert.Equal([setupPath, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/relaunch=1", $"/LOG={Path.Combine(home, "logs", "update.log")}"],
             args);
         Assert.Equal($"Installing v9.9.9 in the background (log: {Path.Combine(home, "logs", "update.log")}).", said[^1]);
 
-        // the laptop copy never downloads the library installer
-        var laptopSpawned = new List<IReadOnlyList<string>>();
-        var laptop = new UpdateHost
+        // A release with only the old role installers isn't taken: this copy installs from the one download or not at all.
+        var oldOnly = new List<IReadOnlyList<string>>();
+        var older = new UpdateHost
         {
-            System = "Windows", AppDir = dir["install2"], Role = "laptop", Http = downloads.Client(), SpawnDetached = laptopSpawned.Add, TempDir = dir["temp2"],
+            System = "Windows", AppDir = dir["install2"], Http = downloads.Client(), SpawnDetached = oldOnly.Add, TempDir = dir["temp2"],
         };
-        Directory.CreateDirectory(laptop.AppDir);
-        Assert.False(await Updates.ApplyAsync(rel, dir["home2"], laptop, said.Add));
-        Assert.Empty(laptopSpawned);
-        Assert.Equal($"v9.9.9 has no {Updates.WindowsLaptopAsset} yet; the next check tries again.", said[^1]);
+        Directory.CreateDirectory(older.AppDir);
+        Assert.False(await Updates.ApplyAsync(Rel("v9.9.9", new()
+        {
+            [Updates.WindowsLaptopAsset] = "https://dl/laptop-setup.exe", [Updates.WindowsLibraryAsset] = "https://dl/library-setup.exe",
+        }), dir["home2"], older, said.Add));
+        Assert.Empty(oldOnly);
+        Assert.Equal($"v9.9.9 has no {Updates.WindowsAsset} yet; the next check tries again.", said[^1]);
     }
 
     [Fact]
@@ -436,18 +440,18 @@ public class UpdaterTests
         byte[] dmgBytes = await File.ReadAllBytesAsync(dmg);
         var downloads = new FakeDownloads(new()
         {
-            ["https://dl/laptop.dmg"] = dmgBytes, ["https://dl/sums.txt"] = Encoding.UTF8.GetBytes(Sha256Sums(Updates.MacLaptopAsset, dmgBytes)),
+            ["https://dl/laptop.dmg"] = dmgBytes, ["https://dl/sums.txt"] = Encoding.UTF8.GetBytes(Sha256Sums(Updates.MacAsset, dmgBytes)),
         });
         var host = new UpdateHost
         {
-            System = "Darwin", AppDir = standIn, Role = "laptop", Http = downloads.Client(), Run = Machine.Run,
+            System = "Darwin", AppDir = standIn, Http = downloads.Client(), Run = Machine.Run,
             Places = new ServicePlaces(dir["agents"], dir["startup"], dir["systemd"]), VersionOf = Updates.VersionOf,
         };
         var said = new List<string>();
         var clock = Stopwatch.StartNew();
         bool ok = await Updates.ApplyAsync(new Release("v" + Engine.Version, Updates.ParseVersion(Engine.Version), "u", "p", new Dictionary<string, string>
         {
-            [Updates.MacLaptopAsset] = "https://dl/laptop.dmg", [Updates.ChecksumsAsset] = "https://dl/sums.txt",
+            [Updates.MacAsset] = "https://dl/laptop.dmg", [Updates.ChecksumsAsset] = "https://dl/sums.txt",
         }), dir["home"], host, said.Add);
         clock.Stop();
         Assert.True(ok, string.Join("; ", said));

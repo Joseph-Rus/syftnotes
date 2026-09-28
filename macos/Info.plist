@@ -18,6 +18,5 @@
     <key>NSMicrophoneUsageDescription</key><string>Study Stash records your lectures so it can write them down. The recording stays on this computer.</string>
     <key>NSAudioCaptureUsageDescription</key><string>Study Stash can also record what this computer plays, like a lecture on Zoom.</string>
     <key>NSLocalNetworkUsageDescription</key><string>Study Stash opens your library on your Mac mini.</string>
-    <key>StudyStashRole</key><string>__ROLE__</string>
 </dict>
 </plist>

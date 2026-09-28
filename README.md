@@ -59,16 +59,14 @@ your laptop                                  your library (this laptop, or a com
 
 ## Install
 
-Download the installer from the [latest release](https://github.com/Joseph-Rus/study-stash/releases/latest):
+One download for every computer, on the [latest release](https://github.com/Joseph-Rus/study-stash/releases/latest):
 
-| | Laptop (records lectures) | Library (the computer that stays on) |
-|---|---|---|
-| **Mac** | [Study-Stash-Laptop.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop.dmg) | [Study-Stash-Library.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library.dmg) |
-| **Windows** | [Study-Stash-Laptop-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop-Setup.exe) | [Study-Stash-Library-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library-Setup.exe) |
+| Mac | Windows |
+|---|---|
+| [Study-Stash.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash.dmg) | [Study-Stash-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Setup.exe) |
 
-Both are the same app; the installer only picks where setup starts. For **one computer**, use the
-laptop download and keep setup's first choice, **Just this computer**. You can add a laptop later
-in **Settings → Your library → Add a laptop**, with nothing to reinstall.
+It's the same app either way; what a computer is for is chosen when you first open it, not when
+you download it.
 
 - **Mac:** open the DMG and drag **Study Stash** into Applications. Study Stash isn't signed with a
   paid Apple Developer ID yet, so the first time macOS asks: click **Done**, then **System Settings
@@ -86,14 +84,19 @@ Then open **Study Stash** and follow setup. It asks how you'll use it:
 - **This is my laptop:** find your library (or type its address and password), check the microphone,
   download the transcription model, Canvas, and your classes.
 
+Changed your mind, or your plans changed? Switch any time in **Settings → Connection → This
+computer**: a laptop can also become your library (bringing over whatever it was connected to
+before), and a library can become a laptop, sending its own lectures to the new one first so
+nothing is left behind. Nothing to reinstall or redownload.
+
 Or install from a terminal:
 
 ```bash
-# Mac (Terminal): add "-s -- library" for the library
+# Mac (Terminal)
 curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.sh | sh
 ```
 ```powershell
-# Windows (PowerShell): set $env:STUDYSTASH_ROLE='library' first for the library
+# Windows (PowerShell)
 irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
 ```
 

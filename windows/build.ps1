@@ -1,8 +1,6 @@
 # Builds Study Stash for Windows: a self-contained publish for x64 and arm64 (so it needs no .NET install),
-# pruned to the runtime each processor needs, and, when Inno Setup 6 is installed, both roles' Setup.exe
-# (D2): Study-Stash-Laptop-Setup.exe and Study-Stash-Library-Setup.exe, the same app with a different
-# study-stash.ini role. One AppId, so installing the other role's Setup.exe over an existing install just
-# rewrites the ini.
+# pruned to the runtime each processor needs, and, when Inno Setup 6 is installed, the one download,
+# Study-Stash-Setup.exe. The app has no role of its own: setup asks what the computer is for.
 #   powershell -File windows\build.ps1 [-Out dist\windows]
 # Needs the .NET SDK, and Inno Setup 6 for the installers (skipped, with a note, when it's missing:
 # choco install innosetup). Neither is signed, so a downloaded Setup.exe gets Windows' SmartScreen
@@ -56,12 +54,10 @@ $Iscc = @((Get-Command iscc -ErrorAction SilentlyContinue).Source,
           "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") |
         Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 if ($Iscc) {
-  foreach ($Role in "laptop", "library") {
-    & $Iscc "/Qp" "/DAppVersion=$Version" "/DSource=$Out" "/DRole=$Role" "/O$Out" (Join-Path $Here "setup.iss")
-    if ($LASTEXITCODE -ne 0) { throw "the $Role installer didn't build" }
-  }
+  & $Iscc "/Qp" "/DAppVersion=$Version" "/DSource=$Out" "/O$Out" (Join-Path $Here "setup.iss")
+  if ($LASTEXITCODE -ne 0) { throw "the installer didn't build" }
 } else {
-  Write-Host "Inno Setup isn't installed, so there are no Setup.exe installers (choco install innosetup)."
+  Write-Host "Inno Setup isn't installed, so there is no Setup.exe (choco install innosetup)."
 }
 Write-Host "Built ${Version}:"
 Get-ChildItem $Out -File | Format-Table Name, Length -AutoSize
