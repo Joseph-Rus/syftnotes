@@ -271,6 +271,7 @@ public class AskStreamingTests
         await asking;
         Assert.Equal("Recursion traces and stack diagrams.", model.Turns[0].Answer);
         Assert.Null(model.Turns[0].Failed);
+        await app.StopAsync(TestContext.Current.CancellationToken); // as the library stops: nothing of it outlives the test
     }
 
     [AvaloniaFact]
