@@ -110,12 +110,15 @@ public static partial class Shell
     }
 
     /// <summary>Newer Canvas data is in (a sync finished, a course was linked or chosen): the sidebar's Due and its
-    /// count, the dropdown's next due, and the Due page or the open class's page, if the window shows one.</summary>
+    /// count, the dropdown's next due, Canvas's notifications, and the Due page or the open class's page, if the
+    /// window shows one.</summary>
     static async Task CanvasUpdatedAsync()
     {
         if (quitting) return;
         UpdateNextDue();
         UpdateDueItem();
+        // A sync's news (new work, a score, an announcement) shows now, not at the notifications' next minute.
+        _ = PollCanvasNotificationsAsync();
         if (mainWindow?.IsVisible != true) return;
         if (dueOpen) await ShowDueAsync();
         else if (library.List == LibraryList.CanvasClass && library.CanvasClass is { } cls && CanvasClassRow(openClass) is { } row)
@@ -199,10 +202,15 @@ public static partial class Shell
         ShowLibrary();
     }
 
+    /// <summary>A notifications poll is out: the minute's timer and a sync's update never ask at once (both would
+    /// show the same news).</summary>
+    static bool canvasNotifyPolling;
+
     static async Task PollCanvasNotificationsAsync()
     {
-        if (quitting || !canvasWatching || canvasNotifier is not { } notifier) return;
+        if (quitting || !canvasWatching || canvasNotifyPolling || canvasNotifier is not { } notifier) return;
         IReadOnlyList<CanvasToastModel> toasts;
+        canvasNotifyPolling = true;
         try
         {
             toasts = await notifier.PollAsync();
@@ -210,6 +218,10 @@ public static partial class Shell
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException)
         {
             return;
+        }
+        finally
+        {
+            canvasNotifyPolling = false;
         }
         // Newest first from the notifier; shown oldest first, so the newest lands on top of the stack.
         foreach (var toast in toasts.Reverse()) CanvasToast(toast);
