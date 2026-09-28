@@ -30,8 +30,12 @@ rng = np.random.default_rng(7)
 
 def timeline():
     src = (ROOT / 'src' / 'config.ts').read_text()
-    block = re.search(r'export const durations = \{(.*?)\};', src, re.S).group(1)
+    block = re.search(r'export const baseDurations = \{(.*?)\};', src, re.S).group(1)
     lengths = [(k, int(v)) for k, v in re.findall(r'(\w+):\s*(\d+)', block)]
+    fitted = ROOT / 'src' / 'timeline.json'  # the recut to the narration, from make_voice.py
+    if fitted.exists():
+        over = __import__('json').loads(fitted.read_text()).get('durations', {})
+        lengths = [(k, int(over.get(k, v))) for k, v in lengths]
     fade = int(re.search(r'export const TRANSITION = (\d+);', src).group(1))
     starts, f = {}, 0
     for k, v in lengths:

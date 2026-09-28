@@ -1,8 +1,8 @@
 import React from 'react';
-import {AbsoluteFill, Audio, interpolate, staticFile} from 'remotion';
+import {AbsoluteFill, Audio, interpolate, Sequence, staticFile} from 'remotion';
 import {linearTiming, TransitionSeries} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
-import {colors, durations, music, musicVolume, TOTAL_FRAMES, TRANSITION} from './config';
+import {colors, duckTo, durations, FPS, music, musicVolume, sceneStart, TOTAL_FRAMES, TRANSITION, voiceLines, voiceVolume} from './config';
 import {Sfx} from './components/Sfx';
 import {Hook} from './scenes/Hook';
 import {Reveal} from './scenes/Reveal';
@@ -12,6 +12,22 @@ import {AskNotes} from './scenes/AskNotes';
 import {CanvasDue} from './scenes/CanvasDue';
 import {Proof} from './scenes/Proof';
 import {Cta} from './scenes/Cta';
+
+// Where each narration line plays, in frames of the whole video.
+const VOICE = voiceLines.map((l) => {
+  const from = sceneStart(l.id) + Math.round(l.at * FPS);
+  return {...l, from, to: from + Math.round(l.seconds * FPS)};
+});
+
+/** How loud the music is at frame `f`: its level, dipping to `duckTo` under the voice, fading in and out at the ends. */
+const musicAt = (f: number) => {
+  const ends = interpolate(f, [0, 15, TOTAL_FRAMES - 30, TOTAL_FRAMES], [0, 1, 1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+  const under = VOICE.reduce((m, v) => {
+    const d = interpolate(f, [v.from - 6, v.from + 2, v.to - 2, v.to + 10], [0, 1, 1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+    return Math.max(m, d);
+  }, 0);
+  return musicVolume * ends * (1 - (1 - duckTo) * under);
+};
 
 const SCENES: [keyof typeof durations, React.FC][] = [
   ['hook', Hook],
@@ -46,16 +62,13 @@ export const Promo: React.FC = () => (
     })}
 
     {/* ♪ The music: public/audio/music.wav, made by scripts/make_audio.py. Set `music` in src/config.ts to use another. */}
-    {music ? (
-      <Audio
-        src={staticFile(music)}
-        volume={(f) =>
-          interpolate(f, [0, 15, TOTAL_FRAMES - 30, TOTAL_FRAMES], [0, musicVolume, musicVolume, 0], {
-            extrapolateLeft: 'clamp',
-            extrapolateRight: 'clamp',
-          })
-        }
-      />
-    ) : null}
+    {music ? <Audio src={staticFile(music)} volume={musicAt} /> : null}
+
+    {/* The narration: src/voiceover.json, made by `npm run voice` (ElevenLabs, or the Mac's voice with --scratch). */}
+    {VOICE.map((v) => (
+      <Sequence key={v.id} from={v.from} durationInFrames={v.to - v.from + 6} layout="none">
+        <Audio src={staticFile(`audio/vo/${v.id}.wav`)} volume={voiceVolume} />
+      </Sequence>
+    ))}
   </AbsoluteFill>
 );

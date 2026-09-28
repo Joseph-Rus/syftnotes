@@ -9,7 +9,8 @@
     "render:vertical": "remotion render src/index.ts PromoVertical out/promo-vertical.mp4",
     "render:all": "npm run render && npm run render:vertical",
     "typecheck": "tsc --noEmit",
-    "audio": "python3 scripts/make_audio.py"
+    "audio": "python3 scripts/make_audio.py",
+    "voice": "python3 scripts/make_voice.py"
   },
   "dependencies": {
     "@remotion/cli": "4.0.529",

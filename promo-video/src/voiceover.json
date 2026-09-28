@@ -1,0 +1,57 @@
+{
+  "about": "The narration, one line per scene. `at` is when the line starts, in seconds into its scene, chosen so the words land on the action (\"Hit record\" as the dropdown opens, \"Claude or OpenAI\" as the menu shows them). `direction` is how to say it; with Eleven v4 it can also go in as an audio tag. Run `npm run voice` after changing anything here.",
+  "model": "eleven_v4",
+  "fallbackModel": "eleven_multilingual_v2",
+  "voiceSettings": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.15, "use_speaker_boost": true, "speed": 1.0},
+  "seed": 2026,
+  "lines": [
+    {
+      "id": "hook",
+      "at": 0.25,
+      "text": "Every week, the lectures pile up… and the notes? You never look at them again.",
+      "direction": "wry, a little tired, like a friend who's been there"
+    },
+    {
+      "id": "reveal",
+      "at": 0.45,
+      "text": "Meet Study Stash — your lectures, turned into notes you'll actually use.",
+      "direction": "warm, a small smile on the name"
+    },
+    {
+      "id": "record",
+      "at": 0.9,
+      "text": "Hit record in the menu bar. It transcribes on your computer, then writes your notes, and files them by class.",
+      "direction": "clear and easy, unhurried"
+    },
+    {
+      "id": "diagrams",
+      "at": 0.4,
+      "text": "It even draws: labeled anatomy for nursing… formulas and graphs for calculus.",
+      "direction": "a spark of delight on \"even\""
+    },
+    {
+      "id": "ask",
+      "at": 0.3,
+      "text": "Ask your notes anything, with Claude or OpenAI, and see exactly where each answer came from.",
+      "direction": "curious, confident"
+    },
+    {
+      "id": "canvas",
+      "at": 0.3,
+      "text": "Canvas is right there too: what's due, and how it's graded.",
+      "direction": "light, matter-of-fact"
+    },
+    {
+      "id": "proof",
+      "at": 0.3,
+      "text": "And your recordings never leave your computers.",
+      "direction": "sincere, a touch slower"
+    },
+    {
+      "id": "cta",
+      "at": 0.6,
+      "text": "Study Stash. Free, for Mac and Windows.",
+      "direction": "warm and confident, a beat after \"Study Stash\""
+    }
+  ]
+}

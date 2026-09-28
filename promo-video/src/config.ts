@@ -1,3 +1,7 @@
+import timeline from './timeline.json';
+import voice from './voice.json';
+import voiceover from './voiceover.json';
+
 // Everything you'd want to change in the video lives here: the words, the colours and the timing.
 // Durations are in frames (30 per second). Scenes cross-fade into each other over TRANSITION frames.
 
@@ -71,10 +75,10 @@ export const text = {
 
 export const TRANSITION = 12;
 
-// Every scene starts on a beat of the music (100 BPM: a beat is 18 frames), so the cuts land on the rhythm:
-// the reveal on beat 5, the recording on 10, the diagrams on 20, Ask on 30, Canvas on 39, the promise on 46 and
-// the call to action on 50. Change a length and run `npm run audio` so the music follows.
-export const durations = {
+// The shortest each scene may be. Every scene starts on a beat of the music (100 BPM: a beat is 18 frames), so the
+// cuts land on the rhythm. `npm run voice` lengthens scenes to fit the narration (writing src/timeline.json), still on
+// the beat, and remakes the music; change a length here and run `npm run audio` so the music follows.
+export const baseDurations = {
   hook: 102,
   reveal: 102,
   record: 192,
@@ -85,6 +89,11 @@ export const durations = {
   cta: 144,
 };
 
+export const durations: typeof baseDurations = {
+  ...baseDurations,
+  ...((timeline as {durations?: Partial<typeof baseDurations>}).durations ?? {}),
+};
+
 // Total length: every scene, less the seven cross-fades between them.
 export const TOTAL_FRAMES = Object.values(durations).reduce((a, b) => a + b, 0) - 7 * TRANSITION;
 
@@ -93,3 +102,21 @@ export const TOTAL_FRAMES = Object.values(durations).reduce((a, b) => a + b, 0) 
 export const music: string | null = 'audio/music.wav';
 export const musicVolume = 0.55;
 export const sfxVolume = 1; // every sound effect, together
+
+// The narration (src/voiceover.json, made by `npm run voice`): each line, where it starts in its scene, and how long.
+// The music dips to `duckTo` of its level under the voice.
+export const voiceVolume = 1;
+export const duckTo = 0.38;
+export const voiceLines = (voiceover.lines as {id: keyof typeof baseDurations; at: number}[])
+  .map((l) => ({...l, seconds: (voice.seconds as Record<string, number>)[l.id]}))
+  .filter((l) => l.seconds !== undefined);
+
+/** The frame each scene starts on, with the cross-fades. */
+export const sceneStart = (id: keyof typeof baseDurations) => {
+  let f = 0;
+  for (const k of Object.keys(durations) as (keyof typeof baseDurations)[]) {
+    if (k === id) return f;
+    f += durations[k] - TRANSITION;
+  }
+  return f;
+};

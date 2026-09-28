@@ -23,6 +23,7 @@ npm run render              # → out/promo.mp4
 npm run render:vertical     # → out/promo-vertical.mp4
 npm run render:all          # both
 npm run audio               # makes the music and sound effects again (needs Python with numpy and scipy)
+npm run voice -- --scratch  # the narration in the Mac's voice; see VOICEOVER.md for ElevenLabs
 ```
 
 ## What to edit

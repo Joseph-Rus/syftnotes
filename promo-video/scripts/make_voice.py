@@ -1,0 +1,233 @@
+#!/usr/bin/env python3
+"""The narration: makes each line of src/voiceover.json, recuts the video to fit it, and remakes the music.
+
+With ElevenLabs (your own account; the key stays in your shell, it is never printed or saved):
+
+    export ELEVENLABS_API_KEY=...                  # from elevenlabs.io → Profile → API keys
+    npm run voice -- --list-voices                 # your voices, with their ids
+    npm run voice -- --voice <voice id>            # all eight lines, then the recut and the music
+    npm run voice -- --voice <voice id> --takes 3  # three takes of each; pick with --pick record=2,ask=3
+
+Without it, a scratch narration in the Mac's own voice, so the cut can be checked first:
+
+    npm run voice -- --scratch
+
+Best practice from ElevenLabs' docs, followed here: one model, voice, set of voice settings and seed for every line;
+each line conditioned on the ones before it (request stitching: previous_request_ids, up to three, oldest first; not
+on eleven_v3) and on the text after it (next_text), so separate clips sound like one read; pacing from punctuation
+(ellipses, dashes) rather than SSML breaks, which v3 and later ignore; WAV at 48 kHz to match the video.
+"""
+import argparse
+import json
+import math
+import os
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import urllib.error
+import urllib.request
+
+import numpy as np
+from scipy.io import wavfile
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / 'src' / 'voiceover.json'
+VOICE_JSON = ROOT / 'src' / 'voice.json'
+TIMELINE = ROOT / 'src' / 'timeline.json'
+OUT = ROOT / 'public' / 'audio' / 'vo'
+API = 'https://api.elevenlabs.io/v1'
+SR = 48000
+FPS = 30
+BEAT = 18  # frames: 100 BPM
+TAIL = 0.45  # seconds of breath after a line, before the cross-fade into the next scene
+CTA_HOLD = 1.6  # seconds the ending holds after its last word
+
+
+# ---- ElevenLabs ------------------------------------------------------------------------------------------------
+
+def key():
+    k = os.environ.get('ELEVENLABS_API_KEY', '').strip()
+    if not k:
+        sys.exit('Set ELEVENLABS_API_KEY in your shell first (elevenlabs.io → Profile → API keys). It is only sent to ElevenLabs.')
+    return k
+
+
+def call(method, path, body=None, query=''):
+    req = urllib.request.Request(f'{API}{path}{query}', method=method, data=json.dumps(body).encode() if body else None)
+    req.add_header('xi-api-key', key())
+    if body:
+        req.add_header('Content-Type', 'application/json')
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return r.read(), r.headers
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode(errors='replace')[:400]
+        raise RuntimeError(f'ElevenLabs said {e.code}: {detail}') from None
+
+
+def list_voices():
+    data, _ = call('GET', '/voices')
+    for v in json.loads(data).get('voices', []):
+        labels = ', '.join(f'{k} {val}' for k, val in (v.get('labels') or {}).items())
+        print(f"{v['voice_id']}  {v['name']:<24} {labels}")
+
+
+def speak(voice, text, model, settings, seed, previous_ids, next_text):
+    body = {'text': text, 'model_id': model, 'voice_settings': settings, 'seed': seed, 'apply_text_normalization': 'auto'}
+    if next_text:
+        body['next_text'] = next_text
+    if previous_ids and model != 'eleven_v3':
+        body['previous_request_ids'] = previous_ids[-3:]
+    last = None
+    for fmt in ('wav_48000', 'mp3_44100_192', 'mp3_44100_128'):  # the best the plan allows
+        try:
+            audio, headers = call('POST', f'/text-to-speech/{voice}', body, f'?output_format={fmt}')
+            return audio, fmt, headers.get('request-id')
+        except RuntimeError as e:
+            last = e
+            if 'output_format' not in str(e) and 'format' not in str(e).lower() and 'tier' not in str(e).lower():
+                raise
+    raise last
+
+
+# ---- The Mac's own voice, for a scratch cut ---------------------------------------------------------------------
+
+def say(text, path):
+    installed = subprocess.run(['say', '-v', '?'], capture_output=True, text=True).stdout
+    voice = next((v for v in ('Ava (Premium)', 'Zoe (Premium)', 'Samantha') if v in installed), None)
+    aiff = path.with_suffix('.aiff')
+    subprocess.run(['say', *(['-v', voice] if voice else []), '-r', '172', '-o', str(aiff), text], check=True)
+    to_wav(aiff, path)
+    aiff.unlink()
+    return voice or 'the default voice'
+
+
+# ---- Clean-up: every clip trimmed, at the same loudness, 48 kHz stereo ---------------------------------------------
+
+def to_wav(src, dst):
+    subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(src), '-ar', str(SR), '-ac', '2', str(dst)], check=True)
+
+
+def tidy(path):
+    sr, x = wavfile.read(path)
+    x = x.astype(float) / (32768.0 if x.dtype == np.int16 else 1.0)
+    if x.ndim == 1:
+        x = np.stack([x, x], 1)
+    mono = np.abs(x).mean(1)
+    win = int(0.01 * sr)
+    level = np.convolve(mono, np.ones(win) / win, 'same')
+    loud = np.where(level > 10 ** (-42 / 20))[0]
+    if len(loud):
+        a = max(0, loud[0] - int(0.04 * sr))
+        b = min(len(x), loud[-1] + int(0.12 * sr))
+        x = x[a:b]
+    rms = np.sqrt(np.mean(x ** 2)) + 1e-9
+    x = x * (10 ** (-19 / 20) / rms)
+    peak = np.max(np.abs(x))
+    if peak > 0.89:
+        x = x * 0.89 / peak
+    wavfile.write(path, sr, (x * 32767).astype(np.int16))
+    return len(x) / sr
+
+
+# ---- The recut: each scene long enough for its line, still starting on a beat -------------------------------------
+
+def base_durations():
+    src = (ROOT / 'src' / 'config.ts').read_text()
+    block = re.search(r'export const baseDurations = \{(.*?)\};', src, re.S).group(1)
+    return {k: int(v) for k, v in re.findall(r'(\w+):\s*(\d+)', block)}
+
+
+def fit(lines, seconds):
+    base = base_durations()
+    transition = int(re.search(r'export const TRANSITION = (\d+);', (ROOT / 'src' / 'config.ts').read_text()).group(1))
+    ids = list(base)
+    at = {l['id']: l['at'] for l in lines}
+    out = {}
+    for i, sid in enumerate(ids):
+        last = i == len(ids) - 1
+        d = base[sid]
+        if sid in seconds:
+            need = at[sid] + seconds[sid] + (CTA_HOLD if last else TAIL)
+            d = max(d, math.ceil(need * FPS) + (0 if last else transition))
+        # Scenes after the first start on a beat: every length but the last is a whole number of beats plus the
+        # cross-fade; the last is whole beats, so the video ends on one too.
+        if last:
+            d = math.ceil(d / BEAT) * BEAT
+        else:
+            d = math.ceil((d - transition) / BEAT) * BEAT + transition
+        out[sid] = d
+    return out
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument('--voice', default=os.environ.get('ELEVENLABS_VOICE_ID'), help='ElevenLabs voice id')
+    p.add_argument('--model', help='override the model in src/voiceover.json')
+    p.add_argument('--takes', type=int, default=1, help='takes of each line (alternates are kept beside the chosen one)')
+    p.add_argument('--pick', default='', help='which take to use, e.g. record=2,ask=3')
+    p.add_argument('--scratch', action='store_true', help="a scratch narration in the Mac's own voice")
+    p.add_argument('--list-voices', action='store_true')
+    p.add_argument('--no-music', action='store_true', help="don't remake the music afterwards")
+    a = p.parse_args()
+
+    if a.list_voices:
+        return list_voices()
+    script = json.loads(SCRIPT.read_text())
+    lines = script['lines']
+    OUT.mkdir(parents=True, exist_ok=True)
+    picks = dict(kv.split('=') for kv in a.pick.split(',') if '=' in kv)
+    seconds, request_ids = {}, []
+    source = 'scratch'
+    if not a.scratch and not a.voice:
+        sys.exit('Give a voice: --voice <id> (see --list-voices), or --scratch for the Mac voice.')
+    model = a.model or script['model']
+
+    for i, line in enumerate(lines):
+        final = OUT / f"{line['id']}.wav"
+        if a.scratch:
+            who = say(line['text'], final)
+        else:
+            source = 'elevenlabs'
+            nxt = lines[i + 1]['text'] if i + 1 < len(lines) else ''
+            chosen = int(picks.get(line['id'], 1))
+            kept_id = None
+            for take in range(1, a.takes + 1):
+                try:
+                    audio, fmt, rid = speak(a.voice, line['text'], model, script['voiceSettings'], script['seed'] + take - 1, request_ids, nxt)
+                except RuntimeError as e:
+                    if 'model' in str(e).lower() and model != script['fallbackModel']:
+                        print(f"  {model} isn't available here; using {script['fallbackModel']}")
+                        model = script['fallbackModel']
+                        audio, fmt, rid = speak(a.voice, line['text'], model, script['voiceSettings'], script['seed'] + take - 1, request_ids, nxt)
+                    else:
+                        raise
+                path = final if take == chosen else OUT / f"{line['id']}.take{take}.wav"
+                with tempfile.NamedTemporaryFile(suffix='.wav' if fmt.startswith('wav') else '.mp3', delete=False) as tmp:
+                    tmp.write(audio)
+                to_wav(tmp.name, path)
+                os.unlink(tmp.name)
+                if take == chosen:
+                    kept_id = rid
+                if path != final:
+                    tidy(path)
+            if kept_id:
+                request_ids.append(kept_id)
+            who = a.voice
+        seconds[line['id']] = round(tidy(final), 3)
+        print(f"  {line['id']:<9} {seconds[line['id']]:5.2f} s  {line['text']}")
+
+    VOICE_JSON.write_text(json.dumps({'source': source, 'voice': who, 'model': None if a.scratch else model, 'seconds': seconds}, indent=2) + '\n')
+    durations = fit(lines, seconds)
+    TIMELINE.write_text(json.dumps({'durations': durations}, indent=2) + '\n')
+    total = sum(durations.values()) - (len(durations) - 1) * int(re.search(r'export const TRANSITION = (\d+);', (ROOT / 'src' / 'config.ts').read_text()).group(1))
+    print(f"recut: {total / FPS:.1f} s — " + ', '.join(f'{k} {v / FPS:.1f}s' for k, v in durations.items()))
+    if not a.no_music:
+        subprocess.run([sys.executable, str(ROOT / 'scripts' / 'make_audio.py')], check=True)
+
+
+if __name__ == '__main__':
+    main()

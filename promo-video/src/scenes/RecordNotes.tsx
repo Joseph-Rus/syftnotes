@@ -11,7 +11,7 @@ const DROP_TOP = 46;
 const OPEN = 30; // the icon is clicked
 const RECORD = 60; // Record is clicked
 const STOP = 128; // Stop is clicked
-const FILED = 158; // the new lecture is filed
+const FILED = 178; // the new lecture is filed, as the narration says "files them by class"
 
 const Waveform: React.FC<{frame: number}> = ({frame}) => (
   <div style={{display: 'flex', alignItems: 'center', gap: 3.5, height: 34}}>

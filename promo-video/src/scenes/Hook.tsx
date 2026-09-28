@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame} from 'remotion';
-import {colors, fonts, text} from '../config';
+import {colors, durations, fonts, text} from '../config';
 import {ease, spr} from '../anim';
 import {Paper, TrafficLights, useVertical, Win} from '../components/Layout';
 import {Sfx} from '../components/Sfx';
@@ -15,7 +15,7 @@ const RECORDINGS = Array.from({length: 18}, (_, i) => {
 });
 
 const Recordings: React.FC<{frame: number}> = ({frame}) => {
-  const scroll = ease(frame, 10, 96) * 520;
+  const scroll = ease(frame, 10, durations.hook - 6) * 520; // the pile keeps growing for the whole scene
   return (
     <Win w={560} h={640}>
       <TrafficLights />
@@ -49,7 +49,8 @@ export const Hook: React.FC = () => {
   const frame = useCurrentFrame();
   const vertical = useVertical();
   const first = spr(frame, 2, {damping: 26, stiffness: 120, mass: 1});
-  const second = spr(frame, 38, {damping: 26, stiffness: 120, mass: 1});
+  // The second line arrives with the narration's "and the notes?", a little over a third of the way in.
+  const second = spr(frame, Math.round(durations.hook * 0.36), {damping: 26, stiffness: 120, mass: 1});
   const win = spr(frame, 0, {damping: 24, stiffness: 110, mass: 1});
   const line: React.CSSProperties = {fontFamily: fonts.display, fontWeight: 600, fontSize: vertical ? 84 : 66, lineHeight: 1.06, letterSpacing: '-0.028em'};
   return (
@@ -73,7 +74,7 @@ export const Hook: React.FC = () => {
           <Recordings frame={frame} />
         </div>
       </AbsoluteFill>
-      <Sfx at={38} name="pop" volume={0.16} />
+      <Sfx at={Math.round(durations.hook * 0.36)} name="pop" volume={0.16} />
     </Paper>
   );
 };
