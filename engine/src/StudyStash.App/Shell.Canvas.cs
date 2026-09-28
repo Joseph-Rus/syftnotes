@@ -293,11 +293,12 @@ public static partial class Shell
         }
         var w = new Window
         {
-            Title = "Canvas", Width = 640, Height = 680, WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Title = "Canvas",
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
             Content = new DockPanel { Children = { header, body } },
         };
         if (Skin.Current == SkinKind.Mac) w.Bind(Window.BackgroundProperty, w.GetResourceObservable("Win"));
+        OpenCentred(w, new Avalonia.Size(640, 680));
         Look.Apply(w);
         WinChrome.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);

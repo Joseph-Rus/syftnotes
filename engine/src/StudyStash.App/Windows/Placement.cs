@@ -103,6 +103,26 @@ public static class Placement
         return null;
     }
 
+    /// <summary>A window opening in the middle of <paramref name="screen"/> (the library the first time, setup,
+    /// Settings, Connect Canvas): at the size it asks for (<paramref name="wanted"/>, in points) where that fits the
+    /// display's usable area with <paramref name="margin"/> to spare, smaller where it doesn't (a 1080p laptop at 150%
+    /// has 672 points above its taskbar), never under <paramref name="min"/>; and centred on that area, its title bar
+    /// never above the top of it.</summary>
+    public static (PixelPoint Position, Size Size) Centred(ScreenGeometry screen, Size wanted, Size min = default, double margin = 16)
+    {
+        var area = screen.WorkingArea;
+        double scale = screen.Scaling;
+        var size = new Size(
+            Math.Max(min.Width, Math.Min(wanted.Width, area.Width / scale - 2 * margin)),
+            Math.Max(min.Height, Math.Min(wanted.Height, area.Height / scale - 2 * margin)));
+        int w = (int)Math.Round(size.Width * scale), h = (int)Math.Round(size.Height * scale);
+        return (new PixelPoint(area.X + Math.Max(0, (area.Width - w) / 2), area.Y + Math.Max(0, (area.Height - h) / 2)), size);
+    }
+
+    /// <summary>A window that has just grown (a bigger setup step) moves up or left as little as it takes to stay
+    /// inside <paramref name="area"/>.</summary>
+    public static PixelPoint KeepInside(PixelRect area, PixelSize size, PixelPoint at) => Clamp(area, size, at.X, at.Y, 0);
+
     /// <summary>Where the nth toast stacks on the primary display: top right, downward on a Mac; bottom right,
     /// upward on Windows.</summary>
     public static PixelPoint ToastSpot(IReadOnlyList<ScreenGeometry> screens, int index, PixelSize size, bool mac, int room = 0)

@@ -176,4 +176,31 @@ public class PlacementTests
         Assert.Contains("\"library_window\"", File.ReadAllText(AppSettings.PathIn(home.Path)));
         Assert.Equal(new WindowPlace(120, 80, 1100.5, 700, true), AppSettings.Load(home.Path).LibraryWindow);
     }
+
+    /// <summary>The library's 1280×800 on a 1080p laptop at 100, 125 and 150% (a 48 px taskbar): it keeps its size
+    /// where it fits, shrinks to the usable area where it doesn't, and its title bar is always on the screen.</summary>
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    [InlineData(1.5)]
+    public void A_window_opening_centred_fits_above_the_taskbar_at_any_scale(double scale)
+    {
+        var laptop = new ScreenGeometry(new PixelRect(0, 0, 1920, 1080), new PixelRect(0, 0, 1920, 1080 - (int)(48 * scale)), scale, true);
+        var (at, size) = Placement.Centred(laptop, new Size(1280, 800), new Size(600, 560));
+        double usable = (1080 - 48 * scale) / scale;
+        Assert.Equal(Math.Min(800, usable - 32), size.Height, 0.5);
+        Assert.Equal(Math.Min(1280, 1920 / scale - 32), size.Width, 0.5);
+        Assert.True(at.Y >= 0, $"the title bar starts {at.Y} px above the screen");
+        Assert.True(at.Y + size.Height * scale <= laptop.WorkingArea.Bottom + 1, "the window runs under the taskbar");
+        Assert.True(at.X >= 0 && at.X + size.Width * scale <= 1920 + 1);
+    }
+
+    [Fact]
+    public void A_window_opening_centred_never_shrinks_below_its_minimum()
+    {
+        var tiny = new ScreenGeometry(new PixelRect(0, 0, 1024, 600), new PixelRect(0, 0, 1024, 560), 1, true);
+        var (at, size) = Placement.Centred(tiny, new Size(1280, 800), new Size(600, 560));
+        Assert.Equal(new Size(992, 560), size);
+        Assert.Equal(0, at.Y);
+    }
 }
