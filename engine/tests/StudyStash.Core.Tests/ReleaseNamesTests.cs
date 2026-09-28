@@ -15,17 +15,13 @@ public class ReleaseNamesTests
     }
 
     [Fact]
-    public void The_Mac_build_script_names_both_DMGs()
+    public void The_Mac_build_script_makes_the_one_DMG_with_no_role_in_the_app()
     {
-        // build-app.sh builds each DMG's name from "Study-Stash-" plus a role argument ("Laptop"/"Library"),
-        // rather than spelling out the whole file name, so check it uses the shared prefix and both roles.
         string buildApp = Read("macos", "build-app.sh");
-        Assert.Contains("Study-Stash-", buildApp);
-        Assert.Contains(RolePart(Updates.MacLaptopAsset), buildApp);
-        Assert.Contains(RolePart(Updates.MacLibraryAsset), buildApp);
+        Assert.Contains(Updates.MacAsset, buildApp);
+        Assert.DoesNotContain("StudyStashRole", buildApp);
+        Assert.DoesNotContain("StudyStashRole", Read("macos", "Info.plist"));
     }
-
-    static string RolePart(string dmgName) => dmgName["Study-Stash-".Length..^".dmg".Length];
 
     [Fact]
     public void The_Windows_installer_and_build_script_name_both_Setup_exe()

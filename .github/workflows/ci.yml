@@ -114,13 +114,12 @@ jobs:
           echo "STUDYSTASH_WHISPER_MODEL=$RUNNER_TEMP/whisper/ggml-tiny.bin" >> "$GITHUB_ENV"
       - name: install.sh parses
         run: sh -n install.sh
-      - name: Build Study Stash.app (both roles) and both DMGs
+      - name: Build Study Stash.app and its one DMG
         run: sh macos/build-app.sh dist/mac
       - name: Signed, universal, and reports its version on both architectures
         run: |
           APP="dist/mac/Study Stash.app"
           codesign --verify --deep --strict --verbose=2 "$APP"
-          codesign --verify --deep --strict --verbose=2 "dist/mac/library/Study Stash.app"
           lipo -info "$APP/Contents/MacOS/StudyStash" | grep -q "x86_64"
           lipo -info "$APP/Contents/MacOS/StudyStash" | grep -q "arm64"
           V=$(env -u DOTNET_ROOT "$APP/Contents/MacOS/StudyStash" version)
@@ -135,28 +134,27 @@ jobs:
         env:
           STUDYSTASH_SELFTEST_FLOW: one-computer
         run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
-      - name: Both DMGs hold the app with the right role, and no model is bundled (D6)
+      - name: The DMG holds the app with no role of its own (setup asks), and no model is bundled (D6)
         run: |
-          for pair in Laptop:laptop Library:library; do
-            name=${pair%%:*}; role=${pair##*:}
-            mnt="$RUNNER_TEMP/mnt-$name"
-            mkdir -p "$mnt"
-            hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" "dist/mac/Study-Stash-$name.dmg"
-            /usr/libexec/PlistBuddy -c "Print :StudyStashRole" "$mnt/Study Stash.app/Contents/Info.plist" | grep -qx "$role"
-            [ -L "$mnt/Applications" ]
-            if find "$mnt" -iname 'ggml-*.bin' -o -name '*.bin' -size +1M | grep -q .; then
-              hdiutil detach -quiet "$mnt"
-              echo "a model file is bundled in Study-Stash-$name.dmg" >&2
-              exit 1
-            fi
+          mnt="$RUNNER_TEMP/mnt-dmg"
+          mkdir -p "$mnt"
+          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$mnt" dist/mac/Study-Stash.dmg
+          if /usr/libexec/PlistBuddy -c "Print :StudyStashRole" "$mnt/Study Stash.app/Contents/Info.plist" >/dev/null 2>&1; then
             hdiutil detach -quiet "$mnt"
-          done
+            echo "Study-Stash.dmg's app still says a role" >&2
+            exit 1
+          fi
+          [ -L "$mnt/Applications" ]
+          if find "$mnt" -iname 'ggml-*.bin' -o -name '*.bin' -size +1M | grep -q .; then
+            hdiutil detach -quiet "$mnt"
+            echo "a model file is bundled in Study-Stash.dmg" >&2
+            exit 1
+          fi
+          hdiutil detach -quiet "$mnt"
       - uses: actions/upload-artifact@v4
         with:
           name: mac-installers
-          path: |
-            dist/mac/Study-Stash-Laptop.dmg
-            dist/mac/Study-Stash-Library.dmg
+          path: dist/mac/Study-Stash.dmg
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -187,10 +185,10 @@ jobs:
           [ -f "$RUNNER_TEMP/whisper/ggml-tiny.bin" ] || curl -fsSL -o "$RUNNER_TEMP/whisper/ggml-tiny.bin" \
             https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
           echo "STUDYSTASH_WHISPER_MODEL=$RUNNER_TEMP/whisper/ggml-tiny.bin" >> "$GITHUB_ENV"
-      - name: Mount the laptop DMG and copy the app out (artifacts lose exec bits, so it travels as a DMG)
+      - name: Mount the DMG and copy the app out (artifacts lose exec bits, so it travels as a DMG)
         run: |
           mkdir -p "$RUNNER_TEMP/mnt"
-          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$RUNNER_TEMP/mnt" dist/mac/Study-Stash-Laptop.dmg
+          hdiutil attach -nobrowse -readonly -noautoopen -mountpoint "$RUNNER_TEMP/mnt" dist/mac/Study-Stash.dmg
           ditto "$RUNNER_TEMP/mnt/Study Stash.app" "$RUNNER_TEMP/Study Stash.app"
           hdiutil detach -quiet "$RUNNER_TEMP/mnt"
           codesign --verify --deep --strict "$RUNNER_TEMP/Study Stash.app"
