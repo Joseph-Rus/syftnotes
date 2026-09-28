@@ -125,10 +125,13 @@ public class AppShots
             Shot.Take("win-04-full-app-ai", SkinKind.Win, t, () => new WinLibrary { DataContext = LectureApp(), Width = 1280, Height = 800 });
     }
 
-    /// <summary>The real settings window at one of the new sections, over a temp home (never a real one).</summary>
-    static async Task SettingsShot(string name, SkinKind skin, string section)
+    /// <summary>The real settings window at one of the new sections, over a temp home (never a real one).
+    /// <paramref name="role"/> writes app.json first, for a section that looks different by role (Connection).</summary>
+    static async Task SettingsShot(string name, SkinKind skin, string section, AppRole? role = null)
     {
         string home = Path.Combine(Path.GetTempPath(), "studystash-settings-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(home);
+        if (role is { } r) new AppSettings { SetupDone = true, Role = r }.Save(home);
         var host = new AppHost(home);
         var canvas = CanvasFixtures.Context(CanvasShots.ConnectedLibrary());
         var model = SettingsModel.Make(host, ai: AiDemo.DemoLibrary(), canvas: canvas);
@@ -165,6 +168,22 @@ public class AppShots
         await SettingsShot("win-06-canvas-settings-app", SkinKind.Win, "Canvas");
         await SettingsShot("win-13-ai-engines-app", SkinKind.Win, "AI");
         await SettingsShot("win-14-ai-tool-access-app", SkinKind.Win, "Access");
+    }
+
+    /// <summary>Settings → Connection's "This computer": a laptop offered "Also be your library", a library offered
+    /// "Become a laptop" (docs/one-download.md).</summary>
+    [AvaloniaFact]
+    public async Task Mac_settings_this_computer()
+    {
+        await SettingsShot("mac-15-this-computer-laptop-app", SkinKind.Mac, "Connection", AppRole.Laptop);
+        await SettingsShot("mac-15-this-computer-library-app", SkinKind.Mac, "Connection", AppRole.Both);
+    }
+
+    [AvaloniaFact]
+    public async Task Win_settings_this_computer()
+    {
+        await SettingsShot("win-15-this-computer-laptop-app", SkinKind.Win, "Connection", AppRole.Laptop);
+        await SettingsShot("win-15-this-computer-library-app", SkinKind.Win, "Connection", AppRole.Both);
     }
 
     /// <summary>Setup at Canvas (design 07): the extension step open, as the lane's own shot has it.</summary>
