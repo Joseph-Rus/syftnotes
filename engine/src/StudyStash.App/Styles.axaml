@@ -36,6 +36,16 @@
       <Style Selector="^:disabled">
         <Setter Property="Opacity" Value="0.4" />
       </Style>
+      <!-- A choice that shows its own hover, press and keyboard focus (a swatch's ring, a card's outline, a radio's
+           rim, a Border.focusring round it): no wash, which would be a square box round something round. -->
+      <Style Selector="^.quiet /template/ Border#PART_Wash">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+      </Style>
+      <!-- Its content (with that focus ring just outside it) isn't cut off at the button's edge. -->
+      <Style Selector="^.quiet">
+        <Setter Property="ClipToBounds" Value="False" />
+      </Style>
       <!-- The Mac's fills, as on the Borders below: a button round as its height reads as a pill. The tinted one
            glows past its edge, which a button would otherwise cut off. -->
       <Style Selector="^.tint">
@@ -190,6 +200,17 @@
       </Style>
     </ControlTheme>
   </Styles.Resources>
+
+  <!-- A quiet choice's keyboard focus: a ring just outside the thing itself, which the view sizes and rounds. -->
+  <Style Selector="Border.focusring">
+    <Setter Property="IsVisible" Value="False" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+  </Style>
+  <Style Selector="Button.quiet:focus-visible Border.focusring">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
 
   <!-- A popup's own window shows only what its panel draws: where the system can't make it see-through, nothing
        (not white) fills the corners round the rounded panel. -->

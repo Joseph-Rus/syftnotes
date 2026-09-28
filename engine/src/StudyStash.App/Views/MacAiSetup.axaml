@@ -72,11 +72,12 @@
                   <StackPanel>
                     <Border Classes="ai-sep" Margin="44,0,0,0" IsVisible="{Binding !First}" />
                     <Grid ColumnDefinitions="Auto,12,*,Auto" MinHeight="41" Margin="16,8">
-                      <Button Grid.ColumnSpan="3" Classes="ai-textbtn" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+                      <Button Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
                         <Grid ColumnDefinitions="Auto,12,*">
                           <Border Classes="ai-radio" Classes.on="{Binding Selected}" Classes.dim="{Binding !CanWrite}" VerticalAlignment="Center">
                             <Ellipse Width="6" Height="6" Fill="White" IsVisible="{Binding Selected}" />
                           </Border>
+                          <Border Classes="focusring ai-radioring" />
                           <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
                             <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
                             <TextBlock Classes="ai-row-sub" Text="{Binding About}" />
@@ -152,11 +153,12 @@
             <StackPanel IsVisible="{Binding OffersNoAi}">
               <Border Classes="ai-sep" Margin="44,0,0,0" />
               <Grid ColumnDefinitions="Auto,12,*,Auto" MinHeight="41" Margin="16,8">
-                <Button Grid.ColumnSpan="3" Classes="ai-textbtn" Command="{Binding PickNoAiCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+                <Button Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding PickNoAiCommand}" HorizontalContentAlignment="Stretch" Padding="0">
                   <Grid ColumnDefinitions="Auto,12,*">
                     <Border Classes="ai-radio" Classes.on="{Binding NoAi}" VerticalAlignment="Center">
                       <Ellipse Width="6" Height="6" Fill="White" IsVisible="{Binding NoAi}" />
                     </Border>
+                    <Border Classes="focusring ai-radioring" />
                     <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
                       <TextBlock Classes="ai-row-title" Text="No AI for now" />
                       <TextBlock Classes="ai-row-sub" Text="Just transcripts. Turn notes on later in Settings." />

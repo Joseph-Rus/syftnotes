@@ -38,35 +38,39 @@
       <TextBlock Classes="ai-section" Text="What they can read" Margin="0,18,0,8" />
       <Border Classes="ai-card">
         <StackPanel>
-          <Button Classes="ai-textbtn" Command="{Binding ToggleLecturesCommand}" HorizontalContentAlignment="Stretch">
+          <Button Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleLecturesCommand}" HorizontalContentAlignment="Stretch">
             <Grid ColumnDefinitions="Auto,12,*" Height="40">
               <Border Classes="ai-check" Classes.on="{Binding ReadLectures}">
                 <c:Icon Glyph="check" Size="14" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding ReadLectures}" />
               </Border>
+              <Border Classes="focusring ai-checkring" />
               <TextBlock Grid.Column="2" Classes="ai-row-title" Text="Lectures and transcripts" VerticalAlignment="Center" />
             </Grid>
           </Button>
-          <Button Classes="ai-textbtn" Command="{Binding ToggleNotesCommand}" HorizontalContentAlignment="Stretch">
+          <Button Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleNotesCommand}" HorizontalContentAlignment="Stretch">
             <Grid ColumnDefinitions="Auto,12,*" Height="40">
               <Border Classes="ai-check" Classes.on="{Binding ReadNotes}">
                 <c:Icon Glyph="check" Size="14" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding ReadNotes}" />
               </Border>
+              <Border Classes="focusring ai-checkring" />
               <TextBlock Grid.Column="2" Classes="ai-row-title" Text="Study notes" VerticalAlignment="Center" />
             </Grid>
           </Button>
-          <Button Classes="ai-textbtn" Command="{Binding ToggleCanvasCommand}" HorizontalContentAlignment="Stretch">
+          <Button Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleCanvasCommand}" HorizontalContentAlignment="Stretch">
             <Grid ColumnDefinitions="Auto,12,*" Height="40">
               <Border Classes="ai-check" Classes.on="{Binding ReadCanvas}">
                 <c:Icon Glyph="check" Size="14" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding ReadCanvas}" />
               </Border>
+              <Border Classes="focusring ai-checkring" />
               <TextBlock Grid.Column="2" Classes="ai-row-title" Text="Canvas assignments and files" VerticalAlignment="Center" />
             </Grid>
           </Button>
-          <Button Classes="ai-textbtn" Command="{Binding ToggleAudioCommand}" HorizontalContentAlignment="Stretch">
+          <Button Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleAudioCommand}" HorizontalContentAlignment="Stretch">
             <Grid ColumnDefinitions="Auto,12,*" Height="40">
               <Border Classes="ai-check" Classes.on="{Binding ReadAudio}">
                 <c:Icon Glyph="check" Size="14" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding ReadAudio}" />
               </Border>
+              <Border Classes="focusring ai-checkring" />
               <TextBlock Grid.Column="2" Classes="ai-row-title" Text="Audio recordings" VerticalAlignment="Center" />
             </Grid>
           </Button>
