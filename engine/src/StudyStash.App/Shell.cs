@@ -130,6 +130,7 @@ public static partial class Shell
         public static Window? Quick => quickWindow;
         public static Window? Recorder => recorderWindow;
         public static Window? Settings => settingsWindow;
+        public static Window? CanvasConnect => canvasConnectWindow;
         /// <summary>Setup's own view model, while its window is open: what the self-test drives (steps, connect,
         /// find, add a class) the same way the view's bindings would.</summary>
         public static ViewModels.SetupModel? SetupModel => setup;
