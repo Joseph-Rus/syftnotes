@@ -933,7 +933,7 @@ public class ConnectorTests
     public async Task Read_file_reads_only_what_search_could_show_a_page_at_a_time()
     {
         using var dir = new TempDir();
-        string lib = dir["library"], secret = dir["secret"], outside = dir["outside"];
+        string lib = dir["pool"], secret = dir["secret"], outside = dir["outside"];
         string week = Path.Combine(lib, "CS 101", "Canvas", "files", "Week 1");
         foreach (string d in new[] { week, secret, outside }) Directory.CreateDirectory(d);
         string slides = Path.Combine(week, "recursion.md");
@@ -958,13 +958,17 @@ public class ConnectorTests
         int offset = int.Parse(first[(more + "(More: call again with offset=".Length)..].TrimEnd('.', ')'));
         Assert.Contains("The base case ends it.", await source.ReadFileAsync(slides, offset));
         Assert.Equal("That's the end of the file.", await source.ReadFileAsync(slides, int.MaxValue));
+        // The "<class>/<path in its folder>" class_files and get_assignment give reads the same file.
+        Assert.Equal(first, await source.ReadFileAsync("CS 101/Canvas/files/Week 1/recursion.md", 0));
 
         Assert.Contains("private folder", await source.ReadFileAsync(taxes, 0));
         const string NotHere = "That isn't a file Study Stash shares with AI tools.";
         Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(week, "diary.md"), 0)); // a link out of the folder
         Assert.StartsWith(NotHere, await source.ReadFileAsync(away, 0));
         Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(week, "..", "..", "..", "..", "..", "outside", "diary.md"), 0));
-        Assert.StartsWith(NotHere, await source.ReadFileAsync("CS 101/Canvas/files/Week 1/recursion.md", 0));
+        Assert.StartsWith(NotHere, await source.ReadFileAsync("Week 1/recursion.md", 0));
+        Assert.StartsWith(NotHere, await source.ReadFileAsync("CS 101/../../outside/diary.md", 0));
+        Assert.False(Directory.Exists(Path.Combine(lib, "Week 1"))); // naming a class that isn't there makes no folder
         Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(home, "claude.json"), 0));
     }
 }

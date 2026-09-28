@@ -51,9 +51,12 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
     /// really is there (a link can't lead out of the folder, or into Study Stash's own settings).</summary>
     string ReadFile(string path, int offset)
     {
-        const string NotHere = "That isn't a file Study Stash shares with AI tools. Use a path exactly as search_files or class_files gave it.";
+        const string NotHere = "That isn't a file Study Stash shares with AI tools. Use a path exactly as search_files, class_files or get_assignment gave it.";
         if (files is null) return "This library can't open files.";
         path = path.Trim();
+        // "<class>/<path in its folder>": how class_files and get_assignment name what Study Stash saved.
+        if (!Path.IsPathFullyQualified(path) && path.IndexOf('/') is > 0 and var slash)
+            path = Path.GetFullPath(Path.Combine(reader.Store.PoolDir, Notes.Slugify(path[..slash], 60), path[(slash + 1)..]));
         if (path.Length == 0 || !Path.IsPathFullyQualified(path)) return NotHere;
         if (files.RootOf(path) is not { } root) return NotHere;
         if (root.Private) return "That file is in a private folder: AI tools see its name only.";
@@ -524,11 +527,15 @@ public static class ClaudeTools
 
     static bool Bool(JsonNode? n) => n is JsonValue v && v.TryGetValue(out bool b) && b;
 
-    static string FileLine(JsonObject f)
+    /// <summary>Where a saved file is in its class's folder, or, on the web (<paramref name="cls"/> given), the
+    /// "&lt;class&gt;/&lt;path&gt;" read_file takes.</summary>
+    static string Saved(string local, string? cls) => local.Length > 0 && cls is not null ? cls + "/" + local : local;
+
+    static string FileLine(JsonObject f, string? cls)
     {
         string name = S(f["name"]);
         string size = f["size"] is JsonValue sv && sv.TryGetValue(out long bytes) && bytes > 0 ? $" ({Canvas.CanvasMarkdown.Size(bytes)})" : "";
-        string local = S(f["local"]), skipped = S(f["skipped"]), url = S(f["url"]);
+        string local = Saved(S(f["local"]), cls), skipped = S(f["skipped"]), url = S(f["url"]);
         if (local.Length > 0) return $"- {name}{size}: {local}";
         if (skipped.Length > 0) return $"- {name}{size}: not saved ({skipped})" + (url.Length > 0 ? " — " + url : "");
         return $"- {name}{size}" + (url.Length > 0 ? ": " + url : "");
@@ -572,7 +579,7 @@ public static class ClaudeTools
         return sb.ToString().TrimEnd();
     }
 
-    static string FormatAssignment(JsonObject a)
+    static string FormatAssignment(JsonObject a, string? cls)
     {
         var sb = new StringBuilder();
         sb.Append($"# {S(a["name"])} — {S(a["class"])}\n\n");
@@ -588,11 +595,11 @@ public static class ClaudeTools
         if (S(a["instructions"]) is { Length: > 0 } instructions)
             sb.Append("\nInstructions:\n").Append(Py.Head(instructions, 4000).Trim()).Append('\n');
         var files = (a["files"] as JsonArray ?? []).OfType<JsonObject>().ToList();
-        if (files.Count > 0) sb.Append("\nFiles:\n").Append(string.Join("\n", files.Select(FileLine))).Append('\n');
+        if (files.Count > 0) sb.Append("\nFiles:\n").Append(string.Join("\n", files.Select(f => FileLine(f, cls)))).Append('\n');
         var rubric = (a["rubric"] as JsonArray ?? []).OfType<JsonObject>().ToList();
         if (rubric.Count > 0) sb.Append("\nRubric:\n").Append(string.Join("\n", rubric.Select(RubricLine))).Append('\n');
         if (a["submission"] is JsonObject sub2 && (sub2["files"] as JsonArray ?? []).OfType<JsonObject>().ToList() is { Count: > 0 } subFiles)
-            sb.Append("\nSubmission:\n").Append(string.Join("\n", subFiles.Select(FileLine))).Append('\n');
+            sb.Append("\nSubmission:\n").Append(string.Join("\n", subFiles.Select(f => FileLine(f, cls)))).Append('\n');
         var comments = (a["comments"] as JsonArray ?? []).OfType<JsonObject>().ToList();
         if (comments.Count > 0)
         {
@@ -603,15 +610,15 @@ public static class ClaudeTools
                 sb.Append($"- {S(c["author"])}").Append(at.Length > 0 ? $" ({Canvas.CanvasMarkdown.When(at, TimeZoneInfo.Local)})" : "").Append(": ").Append(S(c["text"])).Append('\n');
             }
         }
-        if (S(a["spec"]) is { Length: > 0 } spec) sb.Append("\nSpec: ").Append(spec).Append('\n');
-        if (S(a["feedback"]) is { Length: > 0 } feedback) sb.Append("Feedback: ").Append(feedback).Append('\n');
+        if (S(a["spec"]) is { Length: > 0 } spec) sb.Append("\nSpec: ").Append(Saved(spec, cls)).Append('\n');
+        if (S(a["feedback"]) is { Length: > 0 } feedback) sb.Append("Feedback: ").Append(Saved(feedback, cls)).Append('\n');
         return sb.ToString().TrimEnd();
     }
 
     /// <summary>One assignment's whole story: instructions, rubric with marks and comments, submission and files,
     /// grader comments with author and date. <paramref name="assignment"/> is its id, or words of its name (several
-    /// matches are listed instead).</summary>
-    public static async Task<string> GetAssignmentAsync(ILibrarySource lib, string class_name, string assignment)
+    /// matches are listed instead). <paramref name="web"/>: saved files as the paths read_file takes.</summary>
+    public static async Task<string> GetAssignmentAsync(ILibrarySource lib, string class_name, string assignment, bool web = false)
     {
         var body = new JsonObject { ["class"] = class_name };
         if (long.TryParse(assignment, out long id)) body["id"] = id; else body["name"] = assignment;
@@ -620,7 +627,7 @@ public static class ClaudeTools
         if (o["error"] is not null) return "Couldn't: " + S(o["error"]);
         if (o["candidates"] is JsonArray cands)
             return "Several assignments match: " + string.Join("; ", cands.OfType<JsonObject>().Select(c => $"{S(c["name"])} (id {c["id"]})"));
-        return FormatAssignment(o);
+        return FormatAssignment(o, web ? class_name : null);
     }
 
     static string FormatModules(JsonObject m)
@@ -651,17 +658,17 @@ public static class ClaudeTools
         return r is JsonObject m ? FormatModules(m) : "Couldn't read this class's modules.";
     }
 
-    static string FileRow(JsonObject f)
+    static string FileRow(JsonObject f, string? cls)
     {
         string folder = S(f["folder"]);
         string name = (folder.Length > 0 ? folder + "/" : "") + S(f["name"]);
         string size = f["size"] is JsonValue sv && sv.TryGetValue(out long bytes) && bytes > 0 ? $" ({Canvas.CanvasMarkdown.Size(bytes)})" : "";
-        string local = S(f["local"]);
+        string local = Saved(S(f["local"]), cls);
         return $"- {name}{size}" + (local.Length > 0 ? $": {local}" : "");
     }
 
     /// <summary>The class's Files area, with its own words when Canvas hides it from the student.</summary>
-    public static async Task<string> ClassFilesAsync(ILibrarySource lib, string class_name)
+    public static async Task<string> ClassFilesAsync(ILibrarySource lib, string class_name, bool web = false)
     {
         var r = await lib.CanvasAsync("files", new JsonObject { ["class"] = class_name });
         if (r is JsonObject err && err["error"] is not null) return "Couldn't: " + S(err["error"]);
@@ -670,7 +677,7 @@ public static class ClaudeTools
         var files = (f["files"] as JsonArray ?? []).OfType<JsonObject>().ToList();
         string header = allowed ? "" : "Canvas hides this class's Files area from the student; showing what's known from modules and links.\n";
         if (files.Count == 0) return header.Length > 0 ? header.TrimEnd() : "No files.";
-        return header + string.Join("\n", files.Select(FileRow));
+        return header + string.Join("\n", files.Select(f => FileRow(f, web ? class_name : null)));
     }
 
     /// <summary>A class's announcements, newest first, with bodies cut short.</summary>
@@ -750,10 +757,10 @@ public static class ClaudeTools
                     : "The words around the match are all it shows of a file."))));
         if (canRead)
             tools.Add(McpServerTool.Create(
-                ([Description("The file's path, exactly as search_files or class_files gave it.")] string path,
+                ([Description("The file's path, exactly as search_files, class_files or get_assignment gave it.")] string path,
                  [Description("Start this many characters in: the offset a previous answer's last line gives. 0 for the beginning.")] int offset = 0) =>
                     lib.ReadFileAsync(path, offset),
-                Named("read_file", "Read a file", "The words in a file search_files or class_files found (slides, PDFs, Word, Markdown, "
+                Named("read_file", "Read a file", "The words in a file search_files, class_files or get_assignment found (slides, PDFs, Word, Markdown, "
                     + "code, notebooks), up to 40,000 characters a call; a longer file ends with the offset to read on from. Use it "
                     + "to read course materials in full. Only files in the library and the folders the student shares with AI, not "
                     + "private ones.")));
@@ -773,7 +780,7 @@ public static class ClaudeTools
             McpServerTool.Create(
                 ([Description(ClassName)] string class_name,
                  [Description("The assignment's id, or words of its name (\"problem set 4\") as due_assignments shows it. Several matches are listed to choose from.")] string assignment) =>
-                    GetAssignmentAsync(lib, class_name, assignment),
+                    GetAssignmentAsync(lib, class_name, assignment, canRead),
                 Named("get_assignment", "Read an assignment", "One assignment's whole story, including the grader's feedback: instructions, "
                     + "points, due date, status and score, the rubric with the student's marks and the grader's comments on each, what "
                     + "was submitted and its files, and the grader's comments with author and date. Use it for any question about one "
@@ -782,7 +789,7 @@ public static class ClaudeTools
                 Named("class_modules", "Read a class's modules", "A class's Canvas modules in order, each item with its kind (file, page, "
                     + "assignment, quiz, discussion, link, tool), whether Study Stash saved it, and whether it's locked. Use it to see "
                     + "how a course is laid out, week by week. The class comes from list_classes.")),
-            McpServerTool.Create(([Description(ClassName)] string class_name) => ClassFilesAsync(lib, class_name),
+            McpServerTool.Create(([Description(ClassName)] string class_name) => ClassFilesAsync(lib, class_name, canRead),
                 Named("class_files", "Read a class's Files area", "A class's Canvas Files area: folders and files with their sizes, and "
                     + (canRead ? "the path of each one Study Stash saved (read_file reads it)" : "where Study Stash saved each one")
                     + "; or says when Canvas hides the area from the student. Use it to find course materials by name. The class "

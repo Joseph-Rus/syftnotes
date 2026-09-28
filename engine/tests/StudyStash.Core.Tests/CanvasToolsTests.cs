@@ -69,6 +69,10 @@ public class CanvasToolsTests
         Assert.Contains("Points: 20", local);
         Assert.Contains("Status: Graded · 18/20", local);
         Assert.Contains("Base cases: 5 / 5", local);
+        // On the web, what Study Stash saved is named the way read_file takes it: "<class>/<path in its folder>".
+        string web = await ClaudeTools.GetAssignmentAsync(Local(dir, sync), "CS 101", "problem set 4", web: true);
+        Assert.Contains("Spec: CS 101/Canvas/", web);
+        Assert.DoesNotContain("Spec: Canvas/", web);
 
         var (site, remote) = await RemoteAsync(dir, sync);
         await using var _2 = site;
