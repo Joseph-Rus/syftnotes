@@ -152,6 +152,8 @@ public sealed class ScriptedAi(string id, string name = "") : AiProvider
     public bool Streamed { get; private set; }
     /// <summary>The models <see cref="WarmAsync"/> was asked to get ready, in order.</summary>
     public List<string> Warmed { get; } = [];
+    /// <summary>Every prompt it was run with, in order.</summary>
+    public List<string> Prompts { get; } = [];
 
     public override List<string> Command(AiRequest req, bool stream) => [];
     public override IEnumerable<AiEvent> Parse(string line) => [];
@@ -167,6 +169,7 @@ public sealed class ScriptedAi(string id, string name = "") : AiProvider
     {
         Finished = false;
         Streamed = stream;
+        lock (Prompts) Prompts.Add(req.Prompt);
         if (Throws is not null) throw Throws;
         if (Hang) await Task.Delay(Timeout.InfiniteTimeSpan, ct);
         for (int i = 0; i < Script.Count; i++)
