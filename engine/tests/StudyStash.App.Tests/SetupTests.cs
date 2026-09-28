@@ -575,10 +575,12 @@ public sealed class SetupTests
         await canvas.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), [], TestContext.Current.CancellationToken);
 
         Assert.True(m.HasCourses);
-        Assert.Equal(["Calculus II", "Cell and Molecular Biology", "Intro to Programming", "Modern World History", "Study Skills"], m.Courses.Select(c => c.Name));
+        // Only the courses ticked on the Canvas step: this term's, not last term's or a sandbox.
+        Assert.Equal(["Calculus II", "Cell and Molecular Biology", "Intro to Programming", "Modern World History"], m.Courses.Select(c => c.Name));
         Assert.All(m.Courses, c => Assert.True(c.Ticked));
         Assert.Equal("CS 101", m.Courses.Single(c => c.Name == "Intro to Programming").Code);
-        Assert.False(m.Courses.Single(c => c.Name == "Study Skills").HasCode);
+        canvas.Picker.Courses.Single(c => c.Title == "Statics").Ticked = true;
+        Assert.Equal("MECH 2010", m.Courses.Single(c => c.Name == "Statics").Code);
         Assert.Contains("Canvas courses", m.ClassesLede);
 
         m.SkipCommand.Execute(null);

@@ -334,6 +334,31 @@ There is no "Make it" step anywhere: each computer's folder is written and kept 
 
 **Find my courses** saves a typed address first, then asks Chrome; `FindOutcome` names what went wrong (no address,
 Chrome signed out, no extension has checked in, Chrome away, or the error itself) instead of "Chrome didn't answer".
+It keeps each course's term dates (`term.start_at`/`end_at`, and the course's own `start_at`/`end_at`) in `CourseInfo`.
+
+**Choosing which courses to bring in.** A school's list holds last term's courses, sandboxes, chapel and orientation
+next to this term's classes, so nothing is brought in until the student ticks it: setup's Canvas step and the connect
+window list every course found, and Settings → Canvas has "Courses to bring in". `CourseChoices.Suggest` ticks a
+course when its term's (or its own) dates say it's on now (up to 30 days early, 7 days late), or, without dates, when
+its term's name ("Fall 2026", "2026 Fall") does; it leaves unticked, saying why, a past or later term, a course in no
+real term ("Default Term" or none), and one named like a sandbox, chapel, convocation, orientation, advising or
+training. The choice lives in `canvas.json` as `chosen` (course ids; absent in a library from before it, where every
+linked course counts as chosen). The sync (`CanvasSettings.Synced`) and the Scout read only chosen courses.
+`POST /api/v2/canvas/choose {"courses": [ids], "keep": true, "match": false}` (`CourseChoices.Apply`) makes a class for
+each newly chosen course (its cleaned, unique name, or an unlinked class of that name; with `match`, the unlinked class
+`CourseMatch` suggests), and each course no longer chosen stops syncing: with `keep` its class and files stay; without,
+its Canvas folder, index, assignments and crawl memory go, and its class too unless a lecture is filed in it (refused
+with 409 while a sync runs). Its answer is `GET /api/v2/canvas` plus `outcome: {added, stopped, removed,
+kept_for_lectures}`. `GET /api/v2/canvas` says, per course in `course_info`, `chosen`, `suggested`, `why` and `class`,
+and the whole `chosen` list (null before any choice). Linking a class by hand (`POST /api/v2/canvas {"courses"}`)
+chooses its course too.
+
+**The app refreshes by itself.** `GET /api/v2/canvas/state` carries `revision`, which changes whenever a sync finishes
+or a course is linked, unlinked or chosen. The app's `CanvasFeed` follows the shared watch and reads the Due list and
+the classes again whenever `revision` (or, during a sync, the classes left) changes, so an open Due page, a class page,
+the dropdown's next due and the sidebar's count follow a sync without reopening anything. Canvas's files are written
+with `SharedFile` (a file of its own, swapped in, retried while busy) and read without holding them: on Windows a file
+that's open can't be replaced, and a finished sync used to fail to save what's due while the app read it.
 
 **For WS3/WS6 (the app).** The Canvas screens read `extension_version`, `extension_latest`,
 `extension_outdated` and `extension_update` from `GET /api/v2/canvas` (T7 also puts them in `/api/v2/canvas/state`)
@@ -380,7 +405,7 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
   "extension":{"seen","version","latest","outdated","updated":{"from","to","at"}|null,"connected","key_matches",
   "last_seen","refused_at"}, "last_sync" (when the last
   sync finished), "next_sync", "poll_minutes", "syncing":{"left","total","classes":[…]}|null, "paused_until"|null,
-  "error":{"text","at"}|null, "warnings":[…]}`. `state` is decided by `CanvasView.StateOf` in this order: `not_set_up`
+  "error":{"text","at"}|null, "warnings":[…], "revision"}`. `state` is decided by `CanvasView.StateOf` in this order: `not_set_up`
   (no Canvas address) > `no_extension` (no Chrome has ever checked in with this library's **current** extension key)
   > `signed_out` > `chrome_away` (no Chrome with the current key is checking in now: 90 s of quiet for a long-polling
   extension, 5 minutes for an older one) > `syncing` > `error` (the last sync ended with one) > `connected`.

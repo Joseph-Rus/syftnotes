@@ -80,7 +80,7 @@ public sealed class Scout(string home, Func<string, string> classDir, AiJobs ai,
     async Task ExploreAsync(string cls)
     {
         var settings = CanvasSettings.Load(home);
-        if (!settings.Courses.TryGetValue(cls, out long id)) return;
+        if (!settings.Courses.TryGetValue(cls, out long id) || !settings.IsChosen(id)) return;
         var (ready, why) = ai.AgentReady();
         if (!ready)
         {

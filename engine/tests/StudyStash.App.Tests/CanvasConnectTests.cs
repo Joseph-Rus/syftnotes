@@ -43,18 +43,36 @@ public class CanvasConnectTests
     }
 
     [Fact]
-    public async Task With_no_class_linked_it_finds_courses_itself_and_lands_on_match()
+    public async Task With_no_class_linked_it_finds_courses_itself_offers_them_to_tick_then_lands_on_match()
     {
         var classes = new List<CanvasApi.ClassRow> { new() { Class = "CS 101", Linked = false, Suggested = "4201" } };
         var handler = new FakeLibrary()
             .Json(HttpMethod.Post, "/api/v2/canvas/courses", "canvas")
+            .Json(HttpMethod.Post, "/api/v2/canvas/choose", "canvas")
             .Json(HttpMethod.Get, "/api/v2/canvas/classes", JsonSerializer.Serialize(classes, CanvasApi.Json));
         var m = Model(handler);
 
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), classes, TestContext.Current.CancellationToken);
 
+        // Your courses stays open with every course to tick, and Bring in in its row.
+        Assert.Equal(3, m.Current);
+        Assert.Equal("Found 4 courses. Tick the ones to bring in.", m.CoursesSay);
+        Assert.True(m.ShowPicker);
+        Assert.True(m.ShowBringIn);
+        Assert.False(m.ShowFind);
+        // A library from before the choice: the courses its classes link are the ones ticked.
+        Assert.Equal(4, m.Picker.Courses.Count);
+        Assert.Equal(["4201", "4202", "4203"], m.Picker.Courses.Where(c => c.Ticked).Select(c => c.Id).Order());
+        Assert.Equal("Bring in 3 courses", m.BringInLabel);
+        m.Picker.Courses.First(c => c.Id == "4203").Ticked = false;
+        Assert.Equal("Bring in 2 courses", m.BringInLabel);
+
+        await m.BringInCommand.ExecuteAsync(null);
+
+        var chose = Assert.Single(handler.Requests, r => r.Method == "POST" && r.Path == "/api/v2/canvas/choose");
+        Assert.Contains("\"match\":true", chose.Body);
+        Assert.Contains("\"keep\":true", chose.Body);
         Assert.Equal(4, m.Current);
-        Assert.Equal("Found 4 courses.", m.CoursesSay);
         var row = Assert.Single(m.Courses);
         Assert.Equal("4201", row.Selected?.Id); // the suggested course, preselected
     }
@@ -197,8 +215,9 @@ public class CanvasConnectTests
         Assert.True(m.ChromeConnected);
         Assert.False(m.WaitingForChrome);
         Assert.Equal("Connected", m.Step2.Summary);
-        Assert.Equal("Found 4 courses.", m.CoursesSay); // straight on to finding courses, then matching them
-        Assert.Equal(4, m.Current);
+        Assert.Equal("Found 4 courses. Tick the ones to bring in.", m.CoursesSay); // straight on to finding courses
+        Assert.Equal(3, m.Current);
+        Assert.True(m.ShowPicker);
         m.Dispose();
     }
 
@@ -276,7 +295,8 @@ public class CanvasConnectTests
         await Task.Delay(20, TestContext.Current.CancellationToken);
 
         Assert.False(m.SignedOut);
-        Assert.Equal(4, m.Current);
+        Assert.Equal(3, m.Current);
+        Assert.True(m.Picker.HasCourses); // found them on its own, ready to tick
     }
 
     [Fact]
@@ -289,10 +309,12 @@ public class CanvasConnectTests
         };
         var handler = new FakeLibrary()
             .Json(HttpMethod.Post, "/api/v2/canvas/courses", "canvas")
+            .Json(HttpMethod.Post, "/api/v2/canvas/choose", "canvas")
             .Json(HttpMethod.Get, "/api/v2/canvas/classes", JsonSerializer.Serialize(classes, CanvasApi.Json));
         var m = Model(handler);
 
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), classes, TestContext.Current.CancellationToken);
+        await m.BringInCommand.ExecuteAsync(null);
 
         Assert.Equal(4, m.Current);
         Assert.Equal(2, m.Courses.Count);
@@ -312,9 +334,11 @@ public class CanvasConnectTests
         var handler = new FakeLibrary()
             .Json(HttpMethod.Post, "/api/v2/canvas/courses", "canvas")
             .Json(HttpMethod.Get, "/api/v2/canvas/classes", JsonSerializer.Serialize(classes, CanvasApi.Json))
+            .Json(HttpMethod.Post, "/api/v2/canvas/choose", "canvas")
             .Json(HttpMethod.Post, "/api/v2/canvas", "canvas");
         var m = Model(handler);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), classes, TestContext.Current.CancellationToken);
+        await m.BringInCommand.ExecuteAsync(null);
 
         await m.LinkTheseCommand.ExecuteAsync(null);
 

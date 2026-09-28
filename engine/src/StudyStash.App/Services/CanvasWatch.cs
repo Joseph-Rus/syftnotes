@@ -27,6 +27,9 @@ public sealed class CanvasWatch(CanvasContext context)
     /// actually changed — a host that only cares about a real change can compare <see cref="State"/> itself.</summary>
     public event Action? Changed;
 
+    /// <summary>Told about anything that went wrong while asking (for the log); the watch carries on regardless.</summary>
+    public Action<Exception>? OnError { get; init; }
+
     /// <summary>Keeps this computer's Chrome extension folder current on every refresh (on start, and whenever the
     /// library's Canvas address or key changes), and says whether Chrome is connected. Null: leave the folder alone.</summary>
     public ExtensionKeeper? Extension { get; init; }
@@ -97,14 +100,15 @@ public sealed class CanvasWatch(CanvasContext context)
             {
                 await RefreshAsync(token);
             }
-            catch (Exception e) when (e is HttpRequestException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException
-                                          || (e is TaskCanceledException && !token.IsCancellationRequested))
-            {
-                // The library didn't answer this time: keep what's known, and ask again after the usual wait.
-            }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
                 return;
+            }
+            catch (Exception e)
+            {
+                // The library didn't answer this time, or a screen following the watch stumbled: keep what's known,
+                // and ask again after the usual wait. The watch never stops on its own, or nothing would update again.
+                OnError?.Invoke(e);
             }
             using var wake = CancellationTokenSource.CreateLinkedTokenSource(token);
             nap = wake;

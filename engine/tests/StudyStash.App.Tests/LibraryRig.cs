@@ -27,11 +27,14 @@ public sealed class LibraryRig : IAsyncDisposable
 {
     public const string Password = "maple otter";
 
-    /// <summary>The two courses Find my courses finds on the pretend Canvas.</summary>
-    const string CoursesJson = """
-        [{"id": 4201, "name": "CS 101 · Intro to Computer Science", "course_code": "CS 101", "term": {"name": "Fall 2025"}},
-         {"id": 4202, "name": "BIO 110 · Cells and Systems", "course_code": "BIO 110", "term": {"name": "Fall 2025"}}]
+    /// <summary>The two courses Find my courses finds on the pretend Canvas, in a term that's on now (so the picker
+    /// ticks both).</summary>
+    static readonly string CoursesJson = $$$"""
+        [{"id": 4201, "name": "CS 101 · Intro to Computer Science", "course_code": "CS 101", "term": {"name": "This term", "start_at": "{{{TermStart}}}", "end_at": "{{{TermEnd}}}"}},
+         {"id": 4202, "name": "BIO 110 · Cells and Systems", "course_code": "BIO 110", "term": {"name": "This term", "start_at": "{{{TermStart}}}", "end_at": "{{{TermEnd}}}"}}]
         """;
+    static string TermStart => DateTimeOffset.UtcNow.AddDays(-30).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+    static string TermEnd => DateTimeOffset.UtcNow.AddDays(90).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
 
     readonly TempDir dir = new();
     readonly HttpClient http = new() { Timeout = TimeSpan.FromMinutes(2) };

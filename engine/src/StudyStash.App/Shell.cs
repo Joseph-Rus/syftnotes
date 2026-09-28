@@ -1075,6 +1075,7 @@ public static partial class Shell
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         model.Lib.Copy = text => _ = w.Clipboard?.SetTextAsync(text);
         model.Lib.ClassesChanged = LibraryClassesChanged;
+        model.Canvas.OnClassesChanged = LibraryClassesChanged;
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         if (Skin.Current == SkinKind.Win)
         {

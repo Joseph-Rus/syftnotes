@@ -311,4 +311,21 @@ public static class CanvasWords
             _ => new StateCopy("Connected", $"Last sync {C(s.LastSync)}. Next at {C(s.NextSync)}."),
         };
     }
+
+    /// <summary>What saving the course choice did, in a line: "Added Bridge Design and Cell Biology. Syncing them
+    /// now. Stopped syncing Heat Transfer." A class kept for its lectures says so. Null when nothing changed.</summary>
+    public static string? ChoiceSaid(CanvasApi.ChoiceOutcome? o)
+    {
+        if (o is null) return null;
+        static string List(IReadOnlyList<string> names) =>
+            names.Count <= 1 ? string.Join("", names) : string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1];
+        var parts = new List<string>();
+        if (o.Added.Count > 0) parts.Add($"Added {List(o.Added)}. Syncing {(o.Added.Count == 1 ? "it" : "them")} now.");
+        var stoppedOnly = o.Stopped.Except(o.Removed).Except(o.KeptForLectures).ToList();
+        if (stoppedOnly.Count > 0) parts.Add($"Stopped syncing {List(stoppedOnly)}.");
+        if (o.Removed.Count > 0) parts.Add($"Removed {List(o.Removed)}.");
+        if (o.KeptForLectures.Count > 0)
+            parts.Add($"Kept {List(o.KeptForLectures)} for {(o.KeptForLectures.Count == 1 ? "its" : "their")} lectures; {(o.KeptForLectures.Count == 1 ? "its" : "their")} Canvas files are gone.");
+        return parts.Count == 0 ? null : string.Join(" ", parts);
+    }
 }

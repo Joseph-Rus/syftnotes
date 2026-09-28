@@ -108,14 +108,21 @@
         </Grid>
       </Border>
 
-      <!-- Courses -->
+      <!-- Courses to bring in: every course Find my courses found, ticked if it becomes a class and syncs -->
       <Grid ColumnDefinitions="*,Auto">
-        <TextBlock Classes="cv-h2" Text="Courses" />
-        <Button Grid.Column="1" Theme="{StaticResource Surface}" Padding="0" VerticalAlignment="Center"
+        <TextBlock Classes="cv-h2" Text="Courses to bring in" />
+        <Button Grid.Column="1" Theme="{StaticResource Surface}" Padding="0" Margin="0,18,0,8" VerticalAlignment="Center"
                 IsEnabled="{Binding !FindingCourses}" Command="{Binding FindCoursesCommand}">
           <TextBlock Classes="cv-link" Text="Find my courses again" />
         </Button>
       </Grid>
+      <TextBlock Classes="cv-value" FontSize="13" Margin="0,0,0,8" TextWrapping="Wrap"
+                 Text="Only ticked courses become classes and sync. This term's start ticked; past terms, sandboxes and chapel don't." />
+      <TextBlock Classes="cv-value" FontSize="13" Margin="0,0,0,8" Text="Find your courses to choose which to bring in." IsVisible="{Binding !Picker.HasCourses}" />
+      <v:WinCoursePicker DataContext="{Binding Picker}" Margin="0,0,0,8" />
+
+      <!-- Classes: each class's course -->
+      <TextBlock Classes="cv-h2" Text="Classes" />
       <ItemsControl ItemsSource="{Binding Courses}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:CanvasCourseRow">
