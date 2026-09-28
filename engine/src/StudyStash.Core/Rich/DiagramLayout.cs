@@ -51,19 +51,31 @@ public static class DiagramLayout
     }
 
     /// <summary>
-    /// The scene for a column <paramref name="width"/> wide: laid out as written, except that a left-to-right chart
-    /// too wide for the column is laid out top-down instead, when that is narrower.
+    /// The scene for a column <paramref name="width"/> wide: laid out as written, except that a chart too wide for the
+    /// column is turned (see <see cref="Turned"/>) when that makes it narrower.
     /// </summary>
     public static DiagramScene Fit(Flowchart chart, Func<string, double, bool, double> measure, double width)
     {
         var scene = Lay(chart, measure);
-        if (scene.Width > width && scene.Kind != SceneKind.Ring && chart.Direction is ChartDirection.LeftRight or ChartDirection.RightLeft)
+        if (scene.Width > width && Turned(chart, scene.Kind) is { } turned)
         {
-            var down = Lay(chart, measure, ChartDirection.TopDown);
-            if (down.Width < scene.Width) return down;
+            var other = Lay(chart, measure, turned);
+            if (other.Width < scene.Width) return other;
         }
         return scene;
     }
+
+    /// <summary>
+    /// The way to try a chart that's too wide for its column: a left-to-right chart top-down, and a top-down tree
+    /// left-to-right (a classification reads as well across as down). Null when turning it wouldn't help (a ring).
+    /// </summary>
+    public static ChartDirection? Turned(Flowchart chart, SceneKind kind) => kind switch
+    {
+        SceneKind.Ring => null,
+        _ when chart.Direction is ChartDirection.LeftRight or ChartDirection.RightLeft => ChartDirection.TopDown,
+        SceneKind.Tree => ChartDirection.LeftRight,
+        _ => null,
+    };
 
     /// <summary>Which layout a chart gets: a ring for one cycle of 3 to 10 boxes, a tree for a hierarchy of up to 40,
     /// layered for everything else (and anything with groups).</summary>
@@ -301,7 +313,7 @@ public static class DiagramLayout
             if (label.Lines.Count > 0)
             {
                 double tm = (tOut + tIn) / 2;
-                var normal = new Pt(ry * Math.Cos(tm), rx * Math.Sin(tm)).Unit;
+                var normal = new Pt(ry * Math.Cos(tm), rx * Math.Sin(tm)).Unit();
                 double reach = Math.Abs(normal.X) * label.W / 2 + Math.Abs(normal.Y) * label.H / 2 + 6;
                 box = Box.Around(E(tm) + normal * reach, label.W, label.H);
                 for (int step = 0; step < 8 && nodes.Any(nd => nd.Box.Inflate(4).Intersects(box)); step++) box = box.Offset(normal.X * 8, normal.Y * 8);
@@ -339,7 +351,7 @@ public static class DiagramLayout
 
     static SceneEdge Straight(FlowEdge edge, SceneNode from, SceneNode to, Words label)
     {
-        var dir = (to.Box.Center - from.Box.Center).Unit;
+        var dir = (to.Box.Center - from.Box.Center).Unit();
         var start = Along(from, dir, 0);
         var tip = Along(to, dir * -1, 0);
         var startBase = start + dir * MarkerLength(edge.StartEnd);
@@ -394,13 +406,6 @@ public static class DiagramLayout
             double need = l.Lines.Count == 0 ? 0 : (vertical ? l.H : l.W) + 28;
             gapAfter[depth[e.From]] = Math.Max(gapAfter[depth[e.From]], Math.Max(44, need));
         }
-        var centreLine = new double[levels];
-        double at = 0;
-        for (int d = 0; d < levels; d++)
-        {
-            centreLine[d] = at + levelDeep[d] / 2;
-            at += levelDeep[d] + Math.Max(44, gapAfter[d]);
-        }
         var across = new Dictionary<string, double>();
         void Place(string id, double left)
         {
@@ -416,6 +421,16 @@ public static class DiagramLayout
             across[id] = (across[kids[0].e.To] + across[kids[^1].e.To]) / 2;
         }
         Place(root, 0);
+        // A wide fan gets a deeper gap, so its curves don't run flat along the level.
+        foreach (var (e, _) in edgeIndex)
+            gapAfter[depth[e.From]] = Math.Max(gapAfter[depth[e.From]], Math.Min(96, Math.Abs(across[e.To] - across[e.From]) * 0.22));
+        var centreLine = new double[levels];
+        double at = 0;
+        for (int d = 0; d < levels; d++)
+        {
+            centreLine[d] = at + levelDeep[d] / 2;
+            at += levelDeep[d] + Math.Max(44, gapAfter[d]);
+        }
         double flip = dir is ChartDirection.BottomUp or ChartDirection.RightLeft ? -1 : 1;
         Pt Centre(string id) => vertical ? new Pt(across[id], flip * centreLine[depth[id]]) : new Pt(flip * centreLine[depth[id]], across[id]);
         var nodes = f.Nodes.Select(x => new SceneNode(x.Id, Box.Around(Centre(x.Id), sizes[x.Id].W, sizes[x.Id].H), x.Shape, x.Tone, sizes[x.Id].Lines)).ToList();
@@ -463,6 +478,44 @@ public static class DiagramLayout
 
     static DiagramScene Layered(Flowchart f, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer m)
     {
+        var back = BackEdges(f);
+        try
+        {
+            return Layered(f, sizes, labels, dir, m, back, keepOrder: true);
+        }
+        catch (Exception)
+        {
+            // Keeping siblings in the written order is a wish, not a need: without it MSAGL always finds a layout.
+            return Layered(f, sizes, labels, dir, m, back, keepOrder: false);
+        }
+    }
+
+    /// <summary>
+    /// The arrows that close a loop, found walking the chart in the order it was written (so the first box written is
+    /// at the top and an arrow back to it, like "still in pain", is the one that runs against the flow).
+    /// </summary>
+    static HashSet<int> BackEdges(Flowchart f)
+    {
+        var outs = f.Edges.Select((e, i) => (e, i)).Where(x => x.e.From != x.e.To).ToLookup(x => x.e.From, x => x.i);
+        var state = f.Nodes.ToDictionary(n => n.Id, _ => 0);
+        var back = new HashSet<int>();
+        void Visit(string id)
+        {
+            state[id] = 1;
+            foreach (int i in outs[id])
+            {
+                string to = f.Edges[i].To;
+                if (state[to] == 1) back.Add(i);
+                else if (state[to] == 0) Visit(to);
+            }
+            state[id] = 2;
+        }
+        foreach (var n in f.Nodes) if (state[n.Id] == 0) Visit(n.Id);
+        return back;
+    }
+
+    static DiagramScene Layered(Flowchart f, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer m, HashSet<int> back, bool keepOrder)
+    {
         var g = new GeometryGraph();
         // MSAGL's cluster layout throws without something here.
         g.RootCluster.UserData = "root";
@@ -483,6 +536,7 @@ public static class DiagramLayout
         }
         var loops = f.Edges.Where(e => e.From == e.To).Select(e => e.From).ToHashSet();
         var nodes = new Dictionary<string, MsaglNode>();
+        var groupOf = new Dictionary<string, string?>();
         foreach (var n in f.Nodes)
         {
             var s = sizes[n.Id];
@@ -492,20 +546,35 @@ public static class DiagramLayout
             g.Nodes.Add(node);
             nodes[n.Id] = node;
             var group = f.Groups.FirstOrDefault(x => x.Members.Contains(n.Id));
+            groupOf[n.Id] = group?.Id;
             if (group is not null) clusters[group.Id].AddChild(node);
             else g.RootCluster.AddChild(node);
         }
-        var routed = new List<(int Index, MsaglEdge Edge)>();
+        var routed = new List<(int Index, MsaglEdge Edge, bool Reversed)>();
+        // MSAGL spreads arrows between the same two boxes in an order that changes from run to run, so only the
+        // first is routed; the others bow out beside it.
+        var firstBetween = new Dictionary<(string, string), int>();
+        var alongside = new List<(int Index, int First, int Nth)>();
         for (int i = 0; i < f.Edges.Count; i++)
         {
             var e = f.Edges[i];
             if (e.From == e.To) continue;
-            var ge = new MsaglEdge(nodes[e.From], nodes[e.To]);
-            if (e.EndEnd != EdgeEnd.None) ge.EdgeGeometry.TargetArrowhead = new Arrowhead { Length = MarkerLength(e.EndEnd) };
-            if (e.StartEnd != EdgeEnd.None) ge.EdgeGeometry.SourceArrowhead = new Arrowhead { Length = MarkerLength(e.StartEnd) };
+            var pair = string.CompareOrdinal(e.From, e.To) < 0 ? (e.From, e.To) : (e.To, e.From);
+            if (firstBetween.TryGetValue(pair, out int first))
+            {
+                alongside.Add((i, first, alongside.Count(a => a.First == first) + 1));
+                continue;
+            }
+            firstBetween[pair] = i;
+            // An arrow that closes a loop is laid out the other way round, then turned back when it's drawn.
+            bool reversed = back.Contains(i);
+            var ge = reversed ? new MsaglEdge(nodes[e.To], nodes[e.From]) : new MsaglEdge(nodes[e.From], nodes[e.To]);
+            var (atTarget, atSource) = reversed ? (e.StartEnd, e.EndEnd) : (e.EndEnd, e.StartEnd);
+            if (atTarget != EdgeEnd.None) ge.EdgeGeometry.TargetArrowhead = new Arrowhead { Length = MarkerLength(atTarget) };
+            if (atSource != EdgeEnd.None) ge.EdgeGeometry.SourceArrowhead = new Arrowhead { Length = MarkerLength(atSource) };
             if (labels[i].Lines.Count > 0) ge.Label = new MsaglLabel(labels[i].W, labels[i].H, ge);
             g.Edges.Add(ge);
-            routed.Add((i, ge));
+            routed.Add((i, ge, reversed));
         }
         var settings = new SugiyamaLayoutSettings { NodeSeparation = 28, LayerSeparation = 44 };
         settings.EdgeRoutingSettings.EdgeRoutingMode = f.Groups.Count > 0 ? EdgeRoutingMode.Spline : EdgeRoutingMode.SugiyamaSplines;
@@ -517,6 +586,24 @@ public static class DiagramLayout
             _ => 0,
         };
         if (turn != 0) settings.Transformation = PlaneTransformation.Rotation(turn);
+        if (keepOrder)
+        {
+            // Siblings on one level keep the order they were written in: "yes" before "no", first type first. MSAGL's
+            // left becomes the bottom once turned left-to-right, and the right once turned bottom-up.
+            bool flip = dir is ChartDirection.LeftRight or ChartDirection.BottomUp;
+            var level = Levels(f, back);
+            foreach (var siblings in f.Edges.Select((e, i) => (e, i)).Where(x => x.e.From != x.e.To && !back.Contains(x.i)).GroupBy(x => x.e.From))
+            {
+                var kids = siblings.Select(x => x.e.To).Distinct().ToList();
+                for (int k = 0; k + 1 < kids.Count; k++)
+                {
+                    string a = kids[k], b = kids[k + 1];
+                    if (level[a] != level[b] || groupOf[a] != groupOf[b]) continue;
+                    if (flip) settings.AddLeftRightConstraint(nodes[b], nodes[a]);
+                    else settings.AddLeftRightConstraint(nodes[a], nodes[b]);
+                }
+            }
+        }
         LayoutHelpers.CalculateLayout(g, settings, null);
 
         // MSAGL's y points up; the scene's points down.
@@ -524,18 +611,21 @@ public static class DiagramLayout
         var sceneNodes = f.Nodes.Select(n => new SceneNode(n.Id, Box.Around(P(nodes[n.Id].Center), sizes[n.Id].W, sizes[n.Id].H), n.Shape, n.Tone, sizes[n.Id].Lines)).ToList();
         var byId = sceneNodes.ToDictionary(n => n.Id);
         var edges = new SceneEdge[f.Edges.Count];
-        foreach (var (i, ge) in routed)
+        foreach (var (i, ge, reversed) in routed)
         {
             var e = f.Edges[i];
             var path = new List<PathStep> { new(PathVerb.Move, P(ge.Curve.Start)) };
             AddCurve(path, ge.Curve);
-            var startBase = P(ge.Curve.Start);
-            var endBase = P(ge.Curve.End);
-            var startTip = ge.EdgeGeometry.SourceArrowhead is { } sa ? P(sa.TipPosition) : startBase;
-            var tip = ge.EdgeGeometry.TargetArrowhead is { } ta ? P(ta.TipPosition) : endBase;
+            var curveStart = P(ge.Curve.Start);
+            var curveEnd = P(ge.Curve.End);
+            var sourceTip = ge.EdgeGeometry.SourceArrowhead is { } sa ? P(sa.TipPosition) : curveStart;
+            var targetTip = ge.EdgeGeometry.TargetArrowhead is { } ta ? P(ta.TipPosition) : curveEnd;
             var box = ge.Label is { } l ? Box.Around(P(l.Center), labels[i].W, labels[i].H) : new Box();
-            edges[i] = new SceneEdge(e.From, e.To, path, e.Line, e.StartEnd, e.EndEnd, startTip, startBase, tip, endBase, labels[i].Lines, box);
+            edges[i] = reversed
+                ? new SceneEdge(e.From, e.To, Reverse(path), e.Line, e.StartEnd, e.EndEnd, targetTip, curveEnd, sourceTip, curveStart, labels[i].Lines, box)
+                : new SceneEdge(e.From, e.To, path, e.Line, e.StartEnd, e.EndEnd, sourceTip, curveStart, targetTip, curveEnd, labels[i].Lines, box);
         }
+        foreach (var (i, first, nth) in alongside) edges[i] = Beside(f.Edges[i], labels[i], edges[first], nth);
         for (int i = 0; i < f.Edges.Count; i++)
             if (f.Edges[i].From == f.Edges[i].To) edges[i] = Loop(f.Edges[i], byId[f.Edges[i].From], labels[i]);
         var groups = f.Groups.Select(group =>
@@ -545,6 +635,120 @@ public static class DiagramLayout
             return new SceneGroup(group.Id, group.Title, box, new Pt(box.X + 12, box.Y + 8), group.Parent is null ? 0 : 1);
         }).ToList();
         return new DiagramScene(SceneKind.Layered, dir, 0, 0, sceneNodes, edges, groups);
+    }
+
+    /// <summary>
+    /// Another arrow between the same two boxes as <paramref name="first"/>: the same ends, bowed out to one side
+    /// (the second arrow one way, the third the other, further out after that), with its own markers and words.
+    /// </summary>
+    static SceneEdge Beside(FlowEdge e, Words label, SceneEdge first, int nth)
+    {
+        var points = Flatten(first);
+        if (first.From != e.From) points.Reverse();
+        var cumulative = new double[points.Count];
+        for (int k = 1; k < points.Count; k++) cumulative[k] = cumulative[k - 1] + Pt.Distance(points[k - 1], points[k]);
+        double total = Math.Max(cumulative[^1], 1e-6);
+        var dir = (points[^1] - points[0]).Unit();
+        var normal = new Pt(-dir.Y, dir.X);
+        double amount = (nth % 2 == 1 ? 1 : -1) * ((nth + 1) / 2) * 16;
+        for (int k = 1; k < points.Count - 1; k++) points[k] += normal * (amount * Math.Sin(Math.PI * cumulative[k] / total));
+        var (startTip, startBase) = Cut(points, MarkerLength(e.StartEnd), fromEnd: false);
+        var (tip, endBase) = Cut(points, MarkerLength(e.EndEnd), fromEnd: true);
+        var path = new List<PathStep> { new(PathVerb.Move, startBase) };
+        path.AddRange(points.Skip(1).SkipLast(1).Select(p => new PathStep(PathVerb.Line, p)));
+        path.Add(new PathStep(PathVerb.Line, endBase));
+        var box = new Box();
+        if (label.Lines.Count > 0)
+        {
+            var middle = points[Math.Max(0, Array.FindIndex(cumulative, c => c >= total / 2))];
+            var side = normal * Math.Sign(amount);
+            box = Box.Around(middle + side * (Math.Abs(side.X) * label.W / 2 + Math.Abs(side.Y) * label.H / 2 + 4), label.W, label.H);
+        }
+        return new SceneEdge(e.From, e.To, path, e.Line, e.StartEnd, e.EndEnd, startTip, startBase, tip, endBase, label.Lines, box);
+    }
+
+    /// <summary>An arrow as points from tip to tip, its curves sampled.</summary>
+    static List<Pt> Flatten(SceneEdge e)
+    {
+        var points = new List<Pt> { e.StartTip };
+        var at = e.Path[0].A;
+        if (Pt.Distance(at, e.StartTip) > 0.01) points.Add(at);
+        foreach (var step in e.Path.Skip(1))
+        {
+            if (step.Verb == PathVerb.Cubic)
+                for (int k = 1; k <= 12; k++) points.Add(Bezier(at, step.A, step.B, step.C, k / 12.0));
+            else points.Add(step.A);
+            at = step.End;
+        }
+        if (Pt.Distance(at, e.Tip) > 0.01) points.Add(e.Tip);
+        return points;
+    }
+
+    /// <summary>Takes a marker's length off one end of a run of points: the end itself is the marker's tip, and the
+    /// line now stops at its base.</summary>
+    static (Pt Tip, Pt Base) Cut(List<Pt> points, double length, bool fromEnd)
+    {
+        if (fromEnd) points.Reverse();
+        var tip = points[0];
+        var @base = tip;
+        if (length > 0)
+        {
+            double walked = 0;
+            int k = 1;
+            for (; k < points.Count; k++)
+            {
+                double step = Pt.Distance(points[k - 1], points[k]);
+                if (walked + step >= length && k < points.Count - 1)
+                {
+                    @base = points[k - 1] + (points[k] - points[k - 1]).Unit() * (length - walked);
+                    break;
+                }
+                walked += step;
+            }
+            points.RemoveRange(0, Math.Min(k, points.Count - 2));
+            points.Insert(0, @base);
+        }
+        if (fromEnd) points.Reverse();
+        return (tip, @base);
+    }
+
+    /// <summary>Each box's level once the loops are cut: the longest run of arrows that leads to it.</summary>
+    static Dictionary<string, int> Levels(Flowchart f, HashSet<int> back)
+    {
+        var level = f.Nodes.ToDictionary(n => n.Id, _ => 0);
+        var forward = f.Edges.Where((e, i) => e.From != e.To && !back.Contains(i)).ToList();
+        // At most one pass per box: the arrows left form no loop.
+        for (int pass = 0; pass < f.Nodes.Count; pass++)
+        {
+            bool changed = false;
+            foreach (var e in forward)
+                if (level[e.To] < level[e.From] + 1)
+                {
+                    level[e.To] = level[e.From] + 1;
+                    changed = true;
+                }
+            if (!changed) break;
+        }
+        return level;
+    }
+
+    /// <summary>A path run the other way.</summary>
+    static List<PathStep> Reverse(List<PathStep> path)
+    {
+        var pieces = new List<(PathStep Step, Pt From)>();
+        var at = path[0].A;
+        foreach (var step in path.Skip(1))
+        {
+            pieces.Add((step, at));
+            at = step.End;
+        }
+        var reversed = new List<PathStep> { new(PathVerb.Move, at) };
+        for (int i = pieces.Count - 1; i >= 0; i--)
+        {
+            var (step, from) = pieces[i];
+            reversed.Add(step.Verb == PathVerb.Cubic ? new PathStep(PathVerb.Cubic, step.B, step.A, from) : new PathStep(PathVerb.Line, from));
+        }
+        return reversed;
     }
 
     static ICurve Curve(NodeShape shape, double w, double h)

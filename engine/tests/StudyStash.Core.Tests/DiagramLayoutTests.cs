@@ -142,6 +142,17 @@ public class DiagramLayoutTests
     }
 
     [Fact]
+    public void A_top_down_tree_too_wide_for_the_column_turns_left_to_right()
+    {
+        var chart = Flowchart.Parse(Shock);
+        var down = DiagramLayout.Lay(chart, Measure);
+        Assert.True(down.Width > 620);
+        var fitted = DiagramLayout.Fit(chart, Measure, 620);
+        Assert.Equal(ChartDirection.LeftRight, fitted.Direction);
+        Assert.True(fitted.Width <= 620);
+    }
+
+    [Fact]
     public void A_classification_is_a_tree_in_the_order_written()
     {
         var s = Lay(Shock);
@@ -192,6 +203,30 @@ public class DiagramLayoutTests
             case ChartDirection.LeftRight: Assert.True(first.X < last.X); break;
             default: Assert.True(first.X > last.X); break;
         }
+    }
+
+    [Theory]
+    [InlineData(ChartDirection.TopDown)]
+    [InlineData(ChartDirection.LeftRight)]
+    [InlineData(ChartDirection.RightLeft)]
+    [InlineData(ChartDirection.BottomUp)]
+    public void A_decisions_answers_keep_the_order_they_were_written_in(ChartDirection direction)
+    {
+        var s = Lay(Pain, direction);
+        var yes = s.Nodes.Single(n => n.Id == "C").Box.Center;
+        var no = s.Nodes.Single(n => n.Id == "D").Box.Center;
+        if (direction is ChartDirection.TopDown or ChartDirection.BottomUp) Assert.True(yes.X < no.X, "yes is left of no");
+        else Assert.True(yes.Y < no.Y, "yes is above no");
+    }
+
+    [Fact]
+    public void An_arrow_back_to_the_start_runs_against_the_flow_and_the_start_stays_first()
+    {
+        var s = Lay(NursingProcess.Replace("flowchart LR", "flowchart TD"));
+        double Y(string id) => s.Nodes.Single(n => n.Id == id).Box.Center.Y;
+        Assert.True(Y("A") < Y("D") && Y("D") < Y("P") && Y("I") < Y("E"), "written order, top to bottom");
+        var back = s.Edges.Single(e => e.From == "E" && e.To == "A");
+        Assert.True(back.Path[0].A.Y > back.Tip.Y, "the dotted arrow climbs back to the start");
     }
 
     [Theory]
@@ -355,6 +390,8 @@ public class DiagramLayoutTests
         var s = DiagramLayout.Lay(chart, Measure);
         Assert.Equal(60, s.Nodes.Count);
         Assert.True(watch.ElapsedMilliseconds < 3000, $"{watch.ElapsedMilliseconds} ms");
+        // Random arrows repeat and cross: still the same picture every time.
+        Assert.Equal(DiagramSvg.Render(s), DiagramSvg.Render(DiagramLayout.Lay(chart, Measure)));
     }
 
     [Fact]

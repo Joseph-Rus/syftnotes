@@ -9,9 +9,12 @@ public readonly record struct Pt(double X, double Y)
 
     public double Length => Math.Sqrt(X * X + Y * Y);
 
-    public Pt Unit => Length < 1e-9 ? new Pt(0, 0) : this * (1 / Length);
+    /// <summary>The same direction, one pixel long (nothing, for no direction).</summary>
+    public Pt Unit() => Length < 1e-9 ? new Pt(0, 0) : this * (1 / Length);
 
     public static double Distance(Pt a, Pt b) => (a - b).Length;
+
+    public override string ToString() => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"({X:0.##}, {Y:0.##})");
 }
 
 /// <summary>A rectangle on a diagram: its top-left corner and size.</summary>
@@ -104,7 +107,7 @@ public static class SceneShapes
     /// <summary>An arrowhead's three corners: its tip, then either side of its base.</summary>
     public static Pt[] ArrowHead(Pt tip, Pt @base)
     {
-        var u = (tip - @base).Unit;
+        var u = (tip - @base).Unit();
         var across = new Pt(-u.Y, u.X) * (DiagramLayout.ArrowWidth / 2);
         var back = tip - u * DiagramLayout.ArrowLength;
         return [tip, back + across, back - across];
@@ -114,7 +117,7 @@ public static class SceneShapes
     public static (Pt, Pt, Pt, Pt) Cross(Pt tip, Pt @base)
     {
         var c = (tip + @base) * 0.5;
-        var u = (tip - @base).Unit;
+        var u = (tip - @base).Unit();
         var n = new Pt(-u.Y, u.X);
         var a = (u + n) * 2.9;
         var b = (u - n) * 2.9;
