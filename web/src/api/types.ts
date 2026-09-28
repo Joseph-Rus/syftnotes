@@ -208,14 +208,17 @@ export interface Upcoming {
   updated: string | null;
 }
 
-/** A file added to a class or lecture (attachments contract). */
+/** A file added to a class or lecture (Attachment.ToJson in engine/src/StudyStash.Core/Attachments.cs). */
 export interface Attachment {
   id: string;
   name: string;
-  class: string | null;
+  /** Always a real class name (or "Unsorted"), never empty. */
+  class: string;
   lecture: string | null;
   size: number;
   type: string;
   added: string;
   hasText: boolean;
+  /** Still being read: show "Reading your handwriting…" and keep asking. */
+  reading: boolean;
 }
