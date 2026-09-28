@@ -414,9 +414,10 @@ public static class ClaudeWeb
             {identifiedBy}{warn}
             {list}
             <p class="cant">It can't change or delete anything.</p>
-            {toolsOff}{err}{hidden}
+            {toolsOff}{hidden}
             <label for="pw">Library password</label>
             <input id="pw" type="password" name="password" autocomplete="current-password" autofocus required>
+            {err}
             <div class="btns">
             <button name="decision" value="allow">Allow</button>
             <button name="decision" value="deny" class="quiet" formnovalidate>Deny</button>
