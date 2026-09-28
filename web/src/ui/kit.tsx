@@ -306,9 +306,10 @@ export function Button(props: {
   disabled?: boolean;
   type?: 'button' | 'submit';
   wide?: boolean;
+  small?: boolean;
   external?: boolean;
 }) {
-  const cls = `button ${props.kind ?? 'filled'}${props.wide ? ' wide' : ''}`;
+  const cls = `button ${props.kind ?? 'filled'}${props.wide ? ' wide' : ''}${props.small ? ' small' : ''}`;
   if (props.href)
     return (
       <a class={cls} href={props.href} target={props.external ? '_blank' : undefined} rel={props.external ? 'noopener' : undefined}>
