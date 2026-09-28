@@ -203,6 +203,8 @@
               <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Top" Margin="0,5,0,0" />
               <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
             </Grid>
+            <!-- Coming up on the student's calendars, above the library's status -->
+            <v:MacComingUp DockPanel.Dock="Bottom" DataContext="{Binding ComingUp}" Margin="2,8,2,0" />
             <ScrollViewer Name="ClassList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:WindowHeader.MovesWindow="True">
             <!-- With Canvas (design 09) the rows sit 2 px apart, each led by a 16 px slot, and the chosen one is bolder. -->
             <StackPanel Classes="side" Classes.canvas="{Binding HasDue}">
@@ -250,7 +252,7 @@
 
         <!-- The list: lectures by week, Canvas's Due list, or a linked class's own page -->
         <Panel Grid.Column="1" Grid.ColumnSpan="{Binding ColumnSpan}" Width="{Binding ListWidth}" IsVisible="{Binding ShowListColumn}">
-        <DockPanel IsVisible="{Binding ShowLectures}">
+        <DockPanel Name="LectureList" IsVisible="{Binding ShowLectures}">
           <Border DockPanel.Dock="Top" Height="44" Margin="20,0,20,4">
             <StackPanel VerticalAlignment="Center">
               <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold"
@@ -258,6 +260,10 @@
               <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
             </StackPanel>
           </Border>
+          <!-- What's attached in this class (drop files on the list) -->
+          <ScrollViewer DockPanel.Dock="Top" MaxHeight="200" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasClassFiles}" Margin="20,0,20,8">
+            <v:MacAttachments Name="ClassAttachments" DataContext="{Binding ClassFiles}" />
+          </ScrollViewer>
           <DockPanel>
             <TextBlock DockPanel.Dock="Top" IsVisible="{Binding HasEmpty}" Text="{Binding Empty}" FontSize="13" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="20,10" />
             <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -345,6 +351,10 @@
                   </Border>
                 </StackPanel>
               </Border>
+              <!-- What's attached to this lecture (drop files anywhere on the page) -->
+              <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasLectureFiles}" Margin="0,2,0,0">
+                <v:MacAttachments Name="LectureAttachments" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles}" />
+              </Panel>
               <TextBlock IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="13" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="0,12,0,0" />
               <Panel IsVisible="{Binding ShowNotes}">
                 <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasNotes}">

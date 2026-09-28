@@ -1,0 +1,86 @@
+<!-- What's attached to a lecture or a class: the files (a click opens one), Attach, "Reading your handwriting…" while
+     the library reads them, and "Rewrite notes with your attachments" when the notes came first. Files dropped on the
+     lecture or the class land here too (the host page takes the drop). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.WinAttachments"
+             x:DataType="vm:AttachmentsModel">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+    <Style Selector="Button.file">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="8,6" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.remove">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Width" Value="26" />
+      <Setter Property="Height" Value="26" />
+      <Setter Property="CornerRadius" Value="13" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Opacity" Value="0.7" />
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Spacing="6">
+    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+      <TextBlock Text="Attachments" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+      <Button Name="Attach" Grid.Column="1" Classes="ai-pillbtn" Command="{Binding AttachCommand}" IsEnabled="{Binding !Busy}"
+              ToolTip.Tip="Attach your notes, slides or a handout (or drop files here)" AutomationProperties.Name="Attach">
+        <Border Classes="ai-pill">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Glyph="attach_file" Size="15" />
+            <TextBlock Text="Attach" />
+          </StackPanel>
+        </Border>
+      </Button>
+    </Grid>
+
+    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}">
+      <c:Spinner Width="12" Height="12" Foreground="{DynamicResource Fg2}" />
+      <TextBlock Text="Attaching…" FontSize="12" Foreground="{DynamicResource Fg2}" />
+    </StackPanel>
+    <StackPanel Name="ReadingNow" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Reading}">
+      <c:Spinner Width="12" Height="12" Foreground="{DynamicResource Fg2}" />
+      <TextBlock Text="Reading your handwriting…" FontSize="12" Foreground="{DynamicResource Fg2}" />
+    </StackPanel>
+
+    <ItemsControl ItemsSource="{Binding Items}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:AttachmentItem">
+          <Grid ColumnDefinitions="*,4,Auto">
+            <Button Classes="file" Command="{Binding $parent[UserControl].((vm:AttachmentsModel)DataContext).OpenCommand}" CommandParameter="{Binding}"
+                    ToolTip.Tip="Open">
+              <Grid ColumnDefinitions="Auto,10,*">
+                <c:Icon Glyph="{Binding Icon}" Size="18" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="2">
+                  <TextBlock Text="{Binding Name}" FontSize="14" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" />
+                  <TextBlock Text="{Binding About}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </Grid>
+            </Button>
+            <Button Grid.Column="2" Classes="remove" VerticalAlignment="Center" ToolTip.Tip="Remove"
+                    Command="{Binding $parent[UserControl].((vm:AttachmentsModel)DataContext).RemoveCommand}" CommandParameter="{Binding}">
+              <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
+            </Button>
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <Border Classes="ai-bar ready" Padding="16,10,8,10" IsVisible="{Binding OfferRewrite}">
+      <Grid ColumnDefinitions="*,8,Auto" VerticalAlignment="Center">
+        <TextBlock Text="Your notes were written before some of these came." FontSize="14" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Name="RewriteWithAttachments" Grid.Column="2" Classes="ai-pillbtn" Command="{Binding RewriteCommand}">
+          <Border Classes="ai-pill" Classes.primary="True"><TextBlock Text="Rewrite notes with your attachments" /></Border>
+        </Button>
+      </Grid>
+    </Border>
+    <TextBlock IsVisible="{Binding HasSaid}" Text="{Binding Said}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+    <TextBlock IsVisible="{Binding HasProblem}" Text="{Binding Problem}" FontSize="12" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>

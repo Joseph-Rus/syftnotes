@@ -113,7 +113,7 @@ public enum LibraryState
 /// library's classes (asked for every 20 seconds, which also says whether it's reachable), the model and its
 /// download. The windows read it and are told when it changes.
 /// </summary>
-public sealed class AppHost : IDisposable, IProblemSource
+public sealed partial class AppHost : IDisposable, IProblemSource
 {
     readonly CancellationTokenSource stop = new();
     readonly Action<string> log;
@@ -213,6 +213,7 @@ public sealed class AppHost : IDisposable, IProblemSource
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
         Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log);
         var net = laptop ?? new LaptopHost();
+        laptopHost = net;
         Sender = new LectureSender(Lectures, Client, net, this.log);
         Recorder.Changed += () => Changed?.Invoke();
         Recorder.Problem += why =>
@@ -411,6 +412,7 @@ public sealed class AppHost : IDisposable, IProblemSource
         running.Add(Task.Run(() => Whisper.RunAsync(stop.Token)));
         running.Add(Task.Run(() => Sender.RunAsync(stop.Token)));
         running.Add(Task.Run(WatchLibrary));
+        StartCalendars();
         running.Add(Task.Run(() => Lectures.PruneAudio(Settings.KeepAudioDays, DateTimeOffset.Now)));
         watchdog = new Timer(_ => CheckRecorder(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         // A download that quitting (or a closed laptop) cut short picks up where it stopped. A library-only
@@ -684,7 +686,8 @@ public sealed class AppHost : IDisposable, IProblemSource
     public Lecture StartRecording(string className)
     {
         if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
-        var l = Recorder.Start(className, Client().DisplayName);
+        var calendar = CalendarStart(className);
+        var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName), calendar);
         awake ??= new KeepAwake("Recording a lecture");
         Whisper.Wake();
         return l;

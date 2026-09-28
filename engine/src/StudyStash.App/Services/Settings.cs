@@ -88,6 +88,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         new() { Id = "Access", Glyph = "hub", Label = "AI tool access" },
         new() { Id = "Canvas", Glyph = "school", Label = "Canvas" },
         new() { Id = "Folders", Glyph = "folder", Label = "Folders" },
+        new() { Id = "Phone", Glyph = "smartphone", Label = "Phone" },
     ];
 
     /// <summary>Every row of the sidebar, both groups.</summary>
@@ -169,8 +170,20 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public AiProblemsModel AiProblems { get; }
     public AiAccessModel Access { get; }
     public CanvasSettingsModel Canvas { get; }
+    /// <summary>The calendar feeds and sources connected on this computer, and which of their calendars are shown.</summary>
+    public CalendarSettingsModel Calendars { get; }
     /// <summary>The library's own settings (Library, Classes, Notes and sorting, Folders).</summary>
     public LibrarySettingsModel Lib { get; }
+    /// <summary>Adding a phone to the library, and the phones already added.</summary>
+    public PhonesModel Phones { get; private set; }
+    public bool OnPhone => Section == "Phone";
+
+    /// <summary>For a test or a shot: Phone asks <paramref name="phones"/> instead of the connected library.</summary>
+    public SettingsModel WithPhones(Func<LibrarySettingsModel.Call?> phones)
+    {
+        Phones = new PhonesModel(phones);
+        return this;
+    }
 
     // General
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
@@ -195,6 +208,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     };
     public bool OnAi => Section == "AI";
     public bool OnCanvas => Section == "Canvas";
+    public bool OnCalendars => Section == "Calendars";
     public bool OnAccess => Section == "Access";
     /// <summary>The AI panes scroll and pad themselves; every other section sits in the page's own scroller.</summary>
     public bool OnPlainPage => !OnAi && !OnAccess;
@@ -230,6 +244,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             new() { Id = "General", Glyph = "tune", Label = "General" },
             new() { Id = "Appearance", Glyph = "palette", Label = "Appearance" },
             .. records ? new NavItem[] { new() { Id = "Recording", Glyph = "mic", Label = "Recording" } } : [],
+            .. records ? new NavItem[] { new() { Id = "Calendars", Glyph = "event", Label = "Calendars" } } : [],
             new() { Id = "Connection", Glyph = "link", Label = "Connection" },
         ];
         string device = OperatingSystem.IsWindows() ? "PC" : "Mac";
@@ -272,6 +287,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         AiProblems = new AiProblemsModel(ai);
         Access = MakeAccess(ai, host);
         Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch);
+        Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
+        Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
+        Phones.Ticking = Phones.UiTicking();
         Address = cc.ServerUrl;
         DisplayName = cc.DisplayName;
         LibraryHere = host.Settings.LibraryHere;
@@ -330,8 +348,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             case "Canvas":
                 _ = Canvas.LoadAsync();
                 break;
+            case "Calendars":
+                Calendars.Load();
+                break;
             case "Library" or "Classes" or "Notes" or "Folders":
                 _ = Lib.Load();
+                break;
+            case "Phone":
+                _ = Phones.Load();
                 break;
         }
     }
@@ -403,7 +427,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                  {
                      nameof(OnConnection), nameof(OnRecording), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
                      nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage),
-                     nameof(OnGeneral), nameof(OnAppearance),
+                     nameof(OnGeneral), nameof(OnAppearance), nameof(OnPhone), nameof(OnCalendars),
                  })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;
