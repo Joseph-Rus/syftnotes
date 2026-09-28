@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Get the phone app · Study Stash</title>
+<meta name="description" content="Put your Study Stash library on your iPhone, iPad or Android phone: install Tailscale, add the phone in Settings, scan the code, and add it to your home screen.">
+<meta name="theme-color" content="#f8f5ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151a2b" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Study Stash">
+<meta property="og:title" content="Get the Study Stash phone app">
+<meta property="og:description" content="Your lecture library on your iPhone, iPad or Android phone, served by your own library.">
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the page</a>
+
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="../"><img src="../assets/img/icon.webp" alt="" width="30" height="30">Study Stash</a>
+    <nav aria-label="Site">
+      <ul class="nav">
+        <li><a href="./" aria-current="page">Phone app</a></li>
+        <li class="hide-sm"><a href="../privacy/">Privacy</a></li>
+        <li class="hide-sm"><a href="../support/">Support</a></li>
+        <li><a class="gh" href="https://github.com/Joseph-Rus/study-stash" aria-label="Study Stash on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg></a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap narrow">
+    <header class="page-head">
+      <p class="kicker">Phone app</p>
+      <h1>Your library, <span class="hl">in your pocket</span>.</h1>
+      <p class="lede">Read a lecture's notes on the bus, ask your notes a question, and see what's due, on an iPhone, iPad
+        or Android phone. It's a web app your own library serves, so there's no app store and no account: it takes
+        about five minutes, once.</p>
+      <ul class="toc" aria-label="On this page">
+        <li><a href="#before">Before you start</a></li>
+        <li><a href="#steps">Set it up</a></li>
+        <li><a href="#after">Afterwards</a></li>
+        <li><a href="#help">If something's wrong</a></li>
+      </ul>
+    </header>
+
+    <div class="prose">
+      <h2 id="before">Before you start</h2>
+      <p>You need two things:</p>
+      <ul>
+        <li><strong>Study Stash on your library's computer</strong>, open and awake. With one computer, that's your
+          laptop; with two, it's the computer at home that keeps the library.</li>
+        <li><strong>Tailscale on that computer</strong>, signed in. Tailscale is the free, private network Study Stash
+          uses to reach your library from anywhere; a laptop and a library set up for "anywhere" already have it. If not,
+          get it from <a href="https://tailscale.com/download">tailscale.com/download</a>.</li>
+      </ul>
+      <div class="callout">
+        <p>Your phone talks straight to your own library, over Tailscale's encrypted network. Your notes don't pass
+          through any Study Stash server, because there isn't one.</p>
+      </div>
+
+      <h2 id="steps">Set it up</h2>
+      <ol class="steps">
+        <li>
+          <h3>Install Tailscale on your phone</h3>
+          <p>Get <strong>Tailscale</strong> from the App Store (iPhone and iPad) or Google Play (Android). Open it,
+            sign in with <strong>the same account</strong> your library's computer uses, and switch it on. Your phone
+            asks to add a VPN configuration: allow it. That's how the phone reaches your library; only traffic to your own
+            devices goes through it.</p>
+        </li>
+        <li>
+          <h3>Choose Add a phone</h3>
+          <p>In Study Stash, open <strong>Settings → Add a phone</strong>. (The library's web page has the same button
+            in its Settings.) It shows a QR code and a six-digit code. The code works once, for ten minutes; if it runs
+            out, click Add a phone again for a new one.</p>
+        </li>
+        <li>
+          <h3>Scan the QR code</h3>
+          <p>Point your phone's camera at the QR code and tap the link it finds. It opens your library's phone app, at
+            an address like <code>https://your-library.your-tailnet.ts.net/app/</code>.</p>
+        </li>
+        <li>
+          <h3>Add it to your home screen</h3>
+          <p>Do this <strong>before</strong> you type the code: on an iPhone or iPad, the home screen app keeps its own
+            sign-in, separate from the browser's.</p>
+          <div class="platforms">
+            <div>
+              <h4><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.2zM13.8 5.1c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.5-.7.8-1.2 2-1.1 3.1 1.1.1 2.3-.6 3-1.4z"/></svg>iPhone and iPad</h4>
+              <ol>
+                <li>Open the page in <strong>Safari</strong>.</li>
+                <li>Tap <strong>Share</strong> (the square with an arrow).</li>
+                <li>Tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li>
+                <li>Open <strong>Study Stash</strong> from your home screen.</li>
+              </ol>
+            </div>
+            <div>
+              <h4><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.5 9.2 19.3 6a.4.4 0 0 0-.7-.4l-1.8 3.2a11 11 0 0 0-9.6 0L5.4 5.6a.4.4 0 0 0-.7.4l1.8 3.2A10.5 10.5 0 0 0 1 17.6h22a10.5 10.5 0 0 0-5.5-8.4zM7 14.9a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm10 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>Android</h4>
+              <ol>
+                <li>Open the page in <strong>Chrome</strong>.</li>
+                <li>Tap <strong>Install</strong> if Chrome offers it, or open the <strong>⋮</strong> menu.</li>
+                <li>Tap <strong>Install app</strong> (or <strong>Add to Home screen</strong>), then <strong>Install</strong>.</li>
+                <li>Open <strong>Study Stash</strong> from your home screen or app drawer.</li>
+              </ol>
+            </div>
+          </div>
+        </li>
+        <li>
+          <h3>Enter the code</h3>
+          <p>Type the six-digit code from your computer and give the phone a name you'll recognise, like "Sam's
+            iPhone". That's it: the phone stays paired, and you won't be asked again.</p>
+        </li>
+      </ol>
+
+      <h2 id="after">Afterwards</h2>
+      <ul>
+        <li><strong>Keep Tailscale on.</strong> The phone app reaches your library whenever Tailscale is connected,
+          at home or anywhere else, and your library's computer is awake.</li>
+        <li><strong>See or remove a phone</strong> in Study Stash's Settings, where each paired phone is listed with
+          when it was last used. Removing one signs it out straight away: do this if a phone is lost, sold or given
+          away.</li>
+        <li><strong>Updates come with the library.</strong> When Study Stash updates on your library's computer, the
+          phone app updates with it the next time you open it.</li>
+      </ul>
+
+      <h2 id="help">If something's wrong</h2>
+      <div class="faq">
+        <details>
+          <summary>The page won't open, or says it can't connect</summary>
+          <ul>
+            <li>Is Tailscale switched on on the phone? Open the Tailscale app and check it says Connected.</li>
+            <li>Is the phone signed in to the same Tailscale account as your library's computer? In the Tailscale app
+              you should see your library's computer in the list.</li>
+            <li>Is your library's computer on and awake, with Study Stash running? A computer that's asleep can't
+              answer.</li>
+          </ul>
+        </details>
+        <details>
+          <summary>The code doesn't work</summary>
+          <p>Each code works once and for ten minutes. Click <strong>Add a phone</strong> again for a fresh one. After
+            several wrong tries the library waits a little before trying again, so type slowly and check each digit.</p>
+        </details>
+        <details>
+          <summary>I can't find Add to Home Screen</summary>
+          <p>On an iPhone or iPad, open the page in Safari and look in the Share sheet; scroll down the list of
+            actions if it isn't near the top. On Android, use Chrome and look in the ⋮ menu for <strong>Install
+            app</strong> or <strong>Add to Home screen</strong>. Other browsers may not offer it.</p>
+        </details>
+        <details>
+          <summary>It asks for a code again</summary>
+          <p>That happens if the phone was removed in Settings, if the browser's data for the site was cleared, or,
+            on an iPhone, if you paired in Safari and then opened the home screen app (they keep separate sign-ins).
+            Click <strong>Add a phone</strong> for a new code and enter it in the home screen app.</p>
+        </details>
+        <details>
+          <summary>It says the phone app isn't built</summary>
+          <p>Your library is running a version of Study Stash from before the phone app. Update it: in Settings,
+            click <strong>Update now</strong>.</p>
+        </details>
+        <details>
+          <summary>It works at home but not when I'm out</summary>
+          <p>That's almost always Tailscale being switched off on the phone. Switch it on in the Tailscale app. You
+            can let Tailscale connect by itself (its settings call this VPN On Demand on iPhone, or always-on VPN on
+            Android).</p>
+        </details>
+      </div>
+      <p style="margin-top: 2rem;">Still stuck? <a href="../support/">Ask on GitHub</a>, and say which phone you're
+        using and what the page shows.</p>
+    </div>
+  </div>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div>
+      <a class="brand" href="../"><img src="../assets/img/icon.webp" alt="" width="24" height="24">Study Stash</a>
+      <p>Your own lecture library. Free and open source under the MIT licence.</p>
+    </div>
+    <ul class="foot-links">
+      <li><a href="./">Phone app</a></li>
+      <li><a href="../privacy/">Privacy</a></li>
+      <li><a href="../terms/">Terms</a></li>
+      <li><a href="../support/">Support</a></li>
+      <li><a href="https://github.com/Joseph-Rus/study-stash">GitHub</a></li>
+    </ul>
+  </div>
+</footer>
+</body>
+</html>
