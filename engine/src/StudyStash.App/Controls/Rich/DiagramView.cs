@@ -273,7 +273,10 @@ sealed class DiagramCanvas : Control
     {
         if (ReferenceEquals(task, awaiting)) return;
         awaiting = task;
-        task.ContinueWith(_ => Dispatcher.UIThread.Post(() =>
+        // This window's own dispatcher, found here on its thread: never looked up from the layout's thread, which
+        // (once a test's app has gone) would make that thread the UI thread of whatever comes next.
+        var ui = Dispatcher.UIThread;
+        task.ContinueWith(_ => ui.Post(() =>
         {
             if (ReferenceEquals(awaiting, task)) awaiting = null;
             InvalidateMeasure();
