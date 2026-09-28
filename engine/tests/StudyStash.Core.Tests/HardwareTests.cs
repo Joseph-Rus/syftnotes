@@ -154,6 +154,16 @@ public class HardwareTests
     }
 
     [Fact]
+    public void The_log_says_what_the_computer_has()
+    {
+        Assert.Equal("Windows X64, 8 threads, AVX2, 16 GB, NVIDIA GeForce GTX 1650 (4 GB of its own), Vulkan",
+            Pc(cores: 8, card: Card(4, "NVIDIA GeForce GTX 1650")).Describe());
+        Assert.Equal("Windows X64, 4 threads, no AVX2, memory unknown, Intel(R) UHD Graphics 620 (0.1 GB of its own, built in), no Vulkan",
+            Pc(cores: 4, ram: null, card: Card(0.125, "Intel(R) UHD Graphics 620"), vulkan: false, fastMath: false).Describe());
+        Assert.Equal("Mac Arm64, 8 threads, NEON, 16 GB", Mac(16).Describe());
+    }
+
+    [Fact]
     public void This_computer_is_asked_once()
     {
         var first = HardwareProbe.System.Probe();

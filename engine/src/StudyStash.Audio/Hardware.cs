@@ -32,6 +32,15 @@ public sealed record HardwareProfile(HostOs Os, Architecture Arch, int Cores, bo
     public GraphicsCard? WhisperCard =>
         Os == HostOs.Windows && Arch == Architecture.X64 && Vulkan && Card is { Integrated: false } card ? card : null;
 
+    /// <summary>For the log: "Windows X64, 8 threads, AVX2, 16 GB, NVIDIA GeForce GTX 1650 (4 GB of its own), Vulkan".</summary>
+    public string Describe() => string.Join(", ", new[]
+    {
+        $"{Os} {Arch}", $"{Cores} threads", FastMath ? (Arch == Architecture.Arm64 ? "NEON" : "AVX2") : "no AVX2",
+        RamGb is { } ram ? $"{ram:0} GB" : "memory unknown",
+        Card is { } card ? $"{card.Name} ({card.MemoryGb:0.#} GB of its own{(card.Integrated ? ", built in" : "")})" : Os == HostOs.Windows ? "no graphics card" : null,
+        Os == HostOs.Windows ? (Vulkan ? "Vulkan" : "no Vulkan") : null,
+    }.OfType<string>());
+
     /// <summary>"Mac", "PC" or "computer", as Study Stash says this one.</summary>
     public string DeviceWord => Os switch { HostOs.Mac => "Mac", HostOs.Windows => "PC", _ => "computer" };
 }

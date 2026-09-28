@@ -192,8 +192,13 @@ public sealed class AppHost : IDisposable, IProblemSource
     {
         var probe = hardware ?? HardwareProbe.System;
         this.hardware = Task.Run(probe.Probe);
-        Home = home;
         this.log = log ?? (s => Console.WriteLine(s));
+        _ = this.hardware.ContinueWith(t =>
+        {
+            var advice = WhisperModels.Advise(t.Result);
+            this.log($"[model] this computer: {t.Result.Describe()}; the model for it: {advice.Model.Name}");
+        }, TaskContinuationOptions.OnlyOnRanToCompletion);
+        Home = home;
         pretendMic = microphone ?? MicFromEnvironment();
         mics = micPermissions ?? (pretendMic is not null ? MicPermissions.Pretend : MicPermissions.System);
         this.models = models ?? ModelSetting.FromEnvironment();
@@ -330,7 +335,7 @@ public sealed class AppHost : IDisposable, IProblemSource
     /// </summary>
     void KeepModelInUse()
     {
-        if (!Settings.SetupDone || Settings.Model.Length > 0 || Settings.Role == AppRole.Library || models.Model is not null || models.File is not null) return;
+        if (!Settings.SetupDone || Settings.Model.Length > 0 || Settings.Role == AppRole.Library || ModelFromEnvironment) return;
         var had = WhisperModels.All.FirstOrDefault(m => WhisperModels.IsDownloaded(Home, m))
                   ?? WhisperModels.All.FirstOrDefault(m => File.Exists(WhisperModels.PathFor(Home, m) + ".part"));
         if (had is null) return;
@@ -353,7 +358,7 @@ public sealed class AppHost : IDisposable, IProblemSource
     public async Task<ModelAdvice?> ModelSuggestionAsync()
     {
         var hw = await hardware.ConfigureAwait(false);
-        if (models.Model is not null || models.File is not null || !Settings.SetupDone || Settings.Role == AppRole.Library) return null;
+        if (ModelFromEnvironment || !Settings.SetupDone || Settings.Role == AppRole.Library) return null;
         var advice = WhisperModels.Advise(hw);
         return WhisperModels.Heavier(Model, advice.Model) && Settings.ModelSuggested != advice.Model.Id ? advice : null;
     }
@@ -386,6 +391,9 @@ public sealed class AppHost : IDisposable, IProblemSource
         if (lighter is not null) text += $" {lighter.Name} would keep up: switch in Settings → Recording.";
         return ("The transcript is falling behind", text);
     }
+
+    /// <summary>The environment names the model (tests, the self-test): the student's pick and the advice stand aside.</summary>
+    public bool ModelFromEnvironment => models.Model is not null || models.File is not null;
 
     /// <summary>A model file the environment gives to use as it is (nothing downloads); null normally.</summary>
     public string? ModelFile => models.File;

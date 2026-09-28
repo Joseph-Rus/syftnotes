@@ -184,7 +184,7 @@ public static class Setup
             s.Role = m.Role;
             s.SetupDone = true;
             // The model setup showed stays the one in use, and its advice has been heard: no suggestion later.
-            if (records && host.ModelFile is null)
+            if (records && !host.ModelFromEnvironment)
             {
                 s.Model = host.Model.Id;
                 if (m.Models.FirstOrDefault(c => c.Recommended) is { } advised) s.ModelSuggested = advised.Model.Id;
