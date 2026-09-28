@@ -88,6 +88,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         new() { Id = "Access", Glyph = "hub", Label = "AI tool access" },
         new() { Id = "Canvas", Glyph = "school", Label = "Canvas" },
         new() { Id = "Folders", Glyph = "folder", Label = "Folders" },
+        new() { Id = "Phone", Glyph = "smartphone", Label = "Phone" },
     ];
 
     /// <summary>Every row of the sidebar, both groups.</summary>
@@ -171,6 +172,16 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public CanvasSettingsModel Canvas { get; }
     /// <summary>The library's own settings (Library, Classes, Notes and sorting, Folders).</summary>
     public LibrarySettingsModel Lib { get; }
+    /// <summary>Adding a phone to the library, and the phones already added.</summary>
+    public PhonesModel Phones { get; private set; }
+    public bool OnPhone => Section == "Phone";
+
+    /// <summary>For a test or a shot: Phone asks <paramref name="phones"/> instead of the connected library.</summary>
+    public SettingsModel WithPhones(Func<LibrarySettingsModel.Call?> phones)
+    {
+        Phones = new PhonesModel(phones);
+        return this;
+    }
 
     // General
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
@@ -272,6 +283,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         AiProblems = new AiProblemsModel(ai);
         Access = MakeAccess(ai, host);
         Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch);
+        Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
+        Phones.Ticking = Phones.UiTicking();
         Address = cc.ServerUrl;
         DisplayName = cc.DisplayName;
         LibraryHere = host.Settings.LibraryHere;
@@ -332,6 +345,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                 break;
             case "Library" or "Classes" or "Notes" or "Folders":
                 _ = Lib.Load();
+                break;
+            case "Phone":
+                _ = Phones.Load();
                 break;
         }
     }
@@ -403,7 +419,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                  {
                      nameof(OnConnection), nameof(OnRecording), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
                      nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage),
-                     nameof(OnGeneral), nameof(OnAppearance),
+                     nameof(OnGeneral), nameof(OnAppearance), nameof(OnPhone),
                  })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;

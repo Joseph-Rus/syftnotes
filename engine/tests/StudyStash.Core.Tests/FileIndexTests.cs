@@ -31,4 +31,28 @@ public class FileIndexTests
         await index.UpdateAsync();
         Assert.Empty(index.Search("midterm"));
     }
+
+    [Fact]
+    public async Task PDFs_Word_PowerPoint_and_the_library_s_photos_are_searched_by_their_words_and_kept_read()
+    {
+        using var dir = new TempDir();
+        string lib = dir["library"], mine = dir["mine"];
+        Directory.CreateDirectory(Path.Combine(lib, "BIO 110", "Attachments"));
+        Directory.CreateDirectory(mine);
+        DocumentTextTests.TypedPdf(Path.Combine(lib, "BIO 110", "syllabus.pdf"), ["Lab safety quiz Friday"]);
+        DocumentTextTests.Zip(Path.Combine(lib, "BIO 110", "reading.docx"), ("word/document.xml", DocumentTextTests.WordXml("Osmosis moves water")));
+        DocumentTextTests.Zip(Path.Combine(mine, "slides.pptx"), ("ppt/slides/slide1.xml", DocumentTextTests.SlideXml("Glycolysis steps")));
+        File.Copy(DocumentOcrTests.Fixture("handwriting.png"), Path.Combine(lib, "BIO 110", "Attachments", "board.png"));
+        File.Copy(DocumentOcrTests.Fixture("handwriting.png"), Path.Combine(mine, "holiday.png"));
+        var index = new FileIndex(dir.Path, () => [("Library", lib, false), ("Mine", mine, false)], () => []);
+        await index.UpdateAsync();
+
+        Assert.Equal("syllabus", Assert.Single(index.Search("quiz")).Title);
+        Assert.Equal("reading", Assert.Single(index.Search("osmosis")).Title);
+        Assert.Equal("slides", Assert.Single(index.Search("glycolysis")).Title);
+        Assert.Equal(4, index.Files); // the photo outside the library isn't read, or even listed
+        Assert.True(Directory.GetFiles(Path.Combine(dir.Path, "cache", "text")).Length >= 3);
+        if (OperatingSystem.IsMacOS())
+            Assert.Equal("board", Assert.Single(index.Search("mitochondria")).Title);
+    }
 }

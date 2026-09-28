@@ -47,8 +47,9 @@ public sealed partial class ClaudeReach
     private static partial Regex LoginLink();
 
     /// <summary>Serve (tailnet) or Funnel (internet) the Claude port on https://&lt;this computer&gt;.ts.net, or turn it off.
-    /// The address, or why not.</summary>
-    public (string? Url, ReachProblem? Problem) Set(int port, bool internet, bool on)
+    /// The address, or why not. <paramref name="httpsPort"/> is the port it answers on there: 443 for Claude, another
+    /// (8443) for the phone app, so neither takes the other's place.</summary>
+    public (string? Url, ReachProblem? Problem) Set(int port, bool internet, bool on, int httpsPort = 443)
     {
         var ts = Tailscale();
         if (!ts.Installed || ts.Exe.Length == 0)
@@ -60,7 +61,8 @@ public sealed partial class ClaudeReach
         if (ts.Dns.Length == 0)
             return (null, new(ReachKind.NoName, "Tailscale hasn't given this computer a name yet. Turn on MagicDNS in the Tailscale admin console.", DnsPage));
         string verb = internet ? "funnel" : "serve";
-        string[] args = on ? [verb, "--bg", "--https=443", $"http://127.0.0.1:{port}"] : [verb, "--https=443", "off"];
+        string https = $"--https={httpsPort}";
+        string[] args = on ? [verb, "--bg", https, $"http://127.0.0.1:{port}"] : [verb, https, "off"];
         var said = Watch(ts.Exe, args, line => LoginLink().IsMatch(line), SetWait);
         if (said is null) return (null, new(ReachKind.Other, "Tailscale didn't start on the library's computer. Check it's installed and running."));
         var link = LoginLink().Match(said.StoppedAt ?? said.Output);
@@ -71,7 +73,7 @@ public sealed partial class ClaudeReach
             string words = Py.Strip(said.Output);
             return (null, new(ReachKind.Other, words.Length > 0 ? $"Tailscale said: {Py.Head(words, 300)}" : $"Tailscale stopped (code {said.ExitCode}) without saying why."));
         }
-        return (on ? $"https://{ts.Dns.TrimEnd('.')}" : null, null);
+        return (on ? $"https://{ts.Dns.TrimEnd('.')}{(httpsPort == 443 ? "" : $":{httpsPort}")}" : null, null);
     }
 
     /// <summary>A tailnet admin has to allow Funnel (or HTTPS certificates) once: which one Tailscale is asking for.</summary>

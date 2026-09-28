@@ -145,9 +145,10 @@ public static partial class Ui
 
     /// <summary>
     /// Markdown to HTML, with raw HTML off and math left as it is for KaTeX. Note text comes from the laptop and the
-    /// model's output: it may never inject HTML or scripts.
+    /// model's output: it may never inject HTML or scripts. <paramref name="math"/> writes each formula (as written,
+    /// $ signs and all) as HTML instead; it must escape what it writes.
     /// </summary>
-    public static string RenderMd(string? text)
+    public static string RenderMd(string? text, Func<string, string>? math = null)
     {
         var maths = new List<string>();
         string stashed = MathSpan().Replace(text ?? "", m =>
@@ -161,7 +162,11 @@ public static partial class Ui
         foreach (var link in doc.Descendants<AutolinkInline>())
             if (!link.IsEmail && !SafeUrl(link.Url)) link.Url = "#";
         string html = BadUrl().Replace(doc.ToHtml(Markdown), "$1=\"#\"");
-        return MathMark().Replace(html, m => Esc(maths[int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture)]));
+        return MathMark().Replace(html, m =>
+        {
+            string formula = maths[int.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture)];
+            return math is null ? Esc(formula) : math(formula);
+        });
     }
 
     // --- the page shell ----------------------------------------------------------------------------------------
