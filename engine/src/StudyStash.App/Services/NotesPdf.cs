@@ -48,7 +48,7 @@ public static class NotesPdf
     const float PointsPerPixel = 72f / 96f;
 
     /// <summary>A page's size in points.</summary>
-    public static SKSize Size(Paper paper) => paper == Paper.Letter ? new SKSize(612, 792) : new SKSize(595.28f, 841.89f);
+    public static SKSize Size(Paper paper) => paper == Paper.Letter ? new SKSize(612, 792) : new SKSize(595, 842);
 
     /// <summary>How wide the notes' column is on a page, in pixels.</summary>
     public static double ColumnWidth(Paper paper) => (Size(paper).Width - 2 * Side) / PointsPerPixel;
@@ -94,9 +94,17 @@ public static class NotesPdf
     /// </summary>
     public static async Task<int> WriteAsync(Stream output, JsonObject lecture, bool transcript, Paper paper, Color? dot = null)
     {
+        using var pages = await LayOutAsync(lecture, transcript, paper, dot ?? Colors.Gray);
+        await pages.SaveAsync(output);
+        return pages.Slices.Count;
+    }
+
+    /// <summary>The lecture laid out on <paramref name="paper"/> and cut into pages, ready to draw.</summary>
+    internal static async Task<PrintedNotes> LayOutAsync(JsonObject lecture, bool transcript, Paper paper, Color dot)
+    {
         Dispatcher.UIThread.VerifyAccess();
         double width = ColumnWidth(paper), pageHeight = PageHeight(paper);
-        var column = Column(lecture, transcript, dot ?? Colors.Gray, width, pageHeight);
+        var column = Column(lecture, transcript, dot, width, pageHeight);
         var footer = new Grid { Width = width, ColumnDefinitions = new ColumnDefinitions("*,24,Auto") };
         var footerTitle = FooterText();
         footerTitle.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -107,57 +115,87 @@ public static class NotesPdf
         footer.Children.Add(footerPage);
         // The look's tokens in the light look and the first colour theme: paper is white, whatever the screen shows.
         var host = new StackPanel { Children = { column, footer }, Resources = Skin.Build(Skin.Current, ColourThemes.Default) };
+        // Never shown: it's what gives the pieces the app's styles, and the light look.
         var window = new Window { Content = host, RequestedThemeVariant = ThemeVariant.Light, ShowInTaskbar = false, ShowActivated = false };
         try
         {
             await SettleAsync(host, width);
             var slices = Paginate(column, pageHeight);
-            var links = Links(column);
-            var size = Size(paper);
-            // Avalonia sets the canvas's matrix outright as it draws, so each piece is drawn into a picture first (a
-            // picture keeps its matrix relative to wherever it's played back) and the picture is put on the page.
-            using var notes = await PictureAsync(column);
-            using (var stream = new SKManagedWStream(output, disposeManagedStream: false))
-            using (var document = SKDocument.CreatePdf(stream, new SKDocumentPdfMetadata
-            {
-                Title = Title(lecture), Creator = "Study Stash", Producer = "Study Stash", Creation = DateTime.Now, Modified = DateTime.Now,
-                RasterDpi = 300, EncodingQuality = 101,
-            }))
-            {
-                for (int i = 0; i < slices.Count; i++)
-                {
-                    var slice = slices[i];
-                    var canvas = document.BeginPage(size.Width, size.Height);
-                    int saved = canvas.Save();
-                    canvas.Translate(Side, Top);
-                    canvas.Scale(PointsPerPixel);
-                    // A little room either side: a formula's italic or a diagram's hairline may reach just past the column.
-                    canvas.ClipRect(new SKRect(-8, 0, (float)width + 8, (float)(slice.Bottom - slice.Top)));
-                    canvas.Translate(0, (float)-slice.Top);
-                    canvas.DrawPicture(notes);
-                    foreach (var (area, url) in links)
-                        if (area.Top >= slice.Top - 0.5 && area.Bottom <= slice.Bottom + 0.5)
-                            canvas.DrawUrlAnnotation(new SKRect((float)area.Left, (float)area.Top, (float)area.Right, (float)area.Bottom), url);
-                    canvas.RestoreToCount(saved);
-
-                    footerPage.Text = $"Page {i + 1} of {slices.Count}";
-                    Layout(footer, width);
-                    using var foot = await PictureAsync(footer);
-                    saved = canvas.Save();
-                    canvas.Translate(Side, size.Height - FooterBaseline - (float)(footer.Bounds.Height * PointsPerPixel));
-                    canvas.Scale(PointsPerPixel);
-                    canvas.DrawPicture(foot);
-                    canvas.RestoreToCount(saved);
-                    document.EndPage();
-                }
-                document.Close();
-            }
-            return slices.Count;
+            // Avalonia sets the canvas's matrix outright as it draws, so the notes are drawn into a picture first (a
+            // picture keeps its matrix relative to wherever it's played back), and the picture is put on each page.
+            var picture = await PictureAsync(column);
+            return new PrintedNotes(window, column, footer, footerPage, picture, slices, Links(column), paper, Title(lecture));
         }
-        finally
+        catch
         {
-            window.Content = null;
-            window.Close();
+            Close(window);
+            throw;
+        }
+    }
+
+    static void Close(Window window)
+    {
+        window.Content = null;
+        window.Close();
+    }
+
+    /// <summary>A lecture laid out for paper: the notes' column, where each page starts and ends in it, and its links;
+    /// it draws a page onto any canvas (a PDF's, or a picture's for a look at it). Closing it lets the controls go.</summary>
+    internal sealed class PrintedNotes(Window window, StackPanel column, Grid footer, TextBlock footerPage, SKPicture notes,
+        List<PageSlice> slices, List<(Rect Area, string Url)> links, Paper paper, string title) : IDisposable
+    {
+        public StackPanel Column => column;
+        public IReadOnlyList<PageSlice> Slices => slices;
+        public IReadOnlyList<(Rect Area, string Url)> Links => links;
+        public SKSize PageSize => Size(paper);
+
+        /// <summary>Draws page <paramref name="index"/> (from 0), in points, onto <paramref name="canvas"/>.</summary>
+        public async Task DrawPageAsync(SKCanvas canvas, int index)
+        {
+            var slice = slices[index];
+            double width = column.Bounds.Width;
+            int saved = canvas.Save();
+            canvas.Translate(Side, Top);
+            canvas.Scale(PointsPerPixel);
+            // A little room either side: a formula's italic or a diagram's hairline may reach just past the column.
+            canvas.ClipRect(new SKRect(-8, 0, (float)width + 8, (float)(slice.Bottom - slice.Top)));
+            canvas.Translate(0, (float)-slice.Top);
+            canvas.DrawPicture(notes);
+            foreach (var (area, url) in links)
+                if (area.Top >= slice.Top - 0.5 && area.Bottom <= slice.Bottom + 0.5)
+                    canvas.DrawUrlAnnotation(new SKRect((float)area.Left, (float)area.Top, (float)area.Right, (float)area.Bottom), url);
+            canvas.RestoreToCount(saved);
+
+            footerPage.Text = $"Page {index + 1} of {slices.Count}";
+            Layout(footer, width);
+            using var foot = await PictureAsync(footer);
+            saved = canvas.Save();
+            canvas.Translate(Side, PageSize.Height - FooterBaseline - (float)(footer.Bounds.Height * PointsPerPixel));
+            canvas.Scale(PointsPerPixel);
+            canvas.DrawPicture(foot);
+            canvas.RestoreToCount(saved);
+        }
+
+        /// <summary>Writes every page to <paramref name="output"/> as a PDF.</summary>
+        public async Task SaveAsync(Stream output)
+        {
+            using var stream = new SKManagedWStream(output, disposeManagedStream: false);
+            using var document = SKDocument.CreatePdf(stream, new SKDocumentPdfMetadata
+            {
+                Title = title, Creator = "Study Stash", Producer = "Study Stash", Creation = DateTime.Now, Modified = DateTime.Now,
+            });
+            for (int i = 0; i < slices.Count; i++)
+            {
+                await DrawPageAsync(document.BeginPage(PageSize.Width, PageSize.Height), i);
+                document.EndPage();
+            }
+            document.Close();
+        }
+
+        public void Dispose()
+        {
+            notes.Dispose();
+            Close(window);
         }
     }
 
@@ -199,7 +237,13 @@ public static class NotesPdf
             foreach (var line in timed ? TimedText.Parse(raw) : [new Spoken(0, 0, raw)])
             {
                 var row = new Grid { ColumnDefinitions = new ColumnDefinitions(timed ? "48,12,*" : "0,0,*") };
-                if (timed) row.Children.Add(Token(new TextBlock { Text = TimedText.Clock(line.Start), FontSize = 12, Margin = new Thickness(0, 3, 0, 0) }, "Fg2"));
+                // A plain colon, not the Mac font's raised one between figures (or its figures of one width): that glyph
+                // stands for no letter, so a time copied or searched for in the PDF would read "01 05".
+                if (timed)
+                    row.Children.Add(Token(new TextBlock
+                    {
+                        Text = TimedText.Clock(line.Start), FontSize = 12, Margin = new Thickness(0, 3, 0, 0), FontFeatures = FontFeatureCollection.Parse("-calt"),
+                    }, "Fg2"));
                 var said = Token(new TextBlock { Text = line.Text, FontSize = mac ? 16 : 15, LineHeight = (mac ? 16 : 15) * 1.6, TextWrapping = TextWrapping.Wrap }, "Fg");
                 said.Bind(TextBlock.FontFamilyProperty, said.GetResourceObservable(mac ? "SerifFont" : "TextFont"));
                 Grid.SetColumn(said, 2);
@@ -306,9 +350,10 @@ public static class NotesPdf
             }
             var fit = blocks.Where(b => b.Y > top + Eps && b.Y <= limit + Eps).ToList();
             double? best = fit.Where(b => !b.AfterHeading).Select(b => (double?)b.Y).Max() ?? fit.Select(b => (double?)b.Y).Max();
-            // What starts at the break must fit on a page of its own; if it can't, it starts here and goes on.
+            // What starts at the break (a heading and what it heads counting as one) must fit on a page of its own; if
+            // it can't, it starts here and goes on down the page.
             double from = best ?? top;
-            double next = blocks.Where(b => b.Y > from + Eps).Select(b => (double?)b.Y).Min() ?? total;
+            double next = blocks.Where(b => b.Y > from + Eps && !b.AfterHeading).Select(b => (double?)b.Y).Min() ?? total;
             if (best is null || next - from > pageHeight + Eps)
                 if (lines.Where(y => y > from + Eps && y <= limit + Eps).Select(y => (double?)y).Max() is { } line) best = line;
             double end = best ?? limit;
@@ -345,7 +390,7 @@ public static class NotesPdf
                 Control? before = null;
                 foreach (var child in stack.Children.Where(c => c.IsVisible))
                 {
-                    bool afterHeading = before is not null && (before.Classes.Contains(NoteView.HeadingClass) || before.Classes.Contains(NoteView.TableHeaderClass));
+                    bool afterHeading = before is not null && KeepsWithNext(before);
                     breaks.Add((y + child.Bounds.Y, false, afterHeading));
                     before = child;
                 }
@@ -354,6 +399,12 @@ public static class NotesPdf
         foreach (var child in v.GetVisualChildren())
             Collect(child, y + child.Bounds.Y, breaks, atoms);
     }
+
+    /// <summary>A heading, a table's header row, or a line that leads into what follows it ("Worked step by step:"):
+    /// a page doesn't end just after one.</summary>
+    static bool KeepsWithNext(Control block) =>
+        block.Classes.Contains(NoteView.HeadingClass) || block.Classes.Contains(NoteView.TableHeaderClass)
+        || block is TextBlock { Inlines: { Count: > 0 } inlines } && string.Concat(inlines.OfType<Run>().Select(r => r.Text)).TrimEnd().EndsWith(':');
 
     /// <summary>Every link in the notes: where its words are in the column, and where it goes.</summary>
     static List<(Rect Area, string Url)> Links(Control column)
