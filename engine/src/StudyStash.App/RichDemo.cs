@@ -139,4 +139,76 @@ public static class RichDemo
         Fence("mermaid", PainConversation),
         "And the order check, which lost a bracket on the way:",
         Fence("mermaid", BrokenChart));
+
+    /// <summary>Cardiac output and mean arterial pressure, inline in a sentence.</summary>
+    public const string CardiacOutputInline =
+        """Cardiac output is $\text{CO} = \text{HR} \times \text{SV}$, typically 4 to 8 litres a minute; mean arterial pressure, $\text{MAP} = \text{DBP} + \frac{1}{3}(\text{SBP} - \text{DBP})$, should stay above 65 mmHg.""";
+
+    /// <summary>A dose calculation, worked step by step, the way the AI prompt's own example does.</summary>
+    public const string DoseFormula = """
+        $$
+        \text{Volume} = \frac{\text{Desired}}{\text{Have}} \times \text{Quantity} = \frac{500\ \text{mg}}{250\ \text{mg}} \times 5\ \text{mL} = 10\ \text{mL}
+        $$
+        """;
+
+    /// <summary>The MAP formula again, this time as an <c>aligned</c> block worked through line by line.</summary>
+    public const string AlignedFormula = """
+        $$
+        \begin{aligned}
+        \text{MAP} &= \text{DBP} + \frac{1}{3}(\text{SBP} - \text{DBP}) \\
+        &= 80 + \frac{1}{3}(120 - 80) \\
+        &= 93.3\ \text{mmHg}
+        \end{aligned}
+        $$
+        """;
+
+    /// <summary>A <c>cases</c> block: the shock index read differently depending on its value.</summary>
+    public const string CasesFormula = """
+        $$
+        \text{Shock index} =
+        \begin{cases}
+        \text{normal} & \text{if} < 0.7 \\
+        \text{early shock} & \text{if } 0.7 \text{ to } 1.0 \\
+        \text{critical} & \text{if} > 1.0
+        \end{cases}
+        $$
+        """;
+
+    /// <summary>A chemistry formula, through <c>\ce{…}</c>: carbon dioxide and water forming carbonic acid, both ways.</summary>
+    public const string ChemFormula = """
+        $$
+        \ce{CO2 + H2O <=> H2CO3}
+        $$
+        """;
+
+    /// <summary>The part of a nursing lecture's notes where its formulas are.</summary>
+    public static string FormulaNotes { get; } = string.Join("\n\n",
+        "## Key points",
+        CardiacOutputInline,
+        "## Details and examples",
+        "A dose calculation, worked step by step:",
+        DoseFormula,
+        "The same formula again, this time worked through line by line:",
+        AlignedFormula,
+        "A shock index reads differently depending on its value:",
+        CasesFormula,
+        "Carbon dioxide and water form carbonic acid in the blood, and the reaction runs both ways:",
+        ChemFormula);
+
+    /// <summary>An inline formula that lost a brace, and the same mistake on its own line: CSharpMath can't typeset
+    /// either, so both show their source instead.</summary>
+    public const string BrokenInlineFormula = """An unclosed fraction, $\frac{a}{$, breaks CSharpMath, so its source shows instead.""";
+
+    public const string BrokenDisplayFormula = """
+        $$
+        \frac{a}{
+        $$
+        """;
+
+    /// <summary>What a note shows when a formula can't be typeset: its source, inline and on its own line.</summary>
+    public static string FormulaFallbackNotes { get; } = string.Join("\n\n",
+        "## A formula that won't typeset",
+        BrokenInlineFormula,
+        "And on its own line:",
+        BrokenDisplayFormula);
 }

@@ -230,21 +230,21 @@ public sealed partial class NoteView : StackPanel
         return new MathDisplay(mv) { Margin = new Thickness(0, 4) };
     }
 
-    /// <summary>The code-box look, for a display formula (or diagram) that couldn't be drawn: the source in mono,
-    /// with one quiet line saying so.</summary>
+    /// <summary>The code-box look, for a display formula that couldn't be typeset: one quiet line saying so, then
+    /// the source in mono — the same shape as <see cref="DiagramCard"/>'s, one Border and no nested background.</summary>
     Control DisplayFallback(string source)
     {
-        var box = (Border)Code(source);
-        var stack = new StackPanel { Spacing = 6 };
         var note = Text("TextFont", Mac ? 12 : 13, 1.4);
         note.Text = "Couldn't typeset this formula.";
         note.Bind(TextBlock.ForegroundProperty, note.GetResourceObservable("Fg3"));
-        stack.Children.Add(note);
-        stack.Children.Add(box);
-        var card = new Border { Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(Mac ? 8 : 4), Child = stack };
+        var code = new TextBlock
+        {
+            Text = source.TrimEnd(), FontFamily = new FontFamily("SF Mono, Menlo, Cascadia Mono, Consolas, monospace"), FontSize = 13, LineHeight = 19.5,
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 6, 0, 0),
+        };
+        code.Bind(TextBlock.ForegroundProperty, code.GetResourceObservable("Fg"));
+        var card = new Border { Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(Mac ? 8 : 4), Child = new StackPanel { Children = { note, code } } };
         card.Bind(Border.BackgroundProperty, card.GetResourceObservable("Fill2"));
-        box.Background = null;
-        box.Padding = new Thickness(0);
         return card;
     }
 

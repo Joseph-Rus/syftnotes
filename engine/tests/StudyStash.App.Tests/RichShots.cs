@@ -159,4 +159,25 @@ public class RichShots
             }
         }
     }
+
+    /// <summary>Formulas as the notes show them: inline maths on the text's baseline (cardiac output, MAP), then a
+    /// dose calculation, an <c>aligned</c> block, a <c>cases</c> block and a chemistry formula, each on its own
+    /// centred line.</summary>
+    [AvaloniaFact]
+    public void Formulas()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                Shot.Take($"rich-formulas-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, RichDemo.FormulaNotes), size: new Size(876, 1760));
+    }
+
+    /// <summary>A formula that lost a brace: shown as its plain source, inline in mono and on its own line in the
+    /// code-box look, each with the same quiet line saying it couldn't be typeset.</summary>
+    [AvaloniaFact]
+    public void Formula_fallback()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                Shot.Take($"rich-formula-fallback-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, RichDemo.FormulaFallbackNotes), size: new Size(876, 560));
+    }
 }
