@@ -200,18 +200,6 @@ public class WindowsMicTests
     {
         if (!OperatingSystem.IsWindows()) return;
         var access = WindowsPermissions.Microphone();
-        string seen = $"access={access}";
-        try
-        {
-            using var probe = new WindowsSound(withComputerAudio: false) { OpenTimeout = TimeSpan.FromSeconds(8) };
-            probe.Start();
-            seen += " started";
-        }
-        catch (Exception x)
-        {
-            seen += $" {x.GetType().Name} {x.Message} {(x as MicrophoneException)?.Trouble.Kind} status={(x as MicrophoneException)?.Status:X}";
-        }
-        Assert.Fail("DIAGNOSTIC " + seen);
         if (access == MicAccess.Allowed) return; // there's a real microphone here: leave it alone
         using var mic = new WindowsSound(withComputerAudio: true);
         var watch = Stopwatch.StartNew();
