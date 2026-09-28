@@ -135,6 +135,9 @@ notes directly:
 - **Claude Code or Claude Desktop**, on the library's own computer: `studystash mcp` over stdio.
 - **claude.ai**, from anywhere: HTTP with OAuth 2.1, behind a [Tailscale Funnel](https://tailscale.com/kb/1223/funnel).
 
+[docs/claude-connector.md](docs/claude-connector.md) walks through adding Study Stash as a custom connector in Claude,
+what Claude can read, troubleshooting, and how each requirement of Claude's connectors is met and tested.
+
 ## Where your data lives
 
 Everything is under `~/.study-stash` (or `--home`, or the `STUDYSTASH_HOME` environment
