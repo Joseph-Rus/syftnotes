@@ -86,7 +86,7 @@ public sealed class WindowsSound : IAudioSource
                 {
                     c.Loop = Record(() => new WasapiRecorderBuilder().WithLoopbackCapture(), OnPlayed, _ => { });
                 }
-                catch (COMException)
+                catch (Exception e) when (e is COMException or InvalidOperationException or UnauthorizedAccessException)
                 {
                     c.Loop = null; // no speakers, or they won't share: the microphone alone
                 }
