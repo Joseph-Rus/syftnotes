@@ -37,7 +37,12 @@ public class AiToolAccessTests
     [InlineData("get_transcript", "lectures")]
     [InlineData("get_lecture", "notes")]
     [InlineData("search_files", "canvas")]
+    [InlineData("read_file", "canvas")]
     [InlineData("due_assignments", "canvas")]
+    [InlineData("get_assignment", "canvas")]
+    [InlineData("class_modules", "canvas")]
+    [InlineData("class_files", "canvas")]
+    [InlineData("class_announcements", "canvas")]
     [InlineData("canvas_courses", "canvas")]
     [InlineData("canvas_api", "canvas")]
     [InlineData("canvas_page", "canvas")]
@@ -49,7 +54,7 @@ public class AiToolAccessTests
     public async Task Off_refuses_every_tool_no_matter_its_scope()
     {
         var guarded = ToolAccess.Guard([Tool("list_classes"), Tool("get_lecture")], () => Task.FromResult((false, new ReadingScopes())));
-        foreach (var t in guarded) Assert.Equal(ToolAccess.Refused, await Say(t));
+        foreach (var t in guarded) Assert.Equal(ToolAccess.Off, await Say(t));
     }
 
     [Fact]
@@ -62,7 +67,8 @@ public class AiToolAccessTests
         Assert.Equal("ok", await Say(byName["list_classes"]));
         Assert.Equal("ok", await Say(byName["list_lectures"]));
         Assert.Equal("ok", await Say(byName["due_assignments"]));
-        Assert.Equal(ToolAccess.Refused, await Say(byName["get_lecture"]));
+        Assert.Equal(ToolAccess.Refused("notes"), await Say(byName["get_lecture"]));
+        Assert.Contains("(Settings → AI tool access → Study notes)", ToolAccess.Refused("notes"));
     }
 
     [Fact]
@@ -73,7 +79,7 @@ public class AiToolAccessTests
         var tool = Assert.Single(guarded);
         Assert.Equal("ok", await Say(tool));
         on = false;
-        Assert.Equal(ToolAccess.Refused, await Say(tool));
+        Assert.Equal(ToolAccess.Off, await Say(tool));
     }
 
     [Fact]
@@ -84,11 +90,11 @@ public class AiToolAccessTests
         var byName = guarded.ToDictionary(t => t.ProtocolTool.Name);
 
         var lecture = await Say(byName["get_lecture"]); // notes: off
-        Assert.Equal(ToolAccess.Refused, lecture);
+        Assert.Equal(ToolAccess.Refused("notes"), lecture);
         var lectures = await Say(byName["list_lectures"]); // lectures: on
-        Assert.NotEqual(ToolAccess.Refused, lectures);
+        Assert.NotEqual(ToolAccess.Refused("lectures"), lectures);
         var classes = await Say(byName["list_classes"]); // no scope at all
-        Assert.NotEqual(ToolAccess.Refused, classes);
+        Assert.DoesNotContain("settings don't let", classes);
     }
 
     [Fact]

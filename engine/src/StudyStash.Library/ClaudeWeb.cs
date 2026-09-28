@@ -109,6 +109,17 @@ public static class ClaudeWeb
                 await ctx.Response.WriteAsJsonAsync(new { error = "invalid_token", error_description = "Sign in to Study Stash again." });
                 return;
             }
+            // This door never hands out a session, so a session id can only be one a client kept from somewhere
+            // else (an older build, a proxy): the SDK would refuse it with a 400, which Claude takes as the end.
+            ctx.Request.Headers.Remove("Mcp-Session-Id");
+            // No stream to open (GET) and no session to end (DELETE): Streamable HTTP asks for 405 here, where the
+            // SDK's stateless mode would say 404, which a client reads as "your session is gone".
+            if (!HttpMethods.IsPost(ctx.Request.Method))
+            {
+                ctx.Response.StatusCode = StatusCodes.Status405MethodNotAllowed;
+                ctx.Response.Headers.Allow = "POST, OPTIONS";
+                return;
+            }
             await next();
         });
 

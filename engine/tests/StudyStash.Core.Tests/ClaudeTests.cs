@@ -507,7 +507,7 @@ public class ClaudeTests
     // --- AI tool access --------------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task Turning_tool_access_off_refuses_the_whole_door_at_once()
+    public async Task Turning_tool_access_off_refuses_every_call_in_words_but_keeps_the_door_open()
     {
         using var dir = new TempDir();
         var (cfg, store) = Library(dir);
@@ -517,17 +517,18 @@ public class ClaudeTests
         var (token, _) = access.CreateToken("Cursor");
         access.ToolsOn = false;
 
-        var refused = await site.Client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/mcp")
-        {
-            Headers = { Authorization = new("Bearer", token), Accept = { new("application/json"), new("text/event-stream") } },
-            Content = JsonContent.Create(new { jsonrpc = "2.0", id = 1, method = "tools/list" }),
-        });
-        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
-        Assert.Contains("AI tool access is off", await refused.Content.ReadAsStringAsync());
+        // A refused connection would be a dead end in Claude ("couldn't connect"); a tool error reaches the model and
+        // the student in words, and needs no reconnect.
+        await using var mcp = await Connect(site, token);
+        var tools = await mcp.ListToolsAsync();
+        Assert.Equal(5, tools.Count); // refused at call time, not hidden
+        var refused = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
+        Assert.Equal(true, refused.IsError);
+        Assert.Equal(StudyStash.Core.Ai.ToolAccess.Off, ((TextContentBlock)refused.Content[0]).Text);
 
         access.ToolsOn = true;
-        await using var mcp = await Connect(site, token);
-        Assert.Equal(5, (await mcp.ListToolsAsync()).Count);
+        var ok = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
+        Assert.True(ok.IsError is null or false);
     }
 
     [Fact]
@@ -544,7 +545,7 @@ public class ClaudeTests
         await using var mcp = await Connect(site, token);
         var refused = await mcp.CallToolAsync("get_lecture", new Dictionary<string, object?> { ["lecture_id"] = "rec-1" });
         Assert.Equal(true, refused.IsError);
-        Assert.Contains("don't let AI tools read that", ((TextContentBlock)refused.Content[0]).Text);
+        Assert.Equal("Study Stash's settings don't let AI tools read study notes right now (Settings → AI tool access → Study notes).", ((TextContentBlock)refused.Content[0]).Text);
 
         var ok = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
         Assert.True(ok.IsError is null or false);

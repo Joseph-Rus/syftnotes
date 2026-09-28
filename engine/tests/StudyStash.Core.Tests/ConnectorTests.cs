@@ -68,10 +68,19 @@ public class ConnectorTests
             };
         }
 
-        public static async Task<Door> OpenAsync()
+        /// <summary>The door open; <paramref name="canvas"/> links Canvas (so the Canvas tools are there), and
+        /// <paramref name="files"/> gives it folders to read (read_file) under the door's own temp folder.</summary>
+        public static async Task<Door> OpenAsync(bool canvas = false, IReadOnlyList<(string Name, string Path, bool Private)>? files = null)
         {
             var door = new Door();
-            door.Site = await TestSite.StartAsync(b => ClaudeWeb.Build(b, door.Cfg, new LibraryReader(door.Cfg, door.Store), door.Access));
+            var sync = canvas ? new StudyStash.Core.Canvas.CanvasSync(door.Cfg.Home, c => door.Dir[c]) : null;
+            StudyStash.Core.Ai.FileIndex? index = null;
+            if (files is not null)
+            {
+                index = new StudyStash.Core.Ai.FileIndex(door.Cfg.Home, () => files, () => []);
+                await index.UpdateAsync();
+            }
+            door.Site = await TestSite.StartAsync(b => ClaudeWeb.Build(b, door.Cfg, new LibraryReader(door.Cfg, door.Store), door.Access, sync, index));
             return door;
         }
 
@@ -654,5 +663,308 @@ public class ConnectorTests
         Assert.Equal(Ts + "/mcp", access.Grants().Single().Resource);
         Assert.Null(access.Check(tokens!.AccessToken, "https://other.tail1234.ts.net/mcp"));
         Assert.NotNull(access.Check(tokens.AccessToken, Ts + "/mcp"));
+    }
+
+    // --- the MCP endpoint: transport, CORS and Origin, the off switch, and the tools Claude sees -----------------------
+
+    static HttpRequestMessage Rpc(string token, object? body, HttpMethod? method = null, params (string Name, string Value)[] headers)
+    {
+        var r = new HttpRequestMessage(method ?? HttpMethod.Post, "/mcp")
+        {
+            Headers = { Accept = { new("application/json"), new("text/event-stream") }, Authorization = new("Bearer", token) },
+        };
+        if (body is not null) r.Content = JsonContent.Create(body);
+        foreach (var (n, v) in headers) r.Headers.TryAddWithoutValidation(n, v);
+        return r;
+    }
+
+    static object Initialize(string version) => new
+    {
+        jsonrpc = "2.0", id = 1, method = "initialize",
+        @params = new { protocolVersion = version, capabilities = new { }, clientInfo = new { name = "Claude", version = "1.0" } },
+    };
+
+    static string Header(HttpResponseMessage r, string name) =>
+        r.Headers.TryGetValues(name, out var v) || r.Content.Headers.TryGetValues(name, out v) ? string.Join(", ", v) : "";
+
+    /// <summary>An MCP client on the door's internet address, holding <paramref name="token"/>; every request it
+    /// sends is kept in <paramref name="sent"/> when given.</summary>
+    static Task<McpClient> Client(Door door, string token, McpClientOptions? options = null, List<HttpRequestMessage>? sent = null) =>
+        McpClient.CreateAsync(new HttpClientTransport(new HttpClientTransportOptions
+        {
+            Endpoint = new Uri(Ts + "/mcp"), TransportMode = HttpTransportMode.StreamableHttp,
+            AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + token },
+        }, new HttpClient(new Recorder(door.Site.App.GetTestServer().CreateHandler(), sent ?? [])) { BaseAddress = new Uri("http://mini.tail1234.ts.net") },
+            ownsHttpClient: true), options);
+
+    sealed class Recorder(HttpMessageHandler inner, List<HttpRequestMessage> sent) : DelegatingHandler(inner)
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            // The door sees the internet address as Tailscale's proxy hands it on: plain http, same name.
+            request.RequestUri = new UriBuilder(request.RequestUri!) { Scheme = "http", Port = -1 }.Uri;
+            lock (sent) sent.Add(request);
+            return base.SendAsync(request, cancellationToken);
+        }
+    }
+
+    static string Text(ModelContextProtocol.Protocol.CallToolResult r) => ((ModelContextProtocol.Protocol.TextContentBlock)r.Content[0]).Text;
+
+    [Theory]
+    [InlineData("2025-06-18")]
+    [InlineData("2025-11-25")]
+    public async Task Every_request_stands_alone_so_a_restart_loses_claude_nothing(string version)
+    {
+        await using var door = await Door.OpenAsync();
+        var c = door.As("http://mini.tail1234.ts.net");
+        var (token, _) = await SignIn(door, c);
+
+        var init = await c.SendAsync(Rpc(token, Initialize(version), headers: ("MCP-Protocol-Version", version)));
+        Assert.Equal(HttpStatusCode.OK, init.StatusCode);
+        Assert.False(init.Headers.Contains("Mcp-Session-Id"));
+        string body = await init.Content.ReadAsStringAsync();
+        Assert.Contains($"\"protocolVersion\":\"{version}\"", body);
+        Assert.Contains("\"name\":\"study-stash\"", body);
+
+        var note = await c.SendAsync(Rpc(token, new { jsonrpc = "2.0", method = "notifications/initialized" }, headers: ("MCP-Protocol-Version", version)));
+        Assert.Equal(HttpStatusCode.Accepted, note.StatusCode);
+
+        // A session id kept from before the library restarted is ignored, not refused.
+        var list = await c.SendAsync(Rpc(token, new { jsonrpc = "2.0", id = 2, method = "tools/list" }, headers: [("MCP-Protocol-Version", version), ("Mcp-Session-Id", "from-before-a-restart")]));
+        Assert.True(list.StatusCode == HttpStatusCode.OK, await list.Content.ReadAsStringAsync());
+        Assert.Contains("list_classes", await list.Content.ReadAsStringAsync());
+
+        // No stream to open and no session to end.
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await c.SendAsync(Rpc(token, null, HttpMethod.Get))).StatusCode);
+        Assert.Equal(HttpStatusCode.MethodNotAllowed, (await c.SendAsync(Rpc(token, null, HttpMethod.Delete))).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_client_on_the_2026_07_28_revision_reads_with_its_per_request_headers()
+    {
+        await using var door = await Door.OpenAsync();
+        var (token, _) = await SignIn(door, door.As("http://mini.tail1234.ts.net"));
+        List<HttpRequestMessage> sent = [];
+        await using var mcp = await Client(door, token, new McpClientOptions { ProtocolVersion = "2026-07-28" }, sent);
+        var result = await mcp.CallToolAsync("list_classes", new Dictionary<string, object?>());
+        Assert.StartsWith("Library: Sam's library", Text(result));
+        var call = sent.Last();
+        Assert.Equal("2026-07-28", call.Headers.GetValues("MCP-Protocol-Version").Single());
+        Assert.Equal("tools/call", call.Headers.GetValues("Mcp-Method").Single());
+    }
+
+    [Fact]
+    public async Task A_browser_may_ask_first_without_signing_in()
+    {
+        await using var door = await Door.OpenAsync();
+        var c = door.As("http://mini.tail1234.ts.net");
+        var ask = new HttpRequestMessage(HttpMethod.Options, "/mcp")
+        {
+            Headers = { { "Origin", "https://claude.ai" }, { "Access-Control-Request-Method", "POST" }, { "Access-Control-Request-Headers", "authorization, content-type, mcp-protocol-version" } },
+        };
+        var r = await c.SendAsync(ask);
+        Assert.Equal(HttpStatusCode.NoContent, r.StatusCode);
+        Assert.Equal("https://claude.ai", Header(r, "Access-Control-Allow-Origin"));
+        Assert.Contains("Origin", Header(r, "Vary"));
+        Assert.Contains("POST", Header(r, "Access-Control-Allow-Methods"));
+        foreach (string h in new[] { "Authorization", "Content-Type", "Accept", "MCP-Protocol-Version", "Mcp-Session-Id", "Mcp-Method", "Mcp-Name", "Last-Event-ID" })
+            Assert.Contains(h, Header(r, "Access-Control-Allow-Headers"));
+        foreach (string h in new[] { "WWW-Authenticate", "Mcp-Session-Id", "MCP-Protocol-Version" })
+            Assert.Contains(h, Header(r, "Access-Control-Expose-Headers"));
+
+        // Discovery, registration, tokens and signing out: any page may ask, and they hold no cookie.
+        foreach (string path in new[] { "/.well-known/oauth-protected-resource/mcp", "/.well-known/oauth-authorization-server", "/register", "/token", "/revoke" })
+        {
+            var open = await c.SendAsync(new HttpRequestMessage(HttpMethod.Options, path) { Headers = { { "Origin", "https://inspector.example" }, { "Access-Control-Request-Method", "POST" } } });
+            Assert.Equal(HttpStatusCode.NoContent, open.StatusCode);
+            Assert.Equal("*", Header(open, "Access-Control-Allow-Origin"));
+        }
+        Assert.Equal("*", Header(await c.GetAsync("/.well-known/oauth-authorization-server"), "Access-Control-Allow-Origin"));
+        // Asking about anything else doesn't fall through to "not found".
+        Assert.Equal(HttpStatusCode.NoContent, (await c.SendAsync(new HttpRequestMessage(HttpMethod.Options, "/authorize"))).StatusCode);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData("https://claude.ai", true)]
+    [InlineData("https://claude.com", true)]
+    [InlineData("https://mini.tail1234.ts.net", true)]
+    [InlineData("http://localhost:6274", true)]
+    [InlineData("http://127.0.0.1:6274", true)]
+    [InlineData("https://evil.example", false)]
+    [InlineData("https://claude.ai.evil.example", false)]
+    [InlineData("http://mini.tail1234.ts.net", false)]
+    [InlineData("null", false)]
+    public async Task Only_claude_this_library_or_this_computer_may_call_from_a_page(string? origin, bool allowed)
+    {
+        await using var door = await Door.OpenAsync();
+        var c = door.As("http://mini.tail1234.ts.net");
+        var (token, _) = await SignIn(door, c);
+        var r = await c.SendAsync(Rpc(token, new { jsonrpc = "2.0", id = 1, method = "tools/list" }, headers: origin is null ? [] : [("Origin", origin)]));
+        if (allowed)
+        {
+            Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+            if (origin is not null) Assert.Equal(origin, Header(r, "Access-Control-Allow-Origin"));
+            return;
+        }
+        Assert.Equal(HttpStatusCode.Forbidden, r.StatusCode);
+        Assert.Equal("", Header(r, "Access-Control-Allow-Origin"));
+        var error = JsonNode.Parse(await r.Content.ReadAsStringAsync())!.AsObject();
+        Assert.Equal("2.0", error["jsonrpc"]!.GetValue<string>());
+        Assert.False(error.ContainsKey("id"));
+        Assert.NotNull(error["error"]!["message"]);
+    }
+
+    [Fact]
+    public async Task A_page_on_claude_that_isnt_signed_in_can_read_where_to_sign_in()
+    {
+        await using var door = await Door.OpenAsync();
+        var r = await door.As("http://mini.tail1234.ts.net").SendAsync(Rpc("", new { jsonrpc = "2.0", id = 1, method = "tools/list" }, headers: ("Origin", "https://claude.ai")));
+        Assert.Equal(HttpStatusCode.Unauthorized, r.StatusCode);
+        Assert.Equal("https://claude.ai", Header(r, "Access-Control-Allow-Origin"));
+        Assert.Contains("WWW-Authenticate", Header(r, "Access-Control-Expose-Headers"));
+    }
+
+    [Fact]
+    public async Task Tool_access_off_still_connects_and_every_call_says_why_in_words()
+    {
+        await using var door = await Door.OpenAsync();
+        var (token, _) = await SignIn(door, door.As("http://mini.tail1234.ts.net"));
+        door.Access.ToolsOn = false;
+
+        await using var mcp = await Client(door, token);
+        var tools = await mcp.ListToolsAsync(); // refused at call time, not hidden
+        Assert.Contains("list_classes", tools.Select(t => t.Name));
+        foreach (var t in tools)
+        {
+            var r = await mcp.CallToolAsync(t.Name, new Dictionary<string, object?>());
+            Assert.True(r.IsError);
+            Assert.Equal("AI tool access is off in Study Stash. The student can turn it on in Study Stash → Settings → AI tool access.", Text(r));
+        }
+
+        door.Access.ToolsOn = true; // no reconnect needed
+        Assert.StartsWith("Library: Sam's library", Text(await mcp.CallToolAsync("list_classes", new Dictionary<string, object?>())));
+    }
+
+    [Fact]
+    public async Task Canvas_off_refuses_every_tool_that_reads_canvas_naming_the_setting()
+    {
+        using var shared = new TempDir();
+        Directory.CreateDirectory(shared["library"]);
+        await using var door = await Door.OpenAsync(canvas: true, files: [("Library", shared["library"], false)]);
+        var (token, _) = await SignIn(door, door.As("http://mini.tail1234.ts.net"));
+        door.Access.Reading = door.Access.Reading with { Canvas = false };
+
+        await using var mcp = await Client(door, token);
+        var canvasTools = (await mcp.ListToolsAsync()).Select(t => t.Name).Where(n => StudyStash.Core.Ai.ToolAccess.Scope(n) == "canvas").ToList();
+        Assert.Equal(
+            ["canvas_api", "canvas_courses", "canvas_page", "class_announcements", "class_files", "class_modules", "due_assignments", "get_assignment", "read_file", "search_files"],
+            canvasTools.Order());
+        foreach (string name in canvasTools)
+        {
+            var r = await mcp.CallToolAsync(name, new Dictionary<string, object?>());
+            Assert.True(r.IsError, name);
+            Assert.Equal("Study Stash's settings don't let AI tools read Canvas right now (Settings → AI tool access → Canvas assignments and files).", Text(r));
+        }
+        Assert.True((await mcp.CallToolAsync("list_classes", new Dictionary<string, object?>())).IsError is null or false);
+    }
+
+    [Fact]
+    public async Task Claude_on_the_web_sees_only_tools_that_read_each_labelled_so()
+    {
+        using var shared = new TempDir();
+        Directory.CreateDirectory(shared["library"]);
+        await using var door = await Door.OpenAsync(canvas: true, files: [("Library", shared["library"], false)]);
+        var (token, _) = await SignIn(door, door.As("http://mini.tail1234.ts.net"));
+        await using var mcp = await Client(door, token);
+
+        var tools = await mcp.ListToolsAsync();
+        Assert.Equal(
+            ["canvas_api", "canvas_courses", "canvas_page", "class_announcements", "class_files", "class_modules", "due_assignments", "get_assignment",
+             "get_lecture", "get_transcript", "list_classes", "list_lectures", "read_file", "search_files", "search_notes"],
+            tools.Select(t => t.Name).Order());
+        foreach (var t in tools.Select(t => t.ProtocolTool))
+        {
+            Assert.False(string.IsNullOrWhiteSpace(t.Title), t.Name);
+            Assert.Equal((true, false, true, t.Name is "canvas_api" or "canvas_page"),
+                (t.Annotations!.ReadOnlyHint, t.Annotations.DestructiveHint, t.Annotations.IdempotentHint, t.Annotations.OpenWorldHint));
+            Assert.DoesNotContain("file tools", t.Description);
+            Assert.DoesNotContain("canvas_download", t.Description);
+        }
+        Assert.DoesNotContain("canvas_download", mcp.ServerInstructions);
+        Assert.Contains("get_assignment", tools.Single(t => t.Name == "due_assignments").Description);
+        Assert.Contains("the grader's feedback", tools.Single(t => t.Name == "get_assignment").Description);
+    }
+
+    /// <summary>The stdio server (Claude Code and Claude Desktop on this computer) keeps its download, and has no
+    /// read_file: it can open files itself.</summary>
+    [Fact]
+    public void The_stdio_server_keeps_canvas_download()
+    {
+        var names = ClaudeTools.Tools(new ReadingSource()).Select(t => t.ProtocolTool.Name).ToList();
+        Assert.Contains("canvas_download", names);
+        Assert.DoesNotContain("read_file", names);
+        Assert.Contains("your own file tools", ClaudeTools.Tools(new ReadingSource()).Single(t => t.ProtocolTool.Name == "search_files").ProtocolTool.Description);
+    }
+
+    /// <summary>Every tool, in both sets, needs a reading toggle on purpose: only list_classes (class names and
+    /// counts) needs none. A new tool without a scope fails here.</summary>
+    [Fact]
+    public void Every_tool_needs_a_reading_toggle_on_purpose()
+    {
+        foreach (bool web in new[] { false, true })
+            foreach (var t in ClaudeTools.Tools(new ReadingSource(), web))
+                Assert.True(t.ProtocolTool.Name == "list_classes" ? StudyStash.Core.Ai.ToolAccess.Scope(t.ProtocolTool.Name) is null
+                    : StudyStash.Core.Ai.ToolAccess.Scope(t.ProtocolTool.Name) is not null, $"{t.ProtocolTool.Name} has no reading toggle");
+    }
+
+    /// <summary>A library with Canvas linked and files to read, for building the whole tool list.</summary>
+    sealed class ReadingSource : ILibrarySource
+    {
+        public Task<JsonObject> OverviewAsync() => Task.FromResult(new JsonObject());
+        public Task<JsonArray> LecturesAsync(string? className, int limit, string? before) => Task.FromResult(new JsonArray());
+        public Task<JsonObject?> LectureAsync(string id) => Task.FromResult<JsonObject?>(null);
+        public Task<JsonObject> SearchAsync(string query, string? className, int limit) => Task.FromResult(new JsonObject());
+        public bool HasCanvas => true;
+        public bool CanReadFiles => true;
+    }
+
+    [Fact]
+    public async Task Read_file_reads_only_what_search_could_show_a_page_at_a_time()
+    {
+        using var dir = new TempDir();
+        string lib = dir["library"], secret = dir["secret"], outside = dir["outside"];
+        string week = Path.Combine(lib, "CS 101", "Canvas", "files", "Week 1");
+        foreach (string d in new[] { week, secret, outside }) Directory.CreateDirectory(d);
+        string slides = Path.Combine(week, "recursion.md");
+        File.WriteAllText(slides, "# Recursion\n" + new string('a', ClaudeTools.PageChars) + "\nThe base case ends it.");
+        string taxes = Path.Combine(secret, "taxes.txt");
+        File.WriteAllText(taxes, "private words");
+        string away = Path.Combine(outside, "diary.md");
+        File.WriteAllText(away, "not shared");
+        File.CreateSymbolicLink(Path.Combine(week, "diary.md"), away);
+        string home = dir["home"];
+        Directory.CreateDirectory(home);
+        var index = new StudyStash.Core.Ai.FileIndex(home, () => [("Library", lib, false), ("Secret", secret, true)], () => []);
+        await index.UpdateAsync();
+        var cfg = new Config(home, dir["pool"]);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        ILibrarySource source = new LocalLibrary(new LibraryReader(cfg, store), null, home, index);
+
+        string first = await source.ReadFileAsync(slides, 0);
+        Assert.StartsWith("# Recursion", first);
+        int more = first.IndexOf("(More: call again with offset=", StringComparison.Ordinal);
+        Assert.True(more > 0);
+        int offset = int.Parse(first[(more + "(More: call again with offset=".Length)..].TrimEnd('.', ')'));
+        Assert.Contains("The base case ends it.", await source.ReadFileAsync(slides, offset));
+        Assert.Equal("That's the end of the file.", await source.ReadFileAsync(slides, int.MaxValue));
+
+        Assert.Contains("private folder", await source.ReadFileAsync(taxes, 0));
+        const string NotHere = "That isn't a file Study Stash shares with AI tools.";
+        Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(week, "diary.md"), 0)); // a link out of the folder
+        Assert.StartsWith(NotHere, await source.ReadFileAsync(away, 0));
+        Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(week, "..", "..", "..", "..", "..", "outside", "diary.md"), 0));
+        Assert.StartsWith(NotHere, await source.ReadFileAsync("CS 101/Canvas/files/Week 1/recursion.md", 0));
+        Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(home, "claude.json"), 0));
     }
 }
