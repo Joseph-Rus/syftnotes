@@ -44,6 +44,10 @@ public sealed class LibraryWebOptions
     public StudyStash.Core.Ai.Inbox? Inbox { get; init; }
     /// <summary>Starting at login on the library's computer (the app's login item). Null: not offered.</summary>
     public LoginSwitch? StartAtLogin { get; init; }
+    /// <summary>The phones paired with the library (devices.json). Null: kept beside the config.</summary>
+    public Devices? Devices { get; init; }
+    /// <summary>The phone app's files (web/dist). Null: STUDYSTASH_WEB_DIR, else web/ beside the app.</summary>
+    public string? PhoneApp { get; init; }
 }
 
 /// <summary>Small pieces of HTTP the Python engine got from its web framework.</summary>
@@ -210,6 +214,7 @@ public sealed partial class LibraryWeb
     /// <summary>The laptop's key: Authorization: Bearer &lt;password&gt;. Null when it may come in.</summary>
     IResult? RequireKey(HttpContext ctx)
     {
+        if (PhoneOf(ctx) is not null) return null; // a paired phone, on /api/v2
         if (cfg.PoolPassword.Length == 0) return null;
         string h = ctx.Request.Headers.Authorization.ToString();
         string key = h.StartsWith("bearer ", StringComparison.OrdinalIgnoreCase) ? h[7..].Trim() : ctx.Request.Headers["x-pool-key"].ToString();
@@ -401,6 +406,7 @@ public sealed partial class LibraryWeb
         MapFiles(app);
         MapInbox(app);
         MapSettings(app);
+        MapPhone(app);
         app.MapFallback(() => Http.Detail(404, "Not Found"));
     }
 
