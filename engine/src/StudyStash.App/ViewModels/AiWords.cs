@@ -70,13 +70,15 @@ public static partial class AiWords
 
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup
     /// the library is this computer.</summary>
-    public static string SetupAbout(string id, string state) => id == "ollama"
-        ? "Private. Runs here, nothing leaves this computer."
+    public static string SetupAbout(string id, string state, string device = "computer") => id == "ollama"
+        ? state == "not_installed" ? $"Free and private, but not on this {device} yet." : "Private. Runs here, nothing leaves this computer."
         : state switch
         {
             "ready" => "Signed in on this computer.",
-            "not_signed_in" => "Sign in first.",
+            "not_signed_in" => "Installed. Sign in to use it.",
             "unchecked" => "Installed on this computer.",
+            "not_installed" => $"Not on this {device} yet.",
+            "limited" => "Hit its usage limit for now.",
             _ => "",
         };
 

@@ -14,7 +14,7 @@ public partial class WinSetup : UserControl
             Fit(m);
             m.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses)) Fit(m);
+                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses) or nameof(SetupModel.AiHelpOpen)) Fit(m);
             };
         };
     }
@@ -24,7 +24,7 @@ public partial class WinSetup : UserControl
     void Fit(SetupModel m)
     {
         Width = m.Wide ? 900 : 720;
-        Height = m.OnCanvas ? 700 : m.OnAi ? 680 : m.OnClasses && m.HasCourses ? 640 : 480;
+        Height = m.OnCanvas ? 700 : m.OnAi ? (m.AiHelpOpen ? 860 : 680) : m.OnClasses && m.HasCourses ? 640 : 480;
     }
 
     /// <summary>A real window has the system's caption buttons in its title bar; screenshots draw their own.</summary>

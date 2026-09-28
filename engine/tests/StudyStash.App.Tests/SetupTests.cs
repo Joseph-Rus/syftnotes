@@ -1,3 +1,4 @@
+using Avalonia.Headless.XUnit;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.App.Views;
 using StudyStash.Audio;
 using StudyStash.Core;
 
@@ -186,6 +188,26 @@ public sealed class SetupTests
         library.Go(SetupStep.Done);
         Assert.False(library.OnOneComputerDone);
         Assert.False(library.ShowNotesSummary);
+    }
+
+    [AvaloniaFact]
+    public async Task The_setup_window_grows_while_an_engines_setup_steps_show()
+    {
+        var m = SetupModel.For(SkinKind.Mac);
+        m.Go(SetupStep.Ai);
+        var o = AiDemo.Overview();
+        m.Ai = new AiSetupModel(new FakeAiLibrary { Overview = o with { Engines = [.. o.Engines.Select(e => e.Id == "claude" ? e with { State = "not_installed", Installed = false } : e)] } });
+        await m.Ai.Load();
+        var view = new MacSetup { DataContext = m };
+        Assert.Equal(640, view.Height);
+        Assert.False(m.AiHelpOpen);
+
+        m.Ai.Engines.Single(r => r.Id == "claude").ToggleHelpCommand.Execute(null);
+
+        Assert.True(m.AiHelpOpen);
+        Assert.Equal(800, view.Height);
+        m.Go(SetupStep.Canvas);
+        Assert.False(m.AiHelpOpen);
     }
 
     [Fact]

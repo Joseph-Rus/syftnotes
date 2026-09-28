@@ -6,39 +6,91 @@ using StudyStash.Core.Ai;
 
 namespace StudyStash.App.ViewModels;
 
-/// <summary>One engine in the library setup step's "Choose who writes your notes" list: a radio row, Ollama marked
-/// Recommended, a not-signed-in CLI offering to sign in right there.</summary>
+/// <summary>One step in a setup row's help: its number, what to do, the command to paste (with Copy) and a line under
+/// it.</summary>
+public sealed class AiSetupStep
+{
+    public int Number { get; init; }
+    public string Title { get; init; } = "";
+    public string Command { get; init; } = "";
+    public string Note { get; init; } = "";
+    public bool HasCommand => Command.Length > 0;
+    public bool HasNote => Note.Length > 0;
+    public IRelayCommand CopyCommand { get; internal set; } = null!;
+}
+
+/// <summary>One engine in setup's "Choose who writes your notes" list: a radio row, Ollama marked Recommended. An
+/// engine that can't write notes yet (not installed, not signed in) offers "Set up": the steps to get it going, with
+/// the commands to copy, a button to open Terminal (or sign in there), and Check again.</summary>
 public sealed partial class AiSetupRow : ObservableObject
 {
     public string Id { get; init; } = "";
     public string Name { get; init; } = "";
     public string About { get; init; } = "";
+    public string State { get; init; } = "";
     public bool Recommended { get; init; }
     public bool ShowSignIn { get; init; }
+    /// <summary>It can write notes now (as far as anyone can tell without asking it): picking it is allowed.</summary>
+    public bool CanWrite { get; init; }
     /// <summary>The first row in the list shows no separator above it.</summary>
     public bool First { get; internal set; }
     [ObservableProperty] public partial bool Selected { get; set; }
+    /// <summary>The steps to get it going show under the row.</summary>
+    [ObservableProperty] public partial bool ShowHelp { get; set; }
+    public IReadOnlyList<AiSetupStep> Help { get; init; } = [];
+    public bool HasHelp => Help.Count > 0;
+    public string HelpLabel => ShowHelp ? "Hide" : "Set up";
+    /// <summary>The help's first button: "Get Ollama", "Open Terminal" (to install) or "Sign in in Terminal".</summary>
+    public string OpenLabel { get; init; } = "";
+    internal Action? HelpChanged { get; set; }
+
+    partial void OnShowHelpChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HelpLabel));
+        HelpChanged?.Invoke();
+    }
 
     public IRelayCommand SelectCommand { get; internal set; } = null!;
     public IAsyncRelayCommand SignInCommand { get; internal set; } = null!;
+    public IRelayCommand ToggleHelpCommand { get; internal set; } = null!;
+    public IAsyncRelayCommand OpenCommand { get; internal set; } = null!;
+    public IAsyncRelayCommand CheckAgainCommand { get; internal set; } = null!;
 }
 
 /// <summary>
-/// The library setup wizard's AI step (design 15): "Choose who writes your notes" (a radio list of the engines on
-/// this computer, Ollama recommended) and "Who answers your questions" (a select that starts as Same as notes). The
-/// step's body only: the host's sidebar and Back/Continue footer are its own. Continue calls <see cref="SaveAsync"/>.
+/// Setup's AI step (design 15): "Choose who writes your notes" (a radio list of the engines on this computer, Ollama
+/// recommended, Claude Code and Codex with the steps to install and sign in when they aren't ready, and "No AI for
+/// now" for transcripts alone) and "Who answers your questions" (a select that starts as Same as notes). The step's
+/// body only: the host's sidebar and Back/Continue footer are its own. Continue calls <see cref="SaveAsync"/>.
 /// </summary>
 public sealed partial class AiSetupModel : ObservableObject
 {
     /// <summary>The Ask select's first choice: follow whichever engine writes the notes.</summary>
     public const string SameAsNotes = "";
+    /// <summary>"No AI for now": lectures are filed with their transcripts, and no notes are written.</summary>
+    public const string None = "none";
 
     readonly IAiLibrary library;
+    bool picked;
 
     public AiSetupModel(IAiLibrary library) => this.library = library;
 
     public ObservableCollection<AiSetupRow> Engines { get; } = [];
     public List<EngineChoice> AskChoices { get; private set; } = [new(SameAsNotes, "Same as notes")];
+
+    /// <summary>The line under the title: where the engines run.</summary>
+    public string Lede { get; init; } = "This computer is your library, so the engines run here. You can change this later from any of your computers.";
+    /// <summary>Windows words (PowerShell, not Terminal) and commands.</summary>
+    public bool Windows { get; init; } = OperatingSystem.IsWindows();
+    /// <summary>Puts a command on the clipboard.</summary>
+    public Action<string>? Copy { get; init; }
+    /// <summary>Opens Terminal (PowerShell on Windows) for a command to be pasted into.</summary>
+    public Action? OpenTerminal { get; init; }
+    public Action<string>? OpenUrl { get; init; }
+    /// <summary>Turns the library's note writing (and sorting with AI) on or off; true when it did. Null in a host
+    /// that can't, which then doesn't offer "No AI for now".</summary>
+    public Func<bool, Task<bool>>? WriteNotes { get; init; }
+    public bool OffersNoAi => WriteNotes is not null;
 
     [ObservableProperty] public partial string SelectedNotes { get; set; } = "ollama";
     [ObservableProperty] public partial string SelectedAsk { get; set; } = SameAsNotes;
@@ -46,15 +98,23 @@ public sealed partial class AiSetupModel : ObservableObject
     [ObservableProperty] public partial bool Busy { get; set; }
     [ObservableProperty] public partial bool OlderLibrary { get; set; }
     [ObservableProperty] public partial bool Offline { get; set; }
+    /// <summary>A row's steps are showing (the setup window grows to fit them).</summary>
+    [ObservableProperty] public partial bool HelpOpen { get; set; }
 
+    public bool NoAi => SelectedNotes == None;
+    public bool HasSay => !string.IsNullOrEmpty(Say);
     public string SelectedAskName => AskChoices.FirstOrDefault(c => c.Id == SelectedAsk)?.Name ?? SelectedAsk;
     public string OlderLibraryWords => AiWords.OlderLibraryWords;
+    /// <summary>Who writes the notes, for setup's last page: "Ollama", or "Not yet: just transcripts".</summary>
+    public string ChoiceWords => NoAi ? "Not yet: just transcripts" : Engines.FirstOrDefault(r => r.Id == SelectedNotes)?.Name ?? Engines.FirstOrDefault()?.Name ?? "";
 
     partial void OnSelectedAskChanged(string value)
     {
         EngineChoice.Mark(AskChoices, value);
         OnPropertyChanged(nameof(SelectedAskName));
     }
+
+    partial void OnSayChanged(string? value) => OnPropertyChanged(nameof(HasSay));
 
     /// <summary>Reads the library's AI once and fills the rows: called when the step opens.</summary>
     public async Task Load()
@@ -72,6 +132,19 @@ public sealed partial class AiSetupModel : ObservableObject
         Apply(overview);
     }
 
+    /// <summary>It can write notes now: Ollama once installed (it may still need starting, or its model), a CLI
+    /// that's installed and not known to be signed out.</summary>
+    static bool CanWrite(EngineInfo e) => e.Installed && (e.Id == "ollama" || e.State is not ("not_signed_in" or "not_installed"));
+
+    /// <summary>The first time: the library's own pick when it can write notes, else the first engine that's ready,
+    /// else no AI for now (where offered).</summary>
+    string FirstPick(AiOverview overview)
+    {
+        if (overview.Engines.FirstOrDefault(e => e.Id == overview.Notes) is { } notes && CanWrite(notes)) return notes.Id;
+        if (overview.Engines.FirstOrDefault(e => e.State == "ready" && CanWrite(e)) is { } ready) return ready.Id;
+        return OffersNoAi ? None : overview.Notes;
+    }
+
     void Apply(AiOverview? overview)
     {
         if (overview is null)
@@ -82,36 +155,150 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         OlderLibrary = false;
         Offline = false;
-        SelectedNotes = overview.Notes;
-        SelectedAsk = overview.Ask == overview.Notes ? SameAsNotes : overview.Ask;
-        AskChoices = [new EngineChoice(SameAsNotes, "Same as notes"), .. overview.Engines.Select(e => new EngineChoice(e.Id, e.Name))];
+        if (!picked)
+        {
+            SelectedNotes = FirstPick(overview);
+            // Questions follow the notes unless the library asks another engine that's here.
+            SelectedAsk = overview.Ask == overview.Notes || overview.Engines.FirstOrDefault(e => e.Id == overview.Ask) is not { Installed: true } ? SameAsNotes : overview.Ask;
+            picked = true;
+        }
+        AskChoices = [new EngineChoice(SameAsNotes, "Same as notes"), .. overview.Engines.Where(e => e.Installed).Select(e => new EngineChoice(e.Id, e.Name))];
         foreach (var c in AskChoices) c.Pick = new RelayCommand(() => SelectedAsk = c.Id);
         EngineChoice.Mark(AskChoices, SelectedAsk);
         OnPropertyChanged(nameof(AskChoices));
         OnPropertyChanged(nameof(SelectedAskName));
 
+        var open = Engines.Where(r => r.ShowHelp).Select(r => r.Id).ToHashSet();
         Engines.Clear();
-        foreach (var e in overview.Engines.Where(e => e.Id == "ollama" || e.Installed))
+        // Claude Code and Codex always show, with the steps to get them going; Gemini only once it's here.
+        foreach (var e in overview.Engines.Where(e => e.Id is "ollama" or "claude" or "codex" || e.Installed))
         {
+            var steps = EngineSetupWords.Steps(e.Id, e.State, Windows);
+            string terminal = EngineSetupWords.TerminalName(Windows);
             var row = new AiSetupRow
             {
                 Id = e.Id,
                 Name = e.Name,
-                About = AiWords.SetupAbout(e.Id, e.State),
+                About = AiWords.SetupAbout(e.Id, e.State, Windows ? "PC" : "Mac"),
+                State = e.State,
                 Recommended = e.Id == "ollama",
-                ShowSignIn = e.State == "not_signed_in",
+                ShowSignIn = e.State == "not_signed_in" && steps.Count == 0,
+                CanWrite = CanWrite(e),
                 Selected = e.Id == SelectedNotes,
                 First = Engines.Count == 0,
+                Help = [.. steps.Select((h, i) => new AiSetupStep
+                {
+                    Number = i + 1, Title = h.Title, Command = h.Command, Note = h.Note,
+                    CopyCommand = new RelayCommand(() => Copy?.Invoke(h.Command)),
+                })],
+                OpenLabel = e.Id == "ollama" ? "Get Ollama" : e.State == "not_signed_in" ? $"Sign in in {terminal}" : $"Open {terminal}",
+                ShowHelp = open.Contains(e.Id) && steps.Count > 0,
+                HelpChanged = () => HelpOpen = Engines.Any(r => r.ShowHelp),
             };
-            row.SelectCommand = new RelayCommand(() => SelectedNotes = row.Id);
+            row.SelectCommand = new RelayCommand(() => Pick(row));
             row.SignInCommand = new AsyncRelayCommand(() => SignInAsync(row.Id));
+            row.ToggleHelpCommand = new RelayCommand(() => ShowHelpOf(row, !row.ShowHelp));
+            row.OpenCommand = new AsyncRelayCommand(() => OpenAsync(row));
+            row.CheckAgainCommand = new AsyncRelayCommand(() => CheckAgainAsync(row.Id));
             Engines.Add(row);
         }
+        HelpOpen = Engines.Any(r => r.ShowHelp);
+        OnPropertyChanged(nameof(ChoiceWords));
     }
+
+    /// <summary>A row's help opens alone (the list stays short enough to see).</summary>
+    void ShowHelpOf(AiSetupRow row, bool show)
+    {
+        foreach (var r in Engines) r.ShowHelp = r == row && show && r.HasHelp;
+    }
+
+    /// <summary>Picking a row: an engine that can write notes becomes the pick; one that can't yet shows how to get it
+    /// going instead.</summary>
+    void Pick(AiSetupRow row)
+    {
+        if (row.CanWrite) SelectedNotes = row.Id;
+        else ShowHelpOf(row, true);
+    }
+
+    [RelayCommand]
+    void PickNoAi() => SelectedNotes = None;
 
     partial void OnSelectedNotesChanged(string value)
     {
         foreach (var row in Engines) row.Selected = row.Id == value;
+        OnPropertyChanged(nameof(NoAi));
+        OnPropertyChanged(nameof(ChoiceWords));
+    }
+
+    async Task OpenAsync(AiSetupRow row)
+    {
+        if (row.Id == "ollama")
+        {
+            OpenUrl?.Invoke("https://ollama.com/download");
+            return;
+        }
+        if (row.State == "not_signed_in")
+        {
+            await SignInAsync(row.Id);
+            return;
+        }
+        OpenTerminal?.Invoke();
+    }
+
+    /// <summary>Check again: looks at the engine afresh (after installing it, or signing in) and, when it can write
+    /// notes now, picks it, without leaving setup. A CLI that's there is tried for real, which is how its sign-in shows.</summary>
+    async Task CheckAgainAsync(string id)
+    {
+        Busy = true;
+        Say = null;
+        try
+        {
+            var overview = await library.EnginesAsync();
+            if (overview is null)
+            {
+                OlderLibrary = true;
+                return;
+            }
+            string? said = null;
+            if (overview.Engines.FirstOrDefault(e => e.Id == id) is { Installed: true, State: "unchecked" or "not_signed_in" } && id != "ollama")
+            {
+                var check = await library.CheckAsync(id);
+                if (check is null)
+                {
+                    OlderLibrary = true;
+                    return;
+                }
+                said = check.Said;
+                overview = check.Overview ?? overview;
+            }
+            Apply(overview);
+            var row = Engines.FirstOrDefault(r => r.Id == id);
+            string name = row?.Name ?? Core.Ai.Engines.Name(id);
+            if (row is { CanWrite: true })
+            {
+                ShowHelpOf(row, false);
+                SelectedNotes = id;
+                Say = $"{name} is ready. It writes your notes.";
+            }
+            else
+            {
+                Say = said ?? (row?.State == "not_installed"
+                    ? $"{name} isn't installed yet. Run the first step, then Check again."
+                    : $"{name} isn't signed in yet. Run the sign-in step, then Check again.");
+            }
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            Busy = false;
+        }
     }
 
     async Task SignInAsync(string id)
@@ -140,15 +327,27 @@ public sealed partial class AiSetupModel : ObservableObject
     }
 
     /// <summary>The setup host calls this on Continue: saves the pick (ask follows notes when the student left it
-    /// as Same as notes) and says whether it worked.</summary>
+    /// as Same as notes) and says whether it worked. "No AI for now" turns note writing off instead (and on again
+    /// once an engine is picked).</summary>
     public async Task<bool> SaveAsync()
     {
         Busy = true;
         try
         {
+            if (NoAi)
+            {
+                if (WriteNotes is not null && !await WriteNotes(false))
+                {
+                    Say = "Your library didn't take that. Try again.";
+                    return false;
+                }
+                if (SelectedAsk != SameAsNotes && await library.DefaultsAsync(ask: SelectedAsk) is null) { OlderLibrary = true; return false; }
+                return true;
+            }
             string ask = SelectedAsk == SameAsNotes ? SelectedNotes : SelectedAsk;
             var overview = await library.DefaultsAsync(notes: SelectedNotes, ask: ask);
             if (overview is null) { OlderLibrary = true; return false; }
+            if (WriteNotes is not null) await WriteNotes(true);
             return true;
         }
         catch (LibraryRefusedException ex)

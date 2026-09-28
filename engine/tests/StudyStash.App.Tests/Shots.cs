@@ -477,6 +477,17 @@ public class SurfaceShots
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-library-password-existing", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = again, DrawChrome = true } : new WinSetup { DataContext = again, DrawChrome = true },
                     size: new Size(850, 608));
+            // Just this computer's notes step with an engine's setup steps open: Claude Code not installed yet, and
+            // Codex installed but not signed in.
+            foreach (var (engine, state) in new[] { ("claude", "not_installed"), ("codex", "not_signed_in") })
+            {
+                var help = await SetupPage(skin, AppRole.Both, SetupStep.Ai);
+                help.Ai = AiDemo.SetupWith(skin == SkinKind.Win, engine, state);
+                help.Ai.Engines.Single(r => r.Id == engine).ToggleHelpCommand.Execute(null);
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-one-computer-ai-{engine}-help", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = help, DrawChrome = true } : new WinSetup { DataContext = help, DrawChrome = true },
+                        size: new Size(1100, skin == SkinKind.Mac ? 968 : 1028));
+            }
             // Just this computer's welcome while its library is being made, and when it couldn't be.
             var making = SetupModel.For(skin);
             making.Connecting = true;
@@ -512,7 +523,7 @@ public class SurfaceShots
             m.LibraryResult = role == AppRole.Laptop ? "Connected to Ada's library." : $"Ada's library is ready on this {m.DeviceWord}.";
         }
         if (role == AppRole.Both && step == SetupStep.Done) m.NotesSummary = "Ollama";
-        if (step == SetupStep.Ai) m.Ai = AiDemo.Setup();
+        if (step == SetupStep.Ai) m.Ai = AiDemo.Setup(skin == SkinKind.Win, oneComputer: role == AppRole.Both);
         if (step == SetupStep.Canvas || canvasFound)
         {
             // Setup's own Canvas: Add to Chrome pressed and waiting for Chrome, or everything done and the courses found.

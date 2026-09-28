@@ -360,7 +360,7 @@ public sealed partial class SetupModel : ObservableObject
         foreach (string p in new[] { nameof(Index), nameof(IsLast), nameof(StepLabel), nameof(ContinueLabel), nameof(CanGoBack), nameof(OnWelcome), nameof(OnPassword),
                      nameof(OnMicrophone), nameof(OnLibrary), nameof(OnModel), nameof(OnClasses), nameof(OnStartAtLogin), nameof(OnTaskbar), nameof(OnAi),
                      nameof(OnCanvas), nameof(OnDone), nameof(OnLibraryDone), nameof(OnLaptopDone), nameof(OnOneComputerDone), nameof(OnPlainStep),
-                     nameof(Wide), nameof(CanContinue) })
+                     nameof(Wide), nameof(CanContinue), nameof(AiHelpOpen) })
             OnPropertyChanged(p);
     }
 
@@ -368,6 +368,21 @@ public sealed partial class SetupModel : ObservableObject
     {
         NotifyStepDerived();
         OnEnter?.Invoke(value);
+    }
+
+    /// <summary>The AI step is showing an engine's setup steps: the window grows to fit them.</summary>
+    public bool AiHelpOpen => OnAi && Ai?.HelpOpen == true;
+
+    partial void OnAiChanged(AiSetupModel? oldValue, AiSetupModel? newValue)
+    {
+        if (oldValue is not null) oldValue.PropertyChanged -= OnAiPropertyChanged;
+        if (newValue is not null) newValue.PropertyChanged += OnAiPropertyChanged;
+        OnPropertyChanged(nameof(AiHelpOpen));
+    }
+
+    void OnAiPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AiSetupModel.HelpOpen)) OnPropertyChanged(nameof(AiHelpOpen));
     }
 
     partial void OnCanvasChanged(CanvasConnectModel? oldValue, CanvasConnectModel? newValue)
