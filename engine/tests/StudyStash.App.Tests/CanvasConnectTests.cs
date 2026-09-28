@@ -392,7 +392,22 @@ public class CanvasConnectTests
     [Fact]
     public void Chrome_reports_when_nothing_could_be_started()
     {
-        Assert.Equal(Chrome.NotInstalled, Chrome.Open(null, (_, _, _) => null));
+        Assert.Equal(Chrome.NotInstalled, Chrome.Open(null, (_, _, _) => null, () => @"C:\Chrome\chrome.exe"));
+        // Started, but it said it couldn't (a Mac with no Chrome: `open -a` exits 1).
+        Assert.Equal(Chrome.NotInstalled, Chrome.Open(null, (_, _, _) => new ProcResult(1, ""), () => @"C:\Chrome\chrome.exe"));
+    }
+
+    [Fact]
+    public void Chrome_that_windows_cant_find_is_said_without_starting_anything()
+    {
+        if (!OperatingSystem.IsWindows()) return; // Windows looks for chrome.exe first; a Mac asks `open -a`
+        bool ran = false;
+        Assert.Equal(Chrome.NotInstalled, Chrome.Open("chrome://extensions", (_, _, _) =>
+        {
+            ran = true;
+            return new ProcResult(0, "");
+        }, () => null));
+        Assert.False(ran);
     }
 
     [Fact]
@@ -406,7 +421,7 @@ public class CanvasConnectTests
             exe = e;
             args = a;
             return new ProcResult(0, "");
-        });
+        }, () => @"C:\Program Files\Google\Chrome\Application\chrome.exe");
 
         Assert.Null(result);
         Assert.NotNull(exe);
@@ -422,7 +437,7 @@ public class CanvasConnectTests
         {
             args = a;
             return new ProcResult(0, "");
-        });
+        }, () => @"C:\Program Files\Google\Chrome\Application\chrome.exe");
 
         Assert.Contains("chrome://extensions", args!);
     }
