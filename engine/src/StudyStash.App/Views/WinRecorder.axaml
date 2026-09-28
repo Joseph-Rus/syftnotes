@@ -8,6 +8,10 @@
              x:Class="StudyStash.App.Views.WinRecorder"
              x:DataType="vm:RecorderModel"
              ClipToBounds="False">
+  <!-- Esc anywhere in the recorder closes its chat (the chat's own close button does the same) -->
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Escape" Command="{Binding Ask.CloseChatCommand}" />
+  </UserControl.KeyBindings>
   <UserControl.Styles>
     <Style Selector="Button.stop">
       <Setter Property="Theme" Value="{StaticResource Surface}" />

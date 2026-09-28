@@ -132,12 +132,18 @@ public static partial class AiWords
     /// <summary>While waiting: "Asking Claude Code…".</summary>
     public static string Thinking(string engineName) => $"Asking {engineName}…";
 
-    /// <summary>An answer's byline: the engine, then each source's moment in the lecture ("Ollama · 18:05, 18:40"),
-    /// or just the engine when nothing carries a moment.</summary>
+    /// <summary>An answer's byline: the engine, then the moments in the lecture it drew on, earliest first ("Ollama ·
+    /// from 18:05 and 18:40"), or just the engine when nothing carries a moment.</summary>
     public static string AskByline(string engineName, IEnumerable<AskSource> sources)
     {
-        var times = sources.Where(s => s.At is not null).Select(s => TimedText.Clock(s.At!.Value)).ToList();
-        return times.Count > 0 ? $"{engineName} · {string.Join(", ", times)}" : engineName;
+        // The moments the answer drew on, in the order they were said (an engine lists them by relevance), each once.
+        var times = sources.Where(s => s.At is not null).Select(s => s.At!.Value).Order().Select(TimedText.Clock).Distinct().ToList();
+        return times.Count switch
+        {
+            0 => engineName,
+            1 => $"{engineName} · from {times[0]}",
+            _ => $"{engineName} · from {string.Join(", ", times[..^1])} and {times[^1]}",
+        };
     }
 
     /// <summary>"This answer came from Ollama. Claude Code didn't respond in time." — why already reads as a full

@@ -110,7 +110,7 @@ public sealed partial class AiAskModel : ObservableObject
     public bool HasLatest => Latest is not null && !AnswerClosed;
     [ObservableProperty] public partial bool AnswerClosed { get; set; }
 
-    partial void OnAnswerClosedChanged(bool value) => OnPropertyChanged(nameof(HasLatest));
+    partial void OnAnswerClosedChanged(bool value) => ThreadShown();
 
     /// <summary>The answer card's close button: the notes get their room back, and an answer still being written stops.</summary>
     [RelayCommand]
@@ -118,6 +118,27 @@ public sealed partial class AiAskModel : ObservableObject
     {
         Stop();
         AnswerClosed = true;
+    }
+
+    /// <summary>The recorder's chat was closed with a conversation in it: "Show the chat" brings it back as it was.</summary>
+    public bool CanShowChat => Turns.Count > 0 && AnswerClosed;
+
+    /// <summary>The recorder's chat's close button (and Esc): the transcript gets its room back and an answer still
+    /// being written stops. The conversation is kept for this lecture: the next question, or "Show the chat", shows it
+    /// again (a new recording starts a new one).</summary>
+    [RelayCommand(CanExecute = nameof(HasLatest))]
+    void CloseChat() => CloseAnswer();
+
+    /// <summary>"Show the chat": the conversation closed a moment ago, back as it was.</summary>
+    [RelayCommand]
+    void ShowChat() => AnswerClosed = false;
+
+    /// <summary>Whether the thread shows changed (a question asked, the chat closed or shown again).</summary>
+    void ThreadShown()
+    {
+        OnPropertyChanged(nameof(HasLatest));
+        OnPropertyChanged(nameof(CanShowChat));
+        CloseChatCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>Opens Settings → AI engines (the "Change defaults" footer link).</summary>
@@ -218,7 +239,7 @@ public sealed partial class AiAskModel : ObservableObject
         Turns.Add(turn);
         AnswerClosed = false;
         OnPropertyChanged(nameof(Latest));
-        OnPropertyChanged(nameof(HasLatest));
+        ThreadShown();
         Busy = true;
         using var stop = asking = new CancellationTokenSource();
         var paced = new Paced(text => turn.Answer = PartialText.Showable(text));

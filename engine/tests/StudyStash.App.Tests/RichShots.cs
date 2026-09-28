@@ -369,7 +369,7 @@ public class RichShots
     public void Chat_answer_with_diagram()
     {
         var model = new AiAskModel(new FakeAiLibrary()) { LectureId = "cardiac-cycle", ClassName = RichDemo.LectureClassName };
-        model.Turns.Add(new AiTurn("How is low blood pressure treated?", "Ollama") { Answer = RichDemo.ChatFlowAnswer, Byline = "Ollama · 41:20" });
+        model.Turns.Add(new AiTurn("How is low blood pressure treated?", "Ollama") { Answer = RichDemo.ChatFlowAnswer, Byline = "Ollama · from 41:20" });
         foreach (var t in Themes)
         {
             Shot.Take("rich-chat-answer-mac", SkinKind.Mac, t, () => new MacAiAskChat { DataContext = model }, size: Shot.RefSize("mac-16"));
