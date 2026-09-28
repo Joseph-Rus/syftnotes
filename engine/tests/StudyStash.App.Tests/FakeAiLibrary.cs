@@ -31,6 +31,8 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string, RewriteInfo?>? OnRewriteUse { get; set; }
     public Func<ToolAccessInfo?>? OnAccess { get; set; }
     public Func<bool?, ReadingScopes?, ToolAccessInfo?>? OnSetAccess { get; set; }
+    public Func<bool, ToolAccessInfo?>? OnSetWeb { get; set; }
+    public Func<ToolAccessInfo?>? OnCheckWeb { get; set; }
 
     static EngineInfo Row(AiOverview o, string id) => o.Engines.First(e => e.Id == id);
 
@@ -152,6 +154,28 @@ public sealed class FakeAiLibrary : IAiLibrary
         if (Access is null) return Task.FromResult<ToolAccessInfo?>(null);
         Access = Access with { On = on ?? Access.On, Reading = reading ?? Access.Reading };
         return Task.FromResult<ToolAccessInfo?>(Access);
+    }
+
+    /// <summary>Unscripted, Funnel goes on at the design's address and answers from the internet, or goes off.</summary>
+    public Task<ToolAccessInfo?> SetWebAsync(bool on)
+    {
+        Calls.Add($"set-web:{(on ? "on" : "off")}");
+        if (OnSetWeb is not null) return Task.FromResult(OnSetWeb(on));
+        if (Access is null) return Task.FromResult<ToolAccessInfo?>(null);
+        const string Url = "https://mini.tail1234.ts.net";
+        Access = Access with
+        {
+            PublicUrl = on ? Url : null,
+            Web = new WebReach(on, "Study Stash", on ? Url + "/mcp" : null, null, null, on ? true : null, on ? ReachCheck.Answers : null,
+                on ? 1_790_000_000 : null, Access.HasPassword),
+        };
+        return Task.FromResult<ToolAccessInfo?>(Access);
+    }
+
+    public Task<ToolAccessInfo?> CheckWebAsync()
+    {
+        Calls.Add("check-web");
+        return Task.FromResult(OnCheckWeb is not null ? OnCheckWeb() : Access);
     }
 }
 

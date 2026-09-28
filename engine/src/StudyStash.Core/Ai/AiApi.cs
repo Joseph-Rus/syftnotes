@@ -79,14 +79,25 @@ public sealed record ReadingScopes(bool Lectures = true, bool Notes = true, bool
 
 public sealed record ToolConnection(string Id, string Name, string Kind)
 {
+    /// <summary>Where the app that signed in lives (e.g. "claude.ai"), when it said: "" for a token made in Settings.</summary>
+    public string ClientHost { get; init; } = "";
     public double Created { get; init; }
     public double? LastUsed { get; init; }
 }
+
+/// <summary>Whether Claude on the web can reach the library: Funnel on or off, the address to paste into Claude
+/// (<see cref="McpUrl"/>), what went wrong turning it on or off (<see cref="Problem"/>, with the page that fixes it),
+/// and the last check from the internet (<see cref="Reachable"/>, in <see cref="Words"/>, at
+/// <see cref="CheckedAt"/>, Unix seconds).</summary>
+public sealed record WebReach(bool On, string Name, string? McpUrl, string? Problem, string? FixUrl,
+    bool? Reachable, string? Words, double? CheckedAt, bool HasPassword);
 
 public sealed record ToolAccessInfo(bool On, ReadingScopes Reading, List<ToolConnection> Connections)
 {
     public string? PublicUrl { get; init; }
     public bool HasPassword { get; init; }
+    /// <summary>Null from a library too old to put itself on the internet from here.</summary>
+    public WebReach? Web { get; init; }
 }
 
 /// <summary>What the app's AI view models need from the library: engines and their state, the defaults, the
@@ -110,6 +121,10 @@ public interface IAiLibrary
     Task<RewriteInfo?> RewriteUseAsync(string lecture);
     Task<ToolAccessInfo?> AccessAsync();
     Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null);
+    /// <summary>Turns Funnel on or off on the library's computer, then checks it from the internet.</summary>
+    Task<ToolAccessInfo?> SetWebAsync(bool on);
+    /// <summary>Checks again whether the library answers from the internet.</summary>
+    Task<ToolAccessInfo?> CheckWebAsync();
 }
 
 /// <summary>The library's AI over its API (/api/v2/ai), the way the Study Stash app reads it. Like
@@ -200,4 +215,9 @@ public sealed class AiRemote(string serverUrl, string key, HttpClient? http = nu
         if (reading is not null) body["reading"] = JsonSerializer.SerializeToNode(reading, Options);
         return As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access", body));
     }
+
+    public async Task<ToolAccessInfo?> SetWebAsync(bool on) =>
+        As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web", new JsonObject { ["on"] = on }));
+
+    public async Task<ToolAccessInfo?> CheckWebAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Post, "/access/web/check"));
 }

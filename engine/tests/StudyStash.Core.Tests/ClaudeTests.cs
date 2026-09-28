@@ -316,7 +316,7 @@ public class ClaudeTests
         string query = string.Join("&", fields.Select(f => $"{f.Item1}={Uri.EscapeDataString(f.Item2)}"));
         var page = await c.GetAsync("/authorize?" + query);
         string html = await page.Content.ReadAsStringAsync();
-        Assert.Contains("Let Claude read your lectures?", html);
+        Assert.Contains("Claude wants to read your lectures", html);
         Assert.Contains("form-action 'self' https://claude.ai", page.Headers.GetValues("Content-Security-Policy").Single());
 
         var wrong = await c.PostAsync("/authorize", Form([.. fields, ("password", "nope"), ("decision", "allow")]));
@@ -357,10 +357,11 @@ public class ClaudeTests
             Assert.Contains("Study Stash", mcp.ServerInstructions);
         }
 
-        // Refresh gives a new pair and retires the old refresh token; disconnecting ends it.
+        // Refresh gives a new pair and retires the old access token (the old refresh token has a minute's grace:
+        // ConnectorTests); disconnecting ends it.
         var renewed = await Json(await c.PostAsync("/token", Form(("grant_type", "refresh_token"), ("refresh_token", refresh), ("client_id", clientId))));
         Assert.NotEqual(accessToken, renewed["access_token"]!.GetValue<string>());
-        Assert.Equal(HttpStatusCode.BadRequest, (await c.PostAsync("/token", Form(("grant_type", "refresh_token"), ("refresh_token", refresh), ("client_id", clientId)))).StatusCode);
+        Assert.NotEqual(refresh, renewed["refresh_token"]!.GetValue<string>());
         Assert.Null(access.Check(accessToken));
         var grant = access.Grants().Single();
         Assert.Equal("Claude", grant.Name);
@@ -397,7 +398,7 @@ public class ClaudeTests
                 {
                     var authorize = context.AuthorizationUri;
                     var page = await browser.GetAsync(authorize.PathAndQuery, ct);
-                    Assert.Contains("Let Claude Code read your lectures?", await page.Content.ReadAsStringAsync(ct));
+                    Assert.Contains("Claude Code wants to read your lectures", await page.Content.ReadAsStringAsync(ct));
                     var form = System.Web.HttpUtility.ParseQueryString(authorize.Query);
                     var fields = form.AllKeys.Select(k => (k!, form[k]!)).Append(("password", "pw")).Append(("decision", "allow")).ToArray();
                     var answer = await browser.PostAsync("/authorize", Form(fields), ct);
@@ -425,7 +426,7 @@ public class ClaudeTests
         for (int i = 0; i < 8; i++) await site.Client.PostAsync("/authorize", Form([.. fields, ("password", "guess" + i), ("decision", "allow")]));
         var right = await site.Client.PostAsync("/authorize", Form([.. fields, ("password", "pw"), ("decision", "allow")]));
         Assert.Equal((HttpStatusCode)429, right.StatusCode);
-        Assert.Contains("Too many wrong passwords", await right.Content.ReadAsStringAsync());
+        Assert.Contains("Too many wrong tries", await right.Content.ReadAsStringAsync());
 
         // An unknown client, or a redirect it didn't register, never gets redirected to.
         var unknown = await site.Client.GetAsync("/authorize?response_type=code&client_id=nope&redirect_uri=https%3A%2F%2Fevil.example%2F");
@@ -470,24 +471,25 @@ public class ClaudeTests
     public async Task Tailscale_puts_the_door_on_the_tailnet_or_the_internet()
     {
         var ran = new List<string>();
-        ProcResult? ok = new(0, "");
+        WatchResult? ok = new(0, "");
         var reach = new ClaudeReach
         {
             Tailscale = () => new TailscaleInfo(true, true, "Running", "mini.tail1234.ts.net.", ["100.64.0.9"], "/usr/local/bin/tailscale"),
-            Run = (exe, args, _) =>
+            Watch = (exe, args, _, _) =>
             {
                 ran.Add(string.Join(" ", args));
                 return ok;
             },
         };
-        Assert.Equal(("https://mini.tail1234.ts.net", (string?)null), reach.Set(8001, internet: true, on: true));
+        Assert.Equal(("https://mini.tail1234.ts.net", (ReachProblem?)null), reach.Set(8001, internet: true, on: true));
         Assert.Equal("funnel --bg --https=443 http://127.0.0.1:8001", ran[^1]);
         reach.Set(8001, internet: false, on: false);
         Assert.Equal("serve --https=443 off", ran[^1]);
         ok = new(1, "Funnel is not enabled on your tailnet.\nTo enable, visit:\n\n         https://login.tailscale.com/f/funnel?node=abc\n");
-        Assert.Equal("Tailscale needs permission first: open https://login.tailscale.com/f/funnel?node=abc, allow it, then try again.",
-            reach.Set(8001, true, true).Problem);
-        Assert.Contains("isn't running", new ClaudeReach { Tailscale = () => new TailscaleInfo(true, false, Exe: "ts") }.Set(8001, true, true).Problem);
+        Assert.Equal(new ReachProblem(ReachKind.NeedsPermission,
+            "Your tailnet doesn't allow Funnel yet. Open the page below, allow it for this computer, then turn this on again.",
+            "https://login.tailscale.com/f/funnel?node=abc"), reach.Set(8001, true, true).Problem);
+        Assert.Contains("isn't running", new ClaudeReach { Tailscale = () => new TailscaleInfo(true, false, Exe: "ts") }.Set(8001, true, true).Problem!.Words);
 
         // Through the API: the address it's on is kept, and the sign-in names it.
         using var dir = new TempDir();
@@ -508,7 +510,7 @@ public class ClaudeTests
     // --- AI tool access --------------------------------------------------------------------------------------------
 
     [Fact]
-    public async Task Turning_tool_access_off_refuses_the_whole_door_at_once()
+    public async Task Turning_tool_access_off_refuses_every_call_in_words_but_keeps_the_door_open()
     {
         using var dir = new TempDir();
         var (cfg, store) = Library(dir);
@@ -518,17 +520,18 @@ public class ClaudeTests
         var (token, _) = access.CreateToken("Cursor");
         access.ToolsOn = false;
 
-        var refused = await site.Client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/mcp")
-        {
-            Headers = { Authorization = new("Bearer", token), Accept = { new("application/json"), new("text/event-stream") } },
-            Content = JsonContent.Create(new { jsonrpc = "2.0", id = 1, method = "tools/list" }),
-        });
-        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
-        Assert.Contains("AI tool access is off", await refused.Content.ReadAsStringAsync());
+        // A refused connection would be a dead end in Claude ("couldn't connect"); a tool error reaches the model and
+        // the student in words, and needs no reconnect.
+        await using var mcp = await Connect(site, token);
+        var tools = await mcp.ListToolsAsync();
+        Assert.Equal(5, tools.Count); // refused at call time, not hidden
+        var refused = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
+        Assert.Equal(true, refused.IsError);
+        Assert.Equal(StudyStash.Core.Ai.ToolAccess.Off, ((TextContentBlock)refused.Content[0]).Text);
 
         access.ToolsOn = true;
-        await using var mcp = await Connect(site, token);
-        Assert.Equal(5, (await mcp.ListToolsAsync()).Count);
+        var ok = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
+        Assert.True(ok.IsError is null or false);
     }
 
     [Fact]
@@ -545,7 +548,7 @@ public class ClaudeTests
         await using var mcp = await Connect(site, token);
         var refused = await mcp.CallToolAsync("get_lecture", new Dictionary<string, object?> { ["lecture_id"] = "rec-1" });
         Assert.Equal(true, refused.IsError);
-        Assert.Contains("don't let AI tools read that", ((TextContentBlock)refused.Content[0]).Text);
+        Assert.Equal("Study Stash's settings don't let AI tools read study notes right now (Settings → AI tool access → Study notes).", ((TextContentBlock)refused.Content[0]).Text);
 
         var ok = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
         Assert.True(ok.IsError is null or false);

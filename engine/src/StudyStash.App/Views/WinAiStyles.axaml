@@ -489,4 +489,22 @@
     <Setter Property="Background" Value="{DynamicResource Accent}" />
     <Setter Property="BorderThickness" Value="0" />
   </Style>
+
+  <!-- The "Claude (desktop and web)" card's own bits (14, connectors): a numbered step marker the same size as
+       ai-check, and the field rows' own label/value split. -->
+  <Style Selector="Border.ai-num">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-num > TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
 </Styles>

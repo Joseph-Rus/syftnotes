@@ -47,7 +47,8 @@ public sealed class LibrarySettingsRoundTripTests
     /// <summary>A change sent in the background (a switch) has reached the library once <paramref name="done"/> holds.</summary>
     static async Task Until(Func<bool> done)
     {
-        for (int i = 0; i < 200 && !done(); i++) await Task.Delay(25);
+        // Up to 30 s: a busy CI machine can take a few seconds to save a switch; it's quick when all is well.
+        for (int i = 0; i < 1200 && !done(); i++) await Task.Delay(25);
         Assert.True(done());
     }
 

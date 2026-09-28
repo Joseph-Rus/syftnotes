@@ -168,6 +168,9 @@ Windows it runs the new Setup.exe quietly. Every download is checked against the
 **Mac:** quit Study Stash and drag it from Applications to the Trash. **Windows:** Settings → Apps →
 **Study Stash** → Uninstall. Your lectures and settings stay where they are; only the app goes.
 
+[docs/claude-connector.md](docs/claude-connector.md) walks through adding Study Stash as a custom connector in Claude,
+what Claude can read, troubleshooting, and how each requirement of Claude's connectors is met and tested.
+
 ## Where your data lives
 
 Everything is under `~/.study-stash` (or `--home`, or the `STUDYSTASH_HOME` environment variable):
