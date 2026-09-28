@@ -25,8 +25,9 @@ public sealed class LibraryHere
         FirstPort = Environment.GetEnvironmentVariable("STUDYSTASH_LIBRARY_PORT") is { Length: > 0 } p && int.TryParse(p, out int port) ? port : 8787,
     };
 
-    /// <summary>The folder a new library keeps its notes in: Documents/Study Stash.</summary>
-    public static string DefaultFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Study Stash");
+    /// <summary>The folder a new library keeps its notes in: Documents/Study Stash (Documents\Study Stash on Windows,
+    /// wherever Windows keeps Documents), the same folder the engine's own setup uses.</summary>
+    public static string DefaultFolder => Configs.DefaultPoolDir;
 
     /// <summary>The library on this computer listens to this computer alone (just this computer's setup), not to
     /// the network.</summary>
