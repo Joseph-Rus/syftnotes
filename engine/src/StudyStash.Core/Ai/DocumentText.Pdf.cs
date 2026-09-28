@@ -17,14 +17,33 @@ public static partial class DocumentText
     /// </summary>
     static string? Pdf(string path, DocumentTextOptions options, CancellationToken ct)
     {
-        var until = DateTime.UtcNow + options.TimeLimit;
+        var started = DateTime.UtcNow;
         var pages = PdfPages(path, options.MaxPages, ct);
         if (pages is null) return null;
         var bare = Enumerable.Range(0, pages.Count).Where(i => Letters(pages[i]) < TypedEnough).Take(options.MaxOcrPages).ToList();
-        if (bare.Count > 0 && DateTime.UtcNow < until && (options.PageReader ?? PageReader) is { } read)
-            foreach (var (i, text) in read(path, bare, until, ct))
+        var left = options.TimeLimit - (DateTime.UtcNow - started);
+        // The time left starts once it's this file's turn: waiting for another file's reading doesn't use it up.
+        if (bare.Count > 0 && left > TimeSpan.Zero && (options.PageReader ?? PageReader) is { } read)
+            foreach (var (i, text) in OneAtATime(() => read(path, bare, DateTime.UtcNow + left, ct), ct))
                 if (i >= 0 && i < pages.Count && Letters(text) > Letters(pages[i])) pages[i] = text;
         return string.Join("\n\n", pages.Select(Py.Strip).Where(t => t.Length > 0));
+    }
+
+    static readonly SemaphoreSlim recognizing = new(1, 1);
+
+    /// <summary>Text recognition keeps the processor (or graphics) busy: one file is read at a time, the others wait
+    /// their turn.</summary>
+    static T OneAtATime<T>(Func<T> work, CancellationToken ct)
+    {
+        recognizing.Wait(ct);
+        try
+        {
+            return work();
+        }
+        finally
+        {
+            recognizing.Release();
+        }
     }
 
     static int Letters(string text) => text.Count(char.IsLetterOrDigit);

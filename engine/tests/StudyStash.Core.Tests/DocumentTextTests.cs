@@ -139,6 +139,42 @@ public class DocumentTextTests
     }
 
     [Fact]
+    public async Task Files_are_recognized_one_at_a_time_and_waiting_a_turn_uses_none_of_the_time()
+    {
+        using var dir = new TempDir();
+        int now = 0, most = 0;
+        var options = NoCache with
+        {
+            TimeLimit = TimeSpan.FromSeconds(1),
+            PageReader = (_, pages, until, _) =>
+            {
+                Assert.True(until > DateTime.UtcNow.AddMilliseconds(700));
+                int at = Interlocked.Increment(ref now);
+                InterlockedMax(ref most, at);
+                Thread.Sleep(400);
+                Interlocked.Decrement(ref now);
+                return pages.ToDictionary(p => p, _ => "read");
+            },
+        };
+        var files = Enumerable.Range(0, 4).Select(i => dir[$"scan{i}.pdf"]).ToList();
+        foreach (string f in files) TypedPdf(f, [[]]);
+
+        var texts = await Task.WhenAll(files.Select(f => DocumentText.ExtractAsync(f, options, default)));
+
+        // The last in line waited longer than its whole second, and still had it when its turn came.
+        Assert.All(texts, t => Assert.Equal("read", t));
+        Assert.Equal(1, most);
+    }
+
+    static void InterlockedMax(ref int target, int value)
+    {
+        int seen;
+        while ((seen = Volatile.Read(ref target)) < value && Interlocked.CompareExchange(ref target, value, seen) != seen)
+        {
+        }
+    }
+
+    [Fact]
     public async Task Stopping_stops_the_reading_and_keeps_nothing()
     {
         using var dir = new TempDir();

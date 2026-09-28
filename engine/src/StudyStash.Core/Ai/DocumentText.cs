@@ -111,7 +111,7 @@ public static partial class DocumentText
                 ".pptx" => Pptx(path),
                 ".doc" or ".rtf" => Machine.Run("textutil", ["-convert", "txt", "-stdout", path], TimeSpan.FromSeconds(25))?.Stdout,
                 _ when Plain.Contains(ext) => File.ReadAllText(path),
-                _ when Images.Contains(ext) => ImageText(path, DateTime.UtcNow + options.TimeLimit),
+                _ when Images.Contains(ext) => OneAtATime(() => ImageText(path, DateTime.UtcNow + options.TimeLimit), ct),
                 _ => null,
             };
         }
