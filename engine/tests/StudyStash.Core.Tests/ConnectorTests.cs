@@ -263,9 +263,10 @@ public class ConnectorTests
         var page = await c.GetAsync("/authorize?" + Query(fields));
         string html = await page.Content.ReadAsStringAsync();
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
-        // Named by where its identity is published; what it calls itself comes second.
-        Assert.Contains("Let clients.example read your lectures?", html);
-        Assert.Contains("It calls itself Claude.", html);
+        // The self-asserted name leads the heading; the redirect host and the published-identity host follow it.
+        Assert.Contains("Claude wants to read your lectures", html);
+        Assert.Contains("will return to claude.ai", html);
+        Assert.Contains("Identified by clients.example", html);
 
         var back = await Allow(c, fields);
         Assert.StartsWith(WebCallback + "?code=", back.ToString());
@@ -306,21 +307,23 @@ public class ConnectorTests
             Assert.Null(post.Headers.Location);
         }
 
+        const string CimdInvalid = "couldn&#x27;t confirm which app this is";
+        const string UnknownLink = "sign-in link has expired or didn&#x27;t come from Claude";
         door.Docs[HostedDoc] = Doc("https://clients.example/someone-else.json", "Claude", WebCallback);
-        await Problem(HostedDoc, WebCallback, "aren&#x27;t right");
+        await Problem(HostedDoc, WebCallback, CimdInvalid);
         door.Docs[HostedDoc] = Doc(HostedDoc, "Claude", WebCallback);
-        await Problem(HostedDoc, "https://evil.example/cb", "goes somewhere Study Stash doesn");
+        await Problem(HostedDoc, "https://evil.example/cb", UnknownLink);
         door.Docs[HostedDoc] = Doc(HostedDoc, "Claude", "http://evil.example/cb");
-        await Problem(HostedDoc, "http://evil.example/cb", "aren&#x27;t right");
+        await Problem(HostedDoc, "http://evil.example/cb", CimdInvalid);
         door.Docs[HostedDoc] = new JsonObject { ["client_id"] = HostedDoc, ["redirect_uris"] = new JsonArray(WebCallback), ["token_endpoint_auth_method"] = "private_key_jwt" }.ToJsonString();
-        await Problem(HostedDoc, WebCallback, "aren&#x27;t right");
+        await Problem(HostedDoc, WebCallback, CimdInvalid);
         door.Docs[HostedDoc] = "<html>not json</html>";
-        await Problem(HostedDoc, WebCallback, "aren&#x27;t right");
+        await Problem(HostedDoc, WebCallback, CimdInvalid);
         door.Docs.Remove(HostedDoc);
-        await Problem(HostedDoc, WebCallback, "couldn&#x27;t read the app&#x27;s details from clients.example");
+        await Problem(HostedDoc, WebCallback, CimdInvalid);
         // Not a CIMD address (no path, or not https): just an unknown client.
-        await Problem("https://clients.example", WebCallback, "isn&#x27;t one Study Stash knows");
-        await Problem("http://clients.example/claude.json", WebCallback, "isn&#x27;t one Study Stash knows");
+        await Problem("https://clients.example", WebCallback, UnknownLink);
+        await Problem("http://clients.example/claude.json", WebCallback, UnknownLink);
         Assert.DoesNotContain("https://clients.example/", door.Fetched);
     }
 

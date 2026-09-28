@@ -70,6 +70,14 @@ public sealed class ClaudeAccess
 {
     public const double AccessSeconds = 3600, CodeSeconds = 300, RefreshIdleSeconds = 30 * 86400, RefreshGraceSeconds = 60;
     public const int MaxRedirects = 10, MaxRedirectLength = 2000;
+
+    /// <summary>Shown for a client_id nobody knows, or a redirect_uri that doesn't match one on file: it never says
+    /// which, so a guess at a client_id can't be confirmed by the wording.</summary>
+    public const string UnknownLinkMessage = "This sign-in link has expired or didn't come from Claude. Go back to Claude and choose Connect again.";
+
+    /// <summary>Shown when a client's published identity (CIMD) couldn't be read or doesn't check out: the document
+    /// didn't fetch, wasn't JSON, claimed a different client_id, listed no good redirect_uris, or asked for a secret.</summary>
+    public const string CimdInvalidMessage = "Study Stash couldn't confirm which app this is. Go back and try again.";
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
     sealed class State
@@ -286,12 +294,11 @@ public sealed class ClaudeAccess
     public async Task<(ClaudeClient? Client, string? Problem)> ClientForAsync(string clientId, CancellationToken ct = default)
     {
         if (!IsDocumentClientId(clientId))
-            return Client(clientId) is { } registered ? (registered, null)
-                : (null, "This sign-in link isn't one Study Stash knows. Start again from Claude.");
+            return Client(clientId) is { } registered ? (registered, null) : (null, UnknownLinkMessage);
         var url = new Uri(clientId);
         string host = url.IdnHost.ToLowerInvariant();
         string? text = await FetchClientDocument(url, ct);
-        if (text is null) return (null, $"Study Stash couldn't read the app's details from {host}. Try again in a minute, or start again from Claude.");
+        if (text is null) return (null, CimdInvalidMessage);
         System.Text.Json.Nodes.JsonObject? doc;
         try
         {
@@ -302,11 +309,10 @@ public sealed class ClaudeAccess
             doc = null;
         }
         string? Str(string key) => doc?[key] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue(out string? x) ? x : null;
-        string bad = $"The app's details at {host} aren't right, so Study Stash won't sign it in. Start again from Claude.";
-        if (doc is null || Str("client_id") != clientId) return (null, bad);
+        if (doc is null || Str("client_id") != clientId) return (null, CimdInvalidMessage);
         var uris = (doc["redirect_uris"] as System.Text.Json.Nodes.JsonArray ?? []).Select(n => n is System.Text.Json.Nodes.JsonValue v && v.TryGetValue(out string? x) ? x : "").ToList();
-        if (uris.Count == 0 || !uris.All(GoodRedirect)) return (null, bad);
-        if (doc["token_endpoint_auth_method"] is not null && Str("token_endpoint_auth_method") != "none") return (null, bad);
+        if (uris.Count == 0 || !uris.All(GoodRedirect)) return (null, CimdInvalidMessage);
+        if (doc["token_endpoint_auth_method"] is not null && Str("token_endpoint_auth_method") != "none") return (null, CimdInvalidMessage);
         string name = (Str("client_name") ?? "").Trim();
         return (new ClaudeClient { ClientId = clientId, Name = name.Length > 0 ? Py.Head(name, 80) : host, RedirectUris = uris, Created = Now, Host = host }, null);
     }

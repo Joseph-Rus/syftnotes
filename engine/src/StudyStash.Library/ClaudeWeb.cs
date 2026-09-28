@@ -342,13 +342,18 @@ public static class ClaudeWeb
     /// Claude with a code; turned down, with access_denied. Every answer that goes back names this server (iss).</summary>
     static async Task<IResult> Authorize(HttpContext ctx, Config cfg, ClaudeAccess access, IFormCollection? post)
     {
+        // The page is only ever fetched fresh, never framed, and never sent to another site as a referrer.
+        ctx.Response.Headers.CacheControl = "no-store";
+        ctx.Response.Headers["Referrer-Policy"] = "no-referrer";
+        ctx.Response.Headers["X-Frame-Options"] = "DENY";
         string clientId = Q(post, ctx, "client_id"), redirect = Q(post, ctx, "redirect_uri"), state = Q(post, ctx, "state");
         string challenge = Q(post, ctx, "code_challenge"), method = Q(post, ctx, "code_challenge_method"), resource = Q(post, ctx, "resource");
+        string scope = Q(post, ctx, "scope");
         var (client, problem) = await access.ClientForAsync(clientId, ctx.RequestAborted);
         // Nothing is sent back to a redirect we can't vouch for: the page says what's wrong instead.
         if (client is null) return Problem(problem!, 400);
-        if (!client.RedirectUris.Any(r => ClaudeAccess.RedirectMatches(r, redirect)))
-            return Problem("This sign-in link goes somewhere Study Stash doesn't know. Start again from Claude.", 400);
+        if (!client.RedirectUris.Any(r => ClaudeAccess.RedirectMatches(r, redirect)) || !Uri.TryCreate(redirect, UriKind.Absolute, out var redirectUri))
+            return Problem(ClaudeAccess.UnknownLinkMessage, 400);
         string Back(string query) => redirect + (redirect.Contains('?') ? "&" : "?") + query
             + (state.Length > 0 ? "&state=" + Uri.EscapeDataString(state) : "") + "&iss=" + Uri.EscapeDataString(Base(ctx, access));
         if (Q(post, ctx, "response_type") != "code") return Results.Redirect(Back("error=unsupported_response_type"));
@@ -359,62 +364,99 @@ public static class ClaudeWeb
         if (bound is null || !Ours(ctx, cfg, access, bound))
             return Results.Redirect(Back("error=invalid_target&error_description=" + Uri.EscapeDataString("resource isn't this library's MCP address")));
         if (cfg.PoolPassword.Length == 0)
-            return Problem("Set a password for your library first (in its Settings), so only you can let Claude in.", 403);
+            return Problem("Your library has no password yet. Set one in Study Stash → Settings → Library, then connect again.", 403);
         var fields = new[] { ("client_id", clientId), ("redirect_uri", redirect), ("state", state), ("code_challenge", challenge),
-            ("code_challenge_method", method), ("resource", resource), ("response_type", "code") };
-        string csp = $"default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; form-action 'self' {new Uri(redirect).GetLeftPart(UriPartial.Authority)}; frame-ancestors 'none'; base-uri 'none'";
-        if (post is null) return Form(cfg, client, fields, csp, error: null);
+            ("code_challenge_method", method), ("resource", resource), ("response_type", "code"), ("scope", scope) };
+        string csp = $"default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; form-action 'self' {redirectUri.GetLeftPart(UriPartial.Authority)}; frame-ancestors 'none'; base-uri 'none'";
+        if (post is null) return Form(cfg, access, client, redirectUri, fields, csp, error: null);
         if (post.Get("decision") == "deny") return Results.Redirect(Back("error=access_denied"));
-        if (access.LockedOut()) return Form(cfg, client, fields, csp, "Too many wrong passwords. Try again in 15 minutes.", 429);
+        // The same page either way, so the wording alone can't say whether the lockout or the password check found
+        // the problem first.
+        if (access.LockedOut()) return Form(cfg, access, client, redirectUri, fields, csp, "Too many wrong tries. Wait 15 minutes, then choose Connect in Claude again.", 429);
         string password = post.Get("password");
         bool right = CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(password), Encoding.UTF8.GetBytes(cfg.PoolPassword));
         if (!right)
         {
             access.Failed();
-            return Form(cfg, client, fields, csp, "That password isn't right.", 401);
+            return Form(cfg, access, client, redirectUri, fields, csp, "That isn't your library password. Try again.", 401);
         }
         return Results.Redirect(Back("code=" + Uri.EscapeDataString(access.NewCode(client, redirect, challenge, bound))));
     }
 
-    static IResult Form(Config cfg, ClaudeClient client, (string, string)[] fields, string csp, string? error, int status = 200)
+    /// <summary>A redirect back to a program on this computer (Claude Code's loopback callback), not a browser
+    /// somewhere else: the page warns, since anyone could have started that program.</summary>
+    static bool IsLoopback(Uri u) => u.Scheme == Uri.UriSchemeHttp && (u.IsLoopback || u.IdnHost.Equals("localhost", StringComparison.OrdinalIgnoreCase));
+
+    static string HostDisplay(Uri u) => u.HostNameType == UriHostNameType.IPv6 ? $"[{u.IdnHost}]" : u.IdnHost;
+
+    static IResult Form(Config cfg, ClaudeAccess access, ClaudeClient client, Uri redirect, (string, string)[] fields, string csp, string? error, int status = 200)
     {
         string hidden = string.Concat(fields.Select(f => $"<input type=\"hidden\" name=\"{f.Item1}\" value=\"{Ui.Esc(f.Item2)}\">"));
-        string err = error is null ? "" : $"<p class=\"bad\">{Ui.Esc(error)}</p>";
-        // An app with a published identity is named by where it's published: its own name is only its say-so.
-        string who = client.Host ?? (client.Name.Length > 0 ? client.Name : "Claude");
-        string says = client.Host is not null && client.Name != client.Host ? $"<p>It calls itself {Ui.Esc(client.Name)}.</p>" : "";
+        string err = error is null ? "" : $"<p class=\"bad\" role=\"alert\">{Ui.Esc(error)}</p>";
+        // Anyone can claim any name at registration; a published identity (CIMD) is named by where it's published too.
+        string name = client.Name.Length > 0 ? client.Name : "Claude";
+        string identifiedBy = client.Host is not null ? $"<p class=\"who\">Identified by {Ui.Esc(client.Host)}</p>" : "";
+        string warn = IsLoopback(redirect)
+            ? "<p class=\"warn\">This goes back to a program on this computer (localhost). Allow it only if you just started it yourself.</p>" : "";
+        var reading = access.Reading;
+        var items = new List<string>();
+        if (reading.Lectures) items.Add("Lectures and transcripts");
+        if (reading.Notes) items.Add("Study notes");
+        if (reading.Canvas) items.Add("Canvas assignments and files");
+        string list = items.Count > 0 ? $"<ul class=\"reading\">{string.Concat(items.Select(i => $"<li>{Ui.Esc(i)}</li>"))}</ul>" : "";
+        string toolsOff = access.ToolsOn ? "" : "<p class=\"note\">AI tool access is off in Study Stash, so Claude won't see anything until you turn it on.</p>";
         string body = $"""
             <main><form method="post" action="/authorize">
             <img src="/icon.png" alt="" width="56" height="56">
-            <h1>Let {Ui.Esc(who)} read your lectures?</h1>
-            {says}<p>It will see the notes and transcripts in {Ui.Esc(cfg.PoolName)}. It can't change or delete anything.</p>
-            {err}{hidden}
-            <input type="password" name="password" placeholder="Library password" aria-label="Library password" autocomplete="current-password" autofocus required>
+            <p class="lib">{Ui.Esc(cfg.PoolName)}</p>
+            <h1>{Ui.Esc(name)} wants to read your lectures</h1>
+            <p class="who">{Ui.Esc(name)} · will return to {Ui.Esc(HostDisplay(redirect))}</p>
+            {identifiedBy}{warn}
+            {list}
+            <p class="cant">It can't change or delete anything.</p>
+            {toolsOff}{err}{hidden}
+            <label for="pw">Library password</label>
+            <input id="pw" type="password" name="password" autocomplete="current-password" autofocus required>
+            <div class="btns">
             <button name="decision" value="allow">Allow</button>
-            <button name="decision" value="deny" class="quiet" formnovalidate>Don't allow</button>
+            <button name="decision" value="deny" class="quiet" formnovalidate>Deny</button>
+            </div>
             </form></main>
             """;
-        return Http.Html(Shell("Allow Claude · Study Stash", body), csp, status);
+        return Http.Html(Shell($"{name} · {cfg.PoolName}", body), csp, status);
     }
 
     static IResult Problem(string text, int status) =>
-        Http.Html(Shell("Study Stash", $"<main><form><img src=\"/icon.png\" alt=\"\" width=\"56\" height=\"56\"><h1>Can't sign in</h1><p>{Ui.Esc(text)}</p></form></main>"),
+        Http.Html(Shell("Study Stash", $"<main><form><img src=\"/icon.png\" alt=\"\" width=\"56\" height=\"56\"><h1>Can't sign in</h1><p role=\"alert\">{Ui.Esc(text)}</p></form></main>"),
             "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; frame-ancestors 'none'; base-uri 'none'", status);
 
-    /// <summary>A page in the Study Stash look, light or dark with the system, self-contained (no scripts).</summary>
+    /// <summary>A page in the Study Stash look (the Lagoon accent), light or dark with the system, self-contained (no
+    /// scripts, so the CSP can hold to <c>default-src 'none'</c>).</summary>
     static string Shell(string title, string body) => $$$"""
-        <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+        <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <title>{{{Ui.Esc(title)}}}</title><link rel="icon" href="/favicon.ico">
         <style>
-        :root{color-scheme:light dark;--bg:#F4F4F4;--card:#fff;--fg:#1D1D1F;--fg2:rgba(0,0,0,.56);--sep:rgba(0,0,0,.1);--accent:#E5484D;--bad:#C4383D}
-        @media (prefers-color-scheme:dark){:root{--bg:#161616;--card:#1E1E1E;--fg:#F5F5F7;--fg2:rgba(255,255,255,.58);--sep:rgba(255,255,255,.1);--accent:#EC5D5E;--bad:#F4979A}}
-        *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--bg);color:var(--fg);
+        :root{color-scheme:light dark;--bg:#F4F4F4;--card:#fff;--fg:#1D1D1F;--fg2:rgba(0,0,0,.56);--fg3:rgba(0,0,0,.4);--sep:rgba(0,0,0,.1);
+        --accent:#008F90;--accentText:#007172;--bad:#C4383D;--warn:#8A5300}
+        @media (prefers-color-scheme:dark){:root{--bg:#161616;--card:#1E1E1E;--fg:#F5F5F7;--fg2:rgba(255,255,255,.6);--fg3:rgba(255,255,255,.4);
+        --sep:rgba(255,255,255,.12);--accent:#00A8A9;--accentText:#6AD1D1;--bad:#F4979A;--warn:#F2AF48}}
+        *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:var(--bg);color:var(--fg);
         font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-        main{width:min(380px,100%)}form{display:grid;gap:12px;padding:32px 28px;border-radius:16px;background:var(--card);box-shadow:0 12px 40px rgba(0,0,0,.12),0 0 0 .5px var(--sep);text-align:center}
-        img{margin:0 auto 4px;border-radius:12px}h1{font-size:20px;line-height:1.25;margin:0;letter-spacing:-.01em}p{margin:0;color:var(--fg2);font-size:14px}
-        p.bad{color:var(--bad)}input{height:40px;padding:0 12px;border-radius:8px;border:1px solid var(--sep);background:transparent;color:inherit;font:inherit}
-        input:focus{outline:2px solid var(--accent);outline-offset:1px}button{height:40px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}
-        button.quiet{background:transparent;color:var(--fg2);font-weight:500}button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+        main{width:min(400px,100%)}form{display:grid;gap:10px;padding:28px 24px;border-radius:16px;background:var(--card);
+        box-shadow:0 12px 40px rgba(0,0,0,.12),0 0 0 .5px var(--sep);text-align:center}
+        img{margin:0 auto 2px;border-radius:12px}p.lib{margin:0;color:var(--fg3);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+        h1{font-size:19px;line-height:1.3;margin:2px 0 0;letter-spacing:-.01em}p{margin:0;color:var(--fg2);font-size:13px}
+        p.who{font-size:12.5px}p.warn{color:var(--warn)}p.note{color:var(--warn)}p.bad{color:var(--bad);font-weight:600}
+        ul.reading{margin:6px 0 0;padding:0 0 0 18px;text-align:left;font-size:13px;color:var(--fg2)}ul.reading li{margin:2px 0}
+        p.cant{font-size:12.5px}
+        label{font-size:12.5px;color:var(--fg2);text-align:left;margin-top:6px}
+        input{height:44px;padding:0 12px;border-radius:8px;border:1px solid var(--sep);background:transparent;color:inherit;font-size:16px;font-family:inherit}
+        input:focus{outline:2px solid var(--accent);outline-offset:1px}
+        .btns{display:flex;gap:10px}
+        button{flex:1;height:44px;border:0;border-radius:8px;background:var(--accent);color:#fff;font:inherit;font-weight:600;cursor:pointer}
+        button.quiet{background:transparent;color:var(--fg2);font-weight:500;box-shadow:inset 0 0 0 1px var(--sep)}
+        button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+        @media (max-width:360px){.btns{flex-direction:column}}
         </style></head><body>{{{body}}}</body></html>
         """;
 }
