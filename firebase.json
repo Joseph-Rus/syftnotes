@@ -1,13 +1,21 @@
 {
   "hosting": {
     "public": "site",
-    "ignore": ["check.mjs", "README.md", "**/.*"],
+    "ignore": [
+      "check.mjs",
+      "README.md"
+    ],
     "cleanUrls": true,
     "trailingSlash": true,
     "headers": [
       {
         "source": "/assets/**",
-        "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400"
+          }
+        ]
       }
     ]
   }

@@ -11,7 +11,7 @@ site/
   privacy/index.html  privacy policy, including Google's Limited Use disclosure
   terms/index.html    terms of use (MIT, as is)
   support/index.html  support: GitHub issues, private security reports
-  404.html            GitHub Pages' page for a missing address
+  404.html            the page for a missing address
   assets/             site.css, site.js, the icon, favicon, social picture and screenshots (WebP)
   check.mjs           the check CI runs before publishing (not published)
 ```
@@ -28,11 +28,12 @@ python3 -m http.server 8000 --directory site     # then open http://localhost:80
 node site/check.mjs                              # the same check CI runs
 ```
 
-Every link is relative, so the site works at `https://<user>.github.io/study-stash/` and on its own domain alike.
+Every link is relative, so the site works at `https://study-stash-app.web.app/`, on its own domain, and under a
+folder such as `<user>.github.io/study-stash/` alike.
 `check.mjs` fails if one starts with `/`. Pages are folders (`privacy/index.html`), so addresses are
 `/privacy/`, `/phone/` and so on.
 
-**The check** serves `site/` the way GitHub Pages does and fails when a page doesn't load or is missing `lang`, a
+**The check** serves `site/` the way a static host does and fails when a page doesn't load or is missing `lang`, a
 viewport, a `<title>`, a description or an `<h1>`; when an image has no `alt`; when any link, image, script or
 stylesheet on the site doesn't resolve, or a `#fragment` names no id on its page; when a page loads anything from
 another site; or when a download link isn't `Study-Stash.dmg` or `Study-Stash-Setup.exe` from
@@ -41,25 +42,30 @@ before a release with those assets exists.
 
 ## Publishing
 
-`.github/workflows/site.yml` runs the check and publishes `site/` (without `check.mjs` and this README) to GitHub
-Pages when a push to `main` changes `site/**`. Pull requests that change the site are checked but not published. It
-can also be run by hand (Actions, Website, Run workflow).
+The site is hosted by **Firebase Hosting** in the `study-stash-app` Google Cloud project (the same project as the
+Google Calendar sign-in), set up by `firebase.json` and `.firebaserc` at the repository's root: `site/` as it is,
+without `check.mjs` and this README, with clean addresses (`/privacy/`). It's free at
+`https://study-stash-app.web.app/` (and `study-stash-app.firebaseapp.com`).
 
-Once, in the repository's **Settings → Pages**, set **Source** to **GitHub Actions**.
+By hand, from the repository's root, with the Firebase CLI signed in to an owner of the project:
+
+```sh
+node site/check.mjs && firebase deploy --only hosting
+```
+
+`.github/workflows/site.yml` runs the check on every pull request that changes `site/**`, and on a push to `main`
+also publishes, when the repository has a `FIREBASE_SERVICE_ACCOUNT` secret (a service account key for the project
+with the **Firebase Hosting Admin** role; `firebase init hosting:github` makes one and adds the secret). Without the
+secret, it only checks.
 
 ## The domain
 
 The site is built for its own domain, which isn't bought yet. When it is:
 
-1. Add `site/CNAME` holding just the domain, one line, e.g. `studystash.app` (use the bare domain or `www.`, the
-   one you want people to see). The workflow publishes it with the pages.
-2. At the domain's DNS: for a bare domain, `A` records to `185.199.108.153`, `185.199.109.153`,
-   `185.199.110.153`, `185.199.111.153` (and `AAAA` to `2606:50c0:8000::153` … `8003::153`); for `www`, a `CNAME`
-   to `joseph-rus.github.io`.
-3. **Settings → Pages**: type the domain under **Custom domain**, wait for the DNS check, then tick **Enforce
-   HTTPS**. Verify the domain for the account too (GitHub **Settings → Pages → Add a domain**), so no one else can
-   claim it.
-4. Make `og:image` in `index.html` absolute (`https://<domain>/assets/social.png`): link previews need a full
+1. Firebase console → **Hosting → Add custom domain**, type it (the bare domain, and `www` redirecting to it).
+2. At the domain's DNS, add the `TXT` and `A` records Firebase shows; it issues the HTTPS certificate itself (up to a
+   day).
+3. Make `og:image` in `index.html` absolute (`https://<domain>/assets/social.png`): link previews need a full
    address.
 
 Nothing else changes: every link is relative.
@@ -105,8 +111,8 @@ What reviewers check on the site, and where it is:
   publisher domain.
 - **Publisher domain**: verify the domain (**Branding & properties → Publisher domain → Verify**). Entra gives a
   JSON file to publish at `https://<domain>/.well-known/microsoft-identity-association.json`. Put it at
-  `site/.well-known/microsoft-identity-association.json`; the workflow's `upload-pages-artifact@v3` includes
-  dot-folders (v4 leaves them out, so check before upgrading it), and GitHub Pages serves the file as it is. (Adding a DNS `TXT` record instead also works for a verified domain in
+  `site/.well-known/microsoft-identity-association.json`; Firebase Hosting publishes dot-folders (`firebase.json`
+  ignores only the check and this README) and serves the file as it is. (Adding a DNS `TXT` record instead also works for a verified domain in
   the tenant.)
 - **Verified publisher** then needs a Microsoft AI Cloud Partner Program (formerly MPN) account whose publisher
   domain matches, linked in **Branding & properties → Publisher verification**.
