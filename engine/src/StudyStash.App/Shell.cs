@@ -123,6 +123,7 @@ public static partial class Shell
         ticker = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Tick());
         ticker.Start();
         Refresh();
+        SayIfUpdated();
         if (!host.Settings.SetupDone) ShowSetup();
         else if (!Program.Background) ShowLibrary();
         if (SelfTest.Dir is not null) SelfTest.Run();

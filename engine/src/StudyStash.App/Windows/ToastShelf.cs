@@ -67,7 +67,7 @@ public sealed class ToastShelf
         {
             var view = notice.Model is CanvasToastModel canvasToast ? ToastView.For(canvasToast)
                 : new ToastView { Title = notice.Title, Text = notice.Text, ActionLabel = notice.ActionLabel };
-            var w = new Floating { Content = view, Title = notice.Title, ShowActivated = false, NoActivate = true };
+            var w = new Floating { Content = view, Title = notice.Title, ShowActivated = false, Notification = true };
             view.Acted += () =>
             {
                 Close(notice);
@@ -198,5 +198,17 @@ public sealed class ToastShelf
                 if (w.IsVisible) w.Hide();
             }
         }
+        // Lower cards in front: a card's shadow falls mostly below it, so the one under it is never behind that shadow
+        // (where a click would land on the shadow, not on the card). Only when the order changed.
+        var fronts = order.Where(n => shown[n].Window.IsVisible).OrderBy(n => shown[n].Window.Position.Y).ToList();
+        string z = string.Join("\n", fronts.Select(n => n.Key));
+        if (z != zOrder)
+        {
+            zOrder = z;
+            foreach (var n in fronts) shown[n].Window.OrderFront();
+        }
     }
+
+    /// <summary>The cards' front-to-back order when it was last set, top to bottom.</summary>
+    string zOrder = "";
 }

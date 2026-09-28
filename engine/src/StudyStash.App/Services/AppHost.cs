@@ -61,6 +61,8 @@ public sealed class AppSettings
     /// <summary>Light, dark, or match the computer (Settings → Appearance). Settings files saved before this
     /// existed have none, so they come back as <see cref="AppAppearance.System"/>: nothing changes for them.</summary>
     public AppAppearance Appearance { get; set; } = AppAppearance.System;
+    /// <summary>The version of Study Stash that last ran here: a newer one starting (it updated itself) says so, once.</summary>
+    public string LastVersion { get; set; } = "";
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 

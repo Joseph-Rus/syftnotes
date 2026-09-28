@@ -73,7 +73,7 @@ public class ToastShelfTests
         Assert.False(w.ShowActivated);
         Assert.True(w.Topmost);
         Assert.False(w.ShowInTaskbar);
-        Assert.True(w.NoActivate);
+        Assert.True(w.Notification);
     }
 
     [AvaloniaFact]

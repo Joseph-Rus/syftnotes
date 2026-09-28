@@ -54,6 +54,16 @@ public static class NoticeWords
     public static (string Title, string Text) LighterModel(ModelAdvice advice) =>
         ("A lighter model would keep up better", $"{advice.Why} Switch in Settings → Recording.");
 
+    /// <summary>Study Stash updates itself while nothing's recording and starts again: the first start of a newer
+    /// version than <paramref name="lastRun"/> says so, once (the S. went from the menu bar for a moment). Nothing on
+    /// the very first start, or starting an older or the same version.</summary>
+    public static (string Title, string Text)? Updated(string lastRun, string running)
+    {
+        if (lastRun.Length == 0 || Updates.Compare(Updates.ParseVersion(running), Updates.ParseVersion(lastRun)) <= 0) return null;
+        string version = string.Join('.', Updates.ParseVersion(running));
+        return ($"Study Stash updated to {version}", "It updated itself while you weren't recording. Everything is as you left it.");
+    }
+
     /// <summary>The problems worth a notification when they start (not just a line in the dropdown): each stops
     /// lectures being written down or filed until the student does something. A library out of reach isn't one: the
     /// lectures wait on this computer by themselves, and that's normal away from home.</summary>

@@ -75,6 +75,17 @@ public class NoticeWordsTests
         Assert.EndsWith("Switch in Settings → Recording.", text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void A_newer_version_starting_says_it_updated_once_and_nothing_else_does()
+    {
+        Assert.Equal(("Study Stash updated to 0.9.2", "It updated itself while you weren't recording. Everything is as you left it."),
+            NoticeWords.Updated("0.9.1", "0.9.2"));
+        Assert.Equal("Study Stash updated to 1.0.0", NoticeWords.Updated("0.9.1", "v1.0.0")!.Value.Title);
+        Assert.Null(NoticeWords.Updated("", "0.9.2")); // the very first start
+        Assert.Null(NoticeWords.Updated("0.9.2", "0.9.2"));
+        Assert.Null(NoticeWords.Updated("0.9.2", "0.9.1")); // an older copy
+    }
+
     [Theory]
     [InlineData(ProblemKind.WhisperFailed, true)]
     [InlineData(ProblemKind.DownloadFailed, true)]

@@ -116,6 +116,15 @@ public static partial class Shell
         }
     }
 
+    /// <summary>The first start after Study Stash updated itself says so, once; every start remembers its version.</summary>
+    static void SayIfUpdated()
+    {
+        string last = host.Settings.LastVersion;
+        if (last == Engine.Version) return;
+        host.Save(s => s.LastVersion = Engine.Version);
+        if (host.Settings.SetupDone && NoticeWords.Updated(last, Engine.Version) is { } said) Toast(said.Title, said.Text, null, null);
+    }
+
     /// <summary>Quitting: every notification goes.</summary>
     static void CloseAllToasts() => shelf?.CloseAll();
 }

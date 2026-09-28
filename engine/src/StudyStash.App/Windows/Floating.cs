@@ -71,29 +71,71 @@ public class Floating : Window
         return new PixelRect(Position.X + room, Position.Y + room, Math.Max(0, size.Width - 2 * room), Math.Max(0, size.Height - 2 * room));
     }
 
-    /// <summary>Clicking it never takes the keyboard from the app you're typing in (Windows: it isn't activated by a
-    /// click, as the system's own notifications aren't). A Mac is looked after by <see cref="Platform.MacFocus"/>.</summary>
-    public bool NoActivate
+    /// <summary>A notification: a click on it never takes the keyboard from the app you're typing in (Windows: it isn't
+    /// activated by a click, as the system's own notifications aren't; a Mac is looked after by
+    /// <see cref="Platform.MacFocus"/>), and a click in its clear shadow room, where a neighbouring notification or
+    /// the recorder may be, goes to that window under it instead.</summary>
+    public bool Notification
     {
-        get => noActivate;
+        get => notification;
         init
         {
-            noActivate = value;
-            if (value && OperatingSystem.IsWindows()) Win32Properties.AddWndProcHookCallback(this, NoActivateHook);
+            notification = value;
+            if (value && OperatingSystem.IsWindows()) Win32Properties.AddWndProcHookCallback(this, NotificationHook);
         }
     }
 
-    readonly bool noActivate;
+    readonly bool notification;
 
-    const uint WmMouseActivate = 0x0021;
-    const int MaNoActivate = 3;
+    const uint WmMouseActivate = 0x0021, WmNcHitTest = 0x0084;
+    const int MaNoActivate = 3, HtTransparent = -1;
 
-    /// <summary>WM_MOUSEACTIVATE answered "don't activate": the click still lands on the button under it.</summary>
-    static readonly Win32Properties.CustomWndProcHookCallback NoActivateHook = (IntPtr _, uint msg, IntPtr _, IntPtr _, ref bool handled) =>
+    /// <summary>WM_MOUSEACTIVATE answered "don't activate" (the click still lands on the button under it); outside the
+    /// panel, WM_NCHITTEST answers "transparent", which hands the click to the app's own window underneath.</summary>
+    IntPtr NotificationHook(IntPtr hwnd, uint msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg != WmMouseActivate) return IntPtr.Zero;
-        handled = true;
-        return MaNoActivate;
+        if (msg == WmMouseActivate)
+        {
+            handled = true;
+            return MaNoActivate;
+        }
+        if (msg == WmNcHitTest && Panel() is { } panel)
+        {
+            long l = lParam.ToInt64();
+            var at = new PixelPoint((short)(l & 0xFFFF), (short)((l >> 16) & 0xFFFF));
+            if (!panel.Contains(at))
+            {
+                handled = true;
+                return HtTransparent;
+            }
+        }
+        return IntPtr.Zero;
+    }
+
+    /// <summary>In front of the app's other floating windows, without taking the keyboard: a stack of notifications
+    /// puts the lower ones in front, so a neighbour's faint shadow never sits over what you'd click.</summary>
+    public void OrderFront()
+    {
+        if (!IsVisible) return;
+        try
+        {
+            if (OperatingSystem.IsMacOS() && NativeWindow() is var w && w != IntPtr.Zero)
+                objc_msgSend_id(w, sel_registerName("orderFront:"), IntPtr.Zero);
+            else if (OperatingSystem.IsWindows() && TryGetPlatformHandle() is { HandleDescriptor: "HWND", Handle: var hwnd } && hwnd != IntPtr.Zero)
+                SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010); // HWND_TOPMOST; NOSIZE | NOMOVE | NOACTIVATE
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
+
+    /// <summary>A Mac: the NSWindow (Avalonia 12 hands it itself; older backends handed its view). Zero anywhere
+    /// else, and in tests.</summary>
+    IntPtr NativeWindow() => TryGetPlatformHandle() switch
+    {
+        { HandleDescriptor: "NSWindow", Handle: var w } => w,
+        { HandleDescriptor: "NSView", Handle: var v } when v != IntPtr.Zero => objc_msgSend(v, sel_registerName("window")),
+        _ => IntPtr.Zero,
     };
 
     /// <summary>A Mac: let this window show over a full-screen app's own Space (a lecture on a full-screen Zoom
@@ -105,13 +147,7 @@ public class Floating : Window
         if (!OperatingSystem.IsMacOS()) return;
         try
         {
-            // Avalonia 12 hands the NSWindow itself; older backends handed its view.
-            IntPtr nsWindow = TryGetPlatformHandle() switch
-            {
-                { HandleDescriptor: "NSWindow", Handle: var w } => w,
-                { HandleDescriptor: "NSView", Handle: var v } when v != IntPtr.Zero => objc_msgSend(v, sel_registerName("window")),
-                _ => IntPtr.Zero,
-            };
+            IntPtr nsWindow = NativeWindow();
             if (nsWindow == IntPtr.Zero) return;
             const nuint canJoinAllSpaces = 1 << 0, fullScreenAuxiliary = 1 << 8;
             objc_msgSend_setCollectionBehavior(nsWindow, sel_registerName("setCollectionBehavior:"), canJoinAllSpaces | fullScreenAuxiliary);
@@ -204,6 +240,12 @@ public class Floating : Window
 
     [DllImport("user32.dll")]
     static extern bool GetCursorPos(out POINT p);
+
+    [DllImport("user32.dll")]
+    static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    static extern void objc_msgSend_id(IntPtr receiver, IntPtr selector, IntPtr argument);
 
     [DllImport("/usr/lib/libobjc.A.dylib")]
     static extern IntPtr objc_getClass(string name);
