@@ -293,6 +293,8 @@ public static partial class Shell
         var watch = CanvasPoll();
         var model = new CanvasConnectModel(Canvas(), watch) { ShowFooter = true, FinishLabel = "Finish", StepLabel = "" };
         Control view = Skin.Current == SkinKind.Mac ? new MacCanvasConnect { DataContext = model } : new WinCanvasConnect { DataContext = model };
+        // The course list takes the room the steps leave above the footer.
+        if (view.FindControl<ScrollViewer>("Page") is { } page) PickerRoom.Follow(page);
         // The same title bar as the library and Settings: drag it by it, the window buttons sit in it.
         var header = new WindowHeader { Title = "Connect Canvas" };
         DockPanel.SetDock(header, Dock.Top);

@@ -132,6 +132,50 @@ public class SetupCoursesContinueTests
         }
     }
 
+    /// <summary>The connect window (from Settings) with a whole term found: its steps scroll above a footer that
+    /// stays put, so Finish shows and takes one click, in its own size and on a small screen.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac, 680.0)]
+    [InlineData(SkinKind.Mac, 480.0)]
+    [InlineData(SkinKind.Win, 680.0)]
+    [InlineData(SkinKind.Win, 480.0)]
+    public async Task In_the_connect_window_Finish_shows_and_one_click_finishes(SkinKind skin, double height)
+    {
+        try
+        {
+            ((App)Application.Current!).UseSkin(skin);
+            var handler = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", ATerm());
+            var context = CanvasFixtures.Context(handler);
+            using var m = new CanvasConnectModel(context, new CanvasWatch(context)) { ShowFooter = true, FinishLabel = "Finish", StepLabel = "" };
+            await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), []);
+            Assert.True(m.ShowPicker);
+            bool finished = false;
+            m.OnFinish = () => finished = true;
+            // As Shell.ShowCanvasConnect lays it out: a title bar, then the steps in a padded body.
+            Control view = skin == SkinKind.Mac ? new MacCanvasConnect { DataContext = m } : new WinCanvasConnect { DataContext = m };
+            PickerRoom.Follow(view.FindControl<ScrollViewer>("Page")!);
+            var header = new Controls.WindowHeader { Title = "Connect Canvas" };
+            DockPanel.SetDock(header, Dock.Top);
+            var window = new Window { Width = 640, Height = height, Content = new DockPanel { Children = { header, new Border { Padding = new Thickness(32, 12, 32, 24), Child = view } } } };
+            window.Show();
+            window.UpdateLayout();
+            window.CaptureRenderedFrame();
+
+            var finish = view.GetVisualDescendants().OfType<Button>().Single(b => b.IsEffectivelyVisible && b.Command == m.FinishCommand);
+            var at = In(finish, window);
+            Assert.True(at.Top >= 0 && at.Bottom <= window.ClientSize.Height + 0.5, $"{skin} {height}: Finish ({at}) is outside the window");
+            var hit = window.InputHitTest(at.Center) as Visual;
+            Assert.True(hit is not null && (hit == finish || hit.GetVisualAncestors().Contains(finish)), $"{skin} {height}: {Chain(hit)} is over Finish");
+            Click(window, finish);
+            Assert.True(finished);
+            window.Close();
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
     /// <summary>A dropdown left open on a setup page (who answers your questions, on the AI engines step): the click
     /// on Continue both closes it and moves on, rather than only closing it.</summary>
     [AvaloniaTheory]
@@ -186,5 +230,23 @@ public class SetupCoursesContinueTests
                         return view;
                     }, size: new Size(1100, 800));
                 }
+        // The connect window from Settings, the term found, at its own size.
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+            {
+                var handler = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", ATerm());
+                var context = CanvasFixtures.Context(handler);
+                var m = new CanvasConnectModel(context, new CanvasWatch(context)) { ShowFooter = true, FinishLabel = "Finish", StepLabel = "" };
+                await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), []);
+                m.Dispose();
+                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-07-canvas-connect-term", skin, t, () =>
+                {
+                    Control view = skin == SkinKind.Mac ? new MacCanvasConnect { DataContext = m } : new WinCanvasConnect { DataContext = m };
+                    PickerRoom.Follow(view.FindControl<ScrollViewer>("Page")!);
+                    var frame = new Border { Width = 640, Height = 680, Padding = new Thickness(32, 24, 32, 24), Child = view, CornerRadius = new CornerRadius(12) };
+                    frame.Bind(Border.BackgroundProperty, frame.GetResourceObservable(skin == SkinKind.Mac ? "Win" : "Layer"));
+                    return frame;
+                }, size: new Size(800, 800));
+            }
     }
 }
