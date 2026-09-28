@@ -120,6 +120,21 @@ with your own account and plan. Pick one engine for everything, or a different o
 sorting, or answering questions. Without an engine, a lecture is still filed by its class and
 title, and keeps its transcript without study notes.
 
+## Notes
+
+A lecture's notes write formulas and diagrams as their own engine can, and the app draws them, in
+the notes, in a quick answer and in the Ask chat:
+
+- **Formulas** are LaTeX (`$...$` inline, `$$...$$` on their own line), typeset in the app's own
+  type, light or dark. One CSharpMath can't typeset shows its plain source instead, calmly.
+- **Diagrams**: a process, cycle, pathway or hierarchy comes back as a Mermaid flowchart
+  (` ```mermaid `) and is drawn natively, in the theme's colours; something spatial (a structure, a
+  physics setup, a circuit) comes back as a sanitised SVG. Either kind opens larger on a click, and
+  a diagram Study Stash can't draw shows its source with a plain reason instead of failing.
+- **Download**: a lecture's "Download as Markdown…" (or a whole class's) saves a `.md` file that
+  Obsidian, Typora and VS Code all open well — formulas stay LaTeX, a Mermaid diagram is saved
+  again as an SVG beside it, and an SVG diagram becomes an image link to its own sanitised file.
+
 ## Canvas
 
 Settings → Canvas connects your school's Canvas with a small Chrome extension (in `extension/`)
@@ -159,3 +174,8 @@ dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
 [MIT](LICENSE). No warranty: it's provided as is, so check your notes against the lecture before
 relying on them, since models make mistakes. See [SECURITY.md](SECURITY.md) to report a security
 problem.
+
+Notes and diagrams are drawn with [CSharpMath](https://github.com/verybadcat/CSharpMath) (MIT,
+bundling the [Latin Modern Math](https://www.gust.org.pl/projects/e-foundry/lm-math) font under
+the GUST font licence), [Svg.Skia](https://github.com/wieslawsoltes/Svg.Skia) (MIT), and
+[Microsoft Automatic Graph Layout](https://github.com/microsoft/automatic-graph-layout) (MIT).

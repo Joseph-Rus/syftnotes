@@ -1,11 +1,16 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Styling;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
+using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 using StudyStash.App.Windows;
 using StudyStash.Core.Rich;
@@ -218,6 +223,118 @@ public class RichShots
                 new MacLibrary { DataContext = Demo.Library(), Width = 900, Height = 640 }, OpenDownloadMenu()), size: new Size(1350, 640));
             Shot.Take("rich-download-menu-win", SkinKind.Win, t, () => Shot.Side(
                 new WinLibrary { DataContext = Demo.Library(), Width = 900, Height = 640 }, OpenDownloadMenu()), size: new Size(1350, 640));
+        }
+    }
+
+    // -----------------------------------------------------------------------------------------------------------
+    // Task 6: the cardiac-cycle lecture proves the whole thing at once — the full app, the notes column alone, a
+    // quick answer with a formula and a chat answer with a diagram. Demo.cs stays CS 101's and untouched: this
+    // library is our own, built straight from RichDemo.
+    // -----------------------------------------------------------------------------------------------------------
+
+    static IBrush BioDot => Skin.ClassDot(1);
+
+    /// <summary>The sidebar and lecture list around the cardiac-cycle lecture, open on the right.</summary>
+    static LibraryModel CardiacLibrary()
+    {
+        var m = new LibraryModel { ClassTitle = RichDemo.LectureClassName, ClassCount = "9 lectures", Status = "Library connected", DrawChrome = true };
+        m.Classes.Add(new ClassItem { Name = "CS 101", Dot = Skin.ClassDot(0), Count = 12 });
+        m.Classes.Add(new ClassItem { Name = RichDemo.LectureClassName, Dot = BioDot, Count = 9, Selected = true });
+        m.Classes.Add(new ClassItem { Name = "CALC II", Dot = Skin.ClassDot(2), Count = 11 });
+        m.Unsorted = new ClassItem { Name = "Unsorted", IsUnsorted = true, Count = 1 };
+        var week = new LectureGroup { Label = "This week", First = true };
+        week.Items.Add(new LectureCard { Title = RichDemo.LectureTitle, Meta = "Tue 23 Sep · 1 h 12 min", Summary = "The heart moves blood in one continuous cycle, once a beat.", Selected = true });
+        week.Items.Add(new LectureCard { Title = "Blood pressure and perfusion", Meta = "Thu 18 Sep · 1 h 05 min", Summary = "How the body keeps blood moving when pressure drops.", Last = true });
+        m.Groups.Add(week);
+        m.Note = new NoteModel { ClassName = RichDemo.LectureClassName, Dot = BioDot, Meta = RichDemo.LectureMeta, Title = RichDemo.LectureTitle, Markdown = RichDemo.CardiacLecture };
+        var ask = AiDemo.AskIdle();
+        ask.ClassName = RichDemo.LectureClassName;
+        m.Ask = ask;
+        return m;
+    }
+
+    /// <summary>Scrolls the notes column so a diagram shows a little below the top, the way someone reading the
+    /// lecture would have scrolled to it.</summary>
+    static void ScrollToDiagrams(Window window)
+    {
+        Dispatcher.UIThread.RunJobs();
+        var scroller = window.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(s => s.GetVisualDescendants().OfType<NoteView>().Any());
+        var diagram = window.GetVisualDescendants().FirstOrDefault(v => v is DiagramView or SvgView) as Visual;
+        if (scroller is null || diagram is null) return;
+        var top = diagram.TranslatePoint(new Point(0, 0), scroller)?.Y ?? 0;
+        scroller.Offset = new Vector(0, Math.Max(0, scroller.Offset.Y + top - 40));
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    /// <summary>Captures the window as it stands right now (no extra layout pass), unlike <see cref="Shot.Take"/>
+    /// which lays out and captures in the same breath — this shot needs to scroll in between.</summary>
+    static void SaveShot(string name, ThemeVariant variant, Window window, Size size)
+    {
+        var whole = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
+        var frame = new RenderTargetBitmap(new PixelSize((int)size.Width, (int)size.Height));
+        using (var ctx = frame.CreateDrawingContext()) ctx.DrawImage(whole, new Rect(size), new Rect(size));
+        using var file = File.Create(Path.Combine(Shot.Dir, $"{name}-{(variant == ThemeVariant.Dark ? "dark" : "light")}.png"));
+        frame.Save(file, PngBitmapEncoderOptions.Default);
+    }
+
+    /// <summary>The full app on the cardiac-cycle lecture, scrolled to its diagrams: the same window
+    /// <c>Shots.Mac_app</c> draws, but BIO 110's lecture instead of CS 101's — read next to
+    /// <c>ref/mac-04-full-app-*.png</c> / <c>win-04</c> for type, spacing and margins.</summary>
+    [AvaloniaFact]
+    public void Full_app_cardiac_lecture()
+    {
+        foreach (var (skin, look) in new[] { (SkinKind.Mac, "mac"), (SkinKind.Win, "win") })
+            foreach (var t in Themes)
+            {
+                Skin.UseTheme(ColourThemes.Default);
+                ((App)Application.Current!).UseSkin(skin);
+                var size = new Size(1280, 800);
+                Control content = skin == SkinKind.Mac
+                    ? new MacLibrary { DataContext = CardiacLibrary(), Width = size.Width, Height = size.Height }
+                    : new WinLibrary { DataContext = CardiacLibrary(), Width = size.Width, Height = size.Height };
+                var window = new Window { Width = size.Width, Height = size.Height, RequestedThemeVariant = t, Content = content };
+                Look.Apply(window);
+                window.Show();
+                ScrollToDiagrams(window);
+                SaveShot($"rich-full-app-{look}", t, window, size);
+                window.Close();
+            }
+    }
+
+    /// <summary>The lecture's whole notes column, alone, at full height — every block visible at once.</summary>
+    [AvaloniaFact]
+    public void Note_full_lecture()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                Shot.Take($"rich-note-lecture-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, RichDemo.CardiacLecture), size: new Size(876, 3300));
+    }
+
+    /// <summary>The quick panel's answer to "what's a normal MAP?", its formula typeset on the answer's own serif
+    /// baseline (mac-03/win-03 sizes).</summary>
+    [AvaloniaFact]
+    public void Quick_answer_with_formula()
+    {
+        var q = new QuickModel { Query = "what's a normal map?", Answering = true, Answer = RichDemo.QuickMapAnswer };
+        q.Rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Sources", First = true });
+        q.Rows.Add(new QuickRow { Kind = QuickKind.Source, Title = RichDemo.LectureTitle, Meta = "8:40", Selected = true });
+        foreach (var t in Themes)
+        {
+            Shot.Take("rich-quick-answer-mac", SkinKind.Mac, t, () => new MacQuick { DataContext = q }, size: Shot.RefSize("mac-03"));
+            Shot.Take("rich-quick-answer-win", SkinKind.Win, t, () => new WinQuick { DataContext = q }, size: Shot.RefSize("win-03"));
+        }
+    }
+
+    /// <summary>The ask chat's answer with a small flowchart, in its own bubble (mac-16/win-16 sizes).</summary>
+    [AvaloniaFact]
+    public void Chat_answer_with_diagram()
+    {
+        var model = new AiAskModel(new FakeAiLibrary()) { LectureId = "cardiac-cycle", ClassName = RichDemo.LectureClassName };
+        model.Turns.Add(new AiTurn("How is low blood pressure treated?", "Ollama") { Answer = RichDemo.ChatFlowAnswer, Byline = "Ollama · 41:20" });
+        foreach (var t in Themes)
+        {
+            Shot.Take("rich-chat-answer-mac", SkinKind.Mac, t, () => new MacAiAskChat { DataContext = model }, size: Shot.RefSize("mac-16"));
+            Shot.Take("rich-chat-answer-win", SkinKind.Win, t, () => new WinAiAskChat { DataContext = model }, size: Shot.RefSize("win-16"));
         }
     }
 }
