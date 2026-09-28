@@ -12,6 +12,8 @@ public enum MicTroubleKind
     NotHandedOver,
     /// <summary>There is no microphone to record from.</summary>
     NoDevice,
+    /// <summary>Another app has the microphone to itself (Windows' exclusive mode).</summary>
+    InUse,
     /// <summary>Anything else.</summary>
     Other,
 }
@@ -48,6 +50,24 @@ public sealed record MicTrouble(MicTroubleKind Kind, string Title, string Detail
             "Open Sound settings", MacSoundUrl);
 
     public static MicTrouble NoDevice() => NoDevice(OperatingSystem.IsWindows());
+
+    /// <summary>Another app took the microphone for itself alone (a call app, or a recorder in exclusive mode).</summary>
+    public static MicTrouble InUse() => new(MicTroubleKind.InUse, "Another app is using the microphone",
+        "Close the app that's using it, then press Record. Or, in Sound settings, open the microphone's properties and turn off \"Allow applications to take exclusive control\".",
+        "Open Sound settings", WindowsSoundUrl);
+
+    // What Windows answers when a microphone won't open (HRESULTs).
+    public const int AccessDenied = unchecked((int)0x80070005); // E_ACCESSDENIED: the privacy switches are off
+    public const int NotFound = unchecked((int)0x80070490); // E_NOTFOUND: no default microphone
+    public const int DeviceInvalidated = unchecked((int)0x88890004); // AUDCLNT_E_DEVICE_INVALIDATED: unplugged as it opened
+    public const int DeviceInUse = unchecked((int)0x8889000A); // AUDCLNT_E_DEVICE_IN_USE: another app has it alone
+
+    /// <summary>The words for Windows refusing to open the microphone with <paramref name="hresult"/>
+    /// (<paramref name="refused"/>: .NET turned the answer into an <see cref="UnauthorizedAccessException"/>).</summary>
+    public static MicTrouble FromWindows(int hresult, bool refused = false) => refused || hresult == AccessDenied ? Denied(windows: true)
+        : hresult is NotFound or DeviceInvalidated ? NoDevice(windows: true)
+        : hresult == DeviceInUse ? InUse()
+        : Other(windows: true);
 
     /// <summary>A Mac that says yes but won't hand the microphone over: switching Study Stash off and on again makes
     /// macOS remember this copy of the app.</summary>
