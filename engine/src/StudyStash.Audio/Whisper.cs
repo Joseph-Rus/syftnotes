@@ -22,6 +22,9 @@ public sealed record WhisperModel(string Id, string Name, string File, long Byte
     public static string SizeOf(long bytes) => bytes >= 1_000_000_000 ? $"{bytes / 1e9:0.0} GB" : $"{bytes / 1e6:0} MB";
 }
 
+/// <summary>The model that suits a computer, and why, in a line the student reads.</summary>
+public sealed record ModelAdvice(WhisperModel Model, string Why);
+
 public static class WhisperModels
 {
     public static readonly WhisperModel LargeV3 = new("large-v3", "Whisper large-v3", "ggml-large-v3.bin", 3095033483,
@@ -30,17 +33,79 @@ public static class WhisperModels
         "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69", "Nearly as accurate as large-v3 and several times faster.");
     public static readonly WhisperModel LargeV3TurboSmall = new("large-v3-turbo-q5", "Whisper large-v3 turbo (compact)", "ggml-large-v3-turbo-q5_0.bin", 574041195,
         "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2", "large-v3 turbo in a third of the space, for computers without a graphics card.");
+    public static readonly WhisperModel Small = new("small", "Whisper small", "ggml-small.bin", 487601967,
+        "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b", "Quick on any processor. Misses more names and terms than the large ones.");
+    public static readonly WhisperModel Base = new("base", "Whisper base", "ggml-base.bin", 147951465,
+        "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe", "The lightest that still follows a lecture, for an older computer or one with little memory.");
     /// <summary>For tests: small and fast, not good enough for lectures.</summary>
     public static readonly WhisperModel Tiny = new("tiny", "Whisper tiny", "ggml-tiny.bin", 77691713,
         "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21", "For trying things out.");
 
-    public static readonly IReadOnlyList<WhisperModel> All = [LargeV3, LargeV3Turbo, LargeV3TurboSmall, Tiny];
+    /// <summary>Every model, heaviest (and most accurate) first.</summary>
+    public static readonly IReadOnlyList<WhisperModel> All = [LargeV3, LargeV3Turbo, LargeV3TurboSmall, Small, Base, Tiny];
 
     public static WhisperModel? Find(string id) => All.FirstOrDefault(m => m.Id == id);
 
-    /// <summary>What to download on this computer: large-v3, the most accurate, unless it has too little memory to
-    /// hold it (under 7 GB): then the compact turbo.</summary>
-    public static WhisperModel Recommended(double? ramGb) => ramGb is < 7 ? LargeV3TurboSmall : LargeV3;
+    /// <summary><paramref name="a"/> asks more of the computer than <paramref name="b"/>.</summary>
+    public static bool Heavier(WhisperModel a, WhisperModel b)
+    {
+        int ai = IndexOf(a), bi = IndexOf(b);
+        return ai >= 0 && bi >= 0 && ai < bi;
+    }
+
+    static int IndexOf(WhisperModel m)
+    {
+        for (int i = 0; i < All.Count; i++)
+            if (All[i].Id == m.Id) return i;
+        return -1;
+    }
+
+    /// <summary>
+    /// The model that keeps up with a lecture on this computer, and one plain line why.
+    /// <para>
+    /// A lecture is written down live, a 30-second piece at a time, so the model has to finish each piece well inside
+    /// 30 seconds or the transcript falls further behind all lecture. What decides that:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>Apple silicon runs Whisper on its graphics (Metal) with memory the chip shares: large-v3 keeps up on every
+    /// one, as it always has here. Only a Mac with under 7 GB (none are sold) gets the compact model, to leave room.</item>
+    /// <item>A PC with a real graphics card runs Whisper on the card through Vulkan, and what fits is the card's own
+    /// memory. large-v3 needs about 4 GB of it with room to work, so it wants an 8 GB card (the usual size after 6;
+    /// cards say a little under, hence 7.5). large-v3 turbo (about 2 GB) fits a 4 GB card and is nearly as accurate;
+    /// the compact turbo (about 0.8 GB) fits the rest down to 2 GB. Under 2 GB it's graphics built into the processor
+    /// and Whisper uses the processor.</item>
+    /// <item>On the processor alone, the encoder (the same size in every large-v3 model) is the slow part. With 8 or
+    /// more threads and fast maths (AVX2, or any ARM chip's NEON) the compact turbo (q5) does a piece in well under
+    /// 30 seconds on 4 of them; it also needs about 1.5 GB of memory, so 8 GB of memory in all. Fewer threads,
+    /// no AVX2 or less memory: Whisper small, whose encoder does a fraction of the work. Under 4 threads or under
+    /// 4 GB of memory: Whisper base.</item>
+    /// </list>
+    /// Memory the computer won't say (null) counts as enough: the student can always pick a lighter one.
+    /// </summary>
+    public static ModelAdvice Advise(HardwareProfile hw)
+    {
+        string device = hw.DeviceWord;
+        double? ram = hw.RamGb;
+        if (hw.AppleSilicon)
+            return ram is < 7
+                ? new(LargeV3TurboSmall, $"This Mac has {ram:0} GB of memory, so the compact model leaves room for everything else.")
+                : new(LargeV3, "This Mac's Apple silicon runs the most accurate model and keeps up with a lecture.");
+        if (hw.WhisperCard is { MemoryGb: >= 2 } card)
+        {
+            if (card.MemoryGb >= 7.5 && ram is not < 8)
+                return new(LargeV3, $"This PC's graphics card ({card.Name}) runs the most accurate model and keeps up with a lecture.");
+            if (card.MemoryGb >= 3.5)
+                return new(LargeV3Turbo, $"This PC's graphics card ({card.Name}) has room for large-v3 turbo, which keeps up with a lecture.");
+            return new(LargeV3TurboSmall, $"This PC's graphics card ({card.Name}) has little memory of its own, so the compact model keeps up with a lecture.");
+        }
+        if (hw.Cores >= 8 && hw.FastMath && ram is not < 8)
+            return new(LargeV3TurboSmall, $"This {device} has no graphics card Whisper can use, so the compact model keeps up with a lecture.");
+        if (hw.Cores >= 4 && ram is not < 4)
+            return new(Small, $"This {device} has no graphics card Whisper can use and a modest processor, so Whisper small keeps up with a lecture.");
+        return new(Base, ram is < 4
+            ? $"This {device} has little memory, so Whisper base keeps up with a lecture and leaves room for everything else."
+            : $"This {device}'s processor would fall behind a lecture with anything bigger, so Whisper base keeps up.");
+    }
 
     public static string Dir(string home) => Path.Combine(home, "models");
 

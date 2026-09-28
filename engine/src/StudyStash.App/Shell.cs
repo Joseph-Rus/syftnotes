@@ -36,6 +36,8 @@ public static partial class Shell
 
     static readonly PanelModel panel = new();
     static readonly RecorderModel recorder = new();
+    /// <summary>The lecture the student has been told is falling behind (once is enough).</summary>
+    static string? behindToldFor;
     static readonly QuickModel quick = new();
     static readonly LibraryModel library = new();
     static SetupModel? setup;
@@ -108,6 +110,7 @@ public static partial class Shell
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
         host.Start();
+        _ = SuggestLighterModelAsync();
         AppUpdates.Start(host, stop.Token);
         MakeTray();
         // A Mac's app menu (About, Settings… ⌘,, and the system's Hide and Quit ⌘Q) while a window is in front.
@@ -1044,6 +1047,28 @@ public static partial class Shell
 
     /// <summary>Settings from the dropdown's gear, the app menu or ⌘, (Ctrl+,) anywhere: the dropdown and the quick
     /// panel make way for it; before setup's done, setup comes forward instead.</summary>
+    /// <summary>An install on a model heavier than this computer keeps up with (large-v3 on a PC with no graphics card
+    /// Whisper can use) hears once, a little after starting, that a lighter one would. Nothing switches by itself.</summary>
+    static async Task SuggestLighterModelAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), stop.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        if (await host.ModelSuggestionAsync().ConfigureAwait(false) is not { } advice) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            host.ModelSuggestionMade(advice.Model);
+            Program.Log($"[model] suggested {advice.Model.Name} in place of {host.Model.Name}");
+            Toast($"{advice.Model.Name} would keep up better", $"{advice.Why} Switch in Settings → Recording.", "Settings",
+                () => ShowSettings("Recording"), TimeSpan.FromSeconds(30));
+        });
+    }
+
     static void SettingsFromAnywhere()
     {
         panelWindow?.Hide();
@@ -1146,6 +1171,13 @@ public static partial class Shell
         if (setup is not null && micCheck is not null) Setup.TickMic(setup, host, micCheck);
         var live = host.Recorder.Current;
         if (live is null) return;
+        // Said once a lecture, when Whisper clearly can't keep up with it.
+        if (behindToldFor != live.Id && host.FallingBehind() is { } behind)
+        {
+            behindToldFor = live.Id;
+            Program.Log($"[whisper] {live.Id}: the transcript is {TimedText.Clock(host.Recorder.Elapsed - live.TranscribedSeconds)} behind with {host.Model.Name}");
+            Toast(behind.Title, behind.Text, "Settings", () => ShowSettings("Recording"), TimeSpan.FromSeconds(30));
+        }
         string elapsed = TimedText.Clock(host.Recorder.Elapsed);
         var levels = host.Recorder.Levels();
         panel.Elapsed = recorder.Elapsed = elapsed;

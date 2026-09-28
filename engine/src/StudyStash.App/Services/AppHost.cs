@@ -34,6 +34,9 @@ public sealed class AppSettings
     public bool SetupDone { get; set; }
     /// <summary>The Whisper model's id; empty picks the one for this computer.</summary>
     public string Model { get; set; } = "";
+    /// <summary>The lighter model Study Stash once suggested for this computer (an install on a heavier one hears it
+    /// once, never again); empty until then.</summary>
+    public string ModelSuggested { get; set; } = "";
     /// <summary>"" finds each lecture's language; "en" and so on fixes it.</summary>
     public string Language { get; set; } = "";
     /// <summary>Windows: record what the computer plays too (a lecture on Zoom).</summary>
@@ -121,6 +124,8 @@ public sealed class AppHost : IDisposable, IProblemSource
     int checking;
     KeepAwake? awake;
     readonly ModelSetting models;
+    /// <summary>What this computer has, asked once on the thread pool as the app starts.</summary>
+    readonly Task<HardwareProfile> hardware;
     readonly HttpClient? http;
     readonly Func<LibraryService>? localLibrary;
     // The model download: one at a time, its stop button, and a nudge that ends a wait to try again.
@@ -179,13 +184,21 @@ public sealed class AppHost : IDisposable, IProblemSource
     /// <paramref name="models"/> is the model the environment asks for (by default, this process's: see
     /// <see cref="ModelSetting"/>); <paramref name="http"/> downloads it (a test's pretend server).
     /// <paramref name="localLibrary"/> makes this computer's own library (a test's, on a spare port with no real child).
+    /// <paramref name="hardware"/> says what this computer has, which picks its model (a test's pretend computer).
     /// </summary>
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
         Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
-        Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null)
+        Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null, IHardwareProbe? hardware = null)
     {
-        Home = home;
+        var probe = hardware ?? HardwareProbe.System;
+        this.hardware = Task.Run(probe.Probe);
         this.log = log ?? (s => Console.WriteLine(s));
+        _ = this.hardware.ContinueWith(t =>
+        {
+            var advice = WhisperModels.Advise(t.Result);
+            this.log($"[model] this computer: {t.Result.Describe()}; the model for it: {advice.Model.Name}");
+        }, TaskContinuationOptions.OnlyOnRanToCompletion);
+        Home = home;
         pretendMic = microphone ?? MicFromEnvironment();
         mics = micPermissions ?? (pretendMic is not null ? MicPermissions.Pretend : MicPermissions.System);
         this.models = models ?? ModelSetting.FromEnvironment();
@@ -194,6 +207,7 @@ public sealed class AppHost : IDisposable, IProblemSource
         LoginItems = loginItems ?? Platform.LoginItems.System;
         Directory.CreateDirectory(home);
         Settings = AppSettings.Load(home);
+        KeepModelInUse();
         Lectures = new LectureStore(home);
         Recorder.Recover(Lectures, this.log);
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
@@ -302,9 +316,84 @@ public sealed class AppHost : IDisposable, IProblemSource
         return cc.ServerUrl.Length > 0 ? new RemoteLibrary(cc.ServerUrl, cc.PoolKey) : null;
     }
 
-    /// <summary>The transcription model: the one the environment names, else the one picked in Settings, else the one
-    /// for this computer (large-v3, or the compact turbo with little memory).</summary>
-    public WhisperModel Model => models.Model ?? WhisperModels.Find(Settings.Model) ?? WhisperModels.Recommended(Machine.TotalRamGb());
+    /// <summary>The transcription model: the one the environment names, else the one picked in setup or Settings, else
+    /// the one for this computer (<see cref="Advice"/>).</summary>
+    public WhisperModel Model => models.Model ?? WhisperModels.Find(Settings.Model) ?? Advice.Model;
+
+    /// <summary>What this computer has. Asked once, on the thread pool, as the app starts; the first to want it before
+    /// then waits the moment it takes.</summary>
+    public HardwareProfile Hardware => hardware.GetAwaiter().GetResult();
+
+    /// <summary>The model that keeps up with a lecture on this computer, and why.</summary>
+    public ModelAdvice Advice => WhisperModels.Advise(Hardware);
+
+    /// <summary>
+    /// An install from before models were picked for the computer saved no model: it used large-v3 (or the compact
+    /// turbo with little memory). That one is kept, so nothing changes under the student or downloads again by itself;
+    /// <see cref="ModelSuggestionAsync"/> may suggest a lighter one, once. Kept only when a model (or part of one) is
+    /// here: with nothing downloaded yet, the one for this computer is the one it gets.
+    /// </summary>
+    void KeepModelInUse()
+    {
+        if (!Settings.SetupDone || Settings.Model.Length > 0 || Settings.Role == AppRole.Library || ModelFromEnvironment) return;
+        var had = WhisperModels.All.FirstOrDefault(m => WhisperModels.IsDownloaded(Home, m))
+                  ?? WhisperModels.All.FirstOrDefault(m => File.Exists(WhisperModels.PathFor(Home, m) + ".part"));
+        if (had is null) return;
+        Settings.Model = had.Id;
+        try
+        {
+            Settings.Save(Home);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log($"[model] couldn't save the model in use: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// A lighter model to suggest, once: the student records with a model heavier than the one for this computer
+    /// (large-v3 on a PC with no graphics card Whisper can use), and hasn't heard about it before. Null otherwise, and
+    /// always when the environment names the model. Waits for the hardware probe, never on the UI thread.
+    /// </summary>
+    public async Task<ModelAdvice?> ModelSuggestionAsync()
+    {
+        var hw = await hardware.ConfigureAwait(false);
+        if (ModelFromEnvironment || !Settings.SetupDone || Settings.Role == AppRole.Library) return null;
+        var advice = WhisperModels.Advise(hw);
+        return WhisperModels.Heavier(Model, advice.Model) && Settings.ModelSuggested != advice.Model.Id ? advice : null;
+    }
+
+    /// <summary>The suggestion was made (or the student picked a model knowing the one for this computer): not again.</summary>
+    public void ModelSuggestionMade(WhisperModel suggested) => Save(s => s.ModelSuggested = suggested.Id);
+
+    /// <summary>Whisper waits for 20 to 30 seconds of speech and then takes its time over it, so a transcript a minute
+    /// behind is normal. Three minutes behind is clearly more than that: the model can't keep up with this lecture.</summary>
+    public const double BehindAfterSeconds = 180;
+
+    /// <summary>What to tell the student when the lecture being recorded is being written down clearly slower than it's
+    /// said (a title and what to know), or null while it keeps up, pauses, or waits for something else (the model's
+    /// download, a Whisper that couldn't start).</summary>
+    public (string Title, string Text)? FallingBehind()
+    {
+        if (Recorder.Current is not { State: LectureState.Recording } live || !ModelReady || WhisperProblem is not null) return null;
+        return BehindWords(Recorder.Elapsed, live.TranscribedSeconds, Model, Advice);
+    }
+
+    /// <summary><see cref="FallingBehind"/>'s words for <paramref name="recorded"/> seconds recorded and
+    /// <paramref name="written"/> written down with <paramref name="inUse"/>: a lighter model to switch to (the one for
+    /// this computer when it's lighter, else the next lighter one), unless it's already the lightest.</summary>
+    public static (string Title, string Text)? BehindWords(double recorded, double written, WhisperModel inUse, ModelAdvice advice)
+    {
+        if (recorded - written < BehindAfterSeconds) return null;
+        var lighter = WhisperModels.Heavier(inUse, advice.Model) ? advice.Model
+            : WhisperModels.All.SkipWhile(m => m.Id != inUse.Id).Skip(1).FirstOrDefault(m => m.Id != WhisperModels.Tiny.Id);
+        string text = $"{inUse.Name} is slower than the lecture on this computer. Nothing is lost: it catches up after class.";
+        if (lighter is not null) text += $" {lighter.Name} would keep up: switch in Settings → Recording.";
+        return ("The transcript is falling behind", text);
+    }
+
+    /// <summary>The environment names the model (tests, the self-test): the student's pick and the advice stand aside.</summary>
+    public bool ModelFromEnvironment => models.Model is not null || models.File is not null;
 
     /// <summary>A model file the environment gives to use as it is (nothing downloads); null normally.</summary>
     public string? ModelFile => models.File;
@@ -708,6 +797,31 @@ public sealed class AppHost : IDisposable, IProblemSource
         }
         log($"[model] downloading {model.Name} again");
         return DownloadModelAsync(model);
+    }
+
+    /// <summary>
+    /// Remove a model this computer no longer uses (Settings asks the student first), and whatever came of its
+    /// download. Never the one in use or the one downloading. Returns why it couldn't, or null when it's gone.
+    /// </summary>
+    public string? RemoveModel(WhisperModel model)
+    {
+        if (model.Id == Model.Id) return $"{model.Name} is the one in use.";
+        lock (downloadLock)
+            if (download is not null && DownloadingModel?.Id == model.Id) return $"{model.Name} is downloading.";
+        string path = WhisperModels.PathFor(Home, model);
+        try
+        {
+            File.Delete(path);
+            File.Delete(path + ".part");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log($"[model] couldn't remove {path}: {e.Message}");
+            return $"{model.Name} couldn't be removed: {e.Message}";
+        }
+        log($"[model] removed {model.Name}");
+        Changed?.Invoke();
+        return null;
     }
 
     async Task DownloadAsync(WhisperModel model, CancellationTokenSource cts)

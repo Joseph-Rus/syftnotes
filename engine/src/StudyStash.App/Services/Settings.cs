@@ -10,14 +10,36 @@ using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Services;
 
-/// <summary>A Whisper model in Settings: its name, size, what it's for, and whether it's here.</summary>
+/// <summary>A Whisper model in setup and Settings: its name, size, what it's for, whether it's the one for this
+/// computer, and whether it's here.</summary>
 public sealed partial class ModelChoice : ObservableObject
 {
     public required WhisperModel Model { get; init; }
     public string Name => Model.Name;
+    /// <summary>"574 MB", "3 GB": as setup says it.</summary>
+    public string Size => Setup.About(Model.Bytes);
     public string About => $"{Model.Size}. {Model.About}";
+    /// <summary>The model that keeps up with a lecture on this computer.</summary>
+    public bool Recommended { get; init; }
+    /// <summary>Why it's the one for this computer (the recommended one only).</summary>
+    public string Why { get; init; } = "";
+    public bool HasWhy => Why.Length > 0;
+    /// <summary>Its line under the name: why it suits this computer, or what it's for.</summary>
+    public string Line => Why.Length > 0 ? Why : Model.About;
     [ObservableProperty] public partial bool Chosen { get; set; }
     [ObservableProperty] public partial bool Here { get; set; }
+
+    /// <summary>The models to offer, the one in use (<paramref name="chosen"/>) marked: Whisper tiny is only for
+    /// trying things out, so it's there only when it's the one in use.</summary>
+    public static IEnumerable<ModelChoice> For(WhisperModel chosen, ModelAdvice advice, string home) =>
+        WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == chosen.Id).Select(m => new ModelChoice
+        {
+            Model = m,
+            Recommended = m.Id == advice.Model.Id,
+            Why = m.Id == advice.Model.Id ? advice.Why : "",
+            Chosen = m.Id == chosen.Id,
+            Here = WhisperModels.IsDownloaded(home, m),
+        });
 }
 
 /// <summary>One row in the settings sidebar: its section id, icon and label, and whether it's the one showing.</summary>
@@ -105,6 +127,33 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     // Recording
     public ObservableCollection<ModelChoice> Models { get; } = [];
     [ObservableProperty] public partial string ModelLine { get; set; } = "";
+    /// <summary>Why the recommended model suits this computer, and, when the one in use is heavier, that it may fall
+    /// behind.</summary>
+    [ObservableProperty] public partial string ModelAdviceLine { get; set; } = "";
+    /// <summary>A model is downloading: the bar under the list shows how far.</summary>
+    [ObservableProperty] public partial bool ModelDownloading { get; set; }
+    [ObservableProperty] public partial double ModelProgress { get; set; }
+    public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 480;
+    partial void OnModelProgressChanged(double value) => OnPropertyChanged(nameof(ModelBarWidth));
+    readonly ModelAdvice advice;
+    /// <summary>Models downloaded here but not in use (after a switch): offered for removal, never removed unasked.</summary>
+    [ObservableProperty] public partial string SpareLine { get; set; } = "";
+    public bool HasSpare => SpareLine.Length > 0 && !ConfirmingRemove;
+    /// <summary>Remove was pressed: the question, with Remove and Keep them.</summary>
+    [ObservableProperty] public partial bool ConfirmingRemove { get; set; }
+    public string RemoveQuestion => spare.Count switch
+    {
+        0 => "",
+        1 => $"Remove {spare[0].Name} from this computer? It frees {WhisperModel.SizeOf(spare[0].Bytes)}, and you can download it again any time.",
+        _ => $"Remove {string.Join(" and ", spare.Select(m => m.Name))} from this computer? They free {WhisperModel.SizeOf(spare.Sum(m => m.Bytes))}, and you can download them again any time.",
+    };
+    partial void OnSpareLineChanged(string value) => OnPropertyChanged(nameof(HasSpare));
+    partial void OnConfirmingRemoveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasSpare));
+        OnPropertyChanged(nameof(RemoveQuestion));
+    }
+    List<WhisperModel> spare = [];
     [ObservableProperty] public partial string Language { get; set; } = "";
     [ObservableProperty] public partial bool ComputerAudio { get; set; }
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
@@ -233,9 +282,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
         ColourTheme = host.Settings.Theme;
         Appearance = host.Settings.Appearance;
-        // Whisper tiny is only for trying things out: listed only when it's the one in use.
-        foreach (var m in WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == host.Model.Id))
-            Models.Add(new ModelChoice { Model = m, Chosen = m.Id == host.Model.Id, Here = WhisperModels.IsDownloaded(host.Home, m) });
+        advice = host.Advice;
+        foreach (var m in ModelChoice.For(host.Model, advice, host.Home)) Models.Add(m);
         host.Changed += OnHostChanged;
         foreach (var n in NavItems) n.On = n.Id == Section;
         foreach (var t in Themes) t.Chosen = t.Name == ColourTheme;
@@ -316,6 +364,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanStopLibrary));
         ShortcutsSay = Shell.ShortcutsSay();
         ModelLine = ModelWords(host);
+        ModelAdviceLine = AdviceWords(host.Model, advice);
+        ModelDownloading = host.Downloading is not null;
+        ModelProgress = host.Downloading?.Fraction ?? 0;
+        spare = [.. WhisperModels.All.Where(m => m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
+        SpareLine = spare.Count == 0 ? ""
+            : $"Also on this computer: {string.Join(", ", spare.Select(m => $"{m.Name} ({WhisperModel.SizeOf(m.Bytes)})"))}.";
+        if (spare.Count == 0) ConfirmingRemove = false;
+        OnPropertyChanged(nameof(RemoveQuestion));
         foreach (var m in Models)
         {
             m.Chosen = m.Model.Id == host.Model.Id;
@@ -333,6 +389,13 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             return $"Downloading {(host.DownloadingModel ?? host.Model).Name}: {d.Amount}." + (d.Left() is { } left ? $" {left}." : "");
         return $"{host.Model.Name} isn't downloaded yet.";
     }
+
+    /// <summary>Settings → Recording's line about the model for this computer: why it suits it, and when the one in use
+    /// is heavier, that it may fall behind (never a switch: the student picks).</summary>
+    public static string AdviceWords(WhisperModel inUse, ModelAdvice advice) =>
+        WhisperModels.Heavier(inUse, advice.Model)
+            ? $"{advice.Why} {inUse.Name} may fall behind a lecture here: pick {advice.Model.Name} to switch. The one you have stays."
+            : advice.Why;
 
     partial void OnSectionChanged(string value)
     {
@@ -485,6 +548,20 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         // One already here needs nothing, and a download of another one is no longer wanted.
         if (WhisperModels.IsDownloaded(host.Home, choice.Model)) host.StopDownload();
         else _ = host.DownloadModelAsync(choice.Model);
+    }
+
+    [RelayCommand] void AskRemoveSpare() => ConfirmingRemove = true;
+
+    [RelayCommand] void KeepSpare() => ConfirmingRemove = false;
+
+    /// <summary>The student said yes: remove the models not in use.</summary>
+    [RelayCommand]
+    void RemoveSpare()
+    {
+        var problems = spare.Select(host.RemoveModel).OfType<string>().ToList();
+        ConfirmingRemove = false;
+        Refresh();
+        if (problems.Count > 0) ModelLine = string.Join(" ", problems);
     }
 
     /// <summary>Download (or try again now).</summary>

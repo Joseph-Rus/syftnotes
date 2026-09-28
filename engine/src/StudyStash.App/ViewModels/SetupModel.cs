@@ -216,6 +216,21 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial string ModelLeft { get; set; } = "";
     [ObservableProperty] public partial bool ModelReady { get; set; }
     [ObservableProperty] public partial string? ModelProblem { get; set; }
+    /// <summary>The models to pick from, the one for this computer marked (with one line why: "This PC has no
+    /// graphics card Whisper can use, so the compact model keeps up with a lecture.") and picked to begin with.</summary>
+    public ObservableCollection<ModelChoice> Models { get; } = [];
+    /// <summary>The one downloading: shown as a card with Change, which opens the list.</summary>
+    [ObservableProperty] public partial ModelChoice? ChosenModel { get; set; }
+    /// <summary>The list is open (Change was pressed): the card and the download make way for it.</summary>
+    [ObservableProperty] public partial bool ChoosingModel { get; set; }
+    public bool ShowModelCard => ChosenModel is not null && !ChoosingModel;
+    public bool ShowModelDownload => !ChoosingModel;
+    partial void OnChosenModelChanged(ModelChoice? value) => OnPropertyChanged(nameof(ShowModelCard));
+    partial void OnChoosingModelChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowModelCard));
+        OnPropertyChanged(nameof(ShowModelDownload));
+    }
     /// <summary>The laptop's last page: the model's state in a few words.</summary>
     public string ModelSummary => ModelReady ? "Ready" : HasModelProblem ? "Not downloaded yet" : "Downloading in the background";
 
@@ -522,6 +537,8 @@ public sealed partial class SetupModel : ObservableObject
     public Func<Task>? OnConnect { get; set; }
     public Func<Task>? OnFind { get; set; }
     public Action? OnRetryModel { get; set; }
+    /// <summary>Another model picked: it's the one that downloads now (what came of the other stays).</summary>
+    public Action<ModelChoice>? OnPickModel { get; set; }
     public Func<Task>? OnAddClass { get; set; }
     public Action? OnTaskbarSettings { get; set; }
     /// <summary>Puts text on the clipboard (the library's address or password, on the last page).</summary>
@@ -541,6 +558,19 @@ public sealed partial class SetupModel : ObservableObject
         else OnMicSettings?.Invoke();
     }
     [RelayCommand] void RetryModel() => OnRetryModel?.Invoke();
+
+    [RelayCommand] void ChangeModel() => ChoosingModel = true;
+
+    [RelayCommand]
+    void PickModel(ModelChoice choice)
+    {
+        foreach (var m in Models) m.Chosen = m == choice;
+        ChosenModel = choice;
+        ChoosingModel = false;
+        ModelName = choice.Name;
+        ModelSize = choice.Size;
+        OnPickModel?.Invoke(choice);
+    }
     [RelayCommand] void TaskbarSettings() => OnTaskbarSettings?.Invoke();
     [RelayCommand] void ToggleShowPassword() => ShowPassword = !ShowPassword;
     [RelayCommand] void Copy(string? text) => OnCopy?.Invoke(text ?? "");
