@@ -183,6 +183,8 @@
           <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Top" Margin="0,5,0,0" />
           <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="12" LineHeight="16" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
         </Grid>
+        <!-- Coming up on the student's calendars, above the library's status -->
+        <v:WinComingUp DockPanel.Dock="Bottom" DataContext="{Binding ComingUp}" Margin="16,8,16,0" />
         <ScrollViewer Name="ClassList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:WindowHeader.MovesWindow="True">
         <StackPanel Spacing="4">
           <Button Classes="nav" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
