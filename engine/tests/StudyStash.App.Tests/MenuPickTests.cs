@@ -259,6 +259,42 @@ public class MenuPickTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
+    public void The_download_menu_offers_the_open_class_and_checks_transcripts_when_theyre_on(SkinKind skin)
+    {
+        var anchor = new Button { Content = "Export", Width = 32, Height = 32, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top };
+        var w = Host(anchor, skin);
+        try
+        {
+            int downloaded = 0, downloadedClass = 0, toggled = 0;
+            var menu = DownloadMenu.Build("BIO 110", includeTranscripts: false, () => downloaded++, () => downloadedClass++, () => toggled++);
+            menu.Open(anchor);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(menu.IsOpen);
+            Item(menu, "Download as Markdown…"); // exists
+            Item(menu, "Download all of BIO 110…"); // exists, names the open class
+            Assert.False(Checked(Item(menu, "Include transcripts")));
+            Click(Item(menu, "Download as Markdown…"));
+            Assert.Equal(1, downloaded);
+            Assert.Equal(0, downloadedClass + toggled);
+            menu.Close();
+
+            // No class open (Due, or nothing picked yet): no "Download all of…" row at all.
+            var noClass = DownloadMenu.Build(null, includeTranscripts: true, () => { }, () => { }, () => { });
+            Assert.DoesNotContain(noClass.Items.OfType<MenuItem>(), i => (i.Header as string)?.StartsWith("Download all of") == true);
+            noClass.Open(anchor);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(Checked(Item(noClass, "Include transcripts")));
+            noClass.Close();
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
     public void Your_librarys_selects_pick_what_you_click(SkinKind skin)
     {
         ((App)Application.Current!).UseSkin(skin);
