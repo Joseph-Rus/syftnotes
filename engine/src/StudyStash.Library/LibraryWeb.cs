@@ -400,6 +400,7 @@ public sealed partial class LibraryWeb
         MapChat(app);
         MapFiles(app);
         MapInbox(app);
+        MapMove(app);
         MapSettings(app);
         app.MapFallback(() => Http.Detail(404, "Not Found"));
     }
