@@ -67,6 +67,7 @@ public static class CanvasView
                 ["updated"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = When(up.At) } : null,
             },
             ["last_sync"] = When(s.LastDone),
+            ["revision"] = Revision(s),
             ["next_sync"] = s.LastDone.Length > 0 && DateTimeOffset.TryParse(s.LastDone, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var done)
                 ? done.AddMinutes(s.PollMinutes).ToString("o", CultureInfo.InvariantCulture) : null,
             ["poll_minutes"] = s.PollMinutes,
@@ -75,6 +76,15 @@ public static class CanvasView
             ["error"] = s.Error.Length > 0 ? new JsonObject { ["text"] = s.Error, ["at"] = When(s.ErrorAt) } : null,
             ["warnings"] = warnings,
         };
+    }
+
+    /// <summary>Changes whenever what the app shows from Canvas may have: a sync finished, or a course was linked,
+    /// unlinked, chosen or dropped. The app reloads its Due list and class pages when it changes.</summary>
+    public static string Revision(CanvasSettings s)
+    {
+        string all = string.Join("\n", [s.LastDone, .. s.Courses.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => $"{kv.Key}={kv.Value}"),
+            "chosen:" + (s.Chosen is null ? "all" : string.Join(",", s.Chosen.Order(StringComparer.Ordinal)))]);
+        return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(all)))[..16];
     }
 
     // --- classes ---------------------------------------------------------------------------------------------------

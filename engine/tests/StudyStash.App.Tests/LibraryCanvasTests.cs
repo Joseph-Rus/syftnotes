@@ -172,6 +172,88 @@ public class LibraryCanvasTests
         await NoBlankDatesAsync(rig, all.Select(a => $"/api/v2/canvas/assignment?class=CS%20101&id={a.Id}").ToArray());
     }
 
+    /// <summary>What a student saw on Windows: Canvas synced, but the app's Due page and class pages stayed as they were.
+    /// The Due page open before the first sync fills in by itself once the sync finishes, with nothing but the shared
+    /// watch looking at the library; so do the linked classes.</summary>
+    [Fact]
+    public async Task A_sync_finishing_updates_an_open_Due_page_by_itself()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        var stop = TestContext.Current.CancellationToken;
+        var context = rig.Context();
+        var client = context.Client!;
+        await client.SaveAsync(url: FakeCanvas.Base, stop: stop);
+        using var chrome = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        var extension = rig.RunExtensionAsync(chrome.Token);
+        try
+        {
+            Assert.Empty((await client.FindCoursesAsync(stop))!.Error);
+            var watch = new CanvasWatch(context);
+            using var feed = new CanvasFeed(context, watch);
+            var due = new CanvasDueModel(context);
+            int updates = 0;
+            // The app shows updates on its UI thread; here a lock stands in for it.
+            var ui = new Lock();
+            bool Shows(Func<bool> check)
+            {
+                lock (ui) return check();
+            }
+            feed.Updated += () =>
+            {
+                lock (ui)
+                {
+                    updates++;
+                    if (feed.Due is { } d) due.Show(d);
+                }
+            };
+
+            // The Due page is open before anything has synced: nothing to hand in yet, nothing linked.
+            await Until(async () =>
+            {
+                await watch.RefreshAsync(stop);
+                return feed.Due is not null;
+            }, "the first look", 60);
+            Assert.True(Shows(() => due.IsEmpty));
+            Assert.False(feed.Linked);
+
+            // Linking the courses shows without a sync (the sidebar's Due appears), and the sync that follows fills the page.
+            await client.SaveAsync(courses: new Dictionary<string, double> { ["CS 101"] = 4201, ["BIO 110"] = 4202 }, stop: stop);
+            await Until(async () =>
+            {
+                await watch.RefreshAsync(stop);
+                return feed.Linked;
+            }, "the linked classes to show", 60);
+            Assert.NotNull(feed.LinkedClass("CS 101"));
+            await client.SaveAsync(sync: true, stop: stop);
+            await Until(async () =>
+            {
+                await watch.RefreshAsync(stop);
+                return !Shows(() => due.IsEmpty);
+            }, "the Due page to fill in after the sync", 90);
+            Assert.True(Shows(() => due.Groups.SelectMany(g => g.Rows).Any(r => r.Class == "CS 101")));
+            Assert.True(Shows(() => updates >= 2));
+
+            // Once caught up, another look with nothing new reads nothing again.
+            await Until(async () =>
+            {
+                await watch.RefreshAsync(stop);
+                await Task.Delay(100, stop);
+                return !feed.Stale(watch.State!);
+            }, "the feed to catch up", 60);
+            Assert.NotNull(feed.Due!.Synced);
+            int before;
+            lock (ui) before = updates;
+            await watch.RefreshAsync(stop);
+            await Task.Delay(200, stop);
+            lock (ui) Assert.Equal(before, updates);
+        }
+        finally
+        {
+            chrome.Cancel();
+            await extension;
+        }
+    }
+
     /// <summary>What happened on a real library: an old Chrome registration (seen a minute ago, from before keys were
     /// written down, or with a key the library no longer gives out) made the app skip the extension step, and Find my
     /// courses then had no Chrome to ask. Only a Chrome with the current key moves it on.</summary>

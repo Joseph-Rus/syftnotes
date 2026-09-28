@@ -22,10 +22,11 @@ public static partial class Shell
     static CanvasNotifier? canvasNotifier;
     static DispatcherTimer? canvasNotifyTimer;
     static bool canvasWatching;
-    static DateTimeOffset? canvasSynced;
-    /// <summary>The library's last answers about Canvas: what's due, and every class with its course.</summary>
-    static CanvasApi.DueResponse? canvasDue;
-    static List<CanvasApi.ClassRow> canvasClasses = [];
+    /// <summary>The library's last answers about Canvas (what's due, and every class with its course), kept current
+    /// by the watch.</summary>
+    static CanvasFeed? canvasFeed;
+    static CanvasApi.DueResponse? canvasDue => canvasFeed?.Due;
+    static IReadOnlyList<CanvasApi.ClassRow> canvasClasses => canvasFeed?.Classes ?? [];
     static Window? canvasConnectWindow;
 
     /// <summary>The Canvas context every Canvas screen shares, for the library the app is connected to now.</summary>
@@ -42,12 +43,16 @@ public static partial class Shell
         canvasWatching = false;
         canvasFor = key;
         var context = canvas = CanvasContext.For(host);
-        canvasWatch = new CanvasWatch(context) { Extension = new ExtensionKeeper(host.Home, () => context.Client, host.Log) };
+        canvasWatch = new CanvasWatch(context)
+        {
+            Extension = new ExtensionKeeper(host.Home, () => context.Client, host.Log),
+            OnError = e => host.Log($"[canvas] asking the library about Canvas: {e.GetType().Name}: {e.Message}"),
+        };
         canvasWatch.Changed += OnCanvasChanged;
+        canvasFeed?.Dispose();
+        canvasFeed = new CanvasFeed(context, canvasWatch);
+        canvasFeed.Updated += () => Dispatcher.UIThread.Post(() => _ = CanvasUpdatedAsync());
         canvasNotifier = new CanvasNotifier(canvas) { OnOpen = OpenCanvasNotification };
-        canvasDue = null;
-        canvasClasses = [];
-        canvasSynced = null;
         return canvas;
     }
 
@@ -88,48 +93,44 @@ public static partial class Shell
         canvasNotifyTimer = null;
     }
 
-    /// <summary>The poll heard from the library: the status line follows it, and a finished sync brings in what's
-    /// due (the sidebar's count, the dropdown's next due, the Due page and the open class).</summary>
+    /// <summary>The poll heard from the library: the status line follows it. What's due follows through
+    /// <see cref="CanvasFeed"/>, which reads again whenever the library says Canvas changed.</summary>
     static void OnCanvasChanged() => Dispatcher.UIThread.Post(() =>
     {
-        if (quitting || canvasWatch?.State is not { } state) return;
+        if (quitting || canvasWatch?.State is null) return;
         library.Status = LibraryStatus();
         UpdateDueStatus();
-        if (canvasDue is not null && state.LastSync == canvasSynced) return;
-        canvasSynced = state.LastSync;
-        _ = CanvasSyncedAsync();
     });
 
+    /// <summary>Reads Canvas again now (Canvas's connect window finished), then shows it.</summary>
     static async Task CanvasSyncedAsync()
     {
         if (!await LoadCanvasAsync()) return;
+        await CanvasUpdatedAsync();
+    }
+
+    /// <summary>Newer Canvas data is in (a sync finished, a course was linked or chosen): the sidebar's Due and its
+    /// count, the dropdown's next due, and the Due page or the open class's page, if the window shows one.</summary>
+    static async Task CanvasUpdatedAsync()
+    {
+        if (quitting) return;
         UpdateNextDue();
         UpdateDueItem();
         if (mainWindow?.IsVisible != true) return;
         if (dueOpen) await ShowDueAsync();
         else if (library.List == LibraryList.CanvasClass && library.CanvasClass is { } cls && CanvasClassRow(openClass) is { } row)
             await cls.LoadAsync(row);
+        // The open class was just linked (or dropped): it becomes its own Canvas page (or plain lectures again).
+        else if (openClass is { } name && !allLectures && (CanvasClassRow(name) is not null) != (library.List == LibraryList.CanvasClass) && library.List != LibraryList.Due)
+            await ShowClassAsync(name);
     }
 
     /// <summary>Asks the library what's due and which classes are linked. False when it couldn't (no library, an
     /// older one, or no answer), leaving what was known before.</summary>
-    static async Task<bool> LoadCanvasAsync()
+    static Task<bool> LoadCanvasAsync()
     {
-        if (Canvas().Client is not { } client) return false;
-        try
-        {
-            var dueTask = client.DueAsync();
-            var classesTask = client.ClassesAsync();
-            await Task.WhenAll(dueTask, classesTask);
-            if (await dueTask is not { } due) return false;
-            canvasDue = due;
-            canvasClasses = await classesTask ?? [];
-            return true;
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException)
-        {
-            return false;
-        }
+        Canvas();
+        return canvasFeed!.LoadAsync();
     }
 
     static bool CanvasLinked => canvasClasses.Any(c => c.Linked);

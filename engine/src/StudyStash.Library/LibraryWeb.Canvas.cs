@@ -119,7 +119,8 @@ public sealed partial class LibraryWeb
                         if (id is JsonValue n && n.TryGetValue(out long cid) && cid > 0) s.Courses[cls] = cid;
                         else s.Courses.Remove(cls);
                     }
-                if (body?["sync"] is JsonValue sv && sv.TryGetValue(out bool now) && now) s.SyncNow = true;
+                // Sync now while a sync is running is that sync: another straight after it would read it all again.
+                if (body?["sync"] is JsonValue sv && sv.TryGetValue(out bool now) && now && !Canvas.Crawl.Active) s.SyncNow = true;
                 if (body?["poll_minutes"] is JsonValue pv && pv.TryGetValue(out double pm)) s.PollMinutes = Math.Clamp((int)pm, 15, 1440);
                 if (body?["dismiss_update"] is JsonValue dv && dv.TryGetValue(out bool dismiss) && dismiss && s.ExtensionUpdate is { } noted)
                     s.ExtensionUpdate = noted with { Dismissed = true };

@@ -166,6 +166,9 @@ public static class CanvasApi
         public string Url { get; init; } = "";
         public ExtensionInfo? Extension { get; init; }
         public DateTimeOffset? LastSync { get; init; }
+        /// <summary>Changes whenever what the app shows from Canvas may have (a sync finished, a course linked or
+        /// chosen); null from a library older than it.</summary>
+        public string? Revision { get; init; }
         public DateTimeOffset? NextSync { get; init; }
         public int PollMinutes { get; init; }
         public SyncingInfo? Syncing { get; init; }

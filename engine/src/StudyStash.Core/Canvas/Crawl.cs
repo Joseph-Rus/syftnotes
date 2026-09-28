@@ -149,7 +149,7 @@ public sealed partial class Crawl
     {
         try
         {
-            return File.Exists(StatePath) ? JsonNode.Parse(File.ReadAllText(StatePath)) as JsonObject : null;
+            return SharedFile.Read(StatePath) is { } text ? JsonNode.Parse(text) as JsonObject : null;
         }
         catch (JsonException)
         {
@@ -159,9 +159,7 @@ public sealed partial class Crawl
 
     void Save()
     {
-        string tmp = StatePath + ".tmp";
-        File.WriteAllText(tmp, data.ToJsonString());
-        File.Move(tmp, StatePath, overwrite: true);
+        SharedFile.Write(StatePath, data.ToJsonString());
     }
 
     JsonArray Jobs => (JsonArray)data["jobs"]!;

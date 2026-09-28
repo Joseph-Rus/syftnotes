@@ -19,6 +19,9 @@ public sealed class CanvasSettings
     public Dictionary<string, string> Available { get; set; } = [];
     /// <summary>The same courses' code and term (id → info), for <see cref="CourseMatch"/> and the classes screen.</summary>
     public Dictionary<string, CourseInfo> CourseInfo { get; set; } = [];
+    /// <summary>The Canvas courses (ids) the student chose to bring in; only these sync, and only these are explored.
+    /// Null in a library from before the choice: then every linked course is chosen.</summary>
+    public List<string>? Chosen { get; set; }
     /// <summary>How often the extension reads Canvas again.</summary>
     public int PollMinutes { get; set; } = 60;
     /// <summary>When the last sync started (ISO), and when the extension last asked for work.</summary>
@@ -119,10 +122,10 @@ public sealed class CanvasSettings
         lock (Gate)
         {
             string p = PathIn(home);
-            if (!File.Exists(p)) return new CanvasSettings { CurrentKeyId = KeyIdIn(home) };
+            if (SharedFile.Read(p) is not { } text) return new CanvasSettings { CurrentKeyId = KeyIdIn(home) };
             try
             {
-                var s = JsonSerializer.Deserialize<CanvasSettings>(File.ReadAllText(p), Options) ?? new CanvasSettings();
+                var s = JsonSerializer.Deserialize<CanvasSettings>(text, Options) ?? new CanvasSettings();
                 s.CurrentKeyId = KeyIdIn(home);
                 return s;
             }
@@ -138,9 +141,7 @@ public sealed class CanvasSettings
         lock (Gate)
         {
             Directory.CreateDirectory(home);
-            string p = PathIn(home), tmp = p + ".tmp";
-            File.WriteAllText(tmp, JsonSerializer.Serialize(this, Options) + "\n");
-            File.Move(tmp, p, overwrite: true);
+            SharedFile.Write(PathIn(home), JsonSerializer.Serialize(this, Options) + "\n");
         }
     }
 
