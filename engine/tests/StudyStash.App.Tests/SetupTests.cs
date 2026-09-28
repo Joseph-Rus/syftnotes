@@ -666,4 +666,126 @@ public sealed class SetupTests
             check.Close();
         }
     }
+
+    /// <summary>A microphone that won't open, the way Windows' says why; it opens once <see cref="Works"/> is set
+    /// (one plugged in).</summary>
+    sealed class NoMicYet : IAudioSource
+    {
+        public volatile bool Works;
+        public int Opened;
+        public string Name => "No microphone";
+        public int SampleRate => Sound.Rate;
+        public int Channels => 1;
+        public event Action<float[]>? Samples { add { } remove { } }
+        public event Action<string>? Failed { add { } remove { } }
+
+        public void Start()
+        {
+            Interlocked.Increment(ref Opened);
+            if (!Works) throw new MicrophoneException(MicTrouble.NoDevice(windows: true));
+        }
+
+        public void Stop()
+        {
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    [Fact]
+    public async Task Mic_check_keeps_why_the_microphone_wont_open_and_tries_again_a_few_seconds_later()
+    {
+        var now = new DateTime(2026, 9, 1, 9, 0, 0, DateTimeKind.Utc);
+        var mic = new NoMicYet();
+        using var check = new MicCheck(() => now);
+        check.Open(() => mic);
+        await check.Opened;
+        Assert.Equal(MicTroubleKind.NoDevice, check.Trouble!.Kind);
+        Assert.False(check.IsOpen);
+
+        check.Open(() => mic); // straight away: not again yet
+        await check.Opened;
+        Assert.Equal(1, mic.Opened);
+
+        mic.Works = true; // plugged in
+        now += MicCheck.TryAgainAfter;
+        check.Open(() => mic);
+        await check.Opened;
+        Assert.Equal(2, mic.Opened);
+        Assert.True(check.IsOpen);
+        Assert.Null(check.Trouble);
+
+        check.Close();
+        Assert.False(check.IsOpen);
+    }
+
+    [Fact]
+    public async Task Windows_setup_opens_the_microphone_to_find_out_and_shows_no_microphone_with_sound_settings()
+    {
+        using var home = new TempHome();
+        var mic = new NoMicYet();
+        using var host = Host(home, () => mic);
+        using var check = new MicCheck();
+        var m = SetupModel.For(SkinKind.Win, AppRole.Laptop);
+        m.Step = SetupStep.Microphone;
+        m.MicAllowed = false; // Windows couldn't find a microphone to ask about
+        string? opened = null;
+        m.OnOpenUrl = url => opened = url;
+
+        Setup.TickMic(m, host, check, windows: true);
+        await check.Opened;
+        Setup.TickMic(m, host, check, windows: true);
+
+        Assert.Equal(1, mic.Opened);
+        Assert.True(m.ShowMicProblem);
+        Assert.False(m.ShowAllowMic);
+        Assert.False(m.ShowMicCheck);
+        Assert.Equal("No microphone found", m.MicProblemTitle);
+        Assert.Equal("Plug one in, or pick one in Settings → System → Sound → Input.", m.MicProblemText);
+        Assert.Equal("Open Sound settings", m.MicProblemButton);
+        m.MicSettingsCommand.Execute(null);
+        Assert.Equal("ms-settings:sound", opened);
+
+        // One plugged in: the next try opens it and the step shows the waveform.
+        mic.Works = true;
+        check.Close();
+        Setup.TickMic(m, host, check, windows: true);
+        await check.Opened;
+        Setup.TickMic(m, host, check, windows: true);
+        Assert.True(check.IsOpen);
+        Assert.Null(m.MicTrouble);
+        Assert.True(m.MicAllowed);
+        Assert.True(m.ShowMicCheck);
+        Assert.False(m.ShowMicProblem);
+
+        // Refused by the privacy switches: nothing is opened, and the step says where to turn it on.
+        m.Step = SetupStep.Welcome;
+        Setup.TickMic(m, host, check, windows: true);
+        m.MicAllowed = false;
+        m.MicDenied = true;
+        m.Step = SetupStep.Microphone;
+        Setup.TickMic(m, host, check, windows: true);
+        Assert.False(check.IsOpen);
+        Assert.True(m.ShowMicProblem);
+        Assert.Equal("Open microphone settings", m.MicProblemButton);
+        Assert.Contains("Let desktop apps access your microphone", m.MicProblemText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_mac_setup_doesnt_open_a_microphone_it_hasnt_been_allowed()
+    {
+        using var home = new TempHome();
+        var mic = new NoMicYet { Works = true };
+        using var host = Host(home, () => mic);
+        using var check = new MicCheck();
+        var m = SetupModel.For(SkinKind.Mac, AppRole.Laptop);
+        m.Step = SetupStep.Microphone;
+        m.MicAllowed = false;
+        Setup.TickMic(m, host, check, windows: false);
+        await check.Opened;
+        Assert.Equal(0, mic.Opened);
+        Assert.True(m.ShowAllowMic);
+    }
 }

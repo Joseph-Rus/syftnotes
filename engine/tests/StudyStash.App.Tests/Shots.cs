@@ -533,6 +533,15 @@ public class SurfaceShots
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-one-computer-welcome-problem", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = failed, DrawChrome = true } : new WinSetup { DataContext = failed, DrawChrome = true },
                     size: new Size(850, 608));
+            // The microphone step when the microphone won't open: none plugged in, and refused by the system.
+            foreach (var (what, trouble) in new[] { ("none", Audio.MicTrouble.NoDevice(skin == SkinKind.Win)), ("denied", Audio.MicTrouble.Denied(skin == SkinKind.Win)) })
+            {
+                var mic = await SetupPage(skin, AppRole.Laptop, SetupStep.Microphone);
+                mic.MicTrouble = trouble;
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-laptop-microphone-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = mic, DrawChrome = true } : new WinSetup { DataContext = mic, DrawChrome = true },
+                        size: new Size(850, 608));
+            }
         }
     }
 

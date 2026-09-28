@@ -84,6 +84,7 @@ public static class Setup
             Refresh(m, host);
         };
         m.OnMicSettings = () => Dialogs.OpenUrl(host.MicSettingsUrl);
+        m.OnOpenUrl = url => Dialogs.OpenUrl(url);
         m.OnTaskbarSettings = () => Dialogs.OpenUrl("ms-settings:taskbar");
         m.OnRetryModel = () => _ = host.DownloadModelAsync();
         m.OnConnect = () => ConnectAsync(m, host, here);
@@ -180,15 +181,21 @@ public static class Setup
             m.Addresses.Add(new SetupAddress("With Tailscale", $"http://{ts.Dns}:{port}"));
     }
 
-    /// <summary>Every tick while setup's window is open: the microphone is open exactly while its step shows, it's
-    /// allowed, and nothing is recording; copies its levels and whether it's heard anything into the model.</summary>
-    public static void TickMic(SetupModel m, AppHost host, MicCheck mic)
+    /// <summary>Every tick while setup's window is open: the microphone is open exactly while its step shows, it isn't
+    /// refused, and nothing is recording; copies its levels, whether it's heard anything, and why it wouldn't open into
+    /// the model. It opens the way Record does (<see cref="AppHost.OpenMic"/>). Windows asks nobody, so there it's
+    /// tried whenever the privacy switches aren't off: opening is what tells "no microphone" apart.</summary>
+    public static void TickMic(SetupModel m, AppHost host, MicCheck mic, bool windows)
     {
-        if (m.OnMicrophone && m.MicAllowed && host.Recorder.Current is null) mic.Open(host.OpenMic);
+        if (m.OnMicrophone && !m.MicDenied && (m.MicAllowed || windows) && host.Recorder.Current is null) mic.Open(host.OpenMic);
         else mic.Close();
         if (mic.Heard) m.MicHeard = true;
         m.MicLevels = mic.Levels();
+        m.MicTrouble = mic.Trouble;
+        if (mic.IsOpen) m.MicAllowed = true;
     }
+
+    public static void TickMic(SetupModel m, AppHost host, MicCheck mic) => TickMic(m, host, mic, OperatingSystem.IsWindows());
 
     static async Task ConnectAsync(SetupModel m, AppHost host, LibraryHere here)
     {

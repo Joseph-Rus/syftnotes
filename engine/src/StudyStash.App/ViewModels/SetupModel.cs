@@ -122,6 +122,21 @@ public sealed partial class SetupModel : ObservableObject
     /// <summary>A level has passed the "hears you" mark since the mic check opened.</summary>
     [ObservableProperty] public partial bool MicHeard { get; set; }
     public string MicLine => MicHeard ? "Study Stash hears you." : "Say something. The bars move when Study Stash hears you.";
+    /// <summary>Why the mic check couldn't open the microphone (none plugged in, refused, another app has it); null
+    /// while it's fine.</summary>
+    [ObservableProperty] public partial Audio.MicTrouble? MicTrouble { get; set; }
+    /// <summary>The waveform and "allowed" line: the microphone is allowed and opened.</summary>
+    public bool ShowMicCheck => MicAllowed && MicTrouble is null;
+    public bool ShowAllowMic => !MicAllowed && MicTrouble is null;
+    public bool ShowMicProblem => MicDenied || MicTrouble is not null;
+    public bool HasMicProblemTitle => MicTrouble is not null;
+    public string MicProblemTitle => MicTrouble?.Title ?? "";
+    public string MicProblemText => MicTrouble?.Detail ?? (skin == SkinKind.Mac
+        ? "macOS is keeping the microphone from Study Stash. Turn it on in System Settings → Privacy & Security → Microphone."
+        : "Windows is keeping the microphone from desktop apps. Turn on Settings → Privacy & security → Microphone → Let desktop apps access your microphone.");
+    public bool HasMicProblemButton => MicTrouble is null || MicTrouble.HasAction;
+    public string MicProblemButton => MicTrouble is { HasAction: true } t ? t.ActionLabel
+        : skin == SkinKind.Mac ? "Open System Settings" : "Open microphone settings";
 
     // The library: created here (library flow) or connected to (laptop flow)
     [ObservableProperty] public partial string Address { get; set; } = "";
@@ -418,6 +433,19 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnMicHeardChanged(bool value) => OnPropertyChanged(nameof(MicLine));
 
+    partial void OnMicAllowedChanged(bool value) => MicShowsChanged();
+
+    partial void OnMicDeniedChanged(bool value) => MicShowsChanged();
+
+    partial void OnMicTroubleChanged(Audio.MicTrouble? value) => MicShowsChanged();
+
+    void MicShowsChanged()
+    {
+        foreach (var name in new[] { nameof(ShowMicCheck), nameof(ShowAllowMic), nameof(ShowMicProblem), nameof(HasMicProblemTitle),
+                     nameof(MicProblemTitle), nameof(MicProblemText), nameof(HasMicProblemButton), nameof(MicProblemButton) })
+            OnPropertyChanged(name);
+    }
+
     partial void OnLibraryResultChanged(string? value)
     {
         OnPropertyChanged(nameof(HasLibraryResult));
@@ -488,6 +516,8 @@ public sealed partial class SetupModel : ObservableObject
 
     public Func<Task>? OnAllowMic { get; set; }
     public Action? OnMicSettings { get; set; }
+    /// <summary>Opens a settings page (a problem's own button).</summary>
+    public Action<string>? OnOpenUrl { get; set; }
     /// <summary>Creates the library here (library flow) or connects to it (laptop flow).</summary>
     public Func<Task>? OnConnect { get; set; }
     public Func<Task>? OnFind { get; set; }
@@ -504,7 +534,12 @@ public sealed partial class SetupModel : ObservableObject
     public Action? OnFinish { get; set; }
 
     [RelayCommand] Task AllowMic() => OnAllowMic?.Invoke() ?? Task.CompletedTask;
-    [RelayCommand] void MicSettings() => OnMicSettings?.Invoke();
+    /// <summary>The problem's own button (Sound settings for a missing microphone), else the privacy settings.</summary>
+    [RelayCommand] void MicSettings()
+    {
+        if (MicTrouble is { HasAction: true } t) OnOpenUrl?.Invoke(t.ActionUrl);
+        else OnMicSettings?.Invoke();
+    }
     [RelayCommand] void RetryModel() => OnRetryModel?.Invoke();
     [RelayCommand] void TaskbarSettings() => OnTaskbarSettings?.Invoke();
     [RelayCommand] void ToggleShowPassword() => ShowPassword = !ShowPassword;
