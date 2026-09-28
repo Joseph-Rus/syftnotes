@@ -119,6 +119,77 @@ public class AttachedNotesTests
         Assert.False(store.AttachmentsUnused("l1"));
     }
 
+    /// <summary>A library with a lecture in Bio 110 (its notes about cells), a handout for the class, and the student's
+    /// own notes on the lecture; an Ask model that answers from source 1 and hands back the prompt.</summary>
+    static (Store Store, LibraryReader Reader) AskLibrary(TempDir dir)
+    {
+        var cfg = new Config(dir["home"], dir["pool"]) { OllamaEnabled = true, Classes = [new ClassDef("Bio 110"), new ClassDef("CS 101")] };
+        var store = new Store(cfg.DbPath, cfg.PoolDir);
+        store.Save(new Meeting("n1") { Title = "Cells", Date = "2026-09-01", Transcript = "The membrane lets water through by osmosis." },
+            new Classification("Bio 110", 1, "folder"), "## Summary\nCells have membranes.", "qwen3");
+        Attach(store, "own", "Bio 110", "n1", "my notes.pdf", "Mitochondria: the powerhouse. Make ATP.\n\nRibosomes build proteins.");
+        store.AddAttachment(new Attachment("hand", "Syllabus.pdf", "Syllabus.pdf", "Bio 110", null, 1, "application/pdf", "2026-09-02T00:00:00Z"));
+        store.SetAttachmentText("hand", "The midterm is on October 14 and covers mitochondria.");
+        return (store, new LibraryReader(cfg, store));
+    }
+
+    [Fact]
+    public async Task Asking_about_a_lecture_reads_what_the_student_attached_to_it()
+    {
+        using var dir = new TempDir();
+        var (store, reader) = AskLibrary(dir);
+        using var owned = store;
+        string prompt = "";
+        var answer = await reader.AskAsync("What makes ATP? mitochondria", lectureId: "n1", chat: (p, _) =>
+        {
+            prompt = p;
+            int k = p.Split('\n').TakeWhile(l => !l.Contains("my notes.pdf")).Count(l => l.StartsWith('[')) + 1;
+            return Task.FromResult($$"""{"answer": "Mitochondria.", "sources": [{{k}}]}""");
+        });
+        Assert.Contains("Attached to Cells (Bio 110, 2026-09-01), The student's own notes: my notes.pdf:\nMitochondria: the powerhouse.", prompt);
+        Assert.DoesNotContain("Syllabus", prompt); // the class's handout isn't this lecture's
+        var source = (System.Text.Json.Nodes.JsonObject)Assert.Single((System.Text.Json.Nodes.JsonArray)answer["sources"]!)!;
+        Assert.Equal("my notes.pdf", source["title"]!.GetValue<string>());
+        Assert.Equal("own", source["attachment"]!.GetValue<string>());
+        Assert.Equal("n1", source["id"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Asking_about_a_class_reads_every_attachment_in_it()
+    {
+        using var dir = new TempDir();
+        var (store, reader) = AskLibrary(dir);
+        using var owned = store;
+        string prompt = "";
+        await reader.AskAsync("When is the midterm?", className: "Bio 110", chat: (p, _) =>
+        {
+            prompt = p;
+            return Task.FromResult("""{"answer": "October 14.", "sources": []}""");
+        });
+        Assert.Contains("Attached to Bio 110, Handout: Syllabus.pdf:\nThe midterm is on October 14", prompt);
+        // Another class's question doesn't see them.
+        prompt = "";
+        var none = await reader.AskAsync("When is the midterm?", className: "CS 101", chat: (p, _) =>
+        {
+            prompt = p;
+            return Task.FromResult("""{"answer": "x", "sources": []}""");
+        });
+        Assert.DoesNotContain("Syllabus", prompt);
+        Assert.Equal(LibraryReader.NoAnswer, none["answer"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_lecture_with_nothing_but_an_attachment_can_still_be_asked_about()
+    {
+        using var dir = new TempDir();
+        var (store, reader) = AskLibrary(dir);
+        using var owned = store;
+        store.Save(new Meeting("n2") { Title = "Lab", Date = "2026-09-03" }, new Classification("Bio 110", 1, "folder"));
+        Attach(store, "lab", "Bio 110", "n2", "lab sheet.png", "Step 1: stain the onion cells.");
+        var answer = await reader.AskAsync("What's step 1?", lectureId: "n2", chat: (_, _) => Task.FromResult("""{"answer": "Stain them.", "sources": [1]}"""));
+        Assert.Equal("Stain them.", answer["answer"]!.GetValue<string>());
+    }
+
     [Fact]
     public async Task Notes_that_fail_to_be_written_leave_the_attachments_unused()
     {
