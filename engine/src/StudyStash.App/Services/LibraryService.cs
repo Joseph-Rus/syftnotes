@@ -103,6 +103,15 @@ public sealed class LibraryService : IDisposable
         await SpawnAsync();
     }
 
+    /// <summary>The library we stepped aside for (<see cref="LibraryServiceState.Elsewhere"/>) may have stopped since: a
+    /// copy of the app that was ended, whose library was still shutting down as this one started. Then ours starts in
+    /// its place; while another still answers, nothing changes.</summary>
+    public async Task TakeOverIfGoneAsync()
+    {
+        if (State != LibraryServiceState.Elsewhere) return;
+        await StartAsync();
+    }
+
     async Task SpawnAsync()
     {
         Directory.CreateDirectory(LogDir);

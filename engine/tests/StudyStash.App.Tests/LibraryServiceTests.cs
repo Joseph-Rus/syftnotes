@@ -170,6 +170,36 @@ public sealed class LibraryServiceTests
     }
 
     [Fact]
+    public async Task A_service_that_stepped_aside_takes_over_once_the_other_library_is_gone()
+    {
+        // The app was ended and started again at once: its old library was still shutting down, so the new one
+        // stepped aside. Once that one's gone, the new one runs its own.
+        string exe = BuiltEngine();
+        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
+        string home = TempHome();
+        try
+        {
+            var cfg = ReadyConfig(home);
+            cfg.WebHost = "127.0.0.1";
+            Configs.Save(cfg);
+            var old = new LibraryService(home, cfg, [exe]);
+            await old.StartAsync();
+            var fresh = new LibraryService(home, cfg, [exe]);
+            await fresh.StartAsync();
+            Assert.Equal(LibraryServiceState.Elsewhere, fresh.State);
+
+            await fresh.TakeOverIfGoneAsync();
+            Assert.Equal(LibraryServiceState.Elsewhere, fresh.State); // the old one still answers: nothing changes
+
+            await old.StopAsync();
+            await fresh.TakeOverIfGoneAsync();
+            Assert.Equal(LibraryServiceState.Running, fresh.State);
+            await fresh.StopAsync();
+        }
+        finally { try { Directory.Delete(home, true); } catch (IOException) { } }
+    }
+
+    [Fact]
     public async Task The_library_stops_by_itself_when_the_app_that_started_it_goes()
     {
         // The app keeps the library's input open; when the app is gone (ended in Task Manager, or crashed) its end of
