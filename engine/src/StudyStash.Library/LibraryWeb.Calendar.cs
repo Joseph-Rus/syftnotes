@@ -20,4 +20,29 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/calendar/upcoming", (HttpContext ctx) => Api(ctx, () =>
             Http.Json(LibraryCalendar.Read(cfg.Home, EventClass.Of(cfg), DateTimeOffset.UtcNow))));
     }
+
+    /// <summary>"Coming up" on the home page: today and tomorrow's timed events, each with the class it's for.
+    /// "" once there's nothing to show — no laptop sending events yet, or nothing left today or tomorrow.</summary>
+    string ComingUpHtml()
+    {
+        var now = DateTimeOffset.Now;
+        if (LibraryCalendar.Read(cfg.Home, EventClass.Of(cfg), now)["events"] is not JsonArray events || events.Count == 0) return "";
+        var today = now.Date;
+        var rows = events.OfType<JsonObject>()
+            .Where(e => e["allDay"] is not JsonValue v || !v.TryGetValue(out bool allDay) || !allDay)
+            .Select(e => (e, Start: DateTimeOffset.TryParse(e["start"]?.GetValue<string>(), out var t) ? t : (DateTimeOffset?)null))
+            .Where(x => x.Start is { } s && s.Date <= today.AddDays(1))
+            .Take(4)
+            .Select(x =>
+            {
+                var start = x.Start!.Value;
+                string title = x.e["title"]?.GetValue<string>() ?? "";
+                string? cls = x.e["class"]?.GetValue<string>();
+                string when = (start.Date == today ? "" : "Tomorrow ") + start.ToString("h:mm tt");
+                string tag = cls is { Length: > 0 } ? $"<span class=\"tag\" style=\"{Ui.HueStyle(cls)}\">{Ui.Esc(cls)}</span>" : "";
+                return $"<div class=\"row\"><span class=\"grow\">{Ui.Esc(title)}</span>{tag}<span class=\"value\">{Ui.Esc(when)}</span></div>";
+            });
+        string body = string.Concat(rows);
+        return body.Length == 0 ? "" : $"<h2>Coming up</h2><div class=\"group\">{body}</div>";
+    }
 }

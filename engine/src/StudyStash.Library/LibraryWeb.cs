@@ -475,6 +475,7 @@ public sealed partial class LibraryWeb
             + $"<span class=\"value\">{x.Count}</span></a>"));
         string body = $"<h1>{Ui.Esc(cfg.PoolName)}</h1>" + (lede.Length > 0 ? $"<p class=\"sub\">{lede}</p>" : "")
             + $"<div class=\"only-narrow\">{Ui.SearchBox()}<h2>Classes</h2><div class=\"group\">{folders}</div></div>"
+            + ComingUpHtml()
             + QueuePanel(role == "admin")
             + (rows.Count > 0 ? $"<h2>Recent lectures</h2>{Ui.NoteList(rows, "", "")}" : empty);
         return Show(cfg.PoolName, body, c);
