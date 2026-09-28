@@ -44,12 +44,15 @@ public class WinChromeTests
             var pseudo = (IPseudoClasses)d.Classes;
             pseudo.Set(":normal", true);
             pseudo.Set(":has-minimize", true);
-            pseudo.Set(":has-maximize", resizable);
-            pseudo.Set(":has-fullscreen", resizable);
+            // As Windows has it: maximise and full screen are allowed actions even for a window that can't be resized;
+            // there the maximise button is only disabled.
+            pseudo.Set(":has-maximize", true);
+            pseudo.Set(":has-fullscreen", true);
             LogicalChildren.Add(d);
             d.ApplyStyling();
             typeof(WindowDrawnDecorations).GetMethod("ApplyTemplate", BindingFlags.NonPublic | BindingFlags.Instance)!.Invoke(d, null);
             Children.Add(d.Content!.Overlay!);
+            if (!resizable) d.Content.Overlay!.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "PART_MaximizeButton").IsEnabled = false;
         }
     }
 
@@ -127,6 +130,28 @@ public class WinChromeTests
             var min = Part(ours, "PART_MinimizeButton").TranslatePoint(new Point(0, 0), window)!.Value.X;
             Assert.Equal(window.Bounds.Width, right, 1);
             Assert.True(window.Bounds.Width - min <= header.ButtonRoom.Right + 4, $"the caption buttons start {window.Bounds.Width - min} from the right, past the header's {header.ButtonRoom.Right}");
+            window.Close();
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    [AvaloniaFact]
+    public void A_window_that_cant_be_maximised_shows_minimise_and_close_only()
+    {
+        try
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Win);
+            var host = new DrawnHost(new Border(), WinChrome.Decorations(), 32, resizable: false);
+            var window = new Window { Width = 720, Height = 480, Content = host };
+            window.Show();
+            window.UpdateLayout();
+            var d = host.Decorations!;
+            Assert.False(Part(d, "PART_MaximizeButton").IsEffectivelyVisible, "a greyed-out maximise shows");
+            Assert.True(Part(d, "PART_MinimizeButton").IsEffectivelyVisible);
+            Assert.True(Part(d, "PART_CloseButton").IsEffectivelyVisible);
             window.Close();
         }
         finally

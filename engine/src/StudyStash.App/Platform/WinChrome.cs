@@ -127,8 +127,9 @@ public static class WinChrome
 
     /// <summary>
     /// Avalonia's own window decorations (Fluent's), less what would double ours: its title (the header shows the
-    /// app's mark and name already, so the two overlapped) and a full-screen button no Windows window has. The caption
-    /// buttons keep Windows' red close; its glyph turns white on it, as Windows' does.
+    /// app's mark and name already, so the two overlapped), a full-screen button no Windows window has, and a greyed
+    /// maximise on a window that can't be. The caption buttons keep Windows' red close; its glyph turns white on it, as
+    /// Windows' does.
     /// </summary>
     public static ControlTheme? Decorations()
     {
@@ -139,6 +140,9 @@ public static class WinChrome
         var theme = new ControlTheme(typeof(WindowDrawnDecorations)) { BasedOn = fluent };
         theme.Children.Add(Set(x => Bar(x).OfType<Panel>().Name("PART_TitleTextPanel"), Visual.IsVisibleProperty, false));
         theme.Children.Add(Set(x => Bar(x).OfType<Button>().Name("PART_FullScreenButton"), Visual.IsVisibleProperty, false));
+        // A window that can't be maximised (setup, Settings) shows minimise and close only, as the design draws it,
+        // not a greyed-out maximise between them.
+        theme.Children.Add(Set(x => Bar(x).OfType<Button>().Name("PART_MaximizeButton").Class(":disabled"), Visual.IsVisibleProperty, false));
         // Behind our title bar nothing of Avalonia's own shows through (the Mica, or the window's colour, does).
         theme.Children.Add(Set(x => Bar(x).OfType<Panel>().Name("PART_TitleBar"), Panel.BackgroundProperty, Brushes.Transparent));
         theme.Children.Add(Set(x => Bar(x).OfType<Button>().Name("PART_CloseButton").Class(":pointerover").Descendant().OfType<Avalonia.Controls.Shapes.Path>(), Shape.FillProperty, Brushes.White));
