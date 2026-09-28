@@ -479,15 +479,95 @@ public static class DiagramLayout
     static DiagramScene Layered(Flowchart f, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer m)
     {
         var back = BackEdges(f);
-        try
+        var pairs = Siblings(f, back);
+        bool across = dir is ChartDirection.TopDown or ChartDirection.BottomUp;
+        // Siblings in the written order ("yes" before "no") read better, but not at the price of lines crossing.
+        // MSAGL's own layout, the same mirrored, and one made to keep the order: the fewest crossings wins, then the
+        // fewest siblings out of order.
+        var free = Layered(f, sizes, labels, dir, m, back, pairs: null);
+        var candidates = new List<DiagramScene> { free };
+        if (pairs.Count > 0)
         {
-            return Layered(f, sizes, labels, dir, m, back, keepOrder: true);
+            candidates.Add(Mirror(free, across));
+            try
+            {
+                candidates.Add(Layered(f, sizes, labels, dir, m, back, pairs));
+            }
+            catch (Exception)
+            {
+                // Keeping the order is a wish, not a need: without it MSAGL always finds a layout.
+            }
         }
-        catch (Exception)
+        return candidates.OrderBy(Crossings).ThenBy(c => OutOfOrder(c, pairs, across)).First();
+    }
+
+    /// <summary>Boxes that share a parent and a level, in the order their arrows were written: the pairs that should
+    /// read left to right (or top to bottom).</summary>
+    static List<(string First, string Second)> Siblings(Flowchart f, HashSet<int> back)
+    {
+        var level = Levels(f, back);
+        var group = f.Nodes.ToDictionary(n => n.Id, n => f.Groups.FirstOrDefault(g => g.Members.Contains(n.Id))?.Id);
+        var pairs = new List<(string, string)>();
+        foreach (var siblings in f.Edges.Where((e, i) => e.From != e.To && !back.Contains(i)).GroupBy(e => e.From))
         {
-            // Keeping siblings in the written order is a wish, not a need: without it MSAGL always finds a layout.
-            return Layered(f, sizes, labels, dir, m, back, keepOrder: false);
+            var kids = siblings.Select(e => e.To).Distinct().ToList();
+            for (int k = 0; k + 1 < kids.Count; k++)
+                if (level[kids[k]] == level[kids[k + 1]] && group[kids[k]] == group[kids[k + 1]]) pairs.Add((kids[k], kids[k + 1]));
         }
+        return pairs;
+    }
+
+    static int OutOfOrder(DiagramScene s, List<(string First, string Second)> pairs, bool across)
+    {
+        var at = s.Nodes.ToDictionary(n => n.Id, n => n.Box.Center);
+        return pairs.Count(p => across ? at[p.First].X > at[p.Second].X : at[p.First].Y > at[p.Second].Y);
+    }
+
+    /// <summary>The same layout seen in a mirror: left for right in a top-down chart, top for bottom across.</summary>
+    static DiagramScene Mirror(DiagramScene s, bool across)
+    {
+        Pt P(Pt p) => across ? new Pt(-p.X, p.Y) : new Pt(p.X, -p.Y);
+        Box B(Box b) => b.W == 0 && b.H == 0 ? b : across ? b with { X = -b.Right } : b with { Y = -b.Bottom };
+        return s with
+        {
+            Nodes = s.Nodes.Select(n => n with { Box = B(n.Box) }).ToList(),
+            Groups = s.Groups.Select(g => { var box = B(g.Box); return g with { Box = box, TitleAt = new Pt(box.X + 12, box.Y + 8) }; }).ToList(),
+            Edges = s.Edges.Select(e => e with
+            {
+                Path = e.Path.Select(p => new PathStep(p.Verb, P(p.A), P(p.B), P(p.C))).ToList(),
+                StartTip = P(e.StartTip),
+                StartBase = P(e.StartBase),
+                Tip = P(e.Tip),
+                Base = P(e.Base),
+                LabelBox = B(e.LabelBox),
+            }).ToList(),
+        };
+    }
+
+    /// <summary>How many times the arrows cross each other away from the boxes.</summary>
+    internal static int Crossings(DiagramScene s)
+    {
+        var lines = s.Edges.Select(e => Flatten(e)).ToList();
+        var boxes = s.Nodes.Select(n => n.Box.Inflate(4)).ToList();
+        int count = 0;
+        for (int i = 0; i < lines.Count; i++)
+            for (int j = i + 1; j < lines.Count; j++)
+                for (int a = 1; a < lines[i].Count; a++)
+                    for (int b = 1; b < lines[j].Count; b++)
+                        if (Cross(lines[i][a - 1], lines[i][a], lines[j][b - 1], lines[j][b]) is { } p && !boxes.Any(x => x.Contains(p)))
+                            count++;
+        return count;
+    }
+
+    static Pt? Cross(Pt p1, Pt p2, Pt q1, Pt q2)
+    {
+        var r = p2 - p1;
+        var d = q2 - q1;
+        double den = r.X * d.Y - r.Y * d.X;
+        if (Math.Abs(den) < 1e-9) return null;
+        var w = q1 - p1;
+        double t = (w.X * d.Y - w.Y * d.X) / den, u = (w.X * r.Y - w.Y * r.X) / den;
+        return t is >= 0 and <= 1 && u is >= 0 and <= 1 ? p1 + r * t : null;
     }
 
     /// <summary>
@@ -514,7 +594,7 @@ public static class DiagramLayout
         return back;
     }
 
-    static DiagramScene Layered(Flowchart f, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer m, HashSet<int> back, bool keepOrder)
+    static DiagramScene Layered(Flowchart f, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer m, HashSet<int> back, List<(string First, string Second)>? pairs)
     {
         var g = new GeometryGraph();
         // MSAGL's cluster layout throws without something here.
@@ -576,6 +656,36 @@ public static class DiagramLayout
             g.Edges.Add(ge);
             routed.Add((i, ge, reversed));
         }
+        // MSAGL lays each group out as one box in the level around it, but doesn't see the arrows that run into or
+        // out of the group when it decides that level's order, so a group could float anywhere. A stand-in arrow
+        // between the group and the box (or group) at the other end, at the level where they meet, puts it in line.
+        var parentOf = f.Groups.ToDictionary(x => x.Id, x => x.Parent);
+        List<string?> Chain(string id)
+        {
+            var chain = new List<string?>();
+            for (string? at = groupOf[id]; at is not null; at = parentOf[at]) chain.Add(at);
+            chain.Add(null);
+            return chain;
+        }
+        var standIns = new HashSet<(string, string)>();
+        foreach (var (i, ge, reversed) in routed)
+        {
+            string from = reversed ? f.Edges[i].To : f.Edges[i].From, to = reversed ? f.Edges[i].From : f.Edges[i].To;
+            var up = Chain(from);
+            var down = Chain(to);
+            string? meet = up.First(down.Contains);
+            // Just below where the two chains meet: the box itself, or the outermost group holding it there.
+            string Top(string node, List<string?> chain)
+            {
+                int k = chain.IndexOf(meet);
+                return k == 0 ? node : "group:" + chain[k - 1];
+            }
+            string a = Top(from, up), b = Top(to, down);
+            if (a == from && b == to) continue;
+            if (!standIns.Add((a, b))) continue;
+            MsaglNode End(string key) => key.StartsWith("group:", StringComparison.Ordinal) ? clusters[key[6..]] : nodes[key];
+            g.Edges.Add(new MsaglEdge(End(a), End(b)));
+        }
         var settings = new SugiyamaLayoutSettings { NodeSeparation = 28, LayerSeparation = 44 };
         settings.EdgeRoutingSettings.EdgeRoutingMode = f.Groups.Count > 0 ? EdgeRoutingMode.Spline : EdgeRoutingMode.SugiyamaSplines;
         double turn = dir switch
@@ -586,23 +696,13 @@ public static class DiagramLayout
             _ => 0,
         };
         if (turn != 0) settings.Transformation = PlaneTransformation.Rotation(turn);
-        if (keepOrder)
+        if (pairs is not null)
         {
-            // Siblings on one level keep the order they were written in: "yes" before "no", first type first. MSAGL's
-            // left becomes the bottom once turned left-to-right, and the right once turned bottom-up.
+            // MSAGL's left becomes the bottom once turned left-to-right, and the right once turned bottom-up.
             bool flip = dir is ChartDirection.LeftRight or ChartDirection.BottomUp;
-            var level = Levels(f, back);
-            foreach (var siblings in f.Edges.Select((e, i) => (e, i)).Where(x => x.e.From != x.e.To && !back.Contains(x.i)).GroupBy(x => x.e.From))
-            {
-                var kids = siblings.Select(x => x.e.To).Distinct().ToList();
-                for (int k = 0; k + 1 < kids.Count; k++)
-                {
-                    string a = kids[k], b = kids[k + 1];
-                    if (level[a] != level[b] || groupOf[a] != groupOf[b]) continue;
-                    if (flip) settings.AddLeftRightConstraint(nodes[b], nodes[a]);
-                    else settings.AddLeftRightConstraint(nodes[a], nodes[b]);
-                }
-            }
+            foreach (var (a, b) in pairs)
+                if (flip) settings.AddLeftRightConstraint(nodes[b], nodes[a]);
+                else settings.AddLeftRightConstraint(nodes[a], nodes[b]);
         }
         LayoutHelpers.CalculateLayout(g, settings, null);
 

@@ -217,6 +217,8 @@ public class DiagramLayoutTests
         var no = s.Nodes.Single(n => n.Id == "D").Box.Center;
         if (direction is ChartDirection.TopDown or ChartDirection.BottomUp) Assert.True(yes.X < no.X, "yes is left of no");
         else Assert.True(yes.Y < no.Y, "yes is above no");
+        // ...and the arrow back to the start goes round the outside, crossing nothing.
+        Assert.Equal(0, DiagramLayout.Crossings(s));
     }
 
     [Fact]
@@ -227,6 +229,25 @@ public class DiagramLayoutTests
         Assert.True(Y("A") < Y("D") && Y("D") < Y("P") && Y("I") < Y("E"), "written order, top to bottom");
         var back = s.Edges.Single(e => e.From == "E" && e.To == "A");
         Assert.True(back.Path[0].A.Y > back.Tip.Y, "the dotted arrow climbs back to the start");
+    }
+
+    [Fact]
+    public void A_group_sits_in_line_with_the_arrows_into_and_out_of_it()
+    {
+        var s = Lay("""
+            flowchart TD
+              subgraph assess [Assessment]
+                A[Collect data] --> V[Validate the cues]
+              end
+              V --> D[Nursing diagnosis] --> P[Plan] --> I[Implement] --> E{Outcomes met?}
+              E -->|yes| R([Resolve])
+              E -.->|no| A
+            """);
+        var group = s.Groups.Single();
+        Box Of(string id) => s.Nodes.Single(n => n.Id == id).Box;
+        Assert.True(group.Box.Bottom <= Of("D").Y, "the group is above the diagnosis it leads to");
+        Assert.True(Of("D").Bottom <= Of("P").Y && Of("I").Bottom <= Of("E").Y);
+        Assert.All(s.Nodes.Where(n => n.Id is not ("A" or "V")), n => Assert.False(group.Box.Intersects(n.Box)));
     }
 
     [Theory]
