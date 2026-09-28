@@ -68,6 +68,8 @@ public sealed partial class PanelModel : ObservableObject
     public bool HasProblem => ProblemTitle is not null;
 
     public ObservableCollection<LectureItem> Recent { get; } = [];
+    /// <summary>What's coming up on the student's calendars, above Recent.</summary>
+    public ComingUpModel ComingUp { get; } = new();
 
     /// <summary>This computer is only the library: no Record, no transcription model, no lectures of its own; the
     /// dropdown shows the library's state instead (<see cref="Library"/>).</summary>

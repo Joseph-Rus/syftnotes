@@ -3,3 +3,5 @@
 # Fixed expectations the C# tests compare byte for byte.
 engine/tests/StudyStash.Core.Tests/Golden/** -text
 engine/**/*.cs text eol=lf
+# Calendar feeds as servers send them, with CRLF line endings.
+engine/tests/StudyStash.Core.Tests/Fixtures/calendar/** -text

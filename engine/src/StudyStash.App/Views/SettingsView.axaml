@@ -1208,6 +1208,12 @@
                 <v:MacPhones DataContext="{Binding Phones}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
                 <v:WinPhones DataContext="{Binding Phones}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
               </Panel>
+
+              <!-- Calendars: pasting a feed, Connect buttons for kinds that offer one, and the sources already added -->
+              <Panel IsVisible="{Binding OnCalendars}">
+                <v:MacCalendarSettings DataContext="{Binding Calendars}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
+                <v:WinCalendarSettings DataContext="{Binding Calendars}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
+              </Panel>
             </StackPanel>
           </ScrollViewer>
 

@@ -1,0 +1,27 @@
+<!-- Coming up, in the dropdown and the library window (Mac): the next few events today and tomorrow from the
+     student's calendars, each with when, what, and the class it's for (its dot). Hidden with no calendars; with
+     calendars and nothing left, one quiet line says so. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.MacComingUp"
+             x:DataType="vm:ComingUpModel">
+  <StackPanel IsVisible="{Binding HasCalendars}">
+    <TextBlock Text="{Binding Heading}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" Margin="8,2,8,0" />
+    <TextBlock IsVisible="{Binding IsEmpty}" Text="{Binding EmptyText}" FontSize="12" Foreground="{DynamicResource Fg3}" Margin="8,4,8,2" />
+    <ItemsControl ItemsSource="{Binding Rows}" Margin="0,3,0,0">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ComingUpRow">
+          <Grid ColumnDefinitions="7,8,*,8,Auto" Margin="8,4">
+            <Ellipse Width="7" Height="7" Fill="{Binding Dot}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="2">
+              <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
+              <TextBlock IsVisible="{Binding HasDetail}" Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+            <TextBlock Grid.Column="4" Classes="num" Text="{Binding When}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+  </StackPanel>
+</UserControl>

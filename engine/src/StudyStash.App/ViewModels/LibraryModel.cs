@@ -89,6 +89,9 @@ public enum LibraryList { Lectures, Due, CanvasClass }
 /// </summary>
 public sealed partial class LibraryModel : ObservableObject
 {
+    /// <summary>What's coming up on the student's calendars, at the foot of the sidebar.</summary>
+    public ComingUpModel ComingUp { get; } = new();
+
     /// <summary>Below this width the window shows one column after the sidebar, not two.</summary>
     public const double NarrowBelow = 900;
 

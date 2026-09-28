@@ -108,6 +108,9 @@
         </StackPanel>
       </Border>
 
+      <!-- Coming up on the student's calendars -->
+      <v:MacComingUp DataContext="{Binding ComingUp}" IsVisible="{Binding !$parent[UserControl].((vm:PanelModel)DataContext).LibraryOnly}" />
+
       <!-- Recent lectures -->
       <StackPanel IsVisible="{Binding ShowRecent}">
         <TextBlock Text="Recent" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" Margin="8,2,8,0" />

@@ -1265,7 +1265,7 @@ public static partial class Shell
         bool recording = live is not null;
         panel.IsRecording = recording;
         panel.IsPaused = recorder.IsPaused = live?.State == LectureState.Paused;
-        string cls = recording ? live!.ClassName : RecordClass();
+        string cls = recording ? live!.ClassName : RecordClass() is { Length: > 0 } picked ? picked : CalendarClass();
         panel.ClassName = recorder.ClassName = cls;
         int color = host.ColorOf(cls);
         panel.ClassDot = recorder.ClassDot = color >= 0 ? Skin.ClassDot(color) : Brushes.Gray;
@@ -1278,6 +1278,7 @@ public static partial class Shell
         panel.Hint = recording ? null
             : !panel.CanRecord && problem is not null ? problem.Title
             : RecordClass().Length > 0 ? "Picked by you"
+            : CalendarHint() is { } fromCalendar ? fromCalendar
             : ClassPicker.SortHint;
         var (status, good) = host.Status();
         panel.Status = status;
@@ -1295,6 +1296,7 @@ public static partial class Shell
                 OperatingSystem.IsMacOS() ? "Mac" : "PC", host.Overview, canvasWatch?.State, DateTimeOffset.Now, TimeZoneInfo.Local)
             : null;
         KeepCanvasWatched();
+        UpdateComingUp();
         library.Status = LibraryStatus();
         library.StatusGood = host.Library == LibraryState.Connected;
         // The library just came back: the window, if it's open, gets its class reloaded so a note written while it
