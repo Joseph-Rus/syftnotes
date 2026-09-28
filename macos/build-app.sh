@@ -19,6 +19,13 @@ MACOS="$APP/Contents/MacOS"
 rm -rf "$OUT"
 mkdir -p "$MACOS" "$APP/Contents/Resources"
 
+# The phone app (web/) is built first, so each publish carries it beside the app as web/ (the library serves it at
+# /app/). It needs Node and npm; without them the build stops rather than ship a library whose Add a phone leads
+# nowhere.
+command -v npm >/dev/null || { echo "build-app.sh: npm is needed to build the phone app (web/)" >&2; exit 1; }
+(cd "$ROOT/web" && npm ci --no-audit --no-fund --silent && npm run build --silent)
+[ -f "$ROOT/web/dist/index.html" ] || { echo "build-app.sh: the phone app didn't build (web/dist)" >&2; exit 1; }
+
 # One self-contained publish per architecture; the two trees can't be lipo-merged (System.Private.CoreLib and the
 # R2R framework assemblies differ), so both ship whole and macos/launcher.c picks its tree at run time (D1).
 for arch in arm64 x64; do
