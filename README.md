@@ -27,6 +27,21 @@ your laptop                                     your library
                                                    └──────────────────────────────────────┘
 ```
 
+## Just one computer
+
+You don't need a Mac mini or any other server. Install the laptop download
+([Study-Stash-Laptop.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop.dmg) on a Mac,
+[Study-Stash-Laptop-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop-Setup.exe)
+on Windows, installed as in step 2), open **Study Stash**, and keep setup's first choice, **Just this computer**: it records,
+transcribes, keeps your library and writes your notes all on that computer, and the library listens to that computer
+alone. Notes are written while it's on (a lecture whose notes were cut off by sleep gets them after it wakes); turn on
+**Start at login** so the library runs whenever you're logged in. Setup then asks who writes the notes (Ollama, or
+Claude Code or Codex with the steps to install and sign in, or no AI for now), and your classes. To add a laptop later,
+open **Settings → Your library → Add a laptop**: it gives the library a password and shows the addresses to type on
+the laptop, with nothing to reinstall.
+
+For a laptop plus an always-on library, follow steps 1 and 2.
+
 ## 1. Set up the library's computer
 
 On the computer that keeps your library (a Mac mini, or any Mac or Windows PC that stays on),
@@ -84,7 +99,7 @@ irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | 
 Install it the same way as the library (Mac: drag into Applications, then **Open Anyway**;
 Windows: run the Setup.exe, then **Run anyway**). The first time it records, it asks for the
 microphone — say yes (it may ask again after an update, since an ad-hoc signed app can't remember
-across one). Open **Study Stash**, click **Set Up**, and type the library's address and password
+across one). Open **Study Stash**, click **Set Up**, choose **This is my laptop**, and type the library's address and password
 from step 1 (or find them again under **Settings → Connect a laptop** on the library's page).
 
 ## Updates
