@@ -153,7 +153,10 @@ public static class SelfTest
             return;
         }
         var size = new PixelSize(Math.Max(1, (int)Math.Ceiling(w.Bounds.Width)), Math.Max(1, (int)Math.Ceiling(w.Bounds.Height)));
-        using var bmp = new RenderTargetBitmap(new PixelSize(size.Width * 2, size.Height * 2), new Vector(192, 192));
+        // Twice the size on a Mac; on Windows at the window's own size, where a doubled bitmap drew the window twice
+        // as large again and kept only its top-left quarter.
+        int times = OperatingSystem.IsWindows() ? 1 : 2;
+        using var bmp = new RenderTargetBitmap(new PixelSize(size.Width * times, size.Height * times), new Vector(96 * times, 96 * times));
         bmp.Render(w);
         using var f = File.Create(Path.Combine(Dir!, name + ".png"));
         bmp.Save(f, PngBitmapEncoderOptions.Default);
