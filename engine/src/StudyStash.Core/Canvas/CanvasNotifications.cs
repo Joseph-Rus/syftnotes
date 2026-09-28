@@ -82,6 +82,23 @@ public static class CanvasNotifications
         if (f.Items.Count > Cap) f.Items.RemoveRange(0, f.Items.Count - Cap);
     }
 
+    /// <summary>A class was renamed: its notifications say the new name (their text, written then, is left as it was).</summary>
+    public static void Rename(string home, string from, string to)
+    {
+        lock (Gate)
+        {
+            if (!File.Exists(PathIn(home))) return;
+            var f = Load(home);
+            bool changed = false;
+            foreach (var n in f.Items.Where(n => n.Class == from))
+            {
+                n.Class = to;
+                changed = true;
+            }
+            if (changed) Save(home, f);
+        }
+    }
+
     /// <summary>What a sync found becomes notifications ("removed" isn't news worth one).</summary>
     public static void AppendChanges(string home, IReadOnlyList<CanvasChange> changes, string at)
     {

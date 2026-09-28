@@ -20,15 +20,6 @@ public sealed partial class ModelChoice : ObservableObject
     [ObservableProperty] public partial bool Here { get; set; }
 }
 
-/// <summary>A class in the timetable editor: its name and its times as typed.</summary>
-public sealed partial class TimetableRow : ObservableObject
-{
-    [ObservableProperty] public partial string Name { get; set; } = "";
-    [ObservableProperty] public partial string Times { get; set; } = "";
-    [ObservableProperty] public partial bool Bad { get; set; }
-    public Avalonia.Media.IBrush Dot { get; init; } = Avalonia.Media.Brushes.Gray;
-}
-
 /// <summary>One row in the settings sidebar: its section id, icon and label, and whether it's the one showing.</summary>
 public sealed partial class NavItem : ObservableObject
 {
@@ -38,10 +29,19 @@ public sealed partial class NavItem : ObservableObject
     [ObservableProperty] public partial bool On { get; set; }
 }
 
+/// <summary>One choice in the Appearance mode picker: "Match system", "Light" or "Dark", and whether it's the one in
+/// use.</summary>
+public sealed partial class AppearanceOption : ObservableObject
+{
+    public required AppAppearance Mode { get; init; }
+    public required string Label { get; init; }
+    [ObservableProperty] public partial bool Chosen { get; set; }
+}
+
 /// <summary>
 /// Settings, in two groups. This laptop (or this Mac/PC): General, Appearance (the colour theme), Recording (the
-/// model, language, the computer's sound, how long audio stays), Connection (which library; this computer's own) and
-/// Timetable (when classes meet). Your library, changed through its API: Library (name, password, how laptops reach
+/// model, language, the computer's sound, how long audio stays) and Connection (which library; this computer's own).
+/// Your library, changed through its API: Library (name, password, how laptops reach
 /// it, start at login, updates), Classes, Notes and sorting, AI engines (who writes the notes and answers questions),
 /// AI tool access (what Claude Code, Codex and other MCP tools may read), Canvas, and the Folders it may read.
 /// </summary>
@@ -52,7 +52,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string Section { get; set; } = "Connection";
 
     /// <summary>The sidebar's first group: this computer's own settings (General, Appearance, then recording and the
-    /// connection to the library; a library-only computer doesn't record, so it has no Recording or Timetable).</summary>
+    /// connection to the library; a library-only computer doesn't record, so it has no Recording).</summary>
     public IReadOnlyList<NavItem> ComputerNav { get; }
 
     /// <summary>The sidebar's second group: the library's own settings, read and changed through its API, so its web
@@ -80,6 +80,16 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     // Appearance
     public IReadOnlyList<ThemeSwatch> Themes { get; } = [.. ColourThemes.All.Select(t => new ThemeSwatch(t))];
     [ObservableProperty] public partial string ColourTheme { get; set; } = "";
+    public IReadOnlyList<AppearanceOption> AppearanceOptions { get; } =
+    [
+        new() { Mode = AppAppearance.System, Label = "Match system" },
+        new() { Mode = AppAppearance.Light, Label = "Light" },
+        new() { Mode = AppAppearance.Dark, Label = "Dark" },
+    ];
+    [ObservableProperty] public partial AppAppearance Appearance { get; set; } = AppAppearance.System;
+    public bool AppearanceIsSystem => Appearance == AppAppearance.System;
+    public bool AppearanceIsLight => Appearance == AppAppearance.Light;
+    public bool AppearanceIsDark => Appearance == AppAppearance.Dark;
 
     // Library
     [ObservableProperty] public partial string LibraryLine { get; set; } = "";
@@ -103,12 +113,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string? ShortcutsSay { get; set; }
     public bool CanRecordComputerAudio => host.CanRecordComputerAudio;
 
-    // Classes
-    public ObservableCollection<TimetableRow> Rows { get; } = [];
-    [ObservableProperty] public partial string NewClass { get; set; } = "";
-    [ObservableProperty] public partial string NewTimes { get; set; } = "";
-    [ObservableProperty] public partial string? ClassesSay { get; set; }
-
     // AI engines, AI tool access and Canvas: each is its own pane over its own model, read when it's opened.
     public AiEnginesModel Engines { get; }
     /// <summary>What's wrong with an engine right now (offline, signed out, a model missing, a usage limit), above
@@ -125,7 +129,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     public bool OnConnection => Section == "Connection";
     public bool OnRecording => Section == "Recording";
-    public bool OnTimetable => Section == "Timetable";
     public bool OnLibrary => Section == "Library";
     public bool OnClasses => Section == "Classes";
     public bool OnNotes => Section == "Notes";
@@ -136,7 +139,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public string LibraryPageTitle => Section switch { "Classes" => "Classes", "Notes" => "Notes and sorting", "Folders" => "Folders", _ => "Library" };
     public string LibraryPageLine => Section switch
     {
-        "Classes" => "The classes your library files lectures into. A lecture recorded for a class, or whose title matches one of its names, is filed without asking the AI.",
+        "Classes" => "The classes your library files lectures into. It reads each lecture and picks the class it's about from these names and what each covers; a lecture you record for a class goes straight there.",
         "Notes" => "How your library writes the notes for each lecture and sorts it into a class.",
         "Folders" => "Folders on the library's computer that search, and the AI when you chat, may read.",
         _ => Lib.IsHere ? $"Your library, on this {(OperatingSystem.IsWindows() ? "PC" : "Mac")}." : "Your library, on the computer that keeps your lectures.",
@@ -179,7 +182,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             new() { Id = "Appearance", Glyph = "palette", Label = "Appearance" },
             .. records ? new NavItem[] { new() { Id = "Recording", Glyph = "mic", Label = "Recording" } } : [],
             new() { Id = "Connection", Glyph = "link", Label = "Connection" },
-            .. records ? new NavItem[] { new() { Id = "Timetable", Glyph = "schedule", Label = "Timetable" } } : [],
         ];
         string device = OperatingSystem.IsWindows() ? "PC" : "Mac";
         ComputerNavTitle = host.Settings.Role == AppRole.Laptop ? "This laptop" : $"This {device}";
@@ -200,6 +202,10 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             },
             Reveal = dir => Machine.Open(dir),
             OpenPage = OpenLibraryPage,
+            ClassesRenamed = renamed =>
+            {
+                foreach (var (from, to) in renamed) host.FollowRename(from, to);
+            },
         };
         // A library-only computer opens on its library.
         if (!records) Section = "Library";
@@ -218,16 +224,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Shortcuts = host.Settings.Shortcuts;
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
         ColourTheme = host.Settings.Theme;
+        Appearance = host.Settings.Appearance;
         // Whisper tiny is only for trying things out: listed only when it's the one in use.
         foreach (var m in WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == host.Model.Id))
             Models.Add(new ModelChoice { Model = m, Chosen = m.Id == host.Model.Id, Here = WhisperModels.IsDownloaded(host.Home, m) });
-        foreach (var c in host.Timetable.Classes)
-            Rows.Add(new TimetableRow { Name = c.Name, Times = string.Join(", ", c.Times.Select(t => t.Describe())), Dot = Skin.ClassDot(Math.Max(0, host.ColorOf(c.Name))) });
-        foreach (var (name, color, _) in host.Classes().Where(c => Rows.All(r => r.Name != c.Name)))
-            Rows.Add(new TimetableRow { Name = name, Dot = Skin.ClassDot(color) });
         host.Changed += OnHostChanged;
         foreach (var n in NavItems) n.On = n.Id == Section;
         foreach (var t in Themes) t.Chosen = t.Name == ColourTheme;
+        foreach (var o in AppearanceOptions) o.Chosen = o.Mode == Appearance;
         loading = false;
         Refresh();
     }
@@ -326,7 +330,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     {
         foreach (string p in new[]
                  {
-                     nameof(OnConnection), nameof(OnRecording), nameof(OnTimetable), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
+                     nameof(OnConnection), nameof(OnRecording), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
                      nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage),
                      nameof(OnGeneral), nameof(OnAppearance),
                  })
@@ -343,6 +347,18 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     }
 
     [RelayCommand] void PickTheme(string name) => ColourTheme = name;
+
+    partial void OnAppearanceChanged(AppAppearance value)
+    {
+        if (!loading) host.Save(s => s.Appearance = value);
+        Skin.UseAppearance(value);
+        foreach (var o in AppearanceOptions) o.Chosen = o.Mode == value;
+        OnPropertyChanged(nameof(AppearanceIsSystem));
+        OnPropertyChanged(nameof(AppearanceIsLight));
+        OnPropertyChanged(nameof(AppearanceIsDark));
+    }
+
+    [RelayCommand] void PickAppearance(AppAppearance mode) => Appearance = mode;
 
     partial void OnLanguageChanged(string value)
     {
@@ -468,56 +484,6 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     /// <summary>Whisper couldn't start with the model: throw it away and download it again.</summary>
     [RelayCommand] void RedownloadModel() => _ = host.RedownloadModel();
-
-    [RelayCommand]
-    async Task AddClass()
-    {
-        string name = NewClass.Trim();
-        if (name.Length == 0) return;
-        if (NewTimes.Trim().Length > 0 && ClassTime.ParseMany(NewTimes) is null)
-        {
-            ClassesSay = "Write the days and times like “Tue Thu 10:00–11:15” or “MWF 9–9:50”.";
-            return;
-        }
-        if (host.Remote() is { } lib && !host.OlderLibrary)
-        {
-            try
-            {
-                await lib.AddClassAsync(name);
-                await host.CheckLibraryAsync();
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
-            {
-                ClassesSay = "The library didn't take the class; it's in your timetable here.";
-            }
-        }
-        Rows.Add(new TimetableRow { Name = name, Times = NewTimes.Trim(), Dot = Skin.ClassDot(Math.Max(0, host.ColorOf(name))) });
-        NewClass = NewTimes = "";
-        SaveTimetable();
-    }
-
-    [RelayCommand]
-    void RemoveClass(TimetableRow row)
-    {
-        Rows.Remove(row);
-        SaveTimetable();
-    }
-
-    [RelayCommand]
-    void SaveTimetable()
-    {
-        var t = new Timetable();
-        bool bad = false;
-        foreach (var r in Rows)
-        {
-            var times = r.Times.Trim().Length == 0 ? [] : ClassTime.ParseMany(r.Times.Replace(",", " "));
-            r.Bad = times is null;
-            bad |= r.Bad;
-            if (times is { Count: > 0 }) t.Classes.Add(new TimetableClass(r.Name, times));
-        }
-        host.SaveTimetable(t);
-        ClassesSay = bad ? "Some times couldn't be read (marked): write them like “Tue Thu 10:00–11:15”." : "Saved.";
-    }
 
     [RelayCommand] static void Quit() => Shell.Quit();
 

@@ -280,7 +280,7 @@ public static class Desktop
     static readonly HashSet<string> Words = ["show", "record", "panel", "quick", "settings"];
 
     /// <summary>Settings' pages a later copy can open it at.</summary>
-    static readonly HashSet<string> SettingsPages = ["General", "Appearance", "Recording", "Connection", "Timetable", "Library", "Classes", "Notes", "AI", "Access", "Canvas", "Folders"];
+    static readonly HashSet<string> SettingsPages = ["General", "Appearance", "Recording", "Connection", "Library", "Classes", "Notes", "AI", "Access", "Canvas", "Folders"];
 
     /// <summary>Whether a later copy's word is one the app acts on; anything else is ignored. ("snap:&lt;name&gt;" only
     /// while pictures are on: see <see cref="MacSnap"/>.)</summary>

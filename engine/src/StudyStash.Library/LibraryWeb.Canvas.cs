@@ -323,6 +323,15 @@ public sealed partial class LibraryWeb
         return CanvasJson();
     }
 
+    /// <summary>A course as a picker shows it: its class name, with its short code beside it ("Software Engineering ·
+    /// CSCI 321") when the name doesn't already say it.</summary>
+    static string CourseLabel(CanvasSettings s, string id, string title)
+    {
+        var info = s.CourseInfo.GetValueOrDefault(id);
+        string code = info is null ? "" : CourseNames.ShortCode(info.Code, info.Name);
+        return code.Length > 0 && !title.Contains(code, StringComparison.OrdinalIgnoreCase) ? $"{title} · {code}" : title;
+    }
+
     JsonObject Remember(JsonObject failed)
     {
         lastFindError = S(failed["error"]);
@@ -380,10 +389,15 @@ public sealed partial class LibraryWeb
         var courses = new JsonObject();
         foreach (var (cls, id) in s.Courses) courses[cls] = id;
         var available = new JsonObject();
-        foreach (var (id, name) in s.Available) available[id] = name;
+        foreach (var (id, name) in CourseNames.Of(s)) available[id] = name;
         var (waiting, inflight) = Canvas.Crawl.Left;
         var courseInfo = new JsonObject();
-        foreach (var (id, info) in s.CourseInfo) courseInfo[id] = new JsonObject { ["code"] = info.Code, ["name"] = info.Name, ["term"] = info.Term };
+        foreach (var (id, info) in s.CourseInfo)
+            courseInfo[id] = new JsonObject
+            {
+                ["code"] = info.Code, ["name"] = info.Name, ["term"] = info.Term,
+                ["title"] = available[id]?.GetValue<string>() ?? CourseNames.Title(info.Name, info.Code), ["short_code"] = CourseNames.ShortCode(info.Code, info.Name),
+            };
         return new JsonObject
         {
             ["url"] = s.Url, ["courses"] = courses, ["available"] = available, ["last_sync"] = W(s.LastSync), ["error"] = s.Error,
@@ -522,13 +536,14 @@ public sealed partial class LibraryWeb
             _ => "",
         };
         if (s.Error.Length > 0) say += $"<div class=\"notice\"><div>{Ui.Esc(s.Error)}</div></div>";
+        var titles = CourseNames.Of(s);
         string CourseSelect(string cls)
         {
             long have = s.Courses.GetValueOrDefault(cls);
             if (s.Available.Count == 0)
                 return $"<input type=\"number\" name=\"canvas_{Ui.Esc(cls)}\" value=\"{(have > 0 ? have.ToString(CultureInfo.InvariantCulture) : "")}\" placeholder=\"Canvas course id\" style=\"width:9rem\">";
-            var opts = "<option value=\"\">Not on Canvas</option>" + string.Concat(s.Available.OrderBy(kv => kv.Value, StringComparer.OrdinalIgnoreCase).Select(kv =>
-                $"<option value=\"{Ui.Esc(kv.Key)}\"{(kv.Key == have.ToString(CultureInfo.InvariantCulture) ? " selected" : "")}>{Ui.Esc(kv.Value)}</option>"));
+            var opts = "<option value=\"\">Not on Canvas</option>" + string.Concat(titles.OrderBy(kv => kv.Value, StringComparer.OrdinalIgnoreCase).Select(kv =>
+                $"<option value=\"{Ui.Esc(kv.Key)}\"{(kv.Key == have.ToString(CultureInfo.InvariantCulture) ? " selected" : "")}>{Ui.Esc(CourseLabel(s, kv.Key, kv.Value))}</option>"));
             if (have > 0 && !s.Available.ContainsKey(have.ToString(CultureInfo.InvariantCulture))) opts += $"<option value=\"{have}\" selected>Course {have}</option>";
             return $"<select name=\"canvas_{Ui.Esc(cls)}\">{opts}</select>";
         }

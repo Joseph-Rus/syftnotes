@@ -11,7 +11,7 @@ lecture library, and installs itself in one of two roles:
 ```
 laptop                                          library (a Mac mini, say — any computer that stays on)
   record → Whisper (local, no audio leaves it)    /api/ingest → a queue (SQLite)
-  filed by the timetable's class            ──▶   pipeline: study notes (an AI engine) → sort → Markdown
+  the class you picked, or none             ──▶   pipeline: study notes (an AI engine) → sort → Markdown
   Study Stash app / quick panel                   web page, Claude/MCP, Canvas mirror — over Tailscale
 ```
 
@@ -31,17 +31,17 @@ laptop                                          library (a Mac mini, say — any
 1. **Record.** The app opens the microphone (`IAudioSource`), and Whisper transcribes it locally as
    it goes (`ITranscriber`), a piece at a time, carrying the previous piece's words as a prompt so
    names and terms stay spelled the same.
-2. **File it.** If the lecture doesn't already have a class (the laptop's own timetable said
-   otherwise), `Timetable.Load(home).Now(...)` picks the class whose weekly time the recording
-   started in.
+2. **Pick a class, or don't.** Record lets the library sort the lecture unless the student picks a
+   class in the dropdown; a lecture recorded with no class is sent with an empty `folder`.
 3. **Send it.** `LectureSender` POSTs the lecture (`Lecture.Payload()`) to `/api/ingest` once the
    library is reachable, then polls `/api/notes/{id}/status` until it's filed. Nothing is lost if
    the library is asleep or on another network: the laptop keeps trying.
 4. **Queue and write.** `LibraryWeb.Ingest` turns the payload into a `Meeting` (`Wire.MeetingFromJson`)
    and enqueues it (`Store.Enqueue`). `Pipeline.ProcessAsync` then, in the background: writes study
    notes from the transcript with the picked AI engine, sorts it into a class (the recorded class or
-   a title match wins outright; otherwise the AI picks one with a strict schema, or it goes to
-   Unsorted), and saves it as Markdown under `<library folder>/<Class>/`.
+   a title match wins outright; otherwise the AI reads the notes against each class's name, other
+   names, what it covers and its Canvas course's name, and picks one with a strict schema, or it goes
+   to Unsorted), and saves it as Markdown under `<library folder>/<Class>/`.
 5. **Read it.** `studystash mcp` (stdio, for Claude Code or Claude Desktop on the library's own
    computer) and the HTTP + OAuth 2.1 door for claude.ai both read the same library through
    `ClaudeTools`, so Claude can search lectures, read one, and read Canvas.
@@ -55,7 +55,6 @@ Everything lives under one home folder (`~/.study-stash`, `--home`, or `STUDYSTA
 | `config.toml` | The library's settings: its name, password, port, classes, and which AI engine does what. |
 | `client.toml` | The laptop's settings: which library it sends to. |
 | `app.json` | The app's own state: what setup has finished, and how to record. |
-| `timetable.json` | The laptop's weekly class schedule, used to file an unlabelled recording. |
 | `recordings/` | The laptop's own lectures: audio state and what's been sent, one folder per lecture. |
 | `state.db` | The library's SQLite index: one row per lecture, for search and the queue. |
 | `<library folder>/<Class>/*.md` | The notes themselves, plain Markdown, one file per lecture. |

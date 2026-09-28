@@ -209,11 +209,11 @@ public class AppShots
             Shot.Take("win-15-ai-library-setup-app", SkinKind.Win, t, () => new WinSetup { DataContext = ai, DrawChrome = true });
     }
 
-    /// <summary>Design 12's dropdown: the timetable's hint, then the next thing due.</summary>
+    /// <summary>Design 12's dropdown: the hint under Record, then the next thing due.</summary>
     static PanelModel PanelWithDue()
     {
         var p = Demo.Panel(recording: false);
-        p.Hint = "From your timetable · 10:00–11:15";
+        p.Hint = "Picked by you";
         p.NextDue = CanvasQuick.NextDue(CanvasFixtures.Load<CanvasApi.DueResponse>("due"), CanvasFixtures.Zone, CanvasFixtures.Now, _ => { });
         return p;
     }
