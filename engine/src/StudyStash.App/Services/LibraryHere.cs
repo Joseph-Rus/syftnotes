@@ -14,11 +14,53 @@ public sealed class LibraryHere
 {
     /// <summary>The engine to run: the app itself (`StudyStash --home H serve`) unless a test gives its own.</summary>
     public IReadOnlyList<string>? Command { get; init; }
+    /// <summary>Where a new library keeps its notes: <see cref="DefaultFolder"/> unless a test gives its own.</summary>
+    public string? Folder { get; init; }
 
     public static LibraryHere ThisComputer() => new();
 
     /// <summary>The folder a new library keeps its notes in: Documents/Study Stash.</summary>
     public static string DefaultFolder => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Study Stash");
+
+    /// <summary>The library on this computer listens to this computer alone (just this computer's setup), not to
+    /// the network.</summary>
+    public static bool OnlyHere(Config cfg) => System.Net.IPAddress.TryParse(cfg.WebHost, out var ip) && System.Net.IPAddress.IsLoopback(ip);
+
+    /// <summary>
+    /// Settings → Your library's "Add a laptop" (and turning it off again): the library on this computer listens to the
+    /// network, with <paramref name="password"/> for laptops to connect with, or to this computer alone. It starts
+    /// again to listen the new way; this computer's own connection follows a new password. Throws saying why when
+    /// there's no library here or the password is too short (nothing is changed then).
+    /// </summary>
+    public async Task LetLaptopsConnectAsync(AppHost host, bool laptops, string? password = null)
+    {
+        var cfg = host.LocalLibrary?.Cfg ?? Existing(host.Home) ?? throw new InvalidOperationException("There's no library on this computer.");
+        password = password?.Trim();
+        if (laptops && password is not null && password.Length < 4) throw new ArgumentException("Use a password of at least 4 characters.");
+        if (laptops && password is null && cfg.PoolPassword.Length < 4) throw new ArgumentException("Give your library a password first.");
+        string old = cfg.PoolPassword;
+        cfg.WebHost = laptops ? "0.0.0.0" : "127.0.0.1";
+        if (laptops && password is not null) cfg.PoolPassword = password;
+        Configs.Save(cfg);
+        var cc = host.Client();
+        if (cc.PoolKey == old || cc.ServerUrl.Length == 0)
+        {
+            cc.PoolKey = cfg.PoolPassword;
+            host.SaveClient(cc);
+        }
+        if (host.LocalLibrary is { } svc)
+        {
+            await svc.StopAsync();
+            await svc.StartAsync();
+        }
+        else
+        {
+            var fresh = Command is null ? new LibraryService(host.Home, cfg) : new LibraryService(host.Home, cfg, Command);
+            host.UseLocalLibrary(fresh);
+            await fresh.StartAsync();
+        }
+        await host.CheckLibraryAsync();
+    }
 
     static bool IsFree(int port)
     {
@@ -76,7 +118,7 @@ public sealed class LibraryHere
         if (password.Length < 4) throw new ArgumentException("Use a password of at least 4 characters.");
         if (existing is null)
         {
-            cfg.PoolDir = DefaultFolder;
+            cfg.PoolDir = Folder ?? DefaultFolder;
             cfg.WebPort = FreePortPair();
             cfg.WebHost = localOnly ? "127.0.0.1" : "0.0.0.0";
         }

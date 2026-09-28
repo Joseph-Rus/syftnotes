@@ -209,9 +209,11 @@ public static class SelfTest
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
 
-        // Welcome: a build with no installer role asks, and starts on the laptop (which the self-test is).
+        // Welcome: three choices, starting on just this computer; the self-test is a laptop with its own library.
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps");
         Shot(Shell.Windows.Setup, "setup-welcome");
+        m.ChooseLaptopCommand.Execute(null);
+        Say($"chose the laptop: {m.FlowName}, {m.Steps.Count} steps");
         m.NextCommand.Execute(null);
 
         // Library: find it (our own, on its own port, never 8787), a wrong password, then the right one.

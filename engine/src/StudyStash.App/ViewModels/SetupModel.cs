@@ -80,50 +80,38 @@ public sealed partial class SetupCourse : ObservableObject
 }
 
 /// <summary>
-/// First-run setup, as one of two flows. The library (a computer at home): a password, the AI engines, Canvas, your
-/// classes, starting at login, and how to connect your laptop. The laptop: your library, the microphone, the
-/// transcription model (a download of a few gigabytes), Canvas, your classes, on Windows the taskbar, and how to record.
-/// A library that also records (<see cref="AppRole.Both"/>) is the library's flow with the microphone and model added.
+/// First-run setup, as one of three flows the welcome offers. Just this computer (<see cref="AppRole.Both"/>, the
+/// recommended one): the microphone, the transcription model, who writes the notes, Canvas, your classes and starting
+/// at login, with the library made quietly on this computer and reachable only from it. The laptop: your library
+/// elsewhere, the microphone, the model, Canvas, your classes and, on Windows, the taskbar. The library (a computer
+/// that stays on): a password, the AI engines, Canvas, your classes, starting at login, and how to connect your laptop.
 /// </summary>
 public sealed partial class SetupModel : ObservableObject
 {
     public ObservableCollection<StepItem> Steps { get; } = [];
     [ObservableProperty] public partial SetupStep Step { get; set; }
     /// <summary>What this computer is for: set by <see cref="SetRole"/>, which also rebuilds <see cref="Steps"/>.</summary>
-    [ObservableProperty] public partial AppRole Role { get; set; } = AppRole.Laptop;
-    /// <summary>The role the installer was made for (a library or a laptop download), or null for a build that doesn't
-    /// say: then the welcome asks which computer this is.</summary>
-    public AppRole? Preset { get; init; }
+    [ObservableProperty] public partial AppRole Role { get; set; } = AppRole.Both;
     SkinKind skin = SkinKind.Mac;
 
-    /// <summary>Setting up the library (on its own, or one that also records), not a laptop.</summary>
-    public bool IsLibrary => Role != AppRole.Laptop;
+    /// <summary>Just this computer: it records, keeps the library and writes the notes, with no server.</summary>
+    public bool IsOneComputer => Role == AppRole.Both;
+    /// <summary>A library for other computers (the Mac mini at home), which doesn't record.</summary>
+    public bool IsLibrary => Role == AppRole.Library;
     public bool IsLaptop => Role == AppRole.Laptop;
-    /// <summary>No installer said which computer this is, so the welcome asks with two cards.</summary>
-    public bool Asking => Preset is null;
-    public bool ShowSwitch => !Asking && OnWelcome;
+    /// <summary>The library lives on this computer (made here in setup): just this computer, or a library.</summary>
+    public bool LibraryIsHere => Role != AppRole.Laptop;
     public string HeaderTitle => IsLibrary ? "Set up your library" : $"Set up Study Stash on this {DeviceWord}";
-    public string FlowName => IsLibrary ? "Library setup" : "Laptop setup";
-    public string FlowIcon => IsLibrary ? "dns" : "laptop_mac";
-    public string SwitchText => IsLibrary ? "Setting up your laptop instead?" : "Setting up your library instead?";
-    public string WelcomeTitle => Asking ? "Welcome to Study Stash" : IsLibrary ? "Your library lives here" : $"Record lectures on this {DeviceWord}";
-    public string WelcomeBody =>
-        Asking ? "Study Stash works across two computers: your laptop records each lecture, and your library at home keeps them and writes the notes. Which is this one?"
-        : IsLibrary ? "This computer keeps your lectures, writes the notes with an AI engine, and brings in Canvas. Leave it on at home; your laptop sends it recordings."
-        : "Study Stash records and writes down each lecture here, then sends it to your library at home.";
-    /// <summary>The welcome's picture: the laptop sends recordings to the library; the one being set up is filled in.</summary>
-    public string LaptopCaption => IsLaptop ? $"This {DeviceWord}" : "Your laptop";
-    public string LibraryCaption => IsLibrary ? $"This {DeviceWord}" : "Your library";
-    public string AlsoRecordText => $"I'll also record lectures on this {DeviceWord}";
-    /// <summary>The library welcome's checkbox: this library records lectures too (<see cref="AppRole.Both"/>).</summary>
-    public bool AlsoRecord
-    {
-        get => Role == AppRole.Both;
-        set
-        {
-            if (IsLibrary && value != AlsoRecord) SetRole(value ? AppRole.Both : AppRole.Library);
-        }
-    }
+    public string FlowName => Role switch { AppRole.Library => "Library setup", AppRole.Laptop => "Laptop setup", _ => "One-computer setup" };
+    public string FlowIcon => Role switch { AppRole.Library => "dns", AppRole.Laptop => "laptop_mac", _ => "desktop_windows" };
+    public string WelcomeTitle => "Welcome to Study Stash";
+    public string WelcomeBody => "How will you use it? You can add another computer later.";
+    // The welcome's three choices, in the student's words.
+    public string OneComputerAbout => $"Records, transcribes and writes your notes, all on this {DeviceWord}. No server needed; notes are written while it's on.";
+    public static string LaptopAbout => "Records lectures and sends them to your library on another computer.";
+    public string LibraryAbout => skin == SkinKind.Mac
+        ? "A computer that stays on, like a Mac mini. It keeps your lectures and writes the notes."
+        : "A computer that stays on at home. It keeps your lectures and writes the notes.";
 
     // Microphone
     [ObservableProperty] public partial bool MicAllowed { get; set; }
@@ -141,8 +129,18 @@ public sealed partial class SetupModel : ObservableObject
     /// <summary>The password fields show what's typed.</summary>
     [ObservableProperty] public partial bool ShowPassword { get; set; }
     [ObservableProperty] public partial string? LibraryResult { get; set; }
-    /// <summary>The laptop's last page: "Connected to Ada's library", as a value in a list (no full stop).</summary>
-    public string LibrarySummary => LibraryResult?.TrimEnd('.') ?? "";
+    /// <summary>The last page's library row: "Connected to Ada's library" (a laptop), or "Ready on this Mac" (just this
+    /// computer), as a value in a list (no full stop).</summary>
+    public string LibrarySummary => LibraryIsHere ? (LibraryOk ? $"Ready on this {DeviceWord}" : "") : LibraryResult?.TrimEnd('.') ?? "";
+    /// <summary>Just this computer's welcome couldn't make the library: why, under the choices.</summary>
+    public bool HasWelcomeProblem => IsOneComputer && HasLibraryResult && !LibraryOk && !Connecting;
+    /// <summary>The welcome's line under the choices shows only while the library is being made, or why it wasn't.</summary>
+    public bool ShowWelcomeStatus => IsOneComputer && Connecting || HasWelcomeProblem;
+    /// <summary>Who writes the notes, as the AI step left it ("Ollama", "Not yet: just transcripts"), for just this
+    /// computer's last page.</summary>
+    [ObservableProperty] public partial string NotesSummary { get; set; } = "";
+    public bool ShowNotesSummary => IsOneComputer && NotesSummary.Length > 0;
+    partial void OnNotesSummaryChanged(string value) => OnPropertyChanged(nameof(ShowNotesSummary));
     /// <summary>This flow's library is ready: created here (library) or connected to (laptop).</summary>
     [ObservableProperty] public partial bool LibraryOk { get; set; }
     [ObservableProperty] public partial bool Connecting { get; set; }
@@ -183,6 +181,13 @@ public sealed partial class SetupModel : ObservableObject
     public ObservableCollection<SetupAddress> Addresses { get; } = [];
     public string PasswordText => ShowPassword ? Password : new string('•', Math.Clamp(Password.Length, 8, 16));
     public string ShowPasswordText => ShowPassword ? "Hide" : "Show";
+    public string StartAtLoginTitle => IsLibrary ? "Keep your library running" : "Keep Study Stash running";
+    public string StartAtLoginLede => IsLibrary
+        ? "Start Study Stash when this computer starts, so your laptop can always reach it."
+        : $"Start Study Stash when you log in, so your library is ready and your notes get written whenever this {DeviceWord} is on.";
+    public string StartAtLoginHint => IsLibrary ? "Recommended for a library." : "Recommended.";
+    /// <summary>Just this computer's last page: growing into a laptop and a library later.</summary>
+    public string AddLaptopLater => "Want to record on a laptop too? Add it any time in Settings → Your library.";
     public string RecordHint => skin == SkinKind.Mac
         ? "Press ⌥⇧R or click Record in the menu bar when class starts."
         : "Press Ctrl+Alt+R or click Record in the tray when class starts.";
@@ -225,7 +230,7 @@ public sealed partial class SetupModel : ObservableObject
     public int Index => Steps.ToList().FindIndex(s => s.Step == Step) + 1;
     public bool IsLast => Index == Count;
     public string StepLabel =>
-        OnWelcome ? (Asking ? "Welcome" : FlowName)
+        OnWelcome ? "Welcome"
         : OnAi && IsLibrary ? $"Library setup · step {Index} of {Count}"
         : $"Step {Index} of {Count}";
     public string ContinueLabel =>
@@ -247,9 +252,10 @@ public sealed partial class SetupModel : ObservableObject
     public bool OnCanvas => Step == SetupStep.Canvas;
     public bool OnDone => Step == SetupStep.Done;
     public bool OnLibraryDone => OnDone && IsLibrary;
-    public bool OnLaptopDone => OnDone && IsLaptop;
-    /// <summary>The library that also records says how to record on its last page too.</summary>
-    public bool OnBothDone => OnDone && Role == AppRole.Both;
+    /// <summary>The last page of a computer that records (a laptop, or just this computer): how to record.</summary>
+    public bool OnLaptopDone => OnDone && !IsLibrary;
+    /// <summary>Just this computer's last page also says how to add a laptop later.</summary>
+    public bool OnOneComputerDone => OnDone && IsOneComputer;
     /// <summary>The steps drawn the setup's own way (not the AI and Canvas panes, which bring their own title).</summary>
     public bool OnPlainStep => !OnAi && !OnCanvas;
     /// <summary>The AI and Canvas steps need a bigger window than the rest (the design's 900 wide).</summary>
@@ -266,22 +272,29 @@ public sealed partial class SetupModel : ObservableObject
     public double ModelBarWidthWin => Math.Clamp(ModelProgress, 0, 1) * 440;
     public string ModelBody => $"Study Stash turns speech into text on this {DeviceWord}, so your recordings never leave it. The model is about {ModelSize} and only downloads once.";
 
-    /// <summary>Setup in <paramref name="skin"/>'s look, for the installer's <paramref name="preset"/> role (a laptop
-    /// when none is given).</summary>
-    public static SetupModel For(SkinKind skin, AppRole? preset = null)
+    /// <summary>Setup in <paramref name="skin"/>'s look, starting on <paramref name="role"/>'s choice (just this
+    /// computer unless said).</summary>
+    public static SetupModel For(SkinKind skin, AppRole role = AppRole.Both)
     {
-        var m = new SetupModel { Preset = preset, skin = skin };
-        m.SetRole(preset ?? AppRole.Laptop);
+        var m = new SetupModel { skin = skin };
+        m.SetRole(role);
         return m;
     }
+
+    /// <summary>The welcome's choice to start on: the installer's library download starts on "This is my library";
+    /// the laptop download, or a build that doesn't say, on "Just this computer" (the one most students want).</summary>
+    public static AppRole Suggested(AppRole? installer) => installer == AppRole.Library ? AppRole.Library : AppRole.Both;
 
     /// <summary>The steps of each flow, in order. Windows adds the taskbar where Study Stash records.</summary>
     public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin)
     {
         var steps = new List<SetupStep> { SetupStep.Welcome };
-        if (role == AppRole.Laptop) steps.AddRange([SetupStep.Library, SetupStep.Microphone, SetupStep.Model]);
-        else steps.AddRange([SetupStep.Password, SetupStep.Ai]);
-        if (role == AppRole.Both) steps.AddRange([SetupStep.Microphone, SetupStep.Model]);
+        steps.AddRange(role switch
+        {
+            AppRole.Laptop => [SetupStep.Library, SetupStep.Microphone, SetupStep.Model],
+            AppRole.Library => [SetupStep.Password, SetupStep.Ai],
+            _ => [SetupStep.Microphone, SetupStep.Model, SetupStep.Ai],
+        });
         steps.AddRange([SetupStep.Canvas, SetupStep.Classes]);
         if (role != AppRole.Laptop) steps.Add(SetupStep.StartAtLogin);
         if (role != AppRole.Library && skin == SkinKind.Win) steps.Add(SetupStep.Taskbar);
@@ -294,7 +307,7 @@ public sealed partial class SetupModel : ObservableObject
         SetupStep.Welcome => "Welcome",
         SetupStep.Password => "Password",
         SetupStep.Library => "Your library",
-        SetupStep.Ai => "AI engines",
+        SetupStep.Ai => IsLibrary ? "AI engines" : "Notes",
         SetupStep.Microphone => "Microphone",
         SetupStep.Model => "Transcription model",
         SetupStep.Canvas => "Canvas",
@@ -305,8 +318,8 @@ public sealed partial class SetupModel : ObservableObject
     };
 
     /// <summary>What this computer is for: rebuilds <see cref="Steps"/> for that flow and stays on the current step when
-    /// it's still one of them, else goes to the first. Moving between the laptop's flow and the library's forgets
-    /// whether the library was ready (one is created here, the other connected to); what was typed stays.</summary>
+    /// it's still one of them, else goes to the first. Moving between the laptop's flow and one that keeps the library
+    /// here forgets whether the library was ready (one is created here, the other connected to); what was typed stays.</summary>
     public void SetRole(AppRole role)
     {
         bool otherFlow = (role == AppRole.Laptop) != (Role == AppRole.Laptop);
@@ -322,8 +335,9 @@ public sealed partial class SetupModel : ObservableObject
         foreach (var step in StepsFor(role, skin))
             Steps.Add(new StepItem { Step = step, Number = n++, Title = TitleOf(step), Optional = step is SetupStep.Canvas or SetupStep.Classes });
         Go(Steps.Any(s => s.Step == wanted) ? wanted : Steps[0].Step);
-        foreach (string p in new[] { nameof(IsLibrary), nameof(IsLaptop), nameof(HeaderTitle), nameof(FlowName), nameof(FlowIcon), nameof(SwitchText),
-                     nameof(WelcomeTitle), nameof(WelcomeBody), nameof(LaptopCaption), nameof(LibraryCaption), nameof(AlsoRecord), nameof(Count) })
+        foreach (string p in new[] { nameof(IsOneComputer), nameof(IsLibrary), nameof(IsLaptop), nameof(LibraryIsHere), nameof(HeaderTitle), nameof(FlowName),
+                     nameof(FlowIcon), nameof(StartAtLoginTitle), nameof(StartAtLoginLede), nameof(StartAtLoginHint), nameof(Count), nameof(HasWelcomeProblem), nameof(ShowWelcomeStatus),
+                     nameof(ShowNotesSummary), nameof(LibrarySummary) })
             OnPropertyChanged(p);
         NotifyStepDerived();
     }
@@ -345,8 +359,8 @@ public sealed partial class SetupModel : ObservableObject
     {
         foreach (string p in new[] { nameof(Index), nameof(IsLast), nameof(StepLabel), nameof(ContinueLabel), nameof(CanGoBack), nameof(OnWelcome), nameof(OnPassword),
                      nameof(OnMicrophone), nameof(OnLibrary), nameof(OnModel), nameof(OnClasses), nameof(OnStartAtLogin), nameof(OnTaskbar), nameof(OnAi),
-                     nameof(OnCanvas), nameof(OnDone), nameof(OnLibraryDone), nameof(OnLaptopDone), nameof(OnBothDone), nameof(OnPlainStep), nameof(Wide),
-                     nameof(CanContinue), nameof(ShowSwitch) })
+                     nameof(OnCanvas), nameof(OnDone), nameof(OnLibraryDone), nameof(OnLaptopDone), nameof(OnOneComputerDone), nameof(OnPlainStep),
+                     nameof(Wide), nameof(CanContinue) })
             OnPropertyChanged(p);
     }
 
@@ -389,17 +403,24 @@ public sealed partial class SetupModel : ObservableObject
     partial void OnLibraryResultChanged(string? value)
     {
         OnPropertyChanged(nameof(HasLibraryResult));
+        OnPropertyChanged(nameof(HasWelcomeProblem));
+        OnPropertyChanged(nameof(ShowWelcomeStatus));
         OnPropertyChanged(nameof(LibrarySummary));
     }
 
     partial void OnLibraryOkChanged(bool value)
     {
+        OnPropertyChanged(nameof(LibrarySummary));
+        OnPropertyChanged(nameof(HasWelcomeProblem));
+        OnPropertyChanged(nameof(ShowWelcomeStatus));
         OnPropertyChanged(nameof(ContinueLabel));
         OnPropertyChanged(nameof(CanEditLibrary));
     }
 
     partial void OnConnectingChanged(bool value)
     {
+        OnPropertyChanged(nameof(HasWelcomeProblem));
+        OnPropertyChanged(nameof(ShowWelcomeStatus));
         OnPropertyChanged(nameof(CanContinue));
         OnPropertyChanged(nameof(CanEditLibrary));
     }
@@ -472,19 +493,15 @@ public sealed partial class SetupModel : ObservableObject
     [RelayCommand] void Copy(string? text) => OnCopy?.Invoke(text ?? "");
     [RelayCommand] void CopyPassword() => OnCopy?.Invoke(Password);
 
-    /// <summary>The welcome's cards, when no installer said which computer this is.</summary>
+    /// <summary>The welcome's three choices; picking one shows its steps in the sidebar, keeping what's been typed.</summary>
+    [RelayCommand]
+    void ChooseOneComputer() => SetRole(AppRole.Both);
+
     [RelayCommand]
     void ChooseLaptop() => SetRole(AppRole.Laptop);
 
     [RelayCommand]
-    void ChooseLibrary()
-    {
-        if (IsLaptop) SetRole(AppRole.Library);
-    }
-
-    /// <summary>"Setting up your library instead?": the other flow, keeping what's been typed.</summary>
-    [RelayCommand]
-    void SwitchFlow() => SetRole(IsLaptop ? AppRole.Library : AppRole.Laptop);
+    void ChooseLibrary() => SetRole(AppRole.Library);
 
     [RelayCommand]
     async Task Connect()
@@ -526,11 +543,12 @@ public sealed partial class SetupModel : ObservableObject
     }
 
     /// <summary>Continue: on the library's password page it creates the library, on the laptop's library page it
-    /// connects, and either stays (saying why) if that didn't work.</summary>
+    /// connects, and on just this computer's welcome it makes the library here (no password to choose); each stays
+    /// (saying why) if that didn't work.</summary>
     [RelayCommand]
     async Task Next()
     {
-        if ((OnPassword || OnLibrary) && !LibraryOk && OnConnect is not null)
+        if ((OnPassword || OnLibrary || OnWelcome && IsOneComputer) && !LibraryOk && OnConnect is not null)
         {
             await OnConnect();
             if (!LibraryOk) return;

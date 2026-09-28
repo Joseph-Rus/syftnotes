@@ -442,20 +442,21 @@ public class SurfaceShots
         foreach (var t in Themes) Shot.Take("win-05-setup", SkinKind.Win, t, () => new WinSetup { DataContext = Demo.Setup(SkinKind.Win), DrawChrome = true });
     }
 
-    /// <summary>Every page of both setups, the library's and the laptop's, in both looks, light and dark (plus the
-    /// welcome a build with no installer role shows): "mac-05-setup-library-password-light.png" and so on.</summary>
+    /// <summary>Every page of the three setups (just this computer, the laptop, the library), in both looks, light and
+    /// dark: "mac-05-setup-one-computer-welcome-light.png", "mac-05-setup-library-password-light.png" and so on.</summary>
     [AvaloniaFact]
     public async Task Setup_steps()
     {
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
         {
             string look = skin == SkinKind.Mac ? "mac" : "win";
-            foreach (var role in new[] { AppRole.Library, AppRole.Laptop })
+            foreach (var role in new[] { AppRole.Both, AppRole.Library, AppRole.Laptop })
                 foreach (var step in SetupModel.StepsFor(role, skin))
                 {
                     var m = await SetupPage(skin, role, step);
                     var size = step switch { SetupStep.Canvas => new Size(1100, 928), SetupStep.Ai => new Size(1100, 808), _ => new Size(850, 608) };
-                    string name = $"{look}-05-setup-{(role == AppRole.Library ? "library" : "laptop")}-{step.ToString().ToLowerInvariant()}";
+                    string flow = role switch { AppRole.Library => "library", AppRole.Laptop => "laptop", _ => "one-computer" };
+                    string name = $"{look}-05-setup-{flow}-{step.ToString().ToLowerInvariant()}";
                     foreach (var t in Themes)
                         Shot.Take(name, skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
                             size: size);
@@ -476,10 +477,16 @@ public class SurfaceShots
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-library-password-existing", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = again, DrawChrome = true } : new WinSetup { DataContext = again, DrawChrome = true },
                     size: new Size(850, 608));
-            var ask = SetupModel.For(skin);
-            ask.ChooseLibraryCommand.Execute(null);
+            // Just this computer's welcome while its library is being made, and when it couldn't be.
+            var making = SetupModel.For(skin);
+            making.Connecting = true;
             foreach (var t in Themes)
-                Shot.Take($"{look}-05-setup-welcome-ask", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = ask, DrawChrome = true } : new WinSetup { DataContext = ask, DrawChrome = true },
+                Shot.Take($"{look}-05-setup-one-computer-welcome-making", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = making, DrawChrome = true } : new WinSetup { DataContext = making, DrawChrome = true },
+                    size: new Size(850, 608));
+            var failed = SetupModel.For(skin);
+            failed.LibraryResult = "The library didn't start. Its log is in the logs folder.";
+            foreach (var t in Themes)
+                Shot.Take($"{look}-05-setup-one-computer-welcome-problem", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = failed, DrawChrome = true } : new WinSetup { DataContext = failed, DrawChrome = true },
                     size: new Size(850, 608));
         }
     }
@@ -499,11 +506,12 @@ public class SurfaceShots
         m.Addresses.Add(new SetupAddress("At home", "http://mac-mini.local:8787"));
         m.Addresses.Add(new SetupAddress("With Tailscale", "http://mac-mini.example.ts.net:8787"));
         m.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Study Stash");
-        if (step > SetupStep.Library)
+        if (step > SetupStep.Library || role == AppRole.Both && step > SetupStep.Welcome)
         {
             m.LibraryOk = true;
             m.LibraryResult = role == AppRole.Laptop ? "Connected to Ada's library." : $"Ada's library is ready on this {m.DeviceWord}.";
         }
+        if (role == AppRole.Both && step == SetupStep.Done) m.NotesSummary = "Ollama";
         if (step == SetupStep.Ai) m.Ai = AiDemo.Setup();
         if (step == SetupStep.Canvas || canvasFound)
         {

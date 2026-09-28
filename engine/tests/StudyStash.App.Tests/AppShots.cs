@@ -170,7 +170,7 @@ public class AppShots
     /// <summary>Setup at Canvas (design 07): the extension step open, as the lane's own shot has it.</summary>
     static async Task<SetupModel> SetupCanvas(SkinKind skin)
     {
-        var m = SetupModel.For(skin);
+        var m = SetupModel.For(skin, AppRole.Laptop);
         m.Canvas = await CanvasShots.Step2Async();
         m.Canvas.StepLabel = "";
         m.Canvas.ShowFooter = false;
