@@ -36,6 +36,17 @@ public sealed partial class PhonesModel : ObservableObject
     /// a test calls <see cref="Tick"/> itself.</summary>
     public Action<bool>? Ticking { get; set; }
 
+    /// <summary>The real <see cref="Ticking"/>: <see cref="Tick"/> once a second on the UI thread.</summary>
+    public Action<bool> UiTicking()
+    {
+        Avalonia.Threading.DispatcherTimer? timer = null;
+        return on =>
+        {
+            if (on) (timer ??= new Avalonia.Threading.DispatcherTimer(TimeSpan.FromSeconds(1), Avalonia.Threading.DispatcherPriority.Normal, (_, _) => Tick())).Start();
+            else timer?.Stop();
+        };
+    }
+
     [ObservableProperty] public partial LibrarySettingsState State { get; set; } = LibrarySettingsState.Loading;
     public ObservableCollection<PhoneRow> Phones { get; } = [];
     /// <summary>What just happened, or why it didn't.</summary>
