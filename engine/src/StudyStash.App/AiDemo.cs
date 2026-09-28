@@ -88,9 +88,31 @@ public static class AiDemo
 
     /// <summary>The library setup step, loaded: Ollama picked (Recommended), Codex offering to sign in, questions
     /// still Same as notes.</summary>
-    public static AiSetupModel Setup()
+    public static AiSetupModel Setup(bool windows = false, bool oneComputer = false)
     {
-        var m = new AiSetupModel(new Library(SetupOverview()));
+        var m = new AiSetupModel(new Library(SetupOverview()))
+        {
+            Windows = windows,
+            Lede = oneComputer ? $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings."
+                : "This computer is your library, so the engines run here. You can change this later from any of your computers.",
+            WriteNotes = oneComputer ? _ => Task.FromResult(true) : null,
+        };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
+    /// <summary>Just this computer's notes step with one engine in <paramref name="state"/> (Claude Code not installed,
+    /// say): Ollama picked, "No AI for now" offered.</summary>
+    public static AiSetupModel SetupWith(bool windows, string engine, string state)
+    {
+        var o = SetupOverview();
+        o = o with { Engines = [.. o.Engines.Select(e => e.Id == engine ? e with { State = state, Installed = state != "not_installed" } : e)] };
+        var m = new AiSetupModel(new Library(o))
+        {
+            Windows = windows,
+            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings.",
+            WriteNotes = _ => Task.FromResult(true),
+        };
         m.Load().GetAwaiter().GetResult();
         return m;
     }

@@ -17,10 +17,15 @@ namespace StudyStash.App;
 /// reaches the network, Hugging Face, a real Ollama, Canvas or Claude. <see cref="Run"/> then walks the real setup
 /// screens, records a lecture with the pretend microphone, follows it through Whisper to the library and back as
 /// notes, proves the queue and the problem states, pictures every surface, and quits — non-zero on any failure.
+/// With STUDYSTASH_SELFTEST_FLOW=one-computer it proves Just this computer instead: setup makes the app's own library
+/// (no second one is started), and the lecture is recorded, written down and given its notes all on this computer.
 /// </summary>
 public static class SelfTest
 {
     public static string? Dir => Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST") is { Length: > 0 } d ? d : null;
+
+    /// <summary>Setup chooses Just this computer: the app runs its own library, and nothing else is a library.</summary>
+    internal static bool OneComputer => Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_FLOW") == "one-computer";
 
     /// <summary>The self-test's own library, once <see cref="Prepare"/> has started it.</summary>
     internal static LibraryService? Library { get; private set; }
@@ -98,6 +103,13 @@ public static class SelfTest
     static async Task StartEnginesAsync(string home, string modelPath)
     {
         Engine = await SelfTestEngine.StartAsync(modelPath);
+        if (OneComputer)
+        {
+            // Setup makes the library itself: its notes in this run's own folder, on a port far from a real 8787.
+            Environment.SetEnvironmentVariable("STUDYSTASH_NOTES_DIR", Path.Combine(home, "Study Stash"));
+            Environment.SetEnvironmentVariable("STUDYSTASH_LIBRARY_PORT", SelfTestPorts.FreePair().ToString());
+            return;
+        }
         string libHome = Path.Combine(home, "selftest-library");
         Directory.CreateDirectory(libHome);
         int port = SelfTestPorts.FreePair();
@@ -194,8 +206,9 @@ public static class SelfTest
     static async Task Script()
     {
         var host = Shell.Host;
-        Say($"skin {Skin.Current}, home {host.Home}");
-        await RunSetupAsync(host);
+        Say($"skin {Skin.Current}, home {host.Home}{(OneComputer ? ", just this computer" : "")}");
+        if (OneComputer) await RunOneComputerSetupAsync(host);
+        else await RunSetupAsync(host);
         await RunRecordingAsync(host);
         await RunProblemsAsync(host);
         await RunSettingsAsync();
@@ -209,9 +222,11 @@ public static class SelfTest
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
 
-        // Welcome: a build with no installer role asks, and starts on the laptop (which the self-test is).
+        // Welcome: three choices, starting on just this computer; the self-test is a laptop with its own library.
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps");
         Shot(Shell.Windows.Setup, "setup-welcome");
+        m.ChooseLaptopCommand.Execute(null);
+        Say($"chose the laptop: {m.FlowName}, {m.Steps.Count} steps");
         m.NextCommand.Execute(null);
 
         // Library: find it (our own, on its own port, never 8787), a wrong password, then the right one.
@@ -279,6 +294,90 @@ public static class SelfTest
         Shot(Shell.Windows.Main, "library-empty");
     }
 
+    /// <summary>Just this computer: the welcome's first choice makes the library here (listening to this computer
+    /// alone), then the microphone, the model, who writes the notes, Canvas (skipped), a class, and start at login (left
+    /// off: the self-test never adds a login item).</summary>
+    static async Task RunOneComputerSetupAsync(AppHost host)
+    {
+        bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
+        Say(opened ? "setup opened" : "setup didn't open");
+        var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
+
+        m.ChooseOneComputerCommand.Execute(null);
+        Say($"welcome: {m.FlowName}, {m.Steps.Count} steps: {string.Join(", ", m.Steps.Select(x => x.Title))}");
+        Shot(Shell.Windows.Setup, "setup-welcome");
+        await m.NextCommand.ExecuteAsync(null);
+        Say($"library made here: {m.LibraryResult}");
+        if (!m.LibraryOk || host.LocalLibrary is not { } lib) throw new InvalidOperationException("Just this computer didn't make its library");
+        var cfg = Configs.Load(host.Home);
+        Say($"it listens on {cfg.WebHost}:{cfg.WebPort} ({(LibraryHere.OnlyHere(cfg) ? "this computer only" : "the network")}), notes in {cfg.PoolDir}");
+        if (!LibraryHere.OnlyHere(cfg)) throw new InvalidOperationException("Just this computer's library listens to the network");
+        // Its notes engine is the self-test's own (never a real Ollama): the library starts again to use it.
+        cfg.OllamaHost = Engine!.Url;
+        cfg.OllamaModel = "self-test-notes";
+        cfg.AutoUpdate = false;
+        Configs.Save(cfg);
+        await lib.StopAsync();
+        await lib.StartAsync();
+        Say($"library restarted on the self-test's notes engine: {lib.State}");
+
+        bool heard = await Until(() => m.MicHeard, 10);
+        Say(heard ? "microphone heard" : "microphone: nothing heard in 10 s");
+        Shot(Shell.Windows.Setup, "setup-microphone");
+        m.NextCommand.Execute(null);
+
+        bool ready = await Until(() => m.ModelReady, 60);
+        Say(ready ? "model ready" : $"model: not ready in 60 s ({m.ModelProblem})");
+        Shot(Shell.Windows.Setup, "setup-model-ready");
+        if (!ready) throw new InvalidOperationException("the model never finished downloading");
+        m.NextCommand.Execute(null);
+
+        // Who writes the notes: the engines on this computer, as the library sees them. The self-test's engine stands
+        // in for Ollama (the library's own pick), whatever this computer has installed, so the step is left as it is.
+        bool loaded = await Until(() => m.Ai is { Engines.Count: > 0 }, 15);
+        await Wait(2); // the window grows to the step's size first
+        Shot(Shell.Windows.Setup, "setup-notes");
+        Say(loaded ? $"notes step: {string.Join(", ", m.Ai!.Engines.Select(e => $"{e.Name} ({e.State})"))}; no AI offered: {m.Ai.OffersNoAi}" : "notes step: the engines never loaded");
+        if (!loaded) throw new InvalidOperationException("the notes step never read the library's engines");
+        m.Go(SetupStep.Canvas);
+
+        if (m.OnCanvas)
+        {
+            await Wait(1);
+            Shot(Shell.Windows.Setup, "setup-canvas");
+            m.SkipCommand.Execute(null);
+        }
+
+        // Classes: CS 101 and what it covers. Record picks no class, so the library sorts the lecture by what was said.
+        m.NewClass = "CS 101";
+        m.NewAbout = "Intro to computer science: recursion, the call stack, the midterm";
+        await m.AddClassCommand.ExecuteAsync(null);
+        Say(m.ClassProblem is null ? "class added: CS 101" : $"class problem: {m.ClassProblem}");
+        Shot(Shell.Windows.Setup, "setup-classes");
+        if (m.ClassProblem is not null) throw new InvalidOperationException(m.ClassProblem);
+        m.NextCommand.Execute(null);
+
+        // Start at login: shown, and left off (the self-test never adds a login item).
+        if (!m.OnStartAtLogin) throw new InvalidOperationException($"expected Start at login, got {m.Step}");
+        m.StartAtLogin = false;
+        Shot(Shell.Windows.Setup, "setup-start-at-login");
+        m.NextCommand.Execute(null);
+
+        if (m.OnTaskbar)
+        {
+            Shot(Shell.Windows.Setup, "setup-taskbar");
+            m.NextCommand.Execute(null);
+        }
+
+        if (m.OnDone) Shot(Shell.Windows.Setup, "setup-done");
+        if (Shell.Windows.Setup is not null && m.IsLast) m.NextCommand.Execute(null);
+        bool closed = await Until(() => Shell.Windows.Setup is null, 10);
+        Say(closed ? $"setup finished: role {host.Settings.Role}, setup done {host.Settings.SetupDone}" : "setup: the window never closed");
+        if (host.Settings.Role != AppRole.Both) throw new InvalidOperationException($"just this computer finished as {host.Settings.Role}");
+        await Wait(1);
+        Shot(Shell.Windows.Main, "library-empty");
+    }
+
     // --- recording -----------------------------------------------------------------------------------------------
 
     static async Task RunRecordingAsync(AppHost host)
@@ -319,6 +418,12 @@ public static class SelfTest
         Say(filed && l?.State == LectureState.Filed ? $"filed in '{l.FiledClass}'" : $"not filed: {l?.State} {l?.Error}");
         Say($"the self-test's engine saw {Engine!.SortRequests} sort request(s) and {Engine.NotesRequests} notes request(s)");
         if (l?.State != LectureState.Filed) throw new InvalidOperationException("the lecture was never filed");
+        if (OneComputer)
+        {
+            // The notes were written by this computer's own library.
+            if (Engine.NotesRequests == 0) throw new InvalidOperationException("this computer's library never asked for the notes");
+            Say($"notes written on this computer by its own library ({host.LocalLibrary?.State}, {host.Client().ServerUrl})");
+        }
 
         Shell.ShowLibrary();
         await Wait(1.5);
@@ -341,7 +446,10 @@ public static class SelfTest
 
     static async Task RunProblemsAsync(AppHost host)
     {
-        await Library!.StopAsync();
+        // The self-test's own library, or (just this computer) the app's.
+        var lib = Library ?? host.LocalLibrary ?? throw new InvalidOperationException("no library to stop");
+        string password = lib.Cfg.PoolPassword;
+        await lib.StopAsync();
         bool gone = await Until(() => host.Library != LibraryState.Connected, 30);
         Say(gone ? $"library stopped: {host.Library}" : "library: still says Connected 30 s after stopping it");
         await PanelShot("panel-library-unreachable");
@@ -362,7 +470,7 @@ public static class SelfTest
             Say("couldn't record while the library was down (model or mic problem)");
         }
 
-        await Library.StartAsync();
+        await lib.StartAsync();
         bool back = await Until(() => host.Library == LibraryState.Connected, 30);
         Say(back ? "library reachable again" : "library: didn't reconnect in 30 s");
         if (waiting is not null)
@@ -373,19 +481,20 @@ public static class SelfTest
 
         // A changed password: the library says so, and setting it right again in Settings would fix it (not
         // exercised here — Settings' library section is a WS4/WS1 screen).
-        await Library.StopAsync();
-        var cfg = Library.Cfg;
-        cfg.PoolPassword = "a-different-password";
+        // What's on disk (the classes setup added are there), and the password the library's checked with.
+        await lib.StopAsync();
+        var cfg = Configs.Load(lib.Cfg.Home);
+        cfg.PoolPassword = lib.Cfg.PoolPassword = "a-different-password";
         Configs.Save(cfg);
-        await Library.StartAsync();
+        await lib.StartAsync();
         bool wrongPw = await Until(() => host.Library == LibraryState.WrongPassword, 30);
         Say(wrongPw ? "password change noticed" : $"password change: library says {host.Library}");
         await PanelShot("panel-wrong-password");
 
-        await Library.StopAsync();
-        cfg.PoolPassword = LibraryPassword ?? "";
+        await lib.StopAsync();
+        cfg.PoolPassword = lib.Cfg.PoolPassword = password;
         Configs.Save(cfg);
-        await Library.StartAsync();
+        await lib.StartAsync();
         bool restored = await Until(() => host.Library == LibraryState.Connected, 30);
         Say(restored ? "password restored, connected again" : $"password restore: library says {host.Library}");
     }
@@ -397,6 +506,14 @@ public static class SelfTest
         Shell.ShowSettings();
         await Wait(1);
         Shot(Shell.Windows.Settings, "settings-library");
+        if (OneComputer && (Shell.Windows.Settings?.Content as Control)?.DataContext is SettingsModel lib)
+        {
+            // Your library, on this computer: Add a laptop, for later.
+            lib.Section = "Library";
+            await Wait(1.5);
+            Say($"settings: your library here, laptops can connect: {lib.Lib.LaptopsCanConnect}, add a laptop offered: {lib.Lib.CanChangeLaptops}");
+            Shot(Shell.Windows.Settings, "settings-your-library");
+        }
         if ((Shell.Windows.Settings?.Content as Control)?.DataContext is SettingsModel sm)
         {
             sm.Section = "Recording";

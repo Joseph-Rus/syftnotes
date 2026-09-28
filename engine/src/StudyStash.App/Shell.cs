@@ -939,7 +939,14 @@ public static partial class Shell
         };
         // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
         var leave = setup.LeaveAsync;
-        setup.LeaveAsync = async step => step == SetupStep.Ai ? model.Ai is not { } ai || await ai.SaveAsync() : leave is null || await leave(step);
+        setup.LeaveAsync = async step =>
+        {
+            if (step != SetupStep.Ai) return leave is null || await leave(step);
+            if (model.Ai is not { } ai) return true;
+            if (!await ai.SaveAsync()) return false;
+            model.NotesSummary = ai.ChoiceWords;
+            return true;
+        };
         w.Closed += (_, _) =>
         {
             setupWindow = null;
@@ -963,7 +970,24 @@ public static partial class Shell
         switch (step)
         {
             case SetupStep.Ai:
-                model.Ai ??= new AiSetupModel(Ai());
+                // Made afresh when setup changed its mind about which computer this is (the library may have been
+                // made again, with another password), so the step reads the library as it is now.
+                var aiNow = (model.Role, host.Client().PoolKey);
+                if (model.Ai is null || aiMadeFor != aiNow)
+                {
+                    aiMadeFor = aiNow;
+                    model.Ai = new AiSetupModel(Ai())
+                    {
+                        Lede = model.IsOneComputer
+                            ? $"They run on this {model.DeviceWord}, as part of your library. You can change this later in Settings."
+                            : "This computer is your library, so the engines run here. You can change this later from any of your computers.",
+                        Windows = Skin.Current == SkinKind.Win,
+                        Copy = text => model.OnCopy?.Invoke(text),
+                        OpenTerminal = TerminalApp.Open,
+                        OpenUrl = url => Dialogs.OpenUrl(url),
+                        WriteNotes = WriteNotesAsync,
+                    };
+                }
                 _ = model.Ai.Load();
                 break;
             case SetupStep.Canvas when model.Canvas is null:
@@ -974,6 +998,28 @@ public static partial class Shell
                 model.Canvas = connect;
                 _ = StartConnectAsync(connect, watch);
                 break;
+        }
+    }
+
+    /// <summary>Which flow, and which library password, setup's AI step was made for.</summary>
+    static (AppRole Role, string Key)? aiMadeFor;
+
+    /// <summary>Setup's "No AI for now" (and picking an engine after it): the library writes notes, and sorts with AI,
+    /// or doesn't. True when the library took it.</summary>
+    static async Task<bool> WriteNotesAsync(bool on)
+    {
+        if (host.Remote() is not { } lib) return false;
+        try
+        {
+            return await lib.SettingsAsync(HttpMethod.Post, "", new JsonObject
+            {
+                ["notes"] = new JsonObject { ["write"] = on, ["sort"] = on },
+            }) is not null;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            host.Log($"[setup] notes {(on ? "on" : "off")}: {e.Message}");
+            return false;
         }
     }
 

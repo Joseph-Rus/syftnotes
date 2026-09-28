@@ -155,6 +155,21 @@ public class LibrarySettingsApiTests
     }
 
     [Fact]
+    public async Task A_library_on_its_own_computer_alone_says_laptops_cant_reach_it_yet()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        Assert.Equal("0.0.0.0", cfg.WebHost);
+        await using (var site = await Site(cfg, store))
+            Assert.True((await Json(await site.Client.SendAsync(Req(HttpMethod.Get, "/api/v2/settings"))))["reach"]!["laptops"]!.GetValue<bool>());
+
+        cfg.WebHost = "127.0.0.1";
+        await using (var site = await Site(cfg, store))
+            Assert.False((await Json(await site.Client.SendAsync(Req(HttpMethod.Get, "/api/v2/settings"))))["reach"]!["laptops"]!.GetValue<bool>());
+    }
+
+    [Fact]
     public async Task Only_the_library_password_opens_its_settings()
     {
         using var dir = new TempDir();

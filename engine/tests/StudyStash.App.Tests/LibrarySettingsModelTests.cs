@@ -54,6 +54,105 @@ public class LibrarySettingsModelTests
     }
 
     [AvaloniaFact]
+    public async Task Just_this_computers_library_hides_the_laptop_bits_until_a_laptop_is_added()
+    {
+        var fake = new FakeLibrarySettings();
+        fake.Settings["reach"]!["laptops"] = false;
+        var calls = new List<(bool On, string? Password)>();
+        string? told = null;
+        var lib = new LibrarySettingsModel(() => fake.Call)
+        {
+            IsHere = true,
+            PasswordChanged = p => told = p,
+            LetLaptopsConnect = (on, password) =>
+            {
+                calls.Add((on, password));
+                fake.Settings["reach"]!["laptops"] = on;
+                return Task.CompletedTask;
+            },
+        };
+        await lib.Load();
+
+        Assert.True(lib.OnlyThisComputer);
+        Assert.False(lib.ShowReach); // no addresses or password: no laptop uses them
+        Assert.True(lib.CanChangeLaptops);
+        Assert.Equal("Add a laptop", lib.LaptopsTitle);
+        Assert.StartsWith("What the app", lib.NameSub, StringComparison.Ordinal);
+
+        lib.AddLaptopCommand.Execute(null);
+        Assert.True(lib.AddingLaptop);
+        lib.LaptopPassword = "abc";
+        await lib.TurnOnLaptopsCommand.ExecuteAsync(null);
+        Assert.Empty(calls);
+        Assert.Equal("Use a password of at least 4 characters.", lib.LaptopSay);
+
+        lib.LaptopPassword = "correct-horse";
+        await lib.TurnOnLaptopsCommand.ExecuteAsync(null);
+
+        Assert.Equal([(true, (string?)"correct-horse")], calls);
+        Assert.Equal("correct-horse", told); // this computer connects with it from now on
+        Assert.False(lib.AddingLaptop);
+        Assert.True(lib.LaptopsCanConnect);
+        Assert.True(lib.ShowReach);
+        Assert.NotEmpty(lib.Addresses);
+        Assert.Equal("Laptops can connect", lib.LaptopsTitle);
+        Assert.Contains("This is my laptop", lib.LaptopSay, StringComparison.Ordinal);
+
+        await lib.TurnOffLaptopsCommand.ExecuteAsync(null);
+        Assert.Equal((false, (string?)null), calls[1]);
+        Assert.True(lib.OnlyThisComputer);
+    }
+
+    [AvaloniaFact]
+    public async Task Adding_a_laptop_that_fails_says_why_and_stays_open()
+    {
+        var fake = new FakeLibrarySettings();
+        fake.Settings["reach"]!["laptops"] = false;
+        var lib = new LibrarySettingsModel(() => fake.Call)
+        {
+            IsHere = true,
+            LetLaptopsConnect = (_, _) => throw new InvalidOperationException("The library didn't start."),
+        };
+        await lib.Load();
+        lib.AddLaptopCommand.Execute(null);
+        lib.LaptopPassword = "correct-horse";
+
+        await lib.TurnOnLaptopsCommand.ExecuteAsync(null);
+
+        Assert.Equal("The library didn't start.", lib.LaptopSay);
+        Assert.True(lib.AddingLaptop);
+        Assert.True(lib.OnlyThisComputer);
+        Assert.False(lib.ChangingLaptops);
+    }
+
+    [AvaloniaFact]
+    public async Task A_library_that_doesnt_say_is_reachable_by_laptops_as_before()
+    {
+        var fake = new FakeLibrarySettings();
+        ((JsonObject)fake.Settings["reach"]!).Remove("laptops");
+        var lib = new LibrarySettingsModel(() => fake.Call);
+        await lib.Load();
+        Assert.True(lib.LaptopsCanConnect);
+        Assert.True(lib.ShowReach);
+        Assert.False(lib.CanChangeLaptops); // on another computer: nothing to open or close from here
+    }
+
+    [AvaloniaFact]
+    public void Only_just_this_computer_can_open_or_close_its_library_to_laptops_and_its_AI_runs_here()
+    {
+        foreach (var (role, can) in new[] { (AppRole.Both, true), (AppRole.Library, false), (AppRole.Laptop, false) })
+        {
+            var (model, host, home) = Open(new FakeLibrarySettings(), role);
+            using var _h = home;
+            using var _host = host;
+            using var _m = model;
+            Assert.Equal(can, model.Lib.CanChangeLaptops);
+            if (role == AppRole.Laptop) Assert.Contains("from this laptop", model.Engines.Lede, StringComparison.Ordinal);
+            else Assert.Contains($"Engines run on this {(OperatingSystem.IsWindows() ? "PC" : "Mac")}", model.Engines.Lede, StringComparison.Ordinal);
+        }
+    }
+
+    [AvaloniaFact]
     public void Opening_a_library_page_reads_everything_and_changes_nothing()
     {
         var fake = new FakeLibrarySettings();
