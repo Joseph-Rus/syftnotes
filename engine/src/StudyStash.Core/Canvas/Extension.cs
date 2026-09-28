@@ -56,10 +56,75 @@ public static class Extension
         && FileHosts.Any(h => h.StartsWith("*.", StringComparison.Ordinal)
             ? u.Host.EndsWith(h[1..], StringComparison.OrdinalIgnoreCase) : u.Host.Equals(h, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Where Chrome loads it from on this computer.</summary>
-    public static string Folder(string home) => Path.Combine(home, "chrome-extension");
+    /// <summary>Where Chrome loads it from on this computer (<see cref="Folder(string, string, bool)"/> for this
+    /// person and this system).</summary>
+    public static string Folder(string home) => Folder(home, Py.UserHome(), OperatingSystem.IsMacOS());
+
+    /// <summary>
+    /// Where Chrome loads it from. On a Mac, Chrome's Load unpacked window hides dot-folders and ~/Library, and the
+    /// home (~/.study-stash) is one, so the folder there is <c>~/Study Stash/Chrome extension</c>: a folder the window
+    /// shows at once, never synced to iCloud (not Desktop or Documents), and only this person's (it holds what
+    /// connects to the library). A second hidden home in the same account gets its own ("Chrome extension (1a2b3c4d)"),
+    /// so the two never write over each other. Anywhere else, and for a home outside <paramref name="userHome"/> (a
+    /// test's, or one the student put somewhere Chrome shows), it's the home's own chrome-extension, as it always was.
+    /// </summary>
+    public static string Folder(string home, string userHome, bool mac)
+    {
+        string inHome = InHome(home);
+        if (!mac || userHome.Length == 0) return inHome;
+        string full = Path.GetFullPath(home), user = Path.GetFullPath(userHome);
+        string relative = Path.GetRelativePath(user, full);
+        if (relative == "." || relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative)) return inHome;
+        var parts = relative.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        bool hidden = parts[0] == "Library" || parts.Any(p => p.StartsWith('.'));
+        if (!hidden) return inHome;
+        string name = relative == ".study-stash" ? "Chrome extension"
+            : $"Chrome extension ({Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(full)))[..8]})";
+        return Path.Combine(user, "Study Stash", name);
+    }
+
+    /// <summary>The folder inside the home, where Study Stash wrote it before it had a folder of its own on a Mac. A
+    /// Chrome that loaded it from there keeps loading it from there, so it's kept up to date too
+    /// (<see cref="EnsureFor"/>).</summary>
+    public static string InHome(string home) => Path.Combine(home, "chrome-extension");
+
+    /// <summary>
+    /// <see cref="Ensure"/> for a home: its folder (<see cref="Folder(string)"/>), and the one an older Study Stash
+    /// wrote inside the home when that's another folder and it's there (a Chrome may have loaded it and still be
+    /// connected through it: it gets the same update, so it never breaks). The result is the home's own folder.
+    /// </summary>
+    public static EnsureResult EnsureFor(string home, string library, string key, string canvasUrl) =>
+        EnsureFor(home, Folder(home), library, key, canvasUrl);
+
+    /// <summary><see cref="EnsureFor(string, string, string, string)"/> with the home's folder given (tests).</summary>
+    public static EnsureResult EnsureFor(string home, string folder, string library, string key, string canvasUrl)
+    {
+        // The folder that holds it (~/Study Stash on a Mac), when Study Stash makes it, is only this person's too.
+        if (!OperatingSystem.IsWindows() && Path.GetDirectoryName(Path.GetFullPath(folder)) is { } parent && !Directory.Exists(parent))
+            Directory.CreateDirectory(parent, OwnerOnlyFolder);
+        var result = Ensure(folder, library, key, canvasUrl);
+        string old = InHome(home);
+        if (!SamePath(old, folder) && File.Exists(Path.Combine(old, "manifest.json")))
+        {
+            try
+            {
+                if (Ensure(old, library, key, canvasUrl).Changed) result = result with { Changed = true };
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // The old folder is a courtesy to a Chrome that loaded it; the home's own folder is what counts.
+            }
+        }
+        return result;
+    }
+
+    static bool SamePath(string a, string b) =>
+        string.Equals(Path.GetFullPath(a).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(b).TrimEnd(Path.DirectorySeparatorChar),
+            OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
 
     static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+
+    const UnixFileMode OwnerOnlyFolder = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
 
     /// <summary>
     /// Make the folder Chrome loads, or bring it up to date, so it points at this library and this Canvas: the
@@ -71,7 +136,13 @@ public static class Extension
     /// </summary>
     public static EnsureResult Ensure(string dir, string library, string key, string canvasUrl)
     {
-        Directory.CreateDirectory(dir);
+        // Only this person's, like its config: what connects to the library is in it.
+        if (OperatingSystem.IsWindows()) Directory.CreateDirectory(dir);
+        else
+        {
+            Directory.CreateDirectory(dir, OwnerOnlyFolder);
+            File.SetUnixFileMode(dir, OwnerOnlyFolder);
+        }
         bool changed = WriteScripts(dir);
         changed |= WriteManifest(dir, Hosts(library, canvasUrl));
         string json = ConfigJson(library, key, canvasUrl);

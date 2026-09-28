@@ -184,11 +184,12 @@ public static class Setup
         {
             s.Role = m.Role;
             s.SetupDone = true;
-            // The model setup showed stays the one in use, and its advice has been heard: no suggestion later.
+            // The model setup showed stays the one in use, and its advice has been heard: no suggestion later (the
+            // suggestion is of the heaviest model this computer keeps up with, so that's the one marked heard).
             if (records && !host.ModelFromEnvironment)
             {
                 s.Model = host.Model.Id;
-                if (m.Models.FirstOrDefault(c => c.Recommended) is { } advised) s.ModelSuggested = advised.Model.Id;
+                s.ModelSuggested = WhisperModels.Heaviest(host.Hardware).Model.Id;
             }
         });
         // Only the library's flows ask; a laptop's setup never changes its login items.

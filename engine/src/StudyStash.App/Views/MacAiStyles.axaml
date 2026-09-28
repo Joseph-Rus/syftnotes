@@ -481,6 +481,27 @@
     <Setter Property="BorderThickness" Value="0" />
   </Style>
 
+  <!-- A radio or tick row (the engines in setup, what AI tools can read) shows no box round the row: hovered or
+       pressed, the radio's or tick's own rim darkens; focused from the keyboard, a ring goes round it. -->
+  <Style Selector="Button.ai-choice:pointerover Border.ai-radio:not(.on), Button.ai-choice:pressed Border.ai-radio:not(.on), Button.ai-choice:pointerover Border.ai-check:not(.on), Button.ai-choice:pressed Border.ai-check:not(.on)">
+    <Setter Property="BorderBrush" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="Border.ai-radioring, Border.ai-checkring">
+    <Setter Property="Margin" Value="-4" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-radioring">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="CornerRadius" Value="12" />
+  </Style>
+  <Style Selector="Border.ai-checkring">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="CornerRadius" Value="9" />
+  </Style>
+
   <!-- The "Claude (desktop and web)" card's own bits (14, connectors): a fixed-width leading column so the switch's
        icon, the field rows' labels and the steps' numbers all start at the same left edge, a numbered step marker
        the same size as ai-check, and the field rows' own label/value split. -->

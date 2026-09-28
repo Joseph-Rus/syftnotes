@@ -118,7 +118,7 @@ public static class Demo
                     + "won't be on it, but you should be able to say why each call waits for the one it made, and why the most "
                     + "recent call finishes first. Last, reread the definitions of call stack, stack frame and base case: two "
                     + "of the short questions come straight from them.",
-                Byline = "Claude Code · 12:40, 31:05, 58:20",
+                Byline = "Claude Code · from 12:40, 31:05 and 58:20",
             });
         if (deleting) m.Deleting = new LectureDeletion("lec-recursion", "Recursion and the call stack", "CS 101");
         if (deleted) m.Deleted = new LectureDeletion("lec-frames", "Stack frames and scope", "CS 101");

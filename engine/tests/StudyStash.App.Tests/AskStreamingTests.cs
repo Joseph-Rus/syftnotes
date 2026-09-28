@@ -80,7 +80,7 @@ public class AskStreamingTests
         more.SetResult();
         await asking;
         Assert.Equal("Recursion traces and stack diagrams.", turn.Answer);
-        Assert.Equal("Claude Code · 18:05", turn.Byline);
+        Assert.Equal("Claude Code · from 18:05", turn.Byline);
         Assert.False(model.Busy);
     }
 

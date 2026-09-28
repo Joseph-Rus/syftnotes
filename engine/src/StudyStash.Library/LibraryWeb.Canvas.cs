@@ -307,8 +307,10 @@ public sealed partial class LibraryWeb
     {
         try
         {
-            string folder = Extension.Folder(cfg.Home);
-            if (!Extension.Ensure(folder, $"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), Canvas.Settings.Url).Changed) return;
+            // The folder of its own, and the one inside the home a Chrome may already have loaded (kept up to date too).
+            var made = Extension.EnsureFor(cfg.Home, $"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), Canvas.Settings.Url);
+            string folder = made.Path;
+            if (!made.Changed) return;
             Console.WriteLine($"[canvas] the Chrome extension's folder is ready (version {Extension.Version()}): {folder}");
             // Chrome's copy is waiting for work with the old folder's permissions: it looks at the folder now, and
             // reloads itself into the new one.
@@ -625,7 +627,7 @@ public sealed partial class LibraryWeb
             + "<details class=\"help\"><summary>Set up the Chrome extension on this computer</summary><div class=\"group\">"
             + $"<div class=\"row\"><span class=\"grow\">The extension's folder is ready: {where}</span></div>"
             + "<div class=\"row\"><span class=\"grow\">1. In Chrome, open chrome://extensions and turn on Developer mode</span></div>"
-            + "<div class=\"row\"><span class=\"grow\">2. Click Load unpacked and pick that folder</span></div>"
+            + "<div class=\"row\"><span class=\"grow\">2. Click Load unpacked and pick that folder, or drag the folder onto the Extensions page</span></div>"
             + "</div><p class=\"group-foot\">On a laptop that reaches this library from elsewhere, set it up from the Study Stash app's Settings instead.</p></details>";
     }
 

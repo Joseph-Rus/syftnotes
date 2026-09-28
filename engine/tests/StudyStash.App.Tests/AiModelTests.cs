@@ -88,7 +88,7 @@ public class AiWordsTests
     [Fact]
     public void An_answers_byline_names_the_engine_and_its_moments_or_just_the_engine()
     {
-        Assert.Equal("Ollama · 18:05, 18:40", AiWords.AskByline("Ollama", [new AskSource(null, "t", null, null, 18 * 60 + 5, ""), new AskSource(null, "t", null, null, 18 * 60 + 40, "")]));
+        Assert.Equal("Ollama · from 18:05 and 18:40", AiWords.AskByline("Ollama", [new AskSource(null, "t", null, null, 18 * 60 + 5, ""), new AskSource(null, "t", null, null, 18 * 60 + 40, "")]));
         Assert.Equal("Claude Code", AiWords.AskByline("Claude Code", [new AskSource(null, "t", null, null, null, "Intro")]));
     }
 
@@ -587,7 +587,7 @@ public class AiAskModelTests
         Assert.Equal("ollama", lib.AskRequests[0].Engine);
         var turn = Assert.Single(model.Turns);
         Assert.Equal("Recursion traces.", turn.Answer);
-        Assert.Equal("Ollama · 18:05", turn.Byline);
+        Assert.Equal("Ollama · from 18:05", turn.Byline);
         Assert.False(turn.IsThinking);
         Assert.Equal("", model.Question);
     }

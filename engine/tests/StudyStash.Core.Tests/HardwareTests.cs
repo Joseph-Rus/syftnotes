@@ -16,46 +16,52 @@ public class HardwareTests
 
     static GraphicsCard Card(double gb, string name = "NVIDIA GeForce RTX 3060") => new(name, gb, gb < 1);
 
-    public static TheoryData<string, HardwareProfile, string> Computers => new()
+    /// <summary>Each computer: the model it starts on (the compact turbo unless it's too weak for it), and the heaviest
+    /// it keeps up with (a bigger one than that gets a word, once).</summary>
+    public static TheoryData<string, HardwareProfile, string, string> Computers => new()
     {
-        // Apple silicon keeps large-v3, as it always has; only a Mac with very little memory gets the compact model.
-        { "M1 with 8 GB", Mac(8), "large-v3" },
-        { "M3 Pro with 36 GB", Mac(36), "large-v3" },
-        { "Apple silicon that won't say its memory", Mac(null), "large-v3" },
-        { "Apple silicon with 4 GB", Mac(4), "large-v3-turbo-q5" },
+        // Apple silicon starts compact too, and keeps up with large-v3 if the student picks it; only a Mac with very
+        // little memory is kept to the compact model.
+        { "M1 with 8 GB", Mac(8), "large-v3-turbo-q5", "large-v3" },
+        { "M3 Pro with 36 GB", Mac(36), "large-v3-turbo-q5", "large-v3" },
+        { "Apple silicon that won't say its memory", Mac(null), "large-v3-turbo-q5", "large-v3" },
+        { "Apple silicon with 4 GB", Mac(4), "large-v3-turbo-q5", "large-v3-turbo-q5" },
         // An Intel Mac has no Whisper graphics: it's the processor's call.
-        { "Intel Mac, 8 cores", Mac(16, Architecture.X64, 8), "large-v3-turbo-q5" },
-        { "Intel Mac, 4 cores", Mac(8, Architecture.X64, 4), "small" },
-        // A PC with a real graphics card and Vulkan: what fits the card's own memory.
-        { "PC, 12 GB card", Pc(card: Card(12)), "large-v3" },
-        { "PC, 8 GB card (says 7.8)", Pc(card: Card(7.8)), "large-v3" },
-        { "PC, 8 GB card, 6 GB of memory", Pc(ram: 6, card: Card(8)), "large-v3-turbo" },
-        { "PC, 6 GB card", Pc(card: Card(6)), "large-v3-turbo" },
-        { "PC, 4 GB card", Pc(card: Card(3.9)), "large-v3-turbo" },
-        { "PC, 2 GB card", Pc(card: Card(2)), "large-v3-turbo-q5" },
+        { "Intel Mac, 8 cores", Mac(16, Architecture.X64, 8), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "Intel Mac, 4 cores", Mac(8, Architecture.X64, 4), "small", "small" },
+        // A PC with a real graphics card and Vulkan starts compact; what it keeps up with is what fits the card's memory.
+        { "PC, 12 GB card", Pc(card: Card(12)), "large-v3-turbo-q5", "large-v3" },
+        { "PC, 8 GB card (says 7.8)", Pc(card: Card(7.8)), "large-v3-turbo-q5", "large-v3" },
+        { "PC, 8 GB card, 6 GB of memory", Pc(ram: 6, card: Card(8)), "large-v3-turbo-q5", "large-v3-turbo" },
+        { "PC, 6 GB card", Pc(card: Card(6)), "large-v3-turbo-q5", "large-v3-turbo" },
+        { "PC, 4 GB card", Pc(card: Card(3.9)), "large-v3-turbo-q5", "large-v3-turbo" },
+        { "PC, 2 GB card", Pc(card: Card(2)), "large-v3-turbo-q5", "large-v3-turbo-q5" },
         // No card Whisper can use: the processor decides.
-        { "PC, 8 GB card but no Vulkan", Pc(card: Card(8), vulkan: false), "large-v3-turbo-q5" },
-        { "PC, graphics built into the processor", Pc(card: Card(0.125, "Intel(R) UHD Graphics 620")), "large-v3-turbo-q5" },
-        { "PC, 1.5 GB card", Pc(card: new GraphicsCard("AMD Radeon(TM) Graphics", 1.5, false)), "large-v3-turbo-q5" },
-        { "ARM PC with a card (no Vulkan Whisper for ARM)", Pc(card: Card(8), arch: Architecture.Arm64), "large-v3-turbo-q5" },
-        { "PC, no card, 8 threads, 8 GB", Pc(cores: 8, ram: 8), "large-v3-turbo-q5" },
-        { "PC, no card, 8 threads, no AVX2", Pc(cores: 8, fastMath: false), "small" },
-        { "PC, no card, 4 threads", Pc(cores: 4, ram: 8), "small" },
-        { "PC, no card, 16 threads, 6 GB", Pc(cores: 16, ram: 6), "small" },
-        { "PC, no card, 2 threads", Pc(cores: 2, ram: 8), "base" },
-        { "PC, no card, 3 GB", Pc(cores: 8, ram: 3), "base" },
-        { "PC that won't say its memory", Pc(cores: 8, ram: null), "large-v3-turbo-q5" },
-        { "Linux, 8 threads", new(HostOs.Linux, Architecture.X64, 8, true, 16), "large-v3-turbo-q5" },
+        { "PC, 8 GB card but no Vulkan", Pc(card: Card(8), vulkan: false), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "PC, graphics built into the processor", Pc(card: Card(0.125, "Intel(R) UHD Graphics 620")), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "PC, 1.5 GB card", Pc(card: new GraphicsCard("AMD Radeon(TM) Graphics", 1.5, false)), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "ARM PC with a card (no Vulkan Whisper for ARM)", Pc(card: Card(8), arch: Architecture.Arm64), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "PC, no card, 8 threads, 8 GB", Pc(cores: 8, ram: 8), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "PC, no card, 8 threads, no AVX2", Pc(cores: 8, fastMath: false), "small", "small" },
+        { "PC, no card, 4 threads", Pc(cores: 4, ram: 8), "small", "small" },
+        { "PC, no card, 16 threads, 6 GB", Pc(cores: 16, ram: 6), "small", "small" },
+        { "PC, no card, 2 threads", Pc(cores: 2, ram: 8), "base", "base" },
+        { "PC, no card, 3 GB", Pc(cores: 8, ram: 3), "base", "base" },
+        { "PC that won't say its memory", Pc(cores: 8, ram: null), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "Linux, 8 threads", new(HostOs.Linux, Architecture.X64, 8, true, 16), "large-v3-turbo-q5", "large-v3-turbo-q5" },
     };
 
     [Theory]
     [MemberData(nameof(Computers))]
-    public void Each_computer_gets_the_model_that_keeps_up(string computer, HardwareProfile hw, string model)
+    public void Each_computer_starts_on_the_compact_model_unless_it_s_too_weak_for_it(string computer, HardwareProfile hw, string starts, string heaviest)
     {
         var advice = WhisperModels.Advise(hw);
-        Assert.True(advice.Model.Id == model, $"{computer}: {advice.Model.Id}, expected {model}");
+        Assert.True(advice.Model.Id == starts, $"{computer}: starts on {advice.Model.Id}, expected {starts}");
         Assert.False(string.IsNullOrWhiteSpace(advice.Why));
         Assert.EndsWith(".", advice.Why, StringComparison.Ordinal);
+        var most = WhisperModels.Heaviest(hw);
+        Assert.True(most.Model.Id == heaviest, $"{computer}: keeps up with {most.Model.Id} at most, expected {heaviest}");
+        Assert.False(WhisperModels.Heavier(advice.Model, most.Model)); // never starts on more than it keeps up with
     }
 
     [Fact]
@@ -63,14 +69,27 @@ public class HardwareTests
     {
         Assert.Equal("This PC has no graphics card Whisper can use, so the compact model keeps up with a lecture.",
             WhisperModels.Advise(Pc(cores: 8)).Why);
-        Assert.Equal("This Mac's Apple silicon runs the most accurate model and keeps up with a lecture.", WhisperModels.Advise(Mac(16)).Why);
-        Assert.Equal("This PC's graphics card (NVIDIA GeForce RTX 3060) has room for large-v3 turbo, which keeps up with a lecture.",
+        Assert.Equal("The compact model keeps up with a lecture and leaves this Mac room for everything else. Its Apple silicon can run a bigger one too.",
+            WhisperModels.Advise(Mac(16)).Why);
+        Assert.Equal("The compact model keeps up with a lecture and leaves this PC room for everything else. Its graphics card (NVIDIA GeForce RTX 3060) can run a bigger one too.",
             WhisperModels.Advise(Pc(card: Card(6))).Why);
         Assert.Equal("This Mac has 4 GB of memory, so the compact model leaves room for everything else.", WhisperModels.Advise(Mac(4)).Why);
         Assert.Equal("This PC has little memory, so Whisper base keeps up with a lecture and leaves room for everything else.",
             WhisperModels.Advise(Pc(ram: 3)).Why);
         Assert.Equal("This PC's processor would fall behind a lecture with anything bigger, so Whisper base keeps up.",
             WhisperModels.Advise(Pc(cores: 2)).Why);
+        // What a computer keeps up with at most, said the way a suggestion to switch says it.
+        Assert.Equal("This Mac's Apple silicon runs the most accurate model and keeps up with a lecture.", WhisperModels.Heaviest(Mac(16)).Why);
+        Assert.Equal("This PC's graphics card (NVIDIA GeForce RTX 3060) has room for large-v3 turbo, which keeps up with a lecture.",
+            WhisperModels.Heaviest(Pc(card: Card(6))).Why);
+    }
+
+    [Fact]
+    public void The_bigger_models_say_they_are_more_accurate_and_heavier()
+    {
+        Assert.Contains("most accurate, and the heaviest", WhisperModels.LargeV3.About, StringComparison.Ordinal);
+        Assert.Contains("More accurate than the compact one, and heavier", WhisperModels.LargeV3Turbo.About, StringComparison.Ordinal);
+        Assert.Contains("most computers", WhisperModels.LargeV3TurboSmall.About, StringComparison.Ordinal);
     }
 
     [Fact]

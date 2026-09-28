@@ -21,8 +21,9 @@ public static class NoteExport
     /// "2026-09-23 The cardiac cycle.md".</summary>
     public static string FileName(JsonObject lecture) => SafeName($"{Notes.DatePrefix(S(lecture["date"]))} {Notes.Slugify(Title(lecture))}") + ".md";
 
-    /// <summary>The name the Save dialog suggests for one lecture: its title, as a file any computer can keep.</summary>
-    public static string SaveName(string title) => SafeName(Notes.Slugify(title)) + ".md";
+    /// <summary>The name the Save dialog suggests for one lecture: its title, as a file any computer can keep, ending
+    /// in <paramref name="extension"/> (".md", or ".pdf" for the notes on paper).</summary>
+    public static string SaveName(string title, string extension = ".md") => SafeName(Notes.Slugify(title)) + extension;
 
     /// <summary>
     /// A name (already free of the characters no file name may hold: <see cref="Notes.Slugify"/>) that Windows saves

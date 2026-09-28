@@ -28,4 +28,9 @@ public static class Converters
 
     /// <summary>A row that only shows when it has something to say: an engine's subtitle, a menu's footer.</summary>
     public static readonly IValueConverter NotEmpty = new FuncValueConverter<string?, bool>(s => !string.IsNullOrEmpty(s));
+
+    /// <summary>A view that scrolls itself only in its own window: inside a page that already scrolls (setup's),
+    /// it leaves the scrolling to the page.</summary>
+    public static readonly IValueConverter ScrollsIfOwn =
+        new FuncValueConverter<bool, Avalonia.Controls.Primitives.ScrollBarVisibility>(own => own ? Avalonia.Controls.Primitives.ScrollBarVisibility.Auto : Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled);
 }

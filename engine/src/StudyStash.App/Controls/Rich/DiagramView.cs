@@ -38,8 +38,14 @@ public sealed class DiagramView : Decorator
     public DiagramView() : this(opensLarger: true) { }
 
     /// <summary>A diagram that opens larger on a click (in a note), or one that doesn't (the larger window's own).</summary>
-    public DiagramView(bool opensLarger)
+    public DiagramView(bool opensLarger) : this(opensLarger, fitWhole: false) { }
+
+    /// <summary><paramref name="fitWhole"/>: on paper, where there's nothing to scroll, the whole picture fits the room
+    /// it's given (the column, and the page's height), however small that makes it, rather than stopping at
+    /// <see cref="MinScale"/>; and it doesn't open larger.</summary>
+    public DiagramView(bool opensLarger, bool fitWhole)
     {
+        canvas.FitWhole = fitWhole;
         scroller = new ScrollViewer
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -48,6 +54,12 @@ public sealed class DiagramView : Decorator
         };
         HorizontalAlignment = HorizontalAlignment.Center;
         canvas.Failed = ShowProblem;
+        if (fitWhole)
+        {
+            scroller.Content = null;
+            Child = canvas;
+            return;
+        }
         if (!opensLarger)
         {
             Child = scroller;
@@ -85,6 +97,7 @@ public sealed class DiagramView : Decorator
 
     /// <summary>How much the picture is scaled to fit its column.</summary>
     public double Scale => canvas.Scale;
+
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -217,6 +230,9 @@ sealed class DiagramCanvas : Control
 
     public double Scale { get; private set; } = 1;
 
+    /// <summary>No floor on the scale: a diagram on paper (see <see cref="DiagramView(bool, bool)"/>).</summary>
+    public bool FitWhole { get; set; }
+
     FontFamily Family => Font ?? FontFamily.Default;
 
     protected override Size MeasureOverride(Size availableSize)
@@ -265,7 +281,7 @@ sealed class DiagramCanvas : Control
     {
         double scale = Math.Min(maxScale, width / sceneWidth);
         if (double.IsFinite(room.Height) && room.Height > 0) scale = Math.Min(scale, room.Height / sceneHeight);
-        return Math.Max(DiagramView.MinScale, scale);
+        return FitWhole ? scale : Math.Max(DiagramView.MinScale, scale);
     }
 
     /// <summary>Measures again once <paramref name="task"/> (a layout this picture needs) is done.</summary>
