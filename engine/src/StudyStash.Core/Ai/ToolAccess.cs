@@ -33,7 +33,7 @@ public static class ToolAccess
     public static string? Scope(string tool) => tool switch
     {
         "list_lectures" or "search_notes" or "get_transcript" => "lectures",
-        "get_lecture" => "notes",
+        "get_lecture" or "list_attachments" or "read_attachment" => "notes",
         "search_files" or "read_file" or "due_assignments" or "get_assignment" or "class_modules" or "class_files" or "class_announcements"
             or "canvas_courses" or "canvas_api" or "canvas_page" or "canvas_download" => "canvas",
         _ => null,

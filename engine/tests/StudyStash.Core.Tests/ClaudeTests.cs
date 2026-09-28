@@ -349,7 +349,7 @@ public class ClaudeTests
         await using (var mcp = await Connect(site, accessToken))
         {
             var tools = await mcp.ListToolsAsync();
-            Assert.Equal(["get_lecture", "get_transcript", "list_classes", "list_lectures", "search_notes"], tools.Select(t => t.Name).Order());
+            Assert.Equal(["get_lecture", "get_transcript", "list_attachments", "list_classes", "list_lectures", "read_attachment", "search_notes"], tools.Select(t => t.Name).Order());
             Assert.All(tools, t => Assert.True(t.ProtocolTool.Annotations?.ReadOnlyHint));
             var result = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
             Assert.Contains("Membranes and osmosis", ((TextContentBlock)result.Content[0]).Text);
@@ -456,7 +456,7 @@ public class ClaudeTests
         var (door, _) = await Door(cfg, store);
         await using var _door = door;
         await using (var mcp = await Connect(door, token))
-            Assert.Equal(5, (await mcp.ListToolsAsync()).Count);
+            Assert.Equal(7, (await mcp.ListToolsAsync()).Count);
         await Json(await lib.Client.SendAsync(Req(HttpMethod.Delete, $"/api/v2/claude/connections/{made["token_id"]!.GetValue<string>()}")));
         // The door is its own copy (as a second process would be): it sees the disconnect in claude.json at once.
         var after = await door.Client.SendAsync(new HttpRequestMessage(HttpMethod.Post, "/mcp")
@@ -524,7 +524,7 @@ public class ClaudeTests
         // the student in words, and needs no reconnect.
         await using var mcp = await Connect(site, token);
         var tools = await mcp.ListToolsAsync();
-        Assert.Equal(5, tools.Count); // refused at call time, not hidden
+        Assert.Equal(7, tools.Count); // refused at call time, not hidden
         var refused = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
         Assert.Equal(true, refused.IsError);
         Assert.Equal(StudyStash.Core.Ai.ToolAccess.Off, ((TextContentBlock)refused.Content[0]).Text);
