@@ -31,15 +31,26 @@ public sealed class SvgView : Decorator
     public SvgView() : this(opensLarger: true) { }
 
     /// <summary>A drawing that opens larger on a click (in a note), or one that doesn't (the larger window's own).</summary>
-    public SvgView(bool opensLarger)
+    public SvgView(bool opensLarger) : this(opensLarger, fitWhole: false) { }
+
+    /// <summary><paramref name="fitWhole"/>: on paper, where there's nothing to scroll, the whole drawing fits the room
+    /// it's given (the column, and the page's height), however small that makes it, rather than stopping at
+    /// <see cref="MinScale"/>; and it doesn't open larger.</summary>
+    public SvgView(bool opensLarger, bool fitWhole)
     {
+        canvas.FitWhole = fitWhole;
+        HorizontalAlignment = HorizontalAlignment.Center;
+        if (fitWhole)
+        {
+            Child = canvas;
+            return;
+        }
         var scroller = new ScrollViewer
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = canvas,
         };
-        HorizontalAlignment = HorizontalAlignment.Center;
         if (!opensLarger)
         {
             Child = scroller;
@@ -71,6 +82,7 @@ public sealed class SvgView : Decorator
 
     /// <summary>How much the drawing is scaled from its own width to fit.</summary>
     public double Scale => canvas.Scale;
+
 
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
@@ -154,6 +166,9 @@ sealed class SvgCanvas : Control
         }
     }
 
+    /// <summary>No floor on the scale: a drawing on paper (see <see cref="SvgView(bool, bool)"/>).</summary>
+    public bool FitWhole { get; set; }
+
     public Size Room
     {
         get => room;
@@ -172,7 +187,7 @@ sealed class SvgCanvas : Control
         double scale = maxScale;
         if (double.IsFinite(room.Width)) scale = Math.Min(scale, room.Width / natural);
         if (double.IsFinite(room.Height) && room.Height > 0) scale = Math.Min(scale, room.Height / naturalHeight);
-        Scale = Math.Max(SvgView.MinScale, scale);
+        Scale = FitWhole ? scale : Math.Max(SvgView.MinScale, scale);
         return new Size(Math.Ceiling(natural * Scale), Math.Ceiling(naturalHeight * Scale));
     }
 

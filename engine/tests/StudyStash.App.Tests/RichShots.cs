@@ -244,11 +244,11 @@ public class RichShots
                 Shot.Take($"rich-formula-fallback-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, RichDemo.FormulaFallbackNotes), size: new Size(876, 560));
     }
 
-    /// <summary>The share/Export button's menu open over the lecture page: "Download as Markdown…", "Download all of
-    /// {class}…" and "Include transcripts" checked, one left edge for every row.</summary>
+    /// <summary>The share/Export button's menu open over the lecture page: "Download as Markdown…", "Download as PDF…",
+    /// "Download all of {class}…" and "Include transcripts" checked, one left edge for every row.</summary>
     static ContextMenu OpenDownloadMenu()
     {
-        var menu = DownloadMenu.Build("BIO 110", includeTranscripts: true, () => { }, () => { }, () => { });
+        var menu = DownloadMenu.Build("BIO 110", includeTranscripts: true, () => { }, () => { }, () => { }, () => { });
         menu.VerticalAlignment = VerticalAlignment.Top;
         return menu;
     }

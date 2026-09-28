@@ -266,21 +266,29 @@ public class MenuPickTests
         var w = Host(anchor, skin);
         try
         {
-            int downloaded = 0, downloadedClass = 0, toggled = 0;
-            var menu = DownloadMenu.Build("BIO 110", includeTranscripts: false, () => downloaded++, () => downloadedClass++, () => toggled++);
+            int downloaded = 0, downloadedPdf = 0, downloadedClass = 0, toggled = 0;
+            var menu = DownloadMenu.Build("BIO 110", includeTranscripts: false, () => downloaded++, () => downloadedPdf++, () => downloadedClass++, () => toggled++);
             menu.Open(anchor);
             Dispatcher.UIThread.RunJobs();
             Assert.True(menu.IsOpen);
             Item(menu, "Download as Markdown…"); // exists
+            Item(menu, "Download as PDF…"); // exists, right under it
+            Assert.Equal(["Download as Markdown…", "Download as PDF…"], menu.Items.OfType<MenuItem>().Take(2).Select(i => i.Header as string));
             Item(menu, "Download all of BIO 110…"); // exists, names the open class
             Assert.False(Checked(Item(menu, "Include transcripts")));
             Click(Item(menu, "Download as Markdown…"));
             Assert.Equal(1, downloaded);
-            Assert.Equal(0, downloadedClass + toggled);
+            Assert.Equal(0, downloadedPdf + downloadedClass + toggled);
+            menu.Close();
+            menu.Open(anchor);
+            Dispatcher.UIThread.RunJobs();
+            Click(Item(menu, "Download as PDF…"));
+            Assert.Equal(1, downloadedPdf);
+            Assert.Equal(1, downloaded);
             menu.Close();
 
             // No class open (Due, or nothing picked yet): no "Download all of…" row at all.
-            var noClass = DownloadMenu.Build(null, includeTranscripts: true, () => { }, () => { }, () => { });
+            var noClass = DownloadMenu.Build(null, includeTranscripts: true, () => { }, () => { }, () => { }, () => { });
             Assert.DoesNotContain(noClass.Items.OfType<MenuItem>(), i => (i.Header as string)?.StartsWith("Download all of") == true);
             noClass.Open(anchor);
             Dispatcher.UIThread.RunJobs();

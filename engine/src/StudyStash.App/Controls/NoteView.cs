@@ -40,6 +40,21 @@ public sealed partial class NoteView : StackPanel
     /// <summary>The line's own height in pixels (not a multiplier of the size, unlike the design's reading type).</summary>
     public static readonly StyledProperty<double> BodyLineHeightProperty = AvaloniaProperty.Register<NoteView, double>(nameof(BodyLineHeight), 22);
 
+    /// <summary>Set when the notes are laid out for paper (a PDF), this many pixels to a page's height: nothing on
+    /// paper scrolls, so every formula and diagram shrinks as far as it must to fit the column, a diagram no taller than
+    /// a page; diagrams don't open larger; and a fence left open at the end is saved notes that can't be drawn, not an
+    /// answer still arriving. NaN (the default) is the screen.</summary>
+    public static readonly StyledProperty<double> PageHeightProperty = AvaloniaProperty.Register<NoteView, double>(nameof(PageHeight), double.NaN);
+
+    /// <summary>Where a run of text links to (a Markdown link's address), for a PDF to make that text clickable.</summary>
+    public static readonly AttachedProperty<string?> LinkProperty = AvaloniaProperty.RegisterAttached<NoteView, Run, string?>("Link");
+
+    public static string? GetLink(Run run) => run.GetValue(LinkProperty);
+
+    /// <summary>The class a section heading carries, and the one a table's header row carries: a page never ends
+    /// just after either, leaving it cut off from what it heads.</summary>
+    public const string HeadingClass = "note-heading", TableHeaderClass = "note-table-header";
+
     /// <summary>A compact diagram never grows past this tall in the column it sits in (a quick answer or a chat
     /// bubble); a click still opens it at full size.</summary>
     public const double CompactDiagramMaxHeight = 260;
@@ -82,11 +97,19 @@ public sealed partial class NoteView : StackPanel
         set => SetValue(BodyLineHeightProperty, value);
     }
 
+    public double PageHeight
+    {
+        get => GetValue(PageHeightProperty);
+        set => SetValue(PageHeightProperty, value);
+    }
+
+    bool Print => double.IsFinite(PageHeight);
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
         if (change.Property == CompactProperty || change.Property == BodyFontProperty || change.Property == BodySizeProperty
-            || change.Property == BodyLineHeightProperty)
+            || change.Property == BodyLineHeightProperty || change.Property == PageHeightProperty)
         {
             blocks.Clear(); // every block's type changes: none can be kept
             Build();
@@ -195,6 +218,7 @@ public sealed partial class NoteView : StackPanel
                     section = Plain(h.Inline);
                     var head = Text("DisplayFont", Mac ? 17 : 20, 1.25);
                     head.FontWeight = FontWeight.SemiBold;
+                    head.Classes.Add(HeadingClass);
                     Fill(head, h.Inline);
                     head.Margin = Compact ? default : new Thickness(0, first ? (Mac ? 18 : 16) : (Mac ? 14 : 12), 0, 0);
                     control = head;
@@ -237,6 +261,7 @@ public sealed partial class NoteView : StackPanel
     /// earlier on never will, and says it can't be drawn.</summary>
     bool AtEnd(LeafBlock block)
     {
+        if (Print) return false;
         // An unclosed fence's span covers only its opening line; its last line says where it really ends.
         int end = block.Span.End;
         if (block.Lines.Count > 0 && block.Lines.Lines[block.Lines.Count - 1] is var last) end = System.Math.Max(end, last.Position + last.Slice.Length - 1);
@@ -302,7 +327,7 @@ public sealed partial class NoteView : StackPanel
                 mv.Display = true;
                 mv.Size = current.FontSize * DisplayMathFactor;
                 mv.InvalidateMeasure();
-                var lifted = new MathDisplay(mv) { Margin = new Thickness(0, 2) };
+                var lifted = new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 2) };
                 segments.Add(lifted);
                 current = Body();
                 split = true;
@@ -328,7 +353,7 @@ public sealed partial class NoteView : StackPanel
         mv.Bind(MathView.ForegroundProperty, mv.GetResourceObservable("Fg"));
         mv.Measure(Size.Infinity);
         if (mv.ErrorMessage is not null) return DisplayFallback(latex);
-        return new MathDisplay(mv) { Margin = new Thickness(0, 4) };
+        return new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 4) };
     }
 
     /// <summary>The code-box look, for a display formula that couldn't be typeset: one quiet line saying so, then
@@ -393,8 +418,9 @@ public sealed partial class NoteView : StackPanel
         // its space until then, and becomes the calm card if it can't be laid out.
         var font = this.FindResource("TextFont") as FontFamily ?? Application.Current?.FindResource("TextFont") as FontFamily ?? FontFamily.Default;
         SceneCache.Find(chart, chart.ToSource(), font, null);
-        var view = new DiagramView { Chart = chart, Source = source, Margin = new Thickness(0, 6) };
+        var view = new DiagramView(opensLarger: !Print, fitWhole: Print) { Chart = chart, Source = source, Margin = new Thickness(0, 6) };
         if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
+        if (Print) view.MaxHeight = PageHeight;
         return view;
     }
 
@@ -404,8 +430,9 @@ public sealed partial class NoteView : StackPanel
         if (drawing.Problem is { } problem) return new DiagramCard(problem, source);
         using (var hold = SvgPictures.Hold(drawing.Svg!))
             if (hold is null) return new DiagramCard("Study Stash couldn't draw this SVG.", source);
-        var view = new SvgView { Source = source, Margin = new Thickness(0, 6) };
+        var view = new SvgView(opensLarger: !Print, fitWhole: Print) { Source = source, Margin = new Thickness(0, 6) };
         if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
+        if (Print) view.MaxHeight = PageHeight;
         return view;
     }
 
@@ -525,6 +552,7 @@ public sealed partial class NoteView : StackPanel
                 grid.Children.Add(cell);
             }
             var line = new Border { BorderThickness = new Thickness(0, row.IsHeader ? 0 : 1, 0, 0), Padding = new Thickness(0, row.IsHeader ? 0 : 8, 0, 8), Child = grid };
+            if (row.IsHeader) line.Classes.Add(TableHeaderClass);
             line.Bind(Border.BorderBrushProperty, line.GetResourceObservable("Sep"));
             stack.Children.Add(line);
         }
@@ -597,7 +625,11 @@ public sealed partial class NoteView : StackPanel
                     yield return new Run(" ");
                     break;
                 case LinkInline link:
-                    foreach (var r in Runs(link, skip, weight, style, bodySize, fgKey)) yield return r;
+                    foreach (var r in Runs(link, skip, weight, style, bodySize, fgKey))
+                    {
+                        if (!link.IsImage && link.Url is { Length: > 0 } url && r is Run linked) linked.SetValue(LinkProperty, url);
+                        yield return r;
+                    }
                     break;
                 case ContainerInline other:
                     foreach (var r in Runs(other, skip, weight, style, bodySize, fgKey)) yield return r;

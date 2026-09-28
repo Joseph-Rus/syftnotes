@@ -3,19 +3,23 @@ using StudyStash.App.Controls;
 
 namespace StudyStash.App.Views;
 
-/// <summary>The share/Export button's menu: download this lecture, download the whole open class (when one is open),
-/// and a check for whether a download includes the transcript.</summary>
+/// <summary>The share/Export button's menu: download this lecture as Markdown or as a PDF, download the whole open
+/// class (when one is open), and a check for whether a download includes the transcript.</summary>
 public static class DownloadMenu
 {
     /// <summary><paramref name="className"/> null leaves out "Download all of…" (Due, or no class open).
     /// <paramref name="includeTranscripts"/> checks "Include transcripts". <paramref name="download"/>,
-    /// <paramref name="downloadClass"/> and <paramref name="toggleTranscripts"/> run when their row is picked.</summary>
-    public static ContextMenu Build(string? className, bool includeTranscripts, Action download, Action downloadClass, Action toggleTranscripts)
+    /// <paramref name="downloadPdf"/>, <paramref name="downloadClass"/> and <paramref name="toggleTranscripts"/> run
+    /// when their row is picked.</summary>
+    public static ContextMenu Build(string? className, bool includeTranscripts, Action download, Action downloadPdf, Action downloadClass, Action toggleTranscripts)
     {
         var menu = new ContextMenu { WindowManagerAddShadowHint = OperatingSystem.IsMacOS() };
         var one = new MenuItem { Header = "Download as Markdown…" };
         one.Click += (_, _) => download();
         menu.Items.Add(one);
+        var pdf = new MenuItem { Header = "Download as PDF…" };
+        pdf.Click += (_, _) => downloadPdf();
+        menu.Items.Add(pdf);
         if (className is not null)
         {
             var all = new MenuItem { Header = $"Download all of {className}…" };
