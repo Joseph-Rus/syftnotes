@@ -16,6 +16,7 @@ public static class CalendarWords
     public const string Checking = "Reading the calendar…";
     public const string NoSources = "No calendars yet. Add a feed above to see what's coming up.";
     public const string ConnectTitle = "Connect a calendar";
+    public const string MoreComingSoon = "Apple Calendar, Google and Outlook are coming soon; for now, paste a feed's address.";
     public const string ComingUp = "Coming up";
     public const string NothingComingUp = "Nothing else today or tomorrow.";
 
