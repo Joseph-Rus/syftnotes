@@ -112,9 +112,9 @@ public static class Placement
     {
         var area = screen.WorkingArea;
         double scale = screen.Scaling;
-        var size = new Size(
-            Math.Max(min.Width, Math.Min(wanted.Width, area.Width / scale - 2 * margin)),
-            Math.Max(min.Height, Math.Min(wanted.Height, area.Height / scale - 2 * margin)));
+        // A size the window doesn't give (NaN) is as big as the display allows.
+        static double Fit(double want, double room, double least) => Math.Max(double.IsNaN(least) ? 0 : least, double.IsNaN(want) ? room : Math.Min(want, room));
+        var size = new Size(Fit(wanted.Width, area.Width / scale - 2 * margin, min.Width), Fit(wanted.Height, area.Height / scale - 2 * margin, min.Height));
         int w = (int)Math.Round(size.Width * scale), h = (int)Math.Round(size.Height * scale);
         return (new PixelPoint(area.X + Math.Max(0, (area.Width - w) / 2), area.Y + Math.Max(0, (area.Height - h) / 2)), size);
     }

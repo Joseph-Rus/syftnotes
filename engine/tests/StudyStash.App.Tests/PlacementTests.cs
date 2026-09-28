@@ -203,4 +203,11 @@ public class PlacementTests
         Assert.Equal(new Size(992, 560), size);
         Assert.Equal(0, at.Y);
     }
+
+    [Fact]
+    public void A_window_that_gives_no_size_opens_as_big_as_the_display_allows()
+    {
+        var (_, size) = Placement.Centred(Left, new Size(double.NaN, double.NaN), new Size(double.NaN, double.NaN));
+        Assert.Equal(new Size(1920 - 32, 1055 - 32), size);
+    }
 }
