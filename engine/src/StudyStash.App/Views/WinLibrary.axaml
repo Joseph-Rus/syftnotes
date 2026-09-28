@@ -395,10 +395,11 @@
               <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" />
               </Panel>
               <!-- The latest answer, just above the ask bar -->
-              <Panel Name="AnswerRoom" Grid.Row="1" IsVisible="{Binding HasAnswer}" HorizontalAlignment="Center" Margin="0,8,0,88">
+              <!-- Both 600 wide where there's room, narrower (never cut off) in a small window. -->
+              <Panel Name="AnswerRoom" Grid.Row="1" IsVisible="{Binding HasAnswer}" Margin="24,8,24,88">
                 <v:WinAiAnswer DataContext="{Binding Ask}" />
               </Panel>
-              <Panel Name="AskRoom" Grid.RowSpan="2" IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24">
+              <Panel Name="AskRoom" Grid.RowSpan="2" IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" Margin="24,0,24,24">
                 <v:WinAiAskBar DataContext="{Binding Ask}" />
               </Panel>
             </Grid>

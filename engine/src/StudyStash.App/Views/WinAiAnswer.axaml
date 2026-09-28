@@ -15,7 +15,7 @@
   <ContentControl IsVisible="{Binding HasLatest}" Content="{Binding Latest}" ClipToBounds="False">
     <ContentControl.ContentTemplate>
       <DataTemplate x:DataType="vm:AiTurn">
-        <Border Classes="ai-answer-card" Width="600">
+        <Border Classes="ai-answer-card" MaxWidth="600">
           <DockPanel>
             <Grid DockPanel.Dock="Top" ColumnDefinitions="*,8,Auto" Margin="14,6,6,0">
               <TextBlock Classes="ai-asked" Text="{Binding Question}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
