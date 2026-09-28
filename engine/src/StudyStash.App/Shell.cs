@@ -133,6 +133,7 @@ public static partial class Shell
         public static Window? Quick => quickWindow;
         public static Window? Recorder => recorderWindow;
         public static Window? Settings => settingsWindow;
+        public static Window? CanvasConnect => canvasConnectWindow;
         /// <summary>Setup's own view model, while its window is open: what the self-test drives (steps, connect,
         /// find, add a class) the same way the view's bindings would.</summary>
         public static ViewModels.SetupModel? SetupModel => setup;
@@ -375,6 +376,7 @@ public static partial class Shell
     {
         bool mac = OperatingSystem.IsMacOS();
         bool hidden = mac && MacStatusItem.Check() is { Seen: false };
+        if (!IconWords.WorthSaying(hidden, panelWindow?.IsVisible == true)) return;
         var (title, text) = IconWords.WhereItIs(mac, hidden);
         // Longer than most: it's the one way to find the app when its icon can't be seen.
         Toast(title, text, hidden ? IconWords.ShowIt : null, hidden ? MoveIconIntoView : null, TimeSpan.FromSeconds(hidden ? 30 : 12));
@@ -674,6 +676,8 @@ public static partial class Shell
             AppMenu.AddSettingsKey(panelWindow, SettingsFromAnywhere);
         }
         Refresh();
+        // A notification would sit over the dropdown (both hug the same corner): opening it puts them away.
+        foreach (var (_, _, toast) in toasts.ToList()) toast.Close();
         // NSEvent's mouse location is in points, in the same coordinate space Avalonia's screens report: no
         // rescaling (a display's own scale factor doesn't change where its menu bar sits in that shared space).
         var pointer = near ?? Floating.Pointer();
@@ -825,12 +829,10 @@ public static partial class Shell
         }
         else
         {
-            w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
-            w.Background = Brushes.Transparent;
             w.Content = new WinLibrary { DataContext = library };
-            w.Opened += (_, _) => MicaIfAvailable(w);
+            WinChrome.Apply(w);
         }
-        PutWhereLeft(w);
+        if (!PutWhereLeft(w)) OpenCentred(w, new Size(1280, 800));
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         // The menu bar, read back once, so the log shows the app menu really has Settings… ⌘, and Quit ⌘Q.
         if (OperatingSystem.IsMacOS())
@@ -855,20 +857,58 @@ public static partial class Shell
     }
 
     /// <summary>The library window opens where it was left, at the size it was left (or zoomed), if that spot is
-    /// still on a display; otherwise centred at its usual size.</summary>
-    static void PutWhereLeft(Window w)
+    /// still on a display (true); otherwise it's for the caller to centre it.</summary>
+    static bool PutWhereLeft(Window w)
     {
-        if (host.Settings.LibraryWindow is not { } place) return;
+        if (host.Settings.LibraryWindow is not { } place) return false;
         var screens = w.Screens.All.Select(s => new ScreenGeometry(s.Bounds, s.WorkingArea, s.Scaling, s.IsPrimary)).ToList();
         var at = new PixelPoint(place.X, place.Y);
         double scale = Placement.Pick(screens, at).Scaling;
         var size = new PixelSize((int)(Math.Max(place.Width, w.MinWidth) * scale), (int)(Math.Max(place.Height, w.MinHeight) * scale));
-        if (Placement.Restore(at, size, screens, out var fitted) is not { } spot) return;
+        if (Placement.Restore(at, size, screens, out var fitted) is not { } spot) return false;
         w.WindowStartupLocation = WindowStartupLocation.Manual;
         w.Position = spot;
         w.Width = fitted.Width / scale;
         w.Height = fitted.Height / scale;
         if (place.Zoomed) w.Opened += (_, _) => w.WindowState = WindowState.Maximized;
+        return true;
+    }
+
+    /// <summary>The display a window opening now belongs on: on Windows the one the pointer is on, on a Mac the main one.</summary>
+    static ScreenGeometry ScreenFor(Window w) =>
+        Placement.Pick([.. w.Screens.All.Select(s => new ScreenGeometry(s.Bounds, s.WorkingArea, s.Scaling, s.IsPrimary))], OperatingSystem.IsWindows() ? Floating.Pointer() : null);
+
+    /// <summary>Opens <paramref name="w"/> in the middle of the pointer's display, at <paramref name="wanted"/> where
+    /// that fits and smaller where it doesn't (a small screen at 125 or 150%), its title bar always on the screen.
+    /// Returns the most room that display has for a window.</summary>
+    static Size OpenCentred(Window w, Size wanted)
+    {
+        var screen = ScreenFor(w);
+        var (at, size) = Placement.Centred(screen, wanted, new Size(w.MinWidth, w.MinHeight));
+        w.WindowStartupLocation = WindowStartupLocation.Manual;
+        w.Position = at;
+        w.Width = size.Width;
+        w.Height = size.Height;
+        return Placement.Centred(screen, new Size(1e6, 1e6)).Size;
+    }
+
+    /// <summary>A fixed-size window whose view sets its size (setup's steps): no bigger than the display has room for
+    /// (the view scrolls inside), and after it grows, still on the display.</summary>
+    static void FollowView(Window w, Control view)
+    {
+        var room = OpenCentred(w, new Size(view.Width, view.Height));
+        view.MaxWidth = room.Width;
+        view.MaxHeight = room.Height;
+        view.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == Layoutable.WidthProperty) w.Width = Math.Min(view.Width, room.Width);
+            else if (e.Property == Layoutable.HeightProperty) w.Height = Math.Min(view.Height, room.Height);
+            else return;
+            var screen = ScreenFor(w);
+            var size = new PixelSize((int)(w.Width * screen.Scaling), (int)(w.Height * screen.Scaling));
+            var inside = Placement.KeepInside(screen.WorkingArea, size, w.Position);
+            if (inside != w.Position) w.Position = inside;
+        };
     }
 
     /// <summary>Remembers where the library window is and its size, so it opens there next time (it's being hidden,
@@ -881,12 +921,6 @@ public static partial class Shell
             ? before with { Zoomed = true }
             : new WindowPlace(w.Position.X, w.Position.Y, w.ClientSize.Width, w.ClientSize.Height, zoomed);
         host.Save(s => s.LibraryWindow = place);
-    }
-
-    /// <summary>Windows 11's Mica shows through where the design has its Mica color; elsewhere the color stands in.</summary>
-    static void MicaIfAvailable(Window w)
-    {
-        if (w.ActualTransparencyLevel == WindowTransparencyLevel.Mica) w.Resources["Mica"] = Brushes.Transparent;
     }
 
     public static void ShowLibrary()
@@ -916,18 +950,13 @@ public static partial class Shell
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacSetup { DataContext = setup, DrawChrome = false } : new WinSetup { DataContext = setup, DrawChrome = false };
         var w = new Window
         {
-            Title = setup.HeaderTitle, Width = view.Width, Height = view.Height, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen, Content = view,
+            Title = setup.HeaderTitle, CanResize = false, CanMaximize = false, Content = view,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        if (Skin.Current == SkinKind.Win)
-        {
-            w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
-            w.Background = Brushes.Transparent;
-            w.Opened += (_, _) => MicaIfAvailable(w);
-        }
+        WinChrome.Apply(w);
         var model = setup;
         var mic = micCheck = new MicCheck();
         setup.OnFinish = () =>
@@ -946,11 +975,7 @@ public static partial class Shell
             if (e.PropertyName == nameof(SetupModel.HeaderTitle)) w.Title = model.HeaderTitle;
         };
         // The AI and Canvas steps are the design's bigger window (the view sizes itself per step): the window follows.
-        view.PropertyChanged += (_, e) =>
-        {
-            if (e.Property == Layoutable.WidthProperty) w.Width = view.Width;
-            else if (e.Property == Layoutable.HeightProperty) w.Height = view.Height;
-        };
+        FollowView(w, view);
         // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
         var leave = setup.LeaveAsync;
         setup.LeaveAsync = async step =>
@@ -1092,22 +1117,19 @@ public static partial class Shell
         if (section is not null) model.Section = section;
         var w = new Window
         {
-            Title = "Study Stash settings", Width = 900, Height = Skin.Current == SkinKind.Mac ? 780 : 860, CanResize = false, WindowStartupLocation = WindowStartupLocation.CenterScreen,
+            Title = "Study Stash settings", CanResize = false, CanMaximize = false,
             Content = new SettingsView { DataContext = model, DrawChrome = false },
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
+        // The view's own size (900 × 860 on Windows), smaller on a small screen: its pages scroll inside.
+        FollowView(w, (Control)w.Content!);
         Look.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         model.Lib.Copy = text => _ = w.Clipboard?.SetTextAsync(text);
         model.Lib.ClassesChanged = LibraryClassesChanged;
         model.Canvas.OnClassesChanged = LibraryClassesChanged;
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        if (Skin.Current == SkinKind.Win)
-        {
-            w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
-            w.Background = Brushes.Transparent;
-            w.Opened += (_, _) => MicaIfAvailable(w);
-        }
+        WinChrome.Apply(w);
         w.Closed += (_, _) =>
         {
             settingsWindow = null;

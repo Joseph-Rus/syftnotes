@@ -24,7 +24,7 @@ namespace StudyStash.App;
 /// With STUDYSTASH_SELFTEST_FLOW=one-computer it proves Just this computer instead: setup makes the app's own library
 /// (no second one is started), and the lecture is recorded, written down and given its notes all on this computer.
 /// </summary>
-public static class SelfTest
+public static partial class SelfTest
 {
     public static string? Dir => Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST") is { Length: > 0 } d ? d : null;
 
@@ -165,6 +165,7 @@ public static class SelfTest
         using var f = File.Create(Path.Combine(Dir!, name + ".png"));
         bmp.Save(f, PngBitmapEncoderOptions.Default);
         Say($"{name}: {w.Bounds.Width:0}×{w.Bounds.Height:0} at {w.Position} (scale {w.RenderScaling:0.0#})");
+        ScreenShot(w, name);
     }
 
     static async Task Wait(double seconds) => await Task.Delay(TimeSpan.FromSeconds(seconds));
@@ -219,6 +220,7 @@ public static class SelfTest
         await RunRecordingAsync(host);
         await RunProblemsAsync(host);
         await RunSettingsAsync();
+        await RunLooksAsync();
     }
 
     // --- setup -------------------------------------------------------------------------------------------------------

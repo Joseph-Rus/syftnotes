@@ -15,7 +15,8 @@ public partial class WinLibrary : UserControl
         {
             if (DataContext is LibraryModel m) m.Narrow = e.NewSize.Width < LibraryModel.NarrowBelow;
         };
-        Fades.Under(Fade, "Mica", "Layer", 0.75);
+        // The notes fade out under the floating ask bar (shorter while an answer is open), gone for the last quarter.
+        Fades.MaskBottom(NoteScroll, Fade, 0.75);
     }
 
     /// <summary>A lecture row's "Delete lecture…": asks first.</summary>

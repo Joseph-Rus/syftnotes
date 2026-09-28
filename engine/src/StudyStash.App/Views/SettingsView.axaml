@@ -24,9 +24,8 @@
              x:DataType="s:SettingsModel"
              ClipToBounds="False">
   <UserControl.Styles>
-    <!-- The window's own frame: Mac a rounded, shadowed slab of Win, drawn only for a screenshot (a real macOS
-         window is already rounded and shadowed by the OS, so drawing both would double up); Windows a plain
-         rectangular window, so its own radius and shadow are always drawn, real window or shot. -->
+    <!-- The window's own frame, drawn only for a screenshot: a real window is already rounded, edged and shadowed
+         by the system (macOS; Windows 11), so drawing both would double up. -->
     <Style Selector="Border#Chrome">
       <Setter Property="ClipToBounds" Value="True" />
     </Style>
@@ -39,6 +38,8 @@
     </Style>
     <Style Selector=".win Border#Chrome">
       <Setter Property="Background" Value="{DynamicResource Mica}" />
+    </Style>
+    <Style Selector=".win Border#Chrome.chrome">
       <Setter Property="BorderBrush" Value="{DynamicResource FlyStroke}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="8" />
