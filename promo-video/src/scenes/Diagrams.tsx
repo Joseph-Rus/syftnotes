@@ -9,8 +9,9 @@ const SWITCH = 88; // CALC II is clicked
 const INK = colors.text;
 const MUTED = colors.text2;
 
-// Health: the cardiac cycle, five steps round a ring, as the app lays out a cycle.
-const STEPS = ['Atrial systole', 'Isovolumetric contraction', 'Ventricular ejection', 'Isovolumetric relaxation', 'Ventricular filling'];
+// Nursing: the nursing process (ADPIE), five steps round a ring, as the app lays out a cycle.
+const STEPS = ['Assessment', 'Diagnosis', 'Planning', 'Implementation', 'Evaluation'];
+const STEP_NOTES = ['Collect the data', 'Name the problems', 'Set the goals', 'Carry out the care', 'Check the outcomes'];
 const CX = 300;
 const CY = 230;
 const RX = 200;
@@ -22,7 +23,7 @@ const at = (i: number) => {
 const box = (i: number) => {
   const k = i % STEPS.length;
   const {x, y} = at(k);
-  return {x, y, w: k === 0 ? 176 : 170, h: STEPS[k].includes(' ') ? 60 : 44};
+  return {x, y, w: 184, h: 62};
 };
 const inside = (x: number, y: number, b: ReturnType<typeof box>, margin = 12) => Math.abs(x - b.x) <= b.w / 2 + margin && Math.abs(y - b.y) <= b.h / 2 + margin;
 const ARCS = STEPS.map((_, i) => {
@@ -54,15 +55,15 @@ const Cycle: React.FC<{frame: number}> = ({frame}) => (
       const b = box(i);
       const p = spr(frame, 14 + i * 8, bouncy);
       const first = i === 0;
-      const lines = s.split(' ');
       return (
         <g key={s} transform={`translate(${b.x},${b.y}) scale(${p})`} opacity={Math.min(1, p * 2)}>
-          <rect x={-b.w / 2} y={-b.h / 2} width={b.w} height={b.h} rx={first ? b.h / 2 : 11} fill={first ? 'rgba(14,149,148,0.14)' : '#fff'} stroke={first ? colors.lagoon : 'rgba(16,24,40,0.16)'} strokeWidth="1.8" />
-          {lines.map((l, k) => (
-            <text key={l} x={0} y={(k - (lines.length - 1) / 2) * 21 + 6} textAnchor="middle" fontFamily={fonts.ui} fontSize="16.5" fontWeight={500} fill={INK}>
-              {l}
-            </text>
-          ))}
+          <rect x={-b.w / 2} y={-b.h / 2} width={b.w} height={b.h} rx={first ? b.h / 2 : 12} fill={first ? 'rgba(14,149,148,0.14)' : '#fff'} stroke={first ? colors.lagoon : 'rgba(16,24,40,0.16)'} strokeWidth="1.8" />
+          <text x={0} y={-3} textAnchor="middle" fontFamily={fonts.ui} fontSize="17.5" fontWeight={600} fill={INK}>
+            {s}
+          </text>
+          <text x={0} y={18} textAnchor="middle" fontFamily={fonts.ui} fontSize="14" fontWeight={400} fill={MUTED}>
+            {STEP_NOTES[i]}
+          </text>
         </g>
       );
     })}
@@ -182,12 +183,12 @@ export const Diagrams: React.FC = () => {
   const health = (
     <Page
       frame={frame}
-      cls="HLTH 120"
+      cls="NURS 210"
       color={colors.health}
       meta="Thu 25 Sep · 1 h 04 min"
-      title="The cardiac cycle"
+      title="The nursing process"
       by="Claude Code"
-      summary="Each heartbeat runs through five steps, from the atria filling the ventricles to the ventricles filling again."
+      summary="Five steps a nurse repeats with every patient, and each one feeds the next: assess, diagnose, plan, implement, evaluate."
     >
       <Cycle frame={frame} />
     </Page>
@@ -212,7 +213,7 @@ export const Diagrams: React.FC = () => {
         {name: 'CS 101', color: colors.cs, count: 12},
         {name: 'BIO 110', color: colors.bio, count: 9},
         {name: 'CALC II', color: colors.calc, count: 11, lit: math},
-        {name: 'HLTH 120', color: colors.health, count: 8, lit: !math},
+        {name: 'NURS 210', color: colors.health, count: 8, lit: !math},
         {name: 'HIST 210', color: colors.hist, count: 7},
       ]}
     />
@@ -228,12 +229,12 @@ export const Diagrams: React.FC = () => {
     </>
   ) : (
     <>
-      <ListHead title="HLTH 120" sub="8 lectures" />
+      <ListHead title="NURS 210" sub="8 lectures" />
       <Group name="This week" />
-      <ListRow title="The cardiac cycle" sub="Thu 25 Sep · 1 h 04 min" color={colors.health} lit />
-      <ListRow title="Blood pressure" sub="Tue 23 Sep · 58 min" color={colors.health} />
+      <ListRow title="The nursing process" sub="Thu 25 Sep · 1 h 04 min" color={colors.health} lit />
+      <ListRow title="Vital signs" sub="Tue 23 Sep · 58 min" color={colors.health} />
       <Group name="Last week" />
-      <ListRow title="Heart anatomy" sub="Thu 18 Sep · 1 h 02 min" color={colors.health} />
+      <ListRow title="Patient safety" sub="Thu 18 Sep · 1 h 02 min" color={colors.health} />
     </>
   );
   // Where CALC II sits in the sidebar: window, sidebar margin, traffic lights, the "Classes" label, two rows down.

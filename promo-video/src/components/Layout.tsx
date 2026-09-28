@@ -31,18 +31,76 @@ export const Wallpaper: React.FC = () => {
 
 export const MENU_H = 38;
 /** Where Study Stash's icon sits in the menu bar. */
-export const menuIconX = (width: number) => width - (width > 1200 ? 262 : 214);
+// The right of the menu bar, laid out from the right edge as macOS does: the app's icon, then the system's.
+// Each item has a fixed slot, so nothing can run into anything else.
+const INK = '#111418';
+const SLOTS = (wide: boolean): [key: string, w: number][] =>
+  [
+    ['app', 34],
+    ['battery', 34],
+    ['wifi', 26],
+    ['spotlight', 22],
+    ['control', 26],
+    ...(wide ? ([['clock', 168]] as [string, number][]) : []),
+  ];
+const slotX = (width: number) => {
+  const wide = width > 1200;
+  const slots = SLOTS(wide);
+  const x: Record<string, number> = {};
+  let right = width - 20;
+  for (let i = slots.length - 1; i >= 0; i--) {
+    const [key, w] = slots[i];
+    x[key] = right - w;
+    right -= w + (key === 'clock' ? 16 : 20);
+  }
+  return {x, slots};
+};
+/** Where Study Stash's icon sits in the menu bar (its centre). */
+export const menuIconX = (width: number) => slotX(width).x.app + 17;
 
-const Glyph: React.FC<{d: string; w?: number}> = ({d, w = 22}) => (
-  <svg width={w} height="18" viewBox="0 0 24 18" fill="none" stroke={colors.text} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d={d} />
-  </svg>
-);
+const MenuGlyph: React.FC<{kind: string}> = ({kind}) => {
+  switch (kind) {
+    case 'battery':
+      return (
+        <svg width="34" height="16" viewBox="0 0 34 16">
+          <rect x="1" y="1.5" width="27" height="13" rx="4" fill="none" stroke={INK} strokeWidth="1.5" opacity="0.55" />
+          <rect x="3.5" y="4" width="19" height="8" rx="2" fill={INK} />
+          <path d="M30.5 6v4" stroke={INK} strokeWidth="2" strokeLinecap="round" opacity="0.55" />
+        </svg>
+      );
+    case 'wifi':
+      return (
+        <svg width="26" height="19" viewBox="0 0 26 19">
+          <path d="M13 17.6l3.1-3.7a4.8 4.8 0 0 0-6.2 0z" fill={INK} />
+          <path d="M6.9 10.8a9.2 9.2 0 0 1 12.2 0M3.3 6.6a14.6 14.6 0 0 1 19.4 0" fill="none" stroke={INK} strokeWidth="2.3" strokeLinecap="round" />
+        </svg>
+      );
+    case 'spotlight':
+      return (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke={INK} strokeWidth="2.1" strokeLinecap="round">
+          <circle cx="8.3" cy="8.3" r="6" />
+          <path d="M12.8 12.8l5 5" />
+        </svg>
+      );
+    case 'control':
+      return (
+        <svg width="24" height="20" viewBox="0 0 24 20">
+          <rect x="1.5" y="1.5" width="21" height="7" rx="3.5" fill="none" stroke={INK} strokeWidth="1.7" />
+          <circle cx="18" cy="5" r="2" fill={INK} />
+          <rect x="1.5" y="11.5" width="21" height="7" rx="3.5" fill="none" stroke={INK} strokeWidth="1.7" />
+          <circle cx="6" cy="15" r="2" fill={INK} />
+        </svg>
+      );
+    default:
+      return null;
+  }
+};
 
-/** The Mac's menu bar, with Study Stash's icon among the others. `lit` highlights the icon (its menu is open). */
+/** The Mac's menu bar, with Study Stash's icon among the system's. `lit` highlights the icon (its menu is open). */
 export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
   const {width} = useVideoConfig();
   const wide = width > 1200;
+  const {x, slots} = slotX(width);
   return (
     <div
       style={{
@@ -51,43 +109,38 @@ export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
         left: 0,
         right: 0,
         height: MENU_H,
-        background: 'rgba(255,255,255,0.42)',
-        borderBottom: '1px solid rgba(255,255,255,0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 22px',
-        gap: 26,
+        background: 'rgba(255,255,255,0.34)',
+        boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.35)',
         fontFamily: fonts.ui,
         fontSize: 17,
-        color: colors.text,
+        color: INK,
       }}
     >
-      <span style={{fontWeight: 700}}>Study Stash</span>
-      {wide ? ['File', 'Edit', 'View', 'Window', 'Help'].map((m) => <span key={m}>{m}</span>) : null}
-      <div style={{flex: 1}} />
-      <div
-        style={{
-          position: 'absolute',
-          left: menuIconX(width) - 17,
-          top: 4,
-          width: 34,
-          height: 30,
-          borderRadius: 7,
-          background: lit ? 'rgba(16,24,40,0.12)' : 'transparent',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Logo size={24} shadow={false} flat />
+      <div style={{position: 'absolute', left: 26, top: 0, height: MENU_H, display: 'flex', alignItems: 'center', gap: 25}}>
+        <span style={{fontWeight: 700}}>Study Stash</span>
+        {wide ? ['File', 'Edit', 'View', 'Window', 'Help'].map((m) => <span key={m}>{m}</span>) : null}
       </div>
-      <Glyph d="M2 7.5a14 14 0 0 1 20 0M5.5 11a9 9 0 0 1 13 0M9 14.5a4 4 0 0 1 6 0" />
-      <svg width="30" height="16" viewBox="0 0 30 16">
-        <rect x="1" y="2" width="24" height="12" rx="3.5" fill="none" stroke={colors.text} strokeWidth="1.6" />
-        <rect x="3.5" y="4.5" width="15" height="7" rx="1.5" fill={colors.text} />
-        <rect x="26.5" y="6" width="2" height="4" rx="1" fill={colors.text} />
-      </svg>
-      {wide ? <span style={{fontVariantNumeric: 'tabular-nums'}}>Tue 23 Sep  10:02</span> : null}
+      {slots.map(([key, w]) => (
+        <div
+          key={key}
+          style={{
+            position: 'absolute',
+            left: x[key],
+            top: 4,
+            width: w,
+            height: MENU_H - 8,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: key === 'clock' ? 'flex-end' : 'center',
+            borderRadius: 7,
+            background: key === 'app' && lit ? 'rgba(16,24,40,0.13)' : 'transparent',
+            fontVariantNumeric: 'tabular-nums',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {key === 'app' ? <Logo size={23} shadow={false} flat /> : key === 'clock' ? 'Tue 23 Sep  10:02' : <MenuGlyph kind={key} />}
+        </div>
+      ))}
     </div>
   );
 };

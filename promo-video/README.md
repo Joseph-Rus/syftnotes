@@ -45,7 +45,7 @@ npm run render:all          # both
 | 0–3 s | Hook | "Hours of lectures every week. Notes you'll never reread.", beside a pile of untitled recordings |
 | 3–6 s | Reveal | The icon, **Study Stash**, "Your lectures, written up and filed by class." |
 | 6–12 s | Record | The menu bar icon opens the dropdown, Record, the waveform, Stop, and the lecture is filed in CS 101 |
-| 12–18 s | Diagrams | A health class's cardiac cycle (written by Claude Code), then a math class's derivative (by Codex) |
+| 12–18 s | Diagrams | A nursing class's nursing process (written by Claude Code), then a math class's derivative (by Codex) |
 | 18–23 s | Ask | The quick panel; the "Answer with" menu picks Claude Code over Codex (OpenAI) and Ollama; the answer with its sources |
 | 23–27 s | Canvas | What's due, and Lab 3's rubric |
 | 27–30 s | Promise | "Your recordings stay on your computer." Free and open source, for Mac and Windows |

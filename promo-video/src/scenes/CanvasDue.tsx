@@ -108,7 +108,7 @@ export const CanvasDue: React.FC = () => {
         {name: 'CS 101', color: colors.cs, count: 12},
         {name: 'BIO 110', color: colors.bio, count: 9},
         {name: 'CALC II', color: colors.calc, count: 11},
-        {name: 'HLTH 120', color: colors.health, count: 8},
+        {name: 'NURS 210', color: colors.health, count: 8},
       ]}
     />
   );
