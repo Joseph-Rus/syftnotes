@@ -156,4 +156,30 @@ public class DiagramViewTests
     }
 
     static double Luma(Color c) => 0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B;
+
+    /// <summary>At 100%, 125%, 150%, 175% and 200%, a box's outline lands with its outer edge on the screen's own
+    /// pixels (a whole point is 1.5 pixels at 150%: rounding to points alone would leave it straddling two), and a
+    /// word starts on a whole pixel.</summary>
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    [InlineData(1.5)]
+    [InlineData(1.75)]
+    [InlineData(2.0)]
+    public void Outlines_and_words_snap_to_the_screens_own_pixels(double scaling)
+    {
+        foreach (double x in new[] { 11.0, 12.3, 37.8, 101.5 })
+        {
+            var r = DiagramCanvas.Snap(new Rect(x, x + 3.2, 80.4, 36.6), scaling, hairline: true);
+            // The outline is 1 point wide, centred on the rectangle's edge: its outside edge is half a point out.
+            Assert.Equal(0, Frac((r.X - 0.5) * scaling), 6);
+            Assert.Equal(0, Frac((r.Y - 0.5) * scaling), 6);
+            Assert.Equal(0, Frac((r.Right + 0.5) * scaling), 6);
+            Assert.Equal(0, Frac((r.Bottom + 0.5) * scaling), 6);
+            Assert.InRange(r.X - 0.5, x - 1 / scaling, x + 1 / scaling);
+            Assert.Equal(0, Frac(DiagramCanvas.OnPixel(x, scaling) * scaling), 6);
+        }
+    }
+
+    static double Frac(double v) => Math.Abs(v - Math.Round(v));
 }

@@ -303,8 +303,9 @@ sealed class DiagramCanvas : Control
         var accent = Solid(Accent, Color.Parse("#0A84A0")).Color;
         Color? tint = AccentTint is ISolidColorBrush t ? t.Color : null;
         var (fill, stroke) = DiagramColours.Neutral(dark, ink.Color);
-        // At full size, boxes and words land on whole pixels so their hairlines stay crisp.
-        bool snap = Math.Abs(Scale - 1) < 0.001;
+        // Boxes and words land on whole pixels of the screen it's drawn on, so their hairlines stay crisp: at 125%,
+        // 150% or 175% a whole point isn't a whole pixel, so they snap to the screen's own pixels, not to points.
+        double snap = Scale * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
         using var _ = context.PushTransform(Matrix.CreateScale(Scale, Scale));
 
         foreach (var g in scene.Groups)
@@ -463,11 +464,11 @@ sealed class DiagramCanvas : Control
         }
     }
 
-    void DrawCentred(DrawingContext context, string text, double size, FontWeight weight, IBrush brush, double centreX, double top, double lineHeight, bool snap)
+    void DrawCentred(DrawingContext context, string text, double size, FontWeight weight, IBrush brush, double centreX, double top, double lineHeight, double snap)
     {
         var t = Text(text, size, weight, brush);
         double x = centreX - t.WidthIncludingTrailingWhitespace / 2, y = top + (lineHeight - t.Height) / 2;
-        context.DrawText(t, snap ? new Point(Math.Round(x), Math.Round(y)) : new Point(x, y));
+        context.DrawText(t, new Point(OnPixel(x, snap), OnPixel(y, snap)));
     }
 
     FormattedText Text(string text, double size, FontWeight weight, IBrush brush) =>
@@ -479,11 +480,15 @@ sealed class DiagramCanvas : Control
 
     static Rect ToRect(Box b) => new(b.X, b.Y, b.W, b.H);
 
-    /// <summary>A rectangle on whole pixels; a 1 px outline's on the half pixel, so it covers one row exactly.</summary>
-    static Rect Snap(Rect r, bool snap, bool hairline)
+    /// <summary>A rectangle on whole pixels of the screen (<paramref name="pixels"/> of them to a unit of the scene);
+    /// a 1-unit outline's half a unit in, so its outer edge falls on a pixel's edge and it covers one row exactly
+    /// when a unit is a pixel.</summary>
+    internal static Rect Snap(Rect r, double pixels, bool hairline)
     {
-        if (!snap) return r;
-        double x = Math.Round(r.X), y = Math.Round(r.Y), right = Math.Round(r.Right), bottom = Math.Round(r.Bottom);
+        double x = OnPixel(r.X, pixels), y = OnPixel(r.Y, pixels), right = OnPixel(r.Right, pixels), bottom = OnPixel(r.Bottom, pixels);
         return hairline ? new Rect(x + 0.5, y + 0.5, right - x - 1, bottom - y - 1) : new Rect(x, y, right - x, bottom - y);
     }
+
+    /// <summary>The nearest place to <paramref name="v"/> (in the scene's units) on a whole pixel of the screen.</summary>
+    internal static double OnPixel(double v, double pixels) => pixels > 0 ? Math.Round(v * pixels) / pixels : v;
 }

@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Markdig;
 using Markdig.Extensions.Mathematics;
+using Markdig.Extensions.Tables;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using StudyStash.App.Controls.Rich;
@@ -216,6 +217,8 @@ public sealed partial class NoteView : StackPanel
                 return Paragraph(p.Inline);
             case ListBlock list:
                 return List(list);
+            case Table table:
+                return TableBlock(table);
             case FencedCodeBlock fence when KindOf(fence) is { } kind:
                 // A diagram still being written (an answer arriving in pieces) is drawn once its fence closes.
                 return fence.ClosingFencedCharCount == 0 && AtEnd(fence) ? Pending() : Diagram(kind, fence.Lines.ToString());
@@ -444,6 +447,51 @@ public sealed partial class NoteView : StackPanel
         }
         return items;
     }
+
+    /// <summary>
+    /// A table, in the Definitions' calm style: its header in semibold, a hairline above each row, no boxes. Columns
+    /// share the width by how much their longest cell says (so a short "Normal" column doesn't take a third of it), each
+    /// wraps its words, keeps the alignment the Markdown gave it, and typesets the formulas in its cells.
+    /// </summary>
+    Control TableBlock(Table table)
+    {
+        var rows = table.OfType<TableRow>().ToList();
+        int columns = rows.Count == 0 ? 0 : rows.Max(r => r.Count);
+        if (columns == 0) return new StackPanel();
+        var weights = new double[columns];
+        foreach (var row in rows)
+            for (int c = 0; c < row.Count; c++)
+                weights[c] = Math.Max(weights[c], Math.Clamp(CellText(row[c]).Length + 4, 10, 40));
+        string widths = string.Join(",", weights.Select(w => $"{w.ToString(System.Globalization.CultureInfo.InvariantCulture)}*"));
+        double size = Compact ? BodySize : 14;
+        var stack = new StackPanel();
+        foreach (var row in rows)
+        {
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions(widths) };
+            for (int c = 0; c < row.Count; c++)
+            {
+                var cell = Text("TextFont", size, 1.5);
+                cell.Margin = new Thickness(0, 0, c < columns - 1 ? 16 : 0, 0);
+                if (row.IsHeader) cell.FontWeight = FontWeight.SemiBold;
+                cell.TextAlignment = c < table.ColumnDefinitions.Count ? table.ColumnDefinitions[c].Alignment switch
+                {
+                    TableColumnAlign.Center => TextAlignment.Center,
+                    TableColumnAlign.Right => TextAlignment.Right,
+                    _ => TextAlignment.Left,
+                } : TextAlignment.Left;
+                if (row[c] is TableCell { Count: > 0 } tc && tc[0] is ParagraphBlock p) Fill(cell, p.Inline);
+                Grid.SetColumn(cell, c);
+                grid.Children.Add(cell);
+            }
+            var line = new Border { BorderThickness = new Thickness(0, row.IsHeader ? 0 : 1, 0, 0), Padding = new Thickness(0, row.IsHeader ? 0 : 8, 0, 8), Child = grid };
+            line.Bind(Border.BorderBrushProperty, line.GetResourceObservable("Sep"));
+            stack.Children.Add(line);
+        }
+        return stack;
+    }
+
+    static string CellText(MdBlock cell) => string.Concat(cell.Descendants<ParagraphBlock>().Select(p => Plain(p.Inline)))
+        + string.Concat(cell.Descendants<ParagraphBlock>().SelectMany(p => p.Inline?.Descendants<MathInline>() ?? []).Select(m => m.Content.ToString()));
 
     Control Code(string text)
     {

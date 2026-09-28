@@ -19,7 +19,29 @@ public static class NoteExport
 {
     /// <summary>The name a lecture's file is saved under unless the student picks another: its day and title,
     /// "2026-09-23 The cardiac cycle.md".</summary>
-    public static string FileName(JsonObject lecture) => $"{Notes.DatePrefix(S(lecture["date"]))} {Notes.Slugify(Title(lecture))}.md";
+    public static string FileName(JsonObject lecture) => SafeName($"{Notes.DatePrefix(S(lecture["date"]))} {Notes.Slugify(Title(lecture))}") + ".md";
+
+    /// <summary>The name the Save dialog suggests for one lecture: its title, as a file any computer can keep.</summary>
+    public static string SaveName(string title) => SafeName(Notes.Slugify(title)) + ".md";
+
+    /// <summary>
+    /// A name (already free of the characters no file name may hold: <see cref="Notes.Slugify"/>) that Windows saves
+    /// exactly as written: no dots or spaces at its end (Windows quietly drops them, so a class "Chem." would land in a
+    /// folder "Chem" and a second download couldn't find it), and not one of the names Windows keeps for its devices
+    /// (CON, PRN, AUX, NUL, COM1 to COM9, LPT1 to LPT9, with an extension or without), which gets an underscore.
+    /// </summary>
+    public static string SafeName(string name)
+    {
+        string t = name.TrimEnd('.', ' ');
+        if (t.Length == 0) return "Untitled";
+        int dot = t.IndexOf('.');
+        string stem = (dot < 0 ? t : t[..dot]).TrimEnd(' ');
+        return Reserved.Contains(stem) ? stem + "_" + t[stem.Length..] : t;
+    }
+
+    static readonly HashSet<string> Reserved = new(
+        new[] { "CON", "PRN", "AUX", "NUL" }.Concat(new[] { "COM", "LPT" }.SelectMany(p => "123456789¹²³".Select(d => p + d))),
+        StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The lecture's Markdown file. <paramref name="mermaidSvg"/> draws a Mermaid flowchart it already knows
     /// parses (its source in, a standalone SVG out, or null when it couldn't be drawn) — the caller measures text in
@@ -61,7 +83,8 @@ public static class NoteExport
         if (transcript && rawTranscript.Length > 0)
             md.Append("\n## Transcript\n\n").Append(TranscriptText(rawTranscript)).Append('\n');
 
-        return new ExportFile(name, md.ToString(), assets);
+        // One kind of line ending throughout, whatever the library's computer wrote the notes or transcript with.
+        return new ExportFile(name, md.ToString().ReplaceLineEndings("\n"), assets);
     }
 
     /// <summary>A name not already in <paramref name="taken"/>: as given, or with " (2)", " (3)"… before its

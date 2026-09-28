@@ -1,3 +1,4 @@
+using System.Text;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using StudyStash.App.Controls.Rich;
@@ -95,6 +96,66 @@ public class NotesDownloadTests
             seen.Add(link.Groups[1].Value);
         }
         Assert.Equal(["Aortic valve", "Mitral valve"], seen.Order());
+    }
+
+    /// <summary>The files open as UTF-8 everywhere with no byte-order mark in front of their front matter, and a
+    /// formula's backslashes and a note's signs come out byte for byte.</summary>
+    [AvaloniaFact]
+    public async Task Every_file_is_utf8_with_no_byte_order_mark()
+    {
+        await using var rig = await Bio110WithThreeLecturesAsync();
+        var lib = new RemoteLibrary(rig.Url, LibraryRig.Password);
+        using var dir = new TempDir();
+
+        await NotesDownload.ClassAsync(() => Task.FromResult<string?>(dir.Path), lib, "BIO 110", transcript: false, DrawMermaid);
+
+        var files = Directory.GetFiles(Path.Combine(dir.Path, "BIO 110"), "*", SearchOption.AllDirectories);
+        Assert.Equal(4, files.Length); // three lectures and one picture
+        foreach (string file in files)
+        {
+            byte[] bytes = await File.ReadAllBytesAsync(file, TestContext.Current.CancellationToken);
+            Assert.False(bytes is [0xEF, 0xBB, 0xBF, ..], $"{Path.GetFileName(file)} starts with a byte-order mark");
+            Assert.Equal(bytes, new UTF8Encoding(false, true).GetBytes(new UTF8Encoding(false, true).GetString(bytes)));
+        }
+        string cardiac = await File.ReadAllTextAsync(files.Single(f => f.Contains("cardiac cycle") && f.EndsWith(".md")), TestContext.Current.CancellationToken);
+        Assert.StartsWith("---\ntitle: ", cardiac);
+        Assert.Contains("$\\text{CO} = \\text{HR} \\times \\text{SV}$", cardiac);
+    }
+
+    /// <summary>A class named as Windows won't keep a folder (a dot at its end, a device's name) is saved in a folder
+    /// named so it will, and a second download finds it's taken. Listed back from the disk, so on Windows this is
+    /// what Windows really made.</summary>
+    [AvaloniaFact]
+    public async Task A_class_windows_cant_name_a_folder_after_gets_one_it_keeps_exactly()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        var lib = new RemoteLibrary(rig.Url, LibraryRig.Password);
+        using var dir = new TempDir();
+
+        foreach (string cls in new[] { "Chem.", "CON", "Lab: week 3?", "Chem." })
+            await NotesDownload.ClassAsync(() => Task.FromResult<string?>(dir.Path), lib, cls, transcript: false, DrawMermaid);
+
+        var made = Directory.GetDirectories(dir.Path).Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
+        Assert.Equal(["CON_", "Chem", "Lab week 3"], made); // the second "Chem." found its (empty) folder and reused it
+    }
+
+    /// <summary>A folder far deeper than Windows' old 260-character limit on a path still takes a whole class, its
+    /// pictures too.</summary>
+    [AvaloniaFact]
+    public async Task A_class_saves_into_a_folder_past_windows_old_path_limit()
+    {
+        await using var rig = await Bio110WithThreeLecturesAsync();
+        var lib = new RemoteLibrary(rig.Url, LibraryRig.Password);
+        using var dir = new TempDir();
+        string deep = dir.Path;
+        for (int i = 0; deep.Length < 300; i++) deep = Path.Combine(deep, $"Semester notes, part {i} of the long folder");
+        Directory.CreateDirectory(deep);
+
+        await NotesDownload.ClassAsync(() => Task.FromResult<string?>(deep), lib, "BIO 110", transcript: false, DrawMermaid);
+
+        var files = Directory.GetFiles(Path.Combine(deep, "BIO 110"), "*", SearchOption.AllDirectories);
+        Assert.Equal(4, files.Length);
+        Assert.All(files, f => Assert.True(f.Length > 300));
     }
 
     [AvaloniaFact]
