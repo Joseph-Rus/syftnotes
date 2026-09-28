@@ -4,6 +4,9 @@
 //   swift make_icon.swift out.tiles           icon-<px>.png: the Windows / web tile (cream, the S in navy), no margin
 //   swift make_icon.swift out.ico             the Windows icon: the tile at 16–256 px in one .ico
 //   swift make_icon.swift out.marks           mark-<px>.png: the monochrome "S." for the menu bar and the tray
+//   swift make_icon.swift out.chrome          icon-<px>.png for the Chrome extension (copy them into extension/):
+//                                             16, 32 and 48 a bold navy "S." on a flat cream tile (the toolbar, the
+//                                             extensions page), 128 the tile at 96 px with Chrome's 16-px margin
 // Light: a warm cream squircle with a fine paper grain, the S pressed into it in deep navy and the dot pressed in
 // cream. Dark: a glossy near-black squircle, the S and dot in brushed copper. On Apple's macOS grid: an 824-pt
 // rounded square on a 1024 canvas. The icons in assets/ and the app's Assets/ are made with this script.
@@ -285,6 +288,46 @@ func mark(_ px: Int) -> Data {
     return NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
 }
 
+/// The Chrome toolbar's "S.": the S and its dot both in navy, bolder and larger on a flat cream tile than on the app
+/// icon, so the mark still reads at 16 px on a light or a dark toolbar.
+func toolbarIcon(_ px: Int) -> Data {
+    let ctx = canvas(px)
+    let side = CGFloat(px)
+    let inset = side <= 16 ? 0.5 : side * 0.03
+    let tile = rounded(CGRect(x: inset, y: inset, width: side - 2 * inset, height: side - 2 * inset), side * 0.22)
+    ctx.addPath(tile)
+    ctx.clip()
+    ctx.drawLinearGradient(gradient([color(0xf1ede5), color(0xe4ded2)]), start: CGPoint(x: 0, y: side), end: CGPoint(x: 0, y: 0), options: [])
+    ctx.resetClip()
+    // The mark (x 314…742, y 266…752 in design units) fills 70% of the tile's height, centred.
+    let height: CGFloat = 752 - 266, scale = 0.70 * side / height
+    let midX: CGFloat = (314 + 742) / 2, midY: CGFloat = 1024 - (266 + 752) / 2
+    ctx.saveGState()
+    ctx.translateBy(x: side / 2 - midX * scale, y: side / 2 - midY * scale)
+    ctx.scaleBy(x: scale, y: scale)
+    let m = CGMutablePath()
+    m.addPath(sOutline(width: strokeWidth * (side <= 16 ? 1.12 : 1.06)))
+    m.addPath(dotPath(radius: dotRadius * 1.1))
+    ctx.addPath(m)
+    ctx.setFillColor(color(0x2f4a7a))
+    ctx.fillPath()
+    ctx.restoreGState()
+    ctx.addPath(rounded(CGRect(x: inset, y: inset, width: side - 2 * inset, height: side - 2 * inset).insetBy(dx: 0.5, dy: 0.5), side * 0.22 - 0.5))
+    ctx.setLineWidth(1)
+    ctx.setStrokeColor(color(0x000000, 0.14))
+    ctx.strokePath()
+    return NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
+}
+
+/// The Chrome Web Store's and the extensions page's 128-px icon: the full tile (its paper and relief, drawn large and
+/// scaled down) at 96 px, centred, with the 16-px clear margin Chrome asks for.
+func storeIcon() -> Data {
+    let ctx = canvas(128)
+    ctx.interpolationQuality = .high
+    ctx.draw(iconRep(384, .tile).cgImage!, in: CGRect(x: 16, y: 16, width: 96, height: 96))
+    return NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])!
+}
+
 /// A Windows .ico holding the tile at each size: 256 px as PNG, the rest as 32-bit bitmaps, which every Windows
 /// tool (the .NET SDK's icon embedding, Inno Setup, Explorer) reads.
 func ico(_ sizes: [Int]) -> Data {
@@ -330,6 +373,10 @@ case "tiles":
     }
 case "ico":
     try! ico([16, 20, 24, 32, 40, 48, 64, 128, 256]).write(to: out)
+case "chrome":
+    try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    for px in [16, 32, 48] { try! toolbarIcon(px).write(to: out.appendingPathComponent("icon-\(px).png")) }
+    try! storeIcon().write(to: out.appendingPathComponent("icon-128.png"))
 case "marks":
     try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
     for px in [16, 18, 32, 36, 64] {

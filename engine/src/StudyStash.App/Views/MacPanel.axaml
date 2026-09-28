@@ -1,5 +1,5 @@
 <!-- The menu bar dropdown (Surfaces, macOS 01): 320 pt of Liquid Glass, as compact as the system's own menu bar extras
-     (Control Centre, Wi-Fi). Idle: Record for the class on now, a 32 pt pill tinted with the accent, and the small
+     (Control Centre, Wi-Fi). Idle: Record (the class picked, or the library sorts it), a 32 pt pill tinted with the accent, and the small
      chevron beside it switches class. Recording: the timer, the waveform, the last line heard, Pause and Stop. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"

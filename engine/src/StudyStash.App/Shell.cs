@@ -51,8 +51,9 @@ public static partial class Shell
     static PosixSignalRegistration? terminate;
     static int terminations;
 
-    /// <summary>The class Record will use, picked by hand; null follows the timetable.</summary>
-    static string? chosenClass;
+    /// <summary>The class Record will use, picked by hand; "" (the default) lets the library sort the lecture by what
+    /// was said in it.</summary>
+    static string chosenClass = "";
     static string? liveId;
     /// <summary>What's wrong right now (from <see cref="Problems"/>), so the panel's Fix button knows what to do.</summary>
     static AppProblem? currentProblem;
@@ -93,6 +94,8 @@ public static partial class Shell
         RemoteLibrary.Computer = Environment.MachineName;
         host = new AppHost(home, laptop: new LaptopHost(), log: Program.Log);
         Skin.UseTheme(ColourThemes.Find(host.Settings.Theme));
+        // Before any window shows, so it never opens in the wrong mode and then flips.
+        Skin.UseAppearance(host.Settings.Appearance);
         host.Changed += RequestRefresh;
         host.Heard += (l, lines) => Dispatcher.UIThread.Post(() => AddHeard(l, lines));
         host.Filed += l => Dispatcher.UIThread.Post(() =>
@@ -411,13 +414,16 @@ public static partial class Shell
         library.OnSearch = ToggleQuick;
         library.OnSettings = ShowSettings;
         library.OnMove = MoveLecture;
+        library.OnDelete = DeleteLectureAsync;
+        library.OnUndo = UndoDeleteAsync;
         library.OnExport = () => _ = ExportAsync();
         library.OnMore = MoreMenu;
     }
 
     // --- recording ----------------------------------------------------------------------------------------------------
 
-    static string RecordClass() => chosenClass ?? host.ClassNow()?.Name ?? "";
+    /// <summary>The class picked for Record, while the library still has it; otherwise "" (the library sorts it).</summary>
+    static string RecordClass() => chosenClass.Length > 0 && host.Classes().Any(c => c.Name == chosenClass) ? chosenClass : "";
 
     /// <summary>Record is waiting on macOS's microphone prompt: another press does nothing until it's answered.</summary>
     static bool askingForMic;
@@ -486,7 +492,7 @@ public static partial class Shell
     static void StopRecording()
     {
         var l = host.StopRecording();
-        chosenClass = null;
+        chosenClass = "";
         recorderWindow?.Hide();
         if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
         else if (l is not null) Toast("Recording saved", "Study Stash is writing it down; the library files it and writes your notes.", null, null);
@@ -504,7 +510,7 @@ public static partial class Shell
         var menu = ClassPicker.Build([.. host.Classes().Select(c => (c.Name, c.Color))], chosenClass, name =>
         {
             chosenClass = name;
-            Program.Log($"[panel] class picked: {(name is null ? "follow the timetable" : name.Length == 0 ? "let the library sort it" : name)}");
+            Program.Log($"[panel] class picked: {(name.Length == 0 ? "let the library sort it" : name)}");
             Refresh();
             // The dropdown stays up, showing Record's new label and the line under it.
             panelWindow?.Activate();
@@ -1151,7 +1157,6 @@ public static partial class Shell
         panel.ClassName = recorder.ClassName = cls;
         int color = host.ColorOf(cls);
         panel.ClassDot = recorder.ClassDot = color >= 0 ? Skin.ClassDot(color) : Brushes.Gray;
-        var now = host.ClassNow();
         var problem = Problems.For(host);
         currentProblem = problem;
         panel.ProblemTitle = problem?.Title;
@@ -1160,10 +1165,8 @@ public static partial class Shell
         panel.CanRecord = recording || (host.ModelReady && host.MicAccess() is not (MicAccess.Denied or MicAccess.Restricted));
         panel.Hint = recording ? null
             : !panel.CanRecord && problem is not null ? problem.Title
-            : chosenClass is { Length: > 0 } ? "Picked by you"
-            : chosenClass is "" ? "The library will sort it"
-            : now is not null ? $"From your timetable · {now.Time.Describe()}"
-            : host.Timetable.Next(DateTime.Now) is { } next ? $"No class on now · next, {next.Class.Name} {next.Class.Time.Describe()}" : null;
+            : RecordClass().Length > 0 ? "Picked by you"
+            : ClassPicker.SortHint;
         var (status, good) = host.Status();
         panel.Status = status;
         panel.StatusGood = good;

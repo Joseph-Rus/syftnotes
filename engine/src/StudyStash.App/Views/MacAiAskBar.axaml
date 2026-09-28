@@ -1,5 +1,5 @@
 <!-- The ask bar under a lecture's notes (design 16): a field, an engine chip opening "Answer with", a scope chip,
-     and a send button, with the latest answer floating above it once there is one. -->
+     and a send button. The latest answer has its own card above it (MacAiAnswer), in its own room on the page. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -12,33 +12,7 @@
     <StyleInclude Source="avares://StudyStash/Views/MacAiStyles.axaml" />
   </UserControl.Styles>
 
-  <StackPanel Spacing="12" ClipToBounds="False">
-    <ContentControl IsVisible="{Binding HasLatest}" Content="{Binding Latest}" HorizontalAlignment="Center">
-      <ContentControl.ContentTemplate>
-        <DataTemplate x:DataType="vm:AiTurn">
-          <Border Classes="ai-bubble-a" Width="560">
-            <StackPanel Spacing="6">
-              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsThinking}">
-                <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Fg2}" />
-                <TextBlock Classes="ai-thinking" Text="{Binding ThinkingWords}" />
-              </StackPanel>
-              <TextBlock Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
-                         IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
-              <StackPanel Spacing="6" IsVisible="{Binding !IsThinking}">
-                <TextBlock Classes="ai-answer" Text="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
-                <Button Theme="{StaticResource Surface}" Padding="0" HorizontalContentAlignment="Left"
-                        Command="{Binding $parent[UserControl].((vm:AiAskModel)DataContext).OpenTurnSourceCommand}" CommandParameter="{Binding}"
-                        IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}">
-                  <TextBlock Classes="ai-byline" Text="{Binding Byline}" />
-                </Button>
-                <TextBlock Classes="ai-byline" Text="{Binding FellBackNote}" IsVisible="{Binding FellBackNote, Converter={x:Static c:Converters.NotEmpty}}" />
-              </StackPanel>
-            </StackPanel>
-          </Border>
-        </DataTemplate>
-      </ContentControl.ContentTemplate>
-    </ContentControl>
-
+  <Panel ClipToBounds="False">
     <c:Glass CornerRadius="24" Padding="20,0,8,0" Height="48" Width="560" ClipToBounds="False">
       <Grid ColumnDefinitions="*,8,Auto,8,Auto,8,Auto" VerticalAlignment="Center">
         <TextBox Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center">
@@ -82,5 +56,5 @@
         </Button>
       </Grid>
     </c:Glass>
-  </StackPanel>
+  </Panel>
 </UserControl>

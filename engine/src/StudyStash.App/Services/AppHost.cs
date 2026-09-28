@@ -17,6 +17,15 @@ public enum AppRole
     Library,
 }
 
+/// <summary>Settings → Appearance's mode: follow the computer's own light/dark setting, or always show one.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<AppAppearance>))]
+public enum AppAppearance
+{
+    System,
+    Light,
+    Dark,
+}
+
 /// <summary>The app's own settings (app.json beside client.toml): what's been set up, and how to record.</summary>
 public sealed class AppSettings
 {
@@ -44,6 +53,9 @@ public sealed class AppSettings
     public WindowPlace? LibraryWindow { get; set; }
     /// <summary>The colour theme's name (Settings → Appearance): "Lagoon", "Plum"…</summary>
     public string Theme { get; set; } = "Lagoon";
+    /// <summary>Light, dark, or match the computer (Settings → Appearance). Settings files saved before this
+    /// existed have none, so they come back as <see cref="AppAppearance.System"/>: nothing changes for them.</summary>
+    public AppAppearance Appearance { get; set; } = AppAppearance.System;
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 
@@ -94,7 +106,7 @@ public enum LibraryState
 /// <summary>
 /// Everything the app runs, apart from its windows: the recorder, Whisper and the sender on their threads, the
 /// library's classes (asked for every 20 seconds, which also says whether it's reachable), the model and its
-/// download, and the timetable. The windows read it and are told when it changes.
+/// download. The windows read it and are told when it changes.
 /// </summary>
 public sealed class AppHost : IDisposable, IProblemSource
 {
@@ -122,7 +134,6 @@ public sealed class AppHost : IDisposable, IProblemSource
     public Recorder Recorder { get; }
     public TranscriptionWorker Whisper { get; }
     public LectureSender Sender { get; }
-    public Timetable Timetable { get; private set; }
 
     public LibraryState Library { get; private set; } = LibraryState.NotSetUp;
     /// <summary>This computer's own library, for Both/Library roles: started in <see cref="Start"/>, stopped in
@@ -181,7 +192,6 @@ public sealed class AppHost : IDisposable, IProblemSource
         LoginItems = loginItems ?? Platform.LoginItems.System;
         Directory.CreateDirectory(home);
         Settings = AppSettings.Load(home);
-        Timetable = Timetable.Load(home);
         Lectures = new LectureStore(home);
         Recorder.Recover(Lectures, this.log);
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
@@ -389,9 +399,7 @@ public sealed class AppHost : IDisposable, IProblemSource
     /// <summary>A dropped Tailscale link shouldn't leave the dropdown saying "connected" for minutes: the library's
     /// own HTTP client waits far longer than that, so a check gives up on its own after this.</summary>
     static readonly TimeSpan LibraryCheckTimeout = TimeSpan.FromSeconds(8);
-    readonly Lock timetableLock = new();
-
-    /// <summary>Ask the library how it is; its classes come back, and they keep the timetable honest.</summary>
+    /// <summary>Ask the library how it is: whether it's reachable, its classes, and the lectures it deleted for good.</summary>
     public async Task CheckLibraryAsync()
     {
         await libraryCheck.WaitAsync();
@@ -434,9 +442,15 @@ public sealed class AppHost : IDisposable, IProblemSource
                         OlderLibrary = true;
                     }
                     Library = LibraryState.Connected;
+                    // A class renamed in the library keeps its old name among its other names: lectures recorded here
+                    // under the old name follow it, before anything deleted for good drops out.
                     var names = (Overview["classes"] as JsonArray ?? []).Select(c => c?["name"]?.GetValue<string>() ?? "").ToList();
-                    lock (timetableLock)
-                        if (!OlderLibrary && names.Count > 0 && Timetable.KeepOnly(names)) Timetable.Save(Home);
+                    foreach (var c in (Overview["classes"] as JsonArray ?? []).OfType<JsonObject>())
+                        foreach (var alias in (c["aliases"] as JsonArray ?? []).Select(a => a is JsonValue v && v.TryGetValue(out string? t) ? t : null).OfType<string>())
+                            if (c["name"] is JsonValue nv && nv.TryGetValue(out string? name) && name is not null && !names.Contains(alias)
+                                && Lectures.All().Any(l => l.ClassName == alias || l.FiledClass == alias))
+                                FollowRename(alias, name);
+                    DropGone(Overview["gone"] as JsonArray);
                 }
                 catch (InvalidOperationException e) when (e.Message == "wrong password")
                 {
@@ -462,6 +476,18 @@ public sealed class AppHost : IDisposable, IProblemSource
         finally
         {
             libraryCheck.Release();
+        }
+    }
+
+    /// <summary>Lectures the library has deleted for good (their time in its trash is up): this laptop drops its own
+    /// recording of them, the audio and what Whisper wrote, once the library had filed them.</summary>
+    void DropGone(JsonArray? gone)
+    {
+        foreach (var n in gone ?? [])
+        {
+            if (n is not JsonValue v || !v.TryGetValue(out string? id) || Lectures.Get(id) is not { State: LectureState.Filed }) continue;
+            Lectures.Delete(id);
+            log($"[app] dropped the recording of {id}: it was deleted from the library");
         }
     }
 
@@ -517,25 +543,20 @@ public sealed class AppHost : IDisposable, IProblemSource
         Changed?.Invoke();
     }
 
-    public void SaveTimetable(Timetable t)
+    /// <summary>A class was renamed in the library: the lectures recorded here under the old name follow it, so they
+    /// file where it went.</summary>
+    public void FollowRename(string from, string to)
     {
-        lock (timetableLock) Timetable = t;
-        try
-        {
-            t.Save(Home);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            log($"[app] couldn't save the timetable: {e.Message}");
-            Problem?.Invoke("Your timetable couldn't be saved", e.Message);
-        }
-        Changed?.Invoke();
+        foreach (var l in Lectures.All().Where(l => l.ClassName == from || l.FiledClass == from))
+            Lectures.Update(l.Id, x =>
+            {
+                if (x.ClassName == from) x.ClassName = to;
+                if (x.FiledClass == from) x.FiledClass = to;
+            });
+        log($"[app] {from} is now {to} in the library: the lectures here follow it");
     }
 
     // --- recording ------------------------------------------------------------------------------------------------
-
-    /// <summary>The class Record means now, from the timetable: its name and "Tue 10:00–11:15", or nothing.</summary>
-    public ClassNow? ClassNow() => Timetable.Now(DateTime.Now);
 
     /// <summary>
     /// Record's whole start: ask for the microphone if the system hasn't asked yet (and wait for the answer), then

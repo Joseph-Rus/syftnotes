@@ -133,8 +133,10 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         var zone = context.Clock.Zone;
         var now = context.Clock.Now();
         cls = classInfo.Class;
-        code = classInfo.Canvas?.Code;
-        name = classInfo.Canvas?.Name ?? cls;
+        code = classInfo.Canvas is { } course
+            ? course.ShortCode.Length > 0 ? course.ShortCode : StudyStash.Core.Canvas.CourseNames.ShortCode(course.Code, course.Name)
+            : null;
+        name = classInfo.Canvas is { } c ? c.Title.Length > 0 ? c.Title : StudyStash.Core.Canvas.CourseNames.Title(c.Name, c.Code) : cls;
         Title = cls;
         UpdateHeaderLine();
         ScoutLine = classInfo.Scout is { State.Length: > 0 } s ? CanvasWords.ScoutHeaderLine(s, zone) : "";

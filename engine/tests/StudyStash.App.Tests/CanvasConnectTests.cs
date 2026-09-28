@@ -222,12 +222,13 @@ public class CanvasConnectTests
     }
 
     [Fact]
-    public async Task In_setup_it_is_three_parts_and_finding_courses_finishes_it_with_each_courses_code()
+    public async Task In_setup_it_is_three_parts_and_finding_courses_finishes_it_with_each_courses_name_and_code()
     {
         var handler = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", """
             {"url": "https://school.instructure.com",
-             "available": {"4201": "Intro to Programming", "4202": "BIO 110 · Cell Biology", "4205": "Study Skills"},
-             "course_info": {"4201": {"code": "COMP 101", "name": "Intro to Programming", "term": "Fall 2025"}}}
+             "available": {"4201": "Intro to Programming", "4202": "BIO 110 · Cell Biology", "4205": "Study Skills", "4206": "202710.TS.CSCI321.A - Software Engineering"},
+             "course_info": {"4201": {"code": "COMP 101", "name": "Intro to Programming", "term": "Fall 2025"},
+                             "4206": {"code": "202710.TS.CSCI321.A", "name": "202710.TS.CSCI321.A - Software Engineering", "term": "Fall 2026"}}}
             """);
         var m = Model(handler, forSetup: true);
 
@@ -237,8 +238,9 @@ public class CanvasConnectTests
         Assert.False(m.ShowMatchAndSync);
         Assert.True(m.AllDone);
         Assert.All(m.Steps, s => Assert.True(s.IsDone));
-        Assert.Equal("Found 3 courses", m.Step3.Summary);
-        Assert.Equal([("BIO 110", "4202"), ("COMP 101", "4201"), ("Study Skills", "4205")], m.Found.Select(f => (f.ClassName, f.Id)));
+        Assert.Equal("Found 4 courses", m.Step3.Summary);
+        Assert.Equal([("Cell Biology", "BIO 110", "4202"), ("Intro to Programming", "COMP 101", "4201"), ("Software Engineering", "CSCI 321", "4206"), ("Study Skills", "", "4205")],
+            m.Found.Select(f => (f.ClassName, f.Code, f.Id)));
         Assert.DoesNotContain(handler.Requests, r => r.Path == "/api/v2/canvas/classes"); // no matching in setup
     }
 

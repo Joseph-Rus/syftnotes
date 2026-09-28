@@ -128,9 +128,32 @@
     <Style Selector="Border.seg.on TextBlock">
       <Setter Property="Foreground" Value="{DynamicResource Fg}" />
     </Style>
+    <!-- The notes fade out under the floating ask bar; with an answer open they end above it, so a short fade will do. -->
+    <Style Selector="Border.fade">
+      <Setter Property="Height" Value="120" />
+    </Style>
+    <Style Selector="Border.fade.answer">
+      <Setter Property="Height" Value="40" />
+    </Style>
+    <Style Selector="Border.undo">
+      <Setter Property="Height" Value="40" />
+      <Setter Property="CornerRadius" Value="20" />
+      <Setter Property="Padding" Value="16,0,6,0" />
+      <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BoxShadow" Value="{DynamicResource PopupShadow}" />
+    </Style>
+    <Style Selector="Button.undo">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Height" Value="28" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="10,0" />
+    </Style>
   </UserControl.Styles>
 
   <Border Name="Chrome" Background="{DynamicResource Win}" ClipToBounds="True" Classes.chrome="{Binding DrawChrome}">
+    <Panel>
     <DockPanel>
       <!-- The title bar: drag the window by it; the system's traffic lights sit in it, and the toolbar on its right. -->
       <c:WindowHeader Name="Header" DockPanel.Dock="Top" DrawChrome="{Binding DrawChrome}">
@@ -143,6 +166,10 @@
               </Button>
               <Button Classes="tool" Command="{Binding ExportCommand}" ToolTip.Tip="Export" IsEnabled="{Binding HasNote}">
                 <c:Icon Glyph="ios_share" Size="19" Foreground="{DynamicResource Fg}" />
+              </Button>
+              <Button Name="DeleteLecture" Classes="tool" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete lecture" AutomationProperties.Name="Delete lecture"
+                      IsEnabled="{Binding HasNote}">
+                <c:Icon Glyph="delete" Size="19" Foreground="{DynamicResource Fg}" />
               </Button>
             </StackPanel>
           </c:Glass>
@@ -204,13 +231,12 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-              <Button Classes="cls unsorted" Classes.selected="{Binding Unsorted.Selected, FallbackValue=False}"
-                      IsVisible="{Binding Unsorted, Converter={x:Static ObjectConverters.IsNotNull}}"
+              <Button Classes="cls unsorted" Classes.selected="{Binding Unsorted.Selected}"
                       Command="{Binding PickClassCommand}" CommandParameter="{Binding Unsorted}">
                 <Grid ColumnDefinitions="Auto,8,*,Auto">
                   <c:Icon Classes="unsorted" Glyph="inbox" Size="16" Width="16" />
                   <TextBlock Grid.Column="2" Classes="title" Text="Unsorted" FontSize="13" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="3" Classes="count" Text="{Binding Unsorted.Count, FallbackValue=0}" FontSize="13" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="3" Classes="count" Text="{Binding Unsorted.Count}" FontSize="13" VerticalAlignment="Center" />
                 </Grid>
               </Button>
             </StackPanel>
@@ -239,6 +265,11 @@
                           <DataTemplate x:DataType="vm:LectureCard">
                             <Button Classes="card" Classes.selected="{Binding Selected}"
                                     Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).PickLectureCommand}" CommandParameter="{Binding}">
+                              <Button.ContextMenu>
+                                <ContextMenu>
+                                  <MenuItem Header="Delete lecture…" Click="OnDeleteRow" />
+                                </ContextMenu>
+                              </Button.ContextMenu>
                               <StackPanel Margin="12,10">
                                 <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                                 <TextBlock Classes="sub" Text="{Binding Meta}" FontSize="12" Margin="0,2,0,0" />
@@ -266,6 +297,15 @@
         <Panel IsVisible="{Binding ShowCanvasClass}">
           <v:MacCanvasClass DataContext="{Binding CanvasClass}" />
         </Panel>
+          <!-- "Deleted · Undo", for a few seconds after a lecture goes -->
+          <Border Name="UndoToast" Classes="undo" IsVisible="{Binding HasDeleted}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="16,0,16,28">
+            <Grid ColumnDefinitions="*,10,Auto" VerticalAlignment="Center">
+              <TextBlock Text="{Binding Deleted.Said, FallbackValue=''}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <Button Grid.Column="2" Name="Undo" Classes="undo" Command="{Binding UndoCommand}" VerticalAlignment="Center">
+                <TextBlock Text="Undo" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentText}" />
+              </Button>
+            </Grid>
+          </Border>
         </Panel>
 
         <!-- The right: the lecture, an assignment, or a Canvas page -->
@@ -277,7 +317,10 @@
           <Panel IsVisible="{Binding ShowReader}" Margin="1,0,0,0">
             <v:MacCanvasReader DataContext="{Binding Reader}" />
           </Panel>
-        <Panel IsVisible="{Binding ShowLecturePage}">
+        <!-- The notes, and under them the latest answer in its own room: the notes end above it, never under it. The
+             ask bar floats over the bottom of the page (the notes fade out under it, as designed) -->
+        <Grid IsVisible="{Binding ShowLecturePage}" RowDefinitions="*,Auto" ClipToBounds="False">
+          <Panel>
           <ScrollViewer Name="NoteScroll" Margin="1,0,0,0" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasNote}">
             <StackPanel MaxWidth="620" HorizontalAlignment="Left" Margin="64,28,64,140" Spacing="14" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
               <StackPanel Orientation="Horizontal" Spacing="8">
@@ -325,15 +368,21 @@
           <TextBlock IsVisible="{Binding NoNote}" Text="Choose a lecture to read its notes." FontSize="13" Foreground="{DynamicResource Fg3}"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
 
-          <!-- The page fades under the title bar, and out under the ask bar -->
+          <!-- The page fades under the title bar, and out under the ask bar (or above the answer) -->
           <Border Name="TopFade" Height="20" VerticalAlignment="Top" IsHitTestVisible="False" />
-          <Border Name="Fade" Height="120" VerticalAlignment="Bottom" IsHitTestVisible="False" />
+          <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" />
+          </Panel>
+
+          <!-- The latest answer, just above the ask bar -->
+          <Panel Name="AnswerRoom" Grid.Row="1" IsVisible="{Binding HasAnswer}" HorizontalAlignment="Center" Margin="0,8,0,84" ClipToBounds="False">
+            <v:MacAiAnswer DataContext="{Binding Ask}" />
+          </Panel>
 
           <!-- Ask about this lecture, with any engine -->
-          <Panel IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24">
+          <Panel Name="AskRoom" Grid.RowSpan="2" IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24">
             <v:MacAiAskBar DataContext="{Binding Ask}" />
           </Panel>
-        </Panel>
+        </Grid>
 
           <!-- Narrow: back to the list -->
           <c:Glass IsVisible="{Binding NarrowDetail}" Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}"
@@ -345,5 +394,11 @@
         </Panel>
       </Grid>
     </DockPanel>
+
+    <!-- "Delete this lecture?", over the window: a click outside it is Cancel -->
+    <Panel Name="DeleteAsk" IsVisible="{Binding AskingDelete}" Background="Transparent" PointerPressed="OnDeleteAskPressed">
+      <v:MacDeleteLecture HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Panel>
+    </Panel>
   </Border>
 </UserControl>
