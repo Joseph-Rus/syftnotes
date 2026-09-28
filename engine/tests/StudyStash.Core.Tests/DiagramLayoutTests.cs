@@ -318,10 +318,10 @@ public class DiagramLayoutTests
         Assert.Equal(1, inner.Depth);
         foreach (var g in s.Groups)
         {
-            Assert.True(g.TitleAt.X > g.Box.X && g.TitleAt.Y > g.Box.Y);
+            Assert.True(g.Box.Contains(g.TitleBox));
             // The title's line sits above every box in the group.
             foreach (var n in s.Nodes.Where(n => g.Box.Contains(n.Box)))
-                Assert.True(n.Box.Y >= g.TitleAt.Y + 16, $"{n.Id} runs into {g.Title}'s title");
+                Assert.False(n.Box.Intersects(g.TitleBox), $"{n.Id} runs into {g.Title}'s title");
         }
         var nursing = Lay(NursingProcess);
         Assert.True(nursing.Groups.Single(g => g.Id == "gather").Box.Contains(nursing.Nodes.Single(n => n.Id == "A").Box));

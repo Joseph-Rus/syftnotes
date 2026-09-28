@@ -67,8 +67,9 @@ public sealed record SceneEdge(
     string From, string To, IReadOnlyList<PathStep> Path, EdgeLine Line, EdgeEnd StartEnd, EdgeEnd EndEnd,
     Pt StartTip, Pt StartBase, Pt Tip, Pt Base, IReadOnlyList<string> LabelLines, Box LabelBox);
 
-/// <summary>A group as drawn: its box, and where its title's top-left corner sits.</summary>
-public sealed record SceneGroup(string Id, string Title, Box Box, Pt TitleAt, int Depth);
+/// <summary>A group as drawn: its box, and its title's (top left, or top right where an arrow comes in over the
+/// left; lines leave a gap there). <see cref="Depth"/> is 1 for a group inside another.</summary>
+public sealed record SceneGroup(string Id, string Title, Box Box, Box TitleBox, int Depth);
 
 /// <summary>
 /// A laid-out diagram, in its own pixels at scale 1 with its top-left at (0, 0): no colours and no fonts, so the

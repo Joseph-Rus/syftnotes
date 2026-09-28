@@ -498,7 +498,34 @@ public static class DiagramLayout
                 // Keeping the order is a wish, not a need: without it MSAGL always finds a layout.
             }
         }
-        return candidates.OrderBy(Crossings).ThenBy(c => OutOfOrder(c, pairs, across)).First();
+        return Titles(candidates.OrderBy(Crossings).ThenBy(c => OutOfOrder(c, pairs, across)).First());
+    }
+
+    /// <summary>Each group's title top left, unless an arrow runs in over that spot and the top right is clear.</summary>
+    static DiagramScene Titles(DiagramScene s)
+    {
+        if (s.Groups.Count == 0) return s;
+        var lines = s.Edges.Select(Flatten).ToList();
+        bool Clear(Box title) => !lines.Any(points => points.Zip(points.Skip(1)).Any(seg => Touches(title.Inflate(2), seg.First, seg.Second)));
+        return s with
+        {
+            Groups = s.Groups.Select(g =>
+            {
+                var left = g.TitleBox with { X = g.Box.X + 12, Y = g.Box.Y + 7 };
+                var right = left with { X = g.Box.Right - 12 - left.W };
+                return g with { TitleBox = Clear(left) || !Clear(right) ? left : right };
+            }).ToList(),
+        };
+    }
+
+    /// <summary>Whether a line segment touches a box.</summary>
+    static bool Touches(Box b, Pt p, Pt q)
+    {
+        if (b.Contains(p) || b.Contains(q)) return true;
+        Pt[] c = [new(b.X, b.Y), new(b.Right, b.Y), new(b.Right, b.Bottom), new(b.X, b.Bottom)];
+        for (int i = 0; i < 4; i++)
+            if (Cross(p, q, c[i], c[(i + 1) % 4]) is not null) return true;
+        return false;
     }
 
     /// <summary>Boxes that share a parent and a level, in the order their arrows were written: the pairs that should
@@ -531,7 +558,7 @@ public static class DiagramLayout
         return s with
         {
             Nodes = s.Nodes.Select(n => n with { Box = B(n.Box) }).ToList(),
-            Groups = s.Groups.Select(g => { var box = B(g.Box); return g with { Box = box, TitleAt = new Pt(box.X + 12, box.Y + 8) }; }).ToList(),
+            Groups = s.Groups.Select(g => { var box = B(g.Box); return g with { Box = box, TitleBox = g.TitleBox with { X = box.X + 12, Y = box.Y + 7 } }; }).ToList(),
             Edges = s.Edges.Select(e => e with
             {
                 Path = e.Path.Select(p => new PathStep(p.Verb, P(p.A), P(p.B), P(p.C))).ToList(),
@@ -732,7 +759,7 @@ public static class DiagramLayout
         {
             var r = clusters[group.Id].BoundingBox;
             var box = new Box(r.Left, -r.Top, r.Width, r.Height);
-            return new SceneGroup(group.Id, group.Title, box, new Pt(box.X + 12, box.Y + 8), group.Parent is null ? 0 : 1);
+            return new SceneGroup(group.Id, group.Title, box, new Box(box.X + 12, box.Y + 7, m.Width(group.Title, TitleSize, true), 16), group.Parent is null ? 0 : 1);
         }).ToList();
         return new DiagramScene(SceneKind.Layered, dir, 0, 0, sceneNodes, edges, groups);
     }
@@ -997,7 +1024,7 @@ public static class DiagramLayout
             Width = Math.Ceiling(maxX - minX + 2 * Margin),
             Height = Math.Ceiling(maxY - minY + 2 * Margin),
             Nodes = s.Nodes.Select(n => n with { Box = n.Box.Offset(dx, dy) }).ToList(),
-            Groups = s.Groups.Select(g => g with { Box = g.Box.Offset(dx, dy), TitleAt = Move(g.TitleAt) }).ToList(),
+            Groups = s.Groups.Select(g => g with { Box = g.Box.Offset(dx, dy), TitleBox = g.TitleBox.Offset(dx, dy) }).ToList(),
             Edges = s.Edges.Select(e => e with
             {
                 Path = e.Path.Select(p => new PathStep(p.Verb, Move(p.A), Move(p.B), Move(p.C))).ToList(),

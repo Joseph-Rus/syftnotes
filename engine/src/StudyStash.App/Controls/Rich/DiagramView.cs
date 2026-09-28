@@ -203,16 +203,17 @@ sealed class DiagramCanvas : Control
         foreach (var g in scene.Groups)
         {
             context.DrawRectangle(GroupFill, null, new RoundedRect(Snap(ToRect(g.Box), snap, false), 12));
-            DrawText(context, g.Title, DiagramLayout.TitleSize, FontWeight.SemiBold, line, g.TitleAt, snap);
+            DrawCentred(context, g.Title, DiagramLayout.TitleSize, FontWeight.SemiBold, line, g.TitleBox.Center.X, g.TitleBox.Y, g.TitleBox.H, snap);
         }
 
         var labelled = scene.Edges.Where(e => e.LabelLines.Count > 0).ToList();
         IDisposable? clip = null;
-        if (labelled.Count > 0)
+        if (labelled.Count > 0 || scene.Groups.Count > 0)
         {
-            // The lines stop short of their words, so the words need no background of their own.
+            // The lines stop short of their words and of the groups' titles, so neither needs a background.
             var gaps = new GeometryGroup { FillRule = FillRule.NonZero };
             foreach (var e in labelled) gaps.Children.Add(new RectangleGeometry(ToRect(e.LabelBox.Inflate(2))));
+            foreach (var g in scene.Groups) gaps.Children.Add(new RectangleGeometry(ToRect(g.TitleBox.Inflate(2))));
             clip = context.PushGeometryClip(new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(new Rect(-50, -50, scene.Width + 100, scene.Height + 100)), gaps));
         }
         foreach (var e in scene.Edges)
@@ -348,12 +349,6 @@ sealed class DiagramCanvas : Control
         var t = Text(text, size, weight, brush);
         double x = centreX - t.WidthIncludingTrailingWhitespace / 2, y = top + (lineHeight - t.Height) / 2;
         context.DrawText(t, snap ? new Point(Math.Round(x), Math.Round(y)) : new Point(x, y));
-    }
-
-    void DrawText(DrawingContext context, string text, double size, FontWeight weight, IBrush brush, Pt at, bool snap)
-    {
-        var t = Text(text, size, weight, brush);
-        context.DrawText(t, snap ? new Point(Math.Round(at.X), Math.Round(at.Y)) : P(at));
     }
 
     FormattedText Text(string text, double size, FontWeight weight, IBrush brush) =>

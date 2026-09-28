@@ -5,8 +5,8 @@ namespace StudyStash.Core.Rich;
 
 /// <summary>The colours a diagram is drawn in outside the app: hex strings, a tone's stroke and fill.</summary>
 public sealed record DiagramPalette(
-    string Paper, string Ink, string Line, string Words, string NodeFill, string NodeStroke, string GroupFill, string GroupTitle,
-    IReadOnlyDictionary<Tone, (string Stroke, string Fill)> Tones)
+    string Paper, string Ink, string Line, string Words, string NodeFill, string NodeStroke, string GroupFill, string InnerGroupFill,
+    string GroupTitle, IReadOnlyDictionary<Tone, (string Stroke, string Fill)> Tones)
 {
     /// <summary>
     /// The light palette, the one exported files use: the same hexes the notes' writers are given for SVG diagrams
@@ -14,7 +14,7 @@ public sealed record DiagramPalette(
     /// theme's teal for the accent.
     /// </summary>
     public static DiagramPalette Light { get; } = new(
-        "#FFFFFF", "#1D1D1F", "#6E6E73", "#6E6E73", "#FFFFFF", "#C7C7CC", "#F2F2F7", "#6E6E73",
+        "#FFFFFF", "#1D1D1F", "#6E6E73", "#6E6E73", "#FFFFFF", "#C7C7CC", "#F2F2F7", "#E5E5EA", "#6E6E73",
         new Dictionary<Tone, (string, string)>
         {
             [Tone.Red] = ("#D93025", "#FCE8E6"),
@@ -44,10 +44,7 @@ public static class DiagramSvg
         if (title.Length > 0) sb.Append("  <title>").Append(Esc(title)).Append("</title>\n");
         sb.Append($"  <rect width=\"{W}\" height=\"{H}\" fill=\"{p.Paper}\"/>\n");
         foreach (var g in scene.Groups)
-        {
-            sb.Append($"  <rect x=\"{N(g.Box.X)}\" y=\"{N(g.Box.Y)}\" width=\"{N(g.Box.W)}\" height=\"{N(g.Box.H)}\" rx=\"12\" fill=\"{p.GroupFill}\"/>\n");
-            sb.Append($"  <text x=\"{N(g.TitleAt.X)}\" y=\"{N(g.TitleAt.Y + 8 + DiagramLayout.TitleSize * 0.35)}\" font-size=\"12\" font-weight=\"600\" fill=\"{p.GroupTitle}\">{Esc(g.Title)}</text>\n");
-        }
+            sb.Append($"  <rect x=\"{N(g.Box.X)}\" y=\"{N(g.Box.Y)}\" width=\"{N(g.Box.W)}\" height=\"{N(g.Box.H)}\" rx=\"12\" fill=\"{(g.Depth > 0 ? p.InnerGroupFill : p.GroupFill)}\"/>\n");
         foreach (var e in scene.Edges)
         {
             sb.Append($"  <path d=\"{Path(e.Path)}\" fill=\"none\" stroke=\"{p.Line}\" stroke-width=\"{N(SceneShapes.Thickness(e.Line))}\" stroke-linecap=\"round\" stroke-linejoin=\"round\"");
@@ -55,6 +52,13 @@ public static class DiagramSvg
             sb.Append("/>\n");
             Marker(sb, e.EndEnd, e.Tip, e.Base, p.Line);
             Marker(sb, e.StartEnd, e.StartTip, e.StartBase, p.Line);
+        }
+        // Titles and words over the lines, each on its own ground, so a line passing under them leaves a gap.
+        foreach (var g in scene.Groups)
+        {
+            var t = g.TitleBox;
+            sb.Append($"  <rect x=\"{N(t.X - 2)}\" y=\"{N(t.Y)}\" width=\"{N(t.W + 4)}\" height=\"{N(t.H)}\" fill=\"{(g.Depth > 0 ? p.InnerGroupFill : p.GroupFill)}\"/>\n");
+            sb.Append($"  <text x=\"{N(t.X)}\" y=\"{N(t.Center.Y + DiagramLayout.TitleSize * 0.35)}\" font-size=\"12\" font-weight=\"600\" fill=\"{p.GroupTitle}\">{Esc(g.Title)}</text>\n");
         }
         foreach (var e in scene.Edges)
         {

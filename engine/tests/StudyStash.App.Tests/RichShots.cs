@@ -50,6 +50,36 @@ public class RichShots
             }
     }
 
+    /// <summary>Every shape, line and end a chart can have, with a group inside a group.</summary>
+    const string Shapes = """
+        flowchart TD
+          subgraph outer [Assessment]
+            A[Box] --> B(Rounded)
+            subgraph inner [Vital signs]
+              C([Stadium]) ==> D((Circle))
+            end
+          end
+          B --> C
+          D -.-> E{Decision?}
+          E -->|yes| F{{Hexagon}}:::green
+          E -->|no| G[[Subroutine]]:::purple
+          F --o H[(Cylinder)]:::amber
+          G --x H
+          H <--> A
+          H --- I[Loose end]
+          A --> A
+          F -->|again| H
+        """;
+
+    [AvaloniaFact]
+    public void Diagram_shapes()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                Shot.Take($"rich-diagram-shapes-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t,
+                    () => Page(skin, [("Every shape", "Boxes, lines and ends of every kind, and a group inside a group.", Shapes)]), size: new Size(876, 1100));
+    }
+
     /// <summary>The same diagrams in a narrow column: scaled down, or scrolling sideways past the floor.</summary>
     [AvaloniaFact]
     public void Diagrams_narrow()
