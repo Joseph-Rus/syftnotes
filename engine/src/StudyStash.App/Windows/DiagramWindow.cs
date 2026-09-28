@@ -22,14 +22,7 @@ public static class DiagramWindow
     /// <summary>Shows the diagram <paramref name="request"/> asks for, near <paramref name="from"/>.</summary>
     public static Window Open(OpenDiagramEventArgs request, TopLevel? from)
     {
-        Control view = request.Chart is { } chart
-            ? new DiagramView(opensLarger: false) { Chart = chart, MaxScale = MaxScale }
-            : new SvgView(opensLarger: false) { Source = request.Svg, MaxScale = MaxScale };
-        view.VerticalAlignment = VerticalAlignment.Center;
-        var natural = Natural(request);
-        var content = new Border { Padding = new Thickness(Pad), Child = view };
-        content.Bind(Border.BackgroundProperty, content.GetResourceObservable(Skin.Current == SkinKind.Mac ? "Win" : "Mica"));
-
+        var content = Content(request);
         var w = Current;
         if (w is null)
         {
@@ -47,7 +40,7 @@ public static class DiagramWindow
             {
                 if (ReferenceEquals(Current, w)) Current = null;
             };
-            var (width, height) = Size(natural, Area(from ?? w));
+            var (width, height) = Size(Natural(request), Area(from ?? w));
             w.Width = width;
             w.Height = height;
             Current = w;
@@ -59,8 +52,20 @@ public static class DiagramWindow
         return w;
     }
 
+    /// <summary>What the window shows: the diagram, centred on the window's ground with a margin, fitted to it.</summary>
+    internal static Control Content(OpenDiagramEventArgs request)
+    {
+        Control view = request.Chart is { } chart
+            ? new DiagramView(opensLarger: false) { Chart = chart, MaxScale = MaxScale }
+            : new SvgView(opensLarger: false) { Source = request.Svg, MaxScale = MaxScale };
+        view.VerticalAlignment = VerticalAlignment.Center;
+        var content = new Border { Padding = new Thickness(Pad), Child = view };
+        content.Bind(Border.BackgroundProperty, content.GetResourceObservable(Skin.Current == SkinKind.Mac ? "Win" : "Mica"));
+        return content;
+    }
+
     /// <summary>The diagram's own size: a chart's laid-out scene, a drawing's natural width.</summary>
-    static Size Natural(OpenDiagramEventArgs request)
+    internal static Size Natural(OpenDiagramEventArgs request)
     {
         if (request.Scene is { } scene) return new Size(scene.Width, scene.Height);
         if (request.Svg is { } svg && Core.Rich.SafeSvg.Clean(svg) is { Svg: not null } d)

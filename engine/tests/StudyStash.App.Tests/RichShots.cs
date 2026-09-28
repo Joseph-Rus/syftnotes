@@ -2,9 +2,11 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Styling;
 using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
+using StudyStash.App.Windows;
 using StudyStash.Core.Rich;
 
 namespace StudyStash.App.Tests;
@@ -93,5 +95,68 @@ public class RichShots
                 page.Bind(Border.BackgroundProperty, page.GetResourceObservable("Win"));
                 return page;
             }, size: new Size(476, 1900));
+    }
+
+    /// <summary>A note on the library's page, in the look's notes column.</summary>
+    static Control NotePage(SkinKind skin, string markdown, Action<NoteView>? after = null)
+    {
+        bool mac = skin == SkinKind.Mac;
+        var note = new NoteView { Markdown = markdown, Width = mac ? 620 : 640, HorizontalAlignment = HorizontalAlignment.Left };
+        after?.Invoke(note);
+        var page = new Border { Padding = mac ? new Thickness(64, 28) : new Thickness(56, 24), Child = note };
+        page.Bind(Border.BackgroundProperty, page.GetResourceObservable(mac ? "Win" : "Layer"));
+        if (mac) return page;
+        var mica = new Border { Child = page };
+        mica.Bind(Border.BackgroundProperty, mica.GetResourceObservable("Mica"));
+        return mica;
+    }
+
+    /// <summary>The demo lecture's diagrams as its notes show them: a ring, an AI's SVG drawing, a decision chart,
+    /// each with its sentence; the first one pointed at, so its open-larger badge shows.</summary>
+    [AvaloniaFact]
+    public void Note_diagrams()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                Shot.Take($"rich-note-diagrams-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, RichDemo.DiagramNotes, note =>
+                {
+                    var first = note.Children.OfType<DiagramView>().First();
+                    ((Panel)first.Child!).Children.OfType<Border>().Single().IsVisible = true;
+                }), size: new Size(876, 1640));
+    }
+
+    /// <summary>Diagrams that can't be drawn: a sequence diagram and a chart with a box left open, each a calm card
+    /// with its reason and its source; and a diagram still arriving.</summary>
+    [AvaloniaFact]
+    public void Diagram_fallback()
+    {
+        string markdown = RichDemo.FallbackNotes + "\n\nStill arriving:\n\n```mermaid\nflowchart LR\n  A[Assess] --> B";
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                Shot.Take($"rich-diagram-fallback-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, markdown), size: new Size(876, 700));
+    }
+
+    /// <summary>The larger window's content at the size it opens at: the four chambers on the Mac in light, the
+    /// decision chart on Windows in dark.</summary>
+    [AvaloniaFact]
+    public void Diagram_window()
+    {
+        var chart = Flowchart.Parse(RichDemo.PainReassess);
+        foreach (var (skin, variant) in new[] { (SkinKind.Mac, ThemeVariant.Light), (SkinKind.Win, ThemeVariant.Dark) })
+        {
+            ((App)Application.Current!).UseSkin(skin);
+            var font = Application.Current!.FindResource("TextFont") as FontFamily ?? FontFamily.Default;
+            var requests = new[]
+            {
+                new OpenDiagramEventArgs(new Border()) { Title = "The four chambers of the heart", Svg = RichDemo.FourChambers },
+                new OpenDiagramEventArgs(new Border()) { Title = "Pain: assess, act, reassess", Chart = chart, Scene = DiagramLayout.Lay(chart, SceneCache.Measurer(font)) },
+            };
+            foreach (var r in requests)
+            {
+                var (w, h) = DiagramWindow.Size(DiagramWindow.Natural(r), new Size(1440, 900));
+                string name = $"rich-diagram-window-{(skin == SkinKind.Mac ? "mac" : "win")}-{(r.Svg is null ? "chart" : "svg")}";
+                Shot.Take(name, skin, variant, () => new Border { Width = w, Height = h, Child = DiagramWindow.Content(r) }, size: new Size(w + 128, h + 128));
+            }
+        }
     }
 }
