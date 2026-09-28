@@ -456,11 +456,17 @@ public sealed class GeminiProvider : AiProvider
     public void Prepare(IReadOnlyList<string> mcp)
     {
         string exe = Exe() ?? "agy";
-        if (mcp.Count > 0 && Machine.Run(exe, ["mcp", "list"], TimeSpan.FromSeconds(20)) is { } listed
-            && !listed.Stdout.Contains(ClaudeTools.ServerName, StringComparison.Ordinal))
-            Machine.Run(exe, ["mcp", "add", ClaudeTools.ServerName, .. mcp], TimeSpan.FromSeconds(20));
+        // Once seen there, it stays: later turns don't wait for `agy mcp list` again before they start.
+        if (mcp.Count > 0 && !mcpAdded && Machine.Run(exe, ["mcp", "list"], TimeSpan.FromSeconds(20)) is { } listed)
+        {
+            mcpAdded = listed.Stdout.Contains(ClaudeTools.ServerName, StringComparison.Ordinal)
+                || Machine.Run(exe, ["mcp", "add", ClaudeTools.ServerName, .. mcp], TimeSpan.FromSeconds(20)) is { ExitCode: 0 };
+        }
         AllowReading(Path.Combine(Py.UserHome(), ".gemini", "antigravity-cli", "settings.json"));
     }
+
+    /// <summary>Study Stash's MCP server is in Antigravity's settings (seen by this process, or added by it).</summary>
+    static bool mcpAdded;
 
     public static readonly string[] ReadOnlyCommands = ["ls", "cat", "head", "tail", "grep", "rg", "find", "wc", "pdftotext", "file", "stat"];
 
