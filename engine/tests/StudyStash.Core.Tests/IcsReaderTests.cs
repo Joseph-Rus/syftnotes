@@ -8,7 +8,7 @@ public class IcsReaderTests
     [Fact]
     public void Folded_lines_join_whatever_the_line_endings()
     {
-        string text = "﻿BEGIN:VCALENDAR\r\nX-WR-CALNAME:Long\r\n  name\r\n\tagain\nSUMMARY:x\rEND:VCALENDAR\r\n";
+        string text = "\uFEFFBEGIN:VCALENDAR\r\nX-WR-CALNAME:Long\r\n  name\r\n\tagain\nSUMMARY:x\rEND:VCALENDAR\r\n";
         Assert.Equal(["BEGIN:VCALENDAR", "X-WR-CALNAME:Long nameagain", "SUMMARY:x", "END:VCALENDAR"], IcsReader.Unfold(text));
     }
 

@@ -78,7 +78,7 @@ public static class IcsReader
     /// of any kind, blank lines skipped.</summary>
     public static IEnumerable<string> Unfold(string text)
     {
-        if (text.Length > 0 && text[0] == '﻿') text = text[1..];
+        if (text.Length > 0 && text[0] == '\uFEFF') text = text[1..];
         var current = new StringBuilder();
         bool any = false;
         int i = 0;
