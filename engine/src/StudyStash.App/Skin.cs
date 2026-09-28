@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Styling;
+using StudyStash.App.Services;
 
 namespace StudyStash.App;
 
@@ -53,6 +54,24 @@ public static class Skin
         if (Application.Current is App app) app.UseSkin(Current);
     }
 
+    /// <summary>Settings → Appearance's mode as Avalonia's own tri-state: System follows the computer's own
+    /// light/dark setting; Light and Dark always show one.</summary>
+    public static ThemeVariant VariantFor(AppAppearance appearance) => appearance switch
+    {
+        AppAppearance.Light => ThemeVariant.Light,
+        AppAppearance.Dark => ThemeVariant.Dark,
+        _ => ThemeVariant.Default,
+    };
+
+    /// <summary>Apply an appearance mode to the whole running app: every open window follows at once (it's the
+    /// application's own <c>RequestedThemeVariant</c>, and no window sets its own), and so does anything that reads a
+    /// window's <c>ActualThemeVariant</c>, such as <see cref="Controls.GlassBackdrop"/>'s Mac blur and the Windows
+    /// tray icon's ink.</summary>
+    public static void UseAppearance(AppAppearance appearance)
+    {
+        if (Application.Current is { } app) app.RequestedThemeVariant = VariantFor(appearance);
+    }
+
     /// <summary>A look's tokens in the current colour theme.</summary>
     public static ResourceDictionary Build(SkinKind kind) => Build(kind, Theme);
 
@@ -66,10 +85,10 @@ public static class Skin
         {
             MacTokens(light, theme, dark: false);
             MacTokens(dark, theme, dark: true);
-            d["TextFont"] = new FontFamily("SF Pro Text, avares://StudyStash/Assets/Fonts#Inter");
-            d["DisplayFont"] = new FontFamily("SF Pro Display, avares://StudyStash/Assets/Fonts#Inter Display");
+            d["TextFont"] = new FontFamily("SF Pro Text, avares://StudyStash/Assets/Fonts#Inter, Apple Symbols"); // Apple Symbols: key signs like ↩ as text, never an emoji
+            d["DisplayFont"] = new FontFamily("SF Pro Display, avares://StudyStash/Assets/Fonts#Inter Display, Apple Symbols");
             // The design reads notes in New York. Where it isn't installed, Charter (on every Mac) reads as well.
-            d["SerifFont"] = new FontFamily("New York, Charter, Georgia, avares://StudyStash/Assets/Fonts#Inter");
+            d["SerifFont"] = new FontFamily("New York, Charter, Georgia, avares://StudyStash/Assets/Fonts#Inter, Apple Symbols");
             d["RadiusPanel"] = new CornerRadius(14);
             d["RadiusControl"] = new CornerRadius(6);
             d["RadiusMenu"] = new CornerRadius(10);

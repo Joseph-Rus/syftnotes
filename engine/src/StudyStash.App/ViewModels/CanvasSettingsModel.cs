@@ -12,6 +12,21 @@ namespace StudyStash.App.ViewModels;
 public sealed record CourseChoice(string? Id, string Label)
 {
     public override string ToString() => Label;
+
+    /// <summary>Every course Find my courses found, as a picker lists them: by its name, with its short code beside
+    /// it ("Software Engineering · CSCI 321") when the name doesn't say it. An older library's labels stay as sent.</summary>
+    public static List<CourseChoice> From(CanvasApi.Overview? o)
+    {
+        if (o is null) return [];
+        var info = o.CourseInfo.Where(c => c.Id.Length > 0).GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First());
+        return [.. o.Available.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv =>
+        {
+            string label = kv.Value;
+            if (info.TryGetValue(kv.Key, out var c) && c.Title.Length > 0 && c.ShortCode.Length > 0 && !label.Contains(c.ShortCode, StringComparison.OrdinalIgnoreCase))
+                label = $"{label} · {c.ShortCode}";
+            return new CourseChoice(kv.Key, label);
+        })];
+    }
 }
 
 /// <summary>One "Last sync" row: an icon by the change's kind and its already-worded text ("New: CS 101 · Lab 3 ·
@@ -159,7 +174,7 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
         ExtensionLine = state.Extension is { Seen: { } seen } ext ? CanvasWords.ExtensionCheckedInLine(seen, ext.Version, zone, now) : "Not set up yet";
         PollMinutes = state.PollMinutes > 0 ? state.PollMinutes : overview.PollMinutes;
 
-        var choices = overview.Available.OrderBy(kv => kv.Key, StringComparer.Ordinal).Select(kv => new CourseChoice(kv.Key, kv.Value)).ToList();
+        var choices = CourseChoice.From(overview);
         Courses.Clear();
         foreach (var c in classes)
         {

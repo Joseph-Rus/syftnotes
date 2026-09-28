@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using StudyStash.App.Services;
+using StudyStash.App.ViewModels;
 using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
@@ -132,5 +133,109 @@ public sealed class LibraryHereTests
         Assert.Equal("Sam's library", LibraryHere.Existing(home.Path)!.PoolName);
         File.WriteAllText(home["config.toml"], "this isn't [ toml");
         Assert.Null(LibraryHere.Existing(home.Path));
+    }
+
+    [Fact]
+    public async Task Just_this_computer_makes_its_library_on_the_welcomes_Continue_reachable_only_from_here()
+    {
+        string exe = BuiltEngine();
+        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
+        using var home = new TempHome();
+        using var host = Host(home.Path);
+        var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Study Stash"] });
+        try
+        {
+            Assert.True(m.IsOneComputer);
+            await m.NextCommand.ExecuteAsync(null);
+
+            Assert.Equal(SetupStep.Microphone, m.Step);
+            Assert.True(m.LibraryOk);
+            Assert.Equal(LibraryServiceState.Running, host.LocalLibrary!.State);
+            var cfg = Configs.Load(home.Path);
+            Assert.True(LibraryHere.OnlyHere(cfg));
+            Assert.Equal("127.0.0.1", cfg.WebHost);
+            Assert.True(cfg.PoolPassword.Length >= 12); // made up: nobody types it until a laptop is added
+            Assert.Equal(Path.GetFullPath(home["Study Stash"]), Path.GetFullPath(cfg.PoolDir));
+            var cc = Configs.LoadClient(home.Path);
+            Assert.Equal($"http://127.0.0.1:{cfg.WebPort}", cc.ServerUrl);
+            Assert.Equal(cfg.PoolPassword, cc.PoolKey);
+            Assert.Equal(AppRole.Both, AppSettings.Load(home.Path).Role);
+            await host.CheckLibraryAsync();
+            Assert.Equal(LibraryState.Connected, host.Library);
+        }
+        finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
+    }
+
+    [Fact]
+    public async Task Adding_a_laptop_later_opens_the_library_with_the_chosen_password_and_turning_it_off_closes_it()
+    {
+        string exe = BuiltEngine();
+        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
+        using var home = new TempHome();
+        using var host = Host(home.Path);
+        var here = new LibraryHere { Command = [exe], Folder = home["Study Stash"] };
+        try
+        {
+            await here.CreateAsync(host, "Ada's library", null, "Ada", AppRole.Both, localOnly: true);
+            Assert.True(LibraryHere.OnlyHere(Configs.Load(home.Path)));
+
+            // Too short: nothing changes.
+            await Assert.ThrowsAsync<ArgumentException>(() => here.LetLaptopsConnectAsync(host, true, "abc"));
+            Assert.True(LibraryHere.OnlyHere(Configs.Load(home.Path)));
+
+            await here.LetLaptopsConnectAsync(host, true, "correct-horse");
+            var cfg = Configs.Load(home.Path);
+            Assert.False(LibraryHere.OnlyHere(cfg));
+            Assert.Equal("0.0.0.0", cfg.WebHost);
+            Assert.Equal("correct-horse", cfg.PoolPassword);
+            Assert.Equal("correct-horse", Configs.LoadClient(home.Path).PoolKey); // this computer keeps connecting
+            Assert.Equal(LibraryServiceState.Running, host.LocalLibrary!.State);
+            Assert.Equal(LibraryState.Connected, host.Library);
+            Assert.Equal(AppRole.Both, AppSettings.Load(home.Path).Role); // still records here too
+
+            await here.LetLaptopsConnectAsync(host, false);
+            cfg = Configs.Load(home.Path);
+            Assert.True(LibraryHere.OnlyHere(cfg));
+            Assert.Equal("correct-horse", cfg.PoolPassword);
+            Assert.Equal(LibraryServiceState.Running, host.LocalLibrary!.State);
+            Assert.Equal(LibraryState.Connected, host.Library);
+        }
+        finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
+    }
+
+    [Fact]
+    public async Task Going_back_from_just_this_computer_to_the_library_opens_it_to_laptops_with_the_typed_password()
+    {
+        string exe = BuiltEngine();
+        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
+        using var home = new TempHome();
+        using var host = Host(home.Path);
+        var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Study Stash"] });
+        try
+        {
+            await m.NextCommand.ExecuteAsync(null); // Just this computer: its library, to itself
+            Assert.True(LibraryHere.OnlyHere(Configs.Load(home.Path)));
+            int port = Configs.Load(home.Path).WebPort;
+
+            m.Go(SetupStep.Welcome);
+            m.ChooseLibraryCommand.Execute(null);
+            Assert.False(m.LibraryOk); // the library flow makes it its own way
+            m.NextCommand.Execute(null); // -> Password
+            Assert.Equal("Create library", m.ContinueLabel);
+            m.LibraryName = "Ada's library";
+            m.Password = "correct-horse";
+            await m.NextCommand.ExecuteAsync(null);
+
+            Assert.Equal(SetupStep.Ai, m.Step);
+            var cfg = Configs.Load(home.Path);
+            Assert.False(LibraryHere.OnlyHere(cfg));
+            Assert.Equal(("Ada's library", "correct-horse", port), (cfg.PoolName, cfg.PoolPassword, cfg.WebPort));
+            Assert.Equal("correct-horse", Configs.LoadClient(home.Path).PoolKey);
+            Assert.Equal(LibraryServiceState.Running, host.LocalLibrary!.State); // started again, with the new password
+            Assert.Equal(AppRole.Library, AppSettings.Load(home.Path).Role);
+            await host.CheckLibraryAsync();
+            Assert.Equal(LibraryState.Connected, host.Library);
+        }
+        finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
     }
 }

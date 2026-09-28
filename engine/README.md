@@ -43,8 +43,8 @@ dotnet test engine/StudyStash.slnx
 - **Pages** (`LibraryWebTests`, `LibrarySetupTests`): every library and setup page against
   `Golden/pages.json`, byte for byte except a lecture's own note text (Markdown libraries differ
   enough that it's checked for safety instead).
-- **The whole flow** (`LectureFlowTests`): a recording, filed by the timetable when it has no class,
-  sent to a library, written up and sorted by a fake AI, and read back through Claude's own tools.
+- **The whole flow** (`LectureFlowTests`): a recording, with a class or with none (the library sorts
+  it), sent to a library, written up and sorted by a fake AI, and read back through Claude's own tools.
 - **The platform** (`AutostartTests`, `ReadyTests`, `UpdaterTests`, `DoctorTests`): the launchd,
   systemd and Windows Startup files; installing Tailscale, Ollama, a Windows firewall rule;
   `doctor` in every scenario; a real update (download, unpack, check, swap) with a stand-in engine

@@ -63,7 +63,7 @@
               </StackPanel>
             </Border>
             <Button.Flyout>
-              <Flyout Placement="Top" ShowMode="Standard">
+              <Flyout Placement="Top" VerticalOffset="-20" ShowMode="Standard" FlyoutPresenterClasses="bare">
                 <ContentControl Content="{Binding Menu}">
                   <ContentControl.ContentTemplate>
                     <DataTemplate x:DataType="vm:EngineMenuModel">

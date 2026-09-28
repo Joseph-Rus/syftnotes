@@ -417,6 +417,40 @@ public class SurfaceShots
         Shot.Take("mac-04-full-app-due", SkinKind.Mac, ThemeVariant.Light, () => new MacLibrary { DataContext = Demo.Library(due: true), Width = 1280, Height = 800 });
     }
 
+    /// <summary>A long answer above the ask bar: a solid card in its own room, scrolling inside, the notes ending above it.</summary>
+    [AvaloniaFact]
+    public void Mac_app_answer()
+    {
+        foreach (var t in Themes) Shot.Take("mac-04-full-app-answer", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(answered: true), Width = 1280, Height = 800 });
+    }
+
+    [AvaloniaFact]
+    public void Win_app_answer()
+    {
+        foreach (var t in Themes) Shot.Take("win-04-full-app-answer", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(answered: true), Width = 1280, Height = 800 });
+    }
+
+    /// <summary>Deleting a lecture: the window asks first, then "Deleted · Undo" shows under the list.</summary>
+    [AvaloniaFact]
+    public void Mac_app_delete()
+    {
+        foreach (var t in Themes)
+        {
+            Shot.Take("mac-04-full-app-delete", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(deleting: true), Width = 1280, Height = 800 });
+            Shot.Take("mac-04-full-app-deleted", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(deleted: true), Width = 1280, Height = 800 });
+        }
+    }
+
+    [AvaloniaFact]
+    public void Win_app_delete()
+    {
+        foreach (var t in Themes)
+        {
+            Shot.Take("win-04-full-app-delete", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(deleting: true), Width = 1280, Height = 800 });
+            Shot.Take("win-04-full-app-deleted", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(deleted: true), Width = 1280, Height = 800 });
+        }
+    }
+
     [AvaloniaFact]
     public void Win_app()
     {
@@ -442,20 +476,21 @@ public class SurfaceShots
         foreach (var t in Themes) Shot.Take("win-05-setup", SkinKind.Win, t, () => new WinSetup { DataContext = Demo.Setup(SkinKind.Win), DrawChrome = true });
     }
 
-    /// <summary>Every page of both setups, the library's and the laptop's, in both looks, light and dark (plus the
-    /// welcome a build with no installer role shows): "mac-05-setup-library-password-light.png" and so on.</summary>
+    /// <summary>Every page of the three setups (just this computer, the laptop, the library), in both looks, light and
+    /// dark: "mac-05-setup-one-computer-welcome-light.png", "mac-05-setup-library-password-light.png" and so on.</summary>
     [AvaloniaFact]
     public async Task Setup_steps()
     {
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
         {
             string look = skin == SkinKind.Mac ? "mac" : "win";
-            foreach (var role in new[] { AppRole.Library, AppRole.Laptop })
+            foreach (var role in new[] { AppRole.Both, AppRole.Library, AppRole.Laptop })
                 foreach (var step in SetupModel.StepsFor(role, skin))
                 {
                     var m = await SetupPage(skin, role, step);
                     var size = step switch { SetupStep.Canvas => new Size(1100, 928), SetupStep.Ai => new Size(1100, 808), _ => new Size(850, 608) };
-                    string name = $"{look}-05-setup-{(role == AppRole.Library ? "library" : "laptop")}-{step.ToString().ToLowerInvariant()}";
+                    string flow = role switch { AppRole.Library => "library", AppRole.Laptop => "laptop", _ => "one-computer" };
+                    string name = $"{look}-05-setup-{flow}-{step.ToString().ToLowerInvariant()}";
                     foreach (var t in Themes)
                         Shot.Take(name, skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
                             size: size);
@@ -476,10 +511,27 @@ public class SurfaceShots
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-library-password-existing", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = again, DrawChrome = true } : new WinSetup { DataContext = again, DrawChrome = true },
                     size: new Size(850, 608));
-            var ask = SetupModel.For(skin);
-            ask.ChooseLibraryCommand.Execute(null);
+            // Just this computer's notes step with an engine's setup steps open: Claude Code not installed yet, and
+            // Codex installed but not signed in.
+            foreach (var (engine, state) in new[] { ("claude", "not_installed"), ("codex", "not_signed_in") })
+            {
+                var help = await SetupPage(skin, AppRole.Both, SetupStep.Ai);
+                help.Ai = AiDemo.SetupWith(skin == SkinKind.Win, engine, state);
+                help.Ai.Engines.Single(r => r.Id == engine).ToggleHelpCommand.Execute(null);
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-one-computer-ai-{engine}-help", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = help, DrawChrome = true } : new WinSetup { DataContext = help, DrawChrome = true },
+                        size: new Size(1100, skin == SkinKind.Mac ? 968 : 1028));
+            }
+            // Just this computer's welcome while its library is being made, and when it couldn't be.
+            var making = SetupModel.For(skin);
+            making.Connecting = true;
             foreach (var t in Themes)
-                Shot.Take($"{look}-05-setup-welcome-ask", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = ask, DrawChrome = true } : new WinSetup { DataContext = ask, DrawChrome = true },
+                Shot.Take($"{look}-05-setup-one-computer-welcome-making", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = making, DrawChrome = true } : new WinSetup { DataContext = making, DrawChrome = true },
+                    size: new Size(850, 608));
+            var failed = SetupModel.For(skin);
+            failed.LibraryResult = "The library didn't start. Its log is in the logs folder.";
+            foreach (var t in Themes)
+                Shot.Take($"{look}-05-setup-one-computer-welcome-problem", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = failed, DrawChrome = true } : new WinSetup { DataContext = failed, DrawChrome = true },
                     size: new Size(850, 608));
         }
     }
@@ -491,20 +543,21 @@ public class SurfaceShots
         m.LibraryName = "Ada's library";
         m.Password = "correct-horse";
         m.Address = "http://mac-mini:8787";
-        m.Classes.Add(new SetupClass { Name = "CS 101", When = "Tue Thu 10:00–11:15", Dot = Skin.ClassDot(0) });
-        m.Classes.Add(new SetupClass { Name = "BIO 110", When = "Tue 11:00–12:30", Dot = Skin.ClassDot(1) });
+        m.Classes.Add(new SetupClass { Name = "CS 101", About = "Recursion, the call stack and Big-O", Dot = Skin.ClassDot(0) });
+        m.Classes.Add(new SetupClass { Name = "BIO 110", About = "Cells, membranes and genetics", Dot = Skin.ClassDot(1) });
         m.ModelProgress = 0.62;
         m.ModelDone = "1.9 GB of 3.1 GB";
         m.ModelLeft = "About 4 minutes left";
         m.Addresses.Add(new SetupAddress("At home", "http://mac-mini.local:8787"));
         m.Addresses.Add(new SetupAddress("With Tailscale", "http://mac-mini.example.ts.net:8787"));
         m.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Study Stash");
-        if (step > SetupStep.Library)
+        if (step > SetupStep.Library || role == AppRole.Both && step > SetupStep.Welcome)
         {
             m.LibraryOk = true;
             m.LibraryResult = role == AppRole.Laptop ? "Connected to Ada's library." : $"Ada's library is ready on this {m.DeviceWord}.";
         }
-        if (step == SetupStep.Ai) m.Ai = AiDemo.Setup();
+        if (role == AppRole.Both && step == SetupStep.Done) m.NotesSummary = "Ollama";
+        if (step == SetupStep.Ai) m.Ai = AiDemo.Setup(skin == SkinKind.Win, oneComputer: role == AppRole.Both);
         if (step == SetupStep.Canvas || canvasFound)
         {
             // Setup's own Canvas: Add to Chrome pressed and waiting for Chrome, or everything done and the courses found.
@@ -515,10 +568,7 @@ public class SurfaceShots
         if (canvasFound && step == SetupStep.Classes)
         {
             m.Classes.Clear();
-            m.Classes.Add(new SetupClass { Name = "Chapel", When = "Wed 10:00–10:50", Dot = Skin.ClassDot(4) });
-            m.Courses[0].When = "Tue Thu 11:00–12:30";
-            m.Courses[1].When = "MWF 9:00–9:50";
-            m.Courses[3].When = "Tue Thu 10:00–11:15";
+            m.Classes.Add(new SetupClass { Name = "Chapel", About = "Weekly chapel talks", Dot = Skin.ClassDot(4) });
             m.Courses[4].Ticked = false;
         }
         m.Go(step);
@@ -564,19 +614,34 @@ public class SurfaceShots
     static (Services.SettingsModel Model, Services.AppHost Host, string Home) MakeSettings(string section)
     {
         string home = Path.Combine(Path.GetTempPath(), "studystash-settings-" + Guid.NewGuid().ToString("N"));
+        // "One-computer…": the Library page of just this computer's library, before a laptop is added, while one is
+        // being added (its password typed), and once laptops can connect.
+        bool one = section.StartsWith("One-computer", StringComparison.Ordinal);
+        if (one) new Services.AppSettings { SetupDone = true, Role = Services.AppRole.Both }.Save(home);
         var host = new Services.AppHost(home);
         // The library's own pages read the design's example library (Sam's, on a Mac mini); "Unreachable" shows the
         // Library page when it doesn't answer.
         var library = new FakeLibrarySettings { Down = section == "Unreachable" };
-        if (section == "Unreachable") section = "Library";
+        if (one) library.Settings["reach"]!["laptops"] = section == "One-computer-on";
+        // "Rename": Settings → Classes with "Use Canvas course names" and its preview open.
+        bool renaming = section == "Rename";
+        if (renaming) library.Settings = FakeLibrarySettings.CodeNamed();
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
-        model.Section = section;
+        model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : section;
+        if (renaming) model.Lib.ConfirmingCourseNames = true;
+        if (section == "One-computer-adding")
+        {
+            model.Lib.AddLaptopCommand.Execute(null);
+            model.Lib.LaptopPassword = "correct-horse";
+        }
+        if (section == "One-computer-on")
+            model.Lib.LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, choose “This is my laptop”, and enter one of the addresses below and this password.";
         return (model, host, home);
     }
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Notes", "Folders", "Unreachable" })
+        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
         {
             var (model, host, home) = MakeSettings(section);
             try
@@ -600,10 +665,11 @@ public class SurfaceShots
     [AvaloniaFact]
     public void Win_settings() => SettingsShots(SkinKind.Win, new Size(1700, 988));
 
-    /// <summary>The dropdown's class picker as Shell builds it (drawn in place here: a real one is a popup window).</summary>
+    /// <summary>The dropdown's class picker as Shell builds it, CS 101 picked as in the dropdown beside it (drawn in
+    /// place here: a real one is a popup window).</summary>
     internal static ContextMenu ClassMenu()
     {
-        var menu = ClassPicker.Build([("CS 101", 0), ("BIO 110", 1), ("CALC II", 2), ("HIST 210", 3)], null, _ => { });
+        var menu = ClassPicker.Build([("CS 101", 0), ("BIO 110", 1), ("CALC II", 2), ("HIST 210", 3)], "CS 101", _ => { });
         menu.VerticalAlignment = VerticalAlignment.Top;
         return menu;
     }

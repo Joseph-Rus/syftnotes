@@ -27,9 +27,12 @@ public static class AiDemo
         Connections:
         [
             new ToolConnection("tok-1", "Cursor", "token") { Created = 1_726_000_000 },
-            new ToolConnection("sam-web", "Claude", "signin") { Created = 1_726_000_000, LastUsed = 1_726_600_000 },
+            new ToolConnection("sam-web", "Claude", "signin") { ClientHost = "claude.ai", Created = 1_726_000_000, LastUsed = 1_726_600_000 },
         ])
-    { PublicUrl = "https://sams-mini.tailnet.ts.net", HasPassword = true };
+    {
+        PublicUrl = "https://sams-mini.tailnet.ts.net", HasPassword = true,
+        Web = new WebReach(true, "Study Stash", "https://sams-mini.tailnet.ts.net/mcp", null, null, true, Core.ReachCheck.Answers, 1_726_600_000, true),
+    };
 
     /// <summary>Answers one fixed <see cref="AiOverview"/> and nothing else: enough to draw the panes, never a real
     /// library. <paramref name="rewrite"/> answers every rewrite call, for the notes screen's three states.</summary>
@@ -51,6 +54,8 @@ public static class AiDemo
         public Task<RewriteInfo?> RewriteUseAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
         public Task<ToolAccessInfo?> AccessAsync() => Task.FromResult<ToolAccessInfo?>(Access());
         public Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null) => Task.FromResult<ToolAccessInfo?>(Access());
+        public Task<ToolAccessInfo?> SetWebAsync(bool on) => Task.FromResult<ToolAccessInfo?>(Access());
+        public Task<ToolAccessInfo?> CheckWebAsync() => Task.FromResult<ToolAccessInfo?>(Access());
     }
 
     /// <summary>A library's AI that answers the design's overview (and no rewrite running): what the settings window
@@ -83,9 +88,31 @@ public static class AiDemo
 
     /// <summary>The library setup step, loaded: Ollama picked (Recommended), Codex offering to sign in, questions
     /// still Same as notes.</summary>
-    public static AiSetupModel Setup()
+    public static AiSetupModel Setup(bool windows = false, bool oneComputer = false)
     {
-        var m = new AiSetupModel(new Library(SetupOverview()));
+        var m = new AiSetupModel(new Library(SetupOverview()))
+        {
+            Windows = windows,
+            Lede = oneComputer ? $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings."
+                : "This computer is your library, so the engines run here. You can change this later from any of your computers.",
+            WriteNotes = oneComputer ? _ => Task.FromResult(true) : null,
+        };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
+    /// <summary>Just this computer's notes step with one engine in <paramref name="state"/> (Claude Code not installed,
+    /// say): Ollama picked, "No AI for now" offered.</summary>
+    public static AiSetupModel SetupWith(bool windows, string engine, string state)
+    {
+        var o = SetupOverview();
+        o = o with { Engines = [.. o.Engines.Select(e => e.Id == engine ? e with { State = state, Installed = state != "not_installed" } : e)] };
+        var m = new AiSetupModel(new Library(o))
+        {
+            Windows = windows,
+            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings.",
+            WriteNotes = _ => Task.FromResult(true),
+        };
         m.Load().GetAwaiter().GetResult();
         return m;
     }

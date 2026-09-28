@@ -12,15 +12,21 @@ public sealed class EngineOfflineException(string engine, Exception inner)
     public string Engine { get; } = engine;
 }
 
+/// <summary>The computer slept while the notes were being written, and they failed on waking: the lecture goes back
+/// in the queue for another try, not filed without notes.</summary>
+public sealed class SleptException(Exception inner) : Exception("the computer slept while the notes were being written", inner);
+
 /// <summary>
 /// Turns queued lectures into filed ones: writes our notes from the transcript, sorts, saves. Runs in the
 /// background of the library, so an upload from the laptop returns at once even when a big model takes minutes.
-/// While the notes engine isn't answering, lectures stay in the queue and get their notes when it's back.
+/// While the notes engine isn't answering, lectures stay in the queue and get their notes when it's back; notes cut
+/// off because the computer slept (<paramref name="sleep"/> tells) are written again after it wakes.
 /// </summary>
 public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
     Func<Meeting, Config, Task<string>>? summarize = null, Action<string>? log = null, Func<string>? notesModel = null,
-    Func<string>? notesEngine = null)
+    Func<string>? notesEngine = null, SleepClock? sleep = null)
 {
+    readonly SleepClock sleep = sleep ?? SleepClock.System;
     readonly Func<Meeting, Config, Task<string>> summarize = summarize ?? ((m, c) => Summarize.SummarizeTranscriptAsync(m, c));
     readonly Action<string> log = log ?? Console.WriteLine;
     readonly SemaphoreSlim wake = new(0, 1);
@@ -56,6 +62,7 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
         {
             model = notesModel?.Invoke() ?? Cfg.EffectiveSummaryModel; // what writes the notes, as the note records it
             var watch = Stopwatch.StartNew();
+            var slept = sleep.Start();
             try
             {
                 summary = await summarize(m, Cfg);
@@ -64,6 +71,10 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             catch (Exception e) when (IsOffline(e))
             {
                 throw new EngineOfflineException(notesEngine?.Invoke() ?? "Ollama", e);
+            }
+            catch (Exception e) when (slept())
+            {
+                throw new SleptException(e);
             }
             catch (Exception e)
             {
@@ -80,13 +91,16 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
         }
         else
         {
-            // Sort on our notes when we have them: they are cleaner than the raw transcript.
+            // Sort on our notes when we have them: they are cleaner than the raw transcript. A lecture recorded with no
+            // class has no folder: the AI reads it against each class's name, other names, what it covers and its
+            // course's name on Canvas.
             var basis = summary.Length > 0 ? m.WithNotes(summary) : m;
-            c = await Classify.ClassifyAsync(basis, Cfg, chat);
-            if (c.By is "folder" or "rules" && Cfg.OllamaEnabled && Cfg.Classes.Count > 0)
+            var classes = Classify.WithCanvas(Cfg.Classes, Cfg.Home);
+            c = await Classify.ClassifyAsync(basis, Cfg, chat, classes);
+            if (c.By is "folder" or "rules" && Cfg.OllamaEnabled && classes.Count > 0)
             {
                 // The folder or title picked the class; still let the model name the lecture and tag its topics.
-                var described = await Classify.WithOllamaAsync(basis, Cfg.Classes, Cfg, chat);
+                var described = await Classify.WithOllamaAsync(basis, classes, Cfg, chat);
                 if (described is not null)
                 {
                     if (described.LectureTitle.Length > 0) c.LectureTitle = described.LectureTitle;
@@ -122,6 +136,13 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
                     engineProblem = null;
                     log("[pipeline] the notes engine is answering again");
                 }
+            }
+            catch (SleptException e)
+            {
+                // Back in the queue: the next pass writes them now the computer's awake.
+                store.ResetWorking();
+                log($"[pipeline] '{row.Id}' waits: {e.Message} ({e.InnerException?.Message})");
+                break;
             }
             catch (EngineOfflineException e)
             {

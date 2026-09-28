@@ -225,6 +225,29 @@ public sealed partial class FileIndex
     [GeneratedRegex(@"[\w'.+-]+")]
     private static partial Regex Words();
 
+    /// <summary>The folder an indexed file was found in (its name, path and whether it's private), or null when the
+    /// index doesn't hold that exact path: how Claude's read_file knows a path is one search could have shown.</summary>
+    public (string Name, string Path, bool Private)? RootOf(string path)
+    {
+        string? name = null;
+        try
+        {
+            using var db = Open();
+            using var c = db.CreateCommand();
+            c.CommandText = "select root from files where path = $p";
+            c.Parameters.AddWithValue("$p", path);
+            name = c.ExecuteScalar() as string;
+        }
+        catch (SqliteException)
+        {
+        }
+        if (name is null) return null;
+        foreach (var r in roots())
+            if (r.Name == name && path.StartsWith(System.IO.Path.GetFullPath(r.Path).TrimEnd(System.IO.Path.DirectorySeparatorChar) + System.IO.Path.DirectorySeparatorChar, StringComparison.Ordinal))
+                return r;
+        return null;
+    }
+
     /// <summary>Files matching every word (the last may be half typed), best first.</summary>
     public List<FileHit> Search(string query, int limit = 30, string? root = null)
     {

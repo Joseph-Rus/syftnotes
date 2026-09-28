@@ -1,124 +1,132 @@
+<p align="center"><img src="docs/images/icon.png" width="96" alt="Study Stash"></p>
+
 # Study Stash
 
-Your own lecture library: record on your laptop, and it's transcribed, filed under the right
-class, and turned into study notes on your own always-on computer. Free and open source, and
-everything stays on your own computers.
+Your own lecture library. Record a lecture, and it's transcribed on your computer, filed under the
+right class, and turned into study notes — next to your Canvas assignments, and ready to ask about.
+Free and open source, for Mac and Windows, and everything stays on your own computers.
 
-Study Stash is one app for both jobs, on Mac and Windows:
+![The library window: a class's lectures, a lecture's notes, and the Ask bar](docs/images/library-window.png)
 
-- **Your laptop** (the computer you carry to class): a menu bar (Mac) or tray (Windows) app.
-  Click **Record**, and it listens to the microphone and transcribes what it hears locally, with
-  Whisper large-v3 (Metal on Apple silicon, Vulkan or the CPU on Windows) — the audio never leaves
-  the laptop. It looks at your timetable to know which class is on, then sends the lecture to your
-  library once it's reachable. A quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows) searches
-  your lectures from anywhere, and the full window browses classes, lectures, notes, Canvas work,
-  and lets you ask an AI about any of it.
-- **Your library** (a home server: a Mac mini, an old laptop, any computer that stays on): run
-  `StudyStash serve`, and it stores each lecture under its class, writes study notes with an AI
-  engine, mirrors your Canvas courses through a small Chrome extension, and serves a web page and
-  MCP so Claude can read your lectures too.
+## What it does
+
+- **Records and transcribes on your computer.** Click **Record** in the menu bar (Mac) or tray
+  (Windows), or press ⌥⇧R / Ctrl+Alt+R. Whisper large-v3 transcribes as you go — Metal on Apple
+  silicon, Vulkan or the CPU on Windows — and the audio never leaves your computer. While it
+  records, a tiny pill shows the time and the level; pause or stop from the menu bar.
+- **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
+  to review, written by Ollama (free and private) or by Claude Code, Codex or Gemini with the plan
+  you already have. Rewrite a lecture's notes with another engine and keep whichever you like.
+- **Files every lecture under its class**, working out which from what was said, or using the class
+  you picked. Anything it can't place waits in **Unsorted**, and a lecture you don't need can be
+  deleted (with Undo).
+- **Ask about any lecture, class, or all of them.** The Ask bar under a lecture's notes answers
+  from your notes and transcripts, with the engine you pick for that question.
+- **Finds anything in a second.** The quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows)
+  searches lectures, passages in your notes, and classes, and asks your notes a question.
+- **Brings in Canvas.** What's due across your classes, each assignment's instructions, rubric,
+  your submission and feedback, module files and pages, announcements, quizzes and discussions.
+- **Lets Claude read your library** over MCP: Claude Code, Claude Desktop and claude.ai.
+- **Looks at home on your computer.** A native Mac look (Liquid Glass) and Windows 11's, light and
+  dark, with ten colour themes in Settings → Appearance.
+- **Keeps itself up to date**, quietly, when nothing is recording.
+
+<p align="center">
+  <img src="docs/images/menu-bar.png" width="49%" alt="The menu bar dropdown: Record, recent lectures and search; and while recording">
+  <img src="docs/images/quick-panel.png" width="40%" alt="The quick panel: search results, and an answer from your notes">
+</p>
+
+![Canvas in Study Stash: what's due, and an assignment with its rubric](docs/images/canvas-due.png)
+
+## One computer or two
+
+Study Stash is one app with two jobs, so you can use it the way that suits you:
+
+- **One computer.** Your laptop records, keeps the library and writes the notes itself. Nothing
+  else to set up. Notes are written while it's on.
+- **A laptop and a library.** Your laptop records; a computer that stays on at home (a Mac mini,
+  an old laptop, any Mac or PC) keeps the library, writes the notes and syncs Canvas, even while
+  your laptop is asleep. The laptop reaches it at home or, anywhere, over
+  [Tailscale](https://tailscale.com).
 
 ```
-your laptop                                     your library
-┌───────────────────────────┐  POST /api/ingest  ┌──────────────────────────────────────┐
-│ record → Whisper (local)   │ ──────────────────▶│ queue → study notes (your AI engine)  │
-│  ↳ filed by the timetable  │   over Tailscale    │ → sort into a class → Markdown file   │
-└───────────────────────────┘                     │ web page, Claude/MCP, Canvas mirror    │
-                                                   └──────────────────────────────────────┘
+your laptop                                  your library (this laptop, or a computer at home)
+┌────────────────────────────┐   lectures   ┌──────────────────────────────────────────────┐
+│ record → Whisper (local)   │ ───────────▶ │ study notes (your AI) → filed under its class │
+│ ask, search, Canvas, notes │ ◀─────────── │ Canvas mirror · Claude/MCP · search           │
+└────────────────────────────┘              └──────────────────────────────────────────────┘
 ```
 
-## 1. Set up the library's computer
+## Install
 
-On the computer that keeps your library (a Mac mini, or any Mac or Windows PC that stays on),
-download its installer from the [releases page](https://github.com/Joseph-Rus/study-stash/releases/latest):
+Download the installer from the [latest release](https://github.com/Joseph-Rus/study-stash/releases/latest):
 
-| | |
-|---|---|
-| **Mac** | [Study-Stash-Library.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library.dmg) |
-| **Windows** | [Study-Stash-Library-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library-Setup.exe) |
+| | Laptop (records lectures) | Library (the computer that stays on) |
+|---|---|---|
+| **Mac** | [Study-Stash-Laptop.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop.dmg) | [Study-Stash-Library.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library.dmg) |
+| **Windows** | [Study-Stash-Laptop-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop-Setup.exe) | [Study-Stash-Library-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library-Setup.exe) |
 
-Or, from a terminal, one line downloads and installs it for you:
+Both are the same app; the installer only picks where setup starts. For **one computer**, use the
+laptop download and keep setup's first choice, **Just this computer**. You can add a laptop later
+in **Settings → Your library → Add a laptop**, with nothing to reinstall.
+
+- **Mac:** open the DMG and drag **Study Stash** into Applications. Study Stash isn't signed with a
+  paid Apple Developer ID yet, so the first time macOS asks: click **Done**, then **System Settings
+  → Privacy & Security → Open Anyway**. Allow the microphone when it asks.
+- **Windows:** run the Setup.exe. It installs for your account only, no admin rights needed. If
+  Windows says "Windows protected your PC", click **More info**, then **Run anyway**.
+
+Then open **Study Stash** and follow setup. It asks how you'll use it:
+
+- **Just this computer:** check the microphone, download the transcription model, choose who
+  writes the notes, Canvas, your classes, and starting at login (recommended, so your library runs
+  whenever you're logged in).
+- **This is my library:** a password for your library, who writes the notes, Canvas, your classes, and
+  starting at login. It ends by showing the address and password to connect a laptop.
+- **This is my laptop:** find your library (or type its address and password), check the microphone,
+  download the transcription model, Canvas, and your classes.
+
+Or install from a terminal:
 
 ```bash
-# Mac (Terminal)
-curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.sh | sh -s -- library
-```
-```powershell
-# Windows (PowerShell)
-$env:STUDYSTASH_ROLE='library'; irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
-```
-
-- **Mac:** open the DMG and drag **Study Stash** into Applications. macOS asks once before opening
-  an app from the internet that isn't from the App Store (Study Stash isn't signed with a paid
-  Apple Developer ID): click **Done**, then **System Settings → Privacy & Security → Open Anyway**.
-- **Windows:** run the Setup.exe. It installs for your account only, no admin rights, and adds
-  **Study Stash** to the Start Menu. Since it isn't signed, Windows may say "Windows protected your
-  PC": click **More info**, then **Run anyway**.
-
-Open **Study Stash** and click **Set Up**: it downloads the Whisper model that transcribes
-lectures, has you name your library and pick a password, and lets you add your classes (you can
-always add more later). When you finish, the app shows your library and the address and password
-to connect your laptop.
-
-**Coming from 0.4.x?** Install the new app the same way — your lectures and settings stay right
-where they are.
-
-## 2. Connect your laptop
-
-This is the computer you record lectures on. Download its installer the same way:
-
-| | |
-|---|---|
-| **Mac** | [Study-Stash-Laptop.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop.dmg) |
-| **Windows** | [Study-Stash-Laptop-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop-Setup.exe) |
-
-```bash
-# Mac (Terminal)
+# Mac (Terminal): add "-s -- library" for the library
 curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.sh | sh
 ```
 ```powershell
-# Windows (PowerShell)
+# Windows (PowerShell): set $env:STUDYSTASH_ROLE='library' first for the library
 irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
 ```
 
-Install it the same way as the library (Mac: drag into Applications, then **Open Anyway**;
-Windows: run the Setup.exe, then **Run anyway**). The first time it records, it asks for the
-microphone — say yes (it may ask again after an update, since an ad-hoc signed app can't remember
-across one). Open **Study Stash**, click **Set Up**, and type the library's address and password
-from step 1 (or find them again under **Settings → Connect a laptop** on the library's page).
-
-## Updates
-
-Both computers update themselves: 10 minutes after it starts, then every 6 hours, the app checks
-for a new release and installs it as soon as nothing is recording, paused, or being transcribed,
-then restarts on the new version. Turn this off with `auto_update = false` in `client.toml`; to
-update right away, run `studystash update`, or click **Update now** in Settings.
-
-On a Mac, an update downloads the release's DMG and swaps in the new **Study Stash.app**. On
-Windows, it downloads the new Setup.exe and runs it quietly, which closes and reopens the app.
-Either way the download is checked against the release's `SHA256SUMS.txt` first, and only an
-installed copy updates itself — a build folder, or `dotnet run`, never calls GitHub.
-
-Releases come from CI (`.github/workflows/ci.yml`): every push tests the engine on macOS, Linux,
-and Windows, builds and self-tests both apps (a fake microphone and the tiny Whisper model prove
-each one actually transcribes), and installs each with its own installer. To ship a release, bump
-`StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`. When everything passes,
-CI tags it and publishes the four installers plus `SHA256SUMS.txt`, and both computers pick it up
-within the next 6 hours.
-
-## Uninstall
-
-**Mac:** quit Study Stash and drag it from Applications to the Trash. **Windows:** Settings →
-Apps → **Study Stash** → Uninstall. Either way, your lectures stay in your home folder (the
-library's) and in `Documents\Study Stash` (the laptop's) — uninstalling only removes the app.
-
 ## AI engines
 
-Study notes and sorting are written by whichever engine you pick in Settings: Ollama, running
-locally and for free, or Claude Code, Codex, or Gemini's CLI on the library's computer, signed in
-with your own account and plan. Pick one engine for everything, or a different one for notes,
-sorting, or answering questions. Without an engine, a lecture is still filed by its class and
-title, and keeps its transcript without study notes.
+Pick who writes your notes and who answers your questions in setup or in **Settings → Your
+library → AI engines** — one engine for everything, or a different one for each job. The engines
+run on your library's computer (with one computer, that's your laptop). Without an engine, lectures
+are still filed and keep their transcripts.
+
+**Ollama** — free, and nothing leaves your computer. Install it from [ollama.com](https://ollama.com),
+and Study Stash offers to download a model.
+
+**Claude Code** — uses your Claude plan. Install it, then run `claude` once in Terminal and sign in:
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash      # Mac (or: brew install --cask claude-code)
+```
+```powershell
+irm https://claude.ai/install.ps1 | iex             # Windows (PowerShell)
+```
+
+**Codex** — uses your ChatGPT plan. Install it, then run `codex` once and choose **Sign in with
+ChatGPT**:
+
+```bash
+npm install -g @openai/codex                        # Mac or Windows (or on a Mac: brew install --cask codex)
+```
+
+**Gemini** — the Gemini CLI, signed in with your Google account.
+
+Setup's notes step shows these commands with a Copy button, opens Terminal for you, and has
+**Check again** to pick the engine up once it's installed and signed in.
 
 ## Notes
 
@@ -137,24 +145,52 @@ the notes, in a quick answer and in the Ask chat:
 
 ## Canvas
 
-Settings → Canvas connects your school's Canvas with a small Chrome extension (in `extension/`)
-that reads Canvas with your own sign-in — no Canvas API token, which many schools turn off — and
-hands what it reads to the library. The library mirrors each class: assignment instructions and
-rubrics, your submissions with their scores and comments, module files and pages, announcements.
+Study Stash reads Canvas through Chrome with your own sign-in — no Canvas password or token — and
+only reads; nothing on Canvas changes. On your library's computer:
+
+1. **Settings → Your library → Canvas** (or the Canvas step in setup): type your school's Canvas
+   address.
+2. Click **Add to Chrome**. It opens Chrome's extensions page and shows the extension's folder.
+   Turn on **Developer mode**, click **Load unpacked**, and pick that folder.
+3. Sign in to Canvas in Chrome, then click **Find my courses** and match each class to its course.
+
+Canvas then syncs about once an hour while Chrome is open (it can stay minimized): what's due,
+assignments with rubrics, your submissions and feedback, modules, files, pages and announcements,
+filed into each class's folder.
 
 ## Claude and MCP
 
-Your library speaks [MCP](https://modelcontextprotocol.io), so Claude can read your lectures and
-notes directly:
+Your library speaks [MCP](https://modelcontextprotocol.io), so Claude can read your lectures, notes
+and Canvas work (read-only). Set it up in **Settings → Your library → AI tool access**:
 
-- **Claude Code or Claude Desktop**, on the library's own computer: `studystash mcp` over stdio.
-- **claude.ai**, from anywhere: HTTP with OAuth 2.1, behind a [Tailscale Funnel](https://tailscale.com/kb/1223/funnel).
+- **Claude Code or Codex**, on your computers: copy the setup from AI tool access and paste it into
+  a terminal (Claude Code) or `~/.codex/config.toml` (Codex).
+- **Claude Desktop and claude.ai**: turn on internet access (it uses a
+  [Tailscale Funnel](https://tailscale.com/kb/1223/funnel), protected by signing in with your
+  library password), then in Claude add a custom connector named **Study Stash** with the address
+  `https://<your library's name>.<your tailnet>.ts.net/mcp`.
+
+## Updates
+
+Installed copies update themselves: they check for a new release a few minutes after starting and
+every 6 hours, and install it when nothing is recording or being transcribed. To update right
+away, click **Update now** in Settings. On a Mac an update swaps in the new **Study Stash.app**; on
+Windows it runs the new Setup.exe quietly. Every download is checked against the release's
+`SHA256SUMS.txt` first.
+
+## Uninstall
+
+**Mac:** quit Study Stash and drag it from Applications to the Trash. **Windows:** Settings → Apps →
+**Study Stash** → Uninstall. Your lectures and settings stay where they are; only the app goes.
+
+[docs/claude-connector.md](docs/claude-connector.md) walks through adding Study Stash as a custom connector in Claude,
+what Claude can read, troubleshooting, and how each requirement of Claude's connectors is met and tested.
 
 ## Where your data lives
 
-Everything is under `~/.study-stash` (or `--home`, or the `STUDYSTASH_HOME` environment
-variable): `config.toml` or `client.toml`, the lecture database, and the notes themselves as plain
-Markdown files under a class folder you can open, back up, or sync however you like.
+Everything is under `~/.study-stash` (or `--home`, or the `STUDYSTASH_HOME` environment variable):
+your settings, the lecture database, and the notes themselves as plain Markdown files in a folder
+per class, which you can open, back up or sync however you like.
 
 ## Build from source
 
@@ -166,14 +202,20 @@ dotnet test engine/StudyStash.slnx
 dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
 ```
 
-`macos/build-app.sh` builds "Study Stash.app" and a DMG (Xcode's command line tools too).
-`engine/README.md` has more on the engine's projects, tests, and fixtures.
+`macos/build-app.sh` builds "Study Stash.app" and its DMGs (with Xcode's command line tools), and
+`windows/build.ps1` the Windows installers. `engine/README.md` has more on the projects and tests.
+
+Releases come from CI (`.github/workflows/ci.yml`): every change is tested on macOS, Linux and
+Windows, and both apps are built, self-tested and installed. To ship a release, bump
+`StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI publishes the four
+installers and `SHA256SUMS.txt`. A push that only changes the version, on top of a commit that
+already passed, skips the tests and just builds and publishes.
 
 ## License
 
-[MIT](LICENSE). No warranty: it's provided as is, so check your notes against the lecture before
-relying on them, since models make mistakes. See [SECURITY.md](SECURITY.md) to report a security
-problem.
+[MIT](LICENSE). No warranty: check your notes against the lecture before relying on them, since AI
+makes mistakes. Record only where you're allowed to — many schools and places require everyone's
+consent. See [SECURITY.md](SECURITY.md) to report a security problem.
 
 Notes and diagrams are drawn with [CSharpMath](https://github.com/verybadcat/CSharpMath) (MIT,
 bundling the [Latin Modern Math](https://www.gust.org.pl/projects/e-foundry/lm-math) font under

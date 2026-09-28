@@ -75,8 +75,8 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         Assert.Equal("", ExtensionRig.S(found["error"]));
         Assert.True(sw.Elapsed < TimeSpan.FromSeconds(5), $"Find took {sw.Elapsed.TotalSeconds:0.0} s: the extension should be waiting for work");
         var available = found["available"]!.AsObject();
-        Assert.Equal("CS 101 · Intro to Computer Science", ExtensionRig.S(available["4201"]));
-        Assert.Equal("BIO 110 · Cells and Systems", ExtensionRig.S(available["4202"]));
+        Assert.Equal("Intro to Computer Science", ExtensionRig.S(available["4201"]));
+        Assert.Equal("Cells and Systems", ExtensionRig.S(available["4202"]));
         Assert.Equal("Fall 2025", ExtensionRig.S(found["course_info"]!["4201"]!["term"]));
         var asked = rig.Canvas.HitsTo("/api/v1/courses").ToList();
         Assert.NotEmpty(asked);

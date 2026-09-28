@@ -202,6 +202,14 @@
   </Style>
 
   <!-- The "Answer with" / "Rewrite notes with" menu (16/17): Acrylic, 260/290 wide, r8. -->
+  <!-- The "Answer with" menu's panel: its shadow when drawn on the page, none as a popup (a popup's window is just
+       the panel, so a shadow would only fill its corners). -->
+  <Style Selector="Border.ai-menu">
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
+  </Style>
+  <Style Selector="FlyoutPresenter Border.ai-menu">
+    <Setter Property="BoxShadow" Value="none" />
+  </Style>
   <Style Selector="TextBlock.ai-menu-header">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -234,6 +242,7 @@
   </Style>
   <Style Selector="Button.ai-menu-footer TextBlock">
     <Setter Property="FontSize" Value="14" />
+    <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
 
@@ -302,6 +311,26 @@
     <Setter Property="FontSize" Value="14" />
     <Setter Property="LineHeight" Value="20.3" />
     <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="SelectableTextBlock.ai-answer">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="LineHeight" Value="20.3" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- The library's answer card: solid, so the notes never show through it; the question it answers heads it. -->
+  <Style Selector="Border.ai-answer-card">
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BoxShadow" Value="{DynamicResource Shadow}" />
+  </Style>
+  <Style Selector="TextBlock.ai-asked">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="ScrollViewer.ai-answer-scroll">
+    <Setter Property="MaxHeight" Value="240" />
   </Style>
   <Style Selector="TextBlock.ai-byline">
     <Setter Property="FontSize" Value="12" />
@@ -459,5 +488,23 @@
   <Style Selector="Border.ai-check.on">
     <Setter Property="Background" Value="{DynamicResource Accent}" />
     <Setter Property="BorderThickness" Value="0" />
+  </Style>
+
+  <!-- The "Claude (desktop and web)" card's own bits (14, connectors): a numbered step marker the same size as
+       ai-check, and the field rows' own label/value split. -->
+  <Style Selector="Border.ai-num">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-num > TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 </Styles>

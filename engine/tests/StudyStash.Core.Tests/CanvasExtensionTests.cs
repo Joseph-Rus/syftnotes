@@ -366,7 +366,8 @@ public class CanvasExtensionTests
         await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), options));
         await site.PostForm("/login", ("password", Password), ("next", "/"));
         var canvas = new FakeCanvas().Json("/api/v1/courses", """
-            [{"id": 4201, "name": "CS 101 · Intro to Computer Science", "course_code": "CS 101", "term": {"name": "Fall 2025"}}]
+            [{"id": 4201, "name": "CS 101 · Intro to Computer Science", "course_code": "CS 101", "term": {"name": "Fall 2025"}},
+             {"id": 4206, "name": "202710.TS.CSCI321.A  Software Engineering", "course_code": "202710.TS.CSCI321.A", "term": {"name": "Fall 2026"}}]
             """);
 
         // Typed, never saved, then Find: Chrome (here, this test) is asked about the typed Canvas.
@@ -382,6 +383,15 @@ public class CanvasExtensionTests
         var s = CanvasSettings.Load(cfg.Home);
         Assert.Equal("https://canvas.test", s.Url);
         Assert.Equal("CS 101 · Intro to Computer Science", s.Available["4201"]);
+        // Everything that shows a course shows its name, cleaned of codes; the short code is only a label beside it.
+        var asked = await site.Client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "/api/v2/canvas") { Headers = { Authorization = new AuthenticationHeaderValue("Bearer", Password) } });
+        var api = System.Text.Json.Nodes.JsonNode.Parse(await asked.Content.ReadAsStringAsync())!;
+        Assert.Equal("Intro to Computer Science", api["available"]!["4201"]!.GetValue<string>());
+        Assert.Equal("Software Engineering", api["available"]!["4206"]!.GetValue<string>());
+        Assert.Equal("CSCI 321", api["course_info"]!["4206"]!["short_code"]!.GetValue<string>());
+        Assert.Equal("Software Engineering", api["course_info"]!["4206"]!["title"]!.GetValue<string>());
+        cfg.Classes.Add(new ClassDef("Software Engineering"));
+        Assert.Contains("Software Engineering · CSCI 321</option>", await site.Text("/settings"));
         Assert.Equal(["https://canvas.test/*"], HostsOf(cfg.Home).Take(1));
         Assert.Contains(FindOutcome.Say(FindOutcome.Found), await site.Text("/settings?canvas=found"));
     }

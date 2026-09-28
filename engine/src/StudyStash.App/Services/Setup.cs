@@ -31,28 +31,41 @@ public static class Setup
         _ => null,
     };
 
-    /// <summary>Setup for this computer: the installer's flow (or, with none, the welcome asks), with what's already
-    /// known filled in. <paramref name="tailscale"/> and <paramref name="hostName"/> say where a laptop can reach a
-    /// library made here (tests give their own).</summary>
-    public static SetupModel Make(AppHost host, AppRole? preset = null, Func<TailscaleInfo>? tailscale = null, Func<string>? hostName = null)
+    /// <summary>The welcome's choice to start on. A run that stopped part-way picks up where it was: a library already
+    /// made here keeps its flow, and a laptop already connected to a library on another computer stays a laptop.
+    /// Otherwise the installer suggests one (<see cref="SetupModel.Suggested"/>).</summary>
+    public static AppRole StartingRole(AppRole? installer, AppRole saved, string serverUrl)
     {
-        preset ??= Preset(Apps.RolePreset());
-        var m = SetupModel.For(Skin.Current, preset);
-        // A run that stopped part-way picks up the flow it was in, if the installer allows it.
-        var was = host.Settings.Role;
-        if (preset != AppRole.Laptop && was != AppRole.Laptop) m.SetRole(was);
+        if (saved != AppRole.Laptop) return saved;
+        if (serverUrl.Length > 0 && !IsThisComputer(serverUrl)) return AppRole.Laptop;
+        return SetupModel.Suggested(installer);
+    }
+
+    /// <summary>An address on this computer itself (the library a one-computer setup made).</summary>
+    public static bool IsThisComputer(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.IsLoopback || u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Setup for this computer, starting on <paramref name="role"/>'s choice (or, when not given, the one
+    /// <see cref="StartingRole"/> works out), with what's already known filled in. <paramref name="tailscale"/> and
+    /// <paramref name="hostName"/> say where a laptop can reach a library made here, and <paramref name="here"/> makes it
+    /// (tests give their own).</summary>
+    public static SetupModel Make(AppHost host, AppRole? role = null, Func<TailscaleInfo>? tailscale = null, Func<string>? hostName = null,
+        LibraryHere? here = null)
+    {
         var cc = host.Client();
+        var m = SetupModel.For(Skin.Current, role ?? StartingRole(Preset(Apps.RolePreset()), host.Settings.Role, cc.ServerUrl));
         m.Address = cc.ServerUrl;
         m.LibraryName = $"{Person()}'s library";
-        m.NotesFolder = LibraryHere.DefaultFolder;
+        here ??= LibraryHere.ThisComputer();
+        m.NotesFolder = here.Folder ?? LibraryHere.DefaultFolder;
         // Setup run again on the library: it keeps its name, password and notes folder, and it starts at login as it
         // should (Finish writes the login item afresh, pointing at this copy of the app).
-        if (LibraryHere.Existing(host.Home) is { } here)
+        if (LibraryHere.Existing(host.Home) is { } had)
         {
             m.ExistingLibrary = true;
-            if (here.PoolName.Length > 0) m.LibraryName = here.PoolName;
-            m.Password = here.PoolPassword;
-            m.NotesFolder = here.PoolDir;
+            if (had.PoolName.Length > 0) m.LibraryName = had.PoolName;
+            m.Password = had.PoolPassword;
+            m.NotesFolder = had.PoolDir;
             m.StartAtLogin = true;
         }
         if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;
@@ -73,16 +86,16 @@ public static class Setup
         m.OnMicSettings = () => Dialogs.OpenUrl(host.MicSettingsUrl);
         m.OnTaskbarSettings = () => Dialogs.OpenUrl("ms-settings:taskbar");
         m.OnRetryModel = () => _ = host.DownloadModelAsync();
-        m.OnConnect = () => ConnectAsync(m, host);
+        m.OnConnect = () => ConnectAsync(m, host, here);
         m.OnFind = () => FindAsync(m, host);
         m.OnAddClass = () => AddClassAsync(m, host);
-        // Leaving Classes adds the Canvas courses that are ticked (and links them); a time that can't be read stays.
+        // Leaving Classes adds the Canvas courses that are ticked (and links them).
         m.LeaveAsync = step => step == SetupStep.Classes ? AddCoursesAsync(m, host) : Task.FromResult(true);
         m.CanLeave = step =>
         {
-            if (step is SetupStep.Password or SetupStep.Library && !m.LibraryOk)
+            if ((step is SetupStep.Password or SetupStep.Library || step == SetupStep.Welcome && m.IsOneComputer) && !m.LibraryOk)
             {
-                m.LibraryResult = m.IsLibrary ? "Create the library first." : "Connect to your library first.";
+                m.LibraryResult = m.IsLaptop ? "Connect to your library first." : "Create the library first.";
                 return false;
             }
             return true;
@@ -91,10 +104,10 @@ public static class Setup
         {
             if (e.PropertyName != nameof(SetupModel.Step)) return;
             if (m.Step == SetupStep.Model) _ = host.DownloadModelAsync();
+            if (m.Step == SetupStep.Classes) ListClasses(m, host);
             if (m.Step == SetupStep.Done && m.IsLibrary) _ = FillAddressesAsync(m, host, tailscale ?? (() => HostInfo.Tailscale()), hostName ?? LanName);
         };
-        foreach (var c in host.Timetable.Classes)
-            m.Classes.Add(new SetupClass { Name = c.Name, When = string.Join(", ", c.Times.Select(t => t.Describe())), Dot = Skin.ClassDot(Math.Max(0, host.ColorOf(c.Name))) });
+        ListClasses(m, host);
         Refresh(m, host);
         return m;
     }
@@ -177,15 +190,24 @@ public static class Setup
         m.MicLevels = mic.Levels();
     }
 
-    static async Task ConnectAsync(SetupModel m, AppHost host)
+    static async Task ConnectAsync(SetupModel m, AppHost host, LibraryHere here)
     {
         m.Connecting = true;
         m.LibraryResult = null;
         try
         {
-            if (m.IsLibrary)
+            if (m.IsOneComputer)
             {
-                string done = await LibraryHere.ThisComputer().CreateAsync(host, m.LibraryName, m.Password, Person(), m.Role);
+                // Just this computer: the library is made quietly, reachable only from here, with a password of its
+                // own (a laptop added later gets one the student picks). One already here keeps who can reach it.
+                string done = await here.CreateAsync(host, m.LibraryName, null, Person(), AppRole.Both, localOnly: !m.ExistingLibrary);
+                m.LibraryOk = true;
+                m.LibraryResult = done;
+            }
+            else if (m.IsLibrary)
+            {
+                // A library for other computers: laptops can reach it, whatever it was before.
+                string done = await here.CreateAsync(host, m.LibraryName, m.Password, Person(), m.Role, laptops: true);
                 m.LibraryOk = true;
                 m.LibraryResult = done;
             }
@@ -254,57 +276,48 @@ public static class Setup
         }
     }
 
+    /// <summary>Classes lists the library's classes as it has them now (run again setup, it has some already), each
+    /// with what it covers.</summary>
+    static void ListClasses(SetupModel m, AppHost host)
+    {
+        var about = (host.Overview?["classes"] as System.Text.Json.Nodes.JsonArray ?? []).OfType<System.Text.Json.Nodes.JsonObject>()
+            .ToDictionary(c => c["name"]?.GetValue<string>() ?? "", c => c["description"] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue(out string? d) ? d ?? "" : "");
+        foreach (var (name, color, _) in host.Classes())
+        {
+            if (m.Classes.Any(c => c.Name == name)) continue;
+            m.Classes.Add(new SetupClass { Name = name, About = about.GetValueOrDefault(name, ""), Dot = Skin.ClassDot(color) });
+        }
+    }
+
     /// <summary>
-    /// Classes' Continue with Canvas courses found: every ticked course becomes a class (in the library and the
-    /// timetable, with its times when typed), each is linked to its course, and Canvas is asked to sync in the
-    /// background. Every "when" is read first, so one that can't be read stops the step (false, saying how to write it)
-    /// before anything changes. <paramref name="canvas"/> is the library's Canvas API (tests give their own).
+    /// Classes' Continue with Canvas courses found: every ticked course becomes a class in the library (named
+    /// by its course on Canvas, which says what it covers for the library's AI to sort by), each is linked to its course, and Canvas is asked
+    /// to sync in the background. <paramref name="canvas"/> is the library's Canvas API (tests give their own).
     /// </summary>
     public static async Task<bool> AddCoursesAsync(SetupModel m, AppHost host, CanvasClient? canvas = null)
     {
         var ticked = m.Courses.Where(c => c.Ticked && c.Name.Trim().Length > 0).ToList();
         if (ticked.Count == 0) return true;
-        var times = new Dictionary<SetupCourse, List<ClassTime>>();
-        foreach (var c in ticked)
-        {
-            if (c.When.Trim().Length == 0)
-            {
-                times[c] = [];
-            }
-            else if (ClassTime.ParseMany(c.When) is { } parsed)
-            {
-                times[c] = parsed;
-            }
-            else
-            {
-                m.ClassProblem = $"Write when {c.Name} meets like “Tue Thu 10:00–11:15” or “MWF 9–9:50”.";
-                return false;
-            }
-        }
         m.ClassProblem = null;
         m.AddingCourses = true;
         try
         {
-            var t = host.Timetable;
             var lib = host.Remote();
+            var had = host.Classes().Select(c => c.Name).ToHashSet();
             foreach (var c in ticked)
             {
                 string name = c.Name.Trim();
-                if (lib is not null && !t.Classes.Any(x => x.Name == name))
+                if (lib is null || had.Contains(name)) continue;
+                try
                 {
-                    try
-                    {
-                        await lib.AddClassAsync(name);
-                    }
-                    catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
-                    {
-                        // An older library can't take classes over its API: the timetable still has it.
-                    }
+                    await lib.AddClassAsync(name);
                 }
-                t.Classes.RemoveAll(x => x.Name == name);
-                t.Classes.Add(new TimetableClass(name, times[c]));
+                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+                {
+                    // An older library can't take classes over its API: Settings → Classes can add them later.
+                    host.Log($"[setup] the library didn't take the class {name}: {e.Message}");
+                }
             }
-            host.SaveTimetable(t);
             var cc = host.Client();
             canvas ??= cc.ServerUrl.Length > 0 ? new CanvasClient(cc.ServerUrl, cc.PoolKey) : null;
             if (canvas is not null)
@@ -342,43 +355,34 @@ public static class Setup
         }
     }
 
+    /// <summary>Classes' Add: the class goes into the library at once, with what it covers when typed.</summary>
     static async Task AddClassAsync(SetupModel m, AppHost host)
     {
-        string name = m.NewClass.Trim();
+        string name = m.NewClass.Trim(), about = m.NewAbout.Trim();
         if (name.Length == 0) return;
-        List<ClassTime> times = [];
-        if (m.NewWhen.Trim().Length > 0)
+        if (host.Remote() is not { } lib)
         {
-            if (ClassTime.ParseMany(m.NewWhen) is not { } parsed)
-            {
-                m.ClassProblem = "Write the days and times like “Tue Thu 10:00–11:15” or “MWF 9–9:50”.";
-                return;
-            }
-            times = parsed;
+            m.ClassProblem = "Connect to your library first: the classes are its.";
+            return;
+        }
+        try
+        {
+            await lib.AddClassAsync(name, about.Length > 0 ? about : null);
+            await host.CheckLibraryAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            m.ClassProblem = $"The library didn't take the class: {e.Message}";
+            return;
         }
         m.ClassProblem = null;
-        bool existing = host.Timetable.Classes.Any(c => c.Name == name);
-        if (!existing && host.Remote() is { } lib)
-        {
-            try
-            {
-                await lib.AddClassAsync(name);
-                await host.CheckLibraryAsync();
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
-            {
-                // An older library can't take classes over its API: the timetable still has it.
-            }
-        }
-        var t = host.Timetable;
-        t.Classes.RemoveAll(c => c.Name == name);
-        t.Classes.Add(new TimetableClass(name, times));
-        host.SaveTimetable(t);
-        string when = string.Join(", ", times.Select(x => x.Describe()));
         var dot = Skin.ClassDot(Math.Max(0, host.ColorOf(name)));
-        if (m.Classes.FirstOrDefault(c => c.Name == name) is { } row) row.When = when;
-        else m.Classes.Add(new SetupClass { Name = name, When = when, Dot = dot });
+        if (m.Classes.FirstOrDefault(c => c.Name == name) is { } row)
+        {
+            if (row.About.Length == 0) row.About = about;
+        }
+        else m.Classes.Add(new SetupClass { Name = name, About = about, Dot = dot });
         m.NewClass = "";
-        m.NewWhen = "";
+        m.NewAbout = "";
     }
 }

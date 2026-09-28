@@ -9,6 +9,7 @@ using StudyStash.App;
 using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
+using StudyStash.Core.Ai;
 
 namespace StudyStash.App.Tests;
 
@@ -587,14 +588,31 @@ public class AiShots
 
     // --- 14: AI tool access --------------------------------------------------------------------------------------
 
-    static AiAccessModel AccessModel()
+    static AiAccessModel AccessModel(string web = "off")
     {
-        var m = new AiAccessModel(new FakeAiLibrary());
+        // "ready" sets WebOn through the property, which round-trips through the library like the real toggle does
+        // (FakeAiLibrary's own Access must be non-null for that: its default, unscripted SetWebAsync then answers
+        // with the design's address, already reachable). "off" and "problem" only ever poke plain fields, so they
+        // need no library at all.
+        var lib = new FakeAiLibrary { Access = new ToolAccessInfo(true, new ReadingScopes(), []) { HasPassword = true } };
+        var m = new AiAccessModel(lib);
         m.On = true;
         m.ReadLectures = true;
         m.ReadNotes = true;
         m.ReadCanvas = true;
         m.ReadAudio = false;
+        m.HasPassword = true;
+        switch (web)
+        {
+            case "ready":
+                m.WebOn = true;
+                m.ClaudeConnections.Add(new AiConnectionRow { Id = "sig-1", Name = "Claude", Detail = "claude.ai", UsedWords = "Used 10:40", CanRemove = true, First = true });
+                break;
+            case "problem":
+                m.WebNote = "Your tailnet doesn't allow Funnel yet. Open the page below, allow it for this computer, then turn this on again.";
+                m.WebNoteFixUrl = "https://login.tailscale.com/f/funnel?node=abc123";
+                break;
+        }
         m.Connected.Add(new AiConnectionRow { Id = "1", Name = "Claude Code", Detail = "Signed in from the web", UsedWords = "Used 10:40", CanRemove = true, First = true });
         m.Connected.Add(new AiConnectionRow { Id = "2", Name = "Codex", Detail = "Token", UsedWords = "Used Tue", CanRemove = true });
         return m;
@@ -612,6 +630,50 @@ public class AiShots
     {
         foreach (var t in Themes)
             Shot.Take("win-14-ai-tool-access", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel() }));
+    }
+
+    // --- 14: the "Claude (desktop and web)" card (connectors task 5): off, on and answering, and a Funnel problem.
+
+    [AvaloniaFact]
+    public void Mac_ai_tool_access_claude_off()
+    {
+        foreach (var t in Themes)
+            Shot.Take("mac-14-ai-tool-access-claude-off", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI tool access", new MacAiAccess { DataContext = AccessModel("off") }));
+    }
+
+    [AvaloniaFact]
+    public void Mac_ai_tool_access_claude_ready()
+    {
+        foreach (var t in Themes)
+            Shot.Take("mac-14-ai-tool-access-claude-ready", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI tool access", new MacAiAccess { DataContext = AccessModel("ready") }));
+    }
+
+    [AvaloniaFact]
+    public void Mac_ai_tool_access_claude_problem()
+    {
+        foreach (var t in Themes)
+            Shot.Take("mac-14-ai-tool-access-claude-problem", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI tool access", new MacAiAccess { DataContext = AccessModel("problem") }));
+    }
+
+    [AvaloniaFact]
+    public void Win_ai_tool_access_claude_off()
+    {
+        foreach (var t in Themes)
+            Shot.Take("win-14-ai-tool-access-claude-off", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel("off") }));
+    }
+
+    [AvaloniaFact]
+    public void Win_ai_tool_access_claude_ready()
+    {
+        foreach (var t in Themes)
+            Shot.Take("win-14-ai-tool-access-claude-ready", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel("ready") }));
+    }
+
+    [AvaloniaFact]
+    public void Win_ai_tool_access_claude_problem()
+    {
+        foreach (var t in Themes)
+            Shot.Take("win-14-ai-tool-access-claude-problem", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel("problem") }));
     }
 }
 

@@ -1,0 +1,51 @@
+<!-- The latest answer from the ask bar under a lecture's notes (design 16's answer card), just above the bar: a solid
+     card with the question it answers and a close button, in room the page makes for it, so it never lies over the
+     notes. A long answer scrolls inside the card. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.WinAiAnswer"
+             x:DataType="vm:AiAskModel"
+             ClipToBounds="False">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+  </UserControl.Styles>
+
+  <ContentControl IsVisible="{Binding HasLatest}" Content="{Binding Latest}" ClipToBounds="False">
+    <ContentControl.ContentTemplate>
+      <DataTemplate x:DataType="vm:AiTurn">
+        <Border Classes="ai-answer-card" Width="600">
+          <DockPanel>
+            <Grid DockPanel.Dock="Top" ColumnDefinitions="*,8,Auto" Margin="14,6,6,0">
+              <TextBlock Classes="ai-asked" Text="{Binding Question}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+              <Button Grid.Column="2" Classes="ai-close" VerticalAlignment="Center" ToolTip.Tip="Close" AutomationProperties.Name="Close the answer"
+                      Command="{Binding $parent[UserControl].((vm:AiAskModel)DataContext).CloseAnswerCommand}">
+                <c:Icon Glyph="close" Size="16" Foreground="{DynamicResource Fg2}" />
+              </Button>
+            </Grid>
+            <ScrollViewer Classes="ai-answer-scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="6" Margin="14,2,14,12">
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsThinking}">
+                  <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Fg2}" />
+                  <TextBlock Classes="ai-thinking" Text="{Binding ThinkingWords}" />
+                </StackPanel>
+                <TextBlock Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
+                           IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
+                <StackPanel Spacing="6" IsVisible="{Binding !IsThinking}">
+                  <c:NoteView Compact="True" BodySize="14" BodyLineHeight="20.3" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
+                  <Button Theme="{StaticResource Surface}" Padding="0" HorizontalAlignment="Left" HorizontalContentAlignment="Left"
+                          Command="{Binding $parent[UserControl].((vm:AiAskModel)DataContext).OpenTurnSourceCommand}" CommandParameter="{Binding}"
+                          IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}">
+                    <TextBlock Classes="ai-byline" Text="{Binding Byline}" />
+                  </Button>
+                  <TextBlock Classes="ai-byline" Text="{Binding FellBackNote}" TextWrapping="Wrap" IsVisible="{Binding FellBackNote, Converter={x:Static c:Converters.NotEmpty}}" />
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+      </DataTemplate>
+    </ContentControl.ContentTemplate>
+  </ContentControl>
+</UserControl>

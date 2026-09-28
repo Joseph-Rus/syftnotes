@@ -33,7 +33,7 @@ public class LibrarySettingsModelTests
         using var _m = model;
 
         Assert.Equal("This laptop", model.ComputerNavTitle);
-        Assert.Equal(["General", "Appearance", "Recording", "Connection", "Timetable"], model.ComputerNav.Select(n => n.Label));
+        Assert.Equal(["General", "Appearance", "Recording", "Connection"], model.ComputerNav.Select(n => n.Label));
         Assert.Equal(["Library", "Classes", "Notes and sorting", "AI engines", "AI tool access", "Canvas", "Folders"], model.LibraryNav.Select(n => n.Label));
         Assert.Empty(fake.Calls); // nothing asked before a library page opens
     }
@@ -51,6 +51,105 @@ public class LibrarySettingsModelTests
         Assert.True(model.OnLibrary);
         Assert.True(model.Lib.IsHere);
         Assert.True(model.Lib.IsReady);
+    }
+
+    [AvaloniaFact]
+    public async Task Just_this_computers_library_hides_the_laptop_bits_until_a_laptop_is_added()
+    {
+        var fake = new FakeLibrarySettings();
+        fake.Settings["reach"]!["laptops"] = false;
+        var calls = new List<(bool On, string? Password)>();
+        string? told = null;
+        var lib = new LibrarySettingsModel(() => fake.Call)
+        {
+            IsHere = true,
+            PasswordChanged = p => told = p,
+            LetLaptopsConnect = (on, password) =>
+            {
+                calls.Add((on, password));
+                fake.Settings["reach"]!["laptops"] = on;
+                return Task.CompletedTask;
+            },
+        };
+        await lib.Load();
+
+        Assert.True(lib.OnlyThisComputer);
+        Assert.False(lib.ShowReach); // no addresses or password: no laptop uses them
+        Assert.True(lib.CanChangeLaptops);
+        Assert.Equal("Add a laptop", lib.LaptopsTitle);
+        Assert.StartsWith("What the app", lib.NameSub, StringComparison.Ordinal);
+
+        lib.AddLaptopCommand.Execute(null);
+        Assert.True(lib.AddingLaptop);
+        lib.LaptopPassword = "abc";
+        await lib.TurnOnLaptopsCommand.ExecuteAsync(null);
+        Assert.Empty(calls);
+        Assert.Equal("Use a password of at least 4 characters.", lib.LaptopSay);
+
+        lib.LaptopPassword = "correct-horse";
+        await lib.TurnOnLaptopsCommand.ExecuteAsync(null);
+
+        Assert.Equal([(true, (string?)"correct-horse")], calls);
+        Assert.Equal("correct-horse", told); // this computer connects with it from now on
+        Assert.False(lib.AddingLaptop);
+        Assert.True(lib.LaptopsCanConnect);
+        Assert.True(lib.ShowReach);
+        Assert.NotEmpty(lib.Addresses);
+        Assert.Equal("Laptops can connect", lib.LaptopsTitle);
+        Assert.Contains("This is my laptop", lib.LaptopSay, StringComparison.Ordinal);
+
+        await lib.TurnOffLaptopsCommand.ExecuteAsync(null);
+        Assert.Equal((false, (string?)null), calls[1]);
+        Assert.True(lib.OnlyThisComputer);
+    }
+
+    [AvaloniaFact]
+    public async Task Adding_a_laptop_that_fails_says_why_and_stays_open()
+    {
+        var fake = new FakeLibrarySettings();
+        fake.Settings["reach"]!["laptops"] = false;
+        var lib = new LibrarySettingsModel(() => fake.Call)
+        {
+            IsHere = true,
+            LetLaptopsConnect = (_, _) => throw new InvalidOperationException("The library didn't start."),
+        };
+        await lib.Load();
+        lib.AddLaptopCommand.Execute(null);
+        lib.LaptopPassword = "correct-horse";
+
+        await lib.TurnOnLaptopsCommand.ExecuteAsync(null);
+
+        Assert.Equal("The library didn't start.", lib.LaptopSay);
+        Assert.True(lib.AddingLaptop);
+        Assert.True(lib.OnlyThisComputer);
+        Assert.False(lib.ChangingLaptops);
+    }
+
+    [AvaloniaFact]
+    public async Task A_library_that_doesnt_say_is_reachable_by_laptops_as_before()
+    {
+        var fake = new FakeLibrarySettings();
+        ((JsonObject)fake.Settings["reach"]!).Remove("laptops");
+        var lib = new LibrarySettingsModel(() => fake.Call);
+        await lib.Load();
+        Assert.True(lib.LaptopsCanConnect);
+        Assert.True(lib.ShowReach);
+        Assert.False(lib.CanChangeLaptops); // on another computer: nothing to open or close from here
+    }
+
+    [AvaloniaFact]
+    public void Only_just_this_computer_can_open_or_close_its_library_to_laptops_and_its_AI_runs_here()
+    {
+        foreach (var (role, can) in new[] { (AppRole.Both, true), (AppRole.Library, false), (AppRole.Laptop, false) })
+        {
+            var (model, host, home) = Open(new FakeLibrarySettings(), role);
+            using var _h = home;
+            using var _host = host;
+            using var _m = model;
+            Assert.Equal(can, model.Lib.CanChangeLaptops);
+            if (role == AppRole.Laptop) Assert.Contains("from this laptop", model.Engines.Lede, StringComparison.Ordinal);
+            else Assert.Contains($"Engines run on this {(OperatingSystem.IsWindows() ? "PC" : "Mac")}", model.Engines.Lede, StringComparison.Ordinal);
+        }
     }
 
     [AvaloniaFact]
@@ -144,6 +243,58 @@ public class LibrarySettingsModelTests
         Assert.Equal("correct horse", host.Client().PoolKey);
         Assert.False(lib.ChangingPassword);
         Assert.Contains("other computers need the new password", lib.PasswordSay);
+    }
+
+    [AvaloniaFact]
+    public async Task Classes_named_from_course_codes_are_previewed_then_renamed_and_the_lectures_here_follow()
+    {
+        var fake = new FakeLibrarySettings { Settings = FakeLibrarySettings.CodeNamed() };
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        host.Lectures.Add(new Lecture { Id = "rec-1", Started = "2026-09-22T10:00:00-07:00", State = LectureState.Sending, ClassName = "202710.TS.CSCI321.A" });
+        model.Section = "Classes";
+        var lib = model.Lib;
+        int heard = 0;
+        lib.ClassesChanged = () => heard++;
+
+        Assert.True(lib.HasCourseNames);
+        Assert.True(lib.CanUseCourseNames);
+        Assert.Equal("2 classes are named from course codes. Their lectures move with them.", lib.CourseNamesSub);
+        Assert.Equal("Rename 2 classes", lib.RenameLabel);
+        Assert.False(lib.ConfirmingCourseNames);
+        lib.AskUseCourseNamesCommand.Execute(null);
+        Assert.True(lib.ConfirmingCourseNames); // the preview: each class, its new name, and what moves with it
+        Assert.Equal([("Software Engineering", "Now 202710.TS.CSCI321.A", "18 lectures move with it"), ("Senior Design", "Now 202710.TS.ENGR401.A", "14 lectures move with it")],
+            lib.CourseNames.Select(r => (r.To, r.Now, r.Meta)));
+        Assert.DoesNotContain(fake.Calls, c => c.Path == "/course-names"); // nothing renamed until asked
+
+        await lib.UseCourseNamesCommand.ExecuteAsync(null);
+
+        Assert.Contains(fake.Calls, c => (c.Method, c.Path) == ("POST", "/course-names"));
+        Assert.Equal("Renamed 2 classes to their Canvas course names; 32 lectures moved with them.", lib.Say);
+        Assert.Equal(["Software Engineering", "Senior Design", "HIST 210", "MATH 221"], lib.Classes.Select(c => c.Name));
+        Assert.False(lib.HasCourseNames);
+        Assert.False(lib.ConfirmingCourseNames);
+        Assert.Equal(1, heard);
+        Assert.Equal("Software Engineering", host.Lectures.Get("rec-1")!.ClassName); // a lecture waiting here follows
+    }
+
+    [AvaloniaFact]
+    public void While_Canvas_syncs_the_rename_waits_and_says_why()
+    {
+        var fake = new FakeLibrarySettings { Settings = FakeLibrarySettings.CodeNamed() };
+        fake.Settings["course_names"]!["blocked"] = "Canvas is syncing. Try again when it's done.";
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        model.Section = "Classes";
+
+        Assert.True(model.Lib.HasCourseNames);
+        Assert.False(model.Lib.CanUseCourseNames);
+        Assert.Equal("Canvas is syncing. Try again when it's done.", model.Lib.CourseNamesSub);
     }
 
     [AvaloniaFact]

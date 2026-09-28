@@ -293,6 +293,10 @@ public static class CanvasApi
         public string Name { get; init; } = "";
         public string Term { get; init; } = "";
         public string Url { get; init; } = "";
+        /// <summary>The course as a class is named from it ("Software Engineering"): its cleaned name, not its code.</summary>
+        public string Title { get; init; } = "";
+        /// <summary>Its short code ("CSCI 321"), or "" when its code has none worth showing.</summary>
+        public string ShortCode { get; init; } = "";
     }
 
     public sealed record Counts

@@ -1,7 +1,8 @@
-<!-- Library setup's AI step (design 15, Windows): "Choose who writes your notes" (a card list of the engines on this
-     computer, Ollama recommended, a not-signed-in CLI offering to sign in right there) and "Who answers your
-     questions" (starts as Same as notes). The step's body only: the host draws "Library setup · step 3 of 4", the
-     nav and the Back/Next footer, and calls SaveAsync on Next. -->
+<!-- Setup's AI step (design 15, Windows): "Choose who writes your notes" (a card list of the engines on this computer,
+     Ollama recommended; Claude Code and Codex with "Set up": the commands to install and sign in, Copy, Open
+     PowerShell and Check again; and "No AI for now") and "Who answers your questions" (starts as Same as notes). The
+     step's body only: the host draws the step label, the nav and the Back/Next footer, and calls SaveAsync on Next.
+     Every card: radio | name and one line | its action, right-aligned; the help lines up under the name. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -10,14 +11,51 @@
              x:DataType="vm:AiSetupModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+    <Style Selector="Border.ai-radio.dim">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="Border.stepnum">
+      <Setter Property="Width" Value="20" />
+      <Setter Property="Height" Value="20" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="{DynamicResource Subtle2}" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+    <Style Selector="Border.stepnum TextBlock">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- A command to paste: monospace in a control-coloured box, Copy at its right end. -->
+    <Style Selector="Border.code">
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="10,3,3,3" />
+    </Style>
+    <Style Selector="Border.code SelectableTextBlock">
+      <Setter Property="FontFamily" Value="Cascadia Mono, Consolas, SF Mono, Menlo, monospace" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Border.ai-pill.small">
+      <Setter Property="Height" Value="26" />
+      <Setter Property="Padding" Value="10,0" />
+    </Style>
+    <Style Selector="Border.ai-pill.small TextBlock">
+      <Setter Property="FontSize" Value="13" />
+    </Style>
   </UserControl.Styles>
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="32,0,32,20" Spacing="4" MaxWidth="640">
 
       <TextBlock Classes="ai-title" Text="Choose who writes your notes" />
-      <TextBlock Classes="ai-sub" MaxWidth="520" Margin="0,0,0,12"
-                 Text="This computer is your library, so the engines run here. You can change this later from any of your computers." />
+      <TextBlock Classes="ai-sub" MaxWidth="520" Margin="0,0,0,12" Text="{Binding Lede}" />
 
       <TextBlock Text="{Binding OlderLibraryWords}" Classes="ai-sub" IsVisible="{Binding OlderLibrary}" />
       <TextBlock Text="Your library isn't answering. Check it's on and connected." Classes="ai-sub" IsVisible="{Binding Offline}" />
@@ -26,31 +64,106 @@
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:AiSetupRow">
             <Border Classes="ai-card" Margin="{Binding First, Converter={x:Static c:Converters.FirstCardMargin}}">
-              <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
-                <Button Grid.ColumnSpan="3" Classes="ai-textbtn" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
-                  <Grid ColumnDefinitions="Auto,16,*">
-                    <Border Classes="ai-radio" Classes.on="{Binding Selected}" VerticalAlignment="Center">
-                      <Ellipse Width="10" Height="10" Fill="{DynamicResource OnAccent}" IsVisible="{Binding Selected}" />
-                    </Border>
-                    <StackPanel Grid.Column="2" Classes="ai-row-text" VerticalAlignment="Center">
-                      <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
-                      <TextBlock Classes="ai-row-sub" Text="{Binding About}" />
-                    </StackPanel>
-                  </Grid>
-                </Button>
-                <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                  <TextBlock Classes="ai-row-sub" Text="Recommended" IsVisible="{Binding Recommended}" />
-                  <Button Classes="ai-pillbtn" Command="{Binding SignInCommand}" IsVisible="{Binding ShowSignIn}">
-                    <Border Classes="ai-pill">
-                      <TextBlock Text="Sign in" />
-                    </Border>
+              <StackPanel>
+                <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
+                  <Button Grid.ColumnSpan="3" Classes="ai-textbtn" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+                    <Grid ColumnDefinitions="Auto,16,*">
+                      <Border Classes="ai-radio" Classes.on="{Binding Selected}" Classes.dim="{Binding !CanWrite}" VerticalAlignment="Center">
+                        <Ellipse Width="10" Height="10" Fill="{DynamicResource OnAccent}" IsVisible="{Binding Selected}" />
+                      </Border>
+                      <StackPanel Grid.Column="2" Classes="ai-row-text" VerticalAlignment="Center">
+                        <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
+                        <TextBlock Classes="ai-row-sub" Text="{Binding About}" />
+                      </StackPanel>
+                    </Grid>
                   </Button>
+                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <TextBlock Classes="ai-row-sub" Text="Recommended" IsVisible="{Binding Recommended}" VerticalAlignment="Center" />
+                    <Button Classes="ai-pillbtn" Command="{Binding SignInCommand}" IsVisible="{Binding ShowSignIn}">
+                      <Border Classes="ai-pill">
+                        <TextBlock Text="Sign in" />
+                      </Border>
+                    </Button>
+                    <Button Classes="ai-pillbtn" Command="{Binding ToggleHelpCommand}" IsVisible="{Binding HasHelp}">
+                      <Border Classes="ai-pill">
+                        <TextBlock Text="{Binding HelpLabel}" />
+                      </Border>
+                    </Button>
+                  </StackPanel>
+                </Grid>
+                <!-- How to get it going: numbered steps under the name, then Open PowerShell | Check again -->
+                <StackPanel IsVisible="{Binding ShowHelp}" Margin="36,8,0,6" Spacing="12">
+                  <ItemsControl ItemsSource="{Binding Help}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:AiSetupStep">
+                        <Grid ColumnDefinitions="20,10,*">
+                          <Border Classes="stepnum"><TextBlock Text="{Binding Number}" /></Border>
+                          <StackPanel Grid.Column="2" Spacing="6">
+                            <TextBlock Text="{Binding Title}" FontSize="13" LineHeight="19" TextWrapping="Wrap" />
+                            <Border Classes="code" IsVisible="{Binding HasCommand}">
+                              <Grid ColumnDefinitions="*,8,Auto">
+                                <SelectableTextBlock Text="{Binding Command}" />
+                                <Button Grid.Column="2" Classes="ai-pillbtn" Command="{Binding CopyCommand}" VerticalAlignment="Center">
+                                  <Border Classes="ai-pill small">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                      <c:Icon Glyph="content_copy" Size="14" Foreground="{DynamicResource Fg2}" />
+                                      <TextBlock Text="Copy" />
+                                    </StackPanel>
+                                  </Border>
+                                </Button>
+                              </Grid>
+                            </Border>
+                            <TextBlock Text="{Binding Note}" IsVisible="{Binding HasNote}" FontSize="12" LineHeight="17" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                          </StackPanel>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Grid ColumnDefinitions="30,*,Auto">
+                    <Button Grid.Column="1" Classes="ai-pillbtn" Command="{Binding OpenCommand}" HorizontalAlignment="Left">
+                      <Border Classes="ai-pill small">
+                        <TextBlock Text="{Binding OpenLabel}" />
+                      </Border>
+                    </Button>
+                    <Button Grid.Column="2" Classes="ai-pillbtn" Command="{Binding CheckAgainCommand}">
+                      <Border Classes="ai-pill small">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <c:Icon Glyph="refresh" Size="14" Foreground="{DynamicResource Fg2}" />
+                          <TextBlock Text="Check again" />
+                        </StackPanel>
+                      </Border>
+                    </Button>
+                  </Grid>
                 </StackPanel>
-              </Grid>
+              </StackPanel>
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+
+      <!-- No AI for now: transcripts only, notes turned on later in Settings -->
+      <Border Classes="ai-card" IsVisible="{Binding OffersNoAi}">
+        <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
+          <Button Grid.ColumnSpan="3" Classes="ai-textbtn" Command="{Binding PickNoAiCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+            <Grid ColumnDefinitions="Auto,16,*">
+              <Border Classes="ai-radio" Classes.on="{Binding NoAi}" VerticalAlignment="Center">
+                <Ellipse Width="10" Height="10" Fill="{DynamicResource OnAccent}" IsVisible="{Binding NoAi}" />
+              </Border>
+              <StackPanel Grid.Column="2" Classes="ai-row-text" VerticalAlignment="Center">
+                <TextBlock Classes="ai-row-title" Text="No AI for now" />
+                <TextBlock Classes="ai-row-sub" Text="Just transcripts. Turn notes on later in Settings." />
+              </StackPanel>
+            </Grid>
+          </Button>
+        </Grid>
+      </Border>
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="16,4,0,0" IsVisible="{Binding HasSay}">
+        <c:Spinner IsVisible="{Binding Busy}" Width="12" Height="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+        <TextBlock Classes="ai-row-sub" Text="{Binding Say}" TextWrapping="Wrap" MaxWidth="560" VerticalAlignment="Center" />
+      </StackPanel>
 
       <Border Classes="ai-card" Margin="0,12,0,0">
         <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
