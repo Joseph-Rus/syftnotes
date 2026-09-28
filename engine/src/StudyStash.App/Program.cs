@@ -11,7 +11,7 @@ namespace StudyStash.App;
 static class Program
 {
     /// <summary>Where settings, recordings and the model live (~/.study-stash, or --home).</summary>
-    public static string Home { get; private set; } = Configs.DefaultHome;
+    public static string Home { get; internal set; } = Configs.DefaultHome; // tests point it at a temp folder
 
     /// <summary>Started at login: stay in the menu bar or tray, open no window.</summary>
     public static bool Background { get; private set; }

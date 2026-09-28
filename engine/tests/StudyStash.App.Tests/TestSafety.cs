@@ -11,7 +11,9 @@ static class TestSafety
     internal static void TurnOffSystemChanges()
     {
         Platform.Desktop.SystemChangesOff = true;
-        // The app's log is the real home folder's: a chart a test can't lay out is noted nowhere.
+        // The app's home, and so its log, is a folder of the tests' own: nothing a test logs reaches the real one.
+        Program.Home = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests", "home");
+        Directory.CreateDirectory(System.IO.Path.Combine(Program.Home, "logs"));
         Controls.Rich.SceneCache.Log = _ => { };
     }
 #pragma warning restore CA2255
