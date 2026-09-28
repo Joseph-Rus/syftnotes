@@ -293,6 +293,7 @@ public static partial class Shell
             OpenSettings = () => ShowSettings("AI"),
             OnSource = s => PlaySource(s.Id ?? note.Id, s.At),
         };
+        library.Ask?.Stop(); // an answer about the lecture being left isn't wanted any more
         library.Ask = ask;
         _ = ask.Load();
     }

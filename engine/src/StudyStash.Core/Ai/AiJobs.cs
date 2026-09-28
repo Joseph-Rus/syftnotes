@@ -386,6 +386,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         catch (InvalidDataException) when (shown.Length > 0)
         {
             // Its answer came through; only the list of sources after it didn't.
+            Record(engine, true, "");
             result = new JsonObject { ["answer"] = Py.Strip(shown), ["sources"] = new JsonArray() };
         }
         catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TimeoutException && shown.Length > 0)
