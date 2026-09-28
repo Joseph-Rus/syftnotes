@@ -1,15 +1,16 @@
 {
   "source": "elevenlabs website",
-  "voice": "studystash-audio.mp3",
+  "voice": "adam.mp3",
   "model": "eleven_v4",
   "seconds": {
-    "hook": 4.249,
-    "reveal": 4.392,
-    "record": 5.882,
-    "diagrams": 4.628,
-    "ask": 5.529,
-    "canvas": 3.225,
-    "proof": 2.023,
-    "cta": 2.572
+    "hook": 4.123,
+    "reveal": 4.124,
+    "record": 5.529,
+    "handwriting": 4.016,
+    "diagrams": 4.459,
+    "ask": 5.829,
+    "canvas": 3.198,
+    "proof": 2.083,
+    "cta": 2.885
   }
 }

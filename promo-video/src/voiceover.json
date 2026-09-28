@@ -33,8 +33,7 @@
       "id": "handwriting",
       "at": 0.4,
       "text": "Handwritten notes too: snap a photo on your phone, and it's read right into your notes.",
-      "direction": "easy, a little pleased",
-      "inTake": false
+      "direction": "easy, a little pleased"
     },
     {
       "id": "diagrams",

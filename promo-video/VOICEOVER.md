@@ -26,6 +26,25 @@ Every claim is true of the app:
 - Answers name the moments in the lecture they came from.
 - "Your computers" (plural) covers both setups, a laptop alone or with a library at home.
 
+## The take in the video
+
+**Adam, "Engaging, Friendly and Bright"**, from the ElevenLabs website. From its file name, the settings were:
+
+| Setting | Value |
+|---|---|
+| Model | Multilingual v2 |
+| Speed | 0.95 |
+| Stability | 85% |
+| Similarity | 75% |
+| Style | 40% |
+
+The take is kept in `voice-takes/adam-2026-09-28.mp3`. It was split at the gaps between lines found with Whisper's
+word timings, and every clip was checked by transcribing it. To rebuild it exactly:
+
+```sh
+npm run voice -- --from-take voice-takes/adam-2026-09-28.mp3 --cuts 4.26,8.66,14.55,18.8,23.52,29.57,33.19,35.64
+```
+
 ## Making it on the ElevenLabs website (no API key)
 
 The whole script as one take usually sounds most natural, because it's one continuous read.
