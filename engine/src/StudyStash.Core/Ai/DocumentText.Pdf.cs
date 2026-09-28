@@ -14,8 +14,9 @@ public static partial class DocumentText
     }
 
     /// <summary>The typed text on each of a PDF's first <paramref name="max"/> pages ("" for a page with none);
-    /// null when it isn't a PDF that opens.</summary>
-    internal static List<string>? PdfPages(string path, int max, CancellationToken ct) => PdfPigPages(path, max, ct);
+    /// null when it isn't a PDF that opens. A Mac reads it with PDFKit, as Preview does; elsewhere PdfPig reads it.</summary>
+    internal static List<string>? PdfPages(string path, int max, CancellationToken ct) =>
+        MacVision.Available ? MacVision.PdfPages(path, max, ct) : PdfPigPages(path, max, ct);
 
     /// <summary>PdfPig's reading of a PDF's text, in the order it would be read.</summary>
     internal static List<string>? PdfPigPages(string path, int max, CancellationToken ct)

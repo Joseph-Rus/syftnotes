@@ -57,6 +57,24 @@ public class DocumentTextTests
     }
 
     [Fact]
+    public void PDFKit_on_a_Mac_and_PdfPig_elsewhere_read_the_same_pages()
+    {
+        using var dir = new TempDir();
+        TypedPdf(dir["lab.pdf"], ["Lab 2: Titration"], [], ["Record the endpoint volume"]);
+
+        var pig = DocumentText.PdfPigPages(dir["lab.pdf"], 10, default)!;
+        Assert.Equal(["Lab 2: Titration", "", "Record the endpoint volume"], pig.Select(Py.Strip));
+        Assert.Null(DocumentText.PdfPigPages(dir["missing.pdf"], 10, default));
+        if (!OperatingSystem.IsMacOS()) return;
+        Assert.True(MacVision.Available);
+        Assert.Equal(pig.Select(Py.Strip), MacVision.PdfPages(dir["lab.pdf"], 10, default)!.Select(Py.Strip));
+        Assert.Equal(["Lab 2: Titration"], MacVision.PdfPages(dir["lab.pdf"], 1, default)!.Select(Py.Strip));
+        Assert.Null(MacVision.PdfPages(dir["missing.pdf"], 10, default));
+        File.WriteAllText(dir["fake.pdf"], "not a PDF");
+        Assert.Null(MacVision.PdfPages(dir["fake.pdf"], 10, default));
+    }
+
+    [Fact]
     public async Task A_long_PDF_is_read_only_as_far_as_its_page_limit()
     {
         using var dir = new TempDir();
