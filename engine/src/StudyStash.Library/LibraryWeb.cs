@@ -48,6 +48,8 @@ public sealed class LibraryWebOptions
     public Devices? Devices { get; init; }
     /// <summary>The phone app's files (web/dist). Null: STUDYSTASH_WEB_DIR, else web/ beside the app.</summary>
     public string? PhoneApp { get; init; }
+    /// <summary>Reads an attachment's words (path → text, or null). Null: <see cref="StudyStash.Core.Ai.DocumentText"/>.</summary>
+    public Func<string, CancellationToken, Task<string?>>? ReadDocument { get; init; }
 }
 
 /// <summary>Small pieces of HTTP the Python engine got from its web framework.</summary>
@@ -401,6 +403,7 @@ public sealed partial class LibraryWeb
         })));
 
         MapApp(app);
+        MapAttachments(app);
         MapCanvas(app);
         MapChat(app);
         MapFiles(app);
@@ -480,7 +483,7 @@ public sealed partial class LibraryWeb
     {
         var c = Context(role, current, ("/", cfg.PoolName));
         var rows = store.ListNotes(name);
-        string canvasPart = ClassCanvas(name) + ClassFiles(name);
+        string canvasPart = ClassCanvas(name) + ClassFiles(name) + AttachmentsPart(name, null, role == "admin");
         // On the library's own computer, a class can open in a terminal with the AI (Claude Code by default).
         string open = terminal
             ? $"<form method=\"post\" action=\"/terminal\"><input type=\"hidden\" name=\"class\" value=\"{Ui.Esc(name)}\"><button>Open in {Ui.Esc(AgentCli)}</button></form>"
@@ -597,7 +600,7 @@ public sealed partial class LibraryWeb
         string body = $"<a class=\"back only-wide\" href=\"{back.Item1}\">{Ui.Esc(back.cls)}</a>"
             + $"<h1>{Ui.Esc(title)}</h1><dl class=\"about\">{aboutHtml}</dl>"
             + $"<div class=\"toolbar\">{string.Concat(actions)}</div>"
-            + $"<div style=\"height:1.4rem\"></div>{notice}{tabbar}<div class=\"sheet\">{panes}</div>";
+            + $"<div style=\"height:1.4rem\"></div>{notice}{tabbar}<div class=\"sheet\">{panes}</div>{AttachmentsPart(null, noteId, role == "admin")}";
         return Show(title, body, c, math: true);
     }
 

@@ -33,6 +33,13 @@ public interface ILibrarySource
 
     /// <summary>The words in a file search found, from <paramref name="offset"/> on, or why not.</summary>
     Task<string> ReadFileAsync(string path, int offset) => Task.FromResult("This library can't open files.");
+
+    /// <summary>What the student attached to a lecture, or anywhere in a class, or everywhere (as /api/v2/attachments
+    /// lists them); [] where the library has none.</summary>
+    Task<JsonArray> AttachmentsAsync(string? className, string? lectureId) => Task.FromResult(new JsonArray());
+
+    /// <summary>One attachment's words ({id, name, text, reading}), or null when there's no such attachment.</summary>
+    Task<JsonObject?> AttachmentTextAsync(string id) => Task.FromResult<JsonObject?>(null);
 }
 
 /// <summary>The library on this computer.</summary>
@@ -44,6 +51,12 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
     public bool HasCanvas => canvas is not null;
 
     public bool CanReadFiles => files is not null;
+
+    public Task<JsonArray> AttachmentsAsync(string? className, string? lectureId) =>
+        Task.FromResult(new JsonArray([.. reader.Store.ListAttachments(className, lectureId).Select(a => (JsonNode)a.ToJson())]));
+
+    public Task<JsonObject?> AttachmentTextAsync(string id) => Task.FromResult(reader.Store.GetAttachment(id) is { } a
+        ? new JsonObject { ["id"] = a.Id, ["name"] = a.Name, ["text"] = a.Text, ["reading"] = a.State == Attachment.Reading } : null);
 
     public Task<string> ReadFileAsync(string path, int offset) => Task.FromResult(ReadFile(path, offset));
 
@@ -160,7 +173,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
 /// The library over its API (/api/v2), with the laptop's password: what the Study Stash app shows, and what Claude
 /// reads through <c>Study Stash mcp</c> on a laptop.
 /// </summary>
-public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http = null) : ILibrarySource
+public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http = null) : ILibrarySource, IAttachmentLibrary
 {
     static readonly HttpClient Shared = new() { Timeout = TimeSpan.FromSeconds(150) };
     readonly HttpClient client = http ?? Shared;
@@ -253,6 +266,68 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
         {
             return [];
         }
+    }
+
+    // --- attachments: the student's own notes, slides and handouts, kept by the library ---------------------------
+
+    /// <summary>A lecture's attachments, or a class's, or every one: [] from a library older than attachments.</summary>
+    public async Task<JsonArray> AttachmentsAsync(string? className, string? lectureId) =>
+        (await AttachmentListAsync(className, lectureId))?["attachments"] as JsonArray ?? [];
+
+    /// <summary>The whole answer, {attachments, rewrite} (rewrite for a lecture only: its notes were written without
+    /// some of them); null from a library older than attachments.</summary>
+    public async Task<JsonObject?> AttachmentListAsync(string? className, string? lectureId, CancellationToken stop = default) =>
+        await SendAsync(HttpMethod.Get, "/attachments?" + (lectureId is not null ? $"lecture={Q(lectureId)}" : className is not null ? $"class={Q(className)}" : ""),
+            stop: stop) as JsonObject;
+
+    public async Task<JsonObject?> AttachmentTextAsync(string id) => await SendAsync(HttpMethod.Get, $"/attachments/{Q(id)}/text") as JsonObject;
+
+    /// <summary>Sends files to the library, for a lecture (when <paramref name="lectureId"/> is given) or a class. Hands
+    /// back what it kept. A library older than attachments refuses it with a 404, said in words.</summary>
+    public async Task<JsonArray> AttachAsync(IEnumerable<string> paths, string? className, string? lectureId, CancellationToken stop = default)
+    {
+        using var form = new MultipartFormDataContent();
+        if (lectureId is not null) form.Add(new StringContent(lectureId), "lecture");
+        else if (className is not null) form.Add(new StringContent(className), "class");
+        var opened = new List<Stream>();
+        try
+        {
+            foreach (string path in paths)
+            {
+                var file = File.OpenRead(path);
+                opened.Add(file);
+                form.Add(new StreamContent(file), "file", Path.GetFileName(path));
+            }
+            using var request = new HttpRequestMessage(HttpMethod.Post, root + "/attachments") { Content = form };
+            if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+            if (Computer.Length > 0) request.Headers.TryAddWithoutValidation("X-Study-Stash-Computer", Computer);
+            using var r = await client.SendAsync(request, stop);
+            string text = await r.Content.ReadAsStringAsync(stop);
+            if (r.StatusCode == HttpStatusCode.NotFound && !text.Contains("lecture", StringComparison.Ordinal))
+                throw new LibraryRefusedException(404, "Your library runs an older Study Stash: update it to attach files.");
+            if (!r.IsSuccessStatusCode)
+                throw new LibraryRefusedException((int)r.StatusCode, (JsonNode.Parse(text.Length > 0 && text[0] == '{' ? text : "{}") as JsonObject)?["detail"]?.GetValue<string>() ?? r.ReasonPhrase ?? "");
+            return (JsonNode.Parse(text) as JsonObject)?["attachments"] as JsonArray ?? [];
+        }
+        finally
+        {
+            foreach (var s in opened) await s.DisposeAsync();
+        }
+    }
+
+    /// <summary>Removes an attachment on the library, its file too. False: there was no such attachment.</summary>
+    public async Task<bool> RemoveAttachmentAsync(string id) => await SendAsync(HttpMethod.Delete, $"/attachments/{Q(id)}") is not null;
+
+    /// <summary>Copies an attachment's file from the library to <paramref name="path"/>.</summary>
+    public async Task DownloadAttachmentAsync(string id, string path, CancellationToken stop = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, root + $"/attachments/{Q(id)}/raw");
+        if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        using var r = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, stop);
+        if (!r.IsSuccessStatusCode) throw new LibraryRefusedException((int)r.StatusCode, r.StatusCode == HttpStatusCode.NotFound ? "It isn't on your library any more." : r.ReasonPhrase ?? "");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await using var file = File.Create(path);
+        await r.Content.CopyToAsync(file, stop);
     }
 
     static JsonObject CanvasErr(string msg) => new() { ["error"] = msg };
@@ -477,6 +552,31 @@ public static class ClaudeTools
     }
 
     public const int TranscriptChars = PageChars;
+
+    /// <summary>What the student attached, one a line: [id] name — class, lecture, kind, size, and whether its words can be read.</summary>
+    public static async Task<string> ListAttachmentsAsync(ILibrarySource lib, string? className, string? lectureId)
+    {
+        string? cls = string.IsNullOrWhiteSpace(className) ? null : className.Trim(), lecture = string.IsNullOrWhiteSpace(lectureId) ? null : lectureId.Trim();
+        var list = (await lib.AttachmentsAsync(cls, lecture)).OfType<JsonObject>().ToList();
+        if (list.Count == 0) return lecture is not null ? "Nothing is attached to that lecture." : cls is not null ? $"Nothing is attached in {cls}." : "Nothing is attached yet.";
+        return string.Join("\n", list.Select(a =>
+        {
+            string name = S(a["name"]), type = S(a["type"]);
+            string words = Bool(a["hasText"]) ? "read_attachment reads it" : Bool(a["reading"]) ? "its words are still being read" : "no words could be read from it";
+            string of = S(a["lecture"]) is { Length: > 0 } l ? $", lecture {l}" : "";
+            long size = a["size"] is JsonValue sv && sv.TryGetValue(out long b) ? b : 0;
+            return $"- [{S(a["id"])}] {name} — {S(a["class"])}{of}, {Attachments.KindOf(name, type).ToLowerInvariant()}, {Attachments.SizeLabel(size)}; {words}";
+        }));
+    }
+
+    /// <summary>An attachment's words, a page at a time.</summary>
+    public static async Task<string> ReadAttachmentAsync(ILibrarySource lib, string id, int offset)
+    {
+        var a = await lib.AttachmentTextAsync(id.Trim());
+        if (a is null) return $"There's no attachment {id}. list_attachments gives their ids.";
+        if (Bool(a["reading"])) return $"{S(a["name"])}'s words are still being read. Try again in a minute.";
+        return Page(S(a["text"]), offset, $"No words could be read from {S(a["name"])}.");
+    }
 
     static double? ParseClock(string? t)
     {
@@ -756,6 +856,20 @@ public static class ClaudeTools
                 Named("get_transcript", "Read a lecture's transcript", "What was said in one lecture, line by line, each line with its "
                     + "time. Up to 40,000 characters a call; a longer stretch ends with the start value to read on from. Use it to "
                     + "quote the lecturer or check what the notes leave out. The id comes from list_lectures or search_notes.")),
+            McpServerTool.Create(
+                ([Description("Only this class (a name from list_classes). Leave out for every class.")] string? class_name = null,
+                 [Description("Only this lecture's (an id from list_lectures or search_notes).")] string? lecture_id = null) =>
+                    ListAttachmentsAsync(lib, class_name, lecture_id),
+                Named("list_attachments", "List attachments", "Files the student attached to a lecture or a class: their own "
+                    + "handwritten notes, slides, handouts. One a line: [id] name — class, lecture, kind, size. Use it to find the "
+                    + "student's own notes or the slides for a lecture; read_attachment takes the id in brackets.")),
+            McpServerTool.Create(
+                ([Description("The attachment's id, from list_attachments.")] string attachment_id,
+                 [Description("Start this many characters in: the offset a previous answer's last line gives. 0 for the beginning.")] int offset = 0) =>
+                    ReadAttachmentAsync(lib, attachment_id, offset),
+                Named("read_attachment", "Read an attachment", "The words in a file the student attached (handwriting and scans "
+                    + "read as text), up to 40,000 characters a call; a longer one ends with the offset to read on from. Use it to "
+                    + "read the student's own notes or a lecture's slides. The id comes from list_attachments.")),
         ];
         if (!lib.HasCanvas) return tools;
         bool canRead = web && lib.CanReadFiles;

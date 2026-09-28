@@ -140,7 +140,7 @@ public static partial class Notes
 /// The SQLite index (state.db) and the Markdown folder tree. A lecture arrives from the laptop with its transcript
 /// and is queued; the pipeline writes notes from the transcript, sorts it into a class, and saves it here.
 /// </summary>
-public sealed class Store : IDisposable
+public sealed partial class Store : IDisposable
 {
     public const string Queued = "queued", Working = "working", Done = "done", Failed = "failed";
 
@@ -201,6 +201,7 @@ public sealed class Store : IDisposable
         Exec(Schema);
         Migrate();
         HasPassages = CreatePassages();
+        CreateAttachments();
     }
 
     public void Dispose() => conn.Dispose();
@@ -471,6 +472,7 @@ public sealed class Store : IDisposable
                 summaryMd.Length > 0 ? summaryMd : null, summaryModel.Length > 0 ? summaryModel : null, Done,
                 error.Length > 0 ? error : null, known ? firstSeen : now, now);
             Index(m.Id, summaryMd.Length > 0 ? summaryMd : m.NotesMarkdown, m.Transcript, now);
+            AttachmentsFollow(m.Id, c.ClassName);
             return path;
         }
     }
@@ -696,6 +698,7 @@ public sealed class Store : IDisposable
         {
             string oldDir = ClassFolder(from), newDir = ClassFolder(to);
             MoveFolder(oldDir, newDir);
+            RenameAttachments(from, to);
             var rows = Rows("SELECT * FROM notes WHERE class_name=?", from);
             string now = Now();
             foreach (var row in rows)
@@ -840,6 +843,7 @@ public sealed class Store : IDisposable
             {
                 Exec("INSERT INTO gone(id, gone_at) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET gone_at=excluded.gone_at", id, now);
                 Exec("DELETE FROM trash WHERE id=?", id);
+                DetachAttachments(id);
             }
             // A laptop that hasn't reached the library in a month has long since dropped old audio anyway.
             Exec("DELETE FROM gone WHERE gone_at < ?", Stamp(DateTimeOffset.UtcNow.AddDays(-30)));

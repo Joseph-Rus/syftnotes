@@ -35,6 +35,8 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
         /// so <see cref="Use"/> can save it exactly as any other note's <c>summary_model</c> would be saved.</summary>
         public string DraftModel = "";
         public string DraftAt = "";
+        /// <summary>The attachments whose words went into the draft (not kept across a restart: then none count as used).</summary>
+        public List<string> AttachmentIds = [];
         /// <summary>Null once the job's finished — nothing left for <see cref="Cancel"/> to stop.</summary>
         public CancellationTokenSource? Cts;
     }
@@ -140,6 +142,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             if (jobs.TryGetValue(id, out var running) && running.State == "working")
                 throw new RewriteRefusedException(409, "a rewrite is already running for this lecture.");
             var m = store.Meeting(row);
+            m.Attached = store.AttachedTo(id); // the new notes use what the student attached, too
             if (Py.Strip(m.Transcript).Length < Summarize.MinTranscriptChars)
                 throw new RewriteRefusedException(409, "this lecture doesn't have enough of a transcript to rewrite from.");
             if (row.Status is Store.Queued or Store.Working)
@@ -148,7 +151,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
                 throw new RewriteRefusedException(409, $"{Engines.Name(engine)} isn't installed on your library's computer.");
 
             var cts = new CancellationTokenSource();
-            var job = new Job { Engine = engine, Started = ai.Checks.Now().ToString("o"), Cts = cts };
+            var job = new Job { Engine = engine, Started = ai.Checks.Now().ToString("o"), Cts = cts, AttachmentIds = [.. m.Attached.Select(a => a.Id)] };
             jobs[id] = job;
             Persist(cfg.Home, id, job);
             _ = RunAsync(id, m, job, cts.Token);
@@ -252,6 +255,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             var c = new Classification(row.ClassName ?? "", row.Confidence ?? 1, row.ClassifiedBy ?? "human",
                 row.LectureTitle ?? "", JsonTopics(row.Topics));
             store.Save(m, c, draft, job.DraftModel);
+            store.MarkAttachmentsUsed(job.AttachmentIds);
             jobs.Remove(id);
             Forget(cfg.Home, id);
             return Build(id, store.Get(id) ?? row, null);

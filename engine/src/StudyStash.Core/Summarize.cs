@@ -311,9 +311,17 @@ public static partial class Summarize
         return string.Join("\n", lines);
     }
 
-    public static string WholePrompt(Meeting m, string transcript, Drawings drawings = Drawings.Flowcharts) =>
+    public static string WholePrompt(Meeting m, string transcript, Drawings drawings = Drawings.Flowcharts, string attached = "") =>
         "You are an expert note-taker for university lectures. Write study notes for this lecture "
-        + $"from its transcript.\n\n{Structure}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}\n\nTranscript:\n{transcript}";
+        + $"from its transcript.\n\n{Structure}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{AttachedPart(attached)}\n\nTranscript:\n{transcript}";
+
+    /// <summary>What the student attached, under its own heading, for the notes to draw on; nothing when there's none.</summary>
+    static string AttachedPart(string attached) => attached.Length == 0 ? ""
+        : "\n\nThe student attached these to the lecture. Use them to get names, terms, formulas and slide titles right, and to "
+          + "cover what the student wrote down, but write the notes from the lecture itself:\n\n" + attached;
+
+    /// <summary>What the student attached gets at most a third of a call's room; the transcript keeps the rest.</summary>
+    const int AttachedShare = 3;
 
     public static string PartPrompt(Meeting m, string part, int i, int n) =>
         $"You are taking notes on part {i} of {n} of a lecture transcript. Write detailed Markdown bullet "
@@ -328,12 +336,12 @@ public static partial class Summarize
             + $"notes. Remove repetition but keep every distinct fact.\n\n{Rules}\n\n{Header(m)}\n\n{joined}";
     }
 
-    public static string MergePrompt(Meeting m, IReadOnlyList<string> notes, Drawings drawings = Drawings.Flowcharts)
+    public static string MergePrompt(Meeting m, IReadOnlyList<string> notes, Drawings drawings = Drawings.Flowcharts, string attached = "")
     {
         string joined = string.Join("\n\n", notes.Select((n, i) => $"### Part {i + 1}\n{n}"));
         return "You are an expert note-taker for university lectures. Below are notes on consecutive parts of one "
             + "lecture. Merge them into one set of study notes, removing repetition and keeping every distinct "
-            + $"fact.\n\n{Structure}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}\n\n{joined}";
+            + $"fact.\n\n{Structure}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{AttachedPart(attached)}\n\n{joined}";
     }
 
     /// <summary>Our own study notes for a lecture, written from its transcript, drawing what <paramref name="drawings"/>
@@ -345,9 +353,12 @@ public static partial class Summarize
         string model = cfg.EffectiveSummaryModel;
         int ctx = await ContextSizeAsync(cfg, model, show);
         int budget = TranscriptBudget(ctx);
+        // What the student attached takes part of the room (never more than a third), and the transcript the rest.
+        string attached = Attachments.Context(m.Attached, Math.Min(Attachments.MaxContextChars, budget / AttachedShare));
+        budget -= attached.Length;
         string text = Py.Strip(TimedText.Plain(m.Transcript)); // a recording's times would only distract the model
         Task<string> Repaired(string notes) => RepairDiagramsAsync(notes, prompt => chat(cfg, model, prompt, ctx));
-        if (text.Length <= budget) return await Repaired(CleanOutput(await chat(cfg, model, WholePrompt(m, text, drawings), ctx)));
+        if (text.Length <= budget) return await Repaired(CleanOutput(await chat(cfg, model, WholePrompt(m, text, drawings, attached), ctx)));
         var parts = SplitTranscript(text, budget);
         var notes = new List<string>();
         for (int i = 0; i < parts.Count; i++)
@@ -360,7 +371,7 @@ public static partial class Summarize
                 folded.Add(i + 1 < notes.Count ? CleanOutput(await chat(cfg, model, CondensePrompt(m, notes[i..(i + 2)]), ctx)) : notes[i]);
             notes = folded;
         }
-        return await Repaired(CleanOutput(await chat(cfg, model, MergePrompt(m, notes, drawings), ctx)));
+        return await Repaired(CleanOutput(await chat(cfg, model, MergePrompt(m, notes, drawings, attached), ctx)));
     }
 
     /// <summary>How many broken diagrams one note sends back to be fixed.</summary>

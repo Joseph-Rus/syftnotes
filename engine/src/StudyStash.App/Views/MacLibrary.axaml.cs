@@ -10,6 +10,9 @@ public partial class MacLibrary : UserControl
     public MacLibrary()
     {
         InitializeComponent();
+        // Files dropped on the lecture are attached to it; on the list of lectures, to the class.
+        AttachFiles.AcceptDrops(NoteScroll, () => (DataContext as LibraryModel)?.LectureFiles);
+        AttachFiles.AcceptDrops(LectureList, () => (DataContext as LibraryModel)?.ClassFiles);
         // Below 900 px the right column has no room: the list fills the window, and what's opened takes its place.
         SizeChanged += (_, e) =>
         {
