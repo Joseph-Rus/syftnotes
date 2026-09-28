@@ -1,5 +1,7 @@
 using System.IO.Compression;
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace StudyStash.Core.Ai;
@@ -38,8 +40,63 @@ public static partial class DocumentText
     public static async Task<string?> ExtractAsync(string path, DocumentTextOptions options, CancellationToken ct)
     {
         if (!CanRead(path) || !File.Exists(path)) return null;
-        string? text = await Task.Run(() => Read(path, options, ct), ct);
-        return Tidy(text);
+        path = Path.GetFullPath(path);
+        string? stamp = Stamp(path);
+        string? kept = options.CacheDir is { } dir ? Path.Combine(dir, Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path))) + ".txt") : null;
+        if (kept is not null && stamp is not null && Cached(kept, stamp) is { } hit) return hit.Length == 0 ? null : hit;
+        string? text = Tidy(await Task.Run(() => Read(path, options, ct), ct));
+        if (kept is not null && stamp is not null && stamp == Stamp(path)) Keep(kept, stamp, text ?? "");
+        return text;
+    }
+
+    /// <summary>What a kept reading is checked against: how the text was read, and the file's size and time changed.
+    /// Null when the file can't be looked at.</summary>
+    static string? Stamp(string path)
+    {
+        try
+        {
+            var fi = new FileInfo(path);
+            return $"{CacheVersion} {fi.Length} {fi.LastWriteTimeUtc.Ticks}";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Raised when reading gets better, so files read the old way are read again.</summary>
+    const int CacheVersion = 1;
+
+    /// <summary>The text kept for a file as it is now ("" for a file with none), or null when there's none or the
+    /// file has changed since.</summary>
+    static string? Cached(string kept, string stamp)
+    {
+        try
+        {
+            if (!File.Exists(kept)) return null;
+            string all = File.ReadAllText(kept);
+            int nl = all.IndexOf('\n', StringComparison.Ordinal);
+            return nl >= 0 && all[..nl] == stamp ? all[(nl + 1)..] : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Keeps a reading, written whole or not at all (two readers of one file can't leave half of one).</summary>
+    static void Keep(string kept, string stamp, string text)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(kept)!);
+            string temp = $"{kept}.{Guid.NewGuid():N}.tmp";
+            File.WriteAllText(temp, stamp + "\n" + text);
+            File.Move(temp, kept, overwrite: true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     static string? Read(string path, DocumentTextOptions options, CancellationToken ct)

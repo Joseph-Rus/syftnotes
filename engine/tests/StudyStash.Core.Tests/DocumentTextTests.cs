@@ -137,6 +137,53 @@ public class DocumentTextTests
     }
 
     [Fact]
+    public async Task A_file_read_once_is_not_read_again_until_it_changes()
+    {
+        using var dir = new TempDir();
+        var cached = new DocumentTextOptions { CacheDir = dir["cache"] };
+        string notes = dir["notes.txt"];
+        File.WriteAllText(notes, "Photosynthesis happens in the chloroplast.");
+        Assert.Equal("Photosynthesis happens in the chloroplast.", await DocumentText.ExtractAsync(notes, cached, default));
+
+        // What's kept is what's answered: the file isn't opened again.
+        string kept = Assert.Single(Directory.GetFiles(dir["cache"]));
+        string[] lines = File.ReadAllLines(kept);
+        File.WriteAllText(kept, lines[0] + "\nfrom the cache");
+        Assert.Equal("from the cache", await DocumentText.ExtractAsync(notes, cached, default));
+        Assert.Equal("Photosynthesis happens in the chloroplast.", await DocumentText.ExtractAsync(notes, NoCache, default));
+
+        // A changed file (a new time, the same size) is read again, and the new reading replaces the old.
+        File.SetLastWriteTimeUtc(notes, DateTime.UtcNow.AddMinutes(1));
+        Assert.Equal("Photosynthesis happens in the chloroplast.", await DocumentText.ExtractAsync(notes, cached, default));
+        File.WriteAllText(notes, "Respiration happens in the mitochondria.");
+        Assert.Equal("Respiration happens in the mitochondria.", await DocumentText.ExtractAsync(notes, cached, default));
+        Assert.Single(Directory.GetFiles(dir["cache"]));
+    }
+
+    [Fact]
+    public async Task A_file_with_no_words_is_remembered_as_having_none()
+    {
+        using var dir = new TempDir();
+        var cached = new DocumentTextOptions { CacheDir = dir["cache"] };
+        File.WriteAllText(dir["blank.txt"], "   ");
+        Assert.Null(await DocumentText.ExtractAsync(dir["blank.txt"], cached, default));
+        string kept = Assert.Single(Directory.GetFiles(dir["cache"]));
+        Assert.Single(File.ReadAllLines(kept)); // the stamp, and no text
+        Assert.Null(await DocumentText.ExtractAsync(dir["blank.txt"], cached, default));
+    }
+
+    [Fact]
+    public async Task A_cache_that_cannot_be_written_only_means_reading_again()
+    {
+        using var dir = new TempDir();
+        File.WriteAllText(dir["in the way"], "a file where the cache's folder would go");
+        File.WriteAllText(dir["notes.txt"], "Ohm's law: V = IR");
+        var cached = new DocumentTextOptions { CacheDir = Path.Combine(dir["in the way"], "cache") };
+        Assert.Equal("Ohm's law: V = IR", await DocumentText.ExtractAsync(dir["notes.txt"], cached, default));
+        Assert.Equal("Ohm's law: V = IR", await DocumentText.ExtractAsync(dir["notes.txt"], cached, default));
+    }
+
+    [Fact]
     public void Tidy_cuts_long_text_and_keeps_emoji_whole()
     {
         Assert.Null(DocumentText.Tidy(null));
