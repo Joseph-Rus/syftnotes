@@ -31,6 +31,8 @@ public sealed class AppSettings
     public bool ComputerAudio { get; set; }
     /// <summary>Filed lectures' audio is deleted after this many days (the notes and transcript stay). 0 keeps it.</summary>
     public int KeepAudioDays { get; set; } = 30;
+    /// <summary>"Download as Markdown…" includes the transcript too (Settings' words: "Include transcripts").</summary>
+    public bool DownloadTranscripts { get; set; }
     /// <summary>What this computer is for.</summary>
     public AppRole Role { get; set; } = AppRole.Laptop;
     /// <summary>This computer is the library too (Both or Library). Read-only: set <see cref="Role"/> instead. Kept

@@ -1,11 +1,13 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
-using Avalonia.Platform.Storage;
+using StudyStash.App.Controls.Rich;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
+using StudyStash.Core.Rich;
 
 namespace StudyStash.App;
 
@@ -479,20 +481,46 @@ public static partial class Shell
         menu.Open(anchor);
     }
 
+    /// <summary>The share/Export button's menu: download this lecture, download the whole open class, and whether a
+    /// download includes the transcript.</summary>
     static async Task ExportAsync()
     {
-        if (library.Note is not { } note || mainWindow is null) return;
-        var file = await mainWindow.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        await Task.Yield(); // opening the menu is itself synchronous; a pick below does the real, awaited work
+        if (library.Note is not { } note || mainWindow?.Content is not Control anchor || mainWindow is null || host.Remote() is not { } lib) return;
+        var menu = Menu();
+        var one = new MenuItem { Header = "Download as Markdown…" };
+        one.Click += async (_, _) => await NotesDownload.LectureAsync(mainWindow, lib, note.Id, Notes.Slugify(note.Title) + ".md", host.Settings.DownloadTranscripts, MermaidSvg());
+        menu.Items.Add(one);
+        string? cls = dueOpen ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
+        if (cls is not null)
         {
-            Title = "Export notes", SuggestedFileName = Notes.Slugify(note.Title) + ".md", DefaultExtension = "md",
-            FileTypeChoices = [new FilePickerFileType("Markdown") { Patterns = ["*.md"] }],
-        });
-        if (file is null) return;
-        string text = $"# {note.Title}\n\n{note.Meta}\n\n{note.Markdown}\n";
-        if (note.Transcript.Count > 0) text += "\n## Transcript\n\n" + string.Join("\n", note.Transcript.Select(t => t.Time.Length > 0 ? $"[{t.Time}] {t.Text}" : t.Text)) + "\n";
-        await using var stream = await file.OpenWriteAsync();
-        await using var w = new StreamWriter(stream);
-        await w.WriteAsync(text);
+            var all = new MenuItem { Header = $"Download all of {cls}…" };
+            all.Click += async (_, _) => await NotesDownload.ClassAsync(mainWindow, lib, cls, host.Settings.DownloadTranscripts, MermaidSvg());
+            menu.Items.Add(all);
+        }
+        menu.Items.Add(new Separator());
+        var transcripts = new MenuItem { Header = "Include transcripts", Icon = host.Settings.DownloadTranscripts ? new Controls.Icon { Glyph = "check", Size = 13 } : null };
+        transcripts.Click += (_, _) => host.Save(s => s.DownloadTranscripts = !s.DownloadTranscripts);
+        menu.Items.Add(transcripts);
+        menu.Open(anchor);
+    }
+
+    /// <summary>Draws a Mermaid flowchart that already parses, in the app's own font, as a standalone SVG for a
+    /// download; null for one that can't be laid out.</summary>
+    static Func<string, string?> MermaidSvg()
+    {
+        var font = Application.Current?.TryFindResource("TextFont", out var v) == true && v is FontFamily f ? f : FontFamily.Default;
+        return source =>
+        {
+            try
+            {
+                return DiagramSvg.Render(DiagramLayout.Lay(Mermaid.Parse(source), SceneCache.Measurer(font)));
+            }
+            catch (MermaidException)
+            {
+                return null;
+            }
+        };
     }
 
     static async Task CaptureAsync(string text)

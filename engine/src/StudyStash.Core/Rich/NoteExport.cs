@@ -130,5 +130,7 @@ public static class NoteExport
         catch (MermaidException) { return null; }
     }
 
-    static string EncodePath(string path) => string.Join('/', path.Split('/').Select(Uri.EscapeDataString));
+    /// <summary>A relative asset path as a Markdown link reads it: each piece (a title with a space or a
+    /// parenthesis) percent-encoded, the "/" between them kept plain.</summary>
+    public static string EncodePath(string path) => string.Join('/', path.Split('/').Select(Uri.EscapeDataString));
 }
