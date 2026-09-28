@@ -353,6 +353,48 @@ public class AttachmentsApiTests
     }
 
     [Fact]
+    public async Task The_lecture_and_class_pages_show_attachments_and_offer_a_rewrite_only_when_there_are_some()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var owned = store;
+        var reading = new TaskCompletionSource<string?>();
+        await using var site = await Site(cfg, store, Options((path, _) => path.EndsWith(".png") ? reading.Task : Task.FromResult<string?>("words")));
+        await site.PostForm("/login", ("password", "pw"), ("next", "/"));
+        string before = await site.Text("/note/n1"), classBefore = await site.Text("/class/BIO%20110");
+        Assert.DoesNotContain("Attachments", before);
+        Assert.DoesNotContain("Attachments", classBefore);
+
+        var body = await Upload(site, Form([("My notes.pdf", Pdf("words"))], lecture: "n1"));
+        await Upload(site, Form([("IMG_1.png", [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0])], cls: "BIO 110"));
+        await Read(store, body["attachments"]![0]!["id"]!.GetValue<string>());
+
+        string page = await site.Text("/note/n1");
+        Assert.Contains("<h2>Attachments</h2>", page);
+        Assert.Contains($"href=\"/attachments/{body["attachments"]![0]!["id"]}\"", page);
+        Assert.Contains("My notes.pdf", page);
+        Assert.Contains("The student&#x27;s own notes · 13 bytes", page);
+        Assert.Contains("Rewrite notes with your attachments", page);
+        Assert.DoesNotContain("IMG_1.png", page); // the class's own, not this lecture's
+        // After the notes, not in their way.
+        Assert.True(page.IndexOf("<h2>Attachments</h2>", StringComparison.Ordinal) > page.IndexOf("<div class=\"sheet\">", StringComparison.Ordinal));
+
+        string cls = await site.Text("/class/BIO%20110");
+        Assert.Contains("My notes.pdf", cls);
+        Assert.Contains("Cells · The student&#x27;s own notes", cls);
+        Assert.Contains("IMG_1.png", cls);
+        Assert.Contains(LibraryWeb.ReadingWords, cls);
+        Assert.Contains("data-refresh", cls);
+        Assert.DoesNotContain("Rewrite notes with your attachments", cls);
+
+        // Rewriting from the page queues the lecture; once it's written with them, the offer goes.
+        await site.PostForm("/note/n1/resummarize");
+        Assert.Equal(Store.Queued, store.Get("n1")!.Status);
+        Assert.DoesNotContain("Rewrite notes with your attachments", await site.Text("/note/n1"));
+        reading.SetResult(null);
+    }
+
+    [Fact]
     public async Task Attachments_a_restart_left_unread_are_read_when_the_library_starts()
     {
         using var dir = new TempDir();

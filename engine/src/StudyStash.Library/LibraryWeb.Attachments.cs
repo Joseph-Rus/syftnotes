@@ -181,6 +181,37 @@ public sealed partial class LibraryWeb
         }
     }
 
+    /// <summary>"Reading your handwriting…" while an attachment's words are read.</summary>
+    public const string ReadingWords = "Reading your handwriting…";
+
+    /// <summary>The attachments part of a lecture's page (<paramref name="noteId"/>) or a class's page: each file,
+    /// which opens it, what kind it is and its size; and on a lecture whose notes were written without some of them,
+    /// "Rewrite notes with your attachments". Nothing at all when there are none, so the page looks as it always has.</summary>
+    string AttachmentsPart(string? className, string? noteId, bool admin)
+    {
+        var list = store.ListAttachments(noteId is null ? className : null, noteId);
+        if (list.Count == 0) return "";
+        var titles = new Dictionary<string, string>();
+        string Of(string id) => titles.TryGetValue(id, out var t) ? t
+            : titles[id] = store.Get(id) is { } r ? FirstOf(r.LectureTitle, r.Title, "a lecture") : "a lecture";
+        string rows = string.Concat(list.Select(a =>
+        {
+            string state = a.State == Attachment.Reading ? ReadingWords : a.HasText ? "" : "No words to read in it";
+            string about = string.Join(" · ", new[]
+            {
+                noteId is null && a.NoteId is { } n ? Of(n) : "", Attachments.KindOf(a.Name, a.Type), Attachments.SizeLabel(a.Size), state,
+            }.Where(s => s.Length > 0));
+            return $"<a class=\"row\" href=\"/attachments/{Ui.Quote(a.Id, "")}\"><div class=\"grow\"><div class=\"title\">{Ui.Esc(a.Name)}</div>"
+                + $"<div class=\"subtitle\">{Ui.Esc(about)}</div></div></a>";
+        }));
+        bool reading = list.Any(a => a.State == Attachment.Reading);
+        string rewrite = noteId is not null && admin && RewriteOffered(noteId)
+            ? $"<form class=\"row\" method=\"post\" action=\"/note/{Ui.Quote(noteId, "")}/resummarize\"><span class=\"grow\">Your notes were written before some of these came.</span>"
+              + "<button>Rewrite notes with your attachments</button></form>"
+            : "";
+        return $"<h2>Attachments</h2><div class=\"group\"{(reading ? " data-refresh=\"15\"" : "")}>{rows}{rewrite}</div>";
+    }
+
     static IResult TooBig() => Http.Detail(StatusCodes.Status413PayloadTooLarge, "That's more than 200 MB at once. Attach fewer files, or smaller ones.");
 
     /// <summary>Copies a part to disk, stopping once it passes <paramref name="room"/> bytes (then the size is -1).

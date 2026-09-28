@@ -477,7 +477,7 @@ public sealed partial class LibraryWeb
     {
         var c = Context(role, current, ("/", cfg.PoolName));
         var rows = store.ListNotes(name);
-        string canvasPart = ClassCanvas(name) + ClassFiles(name);
+        string canvasPart = ClassCanvas(name) + ClassFiles(name) + AttachmentsPart(name, null, role == "admin");
         // On the library's own computer, a class can open in a terminal with the AI (Claude Code by default).
         string open = terminal
             ? $"<form method=\"post\" action=\"/terminal\"><input type=\"hidden\" name=\"class\" value=\"{Ui.Esc(name)}\"><button>Open in {Ui.Esc(AgentCli)}</button></form>"
@@ -594,7 +594,7 @@ public sealed partial class LibraryWeb
         string body = $"<a class=\"back only-wide\" href=\"{back.Item1}\">{Ui.Esc(back.cls)}</a>"
             + $"<h1>{Ui.Esc(title)}</h1><dl class=\"about\">{aboutHtml}</dl>"
             + $"<div class=\"toolbar\">{string.Concat(actions)}</div>"
-            + $"<div style=\"height:1.4rem\"></div>{notice}{tabbar}<div class=\"sheet\">{panes}</div>";
+            + $"<div style=\"height:1.4rem\"></div>{notice}{tabbar}<div class=\"sheet\">{panes}</div>{AttachmentsPart(null, noteId, role == "admin")}";
         return Show(title, body, c, math: true);
     }
 
