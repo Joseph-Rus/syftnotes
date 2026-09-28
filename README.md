@@ -145,6 +145,9 @@ the notes, in a quick answer and in the Ask chat:
 - **Download**: a lecture's "Download as Markdown…" (or a whole class's) saves a `.md` file that
   Obsidian, Typora and VS Code all open well — formulas stay LaTeX, a Mermaid diagram is saved
   again as an SVG beside it, and an SVG diagram becomes an image link to its own sanitised file.
+  "Download as PDF…" saves the notes as the app draws them, ready to print: headings, tables, typeset
+  formulas and diagrams as sharp vector drawings with the text selectable, light on white whatever
+  the app's look, on Letter paper where that's the local size and A4 elsewhere, with page numbers.
 
 ## Canvas
 
