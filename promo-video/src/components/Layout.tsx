@@ -1,8 +1,7 @@
 import React from 'react';
-import {AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, fonts} from '../config';
 import {spr} from '../anim';
-import {Logo} from './Logo';
 
 export const useVertical = () => {
   const {width, height} = useVideoConfig();
@@ -165,8 +164,9 @@ export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
       }}
     >
       <div style={{position: 'absolute', left: 26, top: 0, height: MENU_H, display: 'flex', alignItems: 'center', gap: 25}}>
-        <span style={{fontWeight: 700}}>Study Stash</span>
-        {wide ? ['File', 'Edit', 'View', 'Window', 'Help'].map((m) => <span key={m}>{m}</span>) : null}
+        {/* Study Stash lives in the menu bar only, so the menus are those of the app in front: Finder. */}
+        <span style={{fontWeight: 700}}>Finder</span>
+        {wide ? ['File', 'Edit', 'View', 'Go', 'Window', 'Help'].map((m) => <span key={m}>{m}</span>) : null}
       </div>
       {slots.map(([key, w]) => (
         <div
@@ -186,7 +186,7 @@ export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
             whiteSpace: 'nowrap',
           }}
         >
-          {key === 'app' ? <Logo size={23} shadow={false} flat ink={INK} /> : key === 'clock' ? 'Tue 23 Sep  10:02' : <MenuGlyph kind={key} />}
+          {key === 'app' ? <Img src={staticFile('mark-36.png')} style={{height: 21, filter: 'invert(1)'}} /> : key === 'clock' ? 'Tue 23 Sep  10:02' : <MenuGlyph kind={key} />}
         </div>
       ))}
     </div>
@@ -245,9 +245,9 @@ export const Win: React.FC<{w: number; h: number; style?: React.CSSProperties; c
       width: w,
       height: h,
       background: colors.window,
-      border: '1px solid rgba(16,24,40,0.10)',
+      border: `1px solid ${colors.edge}`,
       borderRadius: 22,
-      boxShadow: '0 1px 2px rgba(16,24,40,0.06), 0 34px 80px -26px rgba(34, 52, 100, 0.42)',
+      boxShadow: '0 0 0 0.5px rgba(0,0,0,0.6), 0 40px 90px -24px rgba(0, 0, 20, 0.7)',
       overflow: 'hidden',
       position: 'relative',
       fontFamily: fonts.ui,

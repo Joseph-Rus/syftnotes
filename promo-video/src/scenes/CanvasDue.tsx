@@ -15,7 +15,7 @@ const RUBRIC: [string, number][] = [
 ];
 
 const DueIcon = () => (
-  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={colors.lagoonDeep} strokeWidth="2" strokeLinecap="round">
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={colors.lagoonBright} strokeWidth="2" strokeLinecap="round">
     <rect x="3.5" y="5" width="17" height="15" rx="3" />
     <path d="M8 3v4M16 3v4M3.5 10h17" />
   </svg>
@@ -25,25 +25,25 @@ const Detail: React.FC<{frame: number}> = ({frame}) => {
   const f = frame - PICK;
   const p = spr(f, 2, {damping: 26, stiffness: 150, mass: 0.9});
   return (
-    <div style={{padding: '34px 40px 0', opacity: p, transform: `translateY(${(1 - p) * 10}px)`}}>
+    <div style={{padding: '70px 40px 0', opacity: p, transform: `translateY(${(1 - p) * 10}px)`}}>
       <div style={{display: 'flex', alignItems: 'center', gap: 9, fontSize: 15, color: colors.text2}}>
         <ClassDot color={colors.cs} size={8} /> CS 101 · Assignment
       </div>
       <div style={{fontFamily: fonts.display, fontSize: 36, fontWeight: 700, marginTop: 8, letterSpacing: '-0.02em'}}>Lab 3: recursion traces</div>
-      <div style={{display: 'flex', marginTop: 20, borderRadius: 16, background: 'rgba(14,149,148,0.08)', overflow: 'hidden'}}>
+      <div style={{display: 'flex', marginTop: 20, borderRadius: 16, background: colors.card, border: `1px solid ${colors.edge}`, overflow: 'hidden'}}>
         {[
           ['Due', '30 Sep, 11:59 PM'],
           ['Points', '20'],
           ['Status', 'To do'],
         ].map(([k, v], i) => (
-          <div key={k} style={{flex: i ? 1 : 1.6, padding: '13px 18px', borderLeft: i ? '1px solid rgba(255,255,255,0.9)' : 'none', whiteSpace: 'nowrap'}}>
+          <div key={k} style={{flex: i ? 1 : 1.6, padding: '13px 18px', borderLeft: i ? `1px solid ${colors.line}` : 'none', whiteSpace: 'nowrap'}}>
             <div style={{fontSize: 13.5, color: colors.text2}}>{k}</div>
             <div style={{fontSize: 17.5, fontWeight: 600, marginTop: 3}}>{v}</div>
           </div>
         ))}
       </div>
       <div style={{fontSize: 19, fontWeight: 700, marginTop: 24}}>Instructions</div>
-      <div style={{fontFamily: fonts.serif, fontSize: 19, lineHeight: 1.5, marginTop: 6, color: '#2B3342'}}>
+      <div style={{fontFamily: fonts.serif, fontSize: 19, lineHeight: 1.5, marginTop: 6, color: colors.serifInk}}>
         Trace factorial(4) and fib(5) by hand. Draw the call stack at its deepest point.
       </div>
       <div style={{fontSize: 19, fontWeight: 700, marginTop: 22}}>Rubric</div>
@@ -57,11 +57,11 @@ const Detail: React.FC<{frame: number}> = ({frame}) => {
           </div>
         );
       })}
-      <div style={{opacity: spr(f, 44), marginTop: 18, padding: '15px 18px', borderRadius: 16, background: 'rgba(16,24,40,0.045)'}}>
+      <div style={{opacity: spr(f, 44), marginTop: 18, padding: '15px 18px', borderRadius: 16, background: colors.card, border: `1px solid ${colors.edge}`}}>
         <div style={{fontSize: 16.5, fontWeight: 600}}>
           Nothing handed in yet <span style={{fontWeight: 400, color: colors.text2, marginLeft: 8}}>Due in 5 days</span>
         </div>
-        <div style={{fontSize: 15.5, color: colors.lagoonDeep, marginTop: 5, fontWeight: 600}}>Hand it in on Canvas ↗</div>
+        <div style={{fontSize: 15.5, color: colors.lagoonBright, marginTop: 5, fontWeight: 600}}>Hand it in on Canvas ↗</div>
       </div>
     </div>
   );
@@ -85,7 +85,7 @@ export const CanvasDue: React.FC = () => {
   const list = (
     <>
       <ListHead title="Due" sub="3 to hand in · synced 10:24" />
-      <Group name="Overdue" />
+      <Group name="Overdue" accent />
       <ListRow style={rowStyle(0)} title="Reading response" sub="HIST 210 · Was due Mon" color={colors.hist} right="Missing" accent />
       <Group name="This week" />
       <ListRow style={rowStyle(1)} title="Quiz 3 practice" sub="CALC II · Tomorrow, 9:00 AM" color={colors.calc} right="To do" />
@@ -98,7 +98,7 @@ export const CanvasDue: React.FC = () => {
     <Sidebar
       footer="Canvas synced 10:24"
       top={
-        <div style={{display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', marginBottom: 10, borderRadius: 11, background: 'rgba(16,24,40,0.065)', fontSize: 17, fontWeight: 600}}>
+        <div style={{display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', marginBottom: 10, borderRadius: 11, background: colors.hover, border: `1px solid ${colors.edge}`, fontSize: 17, fontWeight: 700}}>
           <DueIcon />
           <div style={{flex: 1}}>Due</div>
           <div style={{color: colors.text2, fontWeight: 400}}>3</div>
@@ -113,12 +113,18 @@ export const CanvasDue: React.FC = () => {
     />
   );
   // Lab 3's row in the list column.
-  const lab = {x: left + ((vertical ? 0 : 252) + 150) * z, y: top + (20 + 60 + 34 + 64 + 34 + 64 + 30) * z};
+  const lab = {x: left + ((vertical ? 0 : 252) + 150) * z, y: top + ((vertical ? 44 : 28) + 52 + 37 + 64 + 37 + 64 + 32) * z};
   return (
     <AbsoluteFill>
       <Desktop>
         <div style={{position: 'absolute', left: left / z, top: top / z, zoom: z, opacity: win, transform: `translateY(${(1 - win) * 30}px) scale(${0.98 + 0.02 * win})`}}>
           <LibraryWindow w={w} h={h} sidebar={sidebar} list={list} listWidth={listW}>
+            <div style={{position: 'absolute', top: 16, right: 18, display: 'flex', gap: 10, fontSize: 15, fontWeight: 600}}>
+              <div style={{display: 'flex', alignItems: 'center', gap: 8, padding: '9px 16px', borderRadius: 999, background: colors.card, border: `1px solid ${colors.edge}`}}>↗ Open in Canvas</div>
+              <div style={{width: 40, height: 40, borderRadius: 20, background: colors.card, border: `1px solid ${colors.edge}`, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={colors.text} strokeWidth="2.4"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" strokeLinecap="round" /></svg>
+              </div>
+            </div>
             {chosen ? <Detail frame={frame} /> : null}
           </LibraryWindow>
         </div>

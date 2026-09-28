@@ -14,13 +14,19 @@ export const colors = {
   ink: '#19263F', // captions
   ink2: '#4A5670',
   highlighter: 'rgba(251, 221, 103, 0.85)',
-  // The app's light windows.
-  text: '#1D2330',
-  text2: '#667085',
-  text3: '#9AA1AE',
-  line: 'rgba(16, 24, 40, 0.08)',
-  window: 'rgba(248, 251, 252, 0.97)',
-  pane: 'rgba(255, 255, 255, 0.72)',
+  // The app in dark mode, as its own screenshot tests draw it (MacLibrary, MacPanel, MacQuick in dark).
+  text: '#EEF2F6',
+  text2: '#9AA7B6',
+  text3: '#768496',
+  line: 'rgba(255, 255, 255, 0.08)',
+  edge: 'rgba(255, 255, 255, 0.10)',
+  window: '#0F1A21',
+  pane: 'rgba(255, 255, 255, 0.035)',
+  hover: 'rgba(255, 255, 255, 0.09)',
+  card: 'rgba(255, 255, 255, 0.055)',
+  popup: 'linear-gradient(180deg, #1C2A42 0%, #162137 100%)',
+  serifInk: '#E6E9EE',
+  lagoonBright: '#34C1BD',
   // The desktop picture: a night-blue sky and a glossy silk wave, in the style of a macOS wallpaper.
   desk: {
     sky: ['#03041A', '#0E0F55', '#2A1E9C', '#5B45C9'],

@@ -46,8 +46,8 @@ const Cycle: React.FC<{frame: number}> = ({frame}) => (
       const p = ease(frame, 24 + i * 8, 38 + i * 8);
       return (
         <g key={i}>
-          <path d={arc.d} fill="none" stroke="#8C95A5" strokeWidth="2.5" pathLength={1} strokeDasharray="1" strokeDashoffset={1 - p} strokeLinecap="round" />
-          <path d="M-10,-6.5 L0,0 L-10,6.5" transform={`translate(${arc.end[0]},${arc.end[1]}) rotate(${arc.angle})`} fill="none" stroke="#8C95A5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity={p >= 0.98 ? 1 : 0} />
+          <path d={arc.d} fill="none" stroke="#7F8BA0" strokeWidth="2.5" pathLength={1} strokeDasharray="1" strokeDashoffset={1 - p} strokeLinecap="round" />
+          <path d="M-10,-6.5 L0,0 L-10,6.5" transform={`translate(${arc.end[0]},${arc.end[1]}) rotate(${arc.angle})`} fill="none" stroke="#7F8BA0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity={p >= 0.98 ? 1 : 0} />
         </g>
       );
     })}
@@ -57,7 +57,7 @@ const Cycle: React.FC<{frame: number}> = ({frame}) => (
       const first = i === 0;
       return (
         <g key={s} transform={`translate(${b.x},${b.y}) scale(${p})`} opacity={Math.min(1, p * 2)}>
-          <rect x={-b.w / 2} y={-b.h / 2} width={b.w} height={b.h} rx={first ? b.h / 2 : 12} fill={first ? 'rgba(14,149,148,0.14)' : '#fff'} stroke={first ? colors.lagoon : 'rgba(16,24,40,0.16)'} strokeWidth="1.8" />
+          <rect x={-b.w / 2} y={-b.h / 2} width={b.w} height={b.h} rx={first ? b.h / 2 : 12} fill={first ? 'rgba(52,193,189,0.16)' : '#172431'} stroke={first ? colors.lagoonBright : colors.edge} strokeWidth="1.8" />
           <text x={0} y={-3} textAnchor="middle" fontFamily={fonts.ui} fontSize="17.5" fontWeight={600} fill={INK}>
             {s}
           </text>
@@ -121,20 +121,20 @@ const Graph: React.FC<{frame: number}> = ({frame}) => {
           <rect x="0" y="0" width={GW} height={GH} />
         </clipPath>
       </defs>
-      <line x1={px(GX0)} y1={py(0)} x2={px(GX1)} y2={py(0)} stroke="rgba(16,24,40,0.22)" strokeWidth="1.6" />
-      <line x1={px(0)} y1={py(GY0)} x2={px(0)} y2={py(GY1)} stroke="rgba(16,24,40,0.22)" strokeWidth="1.6" />
-      <path clipPath="url(#plot-light)" d={`M${curve}`} fill="none" stroke={colors.calc} strokeWidth="3.5" pathLength={1} strokeDasharray="1" strokeDashoffset={1 - draw} strokeLinecap="round" />
+      <line x1={px(GX0)} y1={py(0)} x2={px(GX1)} y2={py(0)} stroke="rgba(255,255,255,0.22)" strokeWidth="1.6" />
+      <line x1={px(0)} y1={py(GY0)} x2={px(0)} y2={py(GY1)} stroke="rgba(255,255,255,0.22)" strokeWidth="1.6" />
+      <path clipPath="url(#plot-light)" d={`M${curve}`} fill="none" stroke="#A78BFA" strokeWidth="3.5" pathLength={1} strokeDasharray="1" strokeDashoffset={1 - draw} strokeLinecap="round" />
       <g clipPath="url(#plot-light)" opacity={secant}>
-        <line x1={px(-0.6)} y1={py(line(-0.6))} x2={px(2.3)} y2={py(line(2.3))} stroke={colors.lagoon} strokeWidth="3" />
+        <line x1={px(-0.6)} y1={py(line(-0.6))} x2={px(2.3)} y2={py(line(2.3))} stroke={colors.lagoonBright} strokeWidth="3" />
       </g>
       <g opacity={secant}>
-        <circle cx={px(1)} cy={py(1)} r="7" fill={colors.lagoon} />
-        <circle cx={px(1 + h)} cy={py((1 + h) ** 2)} r="7" fill="#fff" stroke={colors.lagoon} strokeWidth="2.5" />
+        <circle cx={px(1)} cy={py(1)} r="7" fill={colors.lagoonBright} />
+        <circle cx={px(1 + h)} cy={py((1 + h) ** 2)} r="7" fill={colors.window} stroke={colors.lagoonBright} strokeWidth="2.5" />
         <text x={px(1 + h / 2) + 8} y={py(0) + 30} fontFamily={fonts.serif} fontStyle="italic" fontSize="24" fill={MUTED} opacity={1 - label}>
           h
         </text>
       </g>
-      <text x={px(1.3)} y={py(1) + 40} fontFamily={fonts.ui} fontSize="20" fontWeight={600} fill={colors.lagoonDeep} opacity={label}>
+      <text x={px(1.3)} y={py(1) + 40} fontFamily={fonts.ui} fontSize="20" fontWeight={600} fill={colors.lagoonBright} opacity={label}>
         slope = 2
       </text>
     </svg>
@@ -158,11 +158,15 @@ const Page: React.FC<{cls: string; color: string; meta: string; title: string; b
         <ClassDot color={color} size={8} /> {cls} · {meta}
       </div>
       <div style={{fontFamily: fonts.display, fontSize: 36, fontWeight: 700, marginTop: 8, letterSpacing: '-0.02em'}}>{title}</div>
+      <div style={{display: 'inline-flex', marginTop: 14, padding: 3, borderRadius: 999, background: colors.card, border: `1px solid ${colors.edge}`, fontSize: 14.5, fontWeight: 600}}>
+        <div style={{padding: '6px 18px', borderRadius: 999, background: 'rgba(255,255,255,0.12)'}}>Notes</div>
+        <div style={{padding: '6px 18px', color: colors.text2}}>Transcript</div>
+      </div>
       <div style={{display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 16}}>
-        <span style={{fontSize: 19, fontWeight: 700}}>Summary</span>
+        <span style={{fontFamily: fonts.display, fontSize: 20, fontWeight: 600}}>Summary</span>
         <span style={{fontSize: 14, color: colors.text3}}>Written by {by}</span>
       </div>
-      <div style={{fontFamily: fonts.serif, fontSize: 19.5, lineHeight: 1.5, marginTop: 8, color: '#2B3342'}}>{summary}</div>
+      <div style={{fontFamily: fonts.serif, fontSize: 19.5, lineHeight: 1.5, marginTop: 8, color: colors.serifInk}}>{summary}</div>
       {children}
     </div>
   );
@@ -237,8 +241,8 @@ export const Diagrams: React.FC = () => {
       <ListRow title="Patient safety" sub="Thu 18 Sep · 1 h 02 min" color={colors.health} />
     </>
   );
-  // Where CALC II sits in the sidebar: window, sidebar margin, traffic lights, the "Classes" label, two rows down.
-  const calcRow = {x: left + 12 + 120, y: top + 12 + 62 + 30 + 2 * 44 + 20};
+  // Where CALC II sits in the sidebar: below the traffic lights and the "Classes" label, the third row.
+  const calcRow = {x: left + 12 + 112, y: top + 194};
   return (
     <AbsoluteFill>
       <Desktop>

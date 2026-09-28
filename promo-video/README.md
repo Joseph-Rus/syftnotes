@@ -1,7 +1,10 @@
 # Study Stash promo video
 
 A 35-second promotional video for Study Stash, made with [Remotion](https://www.remotion.dev) (React for
-video). It shows the app as it is: its light look on a Mac desktop, and a pointer that uses it. It's built from code,
+video). It shows the app as it is, in dark mode on a Mac desktop, with a pointer that uses it. The dropdown, the library
+window, the Ask bar's "Answer with" menu and Canvas are drawn to match the app's own screenshot tests
+(`engine/tests/StudyStash.App.Tests`: `mac-01-dropdown`, `mac-04-full-app`, `mac-16-ai-ask-picker`,
+`mac-09-canvas-due`, in dark). It's built from code,
 SVG and the app's own fonts, with no images from other sites. It lives apart from the app: nothing here is part of
 the app's build.
 
@@ -46,7 +49,7 @@ npm run render:all          # both
 | 3–6 s | Reveal | The icon, **Study Stash**, "Your lectures, written up and filed by class." |
 | 6–12 s | Record | The menu bar icon opens the dropdown, Record, the waveform, Stop, and the lecture is filed in CS 101 |
 | 12–18 s | Diagrams | A nursing class's nursing process (written by Claude Code), then a math class's derivative (by Codex) |
-| 18–23 s | Ask | The quick panel; the "Answer with" menu picks Claude Code over Codex (OpenAI) and Ollama; the answer with its sources |
+| 18–23 s | Ask | The Ask bar under a lecture's notes: its "Answer with" menu (Claude Code, Codex from OpenAI, Ollama) picks Codex, and the answer is written above the bar |
 | 23–27 s | Canvas | What's due, and Lab 3's rubric |
 | 27–30 s | Promise | "Your recordings stay on your computer." Free and open source, for Mac and Windows |
 | 30–35 s | Call to action | Free for Mac and Windows, study-stash-app.web.app |

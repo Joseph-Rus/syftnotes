@@ -27,7 +27,7 @@ const Recordings: React.FC<{frame: number}> = ({frame}) => {
           {RECORDINGS.map((r, i) => (
             <div key={r.name} style={{display: 'flex', alignItems: 'center', gap: 16, padding: '15px 28px', borderTop: `1px solid ${colors.line}`, opacity: Math.min(1, spr(frame, i * 2) * 1.4)}}>
               <svg width="30" height="30" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="11" fill="rgba(16,24,40,0.06)" />
+                <circle cx="12" cy="12" r="11" fill={colors.hover} />
                 <path d="M10 8l6 4-6 4z" fill={colors.text2} />
               </svg>
               <div style={{flex: 1}}>
@@ -38,7 +38,7 @@ const Recordings: React.FC<{frame: number}> = ({frame}) => {
             </div>
           ))}
         </div>
-        <div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: 120, background: `linear-gradient(180deg, rgba(248,251,252,0), ${colors.window})`}} />
+        <div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: 120, background: `linear-gradient(180deg, rgba(15,26,33,0), ${colors.window})`}} />
       </div>
     </Win>
   );
