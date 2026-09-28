@@ -37,6 +37,18 @@ function Remove-UnneededRuntimes([string]$Dir, [string]$Rid) {
   }
 }
 
+# The phone app (web/) is built first, so each publish carries it beside the app as web/ (the library serves it at
+# /app/). It needs Node and npm; without them the build stops rather than ship a library whose Add a phone leads
+# nowhere.
+if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw "npm is needed to build the phone app (web/)" }
+Push-Location (Join-Path $Here "..\web")
+try {
+  npm ci --no-audit --no-fund --silent
+  if ($LASTEXITCODE -ne 0) { throw "npm ci for the phone app failed" }
+  npm run build --silent
+  if ($LASTEXITCODE -ne 0) { throw "building the phone app failed" }
+} finally { Pop-Location }
+
 foreach ($Rid in "win-x64", "win-arm64") {
   $Dest = Join-Path $Out $Rid
   Remove-Item -Recurse -Force $Dest -ErrorAction SilentlyContinue
