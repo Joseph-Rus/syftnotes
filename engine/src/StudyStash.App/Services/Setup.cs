@@ -71,6 +71,8 @@ public static class Setup
         if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;
         m.ModelName = host.Model.Name;
         m.ModelSize = About(host.Model.Bytes);
+        // Only a computer that records needs the model (and only it asks what the computer has).
+        if (m.Steps.Any(s => s.Step == SetupStep.Model)) ShowModels(m, host);
         if (cc.ServerUrl.Length > 0 && host.Library == LibraryState.Connected && (m.IsLaptop || host.LocalLibrary is not null))
         {
             m.LibraryOk = true;
@@ -86,6 +88,14 @@ public static class Setup
         m.OnMicSettings = () => Dialogs.OpenUrl(host.MicSettingsUrl);
         m.OnTaskbarSettings = () => Dialogs.OpenUrl("ms-settings:taskbar");
         m.OnRetryModel = () => _ = host.DownloadModelAsync();
+        m.OnPickModel = choice =>
+        {
+            host.Save(s => s.Model = choice.Model.Id);
+            // One already here needs nothing, and a download of another one is no longer wanted.
+            if (WhisperModels.IsDownloaded(host.Home, choice.Model)) host.StopDownload();
+            else if (m.Step == SetupStep.Model) _ = host.DownloadModelAsync(choice.Model);
+            Refresh(m, host);
+        };
         m.OnConnect = () => ConnectAsync(m, host, here);
         m.OnFind = () => FindAsync(m, host);
         m.OnAddClass = () => AddClassAsync(m, host);
@@ -103,13 +113,27 @@ public static class Setup
         m.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName != nameof(SetupModel.Step)) return;
-            if (m.Step == SetupStep.Model) _ = host.DownloadModelAsync();
+            if (m.Step == SetupStep.Model)
+            {
+                if (m.Models.Count == 0) ShowModels(m, host);
+                _ = host.DownloadModelAsync();
+            }
             if (m.Step == SetupStep.Classes) ListClasses(m, host);
             if (m.Step == SetupStep.Done && m.IsLibrary) _ = FillAddressesAsync(m, host, tailscale ?? (() => HostInfo.Tailscale()), hostName ?? LanName);
         };
         ListClasses(m, host);
         Refresh(m, host);
         return m;
+    }
+
+    /// <summary>The models to pick from, the one for this computer marked (and picked, unless another already was),
+    /// and one line why it suits this computer.</summary>
+    static void ShowModels(SetupModel m, AppHost host)
+    {
+        var advice = host.Advice;
+        m.Models.Clear();
+        foreach (var c in ModelChoice.For(host.Model, advice.Model, host.Home)) m.Models.Add(c);
+        m.ModelWhy = advice.Why;
     }
 
     public static void Refresh(SetupModel m, AppHost host)
@@ -131,6 +155,18 @@ public static class Setup
             m.ModelDone = d.Amount;
             m.ModelLeft = d.Left() ?? "";
         }
+        else
+        {
+            // Another model was picked and hasn't started yet: the bar isn't the last one's.
+            m.ModelProgress = 0;
+            m.ModelDone = "";
+            m.ModelLeft = "";
+        }
+        foreach (var c in m.Models)
+        {
+            c.Chosen = c.Model.Id == host.Model.Id;
+            c.Here = WhisperModels.IsDownloaded(host.Home, c.Model);
+        }
     }
 
     /// <summary>A model's size for "The model is about 3 GB": whole gigabytes for the big ones, as the design says it.</summary>
@@ -141,10 +177,17 @@ public static class Setup
     /// Never touches login items otherwise: that would change this computer unasked.</summary>
     public static void Finish(SetupModel m, AppHost host)
     {
+        bool records = m.Steps.Any(s => s.Step == SetupStep.Model);
         host.Save(s =>
         {
             s.Role = m.Role;
             s.SetupDone = true;
+            // The model setup showed stays the one in use, and its advice has been heard: no suggestion later.
+            if (records && host.ModelFile is null)
+            {
+                s.Model = host.Model.Id;
+                if (m.Models.FirstOrDefault(c => c.Recommended) is { } advised) s.ModelSuggested = advised.Model.Id;
+            }
         });
         // Only the library's flows ask; a laptop's setup never changes its login items.
         if (m.StartAtLogin && m.Steps.Any(s => s.Step == SetupStep.StartAtLogin))

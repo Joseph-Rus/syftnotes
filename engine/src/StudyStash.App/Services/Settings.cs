@@ -10,14 +10,30 @@ using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Services;
 
-/// <summary>A Whisper model in Settings: its name, size, what it's for, and whether it's here.</summary>
+/// <summary>A Whisper model in setup and Settings: its name, size, what it's for, whether it's the one for this
+/// computer, and whether it's here.</summary>
 public sealed partial class ModelChoice : ObservableObject
 {
     public required WhisperModel Model { get; init; }
     public string Name => Model.Name;
+    /// <summary>"574 MB", "3 GB": as setup says it.</summary>
+    public string Size => Setup.About(Model.Bytes);
     public string About => $"{Model.Size}. {Model.About}";
+    /// <summary>The model that keeps up with a lecture on this computer.</summary>
+    public bool Recommended { get; init; }
     [ObservableProperty] public partial bool Chosen { get; set; }
     [ObservableProperty] public partial bool Here { get; set; }
+
+    /// <summary>The models to offer, the one in use (<paramref name="chosen"/>) marked: Whisper tiny is only for
+    /// trying things out, so it's there only when it's the one in use.</summary>
+    public static IEnumerable<ModelChoice> For(WhisperModel chosen, WhisperModel recommended, string home) =>
+        WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == chosen.Id).Select(m => new ModelChoice
+        {
+            Model = m,
+            Recommended = m.Id == recommended.Id,
+            Chosen = m.Id == chosen.Id,
+            Here = WhisperModels.IsDownloaded(home, m),
+        });
 }
 
 /// <summary>One row in the settings sidebar: its section id, icon and label, and whether it's the one showing.</summary>

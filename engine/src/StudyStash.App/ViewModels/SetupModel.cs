@@ -201,6 +201,13 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial string ModelLeft { get; set; } = "";
     [ObservableProperty] public partial bool ModelReady { get; set; }
     [ObservableProperty] public partial string? ModelProblem { get; set; }
+    /// <summary>The models to pick from, the one for this computer marked and picked to begin with.</summary>
+    public ObservableCollection<ModelChoice> Models { get; } = [];
+    /// <summary>Why the marked one suits this computer, in one line ("This PC has no graphics card Whisper can use, so
+    /// the compact model keeps up with a lecture.").</summary>
+    [ObservableProperty] public partial string ModelWhy { get; set; } = "";
+    public bool HasModelWhy => !string.IsNullOrEmpty(ModelWhy);
+    partial void OnModelWhyChanged(string value) => OnPropertyChanged(nameof(HasModelWhy));
     /// <summary>The laptop's last page: the model's state in a few words.</summary>
     public string ModelSummary => ModelReady ? "Ready" : HasModelProblem ? "Not downloaded yet" : "Downloading in the background";
 
@@ -492,6 +499,8 @@ public sealed partial class SetupModel : ObservableObject
     public Func<Task>? OnConnect { get; set; }
     public Func<Task>? OnFind { get; set; }
     public Action? OnRetryModel { get; set; }
+    /// <summary>Another model picked: it's the one that downloads now (what came of the other stays).</summary>
+    public Action<ModelChoice>? OnPickModel { get; set; }
     public Func<Task>? OnAddClass { get; set; }
     public Action? OnTaskbarSettings { get; set; }
     /// <summary>Puts text on the clipboard (the library's address or password, on the last page).</summary>
@@ -506,6 +515,15 @@ public sealed partial class SetupModel : ObservableObject
     [RelayCommand] Task AllowMic() => OnAllowMic?.Invoke() ?? Task.CompletedTask;
     [RelayCommand] void MicSettings() => OnMicSettings?.Invoke();
     [RelayCommand] void RetryModel() => OnRetryModel?.Invoke();
+
+    [RelayCommand]
+    void PickModel(ModelChoice choice)
+    {
+        foreach (var m in Models) m.Chosen = m == choice;
+        ModelName = choice.Name;
+        ModelSize = choice.Size;
+        OnPickModel?.Invoke(choice);
+    }
     [RelayCommand] void TaskbarSettings() => OnTaskbarSettings?.Invoke();
     [RelayCommand] void ToggleShowPassword() => ShowPassword = !ShowPassword;
     [RelayCommand] void Copy(string? text) => OnCopy?.Invoke(text ?? "");

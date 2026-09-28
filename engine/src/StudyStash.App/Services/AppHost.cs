@@ -34,6 +34,9 @@ public sealed class AppSettings
     public bool SetupDone { get; set; }
     /// <summary>The Whisper model's id; empty picks the one for this computer.</summary>
     public string Model { get; set; } = "";
+    /// <summary>The lighter model Study Stash once suggested for this computer (an install on a heavier one hears it
+    /// once, never again); empty until then.</summary>
+    public string ModelSuggested { get; set; } = "";
     /// <summary>"" finds each lecture's language; "en" and so on fixes it.</summary>
     public string Language { get; set; } = "";
     /// <summary>Windows: record what the computer plays too (a lecture on Zoom).</summary>
@@ -121,6 +124,8 @@ public sealed class AppHost : IDisposable, IProblemSource
     int checking;
     KeepAwake? awake;
     readonly ModelSetting models;
+    /// <summary>What this computer has, asked once on the thread pool as the app starts.</summary>
+    readonly Task<HardwareProfile> hardware;
     readonly HttpClient? http;
     readonly Func<LibraryService>? localLibrary;
     // The model download: one at a time, its stop button, and a nudge that ends a wait to try again.
@@ -179,11 +184,14 @@ public sealed class AppHost : IDisposable, IProblemSource
     /// <paramref name="models"/> is the model the environment asks for (by default, this process's: see
     /// <see cref="ModelSetting"/>); <paramref name="http"/> downloads it (a test's pretend server).
     /// <paramref name="localLibrary"/> makes this computer's own library (a test's, on a spare port with no real child).
+    /// <paramref name="hardware"/> says what this computer has, which picks its model (a test's pretend computer).
     /// </summary>
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
         Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
-        Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null)
+        Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null, IHardwareProbe? hardware = null)
     {
+        var probe = hardware ?? HardwareProbe.System;
+        this.hardware = Task.Run(probe.Probe);
         Home = home;
         this.log = log ?? (s => Console.WriteLine(s));
         pretendMic = microphone ?? MicFromEnvironment();
@@ -194,6 +202,7 @@ public sealed class AppHost : IDisposable, IProblemSource
         LoginItems = loginItems ?? Platform.LoginItems.System;
         Directory.CreateDirectory(home);
         Settings = AppSettings.Load(home);
+        KeepModelInUse();
         Lectures = new LectureStore(home);
         Recorder.Recover(Lectures, this.log);
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
@@ -302,9 +311,55 @@ public sealed class AppHost : IDisposable, IProblemSource
         return cc.ServerUrl.Length > 0 ? new RemoteLibrary(cc.ServerUrl, cc.PoolKey) : null;
     }
 
-    /// <summary>The transcription model: the one the environment names, else the one picked in Settings, else the one
-    /// for this computer (large-v3, or the compact turbo with little memory).</summary>
-    public WhisperModel Model => models.Model ?? WhisperModels.Find(Settings.Model) ?? WhisperModels.Recommended(Machine.TotalRamGb());
+    /// <summary>The transcription model: the one the environment names, else the one picked in setup or Settings, else
+    /// the one for this computer (<see cref="Advice"/>).</summary>
+    public WhisperModel Model => models.Model ?? WhisperModels.Find(Settings.Model) ?? Advice.Model;
+
+    /// <summary>What this computer has. Asked once, on the thread pool, as the app starts; the first to want it before
+    /// then waits the moment it takes.</summary>
+    public HardwareProfile Hardware => hardware.GetAwaiter().GetResult();
+
+    /// <summary>The model that keeps up with a lecture on this computer, and why.</summary>
+    public ModelAdvice Advice => WhisperModels.Advise(Hardware);
+
+    /// <summary>
+    /// An install from before models were picked for the computer saved no model: it used large-v3 (or the compact
+    /// turbo with little memory). That one is kept, so nothing changes under the student or downloads again by itself;
+    /// <see cref="ModelSuggestionAsync"/> may suggest a lighter one, once. Kept only when a model (or part of one) is
+    /// here: with nothing downloaded yet, the one for this computer is the one it gets.
+    /// </summary>
+    void KeepModelInUse()
+    {
+        if (!Settings.SetupDone || Settings.Model.Length > 0 || Settings.Role == AppRole.Library || models.Model is not null || models.File is not null) return;
+        var had = WhisperModels.All.FirstOrDefault(m => WhisperModels.IsDownloaded(Home, m))
+                  ?? WhisperModels.All.FirstOrDefault(m => File.Exists(WhisperModels.PathFor(Home, m) + ".part"));
+        if (had is null) return;
+        Settings.Model = had.Id;
+        try
+        {
+            Settings.Save(Home);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log($"[model] couldn't save the model in use: {e.Message}");
+        }
+    }
+
+    /// <summary>
+    /// A lighter model to suggest, once: the student records with a model heavier than the one for this computer
+    /// (large-v3 on a PC with no graphics card Whisper can use), and hasn't heard about it before. Null otherwise, and
+    /// always when the environment names the model. Waits for the hardware probe, never on the UI thread.
+    /// </summary>
+    public async Task<ModelAdvice?> ModelSuggestionAsync()
+    {
+        var hw = await hardware.ConfigureAwait(false);
+        if (models.Model is not null || models.File is not null || !Settings.SetupDone || Settings.Role == AppRole.Library) return null;
+        var advice = WhisperModels.Advise(hw);
+        return WhisperModels.Heavier(Model, advice.Model) && Settings.ModelSuggested != advice.Model.Id ? advice : null;
+    }
+
+    /// <summary>The suggestion was made (or the student picked a model knowing the one for this computer): not again.</summary>
+    public void ModelSuggestionMade(WhisperModel suggested) => Save(s => s.ModelSuggested = suggested.Id);
 
     /// <summary>A model file the environment gives to use as it is (nothing downloads); null normally.</summary>
     public string? ModelFile => models.File;
