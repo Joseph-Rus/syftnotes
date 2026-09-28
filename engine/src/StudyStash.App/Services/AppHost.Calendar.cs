@@ -24,8 +24,10 @@ public sealed partial class AppHost
                 if (calendars is not null) return calendars;
                 calendars = new Upcoming(Home, CalendarKinds.Default, log: log);
                 calendarSender = new UpcomingSender(() => calendars.Events, Client, laptopHost, CalendarClasses, log);
+                HasCalendars = CalendarSettings.Load(Home).Sources.Count > 0;
                 calendars.Changed += () =>
                 {
+                    HasCalendars = CalendarSettings.Load(Home).Sources.Count > 0;
                     _ = calendarSender.SendAsync();
                     Changed?.Invoke();
                 };
@@ -33,6 +35,9 @@ public sealed partial class AppHost
             }
         }
     }
+
+    /// <summary>The student has added a calendar (as of the last read, or Settings' last change).</summary>
+    public bool HasCalendars { get; private set; }
 
     /// <summary>The library's classes as calendar matching sees them: names, other names and Canvas codes.</summary>
     public IReadOnlyList<ClassHint> CalendarClasses() => EventClass.From(Overview);
