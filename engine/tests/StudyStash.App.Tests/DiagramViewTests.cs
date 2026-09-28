@@ -114,6 +114,24 @@ public class DiagramViewTests
     }
 
     [AvaloniaFact]
+    public async Task A_download_draws_a_chart_away_from_the_window_from_the_scene_the_note_shows()
+    {
+        var chart = Flowchart.Parse(RichDemo.PainReassess);
+        var view = new DiagramView { Chart = chart };
+        var window = Show(620, SkinKind.Mac, ThemeVariant.Light, view);
+        var font = view.GetVisualDescendants().OfType<DiagramCanvas>().Single().Font!;
+        bool? onUiThread = null;
+        var scene = await Task.Run(() =>
+        {
+            onUiThread = Dispatcher.UIThread.CheckAccess();
+            return SceneCache.Laid(chart, font);
+        }, TestContext.Current.CancellationToken);
+        Assert.False(onUiThread);
+        Assert.Same(view.Scene, scene);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void The_whole_picture_answers_a_click()
     {
         var view = new DiagramView { Chart = Flowchart.Parse(RichDemo.SearchTree) };

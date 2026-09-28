@@ -1,4 +1,5 @@
 using System.Globalization;
+using Avalonia;
 using Avalonia.Media;
 using StudyStash.Core.Rich;
 
@@ -30,10 +31,16 @@ static class SceneCache
     // One layout at a time, in the order asked for: MSAGL was never meant to run beside itself, and a note's charts
     // arrive one after another anyway.
     static Task queue = Task.CompletedTask;
+    // The app the scenes were measured in. There's only ever one, except in tests, where each has its own: a layout
+    // that outlives its test's app is dropped, never kept for the next (its fonts are gone with it).
+    static Application? app;
 
     /// <summary>For a test: runs just before each layout, on the thread laying it out — to hold one back (and show
     /// that nothing waits for it) or to make one fail.</summary>
     internal static Action<Flowchart>? Laying { get; set; }
+
+    /// <summary>Where a chart that couldn't be laid out is noted: the app's log (a test keeps its own).</summary>
+    internal static Action<string> Log { get; set; } = Program.Log;
 
     /// <summary>What the cache knows of <paramref name="chart"/> (written as <paramref name="source"/>, its
     /// <see cref="Flowchart.ToSource"/>) in <paramref name="family"/> and <paramref name="direction"/> (null: its own),
@@ -41,8 +48,16 @@ static class SceneCache
     public static Lookup Find(Flowchart chart, string source, FontFamily family, ChartDirection? direction)
     {
         string key = Key(source, family, direction);
+        var owner = Application.Current;
         lock (gate)
         {
+            if (!ReferenceEquals(app, owner))
+            {
+                map.Clear();
+                order.Clear();
+                running.Clear();
+                app = owner;
+            }
             if (map.TryGetValue(key, out var hit))
             {
                 order.Remove(hit);
@@ -51,7 +66,7 @@ static class SceneCache
             }
             if (running.TryGetValue(key, out var busy)) return new Lookup(null, busy);
             var measure = Measurer(family);
-            var job = queue.ContinueWith(_ => Lay(key, chart, measure, direction), CancellationToken.None,
+            var job = queue.ContinueWith(_ => Lay(key, chart, measure, direction, owner), CancellationToken.None,
                 TaskContinuationOptions.None, TaskScheduler.Default);
             queue = job;
             running[key] = job;
@@ -93,8 +108,13 @@ static class SceneCache
         }
     }
 
-    static DiagramScene? Lay(string key, Flowchart chart, Func<string, double, bool, double> measure, ChartDirection? direction)
+    static DiagramScene? Lay(string key, Flowchart chart, Func<string, double, bool, double> measure, ChartDirection? direction, Application? owner)
     {
+        bool Stale()
+        {
+            lock (gate) return !ReferenceEquals(app, owner);
+        }
+        if (Stale()) return null;
         DiagramScene? scene = null;
         try
         {
@@ -103,10 +123,11 @@ static class SceneCache
         }
         catch (Exception e) // a chart that can't be laid out shows the calm card; it must never take the app down
         {
-            Program.Log($"[diagram] couldn't lay out a chart: {e.GetType().Name}: {e.Message}");
+            if (!Stale()) Log($"[diagram] couldn't lay out a chart: {e.GetType().Name}: {e.Message}");
         }
         lock (gate)
         {
+            if (!ReferenceEquals(app, owner)) return scene;
             running.Remove(key);
             map[key] = order.AddFirst(new Entry(key, scene));
             while (order.Count > Capacity)

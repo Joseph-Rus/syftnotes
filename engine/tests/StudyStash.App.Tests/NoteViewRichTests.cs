@@ -217,6 +217,9 @@ public class NoteViewRichTests
         {
             if (chart.Labels().Contains("Unlayable start")) throw new InvalidOperationException("a layout that fails");
         };
+        var logged = new System.Collections.Concurrent.ConcurrentQueue<string>();
+        var log = SceneCache.Log;
+        SceneCache.Log = logged.Enqueue;
         try
         {
             var note = new NoteView { Markdown = "## Details\n\n" + Fence("mermaid", source) };
@@ -226,11 +229,13 @@ public class NoteViewRichTests
             Assert.Equal(source, card.Source);
             var view = card.FindAncestorOfType<DiagramView>()!;
             Assert.Null(ToolTip.GetTip(view)); // it no longer offers to open larger
+            Assert.Contains(logged, line => line.Contains("a layout that fails"));
             window.Close();
         }
         finally
         {
             SceneCache.Laying = null;
+            SceneCache.Log = log;
         }
     }
 
