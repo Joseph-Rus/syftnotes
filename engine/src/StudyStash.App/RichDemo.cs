@@ -211,4 +211,65 @@ public static class RichDemo
         BrokenInlineFormula,
         "And on its own line:",
         BrokenDisplayFormula);
+
+    // -----------------------------------------------------------------------------------------------------------
+    // The demo lecture: BIO 110's "The cardiac cycle and cardiac output" — a made-up nursing lecture that shows off
+    // formulas and diagrams together, the way a real lecture's notes would. Its class, title and meta match the
+    // library shots' own LectureCard/NoteModel wiring in RichShots.cs (Demo.cs stays CS 101's, untouched).
+    // -----------------------------------------------------------------------------------------------------------
+
+    public const string LectureClassName = "BIO 110";
+    public const string LectureTitle = "The cardiac cycle and cardiac output";
+    public const string LectureMeta = "BIO 110 · Tuesday 23 September · 1 h 12 min";
+
+    /// <summary>Low blood pressure treated by the reading, then always rechecked: the lecture's third flowchart, a
+    /// decision like <see cref="PainReassess"/> but its own (a lecture's notes draw more than one kind).</summary>
+    public const string LowBpReassess = """
+        flowchart TD
+          A[Blood pressure reads low] --> B{Symptomatic?}
+          B -->|yes| C[Raise the legs, start fluids]
+          B -->|no| D[Recheck in 15 minutes]
+          C --> E([Reassess blood pressure])
+          D --> E
+          E -.->|still low| A
+        """;
+
+    /// <summary>The lecture's notes in full: a summary, key points and definitions with their inline maths, then the
+    /// worked formulas and the three diagrams among the details, and questions to review.</summary>
+    public static string CardiacLecture { get; } = string.Join("\n\n",
+        "## Summary",
+        "The heart moves blood in one continuous cycle: the atria fill and contract, the ventricles eject, and the whole cycle repeats about once a second at rest. How much blood it moves each minute, and how hard it pushes, are what cardiac output and mean arterial pressure describe.",
+        "## Key points",
+        CardiacOutputInline,
+        "- Stroke volume is the difference between how full the ventricle gets and how much is left after it ejects: $\\text{SV} = \\text{EDV} - \\text{ESV}$.",
+        "- Raising heart rate raises cardiac output only up to a point; too fast, and the ventricles don't have time to fill.",
+        "## Definitions",
+        "- **Preload**: how much the ventricle stretches as it fills, just before it contracts.",
+        "- **Afterload**: the pressure the ventricle has to overcome to open the valve and eject blood.",
+        "- **Stroke volume**: the blood one contraction ejects, normally 60 to 100 mL: $\\text{SV} = \\text{EDV} - \\text{ESV}$.",
+        "## Details and examples",
+        "Each beat runs through five phases, starting when the atria contract.",
+        Fence("mermaid", CardiacCycle),
+        "The atria contract, the ventricles tense and then eject, relax, and fill again, and the cycle repeats.",
+        "A dose calculation, worked step by step:",
+        DoseFormula,
+        "Mean arterial pressure, worked through line by line:",
+        AlignedFormula,
+        "Oxygen-poor blood fills the right side and goes to the lungs; oxygen-rich blood fills the left side and goes to the body.",
+        Fence("svg", FourChambers),
+        Fence("mermaid", BloodFlow),
+        "A reading below 65 mmHg is treated, then always rechecked:",
+        Fence("mermaid", LowBpReassess),
+        "## Questions to review",
+        "1. What determines preload, and how does it differ from afterload?",
+        "2. If heart rate keeps rising but stroke volume falls further, what happens to cardiac output?");
+
+    /// <summary>The quick panel's answer to "What's a normal MAP?": a plain sentence with its formula inline.</summary>
+    public const string QuickMapAnswer =
+        """A normal mean arterial pressure is 70 to 100 mmHg: $\text{MAP} = \text{DBP} + \frac{1}{3}(\text{SBP} - \text{DBP})$, and it should stay above 65 mmHg to keep organs perfused.""";
+
+    /// <summary>The ask chat's answer to a question about blood pressure: a sentence, then a small flowchart.</summary>
+    public static string ChatFlowAnswer { get; } = string.Join("\n\n",
+        "Blood pressure is treated by the reading, then always rechecked:",
+        Fence("mermaid", LowBpReassess));
 }
