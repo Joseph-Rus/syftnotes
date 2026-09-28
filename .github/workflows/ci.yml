@@ -1,7 +1,8 @@
 # The build and release pipeline for Study Stash (C# on .NET 10, one app for both roles).
 #   Every push and pull request: the engine's tests on macOS, Linux and Windows; the Mac app (one universal
 #   bundle, both roles' DMGs, self-tested here and again natively on an Intel runner); and the Windows app
-#   (both roles' Setup.exe, self-tested, installed, updated in place, and uninstalled cleanly).
+#   (both roles' Setup.exe, self-tested as a laptop and as just this computer, installed, updated in place, and
+#   uninstalled cleanly).
 #   Push to main with a StudyStashVersion in engine/Directory.Build.props that has no tag yet: once all of the
 #   above passes, publish release v<version> with the four installers and SHA256SUMS.txt. Installed copies pick
 #   it up within a few hours (auto_update), or right away with `studystash update`. A version already released
@@ -176,7 +177,7 @@ jobs:
           name: mac-intel-selftest
           path: ${{ runner.temp }}/selftest
 
-  # The Windows app: one AppId for both roles (D2/D3), self-tested (D5), installed, updated in place with a
+  # The Windows app: one AppId for both roles (D2/D3), self-tested (D5) as a laptop and as just this computer, installed, updated in place with a
   # silent Setup.exe, and uninstalled without touching lectures or settings outside the install folder.
   windows-app:
     name: Windows app (Setup.exe, self-test, install)
@@ -243,6 +244,38 @@ jobs:
           if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }
           if ($lines[-1] -ne "ok") { throw "last line was not ok" }
           if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
+      - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and quitting stops it
+        if: needs.version.outputs.tested != 'true'
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $selftestHome = "$env:RUNNER_TEMP\selftest-home-one-computer"
+          $out = "$env:RUNNER_TEMP\selftest\one-computer"
+          New-Item -ItemType Directory -Force -Path $selftestHome, $out | Out-Null
+          $env:STUDYSTASH_SELFTEST = $out
+          $env:STUDYSTASH_SELFTEST_FLOW = "one-computer"
+          $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
+          $env:STUDYSTASH_MIC_SPEED = "4"
+          $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
+          $exe = (Resolve-Path "dist\windows\win-x64\StudyStash.exe").Path
+          $p = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
+          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Study Stash didn't exit within 480 s" }
+          $lines = Get-Content "$out\selftest.txt"
+          $lines | Write-Host
+          if (Test-Path "$selftestHome\logs\library.log") { Write-Host "--- library.log"; Get-Content "$selftestHome\logs\library.log" -Tail 40 | Write-Host }
+          if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }
+          if ($lines[-1] -ne "ok") { throw "last line was not ok" }
+          if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
+          if (-not ($lines -match "just this computer")) { throw "the self-test didn't run Just this computer" }
+          if (-not ($lines -match "notes written on this computer by its own library")) { throw "the notes weren't written by this computer's own library" }
+          # The library ran as the app's own child (StudyStash.exe serve): quitting the app stops it too.
+          $left = $null
+          for ($i = 0; $i -lt 20; $i++) {
+            $left = @(Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
+            if ($left.Count -eq 0) { break }
+            Start-Sleep 1
+          }
+          if ($left.Count -ne 0) { $left | Stop-Process -Force; throw "the app's library (StudyStash.exe serve) was still running 20 s after the app quit" }
       - name: The Laptop installer puts Study Stash on this account, marked laptop
         if: needs.version.outputs.tested != 'true'
         shell: pwsh
