@@ -7,6 +7,6 @@ public partial class WinAssignment : UserControl
     public WinAssignment()
     {
         InitializeComponent();
-        Fades.Under(BottomFade, "Mica", 1);
+        Fades.MaskBottom(Page, BottomFade, 1);
     }
 }

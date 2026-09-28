@@ -106,33 +106,8 @@ public static class WinChrome
         }
     }
 
-    /// <summary>The self-test's comparison: Windows' frame extended over the whole window (the older way to let a
-    /// backdrop through), to picture beside the plain one.</summary>
-    internal static bool ExtendFrame(Window w)
-    {
-        if (!OperatingSystem.IsWindows() || w.TryGetPlatformHandle()?.Handle is not IntPtr hwnd || hwnd == IntPtr.Zero) return false;
-        var all = new Margins { Left = -1, Right = -1, Top = -1, Bottom = -1 };
-        try
-        {
-            return DwmExtendFrameIntoClientArea(hwnd, ref all) >= 0;
-        }
-        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
-        {
-            return false;
-        }
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    struct Margins
-    {
-        public int Left, Right, Top, Bottom;
-    }
-
     [DllImport("dwmapi.dll")]
     static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
-
-    [DllImport("dwmapi.dll")]
-    static extern int DwmExtendFrameIntoClientArea(IntPtr hwnd, ref Margins margins);
 
     /// <summary>
     /// The design's Windows tokens as Windows can show them. Its acrylic (the dropdown, the quick panel, the recorder,

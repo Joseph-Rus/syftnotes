@@ -120,8 +120,8 @@ public static partial class SelfTest
         await Wait(1.5);
         Shot(Shell.Windows.CanvasConnect, "looks-canvas-connect-light");
         Shell.Windows.CanvasConnect?.Close();
-        // For comparison: the same window on the design's solid colour, and on Mica with Windows' frame extended
-        // over it (the older way to let a backdrop through).
+        // For comparison: the same window on the design's own colour, as Windows 10 (or transparency effects off)
+        // shows it, then back to what this Windows has.
         if (Shell.Windows.Main is { } main)
         {
             Shell.ShowLibrary();
@@ -129,9 +129,6 @@ public static partial class SelfTest
             await Wait(1);
             Shot(main, "looks-library-solid-light");
             WinChrome.Use(main, WinChrome.Wanted());
-            Say($"frame extended over the window: {WinChrome.ExtendFrame(main)}");
-            await Wait(1);
-            Shot(main, "looks-library-extended-light");
         }
         Skin.UseAppearance(AppAppearance.System);
         await Wait(0.5);
