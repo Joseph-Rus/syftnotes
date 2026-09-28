@@ -166,7 +166,7 @@
                         <c:Icon Grid.Column="1" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" Margin="6,0,0,0" />
                       </Grid>
                       <Button.Flyout>
-                        <Flyout Placement="BottomEdgeAlignedRight">
+                        <Flyout Placement="BottomEdgeAlignedRight" OverlayDismissEventPassThrough="True">
                           <ItemsControl ItemsSource="{Binding Choices}">
                             <ItemsControl.ItemTemplate>
                               <DataTemplate x:DataType="vm:CourseChoice">

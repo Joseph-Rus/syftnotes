@@ -81,6 +81,15 @@ public class SetupCoursesContinueTests
         return (window, view);
     }
 
+    static void Click(Window window, Visual target)
+    {
+        var at = In(target, window).Center;
+        window.MouseMove(at);
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
     static string Chain(Visual? v) => v is null ? "nothing" : string.Join(" < ", v.GetSelfAndVisualAncestors().Take(8).Select(a => a.GetType().Name + (a is Control { Name: { } n } ? "#" + n : "")));
 
     static Button Continue(Control view) =>
@@ -115,6 +124,41 @@ public class SetupCoursesContinueTests
             window.MouseUp(centre, MouseButton.Left);
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(SetupStep.Classes, m.Step);
+            window.Close();
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    /// <summary>A dropdown left open on a setup page (who answers your questions, on the AI engines step): the click
+    /// on Continue both closes it and moves on, rather than only closing it.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void With_a_dropdown_open_one_click_on_Continue_moves_on(SkinKind skin)
+    {
+        try
+        {
+            ((App)Application.Current!).UseSkin(skin);
+            var m = SetupModel.For(skin, AppRole.Library);
+            m.Ai = AiDemo.Setup();
+            m.Go(SetupStep.Ai);
+            var (window, view) = Open(skin, m, null);
+            var select = view.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is MenuFlyout && b.IsEffectivelyVisible);
+            var flyout = (MenuFlyout)select.Flyout!;
+            // Its own button still opens and closes it.
+            Click(window, select);
+            Assert.True(flyout.IsOpen);
+            Click(window, select);
+            Assert.False(flyout.IsOpen);
+            Click(window, select);
+            Assert.True(flyout.IsOpen);
+
+            Click(window, Continue(view));
+            Assert.False(flyout.IsOpen);
+            Assert.NotEqual(SetupStep.Ai, m.Step);
             window.Close();
         }
         finally

@@ -187,7 +187,8 @@
               </Grid>
             </Border>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
+              <!-- Left open, the click that closes it still reaches what it lands on: Continue moves on in one click. -->
+              <MenuFlyout Placement="BottomEdgeAlignedRight" OverlayDismissEventPassThrough="True" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
             </Button.Flyout>
           </Button>
         </Grid>
