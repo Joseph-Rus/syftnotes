@@ -250,6 +250,16 @@ public class NotesDrawingTests
     }
 
     [Fact]
+    public async Task A_diagram_fence_never_closed_is_left_alone_so_nothing_after_it_is_lost_and_a_reply_may_skip_its_closing_fence()
+    {
+        string unclosed = "## Notes\n\n```mermaid\nflowchart LR\n  A[\"Assess\"] -->\n\n## Questions to review\n1. Why reassess?";
+        Assert.Same(unclosed, await Summarize.RepairDiagramsAsync(unclosed, _ => throw new InvalidOperationException("never asked")));
+
+        string notes = "## Notes\n\n" + Broken;
+        Assert.Equal("## Notes\n\n```mermaid\n" + Fixed + "\n```", await Summarize.RepairDiagramsAsync(notes, _ => Task.FromResult("```mermaid\n" + Fixed + "\n")));
+    }
+
+    [Fact]
     public async Task At_most_two_diagrams_go_back_and_good_notes_are_left_alone()
     {
         string notes = string.Join("\n\n", "## Notes", Broken, Broken, Broken);

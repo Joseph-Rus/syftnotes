@@ -375,7 +375,8 @@ public static partial class Summarize
     public static async Task<string> RepairDiagramsAsync(string notes, Func<string, Task<string>> ask)
     {
         var lines = NoteBlocks.Lines(notes).ToList();
-        var broken = NoteBlocks.Find(lines).Where(b => b.IsDiagram).Select(b => (Block: b, Why: DiagramProblem(b.Kind, b.Text)))
+        // A fence never closed may have swallowed the rest of the note: replacing it could lose that, so it stays.
+        var broken = NoteBlocks.Find(lines).Where(b => b.IsDiagram && b.Closed).Select(b => (Block: b, Why: DiagramProblem(b.Kind, b.Text)))
             .Where(x => x.Why is not null).Take(MaxDiagramRepairs).ToList();
         if (broken.Count == 0) return notes;
         var fixes = new List<(NoteBlock Block, string Text)>();
@@ -424,7 +425,7 @@ public static partial class Summarize
     static string? Corrected(string reply, NoteBlockKind kind)
     {
         string t = Py.Strip(Thinking().Replace(reply ?? "", ""));
-        string candidate = NoteBlocks.Find(t).FirstOrDefault(b => b.Kind == kind && b.Closed)?.Text
+        string candidate = NoteBlocks.Find(t).FirstOrDefault(b => b.Kind == kind)?.Text
             ?? (NoteBlocks.StartsAsDiagram(t) ? t : "");
         candidate = candidate.Trim('\n', '\r');
         return candidate.Trim().Length > 0 && DiagramProblem(kind, candidate) is null ? candidate : null;
