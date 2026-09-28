@@ -27,10 +27,15 @@ public partial class WinSetup : UserControl
         Height = m.OnCanvas ? 700 : m.OnAi ? (m.AiHelpOpen ? 860 : 680) : m.OnClasses && m.HasCourses ? 640 : 480;
     }
 
-    /// <summary>A real window has the system's caption buttons in its title bar; screenshots draw their own.</summary>
+    /// <summary>A real window has the system's caption buttons in its title bar, and its corners, edge and shadow;
+    /// screenshots draw their own.</summary>
     public bool DrawChrome
     {
         get => Header.DrawChrome;
-        set => Header.DrawChrome = value;
+        set
+        {
+            Header.DrawChrome = value;
+            Frame.Classes.Set("framed", value);
+        }
     }
 }

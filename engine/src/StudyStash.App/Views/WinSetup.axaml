@@ -230,9 +230,16 @@
       <Setter Property="HorizontalAlignment" Value="Right" />
       <Setter Property="Margin" Value="0,0,3,0" />
     </Style>
+    <!-- The window's frame, for a screenshot only: a real window has Windows' own corners, edge and shadow. -->
+    <Style Selector="Border#Frame.framed">
+      <Setter Property="BorderBrush" Value="{DynamicResource FlyStroke}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
+    </Style>
   </UserControl.Styles>
 
-  <Border Background="{DynamicResource Mica}" BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1" CornerRadius="8" BoxShadow="{DynamicResource ShadowLg}" ClipToBounds="True">
+  <Border Name="Frame" Background="{DynamicResource Mica}" ClipToBounds="True">
     <DockPanel>
       <!-- The title bar: drag the window by it; the system's caption buttons sit on its right. -->
       <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" Title="{Binding HeaderTitle}" />

@@ -283,14 +283,23 @@ public static partial class Shell
         // The same title bar as the library and Settings: drag it by it, the window buttons sit in it.
         var header = new WindowHeader { Title = "Connect Canvas" };
         DockPanel.SetDock(header, Dock.Top);
+        // Windows: the header on the window's Mica, the steps on a content layer under it (as setup's are).
+        var body = new Border { Padding = new Avalonia.Thickness(32, 12, 32, 24), Child = view };
+        if (Skin.Current == SkinKind.Win)
+        {
+            body.Bind(Border.BackgroundProperty, body.GetResourceObservable("Layer"));
+            body.Bind(Border.BorderBrushProperty, body.GetResourceObservable("LayerStroke"));
+            body.BorderThickness = new Avalonia.Thickness(0, 1, 0, 0);
+        }
         var w = new Window
         {
             Title = "Canvas", Width = 640, Height = 680, WindowStartupLocation = WindowStartupLocation.CenterScreen,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
-            Content = new DockPanel { Children = { header, new Border { Padding = new Avalonia.Thickness(32, 12, 32, 24), Child = view } } },
+            Content = new DockPanel { Children = { header, body } },
         };
-        w.Bind(Window.BackgroundProperty, w.GetResourceObservable(Skin.Current == SkinKind.Mac ? "Win" : "Layer"));
+        if (Skin.Current == SkinKind.Mac) w.Bind(Window.BackgroundProperty, w.GetResourceObservable("Win"));
         Look.Apply(w);
+        WinChrome.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         model.OnSkip = w.Close;

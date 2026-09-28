@@ -109,6 +109,13 @@
     <Style Selector="Border.seg.on Border.underline">
       <Setter Property="IsVisible" Value="True" />
     </Style>
+    <!-- The window's frame, for a screenshot only: a real window has Windows' own corners, edge and shadow. -->
+    <Style Selector="Border#Frame.framed">
+      <Setter Property="BorderBrush" Value="{DynamicResource FlyStroke}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
+    </Style>
     <Style Selector="c|WindowHeader.titlebar">
       <Setter Property="Height" Value="48" />
     </Style>
@@ -139,8 +146,7 @@
     </Style>
   </UserControl.Styles>
 
-  <Border Background="{DynamicResource Mica}" BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1" CornerRadius="8" BoxShadow="{DynamicResource ShadowLg}"
-          ClipToBounds="True" Name="Frame">
+  <Border Name="Frame" Classes.framed="{Binding DrawChrome}" Background="{DynamicResource Mica}" ClipToBounds="True">
     <Panel>
     <DockPanel>
       <!-- The title bar: drag the window by it; the search box in its middle, the system's caption buttons on its

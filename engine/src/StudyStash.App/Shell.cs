@@ -822,10 +822,8 @@ public static partial class Shell
         }
         else
         {
-            w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
-            w.Background = Brushes.Transparent;
             w.Content = new WinLibrary { DataContext = library };
-            w.Opened += (_, _) => MicaIfAvailable(w);
+            WinChrome.Apply(w);
         }
         PutWhereLeft(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
@@ -880,12 +878,6 @@ public static partial class Shell
         host.Save(s => s.LibraryWindow = place);
     }
 
-    /// <summary>Windows 11's Mica shows through where the design has its Mica color; elsewhere the color stands in.</summary>
-    static void MicaIfAvailable(Window w)
-    {
-        if (w.ActualTransparencyLevel == WindowTransparencyLevel.Mica) w.Resources["Mica"] = Brushes.Transparent;
-    }
-
     public static void ShowLibrary()
     {
         if (!host.Settings.SetupDone)
@@ -919,12 +911,7 @@ public static partial class Shell
         Look.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        if (Skin.Current == SkinKind.Win)
-        {
-            w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
-            w.Background = Brushes.Transparent;
-            w.Opened += (_, _) => MicaIfAvailable(w);
-        }
+        WinChrome.Apply(w);
         var model = setup;
         var mic = micCheck = new MicCheck();
         setup.OnFinish = () =>
@@ -1076,12 +1063,7 @@ public static partial class Shell
         model.Lib.Copy = text => _ = w.Clipboard?.SetTextAsync(text);
         model.Lib.ClassesChanged = LibraryClassesChanged;
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
-        if (Skin.Current == SkinKind.Win)
-        {
-            w.TransparencyLevelHint = [WindowTransparencyLevel.Mica, WindowTransparencyLevel.None];
-            w.Background = Brushes.Transparent;
-            w.Opened += (_, _) => MicaIfAvailable(w);
-        }
+        WinChrome.Apply(w);
         w.Closed += (_, _) =>
         {
             settingsWindow = null;

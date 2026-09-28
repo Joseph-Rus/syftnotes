@@ -94,6 +94,12 @@ public sealed class WindowHeader : Panel
             captions.Children.Add(maximise);
             captions.Children.Add(Caption("close", 15));
             Children.Add(captions);
+            // A real window's drag strip and caption buttons are as tall as this bar, whatever it's styled to.
+            SizeChanged += (_, e) =>
+            {
+                if (e.HeightChanged && TopLevel.GetTopLevel(this) is Window { ExtendClientAreaToDecorationsHint: true } w)
+                    Platform.WinChrome.SetTitleBarHeight(w, e.NewSize.Height);
+            };
         }
         maximise ??= new Button();
         parts = Children.Count;

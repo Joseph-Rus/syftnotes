@@ -10,17 +10,19 @@ public static class Fades
     /// <summary>Paints the fade from the <paramref name="colorKey"/> token, and again whenever that token changes
     /// (light to dark, another colour theme).</summary>
     public static void Under(Border fade, string colorKey, double solidFrom) =>
-        fade.Bind(Border.BackgroundProperty, fade.GetResourceObservable(colorKey, v => v is ISolidColorBrush b ? Gradient(b.Color, solidFrom) : null));
+        fade.Bind(Border.BackgroundProperty, fade.GetResourceObservable(colorKey, v => v is ISolidColorBrush { Color.A: > 0 } b ? Gradient(b.Color, solidFrom) : null));
 
     /// <summary>The same fade for a page on a translucent layer (Windows' content layer over Mica): it fades to the
     /// colour the eye sees, <paramref name="layerKey"/> over <paramref name="colorKey"/>, so the fade meets the page
-    /// under it without a band.</summary>
+    /// under it without a band. Over the real Mica (the window's <paramref name="colorKey"/> made clear) no one colour
+    /// is what the eye sees, so there's no fade: a guessed one showed as a pale band over the page.</summary>
     public static void Under(Border fade, string colorKey, string layerKey, double solidFrom)
     {
         Color? under = null, over = null;
         void Paint()
         {
-            if (under is { } u) fade.Background = Gradient(over is { } o ? Over(o, u) : u, solidFrom);
+            if (under is { A: 0 }) fade.Background = null;
+            else if (under is { } u) fade.Background = Gradient(over is { } o ? Over(o, u) : u, solidFrom);
         }
         fade.GetResourceObservable(colorKey).Subscribe(new Watch(v =>
         {
