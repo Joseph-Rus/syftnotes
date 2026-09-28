@@ -398,6 +398,86 @@ public class DiagramLayoutTests
         }
     }
 
+    /// <summary>Every shape, line and end a chart can have, with a group inside a group, two arrows between the same
+    /// two boxes, and an arrow back to the top that runs past everything: the busiest chart there is.</summary>
+    internal const string EveryShape = """
+        flowchart TD
+          subgraph outer [Assessment]
+            A[Box] --> B(Rounded)
+            subgraph inner [Vital signs]
+              C([Stadium]) ==> D((Circle))
+            end
+          end
+          B --> C
+          D -.-> E{Decision?}
+          E -->|yes| F{{Hexagon}}:::green
+          E -->|no| G[[Subroutine]]:::purple
+          F --o H[(Cylinder)]:::amber
+          G --x H
+          H <--> A
+          H --- I[Loose end]
+          A --> A
+          F -->|again| H
+        """;
+
+    public static TheoryData<string, string?> Busy => new()
+    {
+        { EveryShape, null }, { EveryShape, "LeftRight" }, { EveryShape, "BottomUp" }, { EveryShape, "RightLeft" },
+        { NursingProcess, null }, { NursingProcess, "TopDown" }, { NursingProcess, "BottomUp" }, { NursingProcess, "RightLeft" },
+        { Pain, null }, { Pain, "LeftRight" },
+    };
+
+    static DiagramScene LayIn(string source, string? direction) =>
+        Lay(source, direction is null ? null : Enum.Parse<ChartDirection>(direction));
+
+    [Theory]
+    [MemberData(nameof(Busy))]
+    public void No_arrow_runs_across_a_group_title(string source, string? direction)
+    {
+        var s = LayIn(source, direction);
+        var lines = s.Edges.Select(DiagramLayout.Flatten).ToList();
+        foreach (var g in s.Groups)
+        {
+            // The lines leave a 2 px gap around a title; none needs to.
+            Assert.All(lines, l => Assert.True(DiagramLayout.Distance(g.TitleBox, l) > 2.5, $"a line runs across {g.Title}"));
+            Assert.True(g.Box.Contains(g.TitleBox));
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Busy))]
+    public void An_arrows_words_sit_by_their_own_line_and_clear_of_every_other(string source, string? direction)
+    {
+        var s = LayIn(source, direction);
+        var lines = s.Edges.Select(DiagramLayout.Flatten).ToList();
+        for (int i = 0; i < s.Edges.Count; i++)
+        {
+            var e = s.Edges[i];
+            if (e.LabelLines.Count == 0) continue;
+            string words = string.Join(" ", e.LabelLines);
+            double own = DiagramLayout.Distance(e.LabelBox, lines[i]);
+            Assert.True(own is > 2.5 and <= 8, $"\"{words}\" is {own:0.0} px from its own line");
+            for (int j = 0; j < lines.Count; j++)
+                if (j != i) Assert.True(DiagramLayout.Distance(e.LabelBox, lines[j]) >= 10, $"\"{words}\" is beside another line");
+            Assert.DoesNotContain(s.Nodes, n => n.Box.Intersects(e.LabelBox));
+        }
+    }
+
+    [Fact]
+    public void A_second_arrow_between_the_same_two_boxes_has_ends_and_a_line_of_its_own()
+    {
+        var s = Lay(EveryShape);
+        var pair = s.Edges.Where(e => e.From == "F" && e.To == "H").ToList();
+        Assert.Equal(2, pair.Count);
+        Assert.True(Pt.Distance(pair[0].StartTip, pair[1].StartTip) >= 10, "they leave the hexagon from different spots");
+        Assert.True(Pt.Distance(pair[0].Tip, pair[1].Tip) >= 10, "they reach the cylinder at different spots");
+        var a = DiagramLayout.Flatten(pair[0]);
+        var b = DiagramLayout.Flatten(pair[1]);
+        // Beside each other all the way, never crossing: every point of one is well clear of the other.
+        Assert.All(b, p => Assert.True(DiagramLayout.Distance(new Box(p.X, p.Y, 0, 0), a) >= 6, $"{p} is on the first arrow"));
+        Assert.Equal(DiagramLayout.ArrowLength, Pt.Distance(pair[1].Tip, pair[1].Base), 1.5); // its own arrowhead, whole
+    }
+
     public static TheoryData<string, string?> Estimated => new()
     {
         { CardiacCycle, null }, { BloodFlow, null }, { Pain, null }, { NursingProcess, null }, { NursingProcess, "TopDown" },

@@ -525,38 +525,142 @@ public static class DiagramLayout
         // Siblings in the written order ("yes" before "no") read better, but not at the price of lines crossing.
         // MSAGL's own layout, the same mirrored, and one made to keep the order: the fewest crossings wins, then the
         // fewest siblings out of order.
-        var free = Layered(f, sizes, labels, dir, m, back, pairs: null);
-        var candidates = new List<DiagramScene> { free };
-        if (pairs.Count > 0)
+        DiagramScene Best(HashSet<string>? roomy)
         {
-            candidates.Add(Mirror(free, across));
-            try
+            var free = Layered(f, sizes, labels, dir, m, back, pairs: null, roomy);
+            var candidates = new List<DiagramScene> { free };
+            if (pairs.Count > 0)
             {
-                candidates.Add(Layered(f, sizes, labels, dir, m, back, pairs));
+                candidates.Add(Mirror(free, across));
+                try
+                {
+                    candidates.Add(Layered(f, sizes, labels, dir, m, back, pairs, roomy));
+                }
+                catch (Exception)
+                {
+                    // Keeping the order is a wish, not a need: without it MSAGL always finds a layout.
+                }
             }
-            catch (Exception)
-            {
-                // Keeping the order is a wish, not a need: without it MSAGL always finds a layout.
-            }
+            return Titles(ByTheirLines(candidates.OrderBy(Crossings).ThenBy(c => OutOfOrder(c, pairs, across)).First()), out _);
         }
-        return Titles(candidates.OrderBy(Crossings).ThenBy(c => OutOfOrder(c, pairs, across)).First());
+        var scene = Best(null);
+        // A group whose title every arrow into it runs across gets a margin of its own for the title, on its left.
+        var crossed = Crossed(scene);
+        if (crossed.Count == 0) return scene;
+        var roomier = Best(crossed);
+        return Crossed(roomier).Count < crossed.Count ? roomier : scene;
     }
 
-    /// <summary>Each group's title top left, unless an arrow runs in over that spot and the top right is clear.</summary>
-    static DiagramScene Titles(DiagramScene s)
+    /// <summary>The groups whose titles an arrow or an arrow's words still run across.</summary>
+    static HashSet<string> Crossed(DiagramScene s)
     {
+        Titles(s, out var crossed);
+        return crossed;
+    }
+
+    /// <summary>
+    /// Each group's title along its top: top left, unless an arrow (or an arrow's words) runs over that spot; then top
+    /// right, then the clear spot nearest the left. With no clear spot at all (<paramref name="crossed"/> names those
+    /// groups), the spot the fewest arrows cross, where the lines leave a gap for it.
+    /// </summary>
+    static DiagramScene Titles(DiagramScene s, out HashSet<string> crossed)
+    {
+        crossed = [];
         if (s.Groups.Count == 0) return s;
         var lines = s.Edges.Select(Flatten).ToList();
-        bool Clear(Box title) => !lines.Any(points => points.Zip(points.Skip(1)).Any(seg => Touches(title.Inflate(2), seg.First, seg.Second)));
-        return s with
+        var words = s.Edges.Where(e => e.LabelLines.Count > 0).Select(e => e.LabelBox).ToList();
+        int Crossing(Box title) =>
+            lines.Count(points => points.Zip(points.Skip(1)).Any(seg => Touches(title.Inflate(2), seg.First, seg.Second)))
+            + words.Count(w => w.Intersects(title.Inflate(2)));
+        var groups = new List<SceneGroup>();
+        foreach (var g in s.Groups)
         {
-            Groups = s.Groups.Select(g =>
+            var left = g.TitleBox with { X = g.Box.X + 12, Y = g.Box.Y + 7 };
+            double last = Math.Max(left.X, g.Box.Right - 12 - left.W);
+            var spots = new List<Box> { left, left with { X = last } };
+            for (double x = left.X + 2; x < last; x += 2) spots.Add(left with { X = x });
+            var best = spots.Select(b => (Box: b, Crossing: Crossing(b))).MinBy(x => x.Crossing);
+            if (best.Crossing > 0) crossed.Add(g.Id);
+            groups.Add(g with { TitleBox = best.Box });
+        }
+        return s with { Groups = groups };
+    }
+
+    /// <summary>
+    /// An arrow's words kept by their own arrow. MSAGL places them beside it, but in a busy chart another line can run
+    /// right past (or through) them, and then they read as that line's: such words move along their own line, to the
+    /// nearest spot beside it that no other line, box, group title or words come near.
+    /// </summary>
+    static DiagramScene ByTheirLines(DiagramScene s)
+    {
+        if (!s.Edges.Any(e => e.LabelLines.Count > 0)) return s;
+        var lines = s.Edges.Select(Flatten).ToList();
+        var edges = s.Edges.ToList();
+        // Beside their line (not so close that it leaves a gap in it), and clear of every other line.
+        const double Beside = 8, Clear = 10;
+        bool Blocked(Box b, int own) =>
+            s.Nodes.Any(n => n.Box.Inflate(3).Intersects(b))
+            || edges.Where((e, j) => j != own && e.LabelLines.Count > 0).Any(e => e.LabelBox.Inflate(3).Intersects(b))
+            || s.Groups.Any(g => g.TitleBox.Inflate(2).Intersects(b));
+        double Others(Box b, int own) => lines.Where((_, j) => j != own).Select(l => Distance(b, l)).DefaultIfEmpty(double.MaxValue).Min();
+        bool Good(Box b, int own)
+        {
+            double mine = Distance(b, lines[own]);
+            return !Blocked(b, own) && mine is >= 2.5 and <= Beside && Others(b, own) >= Clear;
+        }
+        for (int i = 0; i < edges.Count; i++)
+        {
+            var e = edges[i];
+            if (e.LabelLines.Count == 0 || Good(e.LabelBox, i)) continue;
+            var own = lines[i];
+            var cumulative = new double[own.Count];
+            for (int k = 1; k < own.Count; k++) cumulative[k] = cumulative[k - 1] + Pt.Distance(own[k - 1], own[k]);
+            double total = cumulative[^1];
+            if (total < 1) continue;
+            // From the middle out, either side of the line; the first good spot wins, else the one furthest from
+            // every other line (the spot it has, if none is further).
+            var spots = new List<Box>();
+            foreach (double t in new[] { 0.5, 0.42, 0.58, 0.34, 0.66, 0.26, 0.74, 0.18, 0.82 })
             {
-                var left = g.TitleBox with { X = g.Box.X + 12, Y = g.Box.Y + 7 };
-                var right = left with { X = g.Box.Right - 12 - left.W };
-                return g with { TitleBox = Clear(left) || !Clear(right) ? left : right };
-            }).ToList(),
-        };
+                int k = Math.Max(1, Array.FindIndex(cumulative, c => c >= t * total));
+                var along = (own[k] - own[k - 1]).Unit();
+                var at = own[k - 1] + along * (t * total - cumulative[k - 1]);
+                var normal = new Pt(-along.Y, along.X);
+                double w = e.LabelBox.W, h = e.LabelBox.H;
+                double reach = Math.Abs(normal.X) * w / 2 + Math.Abs(normal.Y) * h / 2 + 4;
+                spots.Add(Box.Around(at + normal * reach, w, h));
+                spots.Add(Box.Around(at - normal * reach, w, h));
+            }
+            var best = spots.Cast<Box?>().FirstOrDefault(b => Good(b!.Value, i))
+                ?? spots.Where(b => !Blocked(b, i) && Distance(b, own) >= 2.5).Prepend(e.LabelBox).MaxBy(b => Math.Min(Others(b, i), 40) - Distance(b, own));
+            edges[i] = e with { LabelBox = best };
+        }
+        return s with { Edges = edges };
+    }
+
+    /// <summary>How far a box is from a line (0 when the line touches it).</summary>
+    internal static double Distance(Box b, List<Pt> line)
+    {
+        double best = double.MaxValue;
+        Pt[] corners = [new(b.X, b.Y), new(b.Right, b.Y), new(b.Right, b.Bottom), new(b.X, b.Bottom)];
+        for (int k = 1; k < line.Count; k++)
+        {
+            var (p, q) = (line[k - 1], line[k]);
+            if (Touches(b, p, q)) return 0;
+            best = Math.Min(best, Math.Min(ToBox(b, p), ToBox(b, q)));
+            foreach (var c in corners) best = Math.Min(best, ToSegment(c, p, q));
+        }
+        return best;
+
+        static double ToBox(Box b, Pt p) => Math.Sqrt(Math.Pow(Math.Max(0, Math.Max(b.X - p.X, p.X - b.Right)), 2) + Math.Pow(Math.Max(0, Math.Max(b.Y - p.Y, p.Y - b.Bottom)), 2));
+
+        static double ToSegment(Pt c, Pt p, Pt q)
+        {
+            var d = q - p;
+            double len = d.X * d.X + d.Y * d.Y;
+            double t = len < 1e-9 ? 0 : Math.Clamp(((c.X - p.X) * d.X + (c.Y - p.Y) * d.Y) / len, 0, 1);
+            return Pt.Distance(c, p + d * t);
+        }
     }
 
     /// <summary>Whether a line segment touches a box.</summary>
@@ -662,7 +766,8 @@ public static class DiagramLayout
         return back;
     }
 
-    static DiagramScene Layered(Flowchart f, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer m, HashSet<int> back, List<(string First, string Second)>? pairs)
+    static DiagramScene Layered(Flowchart f, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer m, HashSet<int> back,
+        List<(string First, string Second)>? pairs, HashSet<string>? roomy)
     {
         var g = new GeometryGraph();
         // MSAGL's cluster layout throws without something here.
@@ -670,13 +775,15 @@ public static class DiagramLayout
         var clusters = new Dictionary<string, Cluster>();
         foreach (var group in f.Groups)
         {
+            double title = m.Width(group.Title, TitleSize, true) * 1.04;
+            // A title that every arrow into its group ran across gets a margin of its own on the left, over no box.
             var cluster = new Cluster
             {
                 UserData = group.Id,
                 RectangularBoundary = new RectangularClusterBoundary
                 {
-                    LeftMargin = 12, RightMargin = 12, BottomMargin = 12, TopMargin = 30,
-                    MinWidth = m.Width(group.Title, TitleSize, true) * 1.04 + 24, MinHeight = 40,
+                    LeftMargin = roomy?.Contains(group.Id) == true ? title + 20 : 12, RightMargin = 12, BottomMargin = 12, TopMargin = 30,
+                    MinWidth = title + 24, MinHeight = 40,
                 },
             };
             (group.Parent is { } parent && clusters.TryGetValue(parent, out var p) ? p : g.RootCluster).AddChild(cluster);
@@ -793,7 +900,7 @@ public static class DiagramLayout
                 ? new SceneEdge(e.From, e.To, Reverse(path), e.Line, e.StartEnd, e.EndEnd, targetTip, curveEnd, sourceTip, curveStart, labels[i].Lines, box)
                 : new SceneEdge(e.From, e.To, path, e.Line, e.StartEnd, e.EndEnd, sourceTip, curveStart, targetTip, curveEnd, labels[i].Lines, box);
         }
-        foreach (var (i, first, nth) in alongside) edges[i] = Beside(f.Edges[i], labels[i], edges[first], nth);
+        foreach (var (i, first, nth) in alongside) edges[i] = Beside(f.Edges[i], labels[i], edges[first], nth, byId[f.Edges[i].From], byId[f.Edges[i].To]);
         for (int i = 0; i < f.Edges.Count; i++)
             if (f.Edges[i].From == f.Edges[i].To) edges[i] = Loop(f.Edges[i], byId[f.Edges[i].From], labels[i]);
         var groups = f.Groups.Select(group =>
@@ -806,20 +913,36 @@ public static class DiagramLayout
     }
 
     /// <summary>
-    /// Another arrow between the same two boxes as <paramref name="first"/>: the same ends, bowed out to one side
-    /// (the second arrow one way, the third the other, further out after that), with its own markers and words.
+    /// Another arrow between the same two boxes as <paramref name="first"/>: beside it all the way, with ends of its
+    /// own a little along each box's edge (the second arrow on one side, the third on the other, further out after
+    /// that), bowed out a little more between them, and with its own markers and words.
     /// </summary>
-    static SceneEdge Beside(FlowEdge e, Words label, SceneEdge first, int nth)
+    static SceneEdge Beside(FlowEdge e, Words label, SceneEdge first, int nth, SceneNode from, SceneNode to)
     {
         var points = Flatten(first);
         if (first.From != e.From) points.Reverse();
+        // Points every few pixels, so a straight first arrow still bows smoothly.
+        points = Resample(points, 6);
         var cumulative = new double[points.Count];
         for (int k = 1; k < points.Count; k++) cumulative[k] = cumulative[k - 1] + Pt.Distance(points[k - 1], points[k]);
         double total = Math.Max(cumulative[^1], 1e-6);
         var dir = (points[^1] - points[0]).Unit();
         var normal = new Pt(-dir.Y, dir.X);
-        double amount = (nth % 2 == 1 ? 1 : -1) * ((nth + 1) / 2) * 20;
-        for (int k = 1; k < points.Count - 1; k++) points[k] += normal * (amount * Math.Sin(Math.PI * cumulative[k] / total));
+        double side = nth % 2 == 1 ? 1 : -1, step = (nth + 1) / 2;
+        // Each end slides along its box's edge until it's 12 px to the side, and the line between moves over with
+        // them, bowed out a little more.
+        var startBy = Slide(from, points[0], step * 12, normal * side) - points[0];
+        var endBy = Slide(to, points[^1], step * 12, normal * side) - points[^1];
+        for (int k = 0; k < points.Count; k++)
+        {
+            double u = cumulative[k] / total;
+            points[k] += startBy * (1 - u) + endBy * u + normal * (side * step * 10 * Math.Sin(Math.PI * u));
+        }
+        // Each end cut (or run on) to where the moved line meets its box.
+        OntoOutline(points, to);
+        points.Reverse();
+        OntoOutline(points, from);
+        points.Reverse();
         var (startTip, startBase) = Cut(points, MarkerLength(e.StartEnd), fromEnd: false);
         var (tip, endBase) = Cut(points, MarkerLength(e.EndEnd), fromEnd: true);
         var path = new List<PathStep> { new(PathVerb.Move, startBase) };
@@ -829,14 +952,87 @@ public static class DiagramLayout
         if (label.Lines.Count > 0)
         {
             var middle = points[Math.Max(0, Array.FindIndex(cumulative, c => c >= total / 2))];
-            var side = normal * Math.Sign(amount);
-            box = Box.Around(middle + side * (Math.Abs(side.X) * label.W / 2 + Math.Abs(side.Y) * label.H / 2 + 4), label.W, label.H);
+            var away = normal * side;
+            box = Box.Around(middle + away * (Math.Abs(away.X) * label.W / 2 + Math.Abs(away.Y) * label.H / 2 + 4), label.W, label.H);
         }
         return new SceneEdge(e.From, e.To, path, e.Line, e.StartEnd, e.EndEnd, startTip, startBase, tip, endBase, label.Lines, box);
     }
 
-    /// <summary>An arrow as points from tip to tip, its curves sampled.</summary>
-    static List<Pt> Flatten(SceneEdge e)
+    /// <summary>The same line with a point at least every <paramref name="spacing"/> pixels along it.</summary>
+    static List<Pt> Resample(List<Pt> points, double spacing)
+    {
+        var dense = new List<Pt> { points[0] };
+        for (int k = 1; k < points.Count; k++)
+        {
+            int pieces = Math.Max(1, (int)Math.Ceiling(Pt.Distance(points[k - 1], points[k]) / spacing));
+            for (int j = 1; j <= pieces; j++) dense.Add(points[k - 1] + (points[k] - points[k - 1]) * ((double)j / pieces));
+        }
+        return dense;
+    }
+
+    /// <summary>The point along <paramref name="n"/>'s outline from <paramref name="p"/> (a point on it) that is
+    /// <paramref name="by"/> pixels over in the direction <paramref name="toward"/> (a unit vector), or as near as the
+    /// outline gets within a box's width.</summary>
+    static Pt Slide(SceneNode n, Pt p, double by, Pt toward)
+    {
+        var q = p;
+        for (double walked = 0; walked < n.Box.W + n.Box.H; walked += 1)
+        {
+            double over = (q.X - p.X) * toward.X + (q.Y - p.Y) * toward.Y;
+            if (over >= by) break;
+            var g = Gradient(n, q);
+            var tangent = new Pt(-g.Y, g.X);
+            if (tangent.X * toward.X + tangent.Y * toward.Y < 0) tangent *= -1;
+            q += tangent;
+            for (int i = 0; i < 3; i++) q -= Gradient(n, q) * Outline(n, q);
+        }
+        return q;
+    }
+
+    /// <summary>Which way is straight out of the box's outline at <paramref name="p"/>.</summary>
+    static Pt Gradient(SceneNode n, Pt p)
+    {
+        const double h = 0.5;
+        var dx = new Pt(h, 0);
+        var dy = new Pt(0, h);
+        return new Pt(Outline(n, p + dx) - Outline(n, p - dx), Outline(n, p + dy) - Outline(n, p - dy)).Unit();
+    }
+
+    /// <summary>Ends a line heading into <paramref name="n"/> where it first meets the box's outline: cut short if
+    /// it runs inside, run on straight if it stops short.</summary>
+    static void OntoOutline(List<Pt> points, SceneNode n)
+    {
+        static Pt Crossing(SceneNode n, Pt outside, Pt inside)
+        {
+            for (int i = 0; i < 40; i++)
+            {
+                var mid = (outside + inside) * 0.5;
+                if (Outline(n, mid) > 0) outside = mid; else inside = mid;
+            }
+            return inside;
+        }
+        int last = points.Count - 1;
+        if (Outline(n, points[last]) > 0)
+        {
+            var dir = (points[last] - points[last - 1]).Unit();
+            for (double d = 2; d <= n.Box.W + n.Box.H; d += 2)
+            {
+                var ahead = points[last] + dir * d;
+                if (Outline(n, ahead) > 0) continue;
+                points[last] = Crossing(n, points[last], ahead);
+                break;
+            }
+            return;
+        }
+        int k = last;
+        while (k > 0 && Outline(n, points[k]) <= 0) k--;
+        if (Outline(n, points[k]) <= 0) return; // it starts inside the box too; leave it be
+        var end = Crossing(n, points[k], points[k + 1]);
+        points.RemoveRange(k + 1, points.Count - k - 1);
+        points.Add(end);
+    }
+
+    internal static List<Pt> Flatten(SceneEdge e)
     {
         var points = new List<Pt> { e.StartTip };
         var at = e.Path[0].A;
@@ -861,19 +1057,26 @@ public static class DiagramLayout
         var @base = tip;
         if (length > 0)
         {
+            // The marker's base: its length back along the line, on whichever piece of it that falls.
             double walked = 0;
             int k = 1;
             for (; k < points.Count; k++)
             {
                 double step = Pt.Distance(points[k - 1], points[k]);
-                if (walked + step >= length && k < points.Count - 1)
+                if (walked + step >= length)
                 {
                     @base = points[k - 1] + (points[k] - points[k - 1]).Unit() * (length - walked);
                     break;
                 }
                 walked += step;
             }
-            points.RemoveRange(0, Math.Min(k, points.Count - 2));
+            if (k == points.Count)
+            {
+                // The whole line is shorter than its marker: the marker takes all of it.
+                k = points.Count - 1;
+                @base = points[k];
+            }
+            points.RemoveRange(0, k);
             points.Insert(0, @base);
         }
         if (fromEnd) points.Reverse();
