@@ -1,7 +1,10 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading.Channels;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Features;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 
@@ -36,6 +39,67 @@ public sealed partial class LibraryWeb
         (await Engines.StatusAsync(AiSettings.Load(cfg.Home), cfg, Jobs.Checks)) with { Pulling = Jobs.Pulling };
 
     static IResult AiJson<T>(T value) => Http.Json(JsonSerializer.SerializeToNode(value, AiRemote.Options));
+
+    /// <summary>
+    /// An answer as it's written, as newline-delimited JSON, each line sent the moment it's ready: <c>{"kind":
+    /// "text", "text"}</c> for more of the answer, <c>{"kind": "answer", "text"}</c> for all of it so far (when what
+    /// came before changed rather than grew), then <c>{"kind": "done", "reply"}</c> with the whole reply, or
+    /// <c>{"kind": "error", "status", "detail"}</c> saying why it stopped. Leaving stops the engine too.
+    /// </summary>
+    async Task StreamAnswerAsync(HttpContext ctx, AskRequest request)
+    {
+        ctx.Response.ContentType = "application/x-ndjson; charset=utf-8";
+        ctx.Response.Headers.CacheControl = "no-store";
+        ctx.Response.Headers["X-Accel-Buffering"] = "no"; // a proxy in front of the library passes each line straight on
+        ctx.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
+        await ctx.Response.StartAsync(ctx.RequestAborted);
+        var lines = Channel.CreateUnbounded<JsonObject>(new UnboundedChannelOptions { SingleReader = true });
+        string sent = "";
+        void SoFar(string answer)
+        {
+            lines.Writer.TryWrite(answer.StartsWith(sent, StringComparison.Ordinal)
+                ? new JsonObject { ["kind"] = "text", ["text"] = answer[sent.Length..] }
+                : new JsonObject { ["kind"] = "answer", ["text"] = answer });
+            sent = answer;
+        }
+        var asking = Task.Run(async () =>
+        {
+            try
+            {
+                var reply = await Jobs.AskAsync(request, Reader, cfg, ctx.RequestAborted, SoFar);
+                lines.Writer.TryWrite(new JsonObject { ["kind"] = "done", ["reply"] = JsonSerializer.SerializeToNode(reply, AiRemote.Options) });
+            }
+            catch (Exception e) when (e is HttpRequestException or TimeoutException or InvalidOperationException or InvalidDataException)
+            {
+                lines.Writer.TryWrite(new JsonObject { ["kind"] = "error", ["status"] = 503, ["detail"] = e.Message });
+            }
+            catch (OperationCanceledException) when (ctx.RequestAborted.IsCancellationRequested)
+            {
+                // they stopped it, or went away
+            }
+            finally
+            {
+                lines.Writer.Complete();
+            }
+        });
+        try
+        {
+            // Whatever has queued up while the last lines went out goes out together, in one write.
+            var batch = new StringBuilder();
+            while (await lines.Reader.WaitToReadAsync(ctx.RequestAborted))
+            {
+                batch.Clear();
+                while (lines.Reader.TryRead(out var line)) batch.Append(line.ToJsonString()).Append('\n');
+                await ctx.Response.WriteAsync(batch.ToString(), Encoding.UTF8, ctx.RequestAborted);
+                await ctx.Response.Body.FlushAsync(ctx.RequestAborted);
+            }
+        }
+        catch (Exception e) when (e is OperationCanceledException or IOException)
+        {
+            // they went away: the answer stops with them
+        }
+        await asking;
+    }
 
     void MapAi(WebApplication app)
     {
@@ -150,6 +214,11 @@ public sealed partial class LibraryWeb
                 Lecture = Str(body, "lecture"), Class = Str(body, "class"), Engine = Str(body, "engine"),
                 Live = Str(body, "live"), LiveTitle = Str(body, "live_title"),
             };
+            if (body?["stream"] is JsonValue sv && sv.TryGetValue(out bool stream) && stream)
+            {
+                await StreamAnswerAsync(ctx, request);
+                return Results.Empty;
+            }
             try
             {
                 return AiJson(await Jobs.AskAsync(request, Reader, cfg, ctx.RequestAborted));
@@ -159,6 +228,10 @@ public sealed partial class LibraryWeb
                 return Http.Detail(503, e.Message);
             }
         })));
+
+        // A student has started typing a question: the engine that will answer it gets ready (a local model loads).
+        app.MapPost("/api/v2/ai/warm", Http.Handle(ctx => ApiAsync(ctx, async () =>
+            Http.Json(new JsonObject { ["warming"] = Jobs.Warm(Str(await Http.JsonBodyAsync(ctx.Request), "engine"), cfg) }))));
 
         app.MapGet("/api/v2/ai/rewrite/{lecture}", Http.Handle(ctx => ApiAsync(ctx, () =>
             Task.FromResult(RewriteResult(() => Rewrites.Get((string)ctx.Request.RouteValues["lecture"]!))))));

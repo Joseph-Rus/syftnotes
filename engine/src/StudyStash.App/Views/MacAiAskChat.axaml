@@ -75,9 +75,15 @@
             </Button.Flyout>
           </Button>
           <Border Grid.Column="4" Classes="ai-field-send">
-            <Button Classes="ai-send" Command="{Binding AskCommand}">
-              <c:Icon Glyph="arrow_upward" Size="18" Foreground="{DynamicResource Fg}" />
-            </Button>
+            <Panel>
+              <Button Classes="ai-send" Command="{Binding AskCommand}" IsVisible="{Binding !Busy}">
+                <c:Icon Glyph="arrow_upward" Size="18" Foreground="{DynamicResource Fg}" />
+              </Button>
+              <!-- While an answer is being written, the same place stops it -->
+              <Button Classes="ai-send" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
+                <c:Icon Glyph="stop" Filled="True" Size="18" Foreground="{DynamicResource Fg}" />
+              </Button>
+            </Panel>
           </Border>
         </Grid>
       </Border>

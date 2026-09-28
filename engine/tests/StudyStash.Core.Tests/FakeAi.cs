@@ -139,16 +139,56 @@ public sealed class ScriptedAi(string id, string name = "") : AiProvider
     /// <summary>Waits here before yielding <see cref="Script"/> — lets a test hold a job at "still working" until it
     /// chooses to let it finish (<c>SetResult</c>), honouring cancellation the same way a real run would.</summary>
     public TaskCompletionSource<bool>? Gate { get; set; }
+    /// <summary>How many of <see cref="Script"/>'s events it says before waiting at <see cref="Gate"/> (0: before any)
+    /// — a run held partway through, the way a real engine is between two pieces of its answer.</summary>
+    public int GateAfter { get; set; }
+    /// <summary>A pause before each event, like an engine writing its answer a piece at a time.</summary>
+    public TimeSpan Pause { get; set; }
+    /// <summary>Whether the last run got to the end of its script.</summary>
+    public bool Finished { get; private set; }
+    /// <summary>Set once a run held at <see cref="Gate"/> is stopped by its CancellationToken instead.</summary>
+    public TaskCompletionSource StoppedWhileHeld { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    /// <summary>Whether the last run asked to stream (the way Ask does), not just for the whole answer at the end.</summary>
+    public bool Streamed { get; private set; }
+    /// <summary>The models <see cref="WarmAsync"/> was asked to get ready, in order.</summary>
+    public List<string> Warmed { get; } = [];
 
     public override List<string> Command(AiRequest req, bool stream) => [];
     public override IEnumerable<AiEvent> Parse(string line) => [];
 
+    public override Task<bool> WarmAsync(string model, CancellationToken ct = default)
+    {
+        lock (Warmed) Warmed.Add(model);
+        return Task.FromResult(true);
+    }
+
     public override async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        Finished = false;
+        Streamed = stream;
         if (Throws is not null) throw Throws;
         if (Hang) await Task.Delay(Timeout.InfiniteTimeSpan, ct);
-        if (Gate is not null) await Gate.Task.WaitAsync(ct);
-        foreach (var e in Script) yield return e;
+        for (int i = 0; i < Script.Count; i++)
+        {
+            if (Gate is not null && i == GateAfter) await Held(Gate.Task, ct);
+            if (Pause > TimeSpan.Zero) await Task.Delay(Pause, ct);
+            yield return Script[i];
+        }
+        if (Gate is not null && GateAfter >= Script.Count) await Held(Gate.Task, ct);
+        Finished = true;
+    }
+
+    async Task Held(Task gate, CancellationToken ct)
+    {
+        try
+        {
+            await gate.WaitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            StoppedWhileHeld.TrySetResult();
+            throw;
+        }
     }
 }
