@@ -66,11 +66,12 @@
             <Border Classes="ai-card" Margin="{Binding First, Converter={x:Static c:Converters.FirstCardMargin}}">
               <StackPanel>
                 <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
-                  <Button Grid.ColumnSpan="3" Classes="ai-textbtn" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+                  <Button Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
                     <Grid ColumnDefinitions="Auto,16,*">
                       <Border Classes="ai-radio" Classes.on="{Binding Selected}" Classes.dim="{Binding !CanWrite}" VerticalAlignment="Center">
                         <Ellipse Width="10" Height="10" Fill="{DynamicResource OnAccent}" IsVisible="{Binding Selected}" />
                       </Border>
+                      <Border Classes="focusring ai-radioring" />
                       <StackPanel Grid.Column="2" Classes="ai-row-text" VerticalAlignment="Center">
                         <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
                         <TextBlock Classes="ai-row-sub" Text="{Binding About}" />
@@ -147,11 +148,12 @@
       <!-- No AI for now: transcripts only, notes turned on later in Settings -->
       <Border Classes="ai-card" IsVisible="{Binding OffersNoAi}">
         <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
-          <Button Grid.ColumnSpan="3" Classes="ai-textbtn" Command="{Binding PickNoAiCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+          <Button Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding PickNoAiCommand}" HorizontalContentAlignment="Stretch" Padding="0">
             <Grid ColumnDefinitions="Auto,16,*">
               <Border Classes="ai-radio" Classes.on="{Binding NoAi}" VerticalAlignment="Center">
                 <Ellipse Width="10" Height="10" Fill="{DynamicResource OnAccent}" IsVisible="{Binding NoAi}" />
               </Border>
+              <Border Classes="focusring ai-radioring" />
               <StackPanel Grid.Column="2" Classes="ai-row-text" VerticalAlignment="Center">
                 <TextBlock Classes="ai-row-title" Text="No AI for now" />
                 <TextBlock Classes="ai-row-sub" Text="Just transcripts. Turn notes on later in Settings." />
@@ -180,7 +182,8 @@
               </Grid>
             </Border>
             <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
+              <!-- Left open, the click that closes it still reaches what it lands on: Continue moves on in one click. -->
+              <MenuFlyout Placement="BottomEdgeAlignedRight" OverlayDismissEventPassThrough="True" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
             </Button.Flyout>
           </Button>
         </Grid>

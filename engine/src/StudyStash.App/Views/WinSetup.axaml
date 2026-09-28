@@ -299,7 +299,7 @@
                 </StackPanel>
               </Grid>
             </Border>
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <ScrollViewer Name="Page" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="36,30,36,4">
               <TextBlock Text="{Binding StepLabel}" FontSize="12" Foreground="{DynamicResource Fg2}" />
 

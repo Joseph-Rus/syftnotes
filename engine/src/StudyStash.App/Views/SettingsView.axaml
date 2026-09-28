@@ -392,6 +392,17 @@
       <Setter Property="BorderThickness" Value="2" />
       <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     </Style>
+    <!-- A card's focus ring follows its corners, 4 px out. -->
+    <Style Selector=".mac Border.cardring">
+      <Setter Property="CornerRadius" Value="20" />
+    </Style>
+    <Style Selector=".win Border.cardring">
+      <Setter Property="CornerRadius" Value="8" />
+    </Style>
+    <!-- A card that isn't chosen, hovered or pressed: its own outline shows faintly (no box round it). -->
+    <Style Selector="Button.card:pointerover Border.choice:not(.on), Button.card:pressed Border.choice:not(.on)">
+      <Setter Property="BorderBrush" Value="{DynamicResource Fg3}" />
+    </Style>
 
     <!-- Settings → Appearance's mode: Mac a three-way segmented pill (System Settings' own Appearance control) — one
          rounded track holding three equal buttons, the chosen one raised. -->
@@ -469,15 +480,22 @@
     </Style>
 
     <!-- The colour theme swatches: Mac a filled ring (a gap of Win, an Accent rim when chosen); Windows a squared
-         swatch with a Fg border and a check when chosen. -->
+         swatch with a Fg border and a check when chosen. Hovered or pressed, the rim shows faintly; focused from the
+         keyboard, a focus ring goes round the swatch. Never a box round the whole cell. -->
     <Style Selector="Border.swatchring">
       <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.swatch:pointerover Border.swatchring, Button.swatch:pressed Border.swatchring">
+      <Setter Property="Background" Value="{DynamicResource Fg3}" />
     </Style>
     <Style Selector=".mac Border.swatchring.on">
       <Setter Property="Background" Value="{DynamicResource Accent}" />
     </Style>
     <Style Selector="Border.swatchborder">
       <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.swatch:pointerover Border.swatchborder, Button.swatch:pressed Border.swatchborder">
+      <Setter Property="BorderBrush" Value="{DynamicResource Fg3}" />
     </Style>
     <Style Selector=".win Border.swatchborder.on">
       <Setter Property="BorderBrush" Value="{DynamicResource Fg}" />
@@ -615,8 +633,9 @@
                     </Button>
                   </StackPanel>
                 </Border>
-                <!-- Windows: a vertical list of radio rows, each the full row wide. -->
-                <Border Classes="group" IsVisible="{Binding IsWin}">
+                <!-- Windows: a vertical list of radio rows, each the full row wide; a row's hover stays inside the
+                     group's rounded corners. -->
+                <Border Classes="group" IsVisible="{Binding IsWin}" ClipToBounds="True">
                   <ItemsControl ItemsSource="{Binding AppearanceOptions}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="s:AppearanceOption">
@@ -643,11 +662,12 @@
                 <TextBlock Classes="say" Text="Light and dark set the whole app at once: the dropdown, quick panel, recorder, library and setup." />
                 <TextBlock Classes="section gap" Text="Colour theme" />
                 <Border Classes="group" Padding="16">
-                  <ItemsControl ItemsSource="{Binding Themes}">
+                  <!-- Unclipped, so a swatch's focus ring shows whole. -->
+                  <ItemsControl ItemsSource="{Binding Themes}" ClipToBounds="False">
                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="5" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="app:ThemeSwatch">
-                        <Button Theme="{StaticResource Surface}" Padding="0" Margin="0,0,0,10"
+                        <Button Classes="quiet swatch" Theme="{StaticResource Surface}" Padding="0" Margin="0,0,0,10"
                                 Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).PickThemeCommand}" CommandParameter="{Binding Name}">
                           <StackPanel Spacing="6" HorizontalAlignment="Center">
                             <Panel IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).ShowMacSwatch}" Width="52" Height="52" HorizontalAlignment="Center">
@@ -656,6 +676,7 @@
                                   <Ellipse Width="44" Height="44" Fill="{Binding Swatch}" />
                                 </Border>
                               </Border>
+                              <Border Classes="focusring" Margin="-4" CornerRadius="30" />
                             </Panel>
                             <Panel IsVisible="{Binding !$parent[UserControl].((s:SettingsModel)DataContext).ShowMacSwatch}" Width="40" Height="40" HorizontalAlignment="Center">
                               <Border Width="40" Height="40" CornerRadius="4" Background="{Binding Swatch}" />
@@ -663,6 +684,7 @@
                               <Border Width="18" Height="18" CornerRadius="9" Background="{DynamicResource Mini}" IsVisible="{Binding Chosen}">
                                 <c:Icon Glyph="check" Size="12" Foreground="{DynamicResource Fg}" />
                               </Border>
+                              <Border Classes="focusring" Margin="-4" CornerRadius="8" />
                             </Panel>
                             <TextBlock Classes="swatchname" Text="{Binding Name}" />
                           </StackPanel>
@@ -706,23 +728,27 @@
                 <TextBlock Classes="h" Text="Recording" />
                 <TextBlock Classes="body" Text="Whisper writes down each lecture on this computer. The recording never leaves it; the library gets the transcript." />
                 <TextBlock Classes="section" Text="Transcription model" />
-                <ItemsControl ItemsSource="{Binding Models}" MaxWidth="480" HorizontalAlignment="Left">
+                <!-- Unclipped, so a card's focus ring shows whole. -->
+                <ItemsControl ItemsSource="{Binding Models}" MaxWidth="480" HorizontalAlignment="Left" ClipToBounds="False">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="s:ModelChoice">
-                      <Button Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
+                      <Button Classes="quiet card" Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
                               Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).PickModelCommand}" CommandParameter="{Binding}">
-                        <Border Classes="choice" Classes.on="{Binding Chosen}" Margin="0">
-                          <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Spacing="2">
-                              <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <Border Classes="badge" IsVisible="{Binding Recommended}"><TextBlock Text="Recommended" /></Border>
+                        <Panel>
+                          <Border Classes="focusring cardring" Margin="-4" />
+                          <Border Classes="choice" Classes.on="{Binding Chosen}" Margin="0">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <StackPanel Spacing="2">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                  <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                  <Border Classes="badge" IsVisible="{Binding Recommended}"><TextBlock Text="Recommended" /></Border>
+                                </StackPanel>
+                                <TextBlock Text="{Binding About}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
                               </StackPanel>
-                              <TextBlock Text="{Binding About}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
-                            </StackPanel>
-                            <c:Icon Grid.Column="1" IsVisible="{Binding Here}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Accent}" Margin="10,0,0,0" />
-                          </Grid>
-                        </Border>
+                              <c:Icon Grid.Column="1" IsVisible="{Binding Here}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Accent}" Margin="10,0,0,0" />
+                            </Grid>
+                          </Border>
+                        </Panel>
                       </Button>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
