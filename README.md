@@ -154,7 +154,10 @@ only reads; nothing on Canvas changes. On your library's computer:
 1. **Settings → Your library → Canvas** (or the Canvas step in setup): type your school's Canvas
    address.
 2. Click **Add to Chrome**. It opens Chrome's extensions page and shows the extension's folder.
-   Turn on **Developer mode**, click **Load unpacked**, and pick that folder.
+   Turn on **Developer mode**, click **Load unpacked**, and pick that folder — or drag the folder
+   onto the Extensions page. On a Mac the folder is **Study Stash → Chrome extension** in your home
+   folder (`~/Study Stash/Chrome extension`), where Chrome's window can see it; on Windows it's
+   `chrome-extension` in `%USERPROFILE%\.study-stash`.
 3. Sign in to Canvas in Chrome, then click **Find my courses** and match each class to its course.
 
 Canvas then syncs about once an hour while Chrome is open (it can stay minimized): what's due,
@@ -193,7 +196,9 @@ what Claude can read, troubleshooting, and how each requirement of Claude's conn
 
 Everything is under `~/.study-stash` (or `--home`, or the `STUDYSTASH_HOME` environment variable):
 your settings, the lecture database, and the notes themselves as plain Markdown files in a folder
-per class, which you can open, back up or sync however you like.
+per class, which you can open, back up or sync however you like. On a Mac the Chrome extension's
+folder is the one exception: `~/Study Stash/Chrome extension`, because Chrome's Load unpacked window
+doesn't show folders whose names start with a dot.
 
 ## Build from source
 

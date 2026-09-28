@@ -385,8 +385,9 @@ public class CanvasShots
     }
 
     /// <summary>Setup's Canvas step: "chrome" (Add to Chrome, not pressed yet), "waiting" (pressed: the folder and
-    /// Chrome are open), or "found" (Chrome connected and five courses found).</summary>
-    internal static async Task<CanvasConnectModel> SetupStepAsync(string at)
+    /// Chrome are open; on a <paramref name="mac"/>, the folder Chrome's picker shows there), or "found" (Chrome
+    /// connected and five courses found).</summary>
+    internal static async Task<CanvasConnectModel> SetupStepAsync(string at, bool mac = false)
     {
         var handler = new FakeLibrary()
             .Json(HttpMethod.Get, "/api/v2/canvas/state", at == "found" ? "state-connected" : "state-no-extension")
@@ -397,6 +398,7 @@ public class CanvasShots
         var m = new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>(at == "found" ? "state-connected" : "state-no-extension"), []);
         if (at == "waiting") await m.AddToChromeCommand.ExecuteAsync(null);
+        if (at == "waiting" && mac) m.ExtensionFolder = Path.Combine("~", "Study Stash", "Chrome extension");
         m.Dispose(); // a still picture: the watch needn't keep asking
         return m;
     }
@@ -475,7 +477,7 @@ public class CanvasShots
     {
         foreach (var at in new[] { "chrome", "waiting", "found" })
         {
-            var m = await SetupStepAsync(at);
+            var m = await SetupStepAsync(at, mac: true);
             foreach (var t in Themes)
             {
                 Control? built = null;
