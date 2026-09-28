@@ -53,7 +53,7 @@ jobs:
       - name: Whisper tiny, for the live transcription tests
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/whisper"
+          mkdir -p "$RUNNER_TEMP/whisper" "$RUNNER_TEMP/crash"
           [ -f "$RUNNER_TEMP/whisper/ggml-tiny.bin" ] || curl -fsSL -o "$RUNNER_TEMP/whisper/ggml-tiny.bin" \
             https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
           echo "STUDYSTASH_WHISPER_MODEL=$RUNNER_TEMP/whisper/ggml-tiny.bin" >> "$GITHUB_ENV"
@@ -65,6 +65,19 @@ jobs:
           # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
           # draws them (its own fonts), in the Windows look, light and dark, at 100% and 150%.
           STUDYSTASH_SHOTS: ${{ runner.os == 'Windows' && format('{0}\shots', runner.temp) || '' }}
+          # A test process that dies in native code leaves a crash report (every thread's stack, native and .NET)
+          # instead of only "exit code 139", so a crash that happens once in a while can be traced the first time.
+          DOTNET_DbgEnableMiniDump: ${{ runner.os != 'Windows' && '1' || '' }}
+          DOTNET_DbgMiniDumpType: ${{ runner.os != 'Windows' && '1' || '' }}
+          DOTNET_EnableCrashReport: ${{ runner.os != 'Windows' && '1' || '' }}
+          DOTNET_DbgMiniDumpName: ${{ runner.os != 'Windows' && format('{0}/crash/core.%p', runner.temp) || '' }}
+      - name: Crash reports, if a test process crashed
+        if: ${{ failure() && runner.os != 'Windows' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: crash-${{ matrix.os }}
+          path: ${{ runner.temp }}/crash/*.crashreport.json
+          if-no-files-found: ignore
       - name: The notes' formulas and diagrams, as Windows draws them
         if: ${{ always() && runner.os == 'Windows' }}
         uses: actions/upload-artifact@v4

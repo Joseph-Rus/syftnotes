@@ -108,6 +108,26 @@ static class SceneCache
         }
     }
 
+    /// <summary>
+    /// Forgets every chart and the app they were measured in, before that app goes: the layout under way finishes
+    /// (waiting up to <paramref name="timeout"/>; false if it's still going), and those still queued are dropped
+    /// without starting. An app's fonts go with it (a test's headless app frees them the moment the test ends), so a
+    /// layout still measuring words with them would read memory that's gone.
+    /// </summary>
+    internal static bool Forget(TimeSpan timeout)
+    {
+        Task pending;
+        lock (gate)
+        {
+            map.Clear();
+            order.Clear();
+            running.Clear();
+            app = null;
+            pending = queue;
+        }
+        return pending.Wait(timeout);
+    }
+
     static DiagramScene? Lay(string key, Flowchart chart, Func<string, double, bool, double> measure, ChartDirection? direction, Application? owner)
     {
         bool Stale()
