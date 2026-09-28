@@ -222,11 +222,12 @@ public class RichWindowsShots
     }
 
     /// <summary>
-    /// At 150% a formula and a diagram draw one and a half times as many pixels across as at 100%: the same size on
-    /// the screen, drawn sharper, never a small picture stretched. The ink is found in the pictures themselves.
+    /// At 125%, 150% and 175% a formula, a chart and a drawing draw that many times as many pixels across as at 100%:
+    /// the same size on the screen, drawn sharper, never a small picture stretched. The ink is found in the pictures
+    /// themselves.
     /// </summary>
     [AvaloniaFact]
-    public void At_150_percent_they_draw_half_as_large_again_in_pixels()
+    public void At_125_150_and_175_percent_they_draw_that_much_larger_in_pixels()
     {
         foreach (var (what, build) in new (string, Func<Control>)[]
         {
@@ -236,7 +237,7 @@ public class RichWindowsShots
         })
         {
             var ink = new Dictionary<double, PixelRect>();
-            foreach (double scale in Scales)
+            foreach (double scale in new[] { 1, 1.25, 1.5, 1.75 })
             {
                 Skin.UseTheme(ColourThemes.Default);
                 ((App)Application.Current!).UseSkin(SkinKind.Win);
@@ -251,10 +252,13 @@ public class RichWindowsShots
                 ink[scale] = Ink(window.CaptureRenderedFrame()!);
                 window.Close();
             }
-            var (small, large) = (ink[1], ink[1.5]);
+            var small = ink[1];
             Assert.True(small.Width > 40 && small.Height > 20, $"{what}: hardly anything drawn at 100% ({small})");
-            Assert.InRange(large.Width / (double)small.Width, 1.45, 1.55);
-            Assert.InRange(large.Height / (double)small.Height, 1.45, 1.55);
+            foreach (double scale in new[] { 1.25, 1.5, 1.75 })
+            {
+                Assert.InRange(ink[scale].Width / (double)small.Width, scale - 0.05, scale + 0.05);
+                Assert.InRange(ink[scale].Height / (double)small.Height, scale - 0.05, scale + 0.05);
+            }
         }
     }
 
