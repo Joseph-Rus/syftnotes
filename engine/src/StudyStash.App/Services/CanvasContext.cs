@@ -34,10 +34,29 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
             OpenInChrome: OpenInChrome,
             OpenChrome: () => OpenInChrome(null),
             OpenChromeExtensions: () => OpenInChrome("chrome://extensions"),
-            RevealFolder: dir => Machine.Open(dir),
+            RevealFolder: Reveal,
             OpenFile: path => Machine.Open(path),
             PrepareExtension: (key, canvasUrl) => Core.Canvas.Extension.Ensure(Core.Canvas.Extension.Folder(host.Home), cc.ServerUrl, key, canvasUrl).Path);
         return new CanvasContext(client, new CanvasClock(() => DateTimeOffset.Now, TimeZoneInfo.Local), cls => Skin.ClassDot(host.ColorOf(cls)), actions, host.Home);
+    }
+
+    /// <summary>Shows the extension's folder for Chrome's Load unpacked. On Windows it's shown selected in the folder
+    /// that holds it, so it can be dragged onto Chrome's extensions page or its path copied into Chrome's picker
+    /// (which starts somewhere else entirely); elsewhere the folder opens.</summary>
+    static void Reveal(string dir)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                using var _ = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", $"/select,\"{dir}\"") { UseShellExecute = false });
+                return;
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+            }
+        }
+        Machine.Open(dir);
     }
 
     static void OpenInChrome(string? url)

@@ -80,23 +80,32 @@ public static class HostInfo
 
     static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(3) };
 
+    /// <summary>Whether nothing listens on <paramref name="port"/>, on the network or on this computer alone. Both are
+    /// tried: Windows lets a network-wide bind share a port a program holds on 127.0.0.1 only (a library made for just
+    /// this computer), and the other way round.</summary>
+    public static bool PortFree(int port) => CanBind(IPAddress.Any, port) && CanBind(IPAddress.Loopback, port);
+
+    static bool CanBind(IPAddress address, int port)
+    {
+        using var s = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        // POSIX: ignore sockets lingering after a restart, as the web server does. (On Windows this flag would
+        // allow sharing a port someone is listening on.)
+        if (!OperatingSystem.IsWindows()) s.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+        try
+        {
+            s.Bind(new IPEndPoint(address, port));
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>"free", "ours" (a Study Stash library already answers there), or "busy" (something else has it).</summary>
     public static async Task<string> PortStatusAsync(int port, HttpClient? http = null)
     {
-        using (var s = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp))
-        {
-            // POSIX: ignore sockets lingering after a restart, as the web server does. (On Windows this flag would
-            // allow sharing a port someone is listening on.)
-            if (!OperatingSystem.IsWindows()) s.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-            try
-            {
-                s.Bind(new IPEndPoint(IPAddress.Any, port));
-                return "free";
-            }
-            catch (SocketException)
-            {
-            }
-        }
+        if (PortFree(port)) return "free";
         try
         {
             using var r = await (http ?? Http).GetAsync($"http://127.0.0.1:{port}/api/health");

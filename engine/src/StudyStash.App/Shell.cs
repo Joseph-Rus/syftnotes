@@ -313,6 +313,20 @@ public static partial class Shell
         }
         tray = new TrayIcon { Icon = TrayImage(false), ToolTipText = "Study Stash", IsVisible = true };
         tray.Clicked += (_, _) => TogglePanel();
+        trayRole = host.Settings.Role;
+        tray.Menu = TrayMenu(host.Settings.Role);
+        TrayIcon.SetIcons(app, new TrayIcons { tray });
+        // The tray's ink is black or white depending on the theme; redraw it when that changes.
+        app.ActualThemeVariantChanged += (_, _) => tray.Icon = TrayImage(trayRecording);
+    }
+
+    /// <summary>The role the tray's menu was made for: setup (or Settings) changing it makes the menu again.</summary>
+    static AppRole? trayRole;
+
+    /// <summary>The tray icon's right-click menu (Windows). Record is there on every computer that records: a laptop,
+    /// and just this computer; a library-only computer doesn't record.</summary>
+    internal static NativeMenu TrayMenu(AppRole role)
+    {
         var menu = new NativeMenu();
         void Item(string title, Action act)
         {
@@ -320,16 +334,13 @@ public static partial class Shell
             i.Click += (_, _) => act();
             menu.Add(i);
         }
-        if (host.Settings.Role != AppRole.Library) Item("Record", ToggleRecording);
+        if (role != AppRole.Library) Item("Record", ToggleRecording);
         Item("Search notes and lectures", ToggleQuick);
         Item("Open Study Stash", ShowLibrary);
         Item("Settings…", SettingsFromAnywhere);
         menu.Add(new NativeMenuItemSeparator());
         Item("Quit Study Stash", () => Quit());
-        tray.Menu = menu;
-        TrayIcon.SetIcons(app, new TrayIcons { tray });
-        // The tray's ink is black or white depending on the theme; redraw it when that changes.
-        app.ActualThemeVariantChanged += (_, _) => tray.Icon = TrayImage(trayRecording);
+        return menu;
     }
 
     /// <summary>The menu bar had no room to show the S. when it was last checked.</summary>
@@ -1218,6 +1229,11 @@ public static partial class Shell
         panel.StatusGood = good;
         // A library-only computer doesn't record: its dropdown says what the library is doing instead.
         panel.LibraryOnly = host.Settings.Role == AppRole.Library;
+        if (tray is not null && trayRole != host.Settings.Role)
+        {
+            trayRole = host.Settings.Role;
+            tray.Menu = TrayMenu(host.Settings.Role);
+        }
         panel.Library = panel.LibraryOnly
             ? LibraryPanelWords.From(host.Library == LibraryState.Connected || host.LocalLibrary?.State is LibraryServiceState.Running or LibraryServiceState.Elsewhere,
                 host.Library == LibraryState.Starting || host.LocalLibrary?.State == LibraryServiceState.Starting,

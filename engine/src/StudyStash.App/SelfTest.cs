@@ -153,7 +153,10 @@ public static class SelfTest
             return;
         }
         var size = new PixelSize(Math.Max(1, (int)Math.Ceiling(w.Bounds.Width)), Math.Max(1, (int)Math.Ceiling(w.Bounds.Height)));
-        using var bmp = new RenderTargetBitmap(new PixelSize(size.Width * 2, size.Height * 2), new Vector(192, 192));
+        // Twice the size on a Mac; on Windows at the window's own size, where a doubled bitmap drew the window twice
+        // as large again and kept only its top-left quarter.
+        int times = OperatingSystem.IsWindows() ? 1 : 2;
+        using var bmp = new RenderTargetBitmap(new PixelSize(size.Width * times, size.Height * times), new Vector(96 * times, 96 * times));
         bmp.Render(w);
         using var f = File.Create(Path.Combine(Dir!, name + ".png"));
         bmp.Save(f, PngBitmapEncoderOptions.Default);
@@ -224,6 +227,7 @@ public static class SelfTest
 
         // Welcome: three choices, starting on just this computer; the self-test is a laptop with its own library.
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps");
+        await Wait(1); // the window lays out its steps first
         Shot(Shell.Windows.Setup, "setup-welcome");
         m.ChooseLaptopCommand.Execute(null);
         Say($"chose the laptop: {m.FlowName}, {m.Steps.Count} steps");
@@ -305,6 +309,7 @@ public static class SelfTest
 
         m.ChooseOneComputerCommand.Execute(null);
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps: {string.Join(", ", m.Steps.Select(x => x.Title))}");
+        await Wait(1); // the sidebar lists the chosen setup's steps first
         Shot(Shell.Windows.Setup, "setup-welcome");
         await m.NextCommand.ExecuteAsync(null);
         Say($"library made here: {m.LibraryResult}");
@@ -312,6 +317,13 @@ public static class SelfTest
         var cfg = Configs.Load(host.Home);
         Say($"it listens on {cfg.WebHost}:{cfg.WebPort} ({(LibraryHere.OnlyHere(cfg) ? "this computer only" : "the network")}), notes in {cfg.PoolDir}");
         if (!LibraryHere.OnlyHere(cfg)) throw new InvalidOperationException("Just this computer's library listens to the network");
+        // And it really does listen only on this computer: nothing a firewall (Windows') would ask about.
+        if (ListeningOn(cfg.WebPort) is { } where)
+        {
+            Say($"port {cfg.WebPort} is open on {(where.Count == 0 ? "nothing" : string.Join(", ", where))}");
+            if (where.Count == 0 || where.Any(a => !System.Net.IPAddress.IsLoopback(a)))
+                throw new InvalidOperationException("Just this computer's library isn't listening on this computer alone");
+        }
         // Its notes engine is the self-test's own (never a real Ollama): the library starts again to use it.
         cfg.OllamaHost = Engine!.Url;
         cfg.OllamaModel = "self-test-notes";
@@ -376,6 +388,21 @@ public static class SelfTest
         if (host.Settings.Role != AppRole.Both) throw new InvalidOperationException($"just this computer finished as {host.Settings.Role}");
         await Wait(1);
         Shot(Shell.Windows.Main, "library-empty");
+    }
+
+    /// <summary>The addresses something listens on at <paramref name="port"/>, as the system lists them; null where it
+    /// can't say.</summary>
+    static List<System.Net.IPAddress>? ListeningOn(int port)
+    {
+        try
+        {
+            return [.. System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()
+                .Where(e => e.Port == port).Select(e => e.Address)];
+        }
+        catch (Exception e) when (e is PlatformNotSupportedException or System.Net.NetworkInformation.NetworkInformationException)
+        {
+            return null;
+        }
     }
 
     // --- recording -----------------------------------------------------------------------------------------------
@@ -449,7 +476,10 @@ public static class SelfTest
         // The self-test's own library, or (just this computer) the app's.
         var lib = Library ?? host.LocalLibrary ?? throw new InvalidOperationException("no library to stop");
         string password = lib.Cfg.PoolPassword;
+        var stopping = System.Diagnostics.Stopwatch.StartNew();
         await lib.StopAsync();
+        // Well under the 10 s it's given before being ended for good: it stopped when asked (on Windows, by its input ending).
+        Say($"library asked to stop: gone in {stopping.Elapsed.TotalSeconds:0.0} s");
         bool gone = await Until(() => host.Library != LibraryState.Connected, 30);
         Say(gone ? $"library stopped: {host.Library}" : "library: still says Connected 30 s after stopping it");
         await PanelShot("panel-library-unreachable");

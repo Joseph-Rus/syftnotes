@@ -379,6 +379,11 @@ public sealed class AppHost : IDisposable, IProblemSource
             try
             {
                 await CheckLibraryAsync();
+                if (Library != LibraryState.Connected && LocalLibrary is { State: LibraryServiceState.Elsewhere } local)
+                {
+                    await local.TakeOverIfGoneAsync();
+                    if (local.State == LibraryServiceState.Running) await CheckLibraryAsync();
+                }
             }
             catch (Exception e)
             {

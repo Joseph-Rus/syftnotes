@@ -107,6 +107,26 @@ public class UiTests
     }
 
     [Fact]
+    public async Task A_port_held_on_this_computer_alone_is_not_free()
+    {
+        // A library made for just this computer listens on 127.0.0.1 only; Windows would let a network-wide probe
+        // share its port, so the probe tries this computer's own address too.
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        try
+        {
+            Assert.False(HostInfo.PortFree(port));
+            Assert.NotEqual("free", await HostInfo.PortStatusAsync(port));
+        }
+        finally
+        {
+            listener.Stop();
+        }
+        Assert.True(HostInfo.PortFree(port));
+    }
+
+    [Fact]
     public async Task A_library_from_any_version_on_the_port_counts_as_ours()
     {
         var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Any, 0);
