@@ -27,6 +27,21 @@ public sealed partial class NoteView : StackPanel
 {
     public static readonly StyledProperty<string?> MarkdownProperty = AvaloniaProperty.Register<NoteView, string?>(nameof(Markdown));
 
+    /// <summary>A quick answer or a chat bubble, not a lecture's notes: the caller's own font, size and line height
+    /// (<see cref="BodyFont"/>, <see cref="BodySize"/>, <see cref="BodyLineHeight"/>) rather than the design's reading
+    /// type; no top margin before a heading; tighter spacing; text selectable; a diagram capped at 260 px tall.</summary>
+    public static readonly StyledProperty<bool> CompactProperty = AvaloniaProperty.Register<NoteView, bool>(nameof(Compact));
+    /// <summary>The resource key of a compact answer's font (e.g. "SerifFont" for the quick panel); the ask chat's
+    /// plain answer leaves this unset and reads the same "TextFont" every <see cref="TextBlock"/> defaults to.</summary>
+    public static readonly StyledProperty<string?> BodyFontProperty = AvaloniaProperty.Register<NoteView, string?>(nameof(BodyFont));
+    public static readonly StyledProperty<double> BodySizeProperty = AvaloniaProperty.Register<NoteView, double>(nameof(BodySize), 15);
+    /// <summary>The line's own height in pixels (not a multiplier of the size, unlike the design's reading type).</summary>
+    public static readonly StyledProperty<double> BodyLineHeightProperty = AvaloniaProperty.Register<NoteView, double>(nameof(BodyLineHeight), 22);
+
+    /// <summary>A compact diagram never grows past this tall in the column it sits in (a quick answer or a chat
+    /// bubble); a click still opens it at full size.</summary>
+    public const double CompactDiagramMaxHeight = 260;
+
     static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseEmphasisExtras().UseMathematics().Build();
 
     /// <summary>Inline maths reads a touch smaller than the body (Latin Modern reads larger than the body fonts at
@@ -41,14 +56,46 @@ public sealed partial class NoteView : StackPanel
         set => SetValue(MarkdownProperty, value);
     }
 
+    public bool Compact
+    {
+        get => GetValue(CompactProperty);
+        set => SetValue(CompactProperty, value);
+    }
+
+    public string? BodyFont
+    {
+        get => GetValue(BodyFontProperty);
+        set => SetValue(BodyFontProperty, value);
+    }
+
+    public double BodySize
+    {
+        get => GetValue(BodySizeProperty);
+        set => SetValue(BodySizeProperty, value);
+    }
+
+    public double BodyLineHeight
+    {
+        get => GetValue(BodyLineHeightProperty);
+        set => SetValue(BodyLineHeightProperty, value);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == MarkdownProperty) Build();
+        if (change.Property == MarkdownProperty || change.Property == CompactProperty || change.Property == BodyFontProperty
+            || change.Property == BodySizeProperty || change.Property == BodyLineHeightProperty) Build();
     }
 
     bool Mac => Skin.Current == SkinKind.Mac;
-    double BodySize => Mac ? 16 : 15;
+
+    /// <summary>The reading body's size in the design's own type: 16 on a Mac (New York), 15 on Windows (Segoe UI).
+    /// A compact answer uses <see cref="BodySize"/> instead (<see cref="EffectiveBodySize"/>).</summary>
+    double DefaultBodySize => Mac ? 16 : 15;
+
+    /// <summary>What a display formula's size follows: the caller's <see cref="BodySize"/> in a compact answer, the
+    /// design's reading size in a lecture's notes.</summary>
+    double EffectiveBodySize => Compact ? BodySize : DefaultBodySize;
 
     TextBlock Text(string resourceFont, double size, double lineHeight)
     {
@@ -58,7 +105,18 @@ public sealed partial class NoteView : StackPanel
         return t;
     }
 
-    TextBlock Body() => Text(Mac ? "SerifFont" : "TextFont", BodySize, 1.6);
+    /// <summary>A compact answer's paragraph text: the caller's own font, size and line height, selectable (an answer
+    /// can be copied a sentence at a time, not just as a whole).</summary>
+    TextBlock CompactText()
+    {
+        var t = new SelectableTextBlock { FontSize = BodySize, LineHeight = BodyLineHeight, TextWrapping = TextWrapping.Wrap };
+        t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(BodyFont ?? "TextFont"));
+        t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
+        t.Bind(SelectableTextBlock.SelectionBrushProperty, t.GetResourceObservable("Hl"));
+        return t;
+    }
+
+    TextBlock Body() => Compact ? CompactText() : Text(Mac ? "SerifFont" : "TextFont", DefaultBodySize, 1.6);
 
     TextBlock Secondary(double size)
     {
@@ -69,7 +127,7 @@ public sealed partial class NoteView : StackPanel
 
     TextBlock Marker(string text)
     {
-        var t = Text(Mac ? "SerifFont" : "TextFont", BodySize, 1.6);
+        var t = Compact ? CompactText() : Text(Mac ? "SerifFont" : "TextFont", DefaultBodySize, 1.6);
         t.Text = text;
         t.TextWrapping = TextWrapping.NoWrap;
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg3"));
@@ -84,7 +142,7 @@ public sealed partial class NoteView : StackPanel
     void Build()
     {
         Children.Clear();
-        Spacing = Mac ? 14 : 12;
+        Spacing = Compact ? 8 : Mac ? 14 : 12;
         previous = diagrams;
         diagrams = [];
         string markdown = source = Markdown ?? "";
@@ -103,7 +161,7 @@ public sealed partial class NoteView : StackPanel
                     var head = Text("DisplayFont", Mac ? 17 : 20, 1.25);
                     head.FontWeight = FontWeight.SemiBold;
                     Fill(head, h.Inline);
-                    head.Margin = new Thickness(0, first ? (Mac ? 18 : 16) : (Mac ? 14 : 12), 0, 0);
+                    head.Margin = Compact ? default : new Thickness(0, first ? (Mac ? 18 : 16) : (Mac ? 14 : 12), 0, 0);
                     control = head;
                     break;
                 case ListBlock list when IsDefinitions(section, list):
@@ -223,7 +281,7 @@ public sealed partial class NoteView : StackPanel
     {
         string latex = source.Trim();
         if (latex.Length == 0 || latex.Length > MaxFormulaChars) return DisplayFallback(latex);
-        var mv = new MathView { Latex = latex, Display = true, Size = BodySize * DisplayMathFactor };
+        var mv = new MathView { Latex = latex, Display = true, Size = EffectiveBodySize * DisplayMathFactor };
         mv.Bind(MathView.ForegroundProperty, mv.GetResourceObservable("Fg"));
         mv.Measure(Size.Infinity);
         if (mv.ErrorMessage is not null) return DisplayFallback(latex);
@@ -299,16 +357,20 @@ public sealed partial class NoteView : StackPanel
             Program.Log($"[diagram] couldn't lay out a chart: {e.GetType().Name}: {e.Message}");
             return new DiagramCard("Study Stash couldn't lay this flowchart out.", source);
         }
-        return new DiagramView { Chart = chart, Margin = new Thickness(0, 6) };
+        var view = new DiagramView { Chart = chart, Margin = new Thickness(0, 6) };
+        if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
+        return view;
     }
 
-    static Control SvgBlock(string source)
+    Control SvgBlock(string source)
     {
         var drawing = SafeSvg.Clean(source, new SafeSvgOptions { FontFamily = SvgView.Font });
         if (drawing.Problem is { } problem) return new DiagramCard(problem, source);
         using (var hold = SvgPictures.Hold(drawing.Svg!))
             if (hold is null) return new DiagramCard("Study Stash couldn't draw this SVG.", source);
-        return new SvgView { Source = source, Margin = new Thickness(0, 6) };
+        var view = new SvgView { Source = source, Margin = new Thickness(0, 6) };
+        if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
+        return view;
     }
 
     /// <summary>A diagram whose fence hasn't closed yet: a quiet line until the rest arrives.</summary>
