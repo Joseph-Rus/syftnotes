@@ -1,22 +1,22 @@
 # The build and release pipeline for Study Stash (C# on .NET 10, one app for both roles).
-#   Every push and pull request: the engine's tests on macOS, Linux and Windows; the Mac app (one universal
-#   bundle, both roles' DMGs, self-tested here and again natively on an Intel runner); and the Windows app
-#   (both roles' Setup.exe, self-tested as a laptop and as just this computer, installed, updated in place, and
-#   uninstalled cleanly).
+#   One full test per change, when it reaches main: the engine's tests on macOS, Linux and Windows; the Mac app
+#   (one universal bundle, both roles' DMGs, self-tested here and again natively on an Intel runner); and the
+#   Windows app (both roles' Setup.exe, self-tested as a laptop and as just this computer, installed, updated in
+#   place, and uninstalled cleanly). The installers are built alongside the engine's tests, not after them.
+#   Branches and pull requests aren't tested on their own. Start a run on one by hand when it needs proving first
+#   (Actions → ci → Run workflow, or `gh workflow run ci --ref <branch>`), e.g. for Windows-only code.
 #   Push to main with a StudyStashVersion in engine/Directory.Build.props that has no tag yet: once all of the
 #   above passes, publish release v<version> with the four installers and SHA256SUMS.txt. Installed copies pick
-#   it up within a few hours (auto_update), or right away with `studystash update`. A version already released
-#   is never published again.
-#   The installers are built alongside the engine's tests, not after them; a release waits for both.
-#   A push to main that only changes the version (and this file) on top of a commit that already passed all of
-#   the above, or that merges a pull request whose run passed on exactly the same code, skips the tests and
-#   self-tests: it builds the installers with this version and publishes them.
+#   it up within a few hours (auto_update), or right away with Update now. A version already released is never
+#   published again.
+#   Code that already passed isn't tested twice: a push to main that only changes the version (and this file) on
+#   top of a commit that passed, or that merges a branch whose run by hand passed on exactly the same code, skips
+#   the tests and self-tests and only builds the installers with this version and publishes them.
 name: ci
 
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -407,11 +407,11 @@ jobs:
       tested: ${{ steps.t.outputs.tested }}
     steps:
       - uses: actions/checkout@v4
-      # A pull request's run tests the pull request merged into main. Its exact tree is kept, so that merging it,
-      # if main hasn't moved meanwhile, is known to be the very code that passed (step t below).
-      - if: github.event_name == 'pull_request'
+      # A run by hand on a branch keeps the exact tree it tests, so that merging that branch into main with the very
+      # same code (main hadn't moved meanwhile) is known to have passed already (step t below).
+      - if: github.event_name != 'push'
         run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
-      - if: github.event_name == 'pull_request'
+      - if: github.event_name != 'push'
         uses: actions/upload-artifact@v4
         with:
           name: tested-tree
@@ -429,7 +429,7 @@ jobs:
           fi
       # "Already tested", for a push to main, either way:
       #   - it changes only the version and this workflow, on top of a commit whose ci run passed; or
-      #   - it merges a pull request whose ci run passed on exactly this tree (main hadn't moved since).
+      #   - it merges a branch (a pull request) whose run passed on exactly this tree (main hadn't moved since).
       # The code is the one that passed, so only the installers are built again, with this version.
       - id: t
         env:
@@ -450,9 +450,9 @@ jobs:
           if [ "$tested" = false ] && [ "${{ github.event_name }}" = push ] && [ "${{ github.ref }}" = refs/heads/main ]; then
             tree=$(git rev-parse "$SHA^{tree}")
             for head in $(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[].head.sha' 2>/dev/null); do
-              for run in $(gh run list -R "$REPO" --workflow ci --event pull_request --commit "$head" --status success --json databaseId --jq '.[].databaseId' 2>/dev/null); do
+              for run in $(gh run list -R "$REPO" --workflow ci --commit "$head" --status success --json databaseId --jq '.[].databaseId' 2>/dev/null); do
                 rm -rf prior && gh run download "$run" -R "$REPO" -n tested-tree -D prior >/dev/null 2>&1 || continue
-                echo "pull request run $run (head $head) tested tree $(cat prior/tested-tree.txt); this push is tree $tree"
+                echo "run $run (head $head) tested tree $(cat prior/tested-tree.txt); this push is tree $tree"
                 if [ "$(cat prior/tested-tree.txt)" = "$tree" ]; then tested=true; break 2; fi
               done
             done

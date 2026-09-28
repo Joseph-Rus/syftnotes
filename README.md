@@ -205,11 +205,14 @@ dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
 `macos/build-app.sh` builds "Study Stash.app" and its DMGs (with Xcode's command line tools), and
 `windows/build.ps1` the Windows installers. `engine/README.md` has more on the projects and tests.
 
-Releases come from CI (`.github/workflows/ci.yml`): every change is tested on macOS, Linux and
-Windows, and both apps are built, self-tested and installed. To ship a release, bump
-`StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI publishes the four
-installers and `SHA256SUMS.txt`. A push that only changes the version, on top of a commit that
-already passed, skips the tests and just builds and publishes.
+Releases come from CI (`.github/workflows/ci.yml`). Every change is tested once, when it reaches
+`main`: on macOS, Linux and Windows, with both apps built, self-tested and installed. Branches and
+pull requests aren't tested on their own; to prove one first (say, Windows-only code), start a run
+by hand with **Actions → ci → Run workflow** or `gh workflow run ci --ref <branch>`. To ship a
+release, bump `StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI
+publishes the four installers and `SHA256SUMS.txt`. Code that already passed isn't tested twice: a
+push that only changes the version on top of a commit that passed, or a merge of a branch whose run
+passed on the very same code, just builds and publishes.
 
 ## License
 
