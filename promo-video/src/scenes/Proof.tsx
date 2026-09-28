@@ -4,6 +4,7 @@ import {colors, fonts, text} from '../config';
 import {ease, spr} from '../anim';
 import {Paper, useVertical} from '../components/Layout';
 import {Marked} from '../components/Marked';
+import {Sfx} from '../components/Sfx';
 
 /** The promise, said plainly. */
 export const Proof: React.FC = () => {
@@ -35,6 +36,7 @@ export const Proof: React.FC = () => {
           {text.proofLine}
         </div>
       </AbsoluteFill>
+      <Sfx at={21} name="marker" volume={0.3} />
     </Paper>
   );
 };

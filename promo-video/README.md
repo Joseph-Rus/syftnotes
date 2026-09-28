@@ -22,14 +22,20 @@ npm run studio              # opens Remotion Studio in the browser: scrub, play,
 npm run render              # → out/promo.mp4
 npm run render:vertical     # → out/promo-vertical.mp4
 npm run render:all          # both
+npm run audio               # makes the music and sound effects again (needs Python with numpy and scipy)
 ```
 
 ## What to edit
 
 - **Words, colours, timing:** `src/config.ts`. Every line of text on screen, the palette (Study Stash's Lagoon teal,
   paper, navy, night), and each scene's length in frames (30 = one second) are all there.
-- **Music:** put a track in `public/` (for example `public/music.mp3`), then set `music = 'music.mp3'` in
-  `src/config.ts`. It fades in at the start and out over the last second. The slot is in `src/Promo.tsx`, marked ♪.
+- **Sound:** the music and every sound effect are made from scratch by `scripts/make_audio.py`: synthesised, with
+  nothing sampled or downloaded, so there is nothing to license. The score is in D major at 100 BPM: a pad, then a
+  plucked arpeggio from the reveal, drums and bass from the recording, a breakdown for the promise, and a final chord.
+  Every scene starts on a beat (18 frames), so if you change a scene's length in `src/config.ts`, run `npm run audio`
+  and the music follows. The sound effects are listed in `src/components/Sfx.tsx`; each scene places its own, and
+  every click of the pointer makes one. The finished mix measures about −14 LUFS, the usual level for YouTube and
+  social video. To use a track of your own instead, put it in `public/` and set `music` in `src/config.ts`.
 - **A scene's look or animation:** `src/scenes/`, one file per scene.
   - `Hook.tsx`: the problem.
   - `Reveal.tsx`: the name and tagline.
@@ -48,7 +54,7 @@ npm run render:all          # both
 | 0–3 s | Hook | "Hours of lectures every week. Notes you'll never reread.", beside a pile of untitled recordings |
 | 3–6 s | Reveal | The icon, **Study Stash**, "Your lectures, written up and filed by class." |
 | 6–12 s | Record | The menu bar icon opens the dropdown, Record, the waveform, Stop, and the lecture is filed in CS 101 |
-| 12–18 s | Diagrams | A nursing class's nursing process (written by Claude Code), then a math class's derivative (by Codex) |
+| 12–18 s | Diagrams | A nursing class's labelled organs of the torso (written by Claude Code), then a math class's derivative (by Codex) |
 | 18–23 s | Ask | The Ask bar under a lecture's notes: its "Answer with" menu (Claude Code, Codex from OpenAI, Ollama) picks Codex, and the answer is written above the bar |
 | 23–27 s | Canvas | What's due, and Lab 3's rubric |
 | 27–30 s | Promise | "Your recordings stay on your computer." Free and open source, for Mac and Windows |

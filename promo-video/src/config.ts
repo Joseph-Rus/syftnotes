@@ -71,21 +71,25 @@ export const text = {
 
 export const TRANSITION = 12;
 
+// Every scene starts on a beat of the music (100 BPM: a beat is 18 frames), so the cuts land on the rhythm:
+// the reveal on beat 5, the recording on 10, the diagrams on 20, Ask on 30, Canvas on 39, the promise on 46 and
+// the call to action on 50. Change a length and run `npm run audio` so the music follows.
 export const durations = {
-  hook: 96,
-  reveal: 105,
-  record: 186,
-  diagrams: 186,
-  ask: 165,
-  canvas: 150,
-  proof: 96,
-  cta: 135,
+  hook: 102,
+  reveal: 102,
+  record: 192,
+  diagrams: 192,
+  ask: 174,
+  canvas: 138,
+  proof: 84,
+  cta: 144,
 };
 
 // Total length: every scene, less the seven cross-fades between them.
 export const TOTAL_FRAMES = Object.values(durations).reduce((a, b) => a + b, 0) - 7 * TRANSITION;
 
-// Background music: put a track in public/ (e.g. public/music.mp3) and set this to its file name.
-// It fades in over half a second and out over the last second. Scene changes fall roughly every 5–6 seconds.
-export const music: string | null = null;
-export const musicVolume = 0.7;
+// Music and sound effects, made from scratch by scripts/make_audio.py (`npm run audio`): nothing sampled or
+// downloaded. To use a track of your own instead, put it in public/ and name it here; set it to null for silence.
+export const music: string | null = 'audio/music.wav';
+export const musicVolume = 0.55;
+export const sfxVolume = 1; // every sound effect, together

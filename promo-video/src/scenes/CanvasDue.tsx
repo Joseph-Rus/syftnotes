@@ -4,6 +4,7 @@ import {colors, fonts, text} from '../config';
 import {spr} from '../anim';
 import {BELOW_TITLE, Title, ClassDot, Cursor, Desktop, useVertical} from '../components/Layout';
 import {Group, LibraryWindow, ListHead, ListRow, Sidebar} from '../components/Sidebar';
+import {Sfx} from '../components/Sfx';
 
 // Canvas in the library, as in docs/images/canvas-due.png.
 const PICK = 40; // "Lab 3" is clicked
@@ -138,6 +139,9 @@ export const CanvasDue: React.FC = () => {
           clicks={[PICK]}
         />
       </Desktop>
+      {RUBRIC.map(([name], i) => (
+        <Sfx key={name} at={PICK + 18 + i * 7} name="pop" volume={0.15} />
+      ))}
       <Title text={text.canvas as [string, string]} delay={10} />
     </AbsoluteFill>
   );

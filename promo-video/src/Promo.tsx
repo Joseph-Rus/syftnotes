@@ -3,6 +3,7 @@ import {AbsoluteFill, Audio, interpolate, staticFile} from 'remotion';
 import {linearTiming, TransitionSeries} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
 import {colors, durations, music, musicVolume, TOTAL_FRAMES, TRANSITION} from './config';
+import {Sfx} from './components/Sfx';
 import {Hook} from './scenes/Hook';
 import {Reveal} from './scenes/Reveal';
 import {RecordNotes} from './scenes/RecordNotes';
@@ -38,7 +39,13 @@ export const Promo: React.FC = () => (
       ])}
     </TransitionSeries>
 
-    {/* ♪ Background music goes here: set `music` in src/config.ts to a file in public/ (e.g. 'music.mp3'). */}
+    {/* A whoosh under each scene change, peaking halfway through the cross-fade. */}
+    {SCENES.slice(1).map(([key], i) => {
+      const start = SCENES.slice(0, i + 1).reduce((f, [k]) => f + durations[k] - TRANSITION, 0);
+      return <Sfx key={key} at={start - 4} name="whoosh" volume={0.18} />;
+    })}
+
+    {/* ♪ The music: public/audio/music.wav, made by scripts/make_audio.py. Set `music` in src/config.ts to use another. */}
     {music ? (
       <Audio
         src={staticFile(music)}

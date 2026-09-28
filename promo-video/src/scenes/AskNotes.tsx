@@ -4,6 +4,7 @@ import {colors, fonts, text} from '../config';
 import {spr, typed, words} from '../anim';
 import {BELOW_TITLE, ClassDot, Cursor, Desktop, Title, useVertical} from '../components/Layout';
 import {Group, LibraryWindow, ListHead, ListRow, Sidebar} from '../components/Sidebar';
+import {Sfx, Typing} from '../components/Sfx';
 
 // Asking about a lecture, as in the app: the Ask bar under the notes, its "Answer with" menu (the app's own
 // "mac-16-ai-ask-picker" shot) and the answer card above the bar ("mac-04-full-app-answer").
@@ -111,7 +112,7 @@ export const AskNotes: React.FC = () => {
   const question = frame >= SEND ? '' : typed(QUESTION, frame, 68, 20);
   const sent = frame >= SEND;
   const card = spr(frame, SEND + 2, {damping: 24, stiffness: 160, mass: 0.9});
-  const answer = words(ANSWER, frame, SEND + 8, 11);
+  const answer = words(ANSWER, frame, SEND + 8, 14);
 
   return (
     <AbsoluteFill>
@@ -266,6 +267,9 @@ export const AskNotes: React.FC = () => {
           clicks={[PICKER, PICKED, SEND]}
         />
       </Desktop>
+      <Sfx at={PICKER + 2} name="pop" volume={0.2} />
+      <Typing start={68} count={QUESTION.length} perSecond={20} />
+      <Sfx at={SEND + 2} name="pop" volume={0.26} />
       <Title text={text.ask as [string, string]} delay={10} />
     </AbsoluteFill>
   );

@@ -5,6 +5,7 @@ import {bouncy, ease, spr} from '../anim';
 import {Paper, useVertical} from '../components/Layout';
 import {Logo} from '../components/Logo';
 import {Marked} from '../components/Marked';
+import {Sfx} from '../components/Sfx';
 
 /** The name: the icon arrives, its full stop drops into place, and the tagline gets the website's highlighter. */
 export const Reveal: React.FC = () => {
@@ -53,6 +54,8 @@ export const Reveal: React.FC = () => {
           {text.tagline.after}
         </div>
       </AbsoluteFill>
+      <Sfx at={22} name="pop" volume={0.3} />
+      <Sfx at={43} name="marker" volume={0.3} />
     </Paper>
   );
 };

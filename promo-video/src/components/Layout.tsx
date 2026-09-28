@@ -2,6 +2,7 @@ import React from 'react';
 import {AbsoluteFill, Easing, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, fonts} from '../config';
 import {spr} from '../anim';
+import {Sfx} from './Sfx';
 
 export const useVertical = () => {
   const {width, height} = useVideoConfig();
@@ -282,6 +283,10 @@ export const Cursor: React.FC<{stops: [number, number, number][]; clicks?: numbe
   const down = clicks.some((c) => frame >= c && frame < c + 5);
   const appear = interpolate(frame, [fs[0], fs[0] + 6], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   return (
+    <>
+    {clicks.map((c) => (
+      <Sfx key={c} at={c} name="click" volume={0.55} />
+    ))}
     <svg
       width="34"
       height="40"
@@ -299,5 +304,6 @@ export const Cursor: React.FC<{stops: [number, number, number][]; clicks?: numbe
     >
       <path d="M1 1 L1 16.2 L4.9 12.6 L7.6 18.6 L10.3 17.4 L7.7 11.6 L13 11.6 Z" fill="#111" stroke="#fff" strokeWidth="1.3" strokeLinejoin="round" />
     </svg>
+    </>
   );
 };

@@ -3,6 +3,7 @@ import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {colors, fonts, text} from '../config';
 import {ease, spr} from '../anim';
 import {Paper, TrafficLights, useVertical, Win} from '../components/Layout';
+import {Sfx} from '../components/Sfx';
 
 // What a term of lectures looks like without Study Stash: a pile of untitled recordings.
 const RECORDINGS = Array.from({length: 18}, (_, i) => {
@@ -72,6 +73,7 @@ export const Hook: React.FC = () => {
           <Recordings frame={frame} />
         </div>
       </AbsoluteFill>
+      <Sfx at={38} name="pop" volume={0.16} />
     </Paper>
   );
 };

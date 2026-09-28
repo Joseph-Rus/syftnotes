@@ -2,6 +2,7 @@ import React from 'react';
 import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, durations, fonts, text} from '../config';
 import {ease, spr, typed} from '../anim';
+import {Sfx} from '../components/Sfx';
 import {Title, ClassDot, Cursor, Desktop, menuIconX, useVertical} from '../components/Layout';
 
 // The menu bar dropdown, as in docs/images/menu-bar.png: Record, then what's recent.
@@ -201,6 +202,11 @@ export const RecordNotes: React.FC = () => {
           clicks={[OPEN, RECORD, STOP]}
         />
       </AbsoluteFill>
+      <Sfx at={8} name="whoosh" volume={0.12} />
+      <Sfx at={OPEN + 2} name="pop" volume={0.22} />
+      <Sfx at={RECORD + 1} name="chime-record" volume={0.4} />
+      <Sfx at={FILED} name="chime-filed" volume={0.42} />
+      <Sfx at={durations.record - 30} name="whoosh" volume={0.1} />
       <Title text={text.record as [string, string]} delay={14} width={vertical ? undefined : 700} under />
     </AbsoluteFill>
   );
