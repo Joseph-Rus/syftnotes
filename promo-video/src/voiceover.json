@@ -1,8 +1,14 @@
 {
-  "about": "The narration, one line per scene. `at` is when the line starts, in seconds into its scene, chosen so the words land on the action (\"Hit record\" as the dropdown opens, \"Claude or OpenAI\" as the menu shows them). `direction` is how to say it; with Eleven v4 it can also go in as an audio tag. Run `npm run voice` after changing anything here.",
+  "about": "The narration, one line per scene. `at` is when the line starts, in seconds into its scene, chosen so the words land on the action (\"Hit record\" as the dropdown opens, \"Claude or OpenAI\" as the menu shows them). `direction` is how to say it; with Eleven v4 it can also go in as an audio tag. Run `npm run voice` after changing anything here. A line with \"inTake\": false was added after the take was recorded: make it on its own and pass it with --line <id>=<file>.",
   "model": "eleven_v4",
   "fallbackModel": "eleven_multilingual_v2",
-  "voiceSettings": {"stability": 0.5, "similarity_boost": 0.75, "style": 0.15, "use_speaker_boost": true, "speed": 1.0},
+  "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.75,
+    "style": 0.15,
+    "use_speaker_boost": true,
+    "speed": 1.0
+  },
   "seed": 2026,
   "lines": [
     {
@@ -22,6 +28,13 @@
       "at": 0.9,
       "text": "Hit record in the menu bar. It transcribes on your computer, then writes your notes, and files them by class.",
       "direction": "clear and easy, unhurried"
+    },
+    {
+      "id": "handwriting",
+      "at": 0.4,
+      "text": "Handwritten notes too: snap a photo on your phone, and it's read right into your notes.",
+      "direction": "easy, a little pleased",
+      "inTake": false
     },
     {
       "id": "diagrams",

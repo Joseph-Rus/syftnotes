@@ -55,6 +55,7 @@ npm run voice -- --scratch  # the narration in the Mac's voice; see VOICEOVER.md
 | 0–3 s | Hook | "Hours of lectures every week. Notes you'll never reread.", beside a pile of untitled recordings |
 | 3–6 s | Reveal | The icon, **Study Stash**, "Your lectures, written up and filed by class." |
 | 6–12 s | Record | The menu bar icon opens the dropdown, Record, the waveform, Stop, and the lecture is filed in CS 101 |
+| | Handwriting | A photo of handwritten notes goes up from the phone app; the lecture reads it and rewrites its notes with it |
 | 12–18 s | Diagrams | A nursing class's labelled organs of the torso (written by Claude Code), then a math class's derivative (by Codex) |
 | 18–23 s | Ask | The Ask bar under a lecture's notes: its "Answer with" menu (Claude Code, Codex from OpenAI, Ollama) picks Codex, and the answer is written above the bar |
 | 23–27 s | Canvas | What's due, and Lab 3's rubric |

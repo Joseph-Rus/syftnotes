@@ -7,6 +7,7 @@ import {Sfx} from './components/Sfx';
 import {Hook} from './scenes/Hook';
 import {Reveal} from './scenes/Reveal';
 import {RecordNotes} from './scenes/RecordNotes';
+import {Handwriting} from './scenes/Handwriting';
 import {Diagrams} from './scenes/Diagrams';
 import {AskNotes} from './scenes/AskNotes';
 import {CanvasDue} from './scenes/CanvasDue';
@@ -33,6 +34,7 @@ const SCENES: [keyof typeof durations, React.FC][] = [
   ['hook', Hook],
   ['reveal', Reveal],
   ['record', RecordNotes],
+  ['handwriting', Handwriting],
   ['diagrams', Diagrams],
   ['ask', AskNotes],
   ['canvas', CanvasDue],

@@ -141,7 +141,7 @@ def tidy(path):
 
 # ---- A take from the website: split at the pauses between lines ---------------------------------------------------
 
-def split_take(path, lines):
+def split_take(path, lines, given=None):
     """Cuts one continuous read into its lines: at the seven pauses that best fit where each line should end, judged by
     how many words come before it, preferring longer pauses."""
     with tempfile.TemporaryDirectory() as d:
@@ -166,6 +166,13 @@ def split_take(path, lines):
             i = j
         else:
             i += 1
+    if given:  # exact cuts, in seconds, between the lines (e.g. from a transcript's word timings)
+        cuts = [first - 5] + [c * 100 for c in given] + [last + 5]
+        for n, line in enumerate(lines):
+            a, b = int(max(0, cuts[n]) * hop), int(cuts[n + 1] * hop)
+            wavfile.write(OUT / f"{line['id']}.wav", sr, (x[a:b] * 32767).astype(np.int16))
+            print(f"  split {line['id']:<9} at {a / sr:6.2f}–{b / sr:6.2f} s")
+        return
     words = [len(l['text'].split()) for l in lines]
     ends = np.cumsum(words)[:-1] / sum(words)
     need = len(lines) - 1
@@ -243,6 +250,8 @@ def main():
     p.add_argument('--scratch', action='store_true', help="a scratch narration in the Mac's own voice")
     p.add_argument('--from-take', help='one continuous read downloaded from the website, split into the lines')
     p.add_argument('--from-files', help='a folder with a file per line from the website: hook.mp3, reveal.mp3, …')
+    p.add_argument('--cuts', help='with --from-take: where each line ends, in seconds, e.g. 4.39,9.06,… (if the automatic split is off)')
+    p.add_argument('--line', action='append', default=[], help='one line from its own file, e.g. --line handwriting=~/Downloads/handwriting.mp3')
     p.add_argument('--list-voices', action='store_true')
     p.add_argument('--no-music', action='store_true', help="don't remake the music afterwards")
     a = p.parse_args()
@@ -258,14 +267,24 @@ def main():
     if not (a.scratch or a.voice or a.from_take or a.from_files):
         sys.exit('Give a voice: --voice <id> (see --list-voices), --from-take <file>, --from-files <folder>, or --scratch.')
     model = a.model or script['model']
+    singles = dict(kv.split('=', 1) for kv in a.line)
     if a.from_take:
-        split_take(pathlib.Path(a.from_take).expanduser(), lines)
+        # Lines added after the take was recorded ("inTake": false) come from --line, or go without a voice.
+        split_take(pathlib.Path(a.from_take).expanduser(), [l for l in lines if l.get('inTake', True)], [float(c) for c in a.cuts.split(',')] if a.cuts else None)
     elif a.from_files:
         from_files(a.from_files, lines)
+    for lid, path in singles.items():
+        to_wav(pathlib.Path(path).expanduser(), OUT / f'{lid}.wav')
+    if a.from_take:
+        lines = [l for l in lines if l.get('inTake', True) or l['id'] in singles]
+        for l in script['lines']:
+            if l not in lines:
+                (OUT / f"{l['id']}.wav").unlink(missing_ok=True)
+                print(f"  {l['id']:<9} no voice yet (not in the take; add it with --line {l['id']}=<file>)")
 
     for i, line in enumerate(lines):
         final = OUT / f"{line['id']}.wav"
-        if a.from_take or a.from_files:
+        if a.from_take or a.from_files or line['id'] in singles:
             source, who = 'elevenlabs website', pathlib.Path(a.from_take or a.from_files).name
         elif a.scratch:
             who = say(line['text'], final)

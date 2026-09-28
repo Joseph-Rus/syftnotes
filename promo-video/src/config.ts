@@ -63,6 +63,7 @@ export const text = {
   tagline: {before: 'Your lectures, ', highlight: 'written up', after: ' and filed by class.'},
   // Each caption is [the part in ink, the part in grey].
   record: ['Record once.', 'The notes write themselves.'],
+  handwriting: ['Your handwriting, too.', 'Read right into your notes.'],
   diagrams: ['Diagrams and formulas,', 'drawn for you.'],
   ask: ['Ask your notes.', 'With Claude or OpenAI.'],
   canvas: ['Canvas,', 'right next to your notes.'],
@@ -82,6 +83,7 @@ export const baseDurations = {
   hook: 102,
   reveal: 102,
   record: 192,
+  handwriting: 228,
   diagrams: 192,
   ask: 174,
   canvas: 138,

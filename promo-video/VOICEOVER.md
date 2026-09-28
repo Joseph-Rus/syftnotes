@@ -13,6 +13,7 @@ The same text lives in `src/voiceover.json`, which the generator and the video b
 | Hook | 0.25 s in | Every week, the lectures pile up… and the notes? You never look at them again. | wry, a little tired, like a friend who's been there |
 | Reveal | 0.45 s in | Meet Study Stash — your lectures, turned into notes you'll actually use. | warm, a small smile on the name |
 | Record | 0.9 s in | Hit record in the menu bar. It transcribes on your computer, then writes your notes, and files them by class. | clear and easy, unhurried |
+| Handwriting | 0.4 s in | Handwritten notes too: snap a photo on your phone, and it's read right into your notes. | easy, a little pleased |
 | Diagrams | 0.4 s in | It even draws: labeled anatomy for nursing… formulas and graphs for calculus. | a spark of delight on "even" |
 | Ask | 0.3 s in | Ask your notes anything, with Claude or OpenAI, and see exactly where each answer came from. | curious, confident |
 | Canvas | 0.3 s in | Canvas is right there too: what's due, and how it's graded. | light, matter-of-fact |
@@ -42,7 +43,15 @@ The whole script as one take usually sounds most natural, because it's one conti
 4. Run `npm run voice -- --from-take ~/Downloads/<the file>.mp3`, then `npm run render:all`.
 
 The take is cut at the pauses between lines: the seven that best fit where each line should end, by word count. The
-cut then follows the voice, and the music is remade. Or download a file per line (`hook.mp3`, `reveal.mp3`,
+cut then follows the voice, and the music is remade.
+
+If the pauses in a take are all about the same length, the guess can land a word early or late. Give the exact cuts
+instead, in seconds, with `--cuts 4.39,9.06,…` (one fewer than the lines). For the first take, the cuts came from
+Whisper's word timings, which put each one in the gap between one line's last word and the next line's first.
+
+A line added after the take was recorded (`"inTake": false` in `src/voiceover.json`, like the handwriting line) is
+made on its own and added with `--line handwriting=~/Downloads/<its file>.mp3`, alongside `--from-take` and `--cuts`.
+Until then, its scene plays with music and sound effects only. Or download a file per line (`hook.mp3`, `reveal.mp3`,
 `record.mp3`, `diagrams.mp3`, `ask.mp3`, `canvas.mp3`, `proof.mp3`, `cta.mp3`) into a folder and run
 `npm run voice -- --from-files <folder>`.
 
