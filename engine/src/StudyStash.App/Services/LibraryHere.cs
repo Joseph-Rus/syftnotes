@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Sockets;
 using StudyStash.Core;
 
 namespace StudyStash.App.Services;
@@ -81,27 +79,11 @@ public sealed class LibraryHere
         await svc.StartAsync();
     }
 
-    static bool IsFree(int port)
-    {
-        using var s = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        // Not on Windows: there the flag would let us share a port someone is listening on.
-        if (!OperatingSystem.IsWindows()) s.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-        try
-        {
-            s.Bind(new IPEndPoint(IPAddress.Loopback, port));
-            return true;
-        }
-        catch (SocketException)
-        {
-            return false;
-        }
-    }
-
     /// <summary>8787 if it (and 8788, for Claude) are free; otherwise the next pair that both are.</summary>
     static int FreePortPair(int first)
     {
         for (int port = first; port < first + 200; port++)
-            if (IsFree(port) && IsFree(port + 1))
+            if (HostInfo.PortFree(port) && HostInfo.PortFree(port + 1))
                 return port;
         throw new InvalidOperationException("No free ports found for the library.");
     }

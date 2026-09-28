@@ -145,6 +145,68 @@ public sealed class LibraryServiceTests
     }
 
     [Fact]
+    public async Task A_second_service_steps_aside_for_a_library_on_this_computer_alone()
+    {
+        // Just this computer's library listens on 127.0.0.1 only (Windows would let a network-wide probe share its port).
+        string exe = BuiltEngine();
+        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
+        string home = TempHome();
+        try
+        {
+            var cfg = ReadyConfig(home);
+            cfg.WebHost = "127.0.0.1";
+            Configs.Save(cfg);
+            var first = new LibraryService(home, cfg, [exe]);
+            await first.StartAsync();
+            Assert.Equal(LibraryServiceState.Running, first.State);
+
+            var second = new LibraryService(home, cfg, [exe]);
+            await second.StartAsync();
+            Assert.Equal(LibraryServiceState.Elsewhere, second.State);
+
+            await first.StopAsync();
+        }
+        finally { try { Directory.Delete(home, true); } catch (IOException) { } }
+    }
+
+    [Fact]
+    public async Task The_library_stops_by_itself_when_the_app_that_started_it_goes()
+    {
+        // The app keeps the library's input open; when the app is gone (ended in Task Manager, or crashed) its end of
+        // the pipe closes, and the library shuts down cleanly instead of running on with nobody to stop it.
+        string exe = BuiltEngine();
+        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
+        string home = TempHome();
+        try
+        {
+            var cfg = ReadyConfig(home);
+            var info = new ProcessStartInfo(exe)
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true,
+                RedirectStandardOutput = true, RedirectStandardError = true,
+                ArgumentList = { "--home", home, "serve" },
+            };
+            info.Environment[Cli.StopWhenInputEndsEnv] = "1";
+            using var p = Process.Start(info)!;
+            p.BeginOutputReadLine();
+            p.BeginErrorReadLine();
+            try
+            {
+                Assert.True(await HostInfo.WaitForServerAsync(cfg, TimeSpan.FromSeconds(30)), "the library never answered");
+                p.StandardInput.Close();
+                using var wait = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                await p.WaitForExitAsync(wait.Token);
+                Assert.Equal(0, p.ExitCode);
+            }
+            finally
+            {
+                if (!p.HasExited) p.Kill(entireProcessTree: true);
+            }
+        }
+        finally { try { Directory.Delete(home, true); } catch (IOException) { } }
+    }
+
+    [Fact]
     public async Task No_config_fails_with_not_set_up_yet()
     {
         string home = TempHome();

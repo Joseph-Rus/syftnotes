@@ -110,8 +110,12 @@ public sealed class LibraryService : IDisposable
         var info = new ProcessStartInfo(command[0])
         {
             UseShellExecute = false,
+            // No console window on Windows, even for an engine built as a console program.
+            CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            // Its input stays open while we want it running: closing it (or this app ending) stops it.
+            RedirectStandardInput = true,
             WorkingDirectory = home,
         };
         foreach (var a in command.Skip(1)) info.ArgumentList.Add(a);
@@ -119,6 +123,7 @@ public sealed class LibraryService : IDisposable
         info.ArgumentList.Add(home);
         info.ArgumentList.Add("serve");
         info.Environment.Remove("STUDYSTASH_SELFTEST");
+        info.Environment[StudyStash.Library.Cli.StopWhenInputEndsEnv] = "1";
 
         Process p;
         try { p = spawn(info); }
@@ -215,20 +220,32 @@ public sealed class LibraryService : IDisposable
         }
         try
         {
-            if (!OperatingSystem.IsWindows())
-            {
-                Native.Kill(p.Id, Native.SigTerm);
-                using var soft = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                try { await p.WaitForExitAsync(soft.Token); }
-                catch (OperationCanceledException) { if (!p.HasExited) p.Kill(entireProcessTree: true); }
-            }
-            else p.Kill(entireProcessTree: true);
+            // A clean stop: its input ends (the only way to ask on Windows), and SIGTERM elsewhere. Then a moment to
+            // shut its database down before it's ended for good.
+            AskToStop(p);
+            if (!OperatingSystem.IsWindows()) Native.Kill(p.Id, Native.SigTerm);
+            using var soft = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try { await p.WaitForExitAsync(soft.Token); }
+            catch (OperationCanceledException) { if (!p.HasExited) p.Kill(entireProcessTree: true); }
             await p.WaitForExitAsync();
         }
         catch (InvalidOperationException) { } // already gone
         lock (gate) proc = null;
         try { File.Delete(PidPath); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         SetState(LibraryServiceState.Stopped);
+    }
+
+    /// <summary>Ends the child's input, which `serve` takes as "stop" (see <see cref="StudyStash.Library.Cli.StopWhenInputEndsEnv"/>).</summary>
+    static void AskToStop(Process p)
+    {
+        try
+        {
+            p.StandardInput.Close();
+        }
+        catch (Exception e) when (e is IOException or InvalidOperationException or ObjectDisposedException)
+        {
+            // Started without its input to us (a test's own spawn), or already gone.
+        }
     }
 
     public void Dispose()

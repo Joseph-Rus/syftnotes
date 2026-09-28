@@ -28,6 +28,35 @@ public static class Cli
     /// lets Settings (on this computer or a laptop) turn starting at login on and off. Null: `serve` offers none.</summary>
     public static Func<string, LoginSwitch>? LoginItems { get; set; }
 
+    /// <summary>Set to "1" by the app for the library it runs as its child: the library stops cleanly once its input
+    /// ends, which is how the app asks it to on Windows (there's no SIGTERM there), and what happens by itself when the
+    /// app is gone for good (ended in Task Manager, or crashed), so no library is ever left running without it.</summary>
+    public const string StopWhenInputEndsEnv = "STUDYSTASH_STOP_WHEN_INPUT_ENDS";
+
+    /// <summary>Reads (and ignores) this process's input until it ends, then asks the command to stop.</summary>
+    static void StopWhenInputEnds(CancellationTokenSource stop) => _ = Task.Run(async () =>
+    {
+        try
+        {
+            using var input = Console.OpenStandardInput();
+            var buffer = new byte[256];
+            while (await input.ReadAsync(buffer) > 0)
+            {
+            }
+        }
+        catch (Exception e) when (e is IOException or ObjectDisposedException or NotSupportedException or UnauthorizedAccessException)
+        {
+        }
+        try
+        {
+            stop.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // The command already finished.
+        }
+    });
+
     /// <summary>True when these arguments name a command (options may come first: <c>--home DIR run</c>).</summary>
     public static bool IsCommand(IReadOnlyList<string> args)
     {
@@ -71,6 +100,12 @@ public static class Cli
         });
 
         string command = words.FirstOrDefault() ?? "";
+        if (Env(StopWhenInputEndsEnv) == "1")
+        {
+            // Not passed on: an AI this library starts may start `mcp`, which talks over its own input.
+            Environment.SetEnvironmentVariable(StopWhenInputEndsEnv, null);
+            if (command is "serve" or "run") StopWhenInputEnds(stop);
+        }
         if (command is not ("version" or "extension-zip" or "")) Directory.CreateDirectory(home);
         return command switch
         {

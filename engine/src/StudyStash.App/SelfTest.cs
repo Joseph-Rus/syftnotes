@@ -312,6 +312,13 @@ public static class SelfTest
         var cfg = Configs.Load(host.Home);
         Say($"it listens on {cfg.WebHost}:{cfg.WebPort} ({(LibraryHere.OnlyHere(cfg) ? "this computer only" : "the network")}), notes in {cfg.PoolDir}");
         if (!LibraryHere.OnlyHere(cfg)) throw new InvalidOperationException("Just this computer's library listens to the network");
+        // And it really does listen only on this computer: nothing a firewall (Windows') would ask about.
+        if (ListeningOn(cfg.WebPort) is { } where)
+        {
+            Say($"port {cfg.WebPort} is open on {(where.Count == 0 ? "nothing" : string.Join(", ", where))}");
+            if (where.Count == 0 || where.Any(a => !System.Net.IPAddress.IsLoopback(a)))
+                throw new InvalidOperationException("Just this computer's library isn't listening on this computer alone");
+        }
         // Its notes engine is the self-test's own (never a real Ollama): the library starts again to use it.
         cfg.OllamaHost = Engine!.Url;
         cfg.OllamaModel = "self-test-notes";
@@ -376,6 +383,21 @@ public static class SelfTest
         if (host.Settings.Role != AppRole.Both) throw new InvalidOperationException($"just this computer finished as {host.Settings.Role}");
         await Wait(1);
         Shot(Shell.Windows.Main, "library-empty");
+    }
+
+    /// <summary>The addresses something listens on at <paramref name="port"/>, as the system lists them; null where it
+    /// can't say.</summary>
+    static List<System.Net.IPAddress>? ListeningOn(int port)
+    {
+        try
+        {
+            return [.. System.Net.NetworkInformation.IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners()
+                .Where(e => e.Port == port).Select(e => e.Address)];
+        }
+        catch (Exception e) when (e is PlatformNotSupportedException or System.Net.NetworkInformation.NetworkInformationException)
+        {
+            return null;
+        }
     }
 
     // --- recording -----------------------------------------------------------------------------------------------
