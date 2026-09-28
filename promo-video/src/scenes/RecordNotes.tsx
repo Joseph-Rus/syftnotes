@@ -2,7 +2,7 @@ import React from 'react';
 import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, durations, fonts, text} from '../config';
 import {ease, spr, typed} from '../anim';
-import {Caption, ClassDot, Cursor, Desktop, menuIconX, useVertical} from '../components/Layout';
+import {Title, ClassDot, Cursor, Desktop, menuIconX, useVertical} from '../components/Layout';
 
 // The menu bar dropdown, as in docs/images/menu-bar.png: Record, then what's recent.
 const DROP_W = 420;
@@ -143,7 +143,7 @@ export const RecordNotes: React.FC = () => {
   const {width} = useVideoConfig();
   const vertical = useVertical();
   const iconX = menuIconX(width);
-  const dropLeft = iconX - 300;
+  const dropLeft = Math.min(iconX - 120, width - DROP_W - 16); // hangs from the icon toward the right, clear of the headline
   // The camera moves in on the menu bar and its dropdown.
   // It pulls back out at the end, the dropdown closing, so the next scene fades in over the same desktop.
   const back = spr(frame, durations.record - 30, {damping: 30, stiffness: 90, mass: 1});
@@ -151,7 +151,7 @@ export const RecordNotes: React.FC = () => {
   const S = vertical ? 2.2 : 1.5;
   const s = interpolate(zoom, [0, 1], [1, S]);
   // Landscape keeps the desktop's right edge (and the clock) in frame; vertical centres the dropdown.
-  const target = vertical ? Math.max(width - width * S, 540 - (dropLeft + DROP_W / 2) * S) : width - width * S;
+  const target = width - width * S; // the camera keeps the desktop's right edge in frame
   const tx = interpolate(zoom, [0, 1], [0, target]);
   const open = spr(frame, OPEN + 2, {damping: 22, stiffness: 180, mass: 0.7});
   return (
@@ -177,7 +177,7 @@ export const RecordNotes: React.FC = () => {
           clicks={[OPEN, RECORD, STOP]}
         />
       </AbsoluteFill>
-      <Caption text={text.record} delay={14} />
+      <Title text={text.record as [string, string]} delay={14} width={vertical ? undefined : 700} under />
     </AbsoluteFill>
   );
 };

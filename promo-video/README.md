@@ -51,8 +51,11 @@ npm run render:all          # both
 | 27–30 s | Promise | "Your recordings stay on your computer." Free and open source, for Mac and Windows |
 | 30–35 s | Call to action | Free for Mac and Windows, study-stash-app.web.app |
 
-Captions sit under the action in the serif the app writes its notes in, and the website's highlighter marks a phrase
-twice. The pointer's path and clicks are the `stops` and `clicks` of each scene's `<Cursor>`.
+The desktop picture, rolling hills in Study Stash's teal under a pale sky, is drawn in `src/components/Layout.tsx`
+(`Wallpaper`; its colours are `sky` and `hills` in `src/config.ts`). Headlines sit above the app in its own Inter
+Display, lined up with the window: the first part in ink, the rest in grey (`Title`). The serif appears only inside the
+app, where the notes really use it. The pointer's path and clicks are the `stops` and `clicks` of each scene's
+`<Cursor>`.
 
 Inter and Inter Display come from the app (`engine/src/StudyStash.App/Assets/Fonts`) under the SIL Open Font
 License (`public/fonts/Inter-OFL.txt`). The notes' serif is the computer's own (New York or Charter on a Mac,

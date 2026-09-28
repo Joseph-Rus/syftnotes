@@ -16,16 +16,57 @@ export const Paper: React.FC<{children?: React.ReactNode}> = ({children}) => (
   </AbsoluteFill>
 );
 
-/** The soft blue desktop the app's screenshots sit on. */
+// Rolling hills, back to front, in a 1920×1080 frame: each crest is a smooth curve through these heights.
+const HILLS: number[][] = [
+  [560, 500, 540, 470, 520, 480],
+  [650, 600, 640, 590, 620, 575],
+  [760, 700, 735, 690, 720, 700],
+  [860, 820, 850, 800, 835, 815],
+  [960, 930, 950, 915, 945, 925],
+];
+const crest = (ys: number[]) => {
+  const step = 1920 / (ys.length - 1);
+  const pts = ys.map((y, i) => [i * step, y]);
+  let d = `M-20 ${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1];
+    const [x1, y1] = pts[i];
+    const mx = (x0 + x1) / 2;
+    d += ` C${mx} ${y0} ${mx} ${y1} ${x1} ${y1}`;
+  }
+  return `${d} L1940 1100 L-20 1100 Z`;
+};
+
+/** The desktop picture: a pale sky over rolling hills in Study Stash's teal, drawn in code. */
 export const Wallpaper: React.FC = () => {
-  const [a, b, c] = colors.wallpaper;
+  const [s0, s1, s2] = colors.sky;
   return (
-    <AbsoluteFill
-      style={{
-        background: `radial-gradient(90% 70% at 20% 10%, rgba(255,255,255,0.55), rgba(255,255,255,0) 60%),
-          linear-gradient(155deg, ${a} 0%, ${b} 48%, ${c} 100%)`,
-      }}
-    />
+    <AbsoluteFill>
+      <svg width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMax slice" style={{position: 'absolute', inset: 0}}>
+        <defs>
+          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={s0} />
+            <stop offset="0.45" stopColor={s1} />
+            <stop offset="1" stopColor={s2} />
+          </linearGradient>
+          <radialGradient id="sun" cx="0.78" cy="0.16" r="0.5">
+            <stop offset="0" stopColor="#FFF8EC" stopOpacity="0.9" />
+            <stop offset="1" stopColor="#FFF8EC" stopOpacity="0" />
+          </radialGradient>
+          {colors.hills.map(([top, bottom], i) => (
+            <linearGradient key={i} id={`hill${i}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={top} />
+              <stop offset="1" stopColor={bottom} />
+            </linearGradient>
+          ))}
+        </defs>
+        <rect x="-20" y="-400" width="1960" height="1500" fill="url(#sky)" />
+        <rect x="-20" y="-400" width="1960" height="1500" fill="url(#sun)" />
+        {HILLS.map((ys, i) => (
+          <path key={i} d={crest(ys)} fill={`url(#hill${i})`} />
+        ))}
+      </svg>
+    </AbsoluteFill>
   );
 };
 
@@ -154,31 +195,38 @@ export const Desktop: React.FC<{children?: React.ReactNode; lit?: boolean}> = ({
   </AbsoluteFill>
 );
 
+/** Where the headline and the window's left edge line up (landscape), and where windows start below it. */
+export const COLUMN = 300;
+export const BELOW_TITLE = 196;
+
 /**
- * A caption under the action, set in the app's serif like a figure caption. One line, eight words at most; it
- * settles in once and stays.
+ * The headline above the app, in the app's own Inter Display: the first part in ink, the rest in grey, one line
+ * (or two where `width` is narrow). It settles in once and stays.
  */
-export const Caption: React.FC<{text: string; delay?: number}> = ({text, delay = 8}) => {
+export const Title: React.FC<{text: [string, string]; delay?: number; width?: number; under?: boolean}> = ({text, delay = 8, width, under = false}) => {
   const frame = useCurrentFrame();
   const vertical = useVertical();
   const p = spr(frame, delay, {damping: 26, stiffness: 120, mass: 1});
+  const q = spr(frame, delay + 7, {damping: 26, stiffness: 120, mass: 1});
   return (
     <div
       style={{
         position: 'absolute',
-        left: vertical ? 72 : 100,
-        right: vertical ? 72 : undefined,
-        bottom: vertical ? 170 : 64,
-        fontFamily: fonts.serif,
-        fontSize: vertical ? 70 : 60,
-        lineHeight: 1.12,
-        letterSpacing: '-0.012em',
-        color: colors.ink,
-        opacity: p,
-        transform: `translateY(${(1 - p) * 18}px)`,
+        left: vertical ? 72 : COLUMN,
+        // Above the window, on the sky. `under` puts it low on a phone-shaped frame, where something fills the top.
+        top: vertical && under ? undefined : vertical ? 140 : 94,
+        bottom: vertical && under ? 150 : undefined,
+        width: width ?? (vertical ? 936 : 1320),
+        fontFamily: fonts.display,
+        fontWeight: 600,
+        fontSize: vertical ? 78 : 58,
+        lineHeight: 1.06,
+        letterSpacing: '-0.025em',
+        zIndex: 40,
       }}
     >
-      {text}
+      <span style={{color: colors.ink, opacity: p, display: 'inline-block', transform: `translateY(${(1 - p) * 14}px)`}}>{text[0]}</span>{' '}
+      <span style={{color: '#7A8497', opacity: q, display: 'inline-block', transform: `translateY(${(1 - q) * 14}px)`}}>{text[1]}</span>
     </div>
   );
 };

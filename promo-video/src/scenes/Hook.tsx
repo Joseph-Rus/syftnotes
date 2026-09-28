@@ -50,7 +50,7 @@ export const Hook: React.FC = () => {
   const first = spr(frame, 2, {damping: 26, stiffness: 120, mass: 1});
   const second = spr(frame, 38, {damping: 26, stiffness: 120, mass: 1});
   const win = spr(frame, 0, {damping: 24, stiffness: 110, mass: 1});
-  const line: React.CSSProperties = {fontFamily: fonts.serif, fontSize: vertical ? 84 : 80, lineHeight: 1.12, letterSpacing: '-0.015em'};
+  const line: React.CSSProperties = {fontFamily: fonts.display, fontWeight: 600, fontSize: vertical ? 84 : 66, lineHeight: 1.06, letterSpacing: '-0.028em'};
   return (
     <Paper>
       <AbsoluteFill
@@ -58,12 +58,12 @@ export const Hook: React.FC = () => {
           flexDirection: vertical ? 'column' : 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: vertical ? 80 : 110,
-          padding: vertical ? '0 72px' : '0 140px',
+          gap: vertical ? 80 : 80,
+          padding: vertical ? '0 72px' : '0 110px',
         }}
       >
-        <div style={{width: vertical ? '100%' : 760}}>
-          <div style={{...line, color: second > 0.05 ? colors.ink2 : colors.ink, opacity: first, transform: `translateY(${(1 - first) * 20}px)`}}>
+        <div style={{width: vertical ? '100%' : 1040}}>
+          <div style={{...line, color: second > 0.05 ? '#7A8497' : colors.ink, opacity: first, transform: `translateY(${(1 - first) * 20}px)`}}>
             {text.hook[0]}
           </div>
           <div style={{...line, color: colors.ink, marginTop: 18, opacity: second, transform: `translateY(${(1 - second) * 20}px)`}}>{text.hook[1]}</div>

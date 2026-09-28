@@ -36,7 +36,7 @@ export const Cta: React.FC = () => {
             {text.name}
           </div>
         </div>
-        <div style={{opacity: line, transform: `translateY(${(1 - line) * 14}px)`, fontFamily: fonts.serif, fontSize: vertical ? 60 : 56, color: colors.ink2}}>
+        <div style={{opacity: line, transform: `translateY(${(1 - line) * 14}px)`, fontFamily: fonts.display, fontWeight: 500, letterSpacing: '-0.015em', fontSize: vertical ? 56 : 50, color: '#7A8497'}}>
           {text.cta}
         </div>
         <div style={{opacity: link, transform: `translateY(${(1 - link) * 14}px)`, fontFamily: fonts.ui, fontWeight: 600, fontSize: vertical ? 54 : 50, color: colors.lagoonDeep, letterSpacing: '-0.01em'}}>

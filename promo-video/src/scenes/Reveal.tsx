@@ -38,8 +38,10 @@ export const Reveal: React.FC = () => {
           style={{
             opacity: line,
             transform: `translateY(${(1 - line) * 16}px)`,
-            fontFamily: fonts.serif,
-            fontSize: vertical ? 58 : 54,
+            fontFamily: fonts.display,
+            fontWeight: 500,
+            letterSpacing: '-0.015em',
+            fontSize: vertical ? 56 : 50,
             color: colors.ink2,
             textAlign: 'center',
             maxWidth: vertical ? 900 : 1400,

@@ -21,8 +21,15 @@ export const colors = {
   line: 'rgba(16, 24, 40, 0.08)',
   window: 'rgba(248, 251, 252, 0.97)',
   pane: 'rgba(255, 255, 255, 0.72)',
-  // The desktop behind the app, as in the app's screenshots.
-  wallpaper: ['#B8D0F3', '#D5E5F8', '#D6CFF4'],
+  // The desktop: a pale sky over rolling hills in the Lagoon teal, back to front.
+  sky: ['#F6F2EA', '#E3EEF5', '#CFE3EE'],
+  hills: [
+    ['#CFE6EC', '#B7D9E2'],
+    ['#9ACFD0', '#7BBBC0'],
+    ['#5FA9AD', '#3F8E97'],
+    ['#2F7A88', '#23586F'],
+    ['#1F4F66', '#173A52'],
+  ] as [string, string][],
   // Class colours, as the sidebar shows them.
   cs: '#3B82F6',
   bio: '#22A45D',
@@ -34,7 +41,7 @@ export const colors = {
 export const fonts = {
   ui: 'Inter, sans-serif',
   display: 'Inter Display, Inter, sans-serif',
-  // The serif the app writes notes in, and the website's headings (New York on a Mac, then Charter or Georgia).
+  // The serif the app writes notes in (New York on a Mac, then Charter or Georgia): only inside the app's windows.
   serif: '"New York", Charter, "Iowan Old Style", Georgia, serif',
 };
 
@@ -42,10 +49,11 @@ export const text = {
   hook: ['Hours of lectures every week.', "Notes you'll never reread."],
   name: 'Study Stash',
   tagline: {before: 'Your lectures, ', highlight: 'written up', after: ' and filed by class.'},
-  record: 'Record once. The notes write themselves.',
-  diagrams: 'Diagrams and formulas, drawn for you.',
-  ask: 'Ask your notes, with Claude or OpenAI.',
-  canvas: 'Canvas, right next to your notes.',
+  // Each caption is [the part in ink, the part in grey].
+  record: ['Record once.', 'The notes write themselves.'],
+  diagrams: ['Diagrams and formulas,', 'drawn for you.'],
+  ask: ['Ask your notes.', 'With Claude or OpenAI.'],
+  canvas: ['Canvas,', 'right next to your notes.'],
   // True whichever AI writes the notes: Whisper transcribes on the computer, so the audio never leaves it.
   proof: {before: 'Your recordings stay on ', highlight: 'your computer', after: '.'},
   proofLine: 'Free and open source, for Mac and Windows.',

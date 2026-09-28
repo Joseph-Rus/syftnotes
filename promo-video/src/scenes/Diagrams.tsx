@@ -2,7 +2,7 @@ import React from 'react';
 import {AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, fonts, text} from '../config';
 import {bouncy, ease, spr} from '../anim';
-import {Caption, ClassDot, Cursor, Desktop, useVertical} from '../components/Layout';
+import {BELOW_TITLE, Title, ClassDot, Cursor, Desktop, useVertical} from '../components/Layout';
 import {Group, LibraryWindow, ListHead, ListRow, Sidebar} from '../components/Sidebar';
 
 const SWITCH = 88; // CALC II is clicked
@@ -178,7 +178,7 @@ export const Diagrams: React.FC = () => {
   const w = vertical ? 784 : 1320;
   const h = vertical ? 820 : 800;
   const left = (width - w * z) / 2;
-  const top = vertical ? 250 : 66;
+  const top = vertical ? 430 : BELOW_TITLE;
   const win = spr(frame, 0, {damping: 26, stiffness: 120, mass: 1});
   const health = (
     <Page
@@ -259,7 +259,7 @@ export const Diagrams: React.FC = () => {
           />
         )}
       </Desktop>
-      <Caption text={text.diagrams} delay={10} />
+      <Title text={text.diagrams as [string, string]} delay={10} />
     </AbsoluteFill>
   );
 };

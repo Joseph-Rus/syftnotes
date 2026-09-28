@@ -2,7 +2,7 @@ import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, fonts, text} from '../config';
 import {ease, spr, typed, words} from '../anim';
-import {Caption, Cursor, Desktop, useVertical} from '../components/Layout';
+import {BELOW_TITLE, Title, Cursor, Desktop, useVertical} from '../components/Layout';
 
 // The quick panel, as in docs/images/quick-panel.png, in the light look.
 const W = 900;
@@ -49,7 +49,7 @@ export const AskNotes: React.FC = () => {
   const vertical = useVertical();
   const scale = vertical ? 1.08 : 1.12;
   const left = (width - W * scale) / 2;
-  const top = vertical ? 300 : 96;
+  const top = vertical ? 450 : BELOW_TITLE + 8;
   const inP = spr(frame, 0, {damping: 24, stiffness: 150, mass: 0.9});
   const menu = frame >= PICKER + 2 && frame < PICKED + 4;
   const menuP = spr(frame, PICKER + 2, {damping: 22, stiffness: 190, mass: 0.7});
@@ -168,7 +168,7 @@ export const AskNotes: React.FC = () => {
           clicks={[PICKER, PICKED]}
         />
       </Desktop>
-      <Caption text={text.ask} delay={10} />
+      <Title text={text.ask as [string, string]} delay={10} />
     </AbsoluteFill>
   );
 };

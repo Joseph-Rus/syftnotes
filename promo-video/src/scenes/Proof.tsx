@@ -18,10 +18,11 @@ export const Proof: React.FC = () => {
           style={{
             opacity: main,
             transform: `translateY(${(1 - main) * 20}px)`,
-            fontFamily: fonts.serif,
-            fontSize: vertical ? 92 : 96,
-            lineHeight: 1.12,
-            letterSpacing: '-0.015em',
+            fontFamily: fonts.display,
+            fontWeight: 600,
+            fontSize: vertical ? 88 : 84,
+            lineHeight: 1.08,
+            letterSpacing: '-0.028em',
             color: colors.ink,
             textAlign: 'center',
           }}

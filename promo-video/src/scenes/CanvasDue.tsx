@@ -2,7 +2,7 @@ import React from 'react';
 import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, fonts, text} from '../config';
 import {spr} from '../anim';
-import {Caption, ClassDot, Cursor, Desktop, useVertical} from '../components/Layout';
+import {BELOW_TITLE, Title, ClassDot, Cursor, Desktop, useVertical} from '../components/Layout';
 import {Group, LibraryWindow, ListHead, ListRow, Sidebar} from '../components/Sidebar';
 
 // Canvas in the library, as in docs/images/canvas-due.png.
@@ -76,7 +76,7 @@ export const CanvasDue: React.FC = () => {
   const w = vertical ? 820 : 1320;
   const h = vertical ? 820 : 800;
   const left = (width - w * z) / 2;
-  const top = vertical ? 250 : 66;
+  const top = vertical ? 430 : BELOW_TITLE;
   const win = spr(frame, 0, {damping: 26, stiffness: 120, mass: 1});
   const chosen = frame >= PICK;
   const row = (i: number) => spr(frame, 6 + i * 5, {damping: 24, stiffness: 150, mass: 0.9});
@@ -132,7 +132,7 @@ export const CanvasDue: React.FC = () => {
           clicks={[PICK]}
         />
       </Desktop>
-      <Caption text={text.canvas} delay={10} />
+      <Title text={text.canvas as [string, string]} delay={10} />
     </AbsoluteFill>
   );
 };
