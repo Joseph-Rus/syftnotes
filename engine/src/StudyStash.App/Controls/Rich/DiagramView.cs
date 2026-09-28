@@ -403,7 +403,8 @@ sealed class DiagramCanvas : Control
     {
         var box = new Rect(Bounds.Size);
         if (box.Width < 1 || box.Height < 1) return;
-        context.DrawRectangle(GroupFill, null, new RoundedRect(box, 12));
+        // The corners of the calm card that says a diagram can't be drawn.
+        context.DrawRectangle(GroupFill, null, new RoundedRect(box, Skin.Current == SkinKind.Mac ? 8 : 4));
         if (box.Height < 24) return;
         var t = Text(NoteView.DrawingWords, DiagramLayout.LabelSize, FontWeight.Normal, Quiet ?? Line ?? Brushes.Gray);
         context.DrawText(t, new Point(Math.Round((box.Width - t.Width) / 2), Math.Round((box.Height - t.Height) / 2)));
