@@ -401,6 +401,7 @@ public sealed partial class LibraryWeb
         MapFiles(app);
         MapInbox(app);
         MapSettings(app);
+        MapCalendar(app);
         app.MapFallback(() => Http.Detail(404, "Not Found"));
     }
 
