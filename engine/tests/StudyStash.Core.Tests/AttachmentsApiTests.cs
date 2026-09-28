@@ -289,6 +289,39 @@ public class AttachmentsApiTests
         Assert.Equal(Attachments.MaxRequestBytes, body["attachments"]![0]!["size"]!.GetValue<long>());
     }
 
+    /// <summary>The real server (Kestrel) refuses bodies over 30 MB unless a route says otherwise: this one does.</summary>
+    [Fact]
+    public async Task The_real_server_takes_more_than_its_usual_30_MB_here_and_nowhere_else()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var owned = store;
+        var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateSlimBuilder();
+        Microsoft.AspNetCore.Hosting.WebHostBuilderKestrelExtensions.ConfigureKestrel(builder.WebHost, k => k.Listen(IPAddress.Loopback, 0));
+        await using var app = LibraryWeb.Build(builder, cfg, store, new Pipeline(cfg, store, log: _ => { }), Options((_, _) => Task.FromResult<string?>(null)));
+        await app.StartAsync();
+        using var http = new HttpClient { BaseAddress = new Uri(app.Urls.Single()), Timeout = TimeSpan.FromMinutes(2) };
+
+        var form = new MultipartFormDataContent { { new StreamContent(new Zeros(40L * 1024 * 1024)), "file", "scan.pdf" } };
+        var r = await http.SendAsync(Req(HttpMethod.Post, "/api/v2/attachments", form));
+        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal(40L * 1024 * 1024, (await Json(r))["attachments"]![0]!["size"]!.GetValue<long>());
+
+        // Another route keeps the usual limit.
+        var big = new ByteArrayContent(new byte[31 * 1024 * 1024]);
+        big.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+        try
+        {
+            var other = await http.SendAsync(Req(HttpMethod.Post, "/api/v2/capture", big));
+            Assert.NotEqual(HttpStatusCode.OK, other.StatusCode);
+        }
+        catch (HttpRequestException)
+        {
+            // Refused partway through sending: the usual limit, as it should be.
+        }
+        await app.StopAsync();
+    }
+
     [Fact]
     public async Task Everything_needs_the_library_password()
     {
