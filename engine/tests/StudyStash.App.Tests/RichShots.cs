@@ -171,6 +171,24 @@ public class RichShots
                 Shot.Take($"rich-formulas-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, RichDemo.FormulaNotes), size: new Size(876, 1760));
     }
 
+    /// <summary>What the notes' prompt shows the engines, drawn the way a note shows it — the worked dose, the
+    /// blood-flow flowchart and the block on a slope — since the models imitate exactly these.</summary>
+    [AvaloniaFact]
+    public void Prompt_examples()
+    {
+        string markdown = string.Join("\n\n",
+            "## Details and examples",
+            "A dose, worked step by step:",
+            Core.Summarize.DoseExample,
+            "```mermaid\n" + Core.Summarize.MermaidExample + "\n```",
+            "Blood goes from the right side of the heart to the lungs, back to the left side, and out to the body.",
+            "```svg\n" + Core.Summarize.SvgExample + "\n```",
+            "The block's weight pulls straight down, the slope pushes back square to its surface, and friction holds it up the slope.");
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                Shot.Take($"rich-prompt-examples-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, markdown), size: new Size(876, 1080));
+    }
+
     /// <summary>A formula that lost a brace: shown as its plain source, inline in mono and on its own line in the
     /// code-box look, each with the same quiet line saying it couldn't be typeset.</summary>
     [AvaloniaFact]

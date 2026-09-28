@@ -104,7 +104,7 @@ public class NotesDrawingTests
         Assert.True(svg.Split('\n').Length <= 14);
         var r = SafeSvg.Clean(svg);
         Assert.Null(r.Problem);
-        Assert.Equal((640, 320), (r.Width, r.Height));
+        Assert.Equal((640, 280), (r.Width, r.Height));
         Assert.Equal("Forces on a block on a slope", r.Title);
         Assert.Equal(["θ", "weight mg", "normal force N", "friction f"], r.Texts);
         Assert.DoesNotContain("width=\"640\"", svg);

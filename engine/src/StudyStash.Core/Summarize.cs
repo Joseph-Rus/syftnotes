@@ -80,19 +80,19 @@ public static partial class Summarize
     /// <summary>The drawing the CLI engines are shown: the forces on a block on a slope, in the palette, every part
     /// labelled, its arrows ending in markers. It passes <see cref="SafeSvg"/> untouched but for its colours.</summary>
     public static readonly string SvgExample = """
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" font-size="14" fill="#1D1D1F">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 280" font-size="14" fill="#1D1D1F">
         <title>Forces on a block on a slope</title>
         <defs>
         <marker id="red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#D93025"/></marker>
         <marker id="green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#188038"/></marker>
         <marker id="amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#E37400"/></marker>
         </defs>
-        <polygon points="60,290 580,290 580,70" fill="none" stroke="#1D1D1F" stroke-width="2"/>
-        <path d="M124 290A64 64 0 0 0 119 265" fill="none" stroke="#6E6E73" stroke-width="1.5"/><text x="134" y="282" fill="#6E6E73">θ</text>
-        <rect x="-48" y="-60" width="96" height="60" rx="4" transform="translate(294 191) rotate(-22.9)" fill="#E8F0FE" stroke="#1A73E8" stroke-width="2"/>
-        <line x1="282" y1="163" x2="282" y2="263" stroke="#D93025" stroke-width="2.5" marker-end="url(#red)"/><text x="292" y="258" fill="#D93025">weight mg</text>
-        <line x1="282" y1="163" x2="243" y2="71" stroke="#188038" stroke-width="2.5" marker-end="url(#green)"/><text x="234" y="62" text-anchor="end" fill="#188038">normal force N</text>
-        <line x1="282" y1="163" x2="374" y2="124" stroke="#E37400" stroke-width="2.5" marker-end="url(#amber)"/><text x="384" y="122" fill="#E37400">friction f</text>
+        <polygon points="60,260 580,260 580,40" fill="none" stroke="#1D1D1F" stroke-width="2"/>
+        <path d="M124 260A64 64 0 0 0 119 235" fill="none" stroke="#6E6E73" stroke-width="1.5"/><text x="134" y="252" fill="#6E6E73">θ</text>
+        <rect x="-48" y="-60" width="96" height="60" rx="4" transform="translate(294 161) rotate(-22.9)" fill="#E8F0FE" stroke="#1A73E8" stroke-width="2"/>
+        <line x1="282" y1="133" x2="282" y2="233" stroke="#D93025" stroke-width="2.5" marker-end="url(#red)"/><text x="292" y="228" fill="#D93025">weight mg</text>
+        <line x1="282" y1="133" x2="243" y2="41" stroke="#188038" stroke-width="2.5" marker-end="url(#green)"/><text x="234" y="32" text-anchor="end" fill="#188038">normal force N</text>
+        <line x1="282" y1="133" x2="374" y2="94" stroke="#E37400" stroke-width="2.5" marker-end="url(#amber)"/><text x="384" y="92" fill="#E37400">friction f</text>
         </svg>
         """.ReplaceLineEndings("\n");
 
