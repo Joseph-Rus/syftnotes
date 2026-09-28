@@ -44,6 +44,8 @@ public sealed class LibraryWebOptions
     public StudyStash.Core.Ai.Inbox? Inbox { get; init; }
     /// <summary>Starting at login on the library's computer (the app's login item). Null: not offered.</summary>
     public LoginSwitch? StartAtLogin { get; init; }
+    /// <summary>Reads an attachment's words (path → text, or null). Null: <see cref="StudyStash.Core.Ai.DocumentText"/>.</summary>
+    public Func<string, CancellationToken, Task<string?>>? ReadDocument { get; init; }
 }
 
 /// <summary>Small pieces of HTTP the Python engine got from its web framework.</summary>
@@ -396,6 +398,7 @@ public sealed partial class LibraryWeb
         })));
 
         MapApp(app);
+        MapAttachments(app);
         MapCanvas(app);
         MapChat(app);
         MapFiles(app);
