@@ -5,12 +5,14 @@ using Avalonia.Controls.Documents;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Markdig;
+using Markdig.Extensions.Mathematics;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using StudyStash.App.Controls.Rich;
 using StudyStash.Core.Rich;
 using MdBlock = Markdig.Syntax.Block;
 using MdInline = Markdig.Syntax.Inlines.Inline;
+using Inline = Avalonia.Controls.Documents.Inline;
 
 namespace StudyStash.App.Controls;
 
@@ -25,7 +27,13 @@ public sealed partial class NoteView : StackPanel
 {
     public static readonly StyledProperty<string?> MarkdownProperty = AvaloniaProperty.Register<NoteView, string?>(nameof(Markdown));
 
-    static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseEmphasisExtras().Build();
+    static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseEmphasisExtras().UseMathematics().Build();
+
+    /// <summary>Inline maths reads a touch smaller than the body (Latin Modern reads larger than the body fonts at
+    /// equal size); a display formula, larger and centred. Past 2 000 characters, a formula goes straight to its
+    /// fallback rather than asking CSharpMath to lay out something that size.</summary>
+    const double InlineMathFactor = 0.94, DisplayMathFactor = 1.15;
+    const int MaxFormulaChars = 2000;
 
     public string? Markdown
     {
@@ -143,10 +151,11 @@ public sealed partial class NoteView : StackPanel
     {
         switch (block)
         {
+            // MathBlock is itself a FencedCodeBlock ($$ on its own lines reads as one): it must come first.
+            case MathBlock mb:
+                return DisplayMath(mb.Lines.ToString());
             case ParagraphBlock p:
-                var body = Body();
-                Fill(body, p.Inline);
-                return body;
+                return Paragraph(p.Inline);
             case ListBlock list:
                 return List(list);
             case FencedCodeBlock fence when KindOf(fence) is { } kind:
@@ -170,6 +179,73 @@ public sealed partial class NoteView : StackPanel
             default:
                 return null;
         }
+    }
+
+    /// <summary>
+    /// A paragraph, its formulas typeset: ordinarily one <see cref="TextBlock"/>, unless it holds an inline formula
+    /// tall enough to crush the lines around it (a matrix, <c>cases</c>) — that one is lifted onto its own centred
+    /// line instead, splitting the paragraph into a small stack of pieces around it.
+    /// </summary>
+    Control Paragraph(ContainerInline? inline)
+    {
+        if (inline is null) return Body();
+        var segments = new List<Control>();
+        var current = Body();
+        bool split = false;
+        foreach (var piece in Runs(inline, null, null, null, current.FontSize, null))
+        {
+            if (piece is InlineUIContainer { Child: MathView { Display: false } mv } && mv.DesiredSize.Height > current.FontSize * 2)
+            {
+                if (current.Inlines!.Count > 0) segments.Add(current);
+                // The same size and style a display formula gets, just still sitting in the paragraph's flow.
+                mv.Display = true;
+                mv.Size = current.FontSize * DisplayMathFactor;
+                mv.InvalidateMeasure();
+                var lifted = new MathDisplay(mv) { Margin = new Thickness(0, 2) };
+                segments.Add(lifted);
+                current = Body();
+                split = true;
+                continue;
+            }
+            current.Inlines!.Add(piece);
+        }
+        if (current.Inlines!.Count > 0 || !split) segments.Add(current);
+        if (segments.Count == 1) return segments[0];
+        var stack = new StackPanel { Spacing = 6 };
+        foreach (var s in segments) stack.Children.Add(s);
+        return stack;
+    }
+
+    /// <summary>A <c>$$…$$</c> formula on its own lines: centred, larger than the body, scaled down to fit the
+    /// column when it's wider (never below <see cref="MathDisplay.MinScale"/>), then scrollable sideways past that.
+    /// One CSharpMath can't typeset shows its source instead, calmly.</summary>
+    Control DisplayMath(string source)
+    {
+        string latex = source.Trim();
+        if (latex.Length == 0 || latex.Length > MaxFormulaChars) return DisplayFallback(latex);
+        var mv = new MathView { Latex = latex, Display = true, Size = BodySize * DisplayMathFactor };
+        mv.Bind(MathView.ForegroundProperty, mv.GetResourceObservable("Fg"));
+        mv.Measure(Size.Infinity);
+        if (mv.ErrorMessage is not null) return DisplayFallback(latex);
+        return new MathDisplay(mv) { Margin = new Thickness(0, 4) };
+    }
+
+    /// <summary>The code-box look, for a display formula (or diagram) that couldn't be drawn: the source in mono,
+    /// with one quiet line saying so.</summary>
+    Control DisplayFallback(string source)
+    {
+        var box = (Border)Code(source);
+        var stack = new StackPanel { Spacing = 6 };
+        var note = Text("TextFont", Mac ? 12 : 13, 1.4);
+        note.Text = "Couldn't typeset this formula.";
+        note.Bind(TextBlock.ForegroundProperty, note.GetResourceObservable("Fg3"));
+        stack.Children.Add(note);
+        stack.Children.Add(box);
+        var card = new Border { Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(Mac ? 8 : 4), Child = stack };
+        card.Bind(Border.BackgroundProperty, card.GetResourceObservable("Fill2"));
+        box.Background = null;
+        box.Padding = new Thickness(0);
+        return card;
     }
 
     enum DiagramKind { Mermaid, Svg }
@@ -301,7 +377,7 @@ public sealed partial class NoteView : StackPanel
             name.FontWeight = FontWeight.SemiBold;
             name.Text = Plain(term);
             var meaning = Secondary(14);
-            Fill(meaning, p.Inline, skip: term, trimLead: true);
+            Fill(meaning, p.Inline, skip: term, trimLead: true, fgKey: "Fg2");
             Grid.SetColumn(meaning, 2);
             row.Children.Add(name);
             row.Children.Add(meaning);
@@ -340,42 +416,49 @@ public sealed partial class NoteView : StackPanel
     static string Plain(ContainerInline? inline) => inline is null ? "" : string.Concat(inline.Descendants<LiteralInline>().Select(l => l.Content.ToString()))
         + string.Concat(inline.Descendants<CodeInline>().Select(c => c.Content));
 
-    /// <summary>A paragraph's text, with bold, italics, code and math kept.</summary>
-    static void Fill(TextBlock t, ContainerInline? inline, MdInline? skip = null, bool trimLead = false)
+    /// <summary>A paragraph's text, with bold, italics, code and math kept. <paramref name="fgKey"/> is the resource
+    /// an inline formula's colour follows — null keeps <see cref="MathView"/>'s own default (Fg).</summary>
+    static void Fill(TextBlock t, ContainerInline? inline, MdInline? skip = null, bool trimLead = false, string? fgKey = null)
     {
         t.Inlines ??= [];
         if (inline is null) return;
         bool lead = trimLead;
-        foreach (var run in Runs(inline, skip, null, null))
+        foreach (var piece in Runs(inline, skip, null, null, t.FontSize, fgKey))
         {
             if (lead)
             {
-                string trimmed = run.Text?.TrimStart(' ', ':', '—', '–', '-') ?? "";
-                if (trimmed.Length == 0) continue;
-                run.Text = char.ToUpperInvariant(trimmed[0]) + trimmed[1..];
+                if (piece is Run run)
+                {
+                    string trimmed = run.Text?.TrimStart(' ', ':', '—', '–', '-') ?? "";
+                    if (trimmed.Length == 0) continue;
+                    run.Text = char.ToUpperInvariant(trimmed[0]) + trimmed[1..];
+                }
                 lead = false;
             }
-            t.Inlines.Add(run);
+            t.Inlines.Add(piece);
         }
     }
 
-    /// <summary>The text as runs; weight and style are set only where the Markdown changes them, so a heading's
-    /// runs stay as heavy as the heading.</summary>
-    static IEnumerable<Run> Runs(ContainerInline container, MdInline? skip, FontWeight? weight, FontStyle? style)
+    /// <summary>The text as runs (or an inline formula's <see cref="InlineUIContainer"/>); weight and style are set
+    /// only where the Markdown changes them, so a heading's runs stay as heavy as the heading.</summary>
+    static IEnumerable<Inline> Runs(ContainerInline container, MdInline? skip, FontWeight? weight, FontStyle? style, double bodySize, string? fgKey)
     {
         for (var i = container.FirstChild; i is not null; i = i.NextSibling)
         {
             if (ReferenceEquals(i, skip)) continue;
             switch (i)
             {
+                case MathInline m:
+                    yield return MathInlineOf(m.Content.ToString(), bodySize, fgKey);
+                    break;
                 case LiteralInline l:
-                    var run = new Run(Math(l.Content.ToString()));
+                    var run = new Run(l.Content.ToString());
                     if (weight is { } w) run.FontWeight = w;
                     if (style is { } st) run.FontStyle = st;
                     yield return run;
                     break;
                 case EmphasisInline e:
-                    foreach (var r in Runs(e, skip, e.DelimiterCount >= 2 ? FontWeight.SemiBold : weight, e.DelimiterCount == 1 ? FontStyle.Italic : style)) yield return r;
+                    foreach (var r in Runs(e, skip, e.DelimiterCount >= 2 ? FontWeight.SemiBold : weight, e.DelimiterCount == 1 ? FontStyle.Italic : style, bodySize, fgKey)) yield return r;
                     break;
                 case CodeInline c:
                     yield return new Run(c.Content) { FontFamily = new FontFamily("SF Mono, Menlo, Cascadia Mono, Consolas, monospace"), FontSize = 14 };
@@ -384,18 +467,32 @@ public sealed partial class NoteView : StackPanel
                     yield return new Run(" ");
                     break;
                 case LinkInline link:
-                    foreach (var r in Runs(link, skip, weight, style)) yield return r;
+                    foreach (var r in Runs(link, skip, weight, style, bodySize, fgKey)) yield return r;
                     break;
                 case ContainerInline other:
-                    foreach (var r in Runs(other, skip, weight, style)) yield return r;
+                    foreach (var r in Runs(other, skip, weight, style, bodySize, fgKey)) yield return r;
                     break;
             }
         }
     }
 
-    [GeneratedRegex(@"\$([^$]+)\$")]
-    private static partial Regex InlineMath();
+    /// <summary>An inline <c>$…$</c> formula, typeset on the text's baseline; one CSharpMath can't typeset, or one
+    /// too long to try, falls back to its plain source in mono (Fg2) rather than an empty gap.</summary>
+    static Inline MathInlineOf(string latex, double bodySize, string? fgKey)
+    {
+        latex = latex.Trim();
+        if (latex.Length == 0 || latex.Length > MaxFormulaChars) return MonoFallback("$" + latex + "$");
+        var mv = new MathView { Latex = latex, Display = false, Size = bodySize * InlineMathFactor };
+        mv.Bind(MathView.ForegroundProperty, mv.GetResourceObservable(fgKey ?? "Fg"));
+        mv.Measure(Size.Infinity);
+        if (mv.ErrorMessage is not null) return MonoFallback("$" + latex + "$");
+        return new InlineUIContainer(mv);
+    }
 
-    /// <summary>$…$ math, readable without a math renderer: the dollar signs go, commands become symbols.</summary>
-    static string Math(string text) => InlineMath().Replace(text, m => StudyStash.Core.Rich.MathText.Plain(m.Groups[1].Value));
+    static Run MonoFallback(string text)
+    {
+        var r = new Run(text) { FontFamily = new FontFamily("SF Mono, Menlo, Cascadia Mono, Consolas, monospace") };
+        r.Bind(Run.ForegroundProperty, r.GetResourceObservable("Fg2"));
+        return r;
+    }
 }
