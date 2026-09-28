@@ -45,7 +45,8 @@ public static partial class Passages
             if (blocks.TryGetValue(k, out var block))
             {
                 Flush();
-                if (Words(block) is { Length: > 0 } words) result.Add(new Passage(noteId, Passage.NotesKind, section, null, words));
+                foreach (string piece in Pieces(Words(block)))
+                    result.Add(new Passage(noteId, Passage.NotesKind, section, null, piece));
                 k = block.Last;
                 continue;
             }
@@ -90,22 +91,55 @@ public static partial class Passages
                 try
                 {
                     var labels = Flowchart.Parse(block.Text).Labels();
-                    return labels.Count == 0 ? "" : "Diagram: " + string.Join(", ", labels);
+                    return labels.Count == 0 ? "" : DiagramPrefix + string.Join(", ", labels);
                 }
                 catch (MermaidException)
                 {
                     // Not a flowchart that can be drawn: its words still find it.
                     var words = Words(block.Text).Where(w => !MermaidWords.Contains(w) && w.Length > 1).ToList();
-                    return words.Count == 0 ? "" : "Diagram: " + string.Join(" ", words);
+                    return words.Count == 0 ? "" : DiagramPrefix + string.Join(" ", words);
                 }
             case NoteBlockKind.Svg:
                 var drawing = SafeSvg.Clean(block.Text);
                 var texts = drawing.Texts.Where(t => t.Trim().Length > 0).ToList();
                 if (drawing.Title.Length > 0 && !texts.Contains(drawing.Title)) texts.Insert(0, drawing.Title);
-                return texts.Count == 0 ? "" : "Diagram: " + string.Join(", ", texts);
-            default:
+                return texts.Count == 0 ? "" : DiagramPrefix + string.Join(", ", texts);
+            case NoteBlockKind.Math:
                 return block.Text.Trim();
+            default:
+                return block.Text.TrimEnd().TrimStart('\n'); // code keeps its indentation
         }
+    }
+
+    const string DiagramPrefix = "Diagram: ";
+
+    /// <summary>A block's words as passages no longer than a long paragraph's: a long code block by whole lines, a
+    /// big diagram's words by whole labels (each piece still saying it's a diagram), so no one passage swamps an
+    /// answer's sources.</summary>
+    static IEnumerable<string> Pieces(string words)
+    {
+        const int max = Target * 2;
+        if (words.Length == 0) yield break;
+        if (words.Length <= max)
+        {
+            yield return words;
+            yield break;
+        }
+        bool diagram = words.StartsWith(DiagramPrefix, StringComparison.Ordinal);
+        string sep = diagram ? ", " : "\n", prefix = diagram ? DiagramPrefix : "";
+        var cur = new StringBuilder();
+        foreach (string part in diagram ? words[DiagramPrefix.Length..].Split(sep) : words.Split('\n'))
+            foreach (string piece in Summarize.Pieces(part, max))
+            {
+                if (cur.Length > 0 && cur.Length + sep.Length + piece.Length > max)
+                {
+                    yield return prefix + cur;
+                    cur.Clear();
+                }
+                if (cur.Length > 0) cur.Append(sep);
+                cur.Append(piece);
+            }
+        if (cur.ToString().Trim().Length > 0) yield return prefix + cur;
     }
 
     /// <summary>A transcript in stretches of about a minute; a timed one's stretches start where a line does.</summary>

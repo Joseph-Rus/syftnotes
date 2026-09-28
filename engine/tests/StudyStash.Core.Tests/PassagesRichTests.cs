@@ -54,6 +54,20 @@ public class PassagesRichTests
     }
 
     [Fact]
+    public void A_long_code_block_or_a_big_diagram_is_cut_at_whole_lines_and_labels()
+    {
+        var code = Enumerable.Range(0, 120).Select(i => $"    total_{i} = total_{i - 1} + values[{i}]").ToList();
+        var boxes = string.Join("\n", Enumerable.Range(0, 50).Select(i => $"  n{i}[\"Step {i} of the long care pathway\"] --> n{i + 1}[\"Step {i + 1} of the long care pathway\"]"));
+        var passages = Passages.FromNotes("n", "## Code\n\n```python\n" + string.Join("\n", code) + "\n```\n\n```mermaid\nflowchart TD\n" + boxes + "\n```");
+        var codeParts = passages.Where(p => !p.Text.StartsWith("Diagram: ")).ToList();
+        var diagramParts = passages.Where(p => p.Text.StartsWith("Diagram: ")).ToList();
+        Assert.True(codeParts.Count > 1 && diagramParts.Count > 1);
+        Assert.All(passages, p => Assert.True(p.Text.Length <= 840 + "Diagram: ".Length, p.Text));
+        Assert.Equal(code, codeParts.SelectMany(p => p.Text.Split('\n')));
+        Assert.Equal(51, diagramParts.SelectMany(p => p.Text["Diagram: ".Length..].Split(", ")).Count());
+    }
+
+    [Fact]
     public void Searching_the_library_finds_a_lecture_by_its_diagrams_words()
     {
         using var dir = new TempDir();

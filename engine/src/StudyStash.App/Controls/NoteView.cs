@@ -250,30 +250,16 @@ public sealed partial class NoteView : StackPanel
 
     enum DiagramKind { Mermaid, Svg }
 
-    [GeneratedRegex(@"^(flowchart|graph)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex FlowchartStart();
-
-    /// <summary>Which fences are diagrams: ```mermaid (or ```mmd), ```svg, an ```xml or ```html one holding an SVG,
-    /// and a bare fence that starts like a flowchart.</summary>
-    static DiagramKind? KindOf(FencedCodeBlock fence)
+    /// <summary>Which fences are diagrams — the same rule search and the diagram repair read notes by
+    /// (<see cref="NoteBlocks.KindOf"/>).</summary>
+    static DiagramKind? KindOf(FencedCodeBlock fence) => NoteBlocks.KindOf(fence.Info ?? "", fence.Lines.ToString()) switch
     {
-        string info = (fence.Info ?? "").Trim().ToLowerInvariant(), text = fence.Lines.ToString().TrimStart();
-        return info switch
-        {
-            "mermaid" or "mmd" => DiagramKind.Mermaid,
-            "svg" => DiagramKind.Svg,
-            "xml" or "html" when IsSvg(text) => DiagramKind.Svg,
-            "" when FlowchartStart().IsMatch(text) => DiagramKind.Mermaid,
-            _ => null,
-        };
-    }
+        NoteBlockKind.Mermaid => DiagramKind.Mermaid,
+        NoteBlockKind.Svg => DiagramKind.Svg,
+        _ => null,
+    };
 
-    static bool IsSvg(string text)
-    {
-        text = text.TrimStart();
-        if (text.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) && text.IndexOf("?>", StringComparison.Ordinal) is int end and >= 0) text = text[(end + 2)..].TrimStart();
-        return text.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
-    }
+    static bool IsSvg(string text) => NoteBlocks.IsSvg(text);
 
     /// <summary>A diagram, drawn: centred in the column with a little room above and below and no frame; or, when it
     /// can't be drawn, the calm card that says why and shows its source. Never an exception.</summary>
