@@ -11,21 +11,33 @@ namespace StudyStash.App.Services;
 /// Saves a lecture, or a whole class, as Markdown a student can keep and open in Obsidian, Typora or VS Code: through
 /// the native Save and folder dialogs, its diagrams drawn as pictures beside the file (or, with nowhere on disk to
 /// put them, folded straight into the Markdown). The same code runs on a laptop and on the library computer, since
-/// it only ever talks to the library through <paramref name="lib" />.
+/// it only ever talks to the library through the <see cref="RemoteLibrary"/> it's given. The dialogs are behind a
+/// thin picker so a test can hand the save a path of its own instead of showing one.
 /// </summary>
 public static class NotesDownload
 {
     static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s ?? "" : "";
 
     /// <summary>One lecture, chosen with the Save dialog.</summary>
-    public static async Task LectureAsync(Window window, RemoteLibrary lib, string lectureId, string suggestedName, bool transcript, Func<string, string?> mermaidSvg)
-    {
-        var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+    public static Task LectureAsync(Window window, RemoteLibrary lib, string lectureId, string suggestedName, bool transcript, Func<string, string?> mermaidSvg) =>
+        LectureAsync(async () =>
         {
-            Title = "Download as Markdown", SuggestedFileName = suggestedName, DefaultExtension = "md",
-            FileTypeChoices = [new FilePickerFileType("Markdown") { Patterns = ["*.md"] }],
-        });
-        if (file is null) return;
+            var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Download as Markdown", SuggestedFileName = suggestedName, DefaultExtension = "md",
+                FileTypeChoices = [new FilePickerFileType("Markdown") { Patterns = ["*.md"] }],
+            });
+            return file is null ? null : ((Func<string, Task>)(text => WriteTextAsync(file, text)), file.TryGetLocalPath());
+        }, lib, lectureId, transcript, mermaidSvg);
+
+    /// <summary>The same save, with <paramref name="pick"/> standing in for the Save dialog: null cancels it (as
+    /// picking Cancel would), otherwise how to write the chosen file's text and its local path, if it has one (a
+    /// sandboxed picker's file may not).</summary>
+    internal static async Task LectureAsync(Func<Task<(Func<string, Task> WriteText, string? LocalPath)?>> pick, RemoteLibrary lib, string lectureId,
+        bool transcript, Func<string, string?> mermaidSvg)
+    {
+        if (await pick() is not { } chosen) return;
+        var (writeText, localPath) = chosen;
         JsonObject? lecture;
         try
         {
@@ -38,22 +50,29 @@ public static class NotesDownload
         }
         if (lecture is null) return;
         var export = NoteExport.Lecture(lecture, transcript, mermaidSvg);
-        string? dir = file.TryGetLocalPath() is { Length: > 0 } path ? Path.GetDirectoryName(path) : null;
-        await WriteTextAsync(file, dir is not null ? export.Markdown : Embedded(export));
+        string? dir = localPath is { Length: > 0 } ? Path.GetDirectoryName(localPath) : null;
+        await writeText(dir is not null ? export.Markdown : Embedded(export));
         if (dir is not null)
             foreach (var asset in export.Assets)
                 await WriteAssetAsync(dir, asset);
     }
 
     /// <summary>Every lecture of a class, into a folder of its own chosen with the folder dialog.</summary>
-    public static async Task ClassAsync(Window window, RemoteLibrary lib, string className, bool transcript, Func<string, string?> mermaidSvg)
+    public static Task ClassAsync(Window window, RemoteLibrary lib, string className, bool transcript, Func<string, string?> mermaidSvg) =>
+        ClassAsync(async () =>
+        {
+            var folders = await window.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = $"Choose where to save {className}" });
+            return folders.Count == 0 ? null : folders[0].TryGetLocalPath();
+        }, lib, className, transcript, mermaidSvg);
+
+    /// <summary>The same save, with <paramref name="pick"/> standing in for the folder dialog: null cancels it, or
+    /// the local folder chosen (a folder that isn't really on this computer counts as none).</summary>
+    internal static async Task ClassAsync(Func<Task<string?>> pick, RemoteLibrary lib, string className, bool transcript, Func<string, string?> mermaidSvg)
     {
-        var folders = await window.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = $"Choose where to save {className}" });
-        if (folders.Count == 0) return;
-        string? chosen = folders[0].TryGetLocalPath();
+        string? chosen = await pick();
         if (chosen is not { Length: > 0 })
         {
-            Shell.Toast("Couldn't download it", "Choose a folder on this computer.", null, null);
+            if (chosen is not null) Shell.Toast("Couldn't download it", "Choose a folder on this computer.", null, null);
             return;
         }
         string classDir = UniqueClassDir(chosen, className);

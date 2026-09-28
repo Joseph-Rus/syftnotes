@@ -6,6 +6,7 @@ using Avalonia.Media;
 using StudyStash.App.Controls.Rich;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.App.Views;
 using StudyStash.Core;
 using StudyStash.Core.Rich;
 
@@ -487,22 +488,11 @@ public static partial class Shell
     {
         await Task.Yield(); // opening the menu is itself synchronous; a pick below does the real, awaited work
         if (library.Note is not { } note || mainWindow?.Content is not Control anchor || mainWindow is null || host.Remote() is not { } lib) return;
-        var menu = Menu();
-        var one = new MenuItem { Header = "Download as Markdown…" };
-        one.Click += async (_, _) => await NotesDownload.LectureAsync(mainWindow, lib, note.Id, Notes.Slugify(note.Title) + ".md", host.Settings.DownloadTranscripts, MermaidSvg());
-        menu.Items.Add(one);
         string? cls = dueOpen ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
-        if (cls is not null)
-        {
-            var all = new MenuItem { Header = $"Download all of {cls}…" };
-            all.Click += async (_, _) => await NotesDownload.ClassAsync(mainWindow, lib, cls, host.Settings.DownloadTranscripts, MermaidSvg());
-            menu.Items.Add(all);
-        }
-        menu.Items.Add(new Separator());
-        var transcripts = new MenuItem { Header = "Include transcripts", Icon = host.Settings.DownloadTranscripts ? new Controls.Icon { Glyph = "check", Size = 13 } : null };
-        transcripts.Click += (_, _) => host.Save(s => s.DownloadTranscripts = !s.DownloadTranscripts);
-        menu.Items.Add(transcripts);
-        menu.Open(anchor);
+        DownloadMenu.Build(cls, host.Settings.DownloadTranscripts,
+            download: () => _ = NotesDownload.LectureAsync(mainWindow, lib, note.Id, Notes.Slugify(note.Title) + ".md", host.Settings.DownloadTranscripts, MermaidSvg()),
+            downloadClass: () => _ = NotesDownload.ClassAsync(mainWindow, lib, cls!, host.Settings.DownloadTranscripts, MermaidSvg()),
+            toggleTranscripts: () => host.Save(s => s.DownloadTranscripts = !s.DownloadTranscripts)).Open(anchor);
     }
 
     /// <summary>Draws a Mermaid flowchart that already parses, in the app's own font, as a standalone SVG for a
