@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Builder;
+using ModelContextProtocol.AspNetCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using StudyStash.Core;
@@ -26,26 +27,73 @@ public static class ClaudeWeb
         builder.Services.AddMcpServer(o =>
         {
             o.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = ClaudeTools.ServerName, Title = "Study Stash", Version = Engine.Version };
-            o.ServerInstructions = ClaudeTools.Instructions;
+            o.ServerInstructions = ClaudeTools.WebInstructions;
         })
-            .WithHttpTransport(o => o.Stateless = true)
-            .WithTools(StudyStash.Core.Ai.ToolAccess.Guard(ClaudeTools.Tools(source), () => Task.FromResult((access.ToolsOn, access.Reading))))
+            // No sessions: every request stands alone, so a library restart (or an update) loses Claude nothing.
+            .WithHttpTransport(o => o.SessionMode = HttpServerSessionMode.Stateless)
+            .WithTools(StudyStash.Core.Ai.ToolAccess.Guard(ClaudeTools.Tools(source, web: true), () => Task.FromResult((access.ToolsOn, access.Reading))))
             .WithPrompts(ClaudeTools.Prompts());
         var app = builder.Build();
 
-        // Only a signed-in Claude (or a token from Settings) gets to the MCP server. Anyone else is told where to
-        // sign in (RFC 9728), which is how Claude finds the sign-in on its own.
+        // In this order: a browser's preflight is answered (no sign-in needed to ask); a page from a site that isn't
+        // Claude or this library is turned away (a browser always says where a page came from; Claude's own servers
+        // send no Origin); only a signed-in Claude (or a token from Settings) gets to the MCP server; anyone else is told
+        // where to sign in (RFC 9728), which is how Claude finds the sign-in on its own. AI tool access being off is
+        // the tools' to say, in words, not a refused connection.
         app.Use(async (ctx, next) =>
         {
             ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
-            if (!ctx.Request.Path.StartsWithSegments(McpPath))
+            var path = ctx.Request.Path;
+            if (!path.StartsWithSegments(McpPath))
             {
+                // Discovery, registration, tokens and signing out hold nothing a cookie could reach: any page may ask.
+                if (Open.Any(p => path.StartsWithSegments(p)))
+                {
+                    ctx.Response.Headers.AccessControlAllowOrigin = "*";
+                    ctx.Response.Headers.AccessControlExposeHeaders = "WWW-Authenticate";
+                }
+                if (HttpMethods.IsOptions(ctx.Request.Method))
+                {
+                    if (Open.Any(p => path.StartsWithSegments(p)))
+                    {
+                        ctx.Response.Headers.AccessControlAllowMethods = "GET, POST, OPTIONS";
+                        ctx.Response.Headers.AccessControlAllowHeaders = "Authorization, Content-Type, MCP-Protocol-Version";
+                        ctx.Response.Headers.AccessControlMaxAge = "600";
+                    }
+                    ctx.Response.StatusCode = StatusCodes.Status204NoContent;
+                    return;
+                }
                 await next();
                 return;
             }
-            if (!access.ToolsOn)
+            string origin = ctx.Request.Headers.Origin.ToString();
+            bool allowed = origin.Length == 0 || AllowedOrigin(ctx, access, origin);
+            ctx.Response.Headers.Vary = "Origin";
+            if (origin.Length > 0 && allowed)
             {
-                await Http.Detail(403, "AI tool access is off in Study Stash.").ExecuteAsync(ctx);
+                ctx.Response.Headers.AccessControlAllowOrigin = origin;
+                ctx.Response.Headers.AccessControlExposeHeaders = "WWW-Authenticate, Mcp-Session-Id, MCP-Protocol-Version";
+            }
+            if (HttpMethods.IsOptions(ctx.Request.Method))
+            {
+                if (origin.Length > 0 && allowed)
+                {
+                    ctx.Response.Headers.AccessControlAllowMethods = "GET, POST, DELETE, OPTIONS";
+                    ctx.Response.Headers.AccessControlAllowHeaders = McpHeaders;
+                    ctx.Response.Headers.AccessControlMaxAge = "600";
+                }
+                ctx.Response.StatusCode = StatusCodes.Status204NoContent;
+                return;
+            }
+            if (!allowed)
+            {
+                // Streamable HTTP's DNS-rebinding guard: a JSON-RPC error with no id, as the spec asks.
+                ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+                await ctx.Response.WriteAsJsonAsync(new JsonObject
+                {
+                    ["jsonrpc"] = "2.0",
+                    ["error"] = new JsonObject { ["code"] = -32600, ["message"] = "Study Stash doesn't take requests from pages on " + origin + "." },
+                });
                 return;
             }
             string auth = ctx.Request.Headers.Authorization.ToString();
@@ -183,6 +231,29 @@ public static class ClaudeWeb
     }
 
     const string Scope = "library:read";
+
+    /// <summary>The paths any web page may call: they hold no cookies and no one's data.</summary>
+    static readonly string[] Open = ["/.well-known", "/register", "/token", "/revoke"];
+
+    const string McpHeaders = "Authorization, Content-Type, Accept, MCP-Protocol-Version, Mcp-Session-Id, Mcp-Method, Mcp-Name, Last-Event-ID";
+
+    /// <summary>Whether a page from <paramref name="origin"/> may call the MCP server: this library by any of its
+    /// names, Claude on the web, or a program on this computer.</summary>
+    public static bool AllowedOrigin(HttpContext ctx, ClaudeAccess access, string origin)
+    {
+        if (OriginOf(origin) is not { } o) return false;
+        if (o.StartsWith("http://localhost:", StringComparison.Ordinal) || o == "http://localhost"
+            || o.StartsWith("http://127.0.0.1:", StringComparison.Ordinal) || o == "http://127.0.0.1")
+            return true;
+        return new[] { Base(ctx, access), access.PublicUrl, access.TailnetUrl ?? "", "https://claude.ai", "https://claude.com" }
+            .Any(known => known.Length > 0 && OriginOf(known) == o);
+    }
+
+    /// <summary>An address's origin the one way it's compared (scheme://host[:port], lowercased, no default port),
+    /// or null when it isn't an http(s) address.</summary>
+    static string? OriginOf(string uri) =>
+        Uri.TryCreate(uri, UriKind.Absolute, out var u) && (u.Scheme == Uri.UriSchemeHttp || u.Scheme == Uri.UriSchemeHttps) && u.UserInfo.Length == 0
+            ? $"{u.Scheme}://{u.IdnHost.ToLowerInvariant()}{(u.IsDefaultPort ? "" : ":" + u.Port)}" : null;
     const string Docs = "https://github.com/Joseph-Rus/study-stash/blob/main/docs/claude-connector.md";
 
     static readonly string[] Loopbacks = ["localhost", "127.0.0.1", "[::1]"];

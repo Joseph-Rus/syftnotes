@@ -6,23 +6,40 @@ namespace StudyStash.Core.Ai;
 /// <summary>
 /// Which of a student's reading toggles (<see cref="ReadingScopes"/>) a tool needs, and the guard that refuses a
 /// call when AI tool access is off, or the toggle its kind needs is off. Refusing happens at call time, not by
-/// hiding the tool from <c>tools/list</c>, so a client's tool list never changes underneath it.
+/// hiding the tool from <c>tools/list</c>, so a client's tool list never changes underneath it, and the refusal is
+/// a tool error in words: it reaches the model and the student, where a refused connection would only say
+/// "couldn't connect".
 /// </summary>
 public static class ToolAccess
 {
-    public const string Refused = "Study Stash's settings don't let AI tools read that right now.";
+    /// <summary>What every tool says while AI tool access is off.</summary>
+    public const string Off = "AI tool access is off in Study Stash. The student can turn it on in Study Stash → Settings → AI tool access.";
 
-    /// <summary>The scope a tool needs, or null when every tool may use it (list_classes: just the class names and
-    /// counts) or nothing reads it yet (audio).</summary>
+    /// <summary>Each scope as its toggle is named in Settings → AI tool access, and what it lets tools read.</summary>
+    static readonly Dictionary<string, (string Toggle, string What)> Toggles = new()
+    {
+        ["lectures"] = ("Lectures and transcripts", "lectures and transcripts"),
+        ["notes"] = ("Study notes", "study notes"),
+        ["canvas"] = ("Canvas assignments and files", "Canvas"),
+    };
+
+    /// <summary>What a tool says when the toggle its scope needs is off, naming that toggle.</summary>
+    public static string Refused(string scope) => Toggles.TryGetValue(scope, out var t)
+        ? $"Study Stash's settings don't let AI tools read {t.What} right now (Settings → AI tool access → {t.Toggle})."
+        : "Study Stash's settings don't let AI tools read that right now (Settings → AI tool access).";
+
+    /// <summary>The scope a tool needs, or null only for list_classes (just the class names and counts). Every other
+    /// tool is named here on purpose: a test fails when a new tool isn't.</summary>
     public static string? Scope(string tool) => tool switch
     {
         "list_lectures" or "search_notes" or "get_transcript" => "lectures",
         "get_lecture" => "notes",
-        "search_files" or "due_assignments" or "canvas_courses" or "canvas_api" or "canvas_page" or "canvas_download" => "canvas",
+        "search_files" or "read_file" or "due_assignments" or "get_assignment" or "class_modules" or "class_files" or "class_announcements"
+            or "canvas_courses" or "canvas_api" or "canvas_page" or "canvas_download" => "canvas",
         _ => null,
     };
 
-    static bool Allowed(string tool, ReadingScopes reading) => Scope(tool) switch
+    static bool Allowed(string? scope, ReadingScopes reading) => scope switch
     {
         "lectures" => reading.Lectures,
         "notes" => reading.Notes,
@@ -35,8 +52,10 @@ public static class ToolAccess
         public override async ValueTask<CallToolResult> InvokeAsync(RequestContext<CallToolRequestParams> request, CancellationToken cancellationToken = default)
         {
             var (on, reading) = await access();
-            return !on || !Allowed(ProtocolTool.Name, reading)
-                ? new CallToolResult { IsError = true, Content = [new TextContentBlock { Text = Refused }] }
+            string? scope = Scope(ProtocolTool.Name);
+            string? refusal = !on ? Off : !Allowed(scope, reading) ? Refused(scope!) : null;
+            return refusal is not null
+                ? new CallToolResult { IsError = true, Content = [new TextContentBlock { Text = refusal }] }
                 : await base.InvokeAsync(request, cancellationToken);
         }
     }
