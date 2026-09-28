@@ -245,10 +245,6 @@ public sealed partial class NoteView : StackPanel
     [GeneratedRegex(@"\$([^$]+)\$")]
     private static partial Regex InlineMath();
 
-    /// <summary>$…$ math, readable without a math renderer: the dollar signs go, a few commands become symbols.</summary>
-    static string Math(string text) => InlineMath().Replace(text, m => m.Groups[1].Value
-        .Replace(@"\times", "×").Replace(@"\cdot", "·").Replace(@"\le", "≤").Replace(@"\ge", "≥").Replace(@"\ne", "≠")
-        .Replace(@"\to", "→").Replace(@"\infty", "∞").Replace(@"\pi", "π").Replace(@"\sum", "Σ").Replace(@"\int", "∫")
-        .Replace(@"\sqrt", "√").Replace(@"\Delta", "Δ").Replace(@"\alpha", "α").Replace(@"\beta", "β").Replace(@"\theta", "θ")
-        .Replace("{", "").Replace("}", "").Replace(@"\", ""));
+    /// <summary>$…$ math, readable without a math renderer: the dollar signs go, commands become symbols.</summary>
+    static string Math(string text) => InlineMath().Replace(text, m => StudyStash.Core.Rich.MathText.Plain(m.Groups[1].Value));
 }
