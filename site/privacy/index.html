@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy policy · Study Stash</title>
+<meta name="description" content="Study Stash's privacy policy: everything stays on your own computers. What the app reads from Google Calendar, Microsoft calendars and Canvas, what it does with it, and how to take it back.">
+<meta name="theme-color" content="#f8f5ee" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#151a2b" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Study Stash">
+<meta property="og:title" content="Study Stash privacy policy">
+<meta property="og:description" content="Everything stays on your own computers. No accounts, no servers, no analytics.">
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the page</a>
+
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="../"><img src="../assets/img/icon.webp" alt="" width="30" height="30">Study Stash</a>
+    <nav aria-label="Site">
+      <ul class="nav">
+        <li><a href="../phone/">Phone app</a></li>
+        <li class="hide-sm"><a href="./" aria-current="page">Privacy</a></li>
+        <li class="hide-sm"><a href="../support/">Support</a></li>
+        <li><a class="gh" href="https://github.com/Joseph-Rus/study-stash" aria-label="Study Stash on GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.8 1.3 3.5 1 .1-.8.4-1.3.8-1.6-2.7-.3-5.5-1.3-5.5-5.9 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.6-2.8 5.6-5.5 5.9.4.4.8 1.1.8 2.2v3.3c0 .3.2.7.8.6A12 12 0 0 0 12 .3"/></svg></a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap narrow">
+    <header class="page-head">
+      <p class="kicker">Privacy policy</p>
+      <h1>Everything stays on your own computers.</h1>
+      <p class="lede">Study Stash is an app you run yourself, not a service. There's no Study Stash account, no Study
+        Stash server and no analytics. This page says exactly what the app reads, where it keeps it, and how to take it
+        back.</p>
+      <p class="updated">Last updated 28 September 2026</p>
+      <ul class="toc" aria-label="On this page">
+        <li><a href="#short">In short</a></li>
+        <li><a href="#stays">What stays on your computers</a></li>
+        <li><a href="#calendars">Calendars</a></li>
+        <li><a href="#google">Google API data</a></li>
+        <li><a href="#canvas">Canvas</a></li>
+        <li><a href="#ai">AI engines</a></li>
+        <li><a href="#network">What the app contacts</a></li>
+        <li><a href="#rights">Your choices</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </header>
+
+    <div class="prose">
+      <h2 id="short">In short</h2>
+      <ul>
+        <li><strong>Your recordings, transcripts, notes and everything else Study Stash makes are kept on your own
+          computers</strong>: your laptop, and your library's computer if you use one. Nothing is sent to the people who
+          make Study Stash, and we have no way to see it.</li>
+        <li><strong>The audio never leaves the computer that recorded it.</strong> Whisper transcribes it on that
+          computer.</li>
+        <li><strong>No analytics, tracking, advertising or crash reporting.</strong> The app has no code that reports
+          on you, and this website has no cookies, trackers or third-party scripts.</li>
+        <li><strong>Calendars and Canvas are read-only</strong> and reached with your own sign-in. What Study Stash reads
+          goes only to your own library, and you can revoke it at any time.</li>
+        <li><strong>The AI that writes your notes is the one you choose.</strong> With Ollama, nothing leaves your
+          computer. With Claude Code, Codex or Gemini, your transcripts go to that company under your own account.</li>
+      </ul>
+      <p>Study Stash is free, open-source software under the MIT licence. Everything on this page can be checked in its
+        <a href="https://github.com/Joseph-Rus/study-stash">source code</a>.</p>
+
+      <h2 id="stays">What stays on your computers</h2>
+      <p>Study Stash keeps its data in one folder, <code>~/.study-stash</code> in your home folder (on Windows,
+        <code>C:\Users\&lt;you&gt;\.study-stash</code>), unless you choose another place. In it are:</p>
+      <ul>
+        <li>your recordings and their transcripts;</li>
+        <li>your study notes, as plain Markdown files in a folder per class, and the lecture database;</li>
+        <li>your classes, settings, and the questions you've asked and their answers;</li>
+        <li>what Study Stash has copied from Canvas and your calendars (below);</li>
+        <li>the sign-ins it needs: your library's password, and the tokens that let it read your calendars. Files
+          holding secrets are written so only your own user account can read them.</li>
+      </ul>
+      <p><strong>Between your own computers.</strong> With a laptop and a library, the laptop sends each lecture to
+        the library, and the library sends back notes, over your home network or over
+        <a href="https://tailscale.com">Tailscale</a>, a private network you set up with your own Tailscale account. The
+        library is protected by its password. A phone you pair (see the <a href="../phone/">phone guide</a>) reaches
+        the library over Tailscale's HTTPS and is let in by a pairing code you make in Settings; you can remove a phone
+        at any time. Tailscale is a separate service with its own
+        <a href="https://tailscale.com/privacy-policy">privacy policy</a>; it sees which of your devices are connected,
+        not what they send each other.</p>
+      <p><strong>Deleting it.</strong> Delete a lecture, a class or a phone in the app, or delete the
+        <code>.study-stash</code> folder to remove everything. Uninstalling the app leaves the folder in place, so your
+        notes aren't lost by accident.</p>
+
+      <h2 id="calendars">Calendars (Google, Microsoft, Apple and calendar links)</h2>
+      <p>If you connect a calendar, Study Stash uses it to show your upcoming classes and events, and to work out which
+        class a recording belongs to and what to call it. Connecting one is optional, and everything else works
+        without it.</p>
+      <h3>What it reads</h3>
+      <p>Study Stash asks only for <strong>read-only</strong> access. It can't create, change or delete anything in
+        your calendars.</p>
+      <div class="table-scroll">
+        <table class="table">
+          <tr><th scope="row">Google Calendar</th><td>Read-only access to your calendars and their events (Google's
+            read-only calendar permission), and your account's email address so Settings can show which account is
+            connected.</td></tr>
+          <tr><th scope="row">Microsoft (Outlook, Microsoft 365)</th><td>Read-only access to your calendars
+            (<code>Calendars.Read</code>), your basic profile's name and email address (<code>User.Read</code>) to
+            show which account is connected, and <code>offline_access</code> so it can keep reading without asking you
+            to sign in each time.</td></tr>
+          <tr><th scope="row">Apple Calendar, calendar links</th><td>On a Mac, the calendars macOS lets it read once you
+            allow it; or a calendar link (.ics) you paste in.</td></tr>
+        </table>
+      </div>
+      <p>From those, Study Stash reads <strong>your list of calendars</strong> (their names and colours) and
+        <strong>the events in the calendars you choose</strong>: each event's title, start and end, whether it's all
+        day, its location, its attendees, its link and whether it's cancelled. It reads events from around now to a few
+        days ahead, not your whole history.</p>
+      <h3>What it does with it</h3>
+      <ul>
+        <li>Shows your upcoming classes and events in the app, on your library's pages and in your phone app.</li>
+        <li>Matches an event to one of your classes, so a lecture recorded at that time is filed under the right class
+          and named after it, and (only if you turn it on) so Study Stash can start recording when a class begins.</li>
+      </ul>
+      <h3>Where it goes</h3>
+      <ul>
+        <li>Calendars are read by the laptop that records. It keeps what it read on that computer and sends the next
+          seven days of events (title, times, location, and the class it matched) to <strong>your own</strong>
+          library, which, with one computer, is the same computer.</li>
+        <li>Your calendar data is <strong>never sent to the developers of Study Stash</strong> or to anyone else. It
+          isn't sold, used for advertising, or used to train AI models. Study Stash doesn't give it to the AI engine
+          that writes your notes; only the name of the class it matched is used.</li>
+        <li>The sign-in tokens for Google and Microsoft are stored on your laptop, readable only by your user account,
+          and are sent only to Google or Microsoft.</li>
+      </ul>
+      <h3>Taking it back</h3>
+      <ul>
+        <li>In Study Stash, remove the account from Settings. It deletes the account's token and the events it copied
+          from that computer.</li>
+        <li>You can also revoke access from your account at any time: for Google at
+          <a href="https://myaccount.google.com/connections">myaccount.google.com/connections</a>; for a Microsoft
+          personal account at <a href="https://account.live.com/consent/Manage">account.live.com/consent/Manage</a>,
+          and for a work or school account at <a href="https://myapps.microsoft.com">myapps.microsoft.com</a>. Once
+          access is revoked, Study Stash can't read anything more.</li>
+      </ul>
+
+      <h2 id="google">Google API data: Limited Use</h2>
+      <div class="callout">
+        <p>Study Stash's use and transfer to any other app of information received from Google APIs will adhere to the
+          <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data
+          Policy</a>, including the Limited Use requirements.</p>
+      </div>
+      <p>In particular, data Study Stash receives from Google Calendar is:</p>
+      <ul>
+        <li>used only to provide the features described above, which you can see in the app;</li>
+        <li>transferred only to your own Study Stash library (a computer you control), and only to provide those
+          features; never to the developers of Study Stash or any other third party, except as needed to comply with
+          the law;</li>
+        <li>never used or transferred for advertising, including retargeting or personalised or interest-based
+          advertising;</li>
+        <li>never used to train or improve AI or machine learning models, general or otherwise;</li>
+        <li>never sold, and never used to determine creditworthiness or for lending;</li>
+        <li>never read by a person. The developers have no access to it at all: it exists only on your computers.</li>
+      </ul>
+      <p>The same promises apply to what Study Stash reads from Microsoft.</p>
+
+      <h2 id="canvas">Canvas</h2>
+      <p>Study Stash copies your Canvas courses (what's due, assignments and rubrics, your submissions and feedback,
+        modules, files, pages, announcements, quizzes and discussions) into your library, so they sit next to your
+        lectures. It does this through the <strong>Study Stash for Canvas</strong> Chrome extension, using your own
+        Canvas sign-in in Chrome. Study Stash never sees your Canvas password, and the extension never reads your
+        cookies: Chrome sends them to Canvas as it would for any page you open.</p>
+      <ul>
+        <li>It only reads. Nothing on Canvas is changed or submitted.</li>
+        <li>What it reads goes only to your own library, on a computer you control. Not to the developers, not to
+          anyone else.</li>
+        <li>The extension can reach only your school's Canvas, Canvas's file storage and your library: the sites you
+          give it.</li>
+        <li>To stop, remove the extension from Chrome. To delete what was copied, delete the class's Canvas folder in
+          your library.</li>
+      </ul>
+
+      <h2 id="ai">AI engines</h2>
+      <p>Study Stash writes notes and answers questions with an AI engine you choose in Settings, running on your
+        library's computer:</p>
+      <ul>
+        <li><strong>Ollama</strong> runs entirely on your computer. Nothing leaves it.</li>
+        <li><strong>Claude Code, Codex or Gemini</strong> are programs from Anthropic, OpenAI and Google that you install
+          and sign in to with your own account and plan. When you choose one, Study Stash gives it the lecture's
+          transcript (or the notes and passages a question needs) and the company's service writes the answer. That
+          company handles it under its terms and privacy policy, with your account. Study Stash's developers never
+          see it.</li>
+        <li><strong>Claude and other MCP apps</strong> can read your library only if you set that up in
+          <strong>Settings → AI tool access</strong>, and only read. Internet access for claude.ai is off unless you turn
+          it on, and it's protected by signing in with your library password.</li>
+      </ul>
+      <p>Without an engine, lectures are still transcribed and filed.</p>
+
+      <h2 id="network">What the app contacts</h2>
+      <p>Apart from your own computers and the services you connect (your calendars, Canvas, and the AI engine you
+        choose), Study Stash contacts:</p>
+      <ul>
+        <li><strong>GitHub</strong>, to check for and download updates from Study Stash's own
+          <a href="https://github.com/Joseph-Rus/study-stash/releases">releases</a>. Each download is checked
+          against the release's checksums. You can turn automatic updates off.</li>
+        <li><strong>Hugging Face</strong>, once, to download the Whisper transcription model, and
+          <strong>ollama.com</strong> if you ask it to install Ollama or a model.</li>
+        <li><strong>jsDelivr</strong>, a public CDN, when your library's web pages show formulas: your browser loads
+          the KaTeX maths typesetter from it.</li>
+        <li><strong>Cloudflare's public DNS</strong>, only when you check whether claude.ai can reach your library, to
+          look your library's address up the way the internet would.</li>
+      </ul>
+      <p>None of these requests include your notes, recordings, calendar or Canvas data, and none identify you beyond
+        what any web request does (your IP address).</p>
+
+      <h2 id="website">This website</h2>
+      <p>This site is static pages hosted by GitHub Pages. It sets no cookies, runs no analytics and loads nothing from
+        other sites. GitHub, as the host, may keep standard server logs (such as IP addresses) under the
+        <a href="https://docs.github.com/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy
+        Statement</a>. Download links go to GitHub.</p>
+
+      <h2 id="rights">Your choices</h2>
+      <p>Because your data is on your own computers, you're in control of all of it: you can open, copy, export
+        (every lecture's notes download as Markdown) or delete it at any time, without asking anyone. We hold no data
+        about you, so there's nothing for us to hand over, correct or delete. Revoking calendar or Canvas access is
+        described above.</p>
+      <p>Study Stash is made for students and isn't directed at children under 13.</p>
+
+      <h2 id="changes">Changes</h2>
+      <p>If this policy changes, the new version is posted here with a new date, and every earlier version stays in
+        the <a href="https://github.com/Joseph-Rus/study-stash/commits/main/site/privacy/index.html">site's history on
+        GitHub</a>. If Study Stash ever needs to read something new, it will ask you first.</p>
+
+      <h2 id="contact">Contact</h2>
+      <p>Questions about privacy: open an issue on
+        <a href="https://github.com/Joseph-Rus/study-stash/issues">GitHub</a>. To report a security problem privately,
+        use the repository's <a href="https://github.com/Joseph-Rus/study-stash/security/advisories/new">Report a
+        vulnerability</a> form. See <a href="../support/">Support</a> for more.</p>
+    </div>
+  </div>
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div>
+      <a class="brand" href="../"><img src="../assets/img/icon.webp" alt="" width="24" height="24">Study Stash</a>
+      <p>Your own lecture library. Free and open source under the MIT licence.</p>
+    </div>
+    <ul class="foot-links">
+      <li><a href="../phone/">Phone app</a></li>
+      <li><a href="./">Privacy</a></li>
+      <li><a href="../terms/">Terms</a></li>
+      <li><a href="../support/">Support</a></li>
+      <li><a href="https://github.com/Joseph-Rus/study-stash">GitHub</a></li>
+    </ul>
+  </div>
+</footer>
+</body>
+</html>

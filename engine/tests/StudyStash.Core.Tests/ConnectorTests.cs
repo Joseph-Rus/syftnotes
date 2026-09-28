@@ -1023,7 +1023,7 @@ public class ConnectorTests
         var tools = await mcp.ListToolsAsync();
         Assert.Equal(
             ["canvas_api", "canvas_courses", "canvas_page", "class_announcements", "class_files", "class_modules", "due_assignments", "get_assignment",
-             "get_lecture", "get_transcript", "list_classes", "list_lectures", "read_file", "search_files", "search_notes"],
+             "get_lecture", "get_transcript", "list_attachments", "list_classes", "list_lectures", "read_attachment", "read_file", "search_files", "search_notes"],
             tools.Select(t => t.Name).Order());
         foreach (var t in tools.Select(t => t.ProtocolTool))
         {

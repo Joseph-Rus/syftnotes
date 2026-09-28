@@ -115,6 +115,7 @@ public static partial class Shell
         foreach (var c in library.Classes) c.Selected = c.Name == name && !c.IsDue;
         library.Unsorted.Selected = name == Configs.Unsorted;
         library.ClassTitle = name;
+        ShowClassFiles(name);
         if (host.Remote() is not { } lib) return;
         JsonArray list;
         try
@@ -268,6 +269,7 @@ public static partial class Shell
             note.Transcript.Add(new HeardLine { Time = TimedText.HasTimes(S(l["transcript"])) ? TimedText.Clock(line.Start) : "", Text = line.Text });
         library.Note = note;
         ShowLectureAi(l, note);
+        ShowLectureFiles(note);
     }
 
     /// <summary>The lecture's notes, which another engine can rewrite (while they aren't still being written), and a

@@ -19,4 +19,10 @@
     <EmbeddedResource Include="..\..\..\assets\apple-touch-icon.png" LogicalName="apple-touch-icon.png" />
   </ItemGroup>
 
+  <!-- The phone app (web/, built with `npm run build`), served at /app/ from web/ beside the app. Left out when it
+       hasn't been built: /app/ then says so. -->
+  <ItemGroup Condition="Exists('..\..\..\web\dist\index.html')">
+    <Content Include="..\..\..\web\dist\**\*" LinkBase="web" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

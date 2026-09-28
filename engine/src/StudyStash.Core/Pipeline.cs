@@ -57,6 +57,7 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
     public async Task<string?> ProcessAsync(NoteRow row)
     {
         var m = store.Meeting(row);
+        m.Attached = store.AttachedTo(row.Id); // what the student attached, with the words read from it so far
         string summary = "", model = "", error = "";
         if (Summarize.WantsSummary(m, Cfg))
         {
@@ -109,6 +110,7 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             }
         }
         string? path = store.Finish(row, m, c, summary, model, error);
+        if (path is not null && summary.Length > 0) store.MarkAttachmentsUsed(m.Attached.Select(a => a.Id));
         log(path is null
             ? $"[pipeline] '{m.Title}' changed while it was being written; not saving the old result"
             : $"[pipeline] filed '{m.Title}' \u2192 {c.ClassName} ({c.By} {Py.FormatFixed(c.Confidence, 2)})");
