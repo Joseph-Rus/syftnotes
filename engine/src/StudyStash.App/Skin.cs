@@ -109,6 +109,7 @@ public static class Skin
         }
         d.ThemeDictionaries[ThemeVariant.Light] = light;
         d.ThemeDictionaries[ThemeVariant.Dark] = dark;
+        FluentPopups.Add(d, light, dark);
         return d;
     }
 

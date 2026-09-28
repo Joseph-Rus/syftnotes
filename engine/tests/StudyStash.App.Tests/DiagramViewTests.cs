@@ -94,7 +94,8 @@ public class DiagramViewTests
         Assert.Equal(
             "Diagram: Assess pain on a 0 to 10 scale, Score above 4?, yes, Give the prescribed analgesic, no, Reposition and use non-drug comfort measures, Reassess in 30 to 60 minutes, still in pain",
             AutomationProperties.GetName(view));
-        Assert.Equal("Open larger", ToolTip.GetTip(view));
+        Assert.Equal("Open larger", AutomationProperties.GetHelpText(view));
+        Assert.Null(ToolTip.GetTip(view)); // no tooltip popping up over the whole diagram while reading
     }
 
     [AvaloniaFact]

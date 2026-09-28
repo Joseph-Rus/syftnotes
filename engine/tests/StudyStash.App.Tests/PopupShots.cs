@@ -18,10 +18,10 @@ using StudyStash.Core.Ai;
 namespace StudyStash.App.Tests;
 
 /// <summary>
-/// Every popup menu, flyout and context menu, opened for real over what opens it, light and dark in both looks:
-/// just its own rounded panel with its soft shadow. The ask bar's "Answer with" once showed a second, square-ish box
-/// round its rounded glass (Fluent's flyout presenter, with its padding); the pictures go to
-/// STUDYSTASH_SHOTS as <c>popup-&lt;mac|win&gt;-&lt;menu&gt;-&lt;light|dark&gt;.png</c>.
+/// Every popup menu, flyout, context menu, select list and tooltip, opened for real over what opens it, light and dark
+/// in both looks: just its own rounded panel. The ask bar's "Answer with" once showed a second, square-ish box round
+/// its rounded glass (Fluent's flyout presenter, with its padding), and tooltips Fluent's dark-edged box; the pictures
+/// go to STUDYSTASH_SHOTS as <c>popup-&lt;mac|win&gt;-&lt;menu&gt;-&lt;light|dark&gt;.png</c>.
 /// </summary>
 public class PopupShots
 {
@@ -31,8 +31,10 @@ public class PopupShots
 
     static PopupShots() => Environment.SetEnvironmentVariable("STUDYSTASH_STILL", "1");
 
-    /// <summary>One menu to open: what it hangs off, and how a student opens it (it hands back the popup's panel).</summary>
-    sealed record Menu(string Name, Func<SkinKind, Task<Control>> Build, Func<Control, Control> Open, Size Size);
+    /// <summary>One menu to open: what it hangs off, and how a student opens it (it hands back the popup's panel).
+    /// <paramref name="Corner"/> is how far in from the panel's edge its corner pixels are checked: a tooltip's small
+    /// radius already covers the pixel one in.</summary>
+    sealed record Menu(string Name, Func<SkinKind, Task<Control>> Build, Func<Control, Control> Open, Size Size, int Corner = 1);
 
     static IEnumerable<Menu> Menus()
     {
@@ -73,6 +75,26 @@ public class PopupShots
             Dispatcher.UIThread.RunJobs();
             return menu;
         }, new Size(600, 300));
+        yield return new("select", _ => Task.FromResult<Control>(Select()), host =>
+        {
+            var select = (ComboBox)host;
+            select.IsDropDownOpen = true;
+            Dispatcher.UIThread.RunJobs();
+            var panel = select.GetVisualDescendants().OfType<Popup>().First(p => p.Name == "PART_Popup").Child!;
+            var hovered = panel.GetVisualDescendants().OfType<ComboBoxItem>().ElementAt(1);
+            TopLevel.GetTopLevel(select)!.MouseMove(hovered.TranslatePoint(new Point(20, 8), TopLevel.GetTopLevel(select)!)!.Value);
+            return panel;
+        }, new Size(600, 300));
+        yield return new("tooltip", _ => Task.FromResult<Control>(Tipped()), host =>
+        {
+            ToolTip.SetIsOpen(host, true);
+            Dispatcher.UIThread.RunJobs();
+            var tip = TopLevel.GetTopLevel(host)!.GetVisualDescendants().OfType<ToolTip>().Single();
+            Assert.True(ToolTip.GetIsOpen(host), "the tooltip didn't open");
+            tip.Transitions = null; // (its quick fade in: the picture is of it shown)
+            tip.Opacity = 1;
+            return tip;
+        }, new Size(400, 160), Corner: 0);
         yield return new("canvas-select", CanvasSettings, host => OpenFlyout(host.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("cv-select") && b.Flyout is Flyout && b.IsEffectivelyVisible)), new Size(1000, 640));
     }
 
@@ -96,6 +118,21 @@ public class PopupShots
     }
 
     static Button Anchor() => new() { Content = "Pick", Width = 64, Height = 32 };
+
+    static ComboBox Select() => new()
+    {
+        ItemsSource = new[] { "Same as notes", "Claude Code", "Ollama · qwen3:30b" },
+        SelectedIndex = 0,
+        Width = 220,
+    };
+
+    static Button Tipped()
+    {
+        var button = new Button { Content = new Icon { Glyph = "drive_file_move", Size = 16 }, Width = 32, Height = 32 };
+        ToolTip.SetTip(button, "Move to another class");
+        ToolTip.SetPlacement(button, PlacementMode.Bottom);
+        return button;
+    }
 
     static Button SettingsSelect()
     {
@@ -210,7 +247,7 @@ public class PopupShots
             var panel = menu.Open(host);
             Dispatcher.UIThread.RunJobs();
             string label = $"{skin} {menu.Name} {variant}";
-            Assert.True(panel.Bounds.Width > 40 && panel.Bounds.Height > 30, $"{label}: the menu is an empty box ({panel.Bounds})");
+            Assert.True(panel.Bounds.Width > 40 && panel.Bounds.Height > 16, $"{label}: the menu is an empty box ({panel.Bounds})");
 
             string name = $"popup-{skin.ToString().ToLowerInvariant()}-{menu.Name}-{(variant == ThemeVariant.Dark ? "dark" : "light")}";
             var whole = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
@@ -230,7 +267,8 @@ public class PopupShots
             // a popup's own window would only fill them), the edges are the panel's.
             var alone = Alone(panel);
             int w = alone.PixelSize.Width, h = alone.PixelSize.Height;
-            foreach (var (x, y) in new[] { (1, 1), (w - 2, 1), (1, h - 2), (w - 2, h - 2) })
+            int c = menu.Corner;
+            foreach (var (x, y) in new[] { (c, c), (w - 1 - c, c), (c, h - 1 - c), (w - 1 - c, h - 1 - c) })
                 Assert.True(AlphaAt(alone, x, y) < 8, $"{label}: its corner ({x},{y}) isn't see-through: a box or a drawn shadow fills it");
             foreach (var (x, y) in new[] { (w / 2, 1), (w / 2, h - 2), (1, h / 2), (w - 2, h / 2) })
                 Assert.True(AlphaAt(alone, x, y) > 60, $"{label}: ({x},{y}) is empty: the panel doesn't reach the popup's edge");

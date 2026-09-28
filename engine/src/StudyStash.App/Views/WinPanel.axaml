@@ -36,7 +36,7 @@
               Padding="12,0,6,0">
         <Grid ColumnDefinitions="Auto,8,*,Auto,2,Auto">
           <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" IsVisible="{Binding ShowStatus}" />
-          <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" IsVisible="{Binding ShowStatus}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" c:Tips.WhenCut="True" IsVisible="{Binding ShowStatus}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
           <Button Name="OpenApp" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0" Command="{Binding OpenAppCommand}">
             <TextBlock Text="Open Study Stash" FontSize="13" VerticalAlignment="Center" />
           </Button>
@@ -82,7 +82,7 @@
           <Border Height="36" CornerRadius="4" Background="{DynamicResource Accent}" ClipToBounds="True">
             <Grid ColumnDefinitions="*,1,36">
               <Button Name="Record" AutomationProperties.Name="Record" Theme="{StaticResource Surface}" Foreground="{DynamicResource OnAccent}" Padding="12,0" Command="{Binding RecordCommand}"
-                      IsEnabled="{Binding CanRecord}" ToolTip.Tip="Start recording">
+                      IsEnabled="{Binding CanRecord}">
                 <Grid ColumnDefinitions="Auto,8,*,Auto">
                   <c:Icon Glyph="fiber_manual_record" Filled="True" Size="14" Foreground="{DynamicResource OnAccent}" />
                   <TextBlock Grid.Column="2" Text="{Binding RecordLabel}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />

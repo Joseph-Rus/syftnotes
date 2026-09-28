@@ -457,7 +457,7 @@
                       <StackPanel Grid.Column="2" Grid.ColumnSpan="5" VerticalAlignment="Center" Spacing="1">
                         <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding Code}" IsVisible="{Binding HasCode}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis"
-                                   ToolTip.Tip="{Binding Code}" />
+                                   ToolTip.Tip="{Binding Code}" c:Tips.WhenCut="True" />
                       </StackPanel>
                     </Grid>
                   </DataTemplate>
@@ -511,7 +511,7 @@
                       <StackPanel>
                         <Grid Classes="row" ColumnDefinitions="116,*,8,Auto">
                           <TextBlock Classes="key" Text="{Binding Where}" />
-                          <TextBlock Grid.Column="1" Classes="value" Text="{Binding Url}" ToolTip.Tip="{Binding Url}" />
+                          <TextBlock Grid.Column="1" Classes="value" Text="{Binding Url}" ToolTip.Tip="{Binding Url}" c:Tips.WhenCut="True" />
                           <Button Grid.Column="3" Classes="mini" Command="{Binding $parent[ItemsControl].((vm:SetupModel)DataContext).CopyCommand}" CommandParameter="{Binding Url}">
                             <TextBlock Text="Copy" />
                           </Button>

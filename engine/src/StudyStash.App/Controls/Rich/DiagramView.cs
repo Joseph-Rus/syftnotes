@@ -119,7 +119,7 @@ public sealed class DiagramView : Decorator
         HorizontalAlignment = HorizontalAlignment.Stretch;
         Cursor = null;
         Focusable = false;
-        ToolTip.SetTip(this, null);
+        AutomationProperties.SetHelpText(this, null);
         Child = new DiagramCard("Study Stash couldn't lay this flowchart out.", Source ?? chart.ToSource());
     }
 }
