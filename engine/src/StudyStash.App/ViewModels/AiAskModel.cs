@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
+using StudyStash.Core.Rich;
 
 namespace StudyStash.App.ViewModels;
 
@@ -84,6 +85,9 @@ public sealed partial class AiAskModel : ObservableObject
     public string LiveTitle { get; set; } = "This lecture, now";
 
     [ObservableProperty] public partial string Question { get; set; } = "";
+    /// <summary>The engine picked for the question being typed gets ready once it's begun (a local model loads), at
+    /// most once a minute; the library does the rest.</summary>
+    DateTime warmedAt = DateTime.MinValue;
     [ObservableProperty] public partial string Scope { get; set; } = "lecture";
     [ObservableProperty] public partial string Engine { get; set; } = "";
     [ObservableProperty] public partial bool MenuOpen { get; set; }
@@ -108,9 +112,13 @@ public sealed partial class AiAskModel : ObservableObject
 
     partial void OnAnswerClosedChanged(bool value) => OnPropertyChanged(nameof(HasLatest));
 
-    /// <summary>The answer card's close button: the notes get their room back.</summary>
+    /// <summary>The answer card's close button: the notes get their room back, and an answer still being written stops.</summary>
     [RelayCommand]
-    void CloseAnswer() => AnswerClosed = true;
+    void CloseAnswer()
+    {
+        Stop();
+        AnswerClosed = true;
+    }
 
     /// <summary>Opens Settings → AI engines (the "Change defaults" footer link).</summary>
     public Action? OpenSettings { get; set; }
@@ -119,8 +127,16 @@ public sealed partial class AiAskModel : ObservableObject
     /// <summary>Closes the "Answer with" popup once an engine is picked; the view wires this to the real flyout.</summary>
     public Action? CloseMenu { get; set; }
 
+    partial void OnQuestionChanged(string value)
+    {
+        if (value.Trim().Length == 0 || DateTime.UtcNow - warmedAt < TimeSpan.FromMinutes(1)) return;
+        warmedAt = DateTime.UtcNow;
+        _ = library.WarmAsync(Engine.Length > 0 ? Engine : null);
+    }
+
     partial void OnEngineChanged(string value)
     {
+        warmedAt = DateTime.MinValue; // another engine may have something of its own to get ready
         foreach (var i in Menu.Items) i.Selected = i.Id == value;
         OnPropertyChanged(nameof(EngineName));
     }
@@ -184,6 +200,14 @@ public sealed partial class AiAskModel : ObservableObject
         OnPropertyChanged(nameof(EngineName));
     }
 
+    /// <summary>The question being answered right now, to stop it.</summary>
+    CancellationTokenSource? asking;
+
+    /// <summary>
+    /// Asks, and shows the answer as it's written: the turn says it's thinking at once, then its answer grows (at
+    /// <see cref="Paced"/>'s steady pace) until the whole reply, with its byline and sources, takes over. Stopped
+    /// or cut off partway, what came stays, with a line saying why it ends there.
+    /// </summary>
     [RelayCommand]
     async Task Ask()
     {
@@ -196,6 +220,9 @@ public sealed partial class AiAskModel : ObservableObject
         OnPropertyChanged(nameof(Latest));
         OnPropertyChanged(nameof(HasLatest));
         Busy = true;
+        using var stop = asking = new CancellationTokenSource();
+        var paced = new Paced(text => turn.Answer = PartialText.Showable(text));
+        string? Partial() => paced.End() is { } text ? PartialText.Ended(text) : null;
         try
         {
             string? live = Live?.Invoke();
@@ -207,7 +234,8 @@ public sealed partial class AiAskModel : ObservableObject
                 Lecture = live is null && Scope == "lecture" ? LectureId : null,
                 Class = live is null && Scope == "class" ? ClassName : null,
             };
-            AskReply? reply = await library.AskAsync(request);
+            AskReply? reply = await library.AskAsync(request, paced.Show, stop.Token);
+            paced.End();
             if (reply is null)
             {
                 turn.Failed = AiWords.OlderLibraryWords;
@@ -219,21 +247,35 @@ public sealed partial class AiAskModel : ObservableObject
             turn.Byline = AiWords.AskByline(reply.EngineName, reply.Sources);
             if (reply.FellBack) turn.FellBackNote = AiWords.FellBackNote(reply.EngineName, reply.Why);
         }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+        {
+            turn.Answer = Partial() ?? "";
+            turn.Byline = AiWords.Stopped;
+        }
         catch (LibraryRefusedException ex)
         {
+            if (Partial() is { } partial) turn.Answer = partial;
             turn.Failed = ex.Message;
         }
         catch
         {
-            turn.Failed = "Your library isn't answering. Check it's on and connected.";
-            Offline = true;
+            string? partial = Partial();
+            if (partial is not null) turn.Answer = partial;
+            turn.Failed = partial is null ? AiWords.NotAnswering : AiWords.CutOff;
+            Offline = partial is null;
         }
         finally
         {
+            asking = null;
             Busy = false;
             OnPropertyChanged(nameof(Latest));
         }
     }
+
+    /// <summary>Stops the answer being written (the ask bar's stop button, or the answer closed, or another
+    /// lecture opened): what's been written so far stays.</summary>
+    [RelayCommand]
+    public void Stop() => asking?.Cancel();
 
     [RelayCommand]
     void OpenTurnSource(AiTurn turn)

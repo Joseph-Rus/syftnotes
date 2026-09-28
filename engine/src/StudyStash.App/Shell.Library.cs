@@ -701,7 +701,15 @@ public static partial class Shell
         return cut.Length > 110 ? cut[..110].TrimEnd() : cut;
     }
 
+    /// <summary>⌘Return in the quick panel: the library's AI answers as it writes; a library too old for that
+    /// answers the old way, once, at the end.</summary>
     static async Task AskQuick(string question)
+    {
+        if (host.Remote() is not null && await quick.AnswerAsync(Ai(), question)) return;
+        await AskQuickAtOnce(question);
+    }
+
+    static async Task AskQuickAtOnce(string question)
     {
         quick.Answering = true;
         quick.Thinking = true;

@@ -83,8 +83,13 @@ public sealed partial class NoteView : StackPanel
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == MarkdownProperty || change.Property == CompactProperty || change.Property == BodyFontProperty
-            || change.Property == BodySizeProperty || change.Property == BodyLineHeightProperty) Build();
+        if (change.Property == CompactProperty || change.Property == BodyFontProperty || change.Property == BodySizeProperty
+            || change.Property == BodyLineHeightProperty)
+        {
+            blocks.Clear(); // every block's type changes: none can be kept
+            Build();
+        }
+        else if (change.Property == MarkdownProperty) Build();
     }
 
     bool Mac => Skin.Current == SkinKind.Mac;
@@ -139,20 +144,42 @@ public sealed partial class NoteView : StackPanel
     Dictionary<string, Control> diagrams = [];
     Dictionary<string, Control> previous = [];
 
+    /// <summary>The last build's top-level pieces, by the Markdown each came from (and what else shaped it), so an
+    /// answer arriving a few words at a time lays out only its newest block again: every block before it, the same
+    /// Markdown in the same place, is kept as it was (its formulas already typeset).</summary>
+    Dictionary<string, Control> blocks = [];
+
     void Build()
     {
         Children.Clear();
         Spacing = Compact ? 8 : Mac ? 14 : 12;
         previous = diagrams;
         diagrams = [];
+        var kept = blocks;
+        blocks = [];
         string markdown = source = Markdown ?? "";
         var doc = Markdig.Markdown.Parse(markdown, Pipeline);
         bool first = true;
         string section = "";
         int skipUntil = -1;
-        foreach (MdBlock block in doc)
+        for (int at = 0; at < doc.Count; at++)
         {
+            MdBlock block = doc[at];
             if (block.Span.Start < skipUntil) continue;
+            // Its Markdown runs to where the next block starts (to the end, for the last one: so it changes whenever
+            // anything more arrives), or past that to its </svg> for a drawing written straight into the Markdown.
+            int? svgEnd = block is HtmlBlock inline && IsSvg(inline.Lines.ToString()) ? SvgEnd(markdown, inline) : null;
+            int end = Math.Max(at + 1 < doc.Count ? doc[at + 1].Span.Start : markdown.Length, svgEnd ?? 0);
+            string key = $"{first}\u0001{section}\u0001{at == doc.Count - 1}\u0001{markdown[block.Span.Start..Math.Clamp(end, block.Span.Start, markdown.Length)]}";
+            for (int n = 2; blocks.ContainsKey(key); n++) key = $"{n}\u0001{key}";
+            if (kept.Remove(key, out var same))
+            {
+                Children.Add(blocks[key] = same);
+                if (block is HeadingBlock kept0) section = Plain(kept0.Inline);
+                else first = false;
+                if (svgEnd is int svgKept) skipUntil = svgKept;
+                continue;
+            }
             Control? control;
             switch (block)
             {
@@ -168,14 +195,10 @@ public sealed partial class NoteView : StackPanel
                     control = Definitions(list);
                     break;
                 case HtmlBlock html when IsSvg(html.Lines.ToString()):
-                    // A drawing written straight into the Markdown ends at its first blank line; take it to </svg>
-                    // (unless a code fence comes first: then it's only what its own lines hold).
-                    int from = html.Span.Start, close = markdown.IndexOf("</svg>", from, StringComparison.OrdinalIgnoreCase);
-                    int fence = markdown.IndexOf("\n```", from, StringComparison.Ordinal);
-                    if (close >= 0 && (fence < 0 || fence > close))
+                    if (SvgEnd(markdown, html) is int close)
                     {
-                        skipUntil = close + "</svg>".Length;
-                        control = Diagram(DiagramKind.Svg, markdown[from..skipUntil]);
+                        skipUntil = close;
+                        control = Diagram(DiagramKind.Svg, markdown[html.Span.Start..skipUntil]);
                     }
                     else control = BlockControl(block);
                     break;
@@ -183,11 +206,20 @@ public sealed partial class NoteView : StackPanel
                     control = BlockControl(block);
                     break;
             }
-            if (control is not null) Children.Add(control);
+            if (control is not null) Children.Add(blocks[key] = control);
             if (block is not HeadingBlock) first = false;
             else if (!first) first = false;
         }
         previous.Clear();
+    }
+
+    /// <summary>A drawing written straight into the Markdown ends at its first blank line; it's taken to </svg>
+    /// (unless a code fence comes first: then it's only what its own lines hold). Where it ends, or null.</summary>
+    static int? SvgEnd(string markdown, HtmlBlock html)
+    {
+        int from = html.Span.Start, close = markdown.IndexOf("</svg>", from, StringComparison.OrdinalIgnoreCase);
+        int fence = markdown.IndexOf("\n```", from, StringComparison.Ordinal);
+        return close >= 0 && (fence < 0 || fence > close) ? close + "</svg>".Length : null;
     }
 
     /// <summary>The Markdown being built.</summary>
@@ -211,19 +243,20 @@ public sealed partial class NoteView : StackPanel
         {
             // MathBlock is itself a FencedCodeBlock ($$ on its own lines reads as one): it must come first.
             case MathBlock mb:
-                return DisplayMath(mb.Lines.ToString());
+                // A formula still being written (an answer arriving in pieces) is typeset once its $$ closes.
+                return mb.ClosingFencedCharCount == 0 && AtEnd(mb) ? Pending(FormulaWords) : DisplayMath(mb.Lines.ToString());
             case ParagraphBlock p:
                 return Paragraph(p.Inline);
             case ListBlock list:
                 return List(list);
             case FencedCodeBlock fence when KindOf(fence) is { } kind:
                 // A diagram still being written (an answer arriving in pieces) is drawn once its fence closes.
-                return fence.ClosingFencedCharCount == 0 && AtEnd(fence) ? Pending() : Diagram(kind, fence.Lines.ToString());
+                return fence.ClosingFencedCharCount == 0 && AtEnd(fence) ? Pending(DrawingWords) : Diagram(kind, fence.Lines.ToString());
             case FencedCodeBlock or CodeBlock:
                 return Code(((LeafBlock)block).Lines.ToString());
             case HtmlBlock html when IsSvg(html.Lines.ToString()):
                 string svg = html.Lines.ToString();
-                return !svg.Contains("</svg>", StringComparison.OrdinalIgnoreCase) && AtEnd(html) ? Pending() : Diagram(DiagramKind.Svg, svg);
+                return !svg.Contains("</svg>", StringComparison.OrdinalIgnoreCase) && AtEnd(html) ? Pending(DrawingWords) : Diagram(DiagramKind.Svg, svg);
             case QuoteBlock q:
                 var quote = Body();
                 quote.Text = string.Join(" ", q.Descendants<ParagraphBlock>().Select(x => Plain(x.Inline)));
@@ -366,16 +399,17 @@ public sealed partial class NoteView : StackPanel
         return view;
     }
 
-    /// <summary>A diagram whose fence hasn't closed yet: a quiet line until the rest arrives.</summary>
-    Control Pending()
+    /// <summary>A diagram or formula whose fence hasn't closed yet: a quiet line until the rest arrives.</summary>
+    Control Pending(string words)
     {
         var t = Text("TextFont", Mac ? 13 : 14, 1.4);
-        t.Text = DrawingWords;
+        t.Text = words;
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg3"));
         return t;
     }
 
     public const string DrawingWords = "Drawing the diagram…";
+    public const string FormulaWords = "Writing the formula…";
 
     /// <summary>Takes a kept diagram out of the page it was on, so it can go on the new one.</summary>
     static void Detach(Control control)

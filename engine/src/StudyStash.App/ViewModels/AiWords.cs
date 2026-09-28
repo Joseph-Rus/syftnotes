@@ -144,6 +144,15 @@ public static partial class AiWords
     /// sentence about the engine that was asked.</summary>
     public static string FellBackNote(string engineName, string why) => $"This answer came from {engineName}. {why}";
 
+    /// <summary>Under an answer the student stopped: what's there is all there'll be.</summary>
+    public const string Stopped = "Stopped.";
+
+    /// <summary>When the library goes quiet with the answer half written (what came is kept above it).</summary>
+    public const string CutOff = "Your library stopped answering partway through. Check it's on and connected.";
+
+    /// <summary>When the library can't be reached at all.</summary>
+    public const string NotAnswering = "Your library isn't answering. Check it's on and connected.";
+
     // -----------------------------------------------------------------------------------------------------------
     // 17 · Rewrite the notes.
     // -----------------------------------------------------------------------------------------------------------

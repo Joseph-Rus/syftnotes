@@ -111,6 +111,26 @@ public sealed class FakeAiLibrary : IAiLibrary
         return Task.FromResult(OnAsk?.Invoke(request));
     }
 
+    /// <summary>An answer written a piece at a time: the test hands the pieces to the answer-so-far callback when it
+    /// likes (and honours the stop token); unset, asking answers at once, through <see cref="OnAsk"/>.</summary>
+    public Func<AskRequest, Action<string>, CancellationToken, Task<AskReply?>>? OnAskStream { get; set; }
+    /// <summary>The engines <see cref="WarmAsync"/> was told a question is being typed for ("" for the library's pick).</summary>
+    public List<string> Warmed { get; } = [];
+
+    public Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop)
+    {
+        if (OnAskStream is null) return AskAsync(request);
+        Calls.Add("ask");
+        AskRequests.Add(request);
+        return OnAskStream(request, answerSoFar, stop);
+    }
+
+    public Task WarmAsync(string? engine)
+    {
+        Warmed.Add(engine ?? "");
+        return Task.CompletedTask;
+    }
+
     public Task<RewriteInfo?> RewriteAsync(string lecture)
     {
         Calls.Add($"rewrite:{lecture}");
