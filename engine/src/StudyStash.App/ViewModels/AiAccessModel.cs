@@ -44,7 +44,9 @@ public sealed partial class AiAccessModel : ObservableObject
         this.now = now ?? (() => DateTime.Now);
     }
 
-    [ObservableProperty] public partial bool On { get; set; } = true;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowToolsOffNote))]
+    public partial bool On { get; set; } = true;
     [ObservableProperty] public partial bool ReadLectures { get; set; } = true;
     [ObservableProperty] public partial bool ReadNotes { get; set; } = true;
     [ObservableProperty] public partial bool ReadCanvas { get; set; } = true;
@@ -56,7 +58,60 @@ public sealed partial class AiAccessModel : ObservableObject
     [ObservableProperty] public partial bool InClaudeCode { get; set; }
     [ObservableProperty] public partial bool InClaudeDesktop { get; set; }
     [ObservableProperty] public partial string? PublicUrl { get; set; }
-    [ObservableProperty] public partial bool HasPassword { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WebToggleEnabled))]
+    public partial bool HasPassword { get; set; }
+
+    // Claude (desktop and web): whether Claude can reach this library over the internet, through Tailscale Funnel
+    // (task 4's ClaudeReach/ReachCheck, read through ToolAccessInfo.Web). WebOn is the switch Settings shows; the
+    // library is the truth, so every change round-trips through it before the switch visibly moves.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowWebReady))]
+    public partial bool WebOn { get; set; }
+    [ObservableProperty] public partial bool WebBusy { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WebStatusWords))]
+    public partial bool WebChecking { get; set; }
+    public string WebName => "Study Stash";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowWebReady))]
+    public partial string? WebUrl { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WebStatusWords))]
+    public partial string? WebWords { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WebStatusOk), nameof(WebStatusWarn))]
+    public partial bool? WebReachable { get; set; }
+    /// <summary>Null from a library too old to put itself on the internet (<see cref="ToolAccessInfo.Web"/> is null).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowWebReady), nameof(WebToggleEnabled))]
+    public partial bool WebSupported { get; set; } = true;
+    /// <summary>The words to show in the card's problem/info row (Funnel's own problem, no password yet, or an
+    /// older library), or null when there's nothing to say. Set directly at each transition, not computed from
+    /// several flags at once, so a test can assert it without reconstructing the priority rules by hand.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowWebNote), nameof(ShowWebReady))]
+    public partial string? WebNote { get; set; }
+    /// <summary>The problem's own fix page, when it has one ("Open" + "Copy link"); null for "no password" and
+    /// "older library", which have no page to send the student to.</summary>
+    [ObservableProperty] public partial string? WebNoteFixUrl { get; set; }
+
+    public bool ShowWebReady => WebSupported && WebOn && WebNote is null && WebUrl is { Length: > 0 };
+    public bool ShowWebNote => WebNote is { Length: > 0 };
+    public bool ShowWebNoteAction => WebNoteFixUrl is { Length: > 0 };
+    /// <summary>The status row's dot and words: "Checking…" while a poll is running, else the last check's own words.</summary>
+    public string? WebStatusWords => WebChecking ? "Checking…" : WebWords;
+    public bool WebStatusOk => WebReachable == true;
+    public bool WebStatusWarn => WebReachable == false;
+    /// <summary>The master AI-tool-access switch (<see cref="On"/>) is off: Claude can be signed in and the address
+    /// can answer, but every tool call is refused. Shown as a quiet note under the card, not another problem.</summary>
+    public bool ShowToolsOffNote => !On;
+    public bool WebToggleEnabled => WebSupported && HasPassword;
+
+    /// <summary>Claude sign-ins (<c>kind == "signin"</c>): the ones this card lists and can remove. A token made in
+    /// Settings, or this computer's own Claude Code/Desktop, stay in <see cref="Connected"/> below instead.</summary>
+    public ObservableCollection<AiConnectionRow> ClaudeConnections { get; } = [];
+    public bool HasClaudeConnections => ClaudeConnections.Count > 0;
 
     public ObservableCollection<AiConnectionRow> Connected { get; } = [];
     public bool HasConnections => Connected.Count > 0;
@@ -76,15 +131,23 @@ public sealed partial class AiAccessModel : ObservableObject
     public Func<Task<string>>? AddToClaudeDesktop { get; set; }
     /// <summary>Takes Study Stash out of Claude Desktop's own config. Answers what to say.</summary>
     public Func<Task<string>>? RemoveFromClaudeDesktopHook { get; set; }
-    /// <summary>Turns on Claude's address on the web (POST /api/v2/claude/reach). The new address, or null if it
-    /// couldn't.</summary>
-    public Func<Task<string?>>? TurnOnWeb { get; set; }
     /// <summary>Revokes one library grant (DELETE /api/v2/claude/connections/{id}). Whether it worked.</summary>
     public Func<string, Task<bool>>? RevokeConnection { get; set; }
+    /// <summary>Opens a problem's fix page in the system browser (<c>Dialogs.OpenUrl</c> in <c>Settings.MakeAccess</c>).</summary>
+    public Action<string>? OpenUrl { get; set; }
+    /// <summary>How the poll between checks waits, so a test can skip the real 5 seconds. Defaults to a real wait.</summary>
+    public Func<TimeSpan, Task>? Delay { get; set; }
+
+    CancellationTokenSource? pollCts;
 
     partial void OnOnChanged(bool value)
     {
         if (!loading) _ = PostAsync(on: value);
+    }
+
+    partial void OnWebOnChanged(bool value)
+    {
+        if (!loading) _ = SetWebAsync(value);
     }
 
     partial void OnReadLecturesChanged(bool value) => PostReading();
@@ -144,31 +207,66 @@ public sealed partial class AiAccessModel : ObservableObject
             ReadAudio = info.Reading.Audio;
             PublicUrl = info.PublicUrl;
             HasPassword = info.HasPassword;
+            ApplyWeb(info.Web);
 
             List<AiConnectionRow> rows = [];
+            List<AiConnectionRow> claudeRows = [];
             foreach (var c in info.Connections)
             {
                 var row = new AiConnectionRow
                 {
                     Id = c.Id,
-                    Name = c.Name,
-                    Detail = c.Kind == "signin" ? "Signed in from the web" : "Token",
+                    Name = c.Kind == "signin" ? (c.Name.Length > 0 ? c.Name : "Claude") : c.Name,
+                    Detail = c.Kind == "signin" ? (c.ClientHost.Length > 0 ? c.ClientHost : "claude.ai") : "Token",
                     UsedWords = c.LastUsed is double lu ? AiWords.UsedWords(Epoch(lu), now()) : "",
                     CanRemove = true,
                 };
                 row.Remove = new AsyncRelayCommand(() => RemoveAsync(row.Id));
-                rows.Add(row);
+                (c.Kind == "signin" ? claudeRows : rows).Add(row);
             }
             if (InClaudeCode) rows.Add(new AiConnectionRow { Id = "claude-code", Name = "Claude Code", Detail = "This computer" });
             if (InClaudeDesktop) rows.Add(NewDesktopRow());
             if (rows.Count > 0) rows[0].First = true;
+            if (claudeRows.Count > 0) claudeRows[0].First = true;
             Connected.Clear();
             foreach (var row in rows) Connected.Add(row);
+            ClaudeConnections.Clear();
+            foreach (var row in claudeRows) ClaudeConnections.Add(row);
             OnPropertyChanged(nameof(HasConnections));
+            OnPropertyChanged(nameof(HasClaudeConnections));
         }
         finally
         {
             loading = false;
+        }
+    }
+
+    /// <summary>Reads Claude's reach into the switch, address and problem/checking state. A null <paramref name="web"/>
+    /// (an older library) leaves the switch off with the "update the library" note; otherwise the "no password" note
+    /// wins over whatever Funnel problem the library sent, since nothing can work until there's a password regardless.</summary>
+    void ApplyWeb(WebReach? web)
+    {
+        WebSupported = web is not null;
+        if (web is null)
+        {
+            WebOn = false;
+            WebUrl = null;
+            WebWords = null;
+            WebReachable = null;
+            WebNote = "Update the library to turn this on.";
+            WebNoteFixUrl = null;
+            return;
+        }
+        WebOn = web.On;
+        WebUrl = web.McpUrl;
+        WebWords = web.Words;
+        WebReachable = web.Reachable;
+        WebNote = web.Problem;
+        WebNoteFixUrl = web.FixUrl;
+        if (!web.HasPassword)
+        {
+            WebNote = "Set a library password first (Settings → Library).";
+            WebNoteFixUrl = null;
         }
     }
 
@@ -220,20 +318,162 @@ public sealed partial class AiAccessModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    public async Task TurnOnClaudeWeb()
+    /// <summary>Turns Claude's address on or off through the library (task 4's <c>/api/v2/ai/access/web</c>), then,
+    /// once it's on and not yet answering from the internet, checks again every few seconds for a while. A refusal
+    /// (no password) or a 404 (an older library) puts the switch straight back to off.</summary>
+    async Task SetWebAsync(bool on)
     {
-        if (TurnOnWeb is null) return;
-        Busy = true;
+        StopPolling();
+        WebBusy = true;
         try
         {
-            var url = await TurnOnWeb();
-            PublicUrl = url;
-            Say = url is not null ? "Claude on the web can reach your library now." : "Couldn't turn on Claude on the web.";
+            ToolAccessInfo? info;
+            try
+            {
+                info = await library.SetWebAsync(on);
+            }
+            catch (LibraryRefusedException ex)
+            {
+                loading = true;
+                try
+                {
+                    WebOn = false;
+                    HasPassword = false;
+                    WebNote = ex.Message;
+                    WebNoteFixUrl = null;
+                }
+                finally
+                {
+                    loading = false;
+                }
+                return;
+            }
+            catch
+            {
+                Offline = true;
+                return;
+            }
+            if (info is null)
+            {
+                loading = true;
+                try
+                {
+                    WebSupported = false;
+                    WebOn = false;
+                }
+                finally
+                {
+                    loading = false;
+                }
+                return;
+            }
+            Apply(info);
+            if (WebOn && WebNote is null && WebReachable != true) StartPolling();
         }
         finally
         {
-            Busy = false;
+            WebBusy = false;
+        }
+    }
+
+    /// <summary>The "Check again" button: one more look from the internet, outside the automatic poll.</summary>
+    [RelayCommand]
+    public async Task CheckWebAgain()
+    {
+        StopPolling();
+        WebBusy = true;
+        try
+        {
+            var info = await library.CheckWebAsync();
+            if (info is not null) Apply(info);
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            WebBusy = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task CopyWebName()
+    {
+        if (Copy is null) return;
+        await Copy(WebName);
+        Say = "Copied.";
+    }
+
+    [RelayCommand]
+    public async Task CopyWebUrl()
+    {
+        if (Copy is null || WebUrl is not { Length: > 0 } url) return;
+        await Copy(url);
+        Say = "Copied.";
+    }
+
+    [RelayCommand]
+    public async Task CopyWebFix()
+    {
+        if (Copy is null || WebNoteFixUrl is not { Length: > 0 } url) return;
+        await Copy(url);
+        Say = "Copied.";
+    }
+
+    [RelayCommand]
+    public void OpenWebFix()
+    {
+        if (WebNoteFixUrl is { Length: > 0 } url) OpenUrl?.Invoke(url);
+    }
+
+    void StopPolling()
+    {
+        pollCts?.Cancel();
+        pollCts = null;
+        WebChecking = false;
+    }
+
+    void StartPolling()
+    {
+        var cts = new CancellationTokenSource();
+        pollCts = cts;
+        WebChecking = true;
+        _ = PollAsync(cts.Token);
+    }
+
+    /// <summary>Checks again every 5 seconds, up to 12 times, while Claude's address is on but not yet answering from
+    /// the internet. Stops the moment it answers, a problem shows up, or the switch goes off — otherwise gives up
+    /// after 12 tries and leaves "Check again" for the student.</summary>
+    async Task PollAsync(CancellationToken ct)
+    {
+        try
+        {
+            for (var i = 0; i < 12 && !ct.IsCancellationRequested; i++)
+            {
+                await (Delay?.Invoke(TimeSpan.FromSeconds(5)) ?? Task.Delay(TimeSpan.FromSeconds(5), ct));
+                if (ct.IsCancellationRequested) return;
+                ToolAccessInfo? info;
+                try
+                {
+                    info = await library.CheckWebAsync();
+                }
+                catch
+                {
+                    return;
+                }
+                if (ct.IsCancellationRequested) return;
+                if (info is not null) Apply(info);
+                if (WebReachable == true || WebNote is not null || !WebOn) return;
+            }
+        }
+        finally
+        {
+            if (pollCts is { } mine && mine.Token == ct)
+            {
+                pollCts = null;
+                WebChecking = false;
+            }
         }
     }
 

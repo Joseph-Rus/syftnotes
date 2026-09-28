@@ -246,12 +246,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             CheckInClaudeDesktop = setup.InClaudeDesktop,
             AddToClaudeDesktop = () => Task.FromResult(setup.AddToClaudeDesktop()),
             RemoveFromClaudeDesktopHook = () => Task.FromResult(setup.RemoveFromClaudeDesktop()),
-            TurnOnWeb = async () =>
-            {
-                if (host.Remote() is not { } lib) return null;
-                var r = await lib.ClaudeAsync(HttpMethod.Post, "/reach", new JsonObject { ["internet"] = true, ["on"] = true });
-                return r?["public_url"]?.GetValue<string>();
-            },
+            OpenUrl = url => Dialogs.OpenUrl(url),
             RevokeConnection = async id =>
             {
                 if (host.Remote() is not { } lib) return false;
