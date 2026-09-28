@@ -179,7 +179,11 @@ public sealed partial class LibraryWeb
         app.MapPost("/api/v2/ai/rewrite/{lecture}/use", Http.Handle(ctx => ApiAsync(ctx, () =>
             Task.FromResult(RewriteResult(() => Rewrites.Use((string)ctx.Request.RouteValues["lecture"]!))))));
 
-        app.MapGet("/api/v2/ai/access", Http.Handle(ctx => ApiAsync(ctx, () => Task.FromResult(AiJson(ToolAccessJson())))));
+        app.MapGet("/api/v2/ai/access", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            await NoticeFunnelOffAsync(force: false);
+            return AiJson(ToolAccessJson());
+        })));
         app.MapPost("/api/v2/ai/access", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
@@ -192,12 +196,83 @@ public sealed partial class LibraryWeb
             }
             return AiJson(ToolAccessJson());
         })));
+
+        // Claude on the web: Funnel on or off through the library, so the laptop and the library both can, and a
+        // Tailscale problem is part of the answer (shown where the switch is), not a refusal.
+        app.MapPost("/api/v2/ai/access/web", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            if (body?["on"] is not JsonValue ov || !ov.TryGetValue(out bool on)) return Http.Detail(400, "on or off?");
+            if (on && cfg.PoolPassword.Length == 0) return Http.Detail(400, "Set a library password first, so only you can let Claude in.");
+            var (url, problem) = await Task.Run(() => options.Reach.Set(ClaudeWeb.PortFor(cfg), internet: true, on));
+            // Off with no Tailscale at all: nothing is on the internet, so there's nothing left to turn off.
+            if (!on && problem?.Kind == ReachKind.NotInstalled) problem = null;
+            lock (web)
+            {
+                web.Problem = problem;
+                web.StatusAt = Environment.TickCount64;
+            }
+            if (problem is null) Claude.PublicUrl = on ? url ?? "" : "";
+            if (problem is null && on) await CheckWebAsync(ctx.RequestAborted);
+            return AiJson(ToolAccessJson());
+        })));
+        app.MapPost("/api/v2/ai/access/web/check", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            await NoticeFunnelOffAsync(force: true);
+            await CheckWebAsync(ctx.RequestAborted);
+            return AiJson(ToolAccessJson());
+        })));
+    }
+
+    /// <summary>What the library knows about reaching it from the internet, beyond the address kept in claude.json:
+    /// the last Tailscale problem and the last check, in memory only.</summary>
+    sealed class WebState
+    {
+        public ReachProblem? Problem;
+        public (string Url, bool Reachable, string Words, double At)? Check;
+        public long StatusAt = long.MinValue / 2;
+    }
+
+    readonly WebState web = new();
+
+    /// <summary>Funnel turned off outside the app leaves an address that goes nowhere: asks Tailscale (at most once a
+    /// minute unless forced) and forgets the address when nothing is funnelled to the Claude port any more.</summary>
+    async Task NoticeFunnelOffAsync(bool force)
+    {
+        if (Claude.PublicUrl.Length == 0) return;
+        lock (web)
+        {
+            if (!force && Environment.TickCount64 - web.StatusAt < 60_000) return;
+            web.StatusAt = Environment.TickCount64;
+        }
+        if (await Task.Run(() => options.Reach.Status(ClaudeWeb.PortFor(cfg))) == false) Claude.PublicUrl = "";
+    }
+
+    /// <summary>Checks the address from the internet (10 seconds at most) and keeps what it found.</summary>
+    async Task CheckWebAsync(CancellationToken ct)
+    {
+        string url = Claude.PublicUrl;
+        if (url.Length == 0) return;
+        var (reachable, words) = await options.WebCheck.RunAsync(url, ct);
+        lock (web) web.Check = (url, reachable, words, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0);
+    }
+
+    WebReach WebJson()
+    {
+        string url = Claude.PublicUrl;
+        lock (web)
+        {
+            var check = web.Check is { } c && c.Url == url && url.Length > 0 ? c : ((string, bool, string, double)?)null;
+            return new WebReach(url.Length > 0, "Study Stash", url.Length > 0 ? url + ClaudeWeb.McpPath : null, web.Problem?.Words, web.Problem?.FixUrl,
+                check?.Item2, check?.Item3, check?.Item4, cfg.PoolPassword.Length > 0);
+        }
     }
 
     ToolAccessInfo ToolAccessJson() => new(Claude.ToolsOn, Claude.Reading,
-        [.. Claude.Grants().Select(g => new ToolConnection(g.Id, g.Name, g.Kind) { Created = g.Created, LastUsed = g.LastUsed > 0 ? g.LastUsed : null })])
+        [.. Claude.Grants().Select(g => new ToolConnection(g.Id, g.Name, g.Kind) { ClientHost = g.ClientHost, Created = g.Created, LastUsed = g.LastUsed > 0 ? g.LastUsed : null })])
     {
         PublicUrl = Claude.PublicUrl.Length > 0 ? Claude.PublicUrl : Claude.TailnetUrl,
         HasPassword = cfg.PoolPassword.Length > 0,
+        Web = WebJson(),
     };
 }
