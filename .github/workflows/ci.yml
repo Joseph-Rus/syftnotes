@@ -7,8 +7,10 @@
 #   above passes, publish release v<version> with the four installers and SHA256SUMS.txt. Installed copies pick
 #   it up within a few hours (auto_update), or right away with `studystash update`. A version already released
 #   is never published again.
-#   A push to main that only changes the version (and this file), on top of a commit that already passed all of
-#   the above, skips the tests and self-tests: it builds the installers with the new version and publishes them.
+#   The installers are built alongside the engine's tests, not after them; a release waits for both.
+#   A push to main that only changes the version (and this file) on top of a commit that already passed all of
+#   the above, or that merges a pull request whose run passed on exactly the same code, skips the tests and
+#   self-tests: it builds the installers with this version and publishes them.
 name: ci
 
 on:
@@ -93,7 +95,7 @@ jobs:
   # windows open, the pretend microphone records, Whisper (Metal) hears the speech from inside the bundle.
   mac-app:
     name: Mac app (DMGs, self-test)
-    needs: [version, engine]
+    needs: [version]  # built alongside the engine tests, not after them; release waits for both
     if: ${{ !cancelled() && !failure() }}
     timeout-minutes: 25
     runs-on: macos-latest
@@ -207,7 +209,7 @@ jobs:
   # without touching lectures or settings outside the install folder.
   windows-app:
     name: Windows app (Setup.exe, self-test, install)
-    needs: [version, engine]
+    needs: [version]  # built alongside the engine tests, not after them; release waits for both
     if: ${{ !cancelled() && !failure() }}
     timeout-minutes: 25
     runs-on: windows-latest
@@ -397,13 +399,24 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      actions: read  # to see whether the commit before this one passed ci
+      actions: read  # to see whether the commit before this one, or the pull request merged here, passed ci
+      pull-requests: read  # to find the pull request a push to main merged
     outputs:
       version: ${{ steps.v.outputs.version }}
       new: ${{ steps.v.outputs.new }}
       tested: ${{ steps.t.outputs.tested }}
     steps:
       - uses: actions/checkout@v4
+      # A pull request's run tests the pull request merged into main. Its exact tree is kept, so that merging it,
+      # if main hasn't moved meanwhile, is known to be the very code that passed (step t below).
+      - if: github.event_name == 'pull_request'
+        run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
+      - if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tested-tree
+          path: tested-tree.txt
+          retention-days: 30
       - id: v
         run: |
           V=$(sed -n 's:.*<StudyStashVersion>\(.*\)</StudyStashVersion>.*:\1:p' engine/Directory.Build.props)
@@ -414,22 +427,37 @@ jobs:
           else
             echo "new=false" >> "$GITHUB_OUTPUT"
           fi
-      # "Already tested": a push to main that changes only the version and this workflow, on top of a commit whose
-      # ci run passed. The code is the one that passed, so only the installers are built again, with the new version.
+      # "Already tested", for a push to main, either way:
+      #   - it changes only the version and this workflow, on top of a commit whose ci run passed; or
+      #   - it merges a pull request whose ci run passed on exactly this tree (main hadn't moved since).
+      # The code is the one that passed, so only the installers are built again, with this version.
       - id: t
         env:
           GH_TOKEN: ${{ github.token }}
           BEFORE: ${{ github.event.before }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
         run: |
           tested=false
           if [ "${{ github.event_name }}" = push ] && [ "${{ github.ref }}" = refs/heads/main ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
-            git fetch -q --depth=1 origin "$BEFORE" && git fetch -q --deepen=1 origin "${{ github.sha }}" || true
-            changed=$(git diff --name-only "$BEFORE" "${{ github.sha }}" 2>/dev/null || echo unknown)
+            git fetch -q --depth=1 origin "$BEFORE" && git fetch -q --deepen=1 origin "$SHA" || true
+            changed=$(git diff --name-only "$BEFORE" "$SHA" 2>/dev/null || echo unknown)
             others=$(printf '%s\n' "$changed" | grep -v -x -e engine/Directory.Build.props -e .github/workflows/ci.yml | grep -c . || true)
-            passed=$(gh run list -R "${{ github.repository }}" --workflow ci --commit "$BEFORE" --status success --json databaseId --jq length 2>/dev/null || echo 0)
+            passed=$(gh run list -R "$REPO" --workflow ci --commit "$BEFORE" --status success --json databaseId --jq length 2>/dev/null || echo 0)
             echo "changed since $BEFORE: $(echo $changed); other files: $others; ci passed there: $passed"
             if [ "$changed" != unknown ] && [ "$others" = 0 ] && [ "${passed:-0}" -gt 0 ]; then tested=true; fi
           fi
+          if [ "$tested" = false ] && [ "${{ github.event_name }}" = push ] && [ "${{ github.ref }}" = refs/heads/main ]; then
+            tree=$(git rev-parse "$SHA^{tree}")
+            for head in $(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[].head.sha' 2>/dev/null); do
+              for run in $(gh run list -R "$REPO" --workflow ci --event pull_request --commit "$head" --status success --json databaseId --jq '.[].databaseId' 2>/dev/null); do
+                rm -rf prior && gh run download "$run" -R "$REPO" -n tested-tree -D prior >/dev/null 2>&1 || continue
+                echo "pull request run $run (head $head) tested tree $(cat prior/tested-tree.txt); this push is tree $tree"
+                if [ "$(cat prior/tested-tree.txt)" = "$tree" ]; then tested=true; break 2; fi
+              done
+            done
+          fi
+          echo "tested=$tested"
           echo "tested=$tested" >> "$GITHUB_OUTPUT"
 
   # Publish v<version> the first time it passes everything above, with exactly the four installers and their
