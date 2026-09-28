@@ -48,8 +48,7 @@
     <!-- The pill: small, and only says it's recording. The red dot pulses slowly (no glow), then the time and a tiny
          level meter; with the pointer over it Stop takes the meter's place, and a click opens the recorder. -->
     <Border Name="Pill" IsVisible="{Binding !Expanded}" Height="32" CornerRadius="8" Background="{DynamicResource Acrylic}" BoxShadow="{DynamicResource Shadow}"
-            BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1" Padding="12,0,5,0" HorizontalAlignment="Left"
-            ToolTip.Tip="Click to see the transcript">
+            BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1" Padding="12,0,5,0" HorizontalAlignment="Left">
       <StackPanel Orientation="Horizontal" Spacing="8">
         <Panel Width="8" Height="8" VerticalAlignment="Center">
           <Ellipse Classes="pulse" Fill="{DynamicResource Rec}" IsVisible="{Binding IsRunning}" />

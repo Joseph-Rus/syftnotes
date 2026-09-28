@@ -151,7 +151,65 @@
         </ControlTemplate>
       </Setter>
     </ControlTheme>
+
+    <!-- A tooltip: one small panel like the menus', the look's control radius, nothing round it (Fluent's had a dark
+         square border). It fades in quickly; when it shows at all is Tips'. -->
+    <ControlTheme x:Key="{x:Type ToolTip}" TargetType="ToolTip">
+      <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
+      <Setter Property="BorderThickness" Value="{DynamicResource PopupStrokeWidth}" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Padding" Value="8,4,8,5" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="MaxWidth" Value="320" />
+      <Setter Property="Opacity" Value="0" />
+      <Setter Property="Transitions">
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.1" />
+        </Transitions>
+      </Setter>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Border Name="PART_LayoutRoot" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter Name="PART_ContentPresenter" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}">
+              <ContentPresenter.Styles>
+                <Style Selector="TextBlock">
+                  <Setter Property="TextWrapping" Value="Wrap" />
+                </Style>
+              </ContentPresenter.Styles>
+            </ContentPresenter>
+          </Border>
+        </ControlTemplate>
+      </Setter>
+      <Style Selector="^:open">
+        <Setter Property="Opacity" Value="1" />
+      </Style>
+    </ControlTheme>
   </Styles.Resources>
+
+  <!-- A popup's own window shows only what its panel draws: where the system can't make it see-through, nothing
+       (not white) fills the corners round the rounded panel. -->
+  <Style Selector="PopupRoot">
+    <Setter Property="Background" Value="{x:Null}" />
+    <Setter Property="TransparencyBackgroundFallback" Value="Transparent" />
+  </Style>
+
+  <!-- A select's list (ComboBox, and a search box's suggestions) is the menus' one rounded panel (FluentPopups points
+       Fluent's names at the popup tokens); its rows are rounded inside it like a menu's. -->
+  <Style Selector="ComboBox /template/ Border#PopupBorder">
+    <Setter Property="Margin" Value="0" />
+  </Style>
+  <Style Selector="ComboBoxItem, AutoCompleteBox ListBoxItem">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+    <Setter Property="Padding" Value="10,5" />
+  </Style>
 
   <!-- A ticked box takes the colour theme's accent, not the system's blue. -->
   <Style Selector="CheckBox:checked /template/ Border#NormalRectangle, CheckBox:checked:pointerover /template/ Border#NormalRectangle, CheckBox:checked:pressed /template/ Border#NormalRectangle">

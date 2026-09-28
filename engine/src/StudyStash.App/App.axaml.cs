@@ -14,6 +14,8 @@ public partial class App : Application
         // Before the menu bar first reads it: otherwise a Mac shows Avalonia's own "About Avalonia" menu.
         if (OperatingSystem.IsMacOS()) Platform.AppMenu.Use(this, Platform.AppMenu.ShowAbout, Shell.SettingsFromMenu);
         Platform.MacPopupShadow.Use();
+        Platform.WinPopupCorners.Use();
+        Controls.Tips.Use();
         Resources.MergedDictionaries.Add(Skin.Build(Skin.Current));
         UseSkin(Skin.Current);
     }

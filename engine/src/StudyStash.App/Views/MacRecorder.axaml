@@ -42,8 +42,7 @@
   <Panel>
     <!-- The pill: small, and only says it's recording. The red dot pulses slowly (no glow), then the time and a tiny
          level meter; with the pointer over it Stop takes the meter's place, and a click opens the recorder. -->
-    <c:Glass Name="Pill" IsVisible="{Binding !Expanded}" Height="28" CornerRadius="14" Padding="10,0,5,0" HorizontalAlignment="Left"
-             ToolTip.Tip="Click to see the transcript">
+    <c:Glass Name="Pill" IsVisible="{Binding !Expanded}" Height="28" CornerRadius="14" Padding="10,0,5,0" HorizontalAlignment="Left">
       <StackPanel Orientation="Horizontal" Spacing="6">
         <Panel Width="8" Height="8" VerticalAlignment="Center">
           <Ellipse Classes="pulse" Fill="{DynamicResource Rec}" IsVisible="{Binding IsRunning}" />

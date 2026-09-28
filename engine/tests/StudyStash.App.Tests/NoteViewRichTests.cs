@@ -228,7 +228,7 @@ public class NoteViewRichTests
             Assert.Equal("Study Stash couldn't lay this flowchart out.", card.Reason);
             Assert.Equal(source, card.Source);
             var view = card.FindAncestorOfType<DiagramView>()!;
-            Assert.Null(ToolTip.GetTip(view)); // it no longer offers to open larger
+            Assert.Null(AutomationProperties.GetHelpText(view)); // it no longer offers to open larger
             Assert.Contains(logged, line => line.Contains("a layout that fails"));
             window.Close();
         }
@@ -317,7 +317,7 @@ public class NoteViewRichTests
         var window = Show(note);
         foreach (var view in Pieces(note))
         {
-            Assert.Equal(OpenLarger.Tip, ToolTip.GetTip(view));
+            Assert.Equal(OpenLarger.Help, AutomationProperties.GetHelpText(view));
             var badge = view.GetVisualDescendants().OfType<Icon>().Single(i => i.Glyph == "open_in_full").Parent as Control;
             Assert.False(badge!.IsVisible);
             window.MouseMove(view.TranslatePoint(new Point(10, 10), window)!.Value);
@@ -339,7 +339,7 @@ public class NoteViewRichTests
         Assert.NotNull(larger);
         Assert.Equal("Atrial systole", larger.Title);
         var big = larger.GetVisualDescendants().OfType<DiagramView>().Single();
-        Assert.Null(ToolTip.GetTip(big));
+        Assert.Null(AutomationProperties.GetHelpText(big));
         Assert.True(larger.Width >= 420 && larger.Height >= 300);
 
         Click(pieces[1]);

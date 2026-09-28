@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
@@ -21,15 +22,15 @@ public sealed class OpenDiagramEventArgs(object source) : RoutedEventArgs(OpenLa
 
 /// <summary>
 /// What makes a diagram in a note open larger: a click (or Enter or Space when it has focus) asks for it, the pointer
-/// becomes a hand, the tooltip says so, and a small open-in-full badge shows in the corner while the pointer is over
-/// it.
+/// becomes a hand, and a small open-in-full badge shows in the corner while the pointer is over it. No tooltip: one
+/// over a whole diagram would pop up every time the pointer crossed it while reading; screen readers hear it instead.
 /// </summary>
 public static class OpenLarger
 {
     public static readonly RoutedEvent<OpenDiagramEventArgs> Event =
         RoutedEvent.Register<OpenDiagramEventArgs>("OpenDiagram", RoutingStrategies.Bubble, typeof(OpenLarger));
 
-    public const string Tip = "Open larger";
+    public const string Help = "Open larger";
 
     /// <summary>The badge: the open-in-full icon on a small raised square, not hit-testable (the click is the
     /// diagram's).</summary>
@@ -54,7 +55,7 @@ public static class OpenLarger
     {
         view.Focusable = true;
         view.Cursor = new Cursor(StandardCursorType.Hand);
-        ToolTip.SetTip(view, Tip);
+        AutomationProperties.SetHelpText(view, Help);
         void Show() => badge.IsVisible = view.IsPointerOver || view.IsKeyboardFocusWithin;
         view.PointerEntered += (_, _) => Show();
         view.PointerExited += (_, _) => Show();
