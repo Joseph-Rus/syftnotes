@@ -128,7 +128,7 @@ public static class DiagramLayout
         }
     }
 
-    sealed record Sized(double W, double H, List<string> Lines, double TextWidth);
+    sealed record Sized(double W, double H, List<string> Lines);
 
     sealed record Words(List<string> Lines, double W, double H);
 
@@ -144,21 +144,21 @@ public static class DiagramLayout
         {
             NodeShape.Circle => Round(Math.Max(56, Math.Max(tw, th) + 36)),
             NodeShape.Decision => Diamond(),
-            NodeShape.Stadium => new Sized(Math.Max(MinWidth, tw + 2 * PadX + h / 2 - 6), h, lines, tw),
-            NodeShape.Hexagon => new Sized(Math.Max(MinWidth, tw + 2 * PadX + h / 2), h, lines, tw),
-            NodeShape.Subroutine => new Sized(Math.Max(MinWidth, tw + 2 * PadX + 16), h, lines, tw),
-            NodeShape.Cylinder => new Sized(Math.Max(MinWidth, tw + 2 * PadX), h + 12, lines, tw),
-            _ => new Sized(Math.Max(MinWidth, tw + 2 * PadX), h, lines, tw),
+            NodeShape.Stadium => new Sized(Math.Max(MinWidth, tw + 2 * PadX + h / 2 - 6), h, lines),
+            NodeShape.Hexagon => new Sized(Math.Max(MinWidth, tw + 2 * PadX + h / 2), h, lines),
+            NodeShape.Subroutine => new Sized(Math.Max(MinWidth, tw + 2 * PadX + 16), h, lines),
+            NodeShape.Cylinder => new Sized(Math.Max(MinWidth, tw + 2 * PadX), h + 12, lines),
+            _ => new Sized(Math.Max(MinWidth, tw + 2 * PadX), h, lines),
         };
 
-        Sized Round(double d) => new(d, d, lines, tw);
+        Sized Round(double d) => new(d, d, lines);
 
         // A rhombus around the words: wide enough that their corners clear its sides, never taller than it needs.
         Sized Diamond()
         {
             double w = Math.Max(96, tw + th * 1.2 + 24);
             double hd = Math.Max(th + 30, th / (1 - tw / w) + 8);
-            return new Sized(w, hd, lines, tw);
+            return new Sized(w, hd, lines);
         }
     }
 
@@ -777,7 +777,7 @@ public static class DiagramLayout
         double total = Math.Max(cumulative[^1], 1e-6);
         var dir = (points[^1] - points[0]).Unit();
         var normal = new Pt(-dir.Y, dir.X);
-        double amount = (nth % 2 == 1 ? 1 : -1) * ((nth + 1) / 2) * 16;
+        double amount = (nth % 2 == 1 ? 1 : -1) * ((nth + 1) / 2) * 20;
         for (int k = 1; k < points.Count - 1; k++) points[k] += normal * (amount * Math.Sin(Math.PI * cumulative[k] / total));
         var (startTip, startBase) = Cut(points, MarkerLength(e.StartEnd), fromEnd: false);
         var (tip, endBase) = Cut(points, MarkerLength(e.EndEnd), fromEnd: true);
