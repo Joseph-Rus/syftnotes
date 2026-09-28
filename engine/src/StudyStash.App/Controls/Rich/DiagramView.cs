@@ -7,16 +7,19 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using StudyStash.Core.Rich;
 
 namespace StudyStash.App.Controls.Rich;
 
 /// <summary>
 /// A flowchart drawn in the app's own type and colours, light or dark, in either look: laid out once (a ring, a
-/// tree or a layered chart), then fitted to its column. A chart too wide for it turns (a left-to-right chart goes
+/// tree or a layered chart) away from the window, with a quiet space about its size kept for it until it's ready,
+/// then fitted to its column. A chart too wide for it turns (a left-to-right chart goes
 /// top-down, a top-down tree left-to-right); then the picture scales down, never below <see cref="MinScale"/> (its
 /// words stay at least 8 px), and past that it scrolls sideways. It never grows past <see cref="MaxScale"/> (1 in a
-/// note). In a note, a click opens it larger (<see cref="OpenLarger"/>).
+/// note). In a note, a click opens it larger (<see cref="OpenLarger"/>). A chart that can't be laid out becomes the
+/// calm card that says so, with its source.
 /// </summary>
 public sealed class DiagramView : Decorator
 {
@@ -28,6 +31,7 @@ public sealed class DiagramView : Decorator
 
     readonly DiagramCanvas canvas = new();
     readonly ScrollViewer scroller;
+    bool failed;
 
     static DiagramView() => AffectsMeasure<DiagramView>(ChartProperty, MaxScaleProperty);
 
@@ -43,6 +47,7 @@ public sealed class DiagramView : Decorator
             Content = canvas,
         };
         HorizontalAlignment = HorizontalAlignment.Center;
+        canvas.Failed = ShowProblem;
         if (!opensLarger)
         {
             Child = scroller;
@@ -50,7 +55,7 @@ public sealed class DiagramView : Decorator
         }
         var badge = OpenLarger.Badge();
         Child = new Panel { Children = { scroller, badge } };
-        OpenLarger.Wire(this, badge, () => Chart is { } chart ? new OpenDiagramEventArgs(this) { Title = Title, Chart = chart, Scene = Scene } : null);
+        OpenLarger.Wire(this, badge, () => !failed && Chart is { } chart ? new OpenDiagramEventArgs(this) { Title = Title, Chart = chart, Scene = Scene } : null);
     }
 
     public Flowchart? Chart
@@ -68,8 +73,15 @@ public sealed class DiagramView : Decorator
     /// <summary>What the diagram is called: its own title, or else its first words.</summary>
     public string Title => Chart is not { } chart ? "Diagram" : chart.Title is { Length: > 0 } t ? t : chart.Labels().FirstOrDefault() ?? "Diagram";
 
-    /// <summary>The diagram as laid out for its column, or null before it has been measured.</summary>
+    /// <summary>The chart as the note wrote it, shown on the card if it can't be laid out (else its own
+    /// canonical source is).</summary>
+    public string? Source { get; init; }
+
+    /// <summary>The diagram as laid out for its column, or null until it has been.</summary>
     public DiagramScene? Scene => canvas.Scene;
+
+    /// <summary>Whether it's still being laid out, its space kept by a quiet placeholder.</summary>
+    public bool IsLaying => canvas.Laying;
 
     /// <summary>How much the picture is scaled to fit its column.</summary>
     public double Scale => canvas.Scale;
@@ -97,6 +109,19 @@ public sealed class DiagramView : Decorator
         // Clear, but there: the whole picture answers a click, not just its lines.
         context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
     }
+
+    /// <summary>The chart couldn't be laid out: the calm card takes its place, across the column, and it no longer
+    /// opens larger.</summary>
+    void ShowProblem()
+    {
+        if (failed || Chart is not { } chart) return;
+        failed = true;
+        HorizontalAlignment = HorizontalAlignment.Stretch;
+        Cursor = null;
+        Focusable = false;
+        ToolTip.SetTip(this, null);
+        Child = new DiagramCard("Study Stash couldn't lay this flowchart out.", Source ?? chart.ToSource());
+    }
 }
 
 /// <summary>What <see cref="DiagramView"/> scrolls: the scene, drawn at its scale with the look's tokens.</summary>
@@ -107,11 +132,12 @@ sealed class DiagramCanvas : Control
     public static readonly StyledProperty<IBrush?> GroupFillProperty = AvaloniaProperty.Register<DiagramCanvas, IBrush?>(nameof(GroupFill));
     public static readonly StyledProperty<IBrush?> AccentProperty = AvaloniaProperty.Register<DiagramCanvas, IBrush?>(nameof(Accent));
     public static readonly StyledProperty<IBrush?> AccentTintProperty = AvaloniaProperty.Register<DiagramCanvas, IBrush?>(nameof(AccentTint));
+    public static readonly StyledProperty<IBrush?> QuietProperty = AvaloniaProperty.Register<DiagramCanvas, IBrush?>(nameof(Quiet));
     public static readonly StyledProperty<FontFamily?> FontProperty = AvaloniaProperty.Register<DiagramCanvas, FontFamily?>(nameof(Font));
 
     static DiagramCanvas()
     {
-        AffectsRender<DiagramCanvas>(InkProperty, LineProperty, GroupFillProperty, AccentProperty, AccentTintProperty);
+        AffectsRender<DiagramCanvas>(InkProperty, LineProperty, GroupFillProperty, AccentProperty, AccentTintProperty, QuietProperty);
         AffectsMeasure<DiagramCanvas>(FontProperty);
     }
 
@@ -124,6 +150,7 @@ sealed class DiagramCanvas : Control
         Bind(GroupFillProperty, this.GetResourceObservable("Fill2"));
         Bind(AccentProperty, this.GetResourceObservable("Accent"));
         Bind(AccentTintProperty, this.GetResourceObservable("AccentTint"));
+        Bind(QuietProperty, this.GetResourceObservable("Fg3"));
         Bind(FontProperty, this.GetResourceObservable("TextFont"));
     }
 
@@ -132,9 +159,15 @@ sealed class DiagramCanvas : Control
     public IBrush? GroupFill { get => GetValue(GroupFillProperty); set => SetValue(GroupFillProperty, value); }
     public IBrush? Accent { get => GetValue(AccentProperty); set => SetValue(AccentProperty, value); }
     public IBrush? AccentTint { get => GetValue(AccentTintProperty); set => SetValue(AccentTintProperty, value); }
+    public IBrush? Quiet { get => GetValue(QuietProperty); set => SetValue(QuietProperty, value); }
     public FontFamily? Font { get => GetValue(FontProperty); set => SetValue(FontProperty, value); }
 
     Flowchart? chart;
+    string? source;
+    SceneKind kind;
+    (double Width, double Height)? guessed, guessedTurned;
+    Task? awaiting;
+    bool failed;
     double maxScale = 1;
     Size room = new(double.PositiveInfinity, double.PositiveInfinity);
 
@@ -144,9 +177,19 @@ sealed class DiagramCanvas : Control
         set
         {
             chart = value;
+            source = value?.ToSource();
+            kind = value is null ? default : DiagramLayout.Kind(value);
+            guessed = guessedTurned = null;
+            failed = false;
             InvalidateMeasure();
         }
     }
+
+    /// <summary>Called (once, on the UI thread) when the chart can't be laid out.</summary>
+    public Action? Failed { get; set; }
+
+    /// <summary>Whether the chart is still being laid out, a placeholder keeping its space.</summary>
+    public bool Laying { get; private set; }
 
     public double MaxScale
     {
@@ -178,38 +221,81 @@ sealed class DiagramCanvas : Control
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        if (chart is null)
+        Laying = false;
+        if (chart is null || source is null)
         {
             Scene = null;
             return default;
         }
         double width = double.IsFinite(room.Width) ? room.Width : double.PositiveInfinity;
-        DiagramScene scene;
-        try
+        // Never lays anything out here: what isn't laid out yet is asked for, and a placeholder keeps its space.
+        var written = SceneCache.Find(chart, source, Family, null);
+        if (written.Failed)
         {
-            scene = SceneCache.Get(chart, Family, null);
-            if (scene.Width > width && DiagramLayout.Turned(chart, scene.Kind) is { } turned)
-            {
-                var other = SceneCache.Get(chart, Family, turned);
-                if (other.Width < scene.Width) scene = other;
-            }
-        }
-        catch (Exception e) // a layout that fails leaves a gap, never a crash (a note checks its charts lay out first)
-        {
-            Program.Log($"[diagram] couldn't lay out a chart: {e.GetType().Name}: {e.Message}");
             Scene = null;
+            Fail();
             return default;
         }
-        double scale = Math.Min(maxScale, width / scene.Width);
-        if (double.IsFinite(room.Height) && room.Height > 0) scale = Math.Min(scale, room.Height / scene.Height);
+        var guess = written.Scene is { } known ? (known.Width, known.Height) : guessed ??= DiagramLayout.Estimate(chart);
+        SceneCache.Lookup? other = null;
+        if (guess.Width > width && DiagramLayout.Turned(chart, written.Scene?.Kind ?? kind) is { } turned)
+        {
+            other = SceneCache.Find(chart, source, Family, turned);
+            var turnedGuess = other.Value.Scene is { } t ? (t.Width, t.Height) : guessedTurned ??= DiagramLayout.Estimate(chart, turned);
+            if (turnedGuess.Width < guess.Width) guess = turnedGuess;
+        }
+        if ((written.Laying ?? other?.Laying) is { } laying)
+        {
+            Wait(laying);
+            Scene = null;
+            Laying = true;
+            Scale = Fit(guess.Width, guess.Height, width);
+            return new Size(Math.Ceiling(Math.Min(guess.Width * Scale, width)), Math.Ceiling(guess.Height * Scale));
+        }
+        var scene = written.Scene!;
+        if (other?.Scene is { } otherScene && otherScene.Width < scene.Width) scene = otherScene;
         Scene = scene;
-        Scale = Math.Max(DiagramView.MinScale, scale);
+        Scale = Fit(scene.Width, scene.Height, width);
         return new Size(Math.Ceiling(scene.Width * Scale), Math.Ceiling(scene.Height * Scale));
+    }
+
+    /// <summary>The scale a picture this size is drawn at in the room given: no larger than the most allowed, no
+    /// smaller than the floor.</summary>
+    double Fit(double sceneWidth, double sceneHeight, double width)
+    {
+        double scale = Math.Min(maxScale, width / sceneWidth);
+        if (double.IsFinite(room.Height) && room.Height > 0) scale = Math.Min(scale, room.Height / sceneHeight);
+        return Math.Max(DiagramView.MinScale, scale);
+    }
+
+    /// <summary>Measures again once <paramref name="task"/> (a layout this picture needs) is done.</summary>
+    void Wait(Task task)
+    {
+        if (ReferenceEquals(task, awaiting)) return;
+        awaiting = task;
+        task.ContinueWith(_ => Dispatcher.UIThread.Post(() =>
+        {
+            if (ReferenceEquals(awaiting, task)) awaiting = null;
+            InvalidateMeasure();
+        }), TaskScheduler.Default);
+    }
+
+    /// <summary>Says the chart couldn't be laid out — after this measure, since the view swaps what it shows.</summary>
+    void Fail()
+    {
+        if (failed) return;
+        failed = true;
+        Dispatcher.UIThread.Post(() => Failed?.Invoke());
     }
 
     public override void Render(DrawingContext context)
     {
         context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
+        if (Laying)
+        {
+            Placeholder(context);
+            return;
+        }
         if (Scene is not { } scene) return;
         bool dark = ActualThemeVariant == ThemeVariant.Dark;
         var ink = Solid(Ink, dark ? Colors.White : Color.Parse("#1D1D1F"));
@@ -312,6 +398,17 @@ sealed class DiagramCanvas : Control
         }
     }
 
+    /// <summary>The space a diagram being laid out keeps: a soft rounded box, with a quiet word in the middle.</summary>
+    void Placeholder(DrawingContext context)
+    {
+        var box = new Rect(Bounds.Size);
+        if (box.Width < 1 || box.Height < 1) return;
+        context.DrawRectangle(GroupFill, null, new RoundedRect(box, 12));
+        if (box.Height < 24) return;
+        var t = Text(NoteView.DrawingWords, DiagramLayout.LabelSize, FontWeight.Normal, Quiet ?? Line ?? Brushes.Gray);
+        context.DrawText(t, new Point(Math.Round((box.Width - t.Width) / 2), Math.Round((box.Height - t.Height) / 2)));
+    }
+
     static void Cylinder(DrawingContext context, Rect b, IBrush fill, Pen pen)
     {
         double cap = SceneShapes.CylinderCap, rx = b.Width / 2;
@@ -388,53 +485,4 @@ sealed class DiagramCanvas : Control
         double x = Math.Round(r.X), y = Math.Round(r.Y), right = Math.Round(r.Right), bottom = Math.Round(r.Bottom);
         return hairline ? new Rect(x + 0.5, y + 0.5, right - x - 1, bottom - y - 1) : new Rect(x, y, right - x, bottom - y);
     }
-}
-
-/// <summary>
-/// Laid-out scenes, kept for the 64 diagrams drawn last (keyed by the chart, the font and the direction), so a note
-/// shown again or a theme switched redraws without laying anything out. Scenes hold no colours.
-/// </summary>
-static class SceneCache
-{
-    const int Capacity = 64;
-    static readonly Dictionary<string, LinkedListNode<(string Key, DiagramScene Scene)>> map = [];
-    static readonly LinkedList<(string Key, DiagramScene Scene)> order = new();
-    static readonly Lock gate = new();
-
-    public static DiagramScene Get(Flowchart chart, FontFamily family, ChartDirection? direction)
-    {
-        string key = $"{family.Name}\u0001{direction}\u0001{chart.ToSource()}";
-        lock (gate)
-        {
-            if (map.TryGetValue(key, out var hit))
-            {
-                order.Remove(hit);
-                order.AddFirst(hit);
-                return hit.Value.Scene;
-            }
-        }
-        var scene = DiagramLayout.Lay(chart, Measurer(family), direction);
-        lock (gate)
-        {
-            if (map.TryGetValue(key, out var raced)) return raced.Value.Scene;
-            map[key] = order.AddFirst((key, scene));
-            while (order.Count > Capacity)
-            {
-                map.Remove(order.Last!.Value.Key);
-                order.RemoveLast();
-            }
-        }
-        return scene;
-    }
-
-    /// <summary>
-    /// Text widths in the look's own font: box words in its medium weight, group titles (12 px) in semibold, the
-    /// words on arrows in regular.
-    /// </summary>
-    public static Func<string, double, bool, double> Measurer(FontFamily family) => (text, size, bold) =>
-    {
-        var weight = !bold ? FontWeight.Normal : size <= DiagramLayout.TitleSize ? FontWeight.SemiBold : FontWeight.Medium;
-        return new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(family, FontStyle.Normal, weight), size, null)
-            .WidthIncludingTrailingWhitespace;
-    };
 }

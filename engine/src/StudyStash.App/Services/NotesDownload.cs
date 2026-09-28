@@ -50,7 +50,8 @@ public static class NotesDownload
         }
         if (lecture is null) return;
         string? dir = localPath is { Length: > 0 } ? Path.GetDirectoryName(localPath) : null;
-        var export = NoteExport.Lecture(lecture, transcript, mermaidSvg, dir is not null ? Path.GetFileName(localPath) : null);
+        // Away from the window: drawing a big flowchart's picture takes a moment.
+        var export = await Task.Run(() => NoteExport.Lecture(lecture, transcript, mermaidSvg, dir is not null ? Path.GetFileName(localPath) : null));
         await writeText(dir is not null ? export.Markdown : Embedded(export));
         if (dir is not null)
             foreach (var asset in export.Assets)
@@ -105,7 +106,8 @@ public static class NotesDownload
             if (lecture is null) { failed++; continue; }
             // Numbered first, so a lecture's diagrams go in a folder named after its own file: two "Lecture 3"s on one
             // day, or two titles that read the same once a file name can hold them, never share (and overwrite) one.
-            var export = NoteExport.Lecture(lecture, transcript, mermaidSvg, NoteExport.UniqueName(NoteExport.FileName(lecture), taken));
+            string name = NoteExport.UniqueName(NoteExport.FileName(lecture), taken);
+            var export = await Task.Run(() => NoteExport.Lecture(lecture, transcript, mermaidSvg, name));
             await File.WriteAllTextAsync(Path.Combine(classDir, export.FileName), export.Markdown, Encoding.UTF8);
             foreach (var asset in export.Assets) await WriteAssetAsync(classDir, asset);
             saved++;

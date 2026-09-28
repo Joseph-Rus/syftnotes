@@ -44,8 +44,7 @@ public class NoteViewRichTests
         content.VerticalAlignment = VerticalAlignment.Top;
         var window = new Window { Width = width + 40, Height = 3000, RequestedThemeVariant = variant ?? ThemeVariant.Light, Content = content };
         window.Show();
-        Dispatcher.UIThread.RunJobs();
-        Assert.NotNull(window.CaptureRenderedFrame());
+        DiagramsReady.Wait(window);
         return window;
     }
 
@@ -156,6 +155,83 @@ public class NoteViewRichTests
         Assert.Same(before[2], after[2]);
         Assert.NotNull(window.CaptureRenderedFrame());
         window.Close();
+    }
+
+    [AvaloniaFact]
+    public void A_big_chart_is_laid_out_away_from_the_window_which_keeps_a_quiet_space_for_it_meanwhile()
+    {
+        // 60 boxes and 110 arrows every which way (the most a chart may have, and about half a second of layout),
+        // with words no other test uses, so nothing has laid it out before.
+        var random = new Random(11);
+        string stamp = Guid.NewGuid().ToString("N")[..6];
+        var lines = new List<string> { "flowchart TD" };
+        for (int i = 0; i < 60; i++) lines.Add($"N{i}[Step {i} {stamp}]");
+        for (int i = 0; i < 110; i++) lines.Add($"N{random.Next(60)} --> N{random.Next(60)}");
+        using var release = new ManualResetEventSlim(false);
+        bool? onUiThread = null;
+        // Every layout is held back until the page has been built, measured and drawn: if the page waited for one,
+        // it would still be waiting (for 30 s, and then find it done).
+        SceneCache.Laying = _ =>
+        {
+            onUiThread ??= Dispatcher.UIThread.CheckAccess();
+            release.Wait(TimeSpan.FromSeconds(30));
+        };
+        try
+        {
+            var note = new NoteView { Markdown = "## Details\nBefore the chart.\n\n" + Fence("mermaid", string.Join("\n", lines)) + "\n\nAfter the chart.", Width = 620 };
+            var window = new Window { Width = 660, Height = 3000, Content = note };
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            Assert.NotNull(window.CaptureRenderedFrame());
+
+            var view = window.GetVisualDescendants().OfType<DiagramView>().Single();
+            Assert.True(view.IsLaying);
+            Assert.Null(view.Scene);
+            var kept = view.Bounds.Size;
+            Assert.True(kept.Width > 100 && kept.Height > 100, $"kept {kept}");
+            // The words after the chart are laid out below the space it keeps.
+            var after = window.GetVisualDescendants().OfType<TextBlock>().Last();
+            Assert.True(after.TranslatePoint(default, window)!.Value.Y >= view.TranslatePoint(new Point(0, kept.Height), window)!.Value.Y);
+
+            release.Set();
+            DiagramsReady.Wait(window);
+            Assert.False(onUiThread);
+            Assert.False(view.IsLaying);
+            Assert.Equal(60, view.Scene!.Nodes.Count);
+            // The space kept was about the picture's own size, so the page hardly moved when it came.
+            Assert.InRange(view.Bounds.Height / kept.Height, 0.5, 2);
+            window.Close();
+        }
+        finally
+        {
+            SceneCache.Laying = null;
+            release.Set();
+        }
+    }
+
+    [AvaloniaFact]
+    public void A_chart_that_cant_be_laid_out_becomes_the_calm_card_with_its_source()
+    {
+        const string source = "flowchart TD\n  A[Unlayable start] --> B[Unlayable end]";
+        SceneCache.Laying = chart =>
+        {
+            if (chart.Labels().Contains("Unlayable start")) throw new InvalidOperationException("a layout that fails");
+        };
+        try
+        {
+            var note = new NoteView { Markdown = "## Details\n\n" + Fence("mermaid", source) };
+            var window = Show(note);
+            var card = window.GetVisualDescendants().OfType<DiagramCard>().Single();
+            Assert.Equal("Study Stash couldn't lay this flowchart out.", card.Reason);
+            Assert.Equal(source, card.Source);
+            var view = card.FindAncestorOfType<DiagramView>()!;
+            Assert.Null(ToolTip.GetTip(view)); // it no longer offers to open larger
+            window.Close();
+        }
+        finally
+        {
+            SceneCache.Laying = null;
+        }
     }
 
     [AvaloniaFact]

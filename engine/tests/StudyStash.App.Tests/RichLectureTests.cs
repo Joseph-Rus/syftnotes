@@ -23,8 +23,7 @@ public class RichLectureTests
         content.HorizontalAlignment = HorizontalAlignment.Left;
         var window = new Window { Width = width + 40, Height = 3200, RequestedThemeVariant = variant, Content = content };
         window.Show();
-        Dispatcher.UIThread.RunJobs();
-        Assert.NotNull(window.CaptureRenderedFrame());
+        DiagramsReady.Wait(window);
         return window;
     }
 

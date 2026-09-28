@@ -29,8 +29,7 @@ public class NoteViewCompactTests
         content.VerticalAlignment = VerticalAlignment.Top;
         var window = new Window { Width = width + 40, Height = 900, RequestedThemeVariant = variant ?? ThemeVariant.Light, Content = content };
         window.Show();
-        Dispatcher.UIThread.RunJobs();
-        Assert.NotNull(window.CaptureRenderedFrame());
+        DiagramsReady.Wait(window);
         return window;
     }
 

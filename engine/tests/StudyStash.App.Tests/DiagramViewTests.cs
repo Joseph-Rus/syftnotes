@@ -32,8 +32,7 @@ public class DiagramViewTests
         foreach (var v in views) column.Children.Add(v);
         var window = new Window { Width = width + 40, Height = 3000, RequestedThemeVariant = variant, Content = column };
         window.Show();
-        Dispatcher.UIThread.RunJobs();
-        Assert.NotNull(window.CaptureRenderedFrame());
+        DiagramsReady.Wait(window);
         return window;
     }
 

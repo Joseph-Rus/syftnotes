@@ -539,7 +539,8 @@ public static partial class Shell
     }
 
     /// <summary>Draws a Mermaid flowchart that already parses, in the app's own font, as a standalone SVG for a
-    /// download; null for one that can't be laid out.</summary>
+    /// download; null for one that can't be laid out. The download calls it away from the UI thread, and a chart the
+    /// notes already showed is drawn from the same scene.</summary>
     static Func<string, string?> MermaidSvg()
     {
         var font = Application.Current?.TryFindResource("TextFont", out var v) == true && v is FontFamily f ? f : FontFamily.Default;
@@ -547,7 +548,7 @@ public static partial class Shell
         {
             try
             {
-                return DiagramSvg.Render(DiagramLayout.Lay(Mermaid.Parse(source), SceneCache.Measurer(font)));
+                return SceneCache.Laid(Mermaid.Parse(source), font) is { } scene ? DiagramSvg.Render(scene) : null;
             }
             catch (MermaidException)
             {

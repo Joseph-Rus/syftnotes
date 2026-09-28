@@ -142,6 +142,45 @@ public class RichShots
                 Shot.Take($"rich-diagram-fallback-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, markdown), size: new Size(876, 700));
     }
 
+    /// <summary>A big chart still being laid out: the quiet space its note keeps for it, about its size, with the
+    /// words after it already in place.</summary>
+    [AvaloniaFact]
+    public void Diagram_laying()
+    {
+        var random = new Random(11);
+        // Words no earlier picture laid out (the same length every time, and hidden until the chart is drawn).
+        string stamp = Guid.NewGuid().ToString("N")[..6];
+        var lines = new List<string> { "flowchart TD" };
+        for (int i = 0; i < 40; i++) lines.Add($"N{i}[Admission step {i} {stamp}]");
+        for (int i = 0; i < 70; i++) lines.Add($"N{random.Next(40)} --> N{random.Next(40)}");
+        string markdown = "## Admitting a patient\n\nEvery step of an admission, from the door to the ward.\n\n```mermaid\n" + string.Join("\n", lines) +
+            "\n```\n\nThe notes go on below while the chart is drawn.";
+        using var release = new ManualResetEventSlim(false);
+        SceneCache.Laying = _ => release.Wait(TimeSpan.FromSeconds(30));
+        try
+        {
+            foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+                foreach (var t in Themes)
+                {
+                    Skin.UseTheme(ColourThemes.Default);
+                    ((App)Application.Current!).UseSkin(skin);
+                    var size = new Size(876, 960);
+                    var window = new Window { Width = size.Width, Height = size.Height, RequestedThemeVariant = t, Content = NotePage(skin, markdown) };
+                    Look.Apply(window);
+                    window.Show();
+                    Dispatcher.UIThread.RunJobs();
+                    Assert.True(window.GetVisualDescendants().OfType<DiagramView>().Single().IsLaying);
+                    SaveShot($"rich-diagram-laying-{(skin == SkinKind.Mac ? "mac" : "win")}", t, window, size);
+                    window.Close();
+                }
+        }
+        finally
+        {
+            SceneCache.Laying = null;
+            release.Set();
+        }
+    }
+
     /// <summary>The larger window's content at the size it opens at: the four chambers on the Mac in light, the
     /// decision chart on Windows in dark.</summary>
     [AvaloniaFact]
@@ -257,7 +296,7 @@ public class RichShots
     /// lecture would have scrolled to it.</summary>
     static void ScrollToDiagrams(Window window)
     {
-        Dispatcher.UIThread.RunJobs();
+        DiagramsReady.Wait(window);
         var scroller = window.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(s => s.GetVisualDescendants().OfType<NoteView>().Any());
         var diagram = window.GetVisualDescendants().FirstOrDefault(v => v is DiagramView or SvgView) as Visual;
         if (scroller is null || diagram is null) return;

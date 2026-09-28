@@ -346,18 +346,11 @@ public sealed partial class NoteView : StackPanel
         {
             return new DiagramCard(e.Message, source);
         }
-        // Laid out now, in the look's font (the drawing reuses it): a chart that can't be laid out says so here.
-        try
-        {
-            var font = this.FindResource("TextFont") as FontFamily ?? Application.Current?.FindResource("TextFont") as FontFamily ?? FontFamily.Default;
-            SceneCache.Get(chart, font, null);
-        }
-        catch (Exception e) // the layout's libraries are the app's, but a bad chart must never take the notes down
-        {
-            Program.Log($"[diagram] couldn't lay out a chart: {e.GetType().Name}: {e.Message}");
-            return new DiagramCard("Study Stash couldn't lay this flowchart out.", source);
-        }
-        var view = new DiagramView { Chart = chart, Margin = new Thickness(0, 6) };
+        // Laid out in the background from now, in the look's font, while the rest of the note is built; the view keeps
+        // its space until then, and becomes the calm card if it can't be laid out.
+        var font = this.FindResource("TextFont") as FontFamily ?? Application.Current?.FindResource("TextFont") as FontFamily ?? FontFamily.Default;
+        SceneCache.Find(chart, chart.ToSource(), font, null);
+        var view = new DiagramView { Chart = chart, Source = source, Margin = new Thickness(0, 6) };
         if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
         return view;
     }

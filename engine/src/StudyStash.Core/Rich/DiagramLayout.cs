@@ -66,6 +66,47 @@ public static class DiagramLayout
     }
 
     /// <summary>
+    /// Roughly how big the chart will be once laid out, found in a moment without laying it out: the room a note keeps
+    /// for a diagram while it's laid out in the background, so the page hardly moves when it arrives. Words are taken
+    /// at an average width; a ring or a tree is placed as it will be (both are quick), and a layered chart is stacked
+    /// level by level, spaced as its layout spaces them.
+    /// </summary>
+    public static (double Width, double Height) Estimate(Flowchart chart, ChartDirection? direction = null)
+    {
+        var m = new Measurer((text, size, bold) => text.Length * size * (bold ? 0.58 : 0.55));
+        var dir = direction ?? chart.Direction;
+        var sizes = chart.Nodes.ToDictionary(n => n.Id, n => Size(n, m));
+        var labels = chart.Edges.Select(e => EdgeLabel(e.Label, m)).ToList();
+        var kind = Kind(chart);
+        if (kind != SceneKind.Layered)
+        {
+            var quick = Normalise(kind == SceneKind.Ring ? Ring(chart, sizes, labels) : Tree(chart, sizes, labels, dir));
+            return (quick.Width, quick.Height);
+        }
+        var back = BackEdges(chart);
+        var level = Levels(chart, back);
+        bool down = dir is ChartDirection.TopDown or ChartDirection.BottomUp;
+        double along = 0, across = 0;
+        var levels = chart.Nodes.GroupBy(n => level[n.Id]).ToList();
+        foreach (var boxes in levels)
+        {
+            along += boxes.Max(n => down ? sizes[n.Id].H : sizes[n.Id].W);
+            across = Math.Max(across, boxes.Sum(n => down ? sizes[n.Id].W : sizes[n.Id].H) + (boxes.Count() - 1) * 28);
+        }
+        along += (levels.Count - 1) * 44;
+        // An arrow's words sit between two levels and push them apart.
+        var worded = chart.Edges.Select((e, i) => (e, i)).Where(x => labels[x.i].Lines.Count > 0 && x.e.From != x.e.To)
+            .Select(x => Math.Min(level[x.e.From], level[x.e.To])).Distinct().Count();
+        along += worded * (down ? 2 * LabelLineHeight : 60);
+        // An arrow back up the chart runs around its side.
+        if (back.Count > 0) across += 20;
+        double w = (down ? across : along) + 2 * Margin, h = (down ? along : across) + 2 * Margin;
+        // A group's title sits at its top whichever way the chart runs; its sides are narrower.
+        int depth = chart.Groups.Count == 0 ? 0 : chart.Groups.Any(g => g.Parent is not null) ? 2 : 1;
+        return (Math.Ceiling(w + depth * 24), Math.Ceiling(h + depth * 42));
+    }
+
+    /// <summary>
     /// The way to try a chart that's too wide for its column: a left-to-right chart top-down, and a top-down tree
     /// left-to-right (a classification reads as well across as down). Null when turning it wouldn't help (a ring).
     /// </summary>

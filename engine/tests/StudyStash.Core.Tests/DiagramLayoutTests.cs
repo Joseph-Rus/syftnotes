@@ -398,6 +398,35 @@ public class DiagramLayoutTests
         }
     }
 
+    public static TheoryData<string, string?> Estimated => new()
+    {
+        { CardiacCycle, null }, { BloodFlow, null }, { Pain, null }, { NursingProcess, null }, { NursingProcess, "TopDown" },
+        { Shock, null }, { Shock, "LeftRight" }, { SearchTree, null }, { Sixty(), null },
+        { "flowchart LR\n  A[Wash your hands] --> B[Check the order] --> C{Right patient?} -->|yes| D[Give the dose] --> E[Document it]\n  C -->|no| F[Stop and ask]", null },
+    };
+
+    [Theory]
+    [MemberData(nameof(Estimated))]
+    public void The_estimate_of_a_charts_size_is_near_what_it_lays_out_to(string source, string? direction)
+    {
+        var chart = Flowchart.Parse(source);
+        var dir = direction is null ? (ChartDirection?)null : Enum.Parse<ChartDirection>(direction);
+        var (w, h) = DiagramLayout.Estimate(chart, dir);
+        var laid = DiagramLayout.Lay(chart, Measure, dir);
+        // Near enough that the page hardly moves when the picture arrives: well within half again either way.
+        Assert.True(w / laid.Width is > 0.67 and < 1.5 && h / laid.Height is > 0.67 and < 1.5,
+            $"estimated {w:0} x {h:0}, laid out {laid.Width:0} x {laid.Height:0}");
+    }
+
+    static string Sixty()
+    {
+        var random = new Random(7);
+        var lines = new List<string> { "flowchart TD" };
+        for (int i = 0; i < 60; i++) lines.Add($"N{i}[Step number {i}]");
+        for (int i = 0; i < 110; i++) lines.Add($"N{random.Next(60)} --> N{random.Next(60)}");
+        return string.Join("\n", lines);
+    }
+
     [Fact]
     public void Sixty_boxes_lay_out_quickly()
     {

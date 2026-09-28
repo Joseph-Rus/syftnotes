@@ -83,7 +83,7 @@ public static class Shot
         Glass.SetBlurBackdrop(window, true);
         Views.Look.Apply(window);
         window.Show();
-        Dispatcher.UIThread.RunJobs();
+        DiagramsReady.Wait(window);
         var whole = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
         var frame = new RenderTargetBitmap(new PixelSize((int)width, (int)height));
         using (var ctx = frame.CreateDrawingContext())
