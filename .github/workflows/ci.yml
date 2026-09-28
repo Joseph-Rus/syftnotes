@@ -239,6 +239,22 @@ jobs:
           echo "V=$V" >> $env:GITHUB_ENV
           $bad = Get-ChildItem dist\windows -Recurse -File -Filter "*.bin" -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1MB }
           if ($bad) { throw "a model file is bundled: $($bad.FullName -join ', ')" }
+      - name: Both trees carry the notes' formula and diagram code, its native parts built for their own processor, and no debug symbols
+        shell: pwsh
+        run: |
+          foreach ($tree in @(@("win-x64", 0x8664), @("win-arm64", 0xAA64))) {
+            $rid = $tree[0]; $machine = $tree[1]
+            foreach ($f in "CSharpMath.SkiaSharp.dll", "CSharpMath.Rendering.dll", "Svg.Skia.dll", "Microsoft.Msagl.dll", "Markdig.dll", "SkiaSharp.dll", "HarfBuzzSharp.dll") {
+              if (-not (Test-Path "dist\windows\$rid\$f")) { throw "$rid has no $f" }
+            }
+            foreach ($f in "libSkiaSharp.dll", "libHarfBuzzSharp.dll") {
+              $bytes = [IO.File]::ReadAllBytes("dist\windows\$rid\$f")
+              $built = [BitConverter]::ToUInt16($bytes, [BitConverter]::ToInt32($bytes, 0x3C) + 4)
+              if ($built -ne $machine) { throw "$rid\$f is built for machine 0x$('{0:X}' -f $built), not 0x$('{0:X}' -f $machine)" }
+            }
+            $symbols = @(Get-ChildItem "dist\windows\$rid" -Recurse -File -Filter "*.pdb")
+            if ($symbols.Count -gt 0) { throw "$rid carries debug symbols: $($symbols.Name -join ', ')" }
+          }
       - name: Self-test, just this computer - setup makes the app's own library, the notes are written here, and quitting stops it
         if: needs.version.outputs.tested != 'true'
         shell: pwsh
