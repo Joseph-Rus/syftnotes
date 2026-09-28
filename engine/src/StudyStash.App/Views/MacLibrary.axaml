@@ -228,7 +228,7 @@
                         <Panel Classes="slot">
                           <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                         </Panel>
-                        <TextBlock Grid.Column="2" Classes="title name" Text="{Binding Name}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                        <TextBlock Grid.Column="2" Classes="title name" Text="{Binding Name}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" />
                         <TextBlock Grid.Column="4" Classes="count" Text="{Binding Count}" FontSize="13" VerticalAlignment="Center" />
                       </Grid>
                     </Button>
@@ -254,7 +254,7 @@
           <Border DockPanel.Dock="Top" Height="44" Margin="20,0,20,4">
             <StackPanel VerticalAlignment="Center">
               <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold"
-                         TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" />
+                         TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
               <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
             </StackPanel>
           </Border>

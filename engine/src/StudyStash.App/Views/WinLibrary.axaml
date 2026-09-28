@@ -212,7 +212,7 @@
                       <Panel Classes="slot">
                         <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                       </Panel>
-                      <TextBlock Grid.Column="2" Classes="name" Text="{Binding Name}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                      <TextBlock Grid.Column="2" Classes="name" Text="{Binding Name}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" />
                       <TextBlock Grid.Column="4" Classes="count" Text="{Binding Count}" FontSize="12" VerticalAlignment="Center" />
                     </Grid>
                   </Panel>
@@ -242,7 +242,7 @@
             <StackPanel DockPanel.Dock="Top" Margin="20,20,20,12">
               <!-- A long class name wraps to a second line, and past that ends in "…" (the whole name on hover). -->
               <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" LineHeight="26"
-                         TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" />
+                         TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
               <TextBlock Text="{Binding ClassCount}" FontSize="12" Foreground="{DynamicResource Fg2}" />
             </StackPanel>
             <DockPanel>
