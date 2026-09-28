@@ -1,13 +1,12 @@
 # Study Stash installer (Windows PowerShell only; on a Mac, run install.sh instead).
-#   The computer that keeps the library:
-#     $env:STUDYSTASH_ROLE='library'; irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
-#   Your laptop (the library's setup shows this line, with its address filled in):
 #     irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
+# The same app for every computer: when it opens, setup asks whether it's just this computer, your laptop or your
+# library. (An old STUDYSTASH_ROLE is still accepted, and changes nothing.)
 #
 # Downloads the newest release's Windows installer (one Setup.exe for x64 and Arm64), checks it
 # against the release's SHA256SUMS.txt when there is one, and runs it quietly: your account only,
-# no admin rights. Safe to rerun; installing the other role's Setup.exe over an existing install is
-# an in-place upgrade.
+# no admin rights. Safe to rerun: installing over an existing install is an in-place upgrade that keeps
+# what it was set up as.
 #
 #   STUDYSTASH_SETUP=<path>   install this Setup.exe instead of downloading one (development, CI)
 & {
@@ -15,9 +14,8 @@
   $ProgressPreference = "SilentlyContinue"  # the default progress bar slows downloads to a crawl
   $Slug = "Joseph-Rus/study-stash"
 
-  # The old server/client wording still works; STUDYSTASH_ROLE is the new name.
-  $Role = if ($env:STUDYSTASH_ROLE) { $env:STUDYSTASH_ROLE } else { "laptop" }
-  $Name = if ($Role -in @("library", "server")) { "Study-Stash-Library-Setup.exe" } else { "Study-Stash-Laptop-Setup.exe" }
+  # One download for every role: setup asks.
+  $Name = "Study-Stash-Setup.exe"
 
   function Fail($Message) {
     Write-Host ""
