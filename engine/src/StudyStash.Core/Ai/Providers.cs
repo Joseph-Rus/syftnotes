@@ -68,6 +68,11 @@ public abstract class AiProvider
     /// while <see cref="PromptOnInput"/> is on; null (nothing) otherwise.</summary>
     public virtual string? Input(AiRequest req) => null;
 
+    /// <summary>Gets ready to answer soon (a student has started typing a question), so the answer starts sooner:
+    /// true when it did something. Only a local model has anything to do (load itself into memory); a CLI starts
+    /// with each question.</summary>
+    public virtual Task<bool> WarmAsync(string model, CancellationToken ct = default) => Task.FromResult(false);
+
     /// <summary>What it does, as it does it. Ends with an <c>error</c> event when it fails.</summary>
     public virtual async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true,
         [EnumeratorCancellation] CancellationToken ct = default)
@@ -80,18 +85,26 @@ public abstract class AiProvider
         await foreach (var e in Spawn(Command(req, stream), req.Cwd, req.Timeout, Parse, Input(req), ct)) yield return e;
     }
 
-    /// <summary>Run to the end: the answer (the provider's final word, else everything it wrote), or why not.</summary>
-    public async Task<AiResult> CompleteAsync(AiRequest req, CancellationToken ct = default)
+    /// <summary>Run to the end: the answer (the provider's final word, else everything it wrote), or why not. With
+    /// <paramref name="soFar"/> it streams: that hears everything written so far each time more arrives (or the
+    /// final word, from a provider that only says it at the end).</summary>
+    public async Task<AiResult> CompleteAsync(AiRequest req, CancellationToken ct = default, Action<string>? soFar = null)
     {
         var text = new StringBuilder();
         string final = "", session = "", error = "";
         var tools = new List<AiEvent>();
-        await foreach (var e in RunAsync(req, stream: false, ct))
+        await foreach (var e in RunAsync(req, stream: soFar is not null, ct))
         {
             switch (e.Kind)
             {
-                case "text": text.Append(e.Text); break;
-                case "final": final = e.Text; break;
+                case "text":
+                    text.Append(e.Text);
+                    soFar?.Invoke(text.ToString());
+                    break;
+                case "final":
+                    final = e.Text;
+                    if (text.Length == 0 && final.Length > 0) soFar?.Invoke(final);
+                    break;
                 case "session" when e.Text.Length > 0: session = e.Text; break;
                 case "tool": tools.Add(e); break;
                 case "error": error = e.Text; break;
@@ -291,6 +304,8 @@ public sealed class ClaudeProvider : AiProvider
         if (!PromptOnInput) cmd.Add(req.Prompt);
         cmd.AddRange(["--output-format", "stream-json", "--verbose"]);
         if (stream) cmd.Add("--include-partial-messages");
+        // A plain answer uses no tools: don't wait for the person's own MCP servers to start first.
+        if (!req.Tools) cmd.Add("--strict-mcp-config");
         if (req.Tools && req.McpCommand.Count > 0)
         {
             var server = new JsonObject { ["command"] = req.McpCommand[0], ["args"] = new JsonArray(req.McpCommand.Skip(1).Select(a => (JsonNode)a).ToArray()) };
@@ -561,16 +576,11 @@ public sealed class OllamaProvider(Func<string> host) : CodexProvider
             yield return AiEvent.Error("Ollama didn't start. Open the Ollama app and try again.");
             yield break;
         }
-        string model = req.Model;
+        string model = await ModelAsync(req.Model) ?? "";
         if (model.Length == 0)
         {
-            var have = await Ollama.ListModelsAsync(host()) ?? [];
-            if (have.Count == 0)
-            {
-                yield return AiEvent.Error("No local models yet: pick and download one in Settings.");
-                yield break;
-            }
-            model = Ollama.PickDefaultModel(have.Select(m => m.Name), have[0].Name);
+            yield return AiEvent.Error("No local models yet: pick and download one in Settings.");
+            yield break;
         }
         if ((req.Tools || req.Write) && Agentic())
         {
@@ -585,13 +595,47 @@ public sealed class OllamaProvider(Func<string> host) : CodexProvider
         await foreach (var e in ChatAsync(req, model, ct)) yield return e;
     }
 
+    /// <summary>The model a run uses: the one asked for when it's installed, else the best one that is; null when
+    /// there's none (or Ollama isn't answering).</summary>
+    async Task<string?> ModelAsync(string asked)
+    {
+        var have = await Ollama.ListModelsAsync(host()) ?? [];
+        var names = have.Select(m => m.Name).ToList();
+        if (asked.Length > 0 && Ollama.HasModel(names, asked)) return asked;
+        return have.Count == 0 ? null : Ollama.PickDefaultModel(names, have[0].Name);
+    }
+
+    /// <summary>How long Ollama keeps the model loaded after a question, so a follow-up doesn't wait for it to load
+    /// again (Ollama's own default is 5 minutes).</summary>
+    public const string KeepLoaded = "15m";
+
+    /// <summary>Loads the model a question would use into memory now (a big one takes seconds to load), when Ollama
+    /// is already running: an empty generate request is Ollama's way to load a model without asking it anything.</summary>
+    public override async Task<bool> WarmAsync(string model, CancellationToken ct = default)
+    {
+        if (await ModelAsync(model) is not { } picked) return false;
+        try
+        {
+            await Ollama.PostAsync(host(), "/api/generate", new JsonObject { ["model"] = picked, ["keep_alive"] = KeepLoaded },
+                TimeSpan.FromMinutes(2), ct: ct);
+            return true;
+        }
+        catch (Exception e) when (e is HttpRequestException or TimeoutException or OperationCanceledException or JsonException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Straight to Ollama, streaming: the system brief, then the prompt.</summary>
     async IAsyncEnumerable<AiEvent> ChatAsync(AiRequest req, string model, [EnumeratorCancellation] CancellationToken ct)
     {
         var messages = new JsonArray();
         if (req.System.Length > 0) messages.Add(new JsonObject { ["role"] = "system", ["content"] = req.System });
         messages.Add(new JsonObject { ["role"] = "user", ["content"] = req.Prompt });
-        var body = new JsonObject { ["model"] = model, ["messages"] = messages, ["stream"] = true, ["think"] = false };
+        var body = new JsonObject
+        {
+            ["model"] = model, ["messages"] = messages, ["stream"] = true, ["think"] = false, ["keep_alive"] = KeepLoaded,
+        };
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(req.Timeout);
         using var msg = new HttpRequestMessage(HttpMethod.Post, host().TrimEnd('/') + "/api/chat")

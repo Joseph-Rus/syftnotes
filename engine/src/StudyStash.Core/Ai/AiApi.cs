@@ -114,6 +114,13 @@ public interface IAiLibrary
     Task<AiOverview?> ModelAsync(string engine, string model);
     Task<AiOverview?> DismissAsync(string problemId);
     Task<AskReply?> AskAsync(AskRequest request);
+    /// <summary>Asks, with the answer shown as it's written: <paramref name="answerSoFar"/> hears all of it so far
+    /// each time more arrives. <paramref name="stop"/> ends it where it is. A library too old to stream (or a
+    /// stand-in that doesn't) answers once, at the end.</summary>
+    Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop) => AskAsync(request);
+    /// <summary>A student has started typing a question for <paramref name="engine"/> (null: the library's pick):
+    /// the library gets that engine ready, so the answer starts sooner. Never fails: it's only a head start.</summary>
+    Task WarmAsync(string? engine) => Task.CompletedTask;
     Task<RewriteInfo?> RewriteAsync(string lecture);
     Task<RewriteInfo?> RewriteStartAsync(string lecture, string engine);
     Task<RewriteInfo?> RewriteCancelAsync(string lecture);
@@ -143,13 +150,24 @@ public sealed class AiRemote(string serverUrl, string key, HttpClient? http = nu
     readonly HttpClient client = http ?? Shared;
     readonly string root = serverUrl.TrimEnd('/') + "/api/v2/ai";
 
-    async Task<JsonNode?> SendAsync(HttpMethod method, string path, JsonNode? body = null, CancellationToken ct = default)
+    HttpRequestMessage Request(HttpMethod method, string path, JsonNode? body)
     {
-        using var request = new HttpRequestMessage(method, root + path);
+        var request = new HttpRequestMessage(method, root + path);
         if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
         if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        return request;
+    }
+
+    async Task<JsonNode?> SendAsync(HttpMethod method, string path, JsonNode? body = null, CancellationToken ct = default)
+    {
+        using var request = Request(method, path, body);
         using var r = await client.SendAsync(request, ct);
-        string text = await r.Content.ReadAsStringAsync(ct);
+        return Read(r, await r.Content.ReadAsStringAsync(ct));
+    }
+
+    /// <summary>What a reply says: its JSON; null for an older library without the route; our refusal, thrown.</summary>
+    static JsonNode? Read(HttpResponseMessage r, string text)
+    {
         JsonObject? asObject = text.Length > 0 && text.TrimStart().StartsWith('{') ? JsonNode.Parse(text) as JsonObject : null;
         if (r.StatusCode == HttpStatusCode.NotFound && asObject?["detail"] is null)
             return null; // an older library: this route doesn't exist there, not that nothing matched
@@ -190,6 +208,52 @@ public sealed class AiRemote(string serverUrl, string key, HttpClient? http = nu
 
     public async Task<AskReply?> AskAsync(AskRequest request) =>
         As<AskReply>(await SendAsync(HttpMethod.Post, "/ask", JsonSerializer.SerializeToNode(request, Options)));
+
+    /// <summary>The answer as the library streams it (see the library's <c>/api/v2/ai/ask</c> with <c>stream</c>),
+    /// read a line at a time as each arrives. Stopping closes the connection, which stops the engine too.</summary>
+    public async Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop)
+    {
+        var body = JsonSerializer.SerializeToNode(request, Options)!.AsObject();
+        body["stream"] = true;
+        using var message = Request(HttpMethod.Post, "/ask", body);
+        using var r = await client.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, stop);
+        if (r.Content.Headers.ContentType?.MediaType != "application/x-ndjson")
+            return As<AskReply>(Read(r, await r.Content.ReadAsStringAsync(stop))); // an older library answers once, at the end
+        using var lines = new StreamReader(await r.Content.ReadAsStreamAsync(stop), Encoding.UTF8);
+        var answer = new StringBuilder();
+        while (await lines.ReadLineAsync(stop) is { } line)
+        {
+            if (line.Length == 0 || JsonNode.Parse(line) is not JsonObject said) continue;
+            string text = Py.AsString(said["text"]) ?? "";
+            switch (Py.AsString(said["kind"]))
+            {
+                case "text":
+                    answerSoFar(answer.Append(text).ToString());
+                    break;
+                case "answer":
+                    answerSoFar(answer.Clear().Append(text).ToString());
+                    break;
+                case "done":
+                    return As<AskReply>(said["reply"]);
+                case "error":
+                    throw new LibraryRefusedException(said["status"] is JsonValue sv && sv.TryGetValue(out int status) ? status : 503,
+                        Py.AsString(said["detail"]) ?? "");
+            }
+        }
+        throw new HttpRequestException("The library stopped answering partway through.");
+    }
+
+    public async Task WarmAsync(string? engine)
+    {
+        try
+        {
+            await SendAsync(HttpMethod.Post, "/warm", new JsonObject { ["engine"] = engine });
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException or JsonException)
+        {
+            // only ever a head start: the question itself says what's wrong
+        }
+    }
 
     public async Task<RewriteInfo?> RewriteAsync(string lecture) =>
         As<RewriteInfo>(await SendAsync(HttpMethod.Get, $"/rewrite/{Seg(lecture)}"));

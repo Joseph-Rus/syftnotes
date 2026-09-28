@@ -18,7 +18,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// <summary>How the library checks whether each engine is ready, without ever contacting an account.</summary>
     public EngineChecks Checks { get; init; } = EngineChecks.Machine;
 
-    /// <summary>How long <see cref="AskAsync"/> waits for the picked engine before falling back to Ollama.</summary>
+    /// <summary>How long <see cref="AskAsync"/> waits for the picked engine before falling back to Ollama: for the
+    /// whole answer, or, when it's shown as it's written, for the engine to start writing it.</summary>
     public TimeSpan AskTimeout { get; init; } = TimeSpan.FromSeconds(90);
 
     /// <summary>A model Ollama is pulling right now, for <see cref="AiOverview.Pulling"/>. Null once it's done.</summary>
@@ -53,24 +54,26 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
 
     /// <summary>Answering with a specific engine, not the one ai.json picks for a job — the "Answer with" menu's
     /// choice, and this class's own fallback to Ollama in <see cref="AskAsync"/>.</summary>
-    async Task<string> AnswerWithAsync(string engine, string model, string prompt, CancellationToken ct)
+    async Task<string> AnswerWithAsync(string engine, string model, string prompt, CancellationToken ct, Action<string>? soFar = null)
     {
         var provider = Provider(engine);
-        var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch()) { Model = model, Timeout = TimeSpan.FromMinutes(15) }, ct);
+        var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch()) { Model = model, Timeout = TimeSpan.FromMinutes(15) }, ct, soFar);
         if (!result.Ok) throw new InvalidOperationException(result.Text);
         return result.Text;
     }
 
-    async Task<string> JsonAnswerWithAsync(string engine, string model, string prompt, JsonObject schema, CancellationToken ct)
+    async Task<string> JsonAnswerWithAsync(string engine, string model, string prompt, JsonObject schema, CancellationToken ct,
+        Action<string>? soFar = null)
     {
         string text = await AnswerWithAsync(engine, model, prompt + "\n\nAnswer with only a JSON object that fits this JSON schema, and nothing else:\n"
-            + schema.ToJsonString(), ct);
+            + schema.ToJsonString(), ct, soFar);
         return FirstObject(text) ?? throw new InvalidDataException("the answer wasn't JSON");
     }
 
-    /// <summary>Ask a question with one named engine, ignoring ai.json's own "ask" pick.</summary>
-    public LibraryReader.AskChatFn AskWith(string engine, string model = "", CancellationToken ct = default) =>
-        (prompt, schema) => JsonAnswerWithAsync(engine, model, prompt, schema, ct);
+    /// <summary>Ask a question with one named engine, ignoring ai.json's own "ask" pick. <paramref name="soFar"/>,
+    /// when given, hears the engine's reply as it's written (all of it so far, each time more arrives).</summary>
+    public LibraryReader.AskChatFn AskWith(string engine, string model = "", CancellationToken ct = default, Action<string>? soFar = null) =>
+        (prompt, schema) => JsonAnswerWithAsync(engine, model, prompt, schema, ct, soFar);
 
     /// <summary>A JSON answer from the AI picked for <paramref name="job"/>, for work that returns a plan.</summary>
     public Task<string> PlanAsync(string job, string prompt, JsonObject schema) => JsonAnswerAsync(job, prompt, schema);
@@ -294,14 +297,50 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         }, ct);
     }
 
+    DateTime warmedAt = DateTime.MinValue;
+    readonly Lock warming = new();
+
+    /// <summary>How often <see cref="Warm"/> asks Ollama to load its model at most: loaded, it stays loaded for
+    /// <see cref="OllamaProvider.KeepLoaded"/> after each question anyway.</summary>
+    public static readonly TimeSpan WarmEvery = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// A student has started typing a question for <paramref name="engine"/> (or the "ask" pick): when Ollama will
+    /// answer it, its model starts loading now, in the background, so the answer isn't held up by the load. True
+    /// when that started; a CLI engine has nothing to get ready.
+    /// </summary>
+    public bool Warm(string? engine, Config cfg)
+    {
+        var settings = Settings;
+        string who = engine is { Length: > 0 } e ? e : settings.For("ask").Provider;
+        if (who != "ollama" && settings.Fallback && Engines.KnownUnusableWhy(who, settings, Checks) is not null) who = "ollama";
+        if (who != "ollama" || (!cfg.OllamaEnabled && Providers is null)) return false;
+        lock (warming)
+        {
+            if (DateTime.UtcNow - warmedAt < WarmEvery) return false;
+            warmedAt = DateTime.UtcNow;
+        }
+        _ = Provider(who).WarmAsync(AskModel(who, settings, cfg));
+        return true;
+    }
+
+    /// <summary>The model an engine answers questions with: for Ollama the library's own model (the one Settings
+    /// picks and the engines pane checks is there), not just the biggest one installed, which may be far slower.</summary>
+    static string AskModel(string engine, AiSettings settings, Config cfg) =>
+        engine == "ollama" ? cfg.EffectiveSummaryModel : settings.Models.GetValueOrDefault(engine, "");
+
     /// <summary>
     /// Answer a question with a chosen engine (the request's, or ai.json's "ask" pick): when it's known unusable
     /// (not installed, not signed in, hit its limit) and <see cref="AiSettings.Fallback"/> is on, Ollama answers up
     /// front; otherwise it's tried for real, under <see cref="AskTimeout"/>, and only falls back on a timeout or an
     /// error (never mid-run: that's the pipeline's own job). Every engine that's actually run has its result
     /// recorded (<see cref="Record"/>).
+    /// <para><paramref name="answerSoFar"/>, when given, hears the answer as it's written (all of it so far, each
+    /// time more arrives), and the timeout only covers the wait for the engine to start. Once the student is reading
+    /// an answer it's never thrown away for another engine's: a failure then says what stopped it.</para>
     /// </summary>
-    public async Task<AskReply> AskAsync(AskRequest request, LibraryReader reader, Config cfg, CancellationToken ct = default)
+    public async Task<AskReply> AskAsync(AskRequest request, LibraryReader reader, Config cfg, CancellationToken ct = default,
+        Action<string>? answerSoFar = null)
     {
         var settings = Settings;
         string asked = request.Engine is { Length: > 0 } e ? e : settings.For("ask").Provider;
@@ -318,11 +357,21 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         if (engine == "ollama" && !cfg.OllamaEnabled && Providers is null)
             throw new InvalidOperationException("Asking needs an engine: turn one on in AI engines.");
 
-        async Task<JsonObject> RunAsync(string who, CancellationToken token)
+        string shown = "";
+        async Task<JsonObject> RunAsync(string who, CancellationTokenSource timer)
         {
-            string model = settings.Models.GetValueOrDefault(who, "");
+            string model = AskModel(who, settings, cfg);
+            Action<string>? written = answerSoFar is null ? null : raw =>
+            {
+                timer.CancelAfter(Timeout.InfiniteTimeSpan); // it's answering: from here it has as long as it needs
+                if (AskAnswer.SoFar(raw) is { Length: > 0 } now && now != shown)
+                {
+                    shown = now;
+                    answerSoFar(now);
+                }
+            };
             var answer = await reader.AskAsync(request.Question, request.Lecture, request.Class, request.Live,
-                request.LiveTitle is { Length: > 0 } t ? t : "This lecture", AskWith(who, model, token));
+                request.LiveTitle is { Length: > 0 } t ? t : "This lecture", AskWith(who, model, timer.Token, written));
             Record(who, true, "");
             return answer;
         }
@@ -332,7 +381,17 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         cts.CancelAfter(AskTimeout);
         try
         {
-            result = await RunAsync(engine, cts.Token);
+            result = await RunAsync(engine, cts);
+        }
+        catch (InvalidDataException) when (shown.Length > 0)
+        {
+            // Its answer came through; only the list of sources after it didn't.
+            result = new JsonObject { ["answer"] = Py.Strip(shown), ["sources"] = new JsonArray() };
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or HttpRequestException or TimeoutException && shown.Length > 0)
+        {
+            Record(engine, false, ex.Message);
+            throw new InvalidOperationException($"{Engines.Name(engine)} stopped partway through: {ex.Message}", ex);
         }
         catch (Exception ex) when (ex is InvalidOperationException or InvalidDataException or HttpRequestException or TimeoutException or OperationCanceledException)
         {
@@ -345,7 +404,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             engine = "ollama";
             using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts2.CancelAfter(AskTimeout);
-            result = await RunAsync(engine, cts2.Token);
+            result = await RunAsync(engine, cts2);
         }
 
         var sources = (result["sources"] as JsonArray ?? []).Select(s => new AskSource(
