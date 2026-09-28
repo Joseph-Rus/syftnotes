@@ -5,6 +5,8 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
     <PackageReference Include="Microsoft.Msagl" Version="1.1.6" />
     <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
+    <!-- The typed text in a PDF, on Windows (a Mac reads it with its own PDFKit). -->
+    <PackageReference Include="PdfPig" Version="0.1.16" />
     <PackageReference Include="QRCoder" Version="1.8.0" />
     <PackageReference Include="ReverseMarkdown" Version="6.2.1" />
     <PackageReference Include="Tomlyn" Version="2.10.1" />

@@ -373,6 +373,27 @@ public class AttachmentsApiTests
     }
 
     [Fact]
+    public async Task A_scanned_photo_attachment_gets_its_words_from_the_real_reader()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var owned = store;
+        // No ReadDocument override here: this goes through DocumentText.ExtractAsync itself, Vision included.
+        await using var site = await Site(cfg, store, new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>([]),
+            Latest = _ => Task.FromResult<Release?>(null),
+        });
+        byte[] photo = File.ReadAllBytes(DocumentOcrTests.Fixture("handwriting.png"));
+        var body = await Upload(site, Form([("notes.png", photo)], lecture: "n1"));
+        string id = body["attachments"]![0]!["id"]!.GetValue<string>();
+        await Read(store, id);
+        var list = await Json(await site.Client.SendAsync(Req(HttpMethod.Get, "/api/v2/attachments?lecture=n1")));
+        Assert.True(list["attachments"]![0]!["hasText"]!.GetValue<bool>());
+    }
+
+    [Fact]
     public async Task A_reader_that_fails_leaves_the_attachment_without_words_not_stuck()
     {
         using var dir = new TempDir();

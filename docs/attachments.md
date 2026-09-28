@@ -57,10 +57,10 @@ or only ever downloads.
 
 ## How attachments feed notes, Ask and Claude
 
-Once a file is saved, the library reads its words in the background, one attachment at a time (reading
-handwriting is slow, so a stack of scans doesn't tie up the whole computer). Today that's a small fallback
-(`DocumentText.ExtractAsync`) that reads embedded text the same way file search already does; real OCR — reading
-handwriting and scans — replaces that one method later without anything else here changing.
+Once a file is saved, the library reads its words in the background with `DocumentText.ExtractAsync`, one
+attachment at a time (reading handwriting is slow, so a stack of scans doesn't tie up the whole computer). That's
+the same reading file search uses: typed text as it is, and the computer's own text recognition (handwriting and
+scans too) where there isn't any — see `docs/document-text.md`.
 
 - **Notes**: when the engine writes a lecture's study notes, it includes the words from that lecture's
   attachments (and the class's, for context), each labelled as "The student's own notes", "Slides" or a
