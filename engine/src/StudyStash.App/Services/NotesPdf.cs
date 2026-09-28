@@ -115,6 +115,9 @@ public static class NotesPdf
         footer.Children.Add(footerPage);
         // The look's tokens in the light look and the first colour theme: paper is white, whatever the screen shows.
         var host = new StackPanel { Children = { column, footer }, Resources = Skin.Build(Skin.Current, ColourThemes.Default) };
+        // A plain colon throughout, not the raised one SF Pro and Inter put between figures: that glyph stands for no
+        // letter, so "3:1" or a time like 10:30 would copy, and be found by a search, as "3 1".
+        host.SetValue(TextElement.FontFeaturesProperty, FontFeatureCollection.Parse("-calt"));
         // Never shown: it's what gives the pieces the app's styles, and the light look.
         var window = new Window { Content = host, RequestedThemeVariant = ThemeVariant.Light, ShowInTaskbar = false, ShowActivated = false };
         try
@@ -237,13 +240,7 @@ public static class NotesPdf
             foreach (var line in timed ? TimedText.Parse(raw) : [new Spoken(0, 0, raw)])
             {
                 var row = new Grid { ColumnDefinitions = new ColumnDefinitions(timed ? "48,12,*" : "0,0,*") };
-                // A plain colon, not the Mac font's raised one between figures (or its figures of one width): that glyph
-                // stands for no letter, so a time copied or searched for in the PDF would read "01 05".
-                if (timed)
-                    row.Children.Add(Token(new TextBlock
-                    {
-                        Text = TimedText.Clock(line.Start), FontSize = 12, Margin = new Thickness(0, 3, 0, 0), FontFeatures = FontFeatureCollection.Parse("-calt"),
-                    }, "Fg2"));
+                if (timed) row.Children.Add(Token(new TextBlock { Text = TimedText.Clock(line.Start), FontSize = 12, Margin = new Thickness(0, 3, 0, 0) }, "Fg2"));
                 var said = Token(new TextBlock { Text = line.Text, FontSize = mac ? 16 : 15, LineHeight = (mac ? 16 : 15) * 1.6, TextWrapping = TextWrapping.Wrap }, "Fg");
                 said.Bind(TextBlock.FontFamilyProperty, said.GetResourceObservable(mac ? "SerifFont" : "TextFont"));
                 Grid.SetColumn(said, 2);

@@ -258,6 +258,20 @@ public class NotesPdfTests
         }
     }
 
+    /// <summary>Some fonts (SF Pro, Inter) raise a colon between figures with a glyph that stands for no letter; on
+    /// paper the plain colon is kept, so "3:1" and "10:30" copy and search as written, in either look.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public async Task A_colon_between_figures_reads_back_as_a_colon(SkinKind skin)
+    {
+        Look(skin);
+        var pdf = await PdfAsync(Lecture("## Ratios\nThe inspiration to expiration ratio is 1:2, and rounds start at 10:30.\n\n| Ratio | Time |\n|---|---|\n| 3:1 | 07:45 |\n"));
+        Assert.Equal(1, pdf.Count("ratio is 1:2, and rounds start at 10:30."));
+        Assert.Equal(1, pdf.Count("3:1"));
+        Assert.Equal(1, pdf.Count("07:45"));
+    }
+
     [AvaloniaFact]
     public async Task A_link_in_the_notes_can_be_clicked_in_the_pdf()
     {
