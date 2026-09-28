@@ -332,7 +332,7 @@ public sealed partial class LibraryWeb
         }));
         app.MapPost("/note/{noteId}/delete", (HttpContext ctx, string noteId) => WithMember(ctx, _ =>
         {
-            store.Delete(noteId);
+            store.Trash(noteId);
             return Http.SeeOther("/");
         }));
         app.MapGet("/note/{noteId}/download", (HttpContext ctx, string noteId) => WithMember(ctx, _ =>
@@ -352,6 +352,12 @@ public sealed partial class LibraryWeb
             return Http.SeeOther($"/settings?queued={n}");
         }));
         app.MapPost("/settings/update", Http.Handle(UpdateNow));
+        app.MapPost("/settings/course-names", (HttpContext ctx) => WithMember(ctx, _ =>
+        {
+            var done = UseCourseNames(null);
+            lastRenameProblem = done["problem"]?.GetValue<string>() ?? "";
+            return Http.SeeOther($"/settings?renamed={(done["renamed"] as JsonArray)?.Count ?? 0}#classes");
+        }));
         Icons.Map(app);
 
         app.MapGet("/api/health", (HttpContext ctx) => RequireKey(ctx) ?? Http.Json(new JsonObject
@@ -635,7 +641,37 @@ public sealed partial class LibraryWeb
         return $"<select id=\"{field}\" name=\"{field}\">{string.Concat(opts)}</select>";
     }
 
-    async Task<IResult> Settings(HttpContext ctx, int? saved, int? queued, string? canvas, string? folders) => await WithMemberAsync(ctx, async role =>
+    /// <summary>What stopped the last "Use Canvas course names" on the web page, said once on the page after it.</summary>
+    string lastRenameProblem = "";
+
+    /// <summary>The web page's "Use Canvas course names": each class that would be renamed, old name → course name,
+    /// and one button that asks before it renames them. Empty when every linked class already has its course's name.</summary>
+    string CourseNamesGroup(int? renamed)
+    {
+        string say = "";
+        if (renamed is int r)
+        {
+            say = r > 0 ? $"<div class=\"notice good\"><div>Renamed {r} class{Plural(r, "", "es")} to {(r == 1 ? "its" : "their")} Canvas course name{Plural(r, "", "s")}. Their lectures moved with them.</div></div>" : "";
+            if (lastRenameProblem.Length > 0) say += $"<div class=\"notice\"><div>{Ui.Esc(lastRenameProblem)}</div></div>";
+            lastRenameProblem = "";
+        }
+        var plan = ClassRename.Plan(cfg, Canvas.Settings);
+        if (plan.Count == 0) return say;
+        var counts = store.ClassesSummary().ToDictionary(x => x.ClassName, x => x.Count);
+        string rows = string.Concat(plan.Select(st =>
+            $"<div class=\"row\"><span class=\"grow\">{Ui.Esc(st.From)} → <strong>{Ui.Esc(st.To)}</strong></span>"
+            + $"<span class=\"value\">{counts.GetValueOrDefault(st.From)} lecture{Plural(counts.GetValueOrDefault(st.From), "", "s")}</span></div>"));
+        string blocked = ClassRename.Blocked(Canvas.Crawl) is { } why ? $"<div class=\"notice\"><div>{Ui.Esc(why)}</div></div>" : "";
+        string button = blocked.Length > 0 ? ""
+            : $"<form class=\"row\" method=\"post\" action=\"/settings/course-names\" data-confirm=\"Rename {plan.Count} class{Plural(plan.Count, "", "es")} to {(plan.Count == 1 ? "its" : "their")} Canvas course name{Plural(plan.Count, "", "s")}? Their folders and lectures move with them.\">"
+              + $"<span class=\"grow\">Rename {plan.Count} class{Plural(plan.Count, "", "es")}</span><button class=\"primary\">Use Canvas course names</button></form>";
+        return say + "<div class=\"group-head\" id=\"course-names\">Use Canvas course names</div>" + blocked
+            + $"<div class=\"group\">{rows}{button}</div>"
+            + "<p class=\"group-foot\">These classes are named from course codes. Each takes its Canvas course's name; its folder, "
+            + "lectures and Canvas files go with it, and the old name stays as one of its other names.</p>";
+    }
+
+    async Task<IResult> Settings(HttpContext ctx, int? saved, int? queued, string? canvas, string? folders, int? renamed) => await WithMemberAsync(ctx, async role =>
     {
         var c = Context(role, "settings", ("/", cfg.PoolName));
         var models = await options.ListModels(cfg.OllamaHost);
@@ -721,12 +757,12 @@ public sealed partial class LibraryWeb
                 + $"<input class=\"wide\" type=\"text\" name=\"class_desc_{i}\" value=\"{Ui.Esc(k.Description)}\" placeholder=\"What it covers (helps the AI)\" aria-label=\"Description\">"
                 + "</div>");
         }
-        string classes = $"<div class=\"group-head\">Classes</div><div class=\"group\">{string.Concat(rows)}</div>"
+        string classes = $"<div class=\"group-head\" id=\"classes\">Classes</div><div class=\"group\">{string.Concat(rows)}</div>"
             + "<p class=\"group-foot\">Lectures are sorted into these. A lecture recorded for a class, or whose title "
             + "matches a name here, is filed without asking the AI. Removing a class keeps its lectures; move them "
             + "from their pages. Fill in the last row to add a class.</p>";
         string form = $"<form method=\"post\" action=\"/settings\">{ai}{classes}"
-            + "<div class=\"actions\"><button class=\"primary\">Save settings</button></div></form>";
+            + "<div class=\"actions\"><button class=\"primary\">Save settings</button></div></form>" + CourseNamesGroup(renamed);
 
         var ts = options.Tailscale();
         string url = HostInfo.ServerUrls(cfg.WebPort, ts, options.HostName())[0];

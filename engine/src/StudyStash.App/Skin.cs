@@ -85,10 +85,10 @@ public static class Skin
         {
             MacTokens(light, theme, dark: false);
             MacTokens(dark, theme, dark: true);
-            d["TextFont"] = new FontFamily("SF Pro Text, avares://StudyStash/Assets/Fonts#Inter");
-            d["DisplayFont"] = new FontFamily("SF Pro Display, avares://StudyStash/Assets/Fonts#Inter Display");
+            d["TextFont"] = new FontFamily("SF Pro Text, avares://StudyStash/Assets/Fonts#Inter, Apple Symbols"); // Apple Symbols: key signs like ↩ as text, never an emoji
+            d["DisplayFont"] = new FontFamily("SF Pro Display, avares://StudyStash/Assets/Fonts#Inter Display, Apple Symbols");
             // The design reads notes in New York. Where it isn't installed, Charter (on every Mac) reads as well.
-            d["SerifFont"] = new FontFamily("New York, Charter, Georgia, avares://StudyStash/Assets/Fonts#Inter");
+            d["SerifFont"] = new FontFamily("New York, Charter, Georgia, avares://StudyStash/Assets/Fonts#Inter, Apple Symbols");
             d["RadiusPanel"] = new CornerRadius(14);
             d["RadiusControl"] = new CornerRadius(6);
             d["RadiusMenu"] = new CornerRadius(10);

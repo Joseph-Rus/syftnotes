@@ -83,6 +83,11 @@ public static class CanvasView
     {
         long? id = s.Courses.TryGetValue(cls, out long cid) ? cid : null;
         var suggested = id is null ? CourseMatch.Suggest(cls, s.Available, s.CourseInfo) : null;
+        var titles = CourseNames.Of(s);
+        string idText = id?.ToString(CultureInfo.InvariantCulture) ?? "";
+        var info = s.CourseInfo.GetValueOrDefault(idText);
+        string title = titles.GetValueOrDefault(idText) ?? (index is { Name.Length: > 0 } ? CourseNames.Title(index.Name, index.Code) : "");
+        string shortCode = CourseNames.ShortCode(index?.Code is { Length: > 0 } c ? c : info?.Code ?? "", index?.Name ?? info?.Name ?? "");
         var done_ = index?.Assignments.Select(a => Assignments.From(cls, a, now).Done).ToList() ?? [];
         int toHandIn = done_.Count(d => !d), done = done_.Count(d => d);
         int newAnnouncements = index?.Announcements.Count(a => !a.ReadOnCanvas) ?? 0;
@@ -92,8 +97,9 @@ public static class CanvasView
             ["canvas"] = id is null ? null : new JsonObject
             {
                 ["id"] = id, ["code"] = index?.Code ?? "", ["name"] = index?.Name ?? "", ["term"] = index?.Term ?? "", ["url"] = index?.HtmlUrl ?? "",
+                ["title"] = title, ["short_code"] = shortCode,
             },
-            ["suggested"] = suggested is { } sug ? new JsonObject { ["id"] = sug.Id, ["name"] = sug.Name } : null,
+            ["suggested"] = suggested is { } sug ? new JsonObject { ["id"] = sug.Id, ["name"] = titles.GetValueOrDefault(sug.Id) ?? sug.Name } : null,
             ["last_sync"] = When(index?.SyncedAt),
             ["counts"] = new JsonObject
             {

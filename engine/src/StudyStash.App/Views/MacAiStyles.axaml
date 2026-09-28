@@ -322,6 +322,34 @@
     <Setter Property="LineHeight" Value="18.85" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
+  <Style Selector="SelectableTextBlock.ai-answer">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="18.85" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- The library's answer card: solid, so the notes never show through it; the question it answers heads it. -->
+  <Style Selector="Border.ai-answer-card">
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Background" Value="{DynamicResource PopupBg}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BoxShadow" Value="{DynamicResource PopupShadow}" />
+  </Style>
+  <Style Selector="TextBlock.ai-asked">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+  </Style>
+  <Style Selector="ScrollViewer.ai-answer-scroll">
+    <Setter Property="MaxHeight" Value="220" />
+  </Style>
+  <Style Selector="Button.ai-close">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
   <Style Selector="TextBlock.ai-byline">
     <Setter Property="FontSize" Value="11" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />

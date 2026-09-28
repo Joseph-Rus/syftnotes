@@ -80,15 +80,13 @@ public class AppHostTests
         using var host = Host(home.Path);
         // app.json's temporary file can't be written where a folder is.
         Directory.CreateDirectory(home["app.json.tmp"]);
-        Directory.CreateDirectory(home["timetable.json"]);
         List<string> said = [];
         host.Problem += (title, _) => said.Add(title);
 
         host.Save(s => s.Language = "fr");
-        host.SaveTimetable(new Timetable());
 
         Assert.Equal("fr", host.Settings.Language);
-        Assert.Equal(["Your settings couldn't be saved", "Your timetable couldn't be saved"], said);
+        Assert.Equal(["Your settings couldn't be saved"], said);
     }
 
     [Fact]

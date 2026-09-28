@@ -80,13 +80,16 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
         }
         else
         {
-            // Sort on our notes when we have them: they are cleaner than the raw transcript.
+            // Sort on our notes when we have them: they are cleaner than the raw transcript. A lecture recorded with no
+            // class has no folder: the AI reads it against each class's name, other names, what it covers and its
+            // course's name on Canvas.
             var basis = summary.Length > 0 ? m.WithNotes(summary) : m;
-            c = await Classify.ClassifyAsync(basis, Cfg, chat);
-            if (c.By is "folder" or "rules" && Cfg.OllamaEnabled && Cfg.Classes.Count > 0)
+            var classes = Classify.WithCanvas(Cfg.Classes, Cfg.Home);
+            c = await Classify.ClassifyAsync(basis, Cfg, chat, classes);
+            if (c.By is "folder" or "rules" && Cfg.OllamaEnabled && classes.Count > 0)
             {
                 // The folder or title picked the class; still let the model name the lecture and tag its topics.
-                var described = await Classify.WithOllamaAsync(basis, Cfg.Classes, Cfg, chat);
+                var described = await Classify.WithOllamaAsync(basis, classes, Cfg, chat);
                 if (described is not null)
                 {
                     if (described.LectureTitle.Length > 0) c.LectureTitle = described.LectureTitle;

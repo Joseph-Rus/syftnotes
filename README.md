@@ -17,7 +17,9 @@ Free and open source, for Mac and Windows, and everything stays on your own comp
 - **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
   to review, written by Ollama (free and private) or by Claude Code, Codex or Gemini with the plan
   you already have. Rewrite a lecture's notes with another engine and keep whichever you like.
-- **Files every lecture under its class.** Anything it can't place waits in **Unsorted**.
+- **Files every lecture under its class**, working out which from what was said, or using the class
+  you picked. Anything it can't place waits in **Unsorted**, and a lecture you don't need can be
+  deleted (with Undo).
 - **Ask about any lecture, class, or all of them.** The Ask bar under a lecture's notes answers
   from your notes and transcripts, with the engine you pick for that question.
 - **Finds anything in a second.** The quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows)

@@ -59,6 +59,4 @@ public partial class SettingsView : UserControl
             Chrome.Classes.Set("chrome", value);
         }
     }
-
-    void OnTimesLostFocus(object? sender, RoutedEventArgs e) => (DataContext as SettingsModel)?.SaveTimetableCommand.Execute(null);
 }

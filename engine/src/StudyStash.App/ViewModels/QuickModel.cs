@@ -63,9 +63,12 @@ public sealed partial class QuickModel : ObservableObject
 
     public bool HasNote => !string.IsNullOrEmpty(Note);
     public bool Searching => !Answering;
-    public string AskHint => Skin.Current == SkinKind.Mac ? "⌘↩ Ask your notes" : "Ctrl+Enter to ask";
-    public string AskKey => Skin.Current == SkinKind.Mac ? "⌘↩" : "Ctrl+Enter";
-    public string OpenKey => Skin.Current == SkinKind.Mac ? "↩" : "Enter";
+    /// <summary>The Return key's sign, asked for as text: on its own a Mac draws ↩ as a blue emoji keycap.</summary>
+    public const string Return = "\u21A9\uFE0E";
+
+    public string AskHint => Skin.Current == SkinKind.Mac ? $"⌘{Return} Ask your notes" : "Ctrl+Enter to ask";
+    public string AskKey => Skin.Current == SkinKind.Mac ? $"⌘{Return}" : "Ctrl+Enter";
+    public string OpenKey => Skin.Current == SkinKind.Mac ? Return : "Enter";
     public string CopyKey => Skin.Current == SkinKind.Mac ? "⌘C" : "Ctrl+C";
     public string CloseKey => Skin.Current == SkinKind.Mac ? "esc" : "Esc";
 
