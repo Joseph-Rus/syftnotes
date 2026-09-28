@@ -24,8 +24,18 @@ Free and open source, for Mac and Windows, and everything stays on your own comp
   from your notes and transcripts, with the engine you pick for that question.
 - **Finds anything in a second.** The quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows)
   searches lectures, passages in your notes, and classes, and asks your notes a question.
+- **Knows what's coming up.** Paste your calendar's link (Google's secret iCal address, iCloud,
+  Outlook or your school's) in Settings → Calendars and pick which calendars to share. Upcoming
+  classes show in the menu bar, the quick panel and the library, and a lecture recorded during one
+  is named after it and filed under its class.
+- **Takes your own notes and slides too.** Attach iPad handwriting, slides, PDFs or photos to a
+  lecture or class (drag them in). Their words, handwriting included, are read on your computer
+  and go into the lecture's notes, Ask and Claude.
 - **Brings in Canvas.** What's due across your classes, each assignment's instructions, rubric,
   your submission and feedback, module files and pages, announcements, quizzes and discussions.
+- **Comes with you on your phone.** Your library serves a phone app over Tailscale: read your
+  notes, see what's coming up, search, and add photos and PDFs to a lecture from your iPhone or
+  iPad. Settings → Your library → Phone shows a code to pair it ([docs/phone.md](docs/phone.md)).
 - **Lets Claude read your library** over MCP: Claude Code, Claude Desktop and claude.ai.
 - **Looks at home on your computer.** A native Mac look (Liquid Glass) and Windows 11's, light and
   dark, with ten colour themes in Settings → Appearance.
@@ -197,21 +207,24 @@ per class, which you can open, back up or sync however you like.
 
 ## Build from source
 
-You need the [.NET 10 SDK](https://dotnet.microsoft.com).
+You need the [.NET 10 SDK](https://dotnet.microsoft.com), and [Node](https://nodejs.org) (22 or later) for the
+phone app in `web/`.
 
 ```sh
 dotnet build engine/StudyStash.slnx
 dotnet test engine/StudyStash.slnx
 dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
+(cd web && npm ci && npm test && npm run build)   # the phone app, into web/dist, which the app then carries
 ```
 
-`macos/build-app.sh` builds "Study Stash.app" and its DMGs (with Xcode's command line tools), and
-`windows/build.ps1` the Windows installers. `engine/README.md` has more on the projects and tests.
+`macos/build-app.sh` builds "Study Stash.app" and `Study-Stash.dmg` (with Xcode's command line tools), and
+`windows/build.ps1` `Study-Stash-Setup.exe`; both build the phone app into it first. `engine/README.md` has more on the projects and tests.
 
 Releases come from CI (`.github/workflows/ci.yml`): every change is tested on macOS, Linux and
 Windows, and both apps are built, self-tested and installed. To ship a release, bump
-`StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI publishes the four
-installers and `SHA256SUMS.txt`. A push that only changes the version, on top of a commit that
+`StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI publishes
+`Study-Stash.dmg`, `Study-Stash-Setup.exe` (and copies under the old installers' names, so older copies
+still update) and `SHA256SUMS.txt`. A push that only changes the version, on top of a commit that
 already passed, skips the tests and just builds and publishes.
 
 ## License
