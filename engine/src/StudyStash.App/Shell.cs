@@ -373,6 +373,7 @@ public static partial class Shell
     {
         bool mac = OperatingSystem.IsMacOS();
         bool hidden = mac && MacStatusItem.Check() is { Seen: false };
+        if (!IconWords.WorthSaying(hidden, panelWindow?.IsVisible == true)) return;
         var (title, text) = IconWords.WhereItIs(mac, hidden);
         // Longer than most: it's the one way to find the app when its icon can't be seen.
         Toast(title, text, hidden ? IconWords.ShowIt : null, hidden ? MoveIconIntoView : null, TimeSpan.FromSeconds(hidden ? 30 : 12));
