@@ -1,0 +1,330 @@
+/* Screens: the boot gate (install, pair, unreachable), a lecture's notes, and uploading. Shared list/button/nav
+   styles are in kit.css. */
+
+.app-shell {
+  position: relative;
+  height: 100%;
+}
+
+.splash {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--ground);
+  color: var(--fg2);
+}
+
+/* --- install / pair / unreachable: one centred column that fills the screen -------------------------------- */
+
+.install,
+.pair {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  background: var(--ground);
+}
+
+.install-body,
+.pair-body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px var(--gutter) 24px;
+  gap: 14px;
+}
+
+.install-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: var(--accent);
+  color: var(--on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 26px/1 var(--font-display);
+  box-shadow: var(--shadow);
+  margin-bottom: 6px;
+}
+
+.install h1,
+.pair h1 {
+  margin: 0;
+  font: 700 24px/1.25 var(--font-display);
+  max-width: 26ch;
+}
+
+.lede {
+  margin: 0;
+  color: var(--fg2);
+  font-size: 16px;
+  max-width: 34ch;
+}
+
+.steps {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  width: 100%;
+  max-width: 340px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.steps li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--raised);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  font-size: 15px;
+}
+.steps-icon {
+  flex: none;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-text);
+  font-size: 18px;
+}
+
+.install-footer {
+  padding: 14px var(--gutter);
+  text-align: center;
+}
+
+.code-input {
+  width: 100%;
+  max-width: 260px;
+  text-align: center;
+  font: 600 34px/1 var(--font-mono);
+  letter-spacing: 0.28em;
+  padding: 12px 0 12px 0.28em;
+  border-radius: 14px;
+  background: var(--raised);
+  box-shadow: var(--shadow);
+  color: var(--fg);
+  margin-top: 6px;
+}
+
+.pair-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 14px;
+  max-width: 30ch;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  max-width: 320px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--fg2);
+}
+.field input {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--raised);
+  box-shadow: var(--shadow);
+  color: var(--fg);
+  font-size: 16px;
+}
+
+.pair-body .button,
+.install-body .button {
+  width: 100%;
+  max-width: 320px;
+}
+
+/* --- a lecture's notes ---------------------------------------------------------------------------------------- */
+
+.lecture-meta {
+  padding: 0 var(--gutter) 4px;
+  color: var(--fg2);
+  font-size: 14px;
+}
+
+.prose {
+  padding: 8px var(--gutter) 4px;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.prose h1,
+.prose h2,
+.prose h3 {
+  font-family: var(--font-display);
+  line-height: 1.3;
+}
+.prose h1 {
+  font-size: 22px;
+}
+.prose h2 {
+  font-size: 19px;
+  margin-top: 1.4em;
+}
+.prose h3 {
+  font-size: 17px;
+}
+.prose p {
+  margin: 0.7em 0;
+}
+.prose pre {
+  overflow-x: auto;
+  background: var(--fill);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+.prose code {
+  font-family: var(--font-mono);
+}
+.prose figure.diagram {
+  margin: 1em 0;
+  text-align: center;
+}
+.prose figure.diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.prose th,
+.prose td {
+  border-bottom: 0.5px solid var(--sep);
+  padding: 6px 8px;
+  text-align: left;
+}
+.prose .math {
+  overflow-x: auto;
+  display: inline-block;
+  max-width: 100%;
+}
+.prose .math.display {
+  display: block;
+  margin: 0.8em 0;
+  text-align: center;
+}
+.prose .diagram-problem {
+  color: var(--fg2);
+}
+
+/* --- upload -------------------------------------------------------------------------------------------------- */
+
+.upload-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.upload-buttons .button {
+  flex: 1;
+}
+
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  background: var(--raised);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 8px;
+}
+.upload-row-icon {
+  flex: none;
+  color: var(--fg2);
+}
+.upload-row-body {
+  flex: 1;
+  min-width: 0;
+}
+.upload-row-title {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.upload-progress {
+  height: 4px;
+  background: var(--fill);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.upload-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.15s linear;
+}
+.upload-row-done,
+.upload-row-error {
+  font-size: 13px;
+  color: var(--fg2);
+  margin-top: 2px;
+}
+.upload-row-error {
+  color: var(--red);
+}
+
+/* --- search -------------------------------------------------------------------------------------------------- */
+
+.search-field {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--fg);
+  font-size: 16px;
+}
+.search-field::placeholder {
+  color: var(--fg3);
+}
+
+/* --- an iPad: two columns, no bottom tab bar ------------------------------------------------------------------ */
+
+@media (min-width: 700px) {
+  .app-shell {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    height: 100%;
+  }
+  .tabbar {
+    position: static;
+    flex-direction: column;
+    height: 100%;
+    padding-top: calc(var(--safe-top) + 16px);
+    padding-bottom: var(--safe-bottom);
+    border-top: none;
+    border-right: 0.5px solid var(--sep);
+    order: -1;
+  }
+  .tabbar a,
+  .tabbar button {
+    flex: none;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    height: 44px;
+    padding: 0 20px;
+    font-size: 15px;
+  }
+  .scroll-body {
+    padding-bottom: 24px;
+  }
+}

@@ -1,0 +1,428 @@
+/* The pieces every screen is built from (see ui/kit.tsx): navigation bars, inset grouped lists, buttons, empty
+   states, the tab bar, and the small controls (segmented, dots, spinner). Colours and fonts come from base.css and
+   the running theme (theme/themes.ts writes the custom properties this reads). */
+
+.screen {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--ground);
+}
+
+.navbar {
+  position: relative;
+  z-index: 2;
+  padding-top: var(--safe-top);
+  background: var(--glass);
+  backdrop-filter: saturate(1.6) blur(20px);
+  -webkit-backdrop-filter: saturate(1.6) blur(20px);
+  border-bottom: 0.5px solid transparent;
+  transition: border-color 0.2s var(--ease);
+}
+.navbar.condensed {
+  border-color: var(--sep);
+}
+
+.navbar-row {
+  height: var(--nav-h);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 6px;
+  gap: 4px;
+}
+
+.navbar-side {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.navbar-side.left {
+  justify-content: flex-start;
+}
+.navbar-side.right {
+  justify-content: flex-end;
+}
+
+.navbar-title {
+  margin: 0;
+  font: 600 17px/1.2 var(--font);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity 0.15s var(--ease);
+}
+.navbar.condensed .navbar-title {
+  opacity: 1;
+}
+
+.navbar-accessory {
+  padding: 0 var(--gutter) 10px;
+}
+
+.back {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  color: var(--accent-text);
+  font: 500 17px/1 var(--font);
+  padding: 8px 6px 8px 2px;
+  margin: -8px 0 -8px -2px;
+  max-width: 44vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.back svg {
+  flex: none;
+  margin-right: -2px;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: var(--accent-text);
+}
+.icon-button:active {
+  background: var(--press);
+}
+.icon-button.filled {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.pull {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  transition: height 0.2s var(--ease);
+}
+.pull.idle {
+  transition: none;
+}
+.pull.spinning {
+  transition: none;
+}
+.pull .spinner {
+  margin-bottom: 10px;
+}
+
+.scroll-body {
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 24px);
+}
+.scroll-body.settle {
+  transition: transform 0.2s var(--ease);
+}
+
+.large-title {
+  padding: 4px var(--gutter) 10px;
+}
+.large-title h1 {
+  margin: 0;
+  font: 700 34px/1.15 var(--font-display);
+  letter-spacing: -0.02em;
+}
+.large-title .subtitle {
+  margin: 4px 0 0;
+  color: var(--fg2);
+  font-size: 15px;
+}
+
+.title-sentinel {
+  height: 1px;
+}
+
+.section {
+  padding: 0 var(--gutter);
+  margin-bottom: 22px;
+}
+.section-title {
+  margin: 0 0 6px 14px;
+  font: 600 13px/1.2 var(--font);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--fg2);
+}
+.section-footer {
+  margin: 6px 14px 0;
+  font-size: 13px;
+  color: var(--fg2);
+}
+
+.group {
+  background: var(--raised);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 11px 14px;
+  width: 100%;
+  text-align: left;
+  color: var(--fg);
+  background: none;
+  border: none;
+  position: relative;
+}
+.row + .row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 14px;
+  right: 0;
+  height: 0.5px;
+  background: var(--sep);
+}
+.row.tappable:active {
+  background: var(--press);
+}
+.row.selected {
+  background: var(--accent-tint);
+}
+.row-lead {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg2);
+}
+.row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.row-title {
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-subtitle {
+  font-size: 13px;
+  color: var(--fg2);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+}
+.row-detail {
+  flex: none;
+  color: var(--fg2);
+  font-size: 15px;
+}
+.row-chevron {
+  flex: none;
+  color: var(--fg3);
+  margin-right: -4px;
+}
+.row.skeleton .bar {
+  display: block;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--fill);
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+.row.skeleton .bar.thin {
+  height: 8px;
+  margin-top: 4px;
+}
+@keyframes shimmer {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.dot {
+  border-radius: 999px;
+  flex: none;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 12px;
+  font: 600 16px/1 var(--font);
+  white-space: nowrap;
+}
+.button.wide {
+  width: 100%;
+}
+.button.filled {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.button.filled:active {
+  filter: brightness(0.92);
+}
+.button.tinted {
+  background: var(--accent-tint);
+  color: var(--accent-text);
+}
+.button.tinted:active {
+  filter: brightness(0.96);
+}
+.button.plain {
+  background: none;
+  color: var(--accent-text);
+  min-height: 36px;
+  padding: 0 4px;
+}
+.button.danger {
+  background: none;
+  color: var(--red);
+}
+.button.small {
+  min-height: 34px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+.button:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.segmented {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--count), 1fr);
+  background: var(--fill);
+  border-radius: 9px;
+  padding: 2px;
+  height: 36px;
+}
+.segmented-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  height: calc(100% - 4px);
+  width: calc((100% - 4px) / var(--count));
+  background: var(--raised);
+  border-radius: 7px;
+  box-shadow: var(--shadow);
+  transform: translateX(calc(var(--index) * 100%));
+  transition: transform 0.2s var(--ease);
+}
+.segmented button {
+  position: relative;
+  z-index: 1;
+  font: 500 13px/1 var(--font);
+  color: var(--fg2);
+}
+.segmented button.on {
+  color: var(--fg);
+}
+
+.spinner {
+  position: relative;
+  display: inline-block;
+}
+.spinner i {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 28%;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: currentColor;
+  color: var(--fg2);
+  transform-origin: 50% 250%;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 32px;
+  color: var(--fg2);
+}
+.empty-icon {
+  color: var(--fg3);
+  margin-bottom: 10px;
+}
+.empty h2 {
+  margin: 0 0 6px;
+  font: 600 18px/1.3 var(--font);
+  color: var(--fg);
+}
+.empty p {
+  margin: 0;
+  font-size: 15px;
+  max-width: 34ch;
+}
+.empty-action {
+  margin-top: 16px;
+}
+
+.problem {
+  padding: 16px var(--gutter);
+  text-align: center;
+}
+.problem p {
+  margin: 0 0 10px;
+  color: var(--fg2);
+  font-size: 15px;
+}
+
+.tabbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  padding-bottom: var(--safe-bottom);
+  background: var(--glass);
+  backdrop-filter: saturate(1.6) blur(20px);
+  -webkit-backdrop-filter: saturate(1.6) blur(20px);
+  border-top: 0.5px solid var(--sep);
+}
+.tabbar a,
+.tabbar button {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: var(--tabbar-h);
+  color: var(--fg3);
+  font: 500 11px/1 var(--font);
+}
+.tabbar a.on,
+.tabbar button.on {
+  color: var(--accent-text);
+}
