@@ -1,0 +1,88 @@
+<!-- Which Canvas courses to bring in (Settings -> Canvas, setup's Canvas step, the connect window), Fluent: one card,
+     one row per course on the steps' grid — tick | name, with its short code and term under it | why it's left out,
+     on the right — every row one height. In Settings a change waits for the bar under the card: Save, or, when it
+     drops courses, Keep them / Remove them. Inside the connect steps ("inset") the rows sit in the step's own card. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.WinCoursePicker"
+             x:DataType="vm:CoursePickerModel">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/WinCanvasStyles.axaml" />
+    <Style Selector="CheckBox.pk-tick">
+      <Setter Property="MinWidth" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Grid.pk-row">
+      <Setter Property="Height" Value="52" />
+      <Setter Property="Margin" Value="16,0" />
+    </Style>
+    <Style Selector="TextBlock.pk-title">
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="TextBlock.pk-detail">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <Style Selector="TextBlock.pk-why">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="12,0,0,0" />
+    </Style>
+    <Style Selector="Border.pk-sep">
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Background" Value="{DynamicResource Sep}" />
+    </Style>
+    <Style Selector="ItemsControl.pk-list > ContentPresenter:nth-last-child(1) Border.pk-sep">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <!-- In the connect steps the list is part of the step's card: no card of its own, rows from the body's edge. -->
+    <Style Selector=":is(UserControl).inset Border.pk-group">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector=":is(UserControl).inset Border.pk-sep">
+      <Setter Property="Margin" Value="0,0,12,0" />
+    </Style>
+    <Style Selector=":is(UserControl).inset Grid.pk-row">
+      <Setter Property="Margin" Value="0,0,12,0" />
+    </Style>
+  </UserControl.Styles>
+  <StackPanel Spacing="8">
+    <Border Classes="cv-group pk-group" IsVisible="{Binding HasCourses}">
+      <ItemsControl Classes="pk-list" ItemsSource="{Binding Courses}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:CoursePick">
+            <StackPanel>
+              <Grid Classes="pk-row" ColumnDefinitions="20,12,*,Auto">
+                <CheckBox Classes="pk-tick" IsChecked="{Binding Ticked}" />
+                <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="1" MinWidth="0">
+                  <TextBlock Classes="pk-title" Text="{Binding Title}" />
+                  <TextBlock Classes="pk-detail" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />
+                </StackPanel>
+                <TextBlock Grid.Column="3" Classes="pk-why" Text="{Binding Right}" />
+              </Grid>
+              <Border Classes="pk-sep" />
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+    <!-- Settings: the change, and what saving it does -->
+    <Grid ColumnDefinitions="*,Auto" MinHeight="32" IsVisible="{Binding ShowSaveBar}">
+      <TextBlock Classes="cv-value" Text="{Binding ChangeLine}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Button Classes="cv-btn" IsEnabled="{Binding !Saving}" Command="{Binding CancelCommand}"><TextBlock Text="Cancel" /></Button>
+        <Button Classes="cv-btn" IsVisible="{Binding Drops}" IsEnabled="{Binding !Saving}" Command="{Binding RemoveCommand}"><TextBlock Text="Remove them" /></Button>
+        <Button Classes="cv-btn cv-primary" IsVisible="{Binding Drops}" IsEnabled="{Binding !Saving}" Command="{Binding KeepCommand}"><TextBlock Text="Keep them" /></Button>
+        <Button Classes="cv-btn cv-primary" IsVisible="{Binding OnlyAdds}" IsEnabled="{Binding !Saving}" Command="{Binding SaveCommand}"><TextBlock Text="Save" /></Button>
+      </StackPanel>
+    </Grid>
+    <TextBlock Classes="cv-value" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
+  </StackPanel>
+</UserControl>

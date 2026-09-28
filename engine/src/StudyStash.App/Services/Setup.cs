@@ -302,6 +302,15 @@ public static class Setup
         m.AddingCourses = true;
         try
         {
+            var cc0 = host.Client();
+            canvas ??= cc0.ServerUrl.Length > 0 ? new CanvasClient(cc0.ServerUrl, cc0.PoolKey) : null;
+            // The library makes the classes itself from the courses chosen, and remembers the choice (only those sync).
+            if (canvas is not null && await ChooseCoursesAsync(canvas, ticked.Select(c => c.Id).ToList(), host))
+            {
+                _ = SyncSoonAsync(canvas, host);
+                await host.CheckLibraryAsync();
+                return true;
+            }
             var lib = host.Remote();
             var had = host.Classes().Select(c => c.Name).ToHashSet();
             foreach (var c in ticked)
@@ -318,8 +327,6 @@ public static class Setup
                     host.Log($"[setup] the library didn't take the class {name}: {e.Message}");
                 }
             }
-            var cc = host.Client();
-            canvas ??= cc.ServerUrl.Length > 0 ? new CanvasClient(cc.ServerUrl, cc.PoolKey) : null;
             if (canvas is not null)
             {
                 try
@@ -339,6 +346,21 @@ public static class Setup
         finally
         {
             m.AddingCourses = false;
+        }
+    }
+
+    /// <summary>Tells the library which courses to bring in (POST canvas/choose). False from a library older than the
+    /// choice, or one that didn't answer: then the classes are added and linked one by one, the old way.</summary>
+    static async Task<bool> ChooseCoursesAsync(CanvasClient canvas, List<string> ids, AppHost host)
+    {
+        try
+        {
+            return await canvas.ChooseAsync(ids) is not null;
+        }
+        catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            host.Log($"[canvas] setup couldn't choose the courses: {e.Message}");
+            return false;
         }
     }
 

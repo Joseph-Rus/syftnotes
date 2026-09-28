@@ -6,6 +6,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacCanvasConnect"
              x:DataType="vm:CanvasConnectModel">
   <UserControl.Styles>
@@ -115,16 +116,26 @@
           <TextBlock Grid.Column="3" Classes="cv-value" Text="{Binding Step3.Summary}" VerticalAlignment="Center" IsVisible="{Binding Step3.IsDone}" />
           <Panel Grid.Column="3" IsVisible="{Binding Step3.IsCurrent}" VerticalAlignment="Center">
             <Button Classes="cv-pill cv-mini cv-primary" IsVisible="{Binding SignedOut}" Command="{Binding OpenCanvasCommand}"><TextBlock Text="Open Canvas" /></Button>
-            <StackPanel Classes="cv-action" IsVisible="{Binding !SignedOut}">
+            <StackPanel Classes="cv-action" IsVisible="{Binding ShowFind}">
               <c:Spinner IsVisible="{Binding FindingCourses}" Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" />
               <TextBlock Classes="cv-value" Text="Looking…" IsVisible="{Binding FindingCourses}" />
               <Button Classes="cv-pill cv-mini cv-primary" IsVisible="{Binding !FindingCourses}" Command="{Binding FindCoursesCommand}"><TextBlock Text="Find my courses" /></Button>
             </StackPanel>
           </Panel>
+          <!-- Settings' window, once the courses are found: the ticked ones become classes, then matching -->
+          <Button Grid.Column="3" Classes="cv-pill cv-mini cv-primary" IsVisible="{Binding ShowBringIn}" IsEnabled="{Binding !Linking}"
+                  Command="{Binding BringInCommand}"><TextBlock Text="{Binding BringInLabel}" /></Button>
         </Grid>
         <StackPanel Classes="cv-body" IsVisible="{Binding Step3.IsCurrent}">
           <TextBlock Classes="cv-step-body" Text="Sign in to Canvas in Chrome. Study Stash looks again by itself once you have." IsVisible="{Binding SignedOut}" />
-          <TextBlock Classes="cv-step-body" Text="{Binding CoursesSay}" IsVisible="{Binding CoursesSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Classes="cv-step-body" Text="{Binding CoursesSay}" IsVisible="{Binding ShowCoursesSay}" />
+        </StackPanel>
+        <!-- Which courses to bring in: this term's ticked, the rest (past terms, sandboxes, chapel) not -->
+        <StackPanel Classes="cv-body" Spacing="6" IsVisible="{Binding ShowPicker}">
+          <TextBlock Classes="cv-step-body" Text="{Binding PickerHint}" />
+          <ScrollViewer MaxHeight="{Binding PickerHeight}" VerticalScrollBarVisibility="Auto">
+            <v:MacCoursePicker Classes="inset" DataContext="{Binding Picker}" />
+          </ScrollViewer>
         </StackPanel>
 
         <!-- 4 Match each class to a course (Settings' window only) -->

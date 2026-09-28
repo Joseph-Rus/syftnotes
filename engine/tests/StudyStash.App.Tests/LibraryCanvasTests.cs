@@ -128,20 +128,23 @@ public class LibraryCanvasTests
         var extension = rig.RunExtensionAsync(chrome.Token);
         try
         {
-            // Chrome checks in: the step moves on by itself, finds the courses and lands on matching them.
+            // Chrome checks in: the step moves on by itself and finds the courses, both this term's so both ticked.
             await Until(async () =>
             {
                 await watch.RefreshAsync(stop);
-                return m.Current == 4;
-            }, "the connect steps to reach matching");
-            Assert.Equal("Found 2 courses.", m.CoursesSay);
-            Assert.Equal(["CS 101", "BIO 110"], m.Courses.Select(r => r.Class));
-            Assert.Equal("4201", m.Courses[0].Selected?.Id); // suggested from the course code, preselected
-            Assert.Equal("4202", m.Courses[1].Selected?.Id);
+                return m.Current == 3 && m.Picker.HasCourses;
+            }, "the connect steps to find the courses");
+            Assert.Equal("Found 2 courses. Tick the ones to bring in.", m.CoursesSay);
+            Assert.All(m.Picker.Courses, c => Assert.True(c.Ticked));
 
-            await m.LinkTheseCommand.ExecuteAsync(null);
-            Assert.Null(m.LinkError);
+            // Bringing them in links each to the class this library already has for it: every class has its course,
+            // so it's straight on to the first sync.
+            await m.BringInCommand.ExecuteAsync(null);
+            Assert.DoesNotContain("Your library", m.Picker.Say ?? "", StringComparison.Ordinal);
             Assert.Equal(5, m.Current);
+            var linked = await client.ClassesAsync(stop);
+            Assert.Equal("4201", linked!.Single(c => c.Class == "CS 101").Canvas?.Id);
+            Assert.Equal("4202", linked!.Single(c => c.Class == "BIO 110").Canvas?.Id);
             await m.SyncNowCommand.ExecuteAsync(null);
             await Until(() => Task.FromResult(CanvasSettings.Load(rig.Home).LastDone.Length > 0), "the sync to finish", 60);
         }
@@ -254,6 +257,42 @@ public class LibraryCanvasTests
         }
     }
 
+    /// <summary>The app chooses courses on a real library: the chosen course becomes a class of its own name, the
+    /// library keeps the choice, and the sync reads that course and not the other.</summary>
+    [Fact]
+    public async Task Choosing_courses_from_the_app_makes_their_classes_and_only_those_sync()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        var stop = TestContext.Current.CancellationToken;
+        var client = rig.Client();
+        await client.SaveAsync(url: FakeCanvas.Base, stop: stop);
+        using var chrome = CancellationTokenSource.CreateLinkedTokenSource(stop);
+        var extension = rig.RunExtensionAsync(chrome.Token);
+        try
+        {
+            var found = await client.FindCoursesAsync(stop);
+            Assert.All(found!.CourseInfo, c => Assert.True(c.Suggested)); // both in this term
+            var chose = await client.ChooseAsync(["4202"], stop: stop);
+            Assert.Equal(["Cells and Systems"], chose!.Outcome!.Added);
+            Assert.Equal(["4202"], chose.Chosen);
+            Assert.True(chose.CourseInfo.Single(c => c.Id == "4202").Chosen);
+            Assert.False(chose.CourseInfo.Single(c => c.Id == "4201").Chosen);
+            Assert.Equal("Cells and Systems", chose.CourseInfo.Single(c => c.Id == "4202").Class);
+
+            await Until(() => Task.FromResult(CanvasSettings.Load(rig.Home).LastDone.Length > 0), "the sync to finish", 60);
+            Assert.NotNull(CourseIndex.Load(rig.Home, "Cells and Systems"));
+            Assert.Null(CourseIndex.Load(rig.Home, "CS 101"));
+            var classes = await client.ClassesAsync(stop);
+            Assert.True(classes!.Single(c => c.Class == "Cells and Systems").Linked);
+            Assert.False(classes!.Single(c => c.Class == "CS 101").Linked);
+        }
+        finally
+        {
+            chrome.Cancel();
+            await extension;
+        }
+    }
+
     /// <summary>What happened on a real library: an old Chrome registration (seen a minute ago, from before keys were
     /// written down, or with a key the library no longer gives out) made the app skip the extension step, and Find my
     /// courses then had no Chrome to ask. Only a Chrome with the current key moves it on.</summary>
@@ -294,7 +333,7 @@ public class LibraryCanvasTests
         Assert.False(extension.Connected);
         Assert.NotNull(extension.RefusedAt);
 
-        // The student's Chrome with this library's key checks in: now it moves on, all the way to matching.
+        // The student's Chrome with this library's key checks in: now it moves on, all the way to the courses found.
         using var chrome = CancellationTokenSource.CreateLinkedTokenSource(stop);
         var running = rig.RunExtensionAsync(chrome.Token);
         try
@@ -302,7 +341,7 @@ public class LibraryCanvasTests
             await Until(async () =>
             {
                 await watch.RefreshAsync(stop);
-                return m.Current == 4;
+                return m.Current == 3 && m.Picker.HasCourses;
             }, "the extension step to see Chrome");
         }
         finally

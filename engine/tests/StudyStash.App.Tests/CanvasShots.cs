@@ -87,11 +87,68 @@ public class CanvasShots
         .Json(HttpMethod.Post, "/api/v2/canvas/scout", "canvas")
         .Json(HttpMethod.Post, "/api/v2/canvas", "canvas");
 
-    internal static async Task<CanvasSettingsModel> Settings(string state = "state-connected")
+    internal static async Task<CanvasSettingsModel> Settings(string state = "state-connected", string overview = "canvas")
     {
-        var model = new CanvasSettingsModel(CanvasFixtures.Context(ConnectedLibrary(state)));
+        var model = new CanvasSettingsModel(CanvasFixtures.Context(ConnectedLibrary(state).Json(HttpMethod.Get, "/api/v2/canvas", overview)));
         await model.LoadAsync();
         return model;
+    }
+
+    /// <summary>A library whose student chose three of seven courses: this term's in, last term's, a sandbox and chapel
+    /// out, each saying why. Made-up courses.</summary>
+    internal const string ChosenCourses = """
+        {"url": "https://school.instructure.com",
+         "courses": {"CS 101": 4201, "BIO 110": 4202, "CALC II": 4203, "HIST 210": 0},
+         "chosen": ["4201", "4202", "4203"],
+         "available": {"4201": "Intro to Programming", "4202": "Cell and Molecular Biology", "4203": "Calculus II", "4204": "Modern World History",
+                       "4206": "Statics", "4207": "Sandbox for Dr. Okafor", "4208": "Chapel and Convocation"},
+         "course_info": {
+           "4201": {"code": "COMP 101", "name": "Intro to Programming", "term": "Fall 2025", "title": "Intro to Programming", "short_code": "COMP 101", "chosen": true, "suggested": true, "why": "", "class": "CS 101"},
+           "4202": {"code": "BIO 110", "name": "Cell and Molecular Biology", "term": "Fall 2025", "title": "Cell and Molecular Biology", "short_code": "BIO 110", "chosen": true, "suggested": true, "why": "", "class": "BIO 110"},
+           "4203": {"code": "MATH 142", "name": "Calculus II", "term": "Fall 2025", "title": "Calculus II", "short_code": "MATH 142", "chosen": true, "suggested": true, "why": "", "class": "CALC II"},
+           "4204": {"code": "HIST 210", "name": "Modern World History", "term": "Fall 2025", "title": "Modern World History", "short_code": "HIST 210", "chosen": false, "suggested": true, "why": "", "class": null},
+           "4206": {"code": "MECH2010.A", "name": "Statics(MECH2010.A)", "term": "Spring 2025", "title": "Statics", "short_code": "MECH 2010", "chosen": false, "suggested": false, "why": "Past term", "class": null},
+           "4207": {"code": "SBX", "name": "Sandbox for Dr. Okafor", "term": "Default Term", "title": "Sandbox for Dr. Okafor", "short_code": "", "chosen": false, "suggested": false, "why": "Not a class", "class": null},
+           "4208": {"code": "GEN0100.A", "name": "Chapel and Convocation(GEN0100.A)", "term": "Fall 2025", "title": "Chapel and Convocation", "short_code": "GEN 0100", "chosen": false, "suggested": false, "why": "Not a class", "class": null}}}
+        """;
+
+    /// <summary>Settings → Canvas with the course picker: as saved, and with a change waiting (one course added, one
+    /// dropped: Keep them / Remove them).</summary>
+    internal static async Task<(CanvasSettingsModel Saved, CanvasSettingsModel Changed)> PickerSettingsAsync()
+    {
+        var saved = await Settings(overview: ChosenCourses);
+        var changed = await Settings(overview: ChosenCourses);
+        changed.Picker.Courses.First(c => c.Id == "4204").Ticked = true;
+        changed.Picker.Courses.First(c => c.Id == "4203").Ticked = false;
+        return (saved, changed);
+    }
+
+    [AvaloniaFact]
+    public async Task Mac_course_picker()
+    {
+        var (saved, changed) = await PickerSettingsAsync();
+        foreach (var t in Themes)
+        {
+            Shot.Take("mac-06-canvas-courses", SkinKind.Mac, t, () => CanvasFrames.MacSettings(new MacCanvasSettings { DataContext = saved }));
+            Shot.Take("mac-06-canvas-courses-changed", SkinKind.Mac, t, () => CanvasFrames.MacSettings(new MacCanvasSettings { DataContext = changed }));
+        }
+        var connect = await CoursesStepAsync();
+        foreach (var t in Themes)
+            Shot.Take("mac-07-canvas-connect-courses", SkinKind.Mac, t, () => CanvasFrames.MacSetup(new MacCanvasConnect { DataContext = connect }));
+    }
+
+    [AvaloniaFact]
+    public async Task Win_course_picker()
+    {
+        var (saved, changed) = await PickerSettingsAsync();
+        foreach (var t in Themes)
+        {
+            Shot.Take("win-06-canvas-courses", SkinKind.Win, t, () => CanvasFrames.WinSettings(new WinCanvasSettings { DataContext = saved }));
+            Shot.Take("win-06-canvas-courses-changed", SkinKind.Win, t, () => CanvasFrames.WinSettings(new WinCanvasSettings { DataContext = changed }));
+        }
+        var connect = await CoursesStepAsync();
+        foreach (var t in Themes)
+            Shot.Take("win-07-canvas-connect-courses", SkinKind.Win, t, () => CanvasFrames.WinSetup(new WinCanvasConnect { DataContext = connect }));
     }
 
     [AvaloniaFact]
@@ -299,16 +356,33 @@ public class CanvasShots
         return m;
     }
 
-    /// <summary>Found my courses, as a library sends them (course_info keyed by id).</summary>
+    /// <summary>Found my courses, as a library sends them (course_info keyed by id): four of this term's, and a past
+    /// term's course and a sandbox the picker leaves unticked.</summary>
     internal const string FoundCourses = """
         {"url": "https://school.instructure.com",
-         "available": {"4201": "Intro to Programming", "4202": "Cell and Molecular Biology", "4203": "Calculus II", "4204": "Modern World History", "4205": "Study Skills"},
-         "course_info": {"4201": {"code": "CS 101", "name": "Intro to Programming", "term": "Fall 2025"},
-                         "4202": {"code": "BIO 110", "name": "Cell and Molecular Biology", "term": "Fall 2025"},
-                         "4203": {"code": "CALC II", "name": "Calculus II", "term": "Fall 2025"},
-                         "4204": {"code": "HIST 210", "name": "Modern World History", "term": "Fall 2025"},
-                         "4205": {"code": "", "name": "Study Skills", "term": "Fall 2025"}}}
+         "available": {"4201": "Intro to Programming", "4202": "Cell and Molecular Biology", "4203": "Calculus II", "4204": "Modern World History",
+                       "4206": "Statics", "4207": "Sandbox for Dr. Okafor"},
+         "course_info": {"4201": {"code": "CS 101", "name": "Intro to Programming", "term": "Fall 2025", "suggested": true},
+                         "4202": {"code": "BIO 110", "name": "Cell and Molecular Biology", "term": "Fall 2025", "suggested": true},
+                         "4203": {"code": "CALC II", "name": "Calculus II", "term": "Fall 2025", "suggested": true},
+                         "4204": {"code": "HIST 210", "name": "Modern World History", "term": "Fall 2025", "suggested": true},
+                         "4206": {"code": "MECH2010.A", "name": "Statics(MECH2010.A)", "term": "Spring 2025", "title": "Statics", "short_code": "MECH 2010", "suggested": false, "why": "Past term"},
+                         "4207": {"code": "SBX", "name": "Sandbox for Dr. Okafor", "term": "Default Term", "suggested": false, "why": "Not a class"}}}
         """;
+
+    /// <summary>Settings' connect window on Your courses: the courses found, ticked, and Bring in in the step's row.</summary>
+    internal static async Task<CanvasConnectModel> CoursesStepAsync()
+    {
+        var unmatched = new List<CanvasApi.ClassRow> { new() { Class = "CS 101", Linked = false, Suggested = "4201" } };
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas/state", "state-connected")
+            .Json(HttpMethod.Post, "/api/v2/canvas/courses", FoundCourses);
+        var m = Connect(handler);
+        m.ShowFooter = true;
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), unmatched);
+        m.Dispose();
+        return m;
+    }
 
     /// <summary>Setup's Canvas step: "chrome" (Add to Chrome, not pressed yet), "waiting" (pressed: the folder and
     /// Chrome are open), or "found" (Chrome connected and five courses found).</summary>
@@ -353,10 +427,12 @@ public class CanvasShots
         var handler = new FakeLibrary()
             .Json(HttpMethod.Get, "/api/v2/canvas/state", "state-connected")
             .Json(HttpMethod.Post, "/api/v2/canvas/courses", "canvas")
+            .Json(HttpMethod.Post, "/api/v2/canvas/choose", "canvas")
             .Json(HttpMethod.Get, "/api/v2/canvas/classes", JsonSerializer.Serialize(unmatched, CanvasApi.Json));
         var m = Connect(handler);
         m.ShowFooter = true;
-        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), unmatched); // finds courses and lands on step 4 itself
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), unmatched); // finds courses on its own
+        await m.BringInCommand.ExecuteAsync(null); // then on to matching
         return m;
     }
 

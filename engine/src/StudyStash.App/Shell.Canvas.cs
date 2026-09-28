@@ -294,6 +294,11 @@ public static partial class Shell
         Look.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
+        model.Picker.OnSaved = () =>
+        {
+            LibraryClassesChanged();
+            return Task.CompletedTask;
+        };
         model.OnSkip = w.Close;
         model.OnBack = w.Close;
         model.OnFinish = () =>

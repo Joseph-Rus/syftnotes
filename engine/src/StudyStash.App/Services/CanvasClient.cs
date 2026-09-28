@@ -142,6 +142,13 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
     public Task<CanvasApi.Overview?> FindCoursesAsync(CancellationToken stop = default) =>
         SendAsync<CanvasApi.Overview>(HttpMethod.Post, canvasRoot + "/courses", null, stop);
 
+    /// <summary>Which courses to bring in (<see cref="CanvasApi.Overview.Outcome"/> says what changed): a class for
+    /// each new one; the rest stop syncing, their classes and files kept (<paramref name="keep"/>) or removed. Null
+    /// from a library older than the choice.</summary>
+    public Task<CanvasApi.Overview?> ChooseAsync(IReadOnlyList<string> courses, bool keep = true, bool match = false, CancellationToken stop = default) =>
+        SendAsync<CanvasApi.Overview>(HttpMethod.Post, canvasRoot + "/choose",
+            new JsonObject { ["courses"] = new JsonArray([.. courses.Select(c => (JsonNode)c)]), ["keep"] = keep, ["match"] = match }, stop);
+
     public Task ScoutAsync(string cls, CancellationToken stop = default) =>
         SendAsync<JsonObject>(HttpMethod.Post, canvasRoot + "/scout", new JsonObject { ["class"] = cls }, stop);
 

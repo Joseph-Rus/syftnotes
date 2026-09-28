@@ -78,6 +78,51 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
                 new ConnectStep { Number = 5, Title = "First sync" },
             ];
         watch.Changed += OnWatchChanged;
+        Picker = new CoursePickerModel(context);
+        Picker.OnChanged = OnPickerChanged;
+    }
+
+    /// <summary>Which of the found courses to bring in: shown under Your courses once they're found. In setup the
+    /// ticked ones are what <see cref="Found"/> hands to the Classes step; in Settings' window "Bring these in" makes
+    /// them classes before matching.</summary>
+    public CoursePickerModel Picker { get; }
+
+    /// <summary>The picker shows: courses were found, and Your courses is open (or setup's Canvas is done).</summary>
+    public bool ShowPicker => Picker.HasCourses && (Current == 3 || ForSetup && AllDone);
+
+    /// <summary>The line over the picker: what Find my courses found (Settings' window), or in setup how to use it.</summary>
+    public string PickerHint => ForSetup ? "Tick the courses to bring in. Only these become classes and sync." : CoursesSay ?? "";
+    /// <summary>What Find my courses said shows on its own only while there's no list to tick under it.</summary>
+    public bool ShowCoursesSay => !string.IsNullOrEmpty(CoursesSay) && !ShowPicker;
+
+    partial void OnCoursesSayChanged(string? value)
+    {
+        OnPropertyChanged(nameof(PickerHint));
+        OnPropertyChanged(nameof(ShowCoursesSay));
+    }
+
+    /// <summary>"Bring in 5 courses" (Settings' window, on Your courses).</summary>
+    public string BringInLabel => Picker.TickedCount == 1 ? "Bring in 1 course" : $"Bring in {Picker.TickedCount} courses";
+    public bool ShowBringIn => !ForSetup && Current == 3 && Picker.HasCourses && !FindingCourses && !SignedOut;
+    /// <summary>Find my courses (or "Looking…") shows on Your courses until there's a list to tick.</summary>
+    public bool ShowFind => !SignedOut && !ShowBringIn;
+    /// <summary>The picker's list scrolls past this: setup's window is shorter than Settings' connect window.</summary>
+    public double PickerHeight => ForSetup ? 300 : 200;
+
+    partial void OnSignedOutChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowBringIn));
+        OnPropertyChanged(nameof(ShowFind));
+    }
+
+    void OnPickerChanged()
+    {
+        if (found is not null) Found = [.. FoundFrom(found).Where(f => Picker.Courses.Any(p => p.Id == f.Id && p.Ticked))];
+        OnPropertyChanged(nameof(ShowPicker));
+        OnPropertyChanged(nameof(ShowCoursesSay));
+        OnPropertyChanged(nameof(BringInLabel));
+        OnPropertyChanged(nameof(ShowBringIn));
+        OnPropertyChanged(nameof(ShowFind));
     }
 
     /// <summary>Setup's three parts (school, Chrome, courses); the classes come in setup's own next step.</summary>
@@ -188,7 +233,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         _ when !ExtensionConnected(s) => 2,
         "signed_out" => 3,
         _ when ForSetup => 3,
-        _ => classes.Count > 0 && classes.All(c => !c.Linked) ? 3 : 5,
+        _ => classes.Any(c => c.Linked) ? 5 : 3,
     };
 
     /// <summary>Chrome is checking in now with the library's current key. Only that moves past the extension step:
@@ -214,7 +259,20 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         }
     }
 
-    partial void OnCurrentChanged(int value) => OnPropertyChanged(nameof(AllDone));
+    partial void OnCurrentChanged(int value)
+    {
+        OnPropertyChanged(nameof(AllDone));
+        OnPropertyChanged(nameof(ShowPicker));
+        OnPropertyChanged(nameof(ShowCoursesSay));
+        OnPropertyChanged(nameof(ShowBringIn));
+        OnPropertyChanged(nameof(ShowFind));
+    }
+
+    partial void OnFindingCoursesChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowBringIn));
+        OnPropertyChanged(nameof(ShowFind));
+    }
 
     void StopHurrying()
     {
@@ -449,16 +507,16 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
                 CoursesSay = answer.Error;
                 return;
             }
-            Found = FoundFrom(answer);
-            CoursesSay = answer.Available.Count == 1 ? "Found 1 course." : $"Found {answer.Available.Count} courses.";
-            Steps[2].Summary = CoursesSay.TrimEnd('.');
+            Picker.Fill(answer);
+            CoursesSay = answer.Available.Count == 1 ? "Found 1 course. Tick the ones to bring in." : $"Found {answer.Available.Count} courses. Tick the ones to bring in.";
+            Steps[2].Summary = answer.Available.Count == 1 ? "Found 1 course" : $"Found {answer.Available.Count} courses";
             if (ForSetup)
             {
                 await GoToAsync(Steps.Count + 1, null, stop);
                 return;
             }
-            var classes = await client.ClassesAsync(stop) ?? [];
-            await GoToAsync(4, classes, stop);
+            // Settings' window stays on Your courses: "Bring in" makes the ticked courses classes, then matching.
+            OnPickerChanged();
         }
         catch (CanvasLibraryException e)
         {
@@ -500,6 +558,29 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         var names = CourseNames.Unique(courses);
         var list = courses.Select(c => new FoundCourse(c.Id, codes[c.Id], names[c.Id]));
         return [.. list.OrderBy(f => f.ClassName, StringComparer.OrdinalIgnoreCase)];
+    }
+
+    /// <summary>Settings' window: the ticked courses become classes (a class this library already has takes the course
+    /// it seems to be), then on to matching the rest, or straight to the sync when every class has its course.</summary>
+    [RelayCommand]
+    async Task BringIn()
+    {
+        if (context.Client is not { } client) return;
+        Linking = true;
+        try
+        {
+            if (!await Picker.ChooseAsync(keep: true, match: true)) return;
+            var classes = await client.ClassesAsync() ?? [];
+            await GoToAsync(classes.Any(c => !c.Linked) ? 4 : 5, classes, default);
+        }
+        catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            Picker.Say = "Your library didn't answer.";
+        }
+        finally
+        {
+            Linking = false;
+        }
     }
 
     [RelayCommand]

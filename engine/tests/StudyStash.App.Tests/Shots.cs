@@ -569,7 +569,7 @@ public class SurfaceShots
         {
             m.Classes.Clear();
             m.Classes.Add(new SetupClass { Name = "Chapel", About = "Weekly chapel talks", Dot = Skin.ClassDot(4) });
-            m.Courses[4].Ticked = false;
+            m.Courses[^1].Ticked = false;
         }
         m.Go(step);
         return m;
