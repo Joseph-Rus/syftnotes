@@ -111,8 +111,9 @@ public sealed class SelfTestEngine : IAsyncDisposable
     }
 
     /// <summary>Fixed, non-repetitive Markdown (Summarize.Repetitive would reject a real loop): enough distinct
-    /// lines that the pipeline keeps it, plus the marker line the self-test looks for.</summary>
-    static string Notes() => string.Join('\n',
+    /// lines that the pipeline keeps it, plus the marker line the self-test looks for. Its details carry a formula
+    /// inline and one on its own line, and a flowchart, so the self-test sees the app draw them.</summary>
+    internal static string Notes() => string.Join('\n',
     [
         "## Summary",
         "The lecture reviewed the coming midterm and worked through recursion, tying it back to the course's earlier units.",
@@ -125,6 +126,21 @@ public sealed class SelfTestEngine : IAsyncDisposable
         "## Definitions",
         "- **Recursion**: a function that calls itself to solve a smaller instance of the same problem.",
         "- **Base case**: the condition that stops the recursion from continuing forever.",
+        "",
+        "## Details and examples",
+        @"Summing a list of $n$ numbers recursively does one addition per call, $T(n) = T(n-1) + c$, so it takes $O(n)$ steps.",
+        "",
+        "$$",
+        @"T(n) = \sum_{k=1}^{n} c = c\,n",
+        "$$",
+        "",
+        "```mermaid",
+        "flowchart TD",
+        "  A[Sum the list] --> B{Is the list empty?}",
+        "  B -->|yes| C([Return 0, the base case])",
+        "  B -->|no| D[Add the first number to the sum of the rest]",
+        "  D --> A",
+        "```",
         "",
         "## Announcements",
         "- The midterm is coming up: review recursion and the earlier units before then.",

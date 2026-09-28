@@ -1,10 +1,14 @@
 using System.Security.Cryptography;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using StudyStash.App.Controls.Rich;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.App.Windows;
 using StudyStash.Audio;
 using StudyStash.Core;
 
@@ -457,6 +461,7 @@ public static class SelfTest
         Shell.Windows.OpenLecture(live.Id);
         await Wait(1);
         Shot(Shell.Windows.Main, "library-note");
+        await RunRichNotesAsync();
         Shell.Windows.OpenLecture(live.Id, transcript: true);
         await Wait(1);
         Shot(Shell.Windows.Main, "library-transcript");
@@ -467,6 +472,81 @@ public static class SelfTest
         Shot(Shell.Windows.Quick, "quick-search");
         Say($"quick search 'midterm': {Shell.Windows.QuickModel.Rows.Count} row(s)");
         Shell.Windows.Quick?.Hide();
+    }
+
+    // --- rich notes: formulas and a flowchart, drawn and opened larger -------------------------------------------
+
+    /// <summary>
+    /// The lecture's notes as the app shows them: its formulas typeset (CSharpMath) and its flowchart laid out (MSAGL)
+    /// and drawn, each with ink in its own place in a picture of the window, which only happens when the maths and
+    /// drawing libraries, and Skia's and HarfBuzz's own native code, came with the app. Then the flowchart opens larger
+    /// the way a student would (Enter on it), in a window of its own, which closes again.
+    /// </summary>
+    static async Task RunRichNotesAsync()
+    {
+        var main = Shell.Windows.Main ?? throw new InvalidOperationException("the library window isn't open");
+        bool drawn = await Until(() => main.GetVisualDescendants().OfType<MathView>().Any(m => m.Display)
+            && main.GetVisualDescendants().OfType<DiagramView>().Any(d => d.Scene is not null), 30);
+        var formulas = main.GetVisualDescendants().OfType<MathView>().ToList();
+        var chart = main.GetVisualDescendants().OfType<DiagramView>().FirstOrDefault();
+        Say($"rich notes: {formulas.Count} formula(s), {formulas.Count(f => f.ErrorMessage is null)} typeset; "
+            + (chart?.Scene is { } s ? $"a flowchart laid out {s.Width:0}×{s.Height:0}" : "no flowchart drawn"));
+        if (!drawn || formulas.Count < 4 || formulas.Any(f => f.ErrorMessage is not null))
+            throw new InvalidOperationException("the notes' formulas weren't typeset: " + string.Join("; ", formulas.Select(f => f.ErrorMessage).OfType<string>()));
+        if (chart?.Scene is null) throw new InvalidOperationException("the notes' flowchart was never drawn");
+
+        foreach (var (what, control, least) in new (string, Control, int)[] { ("formula", formulas.First(f => f.Display), 150), ("flowchart", chart, 600) })
+        {
+            control.BringIntoView();
+            await Wait(1);
+            var (ink, box) = InkIn(main, control);
+            Say($"{what}: {box.Width:0}×{box.Height:0} in the window, {ink} pixels of ink");
+            if (box.Width < 40 || box.Height < 16 || ink < least) throw new InvalidOperationException($"the notes' {what} drew nothing where it sits");
+        }
+        Shot(main, "library-note-rich");
+
+        chart.Focus();
+        chart.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter, Source = chart });
+        bool opened = await Until(() => DiagramWindow.Current is { IsVisible: true }, 10);
+        var larger = DiagramWindow.Current;
+        Say(opened && larger is not null ? $"opened larger: '{larger.Title}', {larger.Bounds.Width:0}×{larger.Bounds.Height:0}" : "the flowchart didn't open larger");
+        if (!opened || larger is null) throw new InvalidOperationException("Enter on the flowchart didn't open it larger");
+        await Wait(1);
+        Shot(larger, "diagram-larger");
+        var (largerInk, _) = InkIn(larger, larger.GetVisualDescendants().OfType<DiagramView>().First());
+        if (largerInk < 600) throw new InvalidOperationException("the larger window drew no flowchart");
+        larger.Close();
+        bool closed = await Until(() => DiagramWindow.Current is null, 5);
+        Say(closed ? "the larger window closed" : "the larger window didn't close");
+        if (!closed) throw new InvalidOperationException("the larger window didn't close");
+    }
+
+    /// <summary>How many pixels of <paramref name="control"/>'s place in a picture of <paramref name="window"/> aren't
+    /// its ground (the colour at its top-left corner), and that place, in the window's own units.</summary>
+    static (int Ink, Rect Box) InkIn(Window window, Control control)
+    {
+        var at = control.TranslatePoint(default, window) ?? default;
+        var box = new Rect(at, control.Bounds.Size).Intersect(new Rect(window.Bounds.Size));
+        if (box.Width < 1 || box.Height < 1) return (0, box);
+        int times = OperatingSystem.IsWindows() ? 1 : 2;
+        var size = new PixelSize(Math.Max(1, (int)Math.Ceiling(window.Bounds.Width)) * times, Math.Max(1, (int)Math.Ceiling(window.Bounds.Height)) * times);
+        using var bmp = new RenderTargetBitmap(size, new Vector(96 * times, 96 * times));
+        bmp.Render(window);
+        var pixels = new PixelRect((int)(box.X * times), (int)(box.Y * times), (int)(box.Width * times), (int)(box.Height * times)).Intersect(new PixelRect(size));
+        var buffer = new byte[pixels.Width * pixels.Height * 4];
+        var pinned = System.Runtime.InteropServices.GCHandle.Alloc(buffer, System.Runtime.InteropServices.GCHandleType.Pinned);
+        try
+        {
+            bmp.CopyPixels(pixels, pinned.AddrOfPinnedObject(), buffer.Length, pixels.Width * 4);
+        }
+        finally
+        {
+            pinned.Free();
+        }
+        int ink = 0;
+        for (int i = 0; i < buffer.Length; i += 4)
+            if (Math.Abs(buffer[i] - buffer[0]) + Math.Abs(buffer[i + 1] - buffer[1]) + Math.Abs(buffer[i + 2] - buffer[2]) > 90) ink++;
+        return (ink / (times * times), box);
     }
 
     // --- problems: the library goes away, and comes back --------------------------------------------------------

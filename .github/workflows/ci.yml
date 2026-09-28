@@ -62,6 +62,18 @@ jobs:
         env:
           # Windows: also run the library as a real background service, from the Startup folder with no window.
           STUDYSTASH_LIVE_SERVICE: ${{ runner.os == 'Windows' && '1' || '' }}
+          # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
+          # draws them (its own fonts), in the Windows look, light and dark, at 100% and 150%.
+          STUDYSTASH_SHOTS: ${{ runner.os == 'Windows' && format('{0}\shots', runner.temp) || '' }}
+      - name: The notes' formulas and diagrams, as Windows draws them
+        if: ${{ always() && runner.os == 'Windows' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-rich-notes
+          path: |
+            ${{ runner.temp }}\shots\richwin-*
+            ${{ runner.temp }}\shots\rich-*-win-*
+          if-no-files-found: error
 
   # The Mac app: one universal bundle for Apple silicon and Intel, started by its own launcher (D1); ad hoc
   # signed with the microphone entitlement; both roles' DMGs (D2). Proved with the real self-test (D5): real
