@@ -1,13 +1,14 @@
 using Avalonia.Media;
 using StudyStash.App.ViewModels;
 using StudyStash.Core.Calendar;
+using StudyStash.Core.Calendar.Ics;
 
 namespace StudyStash.App.Tests;
 
 /// <summary>Coming up: its rows, their words, and the list that changes only when they do.</summary>
 public class ComingUpTests
 {
-    static readonly TimeZoneInfo NewYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+    static readonly TimeZoneInfo NewYork = IcsZones.SystemZone("America/New_York")!;
     static readonly DateTimeOffset Now = new(2026, 9, 28, 9, 0, 0, TimeSpan.FromHours(-4));
 
     static CalendarEvent E(string id, string title, DateTimeOffset start, int minutes = 60, string? location = null) =>

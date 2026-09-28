@@ -54,7 +54,7 @@ public sealed class Devices
     readonly Lock gate = new();
     readonly List<DateTimeOffset> failures = [];
     State state;
-    DateTime loadedAt;
+    byte[]? loadedBytes;
     Code? code;
 
     public Devices(string home, Func<DateTimeOffset>? clock = null)
@@ -70,31 +70,39 @@ public sealed class Devices
     {
         try
         {
-            loadedAt = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : default;
-            return JsonSerializer.Deserialize<State>(File.ReadAllText(path), Json) ?? new State();
+            byte[] bytes = File.Exists(path) ? File.ReadAllBytes(path) : [];
+            var loaded = bytes.Length == 0 ? new State() : JsonSerializer.Deserialize<State>(bytes, Json) ?? new State();
+            loadedBytes = bytes;
+            return loaded;
         }
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
         {
+            loadedBytes = null;
             return new State();
         }
     }
 
     /// <summary>Another copy changed devices.json (a second library process): read it again, so a removal takes
-    /// effect at once. Called under the lock.</summary>
+    /// effect at once. Compares the file's actual bytes rather than its last-write time: Windows' clock only ticks
+    /// every ~15 ms, so two quick writes (one process pairs, another removes) can land on the same timestamp there
+    /// and a change would go unseen. Called under the lock.</summary>
     void Fresh()
     {
-        var at = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : default;
-        if (at != loadedAt) state = Load();
+        byte[] bytes;
+        try { bytes = File.Exists(path) ? File.ReadAllBytes(path) : []; }
+        catch (IOException) { return; } // another copy is mid-write; try again next time
+        if (loadedBytes is null || !bytes.AsSpan().SequenceEqual(loadedBytes)) state = Load();
     }
 
     void Save()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         string tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(state, Json));
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(state, Json);
+        File.WriteAllBytes(tmp, bytes);
         File.Move(tmp, path, overwrite: true);
         Py.OwnerOnly(path);
-        loadedAt = File.GetLastWriteTimeUtc(path);
+        loadedBytes = bytes;
     }
 
     static string Hash(string token) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(token)));

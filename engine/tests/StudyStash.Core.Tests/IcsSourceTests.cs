@@ -30,7 +30,7 @@ public sealed class FeedServer : HttpMessageHandler
 /// <summary>A pasted feed: its address, its id, downloading it, and what goes wrong in words.</summary>
 public class IcsSourceTests
 {
-    static readonly TimeZoneInfo NewYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+    static readonly TimeZoneInfo NewYork = IcsZones.SystemZone("America/New_York")!;
 
     [Fact]
     public void Addresses_are_tidied_and_webcal_is_https()

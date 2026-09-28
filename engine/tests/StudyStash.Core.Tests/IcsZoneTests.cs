@@ -51,6 +51,32 @@ public class IcsZoneTests
     }
 
     [Fact]
+    public void The_table_maps_common_iana_names_to_their_windows_name()
+    {
+        // No ICU is present here (InvariantGlobalization), so on Windows the only way to find these zones is this
+        // table; runs on every OS since it's just a dictionary lookup, not a call to the system's zone database.
+        Assert.Equal("Eastern Standard Time", IcsZones.WindowsToIana.Single(kv => kv.Value == "America/New_York").Key);
+        Assert.Equal("America/New_York", IcsZones.WindowsToIana["Eastern Standard Time"]);
+        Assert.Equal("Europe/London", IcsZones.WindowsToIana["GMT Standard Time"]);
+    }
+
+    [Fact]
+    public void The_resolver_agrees_on_new_york_and_london_however_it_s_asked()
+    {
+        // Whichever of the two names the computer's own database answers to, SystemZone should land on a zone with
+        // the same offset rules for the other name too, since one of them is found through the table's twin.
+        var nyByIana = IcsZones.SystemZone("America/New_York")!;
+        var nyByWindows = IcsZones.SystemZone("Eastern Standard Time")!;
+        var londonByIana = IcsZones.SystemZone("Europe/London")!;
+        var londonByWindows = IcsZones.SystemZone("GMT Standard Time")!;
+        foreach (var probe in new[] { new DateTime(2026, 1, 15, 12, 0, 0), new DateTime(2026, 7, 15, 12, 0, 0) })
+        {
+            Assert.Equal(nyByIana.GetUtcOffset(probe), nyByWindows.GetUtcOffset(probe));
+            Assert.Equal(londonByIana.GetUtcOffset(probe), londonByWindows.GetUtcOffset(probe));
+        }
+    }
+
+    [Fact]
     public void Other_spellings_of_well_known_zones_are_found()
     {
         Assert.NotNull(IcsZones.Find("Asia/Kolkata", None));

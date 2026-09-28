@@ -67,6 +67,13 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             try
             {
                 summary = await summarize(m, Cfg);
+                // The engine just answered: say so now, before the row's status turns to "done" below, so anyone
+                // watching never sees a finished lecture next to a stale "isn't answering" message.
+                if (engineProblem is not null)
+                {
+                    engineProblem = null;
+                    log("[pipeline] the notes engine is answering again");
+                }
                 log($"[pipeline] summarized '{m.Title}' with {model} in {watch.Elapsed.TotalSeconds:0}s");
             }
             catch (Exception e) when (IsOffline(e))
@@ -131,13 +138,8 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             current = row.Id;
             try
             {
-                await ProcessAsync(row);
+                await ProcessAsync(row); // clears engineProblem itself, as soon as the engine answers
                 done++;
-                if (engineProblem is not null)
-                {
-                    engineProblem = null;
-                    log("[pipeline] the notes engine is answering again");
-                }
             }
             catch (SleptException e)
             {

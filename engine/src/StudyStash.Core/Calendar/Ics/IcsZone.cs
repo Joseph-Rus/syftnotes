@@ -134,10 +134,20 @@ public static class IcsZones
     public static IcsZone? Find(string tzid, IReadOnlyDictionary<string, IcsComponent> vtimezones)
     {
         string id = tzid.Trim().Trim('"');
-        foreach (string name in Names(id))
-            if (TimeZoneInfo.TryFindSystemTimeZoneById(name, out var tz))
-                return IcsZone.Of(tz);
+        if (SystemZone(id) is { } tz) return IcsZone.Of(tz);
         if (vtimezones.TryGetValue(id, out var block) && IcsRulesZone.From(block) is { } rules) return rules;
+        return null;
+    }
+
+    /// <summary>The computer's own zone for an IANA or Windows name (or a prefixed path ending in one), trying its
+    /// twin in the other naming when the computer doesn't know the name as given; null when it knows neither. Tests
+    /// that need a real <see cref="TimeZoneInfo"/> for a fixture (e.g. "America/New_York") should call this instead
+    /// of <see cref="TimeZoneInfo.FindSystemTimeZoneById"/> directly, so they resolve the same way on every OS.</summary>
+    public static TimeZoneInfo? SystemZone(string id)
+    {
+        foreach (string name in Names(id.Trim().Trim('"')))
+            if (TimeZoneInfo.TryFindSystemTimeZoneById(name, out var tz))
+                return tz;
         return null;
     }
 
@@ -158,7 +168,7 @@ public static class IcsZones
     }
 
     /// <summary>The Windows zone names Outlook and Exchange write, with the IANA zone each is (CLDR's primary one).</summary>
-    static readonly Dictionary<string, string> WindowsToIana = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly Dictionary<string, string> WindowsToIana = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Dateline Standard Time"] = "Etc/GMT+12",
         ["Hawaiian Standard Time"] = "Pacific/Honolulu",
