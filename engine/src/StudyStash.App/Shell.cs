@@ -672,6 +672,8 @@ public static partial class Shell
             AppMenu.AddSettingsKey(panelWindow, SettingsFromAnywhere);
         }
         Refresh();
+        // A notification would sit over the dropdown (both hug the same corner): opening it puts them away.
+        foreach (var (_, _, toast) in toasts.ToList()) toast.Close();
         // NSEvent's mouse location is in points, in the same coordinate space Avalonia's screens report: no
         // rescaling (a display's own scale factor doesn't change where its menu bar sits in that shared space).
         var pointer = near ?? Floating.Pointer();
