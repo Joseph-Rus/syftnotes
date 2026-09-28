@@ -133,7 +133,7 @@
         <!-- Which courses to bring in: this term's ticked, the rest (past terms, sandboxes, chapel) not -->
         <StackPanel Classes="cv-body" Spacing="6" IsVisible="{Binding ShowPicker}">
           <TextBlock Classes="cv-step-body" Text="{Binding PickerHint}" />
-          <ScrollViewer MaxHeight="{Binding PickerHeight}" VerticalScrollBarVisibility="Auto">
+          <ScrollViewer Name="PickerScroll" MaxHeight="{Binding PickerHeight}" VerticalScrollBarVisibility="Auto">
             <v:MacCoursePicker Classes="inset" DataContext="{Binding Picker}" />
           </ScrollViewer>
         </StackPanel>

@@ -1,0 +1,146 @@
+using System.Text.Json.Nodes;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Styling;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using StudyStash.App.Services;
+using StudyStash.App.ViewModels;
+using StudyStash.App.Views;
+using StudyStash.Core;
+
+namespace StudyStash.App.Tests;
+
+/// <summary>
+/// Setup's Canvas step with a whole term of courses found (25, some with long names): the list scrolls inside the
+/// page, the footer stays put under it, and one click on Continue moves on — in the setup window's own size and in
+/// the smaller one a small laptop screen leaves it.
+/// </summary>
+public class SetupCoursesContinueTests
+{
+    /// <summary>Find my courses for a busy student: 20 this term, 5 from past terms. Made-up courses.</summary>
+    internal static string ATerm()
+    {
+        string[] names =
+        [
+            "Intro to Programming", "Cell and Molecular Biology", "Calculus II", "Modern World History",
+            "Introduction to Engineering Design and Professional Practice Laboratory", "Statics and Strength of Materials",
+            "Organic Chemistry I with Laboratory Section and Recitation", "Academic Writing", "Linear Algebra",
+            "Principles of Microeconomics", "Physics for Scientists and Engineers II", "Data Structures and Algorithms",
+            "Human Anatomy and Physiology", "Public Speaking", "Discrete Mathematics", "Music Appreciation",
+            "Environmental Science and Sustainable Systems Seminar", "Spanish II", "Technical Communication for Engineers",
+            "Probability and Statistics", "Heat Transfer", "Fluid Mechanics", "Thermodynamics", "Bridge Design", "Chapel",
+        ];
+        var available = new JsonObject();
+        var info = new JsonObject();
+        for (int i = 0; i < names.Length; i++)
+        {
+            string id = (5000 + i).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            bool now = i < 20;
+            available[id] = names[i];
+            info[id] = new JsonObject
+            {
+                ["code"] = $"ENGR {1000 + i * 10}", ["name"] = names[i], ["term"] = now ? "Fall 2025" : "Spring 2025",
+                ["suggested"] = now, ["why"] = now ? "" : "Past term",
+            };
+        }
+        return new JsonObject { ["url"] = "https://school.instructure.com", ["available"] = available, ["course_info"] = info }.ToJsonString();
+    }
+
+    static async Task<SetupModel> OnCanvasWithATermAsync(SkinKind skin)
+    {
+        var m = SetupModel.For(skin, AppRole.Laptop);
+        m.Go(SetupStep.Canvas);
+        var handler = new FakeLibrary().Json(HttpMethod.Post, "/api/v2/canvas/courses", ATerm());
+        var context = CanvasFixtures.Context(handler);
+        var canvas = new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true);
+        m.Canvas = canvas;
+        await canvas.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), []);
+        canvas.Dispose();
+        return m;
+    }
+
+    static Control View(SkinKind skin, SetupModel m) =>
+        skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = false } : new WinSetup { DataContext = m, DrawChrome = false };
+
+    static Rect In(Visual v, Visual root) => new(v.TranslatePoint(new Point(0, 0), root)!.Value, v.Bounds.Size);
+
+    /// <summary>The setup window as the app opens it: the view's own size, or less where the screen has less room
+    /// (the app caps the view at the room there is, as Shell.FollowView does).</summary>
+    static (Window Window, Control View) Open(SkinKind skin, SetupModel m, double? roomHeight)
+    {
+        var view = View(skin, m);
+        if (roomHeight is { } h) view.MaxHeight = h;
+        var window = new Window { Width = view.Width, Height = Math.Min(view.Height, roomHeight ?? double.MaxValue), Content = view };
+        window.Show();
+        window.UpdateLayout();
+        window.CaptureRenderedFrame(); // hit testing reads the drawn scene
+        return (window, view);
+    }
+
+    static string Chain(Visual? v) => v is null ? "nothing" : string.Join(" < ", v.GetSelfAndVisualAncestors().Take(8).Select(a => a.GetType().Name + (a is Control { Name: { } n } ? "#" + n : "")));
+
+    static Button Continue(Control view) =>
+        view.GetVisualDescendants().OfType<Button>().Single(b => b.IsEffectivelyVisible && b.Command is { } c && c == ((SetupModel)view.DataContext!).NextCommand);
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac, null)]
+    [InlineData(SkinKind.Mac, 560.0)]
+    [InlineData(SkinKind.Win, null)]
+    [InlineData(SkinKind.Win, 560.0)]
+    [InlineData(SkinKind.Win, 480.0)]
+    public async Task With_a_whole_term_listed_Continue_shows_and_one_click_moves_on(SkinKind skin, double? room)
+    {
+        try
+        {
+            ((App)Application.Current!).UseSkin(skin);
+            var m = await OnCanvasWithATermAsync(skin);
+            Assert.True(m.Canvas!.ShowPicker);
+            Assert.Equal(25, m.Canvas.Picker.Courses.Count);
+            var (window, view) = Open(skin, m, room);
+
+            var button = Continue(view);
+            var at = In(button, window);
+            Assert.True(at.Bottom <= window.ClientSize.Height + 0.5 && at.Top >= 0, $"{skin} {room}: Continue ({at}) is outside the window ({window.ClientSize})");
+            Assert.True(m.CanContinue);
+            // Nothing is drawn over it: what's under its middle is Continue (or inside it).
+            var centre = at.Center;
+            var hit = window.InputHitTest(centre) as Visual;
+            Assert.True(hit is not null && (hit == button || hit.GetVisualAncestors().Contains(button)), $"{skin} {room}: {Chain(hit)} is over Continue ({at})");
+
+            window.MouseDown(centre, MouseButton.Left);
+            window.MouseUp(centre, MouseButton.Left);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(SetupStep.Classes, m.Step);
+            window.Close();
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    /// <summary>The Canvas step with the term listed, in the window's own size and a small screen's.</summary>
+    [AvaloniaFact]
+    public async Task Shots()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (double? room in new double?[] { null, 560 })
+                foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+                {
+                    var m = await OnCanvasWithATermAsync(skin);
+                    string name = $"{(skin == SkinKind.Mac ? "mac" : "win")}-05-setup-canvas-term{(room is null ? "" : "-small")}";
+                    Shot.Take(name, skin, t, () =>
+                    {
+                        var view = View(skin, m);
+                        if (view is MacSetup mac) mac.DrawChrome = true;
+                        if (view is WinSetup win) win.DrawChrome = true;
+                        if (room is { } h) view.Height = h;
+                        return view;
+                    }, size: new Size(1100, 800));
+                }
+    }
+}
