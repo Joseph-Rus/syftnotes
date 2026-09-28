@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="AngleSharp" Version="1.5.2" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Msagl" Version="1.1.6" />
     <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
     <PackageReference Include="ReverseMarkdown" Version="6.2.1" />
     <PackageReference Include="Tomlyn" Version="2.10.1" />

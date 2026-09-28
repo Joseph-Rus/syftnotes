@@ -33,8 +33,7 @@
                 <TextBlock Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
                            IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
                 <StackPanel Spacing="6" IsVisible="{Binding !IsThinking}">
-                  <SelectableTextBlock Classes="ai-answer" Text="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}"
-                                       SelectionBrush="{DynamicResource Hl}" />
+                  <c:NoteView Compact="True" BodySize="14" BodyLineHeight="20.3" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
                   <Button Theme="{StaticResource Surface}" Padding="0" HorizontalAlignment="Left" HorizontalContentAlignment="Left"
                           Command="{Binding $parent[UserControl].((vm:AiAskModel)DataContext).OpenTurnSourceCommand}" CommandParameter="{Binding}"
                           IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}">

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using StudyStash.Core.Rich;
 
 namespace StudyStash.Core;
 
@@ -12,6 +13,10 @@ public delegate Task<int?> ShowFn(Config cfg, string model);
 
 /// <summary>The model didn't finish properly: it ran to the length cap, or repeated itself.</summary>
 public sealed class RunawayOutputException(string message) : Exception(message);
+
+/// <summary>What the notes may draw: Mermaid flowcharts only (every engine, and all a small local model does
+/// well), or SVG drawings too, for what's spatial (the CLI engines, which write SVG that holds together).</summary>
+public enum Drawings { Flowcharts, FlowchartsAndSvg }
 
 /// <summary>
 /// Write study notes from a lecture's transcript with the model you pick (a local Ollama model here). Transcripts
@@ -41,7 +46,7 @@ public static partial class Summarize
         Bullets: the bold term, a colon, then what it means in one sentence.
 
         ## Details and examples
-        Worked examples, derivations, formulas (LaTeX in $...$), code, and demonstrations, in the order they were taught.
+        Worked examples, derivations, formulas and calculations, code, and demonstrations, in the order they were taught.
 
         ## Announcements
         Deadlines, exams, assignments, and readings, with dates exactly as said.
@@ -54,8 +59,77 @@ public static partial class Summarize
         Rules:
         - Use only what is in the transcript. Never invent facts, dates, or examples.
         - The transcript comes from speech recognition: fix obvious mis-hearings of technical terms, and skip filler, small talk, and audio problems.
+        - Write every formula in LaTeX ($...$ or $$...$$).
+        - Keep any formula and any ```mermaid or ```svg block you are given exactly as it is.
         - Write in the language of the lecture. Output Markdown only, with no preamble.
         """.ReplaceLineEndings("\n");
+
+    /// <summary>The dose calculation the notes are shown, as the form a worked calculation takes.</summary>
+    public const string DoseExample =
+        @"$$\text{Volume} = \frac{\text{Desired}}{\text{Have}} \times \text{Quantity} = \frac{500\ \text{mg}}{250\ \text{mg}} \times 5\ \text{mL} = 10\ \text{mL}$$";
+
+    /// <summary>The flowchart the notes are shown: blood flow through the heart, a cycle, coloured by what the colour
+    /// means (oxygen-poor blue, oxygen-rich red), its valves on the arrows. It parses, and draws as a ring.</summary>
+    public static readonly string MermaidExample = """
+        flowchart LR
+        RA["Right atrium"]:::blue -->|tricuspid valve| RV["Right ventricle"]:::blue -->|pulmonary valve| Lungs(("Lungs"))
+        Lungs --> LA["Left atrium"]:::red -->|mitral valve| LV["Left ventricle"]:::red -->|aortic valve| Body(("Body"))
+        Body --> RA
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>The drawing the CLI engines are shown: the forces on a block on a slope, in the palette, every part
+    /// labelled, its arrows ending in markers. It passes <see cref="SafeSvg"/> untouched but for its colours.</summary>
+    public static readonly string SvgExample = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 280" font-size="14" fill="#1D1D1F">
+        <title>Forces on a block on a slope</title>
+        <defs>
+        <marker id="red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#D93025"/></marker>
+        <marker id="green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#188038"/></marker>
+        <marker id="amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0L10 5L0 10z" fill="#E37400"/></marker>
+        </defs>
+        <polygon points="60,260 580,260 580,40" fill="none" stroke="#1D1D1F" stroke-width="2"/>
+        <path d="M124 260A64 64 0 0 0 119 235" fill="none" stroke="#6E6E73" stroke-width="1.5"/><text x="134" y="252" fill="#6E6E73">θ</text>
+        <rect x="-48" y="-60" width="96" height="60" rx="4" transform="translate(294 161) rotate(-22.9)" fill="#E8F0FE" stroke="#1A73E8" stroke-width="2"/>
+        <line x1="282" y1="133" x2="282" y2="233" stroke="#D93025" stroke-width="2.5" marker-end="url(#red)"/><text x="292" y="228" fill="#D93025">weight mg</text>
+        <line x1="282" y1="133" x2="243" y2="41" stroke="#188038" stroke-width="2.5" marker-end="url(#green)"/><text x="234" y="32" text-anchor="end" fill="#188038">normal force N</text>
+        <line x1="282" y1="133" x2="374" y2="94" stroke="#E37400" stroke-width="2.5" marker-end="url(#amber)"/><text x="384" y="92" fill="#E37400">friction f</text>
+        </svg>
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>
+    /// What the notes are told about formulas and diagrams: LaTeX for every formula, with a worked dose as the form;
+    /// a diagram only where a picture makes the lecture clearer, said again in words, drawn as a Mermaid flowchart
+    /// (and, for <see cref="Drawings.FlowchartsAndSvg"/>, as SVG for what's spatial), each with its example.
+    /// </summary>
+    public static string Drawing(Drawings drawings)
+    {
+        bool svg = drawings == Drawings.FlowchartsAndSvg;
+        string what = svg ? "a process, cycle, pathway, decision rule, hierarchy or structure" : "a process, cycle, pathway, decision rule or hierarchy";
+        string examples = "the cardiac cycle, blood flow through the heart, the nursing process, a care or assessment pathway, "
+            + "how a drug moves from dose to effect, the cell cycle, " + (svg ? "a call stack, a binary tree, the forces on a block" : "a binary tree");
+        string text = $$"""
+            Formulas: write every formula, equation, unit conversion and calculation in LaTeX: $...$ inside a sentence, and $$...$$ on a line of its own for one worth seeing alone. Use \frac, \times, \cdot, ^ and _, \text{...} for words and units, and \mathrm{H_2O} for chemistry. Work calculations step by step, for example a dose:
+            {{DoseExample}}
+
+            Diagrams: when the lecture explains {{what}} that a picture makes clearer ({{examples}}), draw it: at most {{(svg ? "three" : "two")}}, and none for a lecture of facts or discussion. Put each diagram on its own, right after the text it illustrates, never inside a bullet, and follow it with one sentence that says the same in words.
+            Draw steps, cycles, pathways, decisions and hierarchies as a Mermaid flowchart:
+            ```mermaid
+            {{MermaidExample}}
+            ```
+            A few words per box, in quotes. LR for a sequence, TD for a hierarchy or a decision. A cycle ends with an arrow from its last step back to its first. A decision is a {"Question?"} box with |yes| and |no| on its arrows. Group boxes with subgraph "Title" ... end. Colour a box only when colour means something: :::red, :::blue, :::green, :::amber, :::purple or :::accent (above: oxygen-rich red, oxygen-poor blue). No style, classDef, click or HTML.
+            """;
+        if (svg)
+            text += $$"""
+
+
+                Draw something spatial (a labelled structure, a physics setup with its forces, a circuit, the graph of a function, a data structure in memory) as SVG instead, in a ```svg block: viewBox="0 0 640 H" with H at most 480, no width or height, text 13 to 15 units and at least 16 from the edges, every part labelled, arrows with a <marker>. Colours only from: #1D1D1F (lines and text), #6E6E73 (secondary text), #C7C7CC (light lines), #FFFFFF (paper), and the stroke/fill pairs red #D93025/#FCE8E6, blue #1A73E8/#E8F0FE, green #188038/#E6F4EA, amber #E37400/#FEF7E0, purple #8E24AA/#F3E8FD; the app recolours them for dark mode. No scripts, images, links, fonts, CSS or foreignObject. For example:
+                ```svg
+                {{SvgExample}}
+                ```
+                """;
+        text += "\n\nThe examples show the form only: write and draw only what this lecture teaches.";
+        return text.ReplaceLineEndings("\n");
+    }
 
     public static async Task<string> OllamaGenerateAsync(Config cfg, string model, string prompt, int numCtx,
         HttpClient? http = null)
@@ -83,10 +157,15 @@ public static partial class Summarize
         return Py.AsString(data?["message"]?["content"]) ?? throw new InvalidDataException("Ollama sent no message");
     }
 
-    /// <summary>The same line over and over: a model stuck in a loop, not notes.</summary>
+    /// <summary>The same line over and over: a model stuck in a loop, not notes. Only the prose counts: a finished
+    /// code block, formula or diagram repeats its lines on purpose (a flowchart's <c>end</c>s, an SVG's shapes).</summary>
     public static bool Repetitive(string text, int times = 5)
     {
-        var lines = Py.SplitLines(text).Select(Py.Strip).Where(l => l.Length >= 12).ToList();
+        var all = Py.SplitLines(text);
+        var inBlock = new bool[all.Count];
+        foreach (var b in NoteBlocks.Find(all).Where(b => b.Closed))
+            for (int k = b.First; k <= b.Last; k++) inBlock[k] = true;
+        var lines = all.Where((_, k) => !inBlock[k]).Select(Py.Strip).Where(l => l.Length >= 12).ToList();
         if (lines.Count == 0) return false;
         var counts = lines.GroupBy(l => l, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count());
         return counts.Values.Max() >= times || (lines.Count >= 20 && counts.Count < lines.Count / 2.0);
@@ -131,7 +210,7 @@ public static partial class Summarize
     [GeneratedRegex("<think>.*?</think>", RegexOptions.Singleline)]
     private static partial Regex Thinking();
 
-    [GeneratedRegex(@"\A```(?:markdown|md)?\s*\n(.*)\n```\z", RegexOptions.Singleline)]
+    [GeneratedRegex(@"\A```(markdown|md)?\s*\n(.*)\n```\z", RegexOptions.Singleline)]
     private static partial Regex Fenced();
 
     [GeneratedRegex(@"(?<=[.!?])\s+")]
@@ -139,11 +218,32 @@ public static partial class Summarize
 
     public static string CleanOutput(string? text)
     {
-        string t = Py.Strip(Thinking().Replace(text ?? "", ""));
-        var fence = Fenced().Match(t);
-        t = Py.Strip(fence.Success ? fence.Groups[1].Value : t);
+        string t = Py.Strip(Unwrapped(Py.Strip(Thinking().Replace(text ?? "", ""))));
         if (Repetitive(t))
             throw new RunawayOutputException("the model repeated itself instead of writing notes, so no notes were written from it");
+        return t;
+    }
+
+    /// <summary>
+    /// Notes the model wrapped whole in a fence: a ```markdown one always comes off. A bare one comes off only when it
+    /// really wraps the whole note (counting the fences inside it, which open with a word and close bare) and what it
+    /// holds isn't a diagram — so a note that merely starts with a diagram or a code block is kept as it is.
+    /// </summary>
+    static string Unwrapped(string t)
+    {
+        var fence = Fenced().Match(t);
+        if (!fence.Success) return t;
+        string inner = fence.Groups[2].Value;
+        if (fence.Groups[1].Success) return inner;
+        if (NoteBlocks.StartsAsDiagram(inner)) return t;
+        var lines = NoteBlocks.Lines(t);
+        int depth = 0;
+        for (int k = 0; k < lines.Length; k++)
+        {
+            if (NoteBlocks.Fence(lines[k]) is not { Char: '`' } f) continue;
+            depth += k == 0 || f.Info.Length > 0 ? 1 : -1;
+            if (depth == 0) return k == lines.Length - 1 ? inner : t;
+        }
         return t;
     }
 
@@ -211,9 +311,9 @@ public static partial class Summarize
         return string.Join("\n", lines);
     }
 
-    public static string WholePrompt(Meeting m, string transcript) =>
+    public static string WholePrompt(Meeting m, string transcript, Drawings drawings = Drawings.Flowcharts) =>
         "You are an expert note-taker for university lectures. Write study notes for this lecture "
-        + $"from its transcript.\n\n{Structure}\n\n{Rules}\n\n{Header(m)}\n\nTranscript:\n{transcript}";
+        + $"from its transcript.\n\n{Structure}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}\n\nTranscript:\n{transcript}";
 
     public static string PartPrompt(Meeting m, string part, int i, int n) =>
         $"You are taking notes on part {i} of {n} of a lecture transcript. Write detailed Markdown bullet "
@@ -228,23 +328,26 @@ public static partial class Summarize
             + $"notes. Remove repetition but keep every distinct fact.\n\n{Rules}\n\n{Header(m)}\n\n{joined}";
     }
 
-    public static string MergePrompt(Meeting m, IReadOnlyList<string> notes)
+    public static string MergePrompt(Meeting m, IReadOnlyList<string> notes, Drawings drawings = Drawings.Flowcharts)
     {
         string joined = string.Join("\n\n", notes.Select((n, i) => $"### Part {i + 1}\n{n}"));
         return "You are an expert note-taker for university lectures. Below are notes on consecutive parts of one "
             + "lecture. Merge them into one set of study notes, removing repetition and keeping every distinct "
-            + $"fact.\n\n{Structure}\n\n{Rules}\n\n{Header(m)}\n\n{joined}";
+            + $"fact.\n\n{Structure}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}\n\n{joined}";
     }
 
-    /// <summary>Our own study notes for a lecture, written from its transcript.</summary>
-    public static async Task<string> SummarizeTranscriptAsync(Meeting m, Config cfg, ChatFn? chat = null, ShowFn? show = null)
+    /// <summary>Our own study notes for a lecture, written from its transcript, drawing what <paramref name="drawings"/>
+    /// allows; a diagram that came out broken is sent back once to be fixed (<see cref="RepairDiagramsAsync"/>).</summary>
+    public static async Task<string> SummarizeTranscriptAsync(Meeting m, Config cfg, ChatFn? chat = null, ShowFn? show = null,
+        Drawings drawings = Drawings.Flowcharts)
     {
         chat ??= (c, model, prompt, ctx) => OllamaGenerateAsync(c, model, prompt, ctx);
         string model = cfg.EffectiveSummaryModel;
         int ctx = await ContextSizeAsync(cfg, model, show);
         int budget = TranscriptBudget(ctx);
         string text = Py.Strip(TimedText.Plain(m.Transcript)); // a recording's times would only distract the model
-        if (text.Length <= budget) return CleanOutput(await chat(cfg, model, WholePrompt(m, text), ctx));
+        Task<string> Repaired(string notes) => RepairDiagramsAsync(notes, prompt => chat(cfg, model, prompt, ctx));
+        if (text.Length <= budget) return await Repaired(CleanOutput(await chat(cfg, model, WholePrompt(m, text, drawings), ctx)));
         var parts = SplitTranscript(text, budget);
         var notes = new List<string>();
         for (int i = 0; i < parts.Count; i++)
@@ -257,6 +360,74 @@ public static partial class Summarize
                 folded.Add(i + 1 < notes.Count ? CleanOutput(await chat(cfg, model, CondensePrompt(m, notes[i..(i + 2)]), ctx)) : notes[i]);
             notes = folded;
         }
-        return CleanOutput(await chat(cfg, model, MergePrompt(m, notes), ctx));
+        return await Repaired(CleanOutput(await chat(cfg, model, MergePrompt(m, notes, drawings), ctx)));
+    }
+
+    /// <summary>How many broken diagrams one note sends back to be fixed.</summary>
+    public const int MaxDiagramRepairs = 2;
+
+    /// <summary>
+    /// One repair round for the diagrams a note drew: each ```mermaid flowchart that doesn't parse and each ```svg
+    /// drawing that can't be made safe (at most <see cref="MaxDiagramRepairs"/>) goes back to the same engine once,
+    /// with what's wrong, and is replaced only by a reply that parses or cleans. Never throws (but for cancelling),
+    /// never fails the notes: a diagram still broken after this shows its source in the note.
+    /// </summary>
+    public static async Task<string> RepairDiagramsAsync(string notes, Func<string, Task<string>> ask)
+    {
+        var lines = NoteBlocks.Lines(notes).ToList();
+        // A fence never closed may have swallowed the rest of the note: replacing it could lose that, so it stays.
+        var broken = NoteBlocks.Find(lines).Where(b => b.IsDiagram && b.Closed).Select(b => (Block: b, Why: DiagramProblem(b.Kind, b.Text)))
+            .Where(x => x.Why is not null).Take(MaxDiagramRepairs).ToList();
+        if (broken.Count == 0) return notes;
+        var fixes = new List<(NoteBlock Block, string Text)>();
+        foreach (var (block, why) in broken)
+        {
+            bool svg = block.Kind == NoteBlockKind.Svg;
+            string prompt = $"This {(svg ? "SVG drawing" : "Mermaid flowchart")} has a problem: {why!.TrimEnd('.')}. "
+                + $"Reply with only the corrected block.\n\n```{(svg ? "svg" : "mermaid")}\n{block.Text}\n```";
+            try
+            {
+                if (Corrected(await ask(prompt), block.Kind) is { } text) fixes.Add((block, text));
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // The engine couldn't answer: the note keeps its diagram as written, and shows its source.
+            }
+        }
+        foreach (var (block, text) in fixes.OrderByDescending(f => f.Block.First))
+        {
+            string first = lines[block.First], indent = first[..(first.Length - first.TrimStart().Length)];
+            var fresh = new List<string> { indent + "```" + (block.Kind == NoteBlockKind.Svg ? "svg" : "mermaid") };
+            fresh.AddRange(text.Split('\n').Select(l => l.Length == 0 ? l : indent + l));
+            fresh.Add(indent + "```");
+            lines.RemoveRange(block.First, block.Last - block.First + 1);
+            lines.InsertRange(block.First, fresh);
+        }
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>Why a diagram can't be drawn, in plain English, or null when it can.</summary>
+    public static string? DiagramProblem(NoteBlockKind kind, string text)
+    {
+        if (kind == NoteBlockKind.Svg) return SafeSvg.Clean(text).Problem;
+        try
+        {
+            Flowchart.Parse(text);
+            return null;
+        }
+        catch (MermaidException e)
+        {
+            return e.Message;
+        }
+    }
+
+    /// <summary>The diagram in a repair's reply (fenced or not), when it's now one that can be drawn.</summary>
+    static string? Corrected(string reply, NoteBlockKind kind)
+    {
+        string t = Py.Strip(Thinking().Replace(reply ?? "", ""));
+        string candidate = NoteBlocks.Find(t).FirstOrDefault(b => b.Kind == kind)?.Text
+            ?? (NoteBlocks.StartsAsDiagram(t) ? t : "");
+        candidate = candidate.Trim('\n', '\r');
+        return candidate.Trim().Length > 0 && DiagramProblem(kind, candidate) is null ? candidate : null;
     }
 }

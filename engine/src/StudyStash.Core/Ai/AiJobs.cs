@@ -98,12 +98,16 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                 else if (c == '}' && --depth == 0)
                 {
                     string candidate = text[start..(i + 1)];
-                    try
+                    // An answer's LaTeX with single backslashes (\sqrt) isn't JSON until they're doubled.
+                    foreach (string attempt in new[] { candidate, Rich.MathText.DoubleLoneBackslashes(candidate) })
                     {
-                        if (JsonNode.Parse(candidate) is JsonObject) return candidate;
-                    }
-                    catch (System.Text.Json.JsonException)
-                    {
+                        try
+                        {
+                            if (JsonNode.Parse(attempt) is JsonObject) return attempt;
+                        }
+                        catch (System.Text.Json.JsonException)
+                        {
+                        }
                     }
                     break;
                 }
@@ -121,13 +125,26 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     bool NotesOnOllama(AiSettings settings) =>
         settings.Local("notes") || (settings.Fallback && Engines.KnownUnusableWhy(settings.For("notes").Provider, settings, Checks) is not null);
 
+    /// <summary>What an engine's notes may draw: Ollama's small models keep to flowcharts; the CLI engines, whose
+    /// SVG holds together, may draw what's spatial too.</summary>
+    public static Drawings DrawingsFor(string engine) => engine == "ollama" ? Drawings.Flowcharts : Drawings.FlowchartsAndSvg;
+
     /// <summary>Writing study notes.</summary>
-    public Task<string> SummarizeAsync(Meeting m, Config cfg) => NotesOnOllama(Settings)
-        ? Core.Summarize.SummarizeTranscriptAsync(m, cfg)
+    public Task<string> SummarizeAsync(Meeting m, Config cfg)
+    {
+        if (NotesOnOllama(Settings))
+            return Providers is null
+                ? Core.Summarize.SummarizeTranscriptAsync(m, cfg)
+                // A test's fake Ollama: the same prompts and sizing as the real one's, through the fake.
+                : Core.Summarize.SummarizeTranscriptAsync(m, cfg,
+                    chat: (_, _, prompt, _) => AnswerWithAsync("ollama", "", prompt, CancellationToken.None),
+                    show: (_, _) => Task.FromResult<int?>(null));
         // Other models read a whole lecture at once: tell the splitter their context is large.
-        : Core.Summarize.SummarizeTranscriptAsync(m, cfg,
+        return Core.Summarize.SummarizeTranscriptAsync(m, cfg,
             chat: (_, _, prompt, _) => AnswerAsync("notes", prompt),
-            show: (_, _) => Task.FromResult<int?>(200_000));
+            show: (_, _) => Task.FromResult<int?>(200_000),
+            drawings: Drawings.FlowchartsAndSvg);
+    }
 
     /// <summary>Rewrite a lecture's notes with a chosen engine — the "Rewrite notes with" menu's own choice, not
     /// ai.json's "notes" pick. Real Ollama with no test hooks keeps <see cref="SummarizeAsync"/>'s own direct path;
@@ -153,7 +170,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             progress?.Invoke(++done, Math.Max(done, parts));
             return result;
         }
-        return Core.Summarize.SummarizeTranscriptAsync(m, cfg, chat: ChatAsync, show: (_, _) => Task.FromResult<int?>(ctx));
+        return Core.Summarize.SummarizeTranscriptAsync(m, cfg, chat: ChatAsync, show: (_, _) => Task.FromResult<int?>(ctx),
+            drawings: DrawingsFor(engine));
     }
 
     /// <summary>The name of what wrote something with a specific engine, not ai.json's own pick for a job — the

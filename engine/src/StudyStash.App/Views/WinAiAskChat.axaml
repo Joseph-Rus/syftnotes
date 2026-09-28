@@ -27,7 +27,7 @@
               </Border>
               <Border Classes="ai-bubble-a" MaxWidth="330" IsVisible="{Binding !IsThinking}">
                 <StackPanel Spacing="6">
-                  <TextBlock Classes="ai-answer" Text="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
+                  <c:NoteView Compact="True" BodySize="14" BodyLineHeight="20.3" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
                   <TextBlock Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
                              IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
                   <Button Theme="{StaticResource Surface}" Padding="0" HorizontalContentAlignment="Left"

@@ -8,7 +8,14 @@ static class TestSafety
 {
 #pragma warning disable CA2255 // the tests are the application here: this has to run before any of them
     [ModuleInitializer]
-    internal static void TurnOffSystemChanges() => Platform.Desktop.SystemChangesOff = true;
+    internal static void TurnOffSystemChanges()
+    {
+        Platform.Desktop.SystemChangesOff = true;
+        // The app's home, and so its log, is a folder of the tests' own: nothing a test logs reaches the real one.
+        Program.Home = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests", "home");
+        Directory.CreateDirectory(System.IO.Path.Combine(Program.Home, "logs"));
+        Controls.Rich.SceneCache.Log = _ => { };
+    }
 #pragma warning restore CA2255
 }
 

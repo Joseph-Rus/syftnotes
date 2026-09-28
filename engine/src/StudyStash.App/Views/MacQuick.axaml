@@ -104,8 +104,8 @@
         <StackPanel IsVisible="{Binding Answering}" Spacing="10" Margin="14,10,14,14">
           <TextBlock Text="From your notes" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
           <c:Spinner IsVisible="{Binding Thinking}" Width="16" Height="16" HorizontalAlignment="Left" Foreground="{DynamicResource Fg2}" />
-          <SelectableTextBlock Text="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                               FontFamily="{DynamicResource SerifFont}" FontSize="17" LineHeight="26.35" TextWrapping="Wrap" SelectionBrush="{DynamicResource Hl}" />
+          <c:NoteView Compact="True" BodyFont="SerifFont" BodySize="17" BodyLineHeight="26.35" Markdown="{Binding Answer}"
+                      IsVisible="{Binding Answer, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
 
         <TextBlock IsVisible="{Binding HasNote}" Text="{Binding Note}" FontSize="13" Foreground="{DynamicResource Fg2}" Margin="14,10" TextWrapping="Wrap" />

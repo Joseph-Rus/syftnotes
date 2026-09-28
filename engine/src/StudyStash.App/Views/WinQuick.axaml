@@ -82,7 +82,7 @@
         <StackPanel Spacing="8">
           <TextBlock Text="From your notes" FontSize="12" Foreground="{DynamicResource Fg2}" />
           <c:Spinner IsVisible="{Binding Thinking}" Width="16" Height="16" HorizontalAlignment="Left" Foreground="{DynamicResource Accent}" />
-          <SelectableTextBlock Text="{Binding Answer}" FontSize="15" LineHeight="23.25" TextWrapping="Wrap" SelectionBrush="{DynamicResource Hl}" />
+          <c:NoteView Compact="True" BodySize="15" BodyLineHeight="23.25" Markdown="{Binding Answer}" />
         </StackPanel>
       </Border>
 
