@@ -75,6 +75,34 @@ public class ClassRenameTests
         Assert.Equal([(Cs, "Software Engineering", "CSCI 321"), (Engr, "Senior Design", "ENGR 401")], plan.Select(p => (p.From, p.To, p.Code)));
     }
 
+    /// <summary>Classes a 0.7.0 setup named with the section code glued on ("Bridge Design(MECH4120.G)") are offered
+    /// their plain course names; two sections of one course keep apart by section.</summary>
+    [Fact]
+    public void Classes_named_with_a_code_in_brackets_are_offered_the_plain_name()
+    {
+        using var dir = new TempDir();
+        const string Bridge = "Bridge Design(MECH4120.G)", HeatA = "Heat Transfer(MECH2710.A)", HeatB = "Heat Transfer(MECH2710.B)";
+        var cfg = new Config(dir["home"], dir["pool"]) { Classes = [new ClassDef(Bridge), new ClassDef(HeatA), new ClassDef(HeatB)] };
+        Directory.CreateDirectory(cfg.Home);
+        Configs.Save(cfg);
+        CanvasSettings.Update(cfg.Home, s =>
+        {
+            s.Url = "https://school.instructure.com";
+            s.Courses = new() { [Bridge] = 51, [HeatA] = 52, [HeatB] = 53 };
+            s.Available = new() { ["51"] = Bridge, ["52"] = HeatA, ["53"] = HeatB };
+            s.CourseInfo = new()
+            {
+                ["51"] = new CourseInfo("MECH4120.G", Bridge, "Fall 2026"),
+                ["52"] = new CourseInfo("MECH2710.A", HeatA, "Fall 2026"),
+                ["53"] = new CourseInfo("MECH2710.B", HeatB, "Fall 2026"),
+            };
+        });
+        var plan = ClassRename.Plan(cfg, CanvasSettings.Load(cfg.Home)).ToDictionary(st => st.From, st => st.To);
+        Assert.Equal("Bridge Design", plan[Bridge]);
+        Assert.Equal("Heat Transfer (section A)", plan[HeatA]);
+        Assert.Equal("Heat Transfer (section B)", plan[HeatB]);
+    }
+
     [Fact]
     public void Renaming_moves_the_folder_and_every_reference_and_loses_no_lecture()
     {

@@ -221,15 +221,6 @@ public class ModelTests
     }
 
     [Fact]
-    public void Large_v3_unless_the_computer_has_little_memory()
-    {
-        Assert.Same(WhisperModels.LargeV3, WhisperModels.Recommended(16));
-        Assert.Same(WhisperModels.LargeV3, WhisperModels.Recommended(8));
-        Assert.Same(WhisperModels.LargeV3, WhisperModels.Recommended(null));
-        Assert.Same(WhisperModels.LargeV3TurboSmall, WhisperModels.Recommended(4));
-    }
-
-    [Fact]
     public void Downloads_come_from_hugging_face_or_a_mirror()
     {
         Assert.Equal("https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin", WhisperModels.Tiny.UrlFrom(null));

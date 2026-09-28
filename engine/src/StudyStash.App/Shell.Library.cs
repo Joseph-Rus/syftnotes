@@ -293,6 +293,7 @@ public static partial class Shell
             OpenSettings = () => ShowSettings("AI"),
             OnSource = s => PlaySource(s.Id ?? note.Id, s.At),
         };
+        library.Ask?.Stop(); // an answer about the lecture being left isn't wanted any more
         library.Ask = ask;
         _ = ask.Load();
     }
@@ -533,7 +534,7 @@ public static partial class Shell
         if (library.Note is not { } note || mainWindow?.Content is not Control anchor || mainWindow is null || host.Remote() is not { } lib) return;
         string? cls = dueOpen ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
         DownloadMenu.Build(cls, host.Settings.DownloadTranscripts,
-            download: () => _ = NotesDownload.LectureAsync(mainWindow, lib, note.Id, Notes.Slugify(note.Title) + ".md", host.Settings.DownloadTranscripts, MermaidSvg()),
+            download: () => _ = NotesDownload.LectureAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title), host.Settings.DownloadTranscripts, MermaidSvg()),
             downloadClass: () => _ = NotesDownload.ClassAsync(mainWindow, lib, cls!, host.Settings.DownloadTranscripts, MermaidSvg()),
             toggleTranscripts: () => host.Save(s => s.DownloadTranscripts = !s.DownloadTranscripts)).Open(anchor);
     }
@@ -701,7 +702,15 @@ public static partial class Shell
         return cut.Length > 110 ? cut[..110].TrimEnd() : cut;
     }
 
+    /// <summary>⌘Return in the quick panel: the library's AI answers as it writes; a library too old for that
+    /// answers the old way, once, at the end.</summary>
     static async Task AskQuick(string question)
+    {
+        if (host.Remote() is not null && await quick.AnswerAsync(Ai(), question)) return;
+        await AskQuickAtOnce(question);
+    }
+
+    static async Task AskQuickAtOnce(string question)
     {
         quick.Answering = true;
         quick.Thinking = true;

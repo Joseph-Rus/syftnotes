@@ -55,7 +55,7 @@ public partial class SettingsView : UserControl
         {
             drawChrome = value;
             Header.DrawChrome = value;
-            // The Mac's own radius/shadow are for a screenshot only (a real window is already rounded by the OS).
+            // The frame's radius, edge and shadow are for a screenshot only (a real window has the system's).
             Chrome.Classes.Set("chrome", value);
         }
     }

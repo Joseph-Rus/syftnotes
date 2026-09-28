@@ -24,9 +24,8 @@
              x:DataType="s:SettingsModel"
              ClipToBounds="False">
   <UserControl.Styles>
-    <!-- The window's own frame: Mac a rounded, shadowed slab of Win, drawn only for a screenshot (a real macOS
-         window is already rounded and shadowed by the OS, so drawing both would double up); Windows a plain
-         rectangular window, so its own radius and shadow are always drawn, real window or shot. -->
+    <!-- The window's own frame, drawn only for a screenshot: a real window is already rounded, edged and shadowed
+         by the system (macOS; Windows 11), so drawing both would double up. -->
     <Style Selector="Border#Chrome">
       <Setter Property="ClipToBounds" Value="True" />
     </Style>
@@ -39,6 +38,8 @@
     </Style>
     <Style Selector=".win Border#Chrome">
       <Setter Property="Background" Value="{DynamicResource Mica}" />
+    </Style>
+    <Style Selector=".win Border#Chrome.chrome">
       <Setter Property="BorderBrush" Value="{DynamicResource FlyStroke}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="8" />
@@ -348,6 +349,23 @@
       <Setter Property="BorderThickness" Value="1" />
     </Style>
 
+    <!-- "Recommended" beside the model for this computer: setup's badge. -->
+    <Style Selector="Border.badge">
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="6,1" />
+      <Setter Property="Background" Value="{DynamicResource AccentTint}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector=".win Border.badge">
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="{DynamicResource Subtle2}" />
+    </Style>
+    <Style Selector="Border.badge TextBlock">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+    </Style>
+
     <!-- A selectable card (a model, an AI, a colour theme): Mac a tinted card, Windows a stroked one; both take an
          accent border when chosen. -->
     <Style Selector="Border.choice">
@@ -369,8 +387,10 @@
       <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
       <Setter Property="Padding" Value="14,12" />
     </Style>
+    <!-- Declared after .win Border.choice, so the chosen card's accent isn't painted over by the plain stroke. -->
     <Style Selector=".win Border.choice.on">
       <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     </Style>
 
     <!-- Settings → Appearance's mode: Mac a three-way segmented pill (System Settings' own Appearance control) — one
@@ -694,7 +714,10 @@
                         <Border Classes="choice" Classes.on="{Binding Chosen}" Margin="0">
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2">
-                              <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" />
+                              <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <Border Classes="badge" IsVisible="{Binding Recommended}"><TextBlock Text="Recommended" /></Border>
+                              </StackPanel>
                               <TextBlock Text="{Binding About}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
                             </StackPanel>
                             <c:Icon Grid.Column="1" IsVisible="{Binding Here}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Accent}" Margin="10,0,0,0" />
@@ -704,7 +727,24 @@
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                <TextBlock Classes="say" Text="{Binding ModelAdviceLine}" Margin="0,0,0,0" />
+                <Border IsVisible="{Binding ModelDownloading}" Height="4" CornerRadius="2" Background="{DynamicResource Fill2}" Width="480"
+                        HorizontalAlignment="Left" Margin="0,8,0,0">
+                  <Border Width="{Binding ModelBarWidth}" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
+                </Border>
                 <TextBlock Classes="say" Text="{Binding ModelLine}" />
+                <!-- A model no longer in use (after a switch) stays until the student says to remove it. -->
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0" IsVisible="{Binding HasSpare}">
+                  <TextBlock Text="{Binding SpareLine}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="380" />
+                  <Button Classes="pill" Command="{Binding AskRemoveSpareCommand}" VerticalAlignment="Center"><TextBlock Text="Remove" FontSize="13" /></Button>
+                </StackPanel>
+                <StackPanel Spacing="8" Margin="0,8,0,0" IsVisible="{Binding ConfirmingRemove}">
+                  <TextBlock Text="{Binding RemoveQuestion}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="pill" Command="{Binding KeepSpareCommand}"><TextBlock Text="Keep" FontSize="13" /></Button>
+                    <Button Classes="pill primary" Command="{Binding RemoveSpareCommand}"><TextBlock Text="Remove" FontSize="13" FontWeight="Medium" /></Button>
+                  </StackPanel>
+                </StackPanel>
                 <TextBlock Classes="section" Text="Language" />
                 <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding Language}" PlaceholderText="Found for each lecture (or en, es, fr…)" FontSize="13" /></Border>
                 <CheckBox IsVisible="{Binding CanRecordComputerAudio}" IsChecked="{Binding ComputerAudio}" Margin="0,16,0,0">

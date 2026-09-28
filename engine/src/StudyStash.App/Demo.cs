@@ -1,6 +1,7 @@
 using Avalonia.Media;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.Audio;
 
 namespace StudyStash.App;
 
@@ -124,22 +125,60 @@ public static class Demo
         return m;
     }
 
+    /// <summary>A term with many classes, their names as a school's catalogue writes them (long, with the section on
+    /// the end), none of them with a lecture yet: the sidebar scrolls, names end in "…", and the open class's name
+    /// is too long for the list's header.</summary>
+    public static LibraryModel Crowded()
+    {
+        string[] names =
+        [
+            "Introduction to Organic Chemistry(CHEM2310.A)", "Differential Equations and Linear Algebra(MATH2250.B)",
+            "Principles of Macroeconomics(ECON2020.C)", "Studio Art: Drawing Fundamentals(ART1100.A)", "World Religions(REL1300.D)",
+            "Fluid Mechanics(ME3310.A)", "Data Structures and Algorithms(CS2420.B)", "Human Anatomy and Physiology Lab(BIO2320L.A)",
+            "Technical Writing for Scientists(ENG3050.C)", "Probability and Statistics for Engineers(STAT3110.A)",
+            "Music Theory II(MUS1220.A)", "Introduction to Psychology(PSY1010.E)", "Senior Project Seminar(ME4900.A)",
+        ];
+        const int open = 9;
+        var m = new LibraryModel { ClassTitle = names[open], ClassCount = "0 lectures", Status = "Library running on this PC", DrawChrome = true };
+        for (int i = 0; i < names.Length; i++) m.Classes.Add(new ClassItem { Name = names[i], Dot = Skin.ClassDot(i), Count = i == 6 ? 12 : 0, Selected = i == open });
+        m.Empty = $"No lectures in {names[open]} yet. Record one and it lands here.";
+        return m;
+    }
+
     public static SetupModel Setup(SkinKind skin)
     {
         var m = SetupModel.For(skin, AppRole.Laptop);
         if (skin == SkinKind.Mac)
         {
             m.Go(SetupStep.Model);
-            m.ModelSize = "3 GB";
-            m.ModelProgress = 0.62;
-            m.ModelDone = "1.9 GB of 3.1 GB";
-            m.ModelLeft = "About 4 minutes left";
+            ModelStep(m, skin);
         }
         else
         {
             m.Go(SetupStep.Taskbar);
         }
         return m;
+    }
+
+    /// <summary>Setup's model step on a made-up computer: a Mac with Apple silicon (large-v3, 62% down) or a PC with
+    /// no graphics card Whisper can use (the compact turbo, 62% down); <paramref name="choosing"/> opens the list.</summary>
+    public static void ModelStep(SetupModel m, SkinKind skin, bool choosing = false)
+    {
+        var hw = skin == SkinKind.Mac
+            ? new HardwareProfile(HostOs.Mac, System.Runtime.InteropServices.Architecture.Arm64, 8, true, 16)
+            : new HardwareProfile(HostOs.Windows, System.Runtime.InteropServices.Architecture.X64, 8, true, 16,
+                new GraphicsCard("Intel(R) UHD Graphics 620", 0.125, true), Vulkan: true);
+        var advice = WhisperModels.Advise(hw);
+        m.Models.Clear();
+        foreach (var c in ModelChoice.For(advice.Model, advice, Path.Combine(Path.GetTempPath(), "studystash-demo-no-models"))) m.Models.Add(c);
+        m.ChosenModel = m.Models.First(c => c.Chosen);
+        m.ChoosingModel = choosing;
+        m.ModelName = advice.Model.Name;
+        m.ModelSize = Services.Setup.About(advice.Model.Bytes);
+        m.ModelProgress = 0.62;
+        var done = new DownloadProgress((long)(advice.Model.Bytes * 0.62), advice.Model.Bytes, 0);
+        m.ModelDone = done.Amount;
+        m.ModelLeft = skin == SkinKind.Mac ? "About 4 minutes left" : "About a minute left";
     }
 
     /// <summary>A library-only computer's dropdown (the Mac mini at home): running, 21 lectures, Canvas synced ten

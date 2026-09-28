@@ -18,6 +18,10 @@ public static class NotesDownload
 {
     static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s ?? "" : "";
 
+    /// <summary>UTF-8 with no byte-order mark, as Markdown and SVG are kept everywhere: a mark before the front
+    /// matter's first "---" hides it from some readers, and <see cref="Encoding.UTF8"/> writes one.</summary>
+    static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
+
     /// <summary>One lecture, chosen with the Save dialog.</summary>
     public static Task LectureAsync(Window window, RemoteLibrary lib, string lectureId, string suggestedName, bool transcript, Func<string, string?> mermaidSvg) =>
         LectureAsync(async () =>
@@ -108,7 +112,7 @@ public static class NotesDownload
             // day, or two titles that read the same once a file name can hold them, never share (and overwrite) one.
             string name = NoteExport.UniqueName(NoteExport.FileName(lecture), taken);
             var export = await Task.Run(() => NoteExport.Lecture(lecture, transcript, mermaidSvg, name));
-            await File.WriteAllTextAsync(Path.Combine(classDir, export.FileName), export.Markdown, Encoding.UTF8);
+            await File.WriteAllTextAsync(Path.Combine(classDir, export.FileName), export.Markdown, Utf8);
             foreach (var asset in export.Assets) await WriteAssetAsync(classDir, asset);
             saved++;
         }
@@ -128,7 +132,7 @@ public static class NotesDownload
     /// name is already there and has something in it (an empty one, left from a run that found nothing, is reused).</summary>
     static string UniqueClassDir(string parent, string className)
     {
-        string baseName = Notes.Slugify(className, 100);
+        string baseName = NoteExport.SafeName(Notes.Slugify(className, 100));
         for (int n = 1; ; n++)
         {
             string path = Path.Combine(parent, n == 1 ? baseName : $"{baseName} ({n})");
@@ -136,18 +140,23 @@ public static class NotesDownload
         }
     }
 
-    static async Task WriteTextAsync(IStorageFile file, string text)
+    static Task WriteTextAsync(IStorageFile file, string text) => WriteTextAsync(file.OpenWriteAsync, text);
+
+    /// <summary>Writes <paramref name="text"/> to the stream <paramref name="open"/> gives, as UTF-8, and ends the file
+    /// there: saved over a longer file (the same lecture downloaded again, with less in it), nothing of the old one is
+    /// left after it, whether or not the picker's stream started it empty.</summary>
+    internal static async Task WriteTextAsync(Func<Task<Stream>> open, string text)
     {
-        await using var stream = await file.OpenWriteAsync();
-        await using var w = new StreamWriter(stream);
-        await w.WriteAsync(text);
+        await using var stream = await open();
+        await using (var w = new StreamWriter(stream, Utf8, bufferSize: -1, leaveOpen: true)) await w.WriteAsync(text);
+        if (stream.CanSeek) stream.SetLength(stream.Position);
     }
 
     static async Task WriteAssetAsync(string baseDir, ExportAsset asset)
     {
         string path = Path.Combine(baseDir, asset.RelativePath.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        await File.WriteAllTextAsync(path, asset.Text, Encoding.UTF8);
+        await File.WriteAllTextAsync(path, asset.Text, Utf8);
     }
 
     /// <summary>A single-file save with nowhere on disk for its pictures: every image link to a saved asset becomes

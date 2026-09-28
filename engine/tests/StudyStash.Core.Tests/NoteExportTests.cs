@@ -183,6 +183,9 @@ public class NoteExportTests
 
     [Theory]
     [InlineData("Lecture 3: Cells / Systems?", "2026-09-23 Lecture 3 Cells Systems.md")]
+    [InlineData("Acids <and> bases | part \"2\"", "2026-09-23 Acids and bases part 2.md")]
+    [InlineData("Where next...", "2026-09-23 Where next.md")]
+    [InlineData("CON", "2026-09-23 CON.md")]
     public void Windows_illegal_characters_never_reach_the_file_name(string title, string expected)
     {
         using var dir = new TempDir();
@@ -262,5 +265,50 @@ public class NoteExportTests
         Assert.Equal("2026-09-23 Lecture 3.md", NoteExport.UniqueName("2026-09-23 Lecture 3.md", taken));
         Assert.Equal("2026-09-23 Lecture 3 (2).md", NoteExport.UniqueName("2026-09-23 Lecture 3.md", taken));
         Assert.Equal("2026-09-23 Lecture 3 (3).md", NoteExport.UniqueName("2026-09-23 Lecture 3.md", taken));
+    }
+
+    /// <summary>What the Save dialog suggests, and a class's folder: names Windows keeps exactly as written.</summary>
+    [Theory]
+    [InlineData("The cardiac cycle", "The cardiac cycle")]
+    [InlineData("Chem.", "Chem")]
+    [InlineData("Week 3 . . .", "Week 3")]
+    [InlineData("CON", "CON_")]
+    [InlineData("aux", "aux_")]
+    [InlineData("nul.notes", "nul_.notes")]
+    [InlineData("COM1", "COM1_")]
+    [InlineData("LPT9 review", "LPT9 review")]
+    [InlineData("Console", "Console")]
+    [InlineData("...", "Untitled")]
+    [InlineData("", "Untitled")]
+    public void SafeName_gives_windows_a_name_it_keeps_exactly(string name, string expected)
+    {
+        Assert.Equal(expected, NoteExport.SafeName(name));
+        Assert.Equal(NoteExport.SafeName(expected), NoteExport.SafeName(name)); // settled: safe again is the same
+    }
+
+    [Theory]
+    [InlineData("What's a normal MAP?", "What's a normal MAP.md")]
+    [InlineData("Lab 2: pH & buffers.", "Lab 2 pH & buffers.md")]
+    [InlineData("PRN", "PRN_.md")]
+    [InlineData("   ", "untitled.md")]
+    public void The_save_dialogs_name_is_the_title_as_a_file_windows_keeps(string title, string expected) =>
+        Assert.Equal(expected, NoteExport.SaveName(title));
+
+    /// <summary>A library on Windows may hand over notes and a transcript with Windows line endings: the saved file
+    /// has one kind throughout, and its formulas come out exactly as written.</summary>
+    [Fact]
+    public void Windows_line_endings_in_the_notes_or_transcript_come_out_as_one_kind()
+    {
+        using var dir = new TempDir();
+        var (_, store) = Library(dir);
+        var m = new Meeting("lec-12") { Title = "Buffers", Date = "2026-09-23", Transcript = "Carbonic acid first.\r\nThen bicarbonate." };
+        var lecture = LectureJson(store, m, "## Summary\r\nThe blood's buffer:\r\n\r\n$$\r\n\\ce{CO2 + H2O <=> H2CO3}\r\n$$\r\n\r\nKeeps pH near 7.4 → 7.35–7.45.\r\n");
+
+        var file = NoteExport.Lecture(lecture, transcript: true, DrawMermaid);
+
+        Assert.DoesNotContain('\r', file.Markdown);
+        Assert.Contains("$$\n\\ce{CO2 + H2O <=> H2CO3}\n$$", file.Markdown);
+        Assert.Contains("Keeps pH near 7.4 → 7.35–7.45.", file.Markdown);
+        Assert.Contains("Carbonic acid first.\nThen bicarbonate.", file.Markdown);
     }
 }

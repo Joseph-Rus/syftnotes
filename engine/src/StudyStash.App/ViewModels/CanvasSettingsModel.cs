@@ -88,7 +88,22 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
         this.watch = watch;
         Status = new CanvasStatusModel(context);
         if (watch is not null) watch.Changed += OnWatchChanged;
+        Picker = new CoursePickerModel(context)
+        {
+            SavesItself = true,
+            OnSaved = async () =>
+            {
+                await LoadAsync();
+                OnClassesChanged?.Invoke();
+            },
+        };
     }
+
+    /// <summary>Which Canvas courses to bring in: every course Find my courses found, with a tick.</summary>
+    public CoursePickerModel Picker { get; }
+
+    /// <summary>The course choice made or removed classes: the host reloads the library's class list.</summary>
+    public Action? OnClassesChanged { get; set; }
 
     /// <summary>The header's status: a compact line when connected or syncing, the full card otherwise.</summary>
     public CanvasStatusModel Status { get; }
@@ -174,6 +189,8 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
         ExtensionLine = state.Extension is { Seen: { } seen } ext ? CanvasWords.ExtensionCheckedInLine(seen, ext.Version, zone, now) : "Not set up yet";
         PollMinutes = state.PollMinutes > 0 ? state.PollMinutes : overview.PollMinutes;
 
+        // A change not saved yet stays as ticked; anything else shows what the library has now.
+        if (!Picker.HasChanges || Picker.Saving) Picker.Fill(overview);
         var choices = CourseChoice.From(overview);
         Courses.Clear();
         foreach (var c in classes)

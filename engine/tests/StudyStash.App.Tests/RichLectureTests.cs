@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
 
@@ -53,6 +54,23 @@ public class RichLectureTests
             .Where(t => t.FontFamily is { Name: var n } && n.Contains("Mono", StringComparison.OrdinalIgnoreCase))
             .Select(t => string.Concat(t.Inlines?.OfType<Avalonia.Controls.Documents.Run>().Select(r => r.Text) ?? []));
         Assert.DoesNotContain(mono, t => t.Contains('$') || t.Contains("\\text"));
+        window.Close();
+    }
+
+    /// <summary>The self-test's own notes, which the self-test checks the app draws: they survive the notes pipeline's
+    /// cleaning, and hold four formulas that typeset (three inline, one on its own line) and a flowchart that lays out.</summary>
+    [AvaloniaFact]
+    public void The_self_tests_notes_carry_formulas_and_a_flowchart_that_draw()
+    {
+        string notes = Core.Summarize.CleanOutput(SelfTestEngine.Notes());
+        Assert.Contains(SelfTestEngine.NotesMarker, notes);
+        var note = new NoteView { Markdown = notes };
+        var window = Show(note, SkinKind.Win, ThemeVariant.Light);
+        var formulas = note.GetVisualDescendants().OfType<MathView>().ToList();
+        Assert.Equal(4, formulas.Count);
+        Assert.All(formulas, f => Assert.Null(f.ErrorMessage));
+        Assert.Single(formulas, f => f.Display);
+        Assert.NotNull(Assert.Single(note.GetVisualDescendants().OfType<DiagramView>()).Scene);
         window.Close();
     }
 }

@@ -19,6 +19,9 @@ public sealed class CanvasSettings
     public Dictionary<string, string> Available { get; set; } = [];
     /// <summary>The same courses' code and term (id → info), for <see cref="CourseMatch"/> and the classes screen.</summary>
     public Dictionary<string, CourseInfo> CourseInfo { get; set; } = [];
+    /// <summary>The Canvas courses (ids) the student chose to bring in; only these sync, and only these are explored.
+    /// Null in a library from before the choice: then every linked course is chosen.</summary>
+    public List<string>? Chosen { get; set; }
     /// <summary>How often the extension reads Canvas again.</summary>
     public int PollMinutes { get; set; } = 60;
     /// <summary>When the last sync started (ISO), and when the extension last asked for work.</summary>
@@ -119,10 +122,10 @@ public sealed class CanvasSettings
         lock (Gate)
         {
             string p = PathIn(home);
-            if (!File.Exists(p)) return new CanvasSettings { CurrentKeyId = KeyIdIn(home) };
+            if (SharedFile.Read(p) is not { } text) return new CanvasSettings { CurrentKeyId = KeyIdIn(home) };
             try
             {
-                var s = JsonSerializer.Deserialize<CanvasSettings>(File.ReadAllText(p), Options) ?? new CanvasSettings();
+                var s = JsonSerializer.Deserialize<CanvasSettings>(text, Options) ?? new CanvasSettings();
                 s.CurrentKeyId = KeyIdIn(home);
                 return s;
             }
@@ -138,9 +141,7 @@ public sealed class CanvasSettings
         lock (Gate)
         {
             Directory.CreateDirectory(home);
-            string p = PathIn(home), tmp = p + ".tmp";
-            File.WriteAllText(tmp, JsonSerializer.Serialize(this, Options) + "\n");
-            File.Move(tmp, p, overwrite: true);
+            SharedFile.Write(PathIn(home), JsonSerializer.Serialize(this, Options) + "\n");
         }
     }
 
@@ -156,9 +157,23 @@ public sealed class CanvasSettings
         }
     }
 
+    /// <summary>The course is one the student brings in: chosen, or (in a library from before the choice) linked.</summary>
+    public bool IsChosen(long id) => Chosen?.Contains(id.ToString(System.Globalization.CultureInfo.InvariantCulture)) ?? Courses.ContainsValue(id);
+
+    /// <summary>The classes that sync (class → course id): each linked class whose course is chosen.</summary>
+    [JsonIgnore] public Dictionary<string, long> Synced => Courses.Where(kv => IsChosen(kv.Value)).ToDictionary(kv => kv.Key, kv => kv.Value);
+
+    /// <summary>A course was linked by hand: it's chosen now too.</summary>
+    public void Choose(long id)
+    {
+        string key = id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (Chosen is null || Chosen.Contains(key)) return;
+        Chosen.Add(key);
+    }
+
     /// <summary>Time for the extension to read Canvas again.</summary>
     public bool Due(DateTimeOffset now) =>
-        On && Courses.Count > 0 && (SyncNow || !DateTimeOffset.TryParse(LastSync, out var last) || last.AddMinutes(PollMinutes) <= now);
+        On && Synced.Count > 0 && (SyncNow || !DateTimeOffset.TryParse(LastSync, out var last) || last.AddMinutes(PollMinutes) <= now);
 
     /// <summary>"https://school.instructure.com" from whatever was pasted (a course page, no scheme, a trailing slash).
     /// Null when it isn't a web address.</summary>
@@ -213,8 +228,9 @@ public sealed class CanvasSettings
 /// <summary>What the course scout found last time: whether it finished, its summary, and how many files it saved.</summary>
 public sealed record ScoutReport(bool Ok, string Report, string When, int Files);
 
-/// <summary>A Canvas course as Canvas names it, for matching it to a class and showing it in Settings.</summary>
-public sealed record CourseInfo(string Code, string Name, string Term);
+/// <summary>A Canvas course as Canvas names it, for matching it to a class and showing it in Settings, with when its
+/// term (and the course itself) starts and ends (ISO; "" where Canvas didn't say), for ticking this term's courses.</summary>
+public sealed record CourseInfo(string Code, string Name, string Term, string TermStart = "", string TermEnd = "", string CourseStart = "", string CourseEnd = "");
 
 /// <summary>Chrome's extension went from one version to a newer one at <paramref name="At"/> (ISO); dismissed once the
 /// student has seen it.</summary>

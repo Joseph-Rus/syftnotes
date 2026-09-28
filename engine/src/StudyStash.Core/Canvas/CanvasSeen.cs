@@ -17,9 +17,7 @@ public static class CanvasSeen
     {
         try
         {
-            return File.Exists(PathIn(home))
-                ? JsonSerializer.Deserialize<Dictionary<string, List<long>>>(File.ReadAllText(PathIn(home)), Options) ?? []
-                : [];
+            return SharedFile.Read(PathIn(home)) is { } text ? JsonSerializer.Deserialize<Dictionary<string, List<long>>>(text, Options) ?? [] : [];
         }
         catch (JsonException)
         {
@@ -29,9 +27,7 @@ public static class CanvasSeen
 
     static void Save(string home, Dictionary<string, List<long>> all)
     {
-        string tmp = PathIn(home) + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(all, Options));
-        File.Move(tmp, PathIn(home), overwrite: true);
+        SharedFile.Write(PathIn(home), JsonSerializer.Serialize(all, Options));
     }
 
     /// <summary>The announcement ids opened in Study Stash for this class.</summary>

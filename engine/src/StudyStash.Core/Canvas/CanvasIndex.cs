@@ -62,7 +62,7 @@ public sealed class CourseIndex
     {
         try
         {
-            return File.Exists(path) ? JsonSerializer.Deserialize<CourseIndex>(File.ReadAllText(path), Options) : null;
+            return SharedFile.Read(path) is { } text ? JsonSerializer.Deserialize<CourseIndex>(text, Options) : null;
         }
         catch (JsonException)
         {
@@ -83,9 +83,7 @@ public sealed class CourseIndex
     void Write(string path)
     {
         Directory.CreateDirectory(Py.Parent(path));
-        string tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(this, Options));
-        File.Move(tmp, path, overwrite: true);
+        SharedFile.Write(path, JsonSerializer.Serialize(this, Options));
     }
 
     static CourseIndex Copy(CourseIndex index) => JsonSerializer.Deserialize<CourseIndex>(JsonSerializer.Serialize(index, Options), Options)!;

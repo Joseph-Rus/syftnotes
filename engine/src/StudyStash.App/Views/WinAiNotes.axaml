@@ -66,11 +66,13 @@
       </Grid>
     </Border>
 
-    <!-- Summary header + Rewrite notes -->
-    <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
-      <TextBlock Classes="ai-notes-title" Text="Summary" />
-      <TextBlock Grid.Column="1" Classes="ai-notes-byline" Margin="10,0,0,0" Text="{Binding ShownByline}" />
-      <Button Name="RewriteButton" Grid.Column="3" Classes="ai-pillbtn" IsVisible="{Binding ShowRewriteButton}">
+    <!-- Summary header + Rewrite notes: the byline sits on Summary's line and gives way (…) before the button does,
+         so a narrow window keeps "Rewrite notes" in reach. -->
+    <Grid ColumnDefinitions="Auto,*,12,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
+      <TextBlock Classes="ai-notes-title" Text="Summary" VerticalAlignment="Center" />
+      <TextBlock Grid.Column="1" Name="Byline" Classes="ai-notes-byline" Margin="10,3,0,0" VerticalAlignment="Center" Text="{Binding ShownByline}"
+                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ShownByline}" c:Tips.WhenCut="True" />
+      <Button Name="RewriteButton" Grid.Column="3" Classes="ai-pillbtn" VerticalAlignment="Center" IsVisible="{Binding ShowRewriteButton}">
         <Border Classes="ai-pill">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <c:Icon Glyph="refresh" Size="16" />

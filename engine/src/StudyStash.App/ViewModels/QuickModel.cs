@@ -2,6 +2,9 @@ using System.Collections.ObjectModel;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.Core;
+using StudyStash.Core.Ai;
+using StudyStash.Core.Rich;
 
 namespace StudyStash.App.ViewModels;
 
@@ -103,8 +106,73 @@ public sealed partial class QuickModel : ObservableObject
 
     partial void OnQueryChanged(string value)
     {
+        answering?.Cancel(); // back to searching: the answer being written is no longer wanted
         if (Answering) Answering = false;
         OnQuery?.Invoke(value);
+    }
+
+    CancellationTokenSource? answering;
+
+    /// <summary>
+    /// Asks the library's AI and shows the answer as it's written: the spinner until its first words, then the
+    /// answer growing at <see cref="Paced"/>'s pace, then its sources as rows to open. False when the library is too
+    /// old to answer this way (the caller asks it the old way). A newer question, or going back to searching, stops
+    /// this one.
+    /// </summary>
+    public async Task<bool> AnswerAsync(IAiLibrary ai, string question)
+    {
+        answering?.Cancel();
+        using var stop = answering = new CancellationTokenSource();
+        Answering = true;
+        Thinking = true;
+        Answer = "";
+        Rows.Clear();
+        Note = null;
+        var paced = new Paced(text =>
+        {
+            Thinking = false;
+            Answer = PartialText.Showable(text);
+        });
+        string? Partial() => paced.End() is { } text ? PartialText.Ended(text) : null;
+        try
+        {
+            var reply = await ai.AskAsync(new AskRequest(question), paced.Show, stop.Token);
+            paced.End();
+            if (reply is null) return false;
+            Thinking = false;
+            Answer = reply.Answer;
+            var sources = reply.Sources.Where(s => s.Id is not null).ToList();
+            if (sources.Count > 0)
+            {
+                Rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Sources", First = true });
+                foreach (var s in sources)
+                    Rows.Add(new QuickRow
+                    {
+                        Kind = QuickKind.Source, Title = s.Title, Meta = s.At is double at ? TimedText.Clock(at) : s.Section, LectureId = s.Id, At = s.At,
+                    });
+                SelectFirst();
+            }
+        }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+        {
+            paced.End(); // what stopped it (a newer question, a new search) has the panel now
+        }
+        catch (Exception e) when (e is LibraryRefusedException or HttpRequestException or IOException or OperationCanceledException or System.Text.Json.JsonException)
+        {
+            string why = e is LibraryRefusedException refused ? refused.Message : "Your library didn't answer. Is it on?";
+            Thinking = false;
+            if (Partial() is { Length: > 0 } partial)
+            {
+                Answer = partial;
+                Note = e is LibraryRefusedException ? why : "Your library stopped answering partway through. Is it on?";
+            }
+            else Answer = why;
+        }
+        finally
+        {
+            if (answering == stop) answering = null;
+        }
+        return true;
     }
 
     [RelayCommand]

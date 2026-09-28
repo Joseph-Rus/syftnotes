@@ -12,12 +12,16 @@ static class DiagramsReady
 {
     public static void Wait(TopLevel top)
     {
-        for (int round = 0; round < 8; round++)
+        var until = DateTime.UtcNow.AddSeconds(60);
+        while (true)
         {
             Dispatcher.UIThread.RunJobs();
             Assert.NotNull(top.CaptureRenderedFrame());
             if (!SceneCache.Busy && !top.GetVisualDescendants().OfType<DiagramView>().Any(d => d.IsLaying)) return;
-            Assert.True(SceneCache.Settle(TimeSpan.FromSeconds(60)), "a diagram took over a minute to lay out");
+            Assert.True(DateTime.UtcNow < until, "a diagram took over a minute to lay out and draw");
+            // A finished layout tells its view from the thread pool: give that a moment to arrive, then look again.
+            if (!SceneCache.Settle(TimeSpan.FromSeconds(60))) continue;
+            Thread.Sleep(5);
         }
     }
 }

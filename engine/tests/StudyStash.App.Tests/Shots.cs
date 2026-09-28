@@ -504,6 +504,16 @@ public class SurfaceShots
                     Shot.Take($"{look}-05-setup-laptop-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
                         size: size);
             }
+            // The model step with Change pressed: every model, the one for this computer marked.
+            foreach (var role in new[] { AppRole.Laptop, AppRole.Both })
+            {
+                var m = await SetupPage(skin, role, SetupStep.Model);
+                Demo.ModelStep(m, skin, choosing: true);
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-{(role == AppRole.Laptop ? "laptop" : "one-computer")}-model-change", skin, t,
+                        () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
+                        size: new Size(850, 608));
+            }
             // Setup run again on the library: it keeps its name, password and notes folder.
             var again = await SetupPage(skin, AppRole.Library, SetupStep.Password);
             again.ExistingLibrary = true;
@@ -533,6 +543,15 @@ public class SurfaceShots
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-one-computer-welcome-problem", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = failed, DrawChrome = true } : new WinSetup { DataContext = failed, DrawChrome = true },
                     size: new Size(850, 608));
+            // The microphone step when the microphone won't open: none plugged in, and refused by the system.
+            foreach (var (what, trouble) in new[] { ("none", Audio.MicTrouble.NoDevice(skin == SkinKind.Win)), ("denied", Audio.MicTrouble.Denied(skin == SkinKind.Win)) })
+            {
+                var mic = await SetupPage(skin, AppRole.Laptop, SetupStep.Microphone);
+                mic.MicTrouble = trouble;
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-laptop-microphone-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = mic, DrawChrome = true } : new WinSetup { DataContext = mic, DrawChrome = true },
+                        size: new Size(850, 608));
+            }
         }
     }
 
@@ -556,6 +575,7 @@ public class SurfaceShots
             m.LibraryOk = true;
             m.LibraryResult = role == AppRole.Laptop ? "Connected to Ada's library." : $"Ada's library is ready on this {m.DeviceWord}.";
         }
+        if (step == SetupStep.Model) Demo.ModelStep(m, skin);
         if (role == AppRole.Both && step == SetupStep.Done) m.NotesSummary = "Ollama";
         if (step == SetupStep.Ai) m.Ai = AiDemo.Setup(skin == SkinKind.Win, oneComputer: role == AppRole.Both);
         if (step == SetupStep.Canvas || canvasFound)
@@ -569,7 +589,7 @@ public class SurfaceShots
         {
             m.Classes.Clear();
             m.Classes.Add(new SetupClass { Name = "Chapel", About = "Weekly chapel talks", Dot = Skin.ClassDot(4) });
-            m.Courses[4].Ticked = false;
+            m.Courses[^1].Ticked = false;
         }
         m.Go(step);
         return m;
@@ -611,14 +631,27 @@ public class SurfaceShots
     }
 
     /// <summary>A settings window over a temp home (never a real one), for a section's shot; disposed after.</summary>
-    static (Services.SettingsModel Model, Services.AppHost Host, string Home) MakeSettings(string section)
+    static (Services.SettingsModel Model, Services.AppHost Host, string Home) MakeSettings(string section, SkinKind skin = SkinKind.Mac)
     {
         string home = Path.Combine(Path.GetTempPath(), "studystash-settings-" + Guid.NewGuid().ToString("N"));
+        // "Recording": the models on a Mac with Apple silicon, or a PC with no graphics card Whisper can use, the one
+        // for it in use; "Recording-heavier": an Intel Mac or that PC still on large-v3 from before, one model
+        // downloading.
+        bool heavier = section == "Recording-heavier";
+        if (heavier) new Services.AppSettings { SetupDone = true, Model = Audio.WhisperModels.LargeV3.Id }.Save(home);
+        // "Recording-remove": switched to the lighter model, asked whether to remove the one before (Whisper small).
+        bool removing = section == "Recording-remove";
+        if (removing)
+        {
+            new Services.AppSettings { SetupDone = true, Model = Audio.WhisperModels.LargeV3TurboSmall.Id }.Save(home);
+            ModelAdviceTests.PretendDownloaded(home, Audio.WhisperModels.Small);
+        }
+        var hardware = FakeHardware.For(skin, appleSilicon: !heavier && !removing);
         // "One-computer…": the Library page of just this computer's library, before a laptop is added, while one is
         // being added (its password typed), and once laptops can connect.
         bool one = section.StartsWith("One-computer", StringComparison.Ordinal);
         if (one) new Services.AppSettings { SetupDone = true, Role = Services.AppRole.Both }.Save(home);
-        var host = new Services.AppHost(home);
+        var host = new Services.AppHost(home, hardware: hardware);
         // The library's own pages read the design's example library (Sam's, on a Mac mini); "Unreachable" shows the
         // Library page when it doesn't answer.
         var library = new FakeLibrarySettings { Down = section == "Unreachable" };
@@ -627,7 +660,14 @@ public class SurfaceShots
         bool renaming = section == "Rename";
         if (renaming) library.Settings = FakeLibrarySettings.CodeNamed();
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
-        model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : section;
+        model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : heavier || removing ? "Recording" : section;
+        if (removing) model.AskRemoveSpareCommand.Execute(null);
+        if (heavier)
+        {
+            model.ModelDownloading = true;
+            model.ModelProgress = 0.38;
+            model.ModelLine = "Downloading Whisper large-v3 turbo (compact): 218 MB of 574 MB. About a minute left.";
+        }
         if (renaming) model.Lib.ConfirmingCourseNames = true;
         if (section == "One-computer-adding")
         {
@@ -641,9 +681,9 @@ public class SurfaceShots
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
+        foreach (string section in new[] { "General", "Appearance", "Recording", "Recording-heavier", "Recording-remove", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
         {
-            var (model, host, home) = MakeSettings(section);
+            var (model, host, home) = MakeSettings(section, skin);
             try
             {
                 foreach (var t in Themes)

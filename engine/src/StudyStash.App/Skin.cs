@@ -106,9 +106,11 @@ public static class Skin
             d["RadiusControl"] = new CornerRadius(4);
             d["RadiusMenu"] = new CornerRadius(8);
             d["PopupStrokeWidth"] = new Thickness(1);
+            d["CaptionButtonWidth"] = 46.0;
         }
         d.ThemeDictionaries[ThemeVariant.Light] = light;
         d.ThemeDictionaries[ThemeVariant.Dark] = dark;
+        FluentPopups.Add(d, light, dark);
         return d;
     }
 
@@ -318,6 +320,20 @@ public static class Skin
         }
         B("IcInfo", accentText);
         B("Good", Good);
+        // The caption buttons Avalonia draws in a Windows window's title bar (Fluent's keys): our ink, hover and press.
+        r["CaptionButtonForeground"] = r["Fg"];
+        r["CaptionButtonBackground"] = r["Hover"];
+        r["CaptionButtonBorderBrush"] = r["Press"];
+        // Fluent's own controls (a text field's focus line, selected text) take the colour theme's accent, not the
+        // one Windows is set to.
+        var accent = ((SolidColorBrush)r["Accent"]!).Color;
+        r["SystemAccentColor"] = accent;
+        double al = Math.Clamp(dark ? 0.8 : L, 0.3, 0.9);
+        for (int i = 1; i <= 3; i++)
+        {
+            r[$"SystemAccentColorLight{i}"] = t.O(Math.Min(0.95, al + 0.07 * i), c);
+            r[$"SystemAccentColorDark{i}"] = t.O(Math.Max(0.2, al - 0.07 * i), c);
+        }
         // Fluent's control border: a hairline all round, darker along the bottom edge.
         r["CtrlBorder"] = new LinearGradientBrush
         {

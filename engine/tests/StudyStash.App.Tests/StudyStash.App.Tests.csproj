@@ -35,6 +35,7 @@
   <ItemGroup>
     <Compile Include="..\StudyStash.Core.Tests\FakeCanvas.cs" Link="Library\FakeCanvas.cs" />
     <Compile Include="..\StudyStash.Core.Tests\TestUtil.cs" Link="Library\TestUtil.cs" />
+    <Compile Include="..\StudyStash.Core.Tests\FakeAi.cs" Link="Library\FakeAi.cs" />
     <Compile Include="..\StudyStash.Core.Tests\E2E\FakeCanvasHttp.cs" Link="Library\FakeCanvasHttp.cs" />
     <Compile Include="..\StudyStash.Core.Tests\E2E\CanvasServer.cs" Link="Library\CanvasServer.cs" />
     <Compile Include="..\StudyStash.Core.Tests\E2E\ChromeRunner.cs" Link="Library\ChromeRunner.cs" />

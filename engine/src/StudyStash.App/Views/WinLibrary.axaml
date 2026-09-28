@@ -53,6 +53,13 @@
     <Style Selector="DockPanel.navpane.canvas Button.nav">
       <Setter Property="Padding" Value="12,0" />
     </Style>
+    <!-- Unsorted's icon sits where the dots' slot does, and its count ends where every class's count ends. -->
+    <Style Selector="Button.nav.unsorted">
+      <Setter Property="Padding" Value="12,0,16,0" />
+    </Style>
+    <Style Selector="DockPanel.navpane.canvas Button.nav.unsorted">
+      <Setter Property="Padding" Value="12,0" />
+    </Style>
     <Style Selector="DockPanel.navpane Border.pill">
       <Setter Property="Margin" Value="-16,0,0,0" />
     </Style>
@@ -109,6 +116,13 @@
     <Style Selector="Border.seg.on Border.underline">
       <Setter Property="IsVisible" Value="True" />
     </Style>
+    <!-- The window's frame, for a screenshot only: a real window has Windows' own corners, edge and shadow. -->
+    <Style Selector="Border#Frame.framed">
+      <Setter Property="BorderBrush" Value="{DynamicResource FlyStroke}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
+    </Style>
     <Style Selector="c|WindowHeader.titlebar">
       <Setter Property="Height" Value="48" />
     </Style>
@@ -139,8 +153,7 @@
     </Style>
   </UserControl.Styles>
 
-  <Border Background="{DynamicResource Mica}" BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1" CornerRadius="8" BoxShadow="{DynamicResource ShadowLg}"
-          ClipToBounds="True" Name="Frame">
+  <Border Name="Frame" Classes.framed="{Binding DrawChrome}" Background="{DynamicResource Mica}" ClipToBounds="True">
     <Panel>
     <DockPanel>
       <!-- The title bar: drag the window by it; the search box in its middle, the system's caption buttons on its
@@ -165,19 +178,21 @@
             <TextBlock Text="Settings" FontSize="14" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
-        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,8,*" Margin="16,0,16,8">
-          <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Top" Margin="0,6,0,0" />
-          <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+        <!-- Whether the library answers: a row of its own above Settings, never under the classes (they scroll). -->
+        <Grid Name="StatusRow" DockPanel.Dock="Bottom" ColumnDefinitions="Auto,8,*" Margin="16,10,16,8">
+          <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Top" Margin="0,5,0,0" />
+          <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="12" LineHeight="16" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
         </Grid>
+        <ScrollViewer Name="ClassList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:WindowHeader.MovesWindow="True">
         <StackPanel Spacing="4">
           <Button Classes="nav" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
                   Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
             <Panel>
               <Border Classes="pill" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
-              <Grid ColumnDefinitions="Auto,14,*,Auto">
+              <Grid ColumnDefinitions="Auto,14,*,12,Auto">
                 <c:Icon Glyph="event_upcoming" Size="16" Foreground="{DynamicResource AccentText}" />
                 <TextBlock Grid.Column="2" Text="Due" FontSize="14" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="3" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" FontSize="12" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="4" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" FontSize="12" VerticalAlignment="Center" />
               </Grid>
             </Panel>
           </Button>
@@ -192,12 +207,13 @@
                         Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
                   <Panel>
                     <Border Classes="pill" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
-                    <Grid ColumnDefinitions="Auto,14,*,Auto">
+                    <!-- dot | name, cut short with "…" (the whole name on hover) | the count, in its own column -->
+                    <Grid ColumnDefinitions="Auto,14,*,12,Auto">
                       <Panel Classes="slot">
                         <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                       </Panel>
-                      <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="3" Classes="count" Text="{Binding Count}" FontSize="12" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Classes="name" Text="{Binding Name}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" />
+                      <TextBlock Grid.Column="4" Classes="count" Text="{Binding Count}" FontSize="12" VerticalAlignment="Center" />
                     </Grid>
                   </Panel>
                 </Button>
@@ -205,15 +221,16 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
           <Border Height="1" Background="{DynamicResource Sep}" Margin="16,4" />
-          <Button Classes="nav" Classes.selected="{Binding Unsorted.Selected}" Padding="12,0"
+          <Button Classes="nav unsorted" Classes.selected="{Binding Unsorted.Selected}"
                   Command="{Binding PickClassCommand}" CommandParameter="{Binding Unsorted}">
-            <Grid ColumnDefinitions="Auto,10,*,Auto">
+            <Grid ColumnDefinitions="Auto,10,*,12,Auto">
               <c:Icon Glyph="inbox" Size="16" Foreground="{DynamicResource Fg2}" />
               <TextBlock Grid.Column="2" Classes="ulabel" Text="Unsorted" FontSize="14" VerticalAlignment="Center" />
-              <TextBlock Grid.Column="3" Classes="count" Text="{Binding Unsorted.Count}" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="4" Classes="count" Text="{Binding Unsorted.Count}" FontSize="12" VerticalAlignment="Center" />
             </Grid>
           </Button>
         </StackPanel>
+        </ScrollViewer>
       </DockPanel>
 
       <!-- The content layer -->
@@ -223,7 +240,9 @@
           <Border Width="1" Background="{DynamicResource Sep}" HorizontalAlignment="Right" IsVisible="{Binding !Narrow}" />
           <DockPanel Margin="0,0,1,0" IsVisible="{Binding ShowLectures}">
             <StackPanel DockPanel.Dock="Top" Margin="20,20,20,12">
-              <TextBlock Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" />
+              <!-- A long class name wraps to a second line, and past that ends in "…" (the whole name on hover). -->
+              <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" LineHeight="26"
+                         TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
               <TextBlock Text="{Binding ClassCount}" FontSize="12" Foreground="{DynamicResource Fg2}" />
             </StackPanel>
             <DockPanel>
@@ -373,13 +392,15 @@
               <TextBlock IsVisible="{Binding NoNote}" Text="Choose a lecture to read its notes." FontSize="14" Foreground="{DynamicResource Fg3}"
                          HorizontalAlignment="Center" VerticalAlignment="Center" />
 
+              <!-- Where the notes fade out (the code-behind masks them over this strip; it paints nothing itself). -->
               <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" />
               </Panel>
               <!-- The latest answer, just above the ask bar -->
-              <Panel Name="AnswerRoom" Grid.Row="1" IsVisible="{Binding HasAnswer}" HorizontalAlignment="Center" Margin="0,8,0,88">
+              <!-- Both 600 wide where there's room, narrower (never cut off) in a small window. -->
+              <Panel Name="AnswerRoom" Grid.Row="1" IsVisible="{Binding HasAnswer}" Margin="24,8,24,88">
                 <v:WinAiAnswer DataContext="{Binding Ask}" />
               </Panel>
-              <Panel Name="AskRoom" Grid.RowSpan="2" IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24">
+              <Panel Name="AskRoom" Grid.RowSpan="2" IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" Margin="24,0,24,24">
                 <v:WinAiAskBar DataContext="{Binding Ask}" />
               </Panel>
             </Grid>

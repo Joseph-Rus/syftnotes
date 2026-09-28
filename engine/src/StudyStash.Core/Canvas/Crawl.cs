@@ -149,7 +149,7 @@ public sealed partial class Crawl
     {
         try
         {
-            return File.Exists(StatePath) ? JsonNode.Parse(File.ReadAllText(StatePath)) as JsonObject : null;
+            return SharedFile.Read(StatePath) is { } text ? JsonNode.Parse(text) as JsonObject : null;
         }
         catch (JsonException)
         {
@@ -159,9 +159,7 @@ public sealed partial class Crawl
 
     void Save()
     {
-        string tmp = StatePath + ".tmp";
-        File.WriteAllText(tmp, data.ToJsonString());
-        File.Move(tmp, StatePath, overwrite: true);
+        SharedFile.Write(StatePath, data.ToJsonString());
     }
 
     JsonArray Jobs => (JsonArray)data["jobs"]!;
@@ -210,6 +208,29 @@ public sealed partial class Crawl
             }
             foreach (var (id, cls) in Courses.ToList())
                 if (S(cls) == from) Courses[id] = to;
+            Save();
+            return true;
+        }
+    }
+
+    /// <summary>A class stopped syncing and its Canvas files went: what's remembered about it (which folder each module
+    /// and assignment had, where each file landed) goes too, so bringing the course in again reads it all afresh.
+    /// Refused (false) while a sync is running or its results wait to be taken.</summary>
+    public bool ForgetClass(string cls)
+    {
+        lock (gate)
+        {
+            if (Flag(data["active"]) || Flag(data["ready"]) || Jobs.Count > 0 || Inflight.Count > 0) return false;
+            foreach (var (key, _) in Manifest.ToList())
+            {
+                int colon = key.IndexOf(':');
+                if (colon < 0) continue;
+                string type = key[..colon], rest = key[(colon + 1)..];
+                if (type == "file" || !rest.StartsWith(cls + ":", StringComparison.Ordinal) || !long.TryParse(rest[(cls.Length + 1)..], out _)) continue;
+                Manifest.Remove(key);
+            }
+            foreach (var (id, c) in Courses.ToList())
+                if (S(c) == cls) Courses.Remove(id);
             Save();
             return true;
         }

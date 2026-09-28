@@ -174,7 +174,7 @@ public static class Assignments
     {
         try
         {
-            return File.Exists(PathIn(home)) ? JsonSerializer.Deserialize<List<Assignment>>(File.ReadAllText(PathIn(home)), Options) ?? [] : [];
+            return SharedFile.Read(PathIn(home)) is { } text ? JsonSerializer.Deserialize<List<Assignment>>(text, Options) ?? [] : [];
         }
         catch (JsonException)
         {
@@ -184,9 +184,7 @@ public static class Assignments
 
     public static void Save(string home, IEnumerable<Assignment> items)
     {
-        string tmp = PathIn(home) + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(items.ToList(), Options));
-        File.Move(tmp, PathIn(home), overwrite: true);
+        SharedFile.Write(PathIn(home), JsonSerializer.Serialize(items.ToList(), Options));
     }
 
     /// <summary>What's still to do, soonest first: open, past due or missing, due within <paramref name="days"/> (or

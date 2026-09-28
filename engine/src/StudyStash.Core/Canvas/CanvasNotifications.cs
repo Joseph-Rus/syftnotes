@@ -57,7 +57,7 @@ public static class CanvasNotifications
     {
         try
         {
-            return File.Exists(PathIn(home)) ? JsonSerializer.Deserialize<NotificationsFile>(File.ReadAllText(PathIn(home)), Options) ?? new() : new();
+            return SharedFile.Read(PathIn(home)) is { } text ? JsonSerializer.Deserialize<NotificationsFile>(text, Options) ?? new() : new();
         }
         catch (JsonException)
         {
@@ -67,9 +67,7 @@ public static class CanvasNotifications
 
     static void Save(string home, NotificationsFile f)
     {
-        string tmp = PathIn(home) + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(f, Options));
-        File.Move(tmp, PathIn(home), overwrite: true);
+        SharedFile.Write(PathIn(home), JsonSerializer.Serialize(f, Options));
     }
 
     static void Add(NotificationsFile f, string kind, string title, string text, string cls, long? assignmentId, long? announcementId, string at)

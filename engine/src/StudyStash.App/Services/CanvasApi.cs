@@ -166,6 +166,9 @@ public static class CanvasApi
         public string Url { get; init; } = "";
         public ExtensionInfo? Extension { get; init; }
         public DateTimeOffset? LastSync { get; init; }
+        /// <summary>Changes whenever what the app shows from Canvas may have (a sync finished, a course linked or
+        /// chosen); null from a library older than it.</summary>
+        public string? Revision { get; init; }
         public DateTimeOffset? NextSync { get; init; }
         public int PollMinutes { get; init; }
         public SyncingInfo? Syncing { get; init; }
@@ -235,6 +238,11 @@ public static class CanvasApi
         public ExtensionUpdate? ExtensionUpdate { get; init; }
         /// <summary>The same as GET canvas/extension, without the key.</summary>
         public ExtensionKey? Extension { get; init; }
+        /// <summary>The course ids the student chose to bring in; null when the library has never been told (then
+        /// every linked course is in), or is older than the choice.</summary>
+        public IReadOnlyList<string>? Chosen { get; init; }
+        /// <summary>Only in the answer to POST canvas/choose: what it did.</summary>
+        public ChoiceOutcome? Outcome { get; init; }
     }
 
     public sealed record ChangeRow
@@ -297,6 +305,24 @@ public static class CanvasApi
         public string Title { get; init; } = "";
         /// <summary>Its short code ("CSCI 321"), or "" when its code has none worth showing.</summary>
         public string ShortCode { get; init; } = "";
+        /// <summary>It's brought in (chosen); null from a library older than the choice.</summary>
+        public bool? Chosen { get; init; }
+        /// <summary>The picker ticks it for a student choosing afresh (this term's); null from an older library.</summary>
+        public bool? Suggested { get; init; }
+        /// <summary>Why it isn't suggested ("Past term", "No term", "Not a class"); "" when it is.</summary>
+        public string Why { get; init; } = "";
+        /// <summary>The class it's linked to, or null.</summary>
+        public string? Class { get; init; }
+    }
+
+    /// <summary>What POST canvas/choose did: the classes made or linked for newly chosen courses, the ones that
+    /// stopped syncing, of those the ones removed, and the ones kept because they hold lectures.</summary>
+    public sealed record ChoiceOutcome
+    {
+        public IReadOnlyList<string> Added { get; init; } = [];
+        public IReadOnlyList<string> Stopped { get; init; } = [];
+        public IReadOnlyList<string> Removed { get; init; } = [];
+        public IReadOnlyList<string> KeptForLectures { get; init; } = [];
     }
 
     public sealed record Counts

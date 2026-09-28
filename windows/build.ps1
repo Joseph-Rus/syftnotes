@@ -46,6 +46,9 @@ foreach ($Rid in "win-x64", "win-arm64") {
     -p:DebugType=None -o $Dest --nologo -v quiet
   if ($LASTEXITCODE -ne 0) { throw "publishing $Rid failed" }
   Remove-UnneededRuntimes $Dest $Rid
+  # -p:DebugType=None leaves out our own symbols, not the ones NuGet ships beside native code (libSkiaSharp.pdb alone
+  # is 84 MB): nothing on a student's computer reads them.
+  Get-ChildItem $Dest -Recurse -File -Filter "*.pdb" | Remove-Item -Force
   Test-NoModel $Dest
 }
 

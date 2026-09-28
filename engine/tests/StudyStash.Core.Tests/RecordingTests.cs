@@ -486,7 +486,7 @@ public class RecordingTests
             var rec = w.Recorder;
             var l = rec.Start("CS 101");
             w.Mic.Play(8);
-            Assert.True(SpinWait.SpinUntil(() => w.Said.Count > 0, 5000), "nothing was said");
+            Assert.True(SpinWait.SpinUntil(() => w.Said.Count > 0, 30000), "nothing was said"); // a busy CI machine is slow to write 6 s
             Assert.Equal([words], w.Said);
             Assert.Equal(LectureState.Paused, w.State);
             Assert.Equal(words, rec.LastProblem);

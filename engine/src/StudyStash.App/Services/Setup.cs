@@ -71,6 +71,8 @@ public static class Setup
         if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;
         m.ModelName = host.Model.Name;
         m.ModelSize = About(host.Model.Bytes);
+        // Only a computer that records needs the model (and only it asks what the computer has).
+        if (m.Steps.Any(s => s.Step == SetupStep.Model)) ShowModels(m, host);
         if (cc.ServerUrl.Length > 0 && host.Library == LibraryState.Connected && (m.IsLaptop || host.LocalLibrary is not null))
         {
             m.LibraryOk = true;
@@ -84,8 +86,17 @@ public static class Setup
             Refresh(m, host);
         };
         m.OnMicSettings = () => Dialogs.OpenUrl(host.MicSettingsUrl);
+        m.OnOpenUrl = url => Dialogs.OpenUrl(url);
         m.OnTaskbarSettings = () => Dialogs.OpenUrl("ms-settings:taskbar");
         m.OnRetryModel = () => _ = host.DownloadModelAsync();
+        m.OnPickModel = choice =>
+        {
+            host.Save(s => s.Model = choice.Model.Id);
+            // One already here needs nothing, and a download of another one is no longer wanted.
+            if (WhisperModels.IsDownloaded(host.Home, choice.Model)) host.StopDownload();
+            else if (m.Step == SetupStep.Model) _ = host.DownloadModelAsync(choice.Model);
+            Refresh(m, host);
+        };
         m.OnConnect = () => ConnectAsync(m, host, here);
         m.OnFind = () => FindAsync(m, host);
         m.OnAddClass = () => AddClassAsync(m, host);
@@ -103,13 +114,27 @@ public static class Setup
         m.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName != nameof(SetupModel.Step)) return;
-            if (m.Step == SetupStep.Model) _ = host.DownloadModelAsync();
+            if (m.Step == SetupStep.Model)
+            {
+                if (m.Models.Count == 0) ShowModels(m, host);
+                _ = host.DownloadModelAsync();
+            }
             if (m.Step == SetupStep.Classes) ListClasses(m, host);
             if (m.Step == SetupStep.Done && m.IsLibrary) _ = FillAddressesAsync(m, host, tailscale ?? (() => HostInfo.Tailscale()), hostName ?? LanName);
         };
         ListClasses(m, host);
         Refresh(m, host);
         return m;
+    }
+
+    /// <summary>The models to pick from, the one for this computer marked (and picked, unless another already was),
+    /// with one line why it suits this computer.</summary>
+    static void ShowModels(SetupModel m, AppHost host)
+    {
+        var advice = host.Advice;
+        m.Models.Clear();
+        foreach (var c in ModelChoice.For(host.Model, advice, host.Home)) m.Models.Add(c);
+        m.ChosenModel = m.Models.FirstOrDefault(c => c.Chosen);
     }
 
     public static void Refresh(SetupModel m, AppHost host)
@@ -131,6 +156,19 @@ public static class Setup
             m.ModelDone = d.Amount;
             m.ModelLeft = d.Left() ?? "";
         }
+        else
+        {
+            // Another model was picked and hasn't started yet: the bar isn't the last one's.
+            m.ModelProgress = 0;
+            m.ModelDone = "";
+            m.ModelLeft = "";
+        }
+        foreach (var c in m.Models)
+        {
+            c.Chosen = c.Model.Id == host.Model.Id;
+            c.Here = WhisperModels.IsDownloaded(host.Home, c.Model);
+        }
+        if (m.Models.FirstOrDefault(c => c.Chosen) is { } chosen) m.ChosenModel = chosen;
     }
 
     /// <summary>A model's size for "The model is about 3 GB": whole gigabytes for the big ones, as the design says it.</summary>
@@ -141,10 +179,17 @@ public static class Setup
     /// Never touches login items otherwise: that would change this computer unasked.</summary>
     public static void Finish(SetupModel m, AppHost host)
     {
+        bool records = m.Steps.Any(s => s.Step == SetupStep.Model);
         host.Save(s =>
         {
             s.Role = m.Role;
             s.SetupDone = true;
+            // The model setup showed stays the one in use, and its advice has been heard: no suggestion later.
+            if (records && !host.ModelFromEnvironment)
+            {
+                s.Model = host.Model.Id;
+                if (m.Models.FirstOrDefault(c => c.Recommended) is { } advised) s.ModelSuggested = advised.Model.Id;
+            }
         });
         // Only the library's flows ask; a laptop's setup never changes its login items.
         if (m.StartAtLogin && m.Steps.Any(s => s.Step == SetupStep.StartAtLogin))
@@ -180,15 +225,21 @@ public static class Setup
             m.Addresses.Add(new SetupAddress("With Tailscale", $"http://{ts.Dns}:{port}"));
     }
 
-    /// <summary>Every tick while setup's window is open: the microphone is open exactly while its step shows, it's
-    /// allowed, and nothing is recording; copies its levels and whether it's heard anything into the model.</summary>
-    public static void TickMic(SetupModel m, AppHost host, MicCheck mic)
+    /// <summary>Every tick while setup's window is open: the microphone is open exactly while its step shows, it isn't
+    /// refused, and nothing is recording; copies its levels, whether it's heard anything, and why it wouldn't open into
+    /// the model. It opens the way Record does (<see cref="AppHost.OpenMic"/>). Windows asks nobody, so there it's
+    /// tried whenever the privacy switches aren't off: opening is what tells "no microphone" apart.</summary>
+    public static void TickMic(SetupModel m, AppHost host, MicCheck mic, bool windows)
     {
-        if (m.OnMicrophone && m.MicAllowed && host.Recorder.Current is null) mic.Open(host.OpenMic);
+        if (m.OnMicrophone && !m.MicDenied && (m.MicAllowed || windows) && host.Recorder.Current is null) mic.Open(host.OpenMic);
         else mic.Close();
         if (mic.Heard) m.MicHeard = true;
         m.MicLevels = mic.Levels();
+        m.MicTrouble = mic.Trouble;
+        if (mic.IsOpen) m.MicAllowed = true;
     }
+
+    public static void TickMic(SetupModel m, AppHost host, MicCheck mic) => TickMic(m, host, mic, OperatingSystem.IsWindows());
 
     static async Task ConnectAsync(SetupModel m, AppHost host, LibraryHere here)
     {
@@ -302,6 +353,15 @@ public static class Setup
         m.AddingCourses = true;
         try
         {
+            var cc0 = host.Client();
+            canvas ??= cc0.ServerUrl.Length > 0 ? new CanvasClient(cc0.ServerUrl, cc0.PoolKey) : null;
+            // The library makes the classes itself from the courses chosen, and remembers the choice (only those sync).
+            if (canvas is not null && await ChooseCoursesAsync(canvas, ticked.Select(c => c.Id).ToList(), host))
+            {
+                _ = SyncSoonAsync(canvas, host);
+                await host.CheckLibraryAsync();
+                return true;
+            }
             var lib = host.Remote();
             var had = host.Classes().Select(c => c.Name).ToHashSet();
             foreach (var c in ticked)
@@ -318,8 +378,6 @@ public static class Setup
                     host.Log($"[setup] the library didn't take the class {name}: {e.Message}");
                 }
             }
-            var cc = host.Client();
-            canvas ??= cc.ServerUrl.Length > 0 ? new CanvasClient(cc.ServerUrl, cc.PoolKey) : null;
             if (canvas is not null)
             {
                 try
@@ -339,6 +397,21 @@ public static class Setup
         finally
         {
             m.AddingCourses = false;
+        }
+    }
+
+    /// <summary>Tells the library which courses to bring in (POST canvas/choose). False from a library older than the
+    /// choice, or one that didn't answer: then the classes are added and linked one by one, the old way.</summary>
+    static async Task<bool> ChooseCoursesAsync(CanvasClient canvas, List<string> ids, AppHost host)
+    {
+        try
+        {
+            return await canvas.ChooseAsync(ids) is not null;
+        }
+        catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            host.Log($"[canvas] setup couldn't choose the courses: {e.Message}");
+            return false;
         }
     }
 

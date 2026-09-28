@@ -24,7 +24,7 @@
                 <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
               </Button>
             </Grid>
-            <ScrollViewer Classes="ai-answer-scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <ScrollViewer Classes="ai-answer-scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True">
               <StackPanel Spacing="6" Margin="16,2,16,12">
                 <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsThinking}">
                   <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Fg2}" />

@@ -171,6 +171,15 @@ public class SettingsAccessTests
         }
     }
 
+    [Fact]
+    public void The_pointer_to_the_S_keeps_out_of_the_way_once_the_dropdown_is_open()
+    {
+        Assert.True(IconWords.WorthSaying(hidden: false, dropdownOpen: false));
+        Assert.False(IconWords.WorthSaying(hidden: false, dropdownOpen: true));
+        // A hidden S. still needs its Show it, dropdown or not.
+        Assert.True(IconWords.WorthSaying(hidden: true, dropdownOpen: true));
+    }
+
     [Theory]
     [InlineData(1512, 664, 600)] // a 14" MacBook Pro: just right of the notch
     [InlineData(1728, 772, 708)]

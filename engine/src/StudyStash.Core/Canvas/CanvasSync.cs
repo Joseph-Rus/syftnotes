@@ -99,15 +99,16 @@ public sealed partial class CanvasSync
         if (protocol < 1) return new CanvasWork([], false, Extension.Version()); // nothing this library knows how to hand it
         // A sync that finished just before the library stopped is filed now, before the next one can start.
         if (Crawl.Ready) Finish();
-        if (!Crawl.Active && !Crawl.Ready && (force || s.Due(now)) && s.On && s.Courses.Count > 0
-            && Crawl.Start(s.Url, s.Courses))
+        var synced = s.Synced;
+        if (!Crawl.Active && !Crawl.Ready && (force || s.Due(now)) && s.On && synced.Count > 0
+            && Crawl.Start(s.Url, synced))
         {
             CanvasSettings.Update(home, st =>
             {
                 st.SyncNow = false;
                 st.LastSync = at;
             });
-            log($"[canvas] syncing {s.Courses.Count} class(es)");
+            log($"[canvas] syncing {synced.Count} class(es)");
         }
         if (Crawl.TakeSignedOut())
             CanvasSettings.Update(home, st =>
@@ -222,14 +223,24 @@ public sealed partial class CanvasSync
                     changes.Add(new CanvasChange("announcement", cls, ann.Title, $"Announcement: {cls} · {ann.Title}", AnnouncementId: ann.Id));
             }
         }
-        // A class no longer linked to Canvas isn't news either: its rows just go.
-        Assignments.Save(home, items);
+        // A class no longer linked to Canvas isn't news either: its rows just go. A file that stays busy past
+        // SharedFile's retries is said, not thrown: the sync is still finished, so the app looks again.
+        string saveError = "";
+        try
+        {
+            Assignments.Save(home, items);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            saveError = $"Couldn't save what's due ({e.Message}). The next sync tries again.";
+            log($"[canvas] {saveError}");
+        }
         int files = done.Changed.Values.Sum(v => v.Count);
         var failed = done.Sections.SelectMany(c => c.Value.Where(l => l.Value == "failed").Select(l => $"{c.Key} {l.Key}")).ToList();
         CanvasSettings.Update(home, st =>
         {
             st.LastDone = at;
-            st.Error = failed.Count > 0 ? $"Couldn't read {string.Join(", ", failed)} from Canvas ({Reason(done.Errors, failed[0])}), so what you had is kept."
+            st.Error = saveError.Length > 0 ? saveError : failed.Count > 0 ? $"Couldn't read {string.Join(", ", failed)} from Canvas ({Reason(done.Errors, failed[0])}), so what you had is kept."
                 : done.Errors.Count > 0 ? $"{done.Errors.Count} thing(s) couldn't be read: {done.Errors[0]}" : "";
             st.ErrorAt = st.Error.Length > 0 ? at : "";
             if (changes.Count == 0) return;

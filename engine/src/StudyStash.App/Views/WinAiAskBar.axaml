@@ -6,16 +6,17 @@
              xmlns:c="using:StudyStash.App.Controls"
              xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.WinAiAskBar"
-             x:DataType="vm:AiAskModel">
+             x:DataType="vm:AiAskModel"
+             HorizontalAlignment="Center">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
   </UserControl.Styles>
 
   <Panel>
     <Border CornerRadius="8" Background="{DynamicResource Acrylic}" BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1"
-            BoxShadow="{DynamicResource ShadowLg}" Height="52" Width="600" Padding="16,0,8,0">
+            BoxShadow="{DynamicResource ShadowLg}" Height="52" Padding="16,0,8,0">
       <Grid ColumnDefinitions="*,8,Auto,8,Auto,8,Auto" VerticalAlignment="Center">
-        <TextBox Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" FontSize="14" VerticalAlignment="Center">
+        <TextBox Classes="bare" MinWidth="72" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" FontSize="14" VerticalAlignment="Center">
           <TextBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
           </TextBox.KeyBindings>
@@ -24,7 +25,7 @@
           <Border Classes="ai-chip-engine">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Glyph="auto_awesome" Size="15" Foreground="{DynamicResource AccentText}" />
-              <TextBlock Text="{Binding EngineName}" TextTrimming="CharacterEllipsis" />
+              <TextBlock Name="EngineName" Text="{Binding EngineName}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !$parent[v:WinAiAskBar].Compact}" />
               <c:Icon Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" />
             </StackPanel>
           </Border>
@@ -51,8 +52,13 @@
             <MenuFlyout Placement="Top" VerticalOffset="-20" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding ScopeChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
           </Button.Flyout>
         </Button>
-        <Button Grid.Column="6" Classes="ai-send" Command="{Binding AskCommand}" VerticalAlignment="Center">
+        <Button Grid.Column="6" Classes="ai-send" Command="{Binding AskCommand}" VerticalAlignment="Center" IsVisible="{Binding !Busy}">
           <c:Icon Glyph="send" Size="18" Foreground="{DynamicResource Fg3}" />
+        </Button>
+        <!-- While an answer is being written, the same place stops it -->
+        <Button Grid.Column="6" Classes="ai-send" Command="{Binding StopCommand}" VerticalAlignment="Center" IsVisible="{Binding Busy}"
+                ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
+          <c:Icon Glyph="stop" Filled="True" Size="18" Foreground="{DynamicResource Fg}" />
         </Button>
       </Grid>
     </Border>

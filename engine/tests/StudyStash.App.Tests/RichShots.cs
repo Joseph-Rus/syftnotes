@@ -104,7 +104,7 @@ public class RichShots
     }
 
     /// <summary>A note on the library's page, in the look's notes column.</summary>
-    static Control NotePage(SkinKind skin, string markdown, Action<NoteView>? after = null)
+    internal static Control NotePage(SkinKind skin, string markdown, Action<NoteView>? after = null)
     {
         bool mac = skin == SkinKind.Mac;
         var note = new NoteView { Markdown = markdown, Width = mac ? 620 : 640, HorizontalAlignment = HorizontalAlignment.Left };
@@ -274,7 +274,7 @@ public class RichShots
     static IBrush BioDot => Skin.ClassDot(1);
 
     /// <summary>The sidebar and lecture list around the cardiac-cycle lecture, open on the right.</summary>
-    static LibraryModel CardiacLibrary()
+    internal static LibraryModel CardiacLibrary()
     {
         var m = new LibraryModel { ClassTitle = RichDemo.LectureClassName, ClassCount = "9 lectures", Status = "Library connected", DrawChrome = true };
         m.Classes.Add(new ClassItem { Name = "CS 101", Dot = Skin.ClassDot(0), Count = 12 });
@@ -294,7 +294,7 @@ public class RichShots
 
     /// <summary>Scrolls the notes column so a diagram shows a little below the top, the way someone reading the
     /// lecture would have scrolled to it.</summary>
-    static void ScrollToDiagrams(Window window)
+    internal static void ScrollToDiagrams(Window window)
     {
         DiagramsReady.Wait(window);
         var scroller = window.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(s => s.GetVisualDescendants().OfType<NoteView>().Any());
