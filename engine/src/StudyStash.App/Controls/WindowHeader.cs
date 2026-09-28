@@ -41,7 +41,9 @@ public sealed class WindowHeader : Panel
 
     static void MoveFromEmptySpace(object? sender, PointerPressedEventArgs e)
     {
-        if (sender is not Control c || e.Source != c || e.ClickCount > 1 || !e.GetCurrentPoint(c).Properties.IsLeftButtonPressed) return;
+        // The panel itself, or (a scrolling list) the empty part of its own template: not a row or a label in it.
+        if (sender is not Control c || (e.Source != c && (e.Source as StyledElement)?.TemplatedParent != c) || e.ClickCount > 1
+            || !e.GetCurrentPoint(c).Properties.IsLeftButtonPressed) return;
         if (TopLevel.GetTopLevel(c) is Window { WindowState: not WindowState.FullScreen } w) w.BeginMoveDrag(e);
     }
 
