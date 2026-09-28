@@ -8,7 +8,13 @@ With ElevenLabs (your own account; the key stays in your shell, it is never prin
     npm run voice -- --voice <voice id>            # all eight lines, then the recut and the music
     npm run voice -- --voice <voice id> --takes 3  # three takes of each; pick with --pick record=2,ask=3
 
-Without it, a scratch narration in the Mac's own voice, so the cut can be checked first:
+From the ElevenLabs website instead (no API key): generate the whole script as one take, download it, and it is split
+into the eight lines at the pauses between them; or download a file per line, named after the line (hook.mp3, …):
+
+    npm run voice -- --from-take ~/Downloads/narration.mp3
+    npm run voice -- --from-files ~/Downloads/lines/     # hook.mp3, reveal.mp3, record.mp3, …
+
+Without either, a scratch narration in the Mac's own voice, so the cut can be checked first:
 
     npm run voice -- --scratch
 
@@ -133,6 +139,71 @@ def tidy(path):
     return len(x) / sr
 
 
+# ---- A take from the website: split at the pauses between lines ---------------------------------------------------
+
+def split_take(path, lines):
+    """Cuts one continuous read into its lines: at the seven pauses that best fit where each line should end, judged by
+    how many words come before it, preferring longer pauses."""
+    with tempfile.TemporaryDirectory() as d:
+        wav = pathlib.Path(d) / 'take.wav'
+        to_wav(path, wav)
+        sr, x = wavfile.read(wav)
+    x = x.astype(float) / 32768.0
+    mono = np.abs(x).mean(1)
+    hop = int(0.01 * sr)
+    level = 20 * np.log10(np.sqrt(np.convolve(mono ** 2, np.ones(hop) / hop, 'same'))[::hop] + 1e-9)
+    quiet = level < level.max() - 32
+    speech = np.where(~quiet)[0]
+    first, last = speech[0], speech[-1]
+    runs, i = [], first
+    while i <= last:
+        if quiet[i]:
+            j = i
+            while j <= last and quiet[j]:
+                j += 1
+            if j - i >= 16:  # 160 ms or more
+                runs.append(((i + j) / 2, j - i))
+            i = j
+        else:
+            i += 1
+    words = [len(l['text'].split()) for l in lines]
+    ends = np.cumsum(words)[:-1] / sum(words)
+    need = len(lines) - 1
+    if len(runs) < need:
+        sys.exit(f'Found only {len(runs)} pauses in the take; the lines need {need}. Put each line in its own paragraph and generate again.')
+    span = last - first
+    cost = lambda k, r: abs((runs[r][0] - first) / span - ends[k]) * 12 - math.log(runs[r][1])
+    best = [[math.inf] * len(runs) for _ in range(need)]
+    back = [[-1] * len(runs) for _ in range(need)]
+    for r in range(len(runs)):
+        best[0][r] = cost(0, r)
+    for k in range(1, need):
+        for r in range(k, len(runs)):
+            for q in range(k - 1, r):
+                c = best[k - 1][q] + cost(k, r)
+                if c < best[k][r]:
+                    best[k][r], back[k][r] = c, q
+    r = min(range(len(runs)), key=lambda r: best[need - 1][r])
+    cuts = []
+    for k in range(need - 1, -1, -1):
+        cuts.append(runs[r][0])
+        r = back[k][r]
+    cuts = [first - 5] + sorted(cuts) + [last + 5]
+    for n, line in enumerate(lines):
+        a, b = int(max(0, cuts[n]) * hop), int(cuts[n + 1] * hop)
+        wavfile.write(OUT / f"{line['id']}.wav", sr, (x[a:b] * 32767).astype(np.int16))
+        print(f"  split {line['id']:<9} at {a / sr:6.2f}–{b / sr:6.2f} s")
+
+
+def from_files(folder, lines):
+    folder = pathlib.Path(folder).expanduser()
+    for line in lines:
+        found = next((p for ext in ('wav', 'mp3', 'm4a', 'aac', 'flac') for p in folder.glob(f"{line['id']}*.{ext}")), None)
+        if not found:
+            sys.exit(f"No file for {line['id']} in {folder} (name it {line['id']}.mp3 or .wav).")
+        to_wav(found, OUT / f"{line['id']}.wav")
+
+
 # ---- The recut: each scene long enough for its line, still starting on a beat -------------------------------------
 
 def base_durations():
@@ -170,6 +241,8 @@ def main():
     p.add_argument('--takes', type=int, default=1, help='takes of each line (alternates are kept beside the chosen one)')
     p.add_argument('--pick', default='', help='which take to use, e.g. record=2,ask=3')
     p.add_argument('--scratch', action='store_true', help="a scratch narration in the Mac's own voice")
+    p.add_argument('--from-take', help='one continuous read downloaded from the website, split into the lines')
+    p.add_argument('--from-files', help='a folder with a file per line from the website: hook.mp3, reveal.mp3, …')
     p.add_argument('--list-voices', action='store_true')
     p.add_argument('--no-music', action='store_true', help="don't remake the music afterwards")
     a = p.parse_args()
@@ -182,13 +255,19 @@ def main():
     picks = dict(kv.split('=') for kv in a.pick.split(',') if '=' in kv)
     seconds, request_ids = {}, []
     source = 'scratch'
-    if not a.scratch and not a.voice:
-        sys.exit('Give a voice: --voice <id> (see --list-voices), or --scratch for the Mac voice.')
+    if not (a.scratch or a.voice or a.from_take or a.from_files):
+        sys.exit('Give a voice: --voice <id> (see --list-voices), --from-take <file>, --from-files <folder>, or --scratch.')
     model = a.model or script['model']
+    if a.from_take:
+        split_take(pathlib.Path(a.from_take).expanduser(), lines)
+    elif a.from_files:
+        from_files(a.from_files, lines)
 
     for i, line in enumerate(lines):
         final = OUT / f"{line['id']}.wav"
-        if a.scratch:
+        if a.from_take or a.from_files:
+            source, who = 'elevenlabs website', pathlib.Path(a.from_take or a.from_files).name
+        elif a.scratch:
             who = say(line['text'], final)
         else:
             source = 'elevenlabs'

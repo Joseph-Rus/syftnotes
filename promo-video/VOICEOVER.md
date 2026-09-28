@@ -25,6 +25,45 @@ Every claim is true of the app:
 - Answers name the moments in the lecture they came from.
 - "Your computers" (plural) covers both setups, a laptop alone or with a library at home.
 
+## Making it on the ElevenLabs website (no API key)
+
+The whole script as one take usually sounds most natural, because it's one continuous read.
+
+1. Open **Text to Speech** and pick the voice.
+2. Set:
+   - Model: **Eleven v4** (or Multilingual v2)
+   - Stability: about **50%**
+   - Similarity: about **75%**
+   - Style: about **15%**
+   - Speaker boost: **on**
+   - Speed: **1.0**
+3. Paste the script below, each line as its own paragraph, with a blank line between. Generate, listen, and
+   regenerate until you like it. Download the MP3.
+4. Run `npm run voice -- --from-take ~/Downloads/<the file>.mp3`, then `npm run render:all`.
+
+The take is cut at the pauses between lines: the seven that best fit where each line should end, by word count. The
+cut then follows the voice, and the music is remade. Or download a file per line (`hook.mp3`, `reveal.mp3`,
+`record.mp3`, `diagrams.mp3`, `ask.mp3`, `canvas.mp3`, `proof.mp3`, `cta.mp3`) into a folder and run
+`npm run voice -- --from-files <folder>`.
+
+```
+Every week, the lectures pile up… and the notes? You never look at them again.
+
+Meet Study Stash — your lectures, turned into notes you'll actually use.
+
+Hit record in the menu bar. It transcribes on your computer, then writes your notes, and files them by class.
+
+It even draws: labeled anatomy for nursing… formulas and graphs for calculus.
+
+Ask your notes anything, with Claude or OpenAI, and see exactly where each answer came from.
+
+Canvas is right there too: what's due, and how it's graded.
+
+And your recordings never leave your computers.
+
+Study Stash. Free, for Mac and Windows.
+```
+
 ## Making it with ElevenLabs
 
 ```sh
@@ -45,6 +84,8 @@ dips under each line in the video and comes back up between them.
   credits. The renders in `out/` were made this way until you run it with ElevenLabs.
 - **The key:** it's read from `ELEVENLABS_API_KEY` and sent only to ElevenLabs. It is never printed or saved. Don't
   put it in a file in the repository.
+- **Plans:** every ElevenLabs subscription includes API access, using the same monthly credits as the website. The
+  whole narration is about 570 characters.
 
 ## What the research says, and what the generator does
 
