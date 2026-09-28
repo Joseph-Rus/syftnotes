@@ -6,6 +6,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -182,4 +183,46 @@ public class DiagramViewTests
     }
 
     static double Frac(double v) => Math.Abs(v - Math.Round(v));
+
+    /// <summary>A picture of a chart drawn into a bitmap at 200% (as the self-test pictures the Mac's windows) has its
+    /// boxes, words and lines where they are at 100%, twice as many pixels across: nothing drawn after the lines'
+    /// clip lands twice as far out.</summary>
+    [AvaloniaFact]
+    public void A_chart_drawn_into_a_bitmap_at_200_percent_keeps_its_boxes_in_place()
+    {
+        var view = new DiagramView { Chart = Flowchart.Parse(RichDemo.NursingProcess) };
+        var window = Show(620, SkinKind.Win, ThemeVariant.Light, view);
+        var ink = new Dictionary<int, PixelRect>();
+        foreach (int times in new[] { 1, 2 })
+        {
+            var size = new PixelSize((int)Math.Ceiling(view.Bounds.Width) * times, (int)Math.Ceiling(view.Bounds.Height) * times);
+            using var bmp = new RenderTargetBitmap(size, new Vector(96 * times, 96 * times));
+            bmp.Render(view);
+            var buffer = new byte[size.Width * size.Height * 4];
+            var pinned = System.Runtime.InteropServices.GCHandle.Alloc(buffer, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try
+            {
+                bmp.CopyPixels(new PixelRect(size), pinned.AddrOfPinnedObject(), buffer.Length, size.Width * 4);
+            }
+            finally
+            {
+                pinned.Free();
+            }
+            int left = size.Width, top = size.Height, right = -1, bottom = -1, count = 0;
+            for (int i = 0; i < buffer.Length; i += 4)
+            {
+                if (buffer[i + 3] < 40) continue;
+                int x = i / 4 % size.Width, y = i / 4 / size.Width;
+                (left, top, right, bottom) = (Math.Min(left, x), Math.Min(top, y), Math.Max(right, x), Math.Max(bottom, y));
+                count++;
+            }
+            Assert.True(count > 1000 * times * times, $"{times}x drew {count} pixels");
+            ink[times] = new PixelRect(left, top, right - left + 1, bottom - top + 1);
+        }
+        Assert.InRange(ink[2].X, ink[1].X * 2 - 3, ink[1].X * 2 + 3);
+        Assert.InRange(ink[2].Y, ink[1].Y * 2 - 3, ink[1].Y * 2 + 3);
+        Assert.InRange(ink[2].Width, ink[1].Width * 2 - 4, ink[1].Width * 2 + 4);
+        Assert.InRange(ink[2].Height, ink[1].Height * 2 - 4, ink[1].Height * 2 + 4);
+        window.Close();
+    }
 }

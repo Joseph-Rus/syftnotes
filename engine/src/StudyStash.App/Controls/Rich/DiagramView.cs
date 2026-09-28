@@ -309,7 +309,7 @@ sealed class DiagramCanvas : Control
         // Boxes and words land on whole pixels of the screen it's drawn on, so their hairlines stay crisp: at 125%,
         // 150% or 175% a whole point isn't a whole pixel, so they snap to the screen's own pixels, not to points.
         double snap = Scale * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
-        using var _ = context.PushTransform(Matrix.CreateScale(Scale, Scale));
+        var scaled = context.PushTransform(Matrix.CreateScale(Scale, Scale));
 
         foreach (var g in scene.Groups)
         {
@@ -358,6 +358,10 @@ sealed class DiagramCanvas : Control
             Marker(context, e.StartEnd, e.StartTip, e.StartBase, line);
         }
         clip?.Dispose();
+        // The scale again, afresh: drawn into a bitmap at 200% (a picture of the window, as the self-test takes), Avalonia
+        // puts the words and boxes that follow a clip taken off inside the same transform twice as far out.
+        scaled.Dispose();
+        using var _ = context.PushTransform(Matrix.CreateScale(Scale, Scale));
 
         foreach (var e in labelled)
         {

@@ -497,12 +497,12 @@ public static class SelfTest
 
         foreach (var (what, control, least) in new (string, Control, int)[] { ("formula", formulas.First(f => f.Display), 150), ("flowchart", chart, 600) })
         {
-            control.BringIntoView();
-            await Wait(1);
-            var (ink, box) = InkIn(main, control);
-            Say($"{what}: {box.Width:0}×{box.Height:0} in the window, {ink} pixels of ink");
-            if (box.Width < 40 || box.Height < 16 || ink < least) throw new InvalidOperationException($"the notes' {what} drew nothing where it sits");
+            int ink = Ink(control);
+            Say($"{what}: {control.Bounds.Width:0}×{control.Bounds.Height:0}, {ink} pixels of ink");
+            if (control.Bounds.Width < 40 || control.Bounds.Height < 16 || ink < least) throw new InvalidOperationException($"the notes' {what} drew nothing");
         }
+        chart.BringIntoView();
+        await Wait(1);
         Shot(main, "library-note-rich");
 
         chart.Focus();
@@ -513,40 +513,38 @@ public static class SelfTest
         if (!opened || larger is null) throw new InvalidOperationException("Enter on the flowchart didn't open it larger");
         await Wait(1);
         Shot(larger, "diagram-larger");
-        var (largerInk, _) = InkIn(larger, larger.GetVisualDescendants().OfType<DiagramView>().First());
-        if (largerInk < 600) throw new InvalidOperationException("the larger window drew no flowchart");
+        var big = larger.GetVisualDescendants().OfType<DiagramView>().First();
+        int bigInk = Ink(big);
+        Say($"the larger flowchart: {big.Bounds.Width:0}×{big.Bounds.Height:0}, {bigInk} pixels of ink");
+        if (bigInk < 600) throw new InvalidOperationException("the larger window drew no flowchart");
         larger.Close();
         bool closed = await Until(() => DiagramWindow.Current is null, 5);
         Say(closed ? "the larger window closed" : "the larger window didn't close");
         if (!closed) throw new InvalidOperationException("the larger window didn't close");
     }
 
-    /// <summary>How many pixels of <paramref name="control"/>'s place in a picture of <paramref name="window"/> aren't
-    /// its ground (the colour at its top-left corner), and that place, in the window's own units.</summary>
-    static (int Ink, Rect Box) InkIn(Window window, Control control)
+    /// <summary>How many pixels <paramref name="control"/> inks when it's drawn on its own (on nothing, so only what
+    /// it draws counts; the window around it can't hide it or stand in for it), in the window's own units.</summary>
+    static int Ink(Control control)
     {
-        var at = control.TranslatePoint(default, window) ?? default;
-        var box = new Rect(at, control.Bounds.Size).Intersect(new Rect(window.Bounds.Size));
-        if (box.Width < 1 || box.Height < 1) return (0, box);
         int times = OperatingSystem.IsWindows() ? 1 : 2;
-        var size = new PixelSize(Math.Max(1, (int)Math.Ceiling(window.Bounds.Width)) * times, Math.Max(1, (int)Math.Ceiling(window.Bounds.Height)) * times);
+        var size = new PixelSize(Math.Max(1, (int)Math.Ceiling(control.Bounds.Width * times)), Math.Max(1, (int)Math.Ceiling(control.Bounds.Height * times)));
         using var bmp = new RenderTargetBitmap(size, new Vector(96 * times, 96 * times));
-        bmp.Render(window);
-        var pixels = new PixelRect((int)(box.X * times), (int)(box.Y * times), (int)(box.Width * times), (int)(box.Height * times)).Intersect(new PixelRect(size));
-        var buffer = new byte[pixels.Width * pixels.Height * 4];
+        bmp.Render(control);
+        var buffer = new byte[size.Width * size.Height * 4];
         var pinned = System.Runtime.InteropServices.GCHandle.Alloc(buffer, System.Runtime.InteropServices.GCHandleType.Pinned);
         try
         {
-            bmp.CopyPixels(pixels, pinned.AddrOfPinnedObject(), buffer.Length, pixels.Width * 4);
+            bmp.CopyPixels(new PixelRect(size), pinned.AddrOfPinnedObject(), buffer.Length, size.Width * 4);
         }
         finally
         {
             pinned.Free();
         }
         int ink = 0;
-        for (int i = 0; i < buffer.Length; i += 4)
-            if (Math.Abs(buffer[i] - buffer[0]) + Math.Abs(buffer[i + 1] - buffer[1]) + Math.Abs(buffer[i + 2] - buffer[2]) > 90) ink++;
-        return (ink / (times * times), box);
+        for (int i = 3; i < buffer.Length; i += 4)
+            if (buffer[i] > 40) ink++;
+        return ink / (times * times);
     }
 
     // --- problems: the library goes away, and comes back --------------------------------------------------------
