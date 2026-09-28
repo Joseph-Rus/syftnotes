@@ -238,13 +238,17 @@
         <Grid ColumnDefinitions="Auto,*">
           <Panel Grid.ColumnSpan="{Binding ColumnSpan}" Width="{Binding ListWidth}" IsVisible="{Binding ShowListColumn}">
           <Border Width="1" Background="{DynamicResource Sep}" HorizontalAlignment="Right" IsVisible="{Binding !Narrow}" />
-          <DockPanel Margin="0,0,1,0" IsVisible="{Binding ShowLectures}">
+          <DockPanel Name="LectureList" Margin="0,0,1,0" IsVisible="{Binding ShowLectures}">
             <StackPanel DockPanel.Dock="Top" Margin="20,20,20,12">
               <!-- A long class name wraps to a second line, and past that ends in "…" (the whole name on hover). -->
               <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" LineHeight="26"
                          TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
               <TextBlock Text="{Binding ClassCount}" FontSize="12" Foreground="{DynamicResource Fg2}" />
             </StackPanel>
+            <!-- What's attached in this class (drop files on the list) -->
+            <ScrollViewer DockPanel.Dock="Top" MaxHeight="200" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasClassFiles}" Margin="20,0,20,12">
+              <v:WinAttachments Name="ClassAttachments" DataContext="{Binding ClassFiles}" />
+            </ScrollViewer>
             <DockPanel>
               <TextBlock DockPanel.Dock="Top" IsVisible="{Binding HasEmpty}" Text="{Binding Empty}" FontSize="14" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="20,8" />
               <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -364,6 +368,10 @@
                       </Border>
                     </StackPanel>
                   </Border>
+                  <!-- What's attached to this lecture (drop files anywhere on the page) -->
+                  <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasLectureFiles}" Margin="0,2,0,0">
+                    <v:WinAttachments Name="LectureAttachments" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles}" />
+                  </Panel>
                   <TextBlock IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="0,12,0,0" />
                   <Panel IsVisible="{Binding ShowNotes}">
                     <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasNotes}">

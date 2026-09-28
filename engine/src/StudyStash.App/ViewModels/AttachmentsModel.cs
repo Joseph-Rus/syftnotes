@@ -135,7 +135,7 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
         foreach (var a in list.OfType<JsonObject>())
         {
             string name = S(a["name"]), type = S(a["type"]);
-            long size = a["size"] is JsonValue sv && sv.TryGetValue(out long bytes) ? bytes : 0;
+            long size = a["size"] is JsonValue sv ? sv.TryGetValue(out long bytes) ? bytes : sv.TryGetValue(out int small) ? small : 0 : 0;
             Items.Add(new AttachmentItem
             {
                 Id = S(a["id"]), Name = name, Type = type, Icon = AttachmentWords.Icon(name, type), Reading = B(a["reading"]),
