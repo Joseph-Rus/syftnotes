@@ -440,9 +440,10 @@ public static class ClaudeWeb
         --accent:#008F90;--accentText:#007172;--bad:#C4383D;--warn:#8A5300}
         @media (prefers-color-scheme:dark){:root{--bg:#161616;--card:#1E1E1E;--fg:#F5F5F7;--fg2:rgba(255,255,255,.6);--fg3:rgba(255,255,255,.4);
         --sep:rgba(255,255,255,.12);--accent:#00A8A9;--accentText:#6AD1D1;--bad:#F4979A;--warn:#F2AF48}}
-        *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px 16px;background:var(--bg);color:var(--fg);
+        *{box-sizing:border-box}html,body{width:100%}body{margin:0;min-height:100vh;display:flex;justify-content:center;align-items:center;
+        padding:24px 16px;background:var(--bg);color:var(--fg);
         font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-        main{width:min(400px,100%)}form{display:grid;gap:10px;padding:28px 24px;border-radius:16px;background:var(--card);
+        main{width:100%;max-width:400px}form{width:100%;display:grid;gap:10px;padding:28px 24px;border-radius:16px;background:var(--card);
         box-shadow:0 12px 40px rgba(0,0,0,.12),0 0 0 .5px var(--sep);text-align:center}
         img{margin:0 auto 2px;border-radius:12px}p.lib{margin:0;color:var(--fg3);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
         h1{font-size:19px;line-height:1.3;margin:2px 0 0;letter-spacing:-.01em}p{margin:0;color:var(--fg2);font-size:13px}

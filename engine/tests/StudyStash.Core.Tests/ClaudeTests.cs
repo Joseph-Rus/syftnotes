@@ -314,7 +314,7 @@ public class ClaudeTests
         string query = string.Join("&", fields.Select(f => $"{f.Item1}={Uri.EscapeDataString(f.Item2)}"));
         var page = await c.GetAsync("/authorize?" + query);
         string html = await page.Content.ReadAsStringAsync();
-        Assert.Contains("Let Claude read your lectures?", html);
+        Assert.Contains("Claude wants to read your lectures", html);
         Assert.Contains("form-action 'self' https://claude.ai", page.Headers.GetValues("Content-Security-Policy").Single());
 
         var wrong = await c.PostAsync("/authorize", Form([.. fields, ("password", "nope"), ("decision", "allow")]));
@@ -396,7 +396,7 @@ public class ClaudeTests
                 {
                     var authorize = context.AuthorizationUri;
                     var page = await browser.GetAsync(authorize.PathAndQuery, ct);
-                    Assert.Contains("Let Claude Code read your lectures?", await page.Content.ReadAsStringAsync(ct));
+                    Assert.Contains("Claude Code wants to read your lectures", await page.Content.ReadAsStringAsync(ct));
                     var form = System.Web.HttpUtility.ParseQueryString(authorize.Query);
                     var fields = form.AllKeys.Select(k => (k!, form[k]!)).Append(("password", "pw")).Append(("decision", "allow")).ToArray();
                     var answer = await browser.PostAsync("/authorize", Form(fields), ct);
@@ -424,7 +424,7 @@ public class ClaudeTests
         for (int i = 0; i < 8; i++) await site.Client.PostAsync("/authorize", Form([.. fields, ("password", "guess" + i), ("decision", "allow")]));
         var right = await site.Client.PostAsync("/authorize", Form([.. fields, ("password", "pw"), ("decision", "allow")]));
         Assert.Equal((HttpStatusCode)429, right.StatusCode);
-        Assert.Contains("Too many wrong passwords", await right.Content.ReadAsStringAsync());
+        Assert.Contains("Too many wrong tries", await right.Content.ReadAsStringAsync());
 
         // An unknown client, or a redirect it didn't register, never gets redirected to.
         var unknown = await site.Client.GetAsync("/authorize?response_type=code&client_id=nope&redirect_uri=https%3A%2F%2Fevil.example%2F");
