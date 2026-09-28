@@ -814,7 +814,7 @@ public sealed partial class LibraryWeb
         string canvasGroup = CanvasOn || canvas is not null || Canvas.Settings.On ? CanvasSettingsGroup(canvas)
             : "<div class=\"group-head\" id=\"canvas\">Canvas</div><div class=\"group\"><form class=\"row\" method=\"get\" action=\"/settings#canvas\">"
               + "<input type=\"hidden\" name=\"canvas\" value=\"start\"><span class=\"grow\">Bring in assignments, feedback and course files from Canvas</span><button>Set up Canvas</button></form></div>";
-        string body = $"<h1>Settings</h1>{flash}{form}{canvasGroup}{FoldersSettingsGroup(folders)}{invite}{maintenance}";
+        string body = $"<h1>Settings</h1>{flash}{form}{canvasGroup}{FoldersSettingsGroup(folders)}{invite}{PhoneSettingsGroup(ctx, c.Nonce)}{maintenance}";
         return Show("Settings", body, c);
     });
 

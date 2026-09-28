@@ -86,6 +86,7 @@ public sealed partial class LibraryWeb
     void MapPhone(WebApplication app)
     {
         MapDevices(app);
+        MapPhoneSettings(app);
         // Whether this phone is paired, and which library it's talking to. No sign-in: the phone app asks it first.
         app.MapGet("/api/v2/me", (HttpContext ctx) =>
         {
