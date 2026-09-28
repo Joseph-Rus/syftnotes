@@ -33,7 +33,7 @@ public class NotesDownloadTests
         rig.AddLecture(new Meeting("l1")
         {
             Title = "The cardiac cycle", Date = "2026-09-22", Raw = new System.Text.Json.Nodes.JsonObject { ["seconds"] = 1800.0 },
-        }, "BIO 110", "## Details and examples\n```mermaid\n" + Summarize.MermaidExample + "\n```\n");
+        }, "BIO 110", "## Details and examples\nCardiac output is $\\text{CO} = \\text{HR} \\times \\text{SV}$.\n\n```mermaid\n" + Summarize.MermaidExample + "\n```\n");
         rig.AddLecture(new Meeting("l2") { Title = "Blood pressure", Date = "2026-09-24", Transcript = "[00:00] Let's talk about blood pressure." },
             "BIO 110", "## Summary\nMAP matters.");
         rig.AddLecture(new Meeting("l3") { Title = "The kidneys", Date = "2026-09-26" }, "BIO 110", "## Summary\nFiltration.");
@@ -55,6 +55,8 @@ public class NotesDownloadTests
         Assert.Contains(files, f => f.Contains("cardiac cycle"));
         Assert.Contains(files, f => f.Contains("Blood pressure"));
         Assert.Contains(files, f => f.Contains("kidneys"));
+        string cardiac = await File.ReadAllTextAsync(files.Single(f => f.Contains("cardiac cycle")), TestContext.Current.CancellationToken);
+        Assert.Contains("$\\text{CO} = \\text{HR} \\times \\text{SV}$", cardiac); // its formula survives too
         var assetDirs = Directory.GetDirectories(classDir, "*.assets");
         var asset = Assert.Single(assetDirs);
         Assert.Single(Directory.GetFiles(asset, "*.svg"));

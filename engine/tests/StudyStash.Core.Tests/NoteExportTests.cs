@@ -149,6 +149,25 @@ public class NoteExportTests
     }
 
     [Fact]
+    public void A_script_smuggled_into_an_otherwise_drawable_svg_never_reaches_the_saved_picture()
+    {
+        using var dir = new TempDir();
+        var (_, store) = Library(dir);
+        var m = new Meeting("lec-5b") { Title = "Sneaky", Date = "2026-09-23" };
+        const string sneaky = """
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><script>alert(1)</script><rect width="80" height="80"/></svg>
+            """;
+        var lecture = LectureJson(store, m, "## Shapes\n```svg\n" + sneaky + "\n```\n");
+
+        var file = NoteExport.Lecture(lecture, transcript: false, DrawMermaid);
+
+        var asset = Assert.Single(file.Assets);
+        Assert.DoesNotContain("<script", asset.Text);
+        Assert.DoesNotContain("alert", asset.Text);
+        Assert.Contains("<rect", asset.Text);
+    }
+
+    [Fact]
     public void Backslash_parens_and_brackets_become_dollar_signs_outside_code()
     {
         using var dir = new TempDir();
