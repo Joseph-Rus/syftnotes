@@ -1,11 +1,16 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Authentication;
 using ModelContextProtocol.Client;
 using StudyStash.Core.Ai;
 using StudyStash.Library;
@@ -50,6 +55,11 @@ public class ConnectorTests
         public readonly List<string> Fetched = [];
         public DateTimeOffset Now = DateTimeOffset.Parse("2026-09-23T10:00:00Z");
         public TestSite Site = null!;
+        /// <summary>The real server (<see cref="OpenLiveAsync"/>), on this port of 127.0.0.1.</summary>
+        WebApplication? live;
+        public int Port;
+        /// <summary>Every address the internet asked for through <see cref="Internet"/>, in order.</summary>
+        public readonly List<string> Asked = [];
 
         Door()
         {
@@ -85,13 +95,45 @@ public class ConnectorTests
             return door;
         }
 
+        /// <summary>The door on a real web server (Kestrel on 127.0.0.1, a port of the moment), as `serve` runs it, with
+        /// the public address the app records when it turns Funnel on, and two lectures to read.</summary>
+        public static async Task<Door> OpenLiveAsync()
+        {
+            var door = new Door();
+            door.Access.PublicUrl = Ts;
+            door.Store.Save(new Meeting("rec-1")
+            {
+                Title = "CS 101 lecture, Tue 23 Sep", Date = "2026-09-23T10:02:12-07:00", Owner = "Sam", Folder = "CS 101",
+                Transcript = "[00:05] Okay, let's start.\n[18:05] Recursion traces will be on the midterm, with the stack diagrams.\n",
+                Raw = new JsonObject { ["source"] = "recorder", ["seconds"] = 4320.0 },
+            }, new Classification("CS 101", 0.95, "folder", "Recursion and the call stack", ["recursion"]),
+                summaryMd: "## Summary\nRecursion: a function that calls itself, down to a base case.", summaryModel: "qwen3:8b");
+            door.Store.Save(new Meeting("rec-2")
+            {
+                Title = "BIO lecture", Date = "2026-09-22T09:00:00-07:00", Owner = "Sam", Transcript = "[00:01] Membranes let water through by osmosis.",
+                Raw = new JsonObject { ["seconds"] = 3000.0 },
+            }, new Classification("BIO 110", 0.9, "folder", "Membranes and osmosis", ["osmosis"]), summaryMd: "## Summary\nWater crosses membranes by osmosis.");
+            var builder = WebApplication.CreateSlimBuilder();
+            builder.WebHost.UseUrls("http://127.0.0.1:0");
+            builder.Logging.ClearProviders();
+            door.live = ClaudeWeb.Build(builder, door.Cfg, new LibraryReader(door.Cfg, door.Store), door.Access);
+            await door.live.StartAsync();
+            door.Port = new Uri(door.live.Urls.Single()).Port;
+            return door;
+        }
+
+        /// <summary>The internet, reaching the real door through Funnel (<see cref="FakeFunnel"/>) at its public
+        /// address. It never follows a redirect, and keeps no cookies.</summary>
+        public HttpClient Internet() => new(new FakeFunnel(Port, Asked)) { BaseAddress = new Uri(Ts) };
+
         /// <summary>A browser that reaches the door as <paramref name="origin"/> (the Host it sends, and plain http
         /// or https as given): that's how Tailscale's proxy hands requests on.</summary>
         public HttpClient As(string origin) => new(Site.App.GetTestServer().CreateHandler()) { BaseAddress = new Uri(origin) };
 
         public async ValueTask DisposeAsync()
         {
-            await Site.DisposeAsync();
+            if (live is not null) await live.DisposeAsync();
+            else await Site.DisposeAsync();
             Store.Dispose();
             Dir.Dispose();
         }
@@ -1071,4 +1113,223 @@ public class ConnectorTests
         Assert.False(Directory.Exists(Path.Combine(lib, "Week 1"))); // naming a class that isn't there makes no folder
         Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(home, "claude.json"), 0));
     }
+
+    // --- end to end: Claude adds Study Stash as a custom connector, over a real server behind Funnel -------------------
+
+    /// <summary>Tailscale Funnel, as far as the test needs it: a request to https://mini.tail1234.ts.net goes on to the
+    /// library's Claude port on this computer over plain http, keeping the name it was sent to and saying who asked and
+    /// how, as Tailscale's proxy does. Any other address fails (so does following a redirect: nothing does), and so does
+    /// an answer slower than Claude waits for.</summary>
+    sealed class FakeFunnel(int port, List<string> asked) : DelegatingHandler(new SocketsHttpHandler { AllowAutoRedirect = false, UseCookies = false })
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var uri = request.RequestUri!;
+            if (uri.GetLeftPart(UriPartial.Authority) != Ts) throw new HttpRequestException($"Funnel only answers for {Ts}, not {uri.GetLeftPart(UriPartial.Authority)}");
+            lock (asked) asked.Add(request.Method + " " + uri.AbsolutePath);
+            // A request of its own, since a client may send the one it gave again (the SDK does, once signed in).
+            var onward = new HttpRequestMessage(request.Method, new UriBuilder(uri) { Scheme = "http", Host = "127.0.0.1", Port = port }.Uri) { Content = request.Content };
+            foreach (var (name, values) in request.Headers) onward.Headers.TryAddWithoutValidation(name, values);
+            onward.Headers.Host = uri.Host;
+            onward.Headers.TryAddWithoutValidation("X-Forwarded-For", "160.79.104.10");
+            onward.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
+            var clock = Stopwatch.StartNew();
+            var response = await base.SendAsync(onward, cancellationToken);
+            response.RequestMessage = request;
+            if (clock.Elapsed > TimeSpan.FromSeconds(10)) throw new TimeoutException($"{uri.AbsolutePath} took {clock.Elapsed.TotalSeconds:0.0} s; Claude gives up at 10");
+            return response;
+        }
+    }
+
+    /// <summary>Where Claude signs in, as it finds out from the address the student pasted alone.</summary>
+    sealed record SignInServer(string Authorize, string Token, string Register, string Revoke);
+
+    /// <summary>Claude's first steps, before anyone signs in: the MCP server says where to read about it (1), that says
+    /// the resource is the pasted address and who signs in for it (2), and the sign-in server describes itself (3).
+    /// Every address it hands out is the public https one.</summary>
+    static async Task<SignInServer> Discover(HttpClient net)
+    {
+        var none = await net.SendAsync(Mcp(null));
+        Assert.Equal(HttpStatusCode.Unauthorized, none.StatusCode);
+        string challenge = none.Headers.WwwAuthenticate.ToString();
+        var hint = System.Text.RegularExpressions.Regex.Match(challenge, "resource_metadata=\"([^\"]+)\"");
+        Assert.True(hint.Success, challenge);
+        Assert.Equal(Ts + "/.well-known/oauth-protected-resource/mcp", hint.Groups[1].Value);
+        Assert.Contains("scope=\"library:read\"", challenge);
+
+        var resource = await Json(await net.GetAsync(hint.Groups[1].Value));
+        Assert.Equal(Ts + "/mcp", resource["resource"]!.GetValue<string>());
+        Assert.Equal($"[\"{Ts}\"]", resource["authorization_servers"]!.ToJsonString());
+        // The root address answers the same, for a client that doesn't add the path.
+        Assert.Equal(Ts + "/mcp", (await Json(await net.GetAsync(Ts + "/.well-known/oauth-protected-resource")))["resource"]!.GetValue<string>());
+
+        string issuer = resource["authorization_servers"]![0]!.GetValue<string>();
+        var server = await Json(await net.GetAsync(issuer + "/.well-known/oauth-authorization-server"));
+        Assert.Equal(issuer, server["issuer"]!.GetValue<string>());
+        Assert.Equal("[\"S256\"]", server["code_challenge_methods_supported"]!.ToJsonString());
+        Assert.Contains("none", server["token_endpoint_auth_methods_supported"]!.AsArray().Select(m => m!.GetValue<string>()));
+        Assert.True(server["client_id_metadata_document_supported"]!.GetValue<bool>());
+        Assert.True(server["authorization_response_iss_parameter_supported"]!.GetValue<bool>());
+        var found = new SignInServer(server["authorization_endpoint"]!.GetValue<string>(), server["token_endpoint"]!.GetValue<string>(),
+            server["registration_endpoint"]!.GetValue<string>(), server["revocation_endpoint"]!.GetValue<string>());
+        Assert.Equal(new SignInServer(Ts + "/authorize", Ts + "/token", Ts + "/register", Ts + "/revoke"), found);
+        return found;
+    }
+
+    /// <summary>The student's side (5 to 7): the page Claude opens in the browser, the icon it shows, a mistyped
+    /// password, then the right one. The address the browser is sent back to.</summary>
+    static async Task<Uri> SignInPage(HttpClient net, SignInServer at, (string, string)[] fields, string client, string returnsTo)
+    {
+        var page = await net.GetAsync(at.Authorize + "?" + Query(fields));
+        string html = await page.Content.ReadAsStringAsync();
+        Assert.True(page.StatusCode == HttpStatusCode.OK, html);
+        Assert.Contains("Sam&#x27;s library", html);
+        Assert.Contains($"{client} wants to read your lectures", html);
+        Assert.Contains("will return to " + returnsTo, html);
+        Assert.Contains("<form method=\"post\" action=\"/authorize\">", html);
+        var icon = await net.GetAsync("/icon.png");
+        Assert.Equal((HttpStatusCode.OK, "image/png"), (icon.StatusCode, icon.Content.Headers.ContentType?.MediaType));
+
+        var wrong = await net.PostAsync(at.Authorize, Form([.. fields, ("password", "nope"), ("decision", "allow")]));
+        Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+        Assert.Null(wrong.Headers.Location);
+        Assert.Contains("That isn&#x27;t your library password. Try again.", await wrong.Content.ReadAsStringAsync());
+
+        var right = await net.PostAsync(at.Authorize, Form([.. fields, ("password", "pw"), ("decision", "allow")]));
+        Assert.True(right.StatusCode == HttpStatusCode.Redirect, await right.Content.ReadAsStringAsync());
+        var back = right.Headers.Location!;
+        Assert.Equal(("st8", Ts), (Params(back)["state"], Params(back)["iss"]));
+        return back;
+    }
+
+    /// <summary>The code and the PKCE verifier swapped for tokens for the pasted address (8), sent as a form, as
+    /// every OAuth client sends it.</summary>
+    static async Task<(string Access, string Refresh)> Tokens(HttpClient net, SignInServer at, Uri back, string verifier, string clientId, string redirect)
+    {
+        var answer = await net.PostAsync(at.Token, Form(("grant_type", "authorization_code"), ("code", Params(back)["code"]!), ("code_verifier", verifier),
+            ("client_id", clientId), ("redirect_uri", redirect), ("resource", Ts + "/mcp")));
+        Assert.Equal("application/json", answer.Content.Headers.ContentType?.MediaType);
+        var tokens = await Json(answer);
+        Assert.Equal(("Bearer", 3600, "library:read"), (tokens["token_type"]!.GetValue<string>(), tokens["expires_in"]!.GetValue<int>(), tokens["scope"]!.GetValue<string>()));
+        return (tokens["access_token"]!.GetValue<string>(), tokens["refresh_token"]!.GetValue<string>());
+    }
+
+    /// <summary>Claude reading, with the SDK's own client through Funnel (9): it connects, lists the tools, and finds
+    /// the recursion lecture.</summary>
+    static async Task ReadsLectures(Door door, string token)
+    {
+        await using var mcp = await McpClient.CreateAsync(new HttpClientTransport(new HttpClientTransportOptions
+        {
+            Endpoint = new Uri(Ts + "/mcp"), TransportMode = HttpTransportMode.StreamableHttp,
+            AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + token },
+        }, door.Internet(), ownsHttpClient: true));
+        Assert.Equal("study-stash", mcp.ServerInfo.Name);
+        Assert.Contains("search_notes", (await mcp.ListToolsAsync()).Select(t => t.Name));
+        var result = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "recursion" });
+        Assert.True(result.IsError is null or false, Text(result));
+        Assert.Contains("CS 101", Text(result));
+        Assert.Contains("rec-1", Text(result));
+    }
+
+    static FormUrlEncodedContent Renewal(string refresh, string clientId) =>
+        Form(("grant_type", "refresh_token"), ("refresh_token", refresh), ("client_id", clientId), ("resource", Ts + "/mcp"));
+
+    [Fact]
+    public async Task Claude_adds_Study_Stash_as_a_custom_connector()
+    {
+        await using var door = await Door.OpenLiveAsync();
+        using var net = door.Internet();
+        var at = await Discover(net);
+
+        // Claude on the web, with its published identity (CIMD): its id is its document's address.
+        door.Docs[HostedDoc] = Doc(HostedDoc, "Claude", WebCallback);
+        string verifier = Verifier();
+        var back = await SignInPage(net, at, Ask(HostedDoc, WebCallback, verifier), "Claude", "claude.ai");
+        Assert.StartsWith(WebCallback + "?code=", back.ToString());
+        Assert.Equal([HostedDoc], door.Fetched.Distinct());
+        var (access, refresh) = await Tokens(net, at, back, verifier, HostedDoc, WebCallback);
+        await ReadsLectures(door, access);
+
+        // 10. An hour on, a new pair; the old access token stops at once, the old refresh token after its minute.
+        var renewed = await Json(await net.PostAsync(at.Token, Renewal(refresh, HostedDoc)));
+        string access2 = renewed["access_token"]!.GetValue<string>(), refresh2 = renewed["refresh_token"]!.GetValue<string>();
+        Assert.NotEqual(refresh, refresh2);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await net.SendAsync(Mcp(access))).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await net.SendAsync(Mcp(access2))).StatusCode);
+        door.Now += TimeSpan.FromSeconds(61);
+        Assert.Equal((HttpStatusCode.BadRequest, "invalid_grant"), await Refused(await net.PostAsync(at.Token, Renewal(refresh, HostedDoc))));
+
+        // 11. Disconnect in Claude: it revokes, and the MCP server asks for a sign-in again.
+        Assert.Equal(HttpStatusCode.OK, (await net.PostAsync(at.Revoke, Form(("token", refresh2), ("token_type_hint", "refresh_token"), ("client_id", HostedDoc)))).StatusCode);
+        var gone = await net.SendAsync(Mcp(access2));
+        Assert.Equal(HttpStatusCode.Unauthorized, gone.StatusCode);
+        Assert.Contains($"resource_metadata=\"{Ts}/.well-known/oauth-protected-resource/mcp\"", gone.Headers.WwwAuthenticate.ToString());
+        Assert.Empty(door.Access.Grants());
+
+        // The same through registration (DCR), for a Claude set to register itself.
+        var registered = await Json(await net.PostAsync(at.Register, JsonContent.Create(new
+        {
+            client_name = "Claude", redirect_uris = new[] { WebCallback }, grant_types = new[] { "authorization_code", "refresh_token" },
+            response_types = new[] { "code" }, token_endpoint_auth_method = "none",
+        })));
+        string clientId = registered["client_id"]!.GetValue<string>();
+        verifier = Verifier();
+        back = await SignInPage(net, at, Ask(clientId, WebCallback, verifier), "Claude", "claude.ai");
+        (access, _) = await Tokens(net, at, back, verifier, clientId, WebCallback);
+        await ReadsLectures(door, access);
+
+        // Claude Code on the laptop, with Anthropic's published document, coming back to a port of the moment.
+        const string Loopback = "http://localhost:51234/callback";
+        door.Docs[ClaudeCodeDoc] = Doc(ClaudeCodeDoc, "Claude Code", "http://localhost/callback", "http://127.0.0.1/callback");
+        verifier = Verifier();
+        back = await SignInPage(net, at, Ask(ClaudeCodeDoc, Loopback, verifier), "Claude Code", "localhost");
+        Assert.StartsWith(Loopback + "?code=", back.ToString());
+        (access, _) = await Tokens(net, at, back, verifier, ClaudeCodeDoc, Loopback);
+        await ReadsLectures(door, access);
+
+        // Both sign-ins are for the pasted address, and nothing ever went anywhere else (Funnel refuses other names).
+        Assert.Equal([("Claude", Ts + "/mcp"), ("Claude Code", Ts + "/mcp")], door.Access.Grants().Select(g => (g.Name, g.Resource)).Order());
+        Assert.Contains("POST /mcp", door.Asked);
+        Assert.Contains("GET /.well-known/oauth-authorization-server", door.Asked);
+    }
+
+    [Fact]
+    public async Task The_sdks_own_oauth_client_signs_in_through_funnel_by_itself()
+    {
+        await using var door = await Door.OpenLiveAsync();
+        door.Docs[HostedDoc] = Doc(HostedDoc, "Claude", WebCallback);
+        using var browser = door.Internet();
+
+        async Task<McpClient> Connect(ClientOAuthOptions oauth, string client)
+        {
+            oauth.AuthorizationCallbackHandler = async (context, ct) =>
+            {
+                var authorize = context.AuthorizationUri;
+                Assert.StartsWith(Ts + "/authorize?", authorize.ToString());
+                var page = await browser.GetAsync(authorize, ct);
+                Assert.Contains(client + " wants to read your lectures", await page.Content.ReadAsStringAsync(ct));
+                var form = System.Web.HttpUtility.ParseQueryString(authorize.Query);
+                var answer = await browser.PostAsync("/authorize",
+                    Form([.. form.AllKeys.Select(k => (k!, form[k]!)), ("password", "pw"), ("decision", "allow")]), ct);
+                var back = Params(answer.Headers.Location!);
+                return new AuthorizationResult { Code = back["code"]!, State = back["state"], Iss = back["iss"] };
+            };
+            return await McpClient.CreateAsync(new HttpClientTransport(new HttpClientTransportOptions
+            {
+                Endpoint = new Uri(Ts + "/mcp"), TransportMode = HttpTransportMode.StreamableHttp, OAuth = oauth,
+            }, door.Internet(), ownsHttpClient: true));
+        }
+
+        // With a published identity (named by where it is published), then by registering (named by where it returns to).
+        await using (var mcp = await Connect(new ClientOAuthOptions { RedirectUri = new Uri(WebCallback), ClientMetadataDocumentUri = new Uri(HostedDoc) }, "Claude"))
+            Assert.StartsWith("Library: Sam's library", Text(await mcp.CallToolAsync("list_classes", new Dictionary<string, object?>())));
+        Assert.Contains(HostedDoc, door.Fetched);
+        await using (var mcp = await Connect(new ClientOAuthOptions { RedirectUri = new Uri(WebCallback), DynamicClientRegistration = new DynamicClientRegistrationOptions { ClientName = "Claude Desktop" } }, "Claude Desktop"))
+            Assert.Contains("CS 101", Text(await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "recursion" })));
+
+        var grants = door.Access.Grants();
+        Assert.Equal(["clients.example", "claude.ai"], grants.OrderBy(g => g.Name).Select(g => g.ClientHost));
+        Assert.All(grants, g => Assert.Equal(Ts + "/mcp", g.Resource));
+    }
 }
+
