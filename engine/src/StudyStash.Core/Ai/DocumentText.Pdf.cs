@@ -33,7 +33,8 @@ public static partial class DocumentText
     internal delegate IReadOnlyDictionary<int, string> PageReaderFn(string path, IReadOnlyList<int> pages, DateTime until, CancellationToken ct);
 
     /// <summary>This computer's text recognition for a PDF's pages; null where there's none.</summary>
-    static PageReaderFn? PageReader => MacVision.Available ? MacVision.PdfPageText : null;
+    static PageReaderFn? PageReader =>
+        MacVision.Available ? MacVision.PdfPageText : WindowsOcr.Available ? WindowsOcr.PdfPageText : null;
 
     /// <summary>The typed text on each of a PDF's first <paramref name="max"/> pages ("" for a page with none);
     /// null when it isn't a PDF that opens. A Mac reads it with PDFKit, as Preview does; elsewhere PdfPig reads it.</summary>

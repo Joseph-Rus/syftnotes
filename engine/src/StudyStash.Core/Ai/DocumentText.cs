@@ -111,7 +111,7 @@ public static partial class DocumentText
                 ".pptx" => Pptx(path),
                 ".doc" or ".rtf" => Machine.Run("textutil", ["-convert", "txt", "-stdout", path], TimeSpan.FromSeconds(25))?.Stdout,
                 _ when Plain.Contains(ext) => File.ReadAllText(path),
-                _ when Images.Contains(ext) => ImageText(path),
+                _ when Images.Contains(ext) => ImageText(path, DateTime.UtcNow + options.TimeLimit),
                 _ => null,
             };
         }
@@ -122,7 +122,8 @@ public static partial class DocumentText
     }
 
     /// <summary>The words in a photo or scan, by the computer's own text recognition; null where there's none.</summary>
-    static string? ImageText(string path) => MacVision.Available ? MacVision.ImageText(path) : null;
+    static string? ImageText(string path, DateTime until) =>
+        MacVision.Available ? MacVision.ImageText(path) : WindowsOcr.Available ? WindowsOcr.ImageText(path, until) : null;
 
     /// <summary>Trimmed, lines of nothing but spaces made empty, at most three line breaks in a row and
     /// <see cref="MaxText"/> characters; null when nothing is left.</summary>
