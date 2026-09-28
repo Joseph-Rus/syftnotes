@@ -140,11 +140,16 @@ public static class NotesDownload
         }
     }
 
-    static async Task WriteTextAsync(IStorageFile file, string text)
+    static Task WriteTextAsync(IStorageFile file, string text) => WriteTextAsync(file.OpenWriteAsync, text);
+
+    /// <summary>Writes <paramref name="text"/> to the stream <paramref name="open"/> gives, as UTF-8, and ends the file
+    /// there: saved over a longer file (the same lecture downloaded again, with less in it), nothing of the old one is
+    /// left after it, whether or not the picker's stream started it empty.</summary>
+    internal static async Task WriteTextAsync(Func<Task<Stream>> open, string text)
     {
-        await using var stream = await file.OpenWriteAsync();
-        await using var w = new StreamWriter(stream, Utf8);
-        await w.WriteAsync(text);
+        await using var stream = await open();
+        await using (var w = new StreamWriter(stream, Utf8, bufferSize: -1, leaveOpen: true)) await w.WriteAsync(text);
+        if (stream.CanSeek) stream.SetLength(stream.Position);
     }
 
     static async Task WriteAssetAsync(string baseDir, ExportAsset asset)

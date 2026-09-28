@@ -30,6 +30,13 @@ public static class Terminal
 
     static string Quote(string s) => "'" + s.Replace("'", "'\\''") + "'";
 
+    /// <summary>Windows Terminal's own arguments for a program started in <paramref name="folder"/>: it reads a ";"
+    /// anywhere as the start of another tab, so each one is "\;", which it hands on as ";".</summary>
+    internal static List<string> WindowsTerminalArgs(string folder, string program, IEnumerable<string> args) =>
+        ["-d", Semicolons(folder), Semicolons(program), .. args.Select(Semicolons)];
+
+    static string Semicolons(string s) => s.Replace(";", "\\;");
+
     /// <summary>Open it. The terminal's name, or throws InvalidOperationException saying why not.</summary>
     public static string Open(string home, string folder, string library, string? className, string terminal, string provider, IReadOnlyList<string> mcp)
     {
@@ -64,8 +71,11 @@ public static class Terminal
         string exe = AiProvider.Which(bin) ?? throw new InvalidOperationException($"{bin} isn't installed on this computer.");
         if (OperatingSystem.IsWindows())
         {
-            var wt = new ProcessStartInfo("wt.exe") { UseShellExecute = true, ArgumentList = { "-d", folder, exe } };
-            foreach (string a in args) wt.ArgumentList.Add(a);
+            // An npm-installed claude.cmd is seen through to its Node.js, so the brief reaches it whole: see WindowsCommand.
+            var launch = WindowsCommand.For([exe, .. args]);
+            var (program, programArgs) = launch.CommandLine is null ? (launch.FileName, launch.Arguments) : (exe, args);
+            var wt = new ProcessStartInfo("wt.exe") { UseShellExecute = true };
+            foreach (string a in WindowsTerminalArgs(folder, program, programArgs)) wt.ArgumentList.Add(a);
             try
             {
                 Process.Start(wt);
@@ -74,8 +84,8 @@ public static class Terminal
             catch (System.ComponentModel.Win32Exception)
             {
                 // No Windows Terminal (Windows 10 without it): the command in a console window of its own.
-                var console = new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = folder };
-                foreach (string a in args) console.ArgumentList.Add(a);
+                var console = new ProcessStartInfo(program) { UseShellExecute = true, WorkingDirectory = folder };
+                foreach (string a in programArgs) console.ArgumentList.Add(a);
                 Process.Start(console);
                 return "a console window";
             }

@@ -170,6 +170,15 @@ public class WindowsCommandTests
         Assert.Equal("What is preload?", exe.Input(req));
     }
 
+    /// <summary>Open in Claude Code on Windows: Windows Terminal is given the folder, the program and its arguments,
+    /// with each ";" (which it would read as the start of another tab) escaped.</summary>
+    [Fact]
+    public void Windows_terminal_keeps_a_semicolon_in_an_argument()
+    {
+        var args = Terminal.WindowsTerminalArgs(@"C:\Notes\CS 101; Fall", @"C:\nodejs\node.exe", [@"C:\npm\cli.js", "--append-system-prompt", "This is the class \"R&D; lab\"."]);
+        Assert.Equal(["-d", @"C:\Notes\CS 101\; Fall", @"C:\nodejs\node.exe", @"C:\npm\cli.js", "--append-system-prompt", "This is the class \"R&D\\; lab\"."], args);
+    }
+
     /// <summary>A stand-in CLI that answers with one line of JSON: the arguments it was given and what came in on its
     /// input.</summary>
     sealed class EchoCli(List<string> cmd) : AiProvider

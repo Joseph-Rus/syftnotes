@@ -158,6 +158,20 @@ public class NotesDownloadTests
         Assert.All(files, f => Assert.True(f.Length > 300));
     }
 
+    /// <summary>Saved over a longer file, through a stream that doesn't start it empty, the file holds the new text
+    /// alone, as UTF-8 with no byte-order mark.</summary>
+    [Fact]
+    public async Task Saving_over_a_longer_file_leaves_nothing_of_the_old_one()
+    {
+        using var dir = new TempDir();
+        string path = dir["lecture.md"];
+        await File.WriteAllTextAsync(path, new string('x', 5000), TestContext.Current.CancellationToken);
+
+        await NotesDownload.WriteTextAsync(() => Task.FromResult<Stream>(new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write)), "---\ntitle: \"Buffers\"\n---\n\nCO₂ → H₂CO₃\n");
+
+        Assert.Equal(Encoding.UTF8.GetBytes("---\ntitle: \"Buffers\"\n---\n\nCO₂ → H₂CO₃\n"), await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken));
+    }
+
     [AvaloniaFact]
     public async Task Cancelling_the_folder_picker_saves_nothing()
     {
