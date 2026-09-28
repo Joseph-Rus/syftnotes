@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
+using StudyStash.App.Views;
 using StudyStash.App.Windows;
 using StudyStash.Core.Rich;
 
@@ -197,5 +198,26 @@ public class RichShots
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
             foreach (var t in Themes)
                 Shot.Take($"rich-formula-fallback-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, RichDemo.FormulaFallbackNotes), size: new Size(876, 560));
+    }
+
+    /// <summary>The share/Export button's menu open over the lecture page: "Download as Markdown…", "Download all of
+    /// {class}…" and "Include transcripts" checked, one left edge for every row.</summary>
+    static ContextMenu OpenDownloadMenu()
+    {
+        var menu = DownloadMenu.Build("BIO 110", includeTranscripts: true, () => { }, () => { }, () => { });
+        menu.VerticalAlignment = VerticalAlignment.Top;
+        return menu;
+    }
+
+    [AvaloniaFact]
+    public void Download_menu()
+    {
+        foreach (var t in Themes)
+        {
+            Shot.Take("rich-download-menu-mac", SkinKind.Mac, t, () => Shot.Side(
+                new MacLibrary { DataContext = Demo.Library(), Width = 900, Height = 640 }, OpenDownloadMenu()), size: new Size(1350, 640));
+            Shot.Take("rich-download-menu-win", SkinKind.Win, t, () => Shot.Side(
+                new WinLibrary { DataContext = Demo.Library(), Width = 900, Height = 640 }, OpenDownloadMenu()), size: new Size(1350, 640));
+        }
     }
 }
