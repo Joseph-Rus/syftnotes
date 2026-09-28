@@ -528,8 +528,8 @@ public static partial class Shell
         }
     }
 
-    /// <summary>The share/Export button's menu: download this lecture, download the whole open class, and whether a
-    /// download includes the transcript.</summary>
+    /// <summary>The share/Export button's menu: download this lecture (as Markdown or a PDF), download the whole open
+    /// class, and whether a download includes the transcript.</summary>
     static async Task ExportAsync()
     {
         await Task.Yield(); // opening the menu is itself synchronous; a pick below does the real, awaited work
@@ -537,6 +537,8 @@ public static partial class Shell
         string? cls = dueOpen ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
         DownloadMenu.Build(cls, host.Settings.DownloadTranscripts,
             download: () => _ = NotesDownload.LectureAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title), host.Settings.DownloadTranscripts, MermaidSvg()),
+            downloadPdf: () => _ = NotesDownload.LecturePdfAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title, ".pdf"), host.Settings.DownloadTranscripts,
+                note.Dot is ISolidColorBrush dot ? dot.Color : Colors.Gray),
             downloadClass: () => _ = NotesDownload.ClassAsync(mainWindow, lib, cls!, host.Settings.DownloadTranscripts, MermaidSvg()),
             toggleTranscripts: () => host.Save(s => s.DownloadTranscripts = !s.DownloadTranscripts)).Open(anchor);
     }

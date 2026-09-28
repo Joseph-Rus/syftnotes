@@ -28,38 +28,42 @@
         <TextBlock Classes="ai-section" Text="What they can read" Margin="4,0" />
         <Border Classes="ai-group">
           <StackPanel>
-            <Button Classes="ai-textbtn" Command="{Binding ToggleLecturesCommand}" HorizontalContentAlignment="Stretch">
+            <Button Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleLecturesCommand}" HorizontalContentAlignment="Stretch">
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*" MinHeight="40" Margin="16,0">
                 <Border Classes="ai-check" Classes.on="{Binding ReadLectures}">
                   <c:Icon Glyph="check" Size="13" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding ReadLectures}" />
                 </Border>
+                <Border Classes="focusring ai-checkring" />
                 <TextBlock Grid.Column="2" Classes="ai-row-title" Text="Lectures and transcripts" VerticalAlignment="Center" />
               </Grid>
             </Button>
             <Border Classes="ai-sep" />
-            <Button Classes="ai-textbtn" Command="{Binding ToggleNotesCommand}" HorizontalContentAlignment="Stretch">
+            <Button Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleNotesCommand}" HorizontalContentAlignment="Stretch">
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*" MinHeight="40" Margin="16,0">
                 <Border Classes="ai-check" Classes.on="{Binding ReadNotes}">
                   <c:Icon Glyph="check" Size="13" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding ReadNotes}" />
                 </Border>
+                <Border Classes="focusring ai-checkring" />
                 <TextBlock Grid.Column="2" Classes="ai-row-title" Text="Study notes" VerticalAlignment="Center" />
               </Grid>
             </Button>
             <Border Classes="ai-sep" />
-            <Button Classes="ai-textbtn" Command="{Binding ToggleCanvasCommand}" HorizontalContentAlignment="Stretch">
+            <Button Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleCanvasCommand}" HorizontalContentAlignment="Stretch">
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*" MinHeight="40" Margin="16,0">
                 <Border Classes="ai-check" Classes.on="{Binding ReadCanvas}">
                   <c:Icon Glyph="check" Size="13" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding ReadCanvas}" />
                 </Border>
+                <Border Classes="focusring ai-checkring" />
                 <TextBlock Grid.Column="2" Classes="ai-row-title" Text="Canvas assignments and files" VerticalAlignment="Center" />
               </Grid>
             </Button>
             <Border Classes="ai-sep" />
-            <Button Classes="ai-textbtn" Command="{Binding ToggleAudioCommand}" HorizontalContentAlignment="Stretch">
+            <Button Classes="ai-textbtn ai-choice quiet" Command="{Binding ToggleAudioCommand}" HorizontalContentAlignment="Stretch">
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*" MinHeight="40" Margin="16,0">
                 <Border Classes="ai-check" Classes.on="{Binding ReadAudio}">
                   <c:Icon Glyph="check" Size="13" Foreground="{DynamicResource OnAccent}" IsVisible="{Binding ReadAudio}" />
                 </Border>
+                <Border Classes="focusring ai-checkring" />
                 <TextBlock Grid.Column="2" Classes="ai-row-title" Text="Audio recordings" VerticalAlignment="Center" />
               </Grid>
             </Button>
@@ -134,7 +138,7 @@
                   <Ellipse Classes="ai-dot" Classes.good="{Binding WebStatusOk}" Classes.warn="{Binding WebStatusWarn}" />
                 </Panel>
                 <TextBlock Grid.Column="2" Classes="ai-state" Classes.warn="{Binding WebStatusWarn}" Text="{Binding WebStatusWords}" VerticalAlignment="Center" />
-                <Button Grid.Column="3" Classes="ai-textbtn" Command="{Binding CheckWebAgainCommand}" VerticalAlignment="Center">
+                <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CheckWebAgainCommand}" VerticalAlignment="Center">
                   <Border Classes="ai-pill-plain"><TextBlock Text="Check again" /></Border>
                 </Button>
               </Grid>
@@ -148,7 +152,7 @@
                 </Panel>
                 <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap" Text="{Binding WebNote}" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding ShowWebNoteAction}">
-                  <Button Classes="ai-textbtn" Command="{Binding CopyWebFixCommand}" VerticalAlignment="Center">
+                  <Button Classes="ai-pillbtn" Command="{Binding CopyWebFixCommand}" VerticalAlignment="Center">
                     <Border Classes="ai-pill-plain"><TextBlock Text="Copy link" /></Border>
                   </Button>
                   <Button Classes="ai-pillbtn" Command="{Binding OpenWebFixCommand}">

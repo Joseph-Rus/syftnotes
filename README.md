@@ -11,9 +11,12 @@ Free and open source, for Mac and Windows, and everything stays on your own comp
 ## What it does
 
 - **Records and transcribes on your computer.** Click **Record** in the menu bar (Mac) or tray
-  (Windows), or press ⌥⇧R / Ctrl+Alt+R. Whisper large-v3 transcribes as you go — Metal on Apple
-  silicon, Vulkan or the CPU on Windows — and the audio never leaves your computer. While it
-  records, a tiny pill shows the time and the level; pause or stop from the menu bar.
+  (Windows), or press ⌥⇧R / Ctrl+Alt+R. Whisper transcribes as you go — Metal on Apple silicon,
+  Vulkan or the CPU on Windows — and the audio never leaves your computer. Every computer starts on
+  the compact large-v3 turbo, which keeps up and leaves room for everything else (a computer too weak
+  for it gets a lighter one); the bigger, more accurate models are a choice in setup and Settings →
+  Recording. While it records, a tiny pill shows the time and the level; pause or stop from the
+  menu bar.
 - **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
   to review, written by Ollama (free and private) or by Claude Code, Codex or Gemini with the plan
   you already have. Rewrite a lecture's notes with another engine and keep whichever you like.
@@ -155,6 +158,9 @@ the notes, in a quick answer and in the Ask chat:
 - **Download**: a lecture's "Download as Markdown…" (or a whole class's) saves a `.md` file that
   Obsidian, Typora and VS Code all open well — formulas stay LaTeX, a Mermaid diagram is saved
   again as an SVG beside it, and an SVG diagram becomes an image link to its own sanitised file.
+  "Download as PDF…" saves the notes as the app draws them, ready to print: headings, tables, typeset
+  formulas and diagrams as sharp vector drawings with the text selectable, light on white whatever
+  the app's look, on Letter paper where that's the local size and A4 elsewhere, with page numbers.
 
 ## Canvas
 
@@ -164,7 +170,10 @@ only reads; nothing on Canvas changes. On your library's computer:
 1. **Settings → Your library → Canvas** (or the Canvas step in setup): type your school's Canvas
    address.
 2. Click **Add to Chrome**. It opens Chrome's extensions page and shows the extension's folder.
-   Turn on **Developer mode**, click **Load unpacked**, and pick that folder.
+   Turn on **Developer mode**, click **Load unpacked**, and pick that folder — or drag the folder
+   onto the Extensions page. On a Mac the folder is **Study Stash → Chrome extension** in your home
+   folder (`~/Study Stash/Chrome extension`), where Chrome's window can see it; on Windows it's
+   `chrome-extension` in `%USERPROFILE%\.study-stash`.
 3. Sign in to Canvas in Chrome, then click **Find my courses** and match each class to its course.
 
 Canvas then syncs about once an hour while Chrome is open (it can stay minimized): what's due,
@@ -203,7 +212,9 @@ what Claude can read, troubleshooting, and how each requirement of Claude's conn
 
 Everything is under `~/.study-stash` (or `--home`, or the `STUDYSTASH_HOME` environment variable):
 your settings, the lecture database, and the notes themselves as plain Markdown files in a folder
-per class, which you can open, back up or sync however you like.
+per class, which you can open, back up or sync however you like. On a Mac the Chrome extension's
+folder is the one exception: `~/Study Stash/Chrome extension`, because Chrome's Load unpacked window
+doesn't show folders whose names start with a dot.
 
 ## Build from source
 
@@ -220,12 +231,15 @@ dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
 `macos/build-app.sh` builds "Study Stash.app" and `Study-Stash.dmg` (with Xcode's command line tools), and
 `windows/build.ps1` `Study-Stash-Setup.exe`; both build the phone app into it first. `engine/README.md` has more on the projects and tests.
 
-Releases come from CI (`.github/workflows/ci.yml`): every change is tested on macOS, Linux and
-Windows, and both apps are built, self-tested and installed. To ship a release, bump
-`StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI publishes
-`Study-Stash.dmg`, `Study-Stash-Setup.exe` (and copies under the old installers' names, so older copies
-still update) and `SHA256SUMS.txt`. A push that only changes the version, on top of a commit that
-already passed, skips the tests and just builds and publishes.
+Releases come from CI (`.github/workflows/ci.yml`). Every change is tested once, when it reaches
+`main`: on macOS, Linux and Windows, with both apps built, self-tested and installed. Branches and
+pull requests aren't tested on their own; to prove one first (say, Windows-only code), start a run
+by hand with **Actions → ci → Run workflow** or `gh workflow run ci --ref <branch>`. To ship a
+release, bump `StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI
+publishes `Study-Stash.dmg`, `Study-Stash-Setup.exe` (and copies under the old installers' names, so
+older copies still update) and `SHA256SUMS.txt`. Code that already passed isn't tested twice: a
+push that only changes the version on top of a commit that passed, or a merge of a branch whose run
+passed on the very same code, just builds and publishes.
 
 ## License
 

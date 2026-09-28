@@ -12,6 +12,16 @@
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
   </UserControl.Styles>
+  <DockPanel>
+    <!-- The small window's own footer, under the steps (which scroll when they run long): Skip for now on the left; Back and Finish on the right, one height, one line -->
+    <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="0,18,0,0" IsVisible="{Binding ShowFooter}">
+      <Button Classes="cv-skip" VerticalAlignment="Center" Command="{Binding SkipCommand}"><TextBlock Classes="cv-link" FontSize="13" Text="Skip for now" /></Button>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
+        <Button Classes="cv-pill" Command="{Binding BackCommand}"><TextBlock Text="Back" /></Button>
+        <Button Classes="cv-pill cv-primary" IsEnabled="{Binding CanFinish}" Command="{Binding FinishCommand}"><TextBlock Text="{Binding FinishLabel}" /></Button>
+      </StackPanel>
+    </Grid>
+    <ScrollViewer Name="Page" VerticalScrollBarVisibility="{Binding ShowFooter, Converter={x:Static c:Converters.ScrollsIfOwn}}">
   <StackPanel Spacing="6">
     <TextBlock Classes="cv-step-label" Text="{Binding StepLabel}" IsVisible="{Binding StepLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
     <TextBlock Classes="cv-h1" Text="{x:Static vm:CanvasConnectModel.Title}" />
@@ -86,7 +96,7 @@
             <Border Grid.Column="2" Classes="cv-illus" Height="84">
               <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
                 <TextBlock Classes="cv-illus-row" Text="Downloads" />
-                <Border Grid.Row="1" Classes="cv-illus-row cv-highlight" Padding="4,2"><TextBlock Classes="cv-illus-row cv-highlight" Text="Study Stash Extension" /></Border>
+                <Border Grid.Row="1" Classes="cv-illus-row cv-highlight" Padding="4,2"><TextBlock Classes="cv-illus-row cv-highlight" Text="{Binding FolderName}" TextTrimming="CharacterEllipsis" /></Border>
                 <TextBlock Grid.Row="2" Classes="cv-illus-row" Text="Documents" />
                 <Border Grid.Row="3" Classes="cv-illus-pick" HorizontalAlignment="Right"><TextBlock Text="Select" /></Border>
               </Grid>
@@ -95,7 +105,7 @@
           <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
             <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="1" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Turn on Developer mode, top right" TextWrapping="Wrap" /></Grid>
             <Grid Grid.Column="1" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="2" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Click Load unpacked" TextWrapping="Wrap" /></Grid>
-            <Grid Grid.Column="2" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Pick the Study Stash Extension folder" TextWrapping="Wrap" /></Grid>
+            <Grid Grid.Column="2" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding PickCaption}" TextWrapping="Wrap" /></Grid>
           </Grid>
           <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding AddedToChrome}">
             <Button Classes="cv-quiet" Command="{Binding ShowFolderCommand}"><TextBlock Classes="cv-link" Text="Show the folder again" /></Button>
@@ -133,7 +143,7 @@
         <!-- Which courses to bring in: this term's ticked, the rest (past terms, sandboxes, chapel) not -->
         <StackPanel Classes="cv-body" Spacing="6" IsVisible="{Binding ShowPicker}">
           <TextBlock Classes="cv-step-body" Text="{Binding PickerHint}" />
-          <ScrollViewer MaxHeight="{Binding PickerHeight}" VerticalScrollBarVisibility="Auto">
+          <ScrollViewer Name="PickerScroll" MaxHeight="{Binding PickerHeight}" VerticalScrollBarVisibility="Auto">
             <v:MacCoursePicker Classes="inset" DataContext="{Binding Picker}" />
           </ScrollViewer>
         </StackPanel>
@@ -166,7 +176,7 @@
                         <c:Icon Grid.Column="1" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" Margin="6,0,0,0" />
                       </Grid>
                       <Button.Flyout>
-                        <Flyout Placement="BottomEdgeAlignedRight">
+                        <Flyout Placement="BottomEdgeAlignedRight" OverlayDismissEventPassThrough="True">
                           <ItemsControl ItemsSource="{Binding Choices}">
                             <ItemsControl.ItemTemplate>
                               <DataTemplate x:DataType="vm:CourseChoice">
@@ -225,13 +235,7 @@
       </StackPanel>
     </Border>
 
-    <!-- The small window's own footer: Skip for now on the left; Back and Finish on the right, one height, one line -->
-    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,18,0,0" IsVisible="{Binding ShowFooter}">
-      <Button Classes="cv-skip" VerticalAlignment="Center" Command="{Binding SkipCommand}"><TextBlock Classes="cv-link" FontSize="13" Text="Skip for now" /></Button>
-      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10">
-        <Button Classes="cv-pill" Command="{Binding BackCommand}"><TextBlock Text="Back" /></Button>
-        <Button Classes="cv-pill cv-primary" IsEnabled="{Binding CanFinish}" Command="{Binding FinishCommand}"><TextBlock Text="{Binding FinishLabel}" /></Button>
-      </StackPanel>
-    </Grid>
   </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
 </UserControl>

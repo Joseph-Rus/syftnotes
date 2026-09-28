@@ -91,12 +91,14 @@
       <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
       <Setter Property="Margin" Value="0,0,0,4" />
     </Style>
-    <!-- The AI and Canvas steps (07, 15) start a little higher, in their taller window. -->
+    <!-- The AI and Canvas steps (07, 15) start a little higher, in their taller window. The column's sides are the
+         page's and the footer's own margins, so a pane that sits out to the column's edges isn't cut off by the
+         page's scrolling. -->
     <Style Selector="DockPanel.stepcol">
-      <Setter Property="Margin" Value="40,12,40,20" />
+      <Setter Property="Margin" Value="0,12,0,20" />
     </Style>
     <Style Selector="DockPanel.stepcol.wide">
-      <Setter Property="Margin" Value="40,4,40,20" />
+      <Setter Property="Margin" Value="0,4,0,20" />
     </Style>
     <!-- Every page's title and the line under it. -->
     <Style Selector="TextBlock.h1">
@@ -278,7 +280,7 @@
 
         <!-- The step -->
         <DockPanel Grid.Column="1" Classes="stepcol" Classes.wide="{Binding Wide}">
-          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto">
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="40,0">
             <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
               <TextBlock Text="Skip for now" FontSize="13" Foreground="{DynamicResource Fg2}" />
             </Button>
@@ -291,7 +293,10 @@
               </Button>
             </StackPanel>
           </Grid>
-          <StackPanel>
+          <!-- The step scrolls under a footer that stays put: a long list (a whole term of Canvas courses) never runs
+               over Continue. -->
+          <ScrollViewer Name="Page" VerticalScrollBarVisibility="Auto">
+          <StackPanel Margin="40,0,40,12">
             <TextBlock Text="{Binding StepLabel}" FontSize="12" Foreground="{DynamicResource Fg2}" />
 
             <!-- Welcome: how Study Stash will be used, as three rows of one height: icon | name (+ Recommended) and
@@ -625,6 +630,7 @@
               <v:MacCanvasConnect DataContext="{Binding Canvas}" />
             </Panel>
           </StackPanel>
+          </ScrollViewer>
         </DockPanel>
       </Grid>
     </DockPanel>

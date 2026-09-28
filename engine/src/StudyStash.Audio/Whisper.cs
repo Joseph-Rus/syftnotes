@@ -28,11 +28,11 @@ public sealed record ModelAdvice(WhisperModel Model, string Why);
 public static class WhisperModels
 {
     public static readonly WhisperModel LargeV3 = new("large-v3", "Whisper large-v3", "ggml-large-v3.bin", 3095033483,
-        "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2", "The most accurate. Best on a Mac with Apple silicon or a PC with a graphics card.");
+        "64d182b440b98d5203c4f9bd541544d84c605196c4f7b845dfa11fb23594d1e2", "The most accurate, and the heaviest: it wants a Mac with Apple silicon or a PC with a big graphics card.");
     public static readonly WhisperModel LargeV3Turbo = new("large-v3-turbo", "Whisper large-v3 turbo", "ggml-large-v3-turbo.bin", 1624555275,
-        "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69", "Nearly as accurate as large-v3 and several times faster.");
+        "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69", "More accurate than the compact one, and heavier: it wants a Mac with Apple silicon or a PC with a graphics card.");
     public static readonly WhisperModel LargeV3TurboSmall = new("large-v3-turbo-q5", "Whisper large-v3 turbo (compact)", "ggml-large-v3-turbo-q5_0.bin", 574041195,
-        "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2", "large-v3 turbo in a third of the space, for computers without a graphics card.");
+        "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2", "large-v3 turbo in a third of the space. Keeps up with a lecture on most computers and leaves room for everything else.");
     public static readonly WhisperModel Small = new("small", "Whisper small", "ggml-small.bin", 487601967,
         "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b", "Quick on any processor. Misses more names and terms than the large ones.");
     public static readonly WhisperModel Base = new("base", "Whisper base", "ggml-base.bin", 147951465,
@@ -61,14 +61,29 @@ public static class WhisperModels
     }
 
     /// <summary>
-    /// The model that keeps up with a lecture on this computer, and one plain line why.
+    /// The model a computer starts on, and one plain line why: the compact large-v3 turbo, on every computer that keeps
+    /// up with it (Apple silicon and PCs with a strong graphics card too), because it's light on the computer and
+    /// leaves room for everything else; a computer too weak for it starts on the lighter one it can run
+    /// (<see cref="Heaviest"/>). The bigger models stay a choice in setup and Settings → Recording.
+    /// </summary>
+    public static ModelAdvice Advise(HardwareProfile hw)
+    {
+        var heaviest = Heaviest(hw);
+        if (!Heavier(heaviest.Model, LargeV3TurboSmall)) return heaviest;
+        return new(LargeV3TurboSmall, hw.AppleSilicon
+            ? "The compact model keeps up with a lecture and leaves this Mac room for everything else. Its Apple silicon can run a bigger one too."
+            : $"The compact model keeps up with a lecture and leaves this PC room for everything else. Its graphics card ({hw.WhisperCard?.Name}) can run a bigger one too.");
+    }
+
+    /// <summary>
+    /// The heaviest (most accurate) model that keeps up with a lecture on this computer, and one plain line why.
     /// <para>
     /// A lecture is written down live, a 30-second piece at a time, so the model has to finish each piece well inside
     /// 30 seconds or the transcript falls further behind all lecture. What decides that:
     /// </para>
     /// <list type="bullet">
     /// <item>Apple silicon runs Whisper on its graphics (Metal) with memory the chip shares: large-v3 keeps up on every
-    /// one, as it always has here. Only a Mac with under 7 GB (none are sold) gets the compact model, to leave room.</item>
+    /// one. Only a Mac with under 7 GB (none are sold) is kept to the compact model, to leave room.</item>
     /// <item>A PC with a real graphics card runs Whisper on the card through Vulkan, and what fits is the card's own
     /// memory. large-v3 needs about 4 GB of it with room to work, so it wants an 8 GB card (the usual size after 6;
     /// cards say a little under, hence 7.5). large-v3 turbo (about 2 GB) fits a 4 GB card and is nearly as accurate;
@@ -80,9 +95,10 @@ public static class WhisperModels
     /// no AVX2 or less memory: Whisper small, whose encoder does a fraction of the work. Under 4 threads or under
     /// 4 GB of memory: Whisper base.</item>
     /// </list>
-    /// Memory the computer won't say (null) counts as enough: the student can always pick a lighter one.
+    /// Memory the computer won't say (null) counts as enough: the student can always pick a lighter one. A model
+    /// heavier than this one is worth a word (<c>ModelSuggestionAsync</c>); one up to this heavy is the student's call.
     /// </summary>
-    public static ModelAdvice Advise(HardwareProfile hw)
+    public static ModelAdvice Heaviest(HardwareProfile hw)
     {
         string device = hw.DeviceWord;
         double? ram = hw.RamGb;

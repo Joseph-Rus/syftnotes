@@ -137,7 +137,7 @@ public static class AiDemo
         m.Turns.Add(new AiTurn("What did she say is on the midterm?", "Ollama")
         {
             Answer = "Recursion traces and call-stack diagrams. Big-O proofs won't be on it.",
-            Byline = "Ollama · 18:05, 18:40",
+            Byline = AiWords.AskByline("Ollama", [new AskSource("lec-recursion", "Recursion", null, null, 18 * 60 + 5, ""), new AskSource("lec-recursion", "Recursion", null, null, 18 * 60 + 40, "")]),
         });
         return m;
     }

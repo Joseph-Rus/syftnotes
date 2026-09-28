@@ -133,20 +133,28 @@ sealed class MathDisplay : Decorator
     public const double MinScale = 0.7;
 
     readonly MathView math;
-    readonly ScrollViewer scroller;
+    readonly bool fitWhole;
 
-    public MathDisplay(MathView mv)
+    /// <summary><paramref name="fitWhole"/>: on paper, where nothing scrolls, the formula shrinks as far as it must
+    /// to fit the column, past <see cref="MinScale"/>.</summary>
+    public MathDisplay(MathView mv, bool fitWhole = false)
     {
+        this.fitWhole = fitWhole;
         math = mv;
         math.HorizontalAlignment = HorizontalAlignment.Center;
-        scroller = new ScrollViewer
+        HorizontalAlignment = HorizontalAlignment.Center;
+        if (fitWhole)
+        {
+            Child = math;
+            return;
+        }
+        var scroller = new ScrollViewer
         {
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = math,
         };
         Child = scroller;
-        HorizontalAlignment = HorizontalAlignment.Center;
     }
 
     protected override AvaloniaSize MeasureOverride(AvaloniaSize availableSize)
@@ -156,7 +164,7 @@ sealed class MathDisplay : Decorator
         var natural = math.Natural;
         double scale = natural.Width <= 0 || !double.IsFinite(availableSize.Width)
             ? 1
-            : Math.Clamp(availableSize.Width / natural.Width, MinScale, 1);
+            : Math.Clamp(availableSize.Width / natural.Width, fitWhole ? 0 : MinScale, 1);
         if (Math.Abs(scale - math.Scale) > 0.0001)
         {
             math.Scale = scale;

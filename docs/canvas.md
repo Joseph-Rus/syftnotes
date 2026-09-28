@@ -118,7 +118,9 @@ home/
   crawl.json                          the sync's queue, its sections, the manifest of saved files
   canvas_assignments.json             every assignment and where you stand, for the Due list
   canvas_key                          the extension's own key
-  chrome-extension/                   the extension's folder, for Chrome's "Load unpacked" (brought up to date when the library starts)
+  chrome-extension/                   the extension's folder, for Chrome's "Load unpacked" (brought up to date when the library starts);
+                                      on a Mac, only one an older Study Stash wrote (see below)
+~/Study Stash/Chrome extension/       on a Mac, the extension's folder (Chrome's picker hides the dot-folder home)
 ```
 
 ### Target (after T8) — reached
@@ -192,7 +194,19 @@ error "Chrome isn't signed in to Canvas.", and a file read that Canvas refused s
 the app's). The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
 `Extension.Ensure(dir, library, key, canvasUrl)` writes it out as a folder for Chrome's "Load unpacked": the scripts
 (`background.js`, `connection.js`, the popup, the "S." icons that `macos/make_icon.swift out.chrome` draws), a manifest,
-and `config.json` + `config.js`. The library keeps its own folder (`<home>/chrome-extension`) ready by itself: on start, and whenever the Canvas address changes.
+and `config.json` + `config.js`. The library keeps its own folder (`Extension.Folder(home)`) ready by itself: on start, and whenever the Canvas address changes.
+
+**Where the folder is.** `Extension.Folder(home)` is `<home>/chrome-extension` on Windows and Linux. On a Mac the home
+is `~/.study-stash`, and Chrome's "Load unpacked" window hides dot-folders (and `~/Library`), so the folder is
+`~/Study Stash/Chrome extension` instead: shown by that window without any shortcut, never synced to iCloud (not in
+Desktop or Documents), and only this person's (the folder and the `Study Stash` folder Study Stash makes for it are
+`0700`; `config.json` and `config.js` are `0600`). Another hidden home in the same account gets its own
+`Chrome extension (<8 hex>)`; a home outside the person's home folder, or one Chrome already shows, keeps
+`<home>/chrome-extension`. **Migration:** a Chrome that loaded `<home>/chrome-extension` before keeps loading it from
+there, so `Extension.EnsureFor` writes both whenever that old folder exists (same library, key and Canvas), and the
+connected copy never breaks. The student can also drag the folder onto Chrome's Extensions page (Developer mode on)
+instead of using Load unpacked; on a Mac and on Windows, Add to Chrome shows the folder selected in Finder/Explorer
+for that.
 
 The same files also pack as a **Chrome Web Store** zip (`StudyStash extension-zip OUT.zip`, `Extension.PackForStore`):
 no config files, no `host_permissions`, `optional_host_permissions` for any site instead. A store copy connects by a
@@ -301,7 +315,7 @@ What protocol 2 (1.3) does, answer by answer (all kept in 1.4):
   keeping what it connects to (`Extension.Connection`: config.json, or a legacy config.js): scripts, pages, icons and
   manifest are rewritten, and config.json + config.js with the same library address, key and Canvas. It leaves alone a
   folder without `manifest.json` or a readable connection, rewrites only files that differ, and returns whether the
-  version changed. The library ensures `<home>/chrome-extension` when it maps its routes (`LibraryWeb.MapCanvas`), so
+  version changed. The library ensures its folder (`Extension.EnsureFor`) when it maps its routes (`LibraryWeb.MapCanvas`), so
   a library update reaches Chrome on its next ask (a running 1.3 reloads into 1.4 by itself, measured end to end).
 - **The update is noted once.** Each visit records the running version (`canvas.json` `extension_version`). When it
   goes up from a known older version, `extension_update = {from, to, at, dismissed}` is set, and `GET /api/v2/canvas`
@@ -314,16 +328,17 @@ What protocol 2 (1.3) does, answer by answer (all kept in 1.4):
 
 There is no "Make it" step anywhere: each computer's folder is written and kept by Study Stash itself.
 
-1. **The library** makes `<home>/chrome-extension` when it starts (`EnsureHere`, even before there's a Canvas address:
+1. **The library** makes its folder (`Extension.Folder(home)`, and keeps an old `<home>/chrome-extension` current) when it starts (`EnsureHere`, even before there's a Canvas address:
    then its manifest has no Canvas host and every job is refused), and writes it again when the Canvas address is
    saved (Settings, `POST /api/v2/canvas {"url"}`, Find my courses with an address typed); every start also brings
    it up to a new engine version. Its config points at `http://127.0.0.1:<port>`.
-2. **The laptop app** keeps `<app home>/chrome-extension` with `ExtensionKeeper.KeepAsync`: it asks the library
+2. **The laptop app** keeps its folder (`ExtensionKeeper.LocalFolder`, the same rule) with `ExtensionKeeper.KeepAsync`: it asks the library
    (`GET /api/v2/canvas/extension`) and, once the library has a Canvas address, writes the folder pointing at the
    library as the laptop reaches it (`CanvasClient.ServerUrl`), the key and the Canvas address. It writes again when
    any of those or the extension version changes, and never when nothing did. When the app and the library share a
    computer and a folder, it only reports the library's own.
-3. **The student** loads the folder once in Chrome (chrome://extensions, Developer mode, Load unpacked), or installs
+3. **The student** loads the folder once in Chrome (chrome://extensions, Developer mode, Load unpacked, or drags the
+   folder onto that page), or installs
    the Chrome Web Store copy and pastes the code (`connection_code`, `ExtensionKeeper.ConnectionCode`). The screens
    can show "Add to Chrome" until `connected` (a check-in within 90 s for protocol 3), then which Chrome it is
    (`seen_where`).

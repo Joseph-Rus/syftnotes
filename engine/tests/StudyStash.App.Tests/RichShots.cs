@@ -244,11 +244,11 @@ public class RichShots
                 Shot.Take($"rich-formula-fallback-{(skin == SkinKind.Mac ? "mac" : "win")}", skin, t, () => NotePage(skin, RichDemo.FormulaFallbackNotes), size: new Size(876, 560));
     }
 
-    /// <summary>The share/Export button's menu open over the lecture page: "Download as Markdown…", "Download all of
-    /// {class}…" and "Include transcripts" checked, one left edge for every row.</summary>
+    /// <summary>The share/Export button's menu open over the lecture page: "Download as Markdown…", "Download as PDF…",
+    /// "Download all of {class}…" and "Include transcripts" checked, one left edge for every row.</summary>
     static ContextMenu OpenDownloadMenu()
     {
-        var menu = DownloadMenu.Build("BIO 110", includeTranscripts: true, () => { }, () => { }, () => { });
+        var menu = DownloadMenu.Build("BIO 110", includeTranscripts: true, () => { }, () => { }, () => { }, () => { });
         menu.VerticalAlignment = VerticalAlignment.Top;
         return menu;
     }
@@ -369,7 +369,7 @@ public class RichShots
     public void Chat_answer_with_diagram()
     {
         var model = new AiAskModel(new FakeAiLibrary()) { LectureId = "cardiac-cycle", ClassName = RichDemo.LectureClassName };
-        model.Turns.Add(new AiTurn("How is low blood pressure treated?", "Ollama") { Answer = RichDemo.ChatFlowAnswer, Byline = "Ollama · 41:20" });
+        model.Turns.Add(new AiTurn("How is low blood pressure treated?", "Ollama") { Answer = RichDemo.ChatFlowAnswer, Byline = "Ollama · from 41:20" });
         foreach (var t in Themes)
         {
             Shot.Take("rich-chat-answer-mac", SkinKind.Mac, t, () => new MacAiAskChat { DataContext = model }, size: Shot.RefSize("mac-16"));

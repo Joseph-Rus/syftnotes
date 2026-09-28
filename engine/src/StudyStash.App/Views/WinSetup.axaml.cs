@@ -8,6 +8,7 @@ public partial class WinSetup : UserControl
     public WinSetup()
     {
         InitializeComponent();
+        PickerRoom.Follow(Page);
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not SetupModel m) return;

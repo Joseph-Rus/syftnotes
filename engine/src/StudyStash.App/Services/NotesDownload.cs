@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using Avalonia.Controls;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 using StudyStash.Core;
 using StudyStash.Core.Rich;
@@ -60,6 +61,53 @@ public static class NotesDownload
         if (dir is not null)
             foreach (var asset in export.Assets)
                 await WriteAssetAsync(dir, asset);
+    }
+
+    /// <summary>One lecture's notes as a PDF, chosen with the Save dialog, on this computer's paper. <paramref name="dot"/>
+    /// is its class's colour.</summary>
+    public static Task LecturePdfAsync(Window window, RemoteLibrary lib, string lectureId, string suggestedName, bool transcript, Color dot) =>
+        LecturePdfAsync(async () =>
+        {
+            var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Download as PDF", SuggestedFileName = suggestedName, DefaultExtension = "pdf",
+                FileTypeChoices = [new FilePickerFileType("PDF") { Patterns = ["*.pdf"], MimeTypes = ["application/pdf"], AppleUniformTypeIdentifiers = ["com.adobe.pdf"] }],
+            });
+            return file is null ? null : file.OpenWriteAsync;
+        }, lib, lectureId, transcript, NotesPdf.LocalPaper(), dot);
+
+    /// <summary>The same save, with <paramref name="pick"/> standing in for the Save dialog: null cancels it, otherwise
+    /// how to open the chosen file for writing.</summary>
+    internal static async Task LecturePdfAsync(Func<Task<Func<Task<Stream>>?>> pick, RemoteLibrary lib, string lectureId, bool transcript, Paper paper, Color dot)
+    {
+        if (await pick() is not { } open) return;
+        JsonObject? lecture;
+        try
+        {
+            lecture = await lib.LectureAsync(lectureId);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            Shell.Toast("Couldn't download it", e.Message, null, null);
+            return;
+        }
+        if (lecture is null) return;
+        // Made in memory first: a PDF that couldn't be made leaves the file the student picked as it was.
+        using var pdf = new MemoryStream();
+        try
+        {
+            await NotesPdf.WriteAsync(pdf, lecture, transcript, paper, dot);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            Program.Log($"[export] couldn't make a PDF of {lectureId}: {e.GetType().Name}: {e.Message}");
+            Shell.Toast("Couldn't make the PDF", "Study Stash couldn't lay these notes out on paper.", null, null);
+            return;
+        }
+        await using var stream = await open();
+        pdf.Position = 0;
+        await pdf.CopyToAsync(stream);
+        if (stream.CanSeek) stream.SetLength(stream.Position);
     }
 
     /// <summary>Every lecture of a class, into a folder of its own chosen with the folder dialog.</summary>
