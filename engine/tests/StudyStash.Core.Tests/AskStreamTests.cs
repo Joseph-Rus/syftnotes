@@ -226,6 +226,36 @@ public class AskStreamTests
         Assert.Equal("Cells have membranes that let water through.", reply!.Answer);
     }
 
+    /// <summary>A library from before answers streamed: it doesn't know "stream" and replies once, as plain JSON.</summary>
+    sealed class OlderLibrary : HttpMessageHandler
+    {
+        public string? Body { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Body = await request.Content!.ReadAsStringAsync(ct);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"answer": "Cells have membranes.", "sources": [], "engine": "claude", "engine_name": "Claude Code"}""",
+                    System.Text.Encoding.UTF8, "application/json"),
+            };
+        }
+    }
+
+    [Fact]
+    public async Task An_app_asking_a_library_too_old_to_stream_gets_the_answer_once_at_the_end()
+    {
+        var older = new OlderLibrary();
+        using var http = new HttpClient(older);
+        var seen = new List<string>();
+
+        var reply = await new AiRemote("http://library.test", "pw", http).AskAsync(Question(), seen.Add, CancellationToken.None);
+
+        Assert.Contains("\"stream\":true", older.Body);
+        Assert.Empty(seen); // nothing half-written to show: the whole answer is the reply
+        Assert.Equal("Cells have membranes.", reply!.Answer);
+    }
+
     [Fact]
     public async Task Typing_a_question_for_ollama_loads_its_model_once_and_a_cli_has_nothing_to_warm()
     {

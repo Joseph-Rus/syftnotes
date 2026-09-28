@@ -246,22 +246,9 @@ public class AskStreamingTests
             Script = [new AiEvent("text", "{\"answer\": \"Recursion traces"), new AiEvent("text", " and stack diagrams.\", \"sources\": [1]}")],
             Gate = gate, GateAfter = 1,
         };
-        var ai = new AiJobs(cfg.Home) { Providers = id => id == "claude" ? claude : new ScriptedAi(id), Checks = new FakeChecks().Installed("claude").Build() };
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
-        builder.Logging.ClearProviders();
-        await using var app = LibraryWeb.Build(builder, cfg, store, new Pipeline(cfg, store, log: _ => { }), new LibraryWebOptions
-        {
-            ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
-            Latest = _ => Task.FromResult<Release?>(null), Ai = ai,
-        });
-        await app.StartAsync(TestContext.Current.CancellationToken);
+        await using var app = await LibraryOnThisComputer(cfg, store, claude);
         using var http = new HttpClient();
-        var model = new AiAskModel(new AiRemote(app.Urls.Single(), "pw", http))
-        {
-            Engine = "claude", Live = () => "Recursion traces will be on the midterm, with the stack diagrams.",
-        };
-        model.Question = "What's on the midterm?";
+        var model = AskingAbout(app, http);
 
         var asking = model.AskCommand.ExecuteAsync(null);
         await WaitFor(() => model.Turns[0].Answer == "Recursion traces");
@@ -273,6 +260,56 @@ public class AskStreamingTests
         Assert.Null(model.Turns[0].Failed);
         await app.StopAsync(TestContext.Current.CancellationToken); // as the library stops: nothing of it outlives the test
     }
+
+    [AvaloniaFact]
+    public async Task Stop_partway_keeps_the_words_so_far_and_the_library_on_this_computer_stops_the_engine()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { PoolPassword = "pw", OllamaEnabled = true };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var claude = new ScriptedAi("claude", "Claude")
+        {
+            Script = [new AiEvent("text", "{\"answer\": \"Recursion traces"), new AiEvent("text", " and stack diagrams.\", \"sources\": [1]}")],
+            Gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously), GateAfter = 1,
+        };
+        await using var app = await LibraryOnThisComputer(cfg, store, claude);
+        using var http = new HttpClient();
+        var model = AskingAbout(app, http);
+
+        var asking = model.AskCommand.ExecuteAsync(null);
+        await WaitFor(() => model.Turns[0].Answer == "Recursion traces");
+        model.StopCommand.Execute(null);
+        await asking;
+
+        Assert.Equal(("Recursion traces", AiWords.Stopped), (model.Turns[0].Answer, model.Turns[0].Byline));
+        Assert.Null(model.Turns[0].Failed);
+        Assert.False(model.Busy);
+        await claude.StoppedWhileHeld.Task.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken); // the engine, not just the screen
+        Assert.False(claude.Finished);
+        await app.StopAsync(TestContext.Current.CancellationToken);
+    }
+
+    /// <summary>A library on this computer, over a real socket, whose only engine is <paramref name="claude"/>.</summary>
+    static async Task<WebApplication> LibraryOnThisComputer(Config cfg, Store store, ScriptedAi claude)
+    {
+        var ai = new AiJobs(cfg.Home) { Providers = id => id == "claude" ? claude : new ScriptedAi(id), Checks = new FakeChecks().Installed("claude").Build() };
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
+        var app = LibraryWeb.Build(builder, cfg, store, new Pipeline(cfg, store, log: _ => { }), new LibraryWebOptions
+        {
+            ListModels = _ => Task.FromResult<List<(string, double)>?>(null), Tailscale = () => new TailscaleInfo(),
+            Latest = _ => Task.FromResult<Release?>(null), Ai = ai,
+        });
+        await app.StartAsync(TestContext.Current.CancellationToken);
+        return app;
+    }
+
+    /// <summary>The ask bar, talking to <paramref name="app"/> the way the app talks to its library, with a question typed.</summary>
+    static AiAskModel AskingAbout(WebApplication app, HttpClient http) => new(new AiRemote(app.Urls.Single(), "pw", http))
+    {
+        Engine = "claude", Live = () => "Recursion traces will be on the midterm, with the stack diagrams.", Question = "What's on the midterm?",
+    };
 
     [AvaloniaFact]
     public void The_notes_view_lays_out_only_the_newest_block_as_an_answer_grows()
