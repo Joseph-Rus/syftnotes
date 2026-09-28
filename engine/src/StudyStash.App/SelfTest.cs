@@ -474,7 +474,10 @@ public static class SelfTest
         // The self-test's own library, or (just this computer) the app's.
         var lib = Library ?? host.LocalLibrary ?? throw new InvalidOperationException("no library to stop");
         string password = lib.Cfg.PoolPassword;
+        var stopping = System.Diagnostics.Stopwatch.StartNew();
         await lib.StopAsync();
+        // Well under the 10 s it's given before being ended for good: it stopped when asked (on Windows, by its input ending).
+        Say($"library asked to stop: gone in {stopping.Elapsed.TotalSeconds:0.0} s");
         bool gone = await Until(() => host.Library != LibraryState.Connected, 30);
         Say(gone ? $"library stopped: {host.Library}" : "library: still says Connected 30 s after stopping it");
         await PanelShot("panel-library-unreachable");
