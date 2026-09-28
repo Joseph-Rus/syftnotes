@@ -318,11 +318,12 @@ public sealed partial class SetupModel : ObservableObject
     };
 
     /// <summary>What this computer is for: rebuilds <see cref="Steps"/> for that flow and stays on the current step when
-    /// it's still one of them, else goes to the first. Moving between the laptop's flow and one that keeps the library
-    /// here forgets whether the library was ready (one is created here, the other connected to); what was typed stays.</summary>
+    /// it's still one of them, else goes to the first. Moving to another flow forgets whether the library was ready (a
+    /// laptop connects to one, just this computer keeps its own to itself, a library opens it to laptops, so each makes
+    /// or reaches it again); what was typed stays.</summary>
     public void SetRole(AppRole role)
     {
-        bool otherFlow = (role == AppRole.Laptop) != (Role == AppRole.Laptop);
+        bool otherFlow = role != Role;
         Role = role;
         if (otherFlow && Steps.Count > 0)
         {

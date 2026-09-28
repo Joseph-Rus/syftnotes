@@ -109,6 +109,11 @@ public sealed class SetupTests
         m.ChooseOneComputerCommand.Execute(null);
         Assert.Equal(AppRole.Both, m.Role);
         Assert.Equal(SetupStep.Microphone, m.Steps[1].Step);
+        // A library made for one choice is made again for another (each keeps it its own way).
+        m.LibraryOk = true;
+        m.ChooseLibraryCommand.Execute(null);
+        Assert.False(m.LibraryOk);
+        m.ChooseOneComputerCommand.Execute(null);
         // What was typed stays, whichever card was tried.
         Assert.Equal(("Ada's library", "correct-horse", "http://mac-mini:8787"), (m.LibraryName, m.Password, m.Address));
     }

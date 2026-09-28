@@ -313,7 +313,7 @@ public static class SelfTest
         await m.NextCommand.ExecuteAsync(null);
         Say($"library made here: {m.LibraryResult}");
         if (!m.LibraryOk || host.LocalLibrary is not { } lib) throw new InvalidOperationException("Just this computer didn't make its library");
-        var cfg = lib.Cfg;
+        var cfg = Configs.Load(host.Home);
         Say($"it listens on {cfg.WebHost}:{cfg.WebPort} ({(LibraryHere.OnlyHere(cfg) ? "this computer only" : "the network")}), notes in {cfg.PoolDir}");
         if (!LibraryHere.OnlyHere(cfg)) throw new InvalidOperationException("Just this computer's library listens to the network");
         // Its notes engine is the self-test's own (never a real Ollama): the library starts again to use it.
@@ -494,9 +494,10 @@ public static class SelfTest
 
         // A changed password: the library says so, and setting it right again in Settings would fix it (not
         // exercised here — Settings' library section is a WS4/WS1 screen).
+        // What's on disk (the classes setup added are there), and the password the library's checked with.
         await lib.StopAsync();
-        var cfg = lib.Cfg;
-        cfg.PoolPassword = "a-different-password";
+        var cfg = Configs.Load(lib.Cfg.Home);
+        cfg.PoolPassword = lib.Cfg.PoolPassword = "a-different-password";
         Configs.Save(cfg);
         await lib.StartAsync();
         bool wrongPw = await Until(() => host.Library == LibraryState.WrongPassword, 30);
@@ -504,7 +505,7 @@ public static class SelfTest
         await PanelShot("panel-wrong-password");
 
         await lib.StopAsync();
-        cfg.PoolPassword = password;
+        cfg.PoolPassword = lib.Cfg.PoolPassword = password;
         Configs.Save(cfg);
         await lib.StartAsync();
         bool restored = await Until(() => host.Library == LibraryState.Connected, 30);

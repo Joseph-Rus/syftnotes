@@ -206,7 +206,8 @@ public static class Setup
             }
             else if (m.IsLibrary)
             {
-                string done = await here.CreateAsync(host, m.LibraryName, m.Password, Person(), m.Role);
+                // A library for other computers: laptops can reach it, whatever it was before.
+                string done = await here.CreateAsync(host, m.LibraryName, m.Password, Person(), m.Role, laptops: true);
                 m.LibraryOk = true;
                 m.LibraryResult = done;
             }

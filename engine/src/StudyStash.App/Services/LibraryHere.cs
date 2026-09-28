@@ -42,7 +42,8 @@ public sealed class LibraryHere
     /// </summary>
     public async Task LetLaptopsConnectAsync(AppHost host, bool laptops, string? password = null)
     {
-        var cfg = host.LocalLibrary?.Cfg ?? Existing(host.Home) ?? throw new InvalidOperationException("There's no library on this computer.");
+        // What's on disk, not the running library's copy: its classes and settings may have changed since it started.
+        var cfg = Existing(host.Home) ?? throw new InvalidOperationException("There's no library on this computer.");
         password = password?.Trim();
         if (laptops && password is not null && password.Length < 4) throw new ArgumentException("Use a password of at least 4 characters.");
         if (laptops && password is null && cfg.PoolPassword.Length < 4) throw new ArgumentException("Give your library a password first.");
@@ -58,8 +59,7 @@ public sealed class LibraryHere
         }
         if (host.LocalLibrary is { } svc)
         {
-            await svc.StopAsync();
-            await svc.StartAsync();
+            await RestartAsync(svc, cfg);
         }
         else
         {
@@ -68,6 +68,17 @@ public sealed class LibraryHere
             await fresh.StartAsync();
         }
         await host.CheckLibraryAsync();
+    }
+
+    /// <summary>The running library takes its new settings: its own copy learns the password it's checked with (and
+    /// its name and who can reach it), and it starts again, reading the rest from disk.</summary>
+    static async Task RestartAsync(LibraryService svc, Config saved)
+    {
+        svc.Cfg.PoolPassword = saved.PoolPassword;
+        svc.Cfg.PoolName = saved.PoolName;
+        svc.Cfg.WebHost = saved.WebHost;
+        await svc.StopAsync();
+        await svc.StartAsync();
     }
 
     static bool IsFree(int port)
@@ -113,11 +124,13 @@ public sealed class LibraryHere
     /// <summary>
     /// Write config.toml for a library on this computer (or fill in one already here), start it, and point client.toml
     /// at it (both roles keep talking to it over the network, even Library-only, so the library window still works).
-    /// A library already here keeps its notes folder, port and who can reach it; a null name or password keeps its own
-    /// (or, for a new library, names it and makes up a password).
+    /// A library already here keeps its notes folder, port and who can reach it, unless <paramref name="localOnly"/>
+    /// keeps it to this computer or <paramref name="laptops"/> opens it to them; a null name or password keeps its own
+    /// (or, for a new library, names it and makes up a password). One this app already runs (setup gone back and
+    /// forth between its choices) starts again with the new settings.
     /// </summary>
     public async Task<string> CreateAsync(AppHost host, string? name, string? password, string displayName,
-        AppRole role = AppRole.Both, bool localOnly = false)
+        AppRole role = AppRole.Both, bool localOnly = false, bool laptops = false)
     {
         var existing = Existing(host.Home);
         var cfg = existing ?? Configs.Load(host.Home);
@@ -130,17 +143,26 @@ public sealed class LibraryHere
             cfg.WebPort = FreePortPair(FirstPort);
             cfg.WebHost = localOnly ? "127.0.0.1" : "0.0.0.0";
         }
-        else if (localOnly)
+        else if (localOnly || laptops)
         {
-            cfg.WebHost = "127.0.0.1";
+            cfg.WebHost = localOnly ? "127.0.0.1" : "0.0.0.0";
         }
         cfg.PoolName = name;
         cfg.PoolPassword = password;
         if (cfg.AdminPassword.Length == 0) cfg.AdminPassword = StudyStash.Library.Http.TokenUrlSafe(12);
         Directory.CreateDirectory(cfg.PoolDir);
         Configs.Save(cfg);
-        var svc = Command is null ? new LibraryService(host.Home, cfg) : new LibraryService(host.Home, cfg, Command);
-        await svc.StartAsync();
+        LibraryService svc;
+        if (host.LocalLibrary is { } running)
+        {
+            await RestartAsync(running, cfg);
+            svc = running;
+        }
+        else
+        {
+            svc = Command is null ? new LibraryService(host.Home, cfg) : new LibraryService(host.Home, cfg, Command);
+            await svc.StartAsync();
+        }
         if (svc.State is not (LibraryServiceState.Running or LibraryServiceState.Elsewhere))
             throw new InvalidOperationException("The library didn't start." + (svc.Failure is { Length: > 0 } f ? $" {f}." : "") + " Its log is in the logs folder.");
         host.UseLocalLibrary(svc);

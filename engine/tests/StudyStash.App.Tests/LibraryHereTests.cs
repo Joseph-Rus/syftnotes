@@ -202,4 +202,40 @@ public sealed class LibraryHereTests
         }
         finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
     }
+
+    [Fact]
+    public async Task Going_back_from_just_this_computer_to_the_library_opens_it_to_laptops_with_the_typed_password()
+    {
+        string exe = BuiltEngine();
+        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
+        using var home = new TempHome();
+        using var host = Host(home.Path);
+        var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Study Stash"] });
+        try
+        {
+            await m.NextCommand.ExecuteAsync(null); // Just this computer: its library, to itself
+            Assert.True(LibraryHere.OnlyHere(Configs.Load(home.Path)));
+            int port = Configs.Load(home.Path).WebPort;
+
+            m.Go(SetupStep.Welcome);
+            m.ChooseLibraryCommand.Execute(null);
+            Assert.False(m.LibraryOk); // the library flow makes it its own way
+            m.NextCommand.Execute(null); // -> Password
+            Assert.Equal("Create library", m.ContinueLabel);
+            m.LibraryName = "Ada's library";
+            m.Password = "correct-horse";
+            await m.NextCommand.ExecuteAsync(null);
+
+            Assert.Equal(SetupStep.Ai, m.Step);
+            var cfg = Configs.Load(home.Path);
+            Assert.False(LibraryHere.OnlyHere(cfg));
+            Assert.Equal(("Ada's library", "correct-horse", port), (cfg.PoolName, cfg.PoolPassword, cfg.WebPort));
+            Assert.Equal("correct-horse", Configs.LoadClient(home.Path).PoolKey);
+            Assert.Equal(LibraryServiceState.Running, host.LocalLibrary!.State); // started again, with the new password
+            Assert.Equal(AppRole.Library, AppSettings.Load(home.Path).Role);
+            await host.CheckLibraryAsync();
+            Assert.Equal(LibraryState.Connected, host.Library);
+        }
+        finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
+    }
 }
