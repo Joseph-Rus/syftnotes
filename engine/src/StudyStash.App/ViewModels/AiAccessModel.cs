@@ -263,7 +263,7 @@ public sealed partial class AiAccessModel : ObservableObject
         WebReachable = web.Reachable;
         WebNote = web.Problem;
         WebNoteFixUrl = web.FixUrl;
-        if (!web.HasPassword)
+        if (!HasPassword)
         {
             WebNote = "Set a library password first (Settings → Library).";
             WebNoteFixUrl = null;

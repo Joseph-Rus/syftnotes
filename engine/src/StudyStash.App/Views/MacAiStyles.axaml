@@ -451,4 +451,27 @@
     <Setter Property="Background" Value="{DynamicResource Accent}" />
     <Setter Property="BorderThickness" Value="0" />
   </Style>
+
+  <!-- The "Claude (desktop and web)" card's own bits (14, connectors): a fixed-width leading column so the switch's
+       icon, the field rows' labels and the steps' numbers all start at the same left edge, a numbered step marker
+       the same size as ai-check, and the field rows' own label/value split. -->
+  <Style Selector="Panel.ai-lead">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-num">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+    <Setter Property="CornerRadius" Value="8" />
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.ai-num > TextBlock">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
 </Styles>

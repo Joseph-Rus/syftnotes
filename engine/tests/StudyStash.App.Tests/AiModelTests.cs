@@ -877,7 +877,10 @@ public class AiAccessModelTests
     static ToolAccessInfo Info() => new(
         On: true, Reading: new ReadingScopes(),
         Connections: [new ToolConnection("tok-1", "Cursor", "token") { Created = 1_726_000_000, LastUsed = new DateTimeOffset(Now.AddHours(-2)).ToUnixTimeSeconds() }])
-    { PublicUrl = null, HasPassword = true };
+    {
+        PublicUrl = null, HasPassword = true,
+        Web = new WebReach(false, "Study Stash", null, null, null, null, null, null, true),
+    };
 
     static (AiAccessModel Model, FakeAiLibrary Library) Loaded(ToolAccessInfo? info = null)
     {
@@ -1014,16 +1017,245 @@ public class AiAccessModelTests
         Assert.Empty(model.Connected);
     }
 
+    // Claude (desktop and web): the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
+    // (task 4). FakeAiLibrary's unscripted SetWebAsync turns Funnel on at "https://mini.tail1234.ts.net" and answers
+    // reachable straight away; OnSetWeb/OnCheckWeb script something else (a problem, a slow check, an older library).
+
     [AvaloniaFact]
-    public async Task Turning_on_claude_on_the_web_shows_its_address()
+    public async Task The_web_card_starts_off_with_no_note()
+    {
+        var (model, _) = Loaded();
+
+        await model.Load();
+
+        Assert.False(model.WebOn);
+        Assert.False(model.ShowWebReady);
+        Assert.Null(model.WebNote);
+        Assert.True(model.WebToggleEnabled);
+    }
+
+    [AvaloniaFact]
+    public async Task Turning_the_web_switch_on_shows_the_address_ready_to_paste()
+    {
+        var (model, lib) = Loaded();
+        await model.Load();
+
+        model.WebOn = true; // FakeAiLibrary's tasks complete synchronously, so this round-trips before returning
+
+        Assert.Contains("set-web:on", lib.Calls);
+        Assert.True(model.WebOn);
+        Assert.True(model.ShowWebReady);
+        Assert.Equal("https://mini.tail1234.ts.net/mcp", model.WebUrl);
+        Assert.Equal("Study Stash", model.WebName);
+        Assert.Equal(ReachCheck.Answers, model.WebWords);
+        Assert.Null(model.WebNote);
+    }
+
+    [AvaloniaFact]
+    public async Task A_funnel_problem_turning_on_shows_its_words_and_switches_back_off()
+    {
+        var (model, lib) = Loaded();
+        await model.Load();
+        lib.OnSetWeb = on => lib.Access! with
+        {
+            Web = new WebReach(false, "Study Stash", null,
+                "Your tailnet doesn't allow Funnel yet. Open the page below, allow it for this computer, then turn this on again.",
+                "https://login.tailscale.com/f/funnel?node=abc", null, null, null, true),
+        };
+
+        model.WebOn = true;
+
+        Assert.False(model.WebOn);
+        Assert.False(model.ShowWebReady);
+        Assert.True(model.ShowWebNote);
+        Assert.StartsWith("Your tailnet doesn't allow Funnel", model.WebNote);
+        Assert.Equal("https://login.tailscale.com/f/funnel?node=abc", model.WebNoteFixUrl);
+        Assert.True(model.ShowWebNoteAction);
+    }
+
+    [AvaloniaFact]
+    public async Task Tailscale_not_installed_shows_its_own_words_with_no_fix_link()
+    {
+        var (model, lib) = Loaded();
+        await model.Load();
+        lib.OnSetWeb = on => lib.Access! with
+        {
+            Web = new WebReach(false, "Study Stash", null,
+                "Tailscale isn't on the library's computer. Install it from tailscale.com/download and sign in.",
+                "https://tailscale.com/download", null, null, null, true),
+        };
+
+        model.WebOn = true;
+
+        Assert.False(model.WebOn);
+        Assert.Contains("Tailscale isn't on the library's computer", model.WebNote);
+        Assert.Equal("https://tailscale.com/download", model.WebNoteFixUrl);
+    }
+
+    [AvaloniaFact]
+    public async Task No_password_shows_a_note_with_no_action_and_disables_the_switch()
+    {
+        var info = Info() with { HasPassword = false };
+        var (model, _) = Loaded(info);
+
+        await model.Load();
+
+        Assert.False(model.HasPassword);
+        Assert.False(model.WebToggleEnabled);
+        Assert.True(model.ShowWebNote);
+        Assert.Equal("Set a library password first (Settings → Library).", model.WebNote);
+        Assert.False(model.ShowWebNoteAction);
+    }
+
+    [AvaloniaFact]
+    public async Task A_refusal_turning_on_without_a_password_puts_the_switch_back_off()
+    {
+        var (model, lib) = Loaded();
+        await model.Load();
+        lib.OnSetWeb = on => throw new LibraryRefusedException(400, "Set a library password first, so only you can let Claude in.");
+
+        model.WebOn = true;
+
+        Assert.False(model.WebOn);
+        Assert.False(model.HasPassword);
+        Assert.Equal("Set a library password first, so only you can let Claude in.", model.WebNote);
+    }
+
+    [AvaloniaFact]
+    public async Task An_older_library_with_no_web_field_says_to_update_it()
+    {
+        var info = Info() with { Web = null };
+        var (model, _) = Loaded(info);
+
+        await model.Load();
+
+        Assert.False(model.WebSupported);
+        Assert.False(model.WebOn);
+        Assert.False(model.WebToggleEnabled);
+        Assert.Equal("Update the library to turn this on.", model.WebNote);
+        Assert.False(model.ShowWebNoteAction);
+    }
+
+    [AvaloniaFact]
+    public async Task Checking_settles_on_reachable_after_two_polls()
+    {
+        var (model, lib) = Loaded();
+        await model.Load();
+        var checks = 0;
+        lib.OnSetWeb = on => lib.Access = lib.Access! with
+        {
+            PublicUrl = "https://mini.tail1234.ts.net",
+            Web = new WebReach(true, "Study Stash", "https://mini.tail1234.ts.net/mcp", null, null, false, "The internet can't find mini.tail1234.ts.net yet. Funnel can take a minute to start.", null, true),
+        };
+        lib.OnCheckWeb = () =>
+        {
+            checks++;
+            var reachable = checks >= 2;
+            return lib.Access! with { Web = lib.Access!.Web! with { Reachable = reachable, Words = reachable ? ReachCheck.Answers : lib.Access!.Web!.Words } };
+        };
+        model.Delay = _ => Task.CompletedTask;
+
+        model.WebOn = true;
+        // FakeAiLibrary's tasks and the stubbed Delay complete synchronously, so the whole poll usually settles before
+        // this line runs; the bounded wait is only a safety net if a future change makes any step genuinely async.
+        var deadline1 = DateTime.UtcNow.AddSeconds(2);
+        while (model.WebChecking && DateTime.UtcNow < deadline1) await Task.Delay(5, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, checks);
+        Assert.True(model.WebStatusOk);
+        Assert.Equal(ReachCheck.Answers, model.WebWords);
+        Assert.False(model.WebChecking);
+    }
+
+    [AvaloniaFact]
+    public async Task Never_reachable_stops_polling_after_twelve_tries_and_leaves_check_again()
+    {
+        var (model, lib) = Loaded();
+        await model.Load();
+        lib.OnSetWeb = on => lib.Access = lib.Access! with
+        {
+            PublicUrl = "https://mini.tail1234.ts.net",
+            Web = new WebReach(true, "Study Stash", "https://mini.tail1234.ts.net/mcp", null, null, false, "The internet can't find mini.tail1234.ts.net yet. Funnel can take a minute to start.", null, true),
+        };
+        lib.OnCheckWeb = () => lib.Access;
+        model.Delay = _ => Task.CompletedTask;
+
+        model.WebOn = true;
+        var deadline2 = DateTime.UtcNow.AddSeconds(2);
+        while (model.WebChecking && DateTime.UtcNow < deadline2) await Task.Delay(5, TestContext.Current.CancellationToken);
+
+        Assert.Equal(12, lib.Calls.Count(c => c == "check-web"));
+        Assert.False(model.WebChecking);
+        Assert.False(model.WebStatusOk);
+    }
+
+    [AvaloniaFact]
+    public async Task Check_again_asks_once_without_restarting_the_automatic_poll()
+    {
+        var (model, lib) = Loaded();
+        await model.Load();
+        lib.OnCheckWeb = () => lib.Access! with { Web = lib.Access!.Web! with { Reachable = true, Words = ReachCheck.Answers } };
+
+        await model.CheckWebAgainCommand.ExecuteAsync(null);
+
+        Assert.Single(lib.Calls, c => c == "check-web");
+        Assert.True(model.WebStatusOk);
+    }
+
+    [AvaloniaFact]
+    public async Task A_claude_sign_in_is_listed_separately_from_tokens_and_can_be_removed()
+    {
+        var info = Info() with
+        {
+            Connections =
+            [
+                new ToolConnection("tok-1", "Cursor", "token"),
+                new ToolConnection("sig-1", "Claude", "signin") { ClientHost = "claude.ai", LastUsed = new DateTimeOffset(Now.AddMinutes(-5)).ToUnixTimeSeconds() },
+            ],
+        };
+        var (model, lib) = Loaded(info);
+        await model.Load();
+
+        var claude = Assert.Single(model.ClaudeConnections);
+        Assert.Equal("Claude", claude.Name);
+        Assert.Equal("claude.ai", claude.Detail);
+        Assert.DoesNotContain(model.Connected, c => c.Id == "sig-1");
+        Assert.Contains(model.Connected, c => c.Id == "tok-1");
+
+        bool revoked = false;
+        model.RevokeConnection = id => { revoked = id == "sig-1"; lib.Access = lib.Access! with { Connections = [lib.Access!.Connections[0]] }; return Task.FromResult(true); };
+        await claude.Remove!.ExecuteAsync(null);
+
+        Assert.True(revoked);
+        Assert.Empty(model.ClaudeConnections);
+    }
+
+    [AvaloniaFact]
+    public async Task Tools_off_shows_a_quiet_note_alongside_whatever_else_the_card_shows()
     {
         var (model, _) = Loaded();
         await model.Load();
-        model.TurnOnWeb = () => Task.FromResult<string?>("https://sams-mini.ts.net");
 
-        await model.TurnOnClaudeWebCommand.ExecuteAsync(null);
+        model.On = false;
 
-        Assert.Equal("https://sams-mini.ts.net", model.PublicUrl);
+        Assert.True(model.ShowToolsOffNote);
+    }
+
+    [AvaloniaFact]
+    public async Task The_laptop_and_the_library_see_the_same_web_state_through_the_same_library()
+    {
+        var lib = new FakeAiLibrary { Access = Info() };
+        var laptop = new AiAccessModel(lib, () => Now);
+        var library = new AiAccessModel(lib, () => Now);
+        await laptop.Load();
+        await library.Load();
+
+        laptop.WebOn = true;
+        await library.Load();
+
+        Assert.True(library.WebOn);
+        Assert.Equal(laptop.WebUrl, library.WebUrl);
+        Assert.Equal("https://mini.tail1234.ts.net/mcp", library.WebUrl);
     }
 
     [AvaloniaFact]

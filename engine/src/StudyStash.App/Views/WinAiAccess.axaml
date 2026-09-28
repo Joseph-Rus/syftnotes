@@ -72,6 +72,106 @@
         </StackPanel>
       </Border>
 
+      <TextBlock Classes="ai-section" Text="Claude (desktop and web)" Margin="0,18,0,8" />
+      <Border Classes="ai-card">
+        <StackPanel>
+          <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="52">
+            <c:Icon Glyph="public" Size="20" />
+            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
+              <TextBlock Classes="ai-row-title" Text="Let Claude reach your library from the internet" TextWrapping="Wrap" />
+              <TextBlock Classes="ai-row-sub" TextWrapping="Wrap"
+                         Text="Claude on the web, the desktop app and your phone connect over HTTPS. Only someone with your library password can let them in." />
+            </StackPanel>
+            <Panel Grid.Column="3" VerticalAlignment="Center">
+              <c:Spinner IsVisible="{Binding WebBusy}" Width="16" Height="16" Foreground="{DynamicResource Fg2}" />
+              <ToggleButton IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
+                            IsChecked="{Binding WebOn}" IsEnabled="{Binding WebToggleEnabled}" />
+            </Panel>
+          </Grid>
+
+          <StackPanel IsVisible="{Binding ShowWebReady}" Margin="0,10,0,0" Spacing="10">
+            <Grid ColumnDefinitions="20,16,*,Auto" MinHeight="36">
+              <Grid Grid.Column="2" Classes="ai-field" ColumnDefinitions="64,*" VerticalAlignment="Center">
+                <TextBlock Classes="ai-row-sub" Text="Name" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Classes="ai-row-title" Text="{Binding WebName}" VerticalAlignment="Center" />
+              </Grid>
+              <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CopyWebNameCommand}">
+                <Border Classes="ai-pill"><TextBlock Text="Copy" /></Border>
+              </Button>
+            </Grid>
+            <Grid ColumnDefinitions="20,16,*,Auto" MinHeight="36">
+              <Grid Grid.Column="2" Classes="ai-field" ColumnDefinitions="64,*" VerticalAlignment="Center">
+                <TextBlock Classes="ai-row-sub" Text="URL" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Classes="ai-row-title" Text="{Binding WebUrl}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              </Grid>
+              <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CopyWebUrlCommand}">
+                <Border Classes="ai-pill"><TextBlock Text="Copy" /></Border>
+              </Button>
+            </Grid>
+            <StackPanel Spacing="10">
+              <Grid ColumnDefinitions="20,16,*">
+                <Border Classes="ai-num"><TextBlock Text="1" /></Border>
+                <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap"
+                           Text="In Claude, open Settings → Connectors and choose Add custom connector." />
+              </Grid>
+              <Grid ColumnDefinitions="20,16,*">
+                <Border Classes="ai-num"><TextBlock Text="2" /></Border>
+                <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap"
+                           Text="Paste the name and URL, then choose Continue." />
+              </Grid>
+              <Grid ColumnDefinitions="20,16,*">
+                <Border Classes="ai-num"><TextBlock Text="3" /></Border>
+                <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap"
+                           Text="Sign in with your library password and choose Allow." />
+              </Grid>
+            </StackPanel>
+            <Grid ColumnDefinitions="20,16,*,Auto" MinHeight="36">
+              <Ellipse Classes="ai-dot" Classes.good="{Binding WebStatusOk}" Classes.warn="{Binding WebStatusWarn}" HorizontalAlignment="Center" />
+              <TextBlock Grid.Column="2" Classes="ai-state" Classes.warn="{Binding WebStatusWarn}" Text="{Binding WebStatusWords}" VerticalAlignment="Center" />
+              <Button Grid.Column="3" Classes="ai-textbtn" Command="{Binding CheckWebAgainCommand}" VerticalAlignment="Center">
+                <TextBlock Text="Check again" FontSize="14" />
+              </Button>
+            </Grid>
+          </StackPanel>
+
+          <Grid IsVisible="{Binding ShowWebNote}" ColumnDefinitions="20,16,*,Auto" Margin="0,10,0,0" MinHeight="40">
+            <c:Icon Glyph="warning" Filled="True" Size="18" Foreground="{DynamicResource Warn}" />
+            <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap" Text="{Binding WebNote}" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding ShowWebNoteAction}">
+              <Button Classes="ai-textbtn" Command="{Binding CopyWebFixCommand}" VerticalAlignment="Center">
+                <TextBlock Text="Copy link" FontSize="14" />
+              </Button>
+              <Button Classes="ai-pillbtn" Command="{Binding OpenWebFixCommand}">
+                <Border Classes="ai-pill"><TextBlock Text="Open" /></Border>
+              </Button>
+            </StackPanel>
+          </Grid>
+
+          <Grid IsVisible="{Binding ShowToolsOffNote}" ColumnDefinitions="20,16,*" Margin="0,10,0,0" MinHeight="32">
+            <c:Icon Glyph="info" Size="16" Foreground="{DynamicResource Fg3}" />
+            <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap"
+                       Text="AI tool access is off, so Claude can't read anything even when connected." />
+          </Grid>
+
+          <ItemsControl ItemsSource="{Binding ClaudeConnections}" Margin="0,10,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:AiConnectionRow">
+                <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="40" Margin="0,4,0,0">
+                  <c:Icon Glyph="{Binding Icon}" Size="18" />
+                  <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
+                    <TextBlock Classes="ai-row-sub" Text="{Binding WinDetail}" />
+                  </StackPanel>
+                  <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding Remove}" IsVisible="{Binding CanRemove}" VerticalAlignment="Center">
+                    <Border Classes="ai-pill"><TextBlock Text="Remove" /></Border>
+                  </Button>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+
       <TextBlock Classes="ai-section" Text="Connect a tool" Margin="0,18,0,8" />
       <Border Classes="ai-card">
         <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
@@ -102,7 +202,6 @@
               <Button.Flyout>
                 <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}">
                   <MenuItem Theme="{StaticResource AiMenuItem}" Header="Claude Desktop: add it for me" Command="{Binding AddClaudeDesktopCommand}" />
-                  <MenuItem Theme="{StaticResource AiMenuItem}" Header="Claude on the web: turn on its address" Command="{Binding TurnOnClaudeWebCommand}" />
                   <MenuItem Theme="{StaticResource AiMenuItem}" Header="Another tool: copy the JSON" Command="{Binding CopyOtherCommand}" />
                 </MenuFlyout>
               </Button.Flyout>
