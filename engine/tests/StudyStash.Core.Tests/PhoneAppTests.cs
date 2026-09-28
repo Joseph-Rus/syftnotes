@@ -139,6 +139,36 @@ public class PhoneAppTests
     }
 
     [Fact]
+    public async Task Without_an_override_STUDYSTASH_WEB_DIR_finds_the_app()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = PhoneApiTests.Library(dir);
+        using var _s = store;
+        string web = BuiltApp(dir);
+        Environment.SetEnvironmentVariable("STUDYSTASH_WEB_DIR", web);
+        try
+        {
+            await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), new LibraryWebOptions
+            {
+                ListModels = _ => Task.FromResult<List<(string, double)>?>(null),
+                Tailscale = () => new(true, true, "Running", "mini.tail1234.ts.net.", ["100.64.0.9"], "/usr/local/bin/tailscale"),
+                Latest = _ => Task.FromResult<Release?>(null),
+                Reach = PhoneApiTests.Reach(),
+                // PhoneApp left null: the environment variable is the only way this build finds the app.
+            }));
+
+            var r = await site.Stranger().GetAsync("/app/");
+
+            Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+            Assert.Equal(Index, await r.Content.ReadAsStringAsync());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("STUDYSTASH_WEB_DIR", null);
+        }
+    }
+
+    [Fact]
     public async Task Without_the_app_built_a_page_says_so_in_the_library_look()
     {
         using var dir = new TempDir();
