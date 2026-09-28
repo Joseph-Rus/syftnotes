@@ -89,7 +89,9 @@ public class MacMetricsTests
     [InlineData(26, true, 31)]
     [InlineData(34, true, 40)]
     public void A_line_of_SF_is_as_tall_as_on_a_Mac(double size, bool display, double height) =>
-        Assert.Equal(height, Typography.LineHeight(size, display));
+        // Fully qualified: CSharpMath.Rendering bundles a font library under its own top-level "Typography"
+        // namespace, which now out-ranks our own Typography class for a bare name outside Controls' namespace.
+        Assert.Equal(height, StudyStash.App.Controls.Typography.LineHeight(size, display));
 
     /// <summary>In the Mac look a line of the system text takes the Mac's height, a line height a view sets itself
     /// stays, and the serif notes keep their own.</summary>
