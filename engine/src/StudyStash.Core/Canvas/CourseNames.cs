@@ -37,6 +37,16 @@ public static partial class CourseNames
     [GeneratedRegex(@"^[A-Z]{2,5}[ -]?\d{2,4}[A-Z]?(?:[.-][A-Za-z0-9]{1,3})?\s*[:·|–—-]\s*")]
     private static partial Regex CodePrefix();
 
+    // A section or course code behind the name, in brackets with or without a space ("Bridge Design(MECH4120.G)",
+    // "Signals (ENGR 3310.B)", "Chemistry [202710.CHEM101.A]") or after a dash ("Statics - ENGR 2010.A"): capitals,
+    // digits and dots only, so "(Honors)" or "(Part II)" stay.
+    [GeneratedRegex(@"(?:\s*[(\[]\s*(?:[A-Z]{2,5}[ -]?\d{2,4}[A-Z]?|\d{4,6}[._-][A-Z0-9]+)(?:[._-][A-Z0-9]{1,6})*\s*[)\]]|\s+[:·|–—-]\s*[A-Z]{2,5}[ -]?\d{2,4}[A-Z]?(?:[._-][A-Z0-9]{1,4})*)$")]
+    private static partial Regex TrailingCode();
+
+    // The section after a course code: the "A" of "MECH2710.A", the "02" of "CS 101-02".
+    [GeneratedRegex(@"(?<![A-Za-z])[A-Z]{2,5}[ -]?\d{2,4}[A-Z]?[.-]([A-Z0-9]{1,3})(?![0-9A-Za-z])")]
+    private static partial Regex SectionAfterCode();
+
     [GeneratedRegex(@"^[\s:·|–—.-]+|[\s:·|–—-]+$")]
     private static partial Regex EdgeSeparators();
 
@@ -55,6 +65,15 @@ public static partial class CourseNames
             foreach (Match m in SubjectNumber().Matches(s ?? ""))
                 if (!TermWords.Contains(m.Groups[1].Value))
                     return $"{m.Groups[1].Value} {m.Groups[2].Value}";
+        return "";
+    }
+
+    /// <summary>The section of a course ("A" from "MECH2710.A" or "Heat Transfer(MECH2710.A)"), from its code or else
+    /// its name; "" when neither says one. Tells apart two sections of one course that share a name and a code.</summary>
+    public static string Section(string code, string name = "")
+    {
+        foreach (string s in new[] { code, name })
+            if (SectionAfterCode().Match(s ?? "") is { Success: true } m && !TermWords.Contains(m.Groups[1].Value)) return m.Groups[1].Value;
         return "";
     }
 
@@ -80,6 +99,7 @@ public static partial class CourseNames
             t = TermNumber().Replace(t, "");
             t = LeadingTerm().Replace(t, "");
             t = TrailingTerm().Replace(t, "");
+            t = TrailingCode().Replace(t, "");
             t = EdgeSeparators().Replace(t, "").Trim();
             // A leading code goes only when a real name is left after it.
             var prefix = CodePrefix().Match(t);
@@ -112,11 +132,12 @@ public static partial class CourseNames
     /// <summary>
     /// The class name for each course (id → name), every one different (ignoring case) from the others and from
     /// <paramref name="taken"/> (and never "Unsorted"): two courses both called "Seminar" become "Seminar (ENGR 401)"
-    /// and "Seminar (ENGR 402)", or "Seminar" and "Seminar 2" when their codes don't tell them apart.
+    /// and "Seminar (ENGR 402)"; two sections of one course, "Statics (section A)" and "Statics (section B)"; or
+    /// "Seminar" and "Seminar 2" when neither tells them apart.
     /// </summary>
     public static Dictionary<string, string> Unique(IEnumerable<(string Id, string Name, string Code)> courses, IEnumerable<string>? taken = null)
     {
-        var list = courses.Select(c => (c.Id, Title: Title(c.Name, c.Code), Short: ShortCode(c.Code, c.Name))).ToList();
+        var list = courses.Select(c => (c.Id, Title: Title(c.Name, c.Code), Short: ShortCode(c.Code, c.Name), Section: Section(c.Code, c.Name))).ToList();
         var used = new HashSet<string>(taken ?? [], StringComparer.OrdinalIgnoreCase) { Configs.Unsorted };
         var result = new Dictionary<string, string>();
         foreach (var group in list.GroupBy(c => c.Title, StringComparer.OrdinalIgnoreCase).OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
@@ -124,9 +145,11 @@ public static partial class CourseNames
             var members = group.OrderBy(c => c.Id, StringComparer.Ordinal).ToList();
             bool clash = members.Count > 1 || used.Contains(group.Key);
             bool codesTell = members.Select(c => c.Short).Where(s => s.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Count() == members.Count;
+            bool sectionsTell = !codesTell && members.Count > 1
+                && members.Select(c => c.Section).Where(s => s.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).Count() == members.Count;
             foreach (var c in members)
             {
-                string name = !clash ? c.Title : codesTell ? Fit($"{c.Title} ({c.Short})") : c.Title;
+                string name = !clash ? c.Title : codesTell ? Fit($"{c.Title} ({c.Short})") : sectionsTell ? Fit($"{c.Title} (section {c.Section})") : c.Title;
                 for (int n = 2; used.Contains(name); n++) name = Fit(c.Title) + $" {n}";
                 used.Add(name);
                 result[c.Id] = name;
