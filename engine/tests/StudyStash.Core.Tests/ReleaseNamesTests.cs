@@ -15,39 +15,45 @@ public class ReleaseNamesTests
     }
 
     [Fact]
-    public void The_Mac_build_script_names_both_DMGs()
+    public void The_Mac_build_script_makes_the_one_DMG_with_no_role_in_the_app()
     {
-        // build-app.sh builds each DMG's name from "Study-Stash-" plus a role argument ("Laptop"/"Library"),
-        // rather than spelling out the whole file name, so check it uses the shared prefix and both roles.
         string buildApp = Read("macos", "build-app.sh");
-        Assert.Contains("Study-Stash-", buildApp);
-        Assert.Contains(RolePart(Updates.MacLaptopAsset), buildApp);
-        Assert.Contains(RolePart(Updates.MacLibraryAsset), buildApp);
+        Assert.Contains(Updates.MacAsset, buildApp);
+        Assert.DoesNotContain("StudyStashRole", buildApp);
+        Assert.DoesNotContain("StudyStashRole", Read("macos", "Info.plist"));
     }
 
-    static string RolePart(string dmgName) => dmgName["Study-Stash-".Length..^".dmg".Length];
-
     [Fact]
-    public void The_Windows_installer_and_build_script_name_both_Setup_exe()
+    public void The_Windows_installer_makes_the_one_Setup_exe_and_writes_no_role()
     {
         string setupIss = Read("windows", "setup.iss");
-        string buildPs1 = Read("windows", "build.ps1");
-        string both = setupIss + "\n" + buildPs1;
-        // setup.iss builds the two names from a #define, so it's enough that each half appears somewhere.
-        Assert.Contains(RoleHalf(Updates.WindowsLaptopAsset), both);
-        Assert.Contains(RoleHalf(Updates.WindowsLibraryAsset), both);
+        Assert.Contains("OutputBaseFilename=" + Path.GetFileNameWithoutExtension(Updates.WindowsAsset), setupIss);
+        Assert.DoesNotContain("Key: \"role\"", setupIss);
+        Assert.DoesNotContain("/DRole", Read("windows", "build.ps1"));
+    }
+
+    [Fact]
+    public void Ci_publishes_the_old_role_names_as_copies_of_the_one_download()
+    {
+        // Copies 0.8.x and older update themselves by these names: every release must still carry them, the same bytes.
+        string ci = Read(".github", "workflows", "ci.yml");
+        Assert.Contains("cp dist/Study-Stash.dmg \"dist/Study-Stash-$role.dmg\"", ci);
+        Assert.Contains("cp dist/Study-Stash-Setup.exe \"dist/Study-Stash-$role-Setup.exe\"", ci);
+        Assert.Contains("for role in Laptop Library", ci);
     }
 
     [Fact]
     public void The_install_scripts_name_every_installer_they_can_fetch()
     {
         string installSh = Read("install.sh");
-        Assert.Contains(Updates.MacLaptopAsset, installSh);
-        Assert.Contains(Updates.MacLibraryAsset, installSh);
+        Assert.Contains("NAME=" + Updates.MacAsset, installSh);
+        Assert.DoesNotContain(Updates.MacLaptopAsset, installSh);
+        Assert.DoesNotContain(Updates.MacLibraryAsset, installSh);
 
         string installPs1 = Read("install.ps1");
-        Assert.Contains(Updates.WindowsLaptopAsset, installPs1);
-        Assert.Contains(Updates.WindowsLibraryAsset, installPs1);
+        Assert.Contains($"$Name = \"{Updates.WindowsAsset}\"", installPs1);
+        Assert.DoesNotContain(Updates.WindowsLaptopAsset, installPs1);
+        Assert.DoesNotContain(Updates.WindowsLibraryAsset, installPs1);
     }
 
     [Fact]

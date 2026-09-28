@@ -89,6 +89,9 @@ public enum LibraryList { Lectures, Due, CanvasClass }
 /// </summary>
 public sealed partial class LibraryModel : ObservableObject
 {
+    /// <summary>What's coming up on the student's calendars, at the foot of the sidebar.</summary>
+    public ComingUpModel ComingUp { get; } = new();
+
     /// <summary>Below this width the window shows one column after the sidebar, not two.</summary>
     public const double NarrowBelow = 900;
 
@@ -128,6 +131,24 @@ public sealed partial class LibraryModel : ObservableObject
     [ObservableProperty] public partial AiNotesModel? Notes { get; set; }
     /// <summary>The ask bar under the open lecture, with its engine picker.</summary>
     [ObservableProperty] public partial AiAskModel? Ask { get; set; }
+    /// <summary>What's attached to the open lecture (files dropped on it land here); null with no lecture open.</summary>
+    [ObservableProperty] public partial AttachmentsModel? LectureFiles { get; set; }
+    /// <summary>What's attached in the class showing (files dropped on its list land here); null on Due.</summary>
+    [ObservableProperty] public partial AttachmentsModel? ClassFiles { get; set; }
+    public bool HasLectureFiles => LectureFiles is not null;
+    public bool HasClassFiles => ClassFiles is not null;
+
+    partial void OnLectureFilesChanged(AttachmentsModel? oldValue, AttachmentsModel? newValue)
+    {
+        oldValue?.Dispose();
+        OnPropertyChanged(nameof(HasLectureFiles));
+    }
+
+    partial void OnClassFilesChanged(AttachmentsModel? oldValue, AttachmentsModel? newValue)
+    {
+        oldValue?.Dispose();
+        OnPropertyChanged(nameof(HasClassFiles));
+    }
 
     /// <summary>The window is too narrow for the right column (below <see cref="NarrowBelow"/>).</summary>
     [ObservableProperty] public partial bool Narrow { get; set; }
@@ -241,6 +262,7 @@ public sealed partial class LibraryModel : ObservableObject
 
     partial void OnNoteChanged(NoteModel? value)
     {
+        if (LectureFiles is { } files && files.LectureId != value?.Id) LectureFiles = null; // another lecture's files don't stay
         OnPropertyChanged(nameof(HasNote));
         OnPropertyChanged(nameof(NoNote));
         OnPropertyChanged(nameof(HasAsk));

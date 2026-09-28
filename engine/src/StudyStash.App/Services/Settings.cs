@@ -88,6 +88,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         new() { Id = "Access", Glyph = "hub", Label = "AI tool access" },
         new() { Id = "Canvas", Glyph = "school", Label = "Canvas" },
         new() { Id = "Folders", Glyph = "folder", Label = "Folders" },
+        new() { Id = "Phone", Glyph = "smartphone", Label = "Phone" },
     ];
 
     /// <summary>Every row of the sidebar, both groups.</summary>
@@ -123,6 +124,18 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// already running from elsewhere, its port taken, or why it stopped.</summary>
     [ObservableProperty] public partial string LibraryServiceLine { get; set; } = "";
     [ObservableProperty] public partial string DisplayName { get; set; } = "";
+
+    // This computer's role, changed after setup (RoleSwitch, docs/one-download.md)
+    [ObservableProperty] public partial string RoleWords { get; set; } = "";
+    public bool IsLaptopRole => host.Settings.Role == AppRole.Laptop;
+    public bool IsLibraryRole => host.Settings.Role != AppRole.Laptop;
+    [ObservableProperty] public partial bool ConfirmingBecomeLibrary { get; set; }
+    [ObservableProperty] public partial string BecomeLibraryQuestion { get; set; } = "";
+    [ObservableProperty] public partial bool ConfirmingBecomeLaptop { get; set; }
+    [ObservableProperty] public partial string BecomeLaptopAddress { get; set; } = "";
+    [ObservableProperty] public partial string BecomeLaptopPassword { get; set; } = "";
+    [ObservableProperty] public partial string? SwitchSay { get; set; }
+    [ObservableProperty] public partial bool Switching { get; set; }
 
     // Recording
     public ObservableCollection<ModelChoice> Models { get; } = [];
@@ -169,8 +182,32 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public AiProblemsModel AiProblems { get; }
     public AiAccessModel Access { get; }
     public CanvasSettingsModel Canvas { get; }
+    /// <summary>The calendar feeds and sources connected on this computer, and which of their calendars are shown.</summary>
+    public CalendarSettingsModel Calendars { get; }
     /// <summary>The library's own settings (Library, Classes, Notes and sorting, Folders).</summary>
     public LibrarySettingsModel Lib { get; }
+    /// <summary>Adding a phone to the library, and the phones already added.</summary>
+    public PhonesModel Phones { get; private set; }
+    public bool OnPhone => Section == "Phone";
+
+    /// <summary>Making (or finding) the library on this computer: <see cref="Services.LibraryHere.ThisComputer"/>
+    /// unless a test gives its own (a built engine to run, and its own notes folder).</summary>
+    Func<LibraryHere> libraryHere = Services.LibraryHere.ThisComputer;
+
+    /// <summary>For a test or a shot: Phone asks <paramref name="phones"/> instead of the connected library.</summary>
+    public SettingsModel WithPhones(Func<LibrarySettingsModel.Call?> phones)
+    {
+        Phones = new PhonesModel(phones);
+        return this;
+    }
+
+    /// <summary>For a test: making this computer the library uses <paramref name="here"/> (a built engine to run)
+    /// instead of the app's own copy of itself.</summary>
+    public SettingsModel WithLibraryHere(Func<LibraryHere> here)
+    {
+        libraryHere = here;
+        return this;
+    }
 
     // General
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
@@ -195,6 +232,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     };
     public bool OnAi => Section == "AI";
     public bool OnCanvas => Section == "Canvas";
+    public bool OnCalendars => Section == "Calendars";
     public bool OnAccess => Section == "Access";
     /// <summary>The AI panes scroll and pad themselves; every other section sits in the page's own scroller.</summary>
     public bool OnPlainPage => !OnAi && !OnAccess;
@@ -230,6 +268,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             new() { Id = "General", Glyph = "tune", Label = "General" },
             new() { Id = "Appearance", Glyph = "palette", Label = "Appearance" },
             .. records ? new NavItem[] { new() { Id = "Recording", Glyph = "mic", Label = "Recording" } } : [],
+            .. records ? new NavItem[] { new() { Id = "Calendars", Glyph = "event", Label = "Calendars" } } : [],
             new() { Id = "Connection", Glyph = "link", Label = "Connection" },
         ];
         string device = OperatingSystem.IsWindows() ? "PC" : "Mac";
@@ -272,6 +311,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         AiProblems = new AiProblemsModel(ai);
         Access = MakeAccess(ai, host);
         Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch);
+        Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
+        Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
+        Phones.Ticking = Phones.UiTicking();
         Address = cc.ServerUrl;
         DisplayName = cc.DisplayName;
         LibraryHere = host.Settings.LibraryHere;
@@ -330,8 +372,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             case "Canvas":
                 _ = Canvas.LoadAsync();
                 break;
+            case "Calendars":
+                Calendars.Load();
+                break;
             case "Library" or "Classes" or "Notes" or "Folders":
                 _ = Lib.Load();
+                break;
+            case "Phone":
+                _ = Phones.Load();
                 break;
         }
     }
@@ -360,6 +408,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             LibraryServiceState.Failed => $"It stopped: {host.LocalLibrary.Failure}",
             _ => "Stopped.",
         };
+        RoleWords = host.Settings.Role switch
+        {
+            AppRole.Laptop => $"This {device} is a laptop: it records lectures and sends them to your library.",
+            AppRole.Library => $"This {device} is your library: it keeps and writes up lectures, but doesn't record its own.",
+            _ => $"This {device} records lectures and is your library, all in one place.",
+        };
+        OnPropertyChanged(nameof(IsLaptopRole));
+        OnPropertyChanged(nameof(IsLibraryRole));
         OnPropertyChanged(nameof(CanStartLibrary));
         OnPropertyChanged(nameof(CanStopLibrary));
         ShortcutsSay = Shell.ShortcutsSay();
@@ -403,7 +459,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                  {
                      nameof(OnConnection), nameof(OnRecording), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
                      nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage),
-                     nameof(OnGeneral), nameof(OnAppearance),
+                     nameof(OnGeneral), nameof(OnAppearance), nameof(OnPhone), nameof(OnCalendars),
                  })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;
@@ -537,6 +593,101 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         catch (Exception e) when (e is InvalidOperationException or ArgumentException)
         {
             LibrarySay = e.Message;
+        }
+    }
+
+    /// <summary>A laptop asks to switch its role fully: become the library too, taking over whatever it was connected
+    /// to before.</summary>
+    [RelayCommand]
+    void AskBecomeLibrary()
+    {
+        var old = RoleSwitch.OldLibraryOf(host);
+        BecomeLibraryQuestion = old is null
+            ? "This computer keeps recording, and becomes your library too: its own place for notes, classes and settings."
+            : $"This computer keeps recording, and becomes your library too. {old.Name}'s lectures come over first, as they are; {old.Name} keeps its own copy.";
+        ConfirmingBecomeLibrary = true;
+        SwitchSay = null;
+    }
+
+    [RelayCommand] void CancelBecomeLibrary() => ConfirmingBecomeLibrary = false;
+
+    /// <summary>The student said yes: this computer becomes the library (taking over the old one's name and password
+    /// when it has none of its own), then brings over whatever it was connected to before, if anything.</summary>
+    [RelayCommand]
+    async Task ConfirmBecomeLibrary()
+    {
+        Switching = true;
+        SwitchSay = "Setting up your library…";
+        try
+        {
+            var old = RoleSwitch.OldLibraryOf(host);
+            string done = await RoleSwitch.ToLibraryAsync(host, libraryHere(), old, DisplayName);
+            LibraryHere = true;
+            ConfirmingBecomeLibrary = false;
+            SwitchSay = old is null ? done : done + " " + await BroughtSafelyAsync(old);
+        }
+        catch (Exception e) when (e is InvalidOperationException or ArgumentException)
+        {
+            SwitchSay = e.Message;
+        }
+        finally
+        {
+            Switching = false;
+        }
+    }
+
+    /// <summary>Bringing lectures over never blocks becoming the library: a problem (the old one's offline, say) is
+    /// said in plain words, not thrown.</summary>
+    async Task<string> BroughtSafelyAsync(OldLibrary old)
+    {
+        try
+        {
+            return await RoleSwitch.BringLecturesAsync(host, old);
+        }
+        catch (InvalidOperationException e)
+        {
+            return $"Couldn't bring {old.Name}'s lectures over yet: {e.Message} Try again from here any time.";
+        }
+    }
+
+    /// <summary>A library (or a one-computer setup) asks to become a plain laptop, sending to another library.</summary>
+    [RelayCommand]
+    void AskBecomeLaptop()
+    {
+        if (Setup.NormalizeAddress(BecomeLaptopAddress).Length == 0)
+        {
+            SwitchSay = "Type your new library's address first, like http://mac-mini:8787.";
+            return;
+        }
+        ConfirmingBecomeLaptop = true;
+        SwitchSay = null;
+    }
+
+    [RelayCommand] void CancelBecomeLaptop() => ConfirmingBecomeLaptop = false;
+
+    /// <summary>The student said yes: this library's lectures go to the new one first, so nothing is left behind,
+    /// then this computer stops being the library and becomes a laptop that sends to it. Nothing changes if either
+    /// step fails: the library here keeps running, ready to be tried again.</summary>
+    [RelayCommand]
+    async Task ConfirmBecomeLaptop()
+    {
+        Switching = true;
+        SwitchSay = "Sending your lectures…";
+        try
+        {
+            string sent = await RoleSwitch.HandOffLecturesAsync(host, BecomeLaptopAddress, BecomeLaptopPassword);
+            string done = await RoleSwitch.ToLaptopAsync(host, BecomeLaptopAddress, BecomeLaptopPassword);
+            LibraryHere = false;
+            ConfirmingBecomeLaptop = false;
+            SwitchSay = sent + " " + done;
+        }
+        catch (InvalidOperationException e)
+        {
+            SwitchSay = e.Message;
+        }
+        finally
+        {
+            Switching = false;
         }
     }
 

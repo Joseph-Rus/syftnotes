@@ -161,6 +161,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
 
     public const string NoAnswer = "I couldn't find that in your notes.";
 
+    /// <summary>A passage Ask picked from a file the student attached.</summary>
+    public const string AttachmentKind = "attachment";
+
     static readonly JsonObject AnswerSchema = new()
     {
         ["type"] = "object",
@@ -191,6 +194,17 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         {
             foreach (var hit in Store.SearchPassages(match, className, limit: 10)) picked.Add((hit.Note, hit.Passage));
         }
+        // What the student attached to the lecture (or anywhere in the class): the pieces that best match, too.
+        var attachedTo = new Dictionary<Passage, Attachment>(ReferenceEqualityComparer.Instance);
+        var files = lectureId is not null ? Store.ListAttachments(noteId: lectureId) : className is not null ? Store.ListAttachments(className) : [];
+        var pieces = files.Where(a => a.HasText).SelectMany(a => Attachments.Pieces(a.Text).Select(t =>
+        {
+            var p = new Passage(a.NoteId ?? "", AttachmentKind, $"{Attachments.KindOf(a.Name, a.Type)}: {a.Name}", null, t);
+            attachedTo[p] = a;
+            return p;
+        })).ToList();
+        foreach (var p in BestOf(pieces, question, 4))
+            picked.Add((attachedTo[p].NoteId is { } id ? Store.Get(id) : null, p));
         var sources = new JsonArray();
         if (picked.Count == 0) return new JsonObject { ["answer"] = NoAnswer, ["sources"] = sources };
 
@@ -205,7 +219,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         for (int i = 0; i < picked.Count; i++)
         {
             var (note, p) = picked[i];
-            string where = note is null ? liveTitle : $"{Title(note)} ({note.ClassName}, {note.Date})";
+            bool file = attachedTo.ContainsKey(p);
+            string where = file ? note is null ? $"Attached to {attachedTo[p].ClassName}" : $"Attached to {Title(note)} ({note.ClassName}, {note.Date})"
+                : note is null ? liveTitle : $"{Title(note)} ({note.ClassName}, {note.Date})";
             string at = p.Start is double s ? $" at {TimedText.Clock(s)}" : p.Section.Length > 0 ? $", {p.Section}" : "";
             prompt.Append('[').Append(i + 1).Append("] ").Append(where).Append(at).Append(":\n").Append(p.Text).Append("\n\n");
         }
@@ -228,11 +244,19 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         foreach (int k in used.Where(k => k >= 1 && k <= picked.Count).Distinct())
         {
             var (note, p) = picked[k - 1];
-            sources.Add(new JsonObject
+            var source = new JsonObject
             {
                 ["id"] = note?.Id, ["title"] = note is null ? liveTitle : Title(note), ["class"] = note?.ClassName,
                 ["date"] = note?.Date, ["at"] = p.Start, ["section"] = p.Section, ["text"] = p.Text,
-            });
+            };
+            if (attachedTo.TryGetValue(p, out var a))
+            {
+                // An attached file: named for itself, with its id so the app can open it.
+                source["title"] = a.Name;
+                source["class"] = a.ClassName;
+                source["attachment"] = a.Id;
+            }
+            sources.Add(source);
         }
         return new JsonObject { ["answer"] = answer, ["sources"] = sources };
     }

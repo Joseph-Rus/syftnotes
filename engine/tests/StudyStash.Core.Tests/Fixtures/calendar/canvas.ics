@@ -1,0 +1,27 @@
+BEGIN:VCALENDAR
+PRODID:-//Instructure//Canvas//EN
+VERSION:2.0
+X-WR-CALNAME:Sam Lee Calendar (Canvas)
+X-WR-CALDESC:Calendar events for the user\, Sam Lee
+METHOD:PUBLISH
+BEGIN:VEVENT
+DTEND:20261002T065900Z
+DTSTAMP:20260928T120000Z
+DTSTART:20261002T065900Z
+CLASS:PUBLIC
+DESCRIPTION:Submit your trace of the recursion.
+SEQUENCE:0
+SUMMARY:Lab 3: Recursion [CS 101-02 Fall 2026]
+UID:event-assignment-123456
+URL;VALUE=URI:https://school.instructure.com/courses/4242/assignments/123456
+END:VEVENT
+BEGIN:VEVENT
+DTEND;VALUE=DATE:20261003
+DTSTAMP:20260928T120000Z
+DTSTART;VALUE=DATE:20261002
+CLASS:PUBLIC
+SUMMARY:Quiz 2 [BIO 110 Fall 2026]
+UID:event-calendar-event-98765
+URL;VALUE=URI:https://school.instructure.com/calendar?event_id=98765&include_contexts=course_4243
+END:VEVENT
+END:VCALENDAR

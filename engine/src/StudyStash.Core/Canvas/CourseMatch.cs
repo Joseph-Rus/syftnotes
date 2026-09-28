@@ -25,7 +25,9 @@ public static partial class CourseMatch
         return n >= 2 && string.Equals(a[..n], b[..n], StringComparison.OrdinalIgnoreCase);
     }
 
-    static int Score(string className, string code, string name)
+    /// <summary>How alike a class name is to a course (or a calendar event) with this code and name: 2 for a shared
+    /// number ("101"), 1 for a shared word ("CALC" ~ "Calculus"), both added up.</summary>
+    public static int Score(string className, string code, string name)
     {
         var classWords = Words(className);
         var classDigits = Digits(className);
