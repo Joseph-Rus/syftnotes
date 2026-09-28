@@ -1,9 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, Audio, interpolate, staticFile} from 'remotion';
-import {linearTiming, springTiming, TransitionSeries} from '@remotion/transitions';
+import {linearTiming, TransitionSeries} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
-import {slide} from '@remotion/transitions/slide';
-import {wipe} from '@remotion/transitions/wipe';
 import {colors, durations, music, musicVolume, TOTAL_FRAMES, TRANSITION} from './config';
 import {Hook} from './scenes/Hook';
 import {Reveal} from './scenes/Reveal';
@@ -14,43 +12,30 @@ import {CanvasDue} from './scenes/CanvasDue';
 import {Proof} from './scenes/Proof';
 import {Cta} from './scenes/Cta';
 
-const glide = springTiming({config: {damping: 200}, durationInFrames: TRANSITION});
+const SCENES: [keyof typeof durations, React.FC][] = [
+  ['hook', Hook],
+  ['reveal', Reveal],
+  ['record', RecordNotes],
+  ['diagrams', Diagrams],
+  ['ask', AskNotes],
+  ['canvas', CanvasDue],
+  ['proof', Proof],
+  ['cta', Cta],
+];
 
-/** The whole video. The same scenes lay themselves out for landscape (1920×1080) or vertical (1080×1920). */
+/**
+ * The whole video. Every scene cross-fades into the next: the desktop stays put while what's open on it changes,
+ * as it would in the app. The same scenes lay themselves out for landscape (1920×1080) or vertical (1080×1920).
+ */
 export const Promo: React.FC = () => (
-  <AbsoluteFill style={{backgroundColor: colors.night}}>
+  <AbsoluteFill style={{backgroundColor: colors.paper}}>
     <TransitionSeries>
-      <TransitionSeries.Sequence durationInFrames={durations.hook}>
-        <Hook />
-      </TransitionSeries.Sequence>
-      {/* No transition here: the reveal opens its paper out of the hook's night itself. */}
-      <TransitionSeries.Sequence durationInFrames={durations.reveal}>
-        <Reveal />
-      </TransitionSeries.Sequence>
-      <TransitionSeries.Transition presentation={wipe({direction: 'from-right'})} timing={glide} />
-      <TransitionSeries.Sequence durationInFrames={durations.record}>
-        <RecordNotes />
-      </TransitionSeries.Sequence>
-      <TransitionSeries.Transition presentation={slide({direction: 'from-right'})} timing={glide} />
-      <TransitionSeries.Sequence durationInFrames={durations.diagrams}>
-        <Diagrams />
-      </TransitionSeries.Sequence>
-      <TransitionSeries.Transition presentation={slide({direction: 'from-right'})} timing={glide} />
-      <TransitionSeries.Sequence durationInFrames={durations.ask}>
-        <AskNotes />
-      </TransitionSeries.Sequence>
-      <TransitionSeries.Transition presentation={slide({direction: 'from-right'})} timing={glide} />
-      <TransitionSeries.Sequence durationInFrames={durations.canvas}>
-        <CanvasDue />
-      </TransitionSeries.Sequence>
-      <TransitionSeries.Transition presentation={wipe({direction: 'from-bottom'})} timing={glide} />
-      <TransitionSeries.Sequence durationInFrames={durations.proof}>
-        <Proof />
-      </TransitionSeries.Sequence>
-      <TransitionSeries.Transition presentation={fade()} timing={linearTiming({durationInFrames: TRANSITION})} />
-      <TransitionSeries.Sequence durationInFrames={durations.cta}>
-        <Cta />
-      </TransitionSeries.Sequence>
+      {SCENES.flatMap(([key, Scene], i) => [
+        ...(i > 0 ? [<TransitionSeries.Transition key={`t-${key}`} presentation={fade()} timing={linearTiming({durationInFrames: TRANSITION})} />] : []),
+        <TransitionSeries.Sequence key={key} durationInFrames={durations[key]}>
+          <Scene />
+        </TransitionSeries.Sequence>,
+      ])}
     </TransitionSeries>
 
     {/* ♪ Background music goes here: set `music` in src/config.ts to a file in public/ (e.g. 'music.mp3'). */}

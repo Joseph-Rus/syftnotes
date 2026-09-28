@@ -1,8 +1,9 @@
 # Study Stash promo video
 
 A 35-second promotional video for Study Stash, made with [Remotion](https://www.remotion.dev) (React for
-video). It's built from code, SVG and the app's own fonts, with no images from other sites. It lives apart from the
-app: nothing here is part of the app's build.
+video). It shows the app as it is: its light look on a Mac desktop, and a pointer that uses it. It's built from code,
+SVG and the app's own fonts, with no images from other sites. It lives apart from the app: nothing here is part of
+the app's build.
 
 - `out/promo.mp4`: 1920×1080, 30 fps
 - `out/promo-vertical.mp4`: 1080×1920, for Reels, Shorts and TikTok
@@ -39,16 +40,19 @@ npm run render:all          # both
 
 ## Scenes
 
-| Time | Scene | On screen |
+| Time | Scene | What happens |
 |---|---|---|
-| 0–3 s | Hook | "Hours of lectures every week." → "Notes you'll never reread." |
-| 3–7 s | Reveal | The icon, **Study Stash**, "Your lectures, written up and filed by class." |
-| 7–12 s | Record | "Record once. Notes write themselves.": recording, then the notes filed under CS 101 |
-| 12–18 s | Diagrams | "Diagrams and formulas, drawn for you.": a health class's cardiac cycle, a math class's derivative |
-| 18–23 s | Ask | "Ask your notes anything.": the answer arrives word by word, with its sources |
-| 23–27 s | Canvas | "Canvas, right next to your notes.": what's due, and an assignment's rubric |
-| 27–30 s | Proof | "Everything stays on your computer." Free · Open source · Mac & Windows |
-| 30–35 s | Call to action | Get it free for Mac and Windows, github.com/Joseph-Rus/study-stash |
+| 0–3 s | Hook | "Hours of lectures every week. Notes you'll never reread.", beside a pile of untitled recordings |
+| 3–6 s | Reveal | The icon, **Study Stash**, "Your lectures, written up and filed by class." |
+| 6–12 s | Record | The menu bar icon opens the dropdown, Record, the waveform, Stop, and the lecture is filed in CS 101 |
+| 12–18 s | Diagrams | A health class's cardiac cycle (written by Claude Code), then a math class's derivative (by Codex) |
+| 18–23 s | Ask | The quick panel; the "Answer with" menu picks Claude Code over Codex (OpenAI) and Ollama; the answer with its sources |
+| 23–27 s | Canvas | What's due, and Lab 3's rubric |
+| 27–30 s | Promise | "Your recordings stay on your computer." Free and open source, for Mac and Windows |
+| 30–35 s | Call to action | Free for Mac and Windows, study-stash-app.web.app |
+
+Captions sit under the action in the serif the app writes its notes in, and the website's highlighter marks a phrase
+twice. The pointer's path and clicks are the `stops` and `clicks` of each scene's `<Cursor>`.
 
 Inter and Inter Display come from the app (`engine/src/StudyStash.App/Assets/Fonts`) under the SIL Open Font
 License (`public/fonts/Inter-OFL.txt`). The notes' serif is the computer's own (New York or Charter on a Mac,

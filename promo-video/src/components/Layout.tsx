@@ -1,162 +1,149 @@
 import React from 'react';
-import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Easing, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, fonts} from '../config';
-import {rise, spr} from '../anim';
+import {spr} from '../anim';
+import {Logo} from './Logo';
 
 export const useVertical = () => {
   const {width, height} = useVideoConfig();
   return height > width;
 };
 
-/** The dark desk the app sits on: night blue, with a slow teal and violet glow, as behind the app's screenshots. */
-export const Night: React.FC<{children?: React.ReactNode}> = ({children}) => {
-  const frame = useCurrentFrame();
-  const drift = Math.sin(frame / 60) * 40;
-  return (
-    <AbsoluteFill style={{backgroundColor: colors.night, overflow: 'hidden'}}>
-      <AbsoluteFill
-        style={{
-          background: `radial-gradient(60% 55% at ${78 + drift / 20}% 8%, rgba(120, 84, 200, 0.30), transparent 70%),
-            radial-gradient(55% 60% at ${12 - drift / 30}% 100%, rgba(0, 143, 144, 0.26), transparent 70%),
-            linear-gradient(180deg, #101B30 0%, ${colors.night} 100%)`,
-        }}
-      />
-      {children}
-    </AbsoluteFill>
-  );
-};
-
-/** The warm paper of the icon. */
+/** The warm paper of the icon and the website. */
 export const Paper: React.FC<{children?: React.ReactNode}> = ({children}) => (
-  <AbsoluteFill
-    style={{
-      background: `radial-gradient(70% 60% at 50% 40%, #FFFDF8 0%, ${colors.paper} 55%, ${colors.paper2} 100%)`,
-      overflow: 'hidden',
-    }}
-  >
+  <AbsoluteFill style={{background: `linear-gradient(180deg, ${colors.paper} 0%, ${colors.paper2} 100%)`, overflow: 'hidden'}}>
     {children}
   </AbsoluteFill>
 );
 
-/** A headline whose words spring up one after another. Never more than about eight words. */
-export const Headline: React.FC<{
-  text: string;
-  delay?: number;
-  size?: number;
-  color?: string;
-  align?: 'left' | 'center';
-  maxWidth?: number;
-}> = ({text, delay = 0, size = 88, color = colors.nightInk, align = 'left', maxWidth}) => {
-  const frame = useCurrentFrame();
+/** The soft blue desktop the app's screenshots sit on. */
+export const Wallpaper: React.FC = () => {
+  const [a, b, c] = colors.wallpaper;
+  return (
+    <AbsoluteFill
+      style={{
+        background: `radial-gradient(90% 70% at 20% 10%, rgba(255,255,255,0.55), rgba(255,255,255,0) 60%),
+          linear-gradient(155deg, ${a} 0%, ${b} 48%, ${c} 100%)`,
+      }}
+    />
+  );
+};
+
+export const MENU_H = 38;
+/** Where Study Stash's icon sits in the menu bar. */
+export const menuIconX = (width: number) => width - (width > 1200 ? 262 : 214);
+
+const Glyph: React.FC<{d: string; w?: number}> = ({d, w = 22}) => (
+  <svg width={w} height="18" viewBox="0 0 24 18" fill="none" stroke={colors.text} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+);
+
+/** The Mac's menu bar, with Study Stash's icon among the others. `lit` highlights the icon (its menu is open). */
+export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
+  const {width} = useVideoConfig();
+  const wide = width > 1200;
   return (
     <div
       style={{
-        fontFamily: fonts.display,
-        fontWeight: 700,
-        fontSize: size,
-        lineHeight: 1.04,
-        letterSpacing: '-0.025em',
-        color,
-        textAlign: align,
-        maxWidth,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: MENU_H,
+        background: 'rgba(255,255,255,0.42)',
+        borderBottom: '1px solid rgba(255,255,255,0.5)',
         display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: align === 'center' ? 'center' : 'flex-start',
-        columnGap: '0.24em',
+        alignItems: 'center',
+        padding: '0 22px',
+        gap: 26,
+        fontFamily: fonts.ui,
+        fontSize: 17,
+        color: colors.text,
       }}
     >
-      {text.split(' ').map((w, i) => (
-        <span key={i} style={{display: 'inline-block', ...rise(spr(frame, delay + i * 3), size * 0.5)}}>
-          {w}
-        </span>
-      ))}
+      <span style={{fontWeight: 700}}>Study Stash</span>
+      {wide ? ['File', 'Edit', 'View', 'Window', 'Help'].map((m) => <span key={m}>{m}</span>) : null}
+      <div style={{flex: 1}} />
+      <div
+        style={{
+          position: 'absolute',
+          left: menuIconX(width) - 17,
+          top: 4,
+          width: 34,
+          height: 30,
+          borderRadius: 7,
+          background: lit ? 'rgba(16,24,40,0.12)' : 'transparent',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Logo size={24} shadow={false} flat />
+      </div>
+      <Glyph d="M2 7.5a14 14 0 0 1 20 0M5.5 11a9 9 0 0 1 13 0M9 14.5a4 4 0 0 1 6 0" />
+      <svg width="30" height="16" viewBox="0 0 30 16">
+        <rect x="1" y="2" width="24" height="12" rx="3.5" fill="none" stroke={colors.text} strokeWidth="1.6" />
+        <rect x="3.5" y="4.5" width="15" height="7" rx="1.5" fill={colors.text} />
+        <rect x="26.5" y="6" width="2" height="4" rx="1" fill={colors.text} />
+      </svg>
+      {wide ? <span style={{fontVariantNumeric: 'tabular-nums'}}>Tue 23 Sep  10:02</span> : null}
     </div>
   );
 };
 
+/** The desktop: wallpaper, whatever is open, and the menu bar on top. */
+export const Desktop: React.FC<{children?: React.ReactNode; lit?: boolean}> = ({children, lit}) => (
+  <AbsoluteFill style={{overflow: 'hidden'}}>
+    <Wallpaper />
+    {children}
+    <MenuBar lit={lit} />
+  </AbsoluteFill>
+);
+
 /**
- * A feature scene: the headline beside the app (landscape) or above it (vertical). The mockup is designed at
- * `w` × `h` and scaled to fit the room it has.
+ * A caption under the action, set in the app's serif like a figure caption. One line, eight words at most; it
+ * settles in once and stays.
  */
-export const Feature: React.FC<{
-  headline: string;
-  w: number;
-  h: number;
-  children: React.ReactNode;
-  opacity?: number;
-}> = ({headline, w, h, children, opacity = 1}) => {
+export const Caption: React.FC<{text: string; delay?: number}> = ({text, delay = 8}) => {
+  const frame = useCurrentFrame();
   const vertical = useVertical();
-  const {width, height} = useVideoConfig();
-  if (vertical) {
-    const top = 560;
-    const boxW = width - 100;
-    const boxH = height - top - 140;
-    const scale = Math.min(boxW / w, boxH / h);
-    return (
-      <Night>
-        <AbsoluteFill style={{opacity}}>
-          <div style={{position: 'absolute', top: 210, left: 70, right: 70}}>
-            <Headline text={headline} size={96} align="center" />
-          </div>
-          <div
-            style={{
-              position: 'absolute',
-              top: top + (boxH - h * scale) / 2,
-              left: (width - w * scale) / 2,
-              width: w,
-              height: h,
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-            }}
-          >
-            {children}
-          </div>
-        </AbsoluteFill>
-      </Night>
-    );
-  }
-  const boxW = 1080;
-  const boxH = height - 180;
-  const scale = Math.min(boxW / w, boxH / h);
+  const p = spr(frame, delay, {damping: 26, stiffness: 120, mass: 1});
   return (
-    <Night>
-      <AbsoluteFill style={{opacity}}>
-        <div style={{position: 'absolute', left: 120, top: 0, bottom: 0, width: 620, display: 'flex', alignItems: 'center'}}>
-          <Headline text={headline} size={84} maxWidth={620} />
-        </div>
-        <div
-          style={{
-            position: 'absolute',
-            left: width - 90 - w * scale,
-            top: (height - h * scale) / 2,
-            width: w,
-            height: h,
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
-          }}
-        >
-          {children}
-        </div>
-      </AbsoluteFill>
-    </Night>
+    <div
+      style={{
+        position: 'absolute',
+        left: vertical ? 72 : 100,
+        right: vertical ? 72 : undefined,
+        bottom: vertical ? 170 : 64,
+        fontFamily: fonts.serif,
+        fontSize: vertical ? 70 : 60,
+        lineHeight: 1.12,
+        letterSpacing: '-0.012em',
+        color: colors.ink,
+        opacity: p,
+        transform: `translateY(${(1 - p) * 18}px)`,
+      }}
+    >
+      {text}
+    </div>
   );
 };
 
-/** A dark glass panel, as the app's windows and panels are drawn in dark mode. */
-export const Glass: React.FC<{style?: React.CSSProperties; children?: React.ReactNode; radius?: number}> = ({
-  style,
-  children,
-  radius = 26,
-}) => (
+/** One of the app's light windows, with its traffic lights. */
+export const Win: React.FC<{w: number; h: number; style?: React.CSSProperties; children?: React.ReactNode}> = ({w, h, style, children}) => (
   <div
     style={{
-      background: 'linear-gradient(180deg, rgba(34, 46, 70, 0.92), rgba(20, 29, 47, 0.94))',
-      border: `1.5px solid ${colors.glassEdge}`,
-      borderRadius: radius,
-      boxShadow: '0 2px 6px rgba(0,0,0,0.25), 0 40px 90px -30px rgba(0,0,0,0.7)',
-      color: colors.nightInk,
-      fontFamily: fonts.ui,
+      width: w,
+      height: h,
+      background: colors.window,
+      border: '1px solid rgba(16,24,40,0.10)',
+      borderRadius: 22,
+      boxShadow: '0 1px 2px rgba(16,24,40,0.06), 0 34px 80px -26px rgba(34, 52, 100, 0.42)',
       overflow: 'hidden',
+      position: 'relative',
+      fontFamily: fonts.ui,
+      color: colors.text,
       ...style,
     }}
   >
@@ -164,16 +151,45 @@ export const Glass: React.FC<{style?: React.CSSProperties; children?: React.Reac
   </div>
 );
 
-/** A window's title bar with the three traffic lights. */
-export const TrafficLights: React.FC = () => (
-  <div style={{display: 'flex', gap: 9, padding: '20px 22px'}}>
+export const TrafficLights: React.FC<{style?: React.CSSProperties}> = ({style}) => (
+  <div style={{display: 'flex', gap: 9, padding: '20px 22px', ...style}}>
     {['#FF5F57', '#FEBC2E', '#28C840'].map((c) => (
-      <div key={c} style={{width: 14, height: 14, borderRadius: 7, background: c}} />
+      <div key={c} style={{width: 14, height: 14, borderRadius: 7, background: c, boxShadow: 'inset 0 0 0 0.5px rgba(0,0,0,0.12)'}} />
     ))}
   </div>
 );
 
-/** A class dot and name, as the sidebar and lists show them. */
 export const ClassDot: React.FC<{color: string; size?: number}> = ({color, size = 10}) => (
   <div style={{width: size, height: size, borderRadius: size / 2, background: color, flexShrink: 0}} />
 );
+
+/** The pointer, moving between `stops` ([frame, x, y]) with an ease, and pressed around each frame in `clicks`. */
+export const Cursor: React.FC<{stops: [number, number, number][]; clicks?: number[]; hideAfter?: number}> = ({stops, clicks = [], hideAfter}) => {
+  const frame = useCurrentFrame();
+  if (hideAfter !== undefined && frame > hideAfter) return null;
+  const fs = stops.map((s) => s[0]);
+  const opts = {easing: Easing.bezier(0.45, 0, 0.2, 1), extrapolateLeft: 'clamp' as const, extrapolateRight: 'clamp' as const};
+  const x = interpolate(frame, fs, stops.map((s) => s[1]), opts);
+  const y = interpolate(frame, fs, stops.map((s) => s[2]), opts);
+  const down = clicks.some((c) => frame >= c && frame < c + 5);
+  const appear = interpolate(frame, [fs[0], fs[0] + 6], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+  return (
+    <svg
+      width="34"
+      height="40"
+      viewBox="0 0 17 20"
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        opacity: appear,
+        transform: `scale(${down ? 0.86 : 1})`,
+        transformOrigin: 'top left',
+        filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.3))',
+        zIndex: 50,
+      }}
+    >
+      <path d="M1 1 L1 16.2 L4.9 12.6 L7.6 18.6 L10.3 17.4 L7.7 11.6 L13 11.6 Z" fill="#111" stroke="#fff" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  );
+};
