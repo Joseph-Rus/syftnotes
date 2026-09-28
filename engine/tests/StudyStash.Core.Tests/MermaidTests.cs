@@ -438,6 +438,13 @@ public class MermaidTests
     }
 
     [Fact]
+    public void An_unclosed_box_is_quoted_from_its_id()
+    {
+        var e = Assert.Throws<MermaidException>(() => P("flowchart TD\n  A[Check the order] --> B[Give the dose\n  B --> C"));
+        Assert.Equal("Line 2 has a box that isn't closed: “B[Give the dose”.", e.Message);
+    }
+
+    [Fact]
     public void Caps_are_refused_with_a_reason()
     {
         string nodes = "flowchart TD\n" + string.Join("\n", Enumerable.Range(0, 61).Select(i => $"N{i}[Box {i}]"));

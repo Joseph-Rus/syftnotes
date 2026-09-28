@@ -607,9 +607,13 @@ public static partial class Mermaid
             return label;
         }
 
+        /// <summary>The unclosed box as written, from its id ("B[Give the dose"), not from mid-word before it.</summary>
         string Snippet(int from)
         {
-            string bit = s[Math.Max(0, from - 12)..];
+            int at = Math.Min(from, s.Length);
+            while (at > 0 && s[at - 1] is '[' or '(' or '{' or '>' or '/' or '\\') at--;
+            while (at > 0 && (char.IsLetterOrDigit(s[at - 1]) || s[at - 1] == '_')) at--;
+            string bit = s[at..];
             return bit.Length > 40 ? bit[..39] + "…" : bit;
         }
 

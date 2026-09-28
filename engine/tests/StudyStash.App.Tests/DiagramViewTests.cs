@@ -66,7 +66,7 @@ public class DiagramViewTests
         if (scene.Width * DiagramView.MinScale > 300)
         {
             // Past the floor the picture keeps its size and scrolls sideways.
-            var scroller = (ScrollViewer)view.Child!;
+            var scroller = view.GetVisualDescendants().OfType<ScrollViewer>().First();
             Assert.Equal(DiagramView.MinScale, view.Scale, 3);
             Assert.True(scroller.Extent.Width > scroller.Viewport.Width);
         }

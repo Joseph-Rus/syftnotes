@@ -7,6 +7,8 @@ using Avalonia.Media;
 using Markdig;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
+using StudyStash.App.Controls.Rich;
+using StudyStash.Core.Rich;
 using MdBlock = Markdig.Syntax.Block;
 using MdInline = Markdig.Syntax.Inlines.Inline;
 
@@ -16,6 +18,8 @@ namespace StudyStash.App.Controls;
 /// A lecture's notes, from their Markdown, in the design's type: section headings (SF Pro Display 17, or Segoe UI
 /// Display 20), reading text (New York 16/1.6 on a Mac, Segoe UI 15/1.6 on Windows), bullets and numbered questions
 /// with their markers in the tertiary color, and the Definitions section as two columns with a rule above each term.
+/// Diagrams are drawn (a ```mermaid flowchart, a ```svg drawing), in a bullet too; one that can't be drawn shows its
+/// source calmly instead.
 /// </summary>
 public sealed partial class NoteView : StackPanel
 {
@@ -64,15 +68,26 @@ public sealed partial class NoteView : StackPanel
         return t;
     }
 
+    /// <summary>The diagrams of the last build, by what they draw, so the same notes set again (an answer arriving
+    /// in pieces, a lecture reopened) keep their drawings instead of laying them out again.</summary>
+    Dictionary<string, Control> diagrams = [];
+    Dictionary<string, Control> previous = [];
+
     void Build()
     {
         Children.Clear();
         Spacing = Mac ? 14 : 12;
-        var doc = Markdig.Markdown.Parse(Markdown ?? "", Pipeline);
+        previous = diagrams;
+        diagrams = [];
+        string markdown = Markdown ?? "";
+        var doc = Markdig.Markdown.Parse(markdown, Pipeline);
         bool first = true;
         string section = "";
+        int skipUntil = -1;
         foreach (MdBlock block in doc)
         {
+            if (block.Span.Start < skipUntil) continue;
+            Control? control;
             switch (block)
             {
                 case HeadingBlock h:
@@ -81,37 +96,165 @@ public sealed partial class NoteView : StackPanel
                     head.FontWeight = FontWeight.SemiBold;
                     Fill(head, h.Inline);
                     head.Margin = new Thickness(0, first ? (Mac ? 18 : 16) : (Mac ? 14 : 12), 0, 0);
-                    Children.Add(head);
-                    break;
-                case ParagraphBlock p:
-                    var body = Body();
-                    Fill(body, p.Inline);
-                    Children.Add(body);
+                    control = head;
                     break;
                 case ListBlock list when IsDefinitions(section, list):
-                    Children.Add(Definitions(list));
+                    control = Definitions(list);
                     break;
-                case ListBlock list:
-                    Children.Add(List(list));
+                case HtmlBlock html when IsSvg(html.Lines.ToString()):
+                    // A drawing written straight into the Markdown ends at its first blank line; take it to </svg>.
+                    int from = html.Span.Start, close = markdown.IndexOf("</svg>", from, StringComparison.OrdinalIgnoreCase);
+                    if (close >= 0) skipUntil = close + "</svg>".Length;
+                    control = close < 0 ? Pending() : Diagram(DiagramKind.Svg, markdown[from..skipUntil]);
                     break;
-                case FencedCodeBlock or CodeBlock:
-                    Children.Add(Code(((LeafBlock)block).Lines.ToString()));
-                    break;
-                case QuoteBlock q:
-                    var quote = Body();
-                    quote.Text = string.Join(" ", q.Descendants<ParagraphBlock>().Select(x => Plain(x.Inline)));
-                    quote.Margin = new Thickness(14, 0, 0, 0);
-                    quote.Bind(TextBlock.ForegroundProperty, quote.GetResourceObservable("Fg2"));
-                    Children.Add(quote);
-                    break;
-                case ThematicBreakBlock:
-                    var rule = new Border { Height = 1, Margin = new Thickness(0, 6) };
-                    rule.Bind(Border.BackgroundProperty, rule.GetResourceObservable("Sep"));
-                    Children.Add(rule);
+                default:
+                    control = BlockControl(block);
                     break;
             }
+            if (control is not null) Children.Add(control);
             if (block is not HeadingBlock) first = false;
             else if (!first) first = false;
+        }
+        previous.Clear();
+    }
+
+    /// <summary>A block of the notes as the page shows it (or null for one it doesn't): the same at the top level and
+    /// inside a bullet.</summary>
+    Control? BlockControl(MdBlock block)
+    {
+        switch (block)
+        {
+            case ParagraphBlock p:
+                var body = Body();
+                Fill(body, p.Inline);
+                return body;
+            case ListBlock list:
+                return List(list);
+            case FencedCodeBlock fence when KindOf(fence) is { } kind:
+                // A diagram still being written (an answer arriving in pieces) is drawn once its fence closes.
+                return fence.ClosingFencedCharCount == 0 ? Pending() : Diagram(kind, fence.Lines.ToString());
+            case FencedCodeBlock or CodeBlock:
+                return Code(((LeafBlock)block).Lines.ToString());
+            case HtmlBlock html when IsSvg(html.Lines.ToString()):
+                string svg = html.Lines.ToString();
+                return svg.Contains("</svg>", StringComparison.OrdinalIgnoreCase) ? Diagram(DiagramKind.Svg, svg) : Pending();
+            case QuoteBlock q:
+                var quote = Body();
+                quote.Text = string.Join(" ", q.Descendants<ParagraphBlock>().Select(x => Plain(x.Inline)));
+                quote.Margin = new Thickness(14, 0, 0, 0);
+                quote.Bind(TextBlock.ForegroundProperty, quote.GetResourceObservable("Fg2"));
+                return quote;
+            case ThematicBreakBlock:
+                var rule = new Border { Height = 1, Margin = new Thickness(0, 6) };
+                rule.Bind(Border.BackgroundProperty, rule.GetResourceObservable("Sep"));
+                return rule;
+            default:
+                return null;
+        }
+    }
+
+    enum DiagramKind { Mermaid, Svg }
+
+    [GeneratedRegex(@"^(flowchart|graph)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex FlowchartStart();
+
+    /// <summary>Which fences are diagrams: ```mermaid (or ```mmd), ```svg, an ```xml or ```html one holding an SVG,
+    /// and a bare fence that starts like a flowchart.</summary>
+    static DiagramKind? KindOf(FencedCodeBlock fence)
+    {
+        string info = (fence.Info ?? "").Trim().ToLowerInvariant(), text = fence.Lines.ToString().TrimStart();
+        return info switch
+        {
+            "mermaid" or "mmd" => DiagramKind.Mermaid,
+            "svg" => DiagramKind.Svg,
+            "xml" or "html" when IsSvg(text) => DiagramKind.Svg,
+            "" when FlowchartStart().IsMatch(text) => DiagramKind.Mermaid,
+            _ => null,
+        };
+    }
+
+    static bool IsSvg(string text)
+    {
+        text = text.TrimStart();
+        if (text.StartsWith("<?xml", StringComparison.OrdinalIgnoreCase) && text.IndexOf("?>", StringComparison.Ordinal) is int end and >= 0) text = text[(end + 2)..].TrimStart();
+        return text.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>A diagram, drawn: centred in the column with a little room above and below and no frame; or, when it
+    /// can't be drawn, the calm card that says why and shows its source. Never an exception.</summary>
+    Control Diagram(DiagramKind kind, string source)
+    {
+        string key = $"{kind}\u0001{source}";
+        for (int n = 2; diagrams.ContainsKey(key); n++) key = $"{kind}\u0001{n}\u0001{source}";
+        if (previous.Remove(key, out var kept))
+        {
+            Detach(kept);
+            return diagrams[key] = kept;
+        }
+        Control made = kind == DiagramKind.Mermaid ? ChartBlock(source) : SvgBlock(source);
+        if (made is not DiagramCard) diagrams[key] = made;
+        return made;
+    }
+
+    Control ChartBlock(string source)
+    {
+        Flowchart chart;
+        try
+        {
+            chart = Flowchart.Parse(source);
+        }
+        catch (MermaidException e)
+        {
+            return new DiagramCard(e.Message, source);
+        }
+        // Laid out now, in the look's font (the drawing reuses it): a chart that can't be laid out says so here.
+        try
+        {
+            var font = this.FindResource("TextFont") as FontFamily ?? Application.Current?.FindResource("TextFont") as FontFamily ?? FontFamily.Default;
+            SceneCache.Get(chart, font, null);
+        }
+        catch (Exception e) // the layout's libraries are the app's, but a bad chart must never take the notes down
+        {
+            Program.Log($"[diagram] couldn't lay out a chart: {e.GetType().Name}: {e.Message}");
+            return new DiagramCard("Study Stash couldn't lay this flowchart out.", source);
+        }
+        return new DiagramView { Chart = chart, Margin = new Thickness(0, 6) };
+    }
+
+    static Control SvgBlock(string source)
+    {
+        var drawing = SafeSvg.Clean(source, new SafeSvgOptions { FontFamily = SvgView.Font });
+        if (drawing.Problem is { } problem) return new DiagramCard(problem, source);
+        using (var hold = SvgPictures.Hold(drawing.Svg!))
+            if (hold is null) return new DiagramCard("Study Stash couldn't draw this SVG.", source);
+        return new SvgView { Source = source, Margin = new Thickness(0, 6) };
+    }
+
+    /// <summary>A diagram whose fence hasn't closed yet: a quiet line until the rest arrives.</summary>
+    Control Pending()
+    {
+        var t = Text("TextFont", Mac ? 13 : 14, 1.4);
+        t.Text = DrawingWords;
+        t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg3"));
+        return t;
+    }
+
+    public const string DrawingWords = "Drawing the diagram…";
+
+    /// <summary>Takes a kept diagram out of the page it was on, so it can go on the new one.</summary>
+    static void Detach(Control control)
+    {
+        switch (control.Parent)
+        {
+            case Panel panel:
+                panel.Children.Remove(control);
+                break;
+            case Decorator decorator:
+                decorator.Child = null;
+                break;
+            case ContentControl content:
+                content.Content = null;
+                break;
         }
     }
 
@@ -158,18 +301,7 @@ public sealed partial class NoteView : StackPanel
             row.Children.Add(Marker(list.IsOrdered ? $"{n++}" : "•"));
             var content = new StackPanel { Spacing = 6 };
             foreach (var inner in item)
-            {
-                if (inner is ParagraphBlock p)
-                {
-                    var t = Body();
-                    Fill(t, p.Inline);
-                    content.Children.Add(t);
-                }
-                else if (inner is ListBlock nested)
-                {
-                    content.Children.Add(List(nested));
-                }
-            }
+                if (BlockControl(inner) is { } c) content.Children.Add(c);
             Grid.SetColumn(content, 2);
             row.Children.Add(content);
             items.Children.Add(row);

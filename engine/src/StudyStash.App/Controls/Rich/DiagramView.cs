@@ -16,7 +16,7 @@ namespace StudyStash.App.Controls.Rich;
 /// tree or a layered chart), then fitted to its column. A chart too wide for it turns (a left-to-right chart goes
 /// top-down, a top-down tree left-to-right); then the picture scales down, never below <see cref="MinScale"/> (its
 /// words stay at least 8 px), and past that it scrolls sideways. It never grows past <see cref="MaxScale"/> (1 in a
-/// note).
+/// note). In a note, a click opens it larger (<see cref="OpenLarger"/>).
 /// </summary>
 public sealed class DiagramView : Decorator
 {
@@ -31,7 +31,10 @@ public sealed class DiagramView : Decorator
 
     static DiagramView() => AffectsMeasure<DiagramView>(ChartProperty, MaxScaleProperty);
 
-    public DiagramView()
+    public DiagramView() : this(opensLarger: true) { }
+
+    /// <summary>A diagram that opens larger on a click (in a note), or one that doesn't (the larger window's own).</summary>
+    public DiagramView(bool opensLarger)
     {
         scroller = new ScrollViewer
         {
@@ -39,10 +42,15 @@ public sealed class DiagramView : Decorator
             VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = canvas,
         };
-        Child = scroller;
         HorizontalAlignment = HorizontalAlignment.Center;
-        Cursor = new Cursor(StandardCursorType.Hand);
-        ToolTip.SetTip(this, "Open larger");
+        if (!opensLarger)
+        {
+            Child = scroller;
+            return;
+        }
+        var badge = OpenLarger.Badge();
+        Child = new Panel { Children = { scroller, badge } };
+        OpenLarger.Wire(this, badge, () => Chart is { } chart ? new OpenDiagramEventArgs(this) { Title = Title, Chart = chart, Scene = Scene } : null);
     }
 
     public Flowchart? Chart
@@ -56,6 +64,9 @@ public sealed class DiagramView : Decorator
         get => GetValue(MaxScaleProperty);
         set => SetValue(MaxScaleProperty, value);
     }
+
+    /// <summary>What the diagram is called: its own title, or else its first words.</summary>
+    public string Title => Chart is not { } chart ? "Diagram" : chart.Title is { Length: > 0 } t ? t : chart.Labels().FirstOrDefault() ?? "Diagram";
 
     /// <summary>The diagram as laid out for its column, or null before it has been measured.</summary>
     public DiagramScene? Scene => canvas.Scene;
@@ -173,11 +184,21 @@ sealed class DiagramCanvas : Control
             return default;
         }
         double width = double.IsFinite(room.Width) ? room.Width : double.PositiveInfinity;
-        var scene = SceneCache.Get(chart, Family, null);
-        if (scene.Width > width && DiagramLayout.Turned(chart, scene.Kind) is { } turned)
+        DiagramScene scene;
+        try
         {
-            var other = SceneCache.Get(chart, Family, turned);
-            if (other.Width < scene.Width) scene = other;
+            scene = SceneCache.Get(chart, Family, null);
+            if (scene.Width > width && DiagramLayout.Turned(chart, scene.Kind) is { } turned)
+            {
+                var other = SceneCache.Get(chart, Family, turned);
+                if (other.Width < scene.Width) scene = other;
+            }
+        }
+        catch (Exception e) // a layout that fails leaves a gap, never a crash (a note checks its charts lay out first)
+        {
+            Program.Log($"[diagram] couldn't lay out a chart: {e.GetType().Name}: {e.Message}");
+            Scene = null;
+            return default;
         }
         double scale = Math.Min(maxScale, width / scene.Width);
         if (double.IsFinite(room.Height) && room.Height > 0) scale = Math.Min(scale, room.Height / scene.Height);

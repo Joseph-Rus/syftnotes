@@ -75,4 +75,68 @@ public static class RichDemo
         ("Types of shock", "Four families, grouped by what fails: the volume, the pump, the vessels, or the way out of the heart.", TypesOfShock),
         ("A binary search tree", "Smaller keys go left and larger keys go right, so 4 sits under 6, under 3.", SearchTree),
     ];
+
+    /// <summary>The four chambers of the heart, drawn as an AI writes an SVG: the writers' palette (blue for the
+    /// oxygen-poor right side, red for the left), arrows with a marker, the valves and the septum labelled.</summary>
+    public const string FourChambers = """
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 380" font-size="14">
+          <title>The four chambers of the heart</title>
+          <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1D1D1F"/></marker></defs>
+          <rect x="150" y="60" width="160" height="110" rx="14" fill="#E8F0FE" stroke="#1A73E8" stroke-width="2"/>
+          <text x="230" y="112" text-anchor="middle" fill="#1D1D1F" font-weight="600">Right atrium</text>
+          <text x="230" y="132" text-anchor="middle" fill="#6E6E73" font-size="12">from the body</text>
+          <rect x="330" y="60" width="160" height="110" rx="14" fill="#FCE8E6" stroke="#D93025" stroke-width="2"/>
+          <text x="410" y="112" text-anchor="middle" fill="#1D1D1F" font-weight="600">Left atrium</text>
+          <text x="410" y="132" text-anchor="middle" fill="#6E6E73" font-size="12">from the lungs</text>
+          <rect x="150" y="200" width="160" height="130" rx="14" fill="#E8F0FE" stroke="#1A73E8" stroke-width="2"/>
+          <text x="230" y="262" text-anchor="middle" fill="#1D1D1F" font-weight="600">Right ventricle</text>
+          <text x="230" y="282" text-anchor="middle" fill="#6E6E73" font-size="12">to the lungs</text>
+          <rect x="330" y="200" width="160" height="130" rx="14" fill="#FCE8E6" stroke="#D93025" stroke-width="2"/>
+          <text x="410" y="262" text-anchor="middle" fill="#1D1D1F" font-weight="600">Left ventricle</text>
+          <text x="410" y="282" text-anchor="middle" fill="#6E6E73" font-size="12">to the body</text>
+          <line x1="230" y1="170" x2="230" y2="198" stroke="#1D1D1F" stroke-width="2" marker-end="url(#arr)"/>
+          <line x1="410" y1="170" x2="410" y2="198" stroke="#1D1D1F" stroke-width="2" marker-end="url(#arr)"/>
+          <text x="140" y="190" text-anchor="end" fill="#6E6E73" font-size="12">tricuspid valve</text>
+          <text x="500" y="190" fill="#6E6E73" font-size="12">mitral valve</text>
+          <line x1="320" y1="40" x2="320" y2="350" stroke="#C7C7CC" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <text x="320" y="30" text-anchor="middle" fill="#6E6E73" font-size="12">septum</text>
+        </svg>
+        """;
+
+    /// <summary>A diagram Study Stash doesn't draw (a sequence diagram), for the calm card that shows its source.</summary>
+    public const string PainConversation = """
+        sequenceDiagram
+          Nurse->>Patient: How bad is the pain, 0 to 10?
+          Patient-->>Nurse: About a 7
+          Nurse->>Patient: I'll bring your analgesic and check back in 30 minutes
+        """;
+
+    /// <summary>A flowchart with a box left open, for the card that says which line.</summary>
+    public const string BrokenChart = """
+        flowchart TD
+          A[Check the order] --> B[Give the dose
+          B --> C[Document it]
+        """;
+
+    static string Fence(string info, string source) => $"```{info}\n{source.TrimEnd()}\n```";
+
+    /// <summary>The part of a nursing lecture's notes where its diagrams are: a ring, a drawing, a decision chart,
+    /// each with the sentence that says the same in words.</summary>
+    public static string DiagramNotes { get; } = string.Join("\n\n",
+        "## Details and examples",
+        "Each beat runs through five phases, starting when the atria contract.",
+        Fence("mermaid", CardiacCycle),
+        "The atria contract, the ventricles tense and then eject, relax, and fill again, and the cycle repeats.",
+        Fence("svg", FourChambers),
+        "Oxygen-poor blood fills the right side and goes to the lungs; oxygen-rich blood fills the left side and goes to the body.",
+        Fence("mermaid", PainReassess),
+        "Treat by the score, then always reassess, and go round again while the pain stays.");
+
+    /// <summary>What a note shows when a diagram can't be drawn: a sequence diagram, and a chart with a box left open.</summary>
+    public static string FallbackNotes { get; } = string.Join("\n\n",
+        "## Talking about pain",
+        "The conversation, as the lecturer drew it on the board:",
+        Fence("mermaid", PainConversation),
+        "And the order check, which lost a bracket on the way:",
+        Fence("mermaid", BrokenChart));
 }
