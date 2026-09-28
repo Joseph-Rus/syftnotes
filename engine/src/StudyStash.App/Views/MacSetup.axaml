@@ -305,7 +305,7 @@
               <TextBlock Classes="h1" Text="{Binding WelcomeTitle}" />
               <TextBlock Classes="lede" Text="{Binding WelcomeBody}" />
               <StackPanel Name="Choices" Spacing="8" Margin="0,20,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
-                <Button Name="OneComputer" Classes="choice" Classes.on="{Binding IsOneComputer}" Command="{Binding ChooseOneComputerCommand}">
+                <Button Name="OneComputer" Classes="choice" Classes.on="{Binding IsOneComputer}" Command="{Binding ChooseOneComputerCommand}" IsEnabled="{Binding CanChooseOneComputer}">
                   <Grid ColumnDefinitions="24,12,*,12,Auto">
                     <c:Icon Glyph="desktop_windows" Size="22" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                     <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
@@ -318,7 +318,7 @@
                     <Border Grid.Column="4" Classes="radio" Classes.on="{Binding IsOneComputer}"><Ellipse /></Border>
                   </Grid>
                 </Button>
-                <Button Name="Laptop" Classes="choice" Classes.on="{Binding IsLaptop}" Command="{Binding ChooseLaptopCommand}">
+                <Button Name="Laptop" Classes="choice" Classes.on="{Binding IsLaptop}" Command="{Binding ChooseLaptopCommand}" IsEnabled="{Binding CanChooseLaptop}">
                   <Grid ColumnDefinitions="24,12,*,12,Auto">
                     <c:Icon Glyph="laptop_mac" Size="22" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                     <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
@@ -328,7 +328,7 @@
                     <Border Grid.Column="4" Classes="radio" Classes.on="{Binding IsLaptop}"><Ellipse /></Border>
                   </Grid>
                 </Button>
-                <Button Name="Library" Classes="choice" Classes.on="{Binding IsLibrary}" Command="{Binding ChooseLibraryCommand}">
+                <Button Name="Library" Classes="choice" Classes.on="{Binding IsLibrary}" Command="{Binding ChooseLibraryCommand}" IsEnabled="{Binding CanChooseLibrary}">
                   <Grid ColumnDefinitions="24,12,*,12,Auto">
                     <c:Icon Glyph="dns" Size="22" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                     <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">

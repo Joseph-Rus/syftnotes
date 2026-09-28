@@ -939,6 +939,14 @@ public static partial class Shell
         _ = LoadLibraryAsync();
     }
 
+    /// <summary>Settings → General's Run setup again: Settings makes way, and setup opens on its welcome with what's
+    /// already set up filled in. The computer counts as set up throughout, so closing it part-way changes nothing.</summary>
+    public static void RunSetupAgain()
+    {
+        settingsWindow?.Close();
+        ShowSetup();
+    }
+
     public static void ShowSetup()
     {
         if (setupWindow is { IsVisible: true })
@@ -946,7 +954,9 @@ public static partial class Shell
             setupWindow.Activate();
             return;
         }
+        bool again = host.Settings.SetupDone;
         setup = Setup.Make(host);
+        setup.Again = again;
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacSetup { DataContext = setup, DrawChrome = false } : new WinSetup { DataContext = setup, DrawChrome = false };
         var w = new Window
         {
@@ -965,7 +975,7 @@ public static partial class Shell
             w.Close();
             ShowLibrary();
             // The first run ends by saying where the S. lives (or that a full menu bar hides it).
-            DispatcherTimer.RunOnce(SayWhereTheIconIs, TimeSpan.FromSeconds(1));
+            if (!again) DispatcherTimer.RunOnce(SayWhereTheIconIs, TimeSpan.FromSeconds(1));
         };
         setup.OnEnter = step => EnterSetupStep(model, step);
         setup.OnCopy = text => _ = w.Clipboard?.SetTextAsync(text);

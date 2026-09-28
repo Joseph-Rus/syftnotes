@@ -587,7 +587,7 @@
               <!-- General -->
               <StackPanel IsVisible="{Binding OnGeneral}" Spacing="8">
                 <TextBlock Classes="h" Text="General" />
-                <TextBlock Classes="body" Text="How Study Stash starts, and its version." />
+                <TextBlock Classes="body" Text="How Study Stash starts, setup, and its version." />
                 <TextBlock Classes="section" Text="Startup" />
                 <Border Classes="group">
                   <Border Classes="row">
@@ -597,6 +597,18 @@
                         <TextBlock Classes="row-sub" Text="To the menu bar or tray" />
                       </StackPanel>
                       <ToggleButton Grid.Column="1" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
+                    </Grid>
+                  </Border>
+                </Border>
+                <TextBlock Classes="section" Text="Setup" />
+                <Border Classes="group">
+                  <Border Classes="row">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Spacing="2">
+                        <TextBlock Classes="row-title" Text="Run setup again" />
+                        <TextBlock Classes="row-sub" Text="The first-run steps, with what's set up already kept" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Classes="pill" Command="{Binding RunSetupAgainCommand}" VerticalAlignment="Center"><TextBlock Text="Run setup" /></Button>
                     </Grid>
                   </Border>
                 </Border>

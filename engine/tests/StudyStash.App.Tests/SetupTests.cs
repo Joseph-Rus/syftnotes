@@ -119,6 +119,25 @@ public sealed class SetupTests
     }
 
     [Fact]
+    public void Setup_run_again_from_settings_keeps_what_this_computer_is_for()
+    {
+        var m = SetupModel.For(SkinKind.Mac, AppRole.Library);
+        m.LibraryOk = true;
+        m.Again = true;
+        Assert.Equal("Set up Study Stash again", m.WelcomeTitle);
+        Assert.Contains("Settings → Connection", m.WelcomeBody, StringComparison.Ordinal);
+        Assert.True(m.CanChooseLibrary);
+        Assert.False(m.CanChooseOneComputer || m.CanChooseLaptop);
+
+        // The other cards do nothing: switching roles moves lectures, which only Settings does.
+        m.ChooseLaptopCommand.Execute(null);
+        m.ChooseOneComputerCommand.Execute(null);
+        Assert.Equal(AppRole.Library, m.Role);
+        Assert.Equal(SetupStep.Password, m.Steps[1].Step);
+        Assert.True(m.LibraryOk);
+    }
+
+    [Fact]
     public void The_windows_laptop_setup_exe_starts_on_just_this_computer()
     {
         // What Study-Stash-Laptop-Setup.exe writes beside StudyStash.exe (Inno Setup's [INI]: plain text, CRLF).

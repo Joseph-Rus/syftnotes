@@ -721,6 +721,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>Whisper couldn't start with the model: throw it away and download it again.</summary>
     [RelayCommand] void RedownloadModel() => _ = host.RedownloadModel();
 
+    /// <summary>Setup's steps again, from the welcome, with this computer's role kept.</summary>
+    [RelayCommand] static void RunSetupAgain() => Shell.RunSetupAgain();
+
     [RelayCommand] static void Quit() => Shell.Quit();
 
     public void Dispose()

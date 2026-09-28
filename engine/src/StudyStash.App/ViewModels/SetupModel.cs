@@ -105,8 +105,20 @@ public sealed partial class SetupModel : ObservableObject
     public string HeaderTitle => IsLibrary ? "Set up your library" : $"Set up Study Stash on this {DeviceWord}";
     public string FlowName => Role switch { AppRole.Library => "Library setup", AppRole.Laptop => "Laptop setup", _ => "One-computer setup" };
     public string FlowIcon => Role switch { AppRole.Library => "dns", AppRole.Laptop => "laptop_mac", _ => "desktop_windows" };
-    public string WelcomeTitle => "Welcome to Study Stash";
-    public string WelcomeBody => "How will you use it? You can add another computer later.";
+    /// <summary>Setup run again from Settings, on a computer that's already set up: it walks the same steps with
+    /// what's there filled in, and stays what it is (a library, a laptop or just this computer). Changing that moves
+    /// lectures between computers, which only Settings → Connection does.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WelcomeTitle), nameof(WelcomeBody), nameof(CanChooseOneComputer), nameof(CanChooseLaptop), nameof(CanChooseLibrary))]
+    public partial bool Again { get; set; }
+    public string WelcomeTitle => Again ? "Set up Study Stash again" : "Welcome to Study Stash";
+    public string WelcomeBody => Again
+        ? "Go through the steps again; what's already set up stays as it is. To change what this computer is for, use Settings → Connection."
+        : "How will you use it? You can add another computer later.";
+    /// <summary>The welcome's choices: any of them the first time; only the one this computer already is when run again.</summary>
+    public bool CanChooseOneComputer => !Again || IsOneComputer;
+    public bool CanChooseLaptop => !Again || IsLaptop;
+    public bool CanChooseLibrary => !Again || IsLibrary;
     // The welcome's three choices, in the student's words.
     public string OneComputerAbout => $"Records, transcribes and writes your notes, all on this {DeviceWord}. No server needed; notes are written while it's on.";
     public static string LaptopAbout => "Records lectures and sends them to your library on another computer.";
@@ -578,13 +590,18 @@ public sealed partial class SetupModel : ObservableObject
 
     /// <summary>The welcome's three choices; picking one shows its steps in the sidebar, keeping what's been typed.</summary>
     [RelayCommand]
-    void ChooseOneComputer() => SetRole(AppRole.Both);
+    void ChooseOneComputer() => Choose(AppRole.Both);
 
     [RelayCommand]
-    void ChooseLaptop() => SetRole(AppRole.Laptop);
+    void ChooseLaptop() => Choose(AppRole.Laptop);
 
     [RelayCommand]
-    void ChooseLibrary() => SetRole(AppRole.Library);
+    void ChooseLibrary() => Choose(AppRole.Library);
+
+    void Choose(AppRole role)
+    {
+        if (!Again) SetRole(role);
+    }
 
     [RelayCommand]
     async Task Connect()
