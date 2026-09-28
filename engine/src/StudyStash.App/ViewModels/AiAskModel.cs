@@ -102,7 +102,15 @@ public sealed partial class AiAskModel : ObservableObject
     public string ScopeName => ScopeChoices.FirstOrDefault(c => c.Id == Scope)?.Name ?? Scope;
     public string Placeholder => AiWords.AskPlaceholder(Scope);
     public AiTurn? Latest => Turns.Count > 0 ? Turns[^1] : null;
-    public bool HasLatest => Latest is not null;
+    /// <summary>The latest answer shows above the ask bar until the student closes it; the next question opens it again.</summary>
+    public bool HasLatest => Latest is not null && !AnswerClosed;
+    [ObservableProperty] public partial bool AnswerClosed { get; set; }
+
+    partial void OnAnswerClosedChanged(bool value) => OnPropertyChanged(nameof(HasLatest));
+
+    /// <summary>The answer card's close button: the notes get their room back.</summary>
+    [RelayCommand]
+    void CloseAnswer() => AnswerClosed = true;
 
     /// <summary>Opens Settings → AI engines (the "Change defaults" footer link).</summary>
     public Action? OpenSettings { get; set; }
@@ -184,6 +192,7 @@ public sealed partial class AiAskModel : ObservableObject
         Question = "";
         var turn = new AiTurn(q, EngineName);
         Turns.Add(turn);
+        AnswerClosed = false;
         OnPropertyChanged(nameof(Latest));
         OnPropertyChanged(nameof(HasLatest));
         Busy = true;

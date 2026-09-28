@@ -415,41 +415,39 @@ public sealed class SetupTests
     }
 
     [Fact]
-    public async Task Adding_an_already_shown_class_sets_its_times_instead_of_posting_a_duplicate()
+    public async Task Classes_lists_the_librarys_classes_and_adds_one_with_what_it_covers()
     {
-        int posts = 0;
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.Logging.ClearProviders();
-        WebHostBuilderKestrelExtensions.ConfigureKestrel(builder.WebHost, k => k.Listen(IPAddress.Loopback, 0));
-        var app = builder.Build();
-        app.MapPost("/classes", () => { posts++; return Results.Ok(new { }); });
-        await app.StartAsync(TestContext.Current.CancellationToken);
-        try
-        {
-            string url = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
-            using var home = new TempHome();
-            using var host = Host(home);
-            var cc = host.Client();
-            cc.ServerUrl = url;
-            Configs.SaveClient(cc);
-            var t = host.Timetable;
-            t.Classes.Add(new TimetableClass("CS 101", []));
-            host.SaveTimetable(t);
-            var m = Setup.Make(host, AppRole.Laptop);
+        await using var rig = await LibraryRig.StartAsync();
+        using var home = new TempHome();
+        using var host = Host(home);
+        var cc = host.Client();
+        cc.ServerUrl = rig.Url;
+        cc.PoolKey = LibraryRig.Password;
+        Configs.SaveClient(cc);
+        await host.CheckLibraryAsync();
+        var m = Setup.Make(host, AppRole.Laptop);
+        Assert.Equal(["CS 101", "BIO 110"], m.Classes.Select(c => c.Name));
 
-            m.NewClass = "CS 101";
-            m.NewWhen = "Tue Thu 10:00-11:15";
-            await m.AddClassCommand.ExecuteAsync(null);
+        m.NewClass = "HIST 210";
+        m.NewAbout = "Modern European history, 1789 to 1914";
+        await m.AddClassCommand.ExecuteAsync(null);
+        Assert.Null(m.ClassProblem);
+        Assert.Equal("Modern European history, 1789 to 1914", m.Classes.Single(c => c.Name == "HIST 210").About);
+        Assert.Equal(("", ""), (m.NewClass, m.NewAbout));
+        // The library has it, and what it covers, for its AI to sort by.
+        Assert.Equal("Modern European history, 1789 to 1914", Configs.Load(rig.Home).Classes.Single(c => c.Name == "HIST 210").Description);
 
-            Assert.Equal(0, posts);
-            Assert.Single(m.Classes, c => c.Name == "CS 101");
-            Assert.Contains("Tue", m.Classes.Single(c => c.Name == "CS 101").When);
-            Assert.Single(host.Timetable.Classes, c => c.Name == "CS 101");
-        }
-        finally
-        {
-            await app.DisposeAsync();
-        }
+        // One it already has isn't added twice.
+        m.NewClass = "CS 101";
+        await m.AddClassCommand.ExecuteAsync(null);
+        Assert.Single(m.Classes, c => c.Name == "CS 101");
+        Assert.Single(Configs.Load(rig.Home).Classes, c => c.Name == "CS 101");
+
+        // A name the library won't take: said, and nothing added.
+        m.NewClass = "Unsorted";
+        await m.AddClassCommand.ExecuteAsync(null);
+        Assert.StartsWith("The library didn't take the class", m.ClassProblem);
+        Assert.DoesNotContain(m.Classes, c => c.Name == "Unsorted");
     }
 
     // ---- Classes from Canvas courses ----
@@ -481,7 +479,7 @@ public sealed class SetupTests
 
         Assert.Equal(SetupStep.Classes, m.Step);
         Assert.False(m.HasCourses);
-        Assert.StartsWith("With your timetable", m.ClassesLede);
+        Assert.StartsWith("The library reads each lecture and files it under the class it's about", m.ClassesLede);
     }
 
     /// <summary>A pretend library on a free port that takes classes (POST /classes) and Canvas saves (POST
@@ -497,7 +495,8 @@ public sealed class SetupTests
         app.MapPost("/api/v2/classes", async (HttpRequest r) =>
         {
             var body = await System.Text.Json.JsonDocument.ParseAsync(r.Body);
-            lock (classes) classes.Add(body.RootElement.GetProperty("name").GetString()!);
+            string about = body.RootElement.TryGetProperty("description", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.String ? d.GetString()! : "";
+            lock (classes) classes.Add($"{body.RootElement.GetProperty("name").GetString()} · {about}");
             return Results.Ok(new { });
         });
         app.MapPost("/api/v2/canvas", async (HttpRequest r) =>
@@ -526,15 +525,12 @@ public sealed class SetupTests
             var m = Setup.Make(host, AppRole.Laptop);
             m.TakeCourses([new FoundCourse("4201", "CS 101", "Intro to Programming"), new FoundCourse("4202", "BIO 110", "Cell Biology"),
                 new FoundCourse("4205", "", "Study Skills")]);
-            m.Courses[0].When = "Tue Thu 10:00-11:15";
             m.Courses[2].Ticked = false;
 
             Assert.True(await Setup.AddCoursesAsync(m, host));
 
-            Assert.Equal(["BIO 110", "CS 101"], host.Timetable.Classes.Select(c => c.Name).Order());
-            Assert.Contains(host.Timetable.Classes.Single(c => c.Name == "CS 101").Times, t => t.Describe().Contains("Tue", StringComparison.Ordinal));
-            Assert.Empty(host.Timetable.Classes.Single(c => c.Name == "BIO 110").Times);
-            Assert.Equal(["BIO 110", "CS 101"], posted.Order());
+            // Each ticked course is a class, its name on Canvas saying what it covers (the library's AI sorts by it).
+            Assert.Equal(["BIO 110 · Cell Biology", "CS 101 · Intro to Programming"], posted.Order());
             for (int i = 0; i < 50 && bodies.Count < 2; i++) await Task.Delay(20, TestContext.Current.CancellationToken); // the sync is asked for without waiting
             Assert.Equal("{\"courses\":{\"CS 101\":4201,\"BIO 110\":4202}}", bodies[0]);
             Assert.Equal("{\"sync\":true}", bodies[1]);
@@ -544,23 +540,6 @@ public sealed class SetupTests
         {
             await app.DisposeAsync();
         }
-    }
-
-    [Fact]
-    public async Task A_when_that_cant_be_read_keeps_Classes_open_and_adds_nothing()
-    {
-        using var home = new TempHome();
-        using var host = Host(home);
-        var m = Setup.Make(host, AppRole.Laptop);
-        m.TakeCourses([new FoundCourse("4201", "CS 101", "Intro to Programming")]);
-        m.Courses[0].When = "whenever";
-        m.Go(SetupStep.Classes);
-
-        await m.NextCommand.ExecuteAsync(null);
-
-        Assert.Equal(SetupStep.Classes, m.Step);
-        Assert.Contains("CS 101", m.ClassProblem);
-        Assert.Empty(host.Timetable.Classes);
     }
 
     [Fact]

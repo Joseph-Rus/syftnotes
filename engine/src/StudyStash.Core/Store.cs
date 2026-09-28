@@ -168,6 +168,8 @@ public sealed class Store : IDisposable
             updated_at TEXT
         );
         CREATE TABLE IF NOT EXISTS sync_state (key TEXT PRIMARY KEY, value TEXT);
+        CREATE TABLE IF NOT EXISTS trash (id TEXT PRIMARY KEY, row_json TEXT, md_text TEXT, deleted_at TEXT);
+        CREATE TABLE IF NOT EXISTS gone (id TEXT PRIMARY KEY, gone_at TEXT);
 
         """;
 
@@ -692,6 +694,149 @@ public sealed class Store : IDisposable
             return true;
         }
     }
+
+    // --- the trash: a deleted lecture can come back for a few minutes -------------------------------------------------
+
+    /// <summary>
+    /// Delete a lecture so it can still be undone: its row and its Markdown file (notes and transcript) go into the
+    /// trash, and it leaves every list, search and answer at once. <see cref="Restore"/> puts it back exactly;
+    /// <see cref="EmptyTrash"/> makes it final. False when there's no such lecture.
+    /// </summary>
+    public bool Trash(string noteId, DateTimeOffset? now = null)
+    {
+        lock (gate)
+        {
+            var row = RawRow(noteId);
+            if (row is null) return false;
+            string? path = row["md_path"] is JsonValue v && v.TryGetValue(out string? p) && p.Length > 0 ? p : null;
+            string? text = path is not null && File.Exists(path) ? Py.ReadText(path) : null;
+            Exec("INSERT INTO trash(id, row_json, md_text, deleted_at) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET "
+                + "row_json=excluded.row_json, md_text=excluded.md_text, deleted_at=excluded.deleted_at",
+                noteId, row.ToJsonString(), text, Stamp(now ?? DateTimeOffset.UtcNow));
+            return Delete(noteId);
+        }
+    }
+
+    /// <summary>A lecture back from the trash, as it was: its row, its file where it was, and its passages for search.
+    /// False when it isn't in the trash (never deleted, or the trash was emptied).</summary>
+    public bool Restore(string noteId)
+    {
+        lock (gate)
+        {
+            string? rowJson, text;
+            using (var cmd = Command("SELECT row_json, md_text FROM trash WHERE id=?", noteId))
+            using (var r = cmd.ExecuteReader())
+            {
+                if (!r.Read()) return false;
+                rowJson = r.IsDBNull(0) ? null : r.GetString(0);
+                text = r.IsDBNull(1) ? null : r.GetString(1);
+            }
+            if (JsonNode.Parse(rowJson ?? "null") is not JsonObject row) return false;
+            var columns = Columns();
+            var cells = row.Where(kv => columns.Contains(kv.Key)).ToList();
+            Exec($"INSERT OR REPLACE INTO notes({string.Join(",", cells.Select(c => c.Key))}) VALUES({string.Join(",", cells.Select(_ => "?"))})",
+                [.. cells.Select(c => Cell(c.Value))]);
+            Exec("DELETE FROM trash WHERE id=?", noteId);
+            // Deleted while its notes were being written: that work was dropped, so it's written again.
+            Exec("UPDATE notes SET status=?, updated_at=? WHERE id=? AND status=?", Queued, Now(), noteId, Working);
+            var back = Get(noteId);
+            if (back is not null && !string.IsNullOrEmpty(back.MdPath) && text is not null)
+            {
+                Directory.CreateDirectory(Py.Parent(back.MdPath));
+                Py.WriteText(back.MdPath, text);
+                var m = Meeting(back);
+                Index(noteId, string.IsNullOrEmpty(back.SummaryMd) ? m.NotesMarkdown : back.SummaryMd, m.Transcript, back.UpdatedAt ?? "");
+            }
+            return back is not null;
+        }
+    }
+
+    /// <summary>Lectures deleted before <paramref name="before"/> are gone for good (everything in the trash, with
+    /// no date): their ids are kept a while in <see cref="Gone"/>, so a laptop can drop its own recording of them.
+    /// Returns how many.</summary>
+    public int EmptyTrash(DateTimeOffset? before = null)
+    {
+        lock (gate)
+        {
+            var ids = new List<string>();
+            using (var cmd = before is { } b ? Command("SELECT id FROM trash WHERE deleted_at < ?", Stamp(b)) : Command("SELECT id FROM trash"))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read()) ids.Add(r.GetString(0));
+            string now = Now();
+            foreach (string id in ids)
+            {
+                Exec("INSERT INTO gone(id, gone_at) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET gone_at=excluded.gone_at", id, now);
+                Exec("DELETE FROM trash WHERE id=?", id);
+            }
+            // A laptop that hasn't reached the library in a month has long since dropped old audio anyway.
+            Exec("DELETE FROM gone WHERE gone_at < ?", Stamp(DateTimeOffset.UtcNow.AddDays(-30)));
+            return ids.Count;
+        }
+    }
+
+    /// <summary>The lectures in the trash now, oldest first.</summary>
+    public List<string> Trashed()
+    {
+        lock (gate)
+        {
+            var ids = new List<string>();
+            using var cmd = Command("SELECT id FROM trash ORDER BY deleted_at");
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) ids.Add(r.GetString(0));
+            return ids;
+        }
+    }
+
+    /// <summary>Lectures deleted for good in the last month.</summary>
+    public List<string> Gone()
+    {
+        lock (gate)
+        {
+            var ids = new List<string>();
+            using var cmd = Command("SELECT id FROM gone ORDER BY gone_at");
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) ids.Add(r.GetString(0));
+            return ids;
+        }
+    }
+
+    static string Stamp(DateTimeOffset t) => t.UtcDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'+00:00'", System.Globalization.CultureInfo.InvariantCulture);
+
+    HashSet<string> Columns()
+    {
+        var cols = new HashSet<string>();
+        using var cmd = Command("PRAGMA table_info(notes)");
+        using var r = cmd.ExecuteReader();
+        while (r.Read()) cols.Add(r.GetString(r.GetOrdinal("name")));
+        return cols;
+    }
+
+    /// <summary>A lecture's whole row, every column as it's stored, so the trash can put it back exactly.</summary>
+    JsonObject? RawRow(string noteId)
+    {
+        using var cmd = Command("SELECT * FROM notes WHERE id=?", noteId);
+        using var r = cmd.ExecuteReader();
+        if (!r.Read()) return null;
+        var row = new JsonObject();
+        for (int i = 0; i < r.FieldCount; i++)
+            row[r.GetName(i)] = r.IsDBNull(i) ? null : r.GetValue(i) switch
+            {
+                long l => JsonValue.Create(l),
+                double d => JsonValue.Create(d),
+                string str => JsonValue.Create(str),
+                var other => JsonValue.Create(Convert.ToString(other, System.Globalization.CultureInfo.InvariantCulture)),
+            };
+        return row;
+    }
+
+    static object? Cell(JsonNode? n) => n switch
+    {
+        null => null,
+        JsonValue v when v.TryGetValue(out string? str) => str,
+        JsonValue v when v.TryGetValue(out long l) => l,
+        JsonValue v when v.TryGetValue(out double d) => d,
+        _ => n.ToJsonString(),
+    };
 
     void DropEmptyDir(string? old, string? @new)
     {

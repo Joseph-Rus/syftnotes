@@ -9,8 +9,8 @@ Study Stash is one app for both jobs, on Mac and Windows:
 - **Your laptop** (the computer you carry to class): a menu bar (Mac) or tray (Windows) app.
   Click **Record**, and it listens to the microphone and transcribes what it hears locally, with
   Whisper large-v3 (Metal on Apple silicon, Vulkan or the CPU on Windows) — the audio never leaves
-  the laptop. It looks at your timetable to know which class is on, then sends the lecture to your
-  library once it's reachable. A quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows) searches
+  the laptop. It sends the lecture to your library once it's reachable, and the library files it
+  under the class it's about from what was said (or under the class you picked, if you did). A quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows) searches
   your lectures from anywhere, and the full window browses classes, lectures, notes, Canvas work,
   and lets you ask an AI about any of it.
 - **Your library** (a home server: a Mac mini, an old laptop, any computer that stays on): run
@@ -22,7 +22,7 @@ Study Stash is one app for both jobs, on Mac and Windows:
 your laptop                                     your library
 ┌───────────────────────────┐  POST /api/ingest  ┌──────────────────────────────────────┐
 │ record → Whisper (local)   │ ──────────────────▶│ queue → study notes (your AI engine)  │
-│  ↳ filed by the timetable  │   over Tailscale    │ → sort into a class → Markdown file   │
+│  ↳ class: yours, or none   │   over Tailscale    │ → sort into a class → Markdown file   │
 └───────────────────────────┘                     │ web page, Claude/MCP, Canvas mirror    │
                                                    └──────────────────────────────────────┘
 ```

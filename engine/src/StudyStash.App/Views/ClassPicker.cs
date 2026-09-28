@@ -6,22 +6,24 @@ using StudyStash.App.Controls;
 namespace StudyStash.App.Views;
 
 /// <summary>
-/// The dropdown's class picker: each class (its dot and name), then "Let the library sort it" and "Follow my
-/// timetable", with a check on what Record will do now. Every label starts at the same place, whether or not its row
-/// has a dot.
+/// The dropdown's class picker: "Let the library sort it" (the default: the library files the lecture by what was said
+/// in it), then each class (its dot and name) for when you'd rather choose, with a check on what Record will do now.
+/// Every label starts at the same place, whether or not its row has a dot.
 /// </summary>
 public static class ClassPicker
 {
-    /// <summary>The menu for <paramref name="classes"/>, <paramref name="chosen"/> checked: null follows the
-    /// timetable, "" lets the library sort it, a class's name records into that class. Picking a row hands
-    /// <paramref name="pick"/> the same kind of value.</summary>
-    public static ContextMenu Build(IReadOnlyList<(string Name, int Color)> classes, string? chosen, Action<string?> pick)
+    public const string SortLabel = "Let the library sort it";
+    /// <summary>The line under Record while the library will sort the lecture.</summary>
+    public const string SortHint = "The library sorts it by what's said";
+
+    /// <summary>The menu for <paramref name="classes"/>, <paramref name="chosen"/> checked: "" lets the library sort
+    /// it, a class's name records into that class. Picking a row hands <paramref name="pick"/> the same kind of value.</summary>
+    public static ContextMenu Build(IReadOnlyList<(string Name, int Color)> classes, string chosen, Action<string> pick)
     {
         var menu = new ContextMenu { WindowManagerAddShadowHint = OperatingSystem.IsMacOS() };
-        foreach (var (name, color) in classes) menu.Items.Add(Row(name, color, chosen == name, () => pick(name)));
+        menu.Items.Add(Row(SortLabel, null, chosen.Length == 0 || classes.All(c => c.Name != chosen), () => pick("")));
         if (classes.Count > 0) menu.Items.Add(new Separator());
-        menu.Items.Add(Row("Let the library sort it", null, chosen == "", () => pick("")));
-        menu.Items.Add(Row("Follow my timetable", null, chosen is null, () => pick(null)));
+        foreach (var (name, color) in classes) menu.Items.Add(Row(name, color, chosen == name, () => pick(name)));
         return menu;
     }
 

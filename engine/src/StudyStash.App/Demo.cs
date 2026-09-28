@@ -81,8 +81,10 @@ public static class Demo
         """;
 
     /// <summary>The sample library; with <paramref name="due"/> a "Due" item heads the sidebar (nothing selected), to
-    /// eyeball it against the Canvas Due screen.</summary>
-    public static LibraryModel Library(bool due = false)
+    /// eyeball it against the Canvas Due screen; with <paramref name="answered"/> a long answer sits above the ask bar;
+    /// with <paramref name="deleting"/> the window asks before deleting the open lecture, and with
+    /// <paramref name="deleted"/> "Deleted · Undo" shows under the list.</summary>
+    public static LibraryModel Library(bool due = false, bool answered = false, bool deleting = false, bool deleted = false)
     {
         var m = new LibraryModel { ClassTitle = "CS 101", ClassCount = "12 lectures", Status = "Library connected", DrawChrome = true };
         if (due) m.Classes.Add(new ClassItem { Name = "Due", IsDue = true, Count = 3 });
@@ -90,7 +92,7 @@ public static class Demo
         m.Classes.Add(new ClassItem { Name = "BIO 110", Dot = Bio, Count = 9 });
         m.Classes.Add(new ClassItem { Name = "CALC II", Dot = Calc, Count = 11 });
         m.Classes.Add(new ClassItem { Name = "HIST 210", Dot = Hist, Count = 7 });
-        m.Unsorted = new ClassItem { Name = "Unsorted", IsUnsorted = true, Count = 2 };
+        m.Unsorted.Count = 2;
         var week = new LectureGroup { Label = "This week", First = true };
         week.Items.Add(new LectureCard { Title = "Recursion and the call stack", Meta = "Tue 23 Sep · 1 h 12 min", Summary = "A recursive function solves a problem by calling itself on a smaller version of it.", Selected = true });
         week.Items.Add(new LectureCard { Title = "Stack frames and scope", Meta = "Thu 18 Sep · 1 h 14 min", Summary = "Where a variable lives decides who can see it, and for how long." });
@@ -105,6 +107,20 @@ public static class Demo
             ClassName = "CS 101", Dot = Cs, Meta = "CS 101 · Tuesday 23 September · 1 h 12 min", Title = "Recursion and the call stack", Markdown = Notes,
         };
         m.Ask = AiDemo.AskIdle();
+        if (answered)
+            m.Ask.Turns.Add(new AiTurn("What should I practise before the midterm?", "Claude Code")
+            {
+                Answer = "Practise tracing recursion by hand. She said the midterm asks you to draw the call stack for a small "
+                    + "recursive function at its deepest point, so work through factorial(4) and fib(4) frame by frame, writing "
+                    + "each call's argument and what it returns. Then check what happens when the base case is wrong: calling "
+                    + "factorial(0) with a base case of n == 1 never stops, and the stack overflows. She also said Big-O proofs "
+                    + "won't be on it, but you should be able to say why each call waits for the one it made, and why the most "
+                    + "recent call finishes first. Last, reread the definitions of call stack, stack frame and base case: two "
+                    + "of the short questions come straight from them.",
+                Byline = "Claude Code · 12:40, 31:05, 58:20",
+            });
+        if (deleting) m.Deleting = new LectureDeletion("lec-recursion", "Recursion and the call stack", "CS 101");
+        if (deleted) m.Deleted = new LectureDeletion("lec-frames", "Stack frames and scope", "CS 101");
         return m;
     }
 
@@ -151,7 +167,7 @@ public static class Demo
     {
         var p = new PanelModel
         {
-            ClassName = "CS 101", ClassDot = Cs, Hint = "From your timetable · Tue 10:00–11:15", Status = "Library connected · Model ready",
+            ClassName = "CS 101", ClassDot = Cs, Hint = "Picked by you", Status = "Library connected · Model ready",
             IsRecording = recording, Elapsed = "24:18", Levels = Wave, LastLine = "“…and when we hit the base case, the frames come off one by one.”",
         };
         if (!recording)

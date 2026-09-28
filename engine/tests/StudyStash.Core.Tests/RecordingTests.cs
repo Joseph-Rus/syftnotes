@@ -213,59 +213,7 @@ public class RecordingTests
         Assert.False(new Chunk(0, quiet).Silent());
     }
 
-    // --- timetable --------------------------------------------------------------------------------------------
-
-    static Timetable Week() => new()
-    {
-        Classes =
-        [
-            new("CS 101", [new(DayOfWeek.Tuesday, new(10, 0), new(11, 15)), new(DayOfWeek.Thursday, new(10, 0), new(11, 15))]),
-            new("BIO 110", [new(DayOfWeek.Tuesday, new(11, 0), new(12, 30))]),
-        ],
-    };
-
-    [Fact]
-    public void Record_picks_the_class_on_now()
-    {
-        var t = Week();
-        var tue = new DateTime(2026, 9, 22); // a Tuesday
-        Assert.Equal("CS 101", t.Now(tue.AddHours(9).AddMinutes(52))?.Name); // ten minutes early counts
-        Assert.Null(t.Now(tue.AddHours(9).AddMinutes(40)));
-        Assert.Equal("BIO 110", t.Now(tue.AddHours(11).AddMinutes(5))?.Name); // overlap: the one that started last
-        Assert.Equal("Tue 10:00–11:15", t.Now(tue.AddHours(10))!.Time.Describe());
-        var next = t.Next(tue.AddHours(13));
-        Assert.Equal("CS 101", next?.Class.Name);
-        Assert.Equal(new DateTime(2026, 9, 24, 10, 0, 0), next?.Starts);
-        Assert.Equal(new DateTime(2026, 9, 29, 10, 0, 0), t.Next(new DateTime(2026, 9, 24, 10, 30, 0))?.Starts);
-    }
-
-    [Theory]
-    [InlineData("Tue Thu 10:00–11:15", "Tue 10:00–11:15|Thu 10:00–11:15")]
-    [InlineData("Mon Wed Fri 9-9:50", "Mon 9:00–9:50|Wed 9:00–9:50|Fri 9:00–9:50")]
-    [InlineData("MWF 9:00-9:50", "Mon 9:00–9:50|Wed 9:00–9:50|Fri 9:00–9:50")]
-    [InlineData("TTh 2-3:15", "Tue 14:00–15:15|Thu 14:00–15:15")]
-    [InlineData("tuesday 2pm to 3:15pm", "Tue 14:00–15:15")]
-    [InlineData("Wed 11:30-1pm", "Wed 11:30–13:00")]
-    [InlineData("sometime", "")]
-    [InlineData("Mon 10-9", "")]
-    public void Class_times_are_read_as_people_write_them(string text, string expected)
-    {
-        var times = ClassTime.ParseMany(text);
-        Assert.Equal(expected, times is null ? "" : string.Join("|", times.Select(t => t.Describe())));
-    }
-
-    [Fact]
-    public void Timetable_saves_and_follows_the_librarys_classes()
-    {
-        using var dir = new TempDir();
-        Week().Save(dir.Path);
-        var back = Timetable.Load(dir.Path);
-        Assert.Equal(["CS 101", "BIO 110"], back.Classes.Select(c => c.Name));
-        Assert.Equal(new TimeOnly(11, 15), back.Classes[0].Times[0].End);
-        Assert.True(back.KeepOnly(["CS 101"]));
-        Assert.Equal(["CS 101"], back.Classes.Select(c => c.Name));
-        Assert.Empty(Timetable.Load(dir["nowhere"]).Classes);
-    }
+    // --- class colors -----------------------------------------------------------------------------------------
 
     [Fact]
     public void Class_colors_are_the_designs()

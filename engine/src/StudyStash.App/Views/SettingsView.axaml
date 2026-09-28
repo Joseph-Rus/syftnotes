@@ -646,35 +646,6 @@
                 </CheckBox>
               </StackPanel>
 
-              <!-- Timetable -->
-              <StackPanel IsVisible="{Binding OnTimetable}" Spacing="8">
-                <TextBlock Classes="h" Text="Timetable" />
-                <TextBlock Classes="body" Text="When your classes meet: Record picks the one that's on. Write the days and times like “Tue Thu 10:00–11:15”." />
-                <ItemsControl ItemsSource="{Binding Rows}" Margin="0,8,0,0" MaxWidth="520" HorizontalAlignment="Left">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="s:TimetableRow">
-                      <Grid ColumnDefinitions="Auto,10,140,10,*,6,Auto" Margin="0,0,0,8">
-                        <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        <Border Grid.Column="4" Classes="field" Classes.bad="{Binding Bad}">
-                          <TextBox Classes="bare" Text="{Binding Times}" PlaceholderText="Not in the timetable" FontSize="13" LostFocus="OnTimesLostFocus" />
-                        </Border>
-                        <Button Grid.Column="6" Theme="{StaticResource Surface}" Width="28" Height="28" CornerRadius="{DynamicResource RadiusControl}" HorizontalContentAlignment="Center"
-                                Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).RemoveClassCommand}" CommandParameter="{Binding}" ToolTip.Tip="Take it off the timetable">
-                          <c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg3}" />
-                        </Button>
-                      </Grid>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <Grid ColumnDefinitions="158,10,*,10,Auto" MaxWidth="520" HorizontalAlignment="Left" Margin="0,4,0,0">
-                  <Border Classes="field"><TextBox Classes="bare" Text="{Binding NewClass}" PlaceholderText="A new class" FontSize="13" /></Border>
-                  <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding NewTimes}" PlaceholderText="Tue Thu 10:00–11:15" FontSize="13" /></Border>
-                  <Button Grid.Column="4" Classes="pill" Command="{Binding AddClassCommand}"><TextBlock Text="Add" FontSize="13" /></Button>
-                </Grid>
-                <TextBlock Classes="say" Text="{Binding ClassesSay}" IsVisible="{Binding ClassesSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-              </StackPanel>
-
               <!-- Your library: its own settings, through its API (Library, Classes, Notes and sorting, Folders). Every
                    row is one grid: its words on the left, its control in the right column on the row's centre line. -->
               <StackPanel IsVisible="{Binding OnLibraryPage}" Spacing="8">

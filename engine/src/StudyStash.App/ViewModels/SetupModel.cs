@@ -58,15 +58,17 @@ public sealed partial class StepItem : ObservableObject
     partial void OnCurrentChanged(bool value) => OnPropertyChanged(nameof(Todo));
 }
 
-/// <summary>A class you're adding in setup, and when it meets: "CS 101, Tue Thu 10:00–11:15".</summary>
+/// <summary>A class in your library, as setup lists it: its name and what it covers ("CS 101 · Recursion, stacks and
+/// Big-O"), which the library's AI reads to sort each lecture.</summary>
 public sealed partial class SetupClass : ObservableObject
 {
     [ObservableProperty] public partial string Name { get; set; } = "";
-    [ObservableProperty] public partial string When { get; set; } = "";
+    [ObservableProperty] public partial string About { get; set; } = "";
     public IBrush Dot { get; init; } = Brushes.Gray;
 }
 
-/// <summary>A Canvas course setup found, as the class it would become: ticked to add it, and when it meets (optional).</summary>
+/// <summary>A Canvas course setup found, as the class it would become: ticked to add it. Its name on Canvas becomes what
+/// the class covers, so the library's AI knows what it's about even when the class is named by its code.</summary>
 public sealed partial class SetupCourse : ObservableObject
 {
     public string Id { get; init; } = "";
@@ -76,7 +78,6 @@ public sealed partial class SetupCourse : ObservableObject
     public string CourseName { get; init; } = "";
     public bool HasCourseName => CourseName.Length > 0 && CourseName != Name;
     [ObservableProperty] public partial bool Ticked { get; set; } = true;
-    [ObservableProperty] public partial string When { get; set; } = "";
 }
 
 /// <summary>
@@ -200,18 +201,19 @@ public sealed partial class SetupModel : ObservableObject
 
     // Classes
     public ObservableCollection<SetupClass> Classes { get; } = [];
-    /// <summary>The courses the Canvas step found, each a class to add (ticked) with an optional "when"; empty when
-    /// Canvas was skipped, and then Classes is the plain add-your-own step.</summary>
+    /// <summary>The courses the Canvas step found, each a class to add (ticked); empty when Canvas was skipped, and
+    /// then Classes is the plain add-your-own step.</summary>
     public ObservableCollection<SetupCourse> Courses { get; } = [];
     public bool HasCourses => Courses.Count > 0;
     public string ClassesLede => HasCourses
-        ? "Your Canvas courses become your classes. Add when each meets, so Record picks the class that's on, and untick any you don't record."
-        : "With your timetable, Record picks the class that's on, so each lecture lands in the right place. You can skip this.";
+        ? "Your Canvas courses become your classes. The library reads each lecture and files it under the one it's about. Untick any you don't record."
+        : "The library reads each lecture and files it under the class it's about. Name your classes and say what each covers. You can skip this.";
     /// <summary>Continue on Classes is adding the ticked courses and linking them to Canvas.</summary>
     [ObservableProperty] public partial bool AddingCourses { get; set; }
     [ObservableProperty] public partial string NewClass { get; set; } = "";
-    [ObservableProperty] public partial string NewWhen { get; set; } = "";
-    /// <summary>The times typed couldn't be read: how to write them.</summary>
+    /// <summary>What the new class covers (optional): it helps the library's AI sort.</summary>
+    [ObservableProperty] public partial string NewAbout { get; set; } = "";
+    /// <summary>The library couldn't take the class: why.</summary>
     [ObservableProperty] public partial string? ClassProblem { get; set; }
     public bool HasClassProblem => !string.IsNullOrEmpty(ClassProblem);
     partial void OnClassProblemChanged(string? value) => OnPropertyChanged(nameof(HasClassProblem));
@@ -373,7 +375,7 @@ public sealed partial class SetupModel : ObservableObject
     partial void OnAddingCoursesChanged(bool value) => OnPropertyChanged(nameof(CanContinue));
 
     /// <summary>The Canvas step found courses: each becomes a ticked row on Classes. A course already shown keeps its
-    /// tick and times; one no longer found goes.</summary>
+    /// tick; one no longer found goes.</summary>
     public void TakeCourses(IReadOnlyList<FoundCourse> found)
     {
         var had = Courses.ToDictionary(c => c.Id);

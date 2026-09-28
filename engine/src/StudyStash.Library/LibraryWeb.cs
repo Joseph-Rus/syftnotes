@@ -332,7 +332,7 @@ public sealed partial class LibraryWeb
         }));
         app.MapPost("/note/{noteId}/delete", (HttpContext ctx, string noteId) => WithMember(ctx, _ =>
         {
-            store.Delete(noteId);
+            store.Trash(noteId);
             return Http.SeeOther("/");
         }));
         app.MapGet("/note/{noteId}/download", (HttpContext ctx, string noteId) => WithMember(ctx, _ =>

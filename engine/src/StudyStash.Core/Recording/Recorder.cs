@@ -873,7 +873,6 @@ public sealed class LectureSender(LectureStore store, Func<ClientConfig> config,
 {
     static readonly double[] Backoff = [30, 60, 120, 300, 600];
     readonly Action<string> log = log ?? (_ => { });
-    readonly string home = Path.GetDirectoryName(store.Dir)!; // where timetable.json is
     // Counts wakes; one look takes them all (see RunAsync).
     readonly SemaphoreSlim wake = new(0);
     // Lectures whose library didn't answer when asked after them: said once in the log, not every 10 seconds.
@@ -921,10 +920,7 @@ public sealed class LectureSender(LectureStore store, Func<ClientConfig> config,
             {
                 var payload = l.Payload();
                 if (l.Owner.Length == 0) payload["owner"] = cc.DisplayName;
-                // Recorded without a class: the one the timetable says was on then files it without asking the AI.
-                // Its own clock time (not this computer's zone) is what the timetable means.
-                if (l.ClassName.Length == 0)
-                    payload["folder"] = Timetable.Load(home).Now(l.StartedAt.DateTime, TimeSpan.FromMinutes(15))?.Name ?? "";
+                // Recorded without a class, it goes unclassified ("folder" empty): the library sorts it by what was said.
                 try
                 {
                     await host.Post($"{server}/api/ingest", payload.ToJsonString(), cc.PoolKey);
