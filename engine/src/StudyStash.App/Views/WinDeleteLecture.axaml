@@ -1,0 +1,46 @@
+<!-- "Delete this lecture?": asked in the library window before a lecture goes, as a Windows 11 content dialog over the
+     page. Cancel and Delete share the footer, one height; Escape cancels. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.WinDeleteLecture"
+             x:DataType="vm:LibraryModel"
+             ClipToBounds="False">
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Escape" Command="{Binding CancelDeleteCommand}" />
+  </UserControl.KeyBindings>
+  <UserControl.Styles>
+    <Style Selector="Button.dialog">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Foreground" Value="{DynamicResource IcErr}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Width="420" CornerRadius="8" Background="{DynamicResource PopupBg}" BorderBrush="{DynamicResource PopupStroke}" BorderThickness="1"
+          BoxShadow="{DynamicResource ShadowLg}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Bottom" Background="{DynamicResource Footer}" Padding="24">
+        <Grid ColumnDefinitions="*,8,*">
+          <Button Name="Confirm" Classes="dialog danger" Command="{Binding ConfirmDeleteCommand}">
+            <TextBlock Text="Delete" FontSize="14" FontWeight="SemiBold" />
+          </Button>
+          <Button Name="Cancel" Grid.Column="2" Classes="dialog" Command="{Binding CancelDeleteCommand}">
+            <TextBlock Text="Cancel" FontSize="14" />
+          </Button>
+        </Grid>
+      </Border>
+      <StackPanel Spacing="12" Margin="24,24,24,24">
+        <TextBlock Text="Delete this lecture?" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Deleting.Warning, FallbackValue=''}" FontSize="14" LineHeight="20" TextWrapping="Wrap" />
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>

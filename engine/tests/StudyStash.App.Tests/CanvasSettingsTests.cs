@@ -6,6 +6,18 @@ namespace StudyStash.App.Tests;
 
 public class CanvasSettingsTests
 {
+    [Fact]
+    public void Course_pickers_list_each_course_by_its_name_with_its_short_code_beside_it()
+    {
+        var o = System.Text.Json.JsonSerializer.Deserialize<CanvasApi.Overview>("""
+            {"available": {"4206": "Software Engineering", "4205": "Study Skills", "4201": "COMP 101 · Intro to Programming"},
+             "course_info": {"4206": {"code": "202710.TS.CSCI321.A", "name": "Software Engineering", "title": "Software Engineering", "short_code": "CSCI 321"},
+                             "4205": {"code": "", "name": "Study Skills", "title": "Study Skills", "short_code": ""}}}
+            """, CanvasApi.Json);
+
+        Assert.Equal(["COMP 101 · Intro to Programming", "Study Skills", "Software Engineering · CSCI 321"], CourseChoice.From(o).Select(c => c.Label));
+    }
+
     static FakeLibrary Connected() => new FakeLibrary()
         .Json(HttpMethod.Get, "/api/v2/canvas/state", "state-connected")
         .Json(HttpMethod.Get, "/api/v2/canvas", "canvas")

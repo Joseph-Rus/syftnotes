@@ -76,7 +76,7 @@ public static partial class Shell
         UpdateDueItem();
         UpdateNextDue();
         int unsorted = host.Overview?["unsorted"]?.GetValue<int>() ?? 0;
-        library.Unsorted = unsorted > 0 ? new ClassItem { Name = Configs.Unsorted, IsUnsorted = true, Count = unsorted } : null;
+        library.Unsorted.Count = unsorted;
         if (host.Library != LibraryState.Connected || host.OlderLibrary)
         {
             ShowLectureList();
@@ -110,7 +110,7 @@ public static partial class Shell
         dueOpen = false;
         dueSelection = null;
         foreach (var c in library.Classes) c.Selected = c.Name == name && !c.IsDue;
-        if (library.Unsorted is { } u) u.Selected = name == Configs.Unsorted;
+        library.Unsorted.Selected = name == Configs.Unsorted;
         library.ClassTitle = name;
         if (host.Remote() is not { } lib) return;
         JsonArray list;
@@ -147,7 +147,7 @@ public static partial class Shell
                 bool writing = S(l["status"]) is "queued" or "working";
                 group.Items.Add(new LectureCard
                 {
-                    Id = S(l["id"]), Title = S(l["title"]), Meta = CardMeta(l), Summary = writing ? "Writing notes…" : S(l["summary"]),
+                    Id = S(l["id"]), Title = S(l["title"]), Meta = CardMeta(l), Summary = writing ? "Writing notes…" : S(l["summary"]), ClassName = S(l["class"]),
                     Last = i == items.Count - 1 && ReferenceEquals(g.Key, lectures.GroupBy(GroupOf).Last().Key),
                 });
             }
@@ -321,7 +321,7 @@ public static partial class Shell
         int turn = ++libraryTurn;
         dueOpen = true;
         foreach (var c in library.Classes) c.Selected = c.IsDue;
-        if (library.Unsorted is { } u) u.Selected = false;
+        library.Unsorted.Selected = false;
         library.ClassTitle = "Due";
         library.Empty = null;
         library.Groups.Clear();
@@ -479,6 +479,49 @@ public static partial class Shell
         menu.Open(anchor);
     }
 
+    /// <summary>Deletes a lecture on the library, the same from a laptop as on the library itself: its notes,
+    /// transcript and search passages go at once, and the library keeps it in its trash a few minutes for Undo. The
+    /// window has already taken it out of the list; if the library refuses, the list is read again.</summary>
+    static async Task<bool> DeleteLectureAsync(LectureDeletion d)
+    {
+        if (openLecture == d.Id) openLecture = null;
+        try
+        {
+            if (host.Remote() is not { } lib) throw new HttpRequestException("Can't reach your library right now.");
+            await lib.DeleteAsync(d.Id);
+            Program.Log($"[library] deleted {d.Id}");
+            _ = host.CheckLibraryAsync();
+            return true;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            Toast("Couldn't delete it", e.Message, null, null);
+            _ = LoadLibraryAsync();
+            return false;
+        }
+    }
+
+    /// <summary>"Undo": the lecture comes back from the library's trash, and opens where it was.</summary>
+    static async Task UndoDeleteAsync(LectureDeletion d)
+    {
+        try
+        {
+            if (host.Remote() is not { } lib) throw new HttpRequestException("Can't reach your library right now.");
+            if (await lib.RestoreAsync(d.Id) is null)
+            {
+                Toast("Couldn't bring it back", "It's no longer in your library's trash.", null, null);
+                return;
+            }
+            Program.Log($"[library] brought back {d.Id}");
+            openLecture = d.Id;
+            await LoadLibraryAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            Toast("Couldn't bring it back", e.Message, null, null);
+        }
+    }
+
     static async Task ExportAsync()
     {
         if (library.Note is not { } note || mainWindow is null) return;
@@ -582,7 +625,7 @@ public static partial class Shell
                         rows.Add(new QuickRow { Kind = QuickKind.Class, Title = S(c["name"]), ClassName = S(c["name"]), Dot = Skin.ClassDot(c["color"]?.GetValue<int>() ?? 0), Meta = $"{n} lecture{(n == 1 ? "" : "s")}" });
                     }
                 }
-                if (rows.Count == 0) quick.Note = $"Nothing matches “{query.Trim()}”. {(Skin.Current == SkinKind.Mac ? "⌘↩" : "Ctrl+Enter")} asks your notes instead.";
+                if (rows.Count == 0) quick.Note = $"Nothing matches “{query.Trim()}”. {(Skin.Current == SkinKind.Mac ? "⌘" + ViewModels.QuickModel.Return : "Ctrl+Enter")} asks your notes instead.";
             }
             catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
             {

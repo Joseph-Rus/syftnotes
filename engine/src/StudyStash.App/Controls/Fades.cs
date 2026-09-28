@@ -12,6 +12,43 @@ public static class Fades
     public static void Under(Border fade, string colorKey, double solidFrom) =>
         fade.Bind(Border.BackgroundProperty, fade.GetResourceObservable(colorKey, v => v is ISolidColorBrush b ? Gradient(b.Color, solidFrom) : null));
 
+    /// <summary>The same fade for a page on a translucent layer (Windows' content layer over Mica): it fades to the
+    /// colour the eye sees, <paramref name="layerKey"/> over <paramref name="colorKey"/>, so the fade meets the page
+    /// under it without a band.</summary>
+    public static void Under(Border fade, string colorKey, string layerKey, double solidFrom)
+    {
+        Color? under = null, over = null;
+        void Paint()
+        {
+            if (under is { } u) fade.Background = Gradient(over is { } o ? Over(o, u) : u, solidFrom);
+        }
+        fade.GetResourceObservable(colorKey).Subscribe(new Watch(v =>
+        {
+            under = (v as ISolidColorBrush)?.Color;
+            Paint();
+        }));
+        fade.GetResourceObservable(layerKey).Subscribe(new Watch(v =>
+        {
+            over = (v as ISolidColorBrush)?.Color;
+            Paint();
+        }));
+    }
+
+    /// <summary><paramref name="top"/> laid over the opaque <paramref name="bottom"/>.</summary>
+    static Color Over(Color top, Color bottom)
+    {
+        double a = top.A / 255.0;
+        byte Mix(byte t, byte b) => (byte)Math.Round(t * a + b * (1 - a));
+        return Color.FromRgb(Mix(top.R, bottom.R), Mix(top.G, bottom.G), Mix(top.B, bottom.B));
+    }
+
+    sealed class Watch(Action<object?> next) : IObserver<object?>
+    {
+        public void OnNext(object? value) => next(value);
+        public void OnCompleted() { }
+        public void OnError(Exception error) { }
+    }
+
     /// <summary>The page fading out from the top, under a toolbar: solid until <paramref name="solidTo"/>, then to
     /// nothing.</summary>
     public static void Over(Border fade, string colorKey, double solidTo) =>

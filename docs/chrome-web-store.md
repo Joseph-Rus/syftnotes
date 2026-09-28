@@ -58,7 +58,7 @@ the item belongs to it. Verify the contact email the dashboard asks for.
 ### 2. The first upload and the extension's ID
 
 ```sh
-StudyStash extension-zip ~/Desktop/study-stash-for-canvas-1.4.zip
+StudyStash extension-zip ~/Desktop/study-stash-for-canvas-1.5.zip
 ```
 
 In the dashboard choose **New item** and upload the zip. The item gets its ID now (32 letters, a to p), and it never
@@ -83,7 +83,8 @@ add it only if the app needs to recognise the extension by ID.
   and uses your own sign-in, that it does nothing until you paste a code from Study Stash, and that nothing goes
   anywhere except your library.
 - **Category**: Education. **Language**: English.
-- **Icon**: 128 × 128 (`extension/icon-128.png`).
+- **Icon**: 128 × 128 (`extension/icon-128.png`: the "S." tile at 96 px inside Chrome's 16-px margin; redraw every
+  size with `swift macos/make_icon.swift out.chrome` and copy them into `extension/`).
 - **Screenshots**: at least one, 1280 × 800 (or 640 × 400). For example: the popup connected ("Canvas synced just
   now") over a Canvas course page, and the popup asking for the code. Use the design's made-up classes (CS 101,
   BIO 110), never a real school or real names.
@@ -120,7 +121,7 @@ Fix it, bump the version and resubmit.
 
 ## Updates
 
-1. Change the files in `extension/` and raise `"version"` in `extension/manifest.json` (1.4 → 1.5; `1.10` comes after
+1. Change the files in `extension/` and raise `"version"` in `extension/manifest.json` (1.5 → 1.6; `1.10` comes after
    `1.9`). **Every change to a shipped file needs a new version**: the store refuses an upload that isn't higher than
    the published one, and unpacked copies only reload themselves when the version (or their sites) changes
    ([canvas.md](canvas.md#versions-updates-and-reload)). The extension's version is its own and never follows the

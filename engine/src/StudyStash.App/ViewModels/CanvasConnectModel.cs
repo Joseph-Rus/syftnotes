@@ -3,6 +3,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.Core.Canvas;
 
 namespace StudyStash.App.ViewModels;
 
@@ -27,12 +28,12 @@ public sealed partial class ConnectStep : ObservableObject
     public bool IsToDo => State == StepState.ToDo;
 }
 
-/// <summary>A course Find my courses found: its Canvas id, its code ("COMP 101", or "" when Canvas has none) and its
-/// name ("Intro to Programming").</summary>
+/// <summary>A course Find my courses found: its Canvas id, its short code ("COMP 101", or "" when its code has none
+/// worth showing) and its name ("Intro to Programming"), cleaned of term and SIS codes.</summary>
 public sealed record FoundCourse(string Id, string Code, string Name)
 {
-    /// <summary>What the course is called as a class: its code, or its name when it has no code.</summary>
-    public string ClassName => Code.Length > 0 ? Code : Name;
+    /// <summary>What the course is called as a class: its name, never its code (the code is only a label beside it).</summary>
+    public string ClassName => Name.Length > 0 ? Name : Code;
 }
 
 /// <summary>
@@ -252,9 +253,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
 
     void EnterMatchStep(IReadOnlyList<CanvasApi.ClassRow> classes)
     {
-        var choices = (found?.Available ?? new Dictionary<string, string>())
-            .OrderBy(kv => kv.Key, StringComparer.Ordinal)
-            .Select(kv => new CourseChoice(kv.Key, kv.Value)).ToList();
+        var choices = CourseChoice.From(found);
         Courses.Clear();
         foreach (var c in classes)
         {
@@ -476,24 +475,30 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         }
     }
 
-    /// <summary>The found courses, each with its code: from <c>course_info</c> when the library sent it, else the part
-    /// of its name before " · " when it has one ("COMP 101 · Intro to Programming").</summary>
-    static IReadOnlyList<FoundCourse> FoundFrom(CanvasApi.Overview o)
+    /// <summary>The found courses, each named as its class will be. The library sends each course's class name
+    /// (<c>available</c>, already cleaned and unique) and its short code (<c>course_info</c>); from an older library
+    /// the names are cleaned here, and a " · " label ("COMP 101 · Intro to Programming") splits into code and name.</summary>
+    public static IReadOnlyList<FoundCourse> FoundFrom(CanvasApi.Overview o)
     {
         var info = o.CourseInfo.Where(c => c.Id.Length > 0).GroupBy(c => c.Id).ToDictionary(g => g.Key, g => g.First());
-        var list = new List<FoundCourse>();
+        var courses = new List<(string Id, string Name, string Code)>();
+        var codes = new Dictionary<string, string>();
         foreach (var (id, label) in o.Available)
         {
-            string code = info.TryGetValue(id, out var c) ? c.Code.Trim() : "";
-            string name = label;
+            info.TryGetValue(id, out var c);
+            string rawCode = c?.Code.Trim() ?? "", name = label;
             int dot = label.IndexOf(" · ", StringComparison.Ordinal);
-            if (dot > 0)
+            if (dot > 0 && c is not { Title.Length: > 0 })
             {
-                if (code.Length == 0) code = label[..dot].Trim();
+                if (rawCode.Length == 0) rawCode = label[..dot].Trim();
                 name = label[(dot + 3)..].Trim();
             }
-            list.Add(new FoundCourse(id, code, name));
+            courses.Add((id, c is { Title.Length: > 0 } ? c.Title : name, rawCode));
+            codes[id] = c is { ShortCode.Length: > 0 } ? c.ShortCode : CourseNames.ShortCode(rawCode, c?.Name ?? name);
         }
+        // The library's names are clean and unique already, and cleaning them again changes nothing.
+        var names = CourseNames.Unique(courses);
+        var list = courses.Select(c => new FoundCourse(c.Id, codes[c.Id], names[c.Id]));
         return [.. list.OrderBy(f => f.ClassName, StringComparer.OrdinalIgnoreCase)];
     }
 

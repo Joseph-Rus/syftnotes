@@ -74,7 +74,7 @@ public class StateShots
     static Control PanelView(SkinKind skin, PanelModel m) => skin == SkinKind.Mac ? new MacPanel { DataContext = m } : new WinPanel { DataContext = m };
 
     /// <summary>A dropdown like <see cref="Demo.Panel"/>'s idle state, but with one of <see cref="Problems"/>'s
-    /// problems showing instead of the usual timetable hint.</summary>
+    /// problems showing instead of the usual hint.</summary>
     static PanelModel PanelWith(ProblemKind kind)
     {
         var m = new PanelModel { ClassName = "CS 101", ClassDot = Skin.ClassDot(0), Status = "Library connected · Model ready", CanRecord = true };

@@ -72,7 +72,9 @@ public class ExtensionScriptTests
                 Body = new JsonObject { ["version"] = onDisk ?? running, ["host_permissions"] = new JsonArray((diskHosts ?? runningHosts).Select(h => (JsonNode)h).ToArray()) }.ToJsonString(),
             });
             if (config is not null) Route("chrome-extension://study-stash/config.json", Json(config));
-            js = new Jint.Engine(o => o.TimeoutInterval(TimeSpan.FromSeconds(20)));
+            // Only a guard against a script that never ends: a busy machine (the app tests render beside these) can take far
+            // longer than the few seconds this normally needs.
+            js = new Jint.Engine(o => o.TimeoutInterval(TimeSpan.FromMinutes(2)));
             js.SetValue("__net", this);
             js.SetValue("btoa", new Func<string, string>(s => Convert.ToBase64String(Encoding.Latin1.GetBytes(s))));
             js.SetValue("atob", new Func<string, string>(s => Encoding.Latin1.GetString(Convert.FromBase64String(s))));

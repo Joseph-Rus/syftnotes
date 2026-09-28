@@ -124,7 +124,7 @@
                       <Border Classes="dot" Width="8" Height="8" CornerRadius="4" Background="{Binding Dot}" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="3" Classes="meta" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
-                      <TextBlock Grid.Column="5" Classes="enter meta" Text="↩" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="5" Classes="enter meta" Text="&#x21A9;&#xFE0E;" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                     <!-- A passage from notes -->
                     <Grid IsVisible="{Binding IsPassage}" Margin="14,8" ColumnDefinitions="8,10,*">

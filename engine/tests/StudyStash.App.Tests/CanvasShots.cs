@@ -87,7 +87,7 @@ public class CanvasShots
         .Json(HttpMethod.Post, "/api/v2/canvas/scout", "canvas")
         .Json(HttpMethod.Post, "/api/v2/canvas", "canvas");
 
-    static async Task<CanvasSettingsModel> Settings(string state = "state-connected")
+    internal static async Task<CanvasSettingsModel> Settings(string state = "state-connected")
     {
         var model = new CanvasSettingsModel(CanvasFixtures.Context(ConnectedLibrary(state)));
         await model.LoadAsync();

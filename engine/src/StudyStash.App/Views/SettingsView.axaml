@@ -373,6 +373,36 @@
       <Setter Property="BorderThickness" Value="2" />
     </Style>
 
+    <!-- Settings → Appearance's mode: Mac a three-way segmented pill (System Settings' own Appearance control) — one
+         rounded track holding three equal buttons, the chosen one raised. -->
+    <Style Selector="Border.seg">
+      <Setter Property="Padding" Value="3" />
+    </Style>
+    <Style Selector=".mac Border.seg">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Background" Value="{DynamicResource Group}" />
+    </Style>
+    <Style Selector="Button.seg-item">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector=".mac Button.seg-item">
+      <Setter Property="Height" Value="28" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="CornerRadius" Value="7" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    </Style>
+    <Style Selector=".mac Button.seg-item.on">
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="Background" Value="{DynamicResource Raised}" />
+    </Style>
+    <Style Selector=".mac Button.seg-item.on /template/ Border#PART_Bg">
+      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+    </Style>
+
     <!-- An accent-track, white-knob toggle: a plain ToggleButton, not the Fluent ToggleSwitch (which doesn't follow
          the colour theme). -->
     <Style Selector="ToggleButton.switch">
@@ -547,7 +577,51 @@
               <StackPanel IsVisible="{Binding OnAppearance}" Spacing="8">
                 <TextBlock Classes="h" Text="Appearance" />
                 <TextBlock Classes="body" Text="Pick how Study Stash looks." />
-                <TextBlock Classes="section" Text="Colour theme" />
+                <TextBlock Classes="section" Text="Mode" />
+                <!-- Mac: a three-way segmented pill, System Settings' own way of choosing an appearance. -->
+                <Border Classes="seg" IsVisible="{Binding IsMac}" HorizontalAlignment="Left">
+                  <StackPanel Orientation="Horizontal" Spacing="2">
+                    <Button Classes="seg-item" Classes.on="{Binding AppearanceIsSystem}"
+                            Command="{Binding PickAppearanceCommand}" CommandParameter="{x:Static s:AppAppearance.System}">
+                      <TextBlock Text="Match system" />
+                    </Button>
+                    <Button Classes="seg-item" Classes.on="{Binding AppearanceIsLight}"
+                            Command="{Binding PickAppearanceCommand}" CommandParameter="{x:Static s:AppAppearance.Light}">
+                      <TextBlock Text="Light" />
+                    </Button>
+                    <Button Classes="seg-item" Classes.on="{Binding AppearanceIsDark}"
+                            Command="{Binding PickAppearanceCommand}" CommandParameter="{x:Static s:AppAppearance.Dark}">
+                      <TextBlock Text="Dark" />
+                    </Button>
+                  </StackPanel>
+                </Border>
+                <!-- Windows: a vertical list of radio rows, each the full row wide. -->
+                <Border Classes="group" IsVisible="{Binding IsWin}">
+                  <ItemsControl ItemsSource="{Binding AppearanceOptions}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="s:AppearanceOption">
+                        <StackPanel>
+                          <Border Classes="rowsep itemsep" />
+                          <Button Theme="{StaticResource Surface}" HorizontalContentAlignment="Stretch"
+                                  Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).PickAppearanceCommand}" CommandParameter="{Binding Mode}">
+                            <Border Classes="row">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Classes="row-title" Text="{Binding Label}" />
+                                <Panel Grid.Column="1" Classes="act" Width="16" Height="16">
+                                  <Ellipse Width="16" Height="16" Stroke="{DynamicResource Fg3}" StrokeThickness="1.3" IsVisible="{Binding !Chosen}" />
+                                  <Ellipse Width="16" Height="16" Stroke="{DynamicResource Accent}" StrokeThickness="1.3" IsVisible="{Binding Chosen}" />
+                                  <Ellipse Width="8" Height="8" Fill="{DynamicResource Accent}" IsVisible="{Binding Chosen}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Panel>
+                              </Grid>
+                            </Border>
+                          </Button>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Border>
+                <TextBlock Classes="say" Text="Light and dark set the whole app at once: the dropdown, quick panel, recorder, library and setup." />
+                <TextBlock Classes="section gap" Text="Colour theme" />
                 <Border Classes="group" Padding="16">
                   <ItemsControl ItemsSource="{Binding Themes}">
                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="5" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -644,35 +718,6 @@
                 <CheckBox IsChecked="{Binding Shortcuts}" Margin="0,16,0,0">
                   <TextBlock Text="Shortcuts that work from any app (search, and Record)" FontSize="13" />
                 </CheckBox>
-              </StackPanel>
-
-              <!-- Timetable -->
-              <StackPanel IsVisible="{Binding OnTimetable}" Spacing="8">
-                <TextBlock Classes="h" Text="Timetable" />
-                <TextBlock Classes="body" Text="When your classes meet: Record picks the one that's on. Write the days and times like “Tue Thu 10:00–11:15”." />
-                <ItemsControl ItemsSource="{Binding Rows}" Margin="0,8,0,0" MaxWidth="520" HorizontalAlignment="Left">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="s:TimetableRow">
-                      <Grid ColumnDefinitions="Auto,10,140,10,*,6,Auto" Margin="0,0,0,8">
-                        <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                        <Border Grid.Column="4" Classes="field" Classes.bad="{Binding Bad}">
-                          <TextBox Classes="bare" Text="{Binding Times}" PlaceholderText="Not in the timetable" FontSize="13" LostFocus="OnTimesLostFocus" />
-                        </Border>
-                        <Button Grid.Column="6" Theme="{StaticResource Surface}" Width="28" Height="28" CornerRadius="{DynamicResource RadiusControl}" HorizontalContentAlignment="Center"
-                                Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).RemoveClassCommand}" CommandParameter="{Binding}" ToolTip.Tip="Take it off the timetable">
-                          <c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg3}" />
-                        </Button>
-                      </Grid>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <Grid ColumnDefinitions="158,10,*,10,Auto" MaxWidth="520" HorizontalAlignment="Left" Margin="0,4,0,0">
-                  <Border Classes="field"><TextBox Classes="bare" Text="{Binding NewClass}" PlaceholderText="A new class" FontSize="13" /></Border>
-                  <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding NewTimes}" PlaceholderText="Tue Thu 10:00–11:15" FontSize="13" /></Border>
-                  <Button Grid.Column="4" Classes="pill" Command="{Binding AddClassCommand}"><TextBlock Text="Add" FontSize="13" /></Button>
-                </Grid>
-                <TextBlock Classes="say" Text="{Binding ClassesSay}" IsVisible="{Binding ClassesSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
 
               <!-- Your library: its own settings, through its API (Library, Classes, Notes and sorting, Folders). Every
@@ -845,6 +890,42 @@
 
                   <!-- Classes: each its own card, the name, other names and what it covers lined up in columns -->
                   <StackPanel IsVisible="{Binding OnClasses}" Spacing="8">
+                    <!-- Use Canvas course names: classes named from course codes take their courses' names, after a preview -->
+                    <Border Classes="group" Margin="0,8,0,0" IsVisible="{Binding Lib.HasCourseNames}">
+                      <StackPanel>
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Use Canvas course names" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.CourseNamesSub}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.AskUseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}" IsVisible="{Binding !Lib.ConfirmingCourseNames}"><TextBlock Text="Preview…" FontSize="13" /></Button>
+                            <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Lib.ConfirmingCourseNames}">
+                              <Button Classes="pill" Command="{Binding Lib.CancelUseCourseNamesCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
+                              <Button Classes="pill primary" Command="{Binding Lib.UseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}"><TextBlock Text="{Binding Lib.RenameLabel}" FontSize="13" FontWeight="Medium" /></Button>
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding Lib.CourseNames}" IsVisible="{Binding Lib.ConfirmingCourseNames}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:CourseNameRow">
+                              <StackPanel>
+                                <Border Classes="rowsep" />
+                                <Border Classes="row">
+                                  <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                      <TextBlock Classes="row-title" Text="{Binding To}" TextTrimming="CharacterEllipsis" />
+                                      <TextBlock Classes="row-sub" Text="{Binding Now}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Classes="row-sub act" Text="{Binding Meta}" VerticalAlignment="Center" />
+                                  </Grid>
+                                </Border>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
                     <ItemsControl ItemsSource="{Binding Lib.Classes}" Margin="0,8,0,0">
                       <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>

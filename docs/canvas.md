@@ -188,11 +188,11 @@ error "Chrome isn't signed in to Canvas.", and a file read that Canvas refused s
 
 ## The extension
 
-`extension/` is a Manifest V3 extension (version **1.4**, Chrome 120 or later; it has its own version, separate from
+`extension/` is a Manifest V3 extension (version **1.5**, Chrome 120 or later; it has its own version, separate from
 the app's). The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
 `Extension.Ensure(dir, library, key, canvasUrl)` writes it out as a folder for Chrome's "Load unpacked": the scripts
-(`background.js`, `connection.js`, the popup), a manifest, and `config.json` + `config.js`. The library keeps its own
-folder (`<home>/chrome-extension`) ready by itself: on start, and whenever the Canvas address changes.
+(`background.js`, `connection.js`, the popup, the "S." icons that `macos/make_icon.swift out.chrome` draws), a manifest,
+and `config.json` + `config.js`. The library keeps its own folder (`<home>/chrome-extension`) ready by itself: on start, and whenever the Canvas address changes.
 
 The same files also pack as a **Chrome Web Store** zip (`StudyStash extension-zip OUT.zip`, `Extension.PackForStore`):
 no config files, no `host_permissions`, `optional_host_permissions` for any site instead. A store copy connects by a
