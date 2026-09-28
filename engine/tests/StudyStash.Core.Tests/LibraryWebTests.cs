@@ -254,8 +254,8 @@ public class LibraryWebTests
         Assert.Contains("Connect your laptop", s);
         Assert.Contains("<span class=\"value\">http://mini.tail.ts.net:8787</span>", s);
         Assert.Contains("<span class=\"value\">pw</span>", s);
-        Assert.Contains("/Study-Stash-Laptop.dmg\">Mac</a>", s);
-        Assert.Contains("/Study-Stash-Laptop-Setup.exe\">Windows</a>", s);
+        Assert.Contains("/Study-Stash.dmg\">Mac</a>", s);
+        Assert.Contains("/Study-Stash-Setup.exe\">Windows</a>", s);
         Assert.Contains("Rewrite summary", await c.Text("/note/n1"));
 
         var r = await c.PostForm("/settings",

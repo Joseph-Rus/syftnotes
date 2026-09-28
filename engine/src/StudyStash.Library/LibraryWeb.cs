@@ -776,7 +776,7 @@ public sealed partial class LibraryWeb
             + $"<div class=\"row\"><span class=\"grow\">Address</span><span class=\"value\">{Ui.Esc(url)}</span></div>"
             + $"<div class=\"row\"><span class=\"grow\">Password</span><span class=\"value\">{Ui.Esc(cfg.PoolPassword.Length > 0 ? cfg.PoolPassword : "none")}</span></div>"
             + "<div class=\"row\"><span class=\"grow\">Study Stash for the laptop</span><span class=\"value\">"
-            + $"<a href=\"{dl}/Study-Stash-Laptop.dmg\">Mac</a> · <a href=\"{dl}/Study-Stash-Laptop-Setup.exe\">Windows</a>"
+            + $"<a href=\"{dl}/{Updates.MacAsset}\">Mac</a> · <a href=\"{dl}/{Updates.WindowsAsset}\">Windows</a>"
             + "</span></div></div><p class=\"group-foot\">On the computer you record lectures on, install Study Stash, "
             + "open it, and enter this address and password.</p>";
 
