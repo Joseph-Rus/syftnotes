@@ -24,14 +24,22 @@ public class ReleaseNamesTests
     }
 
     [Fact]
-    public void The_Windows_installer_and_build_script_name_both_Setup_exe()
+    public void The_Windows_installer_makes_the_one_Setup_exe_and_writes_no_role()
     {
         string setupIss = Read("windows", "setup.iss");
-        string buildPs1 = Read("windows", "build.ps1");
-        string both = setupIss + "\n" + buildPs1;
-        // setup.iss builds the two names from a #define, so it's enough that each half appears somewhere.
-        Assert.Contains(RoleHalf(Updates.WindowsLaptopAsset), both);
-        Assert.Contains(RoleHalf(Updates.WindowsLibraryAsset), both);
+        Assert.Contains("OutputBaseFilename=" + Path.GetFileNameWithoutExtension(Updates.WindowsAsset), setupIss);
+        Assert.DoesNotContain("Key: \"role\"", setupIss);
+        Assert.DoesNotContain("/DRole", Read("windows", "build.ps1"));
+    }
+
+    [Fact]
+    public void Ci_publishes_the_old_role_names_as_copies_of_the_one_download()
+    {
+        // Copies 0.8.x and older update themselves by these names: every release must still carry them, the same bytes.
+        string ci = Read(".github", "workflows", "ci.yml");
+        Assert.Contains("cp dist/Study-Stash.dmg \"dist/Study-Stash-$role.dmg\"", ci);
+        Assert.Contains("cp dist/Study-Stash-Setup.exe \"dist/Study-Stash-$role-Setup.exe\"", ci);
+        Assert.Contains("for role in Laptop Library", ci);
     }
 
     [Fact]

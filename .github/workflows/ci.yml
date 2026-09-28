@@ -200,7 +200,7 @@ jobs:
           name: mac-intel-selftest
           path: ${{ runner.temp }}/selftest
 
-  # The Windows app: one AppId for both roles (D2/D3), self-tested (D5) as just this computer, installed, self-tested as a laptop from the
+  # The Windows app: one Setup.exe with no role of its own (setup asks), self-tested (D5) as just this computer, installed, self-tested as a laptop from the
   # installed copy (so what Setup.exe put there, native code and all, is what runs), updated in place with a silent Setup.exe, and uninstalled
   # without touching lectures or settings outside the install folder.
   windows-app:
@@ -237,7 +237,7 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile("install.ps1", [ref]$null, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { throw "install.ps1 doesn't parse: $errors" }
-      - name: Build win-x64 and win-arm64, and both Setup.exe
+      - name: Build win-x64 and win-arm64, and Study-Stash-Setup.exe
         shell: pwsh
         run: .\windows\build.ps1 -Out dist\windows
       - name: Reports the version from Directory.Build.props, and no model is bundled (D6)
@@ -298,18 +298,18 @@ jobs:
             Start-Sleep 1
           }
           if ($left.Count -ne 0) { $left | Stop-Process -Force; throw "the app's library (StudyStash.exe serve) was still running 20 s after the app quit" }
-      - name: The Laptop installer puts Study Stash on this account, marked laptop
+      - name: The installer puts Study Stash on this account, with no role of its own (setup asks)
         if: needs.version.outputs.tested != 'true'
         shell: pwsh
         run: |
-          Start-Process "dist\windows\Study-Stash-Laptop-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          Start-Process "dist\windows\Study-Stash-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
           if (-not (Test-Path "$app\StudyStash.exe")) { throw "Study Stash isn't installed" }
           if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Study Stash.lnk")) { throw "no Start Menu entry" }
-          if (-not (Select-String -Path "$app\study-stash.ini" -Pattern "role\s*=\s*laptop" -Quiet)) { throw "not marked laptop" }
+          if (Select-String -Path "$app\study-stash.ini" -Pattern "^\s*role\s*=" -Quiet) { throw "the one download wrote a role" }
           $printed = (& "$app\StudyStash.exe" version | Out-String).Trim()
           if ($printed -ne $env:V) { throw "installed version '$printed', expected '$env:V'" }
-      - name: Self-test (D5), from the copy the Laptop installer put there - its native code came with it, and a lecture's formulas and flowchart draw
+      - name: Self-test (D5), from the copy the installer put there - its native code came with it, and a lecture's formulas and flowchart draw
         if: needs.version.outputs.tested != 'true'
         shell: pwsh
         run: |
@@ -329,13 +329,16 @@ jobs:
           if ($lines -match "heard nothing|no model|recording didn't start|FAILED") { throw "the self-test reported a problem" }
           if (-not ($lines -match "^rich notes: .* typeset; a flowchart laid out")) { throw "the self-test didn't see the notes' formulas and flowchart drawn" }
           if (-not ($lines -match "^opened larger: ")) { throw "the self-test didn't open the flowchart larger" }
-      - name: The Library installer, over it, is an in-place upgrade marked library
+      - name: Installing again over an older role install (as an old copy's self-update does) is an in-place upgrade that keeps its role
         if: needs.version.outputs.tested != 'true'
         shell: pwsh
         run: |
-          Start-Process "dist\windows\Study-Stash-Library-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
-          if (-not (Select-String -Path "$app\study-stash.ini" -Pattern "role\s*=\s*library" -Quiet)) { throw "not marked library" }
+          # What an old Study-Stash-Library-Setup.exe left behind.
+          "[app]`r`nrole=library`r`nversion=0.8.0`r`n" | Set-Content -NoNewline "$app\study-stash.ini"
+          Start-Process "dist\windows\Study-Stash-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
+          if (-not (Select-String -Path "$app\study-stash.ini" -Pattern "role\s*=\s*library" -Quiet)) { throw "the old install's role was lost" }
+          if (-not (Select-String -Path "$app\study-stash.ini" -Pattern "version\s*=\s*$env:V" -Quiet)) { throw "study-stash.ini doesn't say $env:V" }
           $entries = @(Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue |
             Where-Object { $_.DisplayName -eq "Study Stash" })
           if ($entries.Count -ne 1) { throw "expected one uninstall entry for Study Stash, found $($entries.Count)" }
@@ -350,7 +353,7 @@ jobs:
           Start-Process -FilePath "$app\StudyStash.exe" -ArgumentList "--home", $updateHome, "--background" | Out-Null
           Start-Sleep 3
           # Wait for the installer only: -Wait would also wait for the app it relaunches, which keeps running.
-          $setup = Start-Process "dist\windows\Study-Stash-Library-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/relaunch=1" -PassThru
+          $setup = Start-Process "dist\windows\Study-Stash-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/CLOSEAPPLICATIONS", "/relaunch=1" -PassThru
           $setup.WaitForExit()
           $ok = $false
           for ($i = 0; $i -lt 30; $i++) {
@@ -380,9 +383,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installers
-          path: |
-            dist\windows\Study-Stash-Laptop-Setup.exe
-            dist\windows\Study-Stash-Library-Setup.exe
+          path: dist\windows\Study-Stash-Setup.exe
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -430,8 +431,9 @@ jobs:
           fi
           echo "tested=$tested" >> "$GITHUB_OUTPUT"
 
-  # Publish v<version> the first time it passes everything above, with exactly the four installers and their
-  # checksums (D2). A version already tagged (or released) is never published again.
+  # Publish v<version> the first time it passes everything above, with the one download per system, the four old role
+  # names as byte-for-byte copies of them (0.8.x and older copies update themselves by those names, and old libraries'
+  # "Connect your laptop" links point at them), and their checksums. A version already tagged is never published again.
   release:
     name: publish release
     needs: [version, engine, mac-app, mac-intel, windows-app]
@@ -460,8 +462,13 @@ jobs:
             echo "v$V is already released; bump StudyStashVersion in engine/Directory.Build.props to publish a new one."
             exit 0
           fi
-          (cd dist && sha256sum Study-Stash-* > SHA256SUMS.txt)
+          for role in Laptop Library; do
+            cp dist/Study-Stash.dmg "dist/Study-Stash-$role.dmg"
+            cp dist/Study-Stash-Setup.exe "dist/Study-Stash-$role-Setup.exe"
+          done
+          (cd dist && sha256sum Study-Stash* > SHA256SUMS.txt)
           gh release create "v$V" --target "$GITHUB_SHA" --title "Study Stash $V" --generate-notes \
+            dist/Study-Stash.dmg dist/Study-Stash-Setup.exe \
             dist/Study-Stash-Laptop.dmg dist/Study-Stash-Library.dmg \
             dist/Study-Stash-Laptop-Setup.exe dist/Study-Stash-Library-Setup.exe \
             dist/SHA256SUMS.txt
