@@ -11,9 +11,12 @@ Free and open source, for Mac and Windows, and everything stays on your own comp
 ## What it does
 
 - **Records and transcribes on your computer.** Click **Record** in the menu bar (Mac) or tray
-  (Windows), or press ⌥⇧R / Ctrl+Alt+R. Whisper large-v3 transcribes as you go — Metal on Apple
-  silicon, Vulkan or the CPU on Windows — and the audio never leaves your computer. While it
-  records, a tiny pill shows the time and the level; pause or stop from the menu bar.
+  (Windows), or press ⌥⇧R / Ctrl+Alt+R. Whisper transcribes as you go — Metal on Apple silicon,
+  Vulkan or the CPU on Windows — and the audio never leaves your computer. Every computer starts on
+  the compact large-v3 turbo, which keeps up and leaves room for everything else (a computer too weak
+  for it gets a lighter one); the bigger, more accurate models are a choice in setup and Settings →
+  Recording. While it records, a tiny pill shows the time and the level; pause or stop from the
+  menu bar.
 - **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
   to review, written by Ollama (free and private) or by Claude Code, Codex or Gemini with the plan
   you already have. Rewrite a lecture's notes with another engine and keep whichever you like.

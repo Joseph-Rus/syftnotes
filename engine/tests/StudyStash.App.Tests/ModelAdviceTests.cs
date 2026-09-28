@@ -22,7 +22,7 @@ sealed class FakeHardware(HardwareProfile profile) : IHardwareProbe
     public static FakeHardware PlainPc() => new(new HardwareProfile(HostOs.Windows, Architecture.X64, 8, true, 16,
         new GraphicsCard("Intel(R) UHD Graphics 620", 0.125, true), Vulkan: true));
 
-    /// <summary>A Mac with Apple silicon: large-v3.</summary>
+    /// <summary>A Mac with Apple silicon: starts on the compact turbo, keeps up with large-v3.</summary>
     public static FakeHardware AppleSilicon() => new(new HardwareProfile(HostOs.Mac, Architecture.Arm64, 8, true, 16));
 
     /// <summary>An Intel Mac (no Whisper graphics): the compact turbo.</summary>
@@ -73,7 +73,7 @@ public class ModelAdviceTests
         }
         using var mac = new TempHome();
         var (onMac, _) = Host(mac, FakeHardware.AppleSilicon());
-        using (onMac) Assert.Same(WhisperModels.LargeV3, onMac.Model);
+        using (onMac) Assert.Same(WhisperModels.LargeV3TurboSmall, onMac.Model); // Apple silicon starts compact too
     }
 
     [Fact]
@@ -340,7 +340,8 @@ public class FallingBehindTests
         // Already on the one for this computer (or lighter): the next lighter one.
         Assert.EndsWith("Whisper small would keep up: switch in Settings → Recording.",
             AppHost.BehindWords(900, 600, WhisperModels.LargeV3TurboSmall, PlainPc)!.Value.Text, StringComparison.Ordinal);
-        Assert.EndsWith("Whisper large-v3 turbo would keep up: switch in Settings → Recording.",
+        // A bigger one than a Mac starts on, falling behind: the compact one it starts on.
+        Assert.EndsWith("Whisper large-v3 turbo (compact) would keep up: switch in Settings → Recording.",
             AppHost.BehindWords(900, 600, WhisperModels.LargeV3, AppleSilicon)!.Value.Text, StringComparison.Ordinal);
 
         // The lightest one has nothing lighter to offer (tiny is only for trying things out).
