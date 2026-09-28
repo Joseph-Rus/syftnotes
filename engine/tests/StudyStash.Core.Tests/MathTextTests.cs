@@ -75,7 +75,13 @@ public class MathTextTests
     [InlineData(@"\dfrac{a}{", @"\frac{a}{")]
     [InlineData(@"\begin{align} a", @"\begin{aligned} a")]
     [InlineData(@"\", @"\")]
-    public void Prepare_rewrites_what_csharpmath_cannot(string latex, string prepared) => Assert.Equal(prepared, MathText.Prepare(latex));
+    public void Prepare_rewrites_what_csharpmath_cannot(string latex, string prepared)
+    {
+        Assert.Equal(prepared, MathText.Prepare(latex));
+        // Rewriting an already-rewritten formula (a note re-typeset, or a rewrite that touches the same $…$ twice)
+        // changes nothing further: none of the rewritten names are themselves rewrite targets.
+        Assert.Equal(prepared, MathText.Prepare(prepared));
+    }
 
     [Theory]
     [InlineData("H2O", "H_{2}O")]
@@ -95,6 +101,20 @@ public class MathTextTests
     [InlineData("```\nfenced: \\(not math\\)\n```\nafter: \\(x\\)", "```\nfenced: \\(not math\\)\n```\nafter: $x$")]
     public void DollarDelimiters_turns_backslash_parens_into_dollars_outside_code(string markdown, string converted) =>
         Assert.Equal(converted, MathText.DollarDelimiters(markdown));
+
+    [Fact]
+    public void Prepare_never_throws_on_garbled_input()
+    {
+        var rng = new Random(1);
+        string[] alphabet = ["\\", "{", "}", "$", "[", "]", "^", "_", "*", "a", " ", "begin", "end", "align", "ce", "SI",
+            "overset", "not", "=", "\n", "\t"];
+        for (int i = 0; i < 300; i++)
+        {
+            string s = string.Concat(Enumerable.Range(0, rng.Next(1, 40)).Select(_ => alphabet[rng.Next(alphabet.Length)]));
+            var ex = Record.Exception(() => MathText.Prepare(s));
+            Assert.Null(ex);
+        }
+    }
 
     [Fact]
     public void RepairJsonEscapes_restores_commands_a_json_decoder_ate_inside_dollars_only()
