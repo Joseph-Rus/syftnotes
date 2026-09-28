@@ -202,6 +202,14 @@
   </Style>
 
   <!-- The "Answer with" / "Rewrite notes with" menu (16/17): Acrylic, 260/290 wide, r8. -->
+  <!-- The "Answer with" menu's panel: its shadow when drawn on the page, none as a popup (a popup's window is just
+       the panel, so a shadow would only fill its corners). -->
+  <Style Selector="Border.ai-menu">
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowLg}" />
+  </Style>
+  <Style Selector="FlyoutPresenter Border.ai-menu">
+    <Setter Property="BoxShadow" Value="none" />
+  </Style>
   <Style Selector="TextBlock.ai-menu-header">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="FontWeight" Value="SemiBold" />
@@ -234,6 +242,7 @@
   </Style>
   <Style Selector="Button.ai-menu-footer TextBlock">
     <Setter Property="FontSize" Value="14" />
+    <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
 

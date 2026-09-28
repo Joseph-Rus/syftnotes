@@ -10,8 +10,8 @@
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
   </UserControl.Styles>
 
-  <Border Width="{Binding Width}" CornerRadius="8" Background="{DynamicResource Acrylic}" BorderBrush="{DynamicResource FlyStroke}"
-          BorderThickness="1" BoxShadow="{DynamicResource ShadowLg}" Padding="4">
+  <Border Classes="ai-menu" Width="{Binding Width}" CornerRadius="8" Background="{DynamicResource Acrylic}" BorderBrush="{DynamicResource FlyStroke}"
+          BorderThickness="1" Padding="4">
     <StackPanel Spacing="0">
       <TextBlock Classes="ai-menu-header" Text="{Binding Header}" />
       <ItemsControl ItemsSource="{Binding Items}">
