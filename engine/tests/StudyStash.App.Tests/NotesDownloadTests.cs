@@ -63,6 +63,41 @@ public class NotesDownloadTests
     }
 
     [AvaloniaFact]
+    public async Task Two_lectures_with_the_same_title_on_one_day_keep_their_own_diagrams_and_each_links_its_own()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        string Notes(string title) => "## Details\n```svg\n" +
+            $"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><title>{title}</title><rect width="80" height="40"/></svg>""" +
+            "\n```\n\n```mermaid\nflowchart TD\n  A[" + title + "] --> B[Next]\n```\n";
+        rig.AddLecture(new Meeting("v1") { Title = "Lecture 3", Date = "2026-09-23" }, "BIO 110", Notes("Mitral valve"));
+        rig.AddLecture(new Meeting("v2") { Title = "Lecture 3", Date = "2026-09-23" }, "BIO 110", Notes("Aortic valve"));
+        var lib = new RemoteLibrary(rig.Url, LibraryRig.Password);
+        using var dir = new TempDir();
+
+        await NotesDownload.ClassAsync(() => Task.FromResult<string?>(dir.Path), lib, "BIO 110", transcript: false, DrawMermaid);
+
+        string classDir = Path.Combine(dir.Path, "BIO 110");
+        var files = Directory.GetFiles(classDir, "*.md");
+        Assert.Equal(2, files.Length);
+        Assert.Equal(2, Directory.GetDirectories(classDir, "*.assets").Length);
+        var seen = new List<string>();
+        foreach (string file in files)
+        {
+            string md = await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken);
+            var link = System.Text.RegularExpressions.Regex.Match(md, @"!\[Diagram: ([^\]]+)\]\(([^)]+)\)");
+            Assert.True(link.Success);
+            string picture = Path.Combine(classDir, Uri.UnescapeDataString(link.Groups[2].Value));
+            Assert.Contains(link.Groups[1].Value, await File.ReadAllTextAsync(picture, TestContext.Current.CancellationToken)); // its own, not the other's
+            string folder = Path.GetDirectoryName(picture)!;
+            Assert.Equal(Path.GetFileNameWithoutExtension(file) + ".assets", Path.GetFileName(folder));
+            Assert.Equal(2, Directory.GetFiles(folder, "*.svg").Length); // its SVG and its flowchart's picture, both there
+            Assert.Contains(link.Groups[1].Value, await File.ReadAllTextAsync(Path.Combine(folder, "diagram-2.svg"), TestContext.Current.CancellationToken));
+            seen.Add(link.Groups[1].Value);
+        }
+        Assert.Equal(["Aortic valve", "Mitral valve"], seen.Order());
+    }
+
+    [AvaloniaFact]
     public async Task Cancelling_the_folder_picker_saves_nothing()
     {
         await using var rig = await Bio110WithThreeLecturesAsync();

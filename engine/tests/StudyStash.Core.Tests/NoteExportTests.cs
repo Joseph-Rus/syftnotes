@@ -210,6 +210,52 @@ public class NoteExportTests
     }
 
     [Fact]
+    public void Two_lectures_whose_names_collide_keep_their_diagrams_in_folders_of_their_own_named_after_their_files()
+    {
+        using var dir = new TempDir();
+        var (_, store) = Library(dir);
+        // "Valves: part 1" and "Valves part 1" read the same once ":" can't be in a file name; both on one day.
+        string Svg(string title) => $"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60"><title>{title}</title><rect width="80" height="40"/></svg>""";
+        var first = LectureJson(store, new Meeting("lec-9") { Title = "Valves: part 1", Date = "2026-09-23" },
+            "## Details\n```svg\n" + Svg("Mitral valve") + "\n```\n");
+        var second = LectureJson(store, new Meeting("lec-10") { Title = "Valves part 1", Date = "2026-09-23" },
+            "## Details\n```svg\n" + Svg("Aortic valve") + "\n```\n");
+        Assert.Equal(NoteExport.FileName(first), NoteExport.FileName(second));
+
+        var taken = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var a = NoteExport.Lecture(first, transcript: false, DrawMermaid, NoteExport.UniqueName(NoteExport.FileName(first), taken));
+        var b = NoteExport.Lecture(second, transcript: false, DrawMermaid, NoteExport.UniqueName(NoteExport.FileName(second), taken));
+
+        Assert.Equal("2026-09-23 Valves part 1.md", a.FileName);
+        Assert.Equal("2026-09-23 Valves part 1 (2).md", b.FileName);
+        Assert.Equal("2026-09-23 Valves part 1.assets/diagram-1.svg", Assert.Single(a.Assets).RelativePath);
+        Assert.Equal("2026-09-23 Valves part 1 (2).assets/diagram-1.svg", Assert.Single(b.Assets).RelativePath);
+        Assert.Contains("](2026-09-23%20Valves%20part%201.assets/diagram-1.svg)", a.Markdown);
+        Assert.Contains("](2026-09-23%20Valves%20part%201%20%282%29.assets/diagram-1.svg)", b.Markdown);
+        Assert.Contains("Mitral valve", a.Assets[0].Text);
+        Assert.Contains("Aortic valve", b.Assets[0].Text);
+
+        // The same lecture exported again under the same name gives the same paths: a re-download lands in place.
+        var again = NoteExport.Lecture(second, transcript: false, DrawMermaid, "2026-09-23 Valves part 1 (2).md");
+        Assert.Equal(b.Assets[0].RelativePath, again.Assets[0].RelativePath);
+    }
+
+    [Fact]
+    public void A_lecture_saved_under_a_name_of_the_students_own_keeps_its_diagrams_beside_that_name()
+    {
+        using var dir = new TempDir();
+        var (_, store) = Library(dir);
+        var lecture = LectureJson(store, new Meeting("lec-11") { Title = "Forces", Date = "2026-09-23" },
+            "## Physics\n```svg\n" + Summarize.SvgExample + "\n```\n");
+
+        var file = NoteExport.Lecture(lecture, transcript: false, DrawMermaid, "Slope forces.md");
+
+        Assert.Equal("Slope forces.md", file.FileName);
+        Assert.Equal("Slope forces.assets/diagram-1.svg", Assert.Single(file.Assets).RelativePath);
+        Assert.Contains("](Slope%20forces.assets/diagram-1.svg)", file.Markdown);
+    }
+
+    [Fact]
     public void UniqueName_gives_two_same_day_same_title_lectures_a_number()
     {
         var taken = new HashSet<string>();

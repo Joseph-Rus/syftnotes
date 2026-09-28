@@ -17,12 +17,19 @@ public sealed record ExportFile(string FileName, string Markdown, IReadOnlyList<
 /// </summary>
 public static class NoteExport
 {
+    /// <summary>The name a lecture's file is saved under unless the student picks another: its day and title,
+    /// "2026-09-23 The cardiac cycle.md".</summary>
+    public static string FileName(JsonObject lecture) => $"{Notes.DatePrefix(S(lecture["date"]))} {Notes.Slugify(Title(lecture))}.md";
+
     /// <summary>The lecture's Markdown file. <paramref name="mermaidSvg"/> draws a Mermaid flowchart it already knows
     /// parses (its source in, a standalone SVG out, or null when it couldn't be drawn) — the caller measures text in
-    /// its own font, so the picture matches what the app would show.</summary>
-    public static ExportFile Lecture(JsonObject lecture, bool transcript, Func<string, string?> mermaidSvg)
+    /// its own font, so the picture matches what the app would show. <paramref name="fileName"/> is the name it will
+    /// really be saved under (the one the Save dialog was given, or a class download's numbered one); its diagrams go
+    /// in a folder named after it, so two lectures saved side by side never share one. Without it, the file keeps
+    /// <see cref="FileName(JsonObject)"/>.</summary>
+    public static ExportFile Lecture(JsonObject lecture, bool transcript, Func<string, string?> mermaidSvg, string? fileName = null)
     {
-        string title = S(lecture["title"]) is { Length: > 0 } t ? t : "Untitled";
+        string title = Title(lecture);
         string className = S(lecture["class"]);
         string dateRaw = S(lecture["date"]);
         double seconds = lecture["seconds"] is JsonValue v && v.TryGetValue(out double s) ? s : 0;
@@ -30,7 +37,8 @@ public static class NoteExport
         string rawTranscript = S(lecture["transcript"]);
         var topics = (lecture["topics"] as JsonArray)?.Select(S).Where(x => x.Length > 0).ToList() ?? [];
 
-        string stem = $"{Notes.DatePrefix(dateRaw)} {Notes.Slugify(title)}";
+        string name = fileName is { Length: > 0 } ? System.IO.Path.GetFileName(fileName) : FileName(lecture);
+        string stem = System.IO.Path.GetFileNameWithoutExtension(name) is { Length: > 0 } st ? st : name;
         var assets = new List<ExportAsset>();
         int diagramIndex = 0;
         string body = notes.Length == 0 ? "_No notes yet._" : DrawDiagrams(MathText.DollarDelimiters(notes), stem, mermaidSvg, assets, ref diagramIndex);
@@ -53,7 +61,7 @@ public static class NoteExport
         if (transcript && rawTranscript.Length > 0)
             md.Append("\n## Transcript\n\n").Append(TranscriptText(rawTranscript)).Append('\n');
 
-        return new ExportFile(stem + ".md", md.ToString(), assets);
+        return new ExportFile(name, md.ToString(), assets);
     }
 
     /// <summary>A name not already in <paramref name="taken"/>: as given, or with " (2)", " (3)"… before its
@@ -75,6 +83,8 @@ public static class NoteExport
 
     static DateTimeOffset? ParseDate(string s) =>
         DateTimeOffset.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var d) ? d : null;
+
+    static string Title(JsonObject lecture) => S(lecture["title"]) is { Length: > 0 } t ? t : "Untitled";
 
     static string S(JsonNode? n) => n is JsonValue v && v.TryGetValue(out string? s) ? s ?? "" : "";
 
