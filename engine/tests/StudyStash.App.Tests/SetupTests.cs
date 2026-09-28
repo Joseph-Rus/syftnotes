@@ -119,6 +119,22 @@ public sealed class SetupTests
     }
 
     [Fact]
+    public void The_windows_laptop_setup_exe_starts_on_just_this_computer()
+    {
+        // What Study-Stash-Laptop-Setup.exe writes beside StudyStash.exe (Inno Setup's [INI]: plain text, CRLF).
+        string dir = Path.Combine(Path.GetTempPath(), "studystash-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.WriteAllText(Path.Combine(dir, "study-stash.ini"), "[app]\r\nrole=laptop\r\nversion=0.6.0\r\n");
+            Assert.Equal(AppRole.Both, Setup.StartingRole(Setup.Preset(Apps.RolePreset(dir, "Windows")), AppRole.Laptop, ""));
+            File.WriteAllText(Path.Combine(dir, "study-stash.ini"), "[app]\r\nrole=library\r\nversion=0.6.0\r\n");
+            Assert.Equal(AppRole.Library, Setup.StartingRole(Setup.Preset(Apps.RolePreset(dir, "Windows")), AppRole.Laptop, ""));
+        }
+        finally { Directory.Delete(dir, true); }
+    }
+
+    [Fact]
     public void Installers_suggest_a_choice_and_a_run_that_stopped_part_way_keeps_its_own()
     {
         // The library download suggests the library; the laptop download, or a build that doesn't say, just this computer.

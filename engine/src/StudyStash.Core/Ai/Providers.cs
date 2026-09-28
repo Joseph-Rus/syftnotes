@@ -55,8 +55,18 @@ public abstract class AiProvider
     public virtual string? Exe() => Which(Binary);
     public virtual bool Available() => Exe() is not null;
 
+    /// <summary>The prompt goes in on the command's input, not its command line (for the CLIs that read it there: see
+    /// <see cref="Input"/>). On by default on Windows: a command line there holds at most 32,767 characters, fewer
+    /// than a long lecture's transcript, and a CLI npm installed (claude.cmd, codex.cmd) runs through cmd.exe, which
+    /// cuts its command line at the first line break and reads &amp;, | and % as its own.</summary>
+    public bool PromptOnInput { get; init; } = OperatingSystem.IsWindows();
+
     public abstract List<string> Command(AiRequest req, bool stream);
     public abstract IEnumerable<AiEvent> Parse(string line);
+
+    /// <summary>What to write to the command's input before it's closed: the prompt, for a CLI that reads it there
+    /// while <see cref="PromptOnInput"/> is on; null (nothing) otherwise.</summary>
+    public virtual string? Input(AiRequest req) => null;
 
     /// <summary>What it does, as it does it. Ends with an <c>error</c> event when it fails.</summary>
     public virtual async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true,
@@ -67,7 +77,7 @@ public abstract class AiProvider
             yield return AiEvent.Error($"{Name} isn't installed on this computer ({Site}).");
             yield break;
         }
-        await foreach (var e in Spawn(Command(req, stream), req.Cwd, req.Timeout, Parse, ct)) yield return e;
+        await foreach (var e in Spawn(Command(req, stream), req.Cwd, req.Timeout, Parse, Input(req), ct)) yield return e;
     }
 
     /// <summary>Run to the end: the answer (the provider's final word, else everything it wrote), or why not.</summary>
@@ -93,15 +103,40 @@ public abstract class AiProvider
 
     // --- running a command ------------------------------------------------------------------------------------
 
-    /// <summary>Where these commands usually live: a background service starts with a short PATH.</summary>
+    /// <summary>Where these commands usually live: a background service starts with a short PATH. On Windows also
+    /// the PATH as Windows has it now: an engine (or Node.js, which npm's claude.cmd and codex.cmd run on) installed
+    /// while Study Stash was running isn't on the PATH it started with, and "Check again" in setup should find it.</summary>
     public static string SearchPath()
     {
         string home = Py.UserHome();
         string[] extra = OperatingSystem.IsWindows()
-            ? [Path.Combine(home, "AppData", "Roaming", "npm"), Path.Combine(home, ".local", "bin")]
+            ? [.. WindowsPathNow(), Path.Combine(home, "AppData", "Roaming", "npm"), Path.Combine(home, ".local", "bin"),
+               Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs")]
             : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", Path.Combine(home, ".local", "bin"),
                Path.Combine(home, ".npm-global", "bin"), Path.Combine(home, ".bun", "bin"), Path.Combine(home, ".claude", "local")];
-        return string.Join(Path.PathSeparator, new[] { Environment.GetEnvironmentVariable("PATH") ?? "" }.Concat(extra));
+        var dirs = new[] { Environment.GetEnvironmentVariable("PATH") ?? "" }.Concat(extra)
+            .SelectMany(p => p.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Distinct(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
+        return string.Join(Path.PathSeparator, dirs);
+    }
+
+    /// <summary>Windows: the folders on this account's PATH and the computer's, as the registry has them now (an
+    /// installer that just ran has already added its own). Empty elsewhere, or when they can't be read.</summary>
+    static IEnumerable<string> WindowsPathNow()
+    {
+        if (!OperatingSystem.IsWindows()) return [];
+        var found = new List<string>();
+        try
+        {
+            using var user = Microsoft.Win32.Registry.CurrentUser.OpenSubKey("Environment");
+            using var machine = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Session Manager\Environment");
+            foreach (var key in new[] { machine, user })
+                if (key?.GetValue("Path") is string path) found.AddRange(path.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        }
+        catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+        }
+        return found;
     }
 
     public static string? Which(string name)
@@ -119,12 +154,14 @@ public abstract class AiProvider
     /// <summary>Start a command and read its lines as they come, turning each into events. A command that fails
     /// without saying why ends with the tail of what it printed to stderr.</summary>
     protected static async IAsyncEnumerable<AiEvent> Spawn(List<string> cmd, string cwd, TimeSpan timeout,
-        Func<string, IEnumerable<AiEvent>> parse, [EnumeratorCancellation] CancellationToken ct = default)
+        Func<string, IEnumerable<AiEvent>> parse, string? input = null, [EnumeratorCancellation] CancellationToken ct = default)
     {
         var psi = new ProcessStartInfo(cmd[0])
         {
             WorkingDirectory = cwd, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true,
             UseShellExecute = false, CreateNoWindow = true, StandardOutputEncoding = Encoding.UTF8,
+            // UTF-8 with no byte-order mark: Windows would otherwise send the prompt in its old code page.
+            StandardInputEncoding = new UTF8Encoding(false),
         };
         foreach (string a in cmd.Skip(1)) psi.ArgumentList.Add(a);
         psi.Environment["PATH"] = SearchPath();
@@ -146,7 +183,7 @@ public abstract class AiProvider
             yield break;
         }
         using var proc = p;
-        proc.StandardInput.Close();
+        var feeding = Task.Run(() => Feed(proc.StandardInput, input), CancellationToken.None);
         var stderr = proc.StandardError.ReadToEndAsync(CancellationToken.None);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);
@@ -189,6 +226,22 @@ public abstract class AiProvider
         {
             if (!proc.HasExited)
                 try { proc.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+            await feeding;
+        }
+    }
+
+    /// <summary>Writes <paramref name="text"/> (if any) to a command's input, then closes it so the command knows
+    /// that's all. Run in the background: a long prompt fills the pipe before the command starts reading. A command
+    /// that stops early just leaves the rest unwritten.</summary>
+    static async Task Feed(StreamWriter stdin, string? text)
+    {
+        try
+        {
+            if (text is not null) await stdin.WriteAsync(text);
+            stdin.Close();
+        }
+        catch (Exception e) when (e is IOException or ObjectDisposedException)
+        {
         }
     }
 
@@ -234,7 +287,9 @@ public sealed class ClaudeProvider : AiProvider
         var never = new List<string> { "Bash", "NotebookEdit", "WebFetch", "WebSearch", "Task" };
         if (req.Write) allowed.AddRange([$"Edit(/{root}/**)", $"Write(/{root}/**)"]);
         else never.AddRange(["Edit", "Write"]);
-        var cmd = new List<string> { Exe() ?? "claude", "-p", req.Prompt, "--output-format", "stream-json", "--verbose" };
+        var cmd = new List<string> { Exe() ?? "claude", "-p" };
+        if (!PromptOnInput) cmd.Add(req.Prompt);
+        cmd.AddRange(["--output-format", "stream-json", "--verbose"]);
         if (stream) cmd.Add("--include-partial-messages");
         if (req.Tools && req.McpCommand.Count > 0)
         {
@@ -252,6 +307,9 @@ public sealed class ClaudeProvider : AiProvider
         if (req.Session.Length > 0) cmd.AddRange(["--resume", req.Session]);
         return cmd;
     }
+
+    /// <summary>`claude -p` with no prompt on its command line reads it from its input.</summary>
+    public override string? Input(AiRequest req) => PromptOnInput ? req.Prompt : null;
 
     public override IEnumerable<AiEvent> Parse(string line)
     {
@@ -307,9 +365,12 @@ public class CodexProvider : AiProvider
             cmd.AddRange(["-c", $"mcp_servers.{McpKey}.command={JsonSerializer.Serialize(req.McpCommand[0])}",
                 "-c", $"mcp_servers.{McpKey}.args={new JsonArray(req.McpCommand.Skip(1).Select(a => (JsonNode)a).ToArray()).ToJsonString()}"]);
         if (req.Model.Length > 0) cmd.AddRange(["-m", req.Model]);
-        cmd.Add(WithSystem(req));
+        cmd.Add(PromptOnInput ? "-" : WithSystem(req));
         return cmd;
     }
+
+    /// <summary>`codex exec -` (and `codex exec resume ID -`) reads the prompt from its input.</summary>
+    public override string? Input(AiRequest req) => PromptOnInput ? WithSystem(req) : null;
 
     const string McpKey = "study_stash";
 

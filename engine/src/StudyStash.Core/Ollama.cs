@@ -14,10 +14,34 @@ public static class Ollama
     static readonly string[] NotForText = ["embed", "whisper", "clip", "rerank"];
 
     /// <summary>One connection pool for every call. Each call sets its own time limit.</summary>
-    public static HttpClient Http { get; } = new(new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromSeconds(10) })
+    public static HttpClient Http { get; } = new(new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromSeconds(10), ConnectCallback = ConnectAsync })
     {
         Timeout = Timeout.InfiniteTimeSpan,
     };
+
+    /// <summary>
+    /// Connects as usual, except that "localhost" tries 127.0.0.1 before ::1. Ollama listens on 127.0.0.1 only, and
+    /// Windows gives localhost's IPv6 address first: a refused connection there takes Windows a couple of seconds
+    /// before the one that works is tried, on every new connection (and a status check only waits five).
+    /// </summary>
+    static async ValueTask<Stream> ConnectAsync(SocketsHttpConnectionContext context, CancellationToken ct)
+    {
+        var at = context.DnsEndPoint;
+        var socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            if (string.Equals(at.Host, "localhost", StringComparison.OrdinalIgnoreCase))
+                await socket.ConnectAsync([IPAddress.Loopback, IPAddress.IPv6Loopback], at.Port, ct);
+            else
+                await socket.ConnectAsync(at, ct);
+            return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
 
     static string Url(string host, string path) => host.TrimEnd('/') + path;
 

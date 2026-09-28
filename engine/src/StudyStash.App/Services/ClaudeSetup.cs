@@ -33,7 +33,9 @@ public sealed class ClaudeSetup
 
     static string Quote(string a) => a.Any(c => c is ' ' or '"' or '\'') ? "\"" + a.Replace("\"", "\\\"") + "\"" : a;
 
-    public string? ClaudeCli() => Machine.Which("claude");
+    /// <summary>Claude Code on this computer: on the PATH, or where its installer and npm put it (a fresh install
+    /// isn't on the PATH this app started with).</summary>
+    public string? ClaudeCli() => StudyStash.Core.Ai.AiProvider.Which("claude");
 
     /// <summary>Add Study Stash to Claude Code (for every project). The result to show.</summary>
     public string AddToClaudeCode()

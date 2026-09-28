@@ -66,8 +66,19 @@ public static class Terminal
         {
             var wt = new ProcessStartInfo("wt.exe") { UseShellExecute = true, ArgumentList = { "-d", folder, exe } };
             foreach (string a in args) wt.ArgumentList.Add(a);
-            Process.Start(wt);
-            return "Windows Terminal";
+            try
+            {
+                Process.Start(wt);
+                return "Windows Terminal";
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+                // No Windows Terminal (Windows 10 without it): the command in a console window of its own.
+                var console = new ProcessStartInfo(exe) { UseShellExecute = true, WorkingDirectory = folder };
+                foreach (string a in args) console.ArgumentList.Add(a);
+                Process.Start(console);
+                return "a console window";
+            }
         }
         var t = Mac.FirstOrDefault(m => m.Id == terminal);
         if (t.Id is null || !Directory.Exists(t.App)) t = Mac.FirstOrDefault(m => Directory.Exists(m.App));

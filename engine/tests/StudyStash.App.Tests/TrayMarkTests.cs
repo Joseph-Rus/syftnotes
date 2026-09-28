@@ -105,4 +105,15 @@ public class TrayMarkTests
         File.WriteAllBytes(Path.Combine(dir, "tray-mac-recording-light-bar.png"), TrayMark.Png(36, Brushes.Black, true));
         File.WriteAllBytes(Path.Combine(dir, "tray-win-dark.png"), TrayMark.Png(32, Brushes.White, false));
     }
+
+    [AvaloniaFact]
+    public void The_tray_menu_offers_record_wherever_this_computer_records()
+    {
+        static List<string> Items(Services.AppRole role) =>
+            [.. Shell.TrayMenu(role).Items.OfType<Avalonia.Controls.NativeMenuItem>().Select(i => i.Header ?? "")];
+        Assert.Equal("Record", Items(Services.AppRole.Both)[0]);
+        Assert.Equal("Record", Items(Services.AppRole.Laptop)[0]);
+        Assert.DoesNotContain("Record", Items(Services.AppRole.Library));
+        Assert.Equal("Quit Study Stash", Items(Services.AppRole.Both)[^1]);
+    }
 }

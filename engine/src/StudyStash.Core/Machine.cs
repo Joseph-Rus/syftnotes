@@ -105,15 +105,18 @@ public static partial class Machine
         }
     }
 
-    /// <summary>shutil.which: the command on PATH (with Windows' .exe and friends), or null.</summary>
+    /// <summary>shutil.which: the command on PATH (with Windows' .exe and friends), or null. On Windows a name with
+    /// no extension never matches a file with none: npm puts a shell script called just "claude" beside claude.cmd,
+    /// and Windows can't run it.</summary>
     public static string? Which(string name)
     {
         string[] exts = OperatingSystem.IsWindows()
             ? (Environment.GetEnvironmentVariable("PATHEXT") ?? ".COM;.EXE;.BAT;.CMD").Split(';', StringSplitOptions.RemoveEmptyEntries)
             : [""];
+        if (!OperatingSystem.IsWindows() || Path.HasExtension(name)) exts = [.. exts.Prepend("")];
         foreach (string dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
-            foreach (string ext in exts.Prepend(""))
+            foreach (string ext in exts)
             {
                 string candidate = Path.Combine(dir, name + ext);
                 if (File.Exists(candidate) && (OperatingSystem.IsWindows() || ext.Length > 0 || IsExecutable(candidate))) return candidate;
