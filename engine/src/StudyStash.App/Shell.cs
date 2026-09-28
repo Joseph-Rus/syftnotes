@@ -36,6 +36,8 @@ public static partial class Shell
 
     static readonly PanelModel panel = new();
     static readonly RecorderModel recorder = new();
+    /// <summary>The lecture the student has been told is falling behind (once is enough).</summary>
+    static string? behindToldFor;
     static readonly QuickModel quick = new();
     static readonly LibraryModel library = new();
     static SetupModel? setup;
@@ -1168,6 +1170,13 @@ public static partial class Shell
         if (setup is not null && micCheck is not null) Setup.TickMic(setup, host, micCheck);
         var live = host.Recorder.Current;
         if (live is null) return;
+        // Said once a lecture, when Whisper clearly can't keep up with it.
+        if (behindToldFor != live.Id && host.FallingBehind() is { } behind)
+        {
+            behindToldFor = live.Id;
+            Program.Log($"[whisper] {live.Id}: the transcript is {TimedText.Clock(host.Recorder.Elapsed - live.TranscribedSeconds)} behind with {host.Model.Name}");
+            Toast(behind.Title, behind.Text, "Settings", () => ShowSettings("Recording"), TimeSpan.FromSeconds(30));
+        }
         string elapsed = TimedText.Clock(host.Recorder.Elapsed);
         var levels = host.Recorder.Levels();
         panel.Elapsed = recorder.Elapsed = elapsed;

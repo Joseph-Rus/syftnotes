@@ -361,6 +361,32 @@ public sealed class AppHost : IDisposable, IProblemSource
     /// <summary>The suggestion was made (or the student picked a model knowing the one for this computer): not again.</summary>
     public void ModelSuggestionMade(WhisperModel suggested) => Save(s => s.ModelSuggested = suggested.Id);
 
+    /// <summary>Whisper waits for 20 to 30 seconds of speech and then takes its time over it, so a transcript a minute
+    /// behind is normal. Three minutes behind is clearly more than that: the model can't keep up with this lecture.</summary>
+    public const double BehindAfterSeconds = 180;
+
+    /// <summary>What to tell the student when the lecture being recorded is being written down clearly slower than it's
+    /// said (a title and what to know), or null while it keeps up, pauses, or waits for something else (the model's
+    /// download, a Whisper that couldn't start).</summary>
+    public (string Title, string Text)? FallingBehind()
+    {
+        if (Recorder.Current is not { State: LectureState.Recording } live || !ModelReady || WhisperProblem is not null) return null;
+        return BehindWords(Recorder.Elapsed, live.TranscribedSeconds, Model, Advice);
+    }
+
+    /// <summary><see cref="FallingBehind"/>'s words for <paramref name="recorded"/> seconds recorded and
+    /// <paramref name="written"/> written down with <paramref name="inUse"/>: a lighter model to switch to (the one for
+    /// this computer when it's lighter, else the next lighter one), unless it's already the lightest.</summary>
+    public static (string Title, string Text)? BehindWords(double recorded, double written, WhisperModel inUse, ModelAdvice advice)
+    {
+        if (recorded - written < BehindAfterSeconds) return null;
+        var lighter = WhisperModels.Heavier(inUse, advice.Model) ? advice.Model
+            : WhisperModels.All.SkipWhile(m => m.Id != inUse.Id).Skip(1).FirstOrDefault(m => m.Id != WhisperModels.Tiny.Id);
+        string text = $"{inUse.Name} is slower than the lecture on this computer. Nothing is lost: it catches up after class.";
+        if (lighter is not null) text += $" {lighter.Name} would keep up: switch in Settings → Recording.";
+        return ("The transcript is falling behind", text);
+    }
+
     /// <summary>A model file the environment gives to use as it is (nothing downloads); null normally.</summary>
     public string? ModelFile => models.File;
 

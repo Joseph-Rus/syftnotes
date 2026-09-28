@@ -264,3 +264,44 @@ public class ModelAdviceTests
             SettingsModel.AdviceWords(WhisperModels.LargeV3Turbo, advice), StringComparison.Ordinal);
     }
 }
+
+public class FallingBehindTests
+{
+    static readonly ModelAdvice PlainPc = WhisperModels.Advise(FakeHardware.PlainPc().Probe());
+    static readonly ModelAdvice AppleSilicon = WhisperModels.Advise(FakeHardware.AppleSilicon().Probe());
+
+    [Fact]
+    public void A_minute_or_two_behind_is_whispers_own_rhythm()
+    {
+        Assert.Null(AppHost.BehindWords(600, 560, WhisperModels.LargeV3, PlainPc));
+        Assert.Null(AppHost.BehindWords(600, 421, WhisperModels.LargeV3, PlainPc));
+        Assert.Null(AppHost.BehindWords(100, 0, WhisperModels.LargeV3, PlainPc));
+    }
+
+    [Fact]
+    public void Clearly_behind_says_so_and_names_a_lighter_model()
+    {
+        var (title, text) = AppHost.BehindWords(900, 600, WhisperModels.LargeV3, PlainPc)!.Value;
+        Assert.Equal("The transcript is falling behind", title);
+        Assert.Equal("Whisper large-v3 is slower than the lecture on this computer. Nothing is lost: it catches up after class. "
+                     + "Whisper large-v3 turbo (compact) would keep up: switch in Settings → Recording.", text);
+
+        // Already on the one for this computer (or lighter): the next lighter one.
+        Assert.EndsWith("Whisper small would keep up: switch in Settings → Recording.",
+            AppHost.BehindWords(900, 600, WhisperModels.LargeV3TurboSmall, PlainPc)!.Value.Text, StringComparison.Ordinal);
+        Assert.EndsWith("Whisper large-v3 turbo would keep up: switch in Settings → Recording.",
+            AppHost.BehindWords(900, 600, WhisperModels.LargeV3, AppleSilicon)!.Value.Text, StringComparison.Ordinal);
+
+        // The lightest one has nothing lighter to offer (tiny is only for trying things out).
+        Assert.Equal("Whisper base is slower than the lecture on this computer. Nothing is lost: it catches up after class.",
+            AppHost.BehindWords(900, 600, WhisperModels.Base, PlainPc)!.Value.Text);
+    }
+
+    [Fact]
+    public void Nothing_to_say_while_nothing_records()
+    {
+        using var home = new TempHome();
+        using var host = new AppHost(home.Path, log: _ => { }, loginItems: new CountingLoginItems(), models: ModelSetting.None, hardware: FakeHardware.PlainPc());
+        Assert.Null(host.FallingBehind());
+    }
+}
