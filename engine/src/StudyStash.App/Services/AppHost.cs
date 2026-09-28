@@ -17,6 +17,15 @@ public enum AppRole
     Library,
 }
 
+/// <summary>Settings → Appearance's mode: follow the computer's own light/dark setting, or always show one.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<AppAppearance>))]
+public enum AppAppearance
+{
+    System,
+    Light,
+    Dark,
+}
+
 /// <summary>The app's own settings (app.json beside client.toml): what's been set up, and how to record.</summary>
 public sealed class AppSettings
 {
@@ -44,6 +53,9 @@ public sealed class AppSettings
     public WindowPlace? LibraryWindow { get; set; }
     /// <summary>The colour theme's name (Settings → Appearance): "Lagoon", "Plum"…</summary>
     public string Theme { get; set; } = "Lagoon";
+    /// <summary>Light, dark, or match the computer (Settings → Appearance). Settings files saved before this
+    /// existed have none, so they come back as <see cref="AppAppearance.System"/>: nothing changes for them.</summary>
+    public AppAppearance Appearance { get; set; } = AppAppearance.System;
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 

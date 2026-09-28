@@ -93,6 +93,8 @@ public static partial class Shell
         RemoteLibrary.Computer = Environment.MachineName;
         host = new AppHost(home, laptop: new LaptopHost(), log: Program.Log);
         Skin.UseTheme(ColourThemes.Find(host.Settings.Theme));
+        // Before any window shows, so it never opens in the wrong mode and then flips.
+        Skin.UseAppearance(host.Settings.Appearance);
         host.Changed += RequestRefresh;
         host.Heard += (l, lines) => Dispatcher.UIThread.Post(() => AddHeard(l, lines));
         host.Filed += l => Dispatcher.UIThread.Post(() =>

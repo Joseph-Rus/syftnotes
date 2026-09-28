@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Styling;
+using StudyStash.App.Services;
 
 namespace StudyStash.App;
 
@@ -51,6 +52,24 @@ public static class Skin
     {
         Theme = theme;
         if (Application.Current is App app) app.UseSkin(Current);
+    }
+
+    /// <summary>Settings → Appearance's mode as Avalonia's own tri-state: System follows the computer's own
+    /// light/dark setting; Light and Dark always show one.</summary>
+    public static ThemeVariant VariantFor(AppAppearance appearance) => appearance switch
+    {
+        AppAppearance.Light => ThemeVariant.Light,
+        AppAppearance.Dark => ThemeVariant.Dark,
+        _ => ThemeVariant.Default,
+    };
+
+    /// <summary>Apply an appearance mode to the whole running app: every open window follows at once (it's the
+    /// application's own <c>RequestedThemeVariant</c>, and no window sets its own), and so does anything that reads a
+    /// window's <c>ActualThemeVariant</c>, such as <see cref="Controls.GlassBackdrop"/>'s Mac blur and the Windows
+    /// tray icon's ink.</summary>
+    public static void UseAppearance(AppAppearance appearance)
+    {
+        if (Application.Current is { } app) app.RequestedThemeVariant = VariantFor(appearance);
     }
 
     /// <summary>A look's tokens in the current colour theme.</summary>
