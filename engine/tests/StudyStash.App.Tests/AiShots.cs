@@ -405,6 +405,49 @@ public class AiShots
     }
 
     // ---------------------------------------------------------------------------------------------------------
+    // An answer being written (design 16's answer card and compact chat, mid-answer): the words so far, the formula
+    // it's in the middle of held back, and Stop where Send was. The design has no picture of this moment; it's the
+    // same card and chat as the picker's, a few words at a time.
+    // ---------------------------------------------------------------------------------------------------------
+
+    const string WritingSoFar = "The base case is the call that stops the recursion: it returns without calling itself again, so each paused call "
+        + "on the stack can finish in turn. In a factorial that's when $n = 0$, which returns 1, and then every call multiplies by its own $\\frac{n";
+
+    static AiAskModel Writing(string question, string engine)
+    {
+        var m = AiDemo.Ask();
+        m.Turns.Add(new AiTurn(question, engine) { Answer = StudyStash.Core.Rich.PartialText.Showable(WritingSoFar) });
+        m.Busy = true;
+        return m;
+    }
+
+    static Control WritingPage(SkinKind skin)
+    {
+        var page = (Border)AskPage(skin, Writing("What's a base case?", "Ollama"));
+        var panel = (Panel)page.Child!;
+        panel.Children.RemoveAt(2); // no "Answer with" menu open: the answer card in its place, above the bar
+        var model = (AiAskModel)((Control)panel.Children[^1]).DataContext!;
+        panel.Children.Insert(2, skin == SkinKind.Mac
+            ? new MacAiAnswer { DataContext = model, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 84) }
+            : new WinAiAnswer { DataContext = model, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 0, 84) });
+        return page;
+    }
+
+    static Control WritingComposition(SkinKind skin) => Shot.Side(WritingPage(skin), AskChatPanel(skin, Writing("And the stack?", "Ollama")));
+
+    [AvaloniaFact]
+    public void Mac_ai_answer_being_written()
+    {
+        foreach (var t in Themes) Shot.Take("mac-16-ai-answer-being-written", SkinKind.Mac, t, () => WritingComposition(SkinKind.Mac));
+    }
+
+    [AvaloniaFact]
+    public void Win_ai_answer_being_written()
+    {
+        foreach (var t in Themes) Shot.Take("win-16-ai-answer-being-written", SkinKind.Win, t, () => WritingComposition(SkinKind.Win));
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
     // A lecture's notes with "Rewrite notes" (design 17): each panel is the design's own little "page" — a class
     // dot and meta line, the title, then our real AiNotes control below it. Picture scaffolding only: the real
     // lecture page (title, meta, the class dot) is another lane's.
