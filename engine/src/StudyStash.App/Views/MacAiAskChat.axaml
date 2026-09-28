@@ -28,7 +28,7 @@
           <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
         </Button>
       </Grid>
-      <ScrollViewer Name="Thread" MaxHeight="240" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True"
+      <ScrollViewer Name="Thread" MaxHeight="240" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True"
                   IsVisible="{Binding HasLatest}">
         <ItemsControl ItemsSource="{Binding Turns}">
           <ItemsControl.ItemsPanel>
