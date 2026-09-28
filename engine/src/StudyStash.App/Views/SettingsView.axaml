@@ -781,6 +781,42 @@
 
                   <!-- Classes: each its own card, the name, other names and what it covers lined up in columns -->
                   <StackPanel IsVisible="{Binding OnClasses}" Spacing="8">
+                    <!-- Use Canvas course names: classes named from course codes take their courses' names, after a preview -->
+                    <Border Classes="group" Margin="0,8,0,0" IsVisible="{Binding Lib.HasCourseNames}">
+                      <StackPanel>
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="Use Canvas course names" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.CourseNamesSub}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.AskUseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}" IsVisible="{Binding !Lib.ConfirmingCourseNames}"><TextBlock Text="Preview…" FontSize="13" /></Button>
+                            <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Lib.ConfirmingCourseNames}">
+                              <Button Classes="pill" Command="{Binding Lib.CancelUseCourseNamesCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
+                              <Button Classes="pill primary" Command="{Binding Lib.UseCourseNamesCommand}" IsEnabled="{Binding Lib.CanUseCourseNames}"><TextBlock Text="{Binding Lib.RenameLabel}" FontSize="13" FontWeight="Medium" /></Button>
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                        <ItemsControl ItemsSource="{Binding Lib.CourseNames}" IsVisible="{Binding Lib.ConfirmingCourseNames}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:CourseNameRow">
+                              <StackPanel>
+                                <Border Classes="rowsep" />
+                                <Border Classes="row">
+                                  <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                      <TextBlock Classes="row-title" Text="{Binding To}" TextTrimming="CharacterEllipsis" />
+                                      <TextBlock Classes="row-sub" Text="{Binding Now}" TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Classes="row-sub act" Text="{Binding Meta}" VerticalAlignment="Center" />
+                                  </Grid>
+                                </Border>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
                     <ItemsControl ItemsSource="{Binding Lib.Classes}" Margin="0,8,0,0">
                       <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>

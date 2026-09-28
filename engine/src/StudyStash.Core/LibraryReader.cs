@@ -21,8 +21,16 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         var counts = Store.ClassesSummary().ToDictionary(c => c.ClassName, c => c.Count);
         var classes = new JsonArray();
         int index = 0;
+        var canvas = Canvas.CanvasSettings.Load(Cfg.Home);
         foreach (var c in Cfg.Classes)
-            classes.Add(new JsonObject { ["name"] = c.Name, ["lectures"] = counts.GetValueOrDefault(c.Name), ["color"] = index++, ["description"] = c.Description });
+            classes.Add(new JsonObject
+            {
+                ["name"] = c.Name, ["lectures"] = counts.GetValueOrDefault(c.Name), ["color"] = index++, ["description"] = c.Description,
+                // The linked Canvas course's short code ("CSCI 321"), a label beside the name; "" when there's none.
+                ["code"] = ShortCodeOf(canvas, c.Name),
+                // Its other names (one it had before a rename, say), so a laptop's lectures filed under an old name can follow it.
+                ["aliases"] = new JsonArray(c.Aliases.Select(a => (JsonNode?)a).ToArray()),
+            });
         // Lectures filed under a class since removed from the config still show, after the rest.
         foreach (var (name, n) in counts.Where(kv => kv.Key != Configs.Unsorted && Cfg.Classes.All(c => c.Name != kv.Key)))
             classes.Add(new JsonObject { ["name"] = name, ["lectures"] = n, ["color"] = index++ });
@@ -38,6 +46,10 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             ["notes_model"] = Cfg.SummaryEnabled && Cfg.OllamaEnabled ? Cfg.EffectiveSummaryModel : null,
         };
     }
+
+    static string ShortCodeOf(Canvas.CanvasSettings s, string cls) =>
+        s.Courses.TryGetValue(cls, out long id) && s.CourseInfo.TryGetValue(id.ToString(CultureInfo.InvariantCulture), out var info)
+            ? Canvas.CourseNames.ShortCode(info.Code, info.Name) : "";
 
     /// <summary>Lectures newest first, in one class (or Unsorted) or all, before a date to page back.</summary>
     public JsonArray Lectures(string? className = null, int limit = 50, string? before = null)

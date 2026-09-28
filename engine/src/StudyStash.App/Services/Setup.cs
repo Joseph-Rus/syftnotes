@@ -76,7 +76,7 @@ public static class Setup
         m.OnConnect = () => ConnectAsync(m, host);
         m.OnFind = () => FindAsync(m, host);
         m.OnAddClass = () => AddClassAsync(m, host);
-        // Leaving Classes adds the Canvas courses that are ticked (and links them); a time that can't be read stays.
+        // Leaving Classes adds the Canvas courses that are ticked (and links them).
         m.LeaveAsync = step => step == SetupStep.Classes ? AddCoursesAsync(m, host) : Task.FromResult(true);
         m.CanLeave = step =>
         {
@@ -268,8 +268,8 @@ public static class Setup
     }
 
     /// <summary>
-    /// Classes' Continue with Canvas courses found: every ticked course becomes a class in the library (its name on
-    /// Canvas saying what it covers, for the library's AI to sort by), each is linked to its course, and Canvas is asked
+    /// Classes' Continue with Canvas courses found: every ticked course becomes a class in the library (named
+    /// by its course on Canvas, which says what it covers for the library's AI to sort by), each is linked to its course, and Canvas is asked
     /// to sync in the background. <paramref name="canvas"/> is the library's Canvas API (tests give their own).
     /// </summary>
     public static async Task<bool> AddCoursesAsync(SetupModel m, AppHost host, CanvasClient? canvas = null)
@@ -288,7 +288,7 @@ public static class Setup
                 if (lib is null || had.Contains(name)) continue;
                 try
                 {
-                    await lib.AddClassAsync(name, c.HasCourseName ? c.CourseName : null);
+                    await lib.AddClassAsync(name);
                 }
                 catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
                 {

@@ -183,6 +183,10 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             },
             Reveal = dir => Machine.Open(dir),
             OpenPage = OpenLibraryPage,
+            ClassesRenamed = renamed =>
+            {
+                foreach (var (from, to) in renamed) host.FollowRename(from, to);
+            },
         };
         // A library-only computer opens on its library.
         if (!records) Section = "Library";

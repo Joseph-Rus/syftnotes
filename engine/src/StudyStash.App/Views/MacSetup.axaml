@@ -430,10 +430,11 @@
                     <DataTemplate x:DataType="vm:SetupCourse">
                       <Grid Classes="classrow" ColumnDefinitions="20,10,150,10,*,10,Auto" Height="44">
                         <CheckBox Classes="tick" IsChecked="{Binding Ticked}" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                   ToolTip.Tip="{Binding Name}" />
-                        <TextBlock Grid.Column="4" Grid.ColumnSpan="3" Text="{Binding CourseName}" IsVisible="{Binding HasCourseName}" FontSize="12" Foreground="{DynamicResource Fg2}"
-                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CourseName}" />
+                        <StackPanel Grid.Column="2" Grid.ColumnSpan="5" VerticalAlignment="Center" Spacing="1">
+                          <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Code}" IsVisible="{Binding HasCode}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis"
+                                     ToolTip.Tip="{Binding Code}" />
+                        </StackPanel>
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>

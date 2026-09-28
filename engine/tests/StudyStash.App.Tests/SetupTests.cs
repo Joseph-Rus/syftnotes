@@ -470,9 +470,10 @@ public sealed class SetupTests
         await canvas.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), [], TestContext.Current.CancellationToken);
 
         Assert.True(m.HasCourses);
-        Assert.Equal(["BIO 110", "CALC II", "CS 101", "HIST 210", "Study Skills"], m.Courses.Select(c => c.Name));
+        Assert.Equal(["Calculus II", "Cell and Molecular Biology", "Intro to Programming", "Modern World History", "Study Skills"], m.Courses.Select(c => c.Name));
         Assert.All(m.Courses, c => Assert.True(c.Ticked));
-        Assert.Equal("Intro to Programming", m.Courses.Single(c => c.Name == "CS 101").CourseName);
+        Assert.Equal("CS 101", m.Courses.Single(c => c.Name == "Intro to Programming").Code);
+        Assert.False(m.Courses.Single(c => c.Name == "Study Skills").HasCode);
         Assert.Contains("Canvas courses", m.ClassesLede);
 
         m.SkipCommand.Execute(null);
@@ -496,7 +497,7 @@ public sealed class SetupTests
         {
             var body = await System.Text.Json.JsonDocument.ParseAsync(r.Body);
             string about = body.RootElement.TryGetProperty("description", out var d) && d.ValueKind == System.Text.Json.JsonValueKind.String ? d.GetString()! : "";
-            lock (classes) classes.Add($"{body.RootElement.GetProperty("name").GetString()} · {about}");
+            lock (classes) classes.Add(about.Length > 0 ? $"{body.RootElement.GetProperty("name").GetString()} · {about}" : body.RootElement.GetProperty("name").GetString()!);
             return Results.Ok(new { });
         });
         app.MapPost("/api/v2/canvas", async (HttpRequest r) =>
@@ -529,10 +530,10 @@ public sealed class SetupTests
 
             Assert.True(await Setup.AddCoursesAsync(m, host));
 
-            // Each ticked course is a class, its name on Canvas saying what it covers (the library's AI sorts by it).
-            Assert.Equal(["BIO 110 · Cell Biology", "CS 101 · Intro to Programming"], posted.Order());
+            // Each ticked course is a class named as on Canvas, which says what it covers (the library's AI sorts by it).
+            Assert.Equal(["Cell Biology", "Intro to Programming"], posted.Order());
             for (int i = 0; i < 50 && bodies.Count < 2; i++) await Task.Delay(20, TestContext.Current.CancellationToken); // the sync is asked for without waiting
-            Assert.Equal("{\"courses\":{\"CS 101\":4201,\"BIO 110\":4202}}", bodies[0]);
+            Assert.Equal("{\"courses\":{\"Intro to Programming\":4201,\"Cell Biology\":4202}}", bodies[0]);
             Assert.Equal("{\"sync\":true}", bodies[1]);
             Assert.False(m.AddingCourses);
         }

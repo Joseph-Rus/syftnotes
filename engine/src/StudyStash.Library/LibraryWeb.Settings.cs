@@ -57,6 +57,47 @@ public sealed partial class LibraryWeb
             pipeline.Wake();
             return Http.Json(new JsonObject { ["queued"] = n });
         }));
+        // "Use Canvas course names": the preview, and doing it (for every class in the preview, or the ones named in
+        // "classes"). The answer says what was renamed, so the app can follow on its own computer.
+        app.MapGet("/api/v2/settings/course-names", (HttpContext ctx) => Api(ctx, () => Http.Json(CourseNamesJson())));
+        app.MapPost("/api/v2/settings/course-names", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            var only = body?["classes"] is JsonArray list ? list.Select(n => n?.GetValue<string>()).OfType<string>().ToHashSet() : null;
+            return Http.Json(UseCourseNames(only));
+        })));
+    }
+
+    /// <summary>The classes "Use Canvas course names" would rename, each with how many lectures move with it, and
+    /// why it can't right now (null when it can).</summary>
+    JsonObject CourseNamesJson()
+    {
+        var counts = store.ClassesSummary().ToDictionary(c => c.ClassName, c => c.Count);
+        return new JsonObject
+        {
+            ["blocked"] = ClassRename.Blocked(Canvas.Crawl),
+            ["renames"] = new JsonArray(ClassRename.Plan(cfg, Canvas.Settings).Select(st => (JsonNode?)new JsonObject
+            {
+                ["from"] = st.From, ["to"] = st.To, ["code"] = st.Code, ["lectures"] = counts.GetValueOrDefault(st.From, 0),
+            }).ToArray()),
+        };
+    }
+
+    /// <summary>Rename the planned classes (or just <paramref name="only"/>) to their Canvas course names.</summary>
+    JsonObject UseCourseNames(IReadOnlySet<string>? only)
+    {
+        var plan = ClassRename.Plan(cfg, Canvas.Settings).Where(st => only is null || only.Contains(st.From)).ToList();
+        var outcome = ClassRename.Apply(cfg, store, plan, Canvas.Crawl);
+        if (outcome.Renamed.Count > 0)
+        {
+            Console.WriteLine($"[classes] renamed to their Canvas course names: {string.Join(", ", outcome.Renamed.Select(st => $"{st.From} → {st.To}"))} ({outcome.Lectures} lectures moved)");
+            pipeline.Wake();
+        }
+        var result = CourseNamesJson();
+        result["renamed"] = new JsonArray(outcome.Renamed.Select(st => (JsonNode?)new JsonObject { ["from"] = st.From, ["to"] = st.To }).ToArray());
+        result["lectures"] = outcome.Lectures;
+        result["problem"] = outcome.Problem;
+        return result;
     }
 
     async Task<JsonObject> SettingsJsonAsync()
@@ -85,6 +126,7 @@ public sealed partial class LibraryWeb
                 ["name"] = c.Name, ["aliases"] = new JsonArray(c.Aliases.Select(a => (JsonNode?)a).ToArray()), ["description"] = c.Description,
                 ["folder"] = store.ClassDir(c.Name), ["lectures"] = counts.GetValueOrDefault(c.Name, 0),
             }).ToArray()),
+            ["course_names"] = CourseNamesJson(),
             ["notes"] = new JsonObject
             {
                 ["write"] = cfg.SummaryEnabled, ["sort"] = cfg.OllamaEnabled, ["min_confidence"] = cfg.MinConfidence, ["writer"] = NotesWriter,

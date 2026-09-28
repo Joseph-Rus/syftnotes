@@ -37,6 +37,18 @@ public static class CanvasSeen
     /// <summary>The announcement ids opened in Study Stash for this class.</summary>
     public static HashSet<long> For(string home, string cls) => Load(home).GetValueOrDefault(cls, []).ToHashSet();
 
+    /// <summary>A class was renamed: its opened announcements move to the new name.</summary>
+    public static void Rename(string home, string from, string to)
+    {
+        lock (Gate)
+        {
+            var all = Load(home);
+            if (!all.Remove(from, out var ids)) return;
+            all[to] = [.. all.GetValueOrDefault(to, []).Union(ids).Order()];
+            Save(home, all);
+        }
+    }
+
     /// <summary>Mark these announcements opened in Study Stash.</summary>
     public static void Mark(string home, string cls, IEnumerable<long> ids)
     {

@@ -430,6 +430,14 @@ public sealed class AppHost : IDisposable, IProblemSource
                         OlderLibrary = true;
                     }
                     Library = LibraryState.Connected;
+                    // A class renamed in the library keeps its old name among its other names: lectures recorded here
+                    // under the old name follow it, before anything deleted for good drops out.
+                    var names = (Overview["classes"] as JsonArray ?? []).Select(c => c?["name"]?.GetValue<string>() ?? "").ToList();
+                    foreach (var c in (Overview["classes"] as JsonArray ?? []).OfType<JsonObject>())
+                        foreach (var alias in (c["aliases"] as JsonArray ?? []).Select(a => a is JsonValue v && v.TryGetValue(out string? t) ? t : null).OfType<string>())
+                            if (c["name"] is JsonValue nv && nv.TryGetValue(out string? name) && name is not null && !names.Contains(alias)
+                                && Lectures.All().Any(l => l.ClassName == alias || l.FiledClass == alias))
+                                FollowRename(alias, name);
                     DropGone(Overview["gone"] as JsonArray);
                 }
                 catch (InvalidOperationException e) when (e.Message == "wrong password")
@@ -521,6 +529,19 @@ public sealed class AppHost : IDisposable, IProblemSource
             Problem?.Invoke("Your settings couldn't be saved", e.Message);
         }
         Changed?.Invoke();
+    }
+
+    /// <summary>A class was renamed in the library: the lectures recorded here under the old name follow it, so they
+    /// file where it went.</summary>
+    public void FollowRename(string from, string to)
+    {
+        foreach (var l in Lectures.All().Where(l => l.ClassName == from || l.FiledClass == from))
+            Lectures.Update(l.Id, x =>
+            {
+                if (x.ClassName == from) x.ClassName = to;
+                if (x.FiledClass == from) x.FiledClass = to;
+            });
+        log($"[app] {from} is now {to} in the library: the lectures here follow it");
     }
 
     // --- recording ------------------------------------------------------------------------------------------------
