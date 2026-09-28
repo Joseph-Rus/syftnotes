@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.TestHost;
 using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
@@ -309,6 +310,35 @@ public class PhoneApiTests
         var r = Req(HttpMethod.Post, "/api/v2/devices/pair", new { code = await CodeAsync(site) }, key: null);
         r.Headers.UserAgent.ParseAdd("Mozilla/5.0 (iPhone; CPU iPhone OS 19_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/19.0 Mobile/15E148 Safari/604.1");
         Assert.Equal("iPhone", (await Json(await site.Stranger().SendAsync(r)))["device"]!["name"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_phone_through_tailscale_serve_is_not_taken_for_this_computer()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        await using var site = await Site(cfg, store);
+        var server = site.App.GetTestServer();
+        // Serve passes the phone's request on from 127.0.0.1, over plain http, saying who it's from.
+        Task<Microsoft.AspNetCore.Http.HttpContext> From127(string path, bool served) => server.SendAsync(c =>
+        {
+            c.Connection.RemoteIpAddress = IPAddress.Loopback;
+            c.Request.Method = "GET";
+            c.Request.Path = path;
+            c.Request.Host = new(served ? "mini.tail1234.ts.net:8443" : "127.0.0.1:8000");
+            if (served)
+            {
+                c.Request.Headers["X-Forwarded-For"] = "100.101.102.103";
+                c.Request.Headers["X-Forwarded-Proto"] = "https";
+                c.Request.Headers["Tailscale-User-Login"] = "sam@example.com";
+            }
+        });
+
+        Assert.Equal(200, (await From127("/settings", served: false)).Response.StatusCode);
+        Assert.Equal(303, (await From127("/settings", served: true)).Response.StatusCode);
+        Assert.Equal(401, (await From127("/api/v2/library", served: true)).Response.StatusCode);
+        Assert.Equal(200, (await From127("/api/v2/me", served: true)).Response.StatusCode);
     }
 
     [Theory]
