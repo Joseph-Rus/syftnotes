@@ -77,4 +77,58 @@ public class AttachedNotesTests
         var m = new Meeting("1") { Attached = [Deck] };
         Assert.Equal([Deck], m.WithNotes("new").Attached);
     }
+
+    /// <summary>A file in a class's Attachments folder, kept in the index with its words already read.</summary>
+    static void Attach(Store store, string id, string className, string noteId, string name, string? words)
+    {
+        string dir = store.AttachmentsDir(className);
+        File.WriteAllText(Path.Combine(dir, name), "x");
+        store.AddAttachment(new Attachment(id, name, name, className, noteId, 1, "application/pdf", "2026-09-01T00:00:00Z"));
+        store.SetAttachmentText(id, words);
+    }
+
+    [Fact]
+    public async Task The_pipeline_writes_a_lecture_with_its_attachments_and_then_counts_them_used()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { OllamaModel = "small:1b", Classes = [new ClassDef("Calc 1")] };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        store.Enqueue(new Meeting("l1") { Title = "Calc 1 lecture", Folder = "Calc 1", Transcript = Lines(40) });
+        Attach(store, "a1", Configs.Unsorted, "l1", "my notes.pdf", "Chain rule: f(g(x))' = f'(g(x)) g'(x)");
+        Attach(store, "a2", Configs.Unsorted, "l1", "IMG_3.png", null); // nothing read from it
+        Meeting? seen = null;
+        var p = new Pipeline(cfg, store, (_, _, _) => Task.FromResult("{}"), (m, _) =>
+        {
+            seen = m;
+            return Task.FromResult("## Summary\nChain rule.");
+        }, _ => { });
+        Assert.Equal(1, await p.RunPendingAsync());
+        var attached = Assert.Single(seen!.Attached);
+        Assert.Equal(("a1", Attachments.OwnNotes), (attached.Id, attached.Label));
+        Assert.True(store.GetAttachment("a1")!.Used);
+        Assert.False(store.GetAttachment("a2")!.Used);
+        Assert.False(store.AttachmentsUnused("l1"));
+        Assert.Equal("Calc 1", store.GetAttachment("a1")!.ClassName); // filed, and they went with it
+
+        // One that comes after the notes are written is not used until they're written again.
+        Attach(store, "a3", "Calc 1", "l1", "Week 2 slides.pdf", "Slide: the chain rule");
+        Assert.True(store.AttachmentsUnused("l1"));
+        store.Requeue("l1");
+        await p.RunPendingAsync();
+        Assert.Equal(2, seen.Attached.Count);
+        Assert.False(store.AttachmentsUnused("l1"));
+    }
+
+    [Fact]
+    public async Task Notes_that_fail_to_be_written_leave_the_attachments_unused()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { OllamaModel = "small:1b", Classes = [new ClassDef("Calc 1")] };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        store.Enqueue(new Meeting("l1") { Title = "Calc 1 lecture", Folder = "Calc 1", Transcript = Lines(40) });
+        Attach(store, "a1", Configs.Unsorted, "l1", "my notes.pdf", "words");
+        var p = new Pipeline(cfg, store, (_, _, _) => Task.FromResult("{}"), (_, _) => throw new InvalidOperationException("model not found"), _ => { });
+        await p.RunPendingAsync();
+        Assert.False(store.GetAttachment("a1")!.Used);
+    }
 }
