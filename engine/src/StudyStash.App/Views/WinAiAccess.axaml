@@ -1,7 +1,8 @@
-<!-- Settings → AI tool access (design 14, Windows): the off switch, what Claude and other MCP tools may read,
+<!-- Settings → AI tool access (design 14, Windows): the off switch, what Claude and other MCP tools may read, the
+     "Claude (desktop and web)" card (connectors task 5: Funnel on/off, the address, a live check, its problems),
      connecting a tool, and the connected list. The pane's own padding and scrolling; the settings window is the
-     host's. An "Other…" text button follows Codex — not in the design, added so Claude Desktop and Claude on the
-     web stay reachable here too (see WIRING.md). -->
+     host's. An "Other…" text button follows Codex — not in the design, added so Claude Desktop stays reachable here
+     too (see WIRING.md). -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
