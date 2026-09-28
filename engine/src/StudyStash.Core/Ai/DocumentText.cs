@@ -49,6 +49,7 @@ public static partial class DocumentText
         {
             return ext switch
             {
+                ".pdf" => Pdf(path, options, ct),
                 ".docx" => Docx(path),
                 ".pptx" => Pptx(path),
                 ".doc" or ".rtf" => Machine.Run("textutil", ["-convert", "txt", "-stdout", path], TimeSpan.FromSeconds(25))?.Stdout,
@@ -124,6 +125,9 @@ public sealed record DocumentTextOptions
 {
     /// <summary>Where read text is kept, by file path, size and time changed; null keeps nothing.</summary>
     public string? CacheDir { get; init; }
+
+    /// <summary>A PDF's pages past this many aren't read (a 300-page textbook's first chapters are what's asked about).</summary>
+    public int MaxPages { get; init; } = 300;
 
     public static DocumentTextOptions Default => new() { CacheDir = Path.Combine(Configs.DefaultHome, "cache", "text") };
 }

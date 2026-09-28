@@ -1,9 +1,13 @@
 using System.IO.Compression;
 using StudyStash.Core.Ai;
+using UglyToad.PdfPig.Content;
+using UglyToad.PdfPig.Core;
+using UglyToad.PdfPig.Fonts.Standard14Fonts;
+using UglyToad.PdfPig.Writer;
 
 namespace StudyStash.Core.Tests;
 
-/// <summary>Reading the words in the files a student hands the library: Word, PowerPoint, plain text.</summary>
+/// <summary>Reading the words in the files a student hands the library: PDFs, Word, PowerPoint, plain text.</summary>
 public class DocumentTextTests
 {
     static readonly DocumentTextOptions NoCache = new();
@@ -26,6 +30,54 @@ public class DocumentTextTests
     internal static string SlideXml(params string[] paragraphs) =>
         """<?xml version="1.0" encoding="UTF-8"?><p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:sp><p:txBody>"""
         + string.Concat(paragraphs.Select(p => $"<a:p><a:r><a:t>{p}</a:t></a:r></a:p>")) + "</p:txBody></p:sp></p:spTree></p:cSld></p:sld>";
+
+    /// <summary>A PDF of typed text: each page its lines, an empty page for none.</summary>
+    internal static void TypedPdf(string path, params string[][] pages)
+    {
+        var b = new PdfDocumentBuilder();
+        var font = b.AddStandard14Font(Standard14Font.Helvetica);
+        foreach (var lines in pages)
+        {
+            var page = b.AddPage(PageSize.Letter);
+            for (int i = 0; i < lines.Length; i++) page.AddText(lines[i], 14, new PdfPoint(72, 700 - i * 24), font);
+        }
+        File.WriteAllBytes(path, b.Build());
+    }
+
+    [Fact]
+    public async Task A_PDF_reads_page_by_page_and_leaves_blank_pages_out()
+    {
+        using var dir = new TempDir();
+        TypedPdf(dir["syllabus.pdf"], ["CS 101 Syllabus", "Midterm: October 14"], [], ["Final project due December 5"]);
+
+        string? text = await DocumentText.ExtractAsync(dir["syllabus.pdf"], NoCache, default);
+
+        Assert.NotNull(text);
+        Assert.Matches(@"^CS 101 Syllabus\s+Midterm: October 14\n\nFinal project due December 5$", text);
+    }
+
+    [Fact]
+    public async Task A_long_PDF_is_read_only_as_far_as_its_page_limit()
+    {
+        using var dir = new TempDir();
+        TypedPdf(dir["textbook.pdf"], [.. Enumerable.Range(1, 12).Select(n => new[] { $"Chapter {n} begins" })]);
+
+        string? text = await DocumentText.ExtractAsync(dir["textbook.pdf"], NoCache with { MaxPages = 3 }, default);
+
+        Assert.Contains("Chapter 3 begins", text);
+        Assert.DoesNotContain("Chapter 4", text);
+    }
+
+    [Fact]
+    public async Task A_PDF_that_is_not_one_is_null()
+    {
+        using var dir = new TempDir();
+        File.WriteAllText(dir["fake.pdf"], "%PDF-1.4 and then nothing a PDF should have");
+        File.WriteAllBytes(dir["empty.pdf"], []);
+
+        Assert.Null(await DocumentText.ExtractAsync(dir["fake.pdf"], NoCache, default));
+        Assert.Null(await DocumentText.ExtractAsync(dir["empty.pdf"], NoCache, default));
+    }
 
     [Fact]
     public async Task A_Word_document_reads_paragraph_by_paragraph_with_its_footnotes()
