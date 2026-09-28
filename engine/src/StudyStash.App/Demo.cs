@@ -1,6 +1,7 @@
 using Avalonia.Media;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.Audio;
 
 namespace StudyStash.App;
 
@@ -130,16 +131,34 @@ public static class Demo
         if (skin == SkinKind.Mac)
         {
             m.Go(SetupStep.Model);
-            m.ModelSize = "3 GB";
-            m.ModelProgress = 0.62;
-            m.ModelDone = "1.9 GB of 3.1 GB";
-            m.ModelLeft = "About 4 minutes left";
+            ModelStep(m, skin);
         }
         else
         {
             m.Go(SetupStep.Taskbar);
         }
         return m;
+    }
+
+    /// <summary>Setup's model step on a made-up computer: a Mac with Apple silicon (large-v3, 62% down) or a PC with
+    /// no graphics card Whisper can use (the compact turbo, 62% down); <paramref name="choosing"/> opens the list.</summary>
+    public static void ModelStep(SetupModel m, SkinKind skin, bool choosing = false)
+    {
+        var hw = skin == SkinKind.Mac
+            ? new HardwareProfile(HostOs.Mac, System.Runtime.InteropServices.Architecture.Arm64, 8, true, 16)
+            : new HardwareProfile(HostOs.Windows, System.Runtime.InteropServices.Architecture.X64, 8, true, 16,
+                new GraphicsCard("Intel(R) UHD Graphics 620", 0.125, true), Vulkan: true);
+        var advice = WhisperModels.Advise(hw);
+        m.Models.Clear();
+        foreach (var c in ModelChoice.For(advice.Model, advice, Path.Combine(Path.GetTempPath(), "studystash-demo-no-models"))) m.Models.Add(c);
+        m.ChosenModel = m.Models.First(c => c.Chosen);
+        m.ChoosingModel = choosing;
+        m.ModelName = advice.Model.Name;
+        m.ModelSize = Services.Setup.About(advice.Model.Bytes);
+        m.ModelProgress = 0.62;
+        var done = new DownloadProgress((long)(advice.Model.Bytes * 0.62), advice.Model.Bytes, 0);
+        m.ModelDone = done.Amount;
+        m.ModelLeft = skin == SkinKind.Mac ? "About 4 minutes left" : "About a minute left";
     }
 
     /// <summary>A library-only computer's dropdown (the Mac mini at home): running, 21 lectures, Canvas synced ten

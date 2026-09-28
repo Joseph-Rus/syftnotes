@@ -108,6 +108,7 @@ public static partial class Shell
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
         host.Start();
+        _ = SuggestLighterModelAsync();
         AppUpdates.Start(host, stop.Token);
         MakeTray();
         // A Mac's app menu (About, Settings… ⌘,, and the system's Hide and Quit ⌘Q) while a window is in front.
@@ -1044,6 +1045,28 @@ public static partial class Shell
 
     /// <summary>Settings from the dropdown's gear, the app menu or ⌘, (Ctrl+,) anywhere: the dropdown and the quick
     /// panel make way for it; before setup's done, setup comes forward instead.</summary>
+    /// <summary>An install on a model heavier than this computer keeps up with (large-v3 on a PC with no graphics card
+    /// Whisper can use) hears once, a little after starting, that a lighter one would. Nothing switches by itself.</summary>
+    static async Task SuggestLighterModelAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), stop.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        if (await host.ModelSuggestionAsync().ConfigureAwait(false) is not { } advice) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            host.ModelSuggestionMade(advice.Model);
+            Program.Log($"[model] suggested {advice.Model.Name} in place of {host.Model.Name}");
+            Toast($"{advice.Model.Name} would keep up better", $"{advice.Why} Switch in Settings → Recording.", "Settings",
+                () => ShowSettings("Recording"), TimeSpan.FromSeconds(30));
+        });
+    }
+
     static void SettingsFromAnywhere()
     {
         panelWindow?.Hide();

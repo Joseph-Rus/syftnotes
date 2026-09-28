@@ -21,16 +21,22 @@ public sealed partial class ModelChoice : ObservableObject
     public string About => $"{Model.Size}. {Model.About}";
     /// <summary>The model that keeps up with a lecture on this computer.</summary>
     public bool Recommended { get; init; }
+    /// <summary>Why it's the one for this computer (the recommended one only).</summary>
+    public string Why { get; init; } = "";
+    public bool HasWhy => Why.Length > 0;
+    /// <summary>Its line under the name: why it suits this computer, or what it's for.</summary>
+    public string Line => Why.Length > 0 ? Why : Model.About;
     [ObservableProperty] public partial bool Chosen { get; set; }
     [ObservableProperty] public partial bool Here { get; set; }
 
     /// <summary>The models to offer, the one in use (<paramref name="chosen"/>) marked: Whisper tiny is only for
     /// trying things out, so it's there only when it's the one in use.</summary>
-    public static IEnumerable<ModelChoice> For(WhisperModel chosen, WhisperModel recommended, string home) =>
+    public static IEnumerable<ModelChoice> For(WhisperModel chosen, ModelAdvice advice, string home) =>
         WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == chosen.Id).Select(m => new ModelChoice
         {
             Model = m,
-            Recommended = m.Id == recommended.Id,
+            Recommended = m.Id == advice.Model.Id,
+            Why = m.Id == advice.Model.Id ? advice.Why : "",
             Chosen = m.Id == chosen.Id,
             Here = WhisperModels.IsDownloaded(home, m),
         });
@@ -121,6 +127,15 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     // Recording
     public ObservableCollection<ModelChoice> Models { get; } = [];
     [ObservableProperty] public partial string ModelLine { get; set; } = "";
+    /// <summary>Why the recommended model suits this computer, and, when the one in use is heavier, that it may fall
+    /// behind.</summary>
+    [ObservableProperty] public partial string ModelAdviceLine { get; set; } = "";
+    /// <summary>A model is downloading: the bar under the list shows how far.</summary>
+    [ObservableProperty] public partial bool ModelDownloading { get; set; }
+    [ObservableProperty] public partial double ModelProgress { get; set; }
+    public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 480;
+    partial void OnModelProgressChanged(double value) => OnPropertyChanged(nameof(ModelBarWidth));
+    readonly ModelAdvice advice;
     [ObservableProperty] public partial string Language { get; set; } = "";
     [ObservableProperty] public partial bool ComputerAudio { get; set; }
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
@@ -249,9 +264,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
         ColourTheme = host.Settings.Theme;
         Appearance = host.Settings.Appearance;
-        // Whisper tiny is only for trying things out: listed only when it's the one in use.
-        foreach (var m in WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == host.Model.Id))
-            Models.Add(new ModelChoice { Model = m, Chosen = m.Id == host.Model.Id, Here = WhisperModels.IsDownloaded(host.Home, m) });
+        advice = host.Advice;
+        foreach (var m in ModelChoice.For(host.Model, advice, host.Home)) Models.Add(m);
         host.Changed += OnHostChanged;
         foreach (var n in NavItems) n.On = n.Id == Section;
         foreach (var t in Themes) t.Chosen = t.Name == ColourTheme;
@@ -332,6 +346,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanStopLibrary));
         ShortcutsSay = Shell.ShortcutsSay();
         ModelLine = ModelWords(host);
+        ModelAdviceLine = AdviceWords(host.Model, advice);
+        ModelDownloading = host.Downloading is not null;
+        ModelProgress = host.Downloading?.Fraction ?? 0;
         foreach (var m in Models)
         {
             m.Chosen = m.Model.Id == host.Model.Id;
@@ -349,6 +366,13 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             return $"Downloading {(host.DownloadingModel ?? host.Model).Name}: {d.Amount}." + (d.Left() is { } left ? $" {left}." : "");
         return $"{host.Model.Name} isn't downloaded yet.";
     }
+
+    /// <summary>Settings → Recording's line about the model for this computer: why it suits it, and when the one in use
+    /// is heavier, that it may fall behind (never a switch: the student picks).</summary>
+    public static string AdviceWords(WhisperModel inUse, ModelAdvice advice) =>
+        WhisperModels.Heavier(inUse, advice.Model)
+            ? $"{advice.Why} {inUse.Name} may fall behind a lecture here: pick {advice.Model.Name} to switch. The one you have stays."
+            : advice.Why;
 
     partial void OnSectionChanged(string value)
     {

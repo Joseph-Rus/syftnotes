@@ -201,13 +201,21 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial string ModelLeft { get; set; } = "";
     [ObservableProperty] public partial bool ModelReady { get; set; }
     [ObservableProperty] public partial string? ModelProblem { get; set; }
-    /// <summary>The models to pick from, the one for this computer marked and picked to begin with.</summary>
+    /// <summary>The models to pick from, the one for this computer marked (with one line why: "This PC has no
+    /// graphics card Whisper can use, so the compact model keeps up with a lecture.") and picked to begin with.</summary>
     public ObservableCollection<ModelChoice> Models { get; } = [];
-    /// <summary>Why the marked one suits this computer, in one line ("This PC has no graphics card Whisper can use, so
-    /// the compact model keeps up with a lecture.").</summary>
-    [ObservableProperty] public partial string ModelWhy { get; set; } = "";
-    public bool HasModelWhy => !string.IsNullOrEmpty(ModelWhy);
-    partial void OnModelWhyChanged(string value) => OnPropertyChanged(nameof(HasModelWhy));
+    /// <summary>The one downloading: shown as a card with Change, which opens the list.</summary>
+    [ObservableProperty] public partial ModelChoice? ChosenModel { get; set; }
+    /// <summary>The list is open (Change was pressed): the card and the download make way for it.</summary>
+    [ObservableProperty] public partial bool ChoosingModel { get; set; }
+    public bool ShowModelCard => ChosenModel is not null && !ChoosingModel;
+    public bool ShowModelDownload => !ChoosingModel;
+    partial void OnChosenModelChanged(ModelChoice? value) => OnPropertyChanged(nameof(ShowModelCard));
+    partial void OnChoosingModelChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowModelCard));
+        OnPropertyChanged(nameof(ShowModelDownload));
+    }
     /// <summary>The laptop's last page: the model's state in a few words.</summary>
     public string ModelSummary => ModelReady ? "Ready" : HasModelProblem ? "Not downloaded yet" : "Downloading in the background";
 
@@ -516,10 +524,14 @@ public sealed partial class SetupModel : ObservableObject
     [RelayCommand] void MicSettings() => OnMicSettings?.Invoke();
     [RelayCommand] void RetryModel() => OnRetryModel?.Invoke();
 
+    [RelayCommand] void ChangeModel() => ChoosingModel = true;
+
     [RelayCommand]
     void PickModel(ModelChoice choice)
     {
         foreach (var m in Models) m.Chosen = m == choice;
+        ChosenModel = choice;
+        ChoosingModel = false;
         ModelName = choice.Name;
         ModelSize = choice.Size;
         OnPickModel?.Invoke(choice);

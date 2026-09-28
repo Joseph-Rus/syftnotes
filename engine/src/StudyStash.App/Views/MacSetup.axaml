@@ -6,6 +6,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:s="using:StudyStash.App.Services"
              xmlns:c="using:StudyStash.App.Controls"
              xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacSetup"
@@ -121,6 +122,17 @@
       <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="MaxLines" Value="2" />
+    </Style>
+    <!-- The model step's list (Change opens it): the welcome's choices, one line high. -->
+    <Style Selector="Button.choice.row">
+      <Setter Property="Height" Value="34" />
+      <Setter Property="CornerRadius" Value="10" />
+    </Style>
+    <Style Selector="Button.choice TextBlock.change">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
     </Style>
     <Style Selector="Border.badge">
       <Setter Property="CornerRadius" Value="6" />
@@ -426,17 +438,57 @@
             <StackPanel IsVisible="{Binding OnModel}">
               <TextBlock Classes="h1" Text="Download the transcription model" />
               <TextBlock Classes="lede" Text="{Binding ModelBody}" />
-              <Border Height="8" CornerRadius="4" Background="{DynamicResource Fill2}" MaxWidth="440" HorizontalAlignment="Stretch" Margin="0,36,0,0">
-                <Border Width="{Binding ModelBarWidth}" CornerRadius="4" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
-              </Border>
-              <Grid ColumnDefinitions="*,Auto" MaxWidth="440" Margin="0,8,0,0">
-                <TextBlock Classes="num" Text="{Binding ModelDone}" FontSize="12" Foreground="{DynamicResource Fg2}" />
-                <TextBlock Grid.Column="1" Classes="num" Text="{Binding ModelLeft}" FontSize="12" Foreground="{DynamicResource Fg2}" />
-              </Grid>
-              <TextBlock IsVisible="{Binding ModelDownloading}" Text="You can carry on while this finishes." FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,24,0,0" />
-              <StackPanel IsVisible="{Binding HasModelProblem}" Orientation="Horizontal" Spacing="10" Margin="0,20,0,0">
-                <TextBlock Text="{Binding ModelProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
-                <Button Classes="push fill" Command="{Binding RetryModelCommand}"><TextBlock Text="Try again" FontSize="13" /></Button>
+              <!-- The model for this computer (Recommended, with why) or the one picked instead, its size, and Change, which
+                   opens every model as a one-line list in place of the card and the download. -->
+              <Button Classes="choice" IsVisible="{Binding ShowModelCard}" Command="{Binding ChangeModelCommand}" Margin="0,20,0,0"
+                      MaxWidth="440" HorizontalAlignment="Stretch">
+                <Grid ColumnDefinitions="*,16,Auto">
+                  <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding ChosenModel.Name}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                      <Border Classes="badge" IsVisible="{Binding ChosenModel.Recommended}"><TextBlock Text="Recommended" /></Border>
+                    </StackPanel>
+                    <TextBlock Classes="about" Text="{Binding ChosenModel.Line}" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="num" Text="{Binding ChosenModel.Size}" FontSize="12" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Right" />
+                    <TextBlock Classes="change" Text="Change" />
+                  </StackPanel>
+                </Grid>
+              </Button>
+              <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding ChoosingModel}" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="s:ModelChoice">
+                    <Button Classes="choice row" Classes.on="{Binding Chosen}" CommandParameter="{Binding}"
+                            Command="{Binding $parent[UserControl].((vm:SetupModel)DataContext).PickModelCommand}">
+                      <Grid ColumnDefinitions="*,12,Auto,16,Auto">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" />
+                          <Border Classes="badge" IsVisible="{Binding Recommended}"><TextBlock Text="Recommended" /></Border>
+                        </StackPanel>
+                        <TextBlock Grid.Column="2" Classes="num" Text="{Binding Size}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                        <Border Grid.Column="4" Classes="radio" Classes.on="{Binding Chosen}"><Ellipse /></Border>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <StackPanel IsVisible="{Binding ShowModelDownload}">
+                <Border Height="8" CornerRadius="4" Background="{DynamicResource Fill2}" MaxWidth="440" HorizontalAlignment="Stretch" Margin="0,36,0,0">
+                  <Border Width="{Binding ModelBarWidth}" CornerRadius="4" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
+                </Border>
+                <Grid ColumnDefinitions="*,Auto" MaxWidth="440" Margin="0,8,0,0">
+                  <TextBlock Classes="num" Text="{Binding ModelDone}" FontSize="12" Foreground="{DynamicResource Fg2}" />
+                  <TextBlock Grid.Column="1" Classes="num" Text="{Binding ModelLeft}" FontSize="12" Foreground="{DynamicResource Fg2}" />
+                </Grid>
+                <TextBlock IsVisible="{Binding ModelDownloading}" Text="You can carry on while this finishes." FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,24,0,0" />
+                <StackPanel IsVisible="{Binding HasModelProblem}" Orientation="Horizontal" Spacing="10" Margin="0,20,0,0">
+                  <TextBlock Text="{Binding ModelProblem}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
+                  <Button Classes="push fill" Command="{Binding RetryModelCommand}"><TextBlock Text="Try again" FontSize="13" /></Button>
+                </StackPanel>
               </StackPanel>
             </StackPanel>
 

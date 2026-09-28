@@ -127,13 +127,13 @@ public static class Setup
     }
 
     /// <summary>The models to pick from, the one for this computer marked (and picked, unless another already was),
-    /// and one line why it suits this computer.</summary>
+    /// with one line why it suits this computer.</summary>
     static void ShowModels(SetupModel m, AppHost host)
     {
         var advice = host.Advice;
         m.Models.Clear();
-        foreach (var c in ModelChoice.For(host.Model, advice.Model, host.Home)) m.Models.Add(c);
-        m.ModelWhy = advice.Why;
+        foreach (var c in ModelChoice.For(host.Model, advice, host.Home)) m.Models.Add(c);
+        m.ChosenModel = m.Models.FirstOrDefault(c => c.Chosen);
     }
 
     public static void Refresh(SetupModel m, AppHost host)
@@ -167,6 +167,7 @@ public static class Setup
             c.Chosen = c.Model.Id == host.Model.Id;
             c.Here = WhisperModels.IsDownloaded(host.Home, c.Model);
         }
+        if (m.Models.FirstOrDefault(c => c.Chosen) is { } chosen) m.ChosenModel = chosen;
     }
 
     /// <summary>A model's size for "The model is about 3 GB": whole gigabytes for the big ones, as the design says it.</summary>
