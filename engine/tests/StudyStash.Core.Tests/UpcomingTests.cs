@@ -31,7 +31,7 @@ public sealed class FakeCalendarSource(string id, string kind = "fake") : ICalen
 public class UpcomingTests
 {
     static readonly DateTimeOffset Now = new(2026, 9, 28, 9, 0, 0, TimeSpan.FromHours(-4));
-    static readonly TimeZoneInfo NewYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
+    static readonly TimeZoneInfo NewYork = IcsZones.SystemZone("America/New_York")!;
 
     static (Upcoming Upcoming, Dictionary<string, FakeCalendarSource> Sources) Make(TempDir dir, params string[] ids)
     {

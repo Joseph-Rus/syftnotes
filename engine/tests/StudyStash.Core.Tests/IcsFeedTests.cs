@@ -6,8 +6,8 @@ namespace StudyStash.Core.Tests;
 /// <summary>Real-world-shaped feeds (Google, iCloud, Canvas, Outlook) turned into the occurrences in a window.</summary>
 public class IcsFeedTests
 {
-    static readonly TimeZoneInfo NewYork = TimeZoneInfo.FindSystemTimeZoneById("America/New_York");
-    static readonly TimeZoneInfo LosAngeles = TimeZoneInfo.FindSystemTimeZoneById("America/Los_Angeles");
+    static readonly TimeZoneInfo NewYork = IcsZones.SystemZone("America/New_York")!;
+    static readonly TimeZoneInfo LosAngeles = IcsZones.SystemZone("America/Los_Angeles")!;
 
     static string Fixture(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "calendar", name));
 
