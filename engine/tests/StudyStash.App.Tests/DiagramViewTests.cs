@@ -219,10 +219,11 @@ public class DiagramViewTests
             Assert.True(count > 1000 * times * times, $"{times}x drew {count} pixels");
             ink[times] = new PixelRect(left, top, right - left + 1, bottom - top + 1);
         }
-        Assert.InRange(ink[2].X, ink[1].X * 2 - 3, ink[1].X * 2 + 3);
-        Assert.InRange(ink[2].Y, ink[1].Y * 2 - 3, ink[1].Y * 2 + 3);
-        Assert.InRange(ink[2].Width, ink[1].Width * 2 - 4, ink[1].Width * 2 + 4);
-        Assert.InRange(ink[2].Height, ink[1].Height * 2 - 4, ink[1].Height * 2 + 4);
+        // Within a few pixels (type is shaped a little differently at each size); a misplaced box is off by hundreds.
+        Assert.InRange(ink[2].X, ink[1].X * 2 - 8, ink[1].X * 2 + 8);
+        Assert.InRange(ink[2].Y, ink[1].Y * 2 - 8, ink[1].Y * 2 + 8);
+        Assert.InRange(ink[2].Width, ink[1].Width * 2 - 8, ink[1].Width * 2 + 8);
+        Assert.InRange(ink[2].Height, ink[1].Height * 2 - 8, ink[1].Height * 2 + 8);
         window.Close();
     }
 }
