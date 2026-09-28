@@ -87,6 +87,79 @@ public class DocumentTextTests
     }
 
     [Fact]
+    public async Task Only_pages_with_next_to_no_typed_text_are_read_as_pictures_and_only_so_many()
+    {
+        using var dir = new TempDir();
+        string typed = "This page has plenty of typed words on it already.";
+        TypedPdf(dir["mixed.pdf"], [typed], ["Page 2"], [], [typed], [], []);
+        var asked = new List<int>();
+        var options = NoCache with
+        {
+            MaxOcrPages = 3,
+            PageReader = (_, pages, _, _) =>
+            {
+                asked.AddRange(pages);
+                return pages.ToDictionary(p => p, p => p == 2 ? "" : $"handwritten page {p + 1}");
+            },
+        };
+
+        string? text = await DocumentText.ExtractAsync(dir["mixed.pdf"], options, default);
+
+        Assert.Equal([1, 2, 4], asked); // page 6 is past the limit
+        Assert.Equal($"{typed}\n\nhandwritten page 2\n\n{typed}\n\nhandwritten page 5", text);
+    }
+
+    [Fact]
+    public async Task Recognition_that_reads_less_than_was_typed_keeps_the_typed_text()
+    {
+        using var dir = new TempDir();
+        TypedPdf(dir["title.pdf"], ["Week 5 notes"]);
+        var options = NoCache with { PageReader = (_, pages, _, _) => new Dictionary<int, string> { [0] = "Wk5", [9] = "not a page" } };
+
+        Assert.Equal("Week 5 notes", await DocumentText.ExtractAsync(dir["title.pdf"], options, default));
+    }
+
+    [Fact]
+    public async Task Recognition_is_given_the_time_left_and_not_asked_once_the_time_is_up()
+    {
+        using var dir = new TempDir();
+        TypedPdf(dir["scan.pdf"], [[]]); // one page, nothing typed
+        DateTime? given = null;
+        DocumentText.PageReaderFn reader = (_, pages, until, _) =>
+        {
+            given = until;
+            return pages.ToDictionary(p => p, _ => "read");
+        };
+
+        Assert.Equal("read", await DocumentText.ExtractAsync(dir["scan.pdf"], NoCache with { PageReader = reader, TimeLimit = TimeSpan.FromMinutes(5) }, default));
+        Assert.InRange(given!.Value, DateTime.UtcNow.AddMinutes(4), DateTime.UtcNow.AddMinutes(5));
+        given = null;
+        Assert.Null(await DocumentText.ExtractAsync(dir["scan.pdf"], NoCache with { PageReader = reader, TimeLimit = TimeSpan.Zero }, default));
+        Assert.Null(given);
+    }
+
+    [Fact]
+    public async Task Stopping_stops_the_reading_and_keeps_nothing()
+    {
+        using var dir = new TempDir();
+        TypedPdf(dir["scan.pdf"], [[]]); // one page, nothing typed
+        using var stop = new CancellationTokenSource();
+        var options = new DocumentTextOptions
+        {
+            CacheDir = dir["cache"],
+            PageReader = (_, _, _, ct) =>
+            {
+                stop.Cancel();
+                ct.ThrowIfCancellationRequested();
+                return new Dictionary<int, string>();
+            },
+        };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => DocumentText.ExtractAsync(dir["scan.pdf"], options, stop.Token));
+        Assert.False(Directory.Exists(dir["cache"]));
+    }
+
+    [Fact]
     public async Task A_PDF_that_is_not_one_is_null()
     {
         using var dir = new TempDir();

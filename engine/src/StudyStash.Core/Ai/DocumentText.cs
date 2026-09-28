@@ -190,5 +190,14 @@ public sealed record DocumentTextOptions
     /// <summary>A PDF's pages past this many aren't read (a 300-page textbook's first chapters are what's asked about).</summary>
     public int MaxPages { get; init; } = 300;
 
+    /// <summary>At most this many of a PDF's pages are read as pictures (about a second each on a Mac).</summary>
+    public int MaxOcrPages { get; init; } = 60;
+
+    /// <summary>Text recognition stops after this long on one file; the pages it read are kept.</summary>
+    public TimeSpan TimeLimit { get; init; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>Tests: stands in for the computer's text recognition of a PDF's pages.</summary>
+    internal DocumentText.PageReaderFn? PageReader { get; init; }
+
     public static DocumentTextOptions Default => new() { CacheDir = Path.Combine(Configs.DefaultHome, "cache", "text") };
 }
