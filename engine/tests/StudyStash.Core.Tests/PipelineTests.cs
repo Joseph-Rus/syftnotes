@@ -73,6 +73,88 @@ public class PipelineTests
         Assert.StartsWith("Ollama on the Mac mini isn't answering", p.EngineProblem);
     }
 
+    /// <summary>Clocks a test moves by hand: the wall clock, and the one that stops while the computer sleeps.</summary>
+    sealed class Clocks
+    {
+        public DateTime Wall = new(2026, 9, 21, 10, 0, 0, DateTimeKind.Utc);
+        public TimeSpan Awake = TimeSpan.FromHours(3);
+        public SleepClock Clock => new(() => Wall, () => Awake);
+
+        /// <summary>The lid closes for <paramref name="asleep"/>, after <paramref name="working"/> of work.</summary>
+        public void Sleep(TimeSpan asleep, TimeSpan working)
+        {
+            Wall += asleep + working;
+            Awake += working;
+        }
+    }
+
+    [Fact]
+    public void Sleep_is_when_the_wall_clock_ran_on_without_the_awake_one()
+    {
+        var c = new Clocks();
+        var slept = c.Clock.Start();
+        Assert.False(slept());
+        c.Sleep(TimeSpan.Zero, TimeSpan.FromHours(2)); // two busy hours, awake all along
+        Assert.False(slept());
+        c.Sleep(TimeSpan.FromSeconds(30), TimeSpan.Zero); // a blink: not worth calling sleep
+        Assert.False(slept());
+        c.Sleep(TimeSpan.FromHours(7), TimeSpan.Zero); // the night
+        Assert.True(slept());
+        Assert.False(c.Clock.Start()()); // a new watch starts from now
+    }
+
+    [Fact]
+    public async Task Notes_cut_off_by_sleep_are_written_again_after_waking_not_filed_without_them()
+    {
+        using var dir = new TempDir();
+        var cfg = CfgFor(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var clocks = new Clocks();
+        int asked = 0;
+        var p = new Pipeline(cfg, store, Sort, (_, _) =>
+        {
+            asked++;
+            if (asked > 1) return Task.FromResult("## Summary\nRecursion, and the midterm.");
+            // Halfway through, the lid closes for the night; on waking the engine's connection has gone.
+            clocks.Sleep(TimeSpan.FromHours(8), TimeSpan.FromMinutes(2));
+            throw new InvalidOperationException("Claude Code: API Error: Connection error.");
+        }, Quiet, sleep: clocks.Clock);
+        store.Enqueue(new Meeting("l1") { Title = "CS 101 lecture", Transcript = Lines(40) });
+
+        Assert.Equal(0, await p.RunPendingAsync());
+        var waiting = store.Get("l1")!;
+        Assert.Equal("queued", waiting.Status);
+        Assert.True(string.IsNullOrEmpty(waiting.Error));
+        Assert.Null(waiting.MdPath);
+        Assert.Null(p.EngineProblem); // the engine is fine: the computer was asleep
+
+        Assert.Equal(1, await p.RunPendingAsync());
+        var row = store.Get("l1")!;
+        Assert.Equal(("done", "CS 101"), (row.Status, row.ClassName));
+        Assert.StartsWith("## Summary", row.SummaryMd);
+        Assert.Equal(2, asked);
+    }
+
+    [Fact]
+    public async Task A_failure_while_awake_still_files_the_lecture_without_notes()
+    {
+        using var dir = new TempDir();
+        var cfg = CfgFor(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var clocks = new Clocks();
+        var p = new Pipeline(cfg, store, Sort, (_, _) =>
+        {
+            clocks.Sleep(TimeSpan.Zero, TimeSpan.FromMinutes(15));
+            throw new InvalidOperationException("claude didn't finish within 15 minutes.");
+        }, Quiet, sleep: clocks.Clock);
+        store.Enqueue(new Meeting("l1") { Title = "CS 101 lecture", Transcript = Lines(40) });
+
+        Assert.Equal(1, await p.RunPendingAsync());
+        var row = store.Get("l1")!;
+        Assert.Equal("done", row.Status);
+        Assert.Contains("didn't finish", row.Error);
+    }
+
     [Fact]
     public async Task An_engine_that_answers_no_still_files_the_lecture_without_notes()
     {
