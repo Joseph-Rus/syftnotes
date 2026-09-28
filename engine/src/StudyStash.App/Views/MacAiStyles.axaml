@@ -249,6 +249,7 @@
   </Style>
   <Style Selector="Button.ai-menu-footer TextBlock">
     <Setter Property="FontSize" Value="13" />
+    <Setter Property="TextWrapping" Value="Wrap" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
 

@@ -87,7 +87,7 @@ public class PopupShots
 
     static async Task<Control> RewriteNotes(SkinKind skin)
     {
-        var m = new AiNotesModel(new FakeAiLibrary { Overview = AiDemo.Overview() });
+        var m = new AiNotesModel(new FakeAiLibrary { Overview = AiDemo.Overview(), OnRewrite = id => new RewriteInfo(id, "none") });
         await m.Load(Lecture, "# Recursion\n\nA function that calls itself.", "Ollama", "2026-09-22T10:00:00Z");
         Control view = skin == SkinKind.Mac ? new MacAiNotes { DataContext = m } : new WinAiNotes { DataContext = m };
         view.Width = 640;
@@ -152,12 +152,13 @@ public class PopupShots
         Dispatcher.UIThread.RunJobs();
     }
 
-    /// <summary>Opens <paramref name="button"/>'s flyout (MenuPickTests clicks them) and hands back its presenter,
-    /// what the popup shows.</summary>
+    /// <summary>Clicks <paramref name="button"/> (its command fills some menus) and hands back its flyout's
+    /// presenter, what the popup shows. MenuPickTests checks the click itself opens it.</summary>
     static Control OpenFlyout(Button button)
     {
         var flyout = Assert.IsAssignableFrom<PopupFlyoutBase>(button.Flyout);
-        flyout.ShowAt(button);
+        Click(button);
+        if (!flyout.IsOpen) flyout.ShowAt(button);
         Assert.True(flyout.IsOpen, "the menu didn't open");
         Dispatcher.UIThread.RunJobs();
         return Assert.IsAssignableFrom<Control>(flyout.Popup.Child);

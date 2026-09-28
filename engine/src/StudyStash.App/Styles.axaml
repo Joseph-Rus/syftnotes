@@ -236,9 +236,10 @@
   <Style Selector=".solidglass c|Glass">
     <Setter Property="Background" Value="{DynamicResource GlassSolid}" />
   </Style>
-  <!-- Glass that is a popup's own panel (the "Answer with" menu): its edges, not its drop shadow, which would only
-       fill the popup window's corners. -->
+  <!-- Glass that is a popup's own panel (the "Answer with" menu): solid, like the other menus, since nothing blurs
+       what's behind a popup window; and its edges, not its drop shadow, which would only fill the window's corners. -->
   <Style Selector="FlyoutPresenter c|Glass">
+    <Setter Property="Background" Value="{DynamicResource GlassSolid}" />
     <Setter Property="BoxShadow" Value="{DynamicResource Edge}" />
   </Style>
   <!-- What lies on the Mac's glass, each with its edge highlight: "tint" is the accent seen through glass, glowing a
