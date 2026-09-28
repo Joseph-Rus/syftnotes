@@ -7,6 +7,7 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using ModelContextProtocol.Client;
+using StudyStash.Core.Ai;
 using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
@@ -356,6 +357,102 @@ public class ConnectorTests
         Assert.Equal(HttpStatusCode.OK, (await c.SendAsync(Mcp(tokens["access_token"]!.GetValue<string>()))).StatusCode);
         Assert.Equal("http://localhost/mcp", door.Access.Grants().Single().Resource);
         Assert.Equal("claude.ai", door.Access.Grants().Single().ClientHost); // named by its document's host
+    }
+
+    // --- the sign-in page ---------------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Sign_in_page_names_the_library_the_redirect_and_what_it_reads()
+    {
+        await using var door = await Door.OpenAsync();
+        var c = door.As("http://mini.tail1234.ts.net");
+        var client = door.Access.Register("Claude Code", [WebCallback]);
+        var fields = Ask(client.ClientId, WebCallback, Verifier());
+        var page = await c.GetAsync("/authorize?" + Query(fields));
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+        Assert.Equal("no-store", page.Headers.CacheControl!.ToString());
+        Assert.Equal("no-referrer", page.Headers.GetValues("Referrer-Policy").Single());
+        Assert.Equal("DENY", page.Headers.GetValues("X-Frame-Options").Single());
+        string csp = page.Headers.GetValues("Content-Security-Policy").Single();
+        Assert.Contains("frame-ancestors 'none'", csp);
+        Assert.Contains("form-action 'self' https://claude.ai", csp);
+        string html = await page.Content.ReadAsStringAsync();
+        Assert.Contains("Sam&#x27;s library", html);
+        Assert.Contains("Claude Code wants to read your lectures", html);
+        Assert.Contains("will return to claude.ai", html);
+        Assert.DoesNotContain("Identified by", html); // a registered (DCR) client has no published identity to name
+        Assert.DoesNotContain("localhost", html); // not a loopback redirect: no loopback warning
+        Assert.Contains("Lectures and transcripts", html);
+        Assert.Contains("Study notes", html);
+        Assert.Contains("Canvas assignments and files", html);
+        Assert.Contains("It can't change or delete anything.", html);
+        Assert.DoesNotContain("AI tool access is off", html);
+
+        // The list follows the toggles, not a fixed script.
+        door.Access.Reading = new ReadingScopes(Lectures: false, Notes: true, Canvas: false);
+        html = await (await c.GetAsync("/authorize?" + Query(fields))).Content.ReadAsStringAsync();
+        Assert.DoesNotContain("Lectures and transcripts", html);
+        Assert.Contains("Study notes", html);
+        Assert.DoesNotContain("Canvas assignments and files", html);
+
+        // Tools off: Claude is told up front, before it tries a call and gets refused.
+        door.Access.ToolsOn = false;
+        html = await (await c.GetAsync("/authorize?" + Query(fields))).Content.ReadAsStringAsync();
+        Assert.Contains("AI tool access is off in Study Stash, so Claude won't see anything until you turn it on.", html);
+    }
+
+    [Fact]
+    public async Task Sign_in_page_warns_before_a_loopback_redirect()
+    {
+        await using var door = await Door.OpenAsync();
+        var c = door.As("http://localhost");
+        door.Docs[ClaudeCodeDoc] = Doc(ClaudeCodeDoc, "Claude Code", "http://localhost/callback");
+        string html = await (await c.GetAsync("/authorize?" + Query(Ask(ClaudeCodeDoc, "http://localhost:51234/callback", Verifier(), resource: null))))
+            .Content.ReadAsStringAsync();
+        Assert.Contains("This goes back to a program on this computer (localhost). Allow it only if you just started it yourself.", html);
+
+        // A web client's redirect (claude.ai) gets no such warning.
+        await using var door2 = await Door.OpenAsync();
+        var c2 = door2.As("http://mini.tail1234.ts.net");
+        var client = door2.Access.Register("Claude", [WebCallback]);
+        string webHtml = await (await c2.GetAsync("/authorize?" + Query(Ask(client.ClientId, WebCallback, Verifier())))).Content.ReadAsStringAsync();
+        Assert.DoesNotContain("program on this computer", webHtml);
+    }
+
+    [Fact]
+    public async Task Sign_in_page_escapes_a_self_asserted_name()
+    {
+        await using var door = await Door.OpenAsync();
+        var c = door.As("http://mini.tail1234.ts.net");
+        var client = door.Access.Register("<script>alert(1)</script>", [WebCallback]);
+        string html = await (await c.GetAsync("/authorize?" + Query(Ask(client.ClientId, WebCallback, Verifier())))).Content.ReadAsStringAsync();
+        Assert.DoesNotContain("<script>alert", html);
+        Assert.Contains("&lt;script&gt;alert(1)&lt;/script&gt;", html);
+    }
+
+    [Fact]
+    public async Task Sign_in_page_words_for_a_wrong_password_a_lockout_and_no_password()
+    {
+        await using var door = await Door.OpenAsync();
+        var c = door.As("http://mini.tail1234.ts.net");
+        var client = door.Access.Register("Claude", [WebCallback]);
+        var fields = Ask(client.ClientId, WebCallback, Verifier());
+
+        var wrong = await c.PostAsync("/authorize", Form([.. fields, ("password", "nope"), ("decision", "allow")]));
+        Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+        string wrongHtml = await wrong.Content.ReadAsStringAsync();
+        Assert.Contains("role=\"alert\"", wrongHtml);
+        Assert.Contains("That isn&#x27;t your library password. Try again.", wrongHtml);
+
+        for (int i = 0; i < 8; i++) door.Access.Failed();
+        var locked = await c.PostAsync("/authorize", Form([.. fields, ("password", "pw"), ("decision", "allow")]));
+        Assert.Equal((HttpStatusCode)429, locked.StatusCode);
+        Assert.Contains("Too many wrong tries. Wait 15 minutes, then choose Connect in Claude again.", await locked.Content.ReadAsStringAsync());
+
+        door.Cfg.PoolPassword = "";
+        var noPassword = await c.GetAsync("/authorize?" + Query(fields));
+        Assert.Equal(HttpStatusCode.Forbidden, noPassword.StatusCode);
+        Assert.Contains("Your library has no password yet. Set one in Study Stash → Settings → Library, then connect again.", await noPassword.Content.ReadAsStringAsync());
     }
 
     [Fact]
