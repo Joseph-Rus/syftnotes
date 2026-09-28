@@ -596,7 +596,7 @@
                 <TextBlock Classes="say" Text="{Binding LibrarySay}" IsVisible="{Binding LibrarySay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <TextBlock Classes="section" Text="Your name in the library" />
                 <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding DisplayName}" FontSize="13" /></Border>
-                <TextBlock Classes="say" IsVisible="{Binding LibraryHere}" Text="This computer is a library too: it runs while Study Stash is open. Turn on Start at login in General to keep it running. Its own settings are under Your library." />
+                <TextBlock Classes="say" IsVisible="{Binding LibraryHere}" Text="Your library runs on this computer while Study Stash is open. Turn on Start at login in General to keep it running. Its own settings, and adding a laptop, are under Your library." />
                 <TextBlock Classes="say" IsVisible="{Binding LibraryHere}" Text="{Binding LibraryServiceLine}" />
                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0" IsVisible="{Binding LibraryHere}">
                   <Button Classes="pill" Command="{Binding StartLibraryCommand}" IsVisible="{Binding CanStartLibrary}"><TextBlock Text="Start" FontSize="13" /></Button>
@@ -699,22 +699,22 @@
                 <StackPanel IsVisible="{Binding Lib.IsReady}" Spacing="8">
                   <!-- Library -->
                   <StackPanel IsVisible="{Binding OnLibrary}" Spacing="8">
-                    <TextBlock Classes="section gap" Text="Name and password" />
+                    <TextBlock Classes="section gap" Text="{Binding Lib.NameSection}" />
                     <Border Classes="group">
                       <StackPanel>
                         <Border Classes="row">
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                               <TextBlock Classes="row-title" Text="Name" />
-                              <TextBlock Classes="row-sub" Text="What your laptop and the library's pages call it" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.NameSub}" />
                             </StackPanel>
                             <Border Grid.Column="1" Classes="field act" Width="220">
                               <TextBox Name="LibraryName" Classes="bare" Text="{Binding Lib.Name}" FontSize="13" VerticalAlignment="Center" />
                             </Border>
                           </Grid>
                         </Border>
-                        <Border Classes="rowsep" />
-                        <Border Classes="row">
+                        <Border Classes="rowsep" IsVisible="{Binding Lib.ShowReach}" />
+                        <Border Classes="row" IsVisible="{Binding Lib.ShowReach}">
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                               <TextBlock Classes="row-title" Text="Password" />
@@ -734,8 +734,43 @@
                     </Border>
                     <TextBlock Classes="say" Text="{Binding Lib.PasswordSay}" IsVisible="{Binding Lib.PasswordSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-                    <TextBlock Classes="section gap" Text="How your laptop reaches it" />
-                    <Border Classes="group">
+                    <!-- A library on this computer: let laptops connect (a password, then the addresses below), or not -->
+                    <StackPanel IsVisible="{Binding Lib.CanChangeLaptops}" Spacing="8">
+                      <TextBlock Classes="section gap" Text="Laptops" />
+                      <Border Classes="group">
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                              <TextBlock Classes="row-title" Text="{Binding Lib.LaptopsTitle}" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.LaptopsSub}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.AddLaptopCommand}" Margin="12,0,0,0" IsEnabled="{Binding !Lib.ChangingLaptops}">
+                              <Button.IsVisible>
+                                <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                  <Binding Path="Lib.OnlyThisComputer" />
+                                  <Binding Path="!Lib.AddingLaptop" />
+                                </MultiBinding>
+                              </Button.IsVisible>
+                              <TextBlock Text="Add a laptop…" FontSize="13" />
+                            </Button>
+                            <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0" IsVisible="{Binding Lib.AddingLaptop}">
+                              <Border Classes="field" Width="180">
+                                <TextBox Name="LaptopPassword" Classes="bare" Text="{Binding Lib.LaptopPassword}" PasswordChar="•" PlaceholderText="A password for your laptop" FontSize="13" VerticalAlignment="Center" />
+                              </Border>
+                              <Button Classes="pill" Command="{Binding Lib.AddLaptopCommand}"><TextBlock Text="Cancel" FontSize="13" /></Button>
+                              <Button Classes="pill primary" Command="{Binding Lib.TurnOnLaptopsCommand}" IsEnabled="{Binding !Lib.ChangingLaptops}"><TextBlock Text="Turn on" FontSize="13" FontWeight="Medium" /></Button>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="pill act" Command="{Binding Lib.TurnOffLaptopsCommand}" IsVisible="{Binding Lib.LaptopsCanConnect}" IsEnabled="{Binding !Lib.ChangingLaptops}" Margin="12,0,0,0">
+                              <TextBlock Text="Turn off" FontSize="13" />
+                            </Button>
+                          </Grid>
+                        </Border>
+                      </Border>
+                      <TextBlock Classes="say" Text="{Binding Lib.LaptopSay}" IsVisible="{Binding Lib.LaptopSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+
+                    <TextBlock Classes="section gap" Text="How your laptop reaches it" IsVisible="{Binding Lib.ShowReach}" />
+                    <Border Classes="group" IsVisible="{Binding Lib.ShowReach}">
                       <ItemsControl ItemsSource="{Binding Lib.Addresses}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="x:String">
@@ -754,7 +789,7 @@
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
                     </Border>
-                    <TextBlock Classes="say" Text="{Binding Lib.ReachLine}" />
+                    <TextBlock Classes="say" Text="{Binding Lib.ReachLine}" IsVisible="{Binding Lib.ShowReach}" />
 
                     <TextBlock Classes="section gap" Text="On its computer" />
                     <Border Classes="group">

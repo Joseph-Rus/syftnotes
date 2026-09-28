@@ -583,19 +583,30 @@ public class SurfaceShots
     static (Services.SettingsModel Model, Services.AppHost Host, string Home) MakeSettings(string section)
     {
         string home = Path.Combine(Path.GetTempPath(), "studystash-settings-" + Guid.NewGuid().ToString("N"));
+        // "One-computer…": the Library page of just this computer's library, before a laptop is added, while one is
+        // being added (its password typed), and once laptops can connect.
+        bool one = section.StartsWith("One-computer", StringComparison.Ordinal);
+        if (one) new Services.AppSettings { SetupDone = true, Role = Services.AppRole.Both }.Save(home);
         var host = new Services.AppHost(home);
         // The library's own pages read the design's example library (Sam's, on a Mac mini); "Unreachable" shows the
         // Library page when it doesn't answer.
         var library = new FakeLibrarySettings { Down = section == "Unreachable" };
-        if (section == "Unreachable") section = "Library";
+        if (one) library.Settings["reach"]!["laptops"] = section == "One-computer-on";
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
-        model.Section = section;
+        model.Section = section == "Unreachable" || one ? "Library" : section;
+        if (section == "One-computer-adding")
+        {
+            model.Lib.AddLaptopCommand.Execute(null);
+            model.Lib.LaptopPassword = "correct-horse";
+        }
+        if (section == "One-computer-on")
+            model.Lib.LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, choose “This is my laptop”, and enter one of the addresses below and this password.";
         return (model, host, home);
     }
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Notes", "Folders", "Unreachable" })
+        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
         {
             var (model, host, home) = MakeSettings(section);
             try

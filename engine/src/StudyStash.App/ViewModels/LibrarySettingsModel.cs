@@ -96,6 +96,9 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     public Action<string>? Copy { get; set; }
     /// <summary>The library's own web page (a fallback for a library too old for these settings).</summary>
     public Action? OpenPage { get; set; }
+    /// <summary>A library on this computer lets laptops connect (with the password given), or keeps to this computer
+    /// alone: it starts again listening that way. Throws saying why not.</summary>
+    public Func<bool, string?, Task>? LetLaptopsConnect { get; set; }
 
     [ObservableProperty] public partial LibrarySettingsState State { get; set; } = LibrarySettingsState.Loading;
     /// <summary>What happened with the last change, or why it didn't: under the page's title.</summary>
@@ -122,6 +125,14 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [ObservableProperty] public partial string? PasswordSay { get; set; }
     public ObservableCollection<string> Addresses { get; } = [];
     [ObservableProperty] public partial bool Tailscale { get; set; }
+    /// <summary>Laptops can reach the library over the network; false for one that keeps to its own computer (just
+    /// this computer's setup), until "Add a laptop".</summary>
+    [ObservableProperty] public partial bool LaptopsCanConnect { get; set; } = true;
+    /// <summary>"Add a laptop" is open: the password a laptop will connect with, and Turn on.</summary>
+    [ObservableProperty] public partial bool AddingLaptop { get; set; }
+    [ObservableProperty] public partial string LaptopPassword { get; set; } = "";
+    [ObservableProperty] public partial string? LaptopSay { get; set; }
+    [ObservableProperty] public partial bool ChangingLaptops { get; set; }
     /// <summary>Null: the library runs without the app on its computer, so this can't be changed from here.</summary>
     [ObservableProperty] public partial bool? StartsAtLogin { get; set; }
     [ObservableProperty] public partial string NotesFolder { get; set; } = "";
@@ -131,6 +142,16 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [ObservableProperty] public partial bool AutoUpdate { get; set; }
 
     public string PasswordLine => HasPassword ? "Set. Your laptop connects with it." : "None: anyone who can reach the library can read it.";
+    /// <summary>Only this computer uses the library: no laptop, so no password or addresses to show.</summary>
+    public bool OnlyThisComputer => IsHere && !LaptopsCanConnect;
+    public bool ShowReach => !OnlyThisComputer;
+    public bool CanChangeLaptops => IsHere && LetLaptopsConnect is not null;
+    public string NameSub => OnlyThisComputer ? "What the app and the library's pages call it" : "What your laptop and the library's pages call it";
+    public string LaptopsTitle => LaptopsCanConnect ? "Laptops can connect" : "Add a laptop";
+    public string NameSection => OnlyThisComputer ? "Name" : "Name and password";
+    public string LaptopsSub => AddingLaptop ? "Choose the password your laptop will connect with."
+        : LaptopsCanConnect ? $"Laptops on your network{(Tailscale ? " or Tailscale" : "")} connect with the library's password."
+        : $"Record on a laptop too: it sends lectures here. This lets other computers reach your library, with a password. Only this {Device} can now.";
     public string ReachLine => Tailscale
         ? "Your laptop reaches it at any of these, at home or away (Tailscale)."
         : "Tailscale isn't running on the library's computer, so a laptop reaches it only on the same Wi-Fi.";
@@ -148,6 +169,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     public string StartAtLoginTitle => IsHere ? $"Start the library when this {Device} starts" : "Start when the library's computer starts";
     public string StartAtLoginSub => StartsAtLogin is null
         ? "The library runs without the Study Stash app there, so this is set on that computer."
+        : OnlyThisComputer ? $"So your notes get written whenever this {Device} is on. Off until you turn it on."
         : "So your laptop can always reach it. Off until you turn it on.";
     static string Device => OperatingSystem.IsWindows() ? "PC" : "Mac";
     public static string RevealLabel => OperatingSystem.IsWindows() ? "Show in File Explorer" : "Show in Finder";
@@ -204,7 +226,19 @@ public sealed partial class LibrarySettingsModel : ObservableObject
 
     partial void OnHasPasswordChanged(bool value) => OnPropertyChanged(nameof(PasswordLine));
 
-    partial void OnTailscaleChanged(bool value) => OnPropertyChanged(nameof(ReachLine));
+    partial void OnTailscaleChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ReachLine));
+        OnPropertyChanged(nameof(LaptopsSub));
+    }
+
+    partial void OnLaptopsCanConnectChanged(bool value)
+    {
+        foreach (string p in new[] { nameof(OnlyThisComputer), nameof(ShowReach), nameof(NameSub), nameof(NameSection), nameof(LaptopsTitle), nameof(LaptopsSub), nameof(StartAtLoginSub) })
+            OnPropertyChanged(p);
+    }
+
+    partial void OnAddingLaptopChanged(bool value) => OnPropertyChanged(nameof(LaptopsSub));
 
     partial void OnStartsAtLoginChanged(bool? value)
     {
@@ -308,6 +342,8 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             Addresses.Clear();
             foreach (var a in (s["reach"]?["addresses"] as JsonArray ?? []).Select(Str).Where(a => a.Length > 0)) Addresses.Add(a);
             Tailscale = Flag(s["reach"]?["tailscale"]);
+            // An older library doesn't say: it listens to the network, as every library did.
+            LaptopsCanConnect = s["reach"]?["laptops"] is not JsonValue lc || !lc.TryGetValue(out bool laptops) || laptops;
             StartsAtLogin = s["start_at_login"] is JsonValue sv && sv.TryGetValue(out bool on) ? on : null;
             var u = s["updates"];
             Version = Str(u?["version"]);
@@ -458,6 +494,63 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {
             PasswordSay = "The library didn't answer, so the password is as it was.";
+        }
+    }
+
+    /// <summary>"Add a laptop…" opens the password to connect with (and Cancel closes it).</summary>
+    [RelayCommand]
+    void AddLaptop()
+    {
+        AddingLaptop = !AddingLaptop;
+        LaptopPassword = "";
+        LaptopSay = null;
+    }
+
+    /// <summary>Turn on: the library listens to the network with this password, and its addresses show.</summary>
+    [RelayCommand]
+    async Task TurnOnLaptops()
+    {
+        string password = LaptopPassword.Trim();
+        if (password.Length < 4)
+        {
+            LaptopSay = "Use a password of at least 4 characters.";
+            return;
+        }
+        if (await ChangeLaptopsAsync(true, password))
+        {
+            AddingLaptop = false;
+            LaptopPassword = "";
+            PasswordChanged?.Invoke(password);
+            LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, choose “This is my laptop”, and enter one of the addresses below and this password.";
+        }
+    }
+
+    /// <summary>Turn off: the library keeps to this computer again (nothing in it changes).</summary>
+    [RelayCommand]
+    async Task TurnOffLaptops()
+    {
+        if (await ChangeLaptopsAsync(false, null)) LaptopSay = $"Only this {Device} uses your library now.";
+    }
+
+    async Task<bool> ChangeLaptopsAsync(bool on, string? password)
+    {
+        if (LetLaptopsConnect is null) return false;
+        ChangingLaptops = true;
+        LaptopSay = on ? "Opening your library to your network…" : "Closing your library to other computers…";
+        try
+        {
+            await LetLaptopsConnect(on, password);
+            await Load();
+            return true;
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            LaptopSay = e.Message;
+            return false;
+        }
+        finally
+        {
+            ChangingLaptops = false;
         }
     }
 
