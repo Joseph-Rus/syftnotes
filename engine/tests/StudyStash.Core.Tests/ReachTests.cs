@@ -89,6 +89,27 @@ public class ReachTests
     }
 
     [Fact]
+    public void Serve_on_another_https_port_leaves_443_to_claude_and_says_the_port()
+    {
+        var asked = new List<IReadOnlyList<string>>();
+        var reach = new ClaudeReach
+        {
+            Tailscale = () => Running,
+            Watch = (_, args, _, _) =>
+            {
+                asked.Add(args);
+                return new WatchResult(0, "");
+            },
+        };
+        Assert.Equal(("https://mini.tail1234.ts.net:8443", (ReachProblem?)null), reach.Set(8000, internet: false, on: true, httpsPort: 8443));
+        Assert.Equal(["serve", "--bg", "--https=8443", "http://127.0.0.1:8000"], asked[0]);
+        Assert.Equal((Ts, (ReachProblem?)null), reach.Set(8001, internet: false, on: true));
+        Assert.Equal(["serve", "--bg", "--https=443", "http://127.0.0.1:8001"], asked[1]);
+        reach.Set(8000, internet: false, on: false, httpsPort: 8443);
+        Assert.Equal(["serve", "--https=8443", "off"], asked[2]);
+    }
+
+    [Fact]
     public void Nothing_here_changes_tailscale_unless_the_service_says_so()
     {
         Assert.Throws<InvalidOperationException>(() => new ClaudeReach { Tailscale = () => Running }.Set(8001, true, true));

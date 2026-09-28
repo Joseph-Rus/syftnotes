@@ -236,6 +236,11 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     public async Task<JsonObject?> SettingsAsync(HttpMethod method, string path = "", JsonObject? body = null) =>
         await SendAsync(method, "/settings" + path, body) as JsonObject;
 
+    /// <summary>The phones paired with the library (GET), a new code to add one (POST "/code"), or removing one (DELETE
+    /// "/&lt;id&gt;"). Null: a library older than phones.</summary>
+    public async Task<JsonObject?> DevicesAsync(HttpMethod method, string path = "", JsonObject? body = null) =>
+        await SendAsync(method, "/devices" + path, body) as JsonObject;
+
     public bool HasCanvas => true; // a library from before Canvas answers each tool with why not
 
     public async Task<JsonArray> SearchFilesAsync(string query, int limit)
