@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Layout;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
 using Markdig;
 using Markdig.Extensions.Mathematics;
@@ -174,6 +175,12 @@ public sealed partial class NoteView : StackPanel
             for (int n = 2; blocks.ContainsKey(key); n++) key = $"{n}\u0001{key}";
             if (kept.Remove(key, out var same))
             {
+                // Its diagrams stay its own: none is handed on to a later block drawing the same thing.
+                foreach (var (drawn, diagram) in previous.Where(d => d.Value == same || d.Value.GetLogicalAncestors().Contains(same)).ToList())
+                {
+                    previous.Remove(drawn);
+                    diagrams[drawn] = diagram;
+                }
                 Children.Add(blocks[key] = same);
                 if (block is HeadingBlock kept0) section = Plain(kept0.Inline);
                 else first = false;

@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using StudyStash.App.Controls;
+using StudyStash.App.Controls.Rich;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
@@ -286,6 +287,19 @@ public class AskStreamingTests
         note.Markdown += "\n\nThe stack";
         Assert.Same(first, note.Children[0]);
         Assert.Equal(3, note.Children.Count);
+    }
+
+    [AvaloniaFact]
+    public void Two_of_the_same_diagram_each_keep_theirs_as_the_answer_grows()
+    {
+        const string chart = "```mermaid\nflowchart LR\n  A[Assess] --> B[Act]\n```";
+        var note = new NoteView { Compact = true, Markdown = $"First:\n\n{chart}\n\nAgain:\n\n{chart}" };
+        var drawn = note.Children.OfType<DiagramView>().ToList();
+        Assert.Equal(2, drawn.Count);
+
+        note.Markdown += "\n\nThat's all."; // the first is kept as it was; the second, no longer last, is looked at again
+
+        Assert.Equal(drawn, note.Children.OfType<DiagramView>());
     }
 
     [AvaloniaFact]
