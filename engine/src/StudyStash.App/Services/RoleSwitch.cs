@@ -68,6 +68,37 @@ public static class RoleSwitch
         return said + " It keeps its own copy.";
     }
 
+    /// <summary>
+    /// Before this library becomes a laptop: hands its lectures over to the library at <paramref name="address"/>, so
+    /// nothing is left behind. This library is checked first, the same way <see cref="ToLaptopAsync"/> checks the one
+    /// a laptop connects to; it keeps every lecture of its own, so sending them is safe to do more than once. Returns
+    /// what to say; throws <see cref="InvalidOperationException"/> saying why when nothing went (a wrong password, or
+    /// the address can't be reached).
+    /// </summary>
+    public static async Task<string> HandOffLecturesAsync(AppHost host, string address, string password,
+        Action<MoveProgress>? progress = null, Func<string, HttpClient>? http = null, CancellationToken ct = default)
+    {
+        var cc = host.Client();
+        if (!Setup.IsThisComputer(cc.ServerUrl)) throw new InvalidOperationException($"There's no library on this {Device} to send from.");
+        string url = Setup.NormalizeAddress(address);
+        if (url.Length == 0) throw new InvalidOperationException("Type the other library's address, like http://mac-mini:8787.");
+        http ??= a => new HttpClient { BaseAddress = new Uri(a.TrimEnd('/') + "/"), Timeout = TimeSpan.FromMinutes(2) };
+        using var from = http(cc.ServerUrl);
+        using var to = http(url);
+        var result = await LibraryMove.CopyAsync(from, cc.PoolKey, to, password.Trim(), progress, ct);
+        return SentWords(result);
+    }
+
+    /// <summary>"12 lectures went to your new library. This one keeps its own copy." and the like.</summary>
+    public static string SentWords(MoveResult r)
+    {
+        string lectures = r.Filed == 1 ? "1 lecture" : $"{r.Filed.ToString(CultureInfo.InvariantCulture)} lectures";
+        if (r.Filed == 0 && r.Skipped == 0) return "There were no lectures to send.";
+        string said = r.Filed == 0 ? "Every lecture is already there." : $"{lectures} went to your new library.";
+        if (r.Filed > 0 && r.Skipped > 0) said += $" {(r.Skipped == 1 ? "1 was" : $"{r.Skipped} were")} already there.";
+        return said + " This library keeps its own copy.";
+    }
+
     /// <summary>The address is this computer's own library: its port, here (by loopback or by this computer's name).</summary>
     static bool IsOwnLibrary(AppHost host, string url)
     {
