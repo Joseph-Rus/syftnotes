@@ -76,6 +76,9 @@ public sealed partial class AiEnginesModel : ObservableObject
 
     public AiEnginesModel(IAiLibrary library) => this.library = library;
 
+    /// <summary>The line under the pane's title: where the engines run (the library elsewhere, or this computer).</summary>
+    public string Lede { get; init; } = "Notes are written after each lecture. Answers come while you ask. Engines run on your library, and you can set them up there or from this laptop.";
+
     public ObservableCollection<AiEngineRow> Engines { get; } = [];
     /// <summary>Not-installed engines: the "Add an engine" menu.</summary>
     public ObservableCollection<AiEngineRow> AddChoices { get; } = [];

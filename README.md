@@ -66,9 +66,9 @@ Download the installer from the [latest release](https://github.com/Joseph-Rus/s
 | **Mac** | [Study-Stash-Laptop.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop.dmg) | [Study-Stash-Library.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library.dmg) |
 | **Windows** | [Study-Stash-Laptop-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Laptop-Setup.exe) | [Study-Stash-Library-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Library-Setup.exe) |
 
-Both are the same app; the installer only picks where setup starts. For **one computer**, install
-it once and, in setup, choose **This is my library** and tick **I'll also record lectures on this
-Mac**.
+Both are the same app; the installer only picks where setup starts. For **one computer**, use the
+laptop download and keep setup's first choice, **Just this computer**. You can add a laptop later
+in **Settings → Your library → Add a laptop**, with nothing to reinstall.
 
 - **Mac:** open the DMG and drag **Study Stash** into Applications. Study Stash isn't signed with a
   paid Apple Developer ID yet, so the first time macOS asks: click **Done**, then **System Settings
@@ -76,11 +76,14 @@ Mac**.
 - **Windows:** run the Setup.exe. It installs for your account only, no admin rights needed. If
   Windows says "Windows protected your PC", click **More info**, then **Run anyway**.
 
-Then open **Study Stash** and follow setup:
+Then open **Study Stash** and follow setup. It asks how you'll use it:
 
-- **Library:** a password for your library, who writes the notes, Canvas, your classes, and
+- **Just this computer:** check the microphone, download the transcription model, choose who
+  writes the notes, Canvas, your classes, and starting at login (recommended, so your library runs
+  whenever you're logged in).
+- **This is my library:** a password for your library, who writes the notes, Canvas, your classes, and
   starting at login. It ends by showing the address and password to connect a laptop.
-- **Laptop:** find your library (or type its address and password), check the microphone,
+- **This is my laptop:** find your library (or type its address and password), check the microphone,
   download the transcription model, Canvas, and your classes.
 
 Or install from a terminal:
@@ -122,7 +125,8 @@ npm install -g @openai/codex                        # Mac or Windows (or on a Ma
 
 **Gemini** — the Gemini CLI, signed in with your Google account.
 
-After installing and signing in, reopen the AI engines page and the engine shows as ready.
+Setup's notes step shows these commands with a Copy button, opens Terminal for you, and has
+**Check again** to pick the engine up once it's installed and signed in.
 
 ## Canvas
 

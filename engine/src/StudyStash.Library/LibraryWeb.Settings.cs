@@ -165,6 +165,8 @@ public sealed partial class LibraryWeb
                 ["addresses"] = new JsonArray(HostInfo.ServerUrls(cfg.WebPort, ts, options.HostName()).Select(u => (JsonNode?)u).ToArray()),
                 ["tailscale"] = ts.Running,
                 ["port"] = cfg.WebPort,
+                // Listening to the network, so laptops can reach it (not a one-computer library, on this computer alone).
+                ["laptops"] = !(System.Net.IPAddress.TryParse(cfg.WebHost, out var ip) && System.Net.IPAddress.IsLoopback(ip)),
             },
             ["start_at_login"] = atLogin,
             ["updates"] = new JsonObject

@@ -202,6 +202,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             },
             Reveal = dir => Machine.Open(dir),
             OpenPage = OpenLibraryPage,
+            // Just this computer's library can let laptops in (or not); a library for other computers always does.
+            LetLaptopsConnect = host.Settings.Role == AppRole.Both ? (on, password) => Services.LibraryHere.ThisComputer().LetLaptopsConnectAsync(host, on, password) : null,
             ClassesRenamed = renamed =>
             {
                 foreach (var (from, to) in renamed) host.FollowRename(from, to);
@@ -211,7 +213,13 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         if (!records) Section = "Library";
         var cc = host.Client();
         ai ??= new AiRemote(cc.ServerUrl, cc.PoolKey);
-        Engines = new AiEnginesModel(ai) { OpenUrl = url => Dialogs.OpenUrl(url) };
+        Engines = new AiEnginesModel(ai)
+        {
+            OpenUrl = url => Dialogs.OpenUrl(url),
+            Lede = "Notes are written after each lecture. Answers come while you ask. " + (host.Settings.Role == AppRole.Laptop
+                ? "Engines run on your library, and you can set them up there or from this laptop."
+                : $"Engines run on this {device}, as part of your library."),
+        };
         AiProblems = new AiProblemsModel(ai);
         Access = MakeAccess(ai, host);
         Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch);

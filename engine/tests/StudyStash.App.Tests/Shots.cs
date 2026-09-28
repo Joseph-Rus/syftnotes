@@ -476,20 +476,21 @@ public class SurfaceShots
         foreach (var t in Themes) Shot.Take("win-05-setup", SkinKind.Win, t, () => new WinSetup { DataContext = Demo.Setup(SkinKind.Win), DrawChrome = true });
     }
 
-    /// <summary>Every page of both setups, the library's and the laptop's, in both looks, light and dark (plus the
-    /// welcome a build with no installer role shows): "mac-05-setup-library-password-light.png" and so on.</summary>
+    /// <summary>Every page of the three setups (just this computer, the laptop, the library), in both looks, light and
+    /// dark: "mac-05-setup-one-computer-welcome-light.png", "mac-05-setup-library-password-light.png" and so on.</summary>
     [AvaloniaFact]
     public async Task Setup_steps()
     {
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
         {
             string look = skin == SkinKind.Mac ? "mac" : "win";
-            foreach (var role in new[] { AppRole.Library, AppRole.Laptop })
+            foreach (var role in new[] { AppRole.Both, AppRole.Library, AppRole.Laptop })
                 foreach (var step in SetupModel.StepsFor(role, skin))
                 {
                     var m = await SetupPage(skin, role, step);
                     var size = step switch { SetupStep.Canvas => new Size(1100, 928), SetupStep.Ai => new Size(1100, 808), _ => new Size(850, 608) };
-                    string name = $"{look}-05-setup-{(role == AppRole.Library ? "library" : "laptop")}-{step.ToString().ToLowerInvariant()}";
+                    string flow = role switch { AppRole.Library => "library", AppRole.Laptop => "laptop", _ => "one-computer" };
+                    string name = $"{look}-05-setup-{flow}-{step.ToString().ToLowerInvariant()}";
                     foreach (var t in Themes)
                         Shot.Take(name, skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
                             size: size);
@@ -510,10 +511,27 @@ public class SurfaceShots
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-library-password-existing", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = again, DrawChrome = true } : new WinSetup { DataContext = again, DrawChrome = true },
                     size: new Size(850, 608));
-            var ask = SetupModel.For(skin);
-            ask.ChooseLibraryCommand.Execute(null);
+            // Just this computer's notes step with an engine's setup steps open: Claude Code not installed yet, and
+            // Codex installed but not signed in.
+            foreach (var (engine, state) in new[] { ("claude", "not_installed"), ("codex", "not_signed_in") })
+            {
+                var help = await SetupPage(skin, AppRole.Both, SetupStep.Ai);
+                help.Ai = AiDemo.SetupWith(skin == SkinKind.Win, engine, state);
+                help.Ai.Engines.Single(r => r.Id == engine).ToggleHelpCommand.Execute(null);
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-one-computer-ai-{engine}-help", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = help, DrawChrome = true } : new WinSetup { DataContext = help, DrawChrome = true },
+                        size: new Size(1100, skin == SkinKind.Mac ? 968 : 1028));
+            }
+            // Just this computer's welcome while its library is being made, and when it couldn't be.
+            var making = SetupModel.For(skin);
+            making.Connecting = true;
             foreach (var t in Themes)
-                Shot.Take($"{look}-05-setup-welcome-ask", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = ask, DrawChrome = true } : new WinSetup { DataContext = ask, DrawChrome = true },
+                Shot.Take($"{look}-05-setup-one-computer-welcome-making", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = making, DrawChrome = true } : new WinSetup { DataContext = making, DrawChrome = true },
+                    size: new Size(850, 608));
+            var failed = SetupModel.For(skin);
+            failed.LibraryResult = "The library didn't start. Its log is in the logs folder.";
+            foreach (var t in Themes)
+                Shot.Take($"{look}-05-setup-one-computer-welcome-problem", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = failed, DrawChrome = true } : new WinSetup { DataContext = failed, DrawChrome = true },
                     size: new Size(850, 608));
         }
     }
@@ -533,12 +551,13 @@ public class SurfaceShots
         m.Addresses.Add(new SetupAddress("At home", "http://mac-mini.local:8787"));
         m.Addresses.Add(new SetupAddress("With Tailscale", "http://mac-mini.example.ts.net:8787"));
         m.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Study Stash");
-        if (step > SetupStep.Library)
+        if (step > SetupStep.Library || role == AppRole.Both && step > SetupStep.Welcome)
         {
             m.LibraryOk = true;
             m.LibraryResult = role == AppRole.Laptop ? "Connected to Ada's library." : $"Ada's library is ready on this {m.DeviceWord}.";
         }
-        if (step == SetupStep.Ai) m.Ai = AiDemo.Setup();
+        if (role == AppRole.Both && step == SetupStep.Done) m.NotesSummary = "Ollama";
+        if (step == SetupStep.Ai) m.Ai = AiDemo.Setup(skin == SkinKind.Win, oneComputer: role == AppRole.Both);
         if (step == SetupStep.Canvas || canvasFound)
         {
             // Setup's own Canvas: Add to Chrome pressed and waiting for Chrome, or everything done and the courses found.
@@ -595,23 +614,34 @@ public class SurfaceShots
     static (Services.SettingsModel Model, Services.AppHost Host, string Home) MakeSettings(string section)
     {
         string home = Path.Combine(Path.GetTempPath(), "studystash-settings-" + Guid.NewGuid().ToString("N"));
+        // "One-computer…": the Library page of just this computer's library, before a laptop is added, while one is
+        // being added (its password typed), and once laptops can connect.
+        bool one = section.StartsWith("One-computer", StringComparison.Ordinal);
+        if (one) new Services.AppSettings { SetupDone = true, Role = Services.AppRole.Both }.Save(home);
         var host = new Services.AppHost(home);
         // The library's own pages read the design's example library (Sam's, on a Mac mini); "Unreachable" shows the
         // Library page when it doesn't answer.
         var library = new FakeLibrarySettings { Down = section == "Unreachable" };
+        if (one) library.Settings["reach"]!["laptops"] = section == "One-computer-on";
+        // "Rename": Settings → Classes with "Use Canvas course names" and its preview open.
         bool renaming = section == "Rename";
         if (renaming) library.Settings = FakeLibrarySettings.CodeNamed();
-        if (section == "Unreachable") section = "Library";
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
-        model.Section = renaming ? "Classes" : section;
-        // "Use Canvas course names", its preview open.
+        model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : section;
         if (renaming) model.Lib.ConfirmingCourseNames = true;
+        if (section == "One-computer-adding")
+        {
+            model.Lib.AddLaptopCommand.Execute(null);
+            model.Lib.LaptopPassword = "correct-horse";
+        }
+        if (section == "One-computer-on")
+            model.Lib.LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, choose “This is my laptop”, and enter one of the addresses below and this password.";
         return (model, host, home);
     }
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable" })
+        foreach (string section in new[] { "General", "Appearance", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
         {
             var (model, host, home) = MakeSettings(section);
             try

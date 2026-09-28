@@ -31,28 +31,41 @@ public static class Setup
         _ => null,
     };
 
-    /// <summary>Setup for this computer: the installer's flow (or, with none, the welcome asks), with what's already
-    /// known filled in. <paramref name="tailscale"/> and <paramref name="hostName"/> say where a laptop can reach a
-    /// library made here (tests give their own).</summary>
-    public static SetupModel Make(AppHost host, AppRole? preset = null, Func<TailscaleInfo>? tailscale = null, Func<string>? hostName = null)
+    /// <summary>The welcome's choice to start on. A run that stopped part-way picks up where it was: a library already
+    /// made here keeps its flow, and a laptop already connected to a library on another computer stays a laptop.
+    /// Otherwise the installer suggests one (<see cref="SetupModel.Suggested"/>).</summary>
+    public static AppRole StartingRole(AppRole? installer, AppRole saved, string serverUrl)
     {
-        preset ??= Preset(Apps.RolePreset());
-        var m = SetupModel.For(Skin.Current, preset);
-        // A run that stopped part-way picks up the flow it was in, if the installer allows it.
-        var was = host.Settings.Role;
-        if (preset != AppRole.Laptop && was != AppRole.Laptop) m.SetRole(was);
+        if (saved != AppRole.Laptop) return saved;
+        if (serverUrl.Length > 0 && !IsThisComputer(serverUrl)) return AppRole.Laptop;
+        return SetupModel.Suggested(installer);
+    }
+
+    /// <summary>An address on this computer itself (the library a one-computer setup made).</summary>
+    public static bool IsThisComputer(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var u) && (u.IsLoopback || u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Setup for this computer, starting on <paramref name="role"/>'s choice (or, when not given, the one
+    /// <see cref="StartingRole"/> works out), with what's already known filled in. <paramref name="tailscale"/> and
+    /// <paramref name="hostName"/> say where a laptop can reach a library made here, and <paramref name="here"/> makes it
+    /// (tests give their own).</summary>
+    public static SetupModel Make(AppHost host, AppRole? role = null, Func<TailscaleInfo>? tailscale = null, Func<string>? hostName = null,
+        LibraryHere? here = null)
+    {
         var cc = host.Client();
+        var m = SetupModel.For(Skin.Current, role ?? StartingRole(Preset(Apps.RolePreset()), host.Settings.Role, cc.ServerUrl));
         m.Address = cc.ServerUrl;
         m.LibraryName = $"{Person()}'s library";
-        m.NotesFolder = LibraryHere.DefaultFolder;
+        here ??= LibraryHere.ThisComputer();
+        m.NotesFolder = here.Folder ?? LibraryHere.DefaultFolder;
         // Setup run again on the library: it keeps its name, password and notes folder, and it starts at login as it
         // should (Finish writes the login item afresh, pointing at this copy of the app).
-        if (LibraryHere.Existing(host.Home) is { } here)
+        if (LibraryHere.Existing(host.Home) is { } had)
         {
             m.ExistingLibrary = true;
-            if (here.PoolName.Length > 0) m.LibraryName = here.PoolName;
-            m.Password = here.PoolPassword;
-            m.NotesFolder = here.PoolDir;
+            if (had.PoolName.Length > 0) m.LibraryName = had.PoolName;
+            m.Password = had.PoolPassword;
+            m.NotesFolder = had.PoolDir;
             m.StartAtLogin = true;
         }
         if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;
@@ -73,16 +86,16 @@ public static class Setup
         m.OnMicSettings = () => Dialogs.OpenUrl(host.MicSettingsUrl);
         m.OnTaskbarSettings = () => Dialogs.OpenUrl("ms-settings:taskbar");
         m.OnRetryModel = () => _ = host.DownloadModelAsync();
-        m.OnConnect = () => ConnectAsync(m, host);
+        m.OnConnect = () => ConnectAsync(m, host, here);
         m.OnFind = () => FindAsync(m, host);
         m.OnAddClass = () => AddClassAsync(m, host);
         // Leaving Classes adds the Canvas courses that are ticked (and links them).
         m.LeaveAsync = step => step == SetupStep.Classes ? AddCoursesAsync(m, host) : Task.FromResult(true);
         m.CanLeave = step =>
         {
-            if (step is SetupStep.Password or SetupStep.Library && !m.LibraryOk)
+            if ((step is SetupStep.Password or SetupStep.Library || step == SetupStep.Welcome && m.IsOneComputer) && !m.LibraryOk)
             {
-                m.LibraryResult = m.IsLibrary ? "Create the library first." : "Connect to your library first.";
+                m.LibraryResult = m.IsLaptop ? "Connect to your library first." : "Create the library first.";
                 return false;
             }
             return true;
@@ -177,15 +190,24 @@ public static class Setup
         m.MicLevels = mic.Levels();
     }
 
-    static async Task ConnectAsync(SetupModel m, AppHost host)
+    static async Task ConnectAsync(SetupModel m, AppHost host, LibraryHere here)
     {
         m.Connecting = true;
         m.LibraryResult = null;
         try
         {
-            if (m.IsLibrary)
+            if (m.IsOneComputer)
             {
-                string done = await LibraryHere.ThisComputer().CreateAsync(host, m.LibraryName, m.Password, Person(), m.Role);
+                // Just this computer: the library is made quietly, reachable only from here, with a password of its
+                // own (a laptop added later gets one the student picks). One already here keeps who can reach it.
+                string done = await here.CreateAsync(host, m.LibraryName, null, Person(), AppRole.Both, localOnly: !m.ExistingLibrary);
+                m.LibraryOk = true;
+                m.LibraryResult = done;
+            }
+            else if (m.IsLibrary)
+            {
+                // A library for other computers: laptops can reach it, whatever it was before.
+                string done = await here.CreateAsync(host, m.LibraryName, m.Password, Person(), m.Role, laptops: true);
                 m.LibraryOk = true;
                 m.LibraryResult = done;
             }

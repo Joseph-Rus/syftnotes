@@ -16,7 +16,7 @@
       <StackPanel Spacing="6">
         <TextBlock Classes="ai-title" Text="AI engines" c:Typography.Extra="-0.39" />
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left"
-                   Text="Notes are written after each lecture. Answers come while you ask. Engines run on your library, and you can set them up there or from this laptop." />
+                   Text="{Binding Lede}" />
       </StackPanel>
 
       <TextBlock Text="{Binding OlderLibraryWords}" Classes="ai-sub" IsVisible="{Binding OlderLibrary}" />
