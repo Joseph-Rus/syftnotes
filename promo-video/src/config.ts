@@ -21,15 +21,17 @@ export const colors = {
   line: 'rgba(16, 24, 40, 0.08)',
   window: 'rgba(248, 251, 252, 0.97)',
   pane: 'rgba(255, 255, 255, 0.72)',
-  // The desktop: a pale sky over rolling hills in the Lagoon teal, back to front.
-  sky: ['#F6F2EA', '#E3EEF5', '#CFE3EE'],
-  hills: [
-    ['#CFE6EC', '#B7D9E2'],
-    ['#9ACFD0', '#7BBBC0'],
-    ['#5FA9AD', '#3F8E97'],
-    ['#2F7A88', '#23586F'],
-    ['#1F4F66', '#173A52'],
-  ] as [string, string][],
+  // The desktop picture: a night-blue sky and a glossy silk wave, in the style of a macOS wallpaper.
+  desk: {
+    sky: ['#03041A', '#0E0F55', '#2A1E9C', '#5B45C9'],
+    wave: ['#1D2BB8', '#2F46E0', '#1A249A'],
+    rim: '#C9D4FF',
+    dune: ['#6F7FE0', '#3444BE'],
+    far: '#2B3AB0',
+  },
+  // Text on the desktop: white, as macOS draws the menu bar over a dark picture.
+  onDesk: '#FFFFFF',
+  onDeskSoft: 'rgba(214, 221, 255, 0.66)',
   // Class colours, as the sidebar shows them.
   cs: '#3B82F6',
   bio: '#22A45D',

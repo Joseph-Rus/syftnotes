@@ -16,55 +16,63 @@ export const Paper: React.FC<{children?: React.ReactNode}> = ({children}) => (
   </AbsoluteFill>
 );
 
-// Rolling hills, back to front, in a 1920×1080 frame: each crest is a smooth curve through these heights.
-const HILLS: number[][] = [
-  [560, 500, 540, 470, 520, 480],
-  [650, 600, 640, 590, 620, 575],
-  [760, 700, 735, 690, 720, 700],
-  [860, 820, 850, 800, 835, 815],
-  [960, 930, 950, 915, 945, 925],
-];
-const crest = (ys: number[]) => {
-  const step = 1920 / (ys.length - 1);
-  const pts = ys.map((y, i) => [i * step, y]);
-  let d = `M-20 ${pts[0][1]}`;
-  for (let i = 1; i < pts.length; i++) {
-    const [x0, y0] = pts[i - 1];
-    const [x1, y1] = pts[i];
-    const mx = (x0 + x1) / 2;
-    d += ` C${mx} ${y0} ${mx} ${y1} ${x1} ${y1}`;
-  }
-  return `${d} L1940 1100 L-20 1100 Z`;
-};
-
-/** The desktop picture: a pale sky over rolling hills in Study Stash's teal, drawn in code. */
+/**
+ * The desktop picture, painted in code in the style of a macOS wallpaper: a night-blue sky that glows violet at the
+ * horizon, one glossy wave of blue silk sweeping up to the right with a bright edge, and soft dunes out of focus.
+ */
 export const Wallpaper: React.FC = () => {
-  const [s0, s1, s2] = colors.sky;
+  const d = colors.desk;
+  // The wave's top edge: low on the left, rising in an S to the top right.
+  const edge = 'M-40 760 C 300 700, 520 640, 760 470 S 1260 150, 1980 170';
   return (
     <AbsoluteFill>
-      <svg width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMax slice" style={{position: 'absolute', inset: 0}}>
+      <svg width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" style={{position: 'absolute', inset: 0}}>
         <defs>
-          <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor={s0} />
-            <stop offset="0.45" stopColor={s1} />
-            <stop offset="1" stopColor={s2} />
+          <linearGradient id="dsky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={d.sky[0]} />
+            <stop offset="0.22" stopColor={d.sky[1]} />
+            <stop offset="0.42" stopColor={d.sky[2]} />
+            <stop offset="0.55" stopColor={d.sky[3]} />
+            <stop offset="1" stopColor={d.sky[2]} />
           </linearGradient>
-          <radialGradient id="sun" cx="0.78" cy="0.16" r="0.5">
-            <stop offset="0" stopColor="#FFF8EC" stopOpacity="0.9" />
-            <stop offset="1" stopColor="#FFF8EC" stopOpacity="0" />
-          </radialGradient>
-          {colors.hills.map(([top, bottom], i) => (
-            <linearGradient key={i} id={`hill${i}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor={top} />
-              <stop offset="1" stopColor={bottom} />
-            </linearGradient>
-          ))}
+          <linearGradient id="dwave" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stopColor={d.wave[1]} />
+            <stop offset="0.45" stopColor={d.wave[0]} />
+            <stop offset="1" stopColor={d.wave[2]} />
+          </linearGradient>
+          <linearGradient id="drim" x1="0" y1="1" x2="1" y2="0">
+            <stop offset="0" stopColor={d.rim} stopOpacity="0.1" />
+            <stop offset="0.35" stopColor={d.rim} stopOpacity="0.95" />
+            <stop offset="0.7" stopColor={d.rim} stopOpacity="0.55" />
+            <stop offset="1" stopColor={d.rim} stopOpacity="0.2" />
+          </linearGradient>
+          <linearGradient id="ddune" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={d.dune[0]} />
+            <stop offset="1" stopColor={d.dune[1]} />
+          </linearGradient>
+          <filter id="blur40" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="40" /></filter>
+          <filter id="blur18" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="18" /></filter>
+          <filter id="blur6" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="6" /></filter>
+          <filter id="blur2"><feGaussianBlur stdDeviation="1.6" /></filter>
+          <clipPath id="dwaveclip"><path d={`${edge} L1980 1120 L-40 1120 Z`} /></clipPath>
         </defs>
-        <rect x="-20" y="-400" width="1960" height="1500" fill="url(#sky)" />
-        <rect x="-20" y="-400" width="1960" height="1500" fill="url(#sun)" />
-        {HILLS.map((ys, i) => (
-          <path key={i} d={crest(ys)} fill={`url(#hill${i})`} />
-        ))}
+        <rect x="-40" y="-40" width="2000" height="1160" fill="url(#dsky)" />
+        {/* The violet glow along the horizon, and far hills out of focus. */}
+        <ellipse cx="560" cy="600" rx="900" ry="120" fill="#7C62E6" opacity="0.45" filter="url(#blur40)" />
+        <path d="M-40 640 C 120 560, 260 560, 420 610 S 700 650, 820 600 L 820 1120 L -40 1120 Z" fill={d.far} opacity="0.85" filter="url(#blur18)" />
+        {/* The silk: its body, folds catching the light, and a bright edge. */}
+        <path d={`${edge} L1980 1120 L-40 1120 Z`} fill="url(#dwave)" />
+        <g clipPath="url(#dwaveclip)">
+          <path d="M-40 850 C 360 790, 640 700, 900 540 S 1400 250, 1980 280" fill="none" stroke="#6E86FF" strokeWidth="70" opacity="0.28" filter="url(#blur18)" />
+          <path d="M600 900 C 900 760, 1200 560, 1980 470" fill="none" stroke="#0B1270" strokeWidth="120" opacity="0.45" filter="url(#blur40)" />
+          <path d="M-40 980 C 420 900, 820 820, 1200 640 S 1700 420, 1980 430" fill="none" stroke="#8FA2FF" strokeWidth="40" opacity="0.22" filter="url(#blur18)" />
+          <ellipse cx="1180" cy="720" rx="420" ry="190" fill="#5B74F0" opacity="0.35" filter="url(#blur40)" />
+        </g>
+        <path d={edge} fill="none" stroke="url(#drim)" strokeWidth="3" filter="url(#blur2)" />
+        <path d={edge} fill="none" stroke="url(#drim)" strokeWidth="14" opacity="0.35" filter="url(#blur6)" />
+        {/* Dunes in the foreground, out of focus. */}
+        <path d="M-40 1120 C -40 900, 160 820, 380 860 S 640 1020, 700 1120 Z" fill="url(#ddune)" opacity="0.8" filter="url(#blur40)" />
+        <path d="M1560 1120 C 1600 900, 1760 780, 1980 740 L 1980 1120 Z" fill="#A4ABDF" opacity="0.75" filter="url(#blur18)" />
       </svg>
     </AbsoluteFill>
   );
@@ -74,7 +82,7 @@ export const MENU_H = 38;
 /** Where Study Stash's icon sits in the menu bar. */
 // The right of the menu bar, laid out from the right edge as macOS does: the app's icon, then the system's.
 // Each item has a fixed slot, so nothing can run into anything else.
-const INK = '#111418';
+const INK = colors.onDesk; // macOS draws the menu bar in white over a dark picture
 const SLOTS = (wide: boolean): [key: string, w: number][] =>
   [
     ['app', 34],
@@ -150,8 +158,7 @@ export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
         left: 0,
         right: 0,
         height: MENU_H,
-        background: 'rgba(255,255,255,0.34)',
-        boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.35)',
+        background: 'rgba(8,10,40,0.18)',
         fontFamily: fonts.ui,
         fontSize: 17,
         color: INK,
@@ -174,12 +181,12 @@ export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
             alignItems: 'center',
             justifyContent: key === 'clock' ? 'flex-end' : 'center',
             borderRadius: 7,
-            background: key === 'app' && lit ? 'rgba(16,24,40,0.13)' : 'transparent',
+            background: key === 'app' && lit ? 'rgba(255,255,255,0.24)' : 'transparent',
             fontVariantNumeric: 'tabular-nums',
             whiteSpace: 'nowrap',
           }}
         >
-          {key === 'app' ? <Logo size={23} shadow={false} flat /> : key === 'clock' ? 'Tue 23 Sep  10:02' : <MenuGlyph kind={key} />}
+          {key === 'app' ? <Logo size={23} shadow={false} flat ink={INK} /> : key === 'clock' ? 'Tue 23 Sep  10:02' : <MenuGlyph kind={key} />}
         </div>
       ))}
     </div>
@@ -225,8 +232,8 @@ export const Title: React.FC<{text: [string, string]; delay?: number; width?: nu
         zIndex: 40,
       }}
     >
-      <span style={{color: colors.ink, opacity: p, display: 'inline-block', transform: `translateY(${(1 - p) * 14}px)`}}>{text[0]}</span>{' '}
-      <span style={{color: '#7A8497', opacity: q, display: 'inline-block', transform: `translateY(${(1 - q) * 14}px)`}}>{text[1]}</span>
+      <span style={{color: colors.onDesk, opacity: p, display: 'inline-block', transform: `translateY(${(1 - p) * 14}px)`}}>{text[0]}</span>{' '}
+      <span style={{color: colors.onDeskSoft, opacity: q, display: 'inline-block', transform: `translateY(${(1 - q) * 14}px)`}}>{text[1]}</span>
     </div>
   );
 };

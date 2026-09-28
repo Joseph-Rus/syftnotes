@@ -51,8 +51,8 @@ npm run render:all          # both
 | 27–30 s | Promise | "Your recordings stay on your computer." Free and open source, for Mac and Windows |
 | 30–35 s | Call to action | Free for Mac and Windows, study-stash-app.web.app |
 
-The desktop picture, rolling hills in Study Stash's teal under a pale sky, is drawn in `src/components/Layout.tsx`
-(`Wallpaper`; its colours are `sky` and `hills` in `src/config.ts`). Headlines sit above the app in its own Inter
+The desktop picture, a night-blue sky and a glossy silk wave in the style of a macOS wallpaper, is painted in code in `src/components/Layout.tsx`
+(`Wallpaper`; its colours are `desk` in `src/config.ts`). Headlines sit above the app in its own Inter
 Display, lined up with the window: the first part in ink, the rest in grey (`Title`). The serif appears only inside the
 app, where the notes really use it. The pointer's path and clicks are the `stops` and `clicks` of each scene's
 `<Cursor>`.
