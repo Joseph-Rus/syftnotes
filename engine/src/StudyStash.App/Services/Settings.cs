@@ -136,6 +136,24 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 480;
     partial void OnModelProgressChanged(double value) => OnPropertyChanged(nameof(ModelBarWidth));
     readonly ModelAdvice advice;
+    /// <summary>Models downloaded here but not in use (after a switch): offered for removal, never removed unasked.</summary>
+    [ObservableProperty] public partial string SpareLine { get; set; } = "";
+    public bool HasSpare => SpareLine.Length > 0 && !ConfirmingRemove;
+    /// <summary>Remove was pressed: the question, with Remove and Keep them.</summary>
+    [ObservableProperty] public partial bool ConfirmingRemove { get; set; }
+    public string RemoveQuestion => spare.Count switch
+    {
+        0 => "",
+        1 => $"Remove {spare[0].Name} from this computer? It frees {WhisperModel.SizeOf(spare[0].Bytes)}, and you can download it again any time.",
+        _ => $"Remove {string.Join(" and ", spare.Select(m => m.Name))} from this computer? They free {WhisperModel.SizeOf(spare.Sum(m => m.Bytes))}, and you can download them again any time.",
+    };
+    partial void OnSpareLineChanged(string value) => OnPropertyChanged(nameof(HasSpare));
+    partial void OnConfirmingRemoveChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasSpare));
+        OnPropertyChanged(nameof(RemoveQuestion));
+    }
+    List<WhisperModel> spare = [];
     [ObservableProperty] public partial string Language { get; set; } = "";
     [ObservableProperty] public partial bool ComputerAudio { get; set; }
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
@@ -349,6 +367,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         ModelAdviceLine = AdviceWords(host.Model, advice);
         ModelDownloading = host.Downloading is not null;
         ModelProgress = host.Downloading?.Fraction ?? 0;
+        spare = [.. WhisperModels.All.Where(m => m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
+        SpareLine = spare.Count == 0 ? ""
+            : $"Also on this computer: {string.Join(", ", spare.Select(m => $"{m.Name} ({WhisperModel.SizeOf(m.Bytes)})"))}.";
+        if (spare.Count == 0) ConfirmingRemove = false;
+        OnPropertyChanged(nameof(RemoveQuestion));
         foreach (var m in Models)
         {
             m.Chosen = m.Model.Id == host.Model.Id;
@@ -525,6 +548,20 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         // One already here needs nothing, and a download of another one is no longer wanted.
         if (WhisperModels.IsDownloaded(host.Home, choice.Model)) host.StopDownload();
         else _ = host.DownloadModelAsync(choice.Model);
+    }
+
+    [RelayCommand] void AskRemoveSpare() => ConfirmingRemove = true;
+
+    [RelayCommand] void KeepSpare() => ConfirmingRemove = false;
+
+    /// <summary>The student said yes: remove the models not in use.</summary>
+    [RelayCommand]
+    void RemoveSpare()
+    {
+        var problems = spare.Select(host.RemoveModel).OfType<string>().ToList();
+        ConfirmingRemove = false;
+        Refresh();
+        if (problems.Count > 0) ModelLine = string.Join(" ", problems);
     }
 
     /// <summary>Download (or try again now).</summary>

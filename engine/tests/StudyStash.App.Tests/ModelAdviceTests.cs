@@ -254,6 +254,57 @@ public class ModelAdviceTests
         }
     }
 
+    /// <summary>A model file of the right size (nothing written: the disk keeps it sparse), so it counts as here.</summary>
+    internal static void PretendDownloaded(string home, WhisperModel m)
+    {
+        Directory.CreateDirectory(WhisperModels.Dir(home));
+        using var f = File.Create(WhisperModels.PathFor(home, m));
+        f.SetLength(m.Bytes);
+    }
+
+    [AvaloniaFact]
+    public void A_model_no_longer_in_use_is_removed_only_when_the_student_says_so()
+    {
+        using var home = new TempHome();
+        new AppSettings { SetupDone = true, Model = "small" }.Save(home.Path);
+        PretendDownloaded(home.Path, WhisperModels.Base);
+        var (host, _) = Host(home);
+        using (host)
+        using (var settings = SettingsModel.Make(host))
+        {
+            Assert.Equal("Also on this computer: Whisper base (148 MB).", settings.SpareLine);
+            Assert.True(settings.HasSpare);
+
+            settings.AskRemoveSpareCommand.Execute(null);
+            Assert.True(settings.ConfirmingRemove);
+            Assert.False(settings.HasSpare);
+            Assert.Equal("Remove Whisper base from this computer? It frees 148 MB, and you can download it again any time.", settings.RemoveQuestion);
+            settings.KeepSpareCommand.Execute(null);
+            Assert.True(WhisperModels.IsDownloaded(home.Path, WhisperModels.Base));
+
+            settings.AskRemoveSpareCommand.Execute(null);
+            settings.RemoveSpareCommand.Execute(null);
+            Assert.False(File.Exists(WhisperModels.PathFor(home.Path, WhisperModels.Base)));
+            Assert.Equal("", settings.SpareLine);
+            Assert.False(settings.ConfirmingRemove);
+        }
+    }
+
+    [Fact]
+    public void The_model_in_use_is_never_removed()
+    {
+        using var home = new TempHome();
+        new AppSettings { SetupDone = true, Model = "base" }.Save(home.Path);
+        PretendDownloaded(home.Path, WhisperModels.Base);
+        var (host, _) = Host(home);
+        using (host)
+        {
+            Assert.Equal("Whisper base is the one in use.", host.RemoveModel(WhisperModels.Base));
+            Assert.True(WhisperModels.IsDownloaded(home.Path, WhisperModels.Base));
+            Assert.Null(host.RemoveModel(WhisperModels.Small)); // nothing there: nothing to do
+        }
+    }
+
     [Fact]
     public void The_advice_line_names_the_one_in_use_only_when_its_heavier()
     {

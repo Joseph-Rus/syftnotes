@@ -630,7 +630,14 @@ public class SurfaceShots
         // downloading.
         bool heavier = section == "Recording-heavier";
         if (heavier) new Services.AppSettings { SetupDone = true, Model = Audio.WhisperModels.LargeV3.Id }.Save(home);
-        var hardware = FakeHardware.For(skin, appleSilicon: !heavier);
+        // "Recording-remove": switched to the lighter model, asked whether to remove the one before (Whisper small).
+        bool removing = section == "Recording-remove";
+        if (removing)
+        {
+            new Services.AppSettings { SetupDone = true, Model = Audio.WhisperModels.LargeV3TurboSmall.Id }.Save(home);
+            ModelAdviceTests.PretendDownloaded(home, Audio.WhisperModels.Small);
+        }
+        var hardware = FakeHardware.For(skin, appleSilicon: !heavier && !removing);
         // "One-computer…": the Library page of just this computer's library, before a laptop is added, while one is
         // being added (its password typed), and once laptops can connect.
         bool one = section.StartsWith("One-computer", StringComparison.Ordinal);
@@ -644,7 +651,8 @@ public class SurfaceShots
         bool renaming = section == "Rename";
         if (renaming) library.Settings = FakeLibrarySettings.CodeNamed();
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
-        model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : heavier ? "Recording" : section;
+        model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : heavier || removing ? "Recording" : section;
+        if (removing) model.AskRemoveSpareCommand.Execute(null);
         if (heavier)
         {
             model.ModelDownloading = true;
@@ -664,7 +672,7 @@ public class SurfaceShots
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance", "Recording", "Recording-heavier", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
+        foreach (string section in new[] { "General", "Appearance", "Recording", "Recording-heavier", "Recording-remove", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
         {
             var (model, host, home) = MakeSettings(section, skin);
             try

@@ -791,6 +791,31 @@ public sealed class AppHost : IDisposable, IProblemSource
         return DownloadModelAsync(model);
     }
 
+    /// <summary>
+    /// Remove a model this computer no longer uses (Settings asks the student first), and whatever came of its
+    /// download. Never the one in use or the one downloading. Returns why it couldn't, or null when it's gone.
+    /// </summary>
+    public string? RemoveModel(WhisperModel model)
+    {
+        if (model.Id == Model.Id) return $"{model.Name} is the one in use.";
+        lock (downloadLock)
+            if (download is not null && DownloadingModel?.Id == model.Id) return $"{model.Name} is downloading.";
+        string path = WhisperModels.PathFor(Home, model);
+        try
+        {
+            File.Delete(path);
+            File.Delete(path + ".part");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log($"[model] couldn't remove {path}: {e.Message}");
+            return $"{model.Name} couldn't be removed: {e.Message}";
+        }
+        log($"[model] removed {model.Name}");
+        Changed?.Invoke();
+        return null;
+    }
+
     async Task DownloadAsync(WhisperModel model, CancellationTokenSource cts)
     {
         int failures = 0;

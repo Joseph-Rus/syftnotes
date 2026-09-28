@@ -732,6 +732,18 @@
                   <Border Width="{Binding ModelBarWidth}" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
                 </Border>
                 <TextBlock Classes="say" Text="{Binding ModelLine}" />
+                <!-- A model no longer in use (after a switch) stays until the student says to remove it. -->
+                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0" IsVisible="{Binding HasSpare}">
+                  <TextBlock Text="{Binding SpareLine}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="380" />
+                  <Button Classes="pill" Command="{Binding AskRemoveSpareCommand}" VerticalAlignment="Center"><TextBlock Text="Remove" FontSize="13" /></Button>
+                </StackPanel>
+                <StackPanel Spacing="8" Margin="0,8,0,0" IsVisible="{Binding ConfirmingRemove}">
+                  <TextBlock Text="{Binding RemoveQuestion}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left" />
+                  <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="pill" Command="{Binding KeepSpareCommand}"><TextBlock Text="Keep" FontSize="13" /></Button>
+                    <Button Classes="pill primary" Command="{Binding RemoveSpareCommand}"><TextBlock Text="Remove" FontSize="13" FontWeight="Medium" /></Button>
+                  </StackPanel>
+                </StackPanel>
                 <TextBlock Classes="section" Text="Language" />
                 <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding Language}" PlaceholderText="Found for each lecture (or en, es, fr…)" FontSize="13" /></Border>
                 <CheckBox IsVisible="{Binding CanRecordComputerAudio}" IsChecked="{Binding ComputerAudio}" Margin="0,16,0,0">
