@@ -77,6 +77,8 @@ public class ReachTests
             With(new TailscaleInfo(true, false, "Stopped", Exe: "ts")));
         Assert.Equal(new ReachProblem(ReachKind.NotRunning, "Tailscale is signed out on the library's computer. Open it and sign in."),
             With(new TailscaleInfo(true, false, "NeedsLogin", Exe: "ts")));
+        Assert.Equal(new ReachProblem(ReachKind.NotRunning, "Tailscale is still connecting on the library's computer. Try again in a moment."),
+            With(new TailscaleInfo(true, false, "Starting", Exe: "ts")));
         Assert.Equal(ReachKind.NoName, With(Running with { Dns = "" })!.Kind);
         Assert.Equal(new ReachProblem(ReachKind.Timeout, "Tailscale didn't answer in time. Check it's running on the library's computer."),
             With(Running, Prints(exits: false, 0, "Waiting for the backend...")));
@@ -451,5 +453,15 @@ public class ReachTests
         var remote = new AiRemote("http://library.test", "pw", http);
         Assert.Null(await remote.SetWebAsync(true));
         Assert.Null(await remote.CheckWebAsync());
+    }
+
+    [Fact]
+    public void The_Mac_apps_own_program_is_asked_as_the_command_line_and_its_usual_home_is_looked_in()
+    {
+        // Run bare from an app opened in the Finder, Tailscale.app's program opens its window instead of answering.
+        HostInfo.Tailscale(run: (_, _, _) => null, candidates: []);
+        Assert.Equal("1", Environment.GetEnvironmentVariable("TAILSCALE_BE_CLI"));
+        // launchd's PATH has no /usr/local/bin, where the Mac app installs its command line.
+        Assert.Equal("/usr/local/bin/tailscale", HostInfo.TailscalePaths[0]);
     }
 }

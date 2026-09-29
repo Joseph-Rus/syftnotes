@@ -55,9 +55,12 @@ public sealed partial class ClaudeReach
         if (!ts.Installed || ts.Exe.Length == 0)
             return (null, new(ReachKind.NotInstalled, "Tailscale isn't on the library's computer. Install it from tailscale.com/download and sign in.", DownloadPage));
         if (!ts.Running)
-            return (null, new(ReachKind.NotRunning, ts.State == "NeedsLogin"
-                ? "Tailscale is signed out on the library's computer. Open it and sign in."
-                : "Tailscale isn't running on the library's computer. Open it and sign in."));
+            return (null, new(ReachKind.NotRunning, ts.State switch
+            {
+                "NeedsLogin" => "Tailscale is signed out on the library's computer. Open it and sign in.",
+                "Starting" => "Tailscale is still connecting on the library's computer. Try again in a moment.",
+                _ => "Tailscale isn't running on the library's computer. Open it and sign in.",
+            }));
         if (ts.Dns.Length == 0)
             return (null, new(ReachKind.NoName, "Tailscale hasn't given this computer a name yet. Turn on MagicDNS in the Tailscale admin console.", DnsPage));
         string verb = internet ? "funnel" : "serve";
