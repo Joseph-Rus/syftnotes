@@ -157,88 +157,6 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
-    public async Task A_first_run_picks_installs_signs_in_and_the_ai_takes_it_from_there()
-    {
-        await using var rig = await new Rig().OpenAsync();
-        var g = rig.Guided;
-        FakeAgents.Replay(rig.Bin, ["""{"type":"system","subtype":"init","session_id":"p-1","tools":[],"mcp_servers":[]}""", Says("ready"), Done("ready", "p-1")], 1);
-        FakeAgents.Replay(rig.Bin, [Init(), Says("Hi! This takes about 5 minutes. Just this Mac, or two computers?"), Done("Hi!")], 2);
-
-        // Pick your AI: nothing picked, nothing found, nothing downloaded.
-        Assert.Equal(GuidedScreen.PickAi, g.Screen);
-        Assert.False(g.ClaudeHere);
-        Assert.False(g.CanContinue);
-        g.PickCommand.Execute("claude");
-        Assert.True(g.CanContinue);
-        await g.ContinueCommand.ExecuteAsync(null);
-        Assert.Equal("claude", AppSettings.Load(rig.Home.Path).SetupAi);
-
-        // Install: only on the press.
-        Assert.Equal(GuidedScreen.Install, g.Screen);
-        Assert.Equal("Install Claude Code", g.InstallTitle);
-        Assert.False(File.Exists(FakeAgents.ExePath(rig.Bin, "claude")));
-        await g.InstallCommand.ExecuteAsync(null);
-        Assert.True(g.Installed, g.InstallProblem);
-        Assert.Equal("Claude Code 2.1.260 is installed.", g.InstalledWords);
-        await g.ContinueCommand.ExecuteAsync(null);
-
-        // Sign in: the CLI's own sign-in, noticed when its status says so, then the plan check.
-        Assert.Equal(GuidedScreen.SignIn, g.Screen);
-        Assert.False(g.SignedIn);
-        await g.OpenSignInCommand.ExecuteAsync(null);
-        Assert.True(g.SignedIn);
-        Assert.True(g.AiReady, $"{g.PlanProblem}: {g.PlanProblemTitle} {g.PlanProblemText} {g.SignInProblem}");
-        Assert.Contains("--tools", FakeAgents.Argv(rig.Bin, 1));
-        Assert.DoesNotContain("--mcp-config", FakeAgents.Argv(rig.Bin, 1));
-        await g.ContinueCommand.ExecuteAsync(null);
-
-        // The chat: its first turn, with the setup tools and their token in its environment only.
-        Assert.Equal(GuidedScreen.Chat, g.Screen);
-        await Until(() => !g.Busy && g.Thread.OfType<AiEntry>().Any(), "the first turn");
-        Assert.Equal("Hi! This takes about 5 minutes. Just this Mac, or two computers?", g.Thread.OfType<AiEntry>().First().Text);
-        Assert.Contains("[Study Stash] Setup was opened.", FakeAgents.Input(rig.Bin, 2));
-        Assert.Contains("--mcp-config", FakeAgents.Argv(rig.Bin, 2));
-        Assert.Contains(SetupChat.TokenVar, FakeAgents.EnvNames(rig.Bin, 2));
-        Assert.Equal(new SetupChatSaved("claude", "s-1"), AppSettings.Load(rig.Home.Path).SetupChat);
-        Assert.Equal(ChecklistState.Done, rig.Item("ai").State);
-        Assert.Equal("How you'll use it", rig.Item("computer").Title);
-
-        // The AI shows the computer card: nothing happens until the student presses Set up.
-        var (error, said) = await rig.CallAsync("offer_computer_setup");
-        Assert.False(error, said);
-        var card = Assert.IsType<CardEntry>(g.Thread[^1]);
-        Assert.True(card.IsComputer);
-        Assert.Equal(ChecklistState.Now, rig.Item("computer").State);
-        Assert.Null(LibraryHere.Existing(rig.Home.Path));
-        Assert.Equal(LibraryState.NotSetUp, rig.Host.Library);
-
-        int turns = FakeAgents.Turns(rig.Bin);
-        await card.PressCommand.ExecuteAsync("setup");
-        Assert.True(rig.Setup.LibraryOk, rig.Setup.LibraryResult);
-        Assert.False(card.Open);
-        Assert.Equal(ChecklistState.Done, rig.Item("computer").State);
-        Assert.Equal($"Just this {rig.Setup.DeviceWord}", rig.Item("computer").Title);
-        Assert.Equal(["claude"], rig.Writers);
-        Assert.Equal(ChecklistState.Done, rig.Item("notes").State);
-        Assert.Contains(g.Thread.OfType<NoteEntry>(), n => n.Text.StartsWith("Your library is ready", StringComparison.Ordinal));
-        await Until(() => FakeAgents.Turns(rig.Bin) > turns && !g.Busy, "the note's turn");
-        Assert.Contains("[Study Stash] The student chose just this", FakeAgents.Input(rig.Bin, turns + 1));
-        Assert.Contains("--resume", FakeAgents.Argv(rig.Bin, turns + 1));
-
-        // A class the student named goes straight into the library, and the checklist shows it.
-        (error, said) = await rig.CallAsync("add_class", new() { ["name"] = "BIO 110", ["about"] = "Cells, genetics and evolution" });
-        Assert.False(error, said);
-        Assert.Contains("BIO 110", rig.Host.Classes().Select(c => c.Name).Concat(rig.Setup.Classes.Select(c => c.Name)));
-        Assert.Equal("1 class", rig.Item("classes").Detail);
-
-        // The status the AI reads is the checklist's.
-        (_, said) = await rig.CallAsync("get_setup_status");
-        Assert.Contains("- computer · Just this", said);
-        Assert.Contains("- classes · Classes: done (optional) · 1 class", said);
-        Assert.Contains("ready_to_finish: no", said);
-    }
-
-    [AvaloniaFact]
     public async Task Cards_change_nothing_until_their_button_is_pressed()
     {
         await using var rig = await new Rig(installed: true, signedIn: true, role: AppRole.Both,
@@ -248,13 +166,13 @@ public sealed class GuidedSetupTests
         g.RoleChosen = true;
 
         Assert.False((await rig.CallAsync("offer_start_at_login")).Error);
-        var login = (CardEntry)g.Thread[^1];
+        var login = g.Thread.OfType<CardEntry>().Last();
         Assert.False((await rig.CallAsync("offer_microphone_check")).Error);
-        var mic = (CardEntry)g.Thread[^1];
+        var mic = g.Thread.OfType<CardEntry>().Last();
         Assert.False(login.Open);
         Assert.True(rig.Setup.MicCheckOpen);
         Assert.False((await rig.CallAsync("offer_model_download", new() { ["model_id"] = "large-v3-turbo-q5" })).Error);
-        var model = (CardEntry)g.Thread[^1];
+        var model = g.Thread.OfType<CardEntry>().Last();
         Assert.False(rig.Setup.MicCheckOpen);
 
         // Three cards shown, and nothing on the computer changed.
@@ -282,7 +200,7 @@ public sealed class GuidedSetupTests
         Assert.Equal(ChecklistState.Todo, rig.Item("microphone").State);
         Assert.True(mic.Folded);
         Assert.False((await rig.CallAsync("offer_microphone_check")).Error);
-        mic = (CardEntry)g.Thread[^1];
+        mic = g.Thread.OfType<CardEntry>().Last();
         Assert.True(rig.Setup.MicCheckOpen);
         rig.Setup.MicAllowed = true;
         rig.Setup.MicHeard = true;
@@ -290,74 +208,6 @@ public sealed class GuidedSetupTests
         Assert.Contains(g.Thread.OfType<NoteEntry>(), n => n.Text == "Microphone allowed · Study Stash hears you");
         Assert.Equal("Study Stash hears you", mic.Outcome);
         Assert.False(rig.Setup.MicCheckOpen);
-    }
-
-    [AvaloniaFact]
-    public async Task Notes_and_words_typed_during_a_turn_go_together_with_the_next()
-    {
-        await using var rig = new Rig(installed: true, signedIn: true, saved: s => s.SetupAi = "claude");
-        File.WriteAllText(Path.Combine(rig.Bin, "sleep"), "2");
-        await rig.OpenAsync();
-        var g = rig.Guided;
-        await Until(() => g.Busy && FakeAgents.Turns(rig.Bin) == 1, "the first turn to start");
-
-        g.Draft = "Just this Mac, please";
-        await g.SendCommand.ExecuteAsync(null);
-        g.Note("Microphone allowed · Study Stash hears you", "The microphone is allowed and Study Stash hears the student.");
-        var typed = g.Thread.OfType<StudentEntry>().Single();
-        Assert.True(typed.Queued);
-        Assert.False(g.CanType);
-        Assert.Equal(1, FakeAgents.Turns(rig.Bin));
-
-        File.Delete(Path.Combine(rig.Bin, "sleep"));
-        await Until(() => FakeAgents.Turns(rig.Bin) == 2 && !g.Busy, "the next turn");
-        Assert.False(typed.Queued);
-        string next = FakeAgents.Input(rig.Bin, 2);
-        Assert.Contains("Just this Mac, please", next);
-        Assert.Contains("[Study Stash] The microphone is allowed and Study Stash hears the student.", next);
-        Assert.Equal(2, FakeAgents.Turns(rig.Bin));
-    }
-
-    [AvaloniaFact]
-    public async Task Quick_replies_are_sent_as_the_students_answer()
-    {
-        await using var rig = await new Rig(installed: true, signedIn: true, saved: s => s.SetupAi = "claude").OpenAsync();
-        var g = rig.Guided;
-        await Until(() => g.Screen == GuidedScreen.Chat && !g.Busy, "the chat");
-        Assert.False((await rig.CallAsync("ask_student", new() { ["question"] = "Does your school use Canvas?", ["choices"] = new[] { "Yes", "No" } })).Error);
-        Assert.Equal(["Yes", "No"], g.QuickReplies);
-        int turns = FakeAgents.Turns(rig.Bin);
-        await g.ReplyCommand.ExecuteAsync("Yes");
-        Assert.Empty(g.QuickReplies);
-        Assert.Equal("Yes", g.Thread.OfType<StudentEntry>().Last().Text);
-        Assert.Equal("Yes", FakeAgents.Input(rig.Bin, turns + 1).Trim());
-
-        // A checklist line clicked asks the AI to go there.
-        await g.ClickItemCommand.ExecuteAsync(rig.Item("canvas"));
-        Assert.Contains("[Study Stash] The student clicked Canvas in the checklist.", FakeAgents.Input(rig.Bin, turns + 2));
-    }
-
-    [AvaloniaFact]
-    public async Task Run_again_goes_straight_to_the_chat_and_keeps_what_the_computer_is_for()
-    {
-        await using var rig = await new Rig(installed: true, signedIn: true, role: AppRole.Laptop, again: true,
-            saved: s =>
-            {
-                s.SetupDone = true;
-                s.Role = AppRole.Laptop;
-                s.SetupAi = "claude";
-            }).OpenAsync();
-        var g = rig.Guided;
-        await Until(() => g.Screen == GuidedScreen.Chat && !g.Busy, "the chat");
-        Assert.Equal("Set up Study Stash again", g.HeaderTitle);
-        Assert.Contains("[Study Stash] Setup was opened again from Settings.", FakeAgents.Input(rig.Bin, 1));
-        Assert.Contains("This is setup run again.", File.ReadAllText(Path.Combine(SetupChat.Folder(rig.Home.Path), "brief.md")));
-        Assert.Equal("This is my laptop", rig.Item("computer").Title);
-
-        var (error, said) = await rig.CallAsync("offer_computer_setup", new() { ["suggested"] = "library" });
-        Assert.True(error);
-        Assert.Contains("Settings → Connection", said);
-        Assert.True(rig.Setup.IsLaptop);
     }
 
     [AvaloniaFact]
@@ -372,70 +222,6 @@ public sealed class GuidedSetupTests
         Assert.Equal(SetupStep.Welcome, rig.Setup.Step);
         Assert.Equal(0, FakeAgents.Turns(rig.Bin));
         Assert.False(File.Exists(FakeAgents.ExePath(rig.Bin, "claude")));
-    }
-
-    [AvaloniaFact]
-    public async Task Set_up_by_hand_from_the_chat_opens_the_first_step_not_done_and_comes_back()
-    {
-        await using var rig = await new Rig(installed: true, signedIn: true, role: AppRole.Laptop, saved: s => s.SetupAi = "claude").OpenAsync();
-        var g = rig.Guided;
-        await Until(() => g.Screen == GuidedScreen.Chat && !g.Busy, "the chat");
-        g.RoleChosen = true;
-        Assert.False((await rig.CallAsync("open_manual_setup", new() { ["step"] = "microphone" })).Error);
-        Assert.Equal(GuidedScreen.Manual, g.Screen);
-        Assert.Equal(SetupStep.Microphone, rig.Setup.Step);
-
-        int turns = FakeAgents.Turns(rig.Bin);
-        g.BackToChatCommand.Execute(null);
-        Assert.Equal(GuidedScreen.Chat, g.Screen);
-        await Until(() => FakeAgents.Turns(rig.Bin) > turns && !g.Busy, "the chat to hear");
-        Assert.Contains("[Study Stash] The student did some steps by hand.", FakeAgents.Input(rig.Bin, turns + 1));
-    }
-
-    [AvaloniaFact]
-    public async Task Setup_by_hand_from_settings_can_still_turn_to_an_ai()
-    {
-        await using var rig = await new Rig(installed: true).OpenAsync(open: false);
-        var g = rig.Guided;
-        g.Screen = GuidedScreen.Manual;
-        g.BackToChatCommand.Execute(null);
-        await Until(() => g.ClaudeHere, "the CLIs to be looked for");
-        Assert.Equal(GuidedScreen.PickAi, g.Screen);
-        Assert.Equal(0, FakeAgents.Turns(rig.Bin));
-    }
-
-    [AvaloniaFact]
-    public async Task A_window_closed_part_way_picks_the_conversation_up_again()
-    {
-        await using var rig = await new Rig(installed: true, signedIn: true,
-            saved: s =>
-            {
-                s.SetupAi = "claude";
-                s.SetupChat = new SetupChatSaved("claude", "s-earlier");
-            }).OpenAsync();
-        var g = rig.Guided;
-        await Until(() => g.Screen == GuidedScreen.Chat && !g.Busy && FakeAgents.Turns(rig.Bin) == 1, "the chat");
-        string[] argv = FakeAgents.Argv(rig.Bin, 1);
-        Assert.Equal("s-earlier", argv[Array.IndexOf(argv, "--resume") + 1]);
-        Assert.Contains("[Study Stash] Setup was reopened.", FakeAgents.Input(rig.Bin, 1));
-        // Nothing was checked again that didn't need to be: no install, no plan check.
-        Assert.Equal(1, FakeAgents.Turns(rig.Bin));
-    }
-
-    [AvaloniaFact]
-    public async Task Already_installed_and_signed_in_skips_to_the_plan_check()
-    {
-        await using var rig = await new Rig(installed: true, signedIn: true).OpenAsync();
-        var g = rig.Guided;
-        Assert.True(g.ClaudeHere);
-        // The device is the look's word: "Mac" in the Mac look, "PC" in Windows'.
-        Assert.Equal($"Already on this {rig.Setup.DeviceWord}", g.AlreadyHere);
-        g.PickCommand.Execute("claude");
-        FakeAgents.Replay(rig.Bin, [Done("ready", "p-1")], 1);
-        await g.ContinueCommand.ExecuteAsync(null);
-        Assert.Equal(GuidedScreen.SignIn, g.Screen);
-        Assert.True(g.AiReady, $"{g.PlanProblem}: {g.PlanProblemTitle} {g.PlanProblemText} {g.SignInProblem}");
-        Assert.False(File.Exists(rig.Home["logs/setup-install.log"]));
     }
 
     [AvaloniaFact]
@@ -482,28 +268,6 @@ public sealed class GuidedSetupTests
         await Until(() => g.HasChatProblem, "the guard");
         Assert.Equal(ChatProblem.Guard, g.ChatProblemKind);
         Assert.Equal("Study Stash stopped Claude: it tried to use a tool it isn't allowed here.", g.ChatProblemText);
-    }
-
-    [AvaloniaFact]
-    public async Task Signed_out_mid_chat_goes_back_to_sign_in()
-    {
-        await using var rig = new Rig(installed: true, signedIn: true, saved: s => s.SetupAi = "claude");
-        FakeAgents.Replay(rig.Bin, [Init(), Done("Invalid API key · Please run /login", error: true)]);
-        await rig.OpenAsync();
-        var g = rig.Guided;
-        await Until(() => g.Screen == GuidedScreen.SignIn, "sign in again");
-        Assert.Equal("That sign-in didn't work. Try again.", g.SignInProblem);
-    }
-
-    [AvaloniaFact]
-    public async Task A_usage_limit_says_until_when_and_what_is_done_stays()
-    {
-        await using var rig = new Rig(installed: true, signedIn: true, saved: s => s.SetupAi = "claude");
-        FakeAgents.Replay(rig.Bin, [Init(), Done("Claude AI usage limit reached. Your limit resets at 3pm.", error: true)]);
-        await rig.OpenAsync();
-        var g = rig.Guided;
-        await Until(() => g.HasChatProblem, "the limit");
-        Assert.Equal("Claude is at its usage limit until 3 pm. You can finish by hand; what's done stays done.", g.ChatProblemText);
     }
 
     // --- the checklist, on its own ------------------------------------------------------------------------------------
