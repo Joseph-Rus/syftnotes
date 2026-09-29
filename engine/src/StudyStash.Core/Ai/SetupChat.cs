@@ -336,7 +336,7 @@ public static partial class SetupChat
         var stderr = proc.StandardError.ReadToEndAsync(CancellationToken.None);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(t.Timeout);
-        var parser = new SetupChatParser(t.Provider);
+        var parser = new SetupChatParser(t.Provider) { ExpectTools = t.McpUrl.Length > 0 };
         bool ended = false, timedOut = false;
         try
         {
@@ -465,6 +465,7 @@ public static partial class SetupChat
             "set_notes_writer" => Arg("engine") switch
             {
                 "none" => "Turned notes off for now",
+                "claude" or "codex" => $"{AgentCli.Get(Arg("engine")).Brand} writes your notes",
                 { Length: > 0 } e => $"{Engines.Name(e)} writes your notes",
                 _ => "Set who writes your notes",
             },
@@ -493,6 +494,8 @@ public sealed class SetupChatParser(string provider)
     bool sawText;
     readonly StringBuilder lastMessage = new();
 
+    /// <summary>The turn was given the setup tools (the plan check has none): then not reaching them is a problem.</summary>
+    public bool ExpectTools { get; init; } = true;
     /// <summary>The AI's last message this turn (its answer).</summary>
     public string Last => lastMessage.ToString().Trim();
     /// <summary>It said something or finished: a stray line on its error output doesn't make that a failure.</summary>
@@ -543,7 +546,7 @@ public sealed class SetupChatParser(string provider)
                     yield break;
                 }
             }
-            if (e["mcp_server_errors"] is JsonArray { Count: > 0 } || e["mcp_servers"] is JsonArray && !connected)
+            if (ExpectTools && (e["mcp_server_errors"] is JsonArray { Count: > 0 } || e["mcp_servers"] is JsonArray && !connected))
                 yield return SetupChatEvent.Trouble(ChatProblem.Tools, "Claude couldn't connect to Study Stash's setup tools.");
         }
         else if (type == "stream_event" && e["parent_tool_use_id"] is null)
@@ -636,7 +639,7 @@ public sealed class SetupChatParser(string provider)
                 if (type == "item.started")
                 {
                     var args = item?["arguments"] is JsonValue text && text.GetValueKind() == JsonValueKind.String
-                        ? Parse(text.GetValue<string>()) : item?["arguments"];
+                        ? ParseJson(text.GetValue<string>()) : item?["arguments"];
                     yield return new SetupChatEvent("Tool") { Tool = tool, Chip = SetupChat.Chip(tool, args) };
                 }
             }
@@ -662,7 +665,7 @@ public sealed class SetupChatParser(string provider)
         }
     }
 
-    static JsonNode? Parse(string json)
+    static JsonNode? ParseJson(string json)
     {
         try
         {
