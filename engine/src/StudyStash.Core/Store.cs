@@ -405,6 +405,62 @@ public sealed partial class Store : IDisposable
         }
     }
 
+    /// <summary>Up to <paramref name="limit"/> lecture ids after <paramref name="after"/> (from the first when null), in
+    /// id order: every lecture, filed or still being written. Only the ids, so a page of a big library is cheap.</summary>
+    public List<string> NoteIds(string? after, int limit)
+    {
+        lock (gate)
+        {
+            var ids = new List<string>();
+            using var cmd = after is null
+                ? Command("SELECT id FROM notes ORDER BY id LIMIT ?", (long)limit)
+                : Command("SELECT id FROM notes WHERE id > ? ORDER BY id LIMIT ?", after, (long)limit);
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) ids.Add(r.GetString(0));
+            return ids;
+        }
+    }
+
+    /// <summary>How many lectures there are, filed or still being written.</summary>
+    public int NoteCount()
+    {
+        lock (gate)
+        {
+            using var cmd = Command("SELECT COUNT(*) FROM notes");
+            return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    /// <summary>Every lecture's note file, as the index has it.</summary>
+    public List<string> NoteFiles()
+    {
+        lock (gate)
+        {
+            var paths = new List<string>();
+            using var cmd = Command("SELECT md_path FROM notes WHERE md_path IS NOT NULL AND md_path != ''");
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) paths.Add(r.GetString(0));
+            return paths;
+        }
+    }
+
+    /// <summary>
+    /// A lecture brought over from another library (<see cref="LibraryMove"/>), filed as it was there: its row and
+    /// passages the way <see cref="Save"/> makes them, and its note file exactly as that library had it (a note edited
+    /// by hand or by the AI keeps its edits) rather than written afresh. False, with nothing touched, when a lecture
+    /// with its id is here already.
+    /// </summary>
+    public bool Import(Meeting m, Classification c, string summaryMd, string summaryModel, string error, string? noteText)
+    {
+        lock (gate)
+        {
+            if (Get(m.Id) is not null) return false;
+            string path = Save(m, c, summaryMd, summaryModel, error);
+            if (!string.IsNullOrEmpty(noteText)) File.WriteAllText(path, noteText, new System.Text.UTF8Encoding(false));
+            return true;
+        }
+    }
+
     public string ClassDir(string? className)
     {
         lock (gate)

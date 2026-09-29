@@ -129,6 +129,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string RoleWords { get; set; } = "";
     public bool IsLaptopRole => host.Settings.Role == AppRole.Laptop;
     public bool IsLibraryRole => host.Settings.Role != AppRole.Laptop;
+    /// <summary>"Use just this computer"'s line under its name: what it does, naming the library it would stop using.</summary>
+    [ObservableProperty] public partial string JustThisComputerLine { get; set; } = "";
     [ObservableProperty] public partial bool ConfirmingBecomeLibrary { get; set; }
     [ObservableProperty] public partial string BecomeLibraryQuestion { get; set; } = "";
     [ObservableProperty] public partial bool ConfirmingBecomeLaptop { get; set; }
@@ -136,6 +138,33 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial string BecomeLaptopPassword { get; set; } = "";
     [ObservableProperty] public partial string? SwitchSay { get; set; }
     [ObservableProperty] public partial bool Switching { get; set; }
+    /// <summary>While a library is brought over (or handed on): what's happening now, "Bringing lectures over: 40 of
+    /// 140…".</summary>
+    [ObservableProperty] public partial string? BringLine { get; set; }
+    /// <summary>How far that part has got, 0 to 1; below 0 while it can't say.</summary>
+    [ObservableProperty] public partial double BringFraction { get; set; } = -1;
+    public bool ShowBringBar => Switching && BringFraction >= 0;
+    public double BringBarWidth => Math.Clamp(BringFraction, 0, 1) * 480;
+    partial void OnBringFractionChanged(double value)
+    {
+        OnPropertyChanged(nameof(ShowBringBar));
+        OnPropertyChanged(nameof(BringBarWidth));
+    }
+    partial void OnSwitchingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowBringBar));
+        OnPropertyChanged(nameof(ShowPendingBring));
+    }
+    /// <summary>This computer is the library, and an old library's lectures haven't all come over yet (bringing them
+    /// stopped part-way, or setup made this the library): the row that says so, with Try again.</summary>
+    [ObservableProperty] public partial bool HasPendingBring { get; set; }
+    /// <summary>That row, except while something is being brought over (the progress line says how it's going).</summary>
+    public bool ShowPendingBring => HasPendingBring && !Switching;
+    partial void OnHasPendingBringChanged(bool value) => OnPropertyChanged(nameof(ShowPendingBring));
+    [ObservableProperty] public partial string PendingBringTitle { get; set; } = "";
+    [ObservableProperty] public partial string PendingBringLine { get; set; } = "";
+    /// <summary>"Try again" once bringing them has been tried; "Bring them over" before.</summary>
+    [ObservableProperty] public partial string PendingBringAction { get; set; } = "";
 
     // Recording
     public ObservableCollection<ModelChoice> Models { get; } = [];
@@ -212,6 +241,17 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public SettingsModel WithLibraryHere(Func<LibraryHere> here)
     {
         libraryHere = here;
+        return this;
+    }
+
+    /// <summary>How bringing a library over (or handing one on) reaches each library: the network, unless a test gives
+    /// its own (an old library "on another computer" that's really on this one).</summary>
+    Func<string, HttpClient>? libraryHttp;
+
+    /// <summary>For a test: bringing a library over reaches each address through <paramref name="http"/>.</summary>
+    public SettingsModel WithLibraryHttp(Func<string, HttpClient> http)
+    {
+        libraryHttp = http;
         return this;
     }
 
@@ -422,12 +462,18 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             LibraryServiceState.Failed => $"It stopped: {host.LocalLibrary.Failure}",
             _ => "Stopped.",
         };
+        var old = host.Settings.Role == AppRole.Laptop ? RoleSwitch.OldLibraryOf(host) : null;
         RoleWords = host.Settings.Role switch
         {
+            AppRole.Laptop when old is not null => $"This {device} is a laptop: it records lectures and sends them to {OldName(old)} on {RoleSwitch.ComputerOf(old.Url)}.",
             AppRole.Laptop => $"This {device} is a laptop: it records lectures and sends them to your library.",
             AppRole.Library => $"This {device} is your library: it keeps and writes up lectures, but doesn't record its own.",
             _ => $"This {device} records lectures and is your library, all in one place.",
         };
+        JustThisComputerLine = old is null
+            ? $"Keep your notes and classes on this {device}: it becomes your library and keeps recording."
+            : $"Stop using {OldName(old)} on {RoleSwitch.ComputerOf(old.Url)}: your classes and notes come to this {device}, which becomes your library and keeps recording. Nothing is deleted there.";
+        RefreshPending();
         OnPropertyChanged(nameof(IsLaptopRole));
         OnPropertyChanged(nameof(IsLibraryRole));
         OnPropertyChanged(nameof(CanStartLibrary));
@@ -574,8 +620,17 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [RelayCommand]
     async Task Connect()
     {
-        LibrarySay = "Connecting…";
         string url = Setup.NormalizeAddress(Address);
+        // This computer is the library: sending to another one instead would hide its lectures here, so that's
+        // Become a laptop, which hands everything over first.
+        if (host.Settings.Role != AppRole.Laptop && url.Length > 0 && RoleSwitch.Elsewhere(host, url))
+        {
+            BecomeLaptopAddress = url;
+            BecomeLaptopPassword = Password;
+            LibrarySay = $"This {Device} is your library. To use the one at {url} instead, press Become a laptop under This computer: everything here goes there first, so nothing is left behind.";
+            return;
+        }
+        LibrarySay = "Connecting…";
         try
         {
             var health = await LibraryApi.CheckServerAsync(url, Password.Trim());
@@ -613,34 +668,29 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         if (host.LocalLibrary is { } svc) await svc.StopAsync();
     }
 
-    /// <summary>A plain laptop decides, from Settings, to also run the library on this computer.</summary>
+    static string Device => OperatingSystem.IsWindows() ? "PC" : "Mac";
+
+    static string OldName(OldLibrary old) => old.Name.Length > 0 ? old.Name : "your library";
+
+    /// <summary>The library pages' way in for a laptop: Connection, with "Use just this computer" asked.</summary>
     [RelayCommand]
-    async Task MakeThisTheLibrary()
+    void GoJustThisComputer()
     {
-        LibrarySay = "Starting your library…";
-        try
-        {
-            // A library that was here before comes back with its own name, password and notes.
-            bool had = Services.LibraryHere.Existing(host.Home) is not null;
-            string done = await Services.LibraryHere.ThisComputer().CreateAsync(host, had ? null : $"{DisplayName}'s library", null, DisplayName);
-            LibraryHere = true;
-            LibrarySay = done;
-        }
-        catch (Exception e) when (e is InvalidOperationException or ArgumentException)
-        {
-            LibrarySay = e.Message;
-        }
+        Section = "Connection";
+        AskBecomeLibrary();
     }
 
-    /// <summary>A laptop asks to switch its role fully: become the library too, taking over whatever it was connected
-    /// to before.</summary>
+    /// <summary>"Use just this computer": a laptop asks to keep everything on this computer, which becomes the library
+    /// too (and keeps recording), bringing over the library it used. It says what will happen before anything does.</summary>
     [RelayCommand]
     void AskBecomeLibrary()
     {
         var old = RoleSwitch.OldLibraryOf(host);
         BecomeLibraryQuestion = old is null
-            ? "This computer keeps recording, and becomes your library too: its own place for notes, classes and settings."
-            : $"This computer keeps recording, and becomes your library too. {old.Name}'s lectures come over first, as they are; {old.Name} keeps its own copy.";
+            ? $"This {Device} keeps recording, and becomes your library too: its own place for notes, classes and settings."
+            : $"{OldName(old)} on {RoleSwitch.ComputerOf(old.Url)} keeps its own copy. Classes and notes come here: every lecture with its notes and transcript, "
+              + $"the files you attached, your classes with their other names and Canvas courses, and your chats. Then this {Device} is your library, and keeps recording. "
+              + $"A big library takes a while; if it stops part-way, what came stays and you can try again.";
         ConfirmingBecomeLibrary = true;
         SwitchSay = null;
     }
@@ -648,19 +698,26 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [RelayCommand] void CancelBecomeLibrary() => ConfirmingBecomeLibrary = false;
 
     /// <summary>The student said yes: this computer becomes the library (taking over the old one's name and password
-    /// when it has none of its own), then brings over whatever it was connected to before, if anything.</summary>
+    /// when it has none of its own), then brings over everything in the library it used, if any, saying how far it's
+    /// got and, at the end, what came. A problem bringing things over (the old library's offline, say) never undoes
+    /// the switch: it's said in plain words, and Try again picks up where it stopped.</summary>
     [RelayCommand]
     async Task ConfirmBecomeLibrary()
     {
         Switching = true;
-        SwitchSay = "Setting up your library…";
+        SwitchSay = null;
+        BringFraction = -1;
+        BringLine = $"Making this {Device} your library…";
         try
         {
             var old = RoleSwitch.OldLibraryOf(host);
             string done = await RoleSwitch.ToLibraryAsync(host, libraryHere(), old, DisplayName);
             LibraryHere = true;
             ConfirmingBecomeLibrary = false;
-            SwitchSay = old is null ? done : done + " " + await BroughtSafelyAsync(old);
+            Refresh();
+            // What the switch remembered: whether the library here is new, so it takes the old one's notes settings too.
+            var bring = RoleSwitch.Pending(host.Home) ?? old;
+            SwitchSay = bring is null ? done : done + " " + await BringAsync(bring);
         }
         catch (Exception e) when (e is InvalidOperationException or ArgumentException)
         {
@@ -669,21 +726,97 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         finally
         {
             Switching = false;
+            BringLine = null;
+            BringFraction = -1;
+            Refresh();
         }
     }
 
-    /// <summary>Bringing lectures over never blocks becoming the library: a problem (the old one's offline, say) is
-    /// said in plain words, not thrown.</summary>
-    async Task<string> BroughtSafelyAsync(OldLibrary old)
+    /// <summary>Try again (or, after setup, Bring them over): whatever hasn't come over from the old library yet.</summary>
+    [RelayCommand]
+    async Task BringAgain()
     {
+        if (RoleSwitch.Pending(host.Home) is not { } old) return;
+        Switching = true;
+        SwitchSay = null;
         try
         {
-            return await RoleSwitch.BringLecturesAsync(host, old);
+            SwitchSay = await BringAsync(old);
+        }
+        finally
+        {
+            Switching = false;
+            BringLine = null;
+            BringFraction = -1;
+            Refresh();
+        }
+    }
+
+    /// <summary>The student would rather leave them where they are (that library is gone for good, say): the row goes,
+    /// and nothing anywhere is deleted.</summary>
+    [RelayCommand]
+    void LeaveThemThere()
+    {
+        if (RoleSwitch.Pending(host.Home) is { } old) SwitchSay = $"OK: what didn't come over stays on {OldName(old)}, as it is.";
+        RoleSwitch.Forget(host.Home);
+        RefreshPending();
+    }
+
+    /// <summary>Brings <paramref name="old"/> over, saying how far it's got; returns what came, or (it stopped) why and
+    /// that Try again picks up where it stopped. Never throws for a library that can't be reached.</summary>
+    async Task<string> BringAsync(OldLibrary old)
+    {
+        string who = OldName(old);
+        BringFraction = -1;
+        BringLine = $"Bringing your classes over from {who}…";
+        try
+        {
+            return await RoleSwitch.BringLecturesAsync(host, old, Progress, libraryHttp);
         }
         catch (InvalidOperationException e)
         {
-            return $"Couldn't bring {old.Name}'s lectures over yet: {e.Message} Try again from here any time.";
+            return $"Not everything from {who} has come over yet. {e.Message} What came is safe here, and {who} still has everything: press Try again when it can be reached.";
         }
+    }
+
+    void Progress(MoveProgress p) => ShowProgress(p, sending: false);
+
+    void SendProgress(MoveProgress p) => ShowProgress(p, sending: true);
+
+    /// <summary>How far bringing (or handing on) a library has got, on the window's thread, while it's going.</summary>
+    void ShowProgress(MoveProgress p, bool sending)
+    {
+        void Show()
+        {
+            if (!Switching) return; // it's over: a late word about it would stay up
+            BringFraction = p.Total > 0 ? (double)p.Done / p.Total : -1;
+            string counted = p.Total > 0 ? $": {p.Done} of {p.Total}…" : "…";
+            BringLine = (p.Stage, sending) switch
+            {
+                (LibraryMove.AttachmentsStage, false) => "Bringing attached files over" + counted,
+                (LibraryMove.FilesStage, false) => "Bringing your other notes and files over" + counted,
+                (_, false) => "Bringing lectures over" + counted,
+                (LibraryMove.AttachmentsStage, true) => "Sending attached files" + counted,
+                (LibraryMove.FilesStage, true) => "Sending your other notes and files" + counted,
+                _ => "Sending lectures" + counted,
+            };
+        }
+        if (Dispatcher.UIThread.CheckAccess()) Show();
+        else Dispatcher.UIThread.Post(Show);
+    }
+
+    /// <summary>The row for an old library whose lectures haven't all come over: shown on a computer that's the library.</summary>
+    void RefreshPending()
+    {
+        var waiting = host.Settings.Role != AppRole.Laptop ? RoleSwitch.Pending(host.Home) : null;
+        HasPendingBring = waiting is not null;
+        if (waiting is null) return;
+        string who = OldName(waiting);
+        PendingBringTitle = waiting.Tried ? $"Not everything from {who} has come over yet" : $"Your classes and notes are still on {who}";
+        PendingBringLine = waiting.Tried
+            ? $"What came is safe on this {Device}, and {who} still has everything. Try again once {RoleSwitch.ComputerOf(waiting.Url)} is on and reachable: only what's missing comes."
+            : $"Bring them to this {Device}: every lecture with its notes and transcript, your classes and files. {who} keeps its own copy.";
+        PendingBringAction = waiting.Tried ? "Try again" : "Bring them over";
     }
 
     /// <summary>A library (or a one-computer setup) asks to become a plain laptop, sending to another library.</summary>
@@ -701,17 +834,20 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     [RelayCommand] void CancelBecomeLaptop() => ConfirmingBecomeLaptop = false;
 
-    /// <summary>The student said yes: this library's lectures go to the new one first, so nothing is left behind,
+    /// <summary>The student said yes: everything in this library goes to the new one first, so nothing is left behind,
     /// then this computer stops being the library and becomes a laptop that sends to it. Nothing changes if either
-    /// step fails: the library here keeps running, ready to be tried again.</summary>
+    /// step fails (or the other library is too old to take everything): the library here keeps running, ready to be
+    /// tried again.</summary>
     [RelayCommand]
     async Task ConfirmBecomeLaptop()
     {
         Switching = true;
-        SwitchSay = "Sending your lectures…";
+        SwitchSay = null;
+        BringFraction = -1;
+        BringLine = "Sending your lectures…";
         try
         {
-            string sent = await RoleSwitch.HandOffLecturesAsync(host, BecomeLaptopAddress, BecomeLaptopPassword);
+            string sent = await RoleSwitch.HandOffLecturesAsync(host, BecomeLaptopAddress, BecomeLaptopPassword, SendProgress, libraryHttp);
             string done = await RoleSwitch.ToLaptopAsync(host, BecomeLaptopAddress, BecomeLaptopPassword);
             LibraryHere = false;
             ConfirmingBecomeLaptop = false;
@@ -724,6 +860,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         finally
         {
             Switching = false;
+            BringLine = null;
+            BringFraction = -1;
+            Refresh();
         }
     }
 

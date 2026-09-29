@@ -151,6 +151,10 @@ public sealed class LibraryHere
         host.UseLocalLibrary(svc);
         host.Save(s => s.Role = role);
         var cc = host.Client();
+        // A laptop that sent to a library on another computer: everything in that library is still to come here, and
+        // is remembered until it has (Settings → Connection brings it over, and says so while it hasn't).
+        if (cc.ServerUrl.Length > 0 && RoleSwitch.Elsewhere(host, cc.ServerUrl))
+            RoleSwitch.Remember(host.Home, new OldLibrary(cc.ServerUrl, cc.PoolKey, cc.PoolName, Fresh: existing is null));
         cc.ServerUrl = $"http://127.0.0.1:{cfg.WebPort}";
         cc.PoolKey = cfg.PoolPassword;
         cc.PoolName = cfg.PoolName;
