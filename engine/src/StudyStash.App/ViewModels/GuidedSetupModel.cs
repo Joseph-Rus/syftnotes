@@ -541,12 +541,14 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         await CheckPlanAsync();
     }
 
-    /// <summary>"Didn't open? Open it again": the page the sign-in printed, or the sign-in once more.</summary>
+    /// <summary>"Didn't open? Open it again": Codex's printed page finishes signing in by itself, so that page opens
+    /// again; Claude Code's ends on a code to paste (there's no field for it here), so its sign-in runs once more and
+    /// opens the page that finishes by itself.</summary>
     [RelayCommand]
     void OpenAgain()
     {
-        if (signIn?.Url is { } url) services.OpenUrl(url);
-        else signIn?.Start();
+        if (Cli.Id == "codex" && signIn?.Url is { } url) services.OpenUrl(url);
+        else signIn?.Restart();
     }
 
     /// <summary>"Sign in in Terminal instead": the same sign-in in a terminal window; the checks carry on.</summary>
