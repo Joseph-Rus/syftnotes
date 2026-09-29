@@ -80,6 +80,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     string lastPrompt = "";
     string? question;
     bool chatStarted, opened;
+    /// <summary>Codex's plan check worked only with the student's own config.toml read (its sign-in is kept there): the
+    /// chat's turns read it too, or each would say the sign-in didn't work.</summary>
+    bool keepUserConfig;
 
     public GuidedSetupModel(SetupModel setup, GuidedServices services, Func<AppSettings> settings, Action<Action<AppSettings>> save)
     {
@@ -422,6 +425,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         StopWork();
         Picked = Other.Id;
         save(s => s.SetupAi = Picked);
+        session = ""; // the other AI can't carry on this one's conversation
         ResetSignIn();
         if (Found.Works) await ToSignInAsync();
         else ToInstall();
@@ -485,6 +489,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         signIn?.Dispose();
         signIn = null;
+        keepUserConfig = false;
         SignedIn = false;
         AiReady = false;
         WaitingSignIn = false;
@@ -536,12 +541,14 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         await CheckPlanAsync();
     }
 
-    /// <summary>"Didn't open? Open it again": the page the sign-in printed, or the sign-in once more.</summary>
+    /// <summary>"Didn't open? Open it again": Codex's printed page finishes signing in by itself, so that page opens
+    /// again; Claude Code's ends on a code to paste (there's no field for it here), so its sign-in runs once more and
+    /// opens the page that finishes by itself.</summary>
     [RelayCommand]
     void OpenAgain()
     {
-        if (signIn?.Url is { } url) services.OpenUrl(url);
-        else signIn?.Start();
+        if (Cli.Id == "codex" && signIn?.Url is { } url) services.OpenUrl(url);
+        else signIn?.Restart();
     }
 
     /// <summary>"Sign in in Terminal instead": the same sign-in in a terminal window; the checks carry on.</summary>
@@ -568,6 +575,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         if (cts.IsCancellationRequested) return;
         if (check.Ok)
         {
+            keepUserConfig = check.KeptConfig;
             AiReady = true;
             return;
         }
@@ -682,7 +690,13 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>One turn: one run of the CLI with the prompt, its words and tools shown as they come.</summary>
     async Task RunTurnAsync(string prompt)
     {
-        if (Found.Exe is not { } exe || Door is not { } door) return;
+        if (Found.Exe is not { } exe) return;
+        if (Door is not { } door)
+        {
+            // The setup tools' door didn't open (the window logged why): say so, with the way out beside it.
+            ShowTrouble(ChatProblem.Tools, "The setup tools' door isn't open.");
+            return;
+        }
         Busy = true;
         ChatProblemText = null;
         ChatProblemKind = ChatProblem.None;
@@ -694,7 +708,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         var turn = new SetupTurn
         {
             Provider = Cli.Id, Exe = exe, Version = Found.Version, WorkDir = work, BriefFile = brief, McpUrl = door.Url, Token = door.Token,
-            Session = session, Prompt = prompt, Windows = services.Windows,
+            Session = session, Prompt = prompt, Windows = services.Windows, IgnoreUserConfig = !keepUserConfig,
         };
         var ai = new AiEntry(Brand);
         bool shown = false;
@@ -826,6 +840,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public void Skip(string step)
     {
         skipped.Add(step);
+        // Setup's Finish turns start at login on when its box is ticked (a library that was here before ticks it): left
+        // for later means it stays as it is.
+        if (step == "start_at_login") Setup.StartAtLogin = false;
         Refresh();
     }
 

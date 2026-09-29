@@ -122,8 +122,9 @@ public class AiTests
         Assert.StartsWith("brief", codex.Input(req));
         Assert.EndsWith(prompt, codex.Input(req));
         var resumed = codex.Command(req with { Session = "t1" }, stream: false);
-        Assert.Equal(new[] { "exec", "resume", "t1" }, resumed.Skip(1).Take(3));
-        Assert.Equal("-", resumed[^1]);
+        // -C and -s are exec's own options, which `resume` turns away: they come before it.
+        Assert.Equal(new[] { "resume", "t1", "-" }, resumed.TakeLast(3));
+        Assert.True(resumed.IndexOf("-C") < resumed.IndexOf("resume") && resumed.IndexOf("-s") < resumed.IndexOf("resume"));
         Assert.Equal("-", new OllamaProvider { PromptOnInput = true }.Command(req, stream: false)[^1]);
 
         // Antigravity keeps its prompt on the command line.

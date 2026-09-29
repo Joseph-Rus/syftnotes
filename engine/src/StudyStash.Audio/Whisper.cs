@@ -6,14 +6,38 @@ using Whisper.net;
 
 namespace StudyStash.Audio;
 
-/// <summary>A Whisper model Study Stash can download (whisper.cpp's files on Hugging Face).</summary>
+/// <summary>Which program reads a model's files.</summary>
+public enum SpeechEngine { Whisper, Parakeet }
+
+/// <summary>One file of a model that comes as several: its name in the model's folder, its size and its SHA-256.</summary>
+public sealed record ModelPart(string Name, long Bytes, string Sha256);
+
+/// <summary>
+/// A speech-to-text model Study Stash can download: a Whisper model (whisper.cpp's files on Hugging Face) or
+/// Parakeet, which is a folder of several files (the name is from the first model there was).
+/// </summary>
 public sealed record WhisperModel(string Id, string Name, string File, long Bytes, string Sha256, string About)
 {
-    public string Url => $"https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{File}";
+    public SpeechEngine Engine { get; init; }
+
+    /// <summary>Where the files are: Hugging Face's address up to the file's name.</summary>
+    public string Source { get; init; } = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
+
+    /// <summary>The files, when the model is a folder called <see cref="File"/> of several; null for one file.</summary>
+    public IReadOnlyList<ModelPart>? Parts { get; init; }
+
+    /// <summary>Every file the model is made of.</summary>
+    public IReadOnlyList<ModelPart> Files => Parts ?? [new ModelPart(File, Bytes, Sha256)];
+
+    public string Url => UrlOf(Files[0], null);
 
     /// <summary>Where it downloads from: Hugging Face, or <c>{mirror}/{file}</c> when a mirror is given (the
     /// self-test's own).</summary>
-    public string UrlFrom(string? mirror) => mirror is { Length: > 0 } m ? $"{m.TrimEnd('/')}/{File}" : Url;
+    public string UrlFrom(string? mirror) => UrlOf(Files[0], mirror);
+
+    /// <summary>Where one of its files downloads from.</summary>
+    public string UrlOf(ModelPart part, string? mirror) =>
+        mirror is { Length: > 0 } m ? $"{m.TrimEnd('/')}/{part.Name}" : $"{Source}/{part.Name}";
 
     /// <summary>"3.1 GB", "550 MB".</summary>
     public string Size => SizeOf(Bytes);
@@ -33,6 +57,25 @@ public static class WhisperModels
         "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69", "More accurate than the compact one, and heavier: it wants a Mac with Apple silicon or a PC with a graphics card.");
     public static readonly WhisperModel LargeV3TurboSmall = new("large-v3-turbo-q5", "Whisper large-v3 turbo (compact)", "ggml-large-v3-turbo-q5_0.bin", 574041195,
         "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2", "large-v3 turbo in a third of the space. Keeps up with a lecture on most computers and leaves room for everything else.");
+    /// <summary>NVIDIA's Parakeet TDT v3 at full precision (its 8-bit file is a fifth the size and about as accurate as
+    /// Whisper base on a lecture from a laptop's microphone, so it isn't offered). It was measured against large-v3
+    /// on two recorded lectures: 17% and 7% of words different, where the compact turbo differs on 13% and 6% and
+    /// Whisper small on 20% and 9%.</summary>
+    public static readonly WhisperModel Parakeet = new("parakeet-v3", "NVIDIA Parakeet v3", "parakeet-tdt-0.6b-v3", 2549800429, "",
+        "Nearly as accurate as the compact turbo, and quick on the processor alone: it doesn't need a graphics card. Writes whole sentences and never makes up words over silence. Reads English and 24 other European languages.")
+    {
+        Engine = SpeechEngine.Parakeet,
+        Source = "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3/resolve/main",
+        // The small files first, so a wrong address or a full disk shows before the gigabytes.
+        Parts =
+        [
+            new("tokens.txt", 93939, "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"),
+            new("joiner.onnx", 25286330, "b9b0bcf88ac571902e69a6536223ed2d94885e981b85045410f1403d53121a63"),
+            new("decoder.onnx", 47233743, "d593cdb0e571f5a457ec2219af9968cbf6b0e8198e8f7839b40a8754593bf68c"),
+            new("encoder.onnx", 41766257, "3eed7ce424bf8339ad09233533c687e2dbd07e74ccf5027b5e7344019ea373b0"),
+            new("encoder.weights", 2435420160, "3af3f51af5f2d01dbbf5af47d42c7962a2c205f11004254bb4f2b979862f39a8"),
+        ],
+    };
     public static readonly WhisperModel Small = new("small", "Whisper small", "ggml-small.bin", 487601967,
         "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b", "Quick on any processor. Misses more names and terms than the large ones.");
     public static readonly WhisperModel Base = new("base", "Whisper base", "ggml-base.bin", 147951465,
@@ -41,8 +84,9 @@ public static class WhisperModels
     public static readonly WhisperModel Tiny = new("tiny", "Whisper tiny", "ggml-tiny.bin", 77691713,
         "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21", "For trying things out.");
 
-    /// <summary>Every model, heaviest (and most accurate) first.</summary>
-    public static readonly IReadOnlyList<WhisperModel> All = [LargeV3, LargeV3Turbo, LargeV3TurboSmall, Small, Base, Tiny];
+    /// <summary>Every model, heaviest first (Parakeet asks less of the processor than the compact turbo, but more
+    /// memory; it sits below it, where a computer that keeps up with the compact turbo keeps up with it).</summary>
+    public static readonly IReadOnlyList<WhisperModel> All = [LargeV3, LargeV3Turbo, LargeV3TurboSmall, Parakeet, Small, Base, Tiny];
 
     public static WhisperModel? Find(string id) => All.FirstOrDefault(m => m.Id == id);
 
@@ -125,12 +169,40 @@ public static class WhisperModels
 
     public static string Dir(string home) => Path.Combine(home, "models");
 
+    /// <summary>The model's file, or its folder when it's several files.</summary>
     public static string PathFor(string home, WhisperModel m) => Path.Combine(Dir(home), m.File);
 
-    public static bool IsDownloaded(string home, WhisperModel m)
+    /// <summary>Where one of the model's files is.</summary>
+    public static string PathOf(string home, WhisperModel m, ModelPart part) =>
+        m.Parts is null ? PathFor(home, m) : Path.Combine(PathFor(home, m), part.Name);
+
+    public static bool IsDownloaded(string home, WhisperModel m) =>
+        m.Files.All(p => new FileInfo(PathOf(home, m, p)) is { Exists: true } f && f.Length == p.Bytes);
+
+    /// <summary>How much of the model is on this computer: the files that are all here, and what came of the others'
+    /// downloads (their .part files).</summary>
+    public static long OnDisk(string home, WhisperModel m) => m.Files.Sum(p => OnDisk(home, m, p));
+
+    /// <summary>How much of one of the model's files is here: all of it, or what a stopped download left.</summary>
+    public static long OnDisk(string home, WhisperModel m, ModelPart part)
     {
-        var f = new FileInfo(PathFor(home, m));
-        return f.Exists && f.Length == m.Bytes;
+        string path = PathOf(home, m, part);
+        if (new FileInfo(path) is { Exists: true } f && f.Length == part.Bytes) return part.Bytes;
+        return new FileInfo(path + ".part") is { Exists: true } stopped ? Math.Min(stopped.Length, part.Bytes) : 0;
+    }
+
+    /// <summary>Delete the model and whatever came of its download. Throws IOException or UnauthorizedAccessException
+    /// when a file can't be removed.</summary>
+    public static void Delete(string home, WhisperModel m)
+    {
+        foreach (var p in m.Files)
+        {
+            string path = PathOf(home, m, p);
+            System.IO.File.Delete(path);
+            System.IO.File.Delete(path + ".part");
+        }
+        if (m.Parts is not null && Directory.Exists(PathFor(home, m)) && !Directory.EnumerateFileSystemEntries(PathFor(home, m)).Any())
+            Directory.Delete(PathFor(home, m));
     }
 }
 
@@ -167,37 +239,66 @@ public static class ModelDownload
     public const long Spare = 200_000_000;
 
     /// <summary>
-    /// Download <paramref name="m"/> (from <paramref name="url"/>, or Hugging Face), picking up from its .part file.
-    /// Progress is reported at once and then about once a second. Throws <see cref="NotEnoughSpaceException"/> when the
-    /// disk can't hold it, <see cref="InvalidDataException"/> (and forgets the .part) when what arrived isn't the model,
-    /// and HttpRequestException or IOException when the connection fails (the .part stays for next time).
+    /// Download <paramref name="m"/> (from <paramref name="url"/>, or Hugging Face; a model of several files comes from
+    /// Hugging Face, or <c>{mirror}/{file}</c>), picking up from the .part file of the one it stopped in. Progress is
+    /// reported at once and then about once a second, over all its files. Throws <see cref="NotEnoughSpaceException"/>
+    /// when the disk can't hold it, <see cref="InvalidDataException"/> (and forgets the .part) when what arrived isn't
+    /// the model, and HttpRequestException or IOException when the connection fails (the .part stays for next time).
     /// </summary>
     public static async Task<string> RunAsync(string home, WhisperModel m, IProgress<DownloadProgress>? progress = null,
-        CancellationToken stop = default, HttpClient? http = null, string? url = null, Func<string, long?>? freeBytes = null)
+        CancellationToken stop = default, HttpClient? http = null, string? url = null, Func<string, long?>? freeBytes = null,
+        string? mirror = null)
     {
-        string path = WhisperModels.PathFor(home, m), part = path + ".part", dir = Path.GetDirectoryName(path)!;
-        Directory.CreateDirectory(dir);
+        string path = WhisperModels.PathFor(home, m);
+        Directory.CreateDirectory(m.Parts is null ? Path.GetDirectoryName(path)! : path);
         if (WhisperModels.IsDownloaded(home, m)) return path;
+        if (m.Parts is not null)
+        {
+            // A folder of gigabytes: room for all of it is asked before the first file starts.
+            long needed = m.Bytes - WhisperModels.OnDisk(home, m) + Spare;
+            if ((freeBytes ?? Disk.FreeBytes)(path) is { } free && free < needed) throw new NotEnoughSpaceException(m, needed);
+        }
+        // What's done is the files before this one, this one so far, and what the files after it already have (a
+        // stopped download's .part files), so the count only ever goes up.
+        var files = m.Files;
+        long[] here = [.. files.Select(p => WhisperModels.OnDisk(home, m, p))];
+        long before = 0;
+        for (int i = 0; i < files.Count; i++)
+        {
+            await FileAsync(WhisperModels.PathOf(home, m, files[i]), files[i], m, before + here.Skip(i + 1).Sum(), progress, stop, http,
+                m.Parts is null ? url ?? m.UrlOf(files[i], mirror) : m.UrlOf(files[i], mirror), freeBytes);
+            before += files[i].Bytes;
+        }
+        return path;
+    }
+
+    /// <summary>One file of a model, <paramref name="before"/> bytes of the rest of the model already being here.</summary>
+    static async Task FileAsync(string path, ModelPart file, WhisperModel m, long before, IProgress<DownloadProgress>? progress,
+        CancellationToken stop, HttpClient? http, string url, Func<string, long?>? freeBytes)
+    {
+        string part = path + ".part", dir = Path.GetDirectoryName(path)!;
+        Directory.CreateDirectory(dir);
+        if (System.IO.File.Exists(path) && new FileInfo(path).Length == file.Bytes) return;
         using var sha = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         long have = System.IO.File.Exists(part) ? new FileInfo(part).Length : 0;
-        if (have > m.Bytes) have = 0;
+        if (have > file.Bytes) have = 0;
         if (have > 0) await HashAsync(part, sha, stop);
-        progress?.Report(new DownloadProgress(have, m.Bytes, 0));
-        if (have == m.Bytes)
+        progress?.Report(new DownloadProgress(before + have, m.Bytes, 0));
+        if (have == file.Bytes)
         {
             // All of it came before, and the app stopped before moving it into place: nothing to ask for.
-            if (Convert.ToHexStringLower(sha.GetHashAndReset()) == m.Sha256)
+            if (Convert.ToHexStringLower(sha.GetHashAndReset()) == file.Sha256)
             {
                 System.IO.File.Move(part, path, overwrite: true);
-                return path;
+                return;
             }
             System.IO.File.Delete(part);
             have = 0;
         }
-        long needed = m.Bytes - have + Spare;
+        long needed = file.Bytes - have + Spare;
         if ((freeBytes ?? Disk.FreeBytes)(dir) is { } free && free < needed) throw new NotEnoughSpaceException(m, needed);
 
-        var response = await SendAsync(http ?? Http, url ?? m.Url, have, stop);
+        var response = await SendAsync(http ?? Http, url, have, stop);
         if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable && have > 0)
         {
             // The server won't send from where the .part stops (its file changed?): start over, once.
@@ -205,8 +306,8 @@ public static class ModelDownload
             System.IO.File.Delete(part);
             have = 0;
             sha.GetHashAndReset();
-            progress?.Report(new DownloadProgress(0, m.Bytes, 0));
-            response = await SendAsync(http ?? Http, url ?? m.Url, 0, stop);
+            progress?.Report(new DownloadProgress(before, m.Bytes, 0));
+            response = await SendAsync(http ?? Http, url, 0, stop);
         }
         using (response)
         {
@@ -215,13 +316,13 @@ public static class ModelDownload
                 // The server sent the whole file again: start over.
                 have = 0;
                 sha.GetHashAndReset();
-                progress?.Report(new DownloadProgress(0, m.Bytes, 0));
+                progress?.Report(new DownloadProgress(before, m.Bytes, 0));
             }
             response.EnsureSuccessStatusCode();
             try
             {
                 await using var body = await response.Content.ReadAsStreamAsync(stop);
-                await using var file = new FileStream(part, have > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20);
+                await using var stream = new FileStream(part, have > 0 ? FileMode.Append : FileMode.Create, FileAccess.Write, FileShare.None, 1 << 20);
                 var buf = new byte[1 << 20];
                 long done = have, windowStart = have;
                 var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -229,7 +330,7 @@ public static class ModelDownload
                 int n;
                 while ((n = await body.ReadAsync(buf, stop)) > 0)
                 {
-                    await file.WriteAsync(buf.AsMemory(0, n), stop);
+                    await stream.WriteAsync(buf.AsMemory(0, n), stop);
                     sha.AppendData(buf, 0, n);
                     done += n;
                     if (clock.Elapsed.TotalSeconds >= 1)
@@ -238,27 +339,26 @@ public static class ModelDownload
                         rate = rate <= 0 ? now : rate * 0.7 + now * 0.3;
                         windowStart = done;
                         clock.Restart();
-                        progress?.Report(new DownloadProgress(done, m.Bytes, rate));
+                        progress?.Report(new DownloadProgress(before + done, m.Bytes, rate));
                     }
                 }
-                progress?.Report(new DownloadProgress(done, m.Bytes, rate));
+                progress?.Report(new DownloadProgress(before + done, m.Bytes, rate));
             }
             catch (IOException e) when (Disk.IsFull(e))
             {
                 long got = System.IO.File.Exists(part) ? new FileInfo(part).Length : 0;
-                throw new NotEnoughSpaceException(m, m.Bytes - got + Spare);
+                throw new NotEnoughSpaceException(m, file.Bytes - got + Spare);
             }
         }
         long length = new FileInfo(part).Length;
         // The connection closed early without saying so: what came is kept, and the next try asks for the rest.
-        if (length < m.Bytes) throw new IOException($"The {m.Name} download stopped before the end.");
-        if (length != m.Bytes || Convert.ToHexStringLower(sha.GetHashAndReset()) != m.Sha256)
+        if (length < file.Bytes) throw new IOException($"The {m.Name} download stopped before the end.");
+        if (length != file.Bytes || Convert.ToHexStringLower(sha.GetHashAndReset()) != file.Sha256)
         {
             System.IO.File.Delete(part);
             throw new InvalidDataException($"The {m.Name} download came out damaged; try again.");
         }
         System.IO.File.Move(part, path, overwrite: true);
-        return path;
     }
 
     static Task<HttpResponseMessage> SendAsync(HttpClient http, string url, long from, CancellationToken stop)

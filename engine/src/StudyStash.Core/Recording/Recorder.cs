@@ -655,6 +655,9 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     /// <summary>Why Whisper isn't writing lectures down ("Whisper couldn't start: …"); null while it works.</summary>
     public string? Problem { get; private set; }
 
+    /// <summary>What the messages call the model that writes lectures down (Whisper, or Parakeet).</summary>
+    public Func<string> EngineName { get; init; } = () => "Whisper";
+
     /// <summary>Keep Whisper in memory this long after its last piece of work (it's gigabytes).</summary>
     public TimeSpan KeepLoaded { get; set; } = TimeSpan.FromMinutes(3);
 
@@ -724,7 +727,7 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
                 if (isLive && n >= TriesPerPiece) return false;
                 if (n < TriesPerPiece) return true;
                 tries.TryRemove(l.Id, out _);
-                Fail(l.Id, $"Whisper couldn't write part of it down: {e.Message}");
+                Fail(l.Id, $"{EngineName()} couldn't write part of it down: {e.Message}");
                 return true;
             }
             usedAt = Clock();
@@ -774,7 +777,7 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
         {
             loadFailedAt = now;
             log($"[whisper] couldn't load the model: {e.Message}");
-            SetProblem($"Whisper couldn't start: {e.Message}");
+            SetProblem($"{EngineName()} couldn't start: {e.Message}");
             return null;
         }
         loadFailedAt = null;
