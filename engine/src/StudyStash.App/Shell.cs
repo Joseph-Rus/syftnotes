@@ -157,6 +157,8 @@ public static partial class Shell
         public static Task Search(string query) => SearchAsync(query);
         public static QuickModel QuickModel => quick;
         public static PanelModel PanelModel => panel;
+        /// <summary>The notifications on screen, newest first, and the display they're on.</summary>
+        public static ToastShelf Toasts => Shelf();
 
         /// <summary>Opens the dropdown the way clicking the real icon would (a Mac's status item; Windows' tray
         /// otherwise), and how far its centre landed from the icon's own, in points — the self-test's placement

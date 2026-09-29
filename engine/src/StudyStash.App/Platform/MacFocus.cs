@@ -20,8 +20,10 @@ public static class MacFocus
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern IntPtr SendPid(IntPtr receiver, IntPtr selector, int pid);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern byte SendOptions(IntPtr receiver, IntPtr selector, nuint options);
 
-    /// <summary>The app in front when the pointer came onto a notification (its process), unless that was this one.</summary>
+    /// <summary>The app in front when the pointer came onto a notification (its process), unless that was this one, and
+    /// when: a click long after that (the pointer left and came back unseen) doesn't bring back an app from then.</summary>
     static int? before;
+    static DateTime rememberedAt;
 
     /// <summary>The pointer came onto a notification: remember which app is in front.</summary>
     public static void Remember()
@@ -34,6 +36,7 @@ public static class MacFocus
             if (front == IntPtr.Zero) return;
             int pid = SendInt(front, sel_registerName("processIdentifier"));
             before = pid > 0 && pid != Environment.ProcessId ? pid : null;
+            rememberedAt = DateTime.UtcNow;
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -46,6 +49,7 @@ public static class MacFocus
     {
         if (!OperatingSystem.IsMacOS() || before is not { } pid) return;
         before = null;
+        if (DateTime.UtcNow - rememberedAt > TimeSpan.FromMinutes(1)) return;
         try
         {
             IntPtr app = Send(objc_getClass("NSApplication"), sel_registerName("sharedApplication"));

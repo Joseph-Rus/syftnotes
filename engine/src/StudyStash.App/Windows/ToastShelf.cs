@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Threading;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
@@ -43,6 +44,13 @@ public sealed class ToastShelf
     }
 
     public NoticeStack Stack { get; } = new();
+
+    /// <summary>Every notification with a window, newest first, and its window.</summary>
+    public IEnumerable<(Notice Notice, Floating Window)> Cards => Stack.Showing.Where(shown.ContainsKey).Select(n => (n, shown[n].Window));
+
+    /// <summary>The display the notifications go on now.</summary>
+    public ScreenGeometry? Screen => shown.Count == 0 ? null
+        : (screens?.Invoke() ?? shown.Values.First().Window.ScreenList()) is var all ? Placement.Pick(all, anchor(all)) : null;
 
     /// <summary>A notification's window, while it has one.</summary>
     public Floating? WindowOf(Notice notice) => shown.TryGetValue(notice, out var s) ? s.Window : null;
@@ -90,9 +98,14 @@ public sealed class ToastShelf
                 // Whatever came while the pointer was on it takes its place now.
                 Arrange();
             };
-            // A display plugged in or out, or its scale changed: the cards go where they now belong.
+            // A display plugged in or out, or its scale changed, or a card grew or shrank (its words laid out again in
+            // another look): the cards go where they now belong.
             EventHandler displaysChanged = (_, _) => ArrangeSoon();
             w.Screens.Changed += displaysChanged;
+            w.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == Window.ClientSizeProperty) ArrangeSoon();
+            };
             w.Closed += (_, _) =>
             {
                 w.Screens.Changed -= displaysChanged;

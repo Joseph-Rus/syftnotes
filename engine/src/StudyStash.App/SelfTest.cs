@@ -219,6 +219,7 @@ public static partial class SelfTest
         else await RunSetupAsync(host);
         await RunRecordingAsync(host);
         await RunProblemsAsync(host);
+        await RunNotificationsAsync();
         await RunSettingsAsync();
         await RunLooksAsync();
     }
