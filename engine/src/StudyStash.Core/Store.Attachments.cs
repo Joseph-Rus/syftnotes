@@ -80,6 +80,69 @@ public sealed partial class Store
         }
     }
 
+    /// <summary>Up to <paramref name="limit"/> attachments after <paramref name="after"/> (from the first when null), in
+    /// id order, words and all: a page of <see cref="LibraryMove"/>.</summary>
+    public List<Attachment> AttachmentsAfter(string? after, int limit)
+    {
+        lock (gate)
+            return after is null
+                ? AttachmentRows($"SELECT {AttachmentColumns} FROM attachments ORDER BY id LIMIT ?", (long)limit)
+                : AttachmentRows($"SELECT {AttachmentColumns} FROM attachments WHERE id > ? ORDER BY id LIMIT ?", after, (long)limit);
+    }
+
+    public int AttachmentCount()
+    {
+        lock (gate)
+        {
+            using var cmd = Command("SELECT COUNT(*) FROM attachments");
+            return Convert.ToInt32(cmd.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    public HashSet<string> AttachmentIds()
+    {
+        lock (gate)
+        {
+            var ids = new HashSet<string>();
+            using var cmd = Command("SELECT id FROM attachments");
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) ids.Add(r.GetString(0));
+            return ids;
+        }
+    }
+
+    /// <summary>Where every attachment's file is (without reading their words).</summary>
+    public List<string> AttachmentFiles()
+    {
+        lock (gate)
+        {
+            var paths = new List<string>();
+            using var cmd = Command("SELECT class_name, file FROM attachments");
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+                if (!r.IsDBNull(1)) paths.Add(Path.Combine(ClassFolder(r.IsDBNull(0) ? Configs.Unsorted : r.GetString(0)), AttachmentsFolder, r.GetString(1)));
+            return paths;
+        }
+    }
+
+    /// <summary>
+    /// An attachment brought over from another library (<see cref="LibraryMove"/>): its file, already on this disk at
+    /// <paramref name="staged"/>, goes into its class's Attachments folder under its own name (or a free one next to
+    /// it), and it keeps its id, the words read from it and whether its lecture's notes used them. False, with nothing
+    /// moved, when an attachment with its id is here already.
+    /// </summary>
+    public bool ImportAttachment(Attachment a, string staged)
+    {
+        lock (gate)
+        {
+            if (GetAttachment(a.Id) is not null) return false;
+            string dir = AttachmentsDir(a.ClassName), file = Attachments.FreeName(dir, Attachments.SafeName(a.File));
+            File.Move(staged, Path.Combine(dir, file));
+            AddAttachment(a with { File = file });
+            return true;
+        }
+    }
+
     /// <summary>The attachments whose words are still to be read (a restart stopped them partway).</summary>
     public List<Attachment> UnreadAttachments()
     {
