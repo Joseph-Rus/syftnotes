@@ -61,6 +61,11 @@ public sealed class AppSettings
     /// <summary>Light, dark, or match the computer (Settings → Appearance). Settings files saved before this
     /// existed have none, so they come back as <see cref="AppAppearance.System"/>: nothing changes for them.</summary>
     public AppAppearance Appearance { get; set; } = AppAppearance.System;
+    /// <summary>How setup was done: "claude" or "codex" (guided, with that AI), "ollama" (by hand, the free model on
+    /// this computer), "manual" (by hand), or "" not yet.</summary>
+    public string SetupAi { get; set; } = "";
+    /// <summary>Guided setup's chat, so a window closed part-way picks it up again: the AI's CLI and its session.</summary>
+    public SetupChatSaved? SetupChat { get; set; }
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 
@@ -89,6 +94,9 @@ public sealed class AppSettings
         File.Move(tmp, path, overwrite: true);
     }
 }
+
+/// <summary>Guided setup's conversation: which CLI ("claude" or "codex") and its own session id, to resume.</summary>
+public sealed record SetupChatSaved(string Provider, string Session);
 
 /// <summary>A window's spot (in the screen's pixels, as Avalonia gives a window's position), its size in the
 /// window's own units, and whether it was zoomed to fill the display.</summary>

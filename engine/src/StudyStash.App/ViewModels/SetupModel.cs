@@ -133,6 +133,8 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial IReadOnlyList<double>? MicLevels { get; set; }
     /// <summary>A level has passed the "hears you" mark since the mic check opened.</summary>
     [ObservableProperty] public partial bool MicHeard { get; set; }
+    /// <summary>Guided setup's microphone card is showing: the microphone opens for it as it does on the step.</summary>
+    public bool MicCheckOpen { get; set; }
     public string MicLine => MicHeard ? "Study Stash hears you." : "Say something. The bars move when Study Stash hears you.";
     /// <summary>Why the mic check couldn't open the microphone (none plugged in, refused, another app has it); null
     /// while it's fine.</summary>
