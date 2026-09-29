@@ -21,7 +21,26 @@ pairing code), `LibraryWeb.Devices.cs` (`/api/v2/devices/*` and the cookie check
 Serve). App side: `ViewModels/PhonesModel.cs` and `Views/MacPhones.axaml` / `Views/WinPhones.axaml` (Settings →
 Phone). Web side: `web/` (see [The web app](#the-web-app)).
 
-## Reaching the library: Tailscale Serve on 8443
+## Reaching the library: the Tailscale IP, and Tailscale Serve on 8443
+
+The QR code opens the library at this computer's **Tailscale IP** over plain http:
+`http://100.x.y.z:<port>/app/`. Every phone on the tailnet reaches that, whatever its DNS settings, and Tailscale
+encrypts the traffic end to end, so plain http is safe there (the browser just can't tell). When Serve works too,
+the address carries the https one as `?https=https://<library>.ts.net:8443/app/`, and the web app
+(`web/src/upgrade.ts`) asks that name for `/api/v2/me` with a 4-second budget: a phone that can look it up
+(MagicDNS on) moves there, where the app reads offline and installs as a real app; one that can't stays on the IP,
+where everything but offline reading works. Only a fresh QR address carries `?https=`, so a paired phone never
+moves (its cookie belongs to the address it paired on). The phone CSP allows `connect-src https://*.ts.net:8443`
+for that one question.
+
+- **A library for this computer alone** (`web_host = "127.0.0.1"`) doesn't listen on the IP, so its QR code is the
+  https address only, and the phone needs MagicDNS.
+- **The pairing cookie** is `Secure` over https (Serve's `X-Forwarded-Proto: https`) and on localhost; at the IP over
+  plain http a browser would drop a Secure cookie, so there it isn't one (still `HttpOnly`, `SameSite=Strict`).
+- **No code at all** only when there's neither: Tailscale isn't running here, or there's no IP and no https name.
+
+The rest of this section is the https side.
+
 
 A PWA needs https: service workers, "Add to Home Screen" as an app, and Secure cookies all require it. The library
 itself speaks plain http on its port (8000), so the phone reaches it through **Tailscale Serve**, which answers with a

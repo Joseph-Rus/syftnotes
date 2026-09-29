@@ -8,15 +8,16 @@ namespace StudyStash.Library;
 
 /// <summary>
 /// The phone app: its pages at /app/ (the web app in web/, which the phone adds to its Home Screen), whether a phone
-/// is paired, and each lecture's notes drawn for it. Phones reach it at https://&lt;library&gt;.ts.net:8443 through
-/// Tailscale Serve; see docs/phone.md.
+/// is paired, and each lecture's notes drawn for it. Phones reach it at this computer's Tailscale IP, or at
+/// https://&lt;library&gt;.ts.net:8443 through Tailscale Serve when they can look that name up; see docs/phone.md.
 /// </summary>
 public sealed partial class LibraryWeb
 {
     /// <summary>The phone app's own rules: its scripts and styles come from its own files, it talks only to this
-    /// library, and no other page may frame it.</summary>
+    /// library (and, opened at the Tailscale IP, asks whether its https name answers: src/upgrade.ts), and no other
+    /// page may frame it.</summary>
     public const string PhoneCsp =
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'";
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.ts.net:8443; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'";
 
     static readonly FileExtensionContentTypeProvider PhoneTypes = MakePhoneTypes();
 

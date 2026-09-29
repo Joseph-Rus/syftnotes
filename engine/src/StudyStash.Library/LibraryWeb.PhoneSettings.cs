@@ -49,7 +49,7 @@ public sealed partial class LibraryWeb
                     + $"<div style=\"font:600 2rem/1.2 var(--mono);letter-spacing:.18em;margin:.4rem 0\">{code[..3]} {code[3..]}</div>"
                     + $"<div class=\"subtitle\" id=\"phone-left\" data-until=\"{until.ToUnixTimeMilliseconds()}\">Works for 10 minutes, once.</div>"
                     + $"<div class=\"subtitle\">3. Add it to your Home Screen from the Share menu.</div>"
-                    + $"<div class=\"subtitle\" style=\"overflow-wrap:anywhere\">{Ui.Esc(url)}</div></div></div></div>"
+                    + $"<div class=\"subtitle\" style=\"overflow-wrap:anywhere\">{Ui.Esc(url.Split('?')[0])}</div></div></div></div>"
                     + $"<script nonce=\"{nonce}\">(function(){{var el=document.getElementById('phone-left');if(!el)return;var until=+el.dataset.until;"
                     + "function tick(){var s=Math.max(0,Math.round((until-Date.now())/1000));el.textContent=s>0?'Works for '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0')+' more, once.':'This code has run out. Make a new one.';"
                     + "if(s>0)setTimeout(tick,1000);}tick();})();</script>";

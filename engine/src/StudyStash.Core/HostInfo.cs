@@ -15,8 +15,15 @@ public sealed record TailscaleInfo(bool Installed = false, bool Running = false,
 /// <summary>Where this computer can be reached (Tailscale), and whether a library already answers on a port.</summary>
 public static class HostInfo
 {
+    /// <summary>Where Tailscale's command line is when it isn't on the PATH, as it isn't for an app opened from the
+    /// Finder (launchd's PATH has no /usr/local/bin): the Mac app's own install of it first, then the app itself.</summary>
     public static readonly string[] TailscalePaths =
-        ["/Applications/Tailscale.app/Contents/MacOS/Tailscale", "/opt/homebrew/bin/tailscale", @"C:\Program Files\Tailscale\tailscale.exe"];
+        ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale", @"C:\Program Files\Tailscale\tailscale.exe"];
+
+    /// <summary>The Mac app's own program (Tailscale.app/Contents/MacOS/Tailscale) is its command line only when it's
+    /// told so: run bare, it tries to open the app's window and prints "The Tailscale GUI failed to start" instead of
+    /// answering, which read as "Tailscale isn't running". Every Tailscale command started from here inherits this.</summary>
+    static HostInfo() => Environment.SetEnvironmentVariable("TAILSCALE_BE_CLI", "1");
 
     static IEnumerable<string> TailscaleCandidates() =>
         new[] { Machine.Which("tailscale") }.Concat(TailscalePaths).OfType<string>().Where(File.Exists);
