@@ -137,8 +137,10 @@ public static class Sound
             {
                 var fmt = new byte[Math.Max(16, (int)size)];
                 f.ReadExactly(fmt, 0, (int)size);
-                if (BinaryPrimitives.ReadUInt16LittleEndian(fmt.AsSpan(0)) != 1 || BinaryPrimitives.ReadUInt16LittleEndian(fmt.AsSpan(2)) != 1
-                    || BinaryPrimitives.ReadUInt16LittleEndian(fmt.AsSpan(14)) != 16)
+                // Plain PCM (1), or the extensible form (0xFFFE) whose sub-format is PCM, as macOS's afconvert writes it.
+                ushort tag = BinaryPrimitives.ReadUInt16LittleEndian(fmt.AsSpan(0));
+                bool pcm = tag == 1 || (tag == 0xFFFE && size >= 26 && BinaryPrimitives.ReadUInt16LittleEndian(fmt.AsSpan(24)) == 1);
+                if (!pcm || BinaryPrimitives.ReadUInt16LittleEndian(fmt.AsSpan(2)) != 1 || BinaryPrimitives.ReadUInt16LittleEndian(fmt.AsSpan(14)) != 16)
                     throw new InvalidDataException($"{path} isn't 16-bit mono PCM");
                 rate = (int)BinaryPrimitives.ReadUInt32LittleEndian(fmt.AsSpan(4));
                 if (size % 2 == 1) f.Seek(1, SeekOrigin.Current);
