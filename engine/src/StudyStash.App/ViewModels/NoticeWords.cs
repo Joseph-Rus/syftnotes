@@ -55,14 +55,53 @@ public static class NoticeWords
         ("A lighter model would keep up better", $"{advice.Why} Switch in Settings → Recording.");
 
     /// <summary>Study Stash updates itself while nothing's recording and starts again: the first start of a newer
-    /// version than <paramref name="lastRun"/> says so, once (the S. went from the menu bar for a moment). Nothing on
-    /// the very first start, or starting an older or the same version.</summary>
-    public static (string Title, string Text)? Updated(string lastRun, string running)
+    /// version than <paramref name="lastRun"/> says so, once (the S. went from the menu bar for a moment), with the
+    /// release's notes as the button. Nothing on the very first start, or starting an older or the same version.</summary>
+    public static (string Title, string Text, string Action)? Updated(string lastRun, string running)
     {
         if (lastRun.Length == 0 || Updates.Compare(Updates.ParseVersion(running), Updates.ParseVersion(lastRun)) <= 0) return null;
-        string version = string.Join('.', Updates.ParseVersion(running));
-        return ($"Study Stash updated to {version}", "It updated itself while you weren't recording. Everything is as you left it.");
+        return ($"Study Stash updated to {Plain(running)}", "Everything is just as you left it.", "What's new");
     }
+
+    /// <summary>A new version is out and updates aren't automatic on this computer: the button installs it.</summary>
+    public static (string Title, string Text, string Action) UpdateReady(string version) =>
+        ($"Study Stash {Plain(version)} is out", "Installing takes about a minute, then Study Stash opens again by itself.", "Update");
+
+    /// <summary>A new version is out but this copy can't replace itself: <paramref name="why"/> says what to do, and
+    /// the button gets the download.</summary>
+    public static (string Title, string Text, string Action) UpdateBlocked(string version, string why) =>
+        ($"Study Stash {Plain(version)} is out", why, "Download");
+
+    /// <summary>Update was pressed: it's on its way.</summary>
+    public static (string Title, string Text) Updating(string version) =>
+        ($"Updating to {Plain(version)}", "Study Stash closes and opens again by itself in a minute or so.");
+
+    /// <summary>Update was pressed during a lecture: nothing's cut short.</summary>
+    public static (string Title, string Text) UpdateWaits(string version) =>
+        ("The update waits for your lecture", $"Study Stash {Plain(version)} installs once you stop recording.");
+
+    /// <summary>The update didn't install: what's running now, that it tries again, and the button gets it by hand.</summary>
+    public static (string Title, string Text, string Action) UpdateFailed(string version, string running) =>
+        ("Study Stash couldn't update", $"You're still on {Plain(running)}. It tries again later, or you can download {Plain(version)} now.", "Download");
+
+    /// <summary>This start comes after quitting to install <paramref name="tried"/>, but runs an older version (Windows'
+    /// Setup.exe didn't finish): the update didn't take. Null when nothing was being installed, or it took.</summary>
+    public static (string Title, string Text, string Action)? UpdateDidntTake(string tried, string running) =>
+        tried.Length == 0 || Updates.Compare(Updates.ParseVersion(running), Updates.ParseVersion(tried)) >= 0 ? null : UpdateFailed(tried, running);
+
+    /// <summary>Settings' line after Update now: what's happening (see <see cref="AppUpdates.NowAsync"/>).</summary>
+    public static string UpdateNowLine(string result) => result switch
+    {
+        AppUpdates.Relaunching or AppUpdates.HandedOff => "Updating: Study Stash opens again on the new version in a minute or so.",
+        AppUpdates.Waiting => "The update installs once you stop recording.",
+        AppUpdates.Failed => "It couldn't update just now, and tries again later.",
+        AppUpdates.CheckFailed => "GitHub couldn't be reached. Try again in a while.",
+        AppUpdates.CantHere => "This copy can't update itself: the notification says what to do.",
+        AppUpdates.Off => "This copy doesn't update itself.",
+        _ => "Study Stash is up to date.",
+    };
+
+    static string Plain(string version) => string.Join('.', Updates.ParseVersion(version));
 
     /// <summary>The problems worth a notification when they start (not just a line in the dropdown): each stops
     /// lectures being written down or filed until the student does something. A library out of reach isn't one: the

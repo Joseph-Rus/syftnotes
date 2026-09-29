@@ -13,13 +13,17 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
 ## What it does
 
 - **Records and transcribes on your computer.** Click **Record** in the menu bar (Mac) or tray
-  (Windows), or press ⌥⇧R / Ctrl+Alt+R. Whisper transcribes as you go — Metal on Apple silicon,
-  Vulkan or the CPU on Windows — and the audio never leaves your computer. Every computer starts on
-  the compact large-v3 turbo, which keeps up and leaves room for everything else (a computer too weak
-  for it gets a lighter one); the bigger, more accurate models, and NVIDIA's Parakeet (nearly as
-  accurate as the compact turbo, and quick on a processor alone; 25 European languages), are a choice in setup
-  and Settings → Recording. While it records, a tiny pill shows the time and the level; pause or stop from the
-  menu bar.
+  (Windows), or press ⌥⇧R / Ctrl+Alt+R. It transcribes as you go, and the audio never leaves your
+  computer. A Mac with Apple silicon or a PC with a graphics card uses Whisper (Metal or Vulkan),
+  starting on the compact large-v3 turbo, which keeps up and leaves room for everything else. A
+  computer with no graphics card Whisper can use, and 4 fast cores and 8 GB of memory, starts on
+  NVIDIA's Parakeet instead (a 2.5 GB download): it's made for the processor, nearly as accurate as
+  the compact turbo, and never makes up words over silence; it reads 25 European languages, and a
+  lecture in another language uses Whisper. A computer too weak for either gets a lighter Whisper.
+  The bigger, more accurate models are a choice in setup and Settings → Recording, where an
+  experimental **Tell speakers apart** also marks in a transcript ("Speaker 2:") where a voice other
+  than the lecturer's seems to speak; it is careful rather than complete, and can be wrong. While it
+  records, a tiny pill shows the time and the level; pause or stop from the menu bar.
 - **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
   to review, written by Ollama (free and private) or by Claude Code, Codex or Gemini with the plan
   you already have. Rewrite a lecture's notes with another engine and keep whichever you like.
@@ -145,10 +149,12 @@ irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | 
 
 ## AI engines
 
-Pick who writes your notes and who answers your questions in setup or in **Settings → Your
-library → AI engines** — one engine for everything, or a different one for each job. The engines
-run on your library's computer (with one computer, that's your laptop). Without an engine, lectures
-are still filed and keep their transcripts.
+Pick who writes your notes, who draws their diagrams and who answers your questions in setup or in
+**Settings → Your library → AI engines** — one engine for everything, or a different one for each
+job. The engines run on your library's computer (with one computer, that's your laptop). Without an
+engine, lectures are still filed and keep their transcripts. With Claude Code, Codex or Gemini, a
+lecture's transcript (and, for its diagrams, its notes) goes to that AI under your own account;
+with Ollama nothing leaves your computer.
 
 **Ollama** — free, and nothing leaves your computer. Install it from [ollama.com](https://ollama.com),
 and Study Stash offers to download a model.
@@ -174,6 +180,30 @@ npm install -g @openai/codex                        # Mac or Windows (or on a Ma
 Setup's notes step shows these commands with a Copy button, opens Terminal for you, and has
 **Check again** to pick the engine up once it's installed and signed in.
 
+**Draws diagrams** is a pick of its own. Once a lecture's notes are written, a stronger model reads
+its timed transcript and the notes, decides whether the lecture teaches anything a picture makes
+clearer (a process, a cycle, a pathway, a decision rule, a hierarchy, a structure, a timeline, a
+comparison, or something spatial like the forces on an object), and if it does, designs it from
+what the lecturer said and puts it at the end of the section it illustrates, with a title, a
+short caption and the moment of the lecture it comes from. Most lectures get one at most (never
+more than three), one under about three minutes gets none, and so does a lecture of discussion,
+admin or definitions.
+
+- **Automatic** (the default) uses the strongest engine that already reads your lectures — the one
+  that writes your notes or answers your questions — trying Claude Code (Opus, high effort), then
+  Codex (high effort), then Gemini (3.1 Pro); otherwise the biggest model Ollama runs on the
+  library's computer (never an Ollama cloud model). So a lecture never goes to an AI it wasn't
+  already going to.
+- **An engine of your own choice** uses its strongest model; one that isn't signed in or is over
+  its limit falls back to Ollama when **Use Ollama instead** is on, as the notes do.
+- **Same as notes** has the notes engine draw them as it writes, the way it did before 0.10.1;
+  **Off** leaves them out.
+
+A diagram that doesn't draw goes back once to be fixed and is otherwise left out, as is one with
+too many boxes or words the lecture never said. If the diagrams can't be designed (the engine is
+busy, over its limit, or takes longer than 8 minutes), the notes are kept exactly as written. The
+library's log says what was drawn, or why nothing was.
+
 ## Notes
 
 A lecture's notes write formulas and diagrams as their own engine can, and the app draws them, in
@@ -183,8 +213,11 @@ the notes, in a quick answer and in the Ask chat:
   type, light or dark. One CSharpMath can't typeset shows its plain source instead, calmly.
 - **Diagrams**: a process, cycle, pathway or hierarchy comes back as a Mermaid flowchart
   (` ```mermaid `) and is drawn natively, in the theme's colours; something spatial (a structure, a
-  physics setup, a circuit) comes back as a sanitised SVG. Either kind opens larger on a click, and
-  a diagram Study Stash can't draw shows its source with a plain reason instead of failing.
+  physics setup, a circuit) comes back as a sanitised SVG. They're designed after the notes by the
+  engine that **Draws diagrams** (see [AI engines](#ai-engines)), each under a bold title with a
+  caption and the moment of the lecture it comes from; rewriting a lecture's notes designs them
+  again rather than adding more. Either kind opens larger on a click, and a diagram Study Stash
+  can't draw shows its source with a plain reason instead of failing.
 - **Download**: a lecture's "Download as Markdown…" (or a whole class's) saves a `.md` file that
   Obsidian, Typora and VS Code all open well — formulas stay LaTeX, a Mermaid diagram is saved
   again as an SVG beside it, and an SVG diagram becomes an image link to its own sanitised file.
@@ -287,8 +320,12 @@ Lectures are written down by [Whisper](https://github.com/openai/whisper) models
 run with [Whisper.net](https://github.com/sandrohanea/whisper.net)) or, if you choose it, by
 [NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3)
 ([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), converted to ONNX by the
-[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) project (Apache-2.0), which runs it. The models
-are downloaded when you pick them; none is bundled.
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) project (Apache-2.0), which runs it. To tell
+voices apart, when you turn that on, it uses
+[pyannote's segmentation 3.0](https://huggingface.co/pyannote/segmentation-3.0) (MIT) and NVIDIA's
+[TitaNet small](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/titanet_small)
+(CC BY 4.0), also converted by sherpa-onnx. The models are downloaded when you pick them; none is
+bundled.
 
 Notes and diagrams are drawn with [CSharpMath](https://github.com/verybadcat/CSharpMath) (MIT,
 bundling the [Latin Modern Math](https://www.gust.org.pl/projects/e-foundry/lm-math) font under

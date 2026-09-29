@@ -9,8 +9,9 @@ namespace StudyStash.Audio;
 /// <summary>Which program reads a model's files.</summary>
 public enum SpeechEngine { Whisper, Parakeet }
 
-/// <summary>One file of a model that comes as several: its name in the model's folder, its size and its SHA-256.</summary>
-public sealed record ModelPart(string Name, long Bytes, string Sha256);
+/// <summary>One file of a model that comes as several: its name in the model's folder, its size and its SHA-256, and
+/// where it downloads from when that isn't the model's <see cref="WhisperModel.Source"/>.</summary>
+public sealed record ModelPart(string Name, long Bytes, string Sha256, string? From = null);
 
 /// <summary>
 /// A speech-to-text model Study Stash can download: a Whisper model (whisper.cpp's files on Hugging Face) or
@@ -37,7 +38,7 @@ public sealed record WhisperModel(string Id, string Name, string File, long Byte
 
     /// <summary>Where one of its files downloads from.</summary>
     public string UrlOf(ModelPart part, string? mirror) =>
-        mirror is { Length: > 0 } m ? $"{m.TrimEnd('/')}/{part.Name}" : $"{Source}/{part.Name}";
+        mirror is { Length: > 0 } m ? $"{m.TrimEnd('/')}/{part.Name}" : part.From ?? $"{Source}/{part.Name}";
 
     /// <summary>"3.1 GB", "550 MB".</summary>
     public string Size => SizeOf(Bytes);
@@ -76,6 +77,21 @@ public static class WhisperModels
             new("encoder.weights", 2435420160, "3af3f51af5f2d01dbbf5af47d42c7962a2c205f11004254bb4f2b979862f39a8"),
         ],
     };
+    /// <summary>What tells the voices in a lecture apart (not a transcription model, so it isn't in <see cref="All"/>):
+    /// pyannote's segmentation (which stretches are one voice; MIT) and NVIDIA's TitaNet small (which voices are the
+    /// same person; CC BY 4.0), both from sherpa-onnx's conversions. Tried on two lectures with the voices set alike at
+    /// 0.9: a lecturer and the students who asked came out as separate voices.</summary>
+    public static readonly WhisperModel Speakers = new("speakers", "Speaker voices", "speaker-voices", 5992913 + 40257283, "",
+        "Tells the voices in a lecture apart, so a student's question isn't taken for the lecturer's words.")
+    {
+        Parts =
+        [
+            new("segmentation.onnx", 5992913, "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+                "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx"),
+            new("embedding.onnx", 40257283, "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e",
+                "https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/main/nemo_en_titanet_small.onnx"),
+        ],
+    };
     public static readonly WhisperModel Small = new("small", "Whisper small", "ggml-small.bin", 487601967,
         "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b", "Quick on any processor. Misses more names and terms than the large ones.");
     public static readonly WhisperModel Base = new("base", "Whisper base", "ggml-base.bin", 147951465,
@@ -108,11 +124,17 @@ public static class WhisperModels
     /// The model a computer starts on, and one plain line why: the compact large-v3 turbo, on every computer that keeps
     /// up with it (Apple silicon and PCs with a strong graphics card too), because it's light on the computer and
     /// leaves room for everything else; a computer too weak for it starts on the lighter one it can run
-    /// (<see cref="Heaviest"/>). The bigger models stay a choice in setup and Settings → Recording.
+    /// (<see cref="Heaviest"/>). The bigger models stay a choice in setup and Settings → Recording. A computer with no
+    /// graphics card Whisper can use, and the processor and memory for it, starts on Parakeet instead, when
+    /// <paramref name="parakeet"/> (it doesn't read the lecture's language, or it won't run here: false).
     /// </summary>
-    public static ModelAdvice Advise(HardwareProfile hw)
+    public static ModelAdvice Advise(HardwareProfile hw, bool parakeet = true)
     {
-        var heaviest = Heaviest(hw);
+        // On the processor alone Parakeet is what to start on: it was made for it (see Heaviest), nearly as accurate as
+        // the compact turbo, and never makes up words over silence.
+        if (parakeet && ProcessorOnly(hw) && FitsParakeet(hw))
+            return new(Parakeet, $"This {hw.DeviceWord} has no graphics card Whisper can use, so Parakeet, made for the processor, keeps up with a lecture.");
+        var heaviest = Heaviest(hw, parakeet);
         if (!Heavier(heaviest.Model, LargeV3TurboSmall)) return heaviest;
         return new(LargeV3TurboSmall, hw.AppleSilicon
             ? "The compact model keeps up with a lecture and leaves this Mac room for everything else. Its Apple silicon can run a bigger one too."
@@ -142,7 +164,7 @@ public static class WhisperModels
     /// Memory the computer won't say (null) counts as enough: the student can always pick a lighter one. A model
     /// heavier than this one is worth a word (<c>ModelSuggestionAsync</c>); one up to this heavy is the student's call.
     /// </summary>
-    public static ModelAdvice Heaviest(HardwareProfile hw)
+    public static ModelAdvice Heaviest(HardwareProfile hw, bool parakeet = true)
     {
         string device = hw.DeviceWord;
         double? ram = hw.RamGb;
@@ -160,12 +182,24 @@ public static class WhisperModels
         }
         if (hw.Cores >= 8 && hw.FastMath && ram is not < 8)
             return new(LargeV3TurboSmall, $"This {device} has no graphics card Whisper can use, so the compact model keeps up with a lecture.");
+        // Parakeet does a piece of a lecture on the processor in a small part of the time Whisper does (measured at
+        // 0.04 of the lecture's length on 5 threads, 0.09 on 2), so it takes the place of Whisper small here; it holds
+        // about 3 GB of memory.
+        if (parakeet && FitsParakeet(hw))
+            return new(Parakeet, $"This {device} has no graphics card Whisper can use, and Parakeet, made for the processor, keeps up with a lecture.");
         if (hw.Cores >= 4 && ram is not < 4)
             return new(Small, $"This {device} has no graphics card Whisper can use and a modest processor, so Whisper small keeps up with a lecture.");
         return new(Base, ram is < 4
             ? $"This {device} has little memory, so Whisper base keeps up with a lecture and leaves room for everything else."
             : $"This {device}'s processor would fall behind a lecture with anything bigger, so Whisper base keeps up.");
     }
+
+    /// <summary>No Apple silicon, no graphics card Whisper can use: Whisper would run on the processor.</summary>
+    static bool ProcessorOnly(HardwareProfile hw) => !hw.AppleSilicon && hw.WhisperCard is not { MemoryGb: >= 2 };
+
+    /// <summary>Parakeet on the processor wants 4 cores with fast maths (AVX2, or an ARM chip's NEON) and 8 GB of memory
+    /// (it holds about 3); memory the computer won't say counts as enough.</summary>
+    static bool FitsParakeet(HardwareProfile hw) => hw.Cores >= 4 && hw.FastMath && hw.RamGb is not < 8;
 
     public static string Dir(string home) => Path.Combine(home, "models");
 

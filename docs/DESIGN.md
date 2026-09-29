@@ -39,7 +39,11 @@ laptop                                          library (a Mac mini, say — any
    the library is asleep or on another network: the laptop keeps trying.
 4. **Queue and write.** `LibraryWeb.Ingest` turns the payload into a `Meeting` (`Wire.MeetingFromJson`)
    and enqueues it (`Store.Enqueue`). `Pipeline.ProcessAsync` then, in the background: writes study
-   notes from the transcript with the picked AI engine, sorts it into a class (the recorded class or
+   notes from the transcript with the picked AI engine, has the diagrams engine design their diagrams
+   (`DiagramDesign`: it reads the timed transcript and the notes, decides whether anything is clearer
+   as a picture, answers in JSON that's checked strictly, and each diagram it designs goes at the end
+   of its section, repaired once or left out if it doesn't draw; a pass that fails leaves the notes
+   exactly as written), sorts it into a class (the recorded class or
    a title match wins outright; otherwise the AI reads the notes against each class's name, other
    names, what it covers and its Canvas course's name, and picks one with a strict schema, or it goes
    to Unsorted), and saves it as Markdown under `<library folder>/<Class>/`.
@@ -81,8 +85,12 @@ runs on a computer.
   the matching installer, and checks its SHA-256 against `SHA256SUMS.txt`. On a Mac it mounts the
   DMG, stages the new `.app` beside the old one, swaps them, and restarts any service that runs
   from the bundle. On Windows it runs the new Setup.exe silently, which closes the running app and
-  relaunches it. Either way, only an installed copy updates itself; a build folder or `dotnet run`
-  never calls GitHub.
+  relaunches it (and, should it stop short, opens the old copy again). Either way, only an installed copy
+  updates itself; a build folder or `dotnet run` never calls GitHub. The app installs only while
+  nothing is recording or being transcribed, and looks again right before the swap or the hand-off,
+  since a lecture may start while it downloads. With `auto_update` off it says a new version is out
+  and installs it when asked; a copy that can't replace itself (a Mac app opened from its disk image)
+  says what to do; an update that fails says so, and the first start of a new version says it updated.
 - **The Mac app is one universal bundle**, started by a tiny native launcher
   (`macos/launcher.c`) at `Contents/MacOS/StudyStash` — the spot macOS reads the real Info.plist
   from (`LSUIElement`, the microphone usage strings), so it can't be a per-architecture `exec`.
@@ -146,7 +154,9 @@ project or its author.
 ## Privacy
 
 - **Everything stays on the student's own computers** unless they pick an AI engine other than
-  Ollama, which then reads what it's asked about under their own account. Lectures, transcripts,
+  Ollama, which then reads what it's asked about under their own account. The diagrams engine, on
+  automatic, only ever uses an AI the student already sends lectures to (the notes or questions
+  engine) or a model Ollama runs on the library's computer, never an Ollama cloud model. Lectures, transcripts,
   and notes live on the library computer; by default, study notes are written by a local model.
   The only outside services are GitHub (update checks) and whichever AI engine the student picked.
   There's no analytics.

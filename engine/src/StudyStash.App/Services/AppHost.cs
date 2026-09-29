@@ -41,6 +41,11 @@ public sealed class AppSettings
     public string Language { get; set; } = "";
     /// <summary>Windows: record what the computer plays too (a lecture on Zoom).</summary>
     public bool ComputerAudio { get; set; }
+    /// <summary>Parakeet's library wouldn't load on this computer (a Windows PC without Microsoft's Visual C++ runtime, say):
+    /// Whisper is the model for it from then on.</summary>
+    public bool ParakeetFailed { get; set; }
+    /// <summary>Tell the voices in a lecture apart once it's written down, and say who's speaking in the transcript.</summary>
+    public bool Speakers { get; set; }
     /// <summary>Filed lectures' audio is deleted after this many days (the notes and transcript stay). 0 keeps it.</summary>
     public int KeepAudioDays { get; set; } = 30;
     /// <summary>"Download as Markdown…" includes the transcript too (Settings' words: "Include transcripts").</summary>
@@ -70,6 +75,9 @@ public sealed class AppSettings
     public SetupChatSaved? SetupChat { get; set; }
     /// <summary>The version of Study Stash that last ran here: a newer one starting (it updated itself) says so, once.</summary>
     public string LastVersion { get; set; } = "";
+    /// <summary>The version this copy quit to install ("0.10.1"), until the next start: one that comes up older than
+    /// that (Windows' Setup.exe didn't finish) says the update didn't take.</summary>
+    public string UpdatingTo { get; set; } = "";
     /// <summary>When the student said "Maybe later" to the library window's ask for a tip (it asks once more a month
     /// on); null until they do.</summary>
     public DateTimeOffset? SupportAskLater { get; set; }
@@ -144,6 +152,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>What this computer has, asked once on the thread pool as the app starts.</summary>
     readonly Task<HardwareProfile> hardware;
     readonly HttpClient? http;
+    readonly Func<ISpeakerLabeler>? voices;
     readonly Func<LibraryService>? localLibrary;
     // The model download: one at a time, its stop button, and a nudge that ends a wait to try again.
     readonly Lock downloadLock = new();
@@ -206,11 +215,14 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <see cref="ModelSetting"/>); <paramref name="http"/> downloads it (a test's pretend server).
     /// <paramref name="localLibrary"/> makes this computer's own library (a test's, on a spare port with no real child).
     /// <paramref name="hardware"/> says what this computer has, which picks its model (a test's pretend computer).
+    /// <paramref name="voices"/> tells a lecture's voices apart (a test's pretend one).
     /// </summary>
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
         Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
-        Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null, IHardwareProbe? hardware = null)
+        Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null, IHardwareProbe? hardware = null,
+        Func<ISpeakerLabeler>? voices = null)
     {
+        this.voices = voices;
         var probe = hardware ?? HardwareProbe.System;
         this.hardware = Task.Run(probe.Probe);
         this.log = log ?? (s => Console.WriteLine(s));
@@ -234,7 +246,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
         Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log)
         {
-            EngineName = () => Model.Engine == SpeechEngine.Parakeet ? "Parakeet" : "Whisper",
+            EngineName = () => engineName,
+            LabelVoices = () => Settings.Speakers && SpeakerModelReady,
+            LoadVoices = () => voices?.Invoke() ?? new SherpaSpeakerLabeler(WhisperModels.PathFor(Home, WhisperModels.Speakers)),
         };
         var net = laptop ?? new LaptopHost();
         laptopHost = net;
@@ -356,7 +370,11 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public HardwareProfile Hardware => hardware.GetAwaiter().GetResult();
 
     /// <summary>The model that keeps up with a lecture on this computer, and why.</summary>
-    public ModelAdvice Advice => WhisperModels.Advise(Hardware);
+    public ModelAdvice Advice => WhisperModels.Advise(Hardware, ParakeetFits);
+
+    /// <summary>Parakeet can be the model for this computer: it reads the lecture's language, and it ran here before (or
+    /// hasn't been tried).</summary>
+    public bool ParakeetFits => ParakeetLanguages.Knows(Settings.Language) && !Settings.ParakeetFailed;
 
     /// <summary>
     /// An install from before models were picked for the computer saved no model: it used large-v3 (or the compact
@@ -392,7 +410,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     {
         var hw = await hardware.ConfigureAwait(false);
         if (ModelFromEnvironment || !Settings.SetupDone || Settings.Role == AppRole.Library) return null;
-        var heaviest = WhisperModels.Heaviest(hw);
+        var heaviest = WhisperModels.Heaviest(hw, ParakeetFits);
         return WhisperModels.Heavier(Model, heaviest.Model) && Settings.ModelSuggested != heaviest.Model.Id ? heaviest : null;
     }
 
@@ -435,16 +453,49 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     public bool ModelReady => ModelFile is not null || WhisperModels.IsDownloaded(Home, Model);
 
+    /// <summary>What tells voices apart is on this computer.</summary>
+    public bool SpeakerModelReady => WhisperModels.IsDownloaded(Home, WhisperModels.Speakers);
+
+    /// <summary>
+    /// Download what tells voices apart when the student wants it and it isn't here, once the transcription model is
+    /// (there's nothing to label before it) and while no other download runs (a new one would stop it). Called when the
+    /// setting is turned on, at start, and when another download ends.
+    /// </summary>
+    public void EnsureSpeakerModel()
+    {
+        if (!Settings.Speakers || Settings.Role == AppRole.Library || !ModelReady || SpeakerModelReady) return;
+        lock (downloadLock)
+            if (download is not null || disposed) return;
+        _ = DownloadModelAsync(WhisperModels.Speakers);
+    }
+
+    /// <summary>What the model being loaded is called, for the words about it (Whisper, or Parakeet).</summary>
+    string engineName = "Whisper";
+
     ITranscriber LoadWhisper()
     {
         if (!ModelReady) throw new InvalidOperationException("The transcription model isn't downloaded yet.");
-        if (ModelFile is null && Model.Engine == SpeechEngine.Parakeet)
+        engineName = ModelFile is null && Model.Engine == SpeechEngine.Parakeet ? "Parakeet" : "Whisper";
+        if (engineName == "Whisper") return new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
+        if (!ParakeetLanguages.Knows(Settings.Language))
+            throw new InvalidOperationException($"Parakeet doesn't read \"{Settings.Language}\": pick a Whisper model in Settings → Recording, or leave the language empty.");
+        try
         {
-            if (!ParakeetLanguages.Knows(Settings.Language))
-                throw new InvalidOperationException($"Parakeet doesn't read \"{Settings.Language}\": pick a Whisper model in Settings → Recording, or leave the language empty.");
             return new ParakeetTranscriber(WhisperModels.PathFor(Home, Model), Settings.Language);
         }
-        return new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
+        catch (Exception e) when (e is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException)
+        {
+            // sherpa-onnx's library won't load here: Whisper takes over, and downloads if it has to.
+            var fallback = WhisperModels.Advise(Hardware, parakeet: false).Model;
+            log($"[model] Parakeet can't load here ({e.GetType().Name}: {e.Message}); switching to {fallback.Name}");
+            Save(s =>
+            {
+                s.ParakeetFailed = true;
+                s.Model = fallback.Id;
+            });
+            _ = DownloadModelAsync(fallback);
+            throw new InvalidOperationException($"Its library won't load on this computer. Study Stash switched to {fallback.Name}, which downloads now.");
+        }
     }
 
     public void Start()
@@ -460,6 +511,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         // A download that quitting (or a closed laptop) cut short picks up where it stopped. A library-only
         // computer never records, so it never needs the model.
         if (Settings.SetupDone && Settings.Role != AppRole.Library && !ModelReady) _ = DownloadModelAsync();
+        else EnsureSpeakerModel();
         if (Settings.Role != AppRole.Laptop && Settings.SetupDone) _ = RefreshLocalLibraryAsync();
     }
 
@@ -931,6 +983,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             }
             Changed?.Invoke();
             Whisper.Wake();
+            // The voice model follows the transcription model; its own end asks for nothing more (a full disk would loop).
+            if (model.Id != WhisperModels.Speakers.Id) EnsureSpeakerModel();
         }
     }
 

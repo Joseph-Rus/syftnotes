@@ -20,6 +20,10 @@ public sealed class UpdateHost
     public string AppDir { get; init; } = "";
     /// <summary>Why AppDir is empty, for the student. Ignored once AppDir is set.</summary>
     public string NotInstalledReason { get; init; } = "This copy runs from a build folder, so it doesn't update itself.";
+    /// <summary>An installed copy that can't replace itself (a Mac app opened from its disk image or Downloads, or one
+    /// whose folder this account can't write to): it still looks for new releases, to say one is out and what to do.
+    /// A build folder isn't one.</summary>
+    public bool CantReplace { get; init; }
     public HttpClient? Http { get; init; }
     public Runner Run { get; init; } = (_, _, _) => throw Off("Running commands");
     public ServicePlaces Places { get; init; } = ServicePlaces.Default;
@@ -41,6 +45,7 @@ public sealed class UpdateHost
         system ??= Machine.Platform;
         string appDir = "";
         string reason = "This copy runs from a build folder, so it doesn't update itself.";
+        bool cantReplace = false;
         if (system == "Darwin")
         {
             appDir = Apps.MacBundleOf(baseDir, out string problem) ?? "";
@@ -50,6 +55,7 @@ public sealed class UpdateHost
                 "unwritable" => "Study Stash's folder isn't writable, so it can't update itself here.",
                 _ => reason,
             };
+            cantReplace = appDir.Length == 0 && problem is "translocated" or "unwritable";
         }
         else if (system == "Windows")
         {
@@ -57,7 +63,7 @@ public sealed class UpdateHost
         }
         return new UpdateHost
         {
-            System = system, AppDir = appDir, NotInstalledReason = reason,
+            System = system, AppDir = appDir, NotInstalledReason = reason, CantReplace = cantReplace,
             Run = Machine.Run, Places = ServicePlaces.Default, VersionOf = Updates.VersionOf, SpawnDetached = Updates.SpawnDetached,
         };
     }
@@ -144,7 +150,7 @@ public static partial class Updates
     /// <summary>Mac path of D4: mount the DMG, copy its app next to this one, check it's really the release before
     /// trusting it, then swap it in and restart what was running from the old one.</summary>
     static async Task<bool> ApplyMacAsync(Release release, string home, UpdateHost host, string asset, string url,
-        IReadOnlyDictionary<string, string>? checksums, bool restartServices, Action<string> log)
+        IReadOnlyDictionary<string, string>? checksums, bool restartServices, Func<bool> ready, Action<string> log)
     {
         string scratch = Path.Combine(host.TempDir, "study-stash-update-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(scratch);
@@ -201,6 +207,12 @@ public static partial class Updates
                 log($"The {release.Tag} download didn't run on this Mac, so this version stays.");
                 return false;
             }
+            if (!ready())
+            {
+                Apps.TryDeleteFolder(fresh);
+                log(PutOff);
+                return false;
+            }
             List<string> roles = restartServices ? ServicesRunning(MacExe(host.AppDir), host) : [];
             try
             {
@@ -234,7 +246,7 @@ public static partial class Updates
     /// <summary>Windows path of D4: hand the Setup.exe the quiet, self-relaunching arguments and return - Setup
     /// closes this copy, installs over it, and starts it again.</summary>
     static async Task<bool> ApplyWindowsAsync(Release release, string home, UpdateHost host, string asset, string url,
-        IReadOnlyDictionary<string, string>? checksums, Action<string> log)
+        IReadOnlyDictionary<string, string>? checksums, Func<bool> ready, Action<string> log)
     {
         string dir = Path.Combine(host.TempDir, "Study Stash update");
         Directory.CreateDirectory(dir);
@@ -260,17 +272,30 @@ public static partial class Updates
             log("The download didn't match its checksum, so this version stays.");
             return false;
         }
+        // Setup.exe closes this copy whatever it's doing: the last moment to put it off.
+        if (!ready())
+        {
+            log(PutOff);
+            return false;
+        }
         string logPath = Path.Combine(home, "logs", "update.log");
         host.SpawnDetached([setup, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/relaunch=1", $"/LOG={logPath}"]);
         log($"Installing {release.Tag} in the background (log: {logPath}).");
         return true;
     }
 
+    /// <summary>What an install says when <c>ready</c> turned false before the step that can't be taken back.</summary>
+    public const string PutOff = "A lecture started, so the update waits until it's over.";
+
     /// <summary>Install `release` on this computer. Downloads its installer, checks it against SHA256SUMS.txt,
-    /// then swaps it in (Mac) or hands off to it (Windows).</summary>
-    public static async Task<bool> ApplyAsync(Release release, string home, UpdateHost host, Action<string>? log = null, bool restartServices = true)
+    /// then swaps it in (Mac) or hands off to it (Windows). <paramref name="ready"/> is asked again right before the
+    /// swap or the hand-off (a download takes a minute or more, and a lecture may have started meanwhile): false leaves
+    /// this version as it is.</summary>
+    public static async Task<bool> ApplyAsync(Release release, string home, UpdateHost host, Action<string>? log = null, bool restartServices = true,
+        Func<bool>? ready = null)
     {
         log ??= Console.WriteLine;
+        ready ??= () => true;
         if (WhyNotUpdatable(host) is string problem)
         {
             log(problem);
@@ -303,8 +328,8 @@ public static partial class Updates
         }
         log($"Installing {release.Tag}...");
         return host.System == "Darwin"
-            ? await ApplyMacAsync(release, home, host, asset, url, checksums, restartServices, log)
-            : await ApplyWindowsAsync(release, home, host, asset, url, checksums, log);
+            ? await ApplyMacAsync(release, home, host, asset, url, checksums, restartServices, ready, log)
+            : await ApplyWindowsAsync(release, home, host, asset, url, checksums, ready, log);
     }
 
     // --- the background checker ------------------------------------------------------------------------------------

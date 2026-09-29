@@ -69,9 +69,126 @@ Filename: "{cmd}"; Parameters: "/c taskkill /f /im StudyStash.exe"; Flags: runhi
 Type: filesandordirs; Name: "{app}"
 
 [Code]
+var
+  UpdateFinished: Boolean;
+
 function Relaunch: Boolean;
 begin
   Result := ExpandConstant('{param:relaunch|0}') = '1';
+end;
+
+// Every process of this account running this install's StudyStash.exe (the app, and the library it runs), counted;
+// with Stop, each is stopped too. WMI can't see another account's: those are left alone.
+function AppCopies(Stop: Boolean): Integer;
+var
+  Wmi, Found, Proc: Variant;
+  I, Pid, ResultCode: Integer;
+  Exe: String;
+begin
+  Result := 0;
+  Wmi := CreateOleObject('WbemScripting.SWbemLocator');
+  Wmi := Wmi.ConnectServer('.', 'root\CIMV2');
+  Found := Wmi.ExecQuery('SELECT ProcessId, ExecutablePath FROM Win32_Process WHERE Name = ''StudyStash.exe''');
+  for I := 0 to Found.Count - 1 do
+  begin
+    Proc := Found.ItemIndex(I);
+    if not VarIsNull(Proc.ExecutablePath) then
+    begin
+      Exe := Proc.ExecutablePath;
+      if CompareText(Exe, ExpandConstant('{app}\StudyStash.exe')) = 0 then
+      begin
+        Result := Result + 1;
+        if Stop then
+        begin
+          Pid := Proc.ProcessId;
+          Log('Stopping Study Stash (' + IntToStr(Pid) + ')');
+          Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /pid ' + IntToStr(Pid), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        end;
+      end;
+    end;
+  end;
+end;
+
+// A copy before 0.10.1 that updated itself also left a hidden PowerShell waiting for it to quit, to open it again.
+// That copy would start in the middle of this install and hold the old files open, and the install would stop half
+// done. Those waiters go first: this Setup opens the app again itself when it's finished.
+procedure StopOldRelaunchers;
+var
+  Wmi, Found, Proc: Variant;
+  I, Pid, ResultCode: Integer;
+  Cmd: String;
+begin
+  Wmi := CreateOleObject('WbemScripting.SWbemLocator');
+  Wmi := Wmi.ConnectServer('.', 'root\CIMV2');
+  Found := Wmi.ExecQuery('SELECT ProcessId, CommandLine FROM Win32_Process WHERE Name = ''powershell.exe''');
+  for I := 0 to Found.Count - 1 do
+  begin
+    Proc := Found.ItemIndex(I);
+    if not VarIsNull(Proc.CommandLine) then
+    begin
+      Cmd := Proc.CommandLine;
+      if (Pos('Wait-Process', Cmd) > 0) and (Pos('StudyStash.exe', Cmd) > 0) then
+      begin
+        Pid := Proc.ProcessId;
+        Log('Stopping an older Study Stash''s relaunch waiter (' + IntToStr(Pid) + ')');
+        Exec(ExpandConstant('{sys}\taskkill.exe'), '/f /pid ' + IntToStr(Pid), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      end;
+    end;
+  end;
+end;
+
+// A silent update (/relaunch=1): the copy that started it is quitting by itself. It gets a moment to, then whatever
+// still runs from this folder is stopped (again, should something have opened one meanwhile), so no file is in use
+// when the new ones go in. Anything that goes wrong here is only logged: Restart Manager (CloseApplications) still
+// closes what it finds.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Tries: Integer;
+begin
+  Result := '';
+  if not Relaunch then Exit;
+  try
+    StopOldRelaunchers;
+    Tries := 0;
+    while (Tries < 20) and (AppCopies(False) > 0) do
+    begin
+      Sleep(500);
+      Tries := Tries + 1;
+    end;
+    Tries := 0;
+    while (Tries < 5) and (AppCopies(True) > 0) do
+    begin
+      Sleep(500);
+      Tries := Tries + 1;
+    end;
+  except
+    Log('Couldn''t check for a running Study Stash: ' + GetExceptionMessage);
+  end;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep = ssPostInstall then UpdateFinished := True;
+end;
+
+// A silent update that stopped short opens the copy that's here again, so the student isn't left without Study
+// Stash (it says the update didn't take); one that finished is opened by [Run].
+procedure DeinitializeSetup();
+var
+  ResultCode: Integer;
+  Exe: String;
+begin
+  if (not Relaunch) or UpdateFinished then Exit;
+  try
+    Exe := ExpandConstant('{app}\StudyStash.exe');
+    if FileExists(Exe) then
+    begin
+      Log('The update didn''t finish: opening Study Stash again');
+      Exec(Exe, '--background', '', SW_SHOWNORMAL, ewNoWait, ResultCode);
+    end;
+  except
+    Log('Couldn''t open Study Stash again: ' + GetExceptionMessage);
+  end;
 end;
 
 // The app's own start-at-login entry (Desktop.StartAtLogin): removed only if it still points at this

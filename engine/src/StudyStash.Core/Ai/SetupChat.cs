@@ -136,7 +136,7 @@ public static partial class SetupChat
             1. How they'll use Study Stash: offer_computer_setup. Most students want just this {device}.{hint}
             2. Laptop: connect to their library with offer_library_connection. Library: offer_library_password.
             3. A computer that records: offer_microphone_check.
-            4. A computer that records: list_transcription_models, recommend the one it marks (the compact one is a good start),
+            4. A computer that records: list_transcription_models, recommend the one it marks for this computer,
                then offer_model_download. It downloads in the background; move on while it does.
             5. Classes. Ask whether their school uses Canvas. If yes, ask for the address they open Canvas at (like
                school.instructure.com), then offer_chrome_helper; when Chrome is connected, offer_course_picker. If not (or later),

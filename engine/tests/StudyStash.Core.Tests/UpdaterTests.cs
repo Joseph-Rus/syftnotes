@@ -89,6 +89,18 @@ public class UpdaterTests
         Assert.True(Updates.IsNewer(rel, "0.5.0"));
     }
 
+    /// <summary>Versions compare as numbers, tag and all: 0.10.1 is newer than 0.10.0 and 0.9.2 (as text it would sort
+    /// first, and a copy would never see its update), and a copy never "updates" to an older or the same one.</summary>
+    [Fact]
+    public void A_release_tag_is_newer_by_its_numbers()
+    {
+        Assert.True(Updates.IsNewer(Rel("v0.10.1"), "0.10.0"));
+        Assert.True(Updates.IsNewer(Rel("v0.10.1"), "0.9.2"));
+        Assert.True(Updates.IsNewer(Rel("v0.10.0"), "0.9.2"));
+        Assert.False(Updates.IsNewer(Rel("v0.10.1"), "0.10.1"));
+        Assert.False(Updates.IsNewer(Rel("v0.9.2"), "0.10.0"));
+    }
+
     [Fact]
     public void Checksums_parse_shasum_output()
     {
@@ -328,6 +340,10 @@ public class UpdaterTests
             [Updates.WindowsAsset] = "https://dl/setup.exe", [Updates.WindowsLibraryAsset] = "https://dl/library-setup.exe",
             [Updates.ChecksumsAsset] = "https://dl/sums.txt",
         });
+        // A lecture started while it downloaded: Setup.exe, which closes the app whatever it's doing, isn't started.
+        Assert.False(await Updates.ApplyAsync(rel, home, host, said.Add, ready: () => false));
+        Assert.Empty(spawned);
+        Assert.Equal(Updates.PutOff, said[^1]);
         Assert.True(await Updates.ApplyAsync(rel, home, host, said.Add));
         var args = Assert.Single(spawned);
         string setupPath = Path.Combine(dir["temp"], "Study Stash update", Updates.WindowsAsset);

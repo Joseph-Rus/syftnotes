@@ -14,6 +14,7 @@ using StudyStash.App.Controls;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
+using StudyStash.Core;
 
 [assembly: AvaloniaTestApplication(typeof(StudyStash.App.Tests.TestApp))]
 // Every test on Avalonia's one UI thread, plain [Fact]s too: a plain test touching Avalonia first can otherwise
@@ -750,33 +751,42 @@ public class SurfaceShots
         }
     }
 
-    /// <summary>Notifications: the plain ones the app says (one line, two, with a button, with words too long to fit)
-    /// and a stack of Canvas ones, the freshest with its buttons.</summary>
+    /// <summary>Notifications, in the app's own words: a lecture filed, saved, and paused by itself (its fix the
+    /// button), words too long to fit; every update notice; and a stack of Canvas ones, the freshest with its buttons.</summary>
     static StackPanel Toasts()
     {
+        static ToastView Card(string title, string text, string? action = null) => new() { Title = title, Text = text, ActionLabel = action };
         var plain = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
-        plain.Children.Add(new ToastView { Title = "Filed in CS 101", Text = "Recursion and the call stack" , ActionLabel = "Open" });
-        plain.Children.Add(new ToastView { Title = "Recording saved", Text = "Study Stash is writing it down; the library files it and writes your notes." });
-        plain.Children.Add(new ToastView { Title = "The model isn't downloaded yet", Text = "Download it in Settings → Recording.", ActionLabel = "Settings" });
-        plain.Children.Add(new ToastView
-        {
-            Title = "Your library didn't answer, and this title is far too long to fit on one line",
-            Text = "Study Stash keeps the recording here and sends it when the library is back. It tries again every few minutes, so there's nothing to do.",
-        });
+        var filed = NoticeWords.Filed("CS 101", "Recursion and the call stack", "");
+        plain.Children.Add(Card(filed.Title, filed.Text, filed.Action));
+        plain.Children.Add(Card("Recording saved", NoticeWords.Saved(LibraryState.Connected, mac: Skin.Current == SkinKind.Mac)));
+        var paused = NoticeWords.Paused(RecordingWords.MicStopped, windows: Skin.Current == SkinKind.Win);
+        plain.Children.Add(Card(NoticeWords.PausedTitle, paused.Text, paused.Action));
+        plain.Children.Add(Card("Your library didn't answer, and this title is far too long to fit on one line",
+            "Study Stash keeps the recording here and sends it when the library is back. It tries again every few minutes, so there's nothing to do."));
+        var updates = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
+        var ready = NoticeWords.UpdateReady("0.10.1");
+        updates.Children.Add(Card(ready.Title, ready.Text, ready.Action));
+        var updating = NoticeWords.Updating("0.10.1");
+        updates.Children.Add(Card(updating.Title, updating.Text));
+        var updated = NoticeWords.Updated("0.10.0", "0.10.1")!.Value;
+        updates.Children.Add(Card(updated.Title, updated.Text, updated.Action));
+        var failed = NoticeWords.UpdateFailed("0.10.1", "0.10.0");
+        updates.Children.Add(Card(failed.Title, failed.Text, failed.Action));
         var canvas = new StackPanel { Spacing = 10, VerticalAlignment = VerticalAlignment.Top };
         foreach (var toast in CanvasShots.ToastGallery()) canvas.Children.Add(ToastView.For(toast));
-        return Shot.Side(plain, canvas);
+        return Shot.Side(plain, updates, canvas);
     }
 
     [AvaloniaFact]
     public void Mac_toast()
     {
-        foreach (var t in Themes) Shot.Take("mac-12-toast", SkinKind.Mac, t, Toasts, size: new Size(1000, 560));
+        foreach (var t in Themes) Shot.Take("mac-12-toast", SkinKind.Mac, t, Toasts, size: new Size(1420, 640));
     }
 
     [AvaloniaFact]
     public void Win_toast()
     {
-        foreach (var t in Themes) Shot.Take("win-12-toast", SkinKind.Win, t, Toasts, size: new Size(1000, 620));
+        foreach (var t in Themes) Shot.Take("win-12-toast", SkinKind.Win, t, Toasts, size: new Size(1420, 720));
     }
 }

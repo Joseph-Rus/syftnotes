@@ -15,8 +15,10 @@ public delegate Task<int?> ShowFn(Config cfg, string model);
 public sealed class RunawayOutputException(string message) : Exception(message);
 
 /// <summary>What the notes may draw: Mermaid flowcharts only (every engine, and all a small local model does
-/// well), or SVG drawings too, for what's spatial (the CLI engines, which write SVG that holds together).</summary>
-public enum Drawings { Flowcharts, FlowchartsAndSvg }
+/// well), or SVG drawings too, for what's spatial (the CLI engines, which write SVG that holds together), or
+/// nothing at all: <see cref="None"/> is for notes whose diagrams a separate pass designs (<see cref="DiagramDesign"/>),
+/// or whose student turned diagrams off.</summary>
+public enum Drawings { Flowcharts, FlowchartsAndSvg, None }
 
 /// <summary>
 /// Write study notes from a lecture's transcript with the model you pick (a local Ollama model here). Transcripts
@@ -96,19 +98,32 @@ public static partial class Summarize
         </svg>
         """.ReplaceLineEndings("\n");
 
+    /// <summary>How every formula is written, up to the worked dose that shows the form.</summary>
+    const string FormulasBrief = @"Formulas: write every formula, equation, unit conversion and calculation in LaTeX: $...$ inside a sentence, and $$...$$ on a line of its own for one worth seeing alone. Use \frac, \times, \cdot, ^ and _, \text{...} for words and units, and \mathrm{H_2O} for chemistry. Work calculations step by step, for example a dose:";
+
+    /// <summary>What an SVG drawing may be: its size, its words, its arrows and the palette the app recolours. The
+    /// notes' own brief and the diagram designer's (<see cref="DiagramDesign"/>) both say it.</summary>
+    public static readonly string SvgRules = """viewBox="0 0 640 H" with H at most 480, no width or height, text 13 to 15 units and at least 16 from the edges, every part labelled, arrows with a <marker>. Colours only from: #1D1D1F (lines and text), #6E6E73 (secondary text), #C7C7CC (light lines), #FFFFFF (paper), and the stroke/fill pairs red #D93025/#FCE8E6, blue #1A73E8/#E8F0FE, green #188038/#E6F4EA, amber #E37400/#FEF7E0, purple #8E24AA/#F3E8FD; the app recolours them for dark mode. No scripts, images, links, fonts, CSS or foreignObject.""";
+
     /// <summary>
     /// What the notes are told about formulas and diagrams: LaTeX for every formula, with a worked dose as the form;
     /// a diagram only where a picture makes the lecture clearer, said again in words, drawn as a Mermaid flowchart
-    /// (and, for <see cref="Drawings.FlowchartsAndSvg"/>, as SVG for what's spatial), each with its example.
+    /// (and, for <see cref="Drawings.FlowchartsAndSvg"/>, as SVG for what's spatial), each with its example. With
+    /// <see cref="Drawings.None"/>, no diagram at all: the process is told in words instead.
     /// </summary>
     public static string Drawing(Drawings drawings)
     {
+        if (drawings == Drawings.None)
+            return (FormulasBrief + "\n" + DoseExample + "\n\n"
+                + "Diagrams: draw none: no Mermaid, no SVG and no pictures made of text. Diagrams are designed separately from the transcript and added to these notes afterwards, "
+                + "so explain every process, cycle, pathway and structure in words, step by step and in the lecturer's order.\n\n"
+                + "The example shows the form only: write only what this lecture teaches.").ReplaceLineEndings("\n");
         bool svg = drawings == Drawings.FlowchartsAndSvg;
         string what = svg ? "a process, cycle, pathway, decision rule, hierarchy or structure" : "a process, cycle, pathway, decision rule or hierarchy";
         string examples = "the cardiac cycle, blood flow through the heart, the nursing process, a care or assessment pathway, "
             + "how a drug moves from dose to effect, the cell cycle, " + (svg ? "a call stack, a binary tree, the forces on a block" : "a binary tree");
         string text = $$"""
-            Formulas: write every formula, equation, unit conversion and calculation in LaTeX: $...$ inside a sentence, and $$...$$ on a line of its own for one worth seeing alone. Use \frac, \times, \cdot, ^ and _, \text{...} for words and units, and \mathrm{H_2O} for chemistry. Work calculations step by step, for example a dose:
+            {{FormulasBrief}}
             {{DoseExample}}
 
             Diagrams: when the lecture explains {{what}} that a picture makes clearer ({{examples}}), draw it: at most {{(svg ? "three" : "two")}}, and none for a lecture of facts or discussion. Put each diagram on its own, right after the text it illustrates, never inside a bullet, and follow it with one sentence that says the same in words.
@@ -122,7 +137,7 @@ public static partial class Summarize
             text += $$"""
 
 
-                Draw something spatial (a labelled structure, a physics setup with its forces, a circuit, the graph of a function, a data structure in memory) as SVG instead, in a ```svg block: viewBox="0 0 640 H" with H at most 480, no width or height, text 13 to 15 units and at least 16 from the edges, every part labelled, arrows with a <marker>. Colours only from: #1D1D1F (lines and text), #6E6E73 (secondary text), #C7C7CC (light lines), #FFFFFF (paper), and the stroke/fill pairs red #D93025/#FCE8E6, blue #1A73E8/#E8F0FE, green #188038/#E6F4EA, amber #E37400/#FEF7E0, purple #8E24AA/#F3E8FD; the app recolours them for dark mode. No scripts, images, links, fonts, CSS or foreignObject. For example:
+                Draw something spatial (a labelled structure, a physics setup with its forces, a circuit, the graph of a function, a data structure in memory) as SVG instead, in a ```svg block: {{SvgRules}} For example:
                 ```svg
                 {{SvgExample}}
                 ```
@@ -131,8 +146,10 @@ public static partial class Summarize
         return text.ReplaceLineEndings("\n");
     }
 
+    /// <summary>One answer from a local model, its context sized and its output capped. <paramref name="json"/> holds
+    /// it to one JSON object (the diagram designer's reply); <paramref name="timeout"/> is how long it may take.</summary>
     public static async Task<string> OllamaGenerateAsync(Config cfg, string model, string prompt, int numCtx,
-        HttpClient? http = null)
+        HttpClient? http = null, TimeSpan? timeout = null, bool json = false, CancellationToken ct = default)
     {
         int numPredict = Math.Min(MaxNotesTokens, numCtx / 2);
         var body = new JsonObject
@@ -148,9 +165,10 @@ public static partial class Summarize
                 ["repeat_penalty"] = 1.1, ["repeat_last_n"] = 256,
             },
         };
+        if (json) body["format"] = "json";
         // A long lecture on a big model, or a slow computer, takes minutes; fine, this runs in the background.
         // Output is capped, so this only has to cover reading the transcript plus 4,096 tokens.
-        var data = await Ollama.PostAsync(cfg.OllamaHost, "/api/chat", body, TimeSpan.FromSeconds(900), http);
+        var data = await Ollama.PostAsync(cfg.OllamaHost, "/api/chat", body, timeout ?? TimeSpan.FromSeconds(900), http, ct);
         if (Py.AsString(data?["done_reason"]) == "length")
             throw new RunawayOutputException($"{model} kept writing past {numPredict} tokens without finishing "
                 + "(small models sometimes loop), so no notes were written from it");
@@ -208,7 +226,7 @@ public static partial class Summarize
         cfg.OllamaEnabled && cfg.SummaryEnabled && Py.Strip(m.Transcript).Length >= MinTranscriptChars;
 
     [GeneratedRegex("<think>.*?</think>", RegexOptions.Singleline)]
-    private static partial Regex Thinking();
+    internal static partial Regex Thinking();
 
     [GeneratedRegex(@"\A```(markdown|md)?\s*\n(.*)\n```\z", RegexOptions.Singleline)]
     private static partial Regex Fenced();
@@ -304,7 +322,7 @@ public static partial class Summarize
         return parts.Where(p => Py.Strip(p).Length > 0).ToList();
     }
 
-    static string Header(Meeting m)
+    internal static string Header(Meeting m)
     {
         var lines = new List<string> { $"Lecture: {m.Title}", $"Date: {Py.Head(m.Date, 10)}" };
         if (m.Folder.Length > 0) lines.Add($"Recorded for: {m.Folder}");
@@ -357,9 +375,12 @@ public static partial class Summarize
         string attached = Attachments.Context(m.Attached, Math.Min(Attachments.MaxContextChars, budget / AttachedShare));
         budget -= attached.Length;
         string text = Py.Strip(TimedText.Plain(m.Transcript)); // a recording's times would only distract the model
+        // A transcript that says who's speaking says what that means, once, before the words (and in each part of a long one).
+        string hint = Speakers.HasLabels(text) ? Speakers.NotesHint + "\n\n" : "";
+        text = hint + text;
         Task<string> Repaired(string notes) => RepairDiagramsAsync(notes, prompt => chat(cfg, model, prompt, ctx));
         if (text.Length <= budget) return await Repaired(CleanOutput(await chat(cfg, model, WholePrompt(m, text, drawings, attached), ctx)));
-        var parts = SplitTranscript(text, budget);
+        var parts = SplitTranscript(text[hint.Length..], budget).Select(part => hint + part).ToList();
         var notes = new List<string>();
         for (int i = 0; i < parts.Count; i++)
             notes.Add(CleanOutput(await chat(cfg, model, PartPrompt(m, parts[i], i + 1, parts.Count), ctx)));

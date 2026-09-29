@@ -41,6 +41,10 @@ public sealed class Lecture
     public double TranscribedSeconds { get; set; }
     public List<Spoken> Segments { get; set; } = [];
     public string Language { get; set; } = "";
+    /// <summary>The voices in it have been told apart (or it was sent without: it was too short, or that failed).</summary>
+    public bool SpeakersDone { get; set; }
+    /// <summary>How many times telling its voices apart has been started; it's given up on after a couple.</summary>
+    public int LabelTries { get; set; }
     /// <summary>Who recorded it, as the library shows it.</summary>
     public string Owner { get; set; } = "";
     /// <summary>What the library filed it as, once it has: the class and the lecture's title there.</summary>

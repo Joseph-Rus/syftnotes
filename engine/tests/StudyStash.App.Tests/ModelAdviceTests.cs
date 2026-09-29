@@ -18,8 +18,13 @@ sealed class FakeHardware(HardwareProfile profile) : IHardwareProbe
         return profile;
     }
 
-    /// <summary>A PC with only the graphics built into its processor (no card Whisper can use): the compact turbo.</summary>
+    /// <summary>A PC with a small graphics card Whisper can use (2 GB): the compact turbo.</summary>
     public static FakeHardware PlainPc() => new(new HardwareProfile(HostOs.Windows, Architecture.X64, 8, true, 16,
+        new GraphicsCard("AMD Radeon(TM) Graphics", 2, false), Vulkan: true));
+
+    /// <summary>A PC with only the graphics built into its processor (no card Whisper can use): Parakeet, made for the
+    /// processor.</summary>
+    public static FakeHardware ProcessorPc() => new(new HardwareProfile(HostOs.Windows, Architecture.X64, 8, true, 16,
         new GraphicsCard("Intel(R) UHD Graphics 620", 0.125, true), Vulkan: true));
 
     /// <summary>A Mac with Apple silicon: starts on the compact turbo, keeps up with large-v3.</summary>
@@ -37,7 +42,7 @@ public class ModelAdviceTests
 {
     static readonly TimeSpan Soon = TimeSpan.FromSeconds(10);
     const string MirrorUrl = "https://mirror.example/models";
-    const string PlainPcWhy = "This PC has no graphics card Whisper can use, so the compact model keeps up with a lecture.";
+    const string PlainPcWhy = "This PC's graphics card (AMD Radeon(TM) Graphics) has little memory of its own, so the compact model keeps up with a lecture.";
 
     /// <summary>A host on a made-up computer whose downloads go to a mirror that holds every request open (nothing
     /// real ever downloads): what's downloading can be seen, and nothing finishes.</summary>

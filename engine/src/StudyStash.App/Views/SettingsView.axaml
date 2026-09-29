@@ -631,7 +631,7 @@
                     <Border Classes="row">
                       <StackPanel Spacing="2" VerticalAlignment="Center">
                         <TextBlock Classes="row-title" Text="Speech models" />
-                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT) and NVIDIA Parakeet TDT 0.6B v3 (CC BY 4.0, converted to ONNX by sherpa-onnx). They run on this computer and download only when you pick them." TextWrapping="Wrap" />
+                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT); NVIDIA Parakeet TDT 0.6B v3 and TitaNet small (CC BY 4.0) and pyannote segmentation 3.0 (MIT), converted to ONNX by sherpa-onnx. They run on this computer and download only when you pick them." TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
                     <Border Classes="rowsep" />
@@ -769,29 +769,60 @@
                   <Button Classes="pill" Command="{Binding StartLibraryCommand}" IsVisible="{Binding CanStartLibrary}"><TextBlock Text="Start" FontSize="13" /></Button>
                   <Button Classes="pill" Command="{Binding StopLibraryCommand}" IsVisible="{Binding CanStopLibrary}"><TextBlock Text="Stop" FontSize="13" /></Button>
                 </StackPanel>
-                <Button Classes="pill" HorizontalAlignment="Left" Margin="0,10,0,0" IsVisible="{Binding !LibraryHere}" Command="{Binding MakeThisTheLibraryCommand}">
-                  <TextBlock Text="Make this computer the library too" FontSize="13" />
-                </Button>
-
                 <!-- This computer's role, switched any time after setup (docs/one-download.md) -->
                 <TextBlock Classes="section gap" Text="This computer" />
                 <TextBlock Classes="body" Text="{Binding RoleWords}" />
+                <!-- An old library whose lectures haven't all come over yet (it stopped part-way, or setup made this the library) -->
+                <Border Classes="group" IsVisible="{Binding ShowPendingBring}">
+                  <Border Classes="row">
+                    <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+                      <c:Icon Glyph="info" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Classes="row-title" Text="{Binding PendingBringTitle}" TextWrapping="Wrap" />
+                        <TextBlock Classes="row-sub" Text="{Binding PendingBringLine}" TextWrapping="Wrap" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Classes="pill" Command="{Binding LeaveThemThereCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Leave them there" FontSize="13" /></Button>
+                        <Button Classes="pill primary" Command="{Binding BringAgainCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="{Binding PendingBringAction}" FontSize="13" FontWeight="Medium" /></Button>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </Border>
+                <!-- A laptop: keep everything on this computer, bringing over the library it used -->
                 <StackPanel Spacing="8" IsVisible="{Binding IsLaptopRole}">
-                  <Button Classes="pill" HorizontalAlignment="Left" IsVisible="{Binding !ConfirmingBecomeLibrary}"
-                          Command="{Binding AskBecomeLibraryCommand}">
-                    <TextBlock Text="Also be your library" FontSize="13" />
-                  </Button>
+                  <Border Classes="group">
+                    <Border Classes="row">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                          <TextBlock Classes="row-title" Text="Use just this computer" />
+                          <TextBlock Classes="row-sub" Text="{Binding JustThisComputerLine}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="pill act" Margin="12,0,0,0" IsVisible="{Binding !ConfirmingBecomeLibrary}" Command="{Binding AskBecomeLibraryCommand}">
+                          <TextBlock Text="Use just this computer…" FontSize="13" />
+                        </Button>
+                      </Grid>
+                    </Border>
+                  </Border>
                   <StackPanel Spacing="8" IsVisible="{Binding ConfirmingBecomeLibrary}">
-                    <TextBlock Classes="say" Margin="0" Text="{Binding BecomeLibraryQuestion}" />
+                    <TextBlock Classes="say" MaxWidth="560" Text="{Binding BecomeLibraryQuestion}" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="pill" Command="{Binding CancelBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" FontSize="13" /></Button>
-                      <Button Classes="pill primary" Command="{Binding ConfirmBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Switch" FontSize="13" FontWeight="Medium" /></Button>
+                      <Button Classes="pill primary" Command="{Binding ConfirmBecomeLibraryCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Use just this computer" FontSize="13" FontWeight="Medium" /></Button>
                     </StackPanel>
                   </StackPanel>
                 </StackPanel>
+                <!-- A library: use a library on another computer instead, handing everything over first -->
                 <StackPanel Spacing="8" IsVisible="{Binding IsLibraryRole}">
-                  <TextBlock Classes="row-sub" Text="Send its lectures to another library and become a laptop that records for it." />
-                  <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left" IsVisible="{Binding !ConfirmingBecomeLaptop}">
+                  <Border Classes="group">
+                    <Border Classes="row">
+                      <StackPanel Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Classes="row-title" Text="Use a library on another computer" />
+                        <TextBlock Classes="row-sub" TextWrapping="Wrap"
+                                   Text="Everything in this library goes to it first: every lecture with its notes and transcript, attached files, your classes and chats. Then this computer records for it." />
+                      </StackPanel>
+                    </Border>
+                  </Border>
+                  <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left" Margin="0,4,0,0" IsVisible="{Binding !ConfirmingBecomeLaptop}">
                     <Border Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopAddress}" PlaceholderText="http://mac-mini:8787" FontSize="13" /></Border>
                     <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding BecomeLaptopPassword}" PasswordChar="•" PlaceholderText="Its password" FontSize="13" /></Border>
                   </Grid>
@@ -799,15 +830,21 @@
                     <TextBlock Text="Become a laptop" FontSize="13" />
                   </Button>
                   <StackPanel Spacing="8" IsVisible="{Binding ConfirmingBecomeLaptop}">
-                    <TextBlock Classes="say" Margin="0"
-                               Text="This library's lectures go to that address first, so nothing is left behind. Then this computer stops being the library: its lectures, notes and settings stay right where they are, ready for it to be the library again any time." />
+                    <TextBlock Classes="say" MaxWidth="560"
+                               Text="Everything in this library goes to that address first, so nothing is left behind; if that library can't take it all, nothing changes here. Then this computer stops being the library: its lectures, notes and settings stay right where they are, ready for it to be the library again any time." />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Button Classes="pill" Command="{Binding CancelBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Cancel" FontSize="13" /></Button>
                       <Button Classes="pill primary" Command="{Binding ConfirmBecomeLaptopCommand}" IsEnabled="{Binding !Switching}"><TextBlock Text="Switch" FontSize="13" FontWeight="Medium" /></Button>
                     </StackPanel>
                   </StackPanel>
                 </StackPanel>
-                <TextBlock Classes="say" Text="{Binding SwitchSay}" IsVisible="{Binding SwitchSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <!-- How far bringing (or handing on) a library has got, then what came -->
+                <TextBlock Classes="say" Text="{Binding BringLine}" IsVisible="{Binding BringLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Border IsVisible="{Binding ShowBringBar}" Height="4" CornerRadius="2" Background="{DynamicResource Fill2}" Width="480"
+                        HorizontalAlignment="Left" Margin="0,4,0,0">
+                  <Border Width="{Binding BringBarWidth}" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
+                </Border>
+                <TextBlock Classes="say" MaxWidth="560" Text="{Binding SwitchSay}" IsVisible="{Binding SwitchSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
 
               <!-- Recording -->
@@ -863,6 +900,10 @@
                 <CheckBox IsVisible="{Binding CanRecordComputerAudio}" IsChecked="{Binding ComputerAudio}" Margin="0,16,0,0">
                   <TextBlock Text="Also record what this computer plays (a lecture on Zoom or Teams)" FontSize="13" />
                 </CheckBox>
+                <CheckBox IsChecked="{Binding Speakers}" Margin="0,16,0,0">
+                  <TextBlock Text="Tell speakers apart in the transcript" FontSize="13" />
+                </CheckBox>
+                <TextBlock Classes="say" Text="{Binding SpeakersLine}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left" />
                 <TextBlock Classes="section" Text="Keep recordings" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Border Classes="field" Width="64"><TextBox Classes="bare" Text="{Binding KeepAudio}" FontSize="13" /></Border>
@@ -1012,6 +1053,20 @@
                         </Border>
                       </StackPanel>
                     </Border>
+                    <!-- A laptop: keeping everything on this computer instead (Connection → This computer) -->
+                    <Border Classes="group" IsVisible="{Binding IsLaptopRole}">
+                      <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="row-title" Text="Use just this computer" />
+                            <TextBlock Classes="row-sub" Text="{Binding JustThisComputerLine}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Classes="pill act" Command="{Binding GoJustThisComputerCommand}" Margin="12,0,0,0">
+                            <TextBlock Text="Use just this computer…" FontSize="13" />
+                          </Button>
+                        </Grid>
+                      </Border>
+                    </Border>
 
                     <TextBlock Classes="section gap" Text="Updates" />
                     <Border Classes="group">
@@ -1029,7 +1084,7 @@
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                               <TextBlock Classes="row-title" Text="Update automatically" />
-                              <TextBlock Classes="row-sub" Text="The library installs each new version by itself" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.AutoUpdateSub}" TextWrapping="Wrap" />
                             </StackPanel>
                             <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.AutoUpdate}" />
                           </Grid>

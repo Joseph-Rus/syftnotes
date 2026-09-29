@@ -16,17 +16,27 @@ public class AppUpdatesTests
         Func<Task<Release?>>? latest = null,
         Updates.ApplyFn? apply = null,
         Action? relaunchAndQuit = null,
-        List<string>? log = null)
+        List<string>? log = null,
+        Func<bool>? idleNow = null,
+        Func<string>? onDiskNow = null,
+        bool automatic = true,
+        bool installerRelaunches = false,
+        Action? quit = null,
+        List<UpdateNews>? told = null)
     {
         log ??= [];
         return new AppUpdates
         {
             Latest = latest ?? (() => Task.FromResult<Release?>(null)),
-            Idle = () => idle,
+            Idle = idleNow ?? (() => idle),
             Enabled = () => enabled,
-            OnDiskVersion = () => onDisk,
+            Automatic = () => automatic,
+            OnDiskVersion = onDiskNow ?? (() => onDisk),
             Apply = apply ?? ((_, _, _, _) => Task.FromResult(true)),
+            InstallerRelaunches = installerRelaunches,
             RelaunchAndQuit = relaunchAndQuit ?? (() => { }),
+            Quit = quit ?? (() => { }),
+            Tell = n => told?.Add(n),
             Log = s => log.Add(s),
             Home = "unused",
         };
@@ -81,17 +91,86 @@ public class AppUpdatesTests
     }
 
     [Fact]
-    public async Task A_failed_install_says_so_and_does_not_quit()
+    public async Task A_failed_install_says_so_once_and_does_not_quit()
     {
         bool quit = false;
+        var told = new List<UpdateNews>();
         var updates = Updates_(
             idle: true,
             latest: () => Task.FromResult<Release?>(Release()),
             apply: (_, _, _, _) => Task.FromResult(false),
-            relaunchAndQuit: () => quit = true);
+            relaunchAndQuit: () => quit = true,
+            told: told);
 
         Assert.Equal("install failed", await updates.RoundAsync());
+        Assert.Equal("install failed", await updates.RoundAsync()); // six hours later: tried again, not said again
         Assert.False(quit);
+        Assert.Equal(UpdateNewsKind.Failed, Assert.Single(told).Kind);
+    }
+
+    /// <summary>The download takes a minute or more: a lecture started meanwhile isn't cut short by the app quitting
+    /// for the new version. It relaunches into the new copy once the lecture's over.</summary>
+    [Fact]
+    public async Task A_lecture_started_while_it_downloaded_is_not_cut_short()
+    {
+        bool recording = false, swapped = false, quit = false;
+        var updates = Updates_(
+            idleNow: () => !recording,
+            onDiskNow: () => swapped ? "9.9.9" : "0.4.4",
+            latest: () => Task.FromResult<Release?>(Release()),
+            apply: (_, _, _, _) =>
+            {
+                recording = true; // Record pressed while it downloaded; the swap went ahead
+                swapped = true;
+                return Task.FromResult(true);
+            },
+            relaunchAndQuit: () => quit = true);
+
+        Assert.Equal("waiting until you're done recording", await updates.RoundAsync());
+        Assert.False(quit);
+        recording = false;
+        Assert.Equal("relaunching", await updates.RoundAsync());
+        Assert.True(quit);
+    }
+
+    /// <summary>Windows' Setup.exe closes the app and opens it again when it's done: the app only quits. Opening the
+    /// old copy itself would hold the files Setup is replacing, and leave the install half done.</summary>
+    [Fact]
+    public async Task Windows_leaves_opening_the_app_again_to_setup()
+    {
+        bool relaunched = false, quit = false;
+        var told = new List<UpdateNews>();
+        var updates = Updates_(
+            latest: () => Task.FromResult<Release?>(Release()),
+            installerRelaunches: true,
+            relaunchAndQuit: () => relaunched = true,
+            quit: () => quit = true,
+            told: told);
+
+        Assert.Equal("handed off", await updates.RoundAsync());
+        Assert.True(quit);
+        Assert.False(relaunched);
+        Assert.Equal(UpdateNewsKind.Restarting, Assert.Single(told).Kind); // remembered, so the next start can say if it took
+    }
+
+    /// <summary>auto_update off: a new version is said (once), never installed by itself, and installs when asked.</summary>
+    [Fact]
+    public async Task With_auto_update_off_a_new_version_is_said_and_installs_when_asked()
+    {
+        int applied = 0;
+        var told = new List<UpdateNews>();
+        var updates = Updates_(
+            automatic: false,
+            latest: () => Task.FromResult<Release?>(Release()),
+            apply: (_, _, _, _) => { applied++; return Task.FromResult(true); },
+            told: told);
+
+        Assert.Equal("available", await updates.RoundAsync());
+        Assert.Equal("available", await updates.RoundAsync());
+        Assert.Equal(0, applied);
+        Assert.Equal(UpdateNewsKind.Ready, Assert.Single(told).Kind);
+        Assert.Equal("relaunching", await updates.NowAsync());
+        Assert.Equal(1, applied);
     }
 
     [Fact]

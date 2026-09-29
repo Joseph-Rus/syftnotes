@@ -719,6 +719,24 @@ public sealed partial class LibraryWeb
         string JobRow(string job, string label) =>
             $"<div class=\"row\"><label class=\"grow\" for=\"ai_job_{job}\">{label}</label>"
             + ProviderSelect($"ai_job_{job}", picked.ByJob.TryGetValue(job, out var jc) ? jc.Provider : "", "Same as above") + "</div>";
+        string DiagramsRow()
+        {
+            string current = DiagramEngines.Normal(picked.Diagrams);
+            string Engine(string id)
+            {
+                var p = providers.First(x => x.Id == id);
+                return p.Name + (p.Available() ? "" : " (not installed)");
+            }
+            string Label(string c) => c switch
+            {
+                DiagramEngines.Auto => "Automatic",
+                DiagramEngines.SameAsNotes => "Same as notes",
+                DiagramEngines.Off => "Off",
+                _ => Engine(c),
+            };
+            string opts = string.Concat(DiagramEngines.Choices.Select(c => $"<option value=\"{c}\"{(c == current ? " selected" : "")}>{Ui.Esc(Label(c))}</option>"));
+            return $"<div class=\"row\"><label class=\"grow\" for=\"ai_diagrams\">Draws diagrams</label><select id=\"ai_diagrams\" name=\"ai_diagrams\">{opts}</select></div>";
+        }
         var main = providers.First(p => p.Id == picked.Provider);
         string modelOpts = string.Concat(main.Models.Select(m =>
             $"<option value=\"{Ui.Esc(m.Id)}\"{(m.Id == picked.Models.GetValueOrDefault(main.Id, "") ? " selected" : "")}>{Ui.Esc(m.Label)}</option>"));
@@ -731,14 +749,16 @@ public sealed partial class LibraryWeb
         string brain = "<div class=\"group-head\">AI</div><div class=\"group\">"
             + $"<div class=\"row\"><label class=\"grow\" for=\"ai_provider\">Does the work</label>{tested}{ProviderSelect("ai_provider", picked.Provider, null)}</div>"
             + (main.Id == "ollama" ? "" : $"<div class=\"row\"><label class=\"grow\" for=\"ai_model\">Model</label><select id=\"ai_model\" name=\"ai_model\">{modelOpts}</select></div>")
-            + JobRow("notes", "Writes study notes") + JobRow("sort", "Sorts lectures") + JobRow("ask", "Answers questions")
+            + JobRow("notes", "Writes study notes") + DiagramsRow() + JobRow("sort", "Sorts lectures") + JobRow("ask", "Answers questions")
             + (Terminal.Available() is { Count: > 0 } terms
                 ? "<div class=\"row\"><label class=\"grow\" for=\"terminal\">Open in… uses</label><select id=\"terminal\" name=\"terminal\">"
                   + string.Concat(terms.Select(t => $"<option value=\"{t.Id}\"{(t.Id == picked.Terminal ? " selected" : "")}>{Ui.Esc(t.Name)}</option>")) + "</select></div>"
                 : "")
             + "</div><p class=\"group-foot\">Claude, ChatGPT and Gemini run through their own apps (Claude Code, Codex, "
-            + "Antigravity), signed in with your own account, so they use your plan. The local model stays on this computer "
-            + "and costs nothing.</p>";
+            + "Antigravity), signed in with your own account, so they use your plan, and they read the transcripts they "
+            + "write notes or draw diagrams from. The local model stays on this computer and costs nothing. Automatic "
+            + "diagrams use the strongest AI that already reads your lectures (the one for notes or questions), or the "
+            + "local model.</p>";
 
         string ai = brain + $"<div class=\"group-head\">Local models</div>{aiState}<div class=\"group\">"
             + "<div class=\"row\"><label class=\"grow\" for=\"summary_model\">Writes summaries</label>"
@@ -866,6 +886,7 @@ public sealed partial class LibraryWeb
                 if (known.Contains(p)) picked.ByJob[job] = new AiChoice(p);
                 else picked.ByJob.Remove(job);
             }
+            if (DiagramEngines.Choices.Contains(Py.Strip(f.Get("ai_diagrams")))) picked.Diagrams = Py.Strip(f.Get("ai_diagrams"));
             picked.Save(cfg.Home);
         }
         return Http.SeeOther("/settings?saved=1");

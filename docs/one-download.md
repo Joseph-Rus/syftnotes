@@ -35,28 +35,80 @@ Both looks (`Views/MacSetup.axaml`, `Views/WinSetup.axaml`) show all three choic
 ## Switching later: Settings → Connection → This computer
 
 `RoleSwitch` (`engine/src/StudyStash.App/Services/RoleSwitch.cs`) is what actually changes a computer's role after
-setup, and `Settings.cs`' `SettingsModel` wires it into **Settings → Connection**, under a new "This computer"
-section (`Views/SettingsView.axaml`, one shared page for both looks). It shows the current role in plain words and,
-depending on it, one of two switches — each with a short explanation and a confirm step before anything changes:
+setup, and `Settings.cs`' `SettingsModel` wires it into **Settings → Connection**, under "This computer"
+(`Views/SettingsView.axaml`, one shared page for both looks). It says what this computer is for in plain words and,
+depending on that, offers one of two moves, each a settings row that explains itself and asks before anything
+changes:
 
-- **A laptop can also become the library.** Nothing about its recordings moves: `LibraryHere.CreateAsync` makes (or
-  finds) a library right where its notes already are. If the laptop was connected to a library on another
-  computer, that library's name and password come over automatically (so connecting from anywhere else is just a
-  new address), and its lectures are brought over too — a page at a time, notes and classes as they were written,
-  with no AI run again (`LibraryMove`, see `RoleSwitch.BringLecturesAsync`). The old library keeps every lecture of
-  its own; bringing them over is safe to do more than once, and a problem doing it (the old library's offline, say)
-  never stops the switch — it's said in plain words, with a way to try again.
-- **A library can become a laptop.** First, this library's own lectures go to the library it's about to connect to
-  (`RoleSwitch.HandOffLecturesAsync`, the same `LibraryMove` used the other way around), so nothing is left behind;
-  if that library can't be reached or the password's wrong, nothing changes and the library here keeps running.
-  Only once that's done does this computer stop being the library and start sending to the other one
-  (`RoleSwitch.ToLaptopAsync`): its own lectures, notes and settings stay on disk untouched, ready for it to be the
-  library again any time.
+- **Use just this computer** (a laptop). This is how a laptop stops depending on its library on another computer
+  without losing anything; a laptop's Settings → Library page offers it too, and it's the only way in (the old "Make
+  this computer the library too" button, which pointed the app at an empty library and left the old one's lectures
+  out of sight, is gone). The row names what it would stop using ("Stop using Sam's library on mac-mini: your
+  classes and notes come to this Mac…"), and the confirm says what happens: *"Sam's library on mac-mini keeps its own
+  copy. Classes and notes come here: every lecture with its notes and transcript, the files you attached, your
+  classes with their other names and Canvas courses, and your chats. Then this Mac is your library, and keeps
+  recording."* Then:
+  1. `RoleSwitch.ToLibraryAsync` → `LibraryHere.CreateAsync` makes (or finds) a library right here, reachable from
+     this computer alone the way setup's Just this computer makes one, with the old library's name and password when
+     it has none of its own. Just before client.toml is pointed at it, the old library (address, password, name) is
+     remembered in `bring-from.json`, readable by the owner only like client.toml, until everything from it has come
+     over. Every way of making this computer the library goes through `CreateAsync`, so setup's own Just this
+     computer on a laptop that used another library remembers it too, and says its classes and notes can come over
+     from Settings → Connection.
+  2. `RoleSwitch.BringLecturesAsync` copies everything with `LibraryMove.CopyAsync` (below), under a progress line and
+     bar ("Bringing lectures over: 40 of 140…", then attached files, then other notes and files), and ends by saying
+     what came: *"26 lectures and 3 classes came over from Sam's library, with 5 files and 1 chat. 1 of them had no
+     notes yet: this Mac writes them now. It keeps its own copy."* (and, when so, how many were already here and
+     which files weren't on the old library any more).
+  3. If it stops part-way (the old library's asleep, Tailscale's off), what came stays, and this computer is already a
+     working library that records. The summary says *"Not everything from Sam's library has come over yet. Can't
+     reach your old library… What came is safe here, and Sam's library still has everything: press Try again when it
+     can be reached."*, and a row stays under This computer — *Not everything from Sam's library has come over yet* —
+     with **Try again** (only what's missing comes) and **Leave them there** (for a library that's gone for good:
+     the row goes, nothing is deleted anywhere). After setup it reads *Your classes and notes are still on Sam's
+     library*, with **Bring them over**.
+- **Use a library on another computer** (a library, or just this computer). First everything in this library goes to
+  the library it's about to connect to (`RoleSwitch.HandOffLecturesAsync`, the same `LibraryMove` the other way
+  round), so nothing is left behind; if that library can't be reached, the password's wrong, or it runs a Study
+  Stash too old to take attached files and chats, nothing changes and the library here keeps running. Only then does
+  this computer stop being the library and start sending to the other one (`RoleSwitch.ToLaptopAsync`): its own
+  lectures, notes and settings stay on disk untouched, ready for it to be the library again any time. On a computer
+  that's the library, the Connect button at the top of the page no longer re-points the app at another library
+  (which hid this one's lectures); it says to use this move instead, with the address filled in.
 
 Both directions restart whatever needs it — the library service starts, stops or takes new settings; the laptop's
 connection points at its new address — through the same `AppHost`/`LibraryHere` machinery Setup and Settings already
 use, so nothing about running the app changes because the switch went through `RoleSwitch` instead of first-run
 setup.
+
+### What comes over, and what doesn't (`LibraryMove`)
+
+`LibraryMove` (`engine/src/StudyStash.Core/LibraryMove.cs`, routes in `LibraryWeb.Move.cs`, all behind the library
+password) copies a library in parts, each a page at a time. The old library's routes only read; the new library's
+never overwrite: a lecture, attachment or chat it already has (by id) is left alone, and a file whose path is taken by
+a different file comes in beside it as "name (2).ext". So running it again brings only what's missing, never a second
+copy, and a stop part-way leaves nothing half-written (a file arrives in a hidden folder and is checked — its size,
+or its SHA-256 — before it's put in place).
+
+| Comes over | How |
+|---|---|
+| Classes: names, other names (the title rules), what each covers, their order (so their colours) | `/api/v2/move/library`. A class the new library has already (whatever the case) keeps its own name and description and learns the old one's other names. |
+| Each class's Canvas course, which courses are chosen, the school's Canvas address | Same. Only when the new library has no course for that class (and it's the same school). The Chrome extension follows the new library by itself (`ExtensionKeeper`); the next sync fills the Due list and course pages in again. |
+| Every lecture, under its class, with who chose it, its transcript, typed and private notes, study notes and what wrote them, topics, and its note file exactly as it was (edits by hand or by the AI included) | `/api/v2/move/lectures`: pages of ids first, then only the lectures the new library says it hasn't got, whole. A lecture whose notes weren't written yet (or failed) comes too, and the new library writes them. |
+| Files attached to lectures and classes, with the words read from them | `/api/v2/move/attachments`, each file streamed through (never all in memory). |
+| The notes folder's other files: notes captured into a class (`<Class>/Notes/`), the Inbox, the Canvas mirror, anything put there by hand | `/api/v2/move/files`, each with its SHA-256. Hidden files and folders (the AI's undo history in `.git`) stay. |
+| Chats | `/api/v2/move/chats`. The AI's own conversation lived on the old computer, so a follow-up here starts afresh from what was said. |
+| How notes are written and sorted (`[summary]`, `[ollama]`, ai.json's picks) | Only into a library the switch just made (one whose AI was never chosen). |
+
+Not brought, on purpose: phones paired with the old library and Claude's connections to it (they belong to its
+address: pair and connect again here), the Chrome extension's key (the new library makes its own), Canvas's sync
+state (rebuilt by the next sync), the folders the old library could read (paths on the other computer), the undo
+history of AI edits, rewrite drafts not used yet, and the trash. Recordings never lived on the library: they're on
+the laptop that made them.
+
+A library from 0.10.0 hands over its filed lectures only (it has no other routes): they come, and the rest waits —
+the summary says to update it and press Try again, and the row stays until it has. One older than that can't hand
+anything over: the summary says to update it, and the row stays for Try again.
 
 ## What an older install does when it updates
 
@@ -88,7 +140,18 @@ an old library to bring lectures from, a laptop becoming the library and inherit
 password, bringing lectures over and the words each outcome says, a library becoming a laptop (refusing its own
 address, a wrong password, an address that can't be reached, and the happy path), and handing lectures off before
 that switch. `SettingsRoleSwitchTests.cs` covers the same moves through `SettingsModel`, the way Settings' "This
-computer" actually calls them, including asking before switching and what's shown while confirming. `LibraryWebTests`
+computer" actually calls them, including asking before switching and what's shown while confirming.
+`UseJustThisComputerTests.cs` is the end-to-end proof: an old library (a real one, on a loopback port, seen by the
+app as "mac-mini") with classes and their rules and Canvas courses, lectures with notes and transcripts (one edited
+by hand, one sorted by a person, one Unsorted, one still waiting for notes, more than a page), attached files,
+captured notes, the Inbox, the Canvas mirror and a chat; a laptop presses Use just this computer, the app starts its
+own library (the built engine) and everything arrives — every class in order with its rules, every lecture under its
+class with its notes, transcript and note file byte for byte, every file — while the old library's files are
+unchanged, byte for byte. A second test stops the copy twice part-way (the network gone on the second page of
+lectures, then the old library going quiet in the middle of a file), checks what came stayed and the Try again row
+shows, then presses Try again and checks everything is there exactly once. `LibraryMoveTests` covers the copy
+between two libraries directly (pages, a second go changing nothing, wrong passwords, an old library too old).
+`LibraryWebTests`
 and `LibrarySetupTests` cover the library's own pages linking to the one download instead of the old Laptop names.
 The Mac and Windows CI jobs build the one DMG and the one Setup.exe, check the DMG carries no `StudyStashRole`, and
 install, self-test and update each in place.
