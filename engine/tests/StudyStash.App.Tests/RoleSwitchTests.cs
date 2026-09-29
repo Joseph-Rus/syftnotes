@@ -181,7 +181,7 @@ public sealed class RoleSwitchTests
         Assert.Equal("Sam's library had no lectures to bring over.", RoleSwitch.BroughtWords(new MoveResult(0, 0, 0), "Sam's library"));
         Assert.Equal("Every lecture from Sam's library is already here. It keeps its own copy.", RoleSwitch.BroughtWords(new MoveResult(0, 3, 0), "Sam's library"));
         Assert.Equal("1 lecture came over from Sam's library. It keeps its own copy.", RoleSwitch.BroughtWords(new MoveResult(1, 0, 0), "Sam's library"));
-        Assert.Equal("3 lectures came over from Sam's library. 1 was already here. It keeps its own copy.", RoleSwitch.BroughtWords(new MoveResult(3, 1, 1), "Sam's library"));
+        Assert.Equal("3 lectures and 1 class came over from Sam's library. 1 was already here. It keeps its own copy.", RoleSwitch.BroughtWords(new MoveResult(3, 1, 1), "Sam's library"));
         Assert.Equal("Your old library had no lectures to bring over.", RoleSwitch.BroughtWords(new MoveResult(0, 0, 0), ""));
     }
 
@@ -251,7 +251,7 @@ public sealed class RoleSwitchTests
         var seen = new List<MoveProgress>();
         string said = await RoleSwitch.BringLecturesAsync(host, old, seen.Add, ct: TestContext.Current.CancellationToken);
 
-        Assert.Equal("2 lectures came over from Sam's library. It keeps its own copy.", said);
+        Assert.Equal("2 lectures and 1 class came over from Sam's library. It keeps its own copy.", said);
         Assert.Equal(2, seen[^1].Total);
         Assert.NotNull(newStore.Get("a1"));
         Assert.NotNull(oldStore.Get("a1")); // the old library keeps every lecture of its own
@@ -287,7 +287,7 @@ public sealed class RoleSwitchTests
         var seen = new List<MoveProgress>();
         string said = await RoleSwitch.HandOffLecturesAsync(host, newUrl, "new-pw", seen.Add, ct: TestContext.Current.CancellationToken);
 
-        Assert.Equal("1 lecture went to your new library. This library keeps its own copy.", said);
+        Assert.Equal("1 lecture and 1 class went to your new library. This library keeps its own copy.", said);
         Assert.NotNull(newStore.Get("a1"));
         Assert.NotNull(hereStore.Get("a1")); // this library keeps every lecture of its own
     }

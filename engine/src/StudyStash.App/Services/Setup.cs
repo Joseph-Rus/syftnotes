@@ -285,6 +285,9 @@ public static class Setup
                 m.LibraryOk = true;
                 m.LibraryResult = $"Connected to {cc.PoolName}.";
             }
+            // A laptop made into the library here: what its old library has comes over from Settings, never unasked.
+            if ((m.IsOneComputer || m.IsLibrary) && RoleSwitch.Pending(host.Home) is { } waiting)
+                m.LibraryResult += $" Your classes and notes on {(waiting.Name.Length > 0 ? waiting.Name : "your old library")} can come over from Settings → Connection.";
             await host.CheckLibraryAsync();
         }
         catch (Exception e) when (e is InvalidOperationException or ArgumentException or HttpRequestException or System.Text.Json.JsonException or IOException)
