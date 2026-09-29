@@ -9,7 +9,7 @@
 /* --- the navigation bar: a long title never runs under the buttons ------------------------------------------ */
 
 .navbar-row {
-  grid-template-columns: minmax(64px, 1fr) minmax(0, 3fr) minmax(64px, 1fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr) minmax(0, 1.4fr);
 }
 
 /* --- lists ----------------------------------------------------------------------------------------------------- */
