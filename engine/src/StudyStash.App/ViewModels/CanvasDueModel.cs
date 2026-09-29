@@ -78,6 +78,7 @@ public sealed partial class CanvasDueModel(CanvasContext context) : ObservableOb
                 row.OnSelectRow = Select;
                 return row;
             }).ToList();
+            if (rows.Count == 0) continue; // no "Overdue" header over nothing
             Groups.Add(new DueGroup(g.Label, g.Key == "overdue", rows));
         }
         IsEmpty = Groups.All(g => g.Rows.Count == 0);

@@ -446,6 +446,7 @@ public static partial class Shell
         recorder.OnPause = TogglePause;
         recorder.OnStop = () => StopRecording();
         recorder.OnExpand = expanded => recorderWindow?.Refit(PlaceRecorder);
+        recorder.Busy = () => recorderWindow?.Refitting == true;
 
         quick.OnQuery = q => _ = SearchAsync(q);
         quick.OnAsk = AskQuick;
@@ -740,11 +741,19 @@ public static partial class Shell
 
     static void ShowRecorder(bool expanded)
     {
-        recorder.Expanded = expanded;
         recorderWindow ??= MakeRecorderWindow();
+        bool changed = recorder.Expanded != expanded;
+        recorder.Expanded = expanded;
+        if (recorderWindow.IsVisible)
+        {
+            // On screen already: a change of size goes through Refit, never a resize in view.
+            if (changed) recorderWindow.Refit(PlaceRecorder);
+            return;
+        }
+        recorderWindow.SizeToContent = SizeToContent.WidthAndHeight;
         PlaceRecorder();
         recorderWindow.Show();
-        recorderWindow.Refit(PlaceRecorder);
+        Dispatcher.UIThread.Post(PlaceRecorder, DispatcherPriority.Loaded);
     }
 
     static Floating MakeRecorderWindow()
@@ -760,7 +769,7 @@ public static partial class Shell
         bool moved = false;
         view.PointerPressed += (_, e) =>
         {
-            if (e.Source is TextBox || !e.GetCurrentPoint(view).Properties.IsLeftButtonPressed || w.Panel() is not { } panel) return;
+            if (e.Source is TextBox || w.Refitting || !e.GetCurrentPoint(view).Properties.IsLeftButtonPressed || w.Panel() is not { } panel) return;
             // All in screen pixels: the window's clear room shrinks and grows at the display's edges as it moves, which
             // shifts the pill inside it, so a point on the pill itself wouldn't stay put.
             grabbed = view.PointToScreen(e.GetPosition(view));

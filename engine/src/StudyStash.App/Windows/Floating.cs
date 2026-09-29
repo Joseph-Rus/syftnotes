@@ -102,25 +102,36 @@ public class Floating : Window
     }
 
     /// <summary>
-    /// The content changed size (the recorder's pill opened or closed): <paramref name="place"/> puts it for its new
-    /// size now, and again once layout has actually resized the window, with a fresh frame drawn after. Placing only
-    /// once, before the resize lands, left a Mac showing the old frame stretched over the new window, shifted off the
-    /// panel. The window always sizes to its content again first: Avalonia stops that for good whenever the system
-    /// resizes the window itself (a display with another scale).
+    /// The content changed size (the recorder's pill opened or closed). Resizing a see-through window while it's on
+    /// screen left a Mac showing its last frame stretched over the new size, shifted off the panel, and clicking fast
+    /// stacked one resize on another before a frame landed. So the window steps off screen for the change:
+    /// <paramref name="place"/> puts it for its new size, it's laid out at that size, and only then does it show again
+    /// (a window coming on screen draws itself whole), placed once more now its size is final. While that's under way
+    /// <see cref="Refitting"/> is true, so the caller can let clicks wait. The window always sizes to its content again
+    /// first: Avalonia stops that for good whenever the system resizes the window itself (a display with another scale).
     /// </summary>
     public void Refit(Action place)
     {
         SizeToContent = SizeToContent.WidthAndHeight;
+        bool shown = IsVisible;
+        Refitting = true;
+        if (shown) Hide();
         holder.InvalidateMeasure();
         place();
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            if (!IsVisible) return;
             place();
-            holder.InvalidateVisual();
-            InvalidateVisual();
+            if (shown) Show();
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (IsVisible) place();
+                Refitting = false;
+            }, Avalonia.Threading.DispatcherPriority.Loaded);
         }, Avalonia.Threading.DispatcherPriority.Loaded);
     }
+
+    /// <summary>A <see cref="Refit"/> is under way: the window isn't at its new size and place yet.</summary>
+    public bool Refitting { get; private set; }
 
     /// <summary>The panel's own size in pixels, without the room round it.</summary>
     public PixelSize PanelSize(double scale)

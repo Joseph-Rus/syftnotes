@@ -90,6 +90,9 @@ public sealed partial class RecorderModel : ObservableObject
     public Action? OnPause { get; set; }
     public Action? OnStop { get; set; }
     public Action<bool>? OnExpand { get; set; }
+    /// <summary>The window is still changing size from the last open or close: a toggle now waits (is dropped), so
+    /// fast clicks can't stack one resize on another.</summary>
+    public Func<bool>? Busy { get; set; }
 
     [RelayCommand] void Pause() => OnPause?.Invoke();
     [RelayCommand] void Stop() => OnStop?.Invoke();
@@ -97,6 +100,7 @@ public sealed partial class RecorderModel : ObservableObject
     [RelayCommand]
     void Toggle()
     {
+        if (Busy?.Invoke() == true) return;
         Expanded = !Expanded;
         Hovered = false;
         OnExpand?.Invoke(Expanded);

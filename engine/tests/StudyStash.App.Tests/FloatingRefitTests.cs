@@ -28,9 +28,14 @@ public class FloatingRefitTests
             placed++;
             w.Put(at);
         });
+        // Off screen while it changes size, and busy until it's back at its new size.
+        Assert.False(w.IsVisible);
+        Assert.True(w.Refitting);
         Dispatcher.UIThread.RunJobs();
 
-        Assert.Equal(2, placed);
+        Assert.True(w.IsVisible);
+        Assert.False(w.Refitting);
+        Assert.Equal(3, placed);
         Assert.Equal(SizeToContent.WidthAndHeight, w.SizeToContent);
         var panel = w.Panel()!.Value;
         double scale = w.DesktopScaling;
