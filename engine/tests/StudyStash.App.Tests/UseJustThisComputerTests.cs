@@ -119,7 +119,11 @@ public sealed class UseJustThisComputerTests
         var all = new Dictionary<string, string>();
         foreach (string root in roots)
             foreach (string file in Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
-                all[file] = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(file)));
+            {
+                // Shared, so a file the old library still has open (its database, on Windows) can be read.
+                using var open = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+                all[file] = Convert.ToHexString(SHA256.HashData(open));
+            }
         return all;
     }
 
