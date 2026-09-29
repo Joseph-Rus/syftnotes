@@ -21,13 +21,11 @@ namespace StudyStash.Audio;
 [SupportedOSPlatform("windows")]
 public sealed class WindowsSound : IAudioSource
 {
-    const int MaxLag = Sound.Rate; // a second of the computer's sound waiting for the microphone
     static readonly WaveFormat Wanted = WaveFormat.CreateIeeeFloatWaveFormat(Sound.Rate, 1);
 
     readonly bool withComputerAudio;
     readonly Func<MMDevice?> findMicrophone;
-    readonly Lock gate = new();
-    readonly Queue<float> played = new();
+    readonly PlayedSound played = new();
     Capture? open;
 
     public WindowsSound(bool withComputerAudio) : this(withComputerAudio, DefaultMicrophone)
@@ -84,7 +82,7 @@ public sealed class WindowsSound : IAudioSource
             {
                 try
                 {
-                    c.Loop = Record(() => new WasapiRecorderBuilder().WithLoopbackCapture(), OnPlayed, _ => { });
+                    c.Loop = Record(() => new WasapiRecorderBuilder().WithLoopbackCapture(), played.Add, _ => { });
                 }
                 catch (Exception e) when (e is COMException or InvalidOperationException or UnauthorizedAccessException)
                 {
@@ -151,24 +149,9 @@ public sealed class WindowsSound : IAudioSource
             ? RecordingWords.CantHearWindows
             : $"The microphone stopped ({e.Message}).";
 
-    void OnPlayed(float[] s)
-    {
-        lock (gate)
-        {
-            foreach (float x in s) played.Enqueue(x);
-            while (played.Count > MaxLag) played.Dequeue();
-        }
-    }
-
     void OnMic(float[] s)
     {
-        if (withComputerAudio)
-        {
-            lock (gate)
-            {
-                for (int i = 0; i < s.Length && played.Count > 0; i++) s[i] = Math.Clamp(s[i] + played.Dequeue(), -1f, 1f);
-            }
-        }
+        if (withComputerAudio) played.MixInto(s);
         Samples?.Invoke(s);
     }
 
@@ -182,7 +165,7 @@ public sealed class WindowsSound : IAudioSource
         c.Mic?.Recorder.StopRecording();
         c.Loop?.Recorder.StopRecording();
         Task.Run(c.Dispose).Wait(TimeSpan.FromSeconds(3));
-        lock (gate) played.Clear();
+        played.Clear();
     }
 
     public void Dispose() => Stop();

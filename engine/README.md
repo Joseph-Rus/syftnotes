@@ -61,6 +61,8 @@ dotnet test engine/StudyStash.slnx
   transcribes a real recording with a real Whisper model.
 - `STUDYSTASH_LIVE_OLLAMA=qwen3:1.7b dotnet test engine/StudyStash.slnx` — notes, sorting, and the
   length cap against a real Ollama.
+- `STUDYSTASH_LIVE_COMPUTER_AUDIO=1 dotnet test engine/StudyStash.slnx` (macOS 14.2 or later) — has `say`
+  speak out loud and checks the Mac's process tap hears it. The terminal needs System Audio Recording allowed.
 - `STUDYSTASH_LIVE_SERVICE=1 dotnet test engine/StudyStash.slnx` (Mac or Windows only) — installs
   the library as the real background service on a spare port, checks it answers, restarts, and
   removes itself. Refuses to run if a library service is already installed, since its label is the

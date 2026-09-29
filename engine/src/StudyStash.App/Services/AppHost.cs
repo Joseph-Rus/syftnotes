@@ -39,7 +39,7 @@ public sealed class AppSettings
     public string ModelSuggested { get; set; } = "";
     /// <summary>"" finds each lecture's language; "en" and so on fixes it.</summary>
     public string Language { get; set; } = "";
-    /// <summary>Windows: record what the computer plays too (a lecture on Zoom).</summary>
+    /// <summary>Record what the computer plays too (a lecture on Zoom): Windows, and macOS 14.2 or later.</summary>
     public bool ComputerAudio { get; set; }
     /// <summary>Parakeet's library wouldn't load on this computer (a Windows PC without Microsoft's Visual C++ runtime, say):
     /// Whisper is the model for it from then on.</summary>
@@ -342,13 +342,13 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// Nothing is asked for a pretend microphone.</summary>
     public Task<MicAccess> AskMicAsync() => mics.AskAsync();
 
-    /// <summary>The microphone to record from (and on Windows, if asked, what the computer plays too).</summary>
+    /// <summary>The microphone to record from (and, if asked, what the computer plays too).</summary>
     public IAudioSource OpenMic() => pretendMic is { } pretend ? pretend() : Microphones.Open(Settings.ComputerAudio);
 
     /// <summary>Where the student turns the microphone on for Study Stash.</summary>
     public string MicSettingsUrl => Microphones.SettingsUrl;
 
-    /// <summary>This computer can record what it plays, too (Windows).</summary>
+    /// <summary>This computer can record what it plays, too (Windows; macOS 14.2 or later).</summary>
     public bool CanRecordComputerAudio => Microphones.CanRecordComputerAudio;
 
     /// <summary>Voice memos from the phone, brought in as lectures for Whisper (<see cref="Start"/> runs it).</summary>

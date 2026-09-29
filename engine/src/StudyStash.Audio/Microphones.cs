@@ -5,16 +5,18 @@ namespace StudyStash.Audio;
 /// <summary>This computer's microphone, whichever system it runs.</summary>
 public static class Microphones
 {
-    /// <summary>The microphone, and on Windows (if asked) what the computer plays too.</summary>
+    /// <summary>The microphone, and (if asked, where it can) what the computer plays too.</summary>
     public static IAudioSource Open(bool withComputerAudio = false)
     {
+        if (OperatingSystem.IsMacOSVersionAtLeast(14, 2) && withComputerAudio) return new MacSound(withComputerAudio: true);
         if (OperatingSystem.IsMacOS()) return new MacMicrophone();
         if (OperatingSystem.IsWindows()) return new WindowsSound(withComputerAudio);
         throw new PlatformNotSupportedException("Recording works on a Mac or a Windows PC.");
     }
 
-    /// <summary>Recording the computer's own sound (a lecture on Zoom) works on Windows; a Mac needs more for it.</summary>
-    public static bool CanRecordComputerAudio => OperatingSystem.IsWindows();
+    /// <summary>Recording the computer's own sound (a lecture on Zoom) works on Windows, and on a Mac with macOS 14.2
+    /// or later (process taps).</summary>
+    public static bool CanRecordComputerAudio => OperatingSystem.IsWindows() || OperatingSystem.IsMacOSVersionAtLeast(14, 2);
 
     public static MicAccess Access()
     {
