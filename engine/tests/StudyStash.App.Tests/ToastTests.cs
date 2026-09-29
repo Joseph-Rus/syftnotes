@@ -1,12 +1,16 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using StudyStash.App.ViewModels;
+using StudyStash.Audio;
+using StudyStash.Core;
 using StudyStash.App.Views;
 
 namespace StudyStash.App.Tests;
@@ -73,7 +77,8 @@ public class ToastTests
             // No buttons unless there's something to do.
             Assert.False(view.FindControl<Grid>("Actions")!.IsVisible);
             var body = view.FindControl<TextBlock>("BodyText")!;
-            Assert.Equal(2, body.MaxLines);
+            // Up to four lines, so what to do is never cut off (a Windows toast's own limit).
+            Assert.Equal(4, body.MaxLines);
             // One × only: Windows' in the header, the Mac's (under the pointer) in the title row.
             Assert.False(view.FindControl<Button>(skin == SkinKind.Mac ? "WinClose" : "MacClose")!.IsEffectivelyVisible);
             Assert.Equal(TextTrimming.CharacterEllipsis, view.FindControl<TextBlock>("TitleText")!.TextTrimming);
@@ -100,6 +105,9 @@ public class ToastTests
             view.FindControl<Button>("MacClose")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert.Equal(1, acted);
             Assert.Equal(1, dismissed);
+            // The second button (Later) puts it away too.
+            view.FindControl<Button>("SecondButton")!.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal(2, dismissed);
             // A Mac banner's × waits for the pointer.
             Assert.False(view.FindControl<Button>("MacClose")!.IsVisible);
         }
@@ -146,6 +154,67 @@ public class ToastTests
         finally
         {
             w.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void A_click_on_the_card_does_what_its_button_does_but_not_without_a_button()
+    {
+        var view = new ToastView { Title = "Filed in CS 101", Text = "Recursion and the call stack", ActionLabel = "Open note" };
+        var w = Host(view, SkinKind.Mac);
+        try
+        {
+            int acted = 0;
+            view.Acted += () => acted++;
+            var at = view.TranslatePoint(new Point(150, 20), w)!.Value;
+            w.MouseMove(at);
+            w.MouseDown(at, MouseButton.Left);
+            w.MouseUp(at, MouseButton.Left);
+            Assert.Equal(1, acted);
+
+            view.ActionLabel = null;
+            w.MouseDown(at, MouseButton.Left);
+            w.MouseUp(at, MouseButton.Left);
+            Assert.Equal(1, acted);
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
+    /// <summary>The longest things the app says fit the card's four lines, in both looks: nothing that says what to do
+    /// is cut off.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void The_apps_longest_words_fit_without_being_cut_off(SkinKind skin)
+    {
+        ((App)Application.Current!).UseSkin(skin);
+        var pc = WhisperModels.Advise(FakeHardware.PlainPc().Probe());
+        foreach (var text in new[]
+                 {
+                     NoticeWords.Paused(RecordingWords.CantHearWindows, windows: true).Text,
+                     StudyStash.App.Services.AppHost.BehindWords(900, 600, WhisperModels.LargeV3, pc)!.Value.Text,
+                     NoticeWords.LighterModel(pc).Text,
+                     NoticeWords.Filed("BIO 110", "Cell membranes and how things get through them", "failed").Text,
+                     StudyStash.Audio.MicTrouble.Denied(windows: true).Detail,
+                     IconWords.WhereItIs(mac: false, hidden: false).Text,
+                 })
+        {
+            var view = new ToastView { Title = "Study Stash", Text = text, ActionLabel = "Settings" };
+            var w = Host(view, skin);
+            try
+            {
+                var body = view.FindControl<TextBlock>("BodyText")!;
+                var whole = new TextBlock { Text = text, FontSize = body.FontSize, LineHeight = body.LineHeight, TextWrapping = TextWrapping.Wrap, FontFamily = body.FontFamily };
+                whole.Measure(new Size(body.Bounds.Width, double.PositiveInfinity));
+                Assert.True(whole.DesiredSize.Height <= 4 * body.LineHeight + 0.5, $"{whole.DesiredSize.Height / body.LineHeight:0.#} lines: {text}");
+            }
+            finally
+            {
+                w.Close();
+            }
         }
     }
 

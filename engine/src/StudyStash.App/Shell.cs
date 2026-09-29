@@ -102,11 +102,15 @@ public static partial class Shell
         host.Heard += (l, lines) => Dispatcher.UIThread.Post(() => AddHeard(l, lines));
         host.Filed += l => Dispatcher.UIThread.Post(() =>
         {
-            Toast($"Filed in {(l.FiledClass.Length > 0 ? l.FiledClass : "your library")}",
-                l.FiledTitle.Length > 0 ? l.FiledTitle : "The notes are written.", "Open note", () => OpenLecture(l.Id));
+            var (title, text, action) = NoticeWords.Filed(l.FiledClass, l.FiledTitle, l.Error);
+            Toast(title, text, action, () => OpenLecture(l.Id));
             RequestLibraryReload();
         });
-        host.Problem += (title, why) => Dispatcher.UIThread.Post(() => Toast(title, why, null, null));
+        host.Problem += (title, why) => Dispatcher.UIThread.Post(() =>
+        {
+            if (title == AppHost.RecordingPaused) SayRecordingPaused(why);
+            else Toast(title, why, null, null);
+        });
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
         host.Start();
@@ -119,6 +123,7 @@ public static partial class Shell
         ticker = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Tick());
         ticker.Start();
         Refresh();
+        SayIfUpdated();
         if (!host.Settings.SetupDone) ShowSetup();
         else if (!Program.Background) ShowLibrary();
         if (SelfTest.Dir is not null) SelfTest.Run();
@@ -152,6 +157,8 @@ public static partial class Shell
         public static Task Search(string query) => SearchAsync(query);
         public static QuickModel QuickModel => quick;
         public static PanelModel PanelModel => panel;
+        /// <summary>The notifications on screen, newest first, and the display they're on.</summary>
+        public static ToastShelf Toasts => Shelf();
 
         /// <summary>Opens the dropdown the way clicking the real icon would (a Mac's status item; Windows' tray
         /// otherwise), and how far its centre landed from the icon's own, in points — the self-test's placement
@@ -260,6 +267,7 @@ public static partial class Shell
         if (quitting) return;
         quitting = true;
         ticker?.Stop();
+        CloseAllToasts();
         StopCanvas();
         stop.Cancel();
         try
@@ -379,7 +387,7 @@ public static partial class Shell
         if (!IconWords.WorthSaying(hidden, panelWindow?.IsVisible == true)) return;
         var (title, text) = IconWords.WhereItIs(mac, hidden);
         // Longer than most: it's the one way to find the app when its icon can't be seen.
-        Toast(title, text, hidden ? IconWords.ShowIt : null, hidden ? MoveIconIntoView : null, TimeSpan.FromSeconds(hidden ? 30 : 12));
+        Toast(title, text, hidden ? IconWords.ShowIt : null, hidden ? MoveIconIntoView : null, hidden ? NoticeTimes.Advice : TimeSpan.FromSeconds(12));
     }
 
     // --- what the buttons do ---------------------------------------------------------------------------------------
@@ -459,8 +467,8 @@ public static partial class Shell
         }
         if (!host.ModelReady)
         {
-            Toast("The model isn't downloaded yet", host.Downloading is not null ? "It's downloading: Record works once it's done." : "Download it in Settings → Recording.",
-                "Settings", ShowSettings);
+            var (title, text, action) = NoticeWords.NoModelYet(host.Downloading);
+            Toast(title, text, action, () => _ = host.DownloadModelAsync());
             return;
         }
         RecordStart start;
@@ -482,8 +490,13 @@ public static partial class Shell
         }
         if (start.Trouble is { } trouble)
         {
-            Toast(trouble.Title, trouble.Detail, trouble.HasAction ? trouble.ActionLabel : null,
-                trouble.ActionUrl.Length > 0 ? () => Dialogs.OpenUrl(trouble.ActionUrl) : null);
+            // The lecture didn't start: this stays until it's closed, or until a lecture does start.
+            Notify(new Notice
+            {
+                Title = trouble.Title, Text = trouble.Detail, ActionLabel = trouble.HasAction ? trouble.ActionLabel : null,
+                Act = trouble.ActionUrl.Length > 0 ? () => Dialogs.OpenUrl(trouble.ActionUrl) : null,
+                UntilClosed = true, StillTrue = () => host.Recorder.Current is null,
+            });
         }
         else if (start.Lecture is { } l)
         {
@@ -511,7 +524,7 @@ public static partial class Shell
         chosenClass = "";
         recorderWindow?.Hide();
         if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
-        else if (l is not null) Toast("Recording saved", "Study Stash is writing it down; the library files it and writes your notes.", null, null);
+        else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS()), null, null);
         Refresh();
     }
 
@@ -556,9 +569,12 @@ public static partial class Shell
     }
 
     /// <summary>The panel's Fix button: what to do depends on which problem is showing right now.</summary>
-    static void FixProblem()
+    static void FixProblem() => FixProblem(currentProblem?.Kind);
+
+    /// <summary>What a problem's button does (the dropdown's Fix, or a problem's notification).</summary>
+    static void FixProblem(ProblemKind? kind)
     {
-        switch (currentProblem?.Kind)
+        switch (kind)
         {
             case ProblemKind.MicDenied:
                 Dialogs.OpenUrl(host.MicSettingsUrl);
@@ -573,7 +589,7 @@ public static partial class Shell
                 _ = host.RefreshLocalLibraryAsync();
                 break;
             case ProblemKind.WrongPassword or ProblemKind.NotSetUp:
-                ShowSettings();
+                ShowSettings("Connection");
                 break;
         }
     }
@@ -672,12 +688,10 @@ public static partial class Shell
         if (panelWindow is not null && DateTime.UtcNow - panelWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
         if (panelWindow is null)
         {
-            panelWindow = new Floating { Content = PanelView(), CloseOnDeactivate = true, Title = "Study Stash" };
+            panelWindow = new Floating { Content = PanelView(), CloseOnDeactivate = true, KeepClear = true, Title = "Study Stash" };
             AppMenu.AddSettingsKey(panelWindow, SettingsFromAnywhere);
         }
         Refresh();
-        // A notification would sit over the dropdown (both hug the same corner): opening it puts them away.
-        foreach (var (_, _, toast) in toasts.ToList()) toast.Close();
         // NSEvent's mouse location is in points, in the same coordinate space Avalonia's screens report: no
         // rescaling (a display's own scale factor doesn't change where its menu bar sits in that shared space).
         var pointer = near ?? Floating.Pointer();
@@ -685,9 +699,9 @@ public static partial class Shell
         var size = panelWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
         var anchor = pointer ?? new PixelPoint(0, 0);
-        panelWindow.Position = OperatingSystem.IsMacOS()
+        panelWindow.Put(OperatingSystem.IsMacOS()
             ? Placement.MacDropdown(anchor, panelWindow.ScreenList(), size, room)
-            : Placement.TrayFlyout(anchor, panelWindow.ScreenList(), size, room);
+            : Placement.TrayFlyout(anchor, panelWindow.ScreenList(), size, room));
         panelWindow.Show();
         panelWindow.Activate();
         Desktop.Activate();
@@ -704,7 +718,7 @@ public static partial class Shell
     static Floating MakeRecorderWindow()
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
-        var w = new Floating { Content = view, Title = "Study Stash recorder" };
+        var w = new Floating { Content = view, KeepClear = true, Title = "Study Stash recorder" };
         AppMenu.AddSettingsKey(w, SettingsFromAnywhere);
         // Drag it anywhere by its background; where it lands is saved once the drag ends, not on every pixel moved.
         // The small pill moves by hand, so a press that never moves is a click, which opens the recorder.
@@ -761,13 +775,14 @@ public static partial class Shell
     /// the window is about to hide or the app to quit).</summary>
     static void SaveRecorderPosition()
     {
-        if (recorderWindow is not { IsVisible: true } w) return;
+        if (recorderWindow is not { IsVisible: true } w || w.Panel() is not { } panel) return;
         var (_, scale) = w.WorkArea(w.Position);
-        var size = w.Measured(scale);
+        // Where the window's top right would be with its whole shadow room, whatever of that room is trimmed now.
+        int room = (int)(Floating.ShadowRoom * scale);
         host.Save(s =>
         {
-            s.RecorderX = w.Position.X + size.Width;
-            s.RecorderY = w.Position.Y;
+            s.RecorderX = panel.Right + room;
+            s.RecorderY = panel.Y - room;
         });
     }
 
@@ -780,7 +795,7 @@ public static partial class Shell
         var size = recorderWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
         PixelPoint? saved = host.Settings.RecorderX is double rx && host.Settings.RecorderY is double ry ? new PixelPoint((int)rx, (int)ry) : null;
-        recorderWindow.Position = Placement.KeepOnScreen(saved, recorderWindow.ScreenList(), size, OperatingSystem.IsMacOS(), room);
+        recorderWindow.Put(Placement.KeepOnScreen(saved, recorderWindow.ScreenList(), size, OperatingSystem.IsMacOS(), room));
     }
 
     static void ToggleQuick()
@@ -795,7 +810,7 @@ public static partial class Shell
         if (quickWindow is null)
         {
             view = Skin.Current == SkinKind.Mac ? new MacQuick { DataContext = quick } : new WinQuick { DataContext = quick };
-            quickWindow = new Floating { Content = view, CloseOnDeactivate = true, Title = "Study Stash search" };
+            quickWindow = new Floating { Content = view, CloseOnDeactivate = true, KeepClear = true, Title = "Study Stash search" };
             AppMenu.AddSettingsKey(quickWindow, SettingsFromAnywhere);
         }
         quick.Answering = false;
@@ -805,7 +820,7 @@ public static partial class Shell
         var (_, scale) = quickWindow.WorkArea(pointer);
         var size = quickWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
-        quickWindow.Position = Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room);
+        quickWindow.Put(Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room));
         quickWindow.Show();
         quickWindow.Activate();
         Desktop.Activate();
@@ -1099,8 +1114,8 @@ public static partial class Shell
         {
             host.ModelSuggestionMade(advice.Model);
             Program.Log($"[model] suggested {advice.Model.Name} in place of {host.Model.Name}");
-            Toast($"{advice.Model.Name} would keep up better", $"{advice.Why} Switch in Settings → Recording.", "Settings",
-                () => ShowSettings("Recording"), TimeSpan.FromSeconds(30));
+            var (title, text) = NoticeWords.LighterModel(advice);
+            Toast(title, text, "Settings", () => ShowSettings("Recording"), NoticeTimes.Advice);
         });
     }
 
@@ -1159,47 +1174,11 @@ public static partial class Shell
         Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
             || canvasConnectWindow?.IsVisible == true));
 
-    /// <summary>Toasts on screen right now, oldest first: how they stack, and what stops the same title firing twice
-    /// in a row.</summary>
-    static readonly List<(string Title, DateTime At, Floating Window)> toasts = [];
-
-    /// <summary>A notification like the system's: top right on a Mac, above the tray on Windows. It goes by itself.
-    /// Error codes in the words go to the log, not on screen.</summary>
-    public static void Toast(string title, string text, string? action, Action? run, TimeSpan? stay = null)
-    {
-        if (quitting) return;
-        if (ToastWords.HadCodes(title) || ToastWords.HadCodes(text)) Program.Log($"[toast] {title}: {text}");
-        title = ToastWords.Plain(title) is { Length: > 0 } plain ? plain : "Study Stash";
-        text = ToastWords.Plain(text);
-        var now = DateTime.UtcNow;
-        toasts.RemoveAll(t => !t.Window.IsVisible);
-        if (toasts.Any(t => t.Title == title && now - t.At < TimeSpan.FromSeconds(10))) return;
-        var view = new ToastView { Title = title, Text = text, ActionLabel = action };
-        var w = new Floating { Content = view, Title = title, ShowActivated = false };
-        view.Acted += () =>
-        {
-            w.Close();
-            run?.Invoke();
-        };
-        view.Dismissed += w.Close;
-        w.Closed += (_, _) => toasts.RemoveAll(t => t.Window == w);
-        var (_, scale) = w.WorkArea();
-        var size = w.Measured(scale);
-        int room = (int)(Floating.ShadowRoom * scale);
-        // Stacked below (a Mac, top right) or above (Windows, bottom right) whichever toasts are already showing.
-        w.Position = Placement.ToastSpot(w.ScreenList(), toasts.Count, size, OperatingSystem.IsMacOS(), room);
-        toasts.Add((title, now, w));
-        w.Show();
-        DispatcherTimer.RunOnce(() =>
-        {
-            if (w.IsVisible && !view.IsPointerOver) w.Close();
-        }, stay ?? TimeSpan.FromSeconds(7));
-    }
-
     // --- keeping it all up to date ------------------------------------------------------------------------------------
 
     static void Tick()
     {
+        SaySettledProblems();
         if (setup is not null && micCheck is not null) Setup.TickMic(setup, host, micCheck);
         var live = host.Recorder.Current;
         if (live is null) return;
@@ -1208,7 +1187,7 @@ public static partial class Shell
         {
             behindToldFor = live.Id;
             Program.Log($"[whisper] {live.Id}: the transcript is {TimedText.Clock(host.Recorder.Elapsed - live.TranscribedSeconds)} behind with {host.Model.Name}");
-            Toast(behind.Title, behind.Text, "Settings", () => ShowSettings("Recording"), TimeSpan.FromSeconds(30));
+            Toast(behind.Title, behind.Text, "Settings", () => ShowSettings("Recording"), NoticeTimes.Advice);
         }
         string elapsed = TimedText.Clock(host.Recorder.Elapsed);
         var levels = host.Recorder.Levels();
@@ -1279,8 +1258,10 @@ public static partial class Shell
         panel.ClassName = recorder.ClassName = cls;
         int color = host.ColorOf(cls);
         panel.ClassDot = recorder.ClassDot = color >= 0 ? Skin.ClassDot(color) : Brushes.Gray;
-        var problem = Problems.For(host);
+        var problems = Problems.All(host).ToList();
+        var problem = problems.FirstOrDefault();
         currentProblem = problem;
+        SayNewProblems(problems);
         panel.ProblemTitle = problem?.Title;
         panel.ProblemDetail = problem?.Detail;
         panel.ProblemAction = problem is { HasAction: true } p ? p.ActionLabel : null;

@@ -57,6 +57,18 @@ public static partial class SelfTest
         int left = r.Left - ScreenMargin, top = r.Top - ScreenMargin;
         int width = r.Right - r.Left + 2 * ScreenMargin, height = r.Bottom - r.Top + 2 * ScreenMargin;
         if (width <= 0 || height <= 0) return null;
+        var pixels = CaptureArea(left, top, width, height);
+        var bmp = ToBitmap(pixels, width, height);
+        // The sidebar's ground: below its last row, clear of the title bar, in from the window's left edge.
+        double scale = w.RenderScaling;
+        var ground = (ScreenMargin + (int)(24 * scale), ScreenMargin + (r.Bottom - r.Top) * 3 / 4);
+        return new Picture(bmp, pixels, width, height, ground);
+    }
+
+    /// <summary>A stretch of the screen, as Windows composes it (every window on it, the taskbar too), in pixels.</summary>
+    [SupportedOSPlatform("windows")]
+    static uint[] CaptureArea(int left, int top, int width, int height)
+    {
         IntPtr screen = GetDC(IntPtr.Zero), memory = CreateCompatibleDC(screen), bitmap = CreateCompatibleBitmap(screen, width, height);
         var pixels = new uint[width * height];
         try
@@ -74,14 +86,35 @@ public static partial class SelfTest
             ReleaseDC(IntPtr.Zero, screen);
         }
         for (int i = 0; i < pixels.Length; i++) pixels[i] |= 0xFF000000;
+        return pixels;
+    }
+
+    static WriteableBitmap ToBitmap(uint[] pixels, int width, int height)
+    {
         var bmp = new WriteableBitmap(new PixelSize(width, height), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Opaque);
         using (var fb = bmp.Lock())
             for (int row = 0; row < height; row++)
                 Marshal.Copy((int[])(object)pixels, row * width, fb.Address + row * fb.RowBytes, width);
-        // The sidebar's ground: below its last row, clear of the title bar, in from the window's left edge.
-        double scale = w.RenderScaling;
-        var ground = (ScreenMargin + (int)(24 * scale), ScreenMargin + (r.Bottom - r.Top) * 3 / 4);
-        return new Picture(bmp, pixels, width, height, ground);
+        return bmp;
+    }
+
+    /// <summary>A picture of a stretch of the screen as <c>&lt;name&gt;-screen.png</c> (Windows only): what the
+    /// student sees there, every window and the taskbar included.</summary>
+    [SupportedOSPlatform("windows")]
+    static void AreaShot(PixelRect area, string name)
+    {
+        if (area.Width <= 0 || area.Height <= 0) return;
+        try
+        {
+            using var bmp = ToBitmap(CaptureArea(area.X, area.Y, area.Width, area.Height), area.Width, area.Height);
+            using var f = File.Create(Path.Combine(Dir!, name + "-screen.png"));
+            bmp.Save(f, PngBitmapEncoderOptions.Default);
+            Say($"{name} (screen): {area.Width}×{area.Height} at {area.X},{area.Y}");
+        }
+        catch (Exception e)
+        {
+            Say($"{name} (screen): no picture ({e.GetType().Name}: {e.Message})");
+        }
     }
 
     /// <summary>The Windows looks, pictured on the real screen: the library (a lecture open) light, dark, and dark in

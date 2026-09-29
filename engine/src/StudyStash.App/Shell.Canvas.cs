@@ -227,6 +227,9 @@ public static partial class Shell
         foreach (var toast in toasts.Reverse()) CanvasToast(toast);
     }
 
+    /// <summary>The announcement a notification asked for, opened as soon as its class's page has loaded.</summary>
+    static long? announcementToOpen;
+
     /// <summary>What a notification opens: its assignment on the Due page, its announcement in its class, or Due.</summary>
     static void OpenCanvasNotification(CanvasApi.NotificationRow n)
     {
@@ -237,6 +240,8 @@ public static partial class Shell
         }
         if (n.Class is { Length: > 0 } c && CanvasClassRow(c) is not null)
         {
+            // An announcement opens in its class's reader, once the class's page has loaded.
+            announcementToOpen = n.AnnouncementId;
             openClass = c;
             dueOpen = false;
             dueSelection = null;
@@ -247,40 +252,15 @@ public static partial class Shell
         ShowLibrary();
     }
 
-    /// <summary>A Canvas notification in its own floating card, stacked with the app's other toasts (three at most on
-    /// screen: a fourth pushes out the oldest).</summary>
-    static void CanvasToast(CanvasToastModel toast)
+    /// <summary>A Canvas notification in the same stack as the app's own (three at most on screen: a fourth folds
+    /// the oldest away). Its words are the library's own; Open, Later/Dismiss and the × mark it seen.</summary>
+    static void CanvasToast(CanvasToastModel toast) => Notify(new Notice
     {
-        if (quitting) return;
-        toasts.RemoveAll(t => !t.Window.IsVisible);
-        while (toasts.Count >= 3)
-        {
-            toasts[0].Window.Close();
-            toasts.RemoveAt(0);
-        }
-        var view = ToastView.For(toast);
-        var w = new Floating { Content = view, Title = toast.Title, ShowActivated = false };
-        void Close() => Dispatcher.UIThread.Post(w.Close);
-        toast.OpenCommand.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(CommunityToolkit.Mvvm.Input.IAsyncRelayCommand.IsRunning) && !toast.OpenCommand.IsRunning) Close();
-        };
-        toast.DismissCommand.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(CommunityToolkit.Mvvm.Input.IAsyncRelayCommand.IsRunning) && !toast.DismissCommand.IsRunning) Close();
-        };
-        w.Closed += (_, _) => toasts.RemoveAll(t => t.Window == w);
-        var (_, scale) = w.WorkArea();
-        var size = w.Measured(scale);
-        int room = (int)(Floating.ShadowRoom * scale);
-        w.Position = Placement.ToastSpot(w.ScreenList(), toasts.Count, size, OperatingSystem.IsMacOS(), room);
-        toasts.Add((toast.Title, DateTime.UtcNow, w));
-        w.Show();
-        DispatcherTimer.RunOnce(() =>
-        {
-            if (w.IsVisible && !view.IsPointerOver) w.Close();
-        }, TimeSpan.FromSeconds(toast.Expanded ? 12 : 7));
-    }
+        Title = toast.Title, Text = toast.Text, ActionLabel = "Open", Model = toast,
+        Key = "canvas:" + toast.Item.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        // The freshest of a batch, with its buttons, stays longer than the ones folded under it.
+        Stay = TimeSpan.FromSeconds(toast.Expanded ? 12 : 7),
+    });
 
     /// <summary>Connecting Canvas, in a small window of its own (from Settings' or the Due page's status card).</summary>
     public static void ShowCanvasConnect()

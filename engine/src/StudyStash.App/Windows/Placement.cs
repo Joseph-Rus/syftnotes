@@ -123,17 +123,73 @@ public static class Placement
     /// inside <paramref name="area"/>.</summary>
     public static PixelPoint KeepInside(PixelRect area, PixelSize size, PixelPoint at) => Clamp(area, size, at.X, at.Y, 0);
 
-    /// <summary>Where the nth toast stacks on the primary display: top right, downward on a Mac; bottom right,
-    /// upward on Windows.</summary>
-    public static PixelPoint ToastSpot(IReadOnlyList<ScreenGeometry> screens, int index, PixelSize size, bool mac, int room = 0)
+    // --- notifications ------------------------------------------------------------------------------------------------
+
+    /// <summary>Room, in points, a notification keeps from the display's right edge, and from the taskbar (Windows).</summary>
+    public const double ToastEdge = 12;
+
+    /// <summary>Room, in points, between a Mac's menu bar and the notification under it (the recorder's own corner
+    /// keeps the same).</summary>
+    public const double ToastUnderMenuBar = 10;
+
+    /// <summary>Room, in points, between two notifications stacked one on the other.</summary>
+    public const double ToastSpacing = 8;
+
+    /// <summary>A Mac's menu bar is at least this tall, in points: a notification never rises into it, even on a
+    /// display whose menu bar hides itself (whose usable area then starts at the very top).</summary>
+    const double MenuBarAtLeast = 24;
+
+    /// <summary>
+    /// Where each notification of a stack goes, newest first, as the system's own do: on a Mac, top right of
+    /// <paramref name="screen"/>, just under the menu bar, older ones below it; on Windows, bottom right, just above
+    /// the taskbar (whichever side that's on, the usable area's corner), older ones above it. <paramref name="cards"/>
+    /// are the panels' own sizes, without their shadow room. A panel in <paramref name="keepClear"/> (the dropdown or
+    /// the tray flyout, the recorder, the quick panel) is never covered: a notification in its way steps past it. A
+    /// notification with no room left on the display waits (null) until there is, and so does every older one. The
+    /// points are the windows' own: <paramref name="room"/> up and left of the panel they show.
+    /// </summary>
+    public static IReadOnlyList<PixelPoint?> ToastStack(ScreenGeometry screen, IReadOnlyList<PixelSize> cards, IReadOnlyList<PixelRect> keepClear,
+        bool mac, int room = 0)
     {
-        var s = Pick(screens);
-        int gap = (int)(Gap * s.Scaling);
-        int x = s.WorkingArea.Right - size.Width - gap + room;
-        int step = (int)(size.Height + Gap * s.Scaling) * index;
-        int y = mac ? s.WorkingArea.Y + gap - room + step : s.WorkingArea.Bottom - size.Height - gap + room - step;
-        return new PixelPoint(x, y);
+        var area = screen.WorkingArea;
+        int Px(double points) => (int)Math.Round(points * screen.Scaling);
+        int edge = Px(ToastEdge), spacing = Px(ToastSpacing);
+        int top = mac ? Math.Max(area.Y, screen.Bounds.Y + Px(MenuBarAtLeast)) + Px(ToastUnderMenuBar) : area.Y + edge;
+        int bottom = area.Bottom - edge;
+        var spots = new PixelPoint?[cards.Count];
+        // A Mac's stack grows down from the top; Windows' grows up from the bottom.
+        int next = mac ? top : bottom;
+        for (int i = 0; i < cards.Count; i++)
+        {
+            var size = cards[i];
+            int x = Math.Max(area.X + edge, area.Right - edge - size.Width);
+            var card = new PixelRect(x, mac ? next : next - size.Height, size.Width, size.Height);
+            // Step past a panel in the way; the step may land on another, so look again (never more often than there
+            // are panels).
+            for (int tries = 0; tries < keepClear.Count && InTheWay(card, keepClear, spacing) is { } panel; tries++)
+                card = card.WithY(mac ? panel.Bottom + spacing : panel.Y - spacing - size.Height);
+            if (card.Y < top || card.Bottom > bottom || InTheWay(card, keepClear, spacing) is not null) break;
+            spots[i] = new PixelPoint(card.X - room, card.Y - room);
+            next = mac ? card.Bottom + spacing : card.Y - spacing;
+        }
+        return spots;
     }
+
+    /// <summary>The first of <paramref name="panels"/> that <paramref name="card"/> would touch (closer than
+    /// <paramref name="spacing"/>), if any.</summary>
+    static PixelRect? InTheWay(PixelRect card, IReadOnlyList<PixelRect> panels, int spacing)
+    {
+        var near = new PixelRect(card.X - spacing, card.Y - spacing, card.Width + 2 * spacing, card.Height + 2 * spacing);
+        foreach (var p in panels)
+            if (p.Width > 0 && p.Height > 0 && near.Intersects(p)) return p;
+        return null;
+    }
+
+    /// <summary>A point in AppKit's screen space (points up from the bottom of the main display, the one with the menu
+    /// bar in Displays settings) in Avalonia's (down from its top): <paramref name="mainHeight"/> is the main display's
+    /// height in points.</summary>
+    public static PixelPoint FromAppKit(double x, double y, double mainHeight) =>
+        new((int)Math.Round(x), (int)Math.Round(mainHeight - y));
 
     /// <summary>Where a Mac's menu bar should put the S. so it shows, as its "preferred position" (points in from the
     /// screen's right edge): just right of the camera notch when there is one (the stretch of menu bar right of it,

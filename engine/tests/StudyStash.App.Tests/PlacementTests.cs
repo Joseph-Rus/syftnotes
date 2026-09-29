@@ -115,19 +115,6 @@ public class PlacementTests
     }
 
     [Fact]
-    public void Toasts_stack_downward_on_a_mac_and_upward_on_windows()
-    {
-        var s = Left;
-        var first = Placement.ToastSpot([s], 0, Small, mac: true);
-        var second = Placement.ToastSpot([s], 1, Small, mac: true);
-        Assert.True(second.Y > first.Y);
-
-        var firstWin = Placement.ToastSpot([s], 0, Small, mac: false);
-        var secondWin = Placement.ToastSpot([s], 1, Small, mac: false);
-        Assert.True(secondWin.Y < firstWin.Y);
-    }
-
-    [Fact]
     public void The_library_window_opens_where_it_was_left()
     {
         var at = Placement.Restore(new PixelPoint(300, 200), new PixelSize(1280, 800), SideBySide, out var size);

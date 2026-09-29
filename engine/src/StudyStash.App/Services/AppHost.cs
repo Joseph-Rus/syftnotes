@@ -61,6 +61,8 @@ public sealed class AppSettings
     /// <summary>Light, dark, or match the computer (Settings → Appearance). Settings files saved before this
     /// existed have none, so they come back as <see cref="AppAppearance.System"/>: nothing changes for them.</summary>
     public AppAppearance Appearance { get; set; } = AppAppearance.System;
+    /// <summary>The version of Study Stash that last ran here: a newer one starting (it updated itself) says so, once.</summary>
+    public string LastVersion { get; set; } = "";
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 
@@ -175,6 +177,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>Something went wrong that the person should hear about now: a title and what to know.</summary>
     public event Action<string, string>? Problem;
 
+    /// <summary><see cref="Problem"/>'s title when the lecture paused by itself (the microphone, the disk): the
+    /// notification waits for the student and offers Resume.</summary>
+    public const string RecordingPaused = "Recording paused";
+
     /// <summary>Starting the app at login (the real login items unless a test gives its own).</summary>
     public ILoginItems LoginItems { get; }
 
@@ -218,7 +224,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Recorder.Changed += () => Changed?.Invoke();
         Recorder.Problem += why =>
         {
-            Problem?.Invoke("Recording paused", why);
+            Problem?.Invoke(RecordingPaused, why);
             Changed?.Invoke();
         };
         Whisper.ProblemChanged += () => Changed?.Invoke();
@@ -391,7 +397,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         var lighter = WhisperModels.Heavier(inUse, advice.Model) ? advice.Model
             : WhisperModels.All.SkipWhile(m => m.Id != inUse.Id).Skip(1).FirstOrDefault(m => m.Id != WhisperModels.Tiny.Id);
         string text = $"{inUse.Name} is slower than the lecture on this computer. Nothing is lost: it catches up after class.";
-        if (lighter is not null) text += $" {lighter.Name} would keep up: switch in Settings → Recording.";
+        // The notification's Settings button opens Settings → Recording, so the words needn't say where.
+        if (lighter is not null) text += $" {lighter.Name} would keep up.";
         return ("The transcript is falling behind", text);
     }
 
@@ -638,7 +645,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             log($"[app] couldn't save the settings: {e.Message}");
-            Problem?.Invoke("Your settings couldn't be saved", e.Message);
+            Problem?.Invoke("Your settings couldn't be saved", "The change lasts until Study Stash quits. Check this computer has free space.");
         }
         Changed?.Invoke();
     }

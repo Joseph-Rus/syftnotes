@@ -2,14 +2,17 @@ using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
+using Avalonia.Input;
+using Avalonia.VisualTree;
 using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Views;
 
 /// <summary>
-/// One notification, in the system's own style for the look: a title, a line or two of plain words (never an error
-/// code), and up to two quiet buttons. <see cref="Acted"/> fires for the first button, <see cref="Dismissed"/> for the ×;
-/// the commands, when set, run as well, so a view model can drive it (<see cref="For(CanvasToastModel)"/>).
+/// One notification, in the system's own style for the look: a title, a few lines of plain words (never an error
+/// code), and up to two quiet buttons. <see cref="Acted"/> fires for the first button, and for a click anywhere else on
+/// it (as the system's own open what they're about); <see cref="Dismissed"/> for the × and the second button (Later).
+/// The commands, when set, run as well, so a view model can drive it (<see cref="For(CanvasToastModel)"/>).
 /// </summary>
 public partial class ToastView : UserControl
 {
@@ -30,14 +33,23 @@ public partial class ToastView : UserControl
         InitializeComponent();
         Classes.Set("mac", mac);
         Classes.Set("win", !mac);
-        ActionButton.Click += (_, _) =>
+        ActionButton.Click += (_, _) => Act();
+        SecondButton.Click += (_, _) =>
         {
-            Run(ActionCommand);
-            Acted?.Invoke();
+            Run(SecondCommand);
+            Dismissed?.Invoke();
         };
-        SecondButton.Click += (_, _) => Run(SecondCommand);
         MacClose.Click += (_, _) => Close();
         WinClose.Click += (_, _) => Close();
+        // A click on the panel itself (not one of its buttons) does what its button would.
+        bool pressed = false;
+        Card.PointerPressed += (_, e) => pressed = !OnAButton(e.Source) && e.GetCurrentPoint(Card).Properties.IsLeftButtonPressed;
+        Card.PointerReleased += (_, e) =>
+        {
+            if (!pressed) return;
+            pressed = false;
+            if (!OnAButton(e.Source) && !string.IsNullOrEmpty(ActionLabel)) Act();
+        };
 
         Card.CornerRadius = new CornerRadius(mac ? 16 : 8);
         Card.Padding = mac ? new Thickness(12, 11, 14, 12) : new Thickness(16, 12, 16, 16);
@@ -48,6 +60,14 @@ public partial class ToastView : UserControl
         WinHeader.IsVisible = !mac;
         MacIcon.IsVisible = mac;
         LayOutActions();
+    }
+
+    static bool OnAButton(object? source) => source is Visual v && v.GetSelfAndVisualAncestors().OfType<Button>().Any();
+
+    void Act()
+    {
+        Run(ActionCommand);
+        Acted?.Invoke();
     }
 
     void Close()
