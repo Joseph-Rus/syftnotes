@@ -117,7 +117,7 @@ public static partial class Shell
         Wire();
         host.Start();
         _ = SuggestLighterModelAsync();
-        AppUpdates.Start(host, stop.Token);
+        AppUpdates.Start(host, stop.Token, SayUpdate);
         MakeTray();
         // A Mac's app menu (About, Settings… ⌘,, and the system's Hide and Quit ⌘Q) while a window is in front.
         Keybindings.Saved = () => host.Settings.Keys;

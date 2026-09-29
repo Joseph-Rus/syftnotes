@@ -78,12 +78,24 @@ public class NoticeWordsTests
     [Fact]
     public void A_newer_version_starting_says_it_updated_once_and_nothing_else_does()
     {
-        Assert.Equal(("Study Stash updated to 0.9.2", "It updated itself while you weren't recording. Everything is as you left it."),
-            NoticeWords.Updated("0.9.1", "0.9.2"));
+        Assert.Equal(("Study Stash updated to 0.10.1", "Everything is just as you left it.", "What's new"),
+            NoticeWords.Updated("0.10.0", "0.10.1"));
         Assert.Equal("Study Stash updated to 1.0.0", NoticeWords.Updated("0.9.1", "v1.0.0")!.Value.Title);
         Assert.Null(NoticeWords.Updated("", "0.9.2")); // the very first start
         Assert.Null(NoticeWords.Updated("0.9.2", "0.9.2"));
-        Assert.Null(NoticeWords.Updated("0.9.2", "0.9.1")); // an older copy
+        Assert.Null(NoticeWords.Updated("0.10.0", "0.9.2")); // an older copy
+    }
+
+    /// <summary>Quitting for an update that then didn't take (Windows' Setup.exe stopped short, and the old copy opened
+    /// again) says so on the next start, with the download; one that took, or none, says nothing of the kind.</summary>
+    [Fact]
+    public void An_update_that_didnt_take_is_said_on_the_next_start()
+    {
+        Assert.Equal(("Study Stash couldn't update", "You're still on 0.10.0. It tries again later, or you can download 0.10.1 now.", "Download"),
+            NoticeWords.UpdateDidntTake("0.10.1", "0.10.0"));
+        Assert.Null(NoticeWords.UpdateDidntTake("0.10.1", "0.10.1"));
+        Assert.Null(NoticeWords.UpdateDidntTake("", "0.10.0"));
+        Assert.Equal("https://github.com/Joseph-Rus/study-stash/releases/tag/v0.10.1", Updates.ReleasePage("0.10.1"));
     }
 
     [Theory]
@@ -114,6 +126,9 @@ public class NoticeWordsTests
             NoticeWords.LighterModel(WhisperModels.Advise(FakeHardware.PlainPc().Probe())).Text,
             IconWords.WhereItIs(mac: false, hidden: false).Text,
             IconWords.WhereItIs(mac: true, hidden: true).Text,
+            NoticeWords.UpdateReady("10.10.10").Text,
+            NoticeWords.UpdateBlocked("10.10.10", "Move Study Stash into Applications, then open it again, so it can update itself.").Text,
+            NoticeWords.UpdateFailed("10.10.10", "10.10.9").Text,
         };
         // About 46 characters a line at the notification's width: four lines.
         foreach (var t in texts) Assert.True(t.Length <= 4 * 46, $"{t.Length} characters: {t}");

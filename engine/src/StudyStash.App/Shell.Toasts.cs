@@ -109,13 +109,84 @@ public static partial class Shell
         }
     }
 
-    /// <summary>The first start after Study Stash updated itself says so, once; every start remembers its version.</summary>
+    /// <summary>The first start after Study Stash updated itself says so, once, with the release's notes a click away;
+    /// a start after quitting for an update that didn't take (Windows' Setup.exe stopped short) says that instead.
+    /// Every start remembers its version.</summary>
     static void SayIfUpdated()
     {
-        string last = host.Settings.LastVersion;
-        if (last == Engine.Version) return;
-        host.Save(s => s.LastVersion = Engine.Version);
-        if (host.Settings.SetupDone && NoticeWords.Updated(last, Engine.Version) is { } said) Toast(said.Title, said.Text, null, null);
+        string last = host.Settings.LastVersion, tried = host.Settings.UpdatingTo;
+        if (last == Engine.Version && tried.Length == 0) return;
+        host.Save(s =>
+        {
+            s.LastVersion = Engine.Version;
+            s.UpdatingTo = "";
+        });
+        if (!host.Settings.SetupDone) return;
+        if (NoticeWords.UpdateDidntTake(tried, Engine.Version) is { } failed)
+            Notify(new Notice
+            {
+                Title = failed.Title, Text = failed.Text, ActionLabel = failed.Action, Act = () => Dialogs.OpenUrl(Updates.ReleasePage(tried)),
+                Stay = NoticeTimes.Advice,
+            });
+        else if (NoticeWords.Updated(last, Engine.Version) is { } said)
+            Notify(new Notice
+            {
+                Title = said.Title, Text = said.Text, ActionLabel = said.Action, Act = () => Dialogs.OpenUrl(Updates.ReleasePage(Engine.Version)),
+                Stay = NoticeTimes.Advice,
+            });
+    }
+
+    /// <summary>What the app's own updates say (<see cref="AppUpdates.Tell"/>, from the updater's thread): a new
+    /// version to install, one this copy can't install itself, one on its way or waiting for the lecture, or one that
+    /// didn't take. Quitting for one remembers which, so the next start can say whether it took.</summary>
+    static void SayUpdate(UpdateNews news) => Dispatcher.UIThread.Post(() =>
+    {
+        string v = news.Version;
+        string page = Updates.ReleasePage(v);
+        switch (news.Kind)
+        {
+            case UpdateNewsKind.Ready:
+            {
+                var (title, text, action) = NoticeWords.UpdateReady(v);
+                Notify(new Notice { Title = title, Text = text, ActionLabel = action, Act = () => _ = UpdateNowAsync(), Stay = NoticeTimes.Advice });
+                break;
+            }
+            case UpdateNewsKind.CantInstall:
+            {
+                var (title, text, action) = NoticeWords.UpdateBlocked(v, news.Why ?? "");
+                Notify(new Notice { Title = title, Text = text, ActionLabel = action, Act = () => Dialogs.OpenUrl(page), Stay = NoticeTimes.Advice });
+                break;
+            }
+            case UpdateNewsKind.Installing:
+            {
+                var (title, text) = NoticeWords.Updating(v);
+                Notify(new Notice { Title = title, Text = text, UntilClosed = true, StillTrue = () => AppUpdates.Current?.Installing == true });
+                break;
+            }
+            case UpdateNewsKind.Waiting:
+            {
+                var (title, text) = NoticeWords.UpdateWaits(v);
+                Notify(new Notice { Title = title, Text = text, Stay = NoticeTimes.Advice });
+                break;
+            }
+            case UpdateNewsKind.Failed:
+            {
+                var (title, text, action) = NoticeWords.UpdateFailed(v, Engine.Version);
+                Notify(new Notice { Title = title, Text = text, ActionLabel = action, Act = () => Dialogs.OpenUrl(page), Stay = NoticeTimes.Advice });
+                break;
+            }
+            case UpdateNewsKind.Restarting:
+                host.Save(s => s.UpdatingTo = v);
+                break;
+        }
+    });
+
+    /// <summary>Update now, from a notification or Settings: installs the newest release (or waits for the lecture),
+    /// off the UI thread. What happened, in Settings' words.</summary>
+    internal static async Task<string> UpdateNowAsync()
+    {
+        if (AppUpdates.Current is not { } updates) return NoticeWords.UpdateNowLine(AppUpdates.Off);
+        return NoticeWords.UpdateNowLine(await Task.Run(updates.NowAsync));
     }
 
     /// <summary>Quitting: every notification goes.</summary>

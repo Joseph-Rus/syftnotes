@@ -1033,7 +1033,7 @@
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                               <TextBlock Classes="row-title" Text="Update automatically" />
-                              <TextBlock Classes="row-sub" Text="The library installs each new version by itself" />
+                              <TextBlock Classes="row-sub" Text="{Binding Lib.AutoUpdateSub}" TextWrapping="Wrap" />
                             </StackPanel>
                             <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.AutoUpdate}" />
                           </Grid>

@@ -62,6 +62,10 @@ public static partial class Updates
         _ => null,
     };
 
+    /// <summary>A release's page on GitHub (what's new, and its downloads): "0.10.1" or "v0.10.1".</summary>
+    public static string ReleasePage(string version) =>
+        $"https://github.com/{RepoSlug}/releases/tag/v{string.Join('.', ParseVersion(version))}";
+
     public static string ArchiveUrl(string reference, bool branch = false) =>
         $"https://github.com/{RepoSlug}/archive/refs/{(branch ? "heads" : "tags")}/{reference}.tar.gz";
 

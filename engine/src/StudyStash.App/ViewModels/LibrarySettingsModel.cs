@@ -150,6 +150,9 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [ObservableProperty] public partial bool CanUpdateNow { get; set; }
     [ObservableProperty] public partial bool AutoUpdate { get; set; }
 
+    /// <summary>A library on this computer is the app's own: the switch updates both, and never mid-lecture.</summary>
+    public string AutoUpdateSub => IsHere ? "Study Stash installs each new version by itself, never while you're recording"
+        : "The library installs each new version by itself";
     public string PasswordLine => HasPassword ? "Set. Your laptop connects with it." : "None: anyone who can reach the library can read it.";
     /// <summary>Only this computer uses the library: no laptop, so no password or addresses to show.</summary>
     public bool OnlyThisComputer => IsHere && !LaptopsCanConnect;
@@ -593,9 +596,21 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         if (NotesFolder.Length > 0) Reveal?.Invoke(NotesFolder);
     }
 
+    /// <summary>A library on this computer is this app's own: the app updates itself (and so the library it runs),
+    /// waiting for a lecture being recorded, and opens again on the new version. What happened, in words. Asking the
+    /// library to would swap the app out from under both and restart neither.</summary>
+    public Func<Task<string>>? UpdateHere { get; init; }
+
     [RelayCommand]
     async Task UpdateNow()
     {
+        if (IsHere && UpdateHere is { } here)
+        {
+            CanUpdateNow = false;
+            UpdateLine = "Downloading the new version…";
+            UpdateLine = await here();
+            return;
+        }
         if (connect() is not { } call) return;
         try
         {

@@ -286,6 +286,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Lib = new LibrarySettingsModel(library ?? (() => host.Remote() is { } lib ? (m, path, body) => lib.SettingsAsync(m, path, body) : null))
         {
             IsHere = host.Settings.LibraryHere,
+            UpdateHere = AppUpdates.Current is { } updates ? async () => NoticeWords.UpdateNowLine(await Task.Run(updates.NowAsync)) : null,
             Renamed = name =>
             {
                 var c = host.Client();

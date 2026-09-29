@@ -75,6 +75,9 @@ public sealed class AppSettings
     public SetupChatSaved? SetupChat { get; set; }
     /// <summary>The version of Study Stash that last ran here: a newer one starting (it updated itself) says so, once.</summary>
     public string LastVersion { get; set; } = "";
+    /// <summary>The version this copy quit to install ("0.10.1"), until the next start: one that comes up older than
+    /// that (Windows' Setup.exe didn't finish) says the update didn't take.</summary>
+    public string UpdatingTo { get; set; } = "";
     /// <summary>When the student said "Maybe later" to the library window's ask for a tip (it asks once more a month
     /// on); null until they do.</summary>
     public DateTimeOffset? SupportAskLater { get; set; }
