@@ -36,17 +36,20 @@ public class CanvasDueTests
     }
 
     [Fact]
-    public void A_planner_to_do_with_no_assignment_of_its_own_is_kept_apart_and_calendar_events_are_dropped()
+    public void A_planner_to_do_with_no_assignment_of_its_own_is_kept_apart_and_calendar_events_announcements_and_graded_quizzes_are_dropped()
     {
         using var dir = new TempDir();
         var sync = FakeCanvas.Library(dir, () => FakeCanvas.DesignNow);
-        var canvas = FakeCanvas.Cs101(); // its default planner fixture: one wiki_page to-do, one calendar_event
+        var canvas = FakeCanvas.Cs101(); // its default planner fixture: one wiki_page to-do, one calendar_event, one
+                                         // announcement, one graded quiz
         Assert.True(canvas.Run(sync));
 
         var index = CourseIndex.Load(dir.Path, "CS 101")!;
         var todo = Assert.Single(index.Todos);
         Assert.Equal(("wiki_page", "Read: Chapter 4 overview", "2025-09-29T06:59:00Z"), (todo.Kind, todo.Title, todo.TodoAt));
         Assert.DoesNotContain(index.Todos, t => t.Kind == "calendar_event"); // not coursework
+        Assert.DoesNotContain(index.Todos, t => t.Kind == "announcement"); // its date is when it was posted
+        Assert.DoesNotContain(index.Todos, t => t.Kind == "quiz"); // an assignment already
         Assert.DoesNotContain(index.Assignments, a => a.MarkedDone); // nobody marked anything done here
 
         // A to-do rides along in the Due list too (the app merges CourseIndex.Todos in the same way for every
@@ -56,5 +59,21 @@ public class CanvasDueTests
         var groups = due["groups"]!.AsArray().ToDictionary(g => g!["key"]!.GetValue<string>(), g => g!["items"]!.AsArray());
         var row = groups["week"]!.Single(i => i!["kind"]!.GetValue<string>() == "todo")!;
         Assert.Equal("Read: Chapter 4 overview", row["name"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void An_older_syncs_announcements_and_duplicate_quizzes_stay_out_of_the_Due_list()
+    {
+        var quiz = new Assignment("CS 101", 9004, "Syllabus quiz", "", 5, "open", null, "", "", Kind: "quiz");
+        TodoInfo[] kept =
+        [
+            new() { Id = 1, Kind = "announcement", Title = "Welcome", TodoAt = "2025-09-02T07:00:05Z" },
+            new() { Id = 2, Kind = "quiz", Title = "Syllabus quiz", TodoAt = "2025-09-26T17:45:00Z" },
+            new() { Id = 3, Kind = "wiki_page", Title = "Read: Chapter 4 overview", TodoAt = "2025-09-29T06:59:00Z" },
+        ];
+
+        var rows = Assignments.Todos("CS 101", kept, [quiz], FakeCanvas.Zone).ToList();
+
+        Assert.Equal(["Read: Chapter 4 overview"], rows.Select(r => r.Name));
     }
 }
