@@ -14,13 +14,19 @@ public class AudioFilesTests
         if (!OperatingSystem.IsMacOS() || !File.Exists("/usr/bin/say")) return;
         using var dir = new TempHome();
         string m4a = Path.Combine(dir.Path, "memo.m4a"), wav = Path.Combine(dir.Path, "memo.wav");
-        using (var say = Process.Start(new ProcessStartInfo("/usr/bin/say", ["-o", m4a, "--data-format=aac", "Gradient descent lowers the loss one step at a time."]) { UseShellExecute = false })!)
-            say.WaitForExit();
-        Assert.True(File.Exists(m4a));
+        // say on a CI runner now and then writes a memo a few milliseconds long (its speech service not yet up), so a
+        // memo too short to be the sentence is spoken again, up to three times.
+        Sound.WavInfo info = default;
+        for (int attempt = 0; attempt == 0 || (attempt < 3 && info.Seconds < 1); attempt++)
+        {
+            using (var say = Process.Start(new ProcessStartInfo("/usr/bin/say", ["-o", m4a, "--data-format=aac", "Gradient descent lowers the loss one step at a time."]) { UseShellExecute = false })!)
+                say.WaitForExit();
+            Assert.True(File.Exists(m4a));
 
-        AudioFiles.ToRecording(m4a, wav);
+            AudioFiles.ToRecording(m4a, wav);
+            info = Sound.Wav(wav);
+        }
 
-        var info = Sound.Wav(wav);
         Assert.Equal(Sound.Rate, info.Rate);
         Assert.InRange(info.Seconds, 1, 10);
         var samples = Sound.ReadWav(wav);
