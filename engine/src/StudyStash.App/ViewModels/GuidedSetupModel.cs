@@ -321,7 +321,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             {
                 SignedIn = true;
                 AiReady = true;
-                StartChat(session.Length > 0 ? "[Study Stash] Setup was reopened." : Again ? "[Study Stash] Setup was opened again from Settings." : "[Study Stash] Setup was opened.");
+                StartChat(Again ? "[Study Stash] Setup was opened again from Settings." : session.Length > 0 ? "[Study Stash] Setup was reopened." : "[Study Stash] Setup was opened.");
                 return;
             }
             Screen = GuidedScreen.SignIn;

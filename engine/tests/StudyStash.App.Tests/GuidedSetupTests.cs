@@ -58,7 +58,9 @@ public sealed class GuidedSetupTests
     /// door, and a folder the fake installer installs the fake CLI into.</summary>
     internal sealed class Rig : IAsyncDisposable
     {
-        public TempHome Home { get; } = new();
+        public TempHome Home { get; }
+        /// <summary>The window's microphone check, ticked the way the app's own tick does.</summary>
+        public MicCheck Mic { get; } = new();
         public AppHost Host { get; }
         public SetupModel Setup { get; }
         public GuidedSetupModel Guided { get; }
@@ -73,8 +75,10 @@ public sealed class GuidedSetupTests
         public List<string> Writers { get; } = [];
         public string InstallMode { get; set; } = "ok";
 
-        public Rig(string cli = "claude", bool installed = false, bool signedIn = false, AppRole? role = null, bool again = false, Action<AppSettings>? saved = null)
+        public Rig(string cli = "claude", bool installed = false, bool signedIn = false, AppRole? role = null, bool again = false, Action<AppSettings>? saved = null,
+            Func<IAudioSource>? mic = null, TempHome? home = null)
         {
+            Home = home ?? new TempHome();
             if (saved is not null)
             {
                 var s = new AppSettings();
@@ -89,7 +93,7 @@ public sealed class GuidedSetupTests
             FakeAgents.Replay(Bin, [Init(), Says("OK."), Done("OK.")]);
             File.WriteAllText(Path.Combine(Bin, "login-delay"), "1");
             foreach (var m in WhisperModels.All) Models.Hold.Add(m.File);
-            Host = new AppHost(Home.Path, () => throw new InvalidOperationException("no microphone in this test"), log: _ => { }, loginItems: Login,
+            Host = new AppHost(Home.Path, mic ?? (() => throw new InvalidOperationException("no microphone in this test")), log: _ => { }, loginItems: Login,
                 models: new ModelSetting(null, Mirror: "https://mirror.example/models"), http: new HttpClient(Models));
             Setup = Services.Setup.Make(Host, role, here: new LibraryHere { Command = [BuiltEngine()], Folder = Home["Study Stash"] });
             Setup.Again = again;
@@ -141,6 +145,8 @@ public sealed class GuidedSetupTests
 
         public async ValueTask DisposeAsync()
         {
+            Mic.Close();
+            Mic.Dispose();
             Guided.Dispose();
             if (Door is not null) await Door.DisposeAsync();
             Host.StopDownload();
