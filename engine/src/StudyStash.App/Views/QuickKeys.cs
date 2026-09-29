@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using StudyStash.App.Platform;
 using Avalonia.Input.Platform;
 using StudyStash.App.ViewModels;
 
@@ -25,7 +26,7 @@ public static class QuickKeys
                     m.Move(-1);
                     e.Handled = true;
                     break;
-                case Key.Enter when command:
+                case var _ when Keybindings.Of(KeyAction.Ask).Matches(e.Key, e.KeyModifiers):
                     e.Handled = true;
                     await m.AskCommand.ExecuteAsync(null);
                     break;

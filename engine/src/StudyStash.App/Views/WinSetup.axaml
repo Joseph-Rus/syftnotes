@@ -596,6 +596,17 @@
                 </Grid>
               </StackPanel>
             </Border>
+            <StackPanel IsVisible="{Binding HasKeys}" Spacing="8" Margin="0,16,0,0" MaxWidth="480" HorizontalAlignment="Left">
+              <Button Classes="sk-open" Command="{Binding ToggleKeysCommand}" Padding="0" Background="Transparent" BorderThickness="0" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <c:Icon Glyph="keyboard" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                  <TextBlock Text="Change shortcuts" FontSize="13" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <Panel IsVisible="{Binding KeysOpen}">
+                <v:ShortcutsEditor DataContext="{Binding Keys}" />
+              </Panel>
+            </StackPanel>
           </StackPanel>
 
           <!-- The laptop's last page: how to record -->
@@ -628,6 +639,17 @@
             </Border>
             <TextBlock IsVisible="{Binding OnOneComputerDone}" Text="{Binding AddLaptopLater}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap"
                        MaxWidth="440" HorizontalAlignment="Left" Margin="0,14,0,0" />
+            <StackPanel IsVisible="{Binding HasKeys}" Spacing="8" Margin="0,16,0,0" MaxWidth="480" HorizontalAlignment="Left">
+              <Button Classes="sk-open" Command="{Binding ToggleKeysCommand}" Padding="0" Background="Transparent" BorderThickness="0" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                  <c:Icon Glyph="keyboard" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                  <TextBlock Text="Change shortcuts" FontSize="13" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+              <Panel IsVisible="{Binding KeysOpen}">
+                <v:ShortcutsEditor DataContext="{Binding Keys}" />
+              </Panel>
+            </StackPanel>
           </StackPanel>
 
               <!-- The taskbar (where Study Stash records) -->

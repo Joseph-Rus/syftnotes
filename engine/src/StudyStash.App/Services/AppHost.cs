@@ -52,6 +52,8 @@ public sealed class AppSettings
     [JsonIgnore]
     public bool LibraryHere => Role != AppRole.Laptop;
     public bool Shortcuts { get; set; } = true;
+    /// <summary>Shortcuts changed from their defaults, by <see cref="KeyAction"/> name: {"Record": "Control+Shift+R"}.</summary>
+    public Dictionary<string, string> Keys { get; set; } = [];
     public double? RecorderX { get; set; }
     public double? RecorderY { get; set; }
     /// <summary>Where the library window was left, and its size (or that it was zoomed), so it opens there again.</summary>

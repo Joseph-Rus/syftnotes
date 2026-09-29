@@ -3,6 +3,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.Core;
+using StudyStash.App.Platform;
 
 namespace StudyStash.App.ViewModels;
 
@@ -94,8 +95,8 @@ public sealed partial class PanelModel : ObservableObject
     public bool HasCanvasLine => Library?.Canvas is not null;
     public bool HasLaptopsLine => Library?.Laptops is not null;
 
-    public string RecordShortcut => Skin.Current == SkinKind.Mac ? "⌥⇧R" : "Ctrl+Alt+R";
-    public string SearchShortcut => Skin.Current == SkinKind.Mac ? "⌥Space" : "Alt+Shift+Space";
+    public string RecordShortcut => Keybindings.Show(KeyAction.Record);
+    public string SearchShortcut => Keybindings.Show(KeyAction.Quick);
     public string SettingsTip => Skin.Current == SkinKind.Mac ? "Settings (⌘,)" : "Settings (Ctrl+,)";
 
     public PanelModel() => Recent.CollectionChanged += (_, _) =>

@@ -3,6 +3,7 @@ using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.App.Platform;
 
 namespace StudyStash.App.ViewModels;
 
@@ -218,9 +219,25 @@ public sealed partial class SetupModel : ObservableObject
     public string StartAtLoginHint => IsLibrary ? "Recommended for a library." : "Recommended.";
     /// <summary>Just this computer's last page: growing into a laptop and a library later.</summary>
     public string AddLaptopLater => "Want to record on a laptop too? Add it any time in Settings → Your library.";
+    /// <summary>The last page's shortcuts, to change them before starting (null in a test that doesn't need them).</summary>
+    public ShortcutsModel? Keys { get; set; }
+    public bool HasKeys => Keys is not null;
+
+    /// <summary>The last page's "Change shortcuts" is open.</summary>
+    [ObservableProperty] public partial bool KeysOpen { get; set; }
+
+    [RelayCommand]
+    void ToggleKeys()
+    {
+        KeysOpen = !KeysOpen;
+        if (!KeysOpen) Keys?.Stop();
+    }
+
+    partial void OnRoleChanged(AppRole value) => Keys?.ShowRecord(value != AppRole.Library);
+
     public string RecordHint => skin == SkinKind.Mac
-        ? "Press ⌥⇧R or click Record in the menu bar when class starts."
-        : "Press Ctrl+Alt+R or click Record in the tray when class starts.";
+        ? $"Press {Keybindings.Show(KeyAction.Record, mac: true)} or click Record in the menu bar when class starts."
+        : $"Press {Keybindings.Show(KeyAction.Record, mac: false)} or click Record in the tray when class starts.";
 
     // Model
     [ObservableProperty] public partial string ModelName { get; set; } = "Whisper large-v3";

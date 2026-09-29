@@ -120,6 +120,7 @@ public static partial class Shell
         AppUpdates.Start(host, stop.Token);
         MakeTray();
         // A Mac's app menu (About, Settings… ⌘,, and the system's Hide and Quit ⌘Q) while a window is in front.
+        Keybindings.Saved = () => host.Settings.Keys;
         if (OperatingSystem.IsMacOS()) AppMenu.Use(app, AppMenu.ShowAbout, SettingsFromAnywhere);
         ApplyShortcutsSetting(force: true);
         ticker = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Tick());
@@ -236,12 +237,18 @@ public static partial class Shell
     /// turned back on, they're asked for again (and the app says if either is taken).</summary>
     static void ApplyShortcutsSetting(bool force = false)
     {
-        bool wanted = host.Settings.Shortcuts;
-        if (!force && wanted == hotkeysOn) return;
+        bool wanted = host.Settings.Shortcuts && !shortcutsPaused;
+        var quickKeys = Keybindings.Of(KeyAction.Quick);
+        var recordKeys = Keybindings.Of(KeyAction.Record);
+        string keys = $"{quickKeys} {recordKeys}";
+        AppMenu.UseSettingsKeys(Keybindings.Of(KeyAction.Settings));
+        if (!force && wanted == hotkeysOn && keys == hotkeysKeys) return;
+        if (hotkeysOn) Hotkeys.Unregister();
         hotkeysOn = wanted;
+        hotkeysKeys = keys;
         if (wanted)
         {
-            hotkeys = Hotkeys.Register(OnShortcut);
+            hotkeys = Hotkeys.Register(OnShortcut, quickKeys, recordKeys);
             if (!hotkeys.All) Program.Log("[app] a shortcut is taken by another app");
         }
         else
@@ -251,12 +258,25 @@ public static partial class Shell
         }
     }
 
+    /// <summary>The shortcuts registered last, so a change to them re-registers.</summary>
+    static string hotkeysKeys = "";
+    /// <summary>Settings is listening for a new shortcut: the system's hold on the current ones is let go meanwhile,
+    /// or pressing one would do it rather than reach Settings.</summary>
+    static bool shortcutsPaused;
+
+    /// <summary>Settings → Shortcuts listening for keys (true), or done (false).</summary>
+    public static void PauseShortcuts(bool paused)
+    {
+        shortcutsPaused = paused;
+        ApplyShortcutsSetting();
+    }
+
     /// <summary>Settings' words about the shortcuts: which one (if any) another app already has.</summary>
     public static string? ShortcutsSay()
     {
         if (!hotkeysOn) return null;
-        string quick = Skin.Current == SkinKind.Mac ? "⌥Space" : "Alt+Shift+Space";
-        string record = Skin.Current == SkinKind.Mac ? "⌥⇧R" : "Ctrl+Alt+R";
+        string quick = Keybindings.Show(KeyAction.Quick);
+        string record = Keybindings.Show(KeyAction.Record);
         if (!hotkeys.Quick) return $"{quick} is taken by another app, so search from the menu bar.";
         if (!hotkeys.Record) return $"{record} is taken by another app, so record from the menu bar.";
         return null;
@@ -1279,6 +1299,7 @@ public static partial class Shell
             return;
         }
         var model = SettingsModel.Make(host, canvas: Canvas(), watch: CanvasPoll());
+        model.Keys.Listening = PauseShortcuts;
         model.Canvas.Status.OnConnect = ShowCanvasConnect;
         model.Canvas.Status.OnShowMeHow = ShowCanvasConnect;
         if (section is not null) model.Section = section;

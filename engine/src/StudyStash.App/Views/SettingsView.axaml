@@ -644,6 +644,17 @@
               </StackPanel>
 
               <!-- Appearance -->
+              <!-- Shortcuts: every key the student can change, and whether search and Record work from any app. -->
+              <StackPanel IsVisible="{Binding OnShortcuts}" Spacing="8">
+                <TextBlock Classes="h" Text="Shortcuts" />
+                <TextBlock Classes="body" Text="Change the keys for searching, recording, asking and Settings." TextWrapping="Wrap" />
+                <CheckBox IsChecked="{Binding Shortcuts}" Margin="0,4,0,4">
+                  <TextBlock Text="Search and Record work from any app" FontSize="13" />
+                </CheckBox>
+                <v:ShortcutsEditor DataContext="{Binding Keys}" />
+                <TextBlock Classes="say" Text="{Binding ShortcutsSay}" IsVisible="{Binding ShortcutsSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+              </StackPanel>
+
               <StackPanel IsVisible="{Binding OnAppearance}" Spacing="8">
                 <TextBlock Classes="h" Text="Appearance" />
                 <TextBlock Classes="body" Text="Pick how Study Stash looks." />
@@ -849,9 +860,6 @@
                   <Border Classes="field" Width="64"><TextBox Classes="bare" Text="{Binding KeepAudio}" FontSize="13" /></Border>
                   <TextBlock Text="days after they're filed (0 keeps them). The notes and transcript stay." FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                 </StackPanel>
-                <CheckBox IsChecked="{Binding Shortcuts}" Margin="0,16,0,0">
-                  <TextBlock Text="Shortcuts that work from any app (search, and Record)" FontSize="13" />
-                </CheckBox>
               </StackPanel>
 
               <!-- Your library: its own settings, through its API (Library, Classes, Notes and sorting, Folders). Every

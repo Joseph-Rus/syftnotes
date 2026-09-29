@@ -2,6 +2,7 @@ using Avalonia.Media;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.Audio;
+using StudyStash.App.Platform;
 
 namespace StudyStash.App;
 
@@ -36,7 +37,7 @@ public static class Demo
         if (!answer)
         {
             q.Query = "call stack";
-            string rec = Skin.Current == SkinKind.Mac ? "⌥⇧R" : "Ctrl+Alt+R";
+            string rec = Keybindings.Show(KeyAction.Record);
             q.Rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Lectures", First = true });
             q.Rows.Add(new QuickRow { Kind = QuickKind.Lecture, Title = "Recursion and the call stack", Meta = "CS 101 · Tue 23 Sep", Dot = Cs, Selected = true });
             q.Rows.Add(new QuickRow { Kind = QuickKind.Lecture, Title = "Stack frames and scope", Meta = "CS 101 · Thu 18 Sep", Dot = Cs });

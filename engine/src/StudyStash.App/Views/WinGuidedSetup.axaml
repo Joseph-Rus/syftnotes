@@ -6,6 +6,7 @@
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:s="using:StudyStash.App.Services"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.WinGuidedSetup"
              x:DataType="vm:GuidedSetupModel"
              Width="720" Height="480">
@@ -832,6 +833,17 @@
                                   </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                               </ItemsControl>
+                              <StackPanel Spacing="8" IsVisible="{Binding Setup.HasKeys}">
+                                <Button Command="{Binding Setup.ToggleKeysCommand}" Padding="0" Background="Transparent" BorderThickness="0" HorizontalAlignment="Left">
+                                  <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <c:Icon Glyph="keyboard" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                                    <TextBlock Text="Change shortcuts" FontSize="14" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                                  </StackPanel>
+                                </Button>
+                                <Panel IsVisible="{Binding Setup.KeysOpen}">
+                                  <v:ShortcutsEditor DataContext="{Binding Setup.Keys}" />
+                                </Panel>
+                              </StackPanel>
                               <Button Classes="push default" HorizontalAlignment="Right" Command="{Binding PressCommand}" CommandParameter="finish"><TextBlock Text="Open Study Stash" FontSize="14" /></Button>
                             </StackPanel>
 

@@ -9,6 +9,7 @@ using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 using StudyStash.Core;
 using StudyStash.Core.Rich;
+using StudyStash.App.Platform;
 
 namespace StudyStash.App;
 
@@ -612,7 +613,7 @@ public static partial class Shell
         await Task.Delay(120); // wait for the typing to pause
         if (turn != searchTurn || quick.Answering) return;
         var rows = new List<QuickRow>();
-        string rec = Skin.Current == SkinKind.Mac ? "⌥⇧R" : "Ctrl+Alt+R";
+        string rec = Keybindings.Show(KeyAction.Record);
         string cls = RecordClass();
         void Actions()
         {

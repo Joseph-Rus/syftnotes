@@ -14,8 +14,25 @@ namespace StudyStash.App.Platform;
 /// </summary>
 public static class AppMenu
 {
-    /// <summary>⌘, on a Mac, Ctrl+, on Windows.</summary>
-    public static KeyGesture SettingsGesture => new(Key.OemComma, OperatingSystem.IsMacOS() ? KeyModifiers.Meta : KeyModifiers.Control);
+    /// <summary>⌘, on a Mac, Ctrl+, on Windows, unless the student changed it (Settings → Shortcuts).</summary>
+    public static KeyGesture SettingsGesture => Keybindings.Of(KeyAction.Settings).Gesture();
+
+    /// <summary>The app menu's Settings… items, whose shortcut follows a change in Settings.</summary>
+    static readonly List<NativeMenuItem> settingsItems = [];
+
+    /// <summary>Every window's Settings key, to follow a change (weakly held: a closed window's goes with it).</summary>
+    static readonly List<WeakReference<KeyBinding>> settingsBindings = [];
+
+    /// <summary>The menu and every window use <paramref name="keys"/> for Settings (a no-op when they already do).</summary>
+    public static void UseSettingsKeys(KeyCombo keys)
+    {
+        var gesture = keys.Gesture();
+        foreach (var item in settingsItems)
+            if (!gesture.Equals(item.Gesture)) item.Gesture = gesture;
+        settingsBindings.RemoveAll(w => !w.TryGetTarget(out _));
+        foreach (var weak in settingsBindings)
+            if (weak.TryGetTarget(out var binding) && !gesture.Equals(binding.Gesture)) binding.Gesture = gesture;
+    }
 
     /// <summary>The app menu's own items; the system adds Services, Hide and Quit ⌘Q after them.</summary>
     public static NativeMenu Build(Action about, Action settings)
@@ -32,7 +49,9 @@ public static class AppMenu
         menu.Items.Clear();
         menu.Add(Item("About Study Stash", about));
         menu.Add(new NativeMenuItemSeparator());
-        menu.Add(Item("Settings…", settings, SettingsGesture));
+        var item = Item("Settings…", settings, SettingsGesture);
+        settingsItems.Add(item);
+        menu.Add(item);
     }
 
     /// <summary>The app's menu is Study Stash's own: set on the app before the menu bar first reads it, or filled in
@@ -74,9 +93,14 @@ public static class AppMenu
         if (OperatingSystem.IsMacOS()) NativeMenu.SetMenu(window, ForWindow(window, library, settings));
     }
 
-    /// <summary>⌘, (Ctrl+,) opens Settings from <paramref name="window"/> (the dropdown, the quick panel, the recorder).</summary>
-    public static void AddSettingsKey(Window window, Action settings) =>
-        window.KeyBindings.Add(new KeyBinding { Gesture = SettingsGesture, Command = new RelayCommand(settings) });
+    /// <summary>⌘, (Ctrl+,, or the student's own) opens Settings from <paramref name="window"/> (the dropdown, the quick
+    /// panel, the recorder); a change in Settings reaches windows already open (<see cref="UseSettingsKeys"/>).</summary>
+    public static void AddSettingsKey(Window window, Action settings)
+    {
+        var binding = new KeyBinding { Gesture = SettingsGesture, Command = new RelayCommand(settings) };
+        settingsBindings.Add(new WeakReference<KeyBinding>(binding));
+        window.KeyBindings.Add(binding);
+    }
 
     static NativeMenuItem Item(string header, Action act, KeyGesture? gesture = null)
     {
