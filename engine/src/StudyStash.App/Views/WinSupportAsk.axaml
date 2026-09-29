@@ -1,0 +1,53 @@
+<!-- The library window's one gentle ask for a tip (Services/SupportAsk.cs says when), atop the lecture list: a Fluent
+     card (Card fill, CardStroke edge, radius 4, as Settings' rows). It covers nothing; each button answers it and it
+     goes. The Ko-fi button is a standard button, not the accent, since it's never the window's main action; the
+     other two are subtle buttons. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:s="using:StudyStash.App.Services"
+             x:Class="StudyStash.App.Views.WinSupportAsk"
+             x:DataType="vm:SupportAskModel">
+  <UserControl.Styles>
+    <Style Selector="Border.ask">
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="{DynamicResource Card}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="12,12,12,4" />
+    </Style>
+    <Style Selector="Button.ask">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="Button.ask-tip">
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.ask-plain TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    </Style>
+  </UserControl.Styles>
+  <Border Classes="ask">
+    <StackPanel>
+      <TextBlock Text="{x:Static s:SupportAsk.Title}" FontSize="14" FontWeight="SemiBold" />
+      <TextBlock Text="{x:Static s:SupportAsk.Text}" FontSize="12" LineHeight="16.8" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="0,2,0,0" />
+      <Button Name="Tip" Classes="ask ask-tip" Command="{Binding TipCommand}" HorizontalAlignment="Left" Margin="0,12,0,0">
+        <TextBlock Text="{x:Static s:SupportAsk.Button}" />
+      </Button>
+      <!-- Subtle buttons: their words line up with the text above, their hover wash reaching into the padding. -->
+      <StackPanel Orientation="Horizontal" Margin="-12,4,0,0">
+        <Button Name="Later" Classes="ask ask-plain" IsVisible="{Binding CanWait}" Command="{Binding LaterCommand}">
+          <TextBlock Text="{x:Static s:SupportAsk.LaterButton}" />
+        </Button>
+        <Button Name="Never" Classes="ask ask-plain" Command="{Binding NeverCommand}">
+          <TextBlock Text="{x:Static s:SupportAsk.NeverButton}" />
+        </Button>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

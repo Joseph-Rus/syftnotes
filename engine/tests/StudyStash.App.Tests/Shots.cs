@@ -451,6 +451,28 @@ public class SurfaceShots
         }
     }
 
+    /// <summary>The one gentle ask for a tip, atop the lecture list once the library holds a few lectures; and in a
+    /// narrow window, where the list fills it.</summary>
+    [AvaloniaFact]
+    public void Mac_app_support()
+    {
+        foreach (var t in Themes)
+        {
+            Shot.Take("mac-04-full-app-support", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(askingSupport: true), Width = 1280, Height = 800 });
+            Shot.Take("mac-04-full-app-support-narrow", SkinKind.Mac, t, () => new MacLibrary { DataContext = Demo.Library(askingSupport: true), Width = 760, Height = 800 });
+        }
+    }
+
+    [AvaloniaFact]
+    public void Win_app_support()
+    {
+        foreach (var t in Themes)
+        {
+            Shot.Take("win-04-full-app-support", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(askingSupport: true), Width = 1280, Height = 800 });
+            Shot.Take("win-04-full-app-support-narrow", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Library(askingSupport: true), Width = 760, Height = 800 });
+        }
+    }
+
     [AvaloniaFact]
     public void Win_app()
     {

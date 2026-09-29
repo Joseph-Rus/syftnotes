@@ -85,7 +85,7 @@ public static class Demo
     /// eyeball it against the Canvas Due screen; with <paramref name="answered"/> a long answer sits above the ask bar;
     /// with <paramref name="deleting"/> the window asks before deleting the open lecture, and with
     /// <paramref name="deleted"/> "Deleted · Undo" shows under the list.</summary>
-    public static LibraryModel Library(bool due = false, bool answered = false, bool deleting = false, bool deleted = false)
+    public static LibraryModel Library(bool due = false, bool answered = false, bool deleting = false, bool deleted = false, bool askingSupport = false)
     {
         var m = new LibraryModel { ClassTitle = "CS 101", ClassCount = "12 lectures", Status = "Library connected", DrawChrome = true };
         if (due) m.Classes.Add(new ClassItem { Name = "Due", IsDue = true, Count = 3 });
@@ -122,6 +122,7 @@ public static class Demo
             });
         if (deleting) m.Deleting = new LectureDeletion("lec-recursion", "Recursion and the call stack", "CS 101");
         if (deleted) m.Deleted = new LectureDeletion("lec-frames", "Stack frames and scope", "CS 101");
+        if (askingSupport) m.AskForSupport(last: false);
         return m;
     }
 

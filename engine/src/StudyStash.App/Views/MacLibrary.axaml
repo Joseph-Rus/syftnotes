@@ -260,6 +260,10 @@
               <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
             </StackPanel>
           </Border>
+          <!-- The one gentle ask for a tip, when it's due: in the list's flow, lined up with the lectures, covering nothing -->
+          <Panel DockPanel.Dock="Top" IsVisible="{Binding HasSupport}" Margin="10,2,10,6">
+            <v:MacSupportAsk Name="SupportAsk" DataContext="{Binding Support}" />
+          </Panel>
           <!-- What's attached in this class (drop files on the list) -->
           <ScrollViewer DockPanel.Dock="Top" MaxHeight="200" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasClassFiles}" Margin="20,0,20,8">
             <v:MacAttachments Name="ClassAttachments" DataContext="{Binding ClassFiles}" />

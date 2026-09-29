@@ -3,6 +3,7 @@ using System.Linq;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.App.Services;
 using StudyStash.Core;
 
 namespace StudyStash.App.ViewModels;
@@ -270,6 +271,29 @@ public sealed partial class LibraryModel : ObservableObject
     }
 
     partial void OnEmptyChanged(string? value) => OnPropertyChanged(nameof(HasEmpty));
+
+    // --- the ask for a tip ------------------------------------------------------------------------------------------
+
+    /// <summary>The one gentle ask for a tip, atop the lecture list (<see cref="SupportAsk"/> says when); null when
+    /// it isn't asking.</summary>
+    [ObservableProperty] public partial SupportAskModel? Support { get; set; }
+    public bool HasSupport => Support is not null;
+    /// <summary>What the student answered: the host saves it, and opens the Ko-fi page for a tip.</summary>
+    public Action<SupportAnswer>? OnSupportAnswer { get; set; }
+
+    partial void OnSupportChanged(SupportAskModel? value) => OnPropertyChanged(nameof(HasSupport));
+
+    /// <summary>Shows the ask (unless it's showing already); <paramref name="last"/> leaves out "Maybe later". Any
+    /// answer puts it away.</summary>
+    public void AskForSupport(bool last) => Support ??= new SupportAskModel(last, answer =>
+    {
+        Support = null;
+        OnSupportAnswer?.Invoke(answer);
+    });
+
+    /// <summary>The window closes with the ask still showing: that counts as "Maybe later" (or, the last time, as
+    /// the end of it), so an ask that's ignored still comes at most twice.</summary>
+    public void WalkAwayFromSupport() => Support?.LaterCommand.Execute(null);
 
     // --- deleting a lecture ---------------------------------------------------------------------------------------
 
