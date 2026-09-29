@@ -5,6 +5,8 @@
 export interface Me {
   paired: boolean;
   library: { name: string; version: string };
+  /** Which phone this is, once paired (a library from before it says nothing). */
+  device?: Device | null;
 }
 
 /** POST /api/v2/devices/pair → the device this phone now is. */
@@ -221,4 +223,38 @@ export interface Attachment {
   hasText: boolean;
   /** Still being read: show "Reading your handwriting…" and keep asking. */
   reading: boolean;
+}
+
+/** GET /api/v2/canvas/assignment (CanvasView.Assignment): one assignment's page. `instructions_html` is the
+ * instructions drawn as safe HTML the way a lecture's notes are (PhoneNotes.Render); a library from before it
+ * sends only the Markdown. */
+export interface AssignmentDetail extends DueItem {
+  instructions: string | null;
+  instructions_html?: string;
+  unlock_at: string | null;
+  lock_at: string | null;
+  submission_types: string[];
+  allowed_attempts: number | null;
+  grading_type: string;
+  rubric: { criterion: string; points: number | null; description?: string; mark?: { points: number | null; comment?: string } | null }[];
+  comments: { author: string; text: string; when?: string; mine?: boolean }[];
+  submission: { state: string; submitted_at: string | null; graded_at: string | null; score: number | null; grade: string | null; late: boolean } | null;
+}
+
+/** A voice memo sent from the phone (VoiceMemo.ToJson in LibraryWeb's VoiceMemos.cs): waiting for a computer that
+ * records, being written down there, done (it's `lecture` now), or failed (`error`). */
+export interface VoiceMemo {
+  id: string;
+  name: string;
+  class: string | null;
+  title: string;
+  size: number;
+  added: string;
+  by: string;
+  state: 'waiting' | 'transcribing' | 'done' | 'failed' | (string & {});
+  computer: string | null;
+  lecture: string | null;
+  error: string | null;
+  /** The lecture it became has reached the library (it's written down on the computer first, then sent). */
+  ready?: boolean;
 }

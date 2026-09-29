@@ -108,6 +108,28 @@ never from a request, and the `device` cookie is set Secure regardless (the brow
 - `last_seen` is written at most once a minute per phone, so browsing doesn't rewrite the file on every request.
 - At most 50 phones: pairing a 51st forgets the one heard from longest ago.
 
+## Voice memos
+
+A lecture recorded with the phone's own Voice Memos becomes a lecture like any other. The library can't write words
+down from sound itself (Whisper runs on the computers that record), so it holds the recording until one does.
+
+- **`POST /api/v2/voice-memos`** (multipart: `file`, and optional `class` and `title`): up to 500 MB, and only a
+  recording by its name (`.m4a` from Voice Memos, `.mp3`, `.wav`, `.aac`, `.caf`, `.mp4`, `.aif(f)`, `.qta`; anything
+  else is `415` in words). Kept in `home/voice-memos/` beside `memos.json`, as `waiting`. `by` is the phone's name.
+- **`GET /api/v2/voice-memos`** → `{memos: [{id, name, class, title, size, added, by, state, computer, lecture,
+  error, ready}]}`, newest first. `state` is `waiting`, `transcribing` (a computer took it), `done` (it's `lecture`
+  now) or `failed` (`error`); `ready` says the lecture has reached the library. A memo taken and not finished within
+  two hours is waiting again.
+- **`POST …/{id}/claim`** `{computer}` (409 when another has it), **`GET …/{id}/audio`**, **`POST …/{id}/done`**
+  `{lecture}` or `{error}` (done lets go of the recording; failed keeps it), **`POST …/{id}/retry`**, **`DELETE …/{id}`**.
+
+The app on a computer that records (`VoiceMemoImport` in `StudyStash.Core/Recording`, started by `AppHost.Start`
+unless the computer is a library only) looks every minute: it takes each waiting memo, fetches it, turns it into the
+recordings' own sound (16 kHz mono WAV: `afconvert` on a Mac, Media Foundation on Windows, `ffmpeg` elsewhere;
+`StudyStash.Audio/AudioFiles.cs`) and adds it to its lectures as recorded and waiting for Whisper, with the memo's
+class and title, the time it was sent as its start, and the computer's own name as who recorded it. Whisper writes
+it down and the sender sends it on, as with any recording; the library is told the lecture's id straight away.
+
 ## The `device` cookie is a key to /api/v2
 
 The single check is `RequireKey` in `LibraryWeb.cs`, which every `/api/v2` route goes through (`Api`/`ApiAsync`). Its

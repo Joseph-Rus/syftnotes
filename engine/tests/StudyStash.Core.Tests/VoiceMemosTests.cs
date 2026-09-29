@@ -64,6 +64,12 @@ public class VoiceMemosTests
         // Done: it's a lecture, and the library lets go of the recording (the computer has its own copy).
         var done = await Json(await site.Client.SendAsync(Req(HttpMethod.Post, $"/api/v2/voice-memos/{id}/done", JsonContent(new { lecture = "rec-20260929-101500-abcdef" }))));
         Assert.Equal(("done", "rec-20260929-101500-abcdef"), (done["state"]!.GetValue<string>(), done["lecture"]!.GetValue<string>()));
+        // Done here, but the lecture reaches the library only once the computer has written it down and sent it.
+        var listed = (await Json(await site.Client.SendAsync(Req(HttpMethod.Get, "/api/v2/voice-memos"))))["memos"]!.AsArray().Single()!;
+        Assert.False(listed["ready"]!.GetValue<bool>());
+        store.Save(new Meeting("rec-20260929-101500-abcdef") { Title = "Recursion, part 2", Date = "2026-09-29", Transcript = "Today." }, new Classification("CS 101", 0.9, "folder"));
+        listed = (await Json(await site.Client.SendAsync(Req(HttpMethod.Get, "/api/v2/voice-memos"))))["memos"]!.AsArray().Single()!;
+        Assert.True(listed["ready"]!.GetValue<bool>());
         Assert.Empty(Directory.GetFiles(Path.Combine(cfg.Home, "voice-memos"), "*.m4a"));
     }
 

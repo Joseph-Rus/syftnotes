@@ -22,7 +22,17 @@ public sealed partial class LibraryWeb
 
     public VoiceMemos Memos => memos ??= new VoiceMemos(cfg.Home);
 
-    static JsonObject MemosJson(IEnumerable<VoiceMemo> list) => new() { ["memos"] = new JsonArray([.. list.Select(m => (JsonNode)m.ToJson())]) };
+    /// <summary>{memos: [...]}, each saying whether the lecture it became has reached the library yet (<c>ready</c>):
+    /// it's written down on the computer that took it first, then sent on.</summary>
+    JsonObject MemosJson(IEnumerable<VoiceMemo> list) => new()
+    {
+        ["memos"] = new JsonArray([.. list.Select(m =>
+        {
+            var o = m.ToJson();
+            o["ready"] = m.Lecture is { Length: > 0 } id && store.Get(id) is not null;
+            return (JsonNode)o;
+        })]),
+    };
 
     void MapVoiceMemos(WebApplication app)
     {

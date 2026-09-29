@@ -1,6 +1,7 @@
 import type { Platform } from '../platform';
 import { AddSquare, Share } from '../ui/icons';
 import { Button } from '../ui/kit';
+import { BASE } from '../router';
 
 /**
  * Shown in a phone's browser, before the app is on the Home Screen: how to add it, for iOS (Share → Add to Home
@@ -11,11 +12,9 @@ export function Install({ platform, onSkip }: { platform: Platform; onSkip: () =
   return (
     <div class="install">
       <div class="install-body">
-        <div class="install-icon" aria-hidden="true">
-          SS
-        </div>
+        <img class="install-icon" src={`${BASE}icon-192.png`} alt="" />
         <h1>Add Study Stash to your Home Screen</h1>
-        <p class="lede">So it opens full screen, like any other app, and works while you're offline.</p>
+        <p class="lede">So it opens full screen, like any other app, and reads your notes even when you're offline.</p>
         {platform === 'ios' ? <IosSteps /> : <AndroidSteps />}
       </div>
       <div class="install-footer">
@@ -34,19 +33,19 @@ function IosSteps() {
         <span class="steps-icon">
           <Share size={20} />
         </span>
-        Tap <strong>Share</strong> at the bottom of Safari
+        <span class="steps-text">Tap <strong>Share</strong> at the bottom of Safari</span>
       </li>
       <li>
         <span class="steps-icon">
           <AddSquare size={20} />
         </span>
-        Scroll down and tap <strong>Add to Home Screen</strong>
+        <span class="steps-text">Scroll down and tap <strong>Add to Home Screen</strong></span>
       </li>
       <li>
         <span class="steps-icon" aria-hidden="true">
           →
         </span>
-        Tap <strong>Add</strong>, then open it from your Home Screen
+        <span class="steps-text">Tap <strong>Add</strong>, then open it from your Home Screen</span>
       </li>
     </ol>
   );
@@ -59,19 +58,19 @@ function AndroidSteps() {
         <span class="steps-icon" aria-hidden="true">
           ⋮
         </span>
-        Open your browser's menu
+        <span class="steps-text">Open your browser's menu</span>
       </li>
       <li>
         <span class="steps-icon">
           <AddSquare size={20} />
         </span>
-        Tap <strong>Install app</strong> or <strong>Add to Home screen</strong>
+        <span class="steps-text">Tap <strong>Install app</strong> or <strong>Add to Home screen</strong></span>
       </li>
       <li>
         <span class="steps-icon" aria-hidden="true">
           →
         </span>
-        Open it from your Home screen
+        <span class="steps-text">Open it from your Home screen</span>
       </li>
     </ol>
   );

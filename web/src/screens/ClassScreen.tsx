@@ -6,6 +6,7 @@ import { href } from '../router';
 import { Doc, Paperclip, PlusCircle } from '../ui/icons';
 import { Empty, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { AttachmentRow } from './attachments';
+import { statusWord } from './Home';
 
 /** A class: its lectures (newest first, grouped by when), and anything attached to the class itself rather than
  * one lecture (a syllabus, a handout). "Add files" sends them here as a class attachment. */
@@ -68,7 +69,7 @@ function Lectures({
               key={l.id}
               href={href({ name: 'lecture', id: l.id })}
               title={l.title || 'Untitled lecture'}
-              subtitle={lectureMeta(l.date, l.seconds)}
+              subtitle={[lectureMeta(l.date, l.seconds), ...l.topics.slice(0, 2)].filter(Boolean).join(' · ')}
               detail={l.status !== 'done' ? statusWord(l.status) : undefined}
               chevron
             />
@@ -77,13 +78,6 @@ function Lectures({
       ))}
     </>
   );
-}
-
-function statusWord(status: string): string {
-  if (status === 'queued') return 'Waiting…';
-  if (status === 'working') return 'Writing notes…';
-  if (status === 'failed') return "Couldn't write notes";
-  return status;
 }
 
 function ClassFiles({ className, files, loading }: { className: string; files: Attachment[]; loading: boolean }) {

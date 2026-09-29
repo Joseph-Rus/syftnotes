@@ -11,23 +11,28 @@ export type Route =
   | { name: 'ask'; chat: string | null }
   | { name: 'due' }
   | { name: 'coming-up' }
+  | { name: 'assignment'; class: string; id: string }
   | { name: 'upload'; class: string | null; lecture: string | null }
+  | { name: 'memo' }
   | { name: 'settings' }
   | { name: 'not-found' };
 
-/** The tabs along the bottom (and the iPad's sidebar). */
-export type Tab = 'library' | 'search' | 'ask' | 'week' | 'upload' | 'settings';
+/** The tabs along the bottom (and the iPad's sidebar). Adding files and voice memos lives in the library. */
+export type Tab = 'library' | 'due' | 'ask' | 'search' | 'settings';
 
 export function tabOf(route: Route): Tab {
   switch (route.name) {
     case 'library':
     case 'class':
     case 'lecture':
+    case 'upload':
+    case 'memo':
     case 'not-found':
       return 'library';
     case 'due':
     case 'coming-up':
-      return 'week';
+    case 'assignment':
+      return 'due';
     default:
       return route.name;
   }
@@ -40,6 +45,10 @@ export function depthOf(route: Route): number {
       return 1;
     case 'lecture':
       return 2;
+    case 'assignment':
+    case 'upload':
+    case 'memo':
+      return 3;
     case 'ask':
       return route.chat ? 1 : 0;
     default:
@@ -67,6 +76,10 @@ export function href(route: Route): string {
       return `${BASE}due`;
     case 'coming-up':
       return `${BASE}coming-up`;
+    case 'assignment':
+      return `${BASE}assignment?${new URLSearchParams({ class: route.class, id: route.id }).toString()}`;
+    case 'memo':
+      return `${BASE}memo`;
     case 'upload': {
       const q = new URLSearchParams();
       if (route.class) q.set('class', route.class);
@@ -108,6 +121,13 @@ export function parse(pathname: string, search = ''): Route {
       return { name: 'due' };
     case 'coming-up':
       return { name: 'coming-up' };
+    case 'assignment': {
+      const cls = query.get('class'),
+        id = query.get('id');
+      return cls && id ? { name: 'assignment', class: cls, id } : { name: 'due' };
+    }
+    case 'memo':
+      return { name: 'memo' };
     case 'upload':
       return { name: 'upload', class: query.get('class'), lecture: query.get('lecture') };
     case 'settings':

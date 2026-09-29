@@ -211,3 +211,17 @@ export const Chat = (p: Props) => (
     <path d="M20.5 11.5c0 4.1-3.8 7.5-8.5 7.5-1.1 0-2.1-.2-3-.5L4 20l1.3-3.6a7 7 0 0 1-1.8-4.9C3.5 7.4 7.3 4 12 4s8.5 3.4 8.5 7.5Z" />
   </Svg>
 );
+
+export const Mic = (p: Props) => (
+  <Svg {...p}>
+    <rect x="9" y="3" width="6" height="11.5" rx="3" fill={p.filled ? 'currentColor' : 'none'} />
+    <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3" />
+  </Svg>
+);
+
+export const Checklist = (p: Props) => (
+  <Svg {...p}>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="4" fill={p.filled ? 'currentColor' : 'none'} />
+    <path d="m7.5 9 1.6 1.6L12 7.7M7.5 15.2l1.6 1.6 2.9-2.9M14 9.2h3M14 15.4h3" stroke={p.filled ? 'var(--tab-knock, #fff)' : 'currentColor'} />
+  </Svg>
+);

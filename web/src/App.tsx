@@ -15,7 +15,11 @@ import { ClassScreen } from './screens/ClassScreen';
 import { LectureScreen } from './screens/LectureScreen';
 import { UploadScreen } from './screens/Upload';
 import { SearchScreen } from './screens/Search';
-import { ComingUpScreen } from './screens/ComingUp';
+import { DueScreen } from './screens/Due';
+import { AssignmentScreen } from './screens/Assignment';
+import { AskScreen } from './screens/Ask';
+import { VoiceMemoScreen } from './screens/VoiceMemo';
+import { useResource } from './data/resource';
 import { SettingsScreen } from './screens/Settings';
 
 const SKIPPED_KEY = 'ss.skippedInstall';
@@ -104,13 +108,20 @@ export function App() {
 
   return (
     <div class="app-shell">
-      <Screens api={api} offline={gate.offline} />
-      <TabBar active={tabOf(route)} />
+      <Screens api={api} offline={gate.offline} onRemoved={() => setGate({ kind: 'pair', library: null })} />
+      <Tabs api={api} route={route} />
     </div>
   );
 }
 
-function Screens({ api, offline }: { api: Api; offline: boolean }) {
+/** The tab bar, with how much is overdue on Due's icon. */
+function Tabs({ api, route }: { api: Api; route: ReturnType<typeof useRoute>['route'] }) {
+  const due = useResource('due', (signal) => api.due(signal));
+  const overdue = due.data?.groups.find((g) => g.key === 'overdue')?.items.length ?? 0;
+  return <TabBar active={tabOf(route)} badges={{ due: overdue }} />;
+}
+
+function Screens({ api, offline, onRemoved }: { api: Api; offline: boolean; onRemoved: () => void }) {
   const { route } = useRoute();
   switch (route.name) {
     case 'library':
@@ -124,13 +135,17 @@ function Screens({ api, offline }: { api: Api; offline: boolean }) {
       return <SearchScreen api={api} q={route.q} />;
     case 'due':
     case 'coming-up':
-      return <ComingUpScreen api={api} />;
+      return <DueScreen api={api} />;
+    case 'assignment':
+      return <AssignmentScreen api={api} className={route.class} id={route.id} />;
     case 'upload':
       return <UploadScreen api={api} className={route.class} lecture={route.lecture} />;
+    case 'memo':
+      return <VoiceMemoScreen api={api} />;
     case 'settings':
-      return <SettingsScreen api={api} />;
+      return <SettingsScreen api={api} onRemoved={onRemoved} />;
     case 'ask':
-      return <Home api={api} offline={offline} />;
+      return <AskScreen api={api} />;
   }
 }
 

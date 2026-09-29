@@ -1,54 +1,115 @@
+import { useState } from 'preact/hooks';
 import type { Api } from '../api/client';
-import type { ClassInfo, LectureSummary, Upcoming } from '../api/types';
-import { lectureMeta, timeRange, dayLabel, parseWhen } from '../format';
+import type { ClassInfo, DueList, LectureSummary } from '../api/types';
+import { dueWhen, lectureMeta } from '../format';
 import { useResource } from '../data/resource';
 import { href } from '../router';
 import { classColor } from '../theme/themes';
-import { Doc, Folder } from '../ui/icons';
-import { Dot, Empty, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
+import { ChevronRight, Folder, Mic, Paperclip, PlusCircle } from '../ui/icons';
+import { Dot, Empty, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
+import { useClassColors } from './classColors';
 
-/** The library's front screen: what's coming up today and tomorrow (when the library has any), the newest
- * lectures, and every class with its dot. */
+/** The library's front screen: the next few things due (when Canvas is linked), the newest lectures with their
+ * classes and topics, and every class with its dot. + adds files or a voice memo. */
 export function Home({ api, offline }: { api: Api; offline: boolean }) {
   const library = useResource('library', (signal) => api.library(signal));
-  const recent = useResource('recent-lectures', (signal) => api.lectures({ limit: 8 }, signal));
-  const upcoming = useResource('upcoming', (signal) => api.upcoming(signal));
+  const recent = useResource('recent-lectures', (signal) => api.lectures({ limit: 6 }, signal));
+  const due = useResource('due', (signal) => api.due(signal));
+  const colorOf = useClassColors(api);
+  const [adding, setAdding] = useState(false);
 
   const refresh = async () => {
-    await Promise.all([library.refresh(), recent.refresh(), upcoming.refresh()]);
+    await Promise.all([library.refresh(), recent.refresh(), due.refresh()]);
   };
 
+  const writing = library.data?.writing ?? 0;
+  const subtitle = offline
+    ? 'Offline — showing what was saved before'
+    : writing > 0
+      ? `Writing notes for ${writing} lecture${writing === 1 ? '' : 's'}…`
+      : library.data?.name;
+
   return (
-    <Screen title="Library" large subtitle={offline ? 'Showing what was saved before — offline' : undefined} onRefresh={refresh}>
-      <ComingUp data={upcoming.data} />
-      <RecentLectures lectures={recent.data} loading={recent.loading} error={recent.error} onRetry={recent.refresh} />
+    <Screen
+      title="Library"
+      large
+      subtitle={subtitle}
+      onRefresh={refresh}
+      actions={
+        <IconButton label="Add" onClick={() => setAdding(true)}>
+          <PlusCircle size={26} />
+        </IconButton>
+      }
+    >
+      <DueSoon list={due.data} colorOf={colorOf} />
+      <RecentLectures lectures={recent.data} loading={recent.loading} error={recent.error} onRetry={recent.refresh} colorOf={colorOf} />
       <Classes overview={library.data} loading={library.loading} error={library.error} onRetry={library.refresh} />
+      {adding ? <AddSheet onClose={() => setAdding(false)} /> : null}
     </Screen>
   );
 }
 
-function ComingUp({ data }: { data: Upcoming | undefined }) {
-  const events = (data?.events ?? []).slice(0, 4);
-  if (events.length === 0) return null;
+/** + : what can be added from here. */
+function AddSheet({ onClose }: { onClose: () => void }) {
   return (
-    <Section title="Coming up">
-      {events.map((e) => (
-        <Row
-          key={e.id}
-          title={e.title}
-          subtitle={dayLabel(parseWhen(e.start) ?? new Date()) + (e.location ? ` · ${e.location}` : '')}
-          detail={timeRange(e.start, e.end, e.allDay)}
-          lead={e.class ? <Dot color={classColorOf(e.class)} /> : undefined}
-        />
-      ))}
-    </Section>
+    <div class="sheet-backdrop" onClick={onClose}>
+      <div class="sheet" role="dialog" aria-label="Add" onClick={(e) => e.stopPropagation()}>
+        <div class="sheet-grabber" />
+        <a class="sheet-option" href={href({ name: 'memo' })} onClick={onClose}>
+          <span class="sheet-icon">
+            <Mic size={22} />
+          </span>
+          <span>
+            <strong>Import a voice memo</strong>
+            <small>A recording from Voice Memos becomes a lecture, with notes.</small>
+          </span>
+        </a>
+        <a class="sheet-option" href={href({ name: 'upload', class: null, lecture: null })} onClick={onClose}>
+          <span class="sheet-icon">
+            <Paperclip size={22} />
+          </span>
+          <span>
+            <strong>Add files</strong>
+            <small>Photos of handwritten notes, slides, PDFs.</small>
+          </span>
+        </a>
+        <button type="button" class="sheet-cancel" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
 
-// Classes are coloured by their place in the library's list; Coming up only has a name, so it can't line up
-// exactly until /calendar/upcoming carries the class's own colour. A plain dot stands in for now.
-function classColorOf(_name: string): string {
-  return 'var(--accent)';
+/** The next three things to hand in, with a way into the Due tab. Hidden when Canvas isn't linked. */
+function DueSoon({ list, colorOf }: { list: DueList | undefined; colorOf: (c: string | null) => string }) {
+  if (!list) return null;
+  const items = list.groups
+    .filter((g) => g.key === 'overdue' || g.key === 'week' || g.key === 'later')
+    .flatMap((g) => g.items.map((i) => ({ ...i, overdue: g.key === 'overdue' })))
+    .slice(0, 3);
+  if (items.length === 0) return null;
+  return (
+    <Section title="Due soon">
+      {items.map((i) => (
+        <Row
+          key={`${i.class}-${i.id}`}
+          href={href({ name: 'assignment', class: i.class, id: String(i.id) })}
+          lead={<Dot color={colorOf(i.class)} />}
+          title={i.name}
+          subtitle={i.class}
+          detail={<span class={i.overdue ? 'due-state missing' : 'due-state'}>{dueWhen(i.due)}</span>}
+          chevron
+        />
+      ))}
+      <a class="row tappable see-all" href={href({ name: 'due' })}>
+        <span class="row-text">
+          <span class="row-title">All {list.to_hand_in} to hand in</span>
+        </span>
+        <ChevronRight size={16} class="row-chevron" />
+      </a>
+    </Section>
+  );
 }
 
 function RecentLectures({
@@ -56,29 +117,43 @@ function RecentLectures({
   loading,
   error,
   onRetry,
+  colorOf,
 }: {
   lectures: LectureSummary[] | undefined;
   loading: boolean;
   error: unknown;
   onRetry: () => void;
+  colorOf: (c: string | null) => string;
 }) {
-  if (error) return <Problem message="Couldn't load your recent lectures." onRetry={onRetry} />;
-  if (loading && !lectures) return <SkeletonRows count={4} />;
+  if (error && !lectures) return <Problem message="Couldn't load your recent lectures." onRetry={onRetry} />;
+  if (loading && !lectures) return <SkeletonRows count={3} />;
   if (!lectures || lectures.length === 0) return null;
   return (
     <Section title="Recent lectures">
       {lectures.map((l) => (
-        <Row
-          key={l.id}
-          href={href({ name: 'lecture', id: l.id })}
-          lead={<Doc size={20} />}
-          title={l.title || 'Untitled lecture'}
-          subtitle={[l.class, lectureMeta(l.date, l.seconds)].filter(Boolean).join(' · ')}
-          chevron
-        />
+        <a key={l.id} class="row tappable lecture-row" href={href({ name: 'lecture', id: l.id })}>
+          <span class="lecture-bar" style={{ background: colorOf(l.class) }} />
+          <span class="row-text">
+            <span class="row-title">{l.title || 'Untitled lecture'}</span>
+            <span class="row-subtitle">{[l.class, lectureMeta(l.date, l.seconds)].filter(Boolean).join(' · ')}</span>
+            {l.status !== 'done' ? (
+              <span class="lecture-status">{statusWord(l.status)}</span>
+            ) : l.topics.length > 0 ? (
+              <span class="lecture-topics">{l.topics.slice(0, 3).join(' · ')}</span>
+            ) : null}
+          </span>
+          <ChevronRight size={16} class="row-chevron" />
+        </a>
       ))}
     </Section>
   );
+}
+
+export function statusWord(status: string): string {
+  if (status === 'queued') return 'Waiting to be written…';
+  if (status === 'working') return 'Writing notes…';
+  if (status === 'failed') return "Notes couldn't be written";
+  return status;
 }
 
 function Classes({
@@ -92,13 +167,13 @@ function Classes({
   error: unknown;
   onRetry: () => void;
 }) {
-  if (error) return <Problem message="Couldn't load your classes." onRetry={onRetry} />;
+  if (error && !overview) return <Problem message="Couldn't load your classes." onRetry={onRetry} />;
   if (loading && !overview) return <SkeletonRows count={5} withSubtitle={false} />;
   if (!overview) return null;
   if (overview.classes.length === 0 && overview.unsorted === 0)
     return (
       <Empty icon={<Folder size={40} />} title="Nothing here yet">
-        Record a lecture on your library computer, and it'll show up here.
+        Record a lecture with Study Stash on your computer, or import a voice memo with +.
       </Empty>
     );
   return (
@@ -110,18 +185,12 @@ function Classes({
           lead={<Dot color={classColor(c.color)} size={12} />}
           title={c.name}
           subtitle={c.code || undefined}
-          detail={`${c.lectures}`}
+          detail={c.lectures === 0 ? '' : `${c.lectures}`}
           chevron
         />
       ))}
       {overview.unsorted > 0 ? (
-        <Row
-          href={href({ name: 'class', class: 'Unsorted' })}
-          lead={<Dot color="var(--fg3)" size={12} />}
-          title="Unsorted"
-          detail={`${overview.unsorted}`}
-          chevron
-        />
+        <Row href={href({ name: 'class', class: 'Unsorted' })} lead={<Dot color="var(--fg3)" size={12} />} title="Unsorted" detail={`${overview.unsorted}`} chevron />
       ) : null}
     </Section>
   );

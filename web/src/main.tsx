@@ -3,6 +3,7 @@ import 'katex/dist/katex.min.css';
 import './styles/base.css';
 import './styles/kit.css';
 import './styles/screens.css';
+import './styles/app.css';
 import { App } from './App';
 
 render(<App />, document.getElementById('app')!);

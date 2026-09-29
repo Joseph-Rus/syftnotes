@@ -71,32 +71,51 @@ guessing at the round-0.9 contract in the shared brief, and one shape needed fix
 - **Install / Pair / Unreachable** (`screens/Install.tsx`, `Pair.tsx`, `Unreachable.tsx`): one centred column, big
   touch targets, safe-area padding top and bottom. Pairing autofills the six digits the moment there are six of
   them; no separate submit tap needed unless autofill doesn't fire.
-- **Home** (`screens/Home.tsx`): Coming up (`GET /api/v2/calendar/upcoming`, hidden entirely when the library has
-  none), recent lectures, then every class with its dot (`theme/themes.ts`'s `classColor`, the same palette
-  `ClassColors.Palette` draws on the Mac). Pull to refresh re-asks all three.
+The tab bar is **Library, Due, Ask, Search, Settings** (`ui/TabBar.tsx`); Due carries a red badge with how much is
+overdue. Adding files and voice memos live behind the Library's **+** (a sheet), and on a class's and a lecture's page.
+
+- **Home** (`screens/Home.tsx`): Due soon (the next three from `GET /api/v2/canvas/due`, hidden when Canvas isn't
+  linked), recent lectures (the class's colour down each one's side, its topics under the title), then every class
+  with its dot (`theme/themes.ts`'s `classColor`, the same palette `ClassColors.Palette` draws on the Mac;
+  `screens/classColors.ts` looks a class's colour up by name for every screen). Pull to refresh re-asks all three.
+- **Due** (`screens/Due.tsx`): the next thing to hand in large, today's and tomorrow's classes from the calendar,
+  then everything still to do by group (an empty group has no heading), and what was handed in this week folded
+  away. **An assignment** (`screens/Assignment.tsx`, `GET /api/v2/canvas/assignment`): when it's due, points and
+  status, the instructions (`instructions_html`, drawn by `PhoneNotes.Render` like a lecture's notes; plain text from
+  an older library), the rubric, comments, and **Hand it in on Canvas**.
+- **Ask** (`screens/Ask.tsx`, `POST /api/v2/ai/ask` streamed): a question about everything or one class, the answer
+  as it's written, and the lectures it drew on as links. The questions stay on the phone (`ss.ask`). A library with
+  no AI set up says where to choose one.
 - **A class** (`ClassScreen.tsx`): its lectures grouped by when (`format.lectureGroup`: "This week", "Last week",
   then by month), and files attached to the class itself (not one lecture) with **Add files**.
-- **A lecture** (`LectureScreen.tsx`): its notes from `/rendered`, KaTeX run over every `.math[data-tex]` element
-  after the HTML lands (`ui/math.ts`'s `renderMath`; a formula KaTeX can't parse just keeps the plain-text fallback
-  `PhoneNotes.Render` already wrote, `throwOnError: false`), and its attachments.
+- **A lecture** (`LectureScreen.tsx`): its class, date, length and topics (each searches), its notes from
+  `/rendered`, KaTeX run over every `.math[data-tex]` element after the HTML lands (`ui/math.ts`'s `renderMath`; a
+  formula KaTeX can't parse just keeps the plain-text fallback `PhoneNotes.Render` already wrote, `throwOnError:
+  false`), its transcript (folded when there are notes, open when there aren't), and its attachments. A lecture
+  without notes says why: being written, failed, or never written.
+- **Import a voice memo** (`screens/VoiceMemo.tsx`): Voice Memos can't hand a recording to a web app, so it's Share
+  → Save to Files, then chosen here, with a title and a class (or "Sort it for me"). It goes to
+  `POST /api/v2/voice-memos`; a computer that records takes it, writes it down and sends it on as a lecture (see
+  [phone.md](phone.md#voice-memos)). The list under it says where each memo is, asking again every five seconds
+  while any is on its way, and a memo whose lecture has arrived (`ready`) opens it.
 - **Add files** (`screens/Upload.tsx`): a camera button (`accept="image/*" capture="environment"`) and a Files
   button (PDFs, images, Office documents, multiple at once); each file uploads on its own so it gets its own
   progress bar and its own **Retry** on failure; anything over 200 MB is refused locally with the same words the
   library would use, before it's ever sent. Once uploaded, the list of what's already there polls every four
   seconds while anything is still `reading`, so "Reading your handwriting…" clears on its own once the library's
   OCR finishes — no manual refresh needed.
-- **Coming up** (`ComingUp.tsx`) and **Search** (`Search.tsx`, a nice-to-have this round) round out the tab bar;
-  **Settings** (`Settings.tsx`) says which library this phone is paired with and points back to the library's own
-  computer for adding or removing phones. Ask, chats and assignments are next round's work — their routes exist
-  (`router.ts` already has `ask` and `due`) but the tab bar and screens don't use them yet.
+- **Search** (`Search.tsx`): searches as the typing pauses; classes, lectures, then passages (a transcript
+  passage says when it was said).
+- **Settings** (`Settings.tsx`): the library, the look (Automatic, Light or Dark, and the Mac's ten colour themes,
+  kept on the phone as `ss.look`), and this phone (`/api/v2/me`'s `device`) with **Remove this phone**, which locks
+  it out at once, as Remove does on the computer.
 
 ## Look and feel
 
 `theme/themes.ts` works out the Mac's Liquid Glass tokens (`Skin.MacTokens`'s formulas, in `oklch()`) for light and
 dark from one of its ten colour themes; `useTheme.ts` writes them as a `<style>` on the page and matches the
-browser's own chrome (the status bar, Safari's tab bar) to it. The phone always runs Lagoon (the default) for now —
-the library doesn't expose which of the ten a student picked over `/api/v2` yet, so there's nothing to read; adding
-that is wave 2. `ui/kit.tsx` is every shared piece (navigation bar with a title that shrinks into it on scroll,
+browser's own chrome (the status bar, Safari's tab bar) to it. Which theme, and light or dark, is chosen in the
+phone's own Settings (`look` in `useTheme.ts`); it starts on Lagoon, following the phone's light or dark. `ui/kit.tsx` is every shared piece (navigation bar with a title that shrinks into it on scroll,
 inset grouped lists, buttons, empty states, skeletons) and `ui/pull.ts` is pull-to-refresh, damped like iOS's rubber
 band. An iPad (or a wide window) gets the sidebar layout in `styles/screens.css`'s media query instead of a bottom
 tab bar.

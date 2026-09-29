@@ -1,15 +1,21 @@
 import { useEffect } from 'preact/hooks';
-import { chromeColour, defaultTheme, themeCss } from './themes';
+import { persistedStore, useStore } from '../data/store';
+import { chromeColour, findTheme, themeCss, type Appearance } from './themes';
+
+/** The look chosen in this phone's Settings: one of the Mac's ten colour themes, and light, dark or the phone's own. */
+export const look = persistedStore<{ theme: string; appearance: Appearance }>('ss.look', { theme: 'Lagoon', appearance: 'system' });
 
 let style: HTMLStyleElement | null = null;
 let meta: HTMLMetaElement | null = null;
 
 /**
- * Puts the running theme's colours on the page: a `<style>` with its custom properties (light, and dark when the
- * phone is dark), and the browser chrome's colour (the status bar, Safari's tab bar) to match. There's one theme for
- * now (Lagoon); when the library can tell the phone which of its ten it's on, this is where that arrives.
+ * Puts the chosen theme's colours on the page: a `<style>` with its custom properties (light, and dark when the
+ * phone is dark or dark was chosen), and the browser chrome's colour (the status bar, Safari's tab bar) to match.
  */
-export function useTheme(theme = defaultTheme) {
+export function useTheme() {
+  const chosen = useStore(look);
+  const theme = findTheme(chosen.theme);
+  const appearance = chosen.appearance;
   useEffect(() => {
     if (typeof document === 'undefined') return;
     if (!style) {
@@ -24,11 +30,12 @@ export function useTheme(theme = defaultTheme) {
         document.head.appendChild(meta);
       }
     }
-    style.textContent = themeCss(theme, 'system');
+    style.textContent = themeCss(theme, appearance);
     const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-    const paint = () => meta!.setAttribute('content', chromeColour(theme, media?.matches ?? false));
+    const paint = () =>
+      meta!.setAttribute('content', chromeColour(theme, appearance === 'dark' || (appearance === 'system' && (media?.matches ?? false))));
     paint();
     media?.addEventListener('change', paint);
     return () => media?.removeEventListener('change', paint);
-  }, [theme]);
+  }, [theme, appearance]);
 }

@@ -3,7 +3,6 @@ import type { Api } from '../api/client';
 import { ApiError } from '../api/client';
 import type { Attachment } from '../api/types';
 import { fileSize } from '../format';
-import { back } from '../router';
 import { Camera, Folder, Photo } from '../ui/icons';
 import { Button, Screen, Section } from '../ui/kit';
 import { AttachmentRow } from './attachments';
@@ -82,15 +81,21 @@ export function UploadScreen({ api, className, lecture }: { api: Api; className:
   const backTo = lecture ? { name: 'lecture' as const, id: lecture } : className ? { name: 'class' as const, class: className } : { name: 'library' as const };
 
   return (
-    <Screen title="Add files" back={{ label: 'Back', to: backTo }}>
-      <Section footer={`Sent to ${where}. Up to 200 MB at once — photos, PDFs, slides, anything with your notes on it.`}>
+    <Screen title="Add files" quiet back={{ label: lecture ? 'Lecture' : className ?? 'Library', to: backTo }}>
+      <header class="detail-head">
+        <h1 class="detail-title">Add files</h1>
+        <div class="detail-meta">To {where}. Photos of handwritten notes are read, so they turn up in search and answers.</div>
+      </header>
+      <Section footer="Up to 200 MB at once: photos, PDFs, slides, documents.">
         <div class="upload-buttons">
-          <Button kind="tinted" onClick={() => cameraPicker.current?.click()}>
-            <Camera size={20} /> Camera
-          </Button>
-          <Button kind="tinted" onClick={() => filePicker.current?.click()}>
-            <Folder size={20} /> Files
-          </Button>
+          <button type="button" class="big-choice" onClick={() => cameraPicker.current?.click()}>
+            <Camera size={28} />
+            <span>Take a photo</span>
+          </button>
+          <button type="button" class="big-choice" onClick={() => filePicker.current?.click()}>
+            <Folder size={28} />
+            <span>Choose files</span>
+          </button>
         </div>
         <input
           ref={cameraPicker}
@@ -132,11 +137,6 @@ export function UploadScreen({ api, className, lecture }: { api: Api; className:
         </Section>
       ) : null}
 
-      <Section>
-        <Button kind="plain" onClick={() => back(backTo)}>
-          Done
-        </Button>
-      </Section>
     </Screen>
   );
 }

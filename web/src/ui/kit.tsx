@@ -19,6 +19,8 @@ export interface ScreenProps {
   onRefresh?: () => Promise<unknown>;
   /** A large title (the tab's first screens); detail screens show the title in the bar only. */
   large?: boolean;
+  /** A detail screen with a heading of its own at the top: the bar shows the title only once that's scrolled away. */
+  quiet?: boolean;
   /** Something that stays under the bar (a search field, a segmented control). */
   accessory?: ComponentChildren;
   children: ComponentChildren;
@@ -28,10 +30,18 @@ export interface ScreenProps {
 export function Screen(props: ScreenProps) {
   const scroller = useRef<HTMLDivElement>(null);
   const sentinel = useRef<HTMLDivElement>(null);
-  const [condensed, setCondensed] = useState(!props.large);
+  const [condensed, setCondensed] = useState(!props.large && !props.quiet);
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const tracker = useRef(new Pull());
+
+  useEffect(() => {
+    if (!props.quiet || !scroller.current) return;
+    const el = scroller.current;
+    const look = () => setCondensed(el.scrollTop > 64);
+    el.addEventListener('scroll', look, { passive: true });
+    return () => el.removeEventListener('scroll', look);
+  }, [props.quiet]);
 
   useEffect(() => {
     if (!props.large || !sentinel.current || typeof IntersectionObserver === 'undefined') return;
@@ -115,7 +125,7 @@ export function BackButton({ label, to }: { label: string; to: Route }) {
       }}
     >
       <ChevronLeft size={22} />
-      <span>{label}</span>
+      <span class="back-label">{label}</span>
     </a>
   );
 }

@@ -24,9 +24,15 @@ describe('moving from the Tailscale IP to the https name', () => {
       throw new Error('asked');
     };
     expect(await secureAddress('http://100.87.191.40:8787/app/', never)).toBeNull();
-    expect(await secureAddress(`https://mini.tail1234.ts.net:8443/app/?https=${encodeURIComponent(secure)}`, never)).toBeNull();
-    expect(offeredSecure(`http://100.1.2.3:8787/app/?https=${encodeURIComponent('https://evil.example/app/')}`)).toBeNull();
-    expect(offeredSecure(`http://100.1.2.3:8787/app/?https=${encodeURIComponent('http://mini.tail1234.ts.net/app/')}`)).toBeNull();
+    expect(
+      await secureAddress(`https://mini.tail1234.ts.net:8443/app/?https=${encodeURIComponent(secure)}`, never),
+    ).toBeNull();
+    expect(
+      offeredSecure(`http://100.1.2.3:8787/app/?https=${encodeURIComponent('https://evil.example/app/')}`),
+    ).toBeNull();
+    expect(
+      offeredSecure(`http://100.1.2.3:8787/app/?https=${encodeURIComponent('http://mini.tail1234.ts.net/app/')}`),
+    ).toBeNull();
     expect(offeredSecure('http://100.1.2.3:8787/app/?https=not%20a%20url')).toBeNull();
   });
 

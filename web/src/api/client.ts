@@ -2,19 +2,21 @@ import { readLines } from './ndjson';
 import type {
   AskEvent,
   AskReply,
+  AssignmentDetail,
   Attachment,
   Chat,
   ChatEvent,
   ChatSummary,
   Device,
   DueList,
-  LectureSummary,
   Lecture,
+  LectureSummary,
   LibraryOverview,
   Me,
   RenderedLecture,
   SearchResults,
   Upcoming,
+  VoiceMemo,
 } from './types';
 
 /**
@@ -229,6 +231,10 @@ export class Api {
     return this.get<DueList>('/canvas/due', undefined, signal);
   }
 
+  assignment(cls: string, id: string | number, signal?: AbortSignal) {
+    return this.get<AssignmentDetail>('/canvas/assignment', { class: cls, id: String(id) }, signal);
+  }
+
   upcoming(signal?: AbortSignal) {
     return this.get<Upcoming>('/calendar/upcoming', undefined, signal);
   }
@@ -245,6 +251,52 @@ export class Api {
 
   deleteAttachment(id: string) {
     return this.del<unknown>(`/attachments/${encodeURIComponent(id)}`);
+  }
+
+  // --- voice memos -------------------------------------------------------------------------------------------
+
+  async voiceMemos(signal?: AbortSignal): Promise<VoiceMemo[]> {
+    return (await this.get<{ memos: VoiceMemo[] }>('/voice-memos', undefined, signal)).memos;
+  }
+
+  retryVoiceMemo(id: string) {
+    return this.post<VoiceMemo>(`/voice-memos/${encodeURIComponent(id)}/retry`, {});
+  }
+
+  deleteVoiceMemo(id: string) {
+    return this.del<{ memos: VoiceMemo[] }>(`/voice-memos/${encodeURIComponent(id)}`);
+  }
+
+  /** Send a recording from Voice Memos, to become a lecture in `class` (or sorted by the library) titled `title`. */
+  async sendVoiceMemo(
+    file: File,
+    to: { class?: string; title?: string },
+    onProgress: (p: UploadProgress) => void = () => {},
+    signal?: AbortSignal,
+  ): Promise<VoiceMemo> {
+    const form = new FormData();
+    form.append('file', file, file.name || 'Voice memo.m4a');
+    if (to.class) form.append('class', to.class);
+    if (to.title) form.append('title', to.title);
+    let result: { status: number; text: string };
+    try {
+      result = await this.uploader(this.url('/voice-memos'), form, onProgress, signal);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') throw e;
+      throw new ApiError(0, "Can't reach your library.");
+    }
+    let body: Partial<VoiceMemo> & { detail?: string } = {};
+    try {
+      body = JSON.parse(result.text) as typeof body;
+    } catch {
+      // not JSON
+    }
+    if (result.status < 200 || result.status >= 300) {
+      if (result.status === 401) this.onUnauthorized?.();
+      if (result.status === 404) throw new ApiError(404, 'Your library is older than this: update Study Stash on your computer to send voice memos.');
+      throw new ApiError(result.status, body.detail ?? defaultWords(result.status));
+    }
+    return body as VoiceMemo;
   }
 
   /** Send files to a class (and a lecture, when one is chosen), saying how far along it is. */

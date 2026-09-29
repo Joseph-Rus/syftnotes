@@ -12,6 +12,8 @@ describe('addresses', () => {
     { name: 'ask', chat: 'c-42' },
     { name: 'due' },
     { name: 'coming-up' },
+    { name: 'assignment', class: 'CS 101', id: '9001' },
+    { name: 'memo' },
     { name: 'upload', class: 'BIO 110', lecture: 'L1' },
     { name: 'upload', class: null, lecture: null },
     { name: 'settings' },
@@ -42,8 +44,11 @@ describe('addresses', () => {
 
 test('screens belong to their tabs', () => {
   expect(tabOf({ name: 'lecture', id: 'x' })).toBe('library');
-  expect(tabOf({ name: 'coming-up' })).toBe('week');
-  expect(tabOf({ name: 'due' })).toBe('week');
+  expect(tabOf({ name: 'coming-up' })).toBe('due');
+  expect(tabOf({ name: 'due' })).toBe('due');
+  expect(tabOf({ name: 'assignment', class: 'CS 101', id: '1' })).toBe('due');
+  expect(tabOf({ name: 'upload', class: null, lecture: null })).toBe('library');
+  expect(tabOf({ name: 'memo' })).toBe('library');
   expect(tabOf({ name: 'ask', chat: 'c' })).toBe('ask');
 });
 
