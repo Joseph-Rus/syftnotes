@@ -442,6 +442,7 @@ public static partial class Shell
         library.OnUndo = UndoDeleteAsync;
         library.OnExport = () => _ = ExportAsync();
         library.OnMore = MoreMenu;
+        library.OnSupportAnswer = answer => SupportAsk.Answer(host, answer, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
     }
 
     // --- recording ----------------------------------------------------------------------------------------------------
@@ -969,6 +970,7 @@ public static partial class Shell
             setupWindow.Activate();
             return;
         }
+        library.Support = null; // the ask for a tip never shows during setup
         bool again = host.Settings.SetupDone;
         setup = Setup.Make(host);
         setup.Again = again;
@@ -1252,6 +1254,7 @@ public static partial class Shell
         var live = host.Recorder.Current;
         liveId = live?.Id;
         bool recording = live is not null;
+        if (recording) library.Support = null; // the ask for a tip never shows while recording
         panel.IsRecording = recording;
         panel.IsPaused = recorder.IsPaused = live?.State == LectureState.Paused;
         string cls = recording ? live!.ClassName : RecordClass() is { Length: > 0 } picked ? picked : CalendarClass();

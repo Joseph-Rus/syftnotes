@@ -729,8 +729,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     [RelayCommand] static void Quit() => Shell.Quit();
 
-    /// <summary>About's "Buy us more Claude usage": the team's Ko-fi page, in the browser.</summary>
-    [RelayCommand] void BuyClaudeUsage() => OpenUrl(SupportAsk.Page);
+    /// <summary>About's "Buy us more Claude usage": the team's Ko-fi page, in the browser, and the library window
+    /// won't ask for a tip after that.</summary>
+    [RelayCommand] void BuyClaudeUsage() => SupportAsk.Answer(host, SupportAnswer.Tip, OpenUrl, DateTimeOffset.Now);
 
     public void Dispose()
     {
