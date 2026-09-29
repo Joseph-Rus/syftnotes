@@ -445,7 +445,7 @@ public static partial class Shell
 
         recorder.OnPause = TogglePause;
         recorder.OnStop = () => StopRecording();
-        recorder.OnExpand = expanded => PlaceRecorder();
+        recorder.OnExpand = expanded => recorderWindow?.Refit(PlaceRecorder);
 
         quick.OnQuery = q => _ = SearchAsync(q);
         quick.OnAsk = AskQuick;
@@ -744,6 +744,7 @@ public static partial class Shell
         recorderWindow ??= MakeRecorderWindow();
         PlaceRecorder();
         recorderWindow.Show();
+        recorderWindow.Refit(PlaceRecorder);
     }
 
     static Floating MakeRecorderWindow()
