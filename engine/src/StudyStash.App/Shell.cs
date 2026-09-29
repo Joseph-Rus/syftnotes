@@ -148,6 +148,12 @@ public static partial class Shell
         public static void StopRecording() => Shell.StopRecording();
         public static void TogglePause() => Shell.TogglePause();
         public static void ShowRecorder(bool expanded) => Shell.ShowRecorder(expanded);
+        /// <summary>One step of dragging the recorder, as the pointer would take it: the self-test's check that it
+        /// goes right up to a Mac's menu bar and down to Windows' taskbar.</summary>
+        public static void DragRecorder(PixelPoint at, PixelPoint pointer)
+        {
+            if (recorderWindow is not null) MoveRecorder(recorderWindow, at, pointer);
+        }
         /// <summary>Record the way the global shortcut would, so the self-test exercises that path too (setup first,
         /// if it isn't done).</summary>
         public static void RecordViaShortcut() => OnShortcut(Shortcut.Record);
@@ -721,43 +727,39 @@ public static partial class Shell
         var w = new Floating { Content = view, KeepClear = true, Title = "Study Stash recorder" };
         AppMenu.AddSettingsKey(w, SettingsFromAnywhere);
         // Drag it anywhere by its background; where it lands is saved once the drag ends, not on every pixel moved.
-        // The small pill moves by hand, so a press that never moves is a click, which opens the recorder.
-        Point? pressed = null;
+        // It moves by hand, not by the system's own window drag, so it can go right up to a Mac's menu bar (see
+        // Placement.Dragged). On the small pill a press that never moves is a click, which opens the recorder.
+        PixelPoint? grabbed = null;
+        PixelPoint grabbedAt = default;
         bool moved = false;
         view.PointerPressed += (_, e) =>
         {
-            if (e.Source is TextBox || !e.GetCurrentPoint(view).Properties.IsLeftButtonPressed) return;
-            if (recorder.Expanded)
-            {
-                w.BeginMoveDrag(e);
-                return;
-            }
-            pressed = e.GetPosition(view);
+            if (e.Source is TextBox || !e.GetCurrentPoint(view).Properties.IsLeftButtonPressed || w.Panel() is not { } panel) return;
+            // All in screen pixels: the window's clear room shrinks and grows at the display's edges as it moves, which
+            // shifts the pill inside it, so a point on the pill itself wouldn't stay put.
+            grabbed = view.PointToScreen(e.GetPosition(view));
+            int room = (int)(Floating.ShadowRoom * w.DesktopScaling);
+            grabbedAt = new PixelPoint(panel.X - room, panel.Y - room);
             moved = false;
             e.Pointer.Capture(view);
         };
         view.PointerMoved += (_, e) =>
         {
-            if (pressed is not { } from) return;
-            var by = e.GetPosition(view) - from;
-            if (!moved && Math.Abs(by.X) + Math.Abs(by.Y) < 4) return;
+            if (grabbed is not { } from) return;
+            var now = view.PointToScreen(e.GetPosition(view));
+            var by = now - from;
+            if (!moved && Math.Abs(by.X) + Math.Abs(by.Y) < 4 * w.DesktopScaling) return;
             moved = true;
-            // The window follows the pointer, so the pointer stays over the same spot of the pill.
-            w.Position += new PixelVector((int)Math.Round(by.X * w.DesktopScaling), (int)Math.Round(by.Y * w.DesktopScaling));
+            // The pill follows the pointer, so the pointer stays over the same spot of it.
+            MoveRecorder(w, grabbedAt + by, now);
         };
         view.PointerReleased += (_, e) =>
         {
-            if (pressed is not null)
-            {
-                pressed = null;
-                e.Pointer.Capture(null);
-                if (!moved)
-                {
-                    recorder.ToggleCommand.Execute(null);
-                    return;
-                }
-            }
-            SaveRecorderPosition();
+            if (grabbed is null) return;
+            grabbed = null;
+            e.Pointer.Capture(null);
+            if (moved) SaveRecorderPosition();
+            else if (!recorder.Expanded) recorder.ToggleCommand.Execute(null);
         };
         w.Closing += (_, e) =>
         {
@@ -769,6 +771,15 @@ public static partial class Shell
         // A display is unplugged, or one's plugged back in: put it back where it belongs, or on screen at least.
         w.Screens.Changed += (_, _) => PlaceRecorder();
         return w;
+    }
+
+    /// <summary>One step of dragging the recorder: to <paramref name="at"/> (its top left with the whole shadow room),
+    /// with the pill kept on the usable part of the display under <paramref name="pointer"/>.</summary>
+    static void MoveRecorder(Floating w, PixelPoint at, PixelPoint pointer)
+    {
+        var screens = w.ScreenList();
+        double scale = Placement.Pick(screens, pointer).Scaling;
+        w.Put(Placement.Dragged(at, pointer, screens, w.Measured(scale), (int)(Floating.ShadowRoom * scale)));
     }
 
     /// <summary>Remembers the recorder's top right corner, so it comes back there next time (a drag just ended, or
