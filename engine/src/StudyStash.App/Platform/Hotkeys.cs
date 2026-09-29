@@ -3,12 +3,12 @@ using System.Runtime.Versioning;
 
 namespace StudyStash.App.Platform;
 
-/// <summary>What a global shortcut does.</summary>
+/// <summary>What a global shortcut does (the keys are the student's: <see cref="Keybindings"/>).</summary>
 public enum Shortcut
 {
-    /// <summary>⌥Space on a Mac, Alt+Shift+Space on Windows: the quick panel.</summary>
+    /// <summary>⌥Space on a Mac, Alt+Shift+Space on Windows, unless changed: the quick panel.</summary>
     Quick = 1,
-    /// <summary>⌥⇧R on a Mac, Ctrl+Alt+R on Windows: start or stop recording.</summary>
+    /// <summary>⌥⇧R on a Mac, Ctrl+Alt+R on Windows, unless changed: start or stop recording.</summary>
     Record = 2,
 }
 
@@ -27,13 +27,13 @@ public static class Hotkeys
 {
     static Action<Shortcut>? pressed;
 
-    public static HotkeyResult Register(Action<Shortcut> onPressed)
+    public static HotkeyResult Register(Action<Shortcut> onPressed, KeyCombo quick, KeyCombo record)
     {
         pressed = onPressed;
         try
         {
-            if (OperatingSystem.IsMacOS()) return Mac.Register();
-            if (OperatingSystem.IsWindows()) return Win.Register();
+            if (OperatingSystem.IsMacOS()) return Mac.Register(quick, record);
+            if (OperatingSystem.IsWindows()) return Win.Register(quick, record);
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
@@ -60,8 +60,6 @@ public static class Hotkeys
     static unsafe class Mac
     {
         const string Carbon = "/System/Library/Frameworks/Carbon.framework/Carbon";
-        const uint Cmd = 0x0100, Shift = 0x0200, Option = 0x0800;
-        const uint KeySpace = 0x31, KeyR = 0x0F;
         const uint KeyboardClass = 0x6B657962; // 'keyb'
         const uint HotKeyPressed = 5;
         const uint Signature = 0x53747348; // 'StsH'
@@ -97,7 +95,7 @@ public static class Hotkeys
         static bool installed;
         static IntPtr quickRef, recordRef;
 
-        public static HotkeyResult Register()
+        public static HotkeyResult Register(KeyCombo quickKeys, KeyCombo recordKeys)
         {
             IntPtr target = GetApplicationEventTarget();
             if (!installed)
@@ -108,8 +106,10 @@ public static class Hotkeys
                 installed = true;
             }
             IntPtr a, b;
-            bool quick = RegisterEventHotKey(KeySpace, Option, new HotKeyId { Signature = Signature, Id = (uint)Shortcut.Quick }, target, 0, &a) == 0;
-            bool record = RegisterEventHotKey(KeyR, Option | Shift, new HotKeyId { Signature = Signature, Id = (uint)Shortcut.Record }, target, 0, &b) == 0;
+            var (qCode, qMods) = quickKeys.Mac();
+            var (rCode, rMods) = recordKeys.Mac();
+            bool quick = RegisterEventHotKey(qCode, qMods, new HotKeyId { Signature = Signature, Id = (uint)Shortcut.Quick }, target, 0, &a) == 0;
+            bool record = RegisterEventHotKey(rCode, rMods, new HotKeyId { Signature = Signature, Id = (uint)Shortcut.Record }, target, 0, &b) == 0;
             quickRef = quick ? a : IntPtr.Zero;
             recordRef = record ? b : IntPtr.Zero;
             return new HotkeyResult(quick, record);
@@ -136,8 +136,7 @@ public static class Hotkeys
     [SupportedOSPlatform("windows")]
     static unsafe class Win
     {
-        const uint ModAlt = 0x1, ModControl = 0x2, ModShift = 0x4, ModNoRepeat = 0x4000;
-        const uint VkSpace = 0x20, VkR = 0x52, WmHotKey = 0x0312;
+        const uint ModNoRepeat = 0x4000, WmHotKey = 0x0312;
         static readonly IntPtr MessageOnly = new(-3);
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -171,7 +170,7 @@ public static class Hotkeys
 
         static IntPtr window;
 
-        public static HotkeyResult Register()
+        public static HotkeyResult Register(KeyCombo quickKeys, KeyCombo recordKeys)
         {
             if (window == IntPtr.Zero)
             {
@@ -181,8 +180,10 @@ public static class Hotkeys
                 window = CreateWindowExW(0, "StudyStashHotkeys", "Study Stash", 0, 0, 0, 0, 0, MessageOnly, IntPtr.Zero, cls.Instance, IntPtr.Zero);
                 if (window == IntPtr.Zero) return new HotkeyResult(false, false);
             }
-            bool quick = RegisterHotKey(window, (int)Shortcut.Quick, ModAlt | ModShift | ModNoRepeat, VkSpace);
-            bool record = RegisterHotKey(window, (int)Shortcut.Record, ModControl | ModAlt | ModNoRepeat, VkR);
+            var (qVk, qMods) = quickKeys.Win();
+            var (rVk, rMods) = recordKeys.Win();
+            bool quick = RegisterHotKey(window, (int)Shortcut.Quick, qMods | ModNoRepeat, qVk);
+            bool record = RegisterHotKey(window, (int)Shortcut.Record, rMods | ModNoRepeat, rVk);
             return new HotkeyResult(quick, record);
         }
 

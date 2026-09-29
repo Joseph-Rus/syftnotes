@@ -10,5 +10,17 @@
     "plannable_date": "2025-09-30T17:00:00Z", "html_url": "https://canvas.test/courses/4201/calendar_events/6602",
     "plannable": {"id": 6602, "title": "Guest lecture: compilers"},
     "planner_override": null
+  },
+  {
+    "context_type": "Course", "course_id": 4201, "plannable_type": "announcement", "plannable_id": 6603,
+    "plannable_date": "2025-09-20T15:27:16Z", "html_url": "https://canvas.test/courses/4201/discussion_topics/6603",
+    "plannable": {"id": 6603, "title": "Correction: please disregard the earlier announcement"},
+    "planner_override": null
+  },
+  {
+    "context_type": "Course", "course_id": 4201, "plannable_type": "quiz", "plannable_id": 6604,
+    "plannable_date": "2025-09-26T17:45:00Z", "html_url": "https://canvas.test/courses/4201/quizzes/6604",
+    "plannable": {"id": 6604, "title": "Syllabus quiz", "assignment_id": 9004},
+    "planner_override": null
   }
 ]

@@ -33,7 +33,7 @@ public class LibrarySettingsModelTests
         using var _m = model;
 
         Assert.Equal("This laptop", model.ComputerNavTitle);
-        Assert.Equal(["General", "Appearance", "Recording", "Calendars", "Connection"], model.ComputerNav.Select(n => n.Label));
+        Assert.Equal(["General", "Appearance", "Shortcuts", "Recording", "Calendars", "Connection"], model.ComputerNav.Select(n => n.Label));
         Assert.Equal(["Library", "Classes", "Notes and sorting", "AI engines", "AI tool access", "Canvas", "Folders", "Phone"], model.LibraryNav.Select(n => n.Label));
         Assert.Empty(fake.Calls); // nothing asked before a library page opens
     }
@@ -47,7 +47,7 @@ public class LibrarySettingsModelTests
         using var _host = host;
         using var _m = model;
 
-        Assert.Equal(["General", "Appearance", "Connection"], model.ComputerNav.Select(n => n.Label));
+        Assert.Equal(["General", "Appearance", "Shortcuts", "Connection"], model.ComputerNav.Select(n => n.Label));
         Assert.True(model.OnLibrary);
         Assert.True(model.Lib.IsHere);
         Assert.True(model.Lib.IsReady);

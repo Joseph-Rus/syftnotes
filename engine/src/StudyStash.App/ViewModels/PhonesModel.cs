@@ -51,6 +51,11 @@ public sealed partial class PhonesModel : ObservableObject
     public ObservableCollection<PhoneRow> Phones { get; } = [];
     /// <summary>What just happened, or why it didn't.</summary>
     [ObservableProperty] public partial string? Say { get; set; }
+    /// <summary>The page that fixes what <see cref="Say"/> says went wrong (Tailscale's HTTPS page, say), or null.</summary>
+    [ObservableProperty] public partial string? Fix { get; set; }
+    public bool HasFix => !string.IsNullOrEmpty(Fix);
+    /// <summary>Opens a page in the browser (a test watches it instead).</summary>
+    public Action<string> OpenUrl { get; set; } = url => Dialogs.OpenUrl(url);
     /// <summary>A code is on show.</summary>
     [ObservableProperty] public partial bool Adding { get; set; }
     [ObservableProperty] public partial bool Asking { get; set; }
@@ -86,6 +91,14 @@ public sealed partial class PhonesModel : ObservableObject
     }
 
     partial void OnAddingChanged(bool value) => OnPropertyChanged(nameof(ShowAdd));
+    partial void OnFixChanged(string? value) => OnPropertyChanged(nameof(HasFix));
+
+    /// <summary>"Open the page": the one the library said fixes it.</summary>
+    [RelayCommand]
+    void OpenFix()
+    {
+        if (Fix is { Length: > 0 } url) OpenUrl(url);
+    }
 
     /// <summary>Ask the library for its phones (when the page opens, and on Try again).</summary>
     [RelayCommand]
@@ -156,6 +169,7 @@ public sealed partial class PhonesModel : ObservableObject
         if (connect() is not { } call || Asking) return;
         Asking = true;
         Say = null;
+        Fix = null;
         try
         {
             if (await call(HttpMethod.Post, "/code", new JsonObject()) is not { } code)
@@ -178,6 +192,7 @@ public sealed partial class PhonesModel : ObservableObject
         catch (LibraryRefusedException e)
         {
             Say = e.Message;
+            Fix = e.Fix is { Length: > 0 } f && Uri.TryCreate(f, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps ? f : null;
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or InvalidOperationException)
         {

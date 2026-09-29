@@ -188,6 +188,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public LibrarySettingsModel Lib { get; }
     /// <summary>Adding a phone to the library, and the phones already added.</summary>
     public PhonesModel Phones { get; private set; }
+    /// <summary>Settings → Shortcuts: the keys for search, Record, Ask and Settings.</summary>
+    public ShortcutsModel Keys { get; }
+    public bool OnShortcuts => Section == "Shortcuts";
     public bool OnPhone => Section == "Phone";
 
     /// <summary>Making (or finding) the library on this computer: <see cref="Services.LibraryHere.ThisComputer"/>
@@ -270,6 +273,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         [
             new() { Id = "General", Glyph = "tune", Label = "General" },
             new() { Id = "Appearance", Glyph = "palette", Label = "Appearance" },
+            new() { Id = "Shortcuts", Glyph = "keyboard", Label = "Shortcuts" },
             .. records ? new NavItem[] { new() { Id = "Recording", Glyph = "mic", Label = "Recording" } } : [],
             .. records ? new NavItem[] { new() { Id = "Calendars", Glyph = "event", Label = "Calendars" } } : [],
             new() { Id = "Connection", Glyph = "link", Label = "Connection" },
@@ -316,6 +320,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch);
         Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
         Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
+        Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, records);
         Phones.Ticking = Phones.UiTicking();
         Address = cc.ServerUrl;
         DisplayName = cc.DisplayName;
@@ -462,7 +467,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                  {
                      nameof(OnConnection), nameof(OnRecording), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
                      nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage),
-                     nameof(OnGeneral), nameof(OnAppearance), nameof(OnPhone), nameof(OnCalendars),
+                     nameof(OnGeneral), nameof(OnAppearance), nameof(OnShortcuts), nameof(OnPhone), nameof(OnCalendars),
                  })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;

@@ -42,7 +42,7 @@ real certificate for `<library>.<tailnet>.ts.net` and passes each request on to 
   turned HTTPS certificates on, there's no code: the answer is `409 {detail, fix}`, where `detail` begins "Your phone
   reaches the library over Tailscale, so it needs Tailscale here first." and then says what to do (ClaudeReach's own
   words), and `fix` is the page that fixes it (tailscale.com/download, the DNS admin page, or the HTTPS page Tailscale
-  printed). Settings shows the words; the library's page links the fix.
+  printed). Settings shows the words with **Open the page** for the fix; the library's page links it too.
 
 ### What a request looks like when it arrives through Serve
 

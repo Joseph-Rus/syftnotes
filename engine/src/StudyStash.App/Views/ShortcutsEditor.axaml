@@ -1,0 +1,119 @@
+<!-- The shortcuts the student can change, in Settings → Shortcuts and on setup's last page: one card, a row per
+     shortcut (what it does, where it works, its keys as a button that listens for new ones, and Reset once it's been
+     changed). Styles itself for either look (the code-behind adds "mac" or "win"), so it reads the same wherever it's
+     put. Draws no outer padding. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.ShortcutsEditor"
+             x:DataType="vm:ShortcutsModel">
+  <UserControl.Styles>
+    <Style Selector=".mac Border.sk-group">
+      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="Background" Value="{DynamicResource Group}" />
+    </Style>
+    <Style Selector=".win Border.sk-group">
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="{DynamicResource Card}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Border.sk-row">
+      <Setter Property="Padding" Value="16,8" />
+      <Setter Property="MinHeight" Value="52" />
+    </Style>
+    <!-- A hairline between two rows, none above the first. -->
+    <Style Selector="Border.sk-sep">
+      <Setter Property="Height" Value="1" />
+      <Setter Property="Margin" Value="16,0,0,0" />
+      <Setter Property="Background" Value="{DynamicResource Sep}" />
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector=".mac Border.sk-sep">
+      <Setter Property="Height" Value="0.5" />
+    </Style>
+    <Style Selector="ContentPresenter:nth-child(n+2) Border.sk-sep">
+      <Setter Property="IsVisible" Value="True" />
+    </Style>
+    <Style Selector="TextBlock.sk-title">
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="TextBlock.sk-sub">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    </Style>
+    <Style Selector=".win TextBlock.sk-title">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector=".win TextBlock.sk-sub">
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <Style Selector="Button.sk-keys">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="MinWidth" Value="96" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector=".mac Button.sk-keys">
+      <Setter Property="Height" Value="30" />
+      <Setter Property="CornerRadius" Value="15" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="Background" Value="{DynamicResource Raised}" />
+    </Style>
+    <Style Selector=".mac Button.sk-keys /template/ Border#PART_Bg">
+      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
+    </Style>
+    <Style Selector=".win Button.sk-keys">
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="12,0" />
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.sk-keys.listening">
+      <Setter Property="Background" Value="{DynamicResource Tint}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    </Style>
+    <Style Selector="Button.sk-link">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="6,0" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Spacing="8">
+    <Border Classes="sk-group">
+      <ItemsControl ItemsSource="{Binding Rows}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ShortcutRow">
+            <StackPanel>
+              <Border Classes="sk-sep" />
+              <Border Classes="sk-row">
+                <Grid ColumnDefinitions="*,12,Auto,4,Auto">
+                  <StackPanel Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Classes="sk-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="sk-sub" Text="{Binding Where}" />
+                  </StackPanel>
+                  <Button Grid.Column="2" Classes="sk-keys" Classes.listening="{Binding Listening}" Command="{Binding ChangeCommand}"
+                          VerticalAlignment="Center" ToolTip.Tip="Click, then press the keys you want">
+                    <TextBlock Text="{Binding Keys}" FontSize="13" FontWeight="Medium" />
+                  </Button>
+                  <Button Grid.Column="4" Classes="sk-link" Command="{Binding ResetCommand}" IsVisible="{Binding Changed}" VerticalAlignment="Center">
+                    <TextBlock Text="Reset" FontSize="12" />
+                  </Button>
+                </Grid>
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+    <TextBlock Classes="sk-sub" Text="{Binding Say}" IsVisible="{Binding HasSay}" TextWrapping="Wrap" Foreground="{DynamicResource Fg}" />
+    <TextBlock Classes="sk-sub" Text="{Binding Hint}" TextWrapping="Wrap" />
+    <Button Classes="sk-link" Command="{Binding ResetAllCommand}" IsVisible="{Binding AnyChanged}" HorizontalAlignment="Left" Padding="0">
+      <TextBlock Text="Put every shortcut back" FontSize="12" />
+    </Button>
+  </StackPanel>
+</UserControl>

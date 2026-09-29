@@ -1308,7 +1308,8 @@ public sealed partial class Crawl
 
     /// <summary>Canvas's planner, for every linked class at once: an assignment marked done there is noted (applied
     /// to the index at <see cref="ApplyPlanner"/>, once the assignments listing's own copy is final); anything else
-    /// with a date becomes a to-do. Calendar events aren't coursework, so they're dropped.</summary>
+    /// with a date becomes a to-do. Calendar events aren't coursework, and announcements and graded quizzes or discussions
+    /// aren't to-dos (the assignments listing has the graded ones), so they're dropped.</summary>
     void Planner(JsonArray list)
     {
         foreach (var item in list.OfType<JsonObject>())
@@ -1319,6 +1320,9 @@ public sealed partial class Crawl
             var plannable = item["plannable"] as JsonObject ?? [];
             long id = (long)(D(item["plannable_id"]) ?? D(plannable["id"]) ?? 0);
             if (id == 0 || type == "calendar_event") continue;
+            // An announcement's date is when it was posted, not when anything's due; a graded quiz or discussion is in
+            // the assignments listing already. Neither is a to-do.
+            if (type == "announcement" || (type != "assignment" && D(plannable["assignment_id"]) is not null)) continue;
             var over = item["planner_override"] as JsonObject;
             bool done = Flag(over?["marked_complete"]);
             if (type == "assignment")
@@ -1329,12 +1333,17 @@ public sealed partial class Crawl
             }
             string title = Py.Strip(S(plannable["title"])) is { Length: > 0 } t ? t : "untitled";
             string? todoAt = Opt(item["plannable_date"]) ?? Opt(plannable["todo_date"]);
-            var todo = new TodoInfo { Id = id, Kind = type, Title = title, TodoAt = todoAt, HtmlUrl = S(item["html_url"]), MarkedDone = done };
+            var todo = new TodoInfo { Id = id, Kind = type, Title = title, TodoAt = todoAt, HtmlUrl = Absolute(S(item["html_url"])), MarkedDone = done };
             var list2 = Staged(cls).Todos;
             int at = list2.FindIndex(x => x.Id == id);
             if (at >= 0) list2[at] = todo; else list2.Add(todo);
         }
     }
+
+    /// <summary>The planner's links are relative ("/courses/1/pages/x"): made whole with the Canvas address, so the
+    /// app can open them.</summary>
+    string Absolute(string url) =>
+        url.StartsWith('/') && S(data["base"]) is { Length: > 0 } b ? b.TrimEnd('/') + url : url;
 
     /// <summary>Bakes this sync's planner reads into the promoted index: an assignment the planner said (this sync)
     /// is marked done gets it; one it didn't read (hidden, failed, or a class the planner job never covered) keeps

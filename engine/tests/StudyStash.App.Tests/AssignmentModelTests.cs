@@ -29,7 +29,44 @@ public class AssignmentModelTests
         Assert.Equal("Due in 5 days", model.SubmissionDetail);
         Assert.False(model.HasComment);
         Assert.True(model.ShowHandInLink);
+        Assert.True(model.ShowSubmission);
+        Assert.False(model.IsTodo);
         Assert.False(model.HasFiles);
+    }
+
+    [Fact]
+    public void An_assignment_that_takes_nothing_through_Canvas_has_no_submission_box()
+    {
+        var model = new AssignmentModel(CanvasFixtures.Context());
+        model.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>("assignment-9001") with { SubmissionTypes = ["on_paper"] });
+
+        Assert.False(model.ShowSubmission);
+        Assert.False(model.ShowHandInLink);
+    }
+
+    [Fact]
+    public void A_planner_to_do_gets_its_own_page_with_nothing_to_hand_in()
+    {
+        List<(string What, string Arg)> log = [];
+        var model = new AssignmentModel(CanvasFixtures.Context(log: log));
+        model.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>("assignment-9001"));
+
+        model.ShowTodo(new CanvasApi.Item
+        {
+            Class = "CS 101", Id = "6601", Name = "Read: Chapter 4 overview", Kind = "todo",
+            DueAt = new DateTimeOffset(2025, 9, 29, 6, 59, 0, TimeSpan.Zero), Url = "https://school.instructure.com/courses/4201/pages/read-chapter-4",
+        });
+
+        Assert.Equal("CS 101 · To-do", model.Meta);
+        Assert.Equal("Read: Chapter 4 overview", model.Title);
+        Assert.True(model.IsTodo);
+        Assert.False(model.IsAssignment);
+        Assert.False(model.ShowSubmission);
+        Assert.False(model.ShowHandInLink);
+        Assert.False(model.HasRubric);
+        Assert.Equal("", model.PointsValue);
+        model.OpenInCanvasCommand.Execute(null);
+        Assert.Contains(("OpenUrl", "https://school.instructure.com/courses/4201/pages/read-chapter-4"), log);
     }
 
     [Fact]

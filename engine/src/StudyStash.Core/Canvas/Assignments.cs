@@ -123,6 +123,15 @@ public static class Assignments
         new(className, t.Id, t.Title, Local(t.TodoAt, zone), null, "open", null, "", t.HtmlUrl, Kind: "todo",
             DueAt: t.TodoAt ?? "", MarkedDone: t.MarkedDone);
 
+    /// <summary>The class's planner to-dos as Due rows, leaving out what an older sync kept that isn't one: an
+    /// announcement (its date is when it was posted), and a quiz or discussion that's an assignment in the list already.</summary>
+    public static IEnumerable<Assignment> Todos(string className, IEnumerable<TodoInfo> todos, IEnumerable<Assignment> assignments, TimeZoneInfo? zone = null)
+    {
+        var names = assignments.Where(a => a.ClassName == className).Select(a => a.Name).ToHashSet(StringComparer.Ordinal);
+        return todos.Where(t => t.Kind != "announcement" && !(t.Kind is "quiz" or "discussion_topic" && names.Contains(t.Title)))
+            .Select(t => From(className, t, zone));
+    }
+
     public static bool Published(JsonObject a) => a["published"] is not JsonValue p || p.GetValueKind() != JsonValueKind.False;
 
     static string Num(double? d) => (d ?? 0).ToString("0.##", CultureInfo.InvariantCulture);

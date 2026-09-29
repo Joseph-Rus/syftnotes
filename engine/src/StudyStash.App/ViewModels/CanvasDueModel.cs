@@ -19,6 +19,8 @@ public sealed partial class DueRow : ObservableObject
     public required bool Strong { get; init; }
     public required string Sub { get; init; }
     public required IBrush Dot { get; init; }
+    /// <summary>The library's own row, for a page that has no assignment to ask for (a to-do).</summary>
+    public CanvasApi.Item? Item { get; init; }
 
     [ObservableProperty] public partial bool Selected { get; set; }
 
@@ -71,6 +73,7 @@ public sealed partial class CanvasDueModel(CanvasContext context) : ObservableOb
                     Strong = item.Missing,
                     Sub = CanvasWords.DueSub(item, zone, now),
                     Dot = context.DotOf(item.Class),
+                    Item = item,
                 };
                 row.OnSelectRow = Select;
                 return row;
@@ -93,6 +96,10 @@ public sealed partial class CanvasDueModel(CanvasContext context) : ObservableOb
         var row = Groups.SelectMany(g => g.Rows).FirstOrDefault(r => r.Class == cls && r.Id == id);
         if (row is not null) Select(row);
     }
+
+    /// <summary>The library's row for a class and id, if it's on the list.</summary>
+    public CanvasApi.Item? ItemOf(string cls, string id) =>
+        Groups.SelectMany(g => g.Rows).FirstOrDefault(r => r.Class == cls && r.Id == id)?.Item;
 
     void Select(DueRow row)
     {

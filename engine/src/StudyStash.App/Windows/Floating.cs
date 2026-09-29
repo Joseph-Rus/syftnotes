@@ -101,6 +101,27 @@ public class Floating : Window
         MoveTo(at, screen.WorkingArea, screen.Scaling);
     }
 
+    /// <summary>
+    /// The content changed size (the recorder's pill opened or closed): <paramref name="place"/> puts it for its new
+    /// size now, and again once layout has actually resized the window, with a fresh frame drawn after. Placing only
+    /// once, before the resize lands, left a Mac showing the old frame stretched over the new window, shifted off the
+    /// panel. The window always sizes to its content again first: Avalonia stops that for good whenever the system
+    /// resizes the window itself (a display with another scale).
+    /// </summary>
+    public void Refit(Action place)
+    {
+        SizeToContent = SizeToContent.WidthAndHeight;
+        holder.InvalidateMeasure();
+        place();
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (!IsVisible) return;
+            place();
+            holder.InvalidateVisual();
+            InvalidateVisual();
+        }, Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+
     /// <summary>The panel's own size in pixels, without the room round it.</summary>
     public PixelSize PanelSize(double scale)
     {
