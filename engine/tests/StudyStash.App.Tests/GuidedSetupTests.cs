@@ -181,7 +181,7 @@ public sealed class GuidedSetupTests
         Assert.False(g.SignedIn);
         await g.OpenSignInCommand.ExecuteAsync(null);
         Assert.True(g.SignedIn);
-        Assert.True(g.AiReady, g.PlanProblemTitle);
+        Assert.True(g.AiReady, $"{g.PlanProblem}: {g.PlanProblemTitle} {g.PlanProblemText} {g.SignInProblem}");
         Assert.Contains("--tools", FakeAgents.Argv(rig.Bin, 1));
         Assert.DoesNotContain("--mcp-config", FakeAgents.Argv(rig.Bin, 1));
         await g.ContinueCommand.ExecuteAsync(null);
@@ -415,7 +415,7 @@ public sealed class GuidedSetupTests
         FakeAgents.Replay(rig.Bin, [Done("ready", "p-1")], 1);
         await g.ContinueCommand.ExecuteAsync(null);
         Assert.Equal(GuidedScreen.SignIn, g.Screen);
-        Assert.True(g.AiReady);
+        Assert.True(g.AiReady, $"{g.PlanProblem}: {g.PlanProblemTitle} {g.PlanProblemText} {g.SignInProblem}");
         Assert.False(File.Exists(rig.Home["logs/setup-install.log"]));
     }
 

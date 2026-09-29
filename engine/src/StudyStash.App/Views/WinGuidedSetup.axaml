@@ -4,12 +4,81 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:s="using:StudyStash.App.Services"
              xmlns:c="using:StudyStash.App.Controls"
              x:Class="StudyStash.App.Views.WinGuidedSetup"
              x:DataType="vm:GuidedSetupModel"
              Width="720" Height="480">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/WinCanvasStyles.axaml" />
+    <!-- The chat's checklist: the sidebar's rows, a second line for detail; the one under way marked like the current step. -->
+    <Style Selector="Button.item">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="12,7" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="Button.item.now /template/ Border#PART_Bg">
+      <Setter Property="Background" Value="{DynamicResource Subtle}" />
+    </Style>
+    <Style Selector="Button.item TextBlock.title">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="Button.item.now TextBlock.title">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.item TextBlock.detail">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="Margin" Value="0,1,0,0" />
+    </Style>
+    <Style Selector="Button.item TextBlock.detail.warn">
+      <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+    </Style>
+    <!-- A card in the chat: Fluent's card, 4 px and a 1 px stroke. -->
+    <Style Selector="Border.card">
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="{DynamicResource Card}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="16,14" />
+      <Setter Property="Width" Value="520" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Border.chip">
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="{DynamicResource Subtle}" />
+      <Setter Property="Padding" Value="8,2" />
+    </Style>
+    <Style Selector="Border.chip TextBlock">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    </Style>
+    <Style Selector="Border.ai-bubble-q.queued">
+      <Setter Property="Opacity" Value="0.5" />
+    </Style>
+    <Style Selector="Button.row">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="MinHeight" Value="36" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="Button.row.on">
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+      <Setter Property="BorderThickness" Value="2" />
+    </Style>
+    <Style Selector="TextBox.field">
+      <Setter Property="MinHeight" Value="32" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
     <Style Selector="Border.step">
       <Setter Property="Height" Value="36" />
       <Setter Property="Padding" Value="12,0" />
@@ -245,7 +314,51 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </StackPanel>
-          <!-- CHAT-SIDEBAR -->
+            <!-- The chat's checklist: only the app ticks it; a line not done yet asks the AI to go there. -->
+            <DockPanel Margin="8,8,8,12" IsVisible="{Binding OnChat}">
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Height="28" Margin="12,0,12,4">
+                <c:Icon Glyph="auto_awesome" Size="16" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding SidebarTitle}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="4,8,4,2">
+                <Button Name="FinishSide" Classes="push default" HorizontalAlignment="Stretch" IsVisible="{Binding ReadyToFinish}" Command="{Binding FinishCommand}">
+                  <TextBlock Text="Open Study Stash" FontSize="14" />
+                </Button>
+                <Button Name="ByHandChat" Classes="quiet" Margin="4,0" HorizontalAlignment="Left" Command="{Binding ByHandCommand}"><TextBlock Text="Set up by hand" /></Button>
+              </StackPanel>
+              <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ItemsControl Name="Checklist" ItemsSource="{Binding Checklist}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChecklistRow">
+                      <Button Classes="item" Classes.now="{Binding IsNow}" IsHitTestVisible="{Binding Clickable}"
+                              Command="{Binding $parent[UserControl].((vm:GuidedSetupModel)DataContext).ClickItemCommand}" CommandParameter="{Binding}">
+                        <Panel>
+                        <Border Classes="pill" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-12,0,0,0" IsVisible="{Binding IsNow}" />
+                        <Grid ColumnDefinitions="Auto,12,*,Auto" RowDefinitions="Auto,Auto">
+                          <Panel Width="18" Height="18" VerticalAlignment="Center">
+                            <c:Icon IsVisible="{Binding IsDone}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource AccentText}" />
+                            <Border IsVisible="{Binding IsNow}" Width="15" Height="15" CornerRadius="8" BorderThickness="1.5" BorderBrush="{DynamicResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                              <Ellipse Width="7" Height="7" Fill="{DynamicResource Accent}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <Border IsVisible="{Binding IsTodo}" Width="15" Height="15" CornerRadius="8" BorderThickness="1.5" BorderBrush="{DynamicResource Fg3}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <c:Icon IsVisible="{Binding IsSkipped}" Glyph="remove" Size="16" Foreground="{DynamicResource Fg3}" />
+                            <c:Icon IsVisible="{Binding IsProblem}" Glyph="warning" Filled="True" Size="17" Foreground="{DynamicResource Warn}" />
+                          </Panel>
+                          <TextBlock Grid.Column="2" Classes="title" Text="{Binding Title}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="3" Text="{Binding Tag}" IsVisible="{Binding HasTag}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" Margin="6,0,0,0" />
+                          <TextBlock Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Classes="detail" Classes.warn="{Binding IsProblem}" Text="{Binding DetailLine}" IsVisible="{Binding HasDetailLine}"
+                                     TextTrimming="CharacterEllipsis" />
+                        </Grid>
+                        </Panel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
         </Panel>
 
         <Border Grid.Column="1" Background="{DynamicResource Layer}" BorderBrush="{DynamicResource LayerStroke}" BorderThickness="1,1,0,0" CornerRadius="8,0,0,0">
@@ -426,7 +539,316 @@
               </StackPanel>
             </ScrollViewer>
           </DockPanel>
-          <!-- CHAT -->
+          <!-- Screen 4 · The chat: the AI's words and the student's, Study Stash's notes, and the cards the AI opens. -->
+          <DockPanel Margin="0,20,0,16" IsVisible="{Binding OnChat}">
+            <StackPanel DockPanel.Dock="Top" Margin="28,0,28,0">
+              <TextBlock Text="{Binding StepLabel}" FontSize="12" Foreground="{DynamicResource Fg2}" />
+              <TextBlock Text="{Binding HeaderTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" Margin="0,2,0,0" />
+              <Border Height="1" Background="{DynamicResource Sep}" Margin="0,12,0,0" />
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Bottom" Margin="28,8,28,0" Spacing="8">
+              <ItemsControl Name="QuickReplies" ItemsSource="{Binding QuickReplies}" IsVisible="{Binding HasQuickReplies}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String">
+                    <Button Classes="ai-pillbtn" Command="{Binding $parent[UserControl].((vm:GuidedSetupModel)DataContext).ReplyCommand}" CommandParameter="{Binding}">
+                      <Border Classes="ai-pill"><TextBlock Text="{Binding}" /></Border>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Border Classes="ai-problem warn" MaxWidth="10000" IsVisible="{Binding HasChatProblem}">
+                <Grid ColumnDefinitions="Auto,12,*,10,Auto,8,Auto">
+                  <Border Classes="ai-problem-glyph warn" VerticalAlignment="Center"><TextBlock Text="!" /></Border>
+                  <TextBlock Grid.Column="2" Classes="ai-problem-text" Text="{Binding ChatProblemText}" VerticalAlignment="Center" />
+                  <Button Grid.Column="4" Classes="push small" Command="{Binding TryAgainCommand}"><TextBlock Text="Try again" FontSize="14" /></Button>
+                  <Button Grid.Column="6" Classes="push small" Command="{Binding ByHandCommand}"><TextBlock Text="Set up by hand" FontSize="14" /></Button>
+                </Grid>
+              </Border>
+              <Border Classes="ai-field">
+                <Grid ColumnDefinitions="*,6,Auto" VerticalAlignment="Center">
+                  <TextBox Name="Field" Classes="bare" Text="{Binding Draft}" PlaceholderText="{Binding FieldHint}" FontSize="14" VerticalAlignment="Center" IsEnabled="{Binding CanType}">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding SendCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                  <Button Name="Send" Grid.Column="2" Classes="ai-send" Command="{Binding SendCommand}" IsEnabled="{Binding CanType}">
+                    <c:Icon Glyph="send" Size="16" Foreground="{DynamicResource AccentText}" />
+                  </Button>
+                </Grid>
+              </Border>
+            </StackPanel>
+            <ScrollViewer Name="ThreadScroll" Margin="28,10,14,0" Padding="0,0,14,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True">
+              <StackPanel Spacing="12" Margin="0,0,0,8">
+                <ItemsControl Name="Thread" ItemsSource="{Binding Thread}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.DataTemplates>
+                    <DataTemplate DataType="vm:AiEntry">
+                      <StackPanel Spacing="4" HorizontalAlignment="Left" MaxWidth="520">
+                        <TextBlock Classes="ai-byline" Text="{Binding Byline}" FontWeight="SemiBold" />
+                        <TextBlock Classes="ai-answer" Text="{Binding Text}" />
+                        <ItemsControl ItemsSource="{Binding Chips}" IsVisible="{Binding HasChips}" Margin="0,2,0,0">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="4" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                              <Border Classes="chip">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                  <c:Icon Glyph="check" Size="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                  <TextBlock Text="{Binding}" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:StudentEntry">
+                      <Border Classes="ai-bubble-q" MaxWidth="400" Classes.queued="{Binding Queued}">
+                        <TextBlock Text="{Binding Text}" />
+                      </Border>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:NoteEntry">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <c:Icon Glyph="check_circle" Filled="True" Size="15" Foreground="{DynamicResource AccentText}" IsVisible="{Binding Good}" VerticalAlignment="Center" />
+                        <c:Icon Glyph="warning" Filled="True" Size="15" Foreground="{DynamicResource Warn}" IsVisible="{Binding Warn}" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Text}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="520" />
+                      </StackPanel>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:CardEntry">
+                      <Panel>
+                        <!-- Folded: its outcome in one line -->
+                        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding Folded}">
+                          <c:Icon Glyph="check_circle" Filled="True" Size="15" Foreground="{DynamicResource AccentText}" IsVisible="{Binding HasOutcome}" VerticalAlignment="Center" />
+                          <c:Icon Glyph="radio_button_unchecked" Size="15" Foreground="{DynamicResource Fg3}" IsVisible="{Binding !HasOutcome}" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding FoldedLine}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <Border Classes="card" IsVisible="{Binding Open}">
+                          <StackPanel Spacing="10">
+                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" />
+
+                            <!-- How you'll use it -->
+                            <StackPanel Spacing="6" IsVisible="{Binding IsComputer}">
+                              <Button Classes="row" Classes.on="{Binding ChoseOne}" Command="{Binding ChooseCommand}" CommandParameter="one">
+                                <Grid ColumnDefinitions="Auto,10,*">
+                                  <Border Classes="radio" Classes.on="{Binding ChoseOne}"><Ellipse /></Border>
+                                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="{Binding JustThis}" FontSize="14" VerticalAlignment="Center" />
+                                    <Border Classes="badge"><TextBlock Text="Recommended" /></Border>
+                                  </StackPanel>
+                                </Grid>
+                              </Button>
+                              <Button Classes="row" Classes.on="{Binding ChoseLaptop}" Command="{Binding ChooseCommand}" CommandParameter="laptop">
+                                <Grid ColumnDefinitions="Auto,10,*">
+                                  <Border Classes="radio" Classes.on="{Binding ChoseLaptop}"><Ellipse /></Border>
+                                  <TextBlock Grid.Column="2" FontSize="14" VerticalAlignment="Center"><Run Text="This is my laptop" /><Run Text="  (library elsewhere)" Foreground="{DynamicResource Fg2}" /></TextBlock>
+                                </Grid>
+                              </Button>
+                              <Button Classes="row" Classes.on="{Binding ChoseLibrary}" Command="{Binding ChooseCommand}" CommandParameter="library">
+                                <Grid ColumnDefinitions="Auto,10,*">
+                                  <Border Classes="radio" Classes.on="{Binding ChoseLibrary}"><Ellipse /></Border>
+                                  <TextBlock Grid.Column="2" FontSize="14" VerticalAlignment="Center"><Run Text="This is my library" /><Run Text="  (a computer that stays on)" Foreground="{DynamicResource Fg2}" /></TextBlock>
+                                </Grid>
+                              </Button>
+                              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                <Button Classes="push default" Command="{Binding PressCommand}" CommandParameter="setup" IsEnabled="{Binding !Busy}"><TextBlock Text="Set up" FontSize="14" /></Button>
+                              </StackPanel>
+                            </StackPanel>
+
+                            <!-- The library's name and password -->
+                            <StackPanel Spacing="8" IsVisible="{Binding IsPassword}">
+                              <TextBox Classes="field" Text="{Binding Setup.LibraryName}" PlaceholderText="Library name" />
+                              <TextBox Classes="field" Text="{Binding Setup.Password}" PasswordChar="•" PlaceholderText="A password for your library (4 or more letters)" />
+                              <TextBlock Classes="note" Text="{Binding PasswordNote}" />
+                              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                <Button Classes="push default" Command="{Binding PressCommand}" CommandParameter="create" IsEnabled="{Binding !Busy}"><TextBlock Text="Create library" FontSize="14" /></Button>
+                              </StackPanel>
+                            </StackPanel>
+
+                            <!-- A laptop connecting to its library -->
+                            <StackPanel Spacing="8" IsVisible="{Binding IsConnection}">
+                              <TextBox Classes="field" Text="{Binding Setup.Address}" PlaceholderText="Your library's address, like mac-mini:8787" />
+                              <TextBox Classes="field" Text="{Binding Setup.Password}" PasswordChar="•" PlaceholderText="Its password" />
+                              <TextBlock Classes="note" Text="{Binding Setup.LibraryResult}" IsVisible="{Binding Setup.HasLibraryResult}" />
+                              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                <Button Classes="push" Command="{Binding PressCommand}" CommandParameter="find" IsEnabled="{Binding !Busy}"><TextBlock Text="Find it" FontSize="14" /></Button>
+                                <Button Classes="push default" Command="{Binding PressCommand}" CommandParameter="connect" IsEnabled="{Binding !Busy}"><TextBlock Text="Connect" FontSize="14" /></Button>
+                              </StackPanel>
+                            </StackPanel>
+
+                            <!-- The microphone -->
+                            <StackPanel Spacing="8" IsVisible="{Binding IsMicrophone}">
+                              <TextBlock Classes="note" Text="It records with this computer's microphone. The recording stays here; only the transcript goes to your library." />
+                              <Button Classes="push default" HorizontalAlignment="Left" Command="{Binding PressCommand}" CommandParameter="allow" IsVisible="{Binding Setup.ShowAllowMic}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                  <c:Icon Glyph="mic" Filled="True" Size="16" Foreground="{DynamicResource OnAccent}" />
+                                  <TextBlock Text="Allow microphone" FontSize="14" VerticalAlignment="Center" />
+                                </StackPanel>
+                              </Button>
+                              <StackPanel Spacing="6" IsVisible="{Binding Setup.ShowMicCheck}">
+                                <c:Waveform Height="28" Bars="24" Levels="{Binding Setup.MicLevels}" Foreground="{DynamicResource Accent}" HorizontalAlignment="Left" />
+                                <TextBlock Classes="note" Text="{Binding Setup.MicLine}" />
+                              </StackPanel>
+                              <StackPanel Spacing="6" IsVisible="{Binding Setup.ShowMicProblem}">
+                                <TextBlock Text="{Binding Setup.MicProblemTitle}" IsVisible="{Binding Setup.HasMicProblemTitle}" FontSize="14" FontWeight="SemiBold" />
+                                <TextBlock Classes="note" Text="{Binding Setup.MicProblemText}" />
+                                <Button Classes="push" HorizontalAlignment="Left" Command="{Binding PressCommand}" CommandParameter="settings" IsVisible="{Binding Setup.HasMicProblemButton}">
+                                  <TextBlock Text="{Binding Setup.MicProblemButton}" FontSize="14" />
+                                </Button>
+                              </StackPanel>
+                            </StackPanel>
+
+                            <!-- The transcription model -->
+                            <StackPanel Spacing="8" IsVisible="{Binding IsModel}">
+                              <TextBlock Classes="note" Text="{Binding ModelBody}" />
+                              <ItemsControl ItemsSource="{Binding Setup.Models}" IsVisible="{Binding Changing}">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="s:ModelChoice">
+                                    <Button Classes="row" Command="{Binding $parent[ItemsControl].((vm:CardEntry)DataContext).PickModelCommand}" CommandParameter="{Binding}">
+                                      <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Text="{Binding Name}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Size}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                      </Grid>
+                                    </Button>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                              <Grid ColumnDefinitions="Auto,*,Auto,8,Auto">
+                                <Button Classes="link" Command="{Binding PressCommand}" CommandParameter="change"><TextBlock Text="Change" /></Button>
+                                <Button Grid.Column="2" Classes="push" Command="{Binding PressCommand}" CommandParameter="notnow"><TextBlock Text="Not now" FontSize="14" /></Button>
+                                <Button Grid.Column="4" Classes="push default" Command="{Binding PressCommand}" CommandParameter="download"><TextBlock Text="Download" FontSize="14" /></Button>
+                              </Grid>
+                            </StackPanel>
+
+                            <!-- Canvas: the Chrome helper, with Canvas connect's own three pictures -->
+                            <StackPanel Spacing="10" IsVisible="{Binding IsChrome}">
+                              <ContentControl Content="{Binding Canvas}">
+                                <ContentControl.ContentTemplate>
+                                  <DataTemplate x:DataType="vm:CanvasConnectModel">
+                              <StackPanel Spacing="10">
+                                <TextBlock Classes="note" Text="{Binding ChromeHelp}" />
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                  <Border Classes="cv-illus" Height="76">
+                                    <StackPanel Spacing="10">
+                                      <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right">
+                                        <TextBlock Classes="cv-illus-row" Text="Developer mode" VerticalAlignment="Center" />
+                                        <Border Classes="cv-illus-toggle"><Ellipse Classes="cv-illus-knob" /></Border>
+                                      </StackPanel>
+                                      <Border Height="6" CornerRadius="3" Background="{DynamicResource Subtle}" Margin="0,4,20,0" />
+                                      <Border Height="6" CornerRadius="3" Background="{DynamicResource Subtle}" Margin="0,0,40,0" />
+                                    </StackPanel>
+                                  </Border>
+                                  <Border Grid.Column="1" Classes="cv-illus" Height="76">
+                                    <StackPanel Spacing="10">
+                                      <TextBlock Classes="cv-illus-title" Text="Extensions" />
+                                      <Border Classes="cv-illus-load" HorizontalAlignment="Left"><TextBlock Text="Load unpacked" /></Border>
+                                    </StackPanel>
+                                  </Border>
+                                  <Border Grid.Column="2" Classes="cv-illus" Height="76">
+                                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+                                      <TextBlock Classes="cv-illus-row" Text="Downloads" />
+                                      <Border Grid.Row="1" Classes="cv-illus-row cv-highlight" Padding="4,2"><TextBlock Classes="cv-illus-row cv-highlight" Text="{Binding FolderName}" TextTrimming="CharacterEllipsis" /></Border>
+                                      <Border Grid.Row="2" Classes="cv-illus-pick" HorizontalAlignment="Right"><TextBlock Text="Select" /></Border>
+                                    </Grid>
+                                  </Border>
+                                </Grid>
+                                <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                                  <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="1" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Turn on Developer mode, top right" TextWrapping="Wrap" /></Grid>
+                                  <Grid Grid.Column="1" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="2" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Click Load unpacked" TextWrapping="Wrap" /></Grid>
+                                  <Grid Grid.Column="2" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding PickCaption}" TextWrapping="Wrap" /></Grid>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding WaitingForChrome}">
+                                  <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                  <TextBlock Classes="note" Text="Waiting for Chrome…" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Classes="note" Foreground="{DynamicResource Warn}" Text="{Binding ChromeError}" IsVisible="{Binding ChromeError, Converter={x:Static c:Converters.NotEmpty}}" />
+                              </StackPanel>
+                                  </DataTemplate>
+                                </ContentControl.ContentTemplate>
+                              </ContentControl>
+                              <Button Classes="push default" HorizontalAlignment="Right" Command="{Binding PressCommand}" CommandParameter="add" IsVisible="{Binding Canvas.ShowAddToChrome, FallbackValue=True}" IsEnabled="{Binding !Busy}">
+                                <TextBlock Text="Add to Chrome" FontSize="14" />
+                              </Button>
+                            </StackPanel>
+
+                            <!-- The courses Canvas found -->
+                            <StackPanel Spacing="8" IsVisible="{Binding IsCourses}">
+                              <ItemsControl ItemsSource="{Binding Setup.Courses}">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="vm:SetupCourse">
+                                    <CheckBox IsChecked="{Binding Ticked}">
+                                      <TextBlock FontSize="14" TextTrimming="CharacterEllipsis"><Run Text="{Binding Name}" /><Run Text="  " /><Run Text="{Binding Code}" Foreground="{DynamicResource Fg2}" FontSize="12" /></TextBlock>
+                                    </CheckBox>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                <Button Classes="push default" Command="{Binding PressCommand}" CommandParameter="add" IsEnabled="{Binding !Busy}"><TextBlock Text="Add these classes" FontSize="14" /></Button>
+                              </StackPanel>
+                            </StackPanel>
+
+                            <!-- Start at login -->
+                            <StackPanel Spacing="10" IsVisible="{Binding IsStartAtLogin}">
+                              <TextBlock Classes="note" Text="{Binding StartAtLoginBody}" />
+                              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <Button Classes="push" Command="{Binding PressCommand}" CommandParameter="notnow"><TextBlock Text="Not now" FontSize="14" /></Button>
+                                <Button Classes="push default" Command="{Binding PressCommand}" CommandParameter="on"><TextBlock Text="Turn on" FontSize="14" /></Button>
+                              </StackPanel>
+                            </StackPanel>
+
+                            <!-- Windows' taskbar -->
+                            <StackPanel Spacing="10" IsVisible="{Binding IsTaskbar}">
+                              <TextBlock Classes="note" Text="{Binding TaskbarBody}" />
+                              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <Button Classes="push" Command="{Binding PressCommand}" CommandParameter="open"><TextBlock Text="Open taskbar settings" FontSize="14" /></Button>
+                                <Button Classes="push default" Command="{Binding PressCommand}" CommandParameter="done"><TextBlock Text="Done" FontSize="14" /></Button>
+                              </StackPanel>
+                            </StackPanel>
+
+                            <!-- Finished -->
+                            <StackPanel Spacing="10" IsVisible="{Binding IsFinish}">
+                              <ItemsControl ItemsSource="{Binding Recap}">
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="x:String">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,1">
+                                      <c:Icon Glyph="check" Size="14" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                                      <TextBlock Text="{Binding}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                              <Button Classes="push default" HorizontalAlignment="Right" Command="{Binding PressCommand}" CommandParameter="finish"><TextBlock Text="Open Study Stash" FontSize="14" /></Button>
+                            </StackPanel>
+
+                            <TextBlock Classes="note" Foreground="{DynamicResource Warn}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" />
+                          </StackPanel>
+                        </Border>
+                      </Panel>
+                    </DataTemplate>
+                  </ItemsControl.DataTemplates>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}">
+                  <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Fg2}" />
+                  <TextBlock Classes="ai-thinking" Text="{Binding Thinking}" />
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </DockPanel>
           </Panel>
         </Border>
       </Grid>

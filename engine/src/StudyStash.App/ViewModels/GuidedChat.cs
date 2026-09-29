@@ -17,7 +17,7 @@ public sealed partial class AiEntry(string byline) : ChatEntry
     [ObservableProperty] public partial string Text { get; set; } = "";
     public ObservableCollection<string> Chips { get; } = [];
     public bool HasChips => Chips.Count > 0;
-    internal void Chip(string chip)
+    public void Chip(string chip)
     {
         Chips.Add(chip);
         OnPropertyChanged(nameof(HasChips));
@@ -78,7 +78,33 @@ public sealed partial class CardEntry : ChatEntry
     /// <summary>The computer card's choice: "one", "laptop" or "library".</summary>
     [ObservableProperty] public partial string Choice { get; set; }
 
+    /// <summary>The model card's list of other models is showing (its Change).</summary>
+    [ObservableProperty] public partial bool Changing { get; set; }
+
     public bool Folded => !Open;
+    /// <summary>What the card is about, as its heading (and its line once folded, before anything came of it).</summary>
+    public string Title => Kind switch
+    {
+        "computer_setup" => "How will you use Study Stash?",
+        "library_password" => "Name your library and give it a password",
+        "library_connection" => "Connect to your library",
+        "microphone_check" => "Let Study Stash hear your lectures",
+        "model_download" => ModelTitle,
+        "chrome_helper" => "Add Study Stash's helper to Chrome",
+        "course_picker" => "Pick your courses",
+        "start_at_login" => "Start Study Stash when you log in?",
+        "taskbar_tip" => "Keep Study Stash on the taskbar",
+        _ => "You're set up",
+    };
+    public string FoldedLine => Outcome.Length > 0 ? Outcome : Title;
+    public string JustThis => $"Just this {Setup.DeviceWord}";
+    public string PasswordNote => $"Your laptop asks for this password once, to connect. It stays on your computers; {owner.Brand} never sees it.";
+    public string StartAtLoginBody => Setup.IsLibrary
+        ? "Your library then starts by itself, so your laptop can always reach it and notes get written."
+        : "Recommended: Study Stash then starts by itself, so your notes get written and Record is always one click away.";
+    public string TaskbarBody => "Windows tucks new icons away under ^. Select ^ in the taskbar corner, then drag the Study Stash icon down beside the clock.";
+    /// <summary>The Chrome helper card's Canvas connection (made when the AI offered it).</summary>
+    public CanvasConnectModel? Canvas => Setup.Canvas;
     public bool HasOutcome => Outcome.Length > 0;
     public bool HasProblem => !string.IsNullOrEmpty(Problem);
     public bool IsComputer => Kind == "computer_setup";
@@ -114,7 +140,11 @@ public sealed partial class CardEntry : ChatEntry
         OnPropertyChanged(nameof(ModelTitle));
         OnPropertyChanged(nameof(ModelBody));
     }
-    partial void OnOutcomeChanged(string value) => OnPropertyChanged(nameof(HasOutcome));
+    partial void OnOutcomeChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasOutcome));
+        OnPropertyChanged(nameof(FoldedLine));
+    }
     partial void OnProblemChanged(string? value) => OnPropertyChanged(nameof(HasProblem));
 
     partial void OnChoiceChanged(string value)
@@ -127,6 +157,10 @@ public sealed partial class CardEntry : ChatEntry
     /// <summary>One of the card's buttons ("setup", "download", "notnow"…): the only way a card changes anything.</summary>
     [RelayCommand]
     Task Press(string action) => owner.PressAsync(this, action);
+
+    /// <summary>The model card's list: another model picked instead.</summary>
+    [RelayCommand]
+    Task PickModel(Services.ModelChoice choice) => owner.PressAsync(this, "pick:" + choice.Model.Id);
 
     [RelayCommand]
     void Choose(string choice)
@@ -154,17 +188,25 @@ public sealed partial class ChecklistRow(string id) : ObservableObject
     public bool HasDetail => Detail.Length > 0;
     public bool ShowOptional => Optional && !IsDone;
     public bool ShowRecommended => Recommended && !IsDone && !IsSkipped;
-    public string Tag => ShowOptional ? "Optional" : ShowRecommended ? "Recommended" : "";
+    public string Tag => ShowOptional ? "Optional" : "";
     public bool HasTag => Tag.Length > 0;
+    /// <summary>The second line: its detail, or "Recommended" for a recommended one not done yet.</summary>
+    public string DetailLine => HasDetail ? Detail : ShowRecommended ? "Recommended" : "";
+    public bool HasDetailLine => DetailLine.Length > 0;
 
     partial void OnStateChanged(ChecklistState value)
     {
         foreach (string p in new[] { nameof(Clickable), nameof(IsDone), nameof(IsNow), nameof(IsTodo), nameof(IsSkipped), nameof(IsProblem), nameof(ShowOptional),
-                     nameof(ShowRecommended), nameof(Tag), nameof(HasTag) })
+                     nameof(ShowRecommended), nameof(Tag), nameof(HasTag), nameof(DetailLine), nameof(HasDetailLine) })
             OnPropertyChanged(p);
     }
 
-    partial void OnDetailChanged(string value) => OnPropertyChanged(nameof(HasDetail));
+    partial void OnDetailChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasDetail));
+        OnPropertyChanged(nameof(DetailLine));
+        OnPropertyChanged(nameof(HasDetailLine));
+    }
 
     partial void OnOptionalChanged(bool value)
     {
@@ -176,7 +218,7 @@ public sealed partial class ChecklistRow(string id) : ObservableObject
     partial void OnRecommendedChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowRecommended));
-        OnPropertyChanged(nameof(Tag));
-        OnPropertyChanged(nameof(HasTag));
+        OnPropertyChanged(nameof(DetailLine));
+        OnPropertyChanged(nameof(HasDetailLine));
     }
 }

@@ -237,8 +237,12 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
                 Fold(card, "Not now");
                 g.Note("Not downloading the model for now", "The student said \"Not now\" to the download.", good: false);
                 break;
+            case ("model_download", "change"):
+                card.Changing = !card.Changing;
+                break;
             case ("model_download", _) when action.StartsWith("pick:", StringComparison.Ordinal):
                 card.ModelId = action[5..];
+                card.Changing = false;
                 break;
             case ("chrome_helper", "add"):
                 if (m.Canvas is not { } c) break;
