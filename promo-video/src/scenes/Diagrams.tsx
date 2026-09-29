@@ -34,7 +34,7 @@ const ORGANS: Organ[] = [
     d: 'M282 469 C282 459 318 459 318 469 C318 479 282 479 282 469 Z'},
 ];
 
-const Body: React.FC<{frame: number}> = ({frame}) => (
+export const Body: React.FC<{frame: number}> = ({frame}) => (
   <svg width={600} height={486} viewBox="0 0 600 486" style={{display: 'block', margin: '18px auto 0', overflow: 'visible'}}>
     <path d={TORSO} fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.34)" strokeWidth="2" strokeLinejoin="round" opacity={ease(frame, 0, 10)} />
     <path d="M300 22 L300 96 M300 96 L276 116 M300 96 L324 116" stroke="#C9D2DE" strokeWidth="6" strokeLinecap="round" fill="none" opacity={0.55 * ease(frame, 4, 12)} />
@@ -157,7 +157,7 @@ const Graph: React.FC<{frame: number}> = ({frame}) => {
   );
 };
 
-const Page: React.FC<{cls: string; color: string; meta: string; title: string; by: string; summary: string; children: React.ReactNode; frame: number}> = ({
+export const Page: React.FC<{cls: string; color: string; meta: string; title: string; by: string; summary: string; children: React.ReactNode; frame: number}> = ({
   cls,
   color,
   meta,
