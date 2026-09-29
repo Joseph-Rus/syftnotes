@@ -247,6 +247,10 @@
                          TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
               <TextBlock Text="{Binding ClassCount}" FontSize="12" Foreground="{DynamicResource Fg2}" />
             </StackPanel>
+            <!-- The one gentle ask for a tip, when it's due: in the list's flow, lined up with the lectures, covering nothing -->
+            <Panel DockPanel.Dock="Top" IsVisible="{Binding HasSupport}" Margin="8,0,8,8">
+              <v:WinSupportAsk Name="SupportAsk" DataContext="{Binding Support}" />
+            </Panel>
             <!-- What's attached in this class (drop files on the list) -->
             <ScrollViewer DockPanel.Dock="Top" MaxHeight="200" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasClassFiles}" Margin="20,0,20,12">
               <v:WinAttachments Name="ClassAttachments" DataContext="{Binding ClassFiles}" />

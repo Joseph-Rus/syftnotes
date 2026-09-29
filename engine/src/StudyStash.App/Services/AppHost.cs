@@ -63,6 +63,11 @@ public sealed class AppSettings
     public AppAppearance Appearance { get; set; } = AppAppearance.System;
     /// <summary>The version of Study Stash that last ran here: a newer one starting (it updated itself) says so, once.</summary>
     public string LastVersion { get; set; } = "";
+    /// <summary>When the student said "Maybe later" to the library window's ask for a tip (it asks once more a month
+    /// on); null until they do.</summary>
+    public DateTimeOffset? SupportAskLater { get; set; }
+    /// <summary>The ask for a tip never shows again: they tipped, said don't ask again, or put it off twice.</summary>
+    public bool SupportAskDone { get; set; }
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 
