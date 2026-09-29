@@ -10,6 +10,8 @@ namespace StudyStash.App.Tests;
 /// a test or a picture that looks at them.</summary>
 static class DiagramsReady
 {
+    static bool Waiting(DiagramView d) => d.IsLaying || (d.IsEffectivelyVisible && d.Chart is not null && d.Scene is null && !d.HasFailed);
+
     public static void Wait(TopLevel top)
     {
         var until = DateTime.UtcNow.AddSeconds(60);
@@ -17,7 +19,9 @@ static class DiagramsReady
         {
             Dispatcher.UIThread.RunJobs();
             Assert.NotNull(top.CaptureRenderedFrame());
-            if (!SceneCache.Busy && !top.GetVisualDescendants().OfType<DiagramView>().Any(d => d.IsLaying)) return;
+            // Done when every diagram on show has its picture (or couldn't have one): nothing busy and nothing laying out
+            // isn't enough, since a finished layout still has to reach its view from the thread pool.
+            if (!SceneCache.Busy && !top.GetVisualDescendants().OfType<DiagramView>().Any(Waiting)) return;
             Assert.True(DateTime.UtcNow < until, "a diagram took over a minute to lay out and draw");
             // A finished layout tells its view from the thread pool: give that a moment to arrive, then look again.
             if (!SceneCache.Settle(TimeSpan.FromSeconds(60))) continue;

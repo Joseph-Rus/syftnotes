@@ -236,19 +236,21 @@ public class LibraryCanvasTests
             Assert.True(Shows(() => due.Groups.SelectMany(g => g.Rows).Any(r => r.Class == "CS 101")));
             Assert.True(Shows(() => updates >= 2));
 
-            // Once caught up, another look with nothing new reads nothing again.
+            // Once caught up, another look with nothing new reads nothing again. The sync can still be writing its last
+            // words when the feed first catches up (a real change, read once more), so this looks until one look in a
+            // row reads nothing: a feed that re-read on every look would never get there.
             await Until(async () =>
             {
                 await watch.RefreshAsync(stop);
                 await Task.Delay(100, stop);
-                return !feed.Stale(watch.State!);
-            }, "the feed to catch up", 60);
+                if (feed.Stale(watch.State!)) return false;
+                int before;
+                lock (ui) before = updates;
+                await watch.RefreshAsync(stop);
+                await Task.Delay(200, stop);
+                lock (ui) return updates == before;
+            }, "a look with nothing new to read nothing", 60);
             Assert.NotNull(feed.Due!.Synced);
-            int before;
-            lock (ui) before = updates;
-            await watch.RefreshAsync(stop);
-            await Task.Delay(200, stop);
-            lock (ui) Assert.Equal(before, updates);
         }
         finally
         {

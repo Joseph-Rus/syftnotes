@@ -95,6 +95,9 @@ public sealed class DiagramView : Decorator
     /// <summary>Whether it's still being laid out, its space kept by a quiet placeholder.</summary>
     public bool IsLaying => canvas.Laying;
 
+    /// <summary>It couldn't be laid out, so it shows its source instead of a picture.</summary>
+    public bool HasFailed => failed;
+
     /// <summary>How much the picture is scaled to fit its column.</summary>
     public double Scale => canvas.Scale;
 
