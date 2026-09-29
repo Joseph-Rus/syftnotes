@@ -4,13 +4,11 @@
 
 Your own lecture library. Record a lecture, and it's transcribed on your computer, filed under the
 right class, and turned into study notes — next to your Canvas assignments, and ready to ask about.
-Free and open source, for Mac and Windows, and everything stays on your own computers.
+Free and open source, for Mac and Windows, and your recordings never leave your own computers.
 
 [![The 50-second demo: a lecture's notes, with a labelled diagram of the organs of the torso](docs/images/demo-poster.png)](https://study-stash-app.web.app/assets/study-stash-demo.mp4)
 
 [Watch the 50-second demo](https://study-stash-app.web.app/assets/study-stash-demo.mp4) (it's narrated, so turn the sound on).
-
-![The library window: a class's lectures, a lecture's notes, and the Ask bar](docs/images/library-window.png)
 
 ## What it does
 
@@ -47,6 +45,8 @@ Free and open source, for Mac and Windows, and everything stays on your own comp
 - **Looks at home on your computer.** A native Mac look (Liquid Glass) and Windows 11's, light and
   dark, with ten colour themes in Settings → Appearance.
 - **Keeps itself up to date**, quietly, when nothing is recording.
+
+![The library window: a class's lectures, a lecture's notes, and the Ask bar](docs/images/library-window.png)
 
 <p align="center">
   <img src="docs/images/menu-bar.png" width="49%" alt="The menu bar dropdown: Record, recent lectures and search; and while recording">
