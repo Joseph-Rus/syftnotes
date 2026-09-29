@@ -61,6 +61,19 @@ public sealed class FakeMic(int rate = 48000, int channels = 2) : IAudioSource
     public void Break(string why) => Failed?.Invoke(why);
 }
 
+/// <summary>What tells voices apart, standing in: the turns it's given, or a failure.</summary>
+public sealed class FakeVoices(params VoiceTurn[] turns) : ISpeakerLabeler
+{
+    public bool Fails { get; init; }
+    public int Loads { get; set; }
+    public bool Disposed { get; private set; }
+
+    public Task<IReadOnlyList<VoiceTurn>> ListenAsync(float[] samples, CancellationToken stop) =>
+        Fails ? throw new InvalidOperationException("the voice model is damaged") : Task.FromResult<IReadOnlyList<VoiceTurn>>(turns);
+
+    public void Dispose() => Disposed = true;
+}
+
 /// <summary>Whisper stand-in: one line per piece, saying where the piece started, and what it was told.</summary>
 public sealed class FakeWhisper : ITranscriber
 {
@@ -995,5 +1008,59 @@ public class RecordingTests
         Assert.True(File.Exists(store.AudioPath("rec-new")));
         Assert.True(File.Exists(store.AudioPath("rec-waiting")));
         Assert.NotNull(store.Get("rec-old"));
+    }
+
+    [Fact]
+    public async Task A_lecture_written_down_waits_for_its_voices_and_then_goes_to_the_library()
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        Recorded(store, "rec-1", 300);
+        // All of it written down already, in thirty lines of ten seconds.
+        store.Update("rec-1", x =>
+        {
+            x.TranscribedSeconds = 300;
+            x.Segments = [.. Enumerable.Range(0, 30).Select(i => new Spoken(i * 10, i * 10 + 10, $"line {i}"))];
+        });
+        var voices = new FakeVoices(new VoiceTurn(0, 140, 5), new VoiceTurn(140, 150, 8), new VoiceTurn(150, 300, 5));
+        var worker = new TranscriptionWorker(store, () => new FakeWhisper(), () => null) { LabelVoices = () => true, LoadVoices = () => voices };
+        var finished = new List<LectureState>();
+        worker.Finished += l => finished.Add(l.State);
+
+        while (await worker.StepAsync(default)) { }
+
+        var l = store.Get("rec-1")!;
+        Assert.Equal(LectureState.Sending, l.State);
+        Assert.True(l.SpeakersDone);
+        Assert.Equal(1, l.LabelTries);
+        Assert.True(voices.Disposed);
+        Assert.Equal([LectureState.Sending], finished); // said once, when it was ready for the library
+        Assert.Equal(2, l.Segments[14].Speaker); // the ten seconds of another voice
+        Assert.Equal(29, l.Segments.Count(s => s.Speaker == 1));
+        Assert.Contains("[02:20] Speaker 2: line 14\n[02:30] Speaker 1: line 15", l.Transcript());
+    }
+
+    [Fact]
+    public async Task A_lecture_goes_to_the_library_as_it_is_when_its_voices_fail_or_are_off_or_it_is_too_short()
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        Recorded(store, "rec-broken", 150);
+        Recorded(store, "rec-short", 60);
+        var failing = new TranscriptionWorker(store, () => new FakeWhisper(), () => null) { LabelVoices = () => true, LoadVoices = () => new FakeVoices { Fails = true } };
+        while (await failing.StepAsync(default)) { }
+
+        var broken = store.Get("rec-broken")!;
+        Assert.Equal(LectureState.Sending, broken.State); // the failure didn't hold it back
+        Assert.True(broken.SpeakersDone);
+        Assert.All(broken.Segments, s => Assert.Equal(0, s.Speaker));
+        Assert.Equal(LectureState.Sending, store.Get("rec-short")!.State);
+        Assert.Equal(0, store.Get("rec-short")!.LabelTries); // under two minutes: not tried
+
+        Recorded(store, "rec-off", 150);
+        var off = new TranscriptionWorker(store, () => new FakeWhisper(), () => null) { LabelVoices = () => false, LoadVoices = () => new FakeVoices { Fails = true } };
+        while (await off.StepAsync(default)) { }
+        Assert.Equal(LectureState.Sending, store.Get("rec-off")!.State);
+        Assert.Equal(0, store.Get("rec-off")!.LabelTries);
     }
 }

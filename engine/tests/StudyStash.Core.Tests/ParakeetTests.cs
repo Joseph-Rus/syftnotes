@@ -50,11 +50,14 @@ public class ParakeetTests
     [Fact]
     public void The_models_size_is_the_size_of_its_files()
     {
-        var m = WhisperModels.Parakeet;
-        Assert.Equal(m.Bytes, m.Parts!.Sum(p => p.Bytes));
-        Assert.All(m.Parts!, p => Assert.Matches("^[0-9a-f]{64}$", p.Sha256));
-        Assert.Equal(SpeechEngine.Parakeet, m.Engine);
-        Assert.Contains(m, WhisperModels.All);
+        foreach (var m in new[] { WhisperModels.Parakeet, WhisperModels.Speakers })
+        {
+            Assert.Equal(m.Bytes, m.Parts!.Sum(p => p.Bytes));
+            Assert.All(m.Parts!, p => Assert.Matches("^[0-9a-f]{64}$", p.Sha256));
+        }
+        Assert.Equal(SpeechEngine.Parakeet, WhisperModels.Parakeet.Engine);
+        Assert.Contains(WhisperModels.Parakeet, WhisperModels.All);
+        Assert.DoesNotContain(WhisperModels.Speakers, WhisperModels.All); // it isn't a transcription model to pick
     }
 
     /// <summary>A pretend Hugging Face for a folder of files: each is served by its name, from where a Range asks.</summary>

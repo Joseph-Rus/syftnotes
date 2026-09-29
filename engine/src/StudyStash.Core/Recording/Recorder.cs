@@ -655,6 +655,18 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     /// <summary>Why Whisper isn't writing lectures down ("Whisper couldn't start: …"); null while it works.</summary>
     public string? Problem { get; private set; }
 
+    /// <summary>Whether to tell a lecture's voices apart once it's all written down (the student turned it on and the
+    /// voice model is here). Null: never.</summary>
+    public Func<bool>? LabelVoices { get; init; }
+
+    /// <summary>What tells voices apart, loaded for one lecture and let go after it (a few seconds' work to load).</summary>
+    public Func<ISpeakerLabeler>? LoadVoices { get; init; }
+
+    /// <summary>A lecture shorter than this has too little talk to tell voices apart in, and one longer than the other is
+    /// too much sound to hold at once (seconds).</summary>
+    public const double MinLabelSeconds = 120, MaxLabelSeconds = 3 * 3600;
+    const int LabelTriesAllowed = 2;
+
     /// <summary>What the messages call the model that writes lectures down (Whisper, or Parakeet).</summary>
     public Func<string> EngineName { get; init; } = () => "Whisper";
 
@@ -699,6 +711,8 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
                 continue;
             }
             int take = Segmenter.CutLength(window, final: !isLive, minSeconds, maxSeconds);
+            // All written down, and its voices next: it goes on to the library once they're told apart.
+            if (take == 0 && !isLive && l.TranscribedSeconds >= l.Seconds - 0.01 && WantsVoices(l)) return await LabelAsync(l, stop);
             if (take == 0) continue; // a live lecture without a full piece yet
             return await TranscribeAsync(l, isLive, new Chunk(from, window[..take]), stop);
         }
@@ -747,7 +761,8 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
             x.Segments = [.. x.Segments, .. heard];
             x.TranscribedSeconds = chunk.EndSeconds;
             if (x.Language.Length == 0) x.Language = language;
-            done = x.State == LectureState.Transcribing && x.TranscribedSeconds >= x.Seconds - 0.01;
+            // All of it written down: on to the library, unless its voices are still to be told apart.
+            done = x.State == LectureState.Transcribing && x.TranscribedSeconds >= x.Seconds - 0.01 && !WantsVoices(x);
             if (done) x.State = LectureState.Sending;
         });
         if (saved is null) return true; // deleted meanwhile
@@ -757,6 +772,40 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
             log($"[whisper] {saved.Id}: {saved.Segments.Count} lines from {TimedText.Clock(saved.Seconds)}");
             Finished?.Invoke(saved);
         }
+        return true;
+    }
+
+    bool WantsVoices(Lecture l) => LabelVoices?.Invoke() == true && LoadVoices is not null && !l.SpeakersDone
+        && l.LabelTries < LabelTriesAllowed && l.Seconds is >= MinLabelSeconds and <= MaxLabelSeconds;
+
+    /// <summary>
+    /// Tell the voices in a lecture that's all written down apart (who said each line), then let it go to the library.
+    /// Whatever goes wrong, it goes as it is: the transcript is what matters. It's counted as tried before it starts,
+    /// so a failure that takes the whole app down isn't started again for ever.
+    /// </summary>
+    async Task<bool> LabelAsync(Lecture l, CancellationToken stop)
+    {
+        store.Update(l.Id, x => x.LabelTries++);
+        IReadOnlyList<VoiceTurn>? turns = null;
+        try
+        {
+            float[] samples = Sound.ReadWav(store.AudioPath(l.Id));
+            using var voices = LoadVoices!();
+            turns = await voices.ListenAsync(samples, stop);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            log($"[voices] {l.Id}: {e.Message} (sent without speakers)");
+        }
+        var saved = store.Update(l.Id, x =>
+        {
+            if (turns is not null) x.Segments = Speakers.Label(x.Segments, turns);
+            x.SpeakersDone = true;
+            if (x.State == LectureState.Transcribing) x.State = LectureState.Sending;
+        });
+        if (saved is null) return true; // deleted meanwhile
+        log($"[voices] {saved.Id}: {saved.Segments.Select(sg => sg.Speaker).Where(n => n > 0).Distinct().Count()} voices");
+        Finished?.Invoke(saved);
         return true;
     }
 

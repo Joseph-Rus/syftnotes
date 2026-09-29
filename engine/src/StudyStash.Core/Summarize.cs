@@ -357,9 +357,12 @@ public static partial class Summarize
         string attached = Attachments.Context(m.Attached, Math.Min(Attachments.MaxContextChars, budget / AttachedShare));
         budget -= attached.Length;
         string text = Py.Strip(TimedText.Plain(m.Transcript)); // a recording's times would only distract the model
+        // A transcript that says who's speaking says what that means, once, before the words (and in each part of a long one).
+        string hint = Speakers.HasLabels(text) ? Speakers.NotesHint + "\n\n" : "";
+        text = hint + text;
         Task<string> Repaired(string notes) => RepairDiagramsAsync(notes, prompt => chat(cfg, model, prompt, ctx));
         if (text.Length <= budget) return await Repaired(CleanOutput(await chat(cfg, model, WholePrompt(m, text, drawings, attached), ctx)));
-        var parts = SplitTranscript(text, budget);
+        var parts = SplitTranscript(text[hint.Length..], budget).Select(part => hint + part).ToList();
         var notes = new List<string>();
         for (int i = 0; i < parts.Count; i++)
             notes.Add(CleanOutput(await chat(cfg, model, PartPrompt(m, parts[i], i + 1, parts.Count), ctx)));

@@ -9,8 +9,9 @@ namespace StudyStash.Audio;
 /// <summary>Which program reads a model's files.</summary>
 public enum SpeechEngine { Whisper, Parakeet }
 
-/// <summary>One file of a model that comes as several: its name in the model's folder, its size and its SHA-256.</summary>
-public sealed record ModelPart(string Name, long Bytes, string Sha256);
+/// <summary>One file of a model that comes as several: its name in the model's folder, its size and its SHA-256, and
+/// where it downloads from when that isn't the model's <see cref="WhisperModel.Source"/>.</summary>
+public sealed record ModelPart(string Name, long Bytes, string Sha256, string? From = null);
 
 /// <summary>
 /// A speech-to-text model Study Stash can download: a Whisper model (whisper.cpp's files on Hugging Face) or
@@ -37,7 +38,7 @@ public sealed record WhisperModel(string Id, string Name, string File, long Byte
 
     /// <summary>Where one of its files downloads from.</summary>
     public string UrlOf(ModelPart part, string? mirror) =>
-        mirror is { Length: > 0 } m ? $"{m.TrimEnd('/')}/{part.Name}" : $"{Source}/{part.Name}";
+        mirror is { Length: > 0 } m ? $"{m.TrimEnd('/')}/{part.Name}" : part.From ?? $"{Source}/{part.Name}";
 
     /// <summary>"3.1 GB", "550 MB".</summary>
     public string Size => SizeOf(Bytes);
@@ -74,6 +75,21 @@ public static class WhisperModels
             new("decoder.onnx", 47233743, "d593cdb0e571f5a457ec2219af9968cbf6b0e8198e8f7839b40a8754593bf68c"),
             new("encoder.onnx", 41766257, "3eed7ce424bf8339ad09233533c687e2dbd07e74ccf5027b5e7344019ea373b0"),
             new("encoder.weights", 2435420160, "3af3f51af5f2d01dbbf5af47d42c7962a2c205f11004254bb4f2b979862f39a8"),
+        ],
+    };
+    /// <summary>What tells the voices in a lecture apart (not a transcription model, so it isn't in <see cref="All"/>):
+    /// pyannote's segmentation (which stretches are one voice; MIT) and NVIDIA's TitaNet small (which voices are the
+    /// same person; CC BY 4.0), both from sherpa-onnx's conversions. Tried on two lectures with the voices set alike at
+    /// 0.9: a lecturer and the students who asked came out as separate voices.</summary>
+    public static readonly WhisperModel Speakers = new("speakers", "Speaker voices", "speaker-voices", 5992913 + 40257283, "",
+        "Tells the voices in a lecture apart, so a student's question isn't taken for the lecturer's words.")
+    {
+        Parts =
+        [
+            new("segmentation.onnx", 5992913, "220ad67ca923bef2fa91f2390c786097bf305bceb5e261d4af67b38e938e1079",
+                "https://huggingface.co/csukuangfj/sherpa-onnx-pyannote-segmentation-3-0/resolve/main/model.onnx"),
+            new("embedding.onnx", 40257283, "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e",
+                "https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/main/nemo_en_titanet_small.onnx"),
         ],
     };
     public static readonly WhisperModel Small = new("small", "Whisper small", "ggml-small.bin", 487601967,

@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using System.Text;
 using SherpaOnnx;
 using StudyStash.Core;
@@ -51,10 +50,10 @@ public sealed class ParakeetTranscriber : ITranscriber
     public ParakeetTranscriber(string folder, string language = "", int threads = 0)
     {
         var config = new OfflineRecognizerConfig();
-        config.ModelConfig.Transducer.Encoder = Readable(Path.Combine(folder, Encoder));
-        config.ModelConfig.Transducer.Decoder = Readable(Path.Combine(folder, Decoder));
-        config.ModelConfig.Transducer.Joiner = Readable(Path.Combine(folder, Joiner));
-        config.ModelConfig.Tokens = Readable(Path.Combine(folder, Tokens));
+        config.ModelConfig.Transducer.Encoder = NativePath.Readable(Path.Combine(folder, Encoder));
+        config.ModelConfig.Transducer.Decoder = NativePath.Readable(Path.Combine(folder, Decoder));
+        config.ModelConfig.Transducer.Joiner = NativePath.Readable(Path.Combine(folder, Joiner));
+        config.ModelConfig.Tokens = NativePath.Readable(Path.Combine(folder, Tokens));
         config.ModelConfig.ModelType = "nemo_transducer";
         config.ModelConfig.Provider = "cpu";
         config.ModelConfig.NumThreads = threads > 0 ? threads : Math.Clamp(Environment.ProcessorCount / 2, 2, 8);
@@ -113,19 +112,6 @@ public sealed class ParakeetTranscriber : ITranscriber
         Flush();
         return lines;
     }
-
-    /// <summary>sherpa-onnx takes file names as ANSI text on Windows, so a folder with a name the code page can't
-    /// spell (a user called Zoë on some computers) would not open: its short name, all plain letters, does.</summary>
-    static string Readable(string path)
-    {
-        if (!OperatingSystem.IsWindows() || path.All(c => c < 128)) return path;
-        var buffer = new StringBuilder(520);
-        if (GetShortPathName(path, buffer, buffer.Capacity) > 0 && buffer.ToString().All(c => c < 128)) return buffer.ToString();
-        throw new IOException($"Study Stash can't open the model in {path}: the folder's name has letters Windows can't pass on. Move Study Stash's folder to one with a plain name.");
-    }
-
-    [DllImport("kernel32", CharSet = CharSet.Unicode, EntryPoint = "GetShortPathNameW")]
-    static extern int GetShortPathName(string path, StringBuilder shortPath, int length);
 
     public void Dispose() => recognizer.Dispose();
 }
