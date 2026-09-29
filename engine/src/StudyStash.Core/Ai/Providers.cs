@@ -121,12 +121,14 @@ public abstract class AiProvider
 
     /// <summary>Where these commands usually live: a background service starts with a short PATH. On Windows also
     /// the PATH as Windows has it now: an engine (or Node.js, which npm's claude.cmd and codex.cmd run on) installed
-    /// while Study Stash was running isn't on the PATH it started with, and "Check again" in setup should find it.</summary>
+    /// while Study Stash was running isn't on the PATH it started with, and "Check again" in setup should find it.
+    /// Codex's own Windows installer puts it in %LOCALAPPDATA%\Programs\OpenAI\Codex\bin.</summary>
     public static string SearchPath()
     {
         string home = Py.UserHome();
         string[] extra = OperatingSystem.IsWindows()
             ? [.. WindowsPathNow(), Path.Combine(home, "AppData", "Roaming", "npm"), Path.Combine(home, ".local", "bin"),
+               Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "OpenAI", "Codex", "bin"),
                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs")]
             : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", Path.Combine(home, ".local", "bin"),
                Path.Combine(home, ".npm-global", "bin"), Path.Combine(home, ".bun", "bin"), Path.Combine(home, ".claude", "local")];
