@@ -270,6 +270,26 @@ public sealed class GuidedSetupTests
         Assert.Equal("Study Stash stopped Claude: it tried to use a tool it isn't allowed here.", g.ChatProblemText);
     }
 
+    [AvaloniaFact]
+    public async Task Not_now_to_start_at_login_leaves_it_off_though_setup_has_its_box_ticked_for_a_library_already_here()
+    {
+        await using var rig = new Rig(role: AppRole.Both);
+        rig.Setup.StartAtLogin = true; // what setup does for a library that was here before
+        rig.Guided.Skip("start_at_login");
+        Assert.False(rig.Setup.StartAtLogin);
+        Assert.Equal(ChecklistState.Skipped, rig.Item("start_at_login").State);
+    }
+
+    [AvaloniaFact]
+    public async Task A_chat_with_no_door_says_so_and_offers_the_way_out_instead_of_sitting_silent()
+    {
+        await using var rig = new Rig(installed: true, signedIn: true, saved: s => s.SetupAi = "claude");
+        await rig.Guided.OpenAsync();
+        Assert.Equal(GuidedScreen.Chat, rig.Guided.Screen);
+        Assert.Equal(ChatProblem.Tools, rig.Guided.ChatProblemKind);
+        Assert.False(rig.Guided.Busy);
+    }
+
     // --- the checklist, on its own ------------------------------------------------------------------------------------
 
     static IReadOnlyList<ChecklistItem> Items(SetupModel m, ChecklistFacts f) => SetupChecklist.From(m, f);

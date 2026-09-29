@@ -174,6 +174,21 @@ public sealed class AgentInstallTests
     }
 
     [Fact]
+    public async Task Opening_the_sign_in_again_runs_it_again_and_the_one_stopped_is_no_failure()
+    {
+        using var home = new TempHome();
+        string exe = FakeAgents.WriteCli(home["bin"], "claude");
+        File.WriteAllText(home["bin/login-delay"], "3");
+        using var signIn = new AgentSignIn(AgentCli.Claude, exe) { Every = TimeSpan.FromMilliseconds(200) };
+        Assert.True(signIn.Start());
+        Assert.True(signIn.Restart());
+        Assert.True(signIn.Running);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        Assert.True(await signIn.WaitAsync(cts.Token));
+        Assert.False(signIn.NeedsTerminal);
+    }
+
+    [Fact]
     public async Task A_sign_in_that_stops_at_once_offers_the_terminal_and_the_wait_goes_on()
     {
         using var home = new TempHome();
