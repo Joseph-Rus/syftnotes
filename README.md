@@ -241,6 +241,12 @@ older copies still update) and `SHA256SUMS.txt`. Code that already passed isn't 
 push that only changes the version on top of a commit that passed, or a merge of a branch whose run
 passed on the very same code, just builds and publishes.
 
+## Support Study Stash
+
+Study Stash is free and open source, and two students build it with Claude. If it saves you time,
+you can [buy us more Claude usage](https://ko-fi.com/studystashteam) on Ko-fi, and it goes into
+building the next version.
+
 ## License
 
 [MIT](LICENSE). No warranty: check your notes against the lecture before relying on them, since AI
