@@ -158,7 +158,10 @@ public sealed partial class LibraryWeb
         {
             if (@class is null || id is null || !cfg.ClassNames().Contains(@class)) return Http.Detail(404, "no such assignment");
             var found = CanvasView.Assignment(CourseIndex.Load(cfg.Home, @class), id.Value, Canvas.Clock(), Canvas.Crawl.AssignmentFolder(@class, id.Value));
-            return found is null ? Http.Detail(404, "no such assignment") : Http.Json(found);
+            if (found is null) return Http.Detail(404, "no such assignment");
+            // The phone shows the instructions as they're drawn for a lecture's notes: safe HTML, formulas ready for KaTeX.
+            found["instructions_html"] = PhoneNotes.Render(Py.AsString(found["instructions"]));
+            return Http.Json(found);
         }));
         app.MapGet("/api/v2/canvas/modules", (HttpContext ctx, string? @class) => Api(ctx, () =>
             @class is null || !cfg.ClassNames().Contains(@class) ? Http.Detail(400, "unknown class") : Http.Json(CanvasView.Modules(CourseIndex.Load(cfg.Home, @class)))));

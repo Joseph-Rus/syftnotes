@@ -404,6 +404,7 @@ public sealed partial class LibraryWeb
 
         MapApp(app);
         MapAttachments(app);
+        MapVoiceMemos(app);
         MapCanvas(app);
         MapChat(app);
         MapFiles(app);

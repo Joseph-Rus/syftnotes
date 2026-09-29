@@ -193,7 +193,10 @@ public class PhoneApiTests
         var lectures = (JsonArray)JsonNode.Parse(await (await phone.SendAsync(Req(HttpMethod.Get, "/api/v2/lectures", key: null, device: device))).Content.ReadAsStringAsync())!;
         Assert.Equal("Recursion", lectures.Single()!["title"]!.GetValue<string>());
         Assert.Equal("CS 101", (await Json(await phone.SendAsync(Req(HttpMethod.Get, "/api/v2/lectures/m1", key: null, device: device))))["class"]!.GetValue<string>());
-        Assert.True((await Json(await phone.SendAsync(Req(HttpMethod.Get, "/api/v2/me", key: null, device: device))))["paired"]!.GetValue<bool>());
+        var me = await Json(await phone.SendAsync(Req(HttpMethod.Get, "/api/v2/me", key: null, device: device)));
+        Assert.True(me["paired"]!.GetValue<bool>());
+        // It says which phone this is, so the phone's Settings can name it and remove it.
+        Assert.Equal(("Sam's iPhone", paired["device"]!["id"]!.GetValue<string>()), (me["device"]!["name"]!.GetValue<string>(), me["device"]!["id"]!.GetValue<string>()));
         // Like a signed-in member, it can add another phone and see the phones.
         Assert.Equal(HttpStatusCode.OK, (await phone.SendAsync(Req(HttpMethod.Post, "/api/v2/devices/code", new { }, key: null, device: device))).StatusCode);
         var list = await Json(await phone.SendAsync(Req(HttpMethod.Get, "/api/v2/devices", key: null, device: device)));

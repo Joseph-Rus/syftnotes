@@ -215,6 +215,11 @@ public class CanvasApiTests
         Assert.Equal("Problem set 4", a["name"]!.GetValue<string>());
         Assert.Equal("18/20", a["score_text"]!.GetValue<string>());
         Assert.Contains("stack frames", a["instructions"]!.GetValue<string>());
+        // The phone's copy of the instructions: the same words as safe HTML.
+        string html = a["instructions_html"]!.GetValue<string>();
+        Assert.Contains("stack frames", html);
+        Assert.StartsWith("<", html);
+        Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
         var rubric = a["rubric"]!.AsArray();
         var stackTraces = rubric.First(r => r!["criterion"]!.GetValue<string>() == "Stack traces")!;
         Assert.Equal(8, stackTraces["mark"]!["points"]!.GetValue<double>());

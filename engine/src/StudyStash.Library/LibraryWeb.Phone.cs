@@ -92,10 +92,13 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/me", (HttpContext ctx) =>
         {
             ctx.Response.Headers.CacheControl = "no-store";
+            var phone = PhoneOf(ctx);
             return Http.Json(new JsonObject
             {
-                ["paired"] = PhoneOf(ctx) is not null,
+                ["paired"] = phone is not null,
                 ["library"] = new JsonObject { ["name"] = cfg.PoolName, ["version"] = Engine.Version },
+                // Which phone this is, so its Settings can name it and remove it.
+                ["device"] = phone is null ? null : DeviceJson(phone, seen: false),
             });
         });
         // A lecture's notes drawn for the phone: its diagrams as pictures and its formulas ready for KaTeX.
