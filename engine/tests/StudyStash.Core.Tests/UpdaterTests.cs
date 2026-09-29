@@ -328,6 +328,10 @@ public class UpdaterTests
             [Updates.WindowsAsset] = "https://dl/setup.exe", [Updates.WindowsLibraryAsset] = "https://dl/library-setup.exe",
             [Updates.ChecksumsAsset] = "https://dl/sums.txt",
         });
+        // A lecture started while it downloaded: Setup.exe, which closes the app whatever it's doing, isn't started.
+        Assert.False(await Updates.ApplyAsync(rel, home, host, said.Add, ready: () => false));
+        Assert.Empty(spawned);
+        Assert.Equal(Updates.PutOff, said[^1]);
         Assert.True(await Updates.ApplyAsync(rel, home, host, said.Add));
         var args = Assert.Single(spawned);
         string setupPath = Path.Combine(dir["temp"], "Study Stash update", Updates.WindowsAsset);
