@@ -614,12 +614,27 @@
                 </Border>
                 <TextBlock Classes="section" Text="About" />
                 <Border Classes="group">
-                  <Border Classes="row">
-                    <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Classes="row-title" Text="{Binding Version, StringFormat='Study Stash {0}'}" />
-                      <Button Grid.Column="1" Classes="pill" Command="{Binding QuitCommand}" VerticalAlignment="Center"><TextBlock Text="Quit Study Stash" /></Button>
-                    </Grid>
-                  </Border>
+                  <StackPanel>
+                    <Border Classes="row">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Classes="row-title" Text="{Binding Version, StringFormat='Study Stash {0}'}" />
+                        <Button Grid.Column="1" Classes="pill" Command="{Binding QuitCommand}" VerticalAlignment="Center"><TextBlock Text="Quit Study Stash" /></Button>
+                      </Grid>
+                    </Border>
+                    <Border Classes="rowsep" />
+                    <!-- Study Stash is free: a tip for the two students who build it goes to their Ko-fi page. -->
+                    <Border Classes="row">
+                      <Grid ColumnDefinitions="*,16,Auto">
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                          <TextBlock Classes="row-title" Text="Support Study Stash" />
+                          <TextBlock Classes="row-sub" Text="{x:Static s:SupportAsk.AboutLine}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Name="BuyClaudeUsage" Grid.Column="2" Classes="pill" Command="{Binding BuyClaudeUsageCommand}" VerticalAlignment="Center">
+                          <TextBlock Text="{x:Static s:SupportAsk.Button}" />
+                        </Button>
+                      </Grid>
+                    </Border>
+                  </StackPanel>
                 </Border>
               </StackPanel>
 
