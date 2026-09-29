@@ -239,6 +239,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         var net = laptop ?? new LaptopHost();
         laptopHost = net;
         Sender = new LectureSender(Lectures, Client, net, this.log);
+        Memos = new VoiceMemoImport(Lectures, () => Remote(), StudyStash.Audio.AudioFiles.ToRecording, () => Client().DisplayName,
+            () => RemoteLibrary.Computer is { Length: > 0 } c ? c : Machine.HostName(), () => Whisper.Wake(), this.log);
+        Memos.Imported += _ => Changed?.Invoke();
         Recorder.Changed += () => Changed?.Invoke();
         Recorder.Problem += why =>
         {
@@ -333,6 +336,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <summary>This computer can record what it plays, too (Windows).</summary>
     public bool CanRecordComputerAudio => Microphones.CanRecordComputerAudio;
+
+    /// <summary>Voice memos from the phone, brought in as lectures for Whisper (<see cref="Start"/> runs it).</summary>
+    public VoiceMemoImport Memos { get; }
 
     /// <summary>The library over its API, once one is set up.</summary>
     public RemoteLibrary? Remote()
@@ -447,6 +453,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         running.Add(Task.Run(() => Sender.RunAsync(stop.Token)));
         running.Add(Task.Run(WatchLibrary));
         StartCalendars();
+        // Voice memos sent from the phone are written down where lectures are recorded; a library-only computer can't.
+        if (Settings.Role != AppRole.Library) running.Add(Task.Run(() => Memos.RunAsync(stop.Token)));
         running.Add(Task.Run(() => Lectures.PruneAudio(Settings.KeepAudioDays, DateTimeOffset.Now)));
         watchdog = new Timer(_ => CheckRecorder(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         // A download that quitting (or a closed laptop) cut short picks up where it stopped. A library-only

@@ -173,7 +173,7 @@ public sealed class LocalLibrary(LibraryReader reader, Canvas.CanvasSync? canvas
 /// The library over its API (/api/v2), with the laptop's password: what the Study Stash app shows, and what Claude
 /// reads through <c>Study Stash mcp</c> on a laptop.
 /// </summary>
-public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http = null) : ILibrarySource, IAttachmentLibrary
+public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http = null) : ILibrarySource, IAttachmentLibrary, IVoiceMemoLibrary
 {
     static readonly HttpClient Shared = new() { Timeout = TimeSpan.FromSeconds(150) };
     readonly HttpClient client = http ?? Shared;
@@ -254,6 +254,40 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     /// "/&lt;id&gt;"). Null: a library older than phones.</summary>
     public async Task<JsonObject?> DevicesAsync(HttpMethod method, string path = "", JsonObject? body = null) =>
         await SendAsync(method, "/devices" + path, body) as JsonObject;
+
+    // --- voice memos sent from the phone, for a computer that records to write down ---------------------------------
+
+    /// <summary>Every voice memo the library holds ({memos: [...]}); null from a library from before them.</summary>
+    public async Task<JsonArray?> VoiceMemosAsync(CancellationToken stop = default) =>
+        (await SendAsync(HttpMethod.Get, "/voice-memos", stop: stop) as JsonObject)?["memos"] as JsonArray;
+
+    /// <summary>Take a waiting memo to write down. False when another computer already has.</summary>
+    public async Task<bool> ClaimVoiceMemoAsync(string id, string computer, CancellationToken stop = default)
+    {
+        try
+        {
+            return await SendAsync(HttpMethod.Post, $"/voice-memos/{Q(id)}/claim", new JsonObject { ["computer"] = computer }, stop) is not null;
+        }
+        catch (LibraryRefusedException e) when (e.Status == 409)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>The memo's recording, saved to <paramref name="path"/>.</summary>
+    public async Task DownloadVoiceMemoAsync(string id, string path, CancellationToken stop = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{root}/voice-memos/{Q(id)}/audio");
+        if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        using var r = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, stop);
+        if (!r.IsSuccessStatusCode) throw new LibraryRefusedException((int)r.StatusCode, r.StatusCode == HttpStatusCode.NotFound ? "The recording isn't on your library any more." : r.ReasonPhrase ?? "");
+        await using var file = File.Create(path);
+        await r.Content.CopyToAsync(file, stop);
+    }
+
+    /// <summary>Tell the library how a memo went: the lecture it became, or why it couldn't.</summary>
+    public Task FinishVoiceMemoAsync(string id, string? lecture, string? error, CancellationToken stop = default) =>
+        SendAsync(HttpMethod.Post, $"/voice-memos/{Q(id)}/done", new JsonObject { ["lecture"] = lecture, ["error"] = error }, stop);
 
     public bool HasCanvas => true; // a library from before Canvas answers each tool with why not
 
