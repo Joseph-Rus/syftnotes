@@ -45,7 +45,7 @@ public class PhoneAppTests
         Assert.Equal(Index, await r.Content.ReadAsStringAsync());
         Assert.Equal("text/html; charset=utf-8", r.Content.Headers.ContentType!.ToString());
         Assert.Equal(LibraryWeb.PhoneCsp, r.Headers.GetValues("Content-Security-Policy").Single());
-        Assert.Equal("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; "
+        Assert.Equal("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.ts.net:8443; "
             + "worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'", LibraryWeb.PhoneCsp);
         Assert.Equal("no-cache", r.Headers.CacheControl!.ToString());
         Assert.Equal("nosniff", r.Headers.GetValues("X-Content-Type-Options").Single());

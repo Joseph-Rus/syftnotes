@@ -25,7 +25,8 @@ public class PhoneSettingsPageTests
         Assert.Equal((HttpStatusCode.SeeOther, "/settings?phone=new#phone"), (r.StatusCode, r.Headers.Location!.OriginalString));
         string page = await site.Text("/settings?phone=new");
         Assert.Contains("<svg xmlns=\"http://www.w3.org/2000/svg\"", page);
-        Assert.Contains("https://mini.tail1234.ts.net:8443/app/", page);
+        // The address a person could type: the Tailscale IP's (the QR code also offers the https name).
+        Assert.Contains($"http://100.64.0.9:{cfg.WebPort}/app/</div>", page);
         var shown = Regex.Match(page, @">(\d{3}) (\d{3})</div>");
         Assert.True(shown.Success);
 

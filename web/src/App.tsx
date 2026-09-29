@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { Api } from './api/client';
 import { decide, type BootFacts, type Gate } from './boot';
+import { secureAddress, withoutOffer } from './upgrade';
 import { currentPlatform, isStandalone } from './platform';
 import { onLinkClick, tabOf, useRoute } from './router';
 import { useTheme } from './theme/useTheme';
@@ -50,6 +51,13 @@ export function App() {
   }, []);
 
   const check = async () => {
+    // Opened from the QR code at the library's Tailscale IP: move to its https name if this phone can reach it.
+    const secure = await secureAddress(window.location.href);
+    if (secure) {
+      window.location.replace(secure);
+      return;
+    }
+    if (window.location.search.includes('https=')) history.replaceState(null, '', withoutOffer(window.location.href));
     const facts: BootFacts = {
       standalone: isStandalone(),
       platform: currentPlatform(),

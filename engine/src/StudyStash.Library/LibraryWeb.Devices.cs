@@ -61,21 +61,43 @@ public sealed partial class LibraryWeb
     }
 
     /// <summary>
-    /// A new code, and the phone app's https address: Tailscale Serve is turned on for it first (on
-    /// <see cref="PhonePort"/>), since a phone app needs https and a phone reaches the library over Tailscale. Why not,
-    /// in words, when it can't be.
+    /// A new code, and where the phone opens the app. Any phone on the tailnet reaches the library at this computer's
+    /// Tailscale IP, whatever its DNS settings, so that's the address the QR code gives (plain http: Tailscale encrypts
+    /// the traffic itself). Tailscale Serve is turned on too (https on <see cref="PhonePort"/>), and when it works the
+    /// address carries it as <c>?https=</c>: a phone that can look the name up (MagicDNS) moves there, where the app
+    /// reads offline and installs as a real app. A library for this computer alone doesn't listen on the IP, so it
+    /// gives the https address only. Why not, in words, when neither can be had.
     /// </summary>
     async Task<(JsonObject? Code, ReachProblem? Problem)> NewPhoneCodeAsync()
     {
-        var (url, problem) = await Task.Run(() => options.Reach.Set(cfg.WebPort, internet: false, on: true, httpsPort: PhonePort));
-        if (url is null)
+        var (secure, problem) = await Task.Run(() => options.Reach.Set(cfg.WebPort, internet: false, on: true, httpsPort: PhonePort));
+        string? secureApp = secure is null ? null : secure.TrimEnd('/') + "/app/";
+        string? plainApp = PlainPhoneAddress();
+        if (secureApp is null && plainApp is null)
         {
             var p = problem ?? new ReachProblem(ReachKind.Other, "Tailscale didn't say where the library is.");
             return (null, p with { Words = "Your phone reaches the library over Tailscale, so it needs Tailscale here first. " + p.Words });
         }
+        string url = plainApp is null ? secureApp! : secureApp is null ? plainApp : plainApp + "?https=" + Uri.EscapeDataString(secureApp);
         var (code, expires) = Phones.NewCode();
-        return (new JsonObject { ["code"] = code, ["url"] = url.TrimEnd('/') + "/app/", ["expires"] = Iso(expires) }, null);
+        return (new JsonObject { ["code"] = code, ["url"] = url, ["secureUrl"] = secureApp, ["expires"] = Iso(expires) }, null);
     }
+
+    /// <summary>http://&lt;Tailscale IP&gt;:&lt;port&gt;/app/, when Tailscale is up and the library listens beyond this
+    /// computer.</summary>
+    string? PlainPhoneAddress()
+    {
+        if (cfg.WebHost is "127.0.0.1" or "localhost" or "::1") return null;
+        var ts = options.Reach.Tailscale();
+        return ts.Running && ts.Ips.FirstOrDefault() is { Length: > 0 } ip ? $"http://{ip}:{cfg.WebPort}/app/" : null;
+    }
+
+    /// <summary>The pairing cookie is https-only wherever the phone's browser would keep it that way: over https
+    /// (Tailscale Serve says so in X-Forwarded-Proto), and on this computer (browsers count localhost as secure). At
+    /// the Tailscale IP, over plain http, a browser drops a Secure cookie, so there it isn't one.</summary>
+    static bool SecureCookie(HttpRequest request) =>
+        request.IsHttps || string.Equals(request.Headers["X-Forwarded-Proto"], "https", StringComparison.OrdinalIgnoreCase)
+        || request.Host.Host is "localhost" or "127.0.0.1" or "[::1]" or "::1";
 
     void MapDevices(WebApplication app)
     {
@@ -104,7 +126,7 @@ public sealed partial class LibraryWeb
                 return PairError(401, "That code isn't right, or it's more than ten minutes old. Make a new one in Study Stash's Settings.");
             ctx.Response.Cookies.Append(Devices.Cookie, token!, new CookieOptions
             {
-                HttpOnly = true, Secure = true, SameSite = SameSiteMode.Strict, Path = "/", MaxAge = TimeSpan.FromDays(400), IsEssential = true,
+                HttpOnly = true, Secure = SecureCookie(ctx.Request), SameSite = SameSiteMode.Strict, Path = "/", MaxAge = TimeSpan.FromDays(400), IsEssential = true,
             });
             Console.WriteLine($"[phone] paired {device.Name}");
             return Http.Json(new JsonObject { ["device"] = DeviceJson(device, seen: false) });

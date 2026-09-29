@@ -97,11 +97,41 @@ public class PhoneApiTests
         var code = await Json(r);
 
         Assert.Matches("^[0-9]{6}$", code["code"]!.GetValue<string>());
-        Assert.Equal("https://mini.tail1234.ts.net:8443/app/", code["url"]!.GetValue<string>());
+        // The QR code opens the Tailscale IP, which any phone on the tailnet reaches, offering the https name to move to.
+        Assert.Equal($"http://100.64.0.9:{cfg.WebPort}/app/?https=https%3A%2F%2Fmini.tail1234.ts.net%3A8443%2Fapp%2F", code["url"]!.GetValue<string>());
+        Assert.Equal("https://mini.tail1234.ts.net:8443/app/", code["secureUrl"]!.GetValue<string>());
         var expires = DateTimeOffset.Parse(code["expires"]!.GetValue<string>(), System.Globalization.CultureInfo.InvariantCulture);
         Assert.InRange(expires - DateTimeOffset.UtcNow, TimeSpan.FromMinutes(9), TimeSpan.FromMinutes(10));
         Assert.Equal(["serve", "--bg", "--https=8443", $"http://127.0.0.1:{cfg.WebPort}"], served.Single());
         Assert.Equal("no-store", r.Headers.CacheControl!.ToString());
+    }
+
+    [Fact]
+    public async Task A_library_for_this_computer_alone_gives_only_its_https_address()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        cfg.WebHost = "127.0.0.1"; // not listening on the Tailscale IP
+        await using var site = await Site(cfg, store);
+
+        var code = await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/devices/code", new { })));
+
+        Assert.Equal("https://mini.tail1234.ts.net:8443/app/", code["url"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Without_MagicDNS_a_phone_still_gets_a_code_at_the_Tailscale_IP()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        await using var site = await Site(cfg, store, reach: Reach(ts: Tailnet with { Dns = "" }));
+
+        var code = await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/devices/code", new { })));
+
+        Assert.Equal($"http://100.64.0.9:{cfg.WebPort}/app/", code["url"]!.GetValue<string>());
+        Assert.Null(code["secureUrl"]);
     }
 
     [Fact]
@@ -122,7 +152,8 @@ public class PhoneApiTests
         using var dir = new TempDir();
         var (cfg, store) = Library(dir);
         using var _s = store;
-        await using var site = await Site(cfg, store, reach: Reach(ts: Tailnet with { Dns = "" }));
+        // No name and no IP to offer: nowhere the phone could go.
+        await using var site = await Site(cfg, store, reach: Reach(ts: Tailnet with { Dns = "", Ips = [] }));
 
         var r = await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/devices/code", new { }));
         Assert.Equal(HttpStatusCode.Conflict, r.StatusCode);
@@ -169,6 +200,16 @@ public class PhoneApiTests
         var only = list["devices"]!.AsArray().Single()!;
         Assert.Equal(("Sam's iPhone", paired["device"]!["id"]!.GetValue<string>()), (only["name"]!.GetValue<string>(), only["id"]!.GetValue<string>()));
         Assert.NotNull(only["lastSeen"]);
+
+        // At the Tailscale IP over plain http a browser would drop a Secure cookie, so there it isn't one.
+        var atIp = Req(HttpMethod.Post, "/api/v2/devices/pair", new { code = await CodeAsync(site), name = "Pixel" }, key: null);
+        atIp.Headers.Host = "100.64.0.9:8787";
+        var plain = await phone.SendAsync(atIp);
+        await Json(plain);
+        string plainSet = plain.Headers.GetValues("Set-Cookie").Single();
+        Assert.DoesNotContain("secure", plainSet, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=strict", plainSet, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("httponly", plainSet, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
