@@ -563,6 +563,13 @@ public sealed partial class SetupModel : ObservableObject
     /// <summary>A step just opened: the host makes what it needs (the AI and Canvas steps' models).</summary>
     public Action<SetupStep>? OnEnter { get; set; }
     public Action? OnFinish { get; set; }
+    /// <summary>Guided setup is in the same window: its link back ("Set up with Claude instead").</summary>
+    public Action? OnGuided { get; set; }
+    [ObservableProperty] public partial string GuidedLabel { get; set; } = "";
+    public bool HasGuidedLink => OnGuided is not null && GuidedLabel.Length > 0;
+    partial void OnGuidedLabelChanged(string value) => OnPropertyChanged(nameof(HasGuidedLink));
+
+    [RelayCommand] void BackToGuided() => OnGuided?.Invoke();
 
     [RelayCommand] Task AllowMic() => OnAllowMic?.Invoke() ?? Task.CompletedTask;
     /// <summary>The problem's own button (Sound settings for a missing microphone), else the privacy settings.</summary>

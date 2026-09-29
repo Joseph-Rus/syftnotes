@@ -281,9 +281,14 @@
         <!-- The step -->
         <DockPanel Grid.Column="1" Classes="stepcol" Classes.wide="{Binding Wide}">
           <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="40,0">
-            <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+              <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
               <TextBlock Text="Skip for now" FontSize="13" Foreground="{DynamicResource Fg2}" />
             </Button>
+              <Button Name="Guided" Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding HasGuidedLink}" Command="{Binding BackToGuidedCommand}" VerticalAlignment="Center">
+                <TextBlock Text="{Binding GuidedLabel}" FontSize="13" Foreground="{DynamicResource Fg2}" />
+              </Button>
+            </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
               <Button Classes="push fill" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}">
                 <TextBlock Text="Back" FontSize="13" />

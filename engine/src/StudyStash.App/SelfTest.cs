@@ -230,6 +230,7 @@ public static partial class SelfTest
         bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
+        await ByHandAsync();
 
         // Welcome: three choices, starting on just this computer; the self-test is a laptop with its own library.
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps");
@@ -304,6 +305,20 @@ public static partial class SelfTest
         Shot(Shell.Windows.Main, "library-empty");
     }
 
+    /// <summary>A first run opens guided setup on Pick your AI. The self-test finds no AI's CLI (it never installs one
+    /// or reaches an account), so it takes the first screen's picture and goes on by hand, as a student can.</summary>
+    static async Task ByHandAsync()
+    {
+        if (Shell.Windows.Guided is not { } g) return;
+        await Until(() => g.Screen == ViewModels.GuidedScreen.PickAi && g.Steps.Count > 0, 10);
+        Say($"guided setup: {g.Screen}, Claude here: {g.ClaudeHere}, ChatGPT here: {g.CodexHere}");
+        await Wait(1);
+        Shot(Shell.Windows.Setup, "setup-guided-pick");
+        g.ByHandCommand.Execute(null);
+        bool swapped = await Until(() => g.Screen == ViewModels.GuidedScreen.Manual, 5);
+        Say(swapped ? "set up by hand" : "setup by hand didn't open");
+    }
+
     /// <summary>Just this computer: the welcome's first choice makes the library here (listening to this computer
     /// alone), then the microphone, the model, who writes the notes, Canvas (skipped), a class, and start at login (left
     /// off: the self-test never adds a login item).</summary>
@@ -312,6 +327,7 @@ public static partial class SelfTest
         bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
+        await ByHandAsync();
 
         m.ChooseOneComputerCommand.Execute(null);
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps: {string.Join(", ", m.Steps.Select(x => x.Title))}");

@@ -723,6 +723,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     /// <summary>Setup's steps again, from the welcome, with this computer's role kept.</summary>
     [RelayCommand] static void RunSetupAgain() => Shell.RunSetupAgain();
+    /// <summary>The row's quiet link: setup by hand, as it was before guided setup.</summary>
+    [RelayCommand] static void RunSetupByHand() => Shell.RunSetupAgain(byHand: true);
 
     [RelayCommand] static void Quit() => Shell.Quit();
 

@@ -38,7 +38,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
     }
 
     /// <summary>Makes the Chrome helper's model (the app's, over the library's Canvas; tests their own).</summary>
-    public Func<CanvasConnectModel?> MakeCanvas { get; init; } = () => null;
+    public Func<Task<CanvasConnectModel?>> MakeCanvas { get; init; } = () => Task.FromResult<CanvasConnectModel?>(null);
     /// <summary>Sets who writes the notes and answers questions on the library: null when it took it, else why not.</summary>
     public Func<string, Task<string?>>? WriteNotes { get; init; }
     /// <summary>The installer's suggestion (the library download says "library").</summary>
@@ -101,7 +101,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
         switch (card.Kind)
         {
             case "chrome_helper":
-                if (m.Canvas is null && MakeCanvas() is { } made) m.Canvas = made;
+                if (m.Canvas is null && await MakeCanvas() is { } made) m.Canvas = made;
                 if (m.Canvas is not { } c) return "Canvas can't be connected from setup here. The student can do it later in Settings → Canvas.";
                 // The school's address is checked and saved (the library's own setting, as the Canvas step does);
                 // the helper itself is only added when the student presses Add to Chrome.

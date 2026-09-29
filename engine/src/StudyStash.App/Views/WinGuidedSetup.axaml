@@ -210,7 +210,7 @@
     <Style Selector="Border.badge">
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="Padding" Value="6,2" />
-      <Setter Property="Background" Value="{DynamicResource AccentTint}" />
+      <Setter Property="Background" Value="{DynamicResource Subtle2}" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <Style Selector="Border.badge TextBlock">

@@ -290,9 +290,14 @@
           <DockPanel>
             <Border DockPanel.Dock="Bottom" Height="64" Background="{DynamicResource Footer}" BorderBrush="{DynamicResource Sep}" BorderThickness="0,1,0,0" Padding="24,0">
               <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+              <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding OnCanvas}" Command="{Binding SkipCommand}" VerticalAlignment="Center">
                   <TextBlock Text="Skip for now" FontSize="14" Foreground="{DynamicResource AccentText}" />
                 </Button>
+              <Button Name="Guided" Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding HasGuidedLink}" Command="{Binding BackToGuidedCommand}" VerticalAlignment="Center">
+                <TextBlock Text="{Binding GuidedLabel}" FontSize="14" Foreground="{DynamicResource AccentText}" />
+              </Button>
+            </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                   <Button Classes="push" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}"><TextBlock Text="Back" FontSize="14" /></Button>
                   <Button Classes="push default" Command="{Binding NextCommand}" IsEnabled="{Binding CanContinue}"><TextBlock Text="{Binding ContinueLabel}" FontSize="14" /></Button>

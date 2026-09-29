@@ -608,7 +608,12 @@
                         <TextBlock Classes="row-title" Text="Run setup again" />
                         <TextBlock Classes="row-sub" Text="The first-run steps, with what's set up already kept" />
                       </StackPanel>
-                      <Button Grid.Column="1" Classes="pill" Command="{Binding RunSetupAgainCommand}" VerticalAlignment="Center"><TextBlock Text="Run setup" /></Button>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <Button Name="SetUpByHand" Theme="{StaticResource Surface}" Padding="0" Command="{Binding RunSetupByHandCommand}" VerticalAlignment="Center">
+                          <TextBlock Text="Set up by hand" FontSize="12" Foreground="{DynamicResource AccentText}" />
+                        </Button>
+                        <Button Classes="pill" Command="{Binding RunSetupAgainCommand}" VerticalAlignment="Center"><TextBlock Text="Run setup" /></Button>
+                      </StackPanel>
                     </Grid>
                   </Border>
                 </Border>
