@@ -41,6 +41,9 @@ public sealed class AppSettings
     public string Language { get; set; } = "";
     /// <summary>Windows: record what the computer plays too (a lecture on Zoom).</summary>
     public bool ComputerAudio { get; set; }
+    /// <summary>Parakeet's library wouldn't load on this computer (a Windows PC without Microsoft's Visual C++ runtime, say):
+    /// Whisper is the model for it from then on.</summary>
+    public bool ParakeetFailed { get; set; }
     /// <summary>Tell the voices in a lecture apart once it's written down, and say who's speaking in the transcript.</summary>
     public bool Speakers { get; set; }
     /// <summary>Filed lectures' audio is deleted after this many days (the notes and transcript stay). 0 keeps it.</summary>
@@ -240,7 +243,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
         Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log)
         {
-            EngineName = () => Model.Engine == SpeechEngine.Parakeet ? "Parakeet" : "Whisper",
+            EngineName = () => engineName,
             LabelVoices = () => Settings.Speakers && SpeakerModelReady,
             LoadVoices = () => voices?.Invoke() ?? new SherpaSpeakerLabeler(WhisperModels.PathFor(Home, WhisperModels.Speakers)),
         };
@@ -358,7 +361,11 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public HardwareProfile Hardware => hardware.GetAwaiter().GetResult();
 
     /// <summary>The model that keeps up with a lecture on this computer, and why.</summary>
-    public ModelAdvice Advice => WhisperModels.Advise(Hardware);
+    public ModelAdvice Advice => WhisperModels.Advise(Hardware, ParakeetFits);
+
+    /// <summary>Parakeet can be the model for this computer: it reads the lecture's language, and it ran here before (or
+    /// hasn't been tried).</summary>
+    public bool ParakeetFits => ParakeetLanguages.Knows(Settings.Language) && !Settings.ParakeetFailed;
 
     /// <summary>
     /// An install from before models were picked for the computer saved no model: it used large-v3 (or the compact
@@ -394,7 +401,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     {
         var hw = await hardware.ConfigureAwait(false);
         if (ModelFromEnvironment || !Settings.SetupDone || Settings.Role == AppRole.Library) return null;
-        var heaviest = WhisperModels.Heaviest(hw);
+        var heaviest = WhisperModels.Heaviest(hw, ParakeetFits);
         return WhisperModels.Heavier(Model, heaviest.Model) && Settings.ModelSuggested != heaviest.Model.Id ? heaviest : null;
     }
 
@@ -453,16 +460,33 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         _ = DownloadModelAsync(WhisperModels.Speakers);
     }
 
+    /// <summary>What the model being loaded is called, for the words about it (Whisper, or Parakeet).</summary>
+    string engineName = "Whisper";
+
     ITranscriber LoadWhisper()
     {
         if (!ModelReady) throw new InvalidOperationException("The transcription model isn't downloaded yet.");
-        if (ModelFile is null && Model.Engine == SpeechEngine.Parakeet)
+        engineName = ModelFile is null && Model.Engine == SpeechEngine.Parakeet ? "Parakeet" : "Whisper";
+        if (engineName == "Whisper") return new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
+        if (!ParakeetLanguages.Knows(Settings.Language))
+            throw new InvalidOperationException($"Parakeet doesn't read \"{Settings.Language}\": pick a Whisper model in Settings → Recording, or leave the language empty.");
+        try
         {
-            if (!ParakeetLanguages.Knows(Settings.Language))
-                throw new InvalidOperationException($"Parakeet doesn't read \"{Settings.Language}\": pick a Whisper model in Settings → Recording, or leave the language empty.");
             return new ParakeetTranscriber(WhisperModels.PathFor(Home, Model), Settings.Language);
         }
-        return new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
+        catch (Exception e) when (e is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException)
+        {
+            // sherpa-onnx's library won't load here: Whisper takes over, and downloads if it has to.
+            var fallback = WhisperModels.Advise(Hardware, parakeet: false).Model;
+            log($"[model] Parakeet can't load here ({e.GetType().Name}: {e.Message}); switching to {fallback.Name}");
+            Save(s =>
+            {
+                s.ParakeetFailed = true;
+                s.Model = fallback.Id;
+            });
+            _ = DownloadModelAsync(fallback);
+            throw new InvalidOperationException($"Its library won't load on this computer. Study Stash switched to {fallback.Name}, which downloads now.");
+        }
     }
 
     public void Start()

@@ -13,15 +13,17 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
 ## What it does
 
 - **Records and transcribes on your computer.** Click **Record** in the menu bar (Mac) or tray
-  (Windows), or press ⌥⇧R / Ctrl+Alt+R. Whisper transcribes as you go — Metal on Apple silicon,
-  Vulkan or the CPU on Windows — and the audio never leaves your computer. Every computer starts on
-  the compact large-v3 turbo, which keeps up and leaves room for everything else (a computer too weak
-  for it gets a lighter one); the bigger, more accurate models, and NVIDIA's Parakeet (nearly as
-  accurate as the compact turbo, and quick on a processor alone; 25 European languages), are a choice in setup
-  and Settings → Recording. An experimental **Tell speakers apart** there marks in a lecture's
-  transcript ("Speaker 2:") where a voice other than the lecturer's seems to speak; it is careful
-  rather than complete, and can be wrong. While it records, a tiny pill shows the time and the level; pause or stop from the
-  menu bar.
+  (Windows), or press ⌥⇧R / Ctrl+Alt+R. It transcribes as you go, and the audio never leaves your
+  computer. A Mac with Apple silicon or a PC with a graphics card uses Whisper (Metal or Vulkan),
+  starting on the compact large-v3 turbo, which keeps up and leaves room for everything else. A
+  computer with no graphics card Whisper can use, and 4 fast cores and 8 GB of memory, starts on
+  NVIDIA's Parakeet instead (a 2.5 GB download): it's made for the processor, nearly as accurate as
+  the compact turbo, and never makes up words over silence; it reads 25 European languages, and a
+  lecture in another language uses Whisper. A computer too weak for either gets a lighter Whisper.
+  The bigger, more accurate models are a choice in setup and Settings → Recording, where an
+  experimental **Tell speakers apart** also marks in a transcript ("Speaker 2:") where a voice other
+  than the lecturer's seems to speak; it is careful rather than complete, and can be wrong. While it
+  records, a tiny pill shows the time and the level; pause or stop from the menu bar.
 - **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
   to review, written by Ollama (free and private) or by Claude Code, Codex or Gemini with the plan
   you already have. Rewrite a lecture's notes with another engine and keep whichever you like.

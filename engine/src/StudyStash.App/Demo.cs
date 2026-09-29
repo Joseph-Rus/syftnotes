@@ -163,7 +163,7 @@ public static class Demo
     }
 
     /// <summary>Setup's model step on a made-up computer: a Mac with Apple silicon (large-v3, 62% down) or a PC with
-    /// no graphics card Whisper can use (the compact turbo, 62% down); <paramref name="choosing"/> opens the list.</summary>
+    /// no graphics card Whisper can use (Parakeet, 62% down); <paramref name="choosing"/> opens the list.</summary>
     public static void ModelStep(SetupModel m, SkinKind skin, bool choosing = false)
     {
         var hw = skin == SkinKind.Mac
@@ -180,7 +180,7 @@ public static class Demo
         m.ModelProgress = 0.62;
         var done = new DownloadProgress((long)(advice.Model.Bytes * 0.62), advice.Model.Bytes, 0);
         m.ModelDone = done.Amount;
-        m.ModelLeft = skin == SkinKind.Mac ? "About 4 minutes left" : "About a minute left";
+        m.ModelLeft = skin == SkinKind.Mac ? "About 4 minutes left" : "About 2 minutes left";
     }
 
     /// <summary>A library-only computer's dropdown (the Mac mini at home): running, 21 lectures, Canvas synced ten

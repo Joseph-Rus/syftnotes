@@ -33,6 +33,22 @@ public class CompactModelStartTests
     }
 
     [Fact]
+    public void A_PC_with_no_graphics_card_starts_on_Parakeet_unless_the_lecture_is_in_a_language_it_does_not_read()
+    {
+        using var home = new TempHome();
+        using (var host = Host(home, FakeHardware.ProcessorPc()))
+        {
+            Assert.Same(WhisperModels.Parakeet, host.Model);
+            Assert.True(host.ParakeetFits);
+        }
+        using var korean = new TempHome();
+        new AppSettings { Language = "ko" }.Save(korean.Path);
+        using var other = Host(korean, FakeHardware.ProcessorPc());
+        Assert.False(other.ParakeetFits);
+        Assert.Same(WhisperModels.LargeV3TurboSmall, other.Model);
+    }
+
+    [Fact]
     public async Task An_install_on_large_v3_that_its_Mac_keeps_up_with_keeps_it_and_hears_nothing()
     {
         // Saved by setup or Settings.

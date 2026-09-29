@@ -193,7 +193,7 @@ public static class Setup
             if (records && !host.ModelFromEnvironment)
             {
                 s.Model = host.Model.Id;
-                s.ModelSuggested = WhisperModels.Heaviest(host.Hardware).Model.Id;
+                s.ModelSuggested = WhisperModels.Heaviest(host.Hardware, host.ParakeetFits).Model.Id;
             }
         });
         // Only the library's flows ask; a laptop's setup never changes its login items.
