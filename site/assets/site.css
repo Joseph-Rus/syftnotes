@@ -179,6 +179,10 @@ section { padding: clamp(4rem, 9vw, 7rem) 0; }
   .flow li:first-child { border-top: 1.5px solid var(--ink); }
 }
 
+/* The demo, under the four steps. preload="none": nothing downloads until it's played. */
+.demo { margin: clamp(2.5rem, 6vw, 4rem) 0 0; }
+.demo video { display: block; width: 100%; height: auto; border-radius: var(--radius); box-shadow: var(--shot-shadow); background: var(--night); }
+
 /* A feature with its screenshot, alternating sides. */
 .feature { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: clamp(2rem, 6vw, 5rem); align-items: center; }
 .feature + .feature { margin-top: clamp(4rem, 9vw, 7rem); }
