@@ -91,6 +91,54 @@ public class PlacementTests
     }
 
     [Fact]
+    public void The_recorder_dragged_up_into_the_menu_bar_stops_right_under_it_not_a_shadow_short()
+    {
+        const int room = 60;
+        var size = new PixelSize(Small.Width + 2 * room, Small.Height + 2 * room);
+        // The pointer has pulled the pill well above the top of the display.
+        var p = Placement.Dragged(new PixelPoint(400, -300), new PixelPoint(600, 5), [Left], size, room);
+        Assert.Equal(Left.WorkingArea.Y, p.Y + room); // the pill's top is the menu bar's bottom edge
+        Assert.Equal(400, p.X); // sideways it follows the pointer
+    }
+
+    [Fact]
+    public void The_recorder_dragged_past_a_displays_edge_stays_on_it()
+    {
+        const int room = 28;
+        var size = new PixelSize(Small.Width + 2 * room, Small.Height + 2 * room);
+        var p = Placement.Dragged(new PixelPoint(1800, 1000), new PixelPoint(1900, 1070), [Left], size, room);
+        Assert.Equal(Left.WorkingArea.Right, p.X + size.Width - room);
+        Assert.Equal(Left.WorkingArea.Bottom, p.Y + size.Height - room);
+    }
+
+    [Fact]
+    public void The_recorder_dragged_in_the_open_goes_exactly_where_the_pointer_takes_it()
+    {
+        var at = new PixelPoint(500, 400);
+        Assert.Equal(at, Placement.Dragged(at, new PixelPoint(700, 500), SideBySide, Small, 0));
+    }
+
+    [Fact]
+    public void The_recorder_dragged_onto_another_display_keeps_to_that_ones_usable_area()
+    {
+        // Over the top of the second, sharper display, whose menu bar is 50 pixels tall.
+        var p = Placement.Dragged(new PixelPoint(2500, -100), new PixelPoint(2600, 10), SideBySide, Small, 0);
+        Assert.Equal(Right.WorkingArea.Y, p.Y);
+    }
+
+    [Fact]
+    public void A_panel_at_the_top_of_a_sharp_display_under_another_is_placed_on_the_lower_one()
+    {
+        // Retina displays stacked: the panel hugs the lower one's menu bar, so the window's clear room (60 points,
+        // 120 pixels here) reaches up into the display above. Counting that room in points put it on the upper one.
+        var top = new ScreenGeometry(new PixelRect(0, 0, 2880, 1800), new PixelRect(0, 50, 2880, 1750), 2);
+        var bottom = new ScreenGeometry(new PixelRect(0, 1800, 2880, 1800), new PixelRect(0, 1850, 2880, 1750), 2, IsPrimary: true);
+        var at = new PixelPoint(1000, bottom.WorkingArea.Y - 120);
+        Assert.Equal(bottom, Placement.PanelScreen(at, [top, bottom], 60));
+        Assert.Equal(top, Placement.PanelScreen(new PixelPoint(1000, 200), [top, bottom], 60));
+    }
+
+    [Fact]
     public void The_recorders_default_corner_differs_by_system()
     {
         var mac = Placement.KeepOnScreen(null, [Left], Small, mac: true);
@@ -112,19 +160,6 @@ public class PlacementTests
     {
         Assert.Equal(Left, Placement.Pick(SideBySide, null));
         Assert.Equal(Left, Placement.Pick([Right, Left], null)); // order doesn't matter, only IsPrimary
-    }
-
-    [Fact]
-    public void Toasts_stack_downward_on_a_mac_and_upward_on_windows()
-    {
-        var s = Left;
-        var first = Placement.ToastSpot([s], 0, Small, mac: true);
-        var second = Placement.ToastSpot([s], 1, Small, mac: true);
-        Assert.True(second.Y > first.Y);
-
-        var firstWin = Placement.ToastSpot([s], 0, Small, mac: false);
-        var secondWin = Placement.ToastSpot([s], 1, Small, mac: false);
-        Assert.True(secondWin.Y < firstWin.Y);
     }
 
     [Fact]

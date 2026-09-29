@@ -1,4 +1,4 @@
-<!-- A notification that looks like the system's own: one plain panel, the app's icon, a title, a line or two, and at
+<!-- A notification that looks like the system's own: one plain panel, the app's icon, a title, a few lines, and at
      most two quiet buttons. On a Mac, a banner (the × shows when the pointer is over it); on Windows, a Windows 11
      toast (the app's name and × along the top). Every toast the app shows, Canvas's included, is one of these. -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -69,7 +69,7 @@
             </Panel>
           </Grid>
           <TextBlock Name="BodyText" Text="{Binding #Root.Text}" IsVisible="{Binding #Root.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                     FontSize="12" LineHeight="16" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                     FontSize="12" LineHeight="16" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
           <Grid Name="Actions" Margin="0,8,0,0">
             <Button Name="ActionButton" Classes="toast-btn">
               <TextBlock Text="{Binding #Root.ActionLabel}" FontSize="12" FontWeight="Medium" />

@@ -40,6 +40,8 @@ public interface IProblemSource
     LibraryServiceState? LocalLibraryState { get; }
     string? LocalLibraryFailure { get; }
     LibraryState Library { get; }
+    /// <summary>The transcription model this computer uses (its size, for the download).</summary>
+    WhisperModel Model { get; }
 }
 
 /// <summary>
@@ -54,49 +56,52 @@ public static class Problems
     static string WithoutPrefix(string text, string prefix) =>
         text.StartsWith(prefix, StringComparison.Ordinal) ? text[prefix.Length..].Trim() : text;
 
-    public static AppProblem? For(IProblemSource host)
+    /// <summary>The most pressing problem right now, or null when all's well.</summary>
+    public static AppProblem? For(IProblemSource host) => All(host).FirstOrDefault();
+
+    /// <summary>Every problem there is right now, most pressing first (a notification is said for each that starts,
+    /// and goes when it's over, whatever's ahead of it).</summary>
+    public static IEnumerable<AppProblem> All(IProblemSource host)
     {
         string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
 
         if (host.RecorderProblem == RecordingWords.DiskFull)
-            return new(ProblemKind.DiskFull, "Your disk is full", "Free some space to record.", "");
+            yield return new(ProblemKind.DiskFull, "Your disk is full", "Free some space to record.", "");
 
         var mic = host.MicAccess();
         if (mic is MicAccess.Denied or MicAccess.Restricted)
         {
             var denied = MicTrouble.Denied();
-            return new(ProblemKind.MicDenied, denied.Title, denied.Detail, denied.ActionLabel);
+            yield return new(ProblemKind.MicDenied, denied.Title, denied.Detail, denied.ActionLabel);
         }
 
         if (host.RecorderProblem == RecordingWords.MicStopped)
-            return new(ProblemKind.NoMic, "No microphone", "Plug one in, or check the sound settings.", "");
+            yield return new(ProblemKind.NoMic, "No microphone", "Plug one in, or check the sound settings.", "");
 
         if (host.WhisperProblem is { } whisper)
-            return new(ProblemKind.WhisperFailed, "Whisper couldn't start", WithoutPrefix(whisper, "Whisper couldn't start: "), "Download again");
+            yield return new(ProblemKind.WhisperFailed, "Whisper couldn't start", WithoutPrefix(whisper, "Whisper couldn't start: "), "Download again");
 
         if (host.DownloadProblem is { } download)
-            return new(ProblemKind.DownloadFailed, "The download stopped", download, "Try again");
+            yield return new(ProblemKind.DownloadFailed, "The download stopped", download, "Try again");
 
         if (!host.ModelReady && host.Downloading is null)
-            return new(ProblemKind.NoModel, "Download the transcription model", "Recording starts once it's here, about 3 GB.", "Download");
+            yield return new(ProblemKind.NoModel, "Download the transcription model", $"Recording starts once it's here, about {Setup.About(host.Model.Bytes)}.", "Download");
 
         if (!host.ModelReady && host.Downloading is { } d)
-            return new(ProblemKind.Downloading, "Downloading the transcription model",
+            yield return new(ProblemKind.Downloading, "Downloading the transcription model",
                 $"{d.Amount}" + (d.Left() is { } left ? $" · {left}" : ""), "");
 
         if (host.Role != AppRole.Laptop && host.LocalLibraryState is LibraryServiceState.Stopped or LibraryServiceState.Failed or LibraryServiceState.PortTaken)
-            return new(ProblemKind.LibraryStopped, "Your library isn't running",
+            yield return new(ProblemKind.LibraryStopped, "Your library isn't running",
                 host.LocalLibraryFailure ?? "Start it to keep recording lectures.", "Start it");
 
         if (host.Library == LibraryState.WrongPassword)
-            return new(ProblemKind.WrongPassword, "Library password changed", "Type the new one in Settings to keep sending lectures.", "Settings");
+            yield return new(ProblemKind.WrongPassword, "Library password changed", "Type the new one in Settings to keep sending lectures.", "Settings");
 
         if (host.Library == LibraryState.Unreachable)
-            return new(ProblemKind.Unreachable, "Can't reach your library", $"Lectures you record wait on this {device} and go when it's back.", "");
+            yield return new(ProblemKind.Unreachable, "Can't reach your library", $"Lectures you record wait on this {device} and go when it's back.", "");
 
         if (host.Library == LibraryState.NotSetUp)
-            return new(ProblemKind.NotSetUp, "No library yet", "Connect to your library in Settings.", "Settings");
-
-        return null;
+            yield return new(ProblemKind.NotSetUp, "No library yet", "Connect to your library in Settings.", "Settings");
     }
 }

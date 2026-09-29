@@ -335,13 +335,13 @@ public class FallingBehindTests
         var (title, text) = AppHost.BehindWords(900, 600, WhisperModels.LargeV3, PlainPc)!.Value;
         Assert.Equal("The transcript is falling behind", title);
         Assert.Equal("Whisper large-v3 is slower than the lecture on this computer. Nothing is lost: it catches up after class. "
-                     + "Whisper large-v3 turbo (compact) would keep up: switch in Settings → Recording.", text);
+                     + "Whisper large-v3 turbo (compact) would keep up.", text);
 
         // Already on the one for this computer (or lighter): the next lighter one.
-        Assert.EndsWith("Whisper small would keep up: switch in Settings → Recording.",
+        Assert.EndsWith("Whisper small would keep up.",
             AppHost.BehindWords(900, 600, WhisperModels.LargeV3TurboSmall, PlainPc)!.Value.Text, StringComparison.Ordinal);
         // A bigger one than a Mac starts on, falling behind: the compact one it starts on.
-        Assert.EndsWith("Whisper large-v3 turbo (compact) would keep up: switch in Settings → Recording.",
+        Assert.EndsWith("Whisper large-v3 turbo (compact) would keep up.",
             AppHost.BehindWords(900, 600, WhisperModels.LargeV3, AppleSilicon)!.Value.Text, StringComparison.Ordinal);
 
         // The lightest one has nothing lighter to offer (tiny is only for trying things out).

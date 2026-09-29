@@ -89,6 +89,15 @@ jobs:
             ${{ runner.temp }}\shots\richwin-*
             ${{ runner.temp }}\shots\rich-*-win-*
           if-no-files-found: error
+      - name: Notifications, as Windows draws them, where they land above the taskbar
+        if: ${{ always() && runner.os == 'Windows' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-notifications
+          path: |
+            ${{ runner.temp }}\shots\win-12-notify-*
+            ${{ runner.temp }}\shots\win-12-toast-*
+          if-no-files-found: error
 
   # The Mac app: one universal bundle for Apple silicon and Intel, started by its own launcher (D1); ad hoc
   # signed with the microphone entitlement; both roles' DMGs (D2). Proved with the real self-test (D5): real

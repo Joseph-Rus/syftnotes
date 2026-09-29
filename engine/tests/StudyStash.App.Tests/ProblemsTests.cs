@@ -20,6 +20,7 @@ sealed class FakeProblemSource : IProblemSource
     public LibraryServiceState? LocalLibraryState { get; set; }
     public string? LocalLibraryFailure { get; set; }
     public LibraryState Library { get; set; } = LibraryState.Connected;
+    public WhisperModel Model { get; set; } = WhisperModels.LargeV3TurboSmall;
 }
 
 /// <summary>What's wrong right now, in the order it's decided (<see cref="Problems.For"/>).</summary>
@@ -29,6 +30,28 @@ public class ProblemsTests
 
     [Fact]
     public void Nothing_is_wrong_once_the_library_and_the_model_are_ready() => Assert.Null(Problems.For(Ready()));
+
+    [Fact]
+    public void Every_problem_there_is_is_listed_most_pressing_first()
+    {
+        var host = Ready();
+        host.WhisperProblem = "Whisper couldn't start: the model file is damaged";
+        host.Library = LibraryState.WrongPassword;
+        Assert.Equal([ProblemKind.WhisperFailed, ProblemKind.WrongPassword], Problems.All(host).Select(p => p.Kind));
+        Assert.Equal(ProblemKind.WhisperFailed, Problems.For(host)!.Kind);
+        Assert.Empty(Problems.All(Ready()));
+    }
+
+    [Fact]
+    public void The_model_to_download_says_its_own_size()
+    {
+        var host = Ready();
+        host.ModelReady = false;
+        host.Model = WhisperModels.LargeV3TurboSmall;
+        Assert.Equal("Recording starts once it's here, about 574 MB.", Problems.For(host)!.Detail);
+        host.Model = WhisperModels.LargeV3;
+        Assert.Equal("Recording starts once it's here, about 3 GB.", Problems.For(host)!.Detail);
+    }
 
     [Fact]
     public void A_full_disk_comes_first_even_with_every_other_problem_too()

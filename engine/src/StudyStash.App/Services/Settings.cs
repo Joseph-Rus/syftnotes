@@ -213,6 +213,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
     public string Version => Engine.Version;
 
+    /// <summary>Hands a web page to the system's browser; a test catches it here instead.</summary>
+    public Action<string> OpenUrl { get; set; } = url => Dialogs.OpenUrl(url);
+
     public bool OnConnection => Section == "Connection";
     public bool OnRecording => Section == "Recording";
     public bool OnLibrary => Section == "Library";
@@ -727,6 +730,10 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [RelayCommand] static void RunSetupByHand() => Shell.RunSetupAgain(byHand: true);
 
     [RelayCommand] static void Quit() => Shell.Quit();
+
+    /// <summary>About's "Buy us more Claude usage": the team's Ko-fi page, in the browser, and the library window
+    /// won't ask for a tip after that.</summary>
+    [RelayCommand] void BuyClaudeUsage() => SupportAsk.Answer(host, SupportAnswer.Tip, OpenUrl, DateTimeOffset.Now);
 
     public void Dispose()
     {

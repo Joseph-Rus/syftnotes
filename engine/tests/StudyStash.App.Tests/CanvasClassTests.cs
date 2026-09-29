@@ -202,6 +202,24 @@ public class CanvasClassTests
     }
 
     [Fact]
+    public void A_notifications_announcement_opens_in_its_reader_on_the_announcements_tab()
+    {
+        var model = Shown();
+        CanvasReaderModel? reader = null;
+        model.OnReader = r => reader = r;
+        Assert.Equal(ClassTab.Lectures, model.Tab);
+
+        Assert.True(model.OpenAnnouncement("an2"));
+        Assert.Equal(ClassTab.Announcements, model.Tab);
+        Assert.Equal("Lab 3 posted", reader!.Title);
+
+        // One this class hasn't got (any more): nothing opens.
+        reader = null;
+        Assert.False(model.OpenAnnouncement("an99"));
+        Assert.Null(reader);
+    }
+
+    [Fact]
     public void Reopening_an_already_read_announcement_posts_nothing_again()
     {
         var model = Shown();

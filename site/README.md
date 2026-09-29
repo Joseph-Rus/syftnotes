@@ -12,7 +12,7 @@ site/
   terms/index.html    terms of use (MIT, as is)
   support/index.html  support: GitHub issues, private security reports
   404.html            the page for a missing address
-  assets/             site.css, site.js, the icon, favicon, social picture and screenshots (WebP)
+  assets/             site.css, site.js, the icon, favicon, social picture, screenshots (WebP) and the demo video
   check.mjs           the check CI runs before publishing (not published)
 ```
 
