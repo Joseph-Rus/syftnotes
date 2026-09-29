@@ -41,6 +41,8 @@ public sealed class GuidedServices
     /// <summary>How far the model's download has got, while it downloads.</summary>
     public Func<double?> Downloading { get; init; } = () => null;
     public Func<DateTime> Now { get; init; } = () => DateTime.Now;
+    /// <summary>A line in the app's log (a turn Study Stash stopped, and why).</summary>
+    public Action<string> Log { get; init; } = _ => { };
     /// <summary>Runs something on the window's thread (a CLI's events come from its own).</summary>
     public Action<Action> Post { get; init; } = a => Dispatcher.UIThread.Post(a);
 
@@ -77,7 +79,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     string session = "";
     string lastPrompt = "";
     string? question;
-    bool chatStarted;
+    bool chatStarted, opened;
 
     public GuidedSetupModel(SetupModel setup, GuidedServices services, Func<AppSettings> settings, Action<Action<AppSettings>> save)
     {
@@ -307,6 +309,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// </summary>
     public async Task OpenAsync()
     {
+        opened = true;
         var (claude, codex) = await Task.Run(() => (services.Find(AgentCli.Claude), services.Find(AgentCli.Codex)));
         ClaudeFound = claude;
         CodexFound = codex;
@@ -373,6 +376,13 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void BackToChat()
     {
+        if (!opened)
+        {
+            // Setup by hand came first (Settings' link): guided setup starts from the top.
+            Screen = GuidedScreen.PickAi;
+            _ = OpenAsync();
+            return;
+        }
         if (!AiReady || !chatStarted)
         {
             Screen = Picked.Length > 0 && AiReady ? GuidedScreen.Chat : GuidedScreen.PickAi;
@@ -753,6 +763,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     void ShowTrouble(ChatProblem kind, string said)
     {
+        // What the CLI said holds no secrets (the token only ever reaches its environment): kept for support.
+        services.Log($"[setup] {Cli.Name} turn stopped: {kind}: {Py.Head(said, 300)}");
         switch (kind)
         {
             case ChatProblem.Auth:

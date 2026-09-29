@@ -976,7 +976,11 @@ public static partial class Shell
         var manualView = Skin.Current == SkinKind.Mac ? (Control)new MacSetup { DataContext = setup, DrawChrome = false } : new WinSetup { DataContext = setup, DrawChrome = false };
         var guided = guidedSetup = MakeGuided(model);
         var guidedView = Skin.Current == SkinKind.Mac ? (Control)new MacGuidedSetup { DataContext = guided, DrawChrome = false } : new WinGuidedSetup { DataContext = guided, DrawChrome = false };
-        if (byHand) guided.Screen = GuidedScreen.Manual;
+        if (byHand)
+        {
+            guided.Screen = GuidedScreen.Manual;
+            model.GuidedLabel = "Set up with an AI instead";
+        }
         var view = byHand ? manualView : guidedView;
         var w = new Window
         {
@@ -1096,6 +1100,7 @@ public static partial class Shell
                 }
             },
             Downloading = () => host.Downloading?.Fraction,
+            Log = host.Log,
         };
         return new GuidedSetupModel(model, services, () => host.Settings, host.Save);
     }

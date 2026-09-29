@@ -393,6 +393,18 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
+    public async Task Setup_by_hand_from_settings_can_still_turn_to_an_ai()
+    {
+        await using var rig = await new Rig(installed: true).OpenAsync(open: false);
+        var g = rig.Guided;
+        g.Screen = GuidedScreen.Manual;
+        g.BackToChatCommand.Execute(null);
+        await Until(() => g.ClaudeHere, "the CLIs to be looked for");
+        Assert.Equal(GuidedScreen.PickAi, g.Screen);
+        Assert.Equal(0, FakeAgents.Turns(rig.Bin));
+    }
+
+    [AvaloniaFact]
     public async Task A_window_closed_part_way_picks_the_conversation_up_again()
     {
         await using var rig = await new Rig(installed: true, signedIn: true,
