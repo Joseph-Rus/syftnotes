@@ -10,20 +10,48 @@
              x:Name="Root"
              Width="356" ClipToBounds="False">
   <UserControl.Styles>
+    <Style Selector="TextBlock#TitleText">
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+    <Style Selector="TextBlock#BodyText">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="LineHeight" Value="16" />
+    </Style>
+    <!-- A Mac banner's buttons: small grey capsules, as the Liquid Glass look's own. -->
     <Style Selector="Button.toast-btn">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Height" Value="24" />
       <Setter Property="MinWidth" Value="64" />
       <Setter Property="Padding" Value="12,0" />
-      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="CornerRadius" Value="12" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="Background" Value="{DynamicResource Fill2}" />
     </Style>
+    <Style Selector="Button.toast-btn TextBlock">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+    <!-- Windows 11's: standard buttons (the control fill and its edge), sharing the width. -->
     <Style Selector="v|ToastView.win Button.toast-btn">
       <Setter Property="Height" Value="32" />
       <Setter Property="CornerRadius" Value="4" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
-      <Setter Property="Background" Value="{DynamicResource Subtle2}" />
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="v|ToastView.win Button.toast-btn TextBlock">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Normal" />
+    </Style>
+    <!-- Windows 11 sets a toast's words larger than a Mac banner's. -->
+    <Style Selector="v|ToastView.win TextBlock#TitleText">
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="v|ToastView.win TextBlock#BodyText">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="LineHeight" Value="18" />
     </Style>
     <!-- Windows' × is in its header. A Mac banner shows its × only under the pointer, where the time was. -->
     <Style Selector="v|ToastView.win Button#MacClose">
@@ -55,9 +83,9 @@
         <Border Name="MacIcon" Width="32" Height="32" CornerRadius="7" ClipToBounds="True" Margin="0,1,10,0" VerticalAlignment="Top">
           <Image Source="avares://StudyStash/Assets/icon.png" RenderOptions.BitmapInterpolationMode="HighQuality" />
         </Border>
-        <StackPanel Grid.Column="1" Spacing="1">
+        <StackPanel Name="Words" Grid.Column="1" Spacing="1">
           <Grid ColumnDefinitions="*,Auto" MinHeight="18">
-            <TextBlock Name="TitleText" Text="{Binding #Root.Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+            <TextBlock Name="TitleText" Text="{Binding #Root.Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
             <Panel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
               <TextBlock Name="WhenText" Text="{Binding #Root.When}" IsVisible="{Binding #Root.When, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
@@ -69,13 +97,13 @@
             </Panel>
           </Grid>
           <TextBlock Name="BodyText" Text="{Binding #Root.Text}" IsVisible="{Binding #Root.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                     FontSize="12" LineHeight="16" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
+                     Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
           <Grid Name="Actions" Margin="0,8,0,0">
             <Button Name="ActionButton" Classes="toast-btn">
-              <TextBlock Text="{Binding #Root.ActionLabel}" FontSize="12" FontWeight="Medium" />
+              <TextBlock Text="{Binding #Root.ActionLabel}" />
             </Button>
             <Button Name="SecondButton" Classes="toast-btn">
-              <TextBlock Text="{Binding #Root.SecondLabel}" FontSize="12" FontWeight="Medium" />
+              <TextBlock Text="{Binding #Root.SecondLabel}" />
             </Button>
           </Grid>
         </StackPanel>

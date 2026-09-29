@@ -59,6 +59,9 @@ public partial class ToastView : UserControl
         Bind(Card, Border.BoxShadowProperty, "PopupShadow");
         WinHeader.IsVisible = !mac;
         MacIcon.IsVisible = mac;
+        // Windows 11 leaves a little more air between a toast's title, words and buttons than a Mac banner does.
+        Words.Spacing = mac ? 1 : 2;
+        Actions.Margin = new Thickness(0, mac ? 8 : 12, 0, 0);
         LayOutActions();
     }
 
