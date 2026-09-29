@@ -8,9 +8,9 @@ namespace StudyStash.App.Platform;
 /// <summary>A Mac window with its own 52 px title bar (<see cref="WindowHeader"/>): the traffic lights sit centred in
 /// it, the way a Finder or Notes window has them. Avalonia leaves them at the plain title bar's spot, near the top
 /// edge; an empty unified toolbar is the system's own way to give a window the taller bar, so that's what it adds.
-/// In full screen the toolbar stays, the way a native window keeps its own toolbar row: macOS shows the lights only when
-/// the menu bar slides down, on a strip of the toolbar's height, which it would paint grey across the header. That
-/// strip is cleared, so at rest the header is just the header and on the reveal the lights sit centred in it.
+/// In full screen the toolbar comes off: macOS would keep it on show there as a layer over the header that takes the
+/// header's clicks. The lights then come down with the menu bar on the system's own strip, cleared of its grey, so at
+/// rest the header is just the header; out of full screen the toolbar goes back.
 /// Anything missing (another OS, no window handle) leaves the window as it was.</summary>
 public static class MacTitleBar
 {
@@ -65,6 +65,10 @@ public static class MacTitleBar
             // outlast the first try. The title bar stays clear too (full screen from the green button would make
             // it opaque again).
             ObjC.SendByte(ns, ObjC.Sel("setTitlebarAppearsTransparent:"), 1);
+            // No toolbar in full screen: there macOS keeps a window's toolbar on show, as a layer of its own over the
+            // top of the window, and that layer takes the clicks meant for the header's buttons (Settings, search,
+            // Open in Canvas) even once it's been cleared. Out of full screen, the next Apply puts it back.
+            if (hasToolbar) ObjC.Send(ns, ObjC.Sel("setToolbar:"), IntPtr.Zero);
             int cleared = ClearFullScreenStrip(ns);
             foreach (int ms in new[] { 800, 2000 })
                 DispatcherTimer.RunOnce(() =>
@@ -73,6 +77,7 @@ public static class MacTitleBar
                     try
                     {
                         ObjC.SendByte(ns, ObjC.Sel("setTitlebarAppearsTransparent:"), 1);
+                        if (ObjC.Send(ns, ObjC.Sel("toolbar")) != IntPtr.Zero) ObjC.Send(ns, ObjC.Sel("setToolbar:"), IntPtr.Zero);
                         int n = ClearFullScreenStrip(ns);
                         if (n > 0) Program.Log($"[chrome] \"{window.Title}\": full screen's title strip is clear ({n} backgrounds and shadows hidden)");
                     }
@@ -80,7 +85,7 @@ public static class MacTitleBar
                     {
                     }
                 }, TimeSpan.FromMilliseconds(ms));
-            if (hasToolbar) return $"come down with the menu bar in full screen, centred in the header on a clear strip ({cleared} backgrounds and shadows hidden now)";
+            return $"come down with the menu bar in full screen, the toolbar off so the header takes its clicks ({cleared} backgrounds and shadows hidden now)";
         }
         before = LightsCentre(ns);
         if (!hasToolbar)
