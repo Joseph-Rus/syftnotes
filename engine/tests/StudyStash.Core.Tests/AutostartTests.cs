@@ -208,9 +208,17 @@ public class AutostartTests
         }
         else
         {
-            var count = Machine.Run("powershell", ["-NoProfile", "-Command",
-                $"@(Get-CimInstance Win32_Process | Where-Object {{ {Autostart.PsFilter} }}).Count"], TimeSpan.FromSeconds(60));
-            Assert.True(count is not null && Py.Strip(count.Stdout) == "0", "a library is running on this computer: not touching it");
+            // The app's tests run alongside these and start libraries of their own for half a minute at a time, so a
+            // library running now is waited out for two minutes before it's taken for one that's really in use.
+            bool none = false;
+            for (var waited = Stopwatch.StartNew(); !none && waited.Elapsed < TimeSpan.FromMinutes(2); )
+            {
+                var count = Machine.Run("powershell", ["-NoProfile", "-Command",
+                    $"@(Get-CimInstance Win32_Process | Where-Object {{ {Autostart.PsFilter} }}).Count"], TimeSpan.FromSeconds(60));
+                none = count is not null && Py.Strip(count.Stdout) == "0";
+                if (!none) await Task.Delay(TimeSpan.FromSeconds(3));
+            }
+            Assert.True(none, "a library is running on this computer: not touching it");
         }
         string exe = BuiltEngine();
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
