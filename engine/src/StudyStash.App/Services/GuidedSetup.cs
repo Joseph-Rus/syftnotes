@@ -390,6 +390,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
             case nameof(SetupModel.MicHeard) when m.MicHeard && !micSaid && g.OpenCard is { IsMicrophone: true } mic:
                 micSaid = true;
                 Fold(mic, "Study Stash hears you");
+                m.MicCheckOpen = false;
                 g.Note("Microphone allowed · Study Stash hears you", "The microphone is allowed and Study Stash hears the student.");
                 break;
             case nameof(SetupModel.MicDenied) or nameof(SetupModel.MicTrouble) when m.ShowMicProblem && !deniedSaid && g.OpenCard is { IsMicrophone: true, Open: true }:
