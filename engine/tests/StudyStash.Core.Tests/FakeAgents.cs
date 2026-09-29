@@ -31,8 +31,11 @@ public static class FakeAgents
         if (OperatingSystem.IsWindows())
         {
             File.WriteAllText(Path.Combine(bin, id + ".ps1"), PowerShellCli(id, version));
+            // Its arguments go to PowerShell in the environment, as the command line cmd.exe was given, and are split there
+            // the way a Windows program splits its own: PowerShell's -File would read a bare "-" (Codex's "the prompt is on
+            // the input") as a parameter with no name, and refuse to start.
             File.WriteAllText(ExePath(bin, id),
-                $"@echo off\r\npowershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"%~dp0{id}.ps1\" %*\r\nexit /b %ERRORLEVEL%\r\n");
+                $"@echo off\r\nset FAKE_ARGS=%*\r\npowershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"%~dp0{id}.ps1\"\r\nexit /b %ERRORLEVEL%\r\n");
         }
         else
         {
@@ -105,19 +108,49 @@ public static class FakeAgents
     static string PowerShellCli(string id, string version) => $$"""
         $D = Split-Path -Parent $MyInvocation.MyCommand.Path
         $ID = '{{id}}'
-        if ($args.Count -gt 0 -and $args[0] -eq '--version') {
+        function Split-Args([string]$s) {
+          $list = New-Object System.Collections.Generic.List[string]
+          $i = 0; $n = $s.Length
+          while ($true) {
+            while ($i -lt $n -and ($s[$i] -eq ' ' -or $s[$i] -eq "`t")) { $i++ }
+            if ($i -ge $n) { break }
+            $sb = New-Object System.Text.StringBuilder
+            $inq = $false
+            while ($i -lt $n) {
+              $c = $s[$i]
+              if (-not $inq -and ($c -eq ' ' -or $c -eq "`t")) { break }
+              if ($c -eq '\') {
+                $k = 0; while ($i -lt $n -and $s[$i] -eq '\') { $k++; $i++ }
+                if ($i -lt $n -and $s[$i] -eq '"') {
+                  [void]$sb.Append('\' * [int][math]::Floor($k / 2))
+                  if ($k % 2 -eq 1) { [void]$sb.Append('"'); $i++ }
+                } else { [void]$sb.Append('\' * $k) }
+                continue
+              }
+              if ($c -eq '"') {
+                if ($inq -and $i + 1 -lt $n -and $s[$i + 1] -eq '"') { [void]$sb.Append('"'); $i += 2; continue }
+                $inq = -not $inq; $i++; continue
+              }
+              [void]$sb.Append($c); $i++
+            }
+            $list.Add($sb.ToString())
+          }
+          return ,$list.ToArray()
+        }
+        $argv = Split-Args ([string]$env:FAKE_ARGS)
+        if ($argv.Count -gt 0 -and $argv[0] -eq '--version') {
           if (Test-Path "$D\broken") { [Console]::Error.WriteLine('it will not start'); exit 1 }
           '{{version}}'; exit 0
         }
-        if ($ID -eq 'claude' -and $args[0] -eq 'auth' -and $args[1] -eq 'status') {
+        if ($ID -eq 'claude' -and $argv[0] -eq 'auth' -and $argv[1] -eq 'status') {
           if (Test-Path "$D\signed-in") { '{"loggedIn":true,"authMethod":"claude.ai","subscriptionType":"pro","email":"someone@example.com","orgId":"org-fake"}'; exit 0 }
           '{"loggedIn":false}'; exit 1
         }
-        if ($ID -eq 'codex' -and $args[0] -eq 'login' -and $args[1] -eq 'status') {
+        if ($ID -eq 'codex' -and $argv[0] -eq 'login' -and $argv[1] -eq 'status') {
           if (Test-Path "$D\signed-in") { 'Logged in using an API key - sk-proj-***FAKEKEY42'; exit 0 }
           'Not logged in'; exit 1
         }
-        if (($ID -eq 'claude' -and $args[0] -eq 'auth' -and $args[1] -eq 'login') -or ($ID -eq 'codex' -and $args[0] -eq 'login')) {
+        if (($ID -eq 'claude' -and $argv[0] -eq 'auth' -and $argv[1] -eq 'login') -or ($ID -eq 'codex' -and $argv[0] -eq 'login')) {
           'Opening your browser to sign in: https://example.com/fake-sign-in?code=abc'
           if (Test-Path "$D\login-fails") { [Console]::Error.WriteLine('Raw mode is not supported'); exit 1 }
           $delay = 1; if (Test-Path "$D\login-delay") { $delay = [int](Get-Content "$D\login-delay") }
@@ -127,7 +160,7 @@ public static class FakeAgents
         $n = 1 + [int](Get-Content "$D\turns" -ErrorAction SilentlyContinue)
         Set-Content "$D\turns" $n
         Set-Content "$D\pid-$n" $PID
-        $args | Set-Content "$D\argv-$n.txt"
+        $argv | Set-Content "$D\argv-$n.txt"
         Get-ChildItem env: | ForEach-Object { $_.Name } | Sort-Object | Set-Content "$D\env-$n.txt"
         [Console]::In.ReadToEnd() | Set-Content "$D\stdin-$n.txt"
         $f = "$D\replay-$n.jsonl"; if (-not (Test-Path $f)) { $f = "$D\replay.jsonl" }
@@ -161,6 +194,7 @@ public static class FakeAgents
                   'memory' { 'Setting up Claude Code...'; [Console]::Error.WriteLine('Installation was killed before it could finish (exit code 137). This usually means the system ran out of memory.'); exit 137 }
                   'other' { [Console]::Error.WriteLine('Checksum verification failed'); exit 1 }
                   'slow' {
+                    New-Item -ItemType Directory -Force $bin | Out-Null
                     Set-Content "$bin\installer.pid" $PID
                     $c = Start-Process -FilePath ping.exe -ArgumentList '-n','300','127.0.0.1' -NoNewWindow -PassThru
                     Set-Content "$bin\child.pid" $c.Id

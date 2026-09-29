@@ -217,7 +217,7 @@ public sealed class GuidedSetupTests
         Assert.True(rig.Setup.LibraryOk, rig.Setup.LibraryResult);
         Assert.False(card.Open);
         Assert.Equal(ChecklistState.Done, rig.Item("computer").State);
-        Assert.Equal(OperatingSystem.IsWindows() ? "Just this PC" : "Just this Mac", rig.Item("computer").Title);
+        Assert.Equal($"Just this {rig.Setup.DeviceWord}", rig.Item("computer").Title);
         Assert.Equal(["claude"], rig.Writers);
         Assert.Equal(ChecklistState.Done, rig.Item("notes").State);
         Assert.Contains(g.Thread.OfType<NoteEntry>(), n => n.Text.StartsWith("Your library is ready", StringComparison.Ordinal));
@@ -428,7 +428,8 @@ public sealed class GuidedSetupTests
         await using var rig = await new Rig(installed: true, signedIn: true).OpenAsync();
         var g = rig.Guided;
         Assert.True(g.ClaudeHere);
-        Assert.Equal(OperatingSystem.IsWindows() ? "Already on this PC" : "Already on this Mac", g.AlreadyHere);
+        // The device is the look's word: "Mac" in the Mac look, "PC" in Windows'.
+        Assert.Equal($"Already on this {rig.Setup.DeviceWord}", g.AlreadyHere);
         g.PickCommand.Execute("claude");
         FakeAgents.Replay(rig.Bin, [Done("ready", "p-1")], 1);
         await g.ContinueCommand.ExecuteAsync(null);
