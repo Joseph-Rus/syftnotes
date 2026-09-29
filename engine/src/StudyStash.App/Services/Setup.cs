@@ -129,7 +129,7 @@ public static class Setup
 
     /// <summary>The models to pick from, the one for this computer marked (and picked, unless another already was),
     /// with one line why it suits this computer.</summary>
-    static void ShowModels(SetupModel m, AppHost host)
+    internal static void ShowModels(SetupModel m, AppHost host)
     {
         var advice = host.Advice;
         m.Models.Clear();
@@ -214,6 +214,9 @@ public static class Setup
         return OperatingSystem.IsMacOS() && !name.Contains('.', StringComparison.Ordinal) ? name + ".local" : name;
     }
 
+    /// <summary>The library's addresses, found the usual way (its name at home, and Tailscale's).</summary>
+    public static Task FillAddressesAsync(SetupModel m, AppHost host) => FillAddressesAsync(m, host, () => HostInfo.Tailscale(), LanName);
+
     /// <summary>The library's last page: its address at home straight away, then its Tailscale one if Tailscale is on
     /// (asking Tailscale takes a moment, so it comes second).</summary>
     public static async Task FillAddressesAsync(SetupModel m, AppHost host, Func<TailscaleInfo> tailscale, Func<string> hostName)
@@ -232,7 +235,7 @@ public static class Setup
     /// tried whenever the privacy switches aren't off: opening is what tells "no microphone" apart.</summary>
     public static void TickMic(SetupModel m, AppHost host, MicCheck mic, bool windows)
     {
-        if (m.OnMicrophone && !m.MicDenied && (m.MicAllowed || windows) && host.Recorder.Current is null) mic.Open(host.OpenMic);
+        if ((m.OnMicrophone || m.MicCheckOpen) && !m.MicDenied && (m.MicAllowed || windows) && host.Recorder.Current is null) mic.Open(host.OpenMic);
         else mic.Close();
         if (mic.Heard) m.MicHeard = true;
         m.MicLevels = mic.Levels();
@@ -330,7 +333,7 @@ public static class Setup
 
     /// <summary>Classes lists the library's classes as it has them now (run again setup, it has some already), each
     /// with what it covers.</summary>
-    static void ListClasses(SetupModel m, AppHost host)
+    internal static void ListClasses(SetupModel m, AppHost host)
     {
         var about = (host.Overview?["classes"] as System.Text.Json.Nodes.JsonArray ?? []).OfType<System.Text.Json.Nodes.JsonObject>()
             .ToDictionary(c => c["name"]?.GetValue<string>() ?? "", c => c["description"] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue(out string? d) ? d ?? "" : "");

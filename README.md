@@ -91,7 +91,32 @@ you download it.
 - **Windows:** run the Setup.exe. It installs for your account only, no admin rights needed. If
   Windows says "Windows protected your PC", click **More info**, then **Run anyway**.
 
-Then open **Study Stash** and follow setup. It asks how you'll use it:
+Then open **Study Stash**. See [Setting up](#setting-up).
+
+## Setting up
+
+The first time Study Stash opens, it asks which AI will set it up with you:
+
+- **Claude** (through Claude Code, from Anthropic): needs a paid Claude plan, Pro or Max.
+- **ChatGPT** (through Codex, from OpenAI): needs a paid ChatGPT plan, Plus or higher.
+
+Pick one, press **Install** (Study Stash runs its maker's own installer, for your account only, no
+admin password; nothing is downloaded until you press it, and it's skipped when it's already
+there), then **Open sign-in page** to sign in on Claude's or ChatGPT's own page. Study Stash never
+sees your password or your sign-in. A tiny test message then checks your plan includes it.
+
+After that your AI walks you through the rest in a chat, with a checklist beside it: one computer or
+two, the microphone, the transcription model, your classes, Canvas, and starting at login. It can
+only use Study Stash's own setup tools (no commands, files or web), and anything that changes your
+computer happens only when you press the button in its card. Close the window part-way and the chat
+picks up where it left off. The chat uses a little of your plan, and your AI then writes your
+notes and answers your questions (you can switch to a free local model in Settings any time).
+
+**No subscription?** "Use a free model on this Mac (Ollama)" on the first screen goes to setup by
+hand, with Ollama picked for your notes. **Set up by hand** is on every screen too, and
+**Settings → General → Run setup** runs either again.
+
+Setup by hand asks how you'll use it:
 
 - **Just this computer:** check the microphone, download the transcription model, choose who
   writes the notes, Canvas, your classes, and starting at login (recommended, so your library runs

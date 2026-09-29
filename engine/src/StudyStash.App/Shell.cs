@@ -18,6 +18,8 @@ using StudyStash.App.Views;
 using StudyStash.App.Windows;
 using StudyStash.Audio;
 using StudyStash.Core;
+using StudyStash.Core.Setup;
+using StudyStash.Library;
 
 namespace StudyStash.App;
 
@@ -142,6 +144,8 @@ public static partial class Shell
         /// <summary>Setup's own view model, while its window is open: what the self-test drives (steps, connect,
         /// find, add a class) the same way the view's bindings would.</summary>
         public static ViewModels.SetupModel? SetupModel => setup;
+        /// <summary>Guided setup's model, while setup's window is open.</summary>
+        public static ViewModels.GuidedSetupModel? Guided => guidedSetup;
         public static void TogglePanel() => Shell.TogglePanel();
         public static void ToggleQuick() => Shell.ToggleQuick();
         public static void Record() => ToggleRecording();
@@ -921,14 +925,16 @@ public static partial class Shell
     }
 
     /// <summary>A fixed-size window whose view sets its size (setup's steps): no bigger than the display has room for
-    /// (the view scrolls inside), and after it grows, still on the display.</summary>
-    static void FollowView(Window w, Control view)
+    /// (the view scrolls inside), and after it grows, still on the display. <paramref name="showing"/>: only while it's
+    /// the view in the window; <paramref name="open"/> false for a second view that isn't showing yet.</summary>
+    static void FollowView(Window w, Control view, Func<bool>? showing = null, bool open = true)
     {
-        var room = OpenCentred(w, new Size(view.Width, view.Height));
+        var room = open ? OpenCentred(w, new Size(view.Width, view.Height)) : Placement.Centred(ScreenFor(w), new Size(1e6, 1e6)).Size;
         view.MaxWidth = room.Width;
         view.MaxHeight = room.Height;
         view.PropertyChanged += (_, e) =>
         {
+            if (showing?.Invoke() == false) return;
             if (e.Property == Layoutable.WidthProperty) w.Width = Math.Min(view.Width, room.Width);
             else if (e.Property == Layoutable.HeightProperty) w.Height = Math.Min(view.Height, room.Height);
             else return;
@@ -967,15 +973,24 @@ public static partial class Shell
         _ = LoadLibraryAsync();
     }
 
-    /// <summary>Settings → General's Run setup again: Settings makes way, and setup opens on its welcome with what's
-    /// already set up filled in. The computer counts as set up throughout, so closing it part-way changes nothing.</summary>
-    public static void RunSetupAgain()
+    /// <summary>Settings → General's Run setup again: Settings makes way, and setup opens (guided, straight to the chat
+    /// when the AI picked before is still signed in; <paramref name="byHand"/>: setup by hand, on its welcome) with
+    /// what's already set up filled in. The computer counts as set up throughout, so closing it part-way changes
+    /// nothing.</summary>
+    public static void RunSetupAgain(bool byHand = false)
     {
         settingsWindow?.Close();
-        ShowSetup();
+        ShowSetup(byHand);
     }
 
-    public static void ShowSetup()
+    public static void ShowSetup() => ShowSetup(false);
+
+    /// <summary>
+    /// Setup's window: guided setup (pick an AI, install it, sign in, then the chat), or setup by hand when
+    /// <paramref name="byHand"/>. Both are over one <see cref="SetupModel"/>, swapped in the same window, so nothing
+    /// done in one is lost in the other. The setup tools' door opens with the window and closes with it.
+    /// </summary>
+    public static void ShowSetup(bool byHand)
     {
         if (setupWindow is { IsVisible: true })
         {
@@ -986,17 +1001,25 @@ public static partial class Shell
         bool again = host.Settings.SetupDone;
         setup = Setup.Make(host);
         setup.Again = again;
-        var view = Skin.Current == SkinKind.Mac ? (Control)new MacSetup { DataContext = setup, DrawChrome = false } : new WinSetup { DataContext = setup, DrawChrome = false };
+        var model = setup;
+        var manualView = Skin.Current == SkinKind.Mac ? (Control)new MacSetup { DataContext = setup, DrawChrome = false } : new WinSetup { DataContext = setup, DrawChrome = false };
+        var guided = guidedSetup = MakeGuided(model);
+        var guidedView = Skin.Current == SkinKind.Mac ? (Control)new MacGuidedSetup { DataContext = guided, DrawChrome = false } : new WinGuidedSetup { DataContext = guided, DrawChrome = false };
+        if (byHand)
+        {
+            guided.Screen = GuidedScreen.Manual;
+            model.GuidedLabel = "Set up with an AI instead";
+        }
+        var view = byHand ? manualView : guidedView;
         var w = new Window
         {
-            Title = setup.HeaderTitle, CanResize = false, CanMaximize = false, Content = view,
+            Title = byHand ? setup.HeaderTitle : "Set up Study Stash", CanResize = false, CanMaximize = false, Content = view,
             ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         WinChrome.Apply(w);
-        var model = setup;
         var mic = micCheck = new MicCheck();
         setup.OnFinish = () =>
         {
@@ -1006,15 +1029,31 @@ public static partial class Shell
             // The first run ends by saying where the S. lives (or that a full menu bar hides it).
             if (!again) DispatcherTimer.RunOnce(SayWhereTheIconIs, TimeSpan.FromSeconds(1));
         };
+        guided.OnFinish = () => model.OnFinish?.Invoke();
         setup.OnEnter = step => EnterSetupStep(model, step);
         setup.OnCopy = text => _ = w.Clipboard?.SetTextAsync(text);
+        // Setup by hand's link back to the guided setup, named for the AI when it's ready.
+        setup.OnGuided = () => guided.BackToChatCommand.Execute(null);
         // The library's setup and the laptop's have their own names: the window's follows the flow.
         setup.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(SetupModel.HeaderTitle)) w.Title = model.HeaderTitle;
+            if (e.PropertyName == nameof(SetupModel.HeaderTitle) && w.Content == manualView) w.Title = model.HeaderTitle;
         };
-        // The AI and Canvas steps are the design's bigger window (the view sizes itself per step): the window follows.
-        FollowView(w, view);
+        // The AI and Canvas steps are the design's bigger window, and so is the chat (each view sizes itself): the
+        // window follows whichever is showing.
+        FollowView(w, view, () => w.Content == view);
+        var other = byHand ? guidedView : manualView;
+        FollowView(w, other, () => w.Content == other, open: false);
+        guided.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(GuidedSetupModel.Screen)) return;
+            var want = guided.Screen == GuidedScreen.Manual ? manualView : guidedView;
+            model.GuidedLabel = guided.AiReady ? $"Set up with {guided.Brand} instead" : "Set up with an AI instead";
+            if (w.Content == want) return;
+            w.Content = want;
+            w.Title = want == manualView ? model.HeaderTitle : "Set up Study Stash";
+            FitTo(w, want);
+        };
         // The AI engines step saves its choice before moving on; if it can't, it says why and stays.
         var leave = setup.LeaveAsync;
         setup.LeaveAsync = async step =>
@@ -1025,10 +1064,16 @@ public static partial class Shell
             model.NotesSummary = ai.ChoiceWords;
             return true;
         };
+        SetupMcpHost? door = null;
+        bool closed = false;
         w.Closed += (_, _) =>
         {
+            closed = true;
             setupWindow = null;
             if (setup == model) setup = null;
+            if (guidedSetup == guided) guidedSetup = null;
+            guided.Dispose();
+            if (door is not null) _ = door.DisposeAsync().AsTask();
             mic.Close();
             if (micCheck == mic) micCheck = null;
             model.Canvas?.Dispose();
@@ -1039,7 +1084,82 @@ public static partial class Shell
         UpdateDock();
         w.Activate();
         Desktop.Activate();
+        _ = OpenGuidedAsync();
+
+        async Task OpenGuidedAsync()
+        {
+            try
+            {
+                var tools = new SetupTools(new GuidedSetup(guided, host) { MakeCanvas = () => SetupCanvasAsync(model) });
+                door = await SetupMcpHost.StartAsync(tools);
+                if (closed)
+                {
+                    await door.DisposeAsync();
+                    return;
+                }
+                guided.Door = new SetupDoor(door.Url, door.Token, tools.NewTurn);
+                if (!byHand) await guided.OpenAsync();
+            }
+            catch (Exception e) when (e is IOException or InvalidOperationException or System.Net.Sockets.SocketException)
+            {
+                // No door, no chat: guided setup can't run here, and setup by hand always can.
+                host.Log($"[setup] guided setup couldn't start: {e.Message}");
+                guided.Screen = GuidedScreen.Manual;
+            }
+        }
     }
+
+    /// <summary>Guided setup's model for this window, reaching the app's own installer, sign-in, terminal and pages.
+    /// The self-test finds no AI's CLI at all, so it never installs one or reaches an account.</summary>
+    static GuidedSetupModel MakeGuided(SetupModel model)
+    {
+        var services = new GuidedServices
+        {
+            Home = host.Home,
+            Find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli),
+            OpenTerminal = (exe, args) =>
+            {
+                try
+                {
+                    Core.Ai.Terminal.RunCommand(host.Home, OperatingSystem.IsMacOS() ? "terminal" : "", exe, args);
+                }
+                catch (InvalidOperationException e)
+                {
+                    host.Log($"[setup] couldn't open a terminal to sign in: {e.Message}");
+                }
+            },
+            Downloading = () => host.Downloading?.Fraction,
+            Log = host.Log,
+        };
+        return new GuidedSetupModel(model, services, () => host.Settings, host.Save);
+    }
+
+    /// <summary>The Chrome helper card's Canvas connection, as the Canvas step makes it, started before the card shows.</summary>
+    static async Task<CanvasConnectModel?> SetupCanvasAsync(SetupModel model)
+    {
+        if (host.Remote() is null) return null;
+        var watch = CanvasPoll();
+        var connect = new CanvasConnectModel(Canvas(), watch, forSetup: true) { ShowFooter = false, FinishLabel = model.ContinueLabel };
+        connect.OnSkip = () => model.SkipCommand.Execute(null);
+        connect.OnFinish = () => model.NextCommand.Execute(null);
+        await StartConnectAsync(connect, watch);
+        return connect;
+    }
+
+    /// <summary>The window takes the size of the view now showing in it (still on the display).</summary>
+    static void FitTo(Window w, Control view)
+    {
+        var screen = ScreenFor(w);
+        double width = Math.Min(view.Width, view.MaxWidth), height = Math.Min(view.Height, view.MaxHeight);
+        w.Width = width;
+        w.Height = height;
+        var size = new PixelSize((int)(width * screen.Scaling), (int)(height * screen.Scaling));
+        var inside = Placement.KeepInside(screen.WorkingArea, size, w.Position);
+        if (inside != w.Position) w.Position = inside;
+    }
+
+    /// <summary>Guided setup's model, while its window is open.</summary>
+    static GuidedSetupModel? guidedSetup;
 
     /// <summary>The AI and Canvas steps need the library (connected two steps before): their models are made as each
     /// opens, reading the library then.</summary>
@@ -1066,7 +1186,7 @@ public static partial class Shell
                         WriteNotes = WriteNotesAsync,
                     };
                 }
-                _ = model.Ai.Load();
+                _ = LoadAiStepAsync(model.Ai);
                 break;
             case SetupStep.Canvas when model.Canvas is null:
                 var watch = CanvasPoll();
@@ -1077,6 +1197,14 @@ public static partial class Shell
                 _ = StartConnectAsync(connect, watch);
                 break;
         }
+    }
+
+    /// <summary>The AI step reads the library; "No subscription? Use a free model" on guided setup's first screen
+    /// comes here with the free model on this computer picked for the notes.</summary>
+    static async Task LoadAiStepAsync(AiSetupModel ai)
+    {
+        await ai.Load();
+        if (host.Settings.SetupAi == "ollama" && ai.Engines.Any(e => e.Id == "ollama")) ai.SelectedNotes = "ollama";
     }
 
     /// <summary>Which flow, and which library password, setup's AI step was made for.</summary>
