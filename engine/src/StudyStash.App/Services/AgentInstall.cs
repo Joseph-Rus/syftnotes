@@ -287,6 +287,8 @@ public sealed class AgentSignIn : IDisposable
         }
         started = DateTime.UtcNow;
         var p = child;
+        var at = started;
+        var done = exited;
         _ = Task.Run(() => Watch(p.StandardOutput));
         _ = Task.Run(() => Watch(p.StandardError));
         _ = Task.Run(async () =>
@@ -294,14 +296,34 @@ public sealed class AgentSignIn : IDisposable
             try
             {
                 await p.WaitForExitAsync();
-                if (p.ExitCode != 0 && DateTime.UtcNow - started < QuickFail) NeedsTerminal = true;
+                // Only the sign-in still current: one stopped to be run again isn't one that couldn't open the browser.
+                if (p.ExitCode != 0 && DateTime.UtcNow - at < QuickFail && ReferenceEquals(child, p)) NeedsTerminal = true;
             }
             catch (InvalidOperationException)
             {
             }
-            exited.TrySetResult();
+            done.TrySetResult();
         });
         return true;
+    }
+
+    /// <summary>Runs the sign-in again, the one going stopped first: it asks the system to open the browser once more.
+    /// (The page Claude Code prints ends on a code to paste, which setup has no field for; the page it opens itself
+    /// finishes on its own.) False when it didn't start.</summary>
+    public bool Restart()
+    {
+        var old = child;
+        child = null;
+        Url = null;
+        try
+        {
+            if (old is { HasExited: false }) old.Kill(entireProcessTree: true);
+            old?.WaitForExit(3000);
+        }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+        }
+        return Start();
     }
 
     /// <summary>Waits until it's signed in (true), checking every <see cref="Every"/> and when the sign-in exits, or

@@ -110,7 +110,7 @@ public class SetupChatTests
         for (int i = 0; i < cmd.Count - 1; i++) if (cmd[i] == "-c") set.Add(cmd[i + 1]);
         foreach (string s in new[]
         {
-            "approval_policy=\"never\"", "features.shell_tool=false", "features.unified_exec=false", "web_search=\"disabled\"",
+            "approval_policy=\"never\"", "sandbox_mode=\"read-only\"", "features.shell_tool=false", "features.unified_exec=false", "web_search=\"disabled\"",
             "tools.view_image=false", "features.apps=false", "features.multi_agent=false", "features.memories=false", "features.hooks=false",
             "project_doc_max_bytes=0", "model_reasoning_effort=\"low\"",
             $"mcp_servers.study_stash_setup.url=\"{Url}\"", "mcp_servers.study_stash_setup.bearer_token_env_var=\"STUDYSTASH_SETUP_TOKEN\"",
@@ -132,7 +132,12 @@ public class SetupChatTests
     {
         using var dir = new TempDir();
         var cmd = SetupChat.Command(Turn(dir, "codex", "codex", session: "t-42"));
-        Assert.Equal(["codex", "exec", "resume", "t-42", "--json"], cmd[..5]);
+        // -C and -s are exec's own options and `resume` turns them away, so the conversation carries on as
+        // `codex exec [options] resume ID -` (the sandbox is also a setting: a resumed one doesn't keep it).
+        Assert.Equal(["codex", "exec", "--json"], cmd[..3]);
+        Assert.Equal(["resume", "t-42", "-"], cmd[^3..]);
+        Assert.True(cmd.IndexOf("-C") < cmd.IndexOf("resume") && cmd.IndexOf("-s") < cmd.IndexOf("resume"));
+        Assert.Contains("sandbox_mode=\"read-only\"", cmd);
     }
 
     [Fact]

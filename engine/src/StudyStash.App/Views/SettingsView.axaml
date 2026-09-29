@@ -627,6 +627,14 @@
                       </Grid>
                     </Border>
                     <Border Classes="rowsep" />
+                    <!-- The credit NVIDIA's licence (CC BY 4.0) asks for, beside OpenAI's. -->
+                    <Border Classes="row">
+                      <StackPanel Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Classes="row-title" Text="Speech models" />
+                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT) and NVIDIA Parakeet TDT 0.6B v3 (CC BY 4.0, converted to ONNX by sherpa-onnx). They run on this computer and download only when you pick them." TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+                    <Border Classes="rowsep" />
                     <!-- Study Stash is free: a tip for the two students who build it goes to their Ko-fi page. -->
                     <Border Classes="row">
                       <Grid ColumnDefinitions="*,16,Auto">
@@ -805,7 +813,7 @@
               <!-- Recording -->
               <StackPanel IsVisible="{Binding OnRecording}" Spacing="8">
                 <TextBlock Classes="h" Text="Recording" />
-                <TextBlock Classes="body" Text="Whisper writes down each lecture on this computer. The recording never leaves it; the library gets the transcript." />
+                <TextBlock Classes="body" Text="Each lecture is written down on this computer by the model you pick. The recording never leaves it; the library gets the transcript." />
                 <TextBlock Classes="section" Text="Transcription model" />
                 <!-- Unclipped, so a card's focus ring shows whole. -->
                 <ItemsControl ItemsSource="{Binding Models}" MaxWidth="480" HorizontalAlignment="Left" ClipToBounds="False">

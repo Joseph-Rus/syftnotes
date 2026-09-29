@@ -385,8 +385,9 @@ public class CodexProvider : AiProvider
 
     public override List<string> Command(AiRequest req, bool stream)
     {
+        // The next turn of a conversation is `codex exec [options] resume ID prompt`: -C and -s are exec's own options
+        // and `resume` turns them away, so every option comes before it.
         var cmd = new List<string> { Which("codex") ?? "codex", "exec" };
-        if (req.Session.Length > 0) cmd.AddRange(["resume", req.Session]);
         cmd.AddRange(ExtraArgs);
         cmd.AddRange(["--json", "--skip-git-repo-check", "-C", req.Cwd, "-s", req.Write ? "workspace-write" : "read-only",
             "-c", "approval_policy=\"never\""]);
@@ -395,11 +396,12 @@ public class CodexProvider : AiProvider
             cmd.AddRange(["-c", $"mcp_servers.{McpKey}.command={JsonSerializer.Serialize(req.McpCommand[0])}",
                 "-c", $"mcp_servers.{McpKey}.args={new JsonArray(req.McpCommand.Skip(1).Select(a => (JsonNode)a).ToArray()).ToJsonString()}"]);
         if (req.Model.Length > 0) cmd.AddRange(["-m", req.Model]);
+        if (req.Session.Length > 0) cmd.AddRange(["resume", req.Session]);
         cmd.Add(PromptOnInput ? "-" : WithSystem(req));
         return cmd;
     }
 
-    /// <summary>`codex exec -` (and `codex exec resume ID -`) reads the prompt from its input.</summary>
+    /// <summary>`codex exec -` (and `codex exec [options] resume ID -`) reads the prompt from its input.</summary>
     public override string? Input(AiRequest req) => PromptOnInput ? WithSystem(req) : null;
 
     const string McpKey = "study_stash";

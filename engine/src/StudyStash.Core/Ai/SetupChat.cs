@@ -221,16 +221,19 @@ public static partial class SetupChat
 
     /// <summary>Codex, locked down: no shell, no web search, no images, no connectors, sub-agents, memories or hooks,
     /// read-only and never asking; no AGENTS.md; the brief as its developer instructions; and the setup server, with
-    /// its token read from the environment and its tools approved. The prompt goes in on its input ("-").</summary>
+    /// its token read from the environment and its tools approved. The prompt goes in on its input ("-"). The next
+    /// turn of a conversation is <c>codex exec [options] resume ID -</c>: <c>-C</c> and <c>-s</c> belong to
+    /// <c>exec</c> alone, and <c>resume</c> turns them away, so every option comes before it, and the sandbox is also
+    /// given as a setting (a resumed conversation doesn't keep the one it began with).</summary>
     public static List<string> CodexCommand(SetupTurn t)
     {
         var cmd = new List<string> { t.Exe, "exec" };
-        if (t.Session.Length > 0) cmd.AddRange(["resume", t.Session]);
         cmd.AddRange(["--json", "--skip-git-repo-check"]);
         if (t.IgnoreUserConfig) cmd.Add("--ignore-user-config");
         cmd.AddRange(["--ignore-rules", "-C", t.WorkDir, "-s", "read-only"]);
         void Set(string key, string toml) => cmd.AddRange(["-c", $"{key}={toml}"]);
         Set("approval_policy", "\"never\"");
+        Set("sandbox_mode", "\"read-only\"");
         Set("features.shell_tool", "false");
         Set("features.unified_exec", "false");
         Set("web_search", "\"disabled\"");
@@ -252,6 +255,7 @@ public static partial class SetupChat
             Set(s + ".tool_timeout_sec", "30");
         }
         if (t.Windows) Set("windows.sandbox", "\"unelevated\"");
+        if (t.Session.Length > 0) cmd.AddRange(["resume", t.Session]);
         cmd.Add("-");
         return cmd;
     }

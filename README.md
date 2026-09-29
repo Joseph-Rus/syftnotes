@@ -16,8 +16,9 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
   (Windows), or press ⌥⇧R / Ctrl+Alt+R. Whisper transcribes as you go — Metal on Apple silicon,
   Vulkan or the CPU on Windows — and the audio never leaves your computer. Every computer starts on
   the compact large-v3 turbo, which keeps up and leaves room for everything else (a computer too weak
-  for it gets a lighter one); the bigger, more accurate models are a choice in setup and Settings →
-  Recording. While it records, a tiny pill shows the time and the level; pause or stop from the
+  for it gets a lighter one); the bigger, more accurate models, and NVIDIA's Parakeet (nearly as
+  accurate as the compact turbo, and quick on a processor alone; 25 European languages), are a choice in setup
+  and Settings → Recording. While it records, a tiny pill shows the time and the level; pause or stop from the
   menu bar.
 - **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
   to review, written by Ollama (free and private) or by Claude Code, Codex or Gemini with the plan
@@ -281,6 +282,13 @@ building the next version.
 [MIT](LICENSE). No warranty: check your notes against the lecture before relying on them, since AI
 makes mistakes. Record only where you're allowed to — many schools and places require everyone's
 consent. See [SECURITY.md](SECURITY.md) to report a security problem.
+
+Lectures are written down by [Whisper](https://github.com/openai/whisper) models (MIT, from OpenAI,
+run with [Whisper.net](https://github.com/sandrohanea/whisper.net)) or, if you choose it, by
+[NVIDIA Parakeet TDT 0.6B v3](https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3)
+([CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)), converted to ONNX by the
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) project (Apache-2.0), which runs it. The models
+are downloaded when you pick them; none is bundled.
 
 Notes and diagrams are drawn with [CSharpMath](https://github.com/verybadcat/CSharpMath) (MIT,
 bundling the [Latin Modern Math](https://www.gust.org.pl/projects/e-foundry/lm-math) font under
