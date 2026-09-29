@@ -291,6 +291,10 @@ public sealed partial class LibraryModel : ObservableObject
         OnSupportAnswer?.Invoke(answer);
     });
 
+    /// <summary>The window closes with the ask still showing: that counts as "Maybe later" (or, the last time, as
+    /// the end of it), so an ask that's ignored still comes at most twice.</summary>
+    public void WalkAwayFromSupport() => Support?.LaterCommand.Execute(null);
+
     // --- deleting a lecture ---------------------------------------------------------------------------------------
 
     /// <summary>The lecture being deleted, while the window asks "Delete this lecture?"; null when it isn't asking.</summary>

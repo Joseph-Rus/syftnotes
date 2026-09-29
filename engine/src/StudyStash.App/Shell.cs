@@ -863,6 +863,7 @@ public static partial class Shell
         }
         w.Closing += (_, e) =>
         {
+            library.WalkAwayFromSupport();
             if (quitting) return;
             SaveLibraryPlace();
             e.Cancel = true;

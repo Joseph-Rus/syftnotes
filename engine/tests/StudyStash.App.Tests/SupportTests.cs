@@ -184,6 +184,26 @@ public class SupportTests
         }
     }
 
+    [Fact]
+    public void Closing_the_window_on_the_ask_counts_as_maybe_later_and_the_last_time_ends_it()
+    {
+        var settings = new AppSettings();
+        var answers = new List<SupportAnswer>();
+        var library = new LibraryModel { OnSupportAnswer = a => { answers.Add(a); SupportAsk.Remember(settings, a, Monday); } };
+        library.WalkAwayFromSupport(); // nothing showing: nothing to answer
+        Assert.Empty(answers);
+
+        library.AskForSupport(last: SupportAsk.IsLast(settings));
+        library.WalkAwayFromSupport();
+        Assert.Equal([SupportAnswer.Later], answers);
+        Assert.Null(library.Support);
+        Assert.False(settings.SupportAskDone);
+
+        library.AskForSupport(last: SupportAsk.IsLast(settings));
+        library.WalkAwayFromSupport();
+        Assert.True(settings.SupportAskDone);
+    }
+
     [AvaloniaFact]
     public void The_last_ask_offers_no_later()
     {
