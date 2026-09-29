@@ -22,8 +22,9 @@ laptop                                          library (a Mac mini, say — any
 - `StudyStash.Library` — the library's web pages, the laptop-facing ingest API, and the setup page
   (ASP.NET Core).
 - `StudyStash.Engine` — the `studystash` command line, for running the engine without the app.
-- `StudyStash.Audio` — the microphone and Whisper bindings (Whisper.net; Metal on Apple silicon,
-  Vulkan or the CPU on Windows).
+- `StudyStash.Audio` — the microphone and the speech models: Whisper (Whisper.net; Metal on Apple
+  silicon, Vulkan or the CPU on Windows) and NVIDIA's Parakeet (sherpa-onnx, on the processor; a
+  model that comes as a folder of files, downloaded one after another).
 - `StudyStash.App` — the Avalonia app: menu bar/tray, quick panel, full window, setup.
 
 ## Record → library → notes → Claude

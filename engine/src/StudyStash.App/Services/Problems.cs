@@ -79,7 +79,10 @@ public static class Problems
             yield return new(ProblemKind.NoMic, "No microphone", "Plug one in, or check the sound settings.", "");
 
         if (host.WhisperProblem is { } whisper)
-            yield return new(ProblemKind.WhisperFailed, "Whisper couldn't start", WithoutPrefix(whisper, "Whisper couldn't start: "), "Download again");
+        {
+            string engine = whisper.StartsWith("Parakeet couldn't start: ", StringComparison.Ordinal) ? "Parakeet" : "Whisper";
+            yield return new(ProblemKind.WhisperFailed, $"{engine} couldn't start", WithoutPrefix(whisper, $"{engine} couldn't start: "), "Download again");
+        }
 
         if (host.DownloadProblem is { } download)
             yield return new(ProblemKind.DownloadFailed, "The download stopped", download, "Try again");

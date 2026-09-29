@@ -232,7 +232,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Lectures = new LectureStore(home);
         Recorder.Recover(Lectures, this.log);
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
-        Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log);
+        Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log)
+        {
+            EngineName = () => Model.Engine == SpeechEngine.Parakeet ? "Parakeet" : "Whisper",
+        };
         var net = laptop ?? new LaptopHost();
         laptopHost = net;
         Sender = new LectureSender(Lectures, Client, net, this.log);
@@ -359,7 +362,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     {
         if (!Settings.SetupDone || Settings.Model.Length > 0 || Settings.Role == AppRole.Library || ModelFromEnvironment) return;
         var had = WhisperModels.All.FirstOrDefault(m => WhisperModels.IsDownloaded(Home, m))
-                  ?? WhisperModels.All.FirstOrDefault(m => File.Exists(WhisperModels.PathFor(Home, m) + ".part"));
+                  ?? WhisperModels.All.FirstOrDefault(m => WhisperModels.OnDisk(Home, m) > 0);
         if (had is null) return;
         Settings.Model = had.Id;
         try
@@ -405,12 +408,13 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <summary><see cref="FallingBehind"/>'s words for <paramref name="recorded"/> seconds recorded and
     /// <paramref name="written"/> written down with <paramref name="inUse"/>: a lighter model to switch to (the one for
-    /// this computer when it's lighter, else the next lighter one), unless it's already the lightest.</summary>
+    /// this computer when it's lighter, else the next lighter Whisper one), unless it's already the lightest. Parakeet
+    /// is never the suggestion: it's a bigger download, and nothing says it keeps up where Whisper doesn't.</summary>
     public static (string Title, string Text)? BehindWords(double recorded, double written, WhisperModel inUse, ModelAdvice advice)
     {
         if (recorded - written < BehindAfterSeconds) return null;
         var lighter = WhisperModels.Heavier(inUse, advice.Model) ? advice.Model
-            : WhisperModels.All.SkipWhile(m => m.Id != inUse.Id).Skip(1).FirstOrDefault(m => m.Id != WhisperModels.Tiny.Id);
+            : WhisperModels.All.SkipWhile(m => m.Id != inUse.Id).Skip(1).FirstOrDefault(m => m.Id != WhisperModels.Tiny.Id && m.Engine == SpeechEngine.Whisper);
         string text = $"{inUse.Name} is slower than the lecture on this computer. Nothing is lost: it catches up after class.";
         // The notification's Settings button opens Settings → Recording, so the words needn't say where.
         if (lighter is not null) text += $" {lighter.Name} would keep up.";
@@ -428,6 +432,12 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     ITranscriber LoadWhisper()
     {
         if (!ModelReady) throw new InvalidOperationException("The transcription model isn't downloaded yet.");
+        if (ModelFile is null && Model.Engine == SpeechEngine.Parakeet)
+        {
+            if (!ParakeetLanguages.Knows(Settings.Language))
+                throw new InvalidOperationException($"Parakeet doesn't read \"{Settings.Language}\": pick a Whisper model in Settings → Recording, or leave the language empty.");
+            return new ParakeetTranscriber(WhisperModels.PathFor(Home, Model), Settings.Language);
+        }
         return new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
     }
 
@@ -776,8 +786,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             download = cts;
             DownloadingModel = model;
             DownloadProblem = null;
-            string part = WhisperModels.PathFor(Home, model) + ".part";
-            Downloading = new DownloadProgress(File.Exists(part) ? Math.Min(new FileInfo(part).Length, model.Bytes) : 0, model.Bytes, 0);
+            Downloading = new DownloadProgress(WhisperModels.OnDisk(Home, model), model.Bytes, 0);
             // On the thread pool: picking up a download first reads the gigabytes already here.
             downloadTask = Task.Run(() => DownloadAsync(model, cts));
         }
@@ -812,8 +821,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         string path = WhisperModels.PathFor(Home, model);
         try
         {
-            File.Delete(path);
-            File.Delete(path + ".part");
+            WhisperModels.Delete(Home, model);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -838,8 +846,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         string path = WhisperModels.PathFor(Home, model);
         try
         {
-            File.Delete(path);
-            File.Delete(path + ".part");
+            WhisperModels.Delete(Home, model);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
@@ -861,7 +868,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             {
                 try
                 {
-                    await ModelDownload.RunAsync(Home, model, Progress(cts), cts.Token, http, models.UrlFor(model));
+                    await ModelDownload.RunAsync(Home, model, Progress(cts), cts.Token, http, models.UrlFor(model), mirror: models.Mirror);
                     Say(cts, null);
                     log($"[model] {model.Name} downloaded");
                     return;
