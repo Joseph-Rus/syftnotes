@@ -41,13 +41,13 @@
               <TextBlock Classes="cv-tile-label" Text="Due" />
               <TextBlock Classes="cv-tile-value" Text="{Binding DueValue}" />
             </StackPanel>
-            <Border Grid.Column="1" Classes="cv-tile-sep" />
-            <StackPanel Grid.Column="2" Spacing="2" Margin="16,12">
+            <Border Grid.Column="1" Classes="cv-tile-sep" IsVisible="{Binding IsAssignment}" />
+            <StackPanel IsVisible="{Binding IsAssignment}" Grid.Column="2" Spacing="2" Margin="16,12">
               <TextBlock Classes="cv-tile-label" Text="Points" />
               <TextBlock Classes="cv-tile-value" Text="{Binding PointsValue}" />
             </StackPanel>
-            <Border Grid.Column="3" Classes="cv-tile-sep" />
-            <StackPanel Grid.Column="4" Spacing="2" Margin="16,12">
+            <Border Grid.Column="3" Classes="cv-tile-sep" IsVisible="{Binding IsAssignment}" />
+            <StackPanel IsVisible="{Binding IsAssignment}" Grid.Column="4" Spacing="2" Margin="16,12">
               <TextBlock Classes="cv-tile-label" Text="{Binding ThirdLabel}" />
               <TextBlock Classes="cv-tile-value" Text="{Binding ThirdValue}" />
             </StackPanel>
@@ -73,8 +73,9 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <TextBlock Classes="cv-h3" Text="Your submission" Margin="0,14,0,0" />
-        <Border Classes="cv-submission">
+        <TextBlock Classes="cv-sub-detail" Text="{x:Static vm:AssignmentModel.TodoText}" TextWrapping="Wrap" Margin="0,6,0,0" IsVisible="{Binding IsTodo}" />
+        <TextBlock Classes="cv-h3" Text="Your submission" Margin="0,14,0,0" IsVisible="{Binding ShowSubmission}" />
+        <Border Classes="cv-submission" IsVisible="{Binding ShowSubmission}">
           <StackPanel Spacing="12">
             <StackPanel Orientation="Horizontal" Spacing="10">
               <TextBlock Classes="cv-sub-status" Text="{Binding SubmissionStatus}" />

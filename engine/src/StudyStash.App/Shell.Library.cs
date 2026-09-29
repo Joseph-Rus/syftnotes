@@ -386,24 +386,32 @@ public static partial class Shell
     static CanvasDueModel NewDueList()
     {
         dueListFor = canvasFor;
-        return new CanvasDueModel(Canvas())
+        CanvasDueModel? due = null;
+        return due = new CanvasDueModel(Canvas())
         {
             OnSelect = (cls, id) =>
             {
                 dueSelection = (cls, id);
                 if (!picking) library.Opened();
-                _ = ShowAssignmentAsync(cls, id);
+                _ = ShowAssignmentAsync(cls, id, due?.ItemOf(cls, id));
             },
         };
     }
 
     /// <summary>An assignment's own page on the right: what to do, the rubric, and what was handed in.</summary>
-    static async Task ShowAssignmentAsync(string cls, string id)
+    /// <summary>A planner to-do (<paramref name="row"/>, from the Due list) has no assignment behind it, so it gets a
+    /// page of its own; anything else the library no longer knows opens nothing rather than an empty page.</summary>
+    static async Task ShowAssignmentAsync(string cls, string id, CanvasApi.Item? row = null)
     {
         var page = new AssignmentModel(Canvas()) { OnSearch = ToggleQuick };
         try
         {
-            await page.LoadAsync(cls, id);
+            if (row is { Kind: "todo" or "to-do" }) page.ShowTodo(row);
+            else if (!await page.LoadAsync(cls, id))
+            {
+                if (row is null) return;
+                page.ShowTodo(row);
+            }
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException)
         {

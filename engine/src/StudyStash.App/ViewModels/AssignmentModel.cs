@@ -59,6 +59,12 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
     [ObservableProperty] public partial string? CommentAuthor { get; set; }
     public bool HasComment => !string.IsNullOrEmpty(CommentText);
     [ObservableProperty] public partial bool ShowHandInLink { get; set; }
+    /// <summary>A planner to-do (a page or note Canvas flagged), not an assignment: nothing to score or hand in.</summary>
+    [ObservableProperty] public partial bool IsTodo { get; set; }
+    public bool IsAssignment => !IsTodo;
+    /// <summary>"Your submission" shows when there's something to say about one: not for a to-do, nor for an
+    /// assignment that takes nothing through Canvas (no submission, on paper, not graded) and has none.</summary>
+    [ObservableProperty] public partial bool ShowSubmission { get; set; }
     public ObservableCollection<FileChip> Files { get; } = [];
     public bool HasFiles => Files.Count > 0;
 
@@ -103,7 +109,10 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
         CommentAuthor = comment?.Author;
         OnPropertyChanged(nameof(HasComment));
 
-        ShowHandInLink = d.Submission is null && !d.Excused;
+        bool takesNothing = d.SubmissionTypes.Count > 0 && d.SubmissionTypes.All(t => t is "none" or "on_paper" or "not_graded");
+        IsTodo = false;
+        ShowSubmission = !(takesNothing && d.Submission is null && !d.Excused);
+        ShowHandInLink = d.Submission is null && !d.Excused && !takesNothing;
 
         Files.Clear();
         var source = d.Submission is { Files.Count: > 0 } sub ? sub.Files : d.Files;
@@ -115,6 +124,37 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
         }
         OnPropertyChanged(nameof(HasFiles));
     }
+
+    /// <summary>A planner to-do's page, from its Due row: when it's for, and a way to open it in Canvas. It has no
+    /// assignment behind it, so no points, status or submission.</summary>
+    public void ShowTodo(CanvasApi.Item item)
+    {
+        var zone = context.Clock.Zone;
+        var now = context.Clock.Now();
+        cls = item.Class;
+        folder = "";
+        url = item.Url;
+        Dot = context.DotOf(item.Class);
+        Meta = CanvasWords.DetailHeader(item.Class, "todo");
+        Title = item.Name;
+        DueValue = item.DueAt is { } due ? CanvasWords.Full(due, zone, now) : "No date";
+        PointsValue = ThirdValue = "";
+        Instructions = "";
+        Rubric.Clear();
+        OnPropertyChanged(nameof(HasRubric));
+        SubmissionStatus = SubmissionDetail = "";
+        OnPropertyChanged(nameof(HasSubmissionDetail));
+        CommentText = CommentAuthor = null;
+        OnPropertyChanged(nameof(HasComment));
+        Files.Clear();
+        OnPropertyChanged(nameof(HasFiles));
+        IsTodo = true;
+        ShowSubmission = ShowHandInLink = false;
+    }
+
+    public const string TodoText = "A to-do from your Canvas planner. There's nothing to hand in: open it in Canvas to read it, and mark it done there.";
+
+    partial void OnIsTodoChanged(bool value) => OnPropertyChanged(nameof(IsAssignment));
 
     static string CombinePath(string folder, string name) => folder.Length > 0 ? $"{folder}/{name}" : name;
 
@@ -131,10 +171,13 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
         _ => "draft",
     };
 
-    public async Task LoadAsync(string classId, string id, CancellationToken stop = default)
+    /// <summary>False when the library has no such assignment (a to-do, or one gone since the list was read).</summary>
+    public async Task<bool> LoadAsync(string classId, string id, CancellationToken stop = default)
     {
-        if (context.Client is not { } client) return;
-        if (await client.AssignmentAsync(classId, id, stop) is { } detail) Show(detail);
+        if (context.Client is not { } client) return false;
+        if (await client.AssignmentAsync(classId, id, stop) is not { } detail) return false;
+        Show(detail);
+        return true;
     }
 
     async Task OpenFileAsync(FileChip chip)

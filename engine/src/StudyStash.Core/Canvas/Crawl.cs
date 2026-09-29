@@ -1333,12 +1333,17 @@ public sealed partial class Crawl
             }
             string title = Py.Strip(S(plannable["title"])) is { Length: > 0 } t ? t : "untitled";
             string? todoAt = Opt(item["plannable_date"]) ?? Opt(plannable["todo_date"]);
-            var todo = new TodoInfo { Id = id, Kind = type, Title = title, TodoAt = todoAt, HtmlUrl = S(item["html_url"]), MarkedDone = done };
+            var todo = new TodoInfo { Id = id, Kind = type, Title = title, TodoAt = todoAt, HtmlUrl = Absolute(S(item["html_url"])), MarkedDone = done };
             var list2 = Staged(cls).Todos;
             int at = list2.FindIndex(x => x.Id == id);
             if (at >= 0) list2[at] = todo; else list2.Add(todo);
         }
     }
+
+    /// <summary>The planner's links are relative ("/courses/1/pages/x"): made whole with the Canvas address, so the
+    /// app can open them.</summary>
+    string Absolute(string url) =>
+        url.StartsWith('/') && S(data["base"]) is { Length: > 0 } b ? b.TrimEnd('/') + url : url;
 
     /// <summary>Bakes this sync's planner reads into the promoted index: an assignment the planner said (this sync)
     /// is marked done gets it; one it didn't read (hidden, failed, or a class the planner job never covered) keeps
