@@ -87,6 +87,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         this.save = save;
         Setup.PropertyChanged += (_, _) => Refresh();
         Setup.Classes.CollectionChanged += (_, _) => Refresh();
+        BuildSteps();
     }
 
     public SetupModel Setup { get; }
@@ -210,24 +211,76 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public bool HasQuickReplies => QuickReplies.Count > 0;
     public bool Windows => services.Windows;
 
-    partial void OnScreenChanged(GuidedScreen value) => Notify(nameof(CanContinue), nameof(StepLabel));
+    public bool OnPick => Screen == GuidedScreen.PickAi;
+    public bool OnInstall => Screen == GuidedScreen.Install;
+    public bool OnSignIn => Screen == GuidedScreen.SignIn;
+    public bool OnChat => Screen == GuidedScreen.Chat;
+    public bool HasStepLabel => !OnPick;
+    /// <summary>The design's size for each screen: 720×480, and 900×560 for the chat.</summary>
+    public double ViewWidth => OnChat ? 900 : 720;
+    public double ViewHeight => OnChat ? 560 : 480;
+    public bool ShowInstalled => Installed;
+    public bool ShowReady => AiReady && OnSignIn;
+    public bool ShowCheckingPlan => CheckingPlan;
+    public string CheckingWords => "Signed in. Checking your plan…";
 
-    partial void OnPickedChanged(string value) =>
+    /// <summary>The sidebar's steps before the chat: your AI, installing it, signing in, then setting up.</summary>
+    public ObservableCollection<StepItem> Steps { get; } = [];
+
+    void BuildSteps()
+    {
+        int at = Screen switch { GuidedScreen.PickAi => 0, GuidedScreen.Install => 1, GuidedScreen.SignIn => 2, _ => 3 };
+        string[] titles = ["Pick your AI", $"Install {Cli.Name}", $"Sign in to {Brand}", "Set up Study Stash"];
+        if (Steps.Count != titles.Length)
+        {
+            Steps.Clear();
+            for (int i = 0; i < titles.Length; i++) Steps.Add(new StepItem { Number = i + 1, Title = titles[i] });
+        }
+        for (int i = 0; i < titles.Length; i++)
+        {
+            if (Steps[i].Title != titles[i]) Steps[i] = new StepItem { Number = i + 1, Title = titles[i] };
+            Steps[i].Current = i == at;
+            Steps[i].Done = i < at || i == 1 && at > 0 && Found.Works && !OnInstall;
+        }
+    }
+
+    partial void OnScreenChanged(GuidedScreen value)
+    {
+        Notify(nameof(CanContinue), nameof(StepLabel), nameof(OnPick), nameof(OnInstall), nameof(OnSignIn), nameof(OnChat), nameof(HasStepLabel),
+            nameof(ViewWidth), nameof(ViewHeight), nameof(ShowReady));
+        BuildSteps();
+    }
+
+    partial void OnPickedChanged(string value)
+    {
+        BuildSteps();
         Notify(nameof(Cli), nameof(Other), nameof(Brand), nameof(Found), nameof(PickedClaude), nameof(PickedCodex), nameof(CanContinue), nameof(StepLabel),
             nameof(InstallTitle), nameof(InstallLede), nameof(InstallButton), nameof(InstallSource), nameof(InstallLine), nameof(UseOtherLabel), nameof(SignInTitle),
             nameof(SignInLede), nameof(Privacy), nameof(PlanNote), nameof(ReadyWords), nameof(SidebarTitle), nameof(FieldHint), nameof(Thinking));
+    }
 
-    partial void OnClaudeFoundChanged(AgentFound value) => Notify(nameof(ClaudeHere), nameof(Found));
-    partial void OnCodexFoundChanged(AgentFound value) => Notify(nameof(CodexHere), nameof(Found));
+    partial void OnClaudeFoundChanged(AgentFound value)
+    {
+        Notify(nameof(ClaudeHere), nameof(Found));
+        BuildSteps();
+    }
+
+    partial void OnCodexFoundChanged(AgentFound value)
+    {
+        Notify(nameof(CodexHere), nameof(Found));
+        BuildSteps();
+    }
     partial void OnInstallingChanged(bool value) => Notify(nameof(ShowInstallButton));
-    partial void OnInstalledChanged(bool value) => Notify(nameof(ShowInstallButton), nameof(CanContinue));
+    partial void OnInstalledChanged(bool value) => Notify(nameof(ShowInstallButton), nameof(CanContinue), nameof(ShowInstalled));
     partial void OnInstallProblemChanged(string? value) => Notify(nameof(ShowInstallButton), nameof(HasInstallProblem));
     partial void OnInstallFailureChanged(InstallFailure value) => Notify(nameof(InstallRegion), nameof(InstallOther));
     partial void OnWaitingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn));
     partial void OnSignedInChanged(bool value) => Notify(nameof(ShowOpenSignIn));
+    partial void OnCheckingPlanChanged(bool value) => Notify(nameof(ShowCheckingPlan));
+
     partial void OnAiReadyChanged(bool value)
     {
-        Notify(nameof(CanContinue));
+        Notify(nameof(CanContinue), nameof(ShowReady));
         Refresh();
     }
     partial void OnSignInProblemChanged(string? value) => Notify(nameof(HasSignInProblem));
