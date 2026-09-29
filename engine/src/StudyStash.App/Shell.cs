@@ -699,9 +699,9 @@ public static partial class Shell
         var size = panelWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
         var anchor = pointer ?? new PixelPoint(0, 0);
-        panelWindow.Position = OperatingSystem.IsMacOS()
+        panelWindow.Put(OperatingSystem.IsMacOS()
             ? Placement.MacDropdown(anchor, panelWindow.ScreenList(), size, room)
-            : Placement.TrayFlyout(anchor, panelWindow.ScreenList(), size, room);
+            : Placement.TrayFlyout(anchor, panelWindow.ScreenList(), size, room));
         panelWindow.Show();
         panelWindow.Activate();
         Desktop.Activate();
@@ -775,13 +775,14 @@ public static partial class Shell
     /// the window is about to hide or the app to quit).</summary>
     static void SaveRecorderPosition()
     {
-        if (recorderWindow is not { IsVisible: true } w) return;
+        if (recorderWindow is not { IsVisible: true } w || w.Panel() is not { } panel) return;
         var (_, scale) = w.WorkArea(w.Position);
-        var size = w.Measured(scale);
+        // Where the window's top right would be with its whole shadow room, whatever of that room is trimmed now.
+        int room = (int)(Floating.ShadowRoom * scale);
         host.Save(s =>
         {
-            s.RecorderX = w.Position.X + size.Width;
-            s.RecorderY = w.Position.Y;
+            s.RecorderX = panel.Right + room;
+            s.RecorderY = panel.Y - room;
         });
     }
 
@@ -794,7 +795,7 @@ public static partial class Shell
         var size = recorderWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
         PixelPoint? saved = host.Settings.RecorderX is double rx && host.Settings.RecorderY is double ry ? new PixelPoint((int)rx, (int)ry) : null;
-        recorderWindow.Position = Placement.KeepOnScreen(saved, recorderWindow.ScreenList(), size, OperatingSystem.IsMacOS(), room);
+        recorderWindow.Put(Placement.KeepOnScreen(saved, recorderWindow.ScreenList(), size, OperatingSystem.IsMacOS(), room));
     }
 
     static void ToggleQuick()
@@ -819,7 +820,7 @@ public static partial class Shell
         var (_, scale) = quickWindow.WorkArea(pointer);
         var size = quickWindow.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale);
-        quickWindow.Position = Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room);
+        quickWindow.Put(Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room));
         quickWindow.Show();
         quickWindow.Activate();
         Desktop.Activate();

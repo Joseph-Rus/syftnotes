@@ -26,14 +26,12 @@ public class ToastShelfTests
         public DateTime Now = new(2026, 9, 28, 10, 0, 0, DateTimeKind.Utc);
         public readonly List<PixelRect> Clear = [];
         public readonly ToastShelf Shelf;
-        public readonly int Room;
 
         public Rig(bool mac)
         {
             ((App)Application.Current!).UseSkin(mac ? SkinKind.Mac : SkinKind.Win);
             var screen = mac ? MacBook : Pc;
             Shelf = new ToastShelf(mac, () => [screen], _ => null, () => Clear, () => Now);
-            Room = (int)Floating.ShadowRoom;
         }
 
         public void Pass(double seconds)
@@ -46,12 +44,19 @@ public class ToastShelfTests
         /// <summary>The card a notice shows, on screen (its window less the shadow room).</summary>
         public PixelRect Card(Notice n)
         {
-            var w = Shelf.WindowOf(n)!;
-            var size = w.Measured(1);
-            return new PixelRect(w.Position.X + Room, w.Position.Y + Room, size.Width - 2 * Room, size.Height - 2 * Room);
+            Dispatcher.UIThread.RunJobs();
+            return Shelf.WindowOf(n)!.Panel()!.Value;
         }
 
         public bool Showing(Notice n) => Shelf.WindowOf(n)?.IsVisible == true;
+
+        /// <summary>A point on the card (a little in from its top left, clear of its buttons), in its window.</summary>
+        public Point On(Notice n, double x = 40, double y = 20)
+        {
+            var w = Shelf.WindowOf(n)!;
+            var card = Card(n);
+            return new Point(card.X - w.Position.X + x, card.Y - w.Position.Y + y);
+        }
 
         public void Dispose() => Shelf.CloseAll();
     }
@@ -70,6 +75,10 @@ public class ToastShelfTests
         Assert.Equal(MacBook.WorkingArea.Y + 10, card.Y);
         var w = rig.Shelf.WindowOf(n)!;
         Assert.True(w.IsVisible);
+        // The window itself stays inside the usable area: a Mac would push one reaching up into the menu bar down,
+        // card and all. Its clear room is trimmed there instead.
+        Assert.True(w.Position.Y >= MacBook.WorkingArea.Y, $"window top {w.Position.Y}");
+        Assert.True(w.Position.X + w.ClientSize.Width <= MacBook.WorkingArea.Right, $"window right {w.Position.X + w.ClientSize.Width}");
         Assert.False(w.ShowActivated);
         Assert.True(w.Topmost);
         Assert.False(w.ShowInTaskbar);
@@ -85,6 +94,38 @@ public class ToastShelfTests
         var card = rig.Card(n);
         Assert.Equal(Pc.WorkingArea.Right - 12, card.Right);
         Assert.Equal(Pc.WorkingArea.Bottom - 12, card.Bottom);
+        // Its clear room never reaches over the taskbar (where it would take the taskbar's clicks) or off the display.
+        var w = rig.Shelf.WindowOf(n)!;
+        Assert.True(w.Position.Y + w.ClientSize.Height <= Pc.WorkingArea.Bottom, $"window bottom {w.Position.Y + w.ClientSize.Height}");
+        Assert.True(w.Position.X + w.ClientSize.Width <= Pc.WorkingArea.Right, $"window right {w.Position.X + w.ClientSize.Width}");
+    }
+
+    [AvaloniaFact]
+    public void A_floating_panel_meant_just_under_the_menu_bar_lands_there_and_its_room_comes_back_lower_down()
+    {
+        ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        var w = new Floating { Content = new Border { Width = 320, Height = 240 } };
+        try
+        {
+            int room = (int)Floating.ShadowRoom;
+            // The dropdown's spot: 6 points under the menu bar, its window reaching 54 points above the usable area.
+            var at = new PixelPoint(900, MacBook.WorkingArea.Y + 6 - room);
+            w.MoveTo(at, MacBook.WorkingArea, 1);
+            w.Show();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(new PixelRect(900 + room, MacBook.WorkingArea.Y + 6, 320, 240), w.Panel());
+            Assert.Equal(MacBook.WorkingArea.Y, w.Position.Y);
+
+            // Somewhere with room all round: the whole shadow room again.
+            w.MoveTo(new PixelPoint(300, 300), MacBook.WorkingArea, 1);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(new PixelRect(300 + room, 300 + room, 320, 240), w.Panel());
+            Assert.Equal(new PixelPoint(300, 300), w.Position);
+        }
+        finally
+        {
+            w.Close();
+        }
     }
 
     [AvaloniaFact]
@@ -144,7 +185,7 @@ public class ToastShelfTests
         Assert.True(rig.Showing(n));
 
         var w = rig.Shelf.WindowOf(n)!;
-        w.MouseMove(new Point(rig.Room + 40, rig.Room + 20));
+        w.MouseMove(rig.On(n));
         Dispatcher.UIThread.RunJobs();
         Assert.True(n.Hovered);
         rig.Pass(60);
@@ -166,7 +207,7 @@ public class ToastShelfTests
         var held = Say("Filed in CS 101", "Recursion and the call stack", "Open note");
         rig.Shelf.Show(held);
         var before = rig.Card(held);
-        rig.Shelf.WindowOf(held)!.MouseMove(new Point(rig.Room + 40, rig.Room + 20));
+        rig.Shelf.WindowOf(held)!.MouseMove(rig.On(held));
         Dispatcher.UIThread.RunJobs();
 
         var late = Say("Recording saved");
@@ -238,7 +279,7 @@ public class ToastShelfTests
         var again = Say("Filed in CS 101", "Big-O, by example", "Open note", () => opened++);
         rig.Shelf.Show(again);
         var w = rig.Shelf.WindowOf(again)!;
-        var at = new Point(rig.Room + 120, rig.Room + 30);
+        var at = rig.On(again, 120, 30);
         w.MouseMove(at);
         w.MouseDown(at, MouseButton.Left);
         w.MouseUp(at, MouseButton.Left);

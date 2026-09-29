@@ -66,9 +66,48 @@ public class Floating : Window
     {
         if (!IsVisible) return null;
         double scale = DesktopScaling;
-        int room = (int)(ShadowRoom * scale);
+        var pad = holder.Padding;
         var size = PixelSize.FromSize(ClientSize, scale);
-        return new PixelRect(Position.X + room, Position.Y + room, Math.Max(0, size.Width - 2 * room), Math.Max(0, size.Height - 2 * room));
+        int left = (int)Math.Round(pad.Left * scale), top = (int)Math.Round(pad.Top * scale);
+        int width = size.Width - left - (int)Math.Round(pad.Right * scale), height = size.Height - top - (int)Math.Round(pad.Bottom * scale);
+        return new PixelRect(Position.X + left, Position.Y + top, Math.Max(0, width), Math.Max(0, height));
+    }
+
+    /// <summary>
+    /// Puts the window where <paramref name="at"/> says (its top left with the whole shadow room round the panel, as
+    /// <see cref="Placement"/> works it out), except that it never reaches past <paramref name="area"/> (the display's
+    /// usable area): the clear room on that side shrinks instead, so the panel lands exactly where it was meant to. A
+    /// Mac pushes any window whose top would be above its menu bar down below it, panel and all (the dropdown, the
+    /// recorder and a notification hung 60 points under the menu bar, not just under it); on Windows a window's clear
+    /// edge over the taskbar, or over the next display, takes the clicks meant for them.
+    /// </summary>
+    public void MoveTo(PixelPoint at, PixelRect area, double scale)
+    {
+        int full = (int)(ShadowRoom * scale);
+        var panel = PanelSize(scale);
+        var p = new PixelRect(at.X + full, at.Y + full, panel.Width, panel.Height);
+        int left = Math.Clamp(p.X - area.X, 0, full), top = Math.Clamp(p.Y - area.Y, 0, full);
+        int right = Math.Clamp(area.Right - p.Right, 0, full), bottom = Math.Clamp(area.Bottom - p.Bottom, 0, full);
+        var padding = new Thickness(left / scale, top / scale, right / scale, bottom / scale);
+        if (holder.Padding != padding) holder.Padding = padding;
+        var position = new PixelPoint(p.X - left, p.Y - top);
+        if (Position != position) Position = position;
+    }
+
+    /// <summary><see cref="MoveTo"/> on whichever display the panel lands on.</summary>
+    public void Put(PixelPoint at)
+    {
+        var screen = Placement.Pick(ScreenList(), new PixelPoint(at.X + (int)ShadowRoom, at.Y + (int)ShadowRoom));
+        MoveTo(at, screen.WorkingArea, screen.Scaling);
+    }
+
+    /// <summary>The panel's own size in pixels, without the room round it.</summary>
+    public PixelSize PanelSize(double scale)
+    {
+        if (holder.Child is not { } child) return default;
+        child.Measure(Size.Infinity);
+        var s = child.DesiredSize;
+        return new PixelSize((int)Math.Ceiling(s.Width * scale), (int)Math.Ceiling(s.Height * scale));
     }
 
     /// <summary>A notification: a click on it never takes the keyboard from the app you're typing in (Windows: it isn't
@@ -200,12 +239,14 @@ public class Floating : Window
     public IReadOnlyList<ScreenGeometry> ScreenList() =>
         Screens.All.Select(s => new ScreenGeometry(s.Bounds, s.WorkingArea, s.Scaling, s.IsPrimary)).ToList();
 
-    /// <summary>The size it will be, in pixels (measured before it's shown).</summary>
+    /// <summary>The size it is with the whole shadow room round the panel, in pixels (measured before it's shown):
+    /// what <see cref="Placement"/> works with. <see cref="MoveTo"/> may trim the room where it would reach past the
+    /// display's usable area.</summary>
     public PixelSize Measured(double scale)
     {
-        holder.Measure(Size.Infinity);
-        var s = holder.DesiredSize;
-        return new PixelSize((int)Math.Ceiling(s.Width * scale), (int)Math.Ceiling(s.Height * scale));
+        var panel = PanelSize(scale);
+        int room = (int)(ShadowRoom * scale);
+        return new PixelSize(panel.Width + 2 * room, panel.Height + 2 * room);
     }
 
     /// <summary>Where the pointer is on screen, in pixels: where the menu bar icon was clicked.</summary>

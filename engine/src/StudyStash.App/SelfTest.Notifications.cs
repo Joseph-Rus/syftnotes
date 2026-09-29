@@ -25,6 +25,7 @@ public static partial class SelfTest
         await Wait(1);
         if (Shell.Windows.Panel is Floating { IsVisible: true } dropdown && dropdown.Panel() is { } panel)
         {
+            CheckDropdown(panel, shelf.Screen);
             CheckNotifications(shelf, "notifications, dropdown open", [panel]);
             if (OperatingSystem.IsWindows() && shelf.Screen is { } flyoutDisplay)
                 AreaShot(Around(Stack(shelf) is { } s ? s.Union(panel) : panel, flyoutDisplay), "notifications-flyout");
@@ -37,6 +38,19 @@ public static partial class SelfTest
             Say("notifications: the dropdown didn't open to check them against");
         }
         shelf.CloseAll();
+    }
+
+    /// <summary>The dropdown hangs just under the menu bar (6 points), not pushed further down by the Mac with its
+    /// clear shadow room; the tray flyout sits 12 pixels above the taskbar.</summary>
+    static void CheckDropdown(PixelRect panel, ScreenGeometry? screen)
+    {
+        if (screen is not { } s) return;
+        var area = s.WorkingArea;
+        bool mac = OperatingSystem.IsMacOS();
+        int want = mac ? area.Y + (int)(6 * s.Scaling) : area.Bottom - (int)(Placement.Gap * s.Scaling);
+        int got = mac ? panel.Y : panel.Bottom;
+        Say(Math.Abs(got - want) <= 1 ? $"dropdown: {(mac ? "top" : "bottom")} at {got}, just {(mac ? "under the menu bar" : "above the taskbar")}"
+            : $"FAILED dropdown: its {(mac ? "top" : "bottom")} is at {got}, not {want} ({panel} in {area})");
     }
 
     /// <summary>Every card on screen, as one rectangle.</summary>

@@ -201,7 +201,7 @@ public sealed class ToastShelf
             var w = shown[order[i]].Window;
             if (spots[i] is { } at)
             {
-                if (w.Position != at) w.Position = at;
+                w.MoveTo(at, screen.WorkingArea, screen.Scaling);
                 order[i].Wait(false, now);
                 if (!w.IsVisible) w.Show();
             }
