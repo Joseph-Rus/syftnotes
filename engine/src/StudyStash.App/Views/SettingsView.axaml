@@ -631,7 +631,7 @@
                     <Border Classes="row">
                       <StackPanel Spacing="2" VerticalAlignment="Center">
                         <TextBlock Classes="row-title" Text="Speech models" />
-                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT) and NVIDIA Parakeet TDT 0.6B v3 (CC BY 4.0, converted to ONNX by sherpa-onnx). They run on this computer and download only when you pick them." TextWrapping="Wrap" />
+                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT); NVIDIA Parakeet TDT 0.6B v3 and TitaNet small (CC BY 4.0) and pyannote segmentation 3.0 (MIT), converted to ONNX by sherpa-onnx. They run on this computer and download only when you pick them." TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
                     <Border Classes="rowsep" />
@@ -863,6 +863,10 @@
                 <CheckBox IsVisible="{Binding CanRecordComputerAudio}" IsChecked="{Binding ComputerAudio}" Margin="0,16,0,0">
                   <TextBlock Text="Also record what this computer plays (a lecture on Zoom or Teams)" FontSize="13" />
                 </CheckBox>
+                <CheckBox IsChecked="{Binding Speakers}" Margin="0,16,0,0">
+                  <TextBlock Text="Tell speakers apart in the transcript" FontSize="13" />
+                </CheckBox>
+                <TextBlock Classes="say" Text="{Binding SpeakersLine}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left" />
                 <TextBlock Classes="section" Text="Keep recordings" />
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Border Classes="field" Width="64"><TextBox Classes="bare" Text="{Binding KeepAudio}" FontSize="13" /></Border>

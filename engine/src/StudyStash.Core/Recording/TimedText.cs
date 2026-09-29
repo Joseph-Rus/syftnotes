@@ -1,11 +1,13 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 namespace StudyStash.Core;
 
-/// <summary>One stretch of speech: when it starts and ends in the recording (seconds), and what was said.</summary>
-public sealed record Spoken(double Start, double End, string Text);
+/// <summary>One stretch of speech: when it starts and ends in the recording (seconds), what was said, and whose voice it
+/// was: 1, 2, 3… by how much each spoke (see <see cref="Speakers"/>), or 0 when voices weren't told apart.</summary>
+public sealed record Spoken(double Start, double End, string Text, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Speaker = 0);
 
 /// <summary>
 /// A recording's transcript as the library keeps it: one "[18:05] what was said" line per stretch of speech, so a
@@ -33,15 +35,21 @@ public static partial class TimedText
         return m >= 60 ? $"{m / 60} h {m % 60:00} min" : $"{m} min";
     }
 
+    /// <summary>The lines of a transcript. Where voices were told apart, a line says "Speaker 2: " when the voice
+    /// changes from the line before, and only then.</summary>
     public static string Format(IEnumerable<Spoken> segments)
     {
         var sb = new StringBuilder();
+        int voice = 0;
         foreach (var s in segments)
         {
             string text = Tidy(s.Text);
             if (text.Length == 0) continue;
             if (sb.Length > 0) sb.Append('\n');
-            sb.Append('[').Append(Clock(s.Start)).Append("] ").Append(text);
+            sb.Append('[').Append(Clock(s.Start)).Append("] ");
+            if (s.Speaker > 0 && s.Speaker != voice) sb.Append("Speaker ").Append(s.Speaker.ToString(CultureInfo.InvariantCulture)).Append(": ");
+            voice = s.Speaker;
+            sb.Append(text);
         }
         return sb.ToString();
     }

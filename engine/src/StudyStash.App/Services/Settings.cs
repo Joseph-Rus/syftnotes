@@ -169,6 +169,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     List<WhisperModel> spare = [];
     [ObservableProperty] public partial string Language { get; set; } = "";
     [ObservableProperty] public partial bool ComputerAudio { get; set; }
+    [ObservableProperty] public partial bool Speakers { get; set; }
+    /// <summary>Under "Tell speakers apart": what it does, or where its model is.</summary>
+    [ObservableProperty] public partial string SpeakersLine { get; set; } = "";
     [ObservableProperty] public partial string KeepAudio { get; set; } = "30";
     [ObservableProperty] public partial bool Shortcuts { get; set; }
     /// <summary>Which shortcut (if either) another app already has, once the toggle's had a moment to try them.</summary>
@@ -327,6 +330,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         LibraryHere = host.Settings.LibraryHere;
         Language = host.Settings.Language;
         ComputerAudio = host.Settings.ComputerAudio;
+        Speakers = host.Settings.Speakers;
+        SpeakersLine = SpeakersWords(host);
         KeepAudio = host.Settings.KeepAudioDays.ToString(System.Globalization.CultureInfo.InvariantCulture);
         Shortcuts = host.Settings.Shortcuts;
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
@@ -428,6 +433,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(CanStopLibrary));
         ShortcutsSay = Shell.ShortcutsSay();
         ModelLine = ModelWords(host);
+        SpeakersLine = SpeakersWords(host);
         ModelAdviceLine = AdviceWords(host.Model, advice);
         ModelDownloading = host.Downloading is not null;
         ModelProgress = host.Downloading?.Fraction ?? 0;
@@ -503,6 +509,27 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     partial void OnComputerAudioChanged(bool value)
     {
         if (!loading) host.Save(s => s.ComputerAudio = value);
+    }
+
+    partial void OnSpeakersChanged(bool value)
+    {
+        if (loading) return;
+        host.Save(s => s.Speakers = value);
+        host.EnsureSpeakerModel();
+        SpeakersLine = SpeakersWords(host);
+    }
+
+    /// <summary>The line under "Tell speakers apart": what it does while it's off, and once it's on, whether its model is
+    /// here, coming, or waiting for the transcription model's download to end.</summary>
+    public static string SpeakersWords(AppHost host)
+    {
+        string size = WhisperModel.SizeOf(WhisperModels.Speakers.Bytes);
+        if (!host.Settings.Speakers)
+            return $"Marks in the transcript where a voice other than the lecturer's seems to speak (\"Speaker 2:\"), so a student's question isn't taken for the lecturer's words. Experimental: it can be wrong. Done on this computer after the lecture; needs a {size} download.";
+        if (host.SpeakerModelReady) return "On. Each lecture's voices are told apart after it's written down, on this computer. A lecture under 2 minutes or over 3 hours is left alone.";
+        if (host.DownloadProblem is { } problem && host.DownloadingModel?.Id == WhisperModels.Speakers.Id) return problem;
+        if (host.Downloading is { } d && host.DownloadingModel?.Id == WhisperModels.Speakers.Id) return $"Downloading the voice model: {d.Amount}.";
+        return $"On. The voice model ({size}) downloads once the transcription model is here.";
     }
 
     partial void OnShortcutsChanged(bool value)
