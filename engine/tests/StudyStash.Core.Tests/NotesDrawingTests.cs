@@ -124,14 +124,15 @@ public class NotesDrawingTests
         var ollama = new Recording("ollama", _ => "## Summary\nThe heart fills, then pumps.");
         var claude = new Recording("claude", _ => "## Summary\nThe heart fills, then pumps.");
         var ai = new AiJobs(cfg.Home) { Providers = id => id == "claude" ? claude : ollama, Checks = new FakeChecks().Installed("claude").Build() };
+        new AiSettings { Diagrams = "notes" }.Save(cfg.Home); // the notes engine draws its own (no diagram pass)
 
-        Assert.Equal("## Summary\nThe heart fills, then pumps.", await ai.SummarizeAsync(Lecture, cfg)); // no ai.json: notes on Ollama
+        Assert.Equal("## Summary\nThe heart fills, then pumps.", await ai.SummarizeAsync(Lecture, cfg)); // notes on Ollama
         await ai.WriteNotesAsync(Lecture, cfg, "ollama", null, CancellationToken.None);
         Assert.Equal(2, ollama.Prompts.Count);
         Assert.All(ollama.Prompts, p => Assert.Contains(Summarize.MermaidExample, p));
         Assert.All(ollama.Prompts, p => Assert.False(AsksForSvg(p)));
 
-        new AiSettings { Provider = "claude", Fallback = false }.Save(cfg.Home);
+        new AiSettings { Provider = "claude", Fallback = false, Diagrams = "notes" }.Save(cfg.Home);
         await ai.SummarizeAsync(Lecture, cfg);
         await ai.WriteNotesAsync(Lecture, cfg, "claude", null, CancellationToken.None);
         Assert.Equal(2, claude.Prompts.Count);

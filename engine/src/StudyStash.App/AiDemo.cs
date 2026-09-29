@@ -15,7 +15,10 @@ public static class AiDemo
         new EngineInfo("gemini", "Gemini", "not_installed") { Site = "https://ai.google.dev/gemini-api" },
     ];
 
-    public static AiOverview Overview() => new(Engines: Engines_, Notes: "ollama", Ask: "claude", Fallback: true, Problems: []);
+    public static AiOverview Overview() => new(Engines: Engines_, Notes: "ollama", Ask: "claude", Fallback: true, Problems: [])
+    {
+        Diagrams = "auto", DiagramsBy = "claude",
+    };
 
     /// <summary>The library setup step's own overview: nobody has picked who answers yet, so it starts as Same as
     /// notes (the design's first choice), not whatever <see cref="Overview"/> settled on for the engines pane.</summary>
@@ -39,7 +42,7 @@ public static class AiDemo
     sealed class Library(AiOverview overview, Func<string, RewriteInfo?>? rewrite = null) : IAiLibrary
     {
         public Task<AiOverview?> EnginesAsync() => Task.FromResult<AiOverview?>(overview);
-        public Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null) => Task.FromResult<AiOverview?>(overview);
+        public Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null, string? diagrams = null) => Task.FromResult<AiOverview?>(overview);
         public Task<AiSaid?> StartAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> DownloadAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> SignInAsync(string engine) => Task.FromResult<AiSaid?>(null);

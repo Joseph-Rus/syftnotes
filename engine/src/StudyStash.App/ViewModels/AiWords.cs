@@ -68,6 +68,26 @@ public static partial class AiWords
         : state == "ready" ? "Runs on your library. Signed in."
         : "Runs on your library.";
 
+    /// <summary>A diagrams pick as its menu says it: Automatic · Same as notes · an engine · Off.</summary>
+    public static string DiagramsChoiceName(string id) => id switch
+    {
+        DiagramEngines.Auto => "Automatic",
+        DiagramEngines.SameAsNotes => "Same as notes",
+        DiagramEngines.Off => "Off",
+        _ => Engines.Name(id),
+    };
+
+    /// <summary>The diagrams row's line, saying where each transcript goes to be drawn from: off draws none; same as
+    /// notes, the notes engine as it writes; otherwise the engine the pick comes to on the library right now.</summary>
+    public static string DiagramsAbout(string choice, string by) => choice switch
+    {
+        DiagramEngines.Off => "New notes have no diagrams",
+        DiagramEngines.SameAsNotes => "The notes engine draws them as it writes",
+        _ when by == "ollama" => "Ollama reads each transcript, on your library",
+        _ when by.Length > 0 => $"{Engines.Name(by)} reads each transcript",
+        _ => "From each transcript, after the notes",
+    };
+
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup
     /// the library is this computer.</summary>
     public static string SetupAbout(string id, string state, string device = "computer") => id == "ollama"

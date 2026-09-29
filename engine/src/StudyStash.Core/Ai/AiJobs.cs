@@ -132,21 +132,123 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// SVG holds together, may draw what's spatial too.</summary>
     public static Drawings DrawingsFor(string engine) => engine == "ollama" ? Drawings.Flowcharts : Drawings.FlowchartsAndSvg;
 
-    /// <summary>Writing study notes.</summary>
-    public Task<string> SummarizeAsync(Meeting m, Config cfg)
+    /// <summary>Writing study notes, then their diagrams (<see cref="DiagramsAsync"/>).</summary>
+    public async Task<string> SummarizeAsync(Meeting m, Config cfg)
     {
-        if (NotesOnOllama(Settings))
-            return Providers is null
-                ? Core.Summarize.SummarizeTranscriptAsync(m, cfg)
+        var settings = Settings;
+        bool onOllama = NotesOnOllama(settings);
+        var (drawings, designer) = await DiagramPlanAsync(m, cfg, settings, onOllama ? "ollama" : settings.For("notes").Provider);
+        string notes;
+        if (onOllama)
+            notes = Providers is null
+                ? await Core.Summarize.SummarizeTranscriptAsync(m, cfg, drawings: drawings)
                 // A test's fake Ollama: the same prompts and sizing as the real one's, through the fake.
-                : Core.Summarize.SummarizeTranscriptAsync(m, cfg,
+                : await Core.Summarize.SummarizeTranscriptAsync(m, cfg,
                     chat: (_, _, prompt, _) => AnswerWithAsync("ollama", "", prompt, CancellationToken.None),
-                    show: (_, _) => Task.FromResult<int?>(null));
-        // Other models read a whole lecture at once: tell the splitter their context is large.
-        return Core.Summarize.SummarizeTranscriptAsync(m, cfg,
-            chat: (_, _, prompt, _) => AnswerAsync("notes", prompt),
-            show: (_, _) => Task.FromResult<int?>(200_000),
-            drawings: Drawings.FlowchartsAndSvg);
+                    show: (_, _) => Task.FromResult<int?>(null), drawings: drawings);
+        else
+            // Other models read a whole lecture at once: tell the splitter their context is large.
+            notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg,
+                chat: (_, _, prompt, _) => AnswerAsync("notes", prompt),
+                show: (_, _) => Task.FromResult<int?>(200_000),
+                drawings: drawings);
+        return designer is null ? notes : await DiagramsAsync(m, cfg, notes, designer, CancellationToken.None);
+    }
+
+    /// <summary>How long the notes' diagrams may take, all told (a test makes it short).</summary>
+    public TimeSpan DiagramTimeout { get; init; } = DiagramDesign.Timeout;
+
+    /// <summary>Where the library's own log goes (a lecture's diagram pass says what it did there); nowhere when unset.</summary>
+    public Action<string>? Log { get; init; }
+
+    /// <summary>
+    /// What notes written by <paramref name="notesEngine"/> are told about diagrams, and who designs them after:
+    /// diagrams off, or a lecture too short for one, draws none; "same as notes" (or no designer to be had) leaves the
+    /// notes engine drawing its own, as before there was a diagram pass; otherwise the notes draw none and the
+    /// designer (<see cref="DiagramEngines.PickAsync"/>) adds them.
+    /// </summary>
+    async Task<(Drawings Notes, DiagramPick? Designer)> DiagramPlanAsync(Meeting m, Config cfg, AiSettings settings, string notesEngine)
+    {
+        Drawings own = DrawingsFor(notesEngine);
+        switch (DiagramEngines.Normal(settings.Diagrams))
+        {
+            case DiagramEngines.Off:
+                return (Drawings.None, null);
+            case DiagramEngines.SameAsNotes:
+                return (own, null);
+        }
+        if (DiagramDesign.Cap(m.Transcript) == 0) return (Drawings.None, null);
+        var pick = await DiagramEngines.PickAsync(settings, cfg, Checks, notesEngine);
+        return pick is null ? (own, null) : (Drawings.None, pick);
+    }
+
+    /// <summary>
+    /// The diagram pass over freshly written notes, with the designer <paramref name="pick"/> names: at most
+    /// <see cref="DiagramTimeout"/>, and never a failure of the notes — an engine that can't answer, a reply that
+    /// can't be used or a pass that runs out of time hands back <paramref name="notes"/> exactly as written. Says in
+    /// the log what it drew or why it drew nothing. Only the caller's own cancelling (a rewrite stopped) throws.
+    /// </summary>
+    async Task<string> DiagramsAsync(Meeting m, Config cfg, string notes, DiagramPick pick, CancellationToken ct)
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        string who = pick.Engine == "ollama" ? pick.Model : Provider(pick.Engine).Name + (pick.Model.Length > 0 ? " " + pick.Model : "");
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(DiagramTimeout);
+        try
+        {
+            bool local = pick.Engine == "ollama" && Providers is null;
+            int ctx = local ? await Core.Summarize.ContextSizeAsync(cfg, pick.Model) : 200_000;
+            var result = await DiagramDesign.DesignAsync(m, notes, pick.Drawings, Designer(pick, cfg, ctx, cts.Token), Core.Summarize.TranscriptBudget(ctx))
+                .WaitAsync(cts.Token);
+            if (pick.Engine != "ollama") Record(pick.Engine, true, "");
+            string left = result.Dropped.Count > 0 ? $"; left out {string.Join("; ", result.Dropped)}" : "";
+            Log?.Invoke(result.Malformed
+                ? $"[diagrams] '{m.Title}': {who}'s answer couldn't be used ({string.Join("; ", result.Dropped)}); the notes are as written"
+                : result.Drawn.Count > 0
+                    ? $"[diagrams] '{m.Title}': {who} drew {result.Drawn.Count} ({string.Join(", ", result.Drawn.Select(d => d.Title))}) in {watch.Elapsed.TotalSeconds:0}s{left}"
+                    : $"[diagrams] '{m.Title}': {who} drew none: {result.Reason}{left}");
+            return result.Notes;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            string why = e is OperationCanceledException or TimeoutException && cts.IsCancellationRequested
+                ? $"it took longer than {(DiagramTimeout.TotalMinutes >= 1 ? $"{DiagramTimeout.TotalMinutes:0} minutes" : $"{DiagramTimeout.TotalSeconds:0} seconds")}"
+                : e.Message;
+            if (pick.Engine != "ollama") Record(pick.Engine, false, why);
+            Log?.Invoke($"[diagrams] '{m.Title}': {who} couldn't design diagrams ({why}); the notes are as written");
+            return notes;
+        }
+    }
+
+    /// <summary>
+    /// The designer, one prompt at a time (its design, then any repair): a local model straight through Ollama, held
+    /// to JSON where the answer must be; a CLI engine with its strongest model and high effort. A CLI that turns those
+    /// down (an older one without --effort, a plan without that model) is asked again as the student set it up, and
+    /// so from then on; a usage limit or a sign-in problem isn't something asking again fixes.
+    /// </summary>
+    Func<string, bool, Task<string>> Designer(DiagramPick pick, Config cfg, int ctx, CancellationToken ct)
+    {
+        if (pick.Engine == "ollama" && Providers is null)
+            return (prompt, json) => Core.Summarize.OllamaGenerateAsync(cfg, pick.Model, prompt, ctx, timeout: DiagramTimeout, json: json, ct: ct);
+        var provider = Provider(pick.Engine);
+        var strong = new AiRequest("", Scratch()) { Model = pick.Model, Effort = pick.Effort, Timeout = DiagramTimeout };
+        var plain = strong with { Model = pick.Engine == "ollama" ? "" : Settings.Models.GetValueOrDefault(pick.Engine, ""), Effort = "" };
+        bool asSetUp = strong == plain;
+        return async (prompt, _) =>
+        {
+            var r = await provider.CompleteAsync((asSetUp ? plain : strong) with { Prompt = prompt }, ct);
+            if (!r.Ok && !asSetUp && !ct.IsCancellationRequested && !Engines.LooksLikeLimit(r.Text) && !Engines.LooksLikeAuth(r.Text))
+            {
+                asSetUp = true;
+                r = await provider.CompleteAsync(plain with { Prompt = prompt }, ct);
+            }
+            if (!r.Ok) throw new InvalidOperationException($"{provider.Name}: {r.Text}");
+            return r.Text;
+        };
     }
 
     /// <summary>Rewrite a lecture's notes with a chosen engine — the "Rewrite notes with" menu's own choice, not
@@ -157,24 +259,39 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// estimate of how many parts the transcript needs (long lectures may need a few more, to merge them). Cancelling
     /// a real Ollama run is best-effort only — Ollama's own call has no way to stop mid-generation — so the caller
     /// marks that job cancelled itself and drops whatever this returns.</summary>
-    public Task<string> WriteNotesAsync(Meeting m, Config cfg, string engine, Action<int, int>? progress, CancellationToken ct)
+    public async Task<string> WriteNotesAsync(Meeting m, Config cfg, string engine, Action<int, int>? progress, CancellationToken ct)
     {
+        // The diagrams come after the notes, from the student's diagrams pick, this rewrite's engine being the one
+        // that reads the lecture; a designer is one more step in the progress.
+        var (drawings, designer) = await DiagramPlanAsync(m, cfg, Settings, engine);
+        string notes;
+        int done = 0, parts;
         if (engine == "ollama" && Providers is null)
-            return Core.Summarize.SummarizeTranscriptAsync(m, cfg);
-        string model = Settings.Models.GetValueOrDefault(engine, "");
-        const int ctx = 200_000; // other models read a whole lecture at once: tell the splitter their context is large
-        string text = Py.Strip(TimedText.Plain(m.Transcript));
-        int budget = Core.Summarize.TranscriptBudget(ctx);
-        int parts = text.Length <= budget ? 1 : Core.Summarize.SplitTranscript(text, budget).Count;
-        int done = 0;
-        async Task<string> ChatAsync(Config c, string mdl, string prompt, int numCtx)
         {
-            string result = await AnswerWithAsync(engine, model, prompt, ct);
-            progress?.Invoke(++done, Math.Max(done, parts));
-            return result;
+            parts = designer is null ? 1 : 2;
+            notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg, drawings: drawings);
+            progress?.Invoke(++done, parts);
         }
-        return Core.Summarize.SummarizeTranscriptAsync(m, cfg, chat: ChatAsync, show: (_, _) => Task.FromResult<int?>(ctx),
-            drawings: DrawingsFor(engine));
+        else
+        {
+            string model = Settings.Models.GetValueOrDefault(engine, "");
+            const int ctx = 200_000; // other models read a whole lecture at once: tell the splitter their context is large
+            string text = Py.Strip(TimedText.Plain(m.Transcript));
+            int budget = Core.Summarize.TranscriptBudget(ctx);
+            parts = (text.Length <= budget ? 1 : Core.Summarize.SplitTranscript(text, budget).Count) + (designer is null ? 0 : 1);
+            async Task<string> ChatAsync(Config c, string mdl, string prompt, int numCtx)
+            {
+                string result = await AnswerWithAsync(engine, model, prompt, ct);
+                progress?.Invoke(++done, Math.Max(done, parts));
+                return result;
+            }
+            notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg, chat: ChatAsync, show: (_, _) => Task.FromResult<int?>(ctx),
+                drawings: drawings);
+        }
+        if (designer is null) return notes;
+        notes = await DiagramsAsync(m, cfg, notes, designer, ct);
+        progress?.Invoke(++done, Math.Max(done, parts));
+        return notes;
     }
 
     /// <summary>The name of what wrote something with a specific engine, not ai.json's own pick for a job — the

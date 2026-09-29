@@ -66,8 +66,9 @@ public sealed partial class AiEngineRow : ObservableObject
 }
 
 /// <summary>
-/// Settings → AI engines (design 13): who writes the notes and who answers questions, every engine's state and what
-/// to do about it, and the Ollama fallback. Reads and drives one library's AI (`IAiLibrary`); the view is just this.
+/// Settings → AI engines (design 13): who writes the notes, who draws their diagrams and who answers questions, every
+/// engine's state and what to do about it, and the Ollama fallback. Reads and drives one library's AI (`IAiLibrary`);
+/// the view is just this.
 /// </summary>
 public sealed partial class AiEnginesModel : ObservableObject
 {
@@ -84,9 +85,15 @@ public sealed partial class AiEnginesModel : ObservableObject
     public ObservableCollection<AiEngineRow> AddChoices { get; } = [];
     public List<EngineChoice> NotesChoices { get; private set; } = [];
     public List<EngineChoice> AskChoices { get; private set; } = [];
+    /// <summary>Who draws the diagrams: Automatic, Same as notes, each engine, Off.</summary>
+    public List<EngineChoice> DiagramsChoices { get; private set; } = [];
 
     [ObservableProperty] public partial string SelectedNotes { get; set; } = "";
     [ObservableProperty] public partial string SelectedAsk { get; set; } = "";
+    /// <summary>The diagrams pick ("" from a library too old to have one: the row isn't shown).</summary>
+    [ObservableProperty] public partial string SelectedDiagrams { get; set; } = "";
+    /// <summary>The engine that pick comes to on the library right now ("" when nobody draws them).</summary>
+    [ObservableProperty] public partial string DiagramsBy { get; set; } = "";
     [ObservableProperty] public partial bool Fallback { get; set; }
     [ObservableProperty] public partial bool Busy { get; set; }
     [ObservableProperty] public partial string? Say { get; set; }
@@ -95,6 +102,10 @@ public sealed partial class AiEnginesModel : ObservableObject
 
     public string SelectedNotesName => NotesChoices.FirstOrDefault(c => c.Id == SelectedNotes)?.Name ?? SelectedNotes;
     public string SelectedAskName => AskChoices.FirstOrDefault(c => c.Id == SelectedAsk)?.Name ?? SelectedAsk;
+    public string SelectedDiagramsName => DiagramsChoices.FirstOrDefault(c => c.Id == SelectedDiagrams)?.Name ?? SelectedDiagrams;
+    /// <summary>The diagrams row's line: who reads each transcript to draw them, or that nobody does.</summary>
+    public string DiagramsAbout => AiWords.DiagramsAbout(SelectedDiagrams, DiagramsBy);
+    public bool HasDiagrams => SelectedDiagrams.Length > 0;
     public bool HasAddChoices => AddChoices.Count > 0;
     public string OlderLibraryWords => AiWords.OlderLibraryWords;
 
@@ -114,6 +125,17 @@ public sealed partial class AiEnginesModel : ObservableObject
         OnPropertyChanged(nameof(SelectedAskName));
         if (!loading) _ = PostDefaultsAsync(ask: value);
     }
+
+    partial void OnSelectedDiagramsChanged(string value)
+    {
+        EngineChoice.Mark(DiagramsChoices, value);
+        OnPropertyChanged(nameof(SelectedDiagramsName));
+        OnPropertyChanged(nameof(DiagramsAbout));
+        OnPropertyChanged(nameof(HasDiagrams));
+        if (!loading && value.Length > 0) _ = PostDefaultsAsync(diagrams: value);
+    }
+
+    partial void OnDiagramsByChanged(string value) => OnPropertyChanged(nameof(DiagramsAbout));
 
     partial void OnFallbackChanged(bool value)
     {
@@ -156,12 +178,19 @@ public sealed partial class AiEnginesModel : ObservableObject
             foreach (var c in NotesChoices) c.Pick = new RelayCommand(() => SelectedNotes = c.Id);
             AskChoices = [.. overview.Engines.Select(e => new EngineChoice(e.Id, e.Name))];
             foreach (var c in AskChoices) c.Pick = new RelayCommand(() => SelectedAsk = c.Id);
+            DiagramsChoices = [.. DiagramEngines.Choices.Select(id => new EngineChoice(id, AiWords.DiagramsChoiceName(id)))];
+            foreach (var c in DiagramsChoices) c.Pick = new RelayCommand(() => SelectedDiagrams = c.Id);
             OnPropertyChanged(nameof(NotesChoices));
             OnPropertyChanged(nameof(AskChoices));
+            OnPropertyChanged(nameof(DiagramsChoices));
             SelectedNotes = overview.Notes;
             SelectedAsk = overview.Ask;
+            DiagramsBy = overview.DiagramsBy;
+            SelectedDiagrams = overview.Diagrams;
             EngineChoice.Mark(NotesChoices, SelectedNotes);
             EngineChoice.Mark(AskChoices, SelectedAsk);
+            EngineChoice.Mark(DiagramsChoices, SelectedDiagrams);
+            OnPropertyChanged(nameof(SelectedDiagramsName));
             Fallback = overview.Fallback;
 
             Engines.Clear();
@@ -295,12 +324,12 @@ public sealed partial class AiEnginesModel : ObservableObject
         else await Load();
     }
 
-    async Task PostDefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null)
+    async Task PostDefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null, string? diagrams = null)
     {
         Busy = true;
         try
         {
-            var overview = await library.DefaultsAsync(notes, ask, fallback);
+            var overview = await library.DefaultsAsync(notes, ask, fallback, diagrams);
             Apply(overview);
         }
         catch (LibraryRefusedException ex)

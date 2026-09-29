@@ -248,6 +248,16 @@ public static class Engines
             problems.Add(new AiProblemInfo(pid, "usage_limit", id, Name(id)) { Until = until });
         }
 
-        return new AiOverview(engines, settings.For("notes").Provider, settings.For("ask").Provider, settings.Fallback, problems);
+        // Who draws the diagrams now: nobody when they're off, the designer the pick comes to, else the notes engine
+        // itself (as it writes), the one the notes really go to once a fallback is counted.
+        string notesNow = settings.For("notes").Provider;
+        if (notesNow != "ollama" && settings.Fallback && KnownUnusableWhy(notesNow, settings, checks) is not null) notesNow = "ollama";
+        string diagrams = DiagramEngines.Normal(settings.Diagrams);
+        string by = diagrams == DiagramEngines.Off ? ""
+            : (await DiagramEngines.PickAsync(settings, cfg, checks, notesNow))?.Engine ?? notesNow;
+        return new AiOverview(engines, settings.For("notes").Provider, settings.For("ask").Provider, settings.Fallback, problems)
+        {
+            Diagrams = diagrams, DiagramsBy = by,
+        };
     }
 }

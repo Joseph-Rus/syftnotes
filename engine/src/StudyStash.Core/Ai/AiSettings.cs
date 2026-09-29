@@ -15,6 +15,7 @@ public sealed record AiChoice(string Provider, string Model = "");
 /// <item><c>ask</c>: answering questions from your notes;</item>
 /// <item><c>agent</c>: work that reads around and uses tools (Canvas, the chat that can change notes).</item>
 /// </list>
+/// Diagrams have a pick of their own (<see cref="Diagrams"/>): a separate pass after the notes, automatic by default.
 /// With no ai.json, everything is the library's Ollama model, as before.
 /// </summary>
 public sealed class AiSettings
@@ -36,6 +37,9 @@ public sealed class AiSettings
     public Dictionary<string, string> Limits { get; set; } = [];
     /// <summary>Problem ids the student has closed, hidden until the problem changes (a new usage limit, say).</summary>
     public List<string> Dismissed { get; set; } = [];
+    /// <summary>Who draws the diagrams in the notes: <c>auto</c>, <c>notes</c> (the notes engine, as it writes),
+    /// <c>off</c>, or an engine's id (<see cref="DiagramEngines"/>).</summary>
+    public string Diagrams { get; set; } = DiagramEngines.Auto;
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "ai.json");
 
