@@ -89,29 +89,22 @@ public static partial class Shell
         });
     }
 
-    /// <summary>The problems showing at the last look, and when each was last said.</summary>
-    static HashSet<ProblemKind> problemsNow = [];
-    static readonly Dictionary<ProblemKind, DateTime> problemSaid = [];
+    static readonly ProblemNotices problemNotices = new();
 
-    /// <summary>A problem that stops lectures being written down or filed (<see cref="NoticeWords.WorthNotifying"/>)
-    /// is said once when it starts, with its fix as the button, and stays until it's over or closed. Not during setup
-    /// (setup shows it), and not again within ten minutes if it comes and goes.</summary>
-    static void SayNewProblems(IReadOnlyList<AppProblem> problems)
+    /// <summary>What's wrong changed (<see cref="Refresh"/>): see <see cref="ProblemNotices"/>.</summary>
+    static void SayNewProblems(IReadOnlyList<AppProblem> problems) => problemNotices.Seen(problems, DateTime.UtcNow);
+
+    /// <summary>Four times a second: a problem that has lasted a moment is said, with its fix as the button, and stays
+    /// until it's over or closed.</summary>
+    static void SaySettledProblems()
     {
-        var before = problemsNow;
-        problemsNow = [.. problems.Select(p => p.Kind)];
-        if (!host.Settings.SetupDone || setupWindow?.IsVisible == true) return;
-        var now = DateTime.UtcNow;
-        foreach (var p in problems)
+        foreach (var p in problemNotices.Due(DateTime.UtcNow, quiet: !host.Settings.SetupDone || setupWindow?.IsVisible == true))
         {
-            if (before.Contains(p.Kind) || !NoticeWords.WorthNotifying(p.Kind)) continue;
-            if (problemSaid.TryGetValue(p.Kind, out var said) && now - said < TimeSpan.FromMinutes(10)) continue;
-            problemSaid[p.Kind] = now;
             var kind = p.Kind;
             Notify(new Notice
             {
                 Title = p.Title, Text = ToastWords.Plain(p.Detail), ActionLabel = p.HasAction ? p.ActionLabel : null, Act = () => FixProblem(kind),
-                UntilClosed = true, StillTrue = () => problemsNow.Contains(kind),
+                UntilClosed = true, StillTrue = () => problemNotices.Showing(kind),
             });
         }
     }

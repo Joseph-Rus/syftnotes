@@ -1177,6 +1177,7 @@ public static partial class Shell
 
     static void Tick()
     {
+        SaySettledProblems();
         if (setup is not null && micCheck is not null) Setup.TickMic(setup, host, micCheck);
         var live = host.Recorder.Current;
         if (live is null) return;
