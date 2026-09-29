@@ -414,6 +414,30 @@ public static partial class SelfTest
 
     // --- recording -----------------------------------------------------------------------------------------------
 
+    /// <summary>The pill dragged past a Mac's menu bar, or Windows' taskbar, stops right against it: the system doesn't
+    /// push it back a shadow's width. Then it goes back to its corner.</summary>
+    static async Task CheckRecorderDragAsync()
+    {
+        if (Shell.Windows.Recorder is not Floating w || w.Panel() is not { } before) return;
+        var screen = Placement.Pick(w.ScreenList(), before.Center);
+        var area = screen.WorkingArea;
+        bool mac = OperatingSystem.IsMacOS();
+        int room = (int)(Floating.ShadowRoom * screen.Scaling);
+        // Well past the edge, as a quick flick of the pointer would take it.
+        var pointer = new PixelPoint(area.X + area.Width / 2, mac ? area.Y + 2 : area.Bottom - 2);
+        Shell.Windows.DragRecorder(new PixelPoint(pointer.X - before.Width / 2 - room, mac ? area.Y - 400 : area.Bottom + 400), pointer);
+        await Wait(0.5);
+        if (w.Panel() is { } after)
+        {
+            int want = mac ? area.Y : area.Bottom, got = mac ? after.Y : after.Bottom;
+            string edge = mac ? "top" : "bottom";
+            Say(Math.Abs(got - want) <= 1 ? $"recorder dragged {(mac ? "up to the menu bar" : "down to the taskbar")}: its {edge} at {got}, right against it"
+                : $"FAILED recorder drag: its {edge} is at {got}, not {want} ({after} in {area})");
+        }
+        Shell.Windows.ShowRecorder(expanded: false);
+        await Wait(0.3);
+    }
+
     static async Task RunRecordingAsync(AppHost host)
     {
         await PanelShot("panel-idle");
@@ -425,6 +449,7 @@ public static partial class SelfTest
         if (live is null) throw new InvalidOperationException("Record didn't start a lecture");
         await Wait(1.5);
         Shot(Shell.Windows.Recorder, "recorder-pill");
+        await CheckRecorderDragAsync();
 
         Shell.Windows.TogglePause();
         await Wait(0.5);

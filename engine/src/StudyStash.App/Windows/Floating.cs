@@ -97,7 +97,7 @@ public class Floating : Window
     /// <summary><see cref="MoveTo"/> on whichever display the panel lands on.</summary>
     public void Put(PixelPoint at)
     {
-        var screen = Placement.Pick(ScreenList(), new PixelPoint(at.X + (int)ShadowRoom, at.Y + (int)ShadowRoom));
+        var screen = Placement.PanelScreen(at, ScreenList(), ShadowRoom);
         MoveTo(at, screen.WorkingArea, screen.Scaling);
     }
 

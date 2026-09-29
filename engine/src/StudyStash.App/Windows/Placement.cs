@@ -83,6 +83,25 @@ public static class Placement
             : new PixelPoint(d.WorkingArea.Right - size.Width - gap + room, d.WorkingArea.Bottom - size.Height - gap + room);
     }
 
+    /// <summary>The recorder as it's dragged: at <paramref name="at"/> (its top left with the whole shadow room, where
+    /// the pointer has taken it), but with the panel kept inside the usable area of the display the pointer is on. A
+    /// Mac pushes a window that reaches into its menu bar down below it, shadow room and all, so the pill used to stop
+    /// a shadow's width short of the menu bar; on Windows it could slide under the taskbar.</summary>
+    public static PixelPoint Dragged(PixelPoint at, PixelPoint pointer, IReadOnlyList<ScreenGeometry> screens, PixelSize size, int room) =>
+        Clamp(Pick(screens, pointer).WorkingArea, size, at.X, at.Y, room);
+
+    /// <summary>The display a floating window's panel lands on, given the window's top left with its whole shadow room
+    /// round the panel: <paramref name="roomPoints"/> points, which is more pixels on a sharper display.</summary>
+    public static ScreenGeometry PanelScreen(PixelPoint at, IReadOnlyList<ScreenGeometry> screens, double roomPoints)
+    {
+        foreach (var s in screens)
+        {
+            int room = (int)(roomPoints * s.Scaling);
+            if (s.Bounds.Contains(new PixelPoint(at.X + room, at.Y + room))) return s;
+        }
+        return Pick(screens, at);
+    }
+
     /// <summary>The library window's last spot, if its title bar would still land on a display (so it can be seen
     /// and dragged); otherwise null, and the window opens centred. Left hanging off an edge, it stays that way (as a
     /// Mac or Windows window would), but never with its title bar under the menu bar; too big for the display now, it
