@@ -175,8 +175,9 @@ public static class Cli
             if (Flag("--no-ollama")) cfg.OllamaEnabled = false;
             Console.WriteLine($"studystash {Engine.Version}: pool '{cfg.PoolName}' on port {cfg.WebPort}");
             using var store = new Store(cfg.DbPath, cfg.PoolDir);
-            // Notes, sorting and Ask use the AI picked in Settings (ai.json): Ollama unless another is chosen.
-            var ai = new AiJobs(home, () => cfg.OllamaHost);
+            // Notes, sorting and Ask use the AI picked in Settings (ai.json): Ollama unless another is chosen. The notes'
+            // diagram pass says in the log what it drew, or why nothing.
+            var ai = new AiJobs(home, () => cfg.OllamaHost) { Log = Console.WriteLine };
             var pipeline = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg));
             var working = pipeline.Start(stop.Token);
             Task updating = Task.CompletedTask;

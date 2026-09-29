@@ -36,6 +36,10 @@ public sealed record PullInfo(string Model, double Fraction, string Why);
 public sealed record AiOverview(List<EngineInfo> Engines, string Notes, string Ask, bool Fallback, List<AiProblemInfo> Problems)
 {
     public PullInfo? Pulling { get; init; }
+    /// <summary>Who draws the notes' diagrams: auto | notes | off | an engine's id ("" from a library too old to say).</summary>
+    public string Diagrams { get; init; } = "";
+    /// <summary>The engine that choice comes to right now on the library ("" when nobody draws them).</summary>
+    public string DiagramsBy { get; init; } = "";
 }
 
 /// <summary>What an action said, and the library's state right after doing it.</summary>
@@ -106,7 +110,7 @@ public sealed record ToolAccessInfo(bool On, ReadingScopes Reading, List<ToolCon
 public interface IAiLibrary
 {
     Task<AiOverview?> EnginesAsync();
-    Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null);
+    Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null, string? diagrams = null);
     Task<AiSaid?> StartAsync(string engine);
     Task<AiSaid?> DownloadAsync(string engine);
     Task<AiSaid?> SignInAsync(string engine);
@@ -180,12 +184,13 @@ public sealed class AiRemote(string serverUrl, string key, HttpClient? http = nu
 
     public async Task<AiOverview?> EnginesAsync() => As<AiOverview>(await SendAsync(HttpMethod.Get, "/engines"));
 
-    public async Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null)
+    public async Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null, string? diagrams = null)
     {
         var body = new JsonObject();
         if (notes is not null) body["notes"] = notes;
         if (ask is not null) body["ask"] = ask;
         if (fallback is not null) body["fallback"] = fallback.Value;
+        if (diagrams is not null) body["diagrams"] = diagrams;
         return As<AiOverview>(await SendAsync(HttpMethod.Post, "/defaults", body));
     }
 

@@ -108,13 +108,14 @@ public sealed partial class LibraryWeb
         app.MapPost("/api/v2/ai/defaults", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
-            string? notes = Str(body, "notes"), ask = Str(body, "ask");
+            string? notes = Str(body, "notes"), ask = Str(body, "ask"), diagrams = Str(body, "diagrams");
             bool? fallback = body?["fallback"] is JsonValue fv && fv.TryGetValue(out bool f) ? f : null;
             foreach (string? id in new[] { notes, ask })
                 if (id is not null && !Engines.Order.Contains(id)) return Http.Detail(400, $"there's no AI called {id}");
+            if (diagrams is not null && !DiagramEngines.Choices.Contains(diagrams)) return Http.Detail(400, $"there's no AI called {diagrams}");
             var overview = await AiOverviewAsync();
-            foreach (string? id in new[] { notes, ask })
-                if (id is not null && overview.Engines.First(e => e.Id == id) is { Installed: false } row)
+            foreach (string? id in new[] { notes, ask, diagrams })
+                if (id is not null && overview.Engines.FirstOrDefault(e => e.Id == id) is { Installed: false } row)
                     return Http.Detail(409, $"{row.Name} isn't installed on your library's computer.");
             var settings = AiSettings.Load(cfg.Home);
             if (notes is not null) settings.ByJob["notes"] = new AiChoice(notes);
@@ -124,6 +125,7 @@ public sealed partial class LibraryWeb
                 settings.ByJob["agent"] = new AiChoice(ask); // the chat that answers questions follows "ask"
             }
             if (fallback is not null) settings.Fallback = fallback.Value;
+            if (diagrams is not null) settings.Diagrams = diagrams;
             settings.Save(cfg.Home);
             return AiJson(await AiOverviewAsync());
         })));

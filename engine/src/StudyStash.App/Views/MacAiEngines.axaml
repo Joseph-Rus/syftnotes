@@ -1,5 +1,5 @@
-<!-- Settings → AI engines (design 13): who writes the notes and who answers questions, every engine's state and what
-     to do about it, and the Ollama fallback. The pane's own padding and scrolling; the settings window is the host's. -->
+<!-- Settings → AI engines (design 13): who writes the notes, who draws their diagrams and who answers questions, every
+     engine's state and what to do about it, and the Ollama fallback. The pane's own padding and scrolling; the settings window is the host's. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -41,6 +41,24 @@
                 </Border>
                 <Button.Flyout>
                   <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding NotesChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
+                </Button.Flyout>
+              </Button>
+            </Grid>
+            <Border Classes="ai-sep" IsVisible="{Binding HasDiagrams}" />
+            <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" Margin="16,8" IsVisible="{Binding HasDiagrams}">
+              <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+                <TextBlock Classes="ai-row-title" Text="Draws diagrams" />
+                <TextBlock Classes="ai-row-sub" Text="{Binding DiagramsAbout}" TextWrapping="Wrap" />
+              </StackPanel>
+              <Button Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
+                <Border Classes="ai-select">
+                  <Grid ColumnDefinitions="*,6,Auto">
+                    <TextBlock Text="{Binding SelectedDiagramsName}" TextTrimming="CharacterEllipsis" />
+                    <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
+                  </Grid>
+                </Border>
+                <Button.Flyout>
+                  <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding DiagramsChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
                 </Button.Flyout>
               </Button>
             </Grid>

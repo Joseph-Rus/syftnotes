@@ -18,6 +18,8 @@ public sealed record AiRequest(string Prompt, string Cwd)
     public IReadOnlyList<string> ReadDirs { get; init; } = [];
     public bool Write { get; init; }
     public string Model { get; init; } = "";
+    /// <summary>How hard the model thinks ("high"), where its command takes a reasoning effort; "" for its own default.</summary>
+    public string Effort { get; init; } = "";
     public bool Tools { get; init; }
     /// <summary>The command that starts Study Stash's MCP server (the engine itself, told `mcp`).</summary>
     public IReadOnlyList<string> McpCommand { get; init; } = [];
@@ -328,6 +330,7 @@ public sealed class ClaudeProvider : AiProvider
         if (req.System.Length > 0 && !SystemOnInput(exe)) cmd.AddRange(["--append-system-prompt", req.System]);
         foreach (string d in req.ReadDirs) cmd.AddRange(["--add-dir", d]);
         if (req.Model.Length > 0) cmd.AddRange(["--model", req.Model]);
+        if (req.Effort.Length > 0) cmd.AddRange(["--effort", req.Effort]);
         if (req.Session.Length > 0) cmd.AddRange(["--resume", req.Session]);
         return cmd;
     }
@@ -396,6 +399,7 @@ public class CodexProvider : AiProvider
             cmd.AddRange(["-c", $"mcp_servers.{McpKey}.command={JsonSerializer.Serialize(req.McpCommand[0])}",
                 "-c", $"mcp_servers.{McpKey}.args={new JsonArray(req.McpCommand.Skip(1).Select(a => (JsonNode)a).ToArray()).ToJsonString()}"]);
         if (req.Model.Length > 0) cmd.AddRange(["-m", req.Model]);
+        if (req.Effort.Length > 0 && Id == "codex") cmd.AddRange(["-c", $"model_reasoning_effort=\"{req.Effort}\""]);
         if (req.Session.Length > 0) cmd.AddRange(["resume", req.Session]);
         cmd.Add(PromptOnInput ? "-" : WithSystem(req));
         return cmd;

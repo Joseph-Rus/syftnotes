@@ -54,6 +54,12 @@ public class AiApiTests
         var notInstalled = await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.DefaultsAsync(notes: "codex"));
         Assert.Equal(409, notInstalled.Status);
         Assert.Contains("Codex", notInstalled.Message);
+
+        // Who draws the diagrams: automatic comes to the notes engine here; off, and an engine that isn't here, refused.
+        Assert.Equal(("auto", "claude"), (overview.Diagrams, overview.DiagramsBy));
+        Assert.Equal(("off", ""), ((await remote.DefaultsAsync(diagrams: "off"))!.Diagrams, (await remote.EnginesAsync())!.DiagramsBy));
+        Assert.Equal(409, (await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.DefaultsAsync(diagrams: "codex"))).Status);
+        Assert.Equal(400, (await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.DefaultsAsync(diagrams: "nope"))).Status);
     }
 
     [Fact]

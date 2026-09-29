@@ -145,6 +145,29 @@ public class AiEnginesModelTests
     }
 
     [AvaloniaFact]
+    public async Task Who_draws_diagrams_says_where_transcripts_go_and_picking_posts_it()
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() with { Diagrams = "auto", DiagramsBy = "claude" } };
+        var model = new AiEnginesModel(lib);
+        await model.Load();
+
+        Assert.True(model.HasDiagrams);
+        Assert.Equal(["Automatic", "Same as notes", "Ollama", "Claude Code", "Codex", "Gemini", "Off"], model.DiagramsChoices.Select(c => c.Name));
+        Assert.Equal("Automatic", model.SelectedDiagramsName);
+        Assert.Equal("Claude Code reads each transcript", model.DiagramsAbout);
+        Assert.Empty(lib.DefaultsCalls);
+
+        model.SelectedDiagrams = "off";
+
+        Assert.Equal("off", lib.DefaultsCalls.Single().Diagrams);
+        Assert.Equal("New notes have no diagrams", model.DiagramsAbout);
+
+        var older = new AiEnginesModel(new FakeAiLibrary { Overview = AiTestData.MixedOverview() });
+        await older.Load();
+        Assert.False(older.HasDiagrams); // a library too old to design diagrams shows no row for it
+    }
+
+    [AvaloniaFact]
     public async Task Turning_the_fallback_off_posts_it()
     {
         var (model, lib) = Loaded();

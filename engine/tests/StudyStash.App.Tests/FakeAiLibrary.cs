@@ -14,7 +14,7 @@ public sealed class FakeAiLibrary : IAiLibrary
     public AiOverview? Overview { get; set; }
     public ToolAccessInfo? Access { get; set; }
     public List<string> Calls { get; } = [];
-    public List<(string? Notes, string? Ask, bool? Fallback)> DefaultsCalls { get; } = [];
+    public List<(string? Notes, string? Ask, bool? Fallback, string? Diagrams)> DefaultsCalls { get; } = [];
     public List<AskRequest> AskRequests { get; } = [];
 
     public Func<string, AiSaid?>? OnStart { get; set; }
@@ -42,13 +42,17 @@ public sealed class FakeAiLibrary : IAiLibrary
         return Task.FromResult(OnEngines is not null ? OnEngines() : Overview);
     }
 
-    public Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null)
+    public Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null, string? diagrams = null)
     {
         Calls.Add("defaults");
-        DefaultsCalls.Add((notes, ask, fallback));
+        DefaultsCalls.Add((notes, ask, fallback, diagrams));
         if (OnDefaults is not null) return Task.FromResult(OnDefaults(notes, ask, fallback));
         if (Overview is null) return Task.FromResult<AiOverview?>(null);
-        Overview = Overview with { Notes = notes ?? Overview.Notes, Ask = ask ?? Overview.Ask, Fallback = fallback ?? Overview.Fallback };
+        Overview = Overview with
+        {
+            Notes = notes ?? Overview.Notes, Ask = ask ?? Overview.Ask, Fallback = fallback ?? Overview.Fallback,
+            Diagrams = diagrams ?? Overview.Diagrams,
+        };
         return Task.FromResult<AiOverview?>(Overview);
     }
 
