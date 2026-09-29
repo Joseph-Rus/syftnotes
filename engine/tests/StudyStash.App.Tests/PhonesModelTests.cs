@@ -15,6 +15,7 @@ public class PhonesModelTests
         public List<JsonObject> Devices { get; } = [];
         public List<(string Method, string Path)> Calls { get; } = [];
         public string? Refuse { get; set; }
+        public string? RefuseFix { get; set; }
         public bool Down { get; set; }
         public bool Older { get; set; }
 
@@ -25,7 +26,7 @@ public class PhonesModelTests
             Calls.Add((method.Method, path));
             if (Down) throw new HttpRequestException("no route to host");
             if (Older) return Task.FromResult<JsonObject?>(null);
-            if (Refuse is { } why) throw new LibraryRefusedException(409, why);
+            if (Refuse is { } why) throw new LibraryRefusedException(409, why, RefuseFix);
             JsonObject? answer = (method.Method, path) switch
             {
                 ("GET", "") => List(),
@@ -130,6 +131,28 @@ public class PhonesModelTests
 
         Assert.False(model.Adding);
         Assert.Equal(fake.Refuse, model.Say);
+        Assert.False(model.HasFix);
+    }
+
+    [AvaloniaFact]
+    public async Task Without_https_certificates_the_page_that_turns_them_on_opens()
+    {
+        var fake = new FakeDevices();
+        var opened = new List<string>();
+        var model = new PhonesModel(() => fake.Call) { OpenUrl = opened.Add };
+        await model.Load();
+        fake.Refuse = "Your phone reaches the library over Tailscale, so it needs Tailscale here first. Your tailnet doesn't have HTTPS certificates turned on yet. Open the page below, turn them on, then turn this on again.";
+        fake.RefuseFix = "https://login.tailscale.com/f/serve?node=abc";
+
+        await model.AddPhoneCommand.ExecuteAsync(null);
+        Assert.True(model.HasFix);
+        model.OpenFixCommand.Execute(null);
+        Assert.Equal(["https://login.tailscale.com/f/serve?node=abc"], opened);
+
+        fake.Refuse = null;
+        await model.AddPhoneCommand.ExecuteAsync(null);
+        Assert.True(model.Adding);
+        Assert.False(model.HasFix);
     }
 
     [AvaloniaFact]

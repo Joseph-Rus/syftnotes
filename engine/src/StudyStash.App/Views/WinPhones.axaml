@@ -62,6 +62,7 @@
         </Grid>
       </Border>
       <TextBlock Classes="say" Text="{Binding Say}" IsVisible="{Binding Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+      <Button Classes="pill" Command="{Binding OpenFixCommand}" IsVisible="{Binding HasFix}" HorizontalAlignment="Left"><TextBlock Text="Open the page" FontSize="13" /></Button>
 
       <!-- The phones already added: each its own card -->
       <TextBlock Classes="section gap" Text="Phones" IsVisible="{Binding !NoPhones}" />

@@ -5,9 +5,11 @@ using System.Text.Json.Nodes;
 namespace StudyStash.Core;
 
 /// <summary>The library answered with an error: its status, in httpx's words.</summary>
-public sealed class LibraryRefusedException(int status, string message) : Exception(message)
+public sealed class LibraryRefusedException(int status, string message, string? fix = null) : Exception(message)
 {
     public int Status { get; } = status;
+    /// <summary>The page that fixes it, when the library named one (its answer's <c>fix</c>).</summary>
+    public string? Fix { get; } = fix;
 }
 
 /// <summary>The laptop's side of the library's API: send a lecture, ask whether it's filed.</summary>

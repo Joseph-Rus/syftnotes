@@ -196,8 +196,9 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
         string text = await r.Content.ReadAsStringAsync(stop);
         if (!r.IsSuccessStatusCode)
         {
-            string detail = (JsonNode.Parse(text.Length > 0 && text[0] == '{' ? text : "{}") as JsonObject)?["detail"]?.GetValue<string>() ?? r.ReasonPhrase ?? "";
-            throw new LibraryRefusedException((int)r.StatusCode, detail);
+            var said = JsonNode.Parse(text.Length > 0 && text[0] == '{' ? text : "{}") as JsonObject;
+            string detail = said?["detail"]?.GetValue<string>() ?? r.ReasonPhrase ?? "";
+            throw new LibraryRefusedException((int)r.StatusCode, detail, Py.AsString(said?["fix"]));
         }
         return JsonNode.Parse(text);
     }
