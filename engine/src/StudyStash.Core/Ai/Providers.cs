@@ -71,10 +71,78 @@ public abstract class AiProvider
     /// while <see cref="PromptOnInput"/> is on; null (nothing) otherwise.</summary>
     public virtual string? Input(AiRequest req) => null;
 
-    /// <summary>Gets ready to answer soon (a student has started typing a question), so the answer starts sooner:
-    /// true when it did something. Only a local model has anything to do (load itself into memory); a CLI starts
-    /// with each question.</summary>
+    /// <summary>Gets ready to answer soon (an ask bar has opened, or a question is being typed), so the answer starts
+    /// sooner: true when it did something. A local model loads itself into memory; a CLI that can wait for its prompt
+    /// is started now with the request it will get (<see cref="Prestart"/>).</summary>
     public virtual Task<bool> WarmAsync(string model, CancellationToken ct = default) => Task.FromResult(false);
+
+    /// <summary>The command that starts this CLI waiting for <paramref name="req"/>'s prompt on its input, written
+    /// there by <see cref="WaitingInput"/>; null when it can't wait (the prompt goes on the command line).</summary>
+    protected virtual List<string>? WaitingCommand(AiRequest req, bool stream) => null;
+
+    /// <summary>What a <see cref="WaitingCommand"/> is handed once the question comes.</summary>
+    protected virtual string WaitingInput(AiRequest req) => req.Prompt;
+
+    /// <summary>
+    /// Starts the CLI for a question that's coming (<paramref name="template"/> is that question's request, without
+    /// its prompt), so the program has loaded by the time the student presses Enter: the next <see cref="RunAsync"/>
+    /// with the same command takes it and hands it the prompt. One waits per command at most, and one nobody asks
+    /// within <see cref="WaitingFor"/> is stopped. It asks the AI nothing until then. True when one started.
+    /// </summary>
+    public bool Prestart(AiRequest template, bool stream = true)
+    {
+        if (WaitingCommand(template, stream) is not { } cmd || !Available()) return false;
+        string key = WaitingKey(cmd, template.Cwd);
+        lock (waitingLock)
+        {
+            if (waiting.TryGetValue(key, out var old) && !old.HasExited) return false;
+            if (Start(cmd, template.Cwd, out _) is not { } p) return false;
+            waiting[key] = p;
+        }
+        _ = Task.Delay(WaitingFor).ContinueWith(_ => StopWaiting(key), TaskScheduler.Default);
+        return true;
+    }
+
+    /// <summary>How long a started CLI waits for its question before it's stopped.</summary>
+    public static readonly TimeSpan WaitingFor = TimeSpan.FromMinutes(3);
+
+    static readonly Dictionary<string, Process> waiting = [];
+    static readonly Lock waitingLock = new();
+
+    static AiProvider() => AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+    {
+        lock (waitingLock)
+            foreach (string key in waiting.Keys.ToList()) StopWaiting(key);
+    };
+
+    static string WaitingKey(List<string> cmd, string cwd) => cwd + "\n" + string.Join('\0', cmd);
+
+    /// <summary>The CLI started for this command, if one is still waiting; it's the caller's from here.</summary>
+    static Process? TakeWaiting(List<string> cmd, string cwd)
+    {
+        lock (waitingLock)
+        {
+            if (!waiting.Remove(WaitingKey(cmd, cwd), out var p)) return null;
+            if (!p.HasExited) return p;
+            p.Dispose();
+            return null;
+        }
+    }
+
+    static void StopWaiting(string key)
+    {
+        Process? p;
+        lock (waitingLock)
+            if (!waiting.Remove(key, out p)) return;
+        try
+        {
+            if (!p.HasExited) p.Kill(entireProcessTree: true);
+        }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+        }
+        p.Dispose();
+    }
 
     /// <summary>What it does, as it does it. Ends with an <c>error</c> event when it fails.</summary>
     public virtual async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true,
@@ -83,6 +151,12 @@ public abstract class AiProvider
         if (!Available())
         {
             yield return AiEvent.Error($"{Name} isn't installed on this computer ({Site}).");
+            yield break;
+        }
+        // Started already (Prestart), waiting for this very command's prompt: it's had its head start.
+        if (WaitingCommand(req, stream) is { } wait && TakeWaiting(wait, req.Cwd) is { } ready)
+        {
+            await foreach (var e in Spawn(wait, req.Cwd, req.Timeout, Parse, WaitingInput(req), ct, ready)) yield return e;
             yield break;
         }
         await foreach (var e in Spawn(Command(req, stream), req.Cwd, req.Timeout, Parse, Input(req), ct)) yield return e;
@@ -167,10 +241,8 @@ public abstract class AiProvider
         return null;
     }
 
-    /// <summary>Start a command and read its lines as they come, turning each into events. A command that fails
-    /// without saying why ends with the tail of what it printed to stderr.</summary>
-    protected static async IAsyncEnumerable<AiEvent> Spawn(List<string> cmd, string cwd, TimeSpan timeout,
-        Func<string, IEnumerable<AiEvent>> parse, string? input = null, [EnumeratorCancellation] CancellationToken ct = default)
+    /// <summary>Starts a command with its input, output and errors piped to us; null (and why) when it can't.</summary>
+    static Process? Start(List<string> cmd, string cwd, out string? error)
     {
         // On Windows an npm-installed CLI is a .cmd, which cmd.exe would mangle the arguments of: see WindowsCommand.
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For(cmd) : new Launch(cmd[0], cmd[1..]);
@@ -185,17 +257,27 @@ public abstract class AiProvider
         else foreach (string a in launch.Arguments) psi.ArgumentList.Add(a);
         psi.Environment["PATH"] = SearchPath();
         psi.Environment.Remove("CLAUDECODE"); // started from inside Claude Code, claude would refuse to nest
-        Process? p;
-        string? startError = null;
+        error = null;
         try
         {
-            p = Process.Start(psi);
+            return Process.Start(psi);
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
         {
-            p = null;
-            startError = e.Message;
+            error = e.Message;
+            return null;
         }
+    }
+
+    /// <summary>Start a command (or take <paramref name="ready"/>, one started earlier) and read its lines as they
+    /// come, turning each into events. A command that fails without saying why ends with the tail of what it printed
+    /// to stderr.</summary>
+    protected static async IAsyncEnumerable<AiEvent> Spawn(List<string> cmd, string cwd, TimeSpan timeout,
+        Func<string, IEnumerable<AiEvent>> parse, string? input = null, [EnumeratorCancellation] CancellationToken ct = default,
+        Process? ready = null)
+    {
+        string? startError = null;
+        var p = ready ?? Start(cmd, cwd, out startError);
         if (p is null)
         {
             yield return AiEvent.Error($"{Path.GetFileName(cmd[0])} didn't start: {startError}");
@@ -298,7 +380,19 @@ public sealed class ClaudeProvider : AiProvider
         full.Length > 1 && full[1] == ':' ? "/" + char.ToLowerInvariant(full[0]) + full[2..].Replace('\\', '/').TrimEnd('/')
             : "/" + full.TrimStart('/');
 
-    public override List<string> Command(AiRequest req, bool stream)
+    public override List<string> Command(AiRequest req, bool stream) => Build(req, stream, waiting: false);
+
+    /// <summary>`claude -p --input-format stream-json` loads and then waits for the question as a message on its
+    /// input. Not for a claude that runs through cmd.exe with a system brief (<see cref="SystemOnInput"/>), whose
+    /// brief would have to go in on the input as plain text.</summary>
+    protected override List<string>? WaitingCommand(AiRequest req, bool stream) =>
+        req.System.Length > 0 && SystemOnInput(Exe() ?? "claude") ? null : Build(req, stream, waiting: true);
+
+    /// <summary>The question, as the one user message a waiting `claude -p` reads (then its input closes).</summary>
+    protected override string WaitingInput(AiRequest req) =>
+        new JsonObject { ["type"] = "user", ["message"] = new JsonObject { ["role"] = "user", ["content"] = req.Prompt } }.ToJsonString() + "\n";
+
+    List<string> Build(AiRequest req, bool stream, bool waiting)
     {
         // Edit and Write are allowed only inside the working folder: "//" makes the rule an absolute path.
         string root = ClaudePath(Path.GetFullPath(req.Cwd));
@@ -308,7 +402,8 @@ public sealed class ClaudeProvider : AiProvider
         else never.AddRange(["Edit", "Write"]);
         string exe = Exe() ?? "claude";
         var cmd = new List<string> { exe, "-p" };
-        if (!PromptOnInput) cmd.Add(req.Prompt);
+        if (waiting) cmd.AddRange(["--input-format", "stream-json"]);
+        else if (!PromptOnInput) cmd.Add(req.Prompt);
         cmd.AddRange(["--output-format", "stream-json", "--verbose"]);
         if (stream) cmd.Add("--include-partial-messages");
         // A plain answer uses no tools: don't wait for the person's own MCP servers to start first.

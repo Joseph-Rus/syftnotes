@@ -85,8 +85,7 @@ public sealed partial class AiAskModel : ObservableObject
     public string LiveTitle { get; set; } = "This lecture, now";
 
     [ObservableProperty] public partial string Question { get; set; } = "";
-    /// <summary>The engine picked for the question being typed gets ready once it's begun (a local model loads), at
-    /// most once a minute; the library does the rest.</summary>
+    /// <summary>When <see cref="Warm"/> last got the picked engine ready.</summary>
     DateTime warmedAt = DateTime.MinValue;
     [ObservableProperty] public partial string Scope { get; set; } = "lecture";
     [ObservableProperty] public partial string Engine { get; set; } = "";
@@ -148,11 +147,19 @@ public sealed partial class AiAskModel : ObservableObject
     /// <summary>Closes the "Answer with" popup once an engine is picked; the view wires this to the real flyout.</summary>
     public Action? CloseMenu { get; set; }
 
-    partial void OnQuestionChanged(string value)
+    /// <summary>The picked engine gets ready in the background (a local model loads into memory; Claude Code starts
+    /// and waits for the question), so the answer isn't held up by it starting: as the ask bar opens, and again as a
+    /// question is typed, at most once a minute. The library does the rest.</summary>
+    public void Warm()
     {
-        if (value.Trim().Length == 0 || DateTime.UtcNow - warmedAt < TimeSpan.FromMinutes(1)) return;
+        if (DateTime.UtcNow - warmedAt < TimeSpan.FromMinutes(1)) return;
         warmedAt = DateTime.UtcNow;
         _ = library.WarmAsync(Engine.Length > 0 ? Engine : null);
+    }
+
+    partial void OnQuestionChanged(string value)
+    {
+        if (value.Trim().Length > 0) Warm();
     }
 
     partial void OnEngineChanged(string value)
@@ -189,6 +196,7 @@ public sealed partial class AiAskModel : ObservableObject
             return;
         }
         Apply(overview);
+        if (overview is not null) Warm();
     }
 
     void Apply(AiOverview? overview)

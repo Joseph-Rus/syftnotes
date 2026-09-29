@@ -57,7 +57,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     async Task<string> AnswerWithAsync(string engine, string model, string prompt, CancellationToken ct, Action<string>? soFar = null)
     {
         var provider = Provider(engine);
-        var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch()) { Model = model, Timeout = TimeSpan.FromMinutes(15) }, ct, soFar);
+        var result = await provider.CompleteAsync(AnswerRequest(prompt, model), ct, soFar);
         if (!result.Ok) throw new InvalidOperationException(result.Text);
         return result.Text;
     }
@@ -69,6 +69,10 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             + schema.ToJsonString(), ct, soFar);
         return FirstObject(text) ?? throw new InvalidDataException("the answer wasn't JSON");
     }
+
+    /// <summary>A plain answer's request: no files, no tools. <see cref="Warm"/> starts a CLI with this same request
+    /// (without its prompt), so the question that follows can take it.</summary>
+    AiRequest AnswerRequest(string prompt, string model) => new(prompt, Scratch()) { Model = model, Timeout = TimeSpan.FromMinutes(15) };
 
     /// <summary>Ask a question with one named engine, ignoring ai.json's own "ask" pick. <paramref name="soFar"/>,
     /// when given, hears the engine's reply as it's written (all of it so far, each time more arrives).</summary>
@@ -297,31 +301,38 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         }, ct);
     }
 
-    DateTime warmedAt = DateTime.MinValue;
+    readonly Dictionary<string, DateTime> warmedAt = [];
     readonly Lock warming = new();
 
-    /// <summary>How often <see cref="Warm"/> asks Ollama to load its model at most: loaded, it stays loaded for
-    /// <see cref="OllamaProvider.KeepLoaded"/> after each question anyway.</summary>
+    /// <summary>How often <see cref="Warm"/> gets one engine ready at most: Ollama's model stays loaded for
+    /// <see cref="OllamaProvider.KeepLoaded"/>, and a started CLI waits <see cref="AiProvider.WaitingFor"/>.</summary>
     public static readonly TimeSpan WarmEvery = TimeSpan.FromMinutes(1);
 
     /// <summary>
-    /// A student has started typing a question for <paramref name="engine"/> (or the "ask" pick): when Ollama will
-    /// answer it, its model starts loading now, in the background, so the answer isn't held up by the load. True
-    /// when that started; a CLI engine has nothing to get ready.
+    /// An ask bar has opened, or a question is being typed, for <paramref name="engine"/> (or the "ask" pick): the
+    /// engine gets ready now, in the background, so the answer isn't held up by it starting. Ollama loads its model
+    /// into memory; Claude Code starts and waits for the question (<see cref="AiProvider.Prestart"/>). True when
+    /// something started.
     /// </summary>
     public bool Warm(string? engine, Config cfg)
     {
         var settings = Settings;
         string who = engine is { Length: > 0 } e ? e : settings.For("ask").Provider;
         if (who != "ollama" && settings.Fallback && Engines.KnownUnusableWhy(who, settings, Checks) is not null) who = "ollama";
-        if (who != "ollama" || (!cfg.OllamaEnabled && Providers is null)) return false;
+        if (who == "ollama" && !cfg.OllamaEnabled && Providers is null) return false;
         lock (warming)
         {
-            if (DateTime.UtcNow - warmedAt < WarmEvery) return false;
-            warmedAt = DateTime.UtcNow;
+            if (DateTime.UtcNow - warmedAt.GetValueOrDefault(who) < WarmEvery) return false;
+            warmedAt[who] = DateTime.UtcNow;
         }
-        _ = Provider(who).WarmAsync(AskModel(who, settings, cfg));
-        return true;
+        string model = AskModel(who, settings, cfg);
+        if (who == "ollama")
+        {
+            _ = Provider(who).WarmAsync(model);
+            return true;
+        }
+        // Asks stream their answer, so the waiting CLI is started to stream too.
+        return Provider(who).Prestart(AnswerRequest("", model), stream: true);
     }
 
     /// <summary>The model an engine answers questions with: for Ollama the library's own model (the one Settings

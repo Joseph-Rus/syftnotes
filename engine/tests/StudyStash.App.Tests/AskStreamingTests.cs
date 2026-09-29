@@ -163,16 +163,18 @@ public class AskStreamingTests
     }
 
     [AvaloniaFact]
-    public async Task Typing_a_question_gets_the_picked_engine_ready_once()
+    public async Task The_picked_engine_gets_ready_as_the_ask_bar_opens_and_once_more_when_another_is_picked()
     {
         var (model, lib) = await Loaded();
+        Assert.Single(lib.Warmed); // before a word is typed
         model.Engine = "ollama";
 
         model.Question = "W";
         model.Question = "Wh";
         model.Question = "What";
 
-        Assert.Equal(["ollama"], lib.Warmed);
+        Assert.Equal(2, lib.Warmed.Count);
+        Assert.Equal("ollama", lib.Warmed[^1]);
     }
 
     [AvaloniaFact]

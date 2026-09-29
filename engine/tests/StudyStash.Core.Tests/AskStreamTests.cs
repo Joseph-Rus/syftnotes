@@ -282,6 +282,33 @@ public class AskStreamTests
     }
 
     [Fact]
+    public async Task Claude_Code_started_before_the_question_is_handed_it_and_answers()
+    {
+        if (OperatingSystem.IsWindows()) return; // the stand-in claude is a shell script
+        using var dir = new TempDir();
+        // A stand-in claude: says what it was started with, then reads the question and answers.
+        string exe = dir["claude"];
+        File.WriteAllText(exe, "#!/bin/sh\necho \"$@\" > \"$0.args\"\nread line\necho \"$line\" > \"$0.heard\"\n"
+            + "echo '{\"type\":\"result\",\"is_error\":false,\"result\":\"heard it\",\"session_id\":\"s1\"}'\n");
+        File.SetUnixFileMode(exe, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        var claude = new ClaudeProvider { At = exe, PromptOnInput = false };
+        var ask = new AiRequest("", dir.Path) { Model = "sonnet" };
+
+        Assert.True(claude.Prestart(ask));
+        Assert.False(claude.Prestart(ask)); // one is waiting already
+        for (int i = 0; i < 100 && !File.Exists(exe + ".args"); i++) await Task.Delay(50);
+        Assert.Contains("--input-format stream-json", File.ReadAllText(exe + ".args")); // started, before any question
+
+        var result = await claude.CompleteAsync(ask with { Prompt = "What is recursion?" }, soFar: _ => { });
+
+        Assert.True(result.Ok, result.Text);
+        Assert.Equal("heard it", result.Text);
+        var heard = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(exe + ".heard"))!;
+        Assert.Equal("What is recursion?", (string?)heard["message"]?["content"]);
+        Assert.DoesNotContain("recursion", File.ReadAllText(exe + ".args"));
+    }
+
+    [Fact]
     public void A_plain_claude_answer_doesnt_wait_for_the_persons_own_mcp_servers()
     {
         var claude = new ClaudeProvider { PromptOnInput = false };
