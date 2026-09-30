@@ -260,7 +260,21 @@
               <!-- A long class name wraps to a second line, and past that ends in "…" (the whole name on hover). -->
               <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" LineHeight="26"
                          TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
-              <TextBlock Text="{Binding ClassCount}" FontSize="12" Foreground="{DynamicResource Fg2}" />
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="{Binding ClassCount}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                <!-- All of a Canvas class's lectures: back to its own page, with its tabs -->
+                <Button Classes="command" Padding="6,2" IsVisible="{Binding CanShowClassPage}" Command="{Binding ShowClassPageCommand}">
+                  <TextBlock Text="Class page" FontSize="12" Foreground="{DynamicResource AccentText}" />
+                </Button>
+                <!-- Attach to the class (drop files on the list, too): its files show here once there are some -->
+                <Button Classes="command" Padding="6,2" IsVisible="{Binding HasClassFiles}" Command="{Binding ClassFiles.AttachCommand, FallbackValue={x:Null}}"
+                        AutomationProperties.Name="Attach to class">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Glyph="attach_file" Size="14" Foreground="{DynamicResource Fg2}" />
+                    <TextBlock Text="Attach" FontSize="12" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
             </StackPanel>
             <!-- The one gentle ask for a tip, when it's due: in the list's flow, lined up with the lectures, covering nothing -->
             <Panel DockPanel.Dock="Top" IsVisible="{Binding HasSupport}" Margin="8,0,8,8">

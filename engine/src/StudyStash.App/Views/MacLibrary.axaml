@@ -271,12 +271,26 @@
         <!-- The list: lectures by week, Canvas's Due list, or a linked class's own page -->
         <Panel Grid.Column="1" Grid.ColumnSpan="{Binding ColumnSpan}" Width="{Binding ListWidth}" IsVisible="{Binding ShowListColumn}">
         <DockPanel Name="LectureList" IsVisible="{Binding ShowLectures}">
-          <Border DockPanel.Dock="Top" Height="44" Margin="20,0,20,4">
-            <StackPanel VerticalAlignment="Center">
-              <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold"
-                         TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
-              <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
-            </StackPanel>
+          <Border DockPanel.Dock="Top" Height="44" Margin="20,0,14,4">
+            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold"
+                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
+                  <!-- All of a Canvas class's lectures: back to its own page, with its tabs -->
+                  <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding CanShowClassPage}" Command="{Binding ShowClassPageCommand}">
+                    <TextBlock Text="· Class page" FontSize="11" Foreground="{DynamicResource AccentText}" />
+                  </Button>
+                </StackPanel>
+              </StackPanel>
+              <!-- Attach to the class (drop files on the list, too): its files show under the name once there are some -->
+              <Button Grid.Column="1" Classes="tool" VerticalAlignment="Center" Command="{Binding ClassFiles.AttachCommand, FallbackValue={x:Null}}"
+                      IsVisible="{Binding HasClassFiles}" ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the list)"
+                      AutomationProperties.Name="Attach to class">
+                <c:Icon Glyph="attach_file" Size="17" Foreground="{DynamicResource Fg2}" />
+              </Button>
+            </Grid>
           </Border>
           <!-- The one gentle ask for a tip, when it's due: in the list's flow, lined up with the lectures, covering nothing -->
           <Panel DockPanel.Dock="Top" IsVisible="{Binding HasSupport}" Margin="10,2,10,6">

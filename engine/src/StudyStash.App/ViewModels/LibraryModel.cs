@@ -422,6 +422,11 @@ public sealed partial class LibraryModel : ObservableObject
     public Action? OnGoBack { get; set; }
     public Action? OnGoForward { get; set; }
 
+    /// <summary>A Canvas class's lectures by week ("All 12 lectures"): its own page (tabs, what's due) is a click away.</summary>
+    [ObservableProperty] public partial bool CanShowClassPage { get; set; }
+    public Action? OnClassPage { get; set; }
+    [RelayCommand] void ShowClassPage() => OnClassPage?.Invoke();
+
     [RelayCommand] void ToggleSidebar() => SidebarHidden = !SidebarHidden;
     [RelayCommand] void GoBack() => OnGoBack?.Invoke();
     [RelayCommand] void GoForward() => OnGoForward?.Invoke();

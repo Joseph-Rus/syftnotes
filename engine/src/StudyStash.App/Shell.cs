@@ -471,6 +471,13 @@ public static partial class Shell
             Remember();
             OpenFromList(() => ShowLectureAsync(l.Id));
         };
+        library.OnClassPage = () =>
+        {
+            if (openClass is not { } cls) return;
+            Remember();
+            allLectures = false;
+            _ = ShowClassAsync(cls);
+        };
         library.OnGoBack = GoBack;
         library.OnGoForward = GoForward;
         library.SidebarHidden = host.Settings.SidebarHidden;

@@ -67,9 +67,9 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     [ObservableProperty] public partial string? Said { get; set; }
 
     public bool HasItems => Items.Count > 0;
-    /// <summary>The "Attachments" row with its Attach button: a class's always; a lecture's once something's attached
-    /// (until then the lecture page's own Attach, beside Notes and Transcript, is the way in).</summary>
-    public bool ShowHeader => HasItems || LectureId is null;
+    /// <summary>The "Attachments" row with its Attach button, once something's attached; until then the page's own
+    /// Attach (beside a lecture's Notes and Transcript, beside a class's name) is the way in.</summary>
+    public bool ShowHeader => HasItems;
     public bool HasProblem => !string.IsNullOrEmpty(Problem);
     public bool HasSaid => !string.IsNullOrEmpty(Said);
 

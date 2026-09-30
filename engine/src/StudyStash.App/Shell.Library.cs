@@ -128,6 +128,7 @@ public static partial class Shell
     {
         int turn = ++libraryTurn;
         if (openClass != name) allLectures = false;
+        library.CanShowClassPage = allLectures && CanvasClassRow(name) is not null;
         openClass = name;
         dueOpen = false;
         dueSelection = null;
@@ -247,6 +248,7 @@ public static partial class Shell
             Remember();
             allLectures = true;
             ShowLectureList();
+            library.CanShowClassPage = true;
         },
     };
 
