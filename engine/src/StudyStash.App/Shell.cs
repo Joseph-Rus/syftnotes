@@ -455,6 +455,7 @@ public static partial class Shell
 
         library.OnClass = c =>
         {
+            Remember();
             library.NarrowDetail = false;
             if (c.IsDue)
             {
@@ -465,7 +466,22 @@ public static partial class Shell
             allLectures = false;
             _ = ShowClassAsync(c.Name);
         };
-        library.OnLecture = l => OpenFromList(() => ShowLectureAsync(l.Id));
+        library.OnLecture = l =>
+        {
+            Remember();
+            OpenFromList(() => ShowLectureAsync(l.Id));
+        };
+        library.OnClassPage = () =>
+        {
+            if (openClass is not { } cls) return;
+            Remember();
+            allLectures = false;
+            _ = ShowClassAsync(cls);
+        };
+        library.OnGoBack = GoBack;
+        library.OnGoForward = GoForward;
+        library.SidebarHidden = host.Settings.SidebarHidden;
+        library.OnSidebarToggled = hidden => host.Save(s => s.SidebarHidden = hidden);
         library.OnSearch = ToggleQuick;
         library.OnSettings = ShowSettings;
         library.OnMove = MoveLecture;
@@ -895,6 +911,7 @@ public static partial class Shell
         }
         if (!PutWhereLeft(w)) OpenCentred(w, new Size(1280, 800));
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
+        AddLibraryKeys(w);
         // The menu bar, read back once, so the log shows the app menu really has Settings… ⌘, and Quit ⌘Q.
         if (OperatingSystem.IsMacOS())
         {
@@ -1464,9 +1481,9 @@ public static partial class Shell
         UpdateComingUp();
         library.Status = LibraryStatus();
         library.StatusGood = host.Library == LibraryState.Connected;
-        // The library just came back: the window, if it's open, gets its class reloaded so a note written while it
-        // was gone shows up without reopening the window.
-        if (lastLibraryState != LibraryState.Connected && host.Library == LibraryState.Connected) RequestLibraryReload();
+        // The library just came back: the window, if it's open, is loaded again (its classes, and the class showing) so
+        // a note written while it was gone shows up without reopening the window.
+        if (lastLibraryState != LibraryState.Connected && host.Library == LibraryState.Connected) RequestLibraryReload(whole: true);
         lastLibraryState = host.Library;
         RefreshRecent();
         if (trayRecording != recording)

@@ -751,24 +751,32 @@
               <StackPanel IsVisible="{Binding OnConnection}" Spacing="8">
                 <TextBlock Classes="h" Text="Connection" />
                 <TextBlock Classes="body" Text="{Binding LibraryLine}" />
-                <TextBlock Classes="section" Text="Connect to a library" />
-                <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left">
-                  <Border Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" FontSize="13" /></Border>
-                  <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" PlaceholderText="Password" FontSize="13" /></Border>
-                </Grid>
-                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
-                  <Button Classes="pill primary" Command="{Binding ConnectCommand}"><TextBlock Text="Connect" FontSize="13" FontWeight="Medium" /></Button>
-                  <Button Classes="pill" Command="{Binding OpenLibraryPageCommand}"><TextBlock Text="Open the library's page" FontSize="13" /></Button>
+                <!-- The library runs here: what it's doing, and its page. Nothing to connect to: using another computer's
+                     library instead is This computer's choice, below. -->
+                <StackPanel Spacing="8" IsVisible="{Binding LibraryHere}">
+                  <TextBlock Classes="say" Text="{Binding LibraryServiceLine}" IsVisible="{Binding LibraryServiceLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
+                    <Button Classes="pill" Command="{Binding OpenLibraryPageCommand}"><TextBlock Text="Open the library's page" FontSize="13" /></Button>
+                    <Button Classes="pill" Command="{Binding StartLibraryCommand}" IsVisible="{Binding CanStartLibrary}"><TextBlock Text="Start" FontSize="13" /></Button>
+                    <Button Classes="pill" Command="{Binding StopLibraryCommand}" IsVisible="{Binding CanStopLibrary}"><TextBlock Text="Stop" FontSize="13" /></Button>
+                  </StackPanel>
+                  <TextBlock Classes="say" Text="It runs while Study Stash is open. Turn on Start at login in General to keep it running; its own settings, and adding a laptop, are under Your library." />
+                </StackPanel>
+                <!-- A laptop: the library it sends lectures to -->
+                <StackPanel Spacing="8" IsVisible="{Binding !LibraryHere}">
+                  <TextBlock Classes="section" Text="Connect to a library" />
+                  <Grid ColumnDefinitions="*,10,160" MaxWidth="480" HorizontalAlignment="Left">
+                    <Border Classes="field"><TextBox Classes="bare" Text="{Binding Address}" PlaceholderText="http://mac-mini:8787" FontSize="13" /></Border>
+                    <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" PlaceholderText="Password" FontSize="13" /></Border>
+                  </Grid>
+                  <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+                    <Button Classes="pill primary" Command="{Binding ConnectCommand}"><TextBlock Text="Connect" FontSize="13" FontWeight="Medium" /></Button>
+                    <Button Classes="pill" Command="{Binding OpenLibraryPageCommand}"><TextBlock Text="Open the library's page" FontSize="13" /></Button>
+                  </StackPanel>
                 </StackPanel>
                 <TextBlock Classes="say" Text="{Binding LibrarySay}" IsVisible="{Binding LibrarySay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <TextBlock Classes="section" Text="Your name in the library" />
+                <TextBlock Classes="section gap" Text="Your name in the library" />
                 <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding DisplayName}" FontSize="13" /></Border>
-                <TextBlock Classes="say" IsVisible="{Binding LibraryHere}" Text="Your library runs on this computer while Study Stash is open. Turn on Start at login in General to keep it running. Its own settings, and adding a laptop, are under Your library." />
-                <TextBlock Classes="say" IsVisible="{Binding LibraryHere}" Text="{Binding LibraryServiceLine}" />
-                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,10,0,0" IsVisible="{Binding LibraryHere}">
-                  <Button Classes="pill" Command="{Binding StartLibraryCommand}" IsVisible="{Binding CanStartLibrary}"><TextBlock Text="Start" FontSize="13" /></Button>
-                  <Button Classes="pill" Command="{Binding StopLibraryCommand}" IsVisible="{Binding CanStopLibrary}"><TextBlock Text="Stop" FontSize="13" /></Button>
-                </StackPanel>
                 <!-- This computer's role, switched any time after setup (docs/one-download.md) -->
                 <TextBlock Classes="section gap" Text="This computer" />
                 <TextBlock Classes="body" Text="{Binding RoleWords}" />
@@ -1136,7 +1144,7 @@
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:LibraryClassRow">
                           <Border Classes="group" Margin="0" Padding="16,12">
-                            <Grid ColumnDefinitions="Auto,12,160,8,*,8,Auto" RowDefinitions="Auto,6,Auto,6,Auto">
+                            <Grid ColumnDefinitions="Auto,12,3*,8,2*,8,Auto" RowDefinitions="Auto,6,Auto,6,Auto">
                               <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
                               <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
                               <Border Grid.Column="4" Classes="field"><TextBox Classes="bare" Text="{Binding Aliases}" PlaceholderText="Other names, like cs101" FontSize="13" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
@@ -1154,10 +1162,10 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <Border Classes="group" Margin="0" Padding="16,12">
-                      <Grid ColumnDefinitions="Auto,12,160,8,*,8,Auto">
+                      <Grid ColumnDefinitions="Auto,12,3*,8,2*,8,Auto">
                         <Ellipse Width="8" Height="8" Fill="{DynamicResource Fill2}" VerticalAlignment="Center" />
                         <Border Grid.Column="2" Classes="field"><TextBox Name="NewLibraryClass" Classes="bare" Text="{Binding Lib.NewClass}" PlaceholderText="A new class" FontSize="13" VerticalAlignment="Center" /></Border>
-                        <TextBlock Grid.Column="4" Classes="row-sub" Text="Its other names and what it covers come next." VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="4" Classes="row-sub" Text="Its other names and what it covers come next." VerticalAlignment="Center" TextWrapping="Wrap" />
                         <Button Grid.Column="6" Classes="pill" Command="{Binding Lib.AddClassCommand}" VerticalAlignment="Center"><TextBlock Text="Add" FontSize="13" /></Button>
                       </Grid>
                     </Border>

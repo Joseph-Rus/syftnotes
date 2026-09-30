@@ -40,9 +40,11 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <Button Classes="cv-hand-in" Margin="22,4,0,0" Command="{Binding AllLecturesCommand}">
+        <Button Classes="cv-hand-in" Margin="22,4,0,0" Command="{Binding AllLecturesCommand}" IsVisible="{Binding HasLectures}">
           <TextBlock Classes="cv-link" Text="{Binding AllLecturesText}" />
         </Button>
+        <TextBlock Classes="cv-sub-detail" Margin="22,4,0,0" TextWrapping="Wrap" IsVisible="{Binding !HasLectures}"
+                   Text="No lectures yet. Record one in class and it lands here, with its notes." />
       </StackPanel>
     </DataTemplate>
     <DataTemplate x:Key="ModuleItemTemplate" x:DataType="vm:ModuleItemRow">
@@ -115,7 +117,7 @@
           <ItemsControl ItemsSource="{Binding Announcements}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AnnouncementRow">
-                <Button Classes="cv-mod-item" Command="{Binding OpenCommand}">
+                <Button Classes="cv-mod-item" Classes.cv-on="{Binding Selected}" Command="{Binding OpenCommand}">
                   <Grid ColumnDefinitions="Auto,*,Auto">
                     <Ellipse Grid.Column="0" Classes="cv-new-dot" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding New}" />
                     <TextBlock Grid.Column="1" Classes="cv-mod-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
@@ -184,7 +186,7 @@
         <ItemsControl ItemsSource="{Binding Announcements}" IsVisible="{Binding AnnouncementsExpanded}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:AnnouncementRow">
-              <Button Classes="cv-mod-item" Command="{Binding OpenCommand}">
+              <Button Classes="cv-mod-item" Classes.cv-on="{Binding Selected}" Command="{Binding OpenCommand}">
                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="26,0,0,0">
                   <Ellipse Grid.Column="0" Classes="cv-new-dot" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding New}" />
                   <TextBlock Grid.Column="1" Classes="cv-mod-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />

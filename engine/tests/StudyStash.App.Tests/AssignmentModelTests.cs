@@ -35,6 +35,46 @@ public class AssignmentModelTests
     }
 
     [Fact]
+    public void Canvas_s_empty_unsubmitted_submission_is_nothing_handed_in()
+    {
+        var model = new AssignmentModel(CanvasFixtures.Context());
+        model.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>("assignment-9001") with { Submission = new CanvasApi.SubmissionInfo { State = "unsubmitted" } });
+
+        Assert.Equal("Nothing handed in yet", model.SubmissionStatus);
+        Assert.Equal("To do", model.ThirdValue);
+        Assert.True(model.ShowHandInLink);
+    }
+
+    [Fact]
+    public void Closed_and_never_handed_in_says_so_with_no_way_to_hand_it_in()
+    {
+        var model = new AssignmentModel(CanvasFixtures.Context());
+        model.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>("assignment-9001") with
+        {
+            Submission = new CanvasApi.SubmissionInfo { State = "unsubmitted" }, LockAt = CanvasFixtures.Now.AddDays(-2),
+        });
+
+        Assert.Equal("Closed", model.ThirdValue);
+        Assert.Equal("Not handed in", model.SubmissionStatus);
+        Assert.StartsWith("Closed ", model.SubmissionDetail);
+        Assert.False(model.ShowHandInLink);
+    }
+
+    [Fact]
+    public void A_text_entry_shows_what_was_sent()
+    {
+        var model = new AssignmentModel(CanvasFixtures.Context());
+        model.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>("assignment-9001") with
+        {
+            Submission = new CanvasApi.SubmissionInfo { State = "submitted", SubmittedAt = CanvasFixtures.Now.AddDays(-1), Body = "<p>My reflection.</p>" },
+        });
+
+        Assert.Equal("Submitted", model.SubmissionStatus);
+        Assert.DoesNotContain("Submitted", model.SubmissionDetail);
+        Assert.Equal("My reflection.", model.SubmissionBody);
+    }
+
+    [Fact]
     public void An_assignment_that_takes_nothing_through_Canvas_has_no_submission_box()
     {
         var model = new AssignmentModel(CanvasFixtures.Context());

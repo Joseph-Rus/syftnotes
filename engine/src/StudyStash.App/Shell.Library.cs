@@ -27,17 +27,24 @@ public static partial class Shell
 
     /// <summary>A lecture was filed, or the library just came back: if its window is open, the class showing gets its
     /// new note within a second (not on every change in that second, just the last one).</summary>
-    static void RequestLibraryReload()
+    static void RequestLibraryReload(bool whole = false)
     {
+        libraryReloadWhole |= whole;
         if (libraryReloadQueued || mainWindow?.IsVisible != true) return;
         libraryReloadQueued = true;
         Avalonia.Threading.DispatcherTimer.RunOnce(() =>
         {
             libraryReloadQueued = false;
+            bool all = libraryReloadWhole;
+            libraryReloadWhole = false;
             if (quitting || mainWindow?.IsVisible != true) return;
-            _ = dueOpen ? ShowDueAsync() : openClass is { } cls ? ShowClassAsync(cls) : Task.CompletedTask;
+            // Back after being away (the window opened before the library was up, say): its classes too, not just the
+            // page showing, which may be "Can't reach your library" with no classes beside it.
+            _ = all ? LoadLibraryAsync() : dueOpen ? ShowDueAsync() : openClass is { } cls ? ShowClassAsync(cls) : Task.CompletedTask;
         }, TimeSpan.FromSeconds(1));
     }
+
+    static bool libraryReloadWhole;
 
     /// <summary>The library's classes changed in Settings: the library window (when open) lists them again, and the
     /// dropdown's class switcher follows.</summary>
@@ -121,6 +128,7 @@ public static partial class Shell
     {
         int turn = ++libraryTurn;
         if (openClass != name) allLectures = false;
+        library.CanShowClassPage = allLectures && CanvasClassRow(name) is not null;
         openClass = name;
         dueOpen = false;
         dueSelection = null;
@@ -143,7 +151,9 @@ public static partial class Shell
         library.ClassCount = $"{list.Count} lecture{(list.Count == 1 ? "" : "s")}";
         library.Groups.Clear();
         var lectures = list.OfType<JsonObject>().ToList();
-        library.Empty = lectures.Count == 0 ? $"No lectures in {name} yet. Record one and it lands here." : null;
+        library.Empty = lectures.Count > 0 ? null
+            : name == Configs.Unsorted ? "Nothing to sort. A lecture the library can't place in a class waits here for you to file."
+            : $"No lectures in {name} yet. Record one and it lands here.";
         var today = DateTime.Today;
         var weekStart = today.AddDays(-(((int)today.DayOfWeek + 6) % 7)); // Monday
         string GroupOf(JsonObject l)
@@ -172,14 +182,21 @@ public static partial class Shell
         // A class linked to Canvas gets its own page: its lectures, what's to hand in, modules, files, announcements.
         if (CanvasClassRow(name) is { } row && !allLectures)
         {
-            var page = library.CanvasClass is { } open && openCanvasClass == name ? open : NewCanvasClass();
+            bool fresh = !(library.CanvasClass is { } open && openCanvasClass == name);
+            var page = fresh ? NewCanvasClass() : library.CanvasClass!;
             openCanvasClass = name;
             var ctx = Canvas();
             page.SetLectures([.. lectures.Take(3).Select(l =>
             {
                 string id = S(l["id"]);
-                return new LectureRow(S(l["title"]), Date(S(l["date"])) is { } d ? CanvasWords.ShortDay(d, ctx.Clock.Zone) : "", () => OpenFromList(() => ShowLectureAsync(id)));
+                return new LectureRow(S(l["title"]), Date(S(l["date"])) is { } d ? CanvasWords.ShortDay(d, ctx.Clock.Zone) : "", () =>
+                {
+                    Remember();
+                    OpenFromList(() => ShowLectureAsync(id));
+                });
             })], lectures.Count);
+            // Nothing recorded for it yet: its page opens on what's to hand in, not an empty Lectures tab.
+            if (fresh && lectures.Count == 0) page.Tab = ClassTab.Assignments;
             library.CanvasClass = page;
             library.List = LibraryList.CanvasClass;
             try
@@ -198,6 +215,10 @@ public static partial class Shell
             }
         }
         else ShowLectureList();
+        library.NoNoteText = lectures.Count > 0 ? "Choose a lecture to read its notes."
+            : name == Configs.Unsorted ? "Every lecture is in a class."
+            : library.List == LibraryList.CanvasClass ? $"No lectures in {name} yet. Pick an assignment to see it here."
+            : $"No lectures in {name} yet.";
         string? pick = openLecture is not null && lectures.Any(l => S(l["id"]) == openLecture) ? openLecture : lectures.Select(l => S(l["id"])).FirstOrDefault();
         if (pick is not null) await ShowLectureAsync(pick);
         else
@@ -213,17 +234,30 @@ public static partial class Shell
 
     static CanvasClassModel NewCanvasClass() => new(Canvas())
     {
-        OnAssignment = (cls, id) => OpenFromList(() => ShowAssignmentAsync(cls, id)),
+        OnAssignment = (cls, id) =>
+        {
+            Remember();
+            OpenFromList(() => ShowAssignmentAsync(cls, id));
+        },
         OnReader = reader => OpenFromList(() =>
         {
+            Remember();
             library.Assignment = null;
             library.Reader = reader;
             return Task.CompletedTask;
         }),
+        OnLecturesTab = from =>
+        {
+            if (library.Assignment is null && library.Reader is null) return;
+            Remember(from);
+            ClearDetail();
+        },
         OnAllLectures = () =>
         {
+            Remember();
             allLectures = true;
             ShowLectureList();
+            library.CanShowClassPage = true;
         },
     };
 
@@ -283,12 +317,36 @@ public static partial class Shell
                 : notes.Length == 0 ? S(l["error"]) is { Length: > 0 } err ? err : "There are no notes for this lecture." : null,
             ShowTranscript = transcript,
         };
+        // A transcript without times (one pasted from another app) reads a paragraph per line it came with (each
+        // speaker's turn), not as one wall of text.
         foreach (var line in TimedText.HasTimes(S(l["transcript"])) ? TimedText.Parse(S(l["transcript"]))
-                     : S(l["transcript"]) is { Length: > 0 } plain ? [new Spoken(0, 0, plain)] : [])
+                     : S(l["transcript"]).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                         .SelectMany(p => Paragraphs(p)).Select(p => new Spoken(0, 0, p)))
             note.Transcript.Add(new HeardLine { Time = TimedText.HasTimes(S(l["transcript"])) ? TimedText.Clock(line.Start) : "", Text = line.Text });
         library.Note = note;
         ShowLectureAi(l, note);
         ShowLectureFiles(note);
+    }
+
+    /// <summary>A long run of speech as paragraphs of a few sentences each (about <paramref name="size"/> characters),
+    /// broken where a sentence ends: a whole lecture copied as one line otherwise reads as one wall of text.</summary>
+    internal static IEnumerable<string> Paragraphs(string text, int size = 600)
+    {
+        int start = 0;
+        while (text.Length - start > size * 3 / 2)
+        {
+            int end = -1;
+            for (int i = start + size; i < Math.Min(text.Length - 1, start + size * 2); i++)
+                if (text[i] is '.' or '?' or '!' && text[i + 1] == ' ')
+                {
+                    end = i + 1;
+                    break;
+                }
+            if (end < 0) break;
+            yield return text[start..end].Trim();
+            start = end;
+        }
+        yield return text[start..].Trim();
     }
 
     /// <summary>The lecture's notes, which another engine can rewrite (while they aren't still being written), and a
@@ -392,6 +450,7 @@ public static partial class Shell
         {
             OnSelect = (cls, id) =>
             {
+                if (!picking) Remember();
                 dueSelection = (cls, id);
                 if (!picking) library.Opened();
                 _ = ShowAssignmentAsync(cls, id, due?.ItemOf(cls, id));
@@ -419,11 +478,13 @@ public static partial class Shell
             return;
         }
         library.Reader = null;
+        openAssignment = (cls, id);
         library.Assignment = page;
     }
 
     static void OpenLecture(string id, bool transcript = false)
     {
+        Remember();
         // Whichever load of the window finishes last (its class, or this lecture's) shows this lecture.
         openLecture = id;
         ShowLibrary();
@@ -727,12 +788,22 @@ public static partial class Shell
     /// <summary>A passage cut down to the part round what was searched for.</summary>
     static string Excerpt(string text, string query)
     {
-        text = text.Replace('\n', ' ').Trim();
+        text = PlainPassage(text);
         int at = Controls.Marked.Find(text, query).FirstOrDefault() is { Length: > 0 } f ? f.Start : 0;
         int from = Math.Max(0, at - 40);
         if (from > 0) from = text.IndexOf(' ', from) is int sp and >= 0 && sp < at ? sp + 1 : from;
         string cut = text[from..];
         return cut.Length > 110 ? cut[..110].TrimEnd() : cut;
+    }
+
+    /// <summary>A passage of notes as it reads, not as it's written: no Markdown's **, `, # or list markers, no
+    /// link addresses, one line.</summary>
+    internal static string PlainPassage(string text)
+    {
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"!?\[([^\]]*)\]\([^)]*\)", "$1");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"(?m)^\s*(#{1,6}\s+|[-*+]\s+|\d+\.\s+|>\s?)", "");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"(\*\*|__|\*|`|~~)", "");
+        return System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
     }
 
     /// <summary>⌘Return in the quick panel: the library's AI answers as it writes; a library too old for that

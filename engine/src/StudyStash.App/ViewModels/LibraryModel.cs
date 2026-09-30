@@ -164,6 +164,8 @@ public sealed partial class LibraryModel : ObservableObject
     public bool ShowReader => Assignment is null && Reader is not null;
     /// <summary>The lecture's page, with its toolbar and ask bar: whenever no assignment or Canvas page is open.</summary>
     public bool ShowLecturePage => Assignment is null && Reader is null;
+    /// <summary>Move, export and delete: only over a lecture that's open (not the empty "Choose a lecture" page).</summary>
+    public bool ShowLectureTools => ShowLecturePage && HasNote;
     public bool HasNotes => Notes is not null;
     public bool HasAsk => Ask is not null && HasNote && ShowLecturePage;
     /// <summary>An answer to show above the ask bar: the page gives it its own room, and the notes end above it.</summary>
@@ -222,6 +224,7 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(ShowAssignment));
         OnPropertyChanged(nameof(ShowReader));
         OnPropertyChanged(nameof(ShowLecturePage));
+        OnPropertyChanged(nameof(ShowLectureTools));
         OnPropertyChanged(nameof(HasAsk));
         OnPropertyChanged(nameof(HasAnswer));
     }
@@ -259,12 +262,15 @@ public sealed partial class LibraryModel : ObservableObject
 
     public bool HasNote => Note is not null;
     public bool NoNote => Note is null;
+    /// <summary>What the empty page beside the list says: pick a lecture, or that there are none to pick.</summary>
+    [ObservableProperty] public partial string NoNoteText { get; set; } = "Choose a lecture to read its notes.";
     public bool HasEmpty => !string.IsNullOrEmpty(Empty);
 
     partial void OnNoteChanged(NoteModel? value)
     {
         if (LectureFiles is { } files && files.LectureId != value?.Id) LectureFiles = null; // another lecture's files don't stay
         OnPropertyChanged(nameof(HasNote));
+        OnPropertyChanged(nameof(ShowLectureTools));
         OnPropertyChanged(nameof(NoNote));
         OnPropertyChanged(nameof(HasAsk));
         OnPropertyChanged(nameof(HasAnswer));
@@ -400,6 +406,32 @@ public sealed partial class LibraryModel : ObservableObject
     public Action? OnSearch { get; set; }
     public Action? OnSettings { get; set; }
     public Action? OnMore { get; set; }
+
+    /// <summary>The sidebar is folded away, leaving the list and the page the whole window.</summary>
+    [ObservableProperty] public partial bool SidebarHidden { get; set; }
+    public bool ShowSidebar => !SidebarHidden;
+    partial void OnSidebarHiddenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowSidebar));
+        OnSidebarToggled?.Invoke(value);
+    }
+
+    /// <summary>There's somewhere to go back (or forward) to, as in a browser: the places the student picked.</summary>
+    [ObservableProperty] public partial bool CanGoBack { get; set; }
+    [ObservableProperty] public partial bool CanGoForward { get; set; }
+
+    public Action<bool>? OnSidebarToggled { get; set; }
+    public Action? OnGoBack { get; set; }
+    public Action? OnGoForward { get; set; }
+
+    /// <summary>A Canvas class's lectures by week ("All 12 lectures"): its own page (tabs, what's due) is a click away.</summary>
+    [ObservableProperty] public partial bool CanShowClassPage { get; set; }
+    public Action? OnClassPage { get; set; }
+    [RelayCommand] void ShowClassPage() => OnClassPage?.Invoke();
+
+    [RelayCommand] void ToggleSidebar() => SidebarHidden = !SidebarHidden;
+    [RelayCommand] void GoBack() => OnGoBack?.Invoke();
+    [RelayCommand] void GoForward() => OnGoForward?.Invoke();
 
     [RelayCommand] void PickClass(ClassItem c) => OnClass?.Invoke(c);
     [RelayCommand] void PickLecture(LectureCard l) => OnLecture?.Invoke(l);

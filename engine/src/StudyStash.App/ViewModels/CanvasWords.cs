@@ -91,27 +91,60 @@ public static class CanvasWords
     // ---- an item (Due list, a class's assignment tabs) ----
 
     /// <summary>What the right of a Due-list row shows: its score when it's graded, else its plain label.</summary>
-    public static string RightLabel(CanvasApi.Item item) => !string.IsNullOrEmpty(item.ScoreText) ? item.ScoreText : item.Label;
+    public static string RightLabel(CanvasApi.Item item) =>
+        // A score out of nothing ("0/0", Canvas's way of counting a syllabus quiz or attendance) says nothing: its label does.
+        !string.IsNullOrEmpty(item.ScoreText) && !(item.Points is null or 0 && item.ScoreText.EndsWith("/0", StringComparison.Ordinal)) ? item.ScoreText : item.Label;
 
-    /// <summary>"{class} · Was due …" / "… {When}" / "… Graded {Day}" / "… Submitted {Day}" / "… Marked done {Day}".</summary>
+    /// <summary>Still to hand in (not yet submitted, and Canvas still takes it).</summary>
+    public static bool ToHandIn(CanvasApi.Item item) => item.Status is "open" or "to_hand_in" or "past due" or "missing" or "overdue";
+
+    /// <summary>A row's right-hand word in a list: for work still to hand in, how soon it's due ("Today", "Tomorrow",
+    /// "In 3 days", "In 2 weeks") or that it's late; for the rest, the score or the plain label.</summary>
+    public static string RightLabel(CanvasApi.Item item, TimeZoneInfo zone, DateTimeOffset now)
+    {
+        if (!ToHandIn(item) || !string.IsNullOrEmpty(item.ScoreText)) return RightLabel(item);
+        if (item.Missing || item.Status is "missing") return "Missing";
+        if (item.DueAt is not { } due) return "";
+        int days = (Local(due, zone).Date - Local(now, zone).Date).Days;
+        return days switch
+        {
+            < 0 => "Late",
+            0 => "Today",
+            1 => "Tomorrow",
+            < 14 => $"In {days} days",
+            // The date itself is on the line under the title; this only says how far off it is.
+            _ => $"In {days / 7} weeks",
+        };
+    }
+
+    /// <summary>"Was due … · {class}" / "{When} · …" / "Graded {Day} · …" / "Submitted {Day} · …" / "Marked done {Day} · …".</summary>
     public static string DueSub(CanvasApi.Item item, TimeZoneInfo zone, DateTimeOffset now)
     {
         string body = item.Status switch
         {
             "missing" or "overdue" => item.DueAt is { } da ? $"Was due {Full(da, zone, now)}" : "Overdue",
             "graded" => item.GradedAt is { } g ? $"Graded {Day(g, zone)}" : RightLabel(item),
-            "submitted" => item.Submitted is { } sub ? $"Submitted {Day(sub, zone)}" : RightLabel(item),
+            "submitted" or "late" => item.Submitted is { } sub ? $"Submitted {Day(sub, zone)}" : RightLabel(item),
+            "past due" => item.DueAt is { } pd ? $"Was due {Full(pd, zone, now)}" : "Past due",
+            "closed" => "Closed",
             "marked_done" => item.MarkedDone is { } md ? $"Marked done {Day(md, zone)}" : RightLabel(item),
             _ => item.DueAt is { } due ? When(due, zone, now) : "No due date",
         };
-        return $"{item.Class} · {body}";
+        // The date first: a long class name is what gets cut short, not when it's due (the dot says the class).
+        return $"{body} · {item.Class}";
     }
 
     /// <summary>A class's tab row: to-hand-in items lead with their points, done ones with their plain label.</summary>
     public static string ClassTabRow(CanvasApi.Item item, TimeZoneInfo zone, DateTimeOffset now)
     {
-        if (item.DueAt is not { } due) return item.Status == "to_hand_in" ? $"{PointsText(item.Points)} pts · No due date" : $"{item.Label} · No due date";
-        return item.Status == "to_hand_in" ? $"{PointsText(item.Points)} pts · {When(due, zone, now)}" : $"{item.Label} · due {Day(due, zone)}";
+        string points = item.Points is > 0 ? $"{PointsText(item.Points)} pts · " : "";
+        if (ToHandIn(item)) return item.DueAt is { } due ? $"{points}{When(due, zone, now)}" : $"{points}No due date";
+        // Done: when it went in, or was graded, rather than the label the row already shows on its right.
+        string late = item.Late ? " · late" : "";
+        if (item.GradedAt is { } graded) return $"Graded {Day(graded, zone)}{late}";
+        if (item.Submitted is { } sub) return $"Submitted {Day(sub, zone)}{late}";
+        // The label is already on the row's right ("Excused", "Nothing to hand in"): here, only when it was due.
+        return item.DueAt is { } was ? $"Due {Day(was, zone)}" : "No due date";
     }
 
     /// <summary>The Due list's header: how many are left to hand in, and when it last synced.</summary>
@@ -162,13 +195,26 @@ public static class CanvasWords
     /// <summary>The assignment detail's submission card: its status line and, under it, when it was submitted or
     /// how long until it's due.</summary>
     public static SubmissionCopy SubmissionText(CanvasApi.SubmissionInfo? submission, double? score, double? points, string? grade,
-        string? gradingType, bool excused, DateTimeOffset dueAt, TimeZoneInfo zone, DateTimeOffset now)
+        string? gradingType, bool excused, DateTimeOffset? dueAt, TimeZoneInfo zone, DateTimeOffset now)
     {
         if (excused) return new SubmissionCopy("Excused", "");
-        if (submission is null) return new SubmissionCopy("Nothing handed in yet", DueRelative(dueAt, zone, now));
-        string detail = submission.SubmittedAt is { } sa ? $"Submitted {Full(sa, zone, now)}" : "";
-        if (submission.GradedAt is not null) return new SubmissionCopy($"Graded · {ScoreOrGradeText(score, points, grade, gradingType)}", detail);
-        return new SubmissionCopy(submission.Late ? "Submitted late" : "Submitted", detail);
+        if (submission is null) return new SubmissionCopy("Nothing handed in yet", dueAt is { } due ? DueRelative(due, zone, now) : "");
+        if (submission.GradedAt is not null)
+            return new SubmissionCopy($"Graded · {ScoreOrGradeText(score, points, grade, gradingType)}",
+                submission.SubmittedAt is { } handed ? $"Submitted {Full(handed, zone, now)}" : "");
+        // "Submitted" already says what happened; the line beside it only says when.
+        return new SubmissionCopy(submission.Late ? "Submitted late" : "Submitted", submission.SubmittedAt is { } sa ? Full(sa, zone, now) : "");
+    }
+
+    /// <summary>The first few lines of a text-entry submission, as plain text (Canvas stores it as HTML).</summary>
+    public static string BodyPreview(string? body, int max = 280)
+    {
+        if (string.IsNullOrWhiteSpace(body)) return "";
+        string text = System.Net.WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Replace(body, "<[^>]+>", " "));
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
+        if (text.Length <= max) return text;
+        int cut = text.LastIndexOf(' ', max);
+        return text[..(cut > max - 60 ? cut : max)].TrimEnd() + "…";
     }
 
     // ---- sizes ----
@@ -191,12 +237,12 @@ public static class CanvasWords
     /// <summary>"COMP 101 on Canvas", or the course's plain name when it has no code.</summary>
     public static string ClassCanvasLine(string? code, string name) => $"{(string.IsNullOrEmpty(code) ? name : code)} on Canvas";
 
-    /// <summary>Scout's line under a class's header.</summary>
+    /// <summary>Scout's line under a class's header. One that didn't finish says nothing here: there's nothing to do
+    /// about it from the class page, and Settings → Canvas has its Try again.</summary>
     public static string ScoutHeaderLine(CanvasApi.Scout scout, TimeZoneInfo zone) => scout.State switch
     {
         "done" => $"Scout explored this course · {FileCountText(scout.Files)} saved · {(scout.When is { } w ? ScoutDay(w, zone) : "")}",
         "exploring" => "Scout exploring…",
-        "failed" => "Scout didn’t finish",
         _ => "",
     };
 

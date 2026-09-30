@@ -10,7 +10,7 @@
     <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
   </UserControl.Styles>
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel MaxWidth="600" Margin="56,56,56,48" Spacing="12" HorizontalAlignment="Left">
+    <StackPanel MaxWidth="600" Margin="56,28,56,48" Spacing="12" HorizontalAlignment="Left">
       <TextBlock Classes="cv-meta" Text="{Binding Meta}" />
       <TextBlock Classes="cv-detail-title" c:Typography.Extra="-0.6" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
       <c:NoteView Markdown="{Binding Body}" />

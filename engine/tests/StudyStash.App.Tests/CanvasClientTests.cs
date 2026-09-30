@@ -567,4 +567,13 @@ public class CanvasClientTests
         Assert.False(item.Late);
         Assert.False(item.Missing);
     }
+
+    [Theory]
+    [InlineData("""{"local":"Canvas/modules/01 Week 1/slides.pptx"}""", "Canvas/modules/01 Week 1/slides.pptx")]
+    [InlineData("""{"local":true}""", "")]
+    [InlineData("""{"local":false}""", null)]
+    [InlineData("""{"local":null}""", null)]
+    [InlineData("""{"local":""}""", null)]
+    public void A_saved_file_s_path_reads_from_either_library(string json, string? expected) =>
+        Assert.Equal(expected, System.Text.Json.JsonSerializer.Deserialize<CanvasApi.ModuleItem>(json, CanvasApi.Json)!.Local);
 }

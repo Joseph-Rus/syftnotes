@@ -417,6 +417,9 @@
     <Setter Property="FontSize" Value="11" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
+  <Style Selector="Button.cv-mod-item.cv-on">
+    <Setter Property="Background" Value="{DynamicResource Fill2}" />
+  </Style>
   <Style Selector="Button.cv-mod-item">
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Margin" Value="10,0" />

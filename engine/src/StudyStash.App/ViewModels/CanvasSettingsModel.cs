@@ -121,6 +121,13 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
 
     [ObservableProperty] public partial string ExtensionLine { get; set; } = "";
 
+    /// <summary>Connect Canvas's steps (the extension's folder, Chrome's Load unpacked): from the Chrome extension row,
+    /// to set it up again after it's gone from Chrome, or on a new Chrome.</summary>
+    public Action? OnSetUpExtension { get; set; }
+
+    [RelayCommand]
+    void SetUpExtension() => OnSetUpExtension?.Invoke();
+
     public IReadOnlyList<PollChoice> PollChoices { get; } =
         [.. new[] { 15, 30, 60, 180, 1440 }.Select(m => new PollChoice(m, CanvasWords.PollIntervalText(m)))];
     [NotifyPropertyChangedFor(nameof(PollLabel))]

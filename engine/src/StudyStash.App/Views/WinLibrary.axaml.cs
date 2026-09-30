@@ -33,14 +33,4 @@ public partial class WinLibrary : UserControl
     {
         if (ReferenceEquals(e.Source, sender) && DataContext is LibraryModel m) m.CancelDeleteCommand.Execute(null);
     }
-
-    void OnNotesTab(object? sender, PointerPressedEventArgs e)
-    {
-        if ((DataContext as LibraryModel)?.Note is { } n) n.ShowTranscript = false;
-    }
-
-    void OnTranscriptTab(object? sender, PointerPressedEventArgs e)
-    {
-        if ((DataContext as LibraryModel)?.Note is { } n) n.ShowTranscript = true;
-    }
 }

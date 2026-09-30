@@ -472,7 +472,7 @@ public sealed partial class LibraryWeb
 
     static readonly Dictionary<string, (string Label, string Color)> StatusLook = new()
     {
-        ["missing"] = ("Missing", "var(--red)"), ["past due"] = ("Past due", "var(--red)"), ["open"] = ("To do", "var(--label-3)"),
+        ["missing"] = ("Missing", "var(--red)"), ["past due"] = ("Past due", "var(--red)"), ["open"] = ("To do", "var(--label-3)"), ["closed"] = ("Closed", "var(--label-3)"),
         ["graded"] = ("Graded", "var(--green)"), ["submitted"] = ("Submitted", "var(--green)"), ["late"] = ("Submitted late", "var(--orange)"),
         ["excused"] = ("Excused", "var(--label-3)"), ["no submission"] = ("Nothing to hand in", "var(--label-3)"),
     };

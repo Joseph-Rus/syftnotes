@@ -27,27 +27,27 @@ public class CanvasDueTests
         Assert.Equal("Reading response: Treaty of Versailles", missing.Title);
         Assert.Equal("Missing", missing.Right);
         Assert.True(missing.Strong);
-        Assert.Equal("HIST 210 · Was due Mon 22 Sep, 11:59 PM", missing.Sub);
+        Assert.Equal("Was due Mon 22 Sep, 11:59 PM · HIST 210", missing.Sub);
 
         var week = model.Groups[1];
         Assert.Equal("This week", week.Label);
         Assert.False(week.Accent);
         Assert.Equal(2, week.Rows.Count);
         Assert.Equal("Quiz 3 practice", week.Rows[0].Title);
-        Assert.Equal("To do", week.Rows[0].Right);
+        Assert.Equal("Tomorrow", week.Rows[0].Right);
         Assert.False(week.Rows[0].Strong);
-        Assert.Equal("CALC II · Tomorrow, 9:00 AM", week.Rows[0].Sub);
+        Assert.Equal("Tomorrow, 9:00 AM · CALC II", week.Rows[0].Sub);
         Assert.Equal("Lab 3: recursion traces", week.Rows[1].Title);
-        Assert.Equal("CS 101 · Tue 30 Sep, 11:59 PM", week.Rows[1].Sub);
+        Assert.Equal("Tue 30 Sep, 11:59 PM · CS 101", week.Rows[1].Sub);
 
         var handedIn = model.Groups[2];
         Assert.Equal("Handed in", handedIn.Label);
         Assert.Equal("Osmosis lab report", handedIn.Rows[0].Title);
         Assert.Equal("Submitted", handedIn.Rows[0].Right);
-        Assert.Equal("BIO 110 · Submitted Wed 24 Sep", handedIn.Rows[0].Sub);
+        Assert.Equal("Submitted Wed 24 Sep · BIO 110", handedIn.Rows[0].Sub);
         Assert.Equal("Problem set 4", handedIn.Rows[1].Title);
         Assert.Equal("18/20", handedIn.Rows[1].Right);
-        Assert.Equal("CS 101 · Graded Mon 22 Sep", handedIn.Rows[1].Sub);
+        Assert.Equal("Graded Mon 22 Sep · CS 101", handedIn.Rows[1].Sub);
     }
 
     [Fact]

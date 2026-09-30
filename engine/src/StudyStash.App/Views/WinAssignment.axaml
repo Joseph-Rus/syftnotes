@@ -50,8 +50,7 @@
           </Border>
 
           <TextBlock Classes="cv-h3" Text="Instructions" Margin="0,18,0,0" IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-          <TextBlock Text="{Binding Instructions}" FontSize="15" LineHeight="24" TextWrapping="Wrap"
-                     IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <c:NoteView Markdown="{Binding Instructions}" LinkHandler="{Binding LinkHandler}" IsVisible="{Binding Instructions, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
           <TextBlock Classes="cv-h3" Text="Rubric" Margin="0,14,0,0" IsVisible="{Binding HasRubric}" />
           <ItemsControl ItemsSource="{Binding Rubric}" IsVisible="{Binding HasRubric}">
@@ -77,6 +76,7 @@
                 <TextBlock Classes="cv-sub-status" Text="{Binding SubmissionStatus}" />
                 <TextBlock Classes="cv-sub-detail" Text="{Binding SubmissionDetail}" IsVisible="{Binding HasSubmissionDetail}" VerticalAlignment="Bottom" />
               </StackPanel>
+              <TextBlock Classes="cv-sub-detail" Text="{Binding SubmissionBody}" IsVisible="{Binding HasSubmissionBody}" TextWrapping="Wrap" />
               <StackPanel Spacing="2" IsVisible="{Binding HasComment}">
                 <TextBlock Classes="cv-comment" Text="{Binding CommentText}" />
                 <TextBlock Classes="cv-comment-author" Text="{Binding CommentAuthor}" />

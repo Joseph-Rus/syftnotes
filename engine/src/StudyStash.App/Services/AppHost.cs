@@ -63,6 +63,8 @@ public sealed class AppSettings
     public double? RecorderY { get; set; }
     /// <summary>Where the library window was left, and its size (or that it was zoomed), so it opens there again.</summary>
     public WindowPlace? LibraryWindow { get; set; }
+    /// <summary>The library window's sidebar is folded away (the toolbar's sidebar button, ⌃⌘S or Ctrl+Shift+S).</summary>
+    public bool SidebarHidden { get; set; }
     /// <summary>The colour theme's name (Settings → Appearance): "Lagoon", "Plum"…</summary>
     public string Theme { get; set; } = "Lagoon";
     /// <summary>Light, dark, or match the computer (Settings → Appearance). Settings files saved before this

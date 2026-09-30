@@ -15,10 +15,12 @@ public sealed record RubricRow(string Criterion, string Right, string? Comment);
 public sealed partial class FileChip : ObservableObject
 {
     public required string Name { get; init; }
-    public required string SizeText { get; init; }
-    public required string Glyph { get; init; }
     /// <summary>The path the library's files API knows it by (its folder, if any, plus its name).</summary>
     public required string Path { get; init; }
+    public string SizeText { get; init; } = "";
+    public string Glyph { get; init; } = "draft";
+    /// <summary>The file on Canvas, for when the library hasn't saved it.</summary>
+    public string? Url { get; init; }
 
     [ObservableProperty] public partial bool Opening { get; set; }
 
@@ -55,6 +57,9 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
     [ObservableProperty] public partial string SubmissionStatus { get; set; } = "";
     [ObservableProperty] public partial string SubmissionDetail { get; set; } = "";
     public bool HasSubmissionDetail => SubmissionDetail.Length > 0;
+    /// <summary>The start of what was typed into Canvas for a text entry, so the student sees what they sent.</summary>
+    [ObservableProperty] public partial string SubmissionBody { get; set; } = "";
+    public bool HasSubmissionBody => SubmissionBody.Length > 0;
     [ObservableProperty] public partial string? CommentText { get; set; }
     [ObservableProperty] public partial string? CommentAuthor { get; set; }
     public bool HasComment => !string.IsNullOrEmpty(CommentText);
@@ -88,9 +93,15 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
 
         DueValue = d.DueAt is { } due ? CanvasWords.Full(due, zone, now) : "No due date";
         PointsValue = CanvasWords.PointsText(d.Points);
+        // Canvas sends a submission for every assignment, "unsubmitted" until something's handed in: only one with
+        // something in it (a time, a grade, a state past unsubmitted) is the student's.
+        var handedIn = d.Submission is { } given && (given.SubmittedAt is not null || given.GradedAt is not null
+            || given.State is { Length: > 0 } state && state != "unsubmitted") ? given : null;
+        bool closed = handedIn is null && !d.Excused && d.LockAt is { } lockAt && lockAt < now;
         bool graded = d.Status == "graded" || d.GradedAt is not null;
         ThirdLabel = graded ? "Score" : "Status";
-        ThirdValue = graded ? CanvasWords.ScoreOrGradeText(d.Score, d.Points, d.Grade, d.GradingType) : d.Label;
+        ThirdValue = graded ? CanvasWords.ScoreOrGradeText(d.Score, d.Points, d.Grade, d.GradingType)
+            : closed ? "Closed" : handedIn is not null && d.Label == "To do" ? "Submitted" : d.Label;
 
         Instructions = d.Instructions ?? "";
 
@@ -99,10 +110,13 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
             Rubric.Add(new RubricRow(r.Criterion, CanvasWords.RubricPoints(r), r.Mark?.Comment is { Length: > 0 } c ? CanvasWords.Quote(c) : null));
         OnPropertyChanged(nameof(HasRubric));
 
-        var copy = CanvasWords.SubmissionText(d.Submission, d.Score, d.Points, d.Grade, d.GradingType, d.Excused, d.DueAt ?? now, zone, now);
+        var copy = closed ? new CanvasWords.SubmissionCopy("Not handed in", $"Closed {CanvasWords.Full(d.LockAt!.Value, zone, now)}")
+            : CanvasWords.SubmissionText(handedIn, d.Score, d.Points, d.Grade, d.GradingType, d.Excused, d.DueAt, zone, now);
         SubmissionStatus = copy.Status;
-        SubmissionDetail = copy.Detail;
+        SubmissionDetail = handedIn?.Attempt is > 1 && copy.Detail.Length > 0 ? $"{copy.Detail} · attempt {handedIn.Attempt}" : copy.Detail;
         OnPropertyChanged(nameof(HasSubmissionDetail));
+        SubmissionBody = CanvasWords.BodyPreview(handedIn?.Body);
+        OnPropertyChanged(nameof(HasSubmissionBody));
 
         var comment = d.Comments.Count > 0 ? d.Comments[^1] : null;
         CommentText = comment?.Text;
@@ -111,14 +125,14 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
 
         bool takesNothing = d.SubmissionTypes.Count > 0 && d.SubmissionTypes.All(t => t is "none" or "on_paper" or "not_graded");
         IsTodo = false;
-        ShowSubmission = !(takesNothing && d.Submission is null && !d.Excused);
-        ShowHandInLink = d.Submission is null && !d.Excused && !takesNothing;
+        ShowSubmission = !(takesNothing && handedIn is null && !d.Excused);
+        ShowHandInLink = handedIn is null && !d.Excused && !takesNothing && !closed;
 
         Files.Clear();
-        var source = d.Submission is { Files.Count: > 0 } sub ? sub.Files : d.Files;
+        var source = handedIn is { Files.Count: > 0 } sub ? sub.Files : d.Files;
         foreach (var f in source)
         {
-            var chip = new FileChip { Name = f.Name, SizeText = CanvasWords.Size(f.Size), Glyph = FileGlyph(f.Format), Path = CombinePath(folder, f.Name) };
+            var chip = new FileChip { Name = f.Name, SizeText = CanvasWords.Size(f.Size), Glyph = FileGlyph(f.Format), Path = f.Local is { Length: > 0 } saved ? saved : CombinePath(folder, f.Name), Url = f.Url };
             chip.OnOpen = c => _ = OpenFileAsync(c);
             Files.Add(chip);
         }
@@ -142,8 +156,9 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
         Instructions = "";
         Rubric.Clear();
         OnPropertyChanged(nameof(HasRubric));
-        SubmissionStatus = SubmissionDetail = "";
+        SubmissionStatus = SubmissionDetail = SubmissionBody = "";
         OnPropertyChanged(nameof(HasSubmissionDetail));
+        OnPropertyChanged(nameof(HasSubmissionBody));
         CommentText = CommentAuthor = null;
         OnPropertyChanged(nameof(HasComment));
         Files.Clear();
@@ -189,11 +204,48 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
             System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest)!);
             if (context.Client is { } client && await client.DownloadAsync(cls, chip.Path, dest))
                 context.Actions.OpenFile(dest);
+            else if (chip.Url is { Length: > 0 } fileUrl) context.Actions.OpenInChrome(fileUrl);
+            else if (url is { Length: > 0 }) context.Actions.OpenInChrome(url);
+        }
+        catch (Exception e) when (e is HttpRequestException or CanvasLibraryException or System.IO.IOException or TaskCanceledException)
+        {
+            if (url is { Length: > 0 }) context.Actions.OpenInChrome(url);
         }
         finally
         {
             chip.Opening = false;
         }
+    }
+
+    /// <summary>A link in the instructions: a web address opens in the browser (Canvas's in Chrome); one into the
+    /// assignment's own saved files ("files/slides.pdf", "../Lab 1/files/policy.pdf") opens the library's copy, or
+    /// the assignment on Canvas when the library hasn't got it.</summary>
+    public Action<string> LinkHandler => OpenLink;
+
+    public void OpenLink(string link)
+    {
+        if (Uri.TryCreate(link, UriKind.Absolute, out var abs) && abs.Scheme is "http" or "https" or "mailto")
+        {
+            Controls.NoteView.OpenLink(link);
+            return;
+        }
+        string path = ResolveRelative(folder, Uri.UnescapeDataString(link.Split('#', '?')[0]));
+        var chip = new FileChip { Name = System.IO.Path.GetFileName(path), Path = path };
+        _ = OpenFileAsync(chip);
+    }
+
+    /// <summary><paramref name="relative"/> (with its ./ and ../) against <paramref name="baseFolder"/>, as the
+    /// library's forward-slash path.</summary>
+    static string ResolveRelative(string baseFolder, string relative)
+    {
+        var parts = new List<string>(baseFolder.Split('/', StringSplitOptions.RemoveEmptyEntries));
+        foreach (var piece in relative.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (piece == ".") continue;
+            if (piece == "..") { if (parts.Count > 0) parts.RemoveAt(parts.Count - 1); continue; }
+            parts.Add(piece);
+        }
+        return string.Join('/', parts);
     }
 
     [RelayCommand]

@@ -13,7 +13,8 @@
   </UserControl.Styles>
 
   <Panel ClipToBounds="False">
-    <c:Glass CornerRadius="24" Padding="20,0,8,0" Height="48" Width="560" ClipToBounds="False">
+    <!-- Solid: it floats over the notes, whose words would otherwise show through the question being typed -->
+    <c:Glass CornerRadius="24" Padding="20,0,8,0" Height="48" Width="560" ClipToBounds="False" Background="{DynamicResource GlassSolid}">
       <Grid ColumnDefinitions="*,8,Auto,8,Auto,8,Auto" VerticalAlignment="Center">
         <TextBox Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center">
           <TextBox.KeyBindings>

@@ -133,7 +133,9 @@ public sealed class SettingsRoleSwitchTests
         using var host = new AppHost(home.Path, log: _ => { });
         // Write config.toml and a lecture before starting the library, the way LibraryHere.CreateAsync finds an
         // existing one and keeps its notes: the child process opens the same database once it starts.
-        var cfg = new Config(home.Path, home["here-pool"]) { PoolName = "Ada's library", PoolPassword = "here-pw" };
+        // A port of its own: the default (8787) may be a real library's on this computer, and this one keeps whatever
+        // port its config says, so the hand-off would reach that library instead.
+        var cfg = new Config(home.Path, home["here-pool"]) { PoolName = "Ada's library", PoolPassword = "here-pw", WebPort = FreePort() };
         Directory.CreateDirectory(cfg.Home);
         Directory.CreateDirectory(cfg.PoolDir);
         Configs.Save(cfg);
@@ -162,5 +164,12 @@ public sealed class SettingsRoleSwitchTests
         {
             if (host.LocalLibrary is { } svc) await svc.StopAsync();
         }
+    }
+
+    static int FreePort()
+    {
+        for (int port = 18_787; port < 19_787; port += 2)
+            if (StudyStash.Core.HostInfo.PortFree(port) && StudyStash.Core.HostInfo.PortFree(port + 1)) return port;
+        throw new InvalidOperationException("no free ports");
     }
 }
