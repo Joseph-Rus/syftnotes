@@ -128,7 +128,7 @@
           <ItemsControl ItemsSource="{Binding Announcements}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AnnouncementRow">
-                <Button Classes="cv-mod-item" Command="{Binding OpenCommand}">
+                <Button Classes="cv-mod-item" Classes.cv-on="{Binding Selected}" Command="{Binding OpenCommand}">
                   <Grid ColumnDefinitions="Auto,*,Auto">
                     <Ellipse Grid.Column="0" Classes="cv-new-dot" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding New}" />
                     <TextBlock Grid.Column="1" Classes="cv-mod-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
@@ -197,7 +197,7 @@
         <ItemsControl ItemsSource="{Binding Announcements}" IsVisible="{Binding AnnouncementsExpanded}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:AnnouncementRow">
-              <Button Classes="cv-mod-item" Command="{Binding OpenCommand}">
+              <Button Classes="cv-mod-item" Classes.cv-on="{Binding Selected}" Command="{Binding OpenCommand}">
                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="26,0,0,0">
                   <Ellipse Grid.Column="0" Classes="cv-new-dot" Margin="0,0,8,0" VerticalAlignment="Center" IsVisible="{Binding New}" />
                   <TextBlock Grid.Column="1" Classes="cv-mod-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />

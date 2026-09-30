@@ -45,6 +45,8 @@ public sealed partial class AnnouncementRow : ObservableObject
     public required string Title { get; init; }
     public required string When { get; init; }
     [ObservableProperty] public partial bool New { get; set; }
+    /// <summary>It's the one open beside the list.</summary>
+    [ObservableProperty] public partial bool Selected { get; set; }
     public Action<AnnouncementRow>? OnOpen { get; set; }
 
     [RelayCommand]
@@ -329,6 +331,7 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
 
     void OpenAnnouncement(AnnouncementRow row, CanvasApi.AnnouncementRow a)
     {
+        foreach (var other in Announcements) other.Selected = ReferenceEquals(other, row);
         var reader = new CanvasReaderModel(context);
         reader.ShowAnnouncement(a);
         OnReader?.Invoke(reader);

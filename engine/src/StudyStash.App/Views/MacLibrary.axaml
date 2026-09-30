@@ -356,7 +356,7 @@
         <Grid IsVisible="{Binding ShowLecturePage}" RowDefinitions="*,Auto" ClipToBounds="False">
           <Panel>
           <ScrollViewer Name="NoteScroll" Margin="1,0,0,0" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasNote}">
-            <StackPanel MaxWidth="620" HorizontalAlignment="Left" Margin="64,28,64,140" Spacing="14" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
+            <StackPanel MaxWidth="620" HorizontalAlignment="Left" Margin="56,28,56,140" Spacing="14" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding Meta}" FontSize="12" Foreground="{DynamicResource Fg2}" />
