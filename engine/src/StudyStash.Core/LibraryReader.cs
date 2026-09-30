@@ -110,9 +110,14 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     [GeneratedRegex(@"\*\*|__|`|\[([^\]]*)\]\([^)]*\)")]
     private static partial Regex Markup();
 
+    [GeneratedRegex(@"\A\s*---[ \t]*\r?\n.*?\r?\n---[ \t]*(\r?\n|\z)", RegexOptions.Singleline)]
+    private static partial Regex FrontMatter();
+
     /// <summary>The lecture in a line: the first sentence of its Summary (or Overview), for lists.</summary>
     public static string FirstSentence(string notes)
     {
+        // Notes brought in from another app can start with its front matter ("---", "granola_id: …", "---"): not the lecture.
+        notes = FrontMatter().Replace(notes, "", 1);
         string text = "";
         foreach (string heading in new[] { "Summary", "Overview" })
             if ((text = Notes.Section(notes, heading)).Length > 0) break;
