@@ -753,12 +753,22 @@ public static partial class Shell
     /// <summary>A passage cut down to the part round what was searched for.</summary>
     static string Excerpt(string text, string query)
     {
-        text = text.Replace('\n', ' ').Trim();
+        text = PlainPassage(text);
         int at = Controls.Marked.Find(text, query).FirstOrDefault() is { Length: > 0 } f ? f.Start : 0;
         int from = Math.Max(0, at - 40);
         if (from > 0) from = text.IndexOf(' ', from) is int sp and >= 0 && sp < at ? sp + 1 : from;
         string cut = text[from..];
         return cut.Length > 110 ? cut[..110].TrimEnd() : cut;
+    }
+
+    /// <summary>A passage of notes as it reads, not as it's written: no Markdown's **, `, # or list markers, no
+    /// link addresses, one line.</summary>
+    internal static string PlainPassage(string text)
+    {
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"!?\[([^\]]*)\]\([^)]*\)", "$1");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"(?m)^\s*(#{1,6}\s+|[-*+]\s+|\d+\.\s+|>\s?)", "");
+        text = System.Text.RegularExpressions.Regex.Replace(text, @"(\*\*|__|\*|`|~~)", "");
+        return System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ").Trim();
     }
 
     /// <summary>⌘Return in the quick panel: the library's AI answers as it writes; a library too old for that
