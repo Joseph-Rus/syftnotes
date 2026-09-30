@@ -380,12 +380,16 @@
               <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,0">
                 <Border HorizontalAlignment="Left" Padding="3" CornerRadius="18" Background="{DynamicResource Fill}" BoxShadow="{DynamicResource EdgeSoft}">
                   <StackPanel Orientation="Horizontal">
-                    <Border Classes="seg" Classes.on="{Binding ShowNotes}" PointerPressed="OnNotesTab">
-                      <TextBlock Text="Notes" FontSize="12" FontWeight="Medium" />
-                    </Border>
-                    <Border Classes="seg" Classes.on="{Binding ShowTranscript}" PointerPressed="OnTranscriptTab">
-                      <TextBlock Text="Transcript" FontSize="12" FontWeight="Medium" />
-                    </Border>
+                    <Button Theme="{StaticResource Surface}" Padding="0" CornerRadius="15" Command="{Binding NotesCommand}" AutomationProperties.Name="Notes">
+                      <Border Classes="seg" Classes.on="{Binding ShowNotes}">
+                        <TextBlock Text="Notes" FontSize="12" FontWeight="Medium" />
+                      </Border>
+                    </Button>
+                    <Button Theme="{StaticResource Surface}" Padding="0" CornerRadius="15" Command="{Binding TranscriptsCommand}" AutomationProperties.Name="Transcript">
+                      <Border Classes="seg" Classes.on="{Binding ShowTranscript}">
+                        <TextBlock Text="Transcript" FontSize="12" FontWeight="Medium" />
+                      </Border>
+                    </Button>
                   </StackPanel>
                 </Border>
                 <!-- Nothing attached yet: Attach sits beside the tabs rather than heading an empty list of its own -->
@@ -418,9 +422,9 @@
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:HeardLine">
-                      <Grid ColumnDefinitions="48,12,*">
-                        <TextBlock Classes="num" Text="{Binding Time}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,3,0,0" />
-                        <SelectableTextBlock Grid.Column="2" Text="{Binding Text}" FontFamily="{DynamicResource SerifFont}" FontSize="16" LineHeight="25.6" TextWrapping="Wrap"
+                      <Grid ColumnDefinitions="Auto,*">
+                        <TextBlock Classes="num" Width="48" Text="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,3,12,0" />
+                        <SelectableTextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="{DynamicResource SerifFont}" FontSize="16" LineHeight="25.6" TextWrapping="Wrap"
                                              SelectionBrush="{DynamicResource Hl}" />
                       </Grid>
                     </DataTemplate>

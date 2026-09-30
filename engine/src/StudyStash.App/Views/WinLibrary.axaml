@@ -390,18 +390,22 @@
                     <Border HorizontalAlignment="Left" Padding="2" CornerRadius="4" Background="{DynamicResource Subtle}" BorderBrush="{DynamicResource CtrlStroke}"
                             BorderThickness="1">
                       <StackPanel Orientation="Horizontal">
-                        <Border Classes="seg" Classes.on="{Binding ShowNotes}" PointerPressed="OnNotesTab">
-                          <Panel>
-                            <TextBlock Text="Notes" FontSize="14" />
-                            <Border Classes="underline" Width="16" Height="3" CornerRadius="2" Background="{DynamicResource Accent}" VerticalAlignment="Bottom" Margin="0,0,0,-4" />
-                          </Panel>
-                        </Border>
-                        <Border Classes="seg" Classes.on="{Binding ShowTranscript}" PointerPressed="OnTranscriptTab">
-                          <Panel>
-                            <TextBlock Text="Transcript" FontSize="14" />
-                            <Border Classes="underline" Width="16" Height="3" CornerRadius="2" Background="{DynamicResource Accent}" VerticalAlignment="Bottom" Margin="0,0,0,-4" />
-                          </Panel>
-                        </Border>
+                        <Button Theme="{StaticResource Surface}" Padding="0" Command="{Binding NotesCommand}" AutomationProperties.Name="Notes">
+                          <Border Classes="seg" Classes.on="{Binding ShowNotes}">
+                            <Panel>
+                              <TextBlock Text="Notes" FontSize="14" />
+                              <Border Classes="underline" Width="16" Height="3" CornerRadius="2" Background="{DynamicResource Accent}" VerticalAlignment="Bottom" Margin="0,0,0,-4" />
+                            </Panel>
+                          </Border>
+                        </Button>
+                        <Button Theme="{StaticResource Surface}" Padding="0" Command="{Binding TranscriptsCommand}" AutomationProperties.Name="Transcript">
+                          <Border Classes="seg" Classes.on="{Binding ShowTranscript}">
+                            <Panel>
+                              <TextBlock Text="Transcript" FontSize="14" />
+                              <Border Classes="underline" Width="16" Height="3" CornerRadius="2" Background="{DynamicResource Accent}" VerticalAlignment="Bottom" Margin="0,0,0,-4" />
+                            </Panel>
+                          </Border>
+                        </Button>
                       </StackPanel>
                     </Border>
                     <!-- Nothing attached yet: Attach sits beside the tabs rather than heading an empty list of its own -->
@@ -434,9 +438,9 @@
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:HeardLine">
-                          <Grid ColumnDefinitions="52,12,*">
-                            <TextBlock Classes="num" Text="{Binding Time}" FontSize="12" Foreground="{DynamicResource Fg3}" Margin="0,3,0,0" />
-                            <SelectableTextBlock Grid.Column="2" Text="{Binding Text}" FontSize="15" LineHeight="24" TextWrapping="Wrap" SelectionBrush="{DynamicResource Hl}" />
+                          <Grid ColumnDefinitions="Auto,*">
+                            <TextBlock Classes="num" Width="52" Text="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="12" Foreground="{DynamicResource Fg3}" Margin="0,3,12,0" />
+                            <SelectableTextBlock Grid.Column="1" Text="{Binding Text}" FontSize="15" LineHeight="24" TextWrapping="Wrap" SelectionBrush="{DynamicResource Hl}" />
                           </Grid>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>

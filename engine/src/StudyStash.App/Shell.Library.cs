@@ -314,12 +314,36 @@ public static partial class Shell
                 : notes.Length == 0 ? S(l["error"]) is { Length: > 0 } err ? err : "There are no notes for this lecture." : null,
             ShowTranscript = transcript,
         };
+        // A transcript without times (one pasted from another app) reads a paragraph per line it came with (each
+        // speaker's turn), not as one wall of text.
         foreach (var line in TimedText.HasTimes(S(l["transcript"])) ? TimedText.Parse(S(l["transcript"]))
-                     : S(l["transcript"]) is { Length: > 0 } plain ? [new Spoken(0, 0, plain)] : [])
+                     : S(l["transcript"]).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                         .SelectMany(p => Paragraphs(p)).Select(p => new Spoken(0, 0, p)))
             note.Transcript.Add(new HeardLine { Time = TimedText.HasTimes(S(l["transcript"])) ? TimedText.Clock(line.Start) : "", Text = line.Text });
         library.Note = note;
         ShowLectureAi(l, note);
         ShowLectureFiles(note);
+    }
+
+    /// <summary>A long run of speech as paragraphs of a few sentences each (about <paramref name="size"/> characters),
+    /// broken where a sentence ends: a whole lecture copied as one line otherwise reads as one wall of text.</summary>
+    internal static IEnumerable<string> Paragraphs(string text, int size = 600)
+    {
+        int start = 0;
+        while (text.Length - start > size * 3 / 2)
+        {
+            int end = -1;
+            for (int i = start + size; i < Math.Min(text.Length - 1, start + size * 2); i++)
+                if (text[i] is '.' or '?' or '!' && text[i + 1] == ' ')
+                {
+                    end = i + 1;
+                    break;
+                }
+            if (end < 0) break;
+            yield return text[start..end].Trim();
+            start = end;
+        }
+        yield return text[start..].Trim();
     }
 
     /// <summary>The lecture's notes, which another engine can rewrite (while they aren't still being written), and a
