@@ -91,7 +91,9 @@ public static class CanvasWords
     // ---- an item (Due list, a class's assignment tabs) ----
 
     /// <summary>What the right of a Due-list row shows: its score when it's graded, else its plain label.</summary>
-    public static string RightLabel(CanvasApi.Item item) => !string.IsNullOrEmpty(item.ScoreText) ? item.ScoreText : item.Label;
+    public static string RightLabel(CanvasApi.Item item) =>
+        // A score out of nothing ("0/0", Canvas's way of counting a syllabus quiz or attendance) says nothing: its label does.
+        !string.IsNullOrEmpty(item.ScoreText) && !(item.Points is null or 0 && item.ScoreText.EndsWith("/0", StringComparison.Ordinal)) ? item.ScoreText : item.Label;
 
     /// <summary>Still to hand in (not yet submitted, and Canvas still takes it).</summary>
     public static bool ToHandIn(CanvasApi.Item item) => item.Status is "open" or "to_hand_in" or "past due" or "missing" or "overdue";
@@ -141,7 +143,8 @@ public static class CanvasWords
         string late = item.Late ? " · late" : "";
         if (item.GradedAt is { } graded) return $"Graded {Day(graded, zone)}{late}";
         if (item.Submitted is { } sub) return $"Submitted {Day(sub, zone)}{late}";
-        return item.DueAt is { } was ? $"{item.Label} · due {Day(was, zone)}" : item.Label;
+        // The label is already on the row's right ("Excused", "Nothing to hand in"): here, only when it was due.
+        return item.DueAt is { } was ? $"Due {Day(was, zone)}" : "No due date";
     }
 
     /// <summary>The Due list's header: how many are left to hand in, and when it last synced.</summary>

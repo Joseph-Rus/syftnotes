@@ -36,6 +36,10 @@ public class CanvasWordsTests
         Assert.Equal("18/20", CanvasWords.RightLabel(Item(status: "graded", label: "Graded", scoreText: "18/20", dueAt: Now.AddDays(-3)), Zone, Now));
 
     [Fact]
+    public void RightLabel_of_a_score_out_of_nothing_is_its_label() =>
+        Assert.Equal("Graded", CanvasWords.RightLabel(Item(status: "graded", label: "Graded", points: 0, scoreText: "0/0")));
+
+    [Fact]
     public void RightLabel_with_no_due_date_says_nothing() =>
         Assert.Equal("", CanvasWords.RightLabel(Item(status: "open"), Zone, Now));
 
@@ -193,15 +197,15 @@ public class CanvasWordsTests
             Item(status: "to_hand_in", points: 20, dueAt: new DateTimeOffset(2025, 10, 1, 6, 59, 0, TimeSpan.Zero)), Zone, Now));
 
     [Theory]
-    [InlineData("graded", "Graded", "2025-09-17T06:59:00Z", "Graded · due Tue 16 Sep")]
-    [InlineData("submitted", "Submitted late", "2025-09-12T06:59:00Z", "Submitted late · due Thu 11 Sep")]
-    [InlineData("excused", "Excused", "2025-09-06T06:59:00Z", "Excused · due Fri 5 Sep")]
-    public void ClassTabRow_a_done_item_leads_with_its_label(string status, string label, string dueAt, string expected) =>
+    [InlineData("graded", "Graded", "2025-09-17T06:59:00Z", "Due Tue 16 Sep")]
+    [InlineData("submitted", "Submitted late", "2025-09-12T06:59:00Z", "Due Thu 11 Sep")]
+    [InlineData("excused", "Excused", "2025-09-06T06:59:00Z", "Due Fri 5 Sep")]
+    public void ClassTabRow_a_done_item_with_no_dates_says_when_it_was_due(string status, string label, string dueAt, string expected) =>
         Assert.Equal(expected, CanvasWords.ClassTabRow(Item(status: status, label: label, dueAt: DateTimeOffset.Parse(dueAt)), Zone, Now));
 
     [Fact]
     public void ClassTabRow_with_no_due_date() =>
-        Assert.Equal("Excused", CanvasWords.ClassTabRow(Item(status: "excused", label: "Excused"), Zone, Now));
+        Assert.Equal("No due date", CanvasWords.ClassTabRow(Item(status: "excused", label: "Excused"), Zone, Now));
 
     // ---- kind word, points, score ----
 

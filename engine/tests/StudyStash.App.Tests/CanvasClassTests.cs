@@ -69,7 +69,7 @@ public class CanvasClassTests
         Assert.Equal(("Problem set 4", "18/20", "Graded Mon 22 Sep"), (done[0].Title, done[0].Right, done[0].Sub));
         Assert.Equal(("Problem set 3", "20/20", "Graded Mon 15 Sep"), (done[1].Title, done[1].Right, done[1].Sub));
         Assert.Equal(("Lab 2: tracing loops", "17/20", "Graded Sun 14 Sep · late"), (done[2].Title, done[2].Right, done[2].Sub));
-        Assert.Equal(("Syllabus quiz", "Excused", "Excused · due Fri 5 Sep"), (done[3].Title, done[3].Right, done[3].Sub));
+        Assert.Equal(("Syllabus quiz", "Excused", "Due Fri 5 Sep"), (done[3].Title, done[3].Right, done[3].Sub));
     }
 
     [Fact]
