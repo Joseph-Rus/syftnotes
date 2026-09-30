@@ -180,7 +180,8 @@ public static partial class Shell
         // A class linked to Canvas gets its own page: its lectures, what's to hand in, modules, files, announcements.
         if (CanvasClassRow(name) is { } row && !allLectures)
         {
-            var page = library.CanvasClass is { } open && openCanvasClass == name ? open : NewCanvasClass();
+            bool fresh = !(library.CanvasClass is { } open && openCanvasClass == name);
+            var page = fresh ? NewCanvasClass() : library.CanvasClass!;
             openCanvasClass = name;
             var ctx = Canvas();
             page.SetLectures([.. lectures.Take(3).Select(l =>
@@ -192,6 +193,8 @@ public static partial class Shell
                     OpenFromList(() => ShowLectureAsync(id));
                 });
             })], lectures.Count);
+            // Nothing recorded for it yet: its page opens on what's to hand in, not an empty Lectures tab.
+            if (fresh && lectures.Count == 0) page.Tab = ClassTab.Assignments;
             library.CanvasClass = page;
             library.List = LibraryList.CanvasClass;
             try
@@ -210,6 +213,9 @@ public static partial class Shell
             }
         }
         else ShowLectureList();
+        library.NoNoteText = lectures.Count > 0 ? "Choose a lecture to read its notes."
+            : library.List == LibraryList.CanvasClass ? $"No lectures in {name} yet. Pick an assignment to see it here."
+            : $"No lectures in {name} yet.";
         string? pick = openLecture is not null && lectures.Any(l => S(l["id"]) == openLecture) ? openLecture : lectures.Select(l => S(l["id"])).FirstOrDefault();
         if (pick is not null) await ShowLectureAsync(pick);
         else

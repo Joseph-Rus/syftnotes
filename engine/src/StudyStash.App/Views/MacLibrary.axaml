@@ -429,7 +429,7 @@
               </StackPanel>
             </StackPanel>
           </ScrollViewer>
-          <TextBlock IsVisible="{Binding NoNote}" Text="Choose a lecture to read its notes." FontSize="13" Foreground="{DynamicResource Fg3}"
+          <TextBlock IsVisible="{Binding NoNote}" Text="{Binding NoNoteText}" FontSize="13" Foreground="{DynamicResource Fg3}"
                      HorizontalAlignment="Center" VerticalAlignment="Center" />
 
           <!-- The page fades under the title bar, and out under the ask bar (or above the answer) -->

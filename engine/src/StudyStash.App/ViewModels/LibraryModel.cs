@@ -262,6 +262,8 @@ public sealed partial class LibraryModel : ObservableObject
 
     public bool HasNote => Note is not null;
     public bool NoNote => Note is null;
+    /// <summary>What the empty page beside the list says: pick a lecture, or that there are none to pick.</summary>
+    [ObservableProperty] public partial string NoNoteText { get; set; } = "Choose a lecture to read its notes.";
     public bool HasEmpty => !string.IsNullOrEmpty(Empty);
 
     partial void OnNoteChanged(NoteModel? value)

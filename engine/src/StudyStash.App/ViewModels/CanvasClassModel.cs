@@ -104,6 +104,8 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
 
     public ObservableCollection<LectureRow> RecentLectures { get; } = [];
     [ObservableProperty] public partial string AllLecturesText { get; set; } = "";
+    /// <summary>The class has lectures (no "All 0 lectures" link: an empty class says so instead).</summary>
+    public bool HasLectures => lectureTotal > 0;
     public Action? OnAllLectures { get; set; }
 
     [ObservableProperty] public partial int ModulesCount { get; set; }
@@ -202,6 +204,7 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         RecentLectures.Clear();
         foreach (var r in recent) RecentLectures.Add(r);
         AllLecturesText = total == 1 ? "All 1 lecture" : $"All {total} lectures";
+        OnPropertyChanged(nameof(HasLectures));
         UpdateHeaderLine();
     }
 
