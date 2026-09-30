@@ -361,7 +361,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         };
         AiProblems = new AiProblemsModel(ai);
         Access = MakeAccess(ai, host);
-        Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch);
+        Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch) { OnSetUpExtension = () => Shell.ShowCanvasConnect() };
         Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
         Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
         Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, records);

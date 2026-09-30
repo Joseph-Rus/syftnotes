@@ -68,12 +68,14 @@
       <TextBlock Classes="cv-link" Margin="0,0,0,8" Text="{Binding SchoolError}" IsVisible="{Binding SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
       <Border Classes="cv-item">
-        <Grid ColumnDefinitions="Auto,*">
+        <Grid ColumnDefinitions="Auto,*,Auto">
           <c:Icon Glyph="extension" Size="20" />
           <StackPanel Grid.Column="1" Spacing="0" Margin="16,0,0,0" VerticalAlignment="Center" MinWidth="0">
             <TextBlock Text="Chrome extension" FontSize="14" />
             <TextBlock Classes="cv-value" Text="{Binding ExtensionLine}" />
           </StackPanel>
+          <Button Grid.Column="2" Classes="cv-btn" VerticalAlignment="Center" Command="{Binding SetUpExtensionCommand}"
+                  ToolTip.Tip="The steps to add it to Chrome again: its folder, and Load unpacked"><TextBlock Text="Set up" /></Button>
         </Grid>
       </Border>
 
