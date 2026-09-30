@@ -457,14 +457,20 @@ public static partial class Shell
         {
             Remember();
             library.NarrowDetail = false;
+            if (c.IsHome)
+            {
+                _ = ShowHomeAsync();
+                return;
+            }
             if (c.IsDue)
             {
                 dueSelection = null;
                 _ = ShowDueAsync();
                 return;
             }
+            // A class opens on its home; Unsorted, which has none, on its lectures.
             allLectures = false;
-            _ = ShowClassAsync(c.Name);
+            _ = c.IsUnsorted ? ShowClassAsync(c.Name) : ShowClassHomeAsync(c.Name);
         };
         library.OnLecture = l =>
         {
@@ -475,8 +481,7 @@ public static partial class Shell
         {
             if (openClass is not { } cls) return;
             Remember();
-            allLectures = false;
-            _ = ShowClassAsync(cls);
+            _ = ShowClassHomeAsync(cls);
         };
         library.OnGoBack = GoBack;
         library.OnGoForward = GoForward;

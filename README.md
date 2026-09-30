@@ -30,6 +30,10 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
 - **Files every lecture under its class**, working out which from what was said, or using the class
   you picked. Anything it can't place waits in **Unsorted**, and a lecture you don't need can be
   deleted (with Undo).
+- **Shows you everything at a glance.** The library opens on **Home**: what's due soon, what's
+  coming up, your newest lectures and a card for every class. Each class (or club) has a home of
+  its own too: its lectures, what's to hand in, when it next meets, its files, and on Canvas its
+  assignments, modules and announcements.
 - **Ask about any lecture, class, or all of them.** The Ask bar under a lecture's notes answers
   from your notes and transcripts, with the engine you pick for that question.
 - **Finds anything in a second.** The quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows)

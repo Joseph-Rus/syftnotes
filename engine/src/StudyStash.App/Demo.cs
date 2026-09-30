@@ -127,6 +127,71 @@ public static class Demo
         return m;
     }
 
+    /// <summary>The sample library on Home (<paramref name="cls"/>: on that class's home instead), with a week of
+    /// lectures, three things to hand in (one late), and today's classes on the calendar.</summary>
+    public static LibraryModel Overview(string? cls = null, bool narrow = false, bool canvas = true, bool calendars = true)
+    {
+        var m = Library(due: canvas);
+        m.Note = null;
+        m.Ask = null;
+        foreach (var c in m.Classes) c.Selected = cls is not null && c.Name == cls && !c.IsDue;
+        m.Home.Selected = cls is null;
+        var now = new DateTimeOffset(2026, 9, 30, 10, 20, 0, TimeSpan.FromHours(-7));
+        var zone = TimeZoneInfo.CreateCustomTimeZone("Demo", TimeSpan.FromHours(-7), "Demo", "Demo");
+        OverviewModel.LectureFacts L(string id, string title, string c, int daysAgo, double min, string summary) =>
+            new(id, title, c, now.AddDays(-daysAgo).AddHours(-1), min * 60, summary, false);
+        var lectures = new List<OverviewModel.LectureFacts>
+        {
+            L("l1", "Recursion and the call stack", "CS 101", 1, 72, "A recursive function solves a problem by calling itself on a smaller version of it."),
+            L("l2", "Cell membranes and transport", "BIO 110", 1, 50, "How the lipid bilayer lets some molecules through and keeps others out."),
+            L("l3", "Integration by parts", "CALC II", 2, 55, "Turning the integral of a product into one that's easier, and choosing u well."),
+            L("l4", "Stack frames and scope", "CS 101", 6, 74, "Where a variable lives decides who can see it, and for how long."),
+            L("l5", "The Treaty of Versailles", "HIST 210", 7, 48, "What the treaty asked of Germany, and why so many thought it would not hold."),
+            L("l6", "Functions as values", "CS 101", 8, 70, "Passing a function to another function, and why map and filter work."),
+        };
+        CanvasApi.Item Item(string c, string id, string name, double inDays, string status = "open", bool missing = false) => new()
+        {
+            Class = c, Id = id, Name = name, Kind = "assignment", DueAt = now.AddDays(inDays), Status = status, Missing = missing, Points = 10,
+        };
+        var due = new CanvasApi.DueResponse
+        {
+            ToHandIn = 4,
+            Groups =
+            [
+                new CanvasApi.Group { Key = "overdue", Label = "Overdue", Items = [Item("BIO 110", "a1", "Lab 3 write-up", -1, "missing", missing: true)] },
+                new CanvasApi.Group { Key = "week", Label = "This week", Items = [Item("CS 101", "a2", "Problem set 4: recursion", 1), Item("CALC II", "a3", "Quiz 5", 2), Item("CS 101", "a4", "Reading: SICP 1.2", 5)] },
+            ],
+        };
+        var events = new List<ComingUpRow>
+        {
+            new("e1", "Now, until 11:15 AM", "CS 101 Lecture", "Engineering Hall 204", "CS 101", Cs, true),
+            new("e2", "1:30 PM", "BIO 110 Lab", "Science Center B12", "BIO 110", Bio, false),
+            new("e3", "Tomorrow 9:00 AM", "CALC II", "Math 101", "CALC II", Calc, false),
+        };
+        var sources = new OverviewModel.Sources
+        {
+            Now = now, Zone = zone,
+            Classes = [("CS 101", Cs, 12), ("BIO 110", Bio, 9), ("CALC II", Calc, 11), ("HIST 210", Hist, 7)],
+            Lectures = lectures,
+            Due = canvas ? due : null,
+            Canvas = canvas ? [new CanvasApi.ClassRow { Class = "CS 101", Linked = true }] : [],
+            Events = calendars ? events : null,
+            Unsorted = 2,
+        };
+        if (cls is null) m.Overview = OverviewModel.Home(sources);
+        else
+        {
+            var facts = new ClassHomeFacts(cls, Cs, 12, canvas ? "CS 101" : null, canvas ? "Introduction to Computer Science" : null,
+                "Programming from the ground up: recursion, data structures and how programs run.",
+                canvas ? new CanvasApi.Counts { ToHandIn = 2, Done = 6, Modules = 6, Files = 9, Announcements = 4, AnnouncementsNew = 1 } : null);
+            var page = OverviewModel.ForClass(facts, sources);
+            page.AddLinks(facts, () => { }, canvas ? _ => { } : null);
+            m.Overview = page;
+        }
+        m.Narrow = narrow;
+        return m;
+    }
+
     /// <summary>A term with many classes, their names as a school's catalogue writes them (long, with the section on
     /// the end), none of them with a lecture yet: the sidebar scrolls, names end in "…", and the open class's name
     /// is too long for the list's header.</summary>

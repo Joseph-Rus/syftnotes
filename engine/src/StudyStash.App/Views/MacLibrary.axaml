@@ -192,7 +192,7 @@
               </Button>
             </StackPanel>
           </c:Glass>
-          <c:Glass Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}" IsVisible="{Binding ShowAssignment}">
+          <c:Glass Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}" IsVisible="{Binding ShowAssignmentTools}">
             <Button Classes="pill" Command="{Binding Assignment.OpenInCanvasCommand, FallbackValue={x:Null}}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Glyph="open_in_new" Size="16" Foreground="{DynamicResource Fg}" />
@@ -226,6 +226,14 @@
             <ScrollViewer Name="ClassList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:WindowHeader.MovesWindow="True">
             <!-- With Canvas (design 09) the rows sit 2 px apart, each led by a 16 px slot, and the chosen one is bolder. -->
             <StackPanel Classes="side" Classes.canvas="{Binding HasDue}">
+              <!-- Home: every class at once -->
+              <Button Name="HomeRow" Classes="cls" Classes.selected="{Binding Home.Selected}"
+                      Command="{Binding PickClassCommand}" CommandParameter="{Binding Home}">
+                <Grid ColumnDefinitions="Auto,8,*">
+                  <c:Icon Glyph="home" Size="17" Width="16" Foreground="{DynamicResource AccentText}" />
+                  <TextBlock Grid.Column="2" Classes="title" Text="Home" FontSize="13" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
               <Button Classes="cls" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
                       Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
                 <Grid ColumnDefinitions="Auto,8,*,10,Auto">
@@ -278,9 +286,9 @@
                            TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
-                  <!-- All of a Canvas class's lectures: back to its own page, with its tabs -->
+                  <!-- A class's lectures: back to the class's home -->
                   <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding CanShowClassPage}" Command="{Binding ShowClassPageCommand}">
-                    <TextBlock Text="· Class page" FontSize="11" Foreground="{DynamicResource AccentText}" />
+                    <TextBlock Text="· Class home" FontSize="11" Foreground="{DynamicResource AccentText}" />
                   </Button>
                 </StackPanel>
               </StackPanel>
@@ -354,6 +362,11 @@
               </Button>
             </Grid>
           </Border>
+        </Panel>
+
+        <!-- Home, or a class's home: across the list and the page beside it -->
+        <Panel Grid.Column="1" Grid.ColumnSpan="2" IsVisible="{Binding ShowOverview}">
+          <v:MacOverview Name="Overview" DataContext="{Binding Overview}" />
         </Panel>
 
         <!-- The right: the lecture, an assignment, or a Canvas page -->

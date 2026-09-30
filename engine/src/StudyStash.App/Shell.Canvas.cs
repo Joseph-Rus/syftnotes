@@ -122,6 +122,7 @@ public static partial class Shell
         _ = PollCanvasNotificationsAsync();
         if (mainWindow?.IsVisible != true) return;
         if (dueOpen) await ShowDueAsync();
+        else if (overviewOf is { } over) await ShowOverviewAsync(over);
         else if (library.List == LibraryList.CanvasClass && library.CanvasClass is { } cls && CanvasClassRow(openClass) is { } row)
             await cls.LoadAsync(row);
         // The open class was just linked (or dropped): it becomes its own Canvas page (or plain lectures again).
@@ -249,6 +250,7 @@ public static partial class Shell
             // An announcement opens in its class's reader, once the class's page has loaded.
             announcementToOpen = n.AnnouncementId;
             openClass = c;
+            overviewOf = null;
             dueOpen = false;
             dueSelection = null;
             ShowLibrary();

@@ -16,6 +16,8 @@ public sealed partial class ClassItem : ObservableObject
     public bool IsUnsorted { get; init; }
     /// <summary>Not a class: what's due soon in every class, from Canvas.</summary>
     public bool IsDue { get; init; }
+    /// <summary>Not a class: Home, the overview of every class, atop the sidebar.</summary>
+    public bool IsHome { get; init; }
     [ObservableProperty] public partial int Count { get; set; }
     [ObservableProperty] public partial bool Selected { get; set; }
     public bool HasDot => !IsUnsorted;
@@ -103,6 +105,11 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Where lectures the library couldn't place wait: always in the sidebar under the classes, even
     /// empty, so they're one click away.</summary>
     [ObservableProperty] public partial ClassItem Unsorted { get; set; } = new() { Name = Configs.Unsorted, IsUnsorted = true };
+    /// <summary>Home, atop the sidebar: every class at once.</summary>
+    public ClassItem Home { get; } = new() { Name = "Home", IsHome = true };
+    /// <summary>Home or a class's home, across the list and the page beside it; null shows those instead.</summary>
+    [ObservableProperty] public partial OverviewModel? Overview { get; set; }
+    public bool ShowOverview => Overview is not null;
     public ObservableCollection<LectureGroup> Groups { get; } = [];
     [ObservableProperty] public partial string ClassTitle { get; set; } = "";
     [ObservableProperty] public partial string ClassCount { get; set; } = "";
@@ -165,7 +172,9 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>The lecture's page, with its toolbar and ask bar: whenever no assignment or Canvas page is open.</summary>
     public bool ShowLecturePage => Assignment is null && Reader is null;
     /// <summary>Move, export and delete: only over a lecture that's open (not the empty "Choose a lecture" page).</summary>
-    public bool ShowLectureTools => ShowLecturePage && HasNote;
+    public bool ShowLectureTools => ShowLecturePage && HasNote && Overview is null;
+    /// <summary>Open in Canvas, over an assignment on the right (not over an overview).</summary>
+    public bool ShowAssignmentTools => ShowAssignment && Overview is null;
     public bool HasNotes => Notes is not null;
     public bool HasAsk => Ask is not null && HasNote && ShowLecturePage;
     /// <summary>An answer to show above the ask bar: the page gives it its own room, and the notes end above it.</summary>
@@ -179,8 +188,8 @@ public sealed partial class LibraryModel : ObservableObject
         LibraryList.CanvasClass when Skin.Current == SkinKind.Win => 360,
         _ => 340,
     };
-    public bool ShowListColumn => !Narrow || !NarrowDetail;
-    public bool ShowDetailColumn => !Narrow || NarrowDetail;
+    public bool ShowListColumn => Overview is null && (!Narrow || !NarrowDetail);
+    public bool ShowDetailColumn => Overview is null && (!Narrow || NarrowDetail);
     /// <summary>Where the right column sits: its own column, or the list's when it's narrow.</summary>
     public int DetailColumn => Narrow ? 1 : 2;
     public int ColumnSpan => Narrow ? 2 : 1;
@@ -222,6 +231,7 @@ public sealed partial class LibraryModel : ObservableObject
     void DetailChanged()
     {
         OnPropertyChanged(nameof(ShowAssignment));
+        OnPropertyChanged(nameof(ShowAssignmentTools));
         OnPropertyChanged(nameof(ShowReader));
         OnPropertyChanged(nameof(ShowLecturePage));
         OnPropertyChanged(nameof(ShowLectureTools));
@@ -229,8 +239,20 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(HasAnswer));
     }
 
+    partial void OnOverviewChanged(OverviewModel? oldValue, OverviewModel? newValue)
+    {
+        if (oldValue?.Files is { } files && !ReferenceEquals(files, newValue?.Files) && !ReferenceEquals(files, ClassFiles)) files.Dispose();
+        if (newValue is not null) newValue.Narrow = Narrow;
+        OnPropertyChanged(nameof(ShowOverview));
+        OnPropertyChanged(nameof(ShowListColumn));
+        OnPropertyChanged(nameof(ShowDetailColumn));
+        OnPropertyChanged(nameof(ShowLectureTools));
+        OnPropertyChanged(nameof(ShowAssignmentTools));
+    }
+
     partial void OnNarrowChanged(bool value)
     {
+        if (Overview is { } o) o.Narrow = value;
         if (!value) NarrowDetail = false;
         if (CanvasClass is { } c) c.Layout = value ? ClassLayout.Sections : ClassLayout.Tabs;
         OnPropertyChanged(nameof(ListWidth));
@@ -424,7 +446,7 @@ public sealed partial class LibraryModel : ObservableObject
     public Action? OnGoBack { get; set; }
     public Action? OnGoForward { get; set; }
 
-    /// <summary>A Canvas class's lectures by week ("All 12 lectures"): its own page (tabs, what's due) is a click away.</summary>
+    /// <summary>A class's lectures by week: its home (what's due, what's coming up, its Canvas lists) is a click away.</summary>
     [ObservableProperty] public partial bool CanShowClassPage { get; set; }
     public Action? OnClassPage { get; set; }
     [RelayCommand] void ShowClassPage() => OnClassPage?.Invoke();

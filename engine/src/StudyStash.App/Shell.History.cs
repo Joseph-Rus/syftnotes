@@ -4,8 +4,8 @@ using StudyStash.App.ViewModels;
 namespace StudyStash.App;
 
 /// <summary>
-/// Back and forward in the library window, as in a browser: each place the student leaves for another (a class, the
-/// Due page, a lecture, an assignment, a Canvas page) is kept, and Back (⌘[ or Alt+Left) goes to it again. A place is
+/// Back and forward in the library window, as in a browser: each place the student leaves for another (Home, a class's
+/// home, a class, the Due page, a lecture, an assignment, a Canvas page) is kept, and Back (⌘[ or Alt+Left) goes to it again. A place is
 /// what the window showed, so going back to it opens the same class, lecture and page.
 /// </summary>
 public static partial class Shell
@@ -13,7 +13,7 @@ public static partial class Shell
     /// <summary>What the window showed: Due (and the row picked there), or a class (its lecture, and an assignment or a
     /// Canvas page over it).</summary>
     sealed record Place(bool Due, (string Class, string Id)? DueRow, string? Class, string? Lecture, bool AllLectures,
-        (string Class, string Id)? Assignment, CanvasReaderModel? Reader, ClassTab? Tab = null);
+        (string Class, string Id)? Assignment, CanvasReaderModel? Reader, ClassTab? Tab = null, string? Overview = null);
 
     const int HistoryLimit = 50;
     static readonly List<Place> backPlaces = [], forwardPlaces = [];
@@ -25,6 +25,7 @@ public static partial class Shell
     static Place? Here(ClassTab? tab = null)
     {
         if (dueOpen) return new Place(true, dueSelection, null, null, false, null, null);
+        if (overviewOf is { } over) return new Place(false, null, null, null, false, null, null, Overview: over);
         if (openClass is not { Length: > 0 } cls) return null;
         return new Place(false, null, cls, openLecture, allLectures, library.Assignment is null ? null : openAssignment, library.Reader,
             tab ?? library.CanvasClass?.Tab);
@@ -65,6 +66,11 @@ public static partial class Shell
             {
                 dueSelection = place.DueRow;
                 await ShowDueAsync();
+                return;
+            }
+            if (place.Overview is { } over)
+            {
+                await ShowOverviewAsync(over);
                 return;
             }
             if (place.Class is not { } cls) return;

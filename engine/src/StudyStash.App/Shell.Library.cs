@@ -40,7 +40,8 @@ public static partial class Shell
             if (quitting || mainWindow?.IsVisible != true) return;
             // Back after being away (the window opened before the library was up, say): its classes too, not just the
             // page showing, which may be "Can't reach your library" with no classes beside it.
-            _ = all ? LoadLibraryAsync() : dueOpen ? ShowDueAsync() : openClass is { } cls ? ShowClassAsync(cls) : Task.CompletedTask;
+            _ = all ? LoadLibraryAsync() : dueOpen ? ShowDueAsync() : overviewOf is { } over ? ShowOverviewAsync(over)
+                : openClass is { } cls ? ShowClassAsync(cls) : Task.CompletedTask;
         }, TimeSpan.FromSeconds(1));
     }
 
@@ -90,6 +91,7 @@ public static partial class Shell
         library.Unsorted.Count = unsorted;
         if (host.Library != LibraryState.Connected || host.OlderLibrary)
         {
+            LeaveOverview();
             ShowLectureList();
             library.Groups.Clear();
             library.ClassTitle = "";
@@ -110,8 +112,10 @@ public static partial class Shell
             await ShowDueAsync();
             return;
         }
-        string pick = openClass ?? library.Classes.FirstOrDefault(c => c.Count > 0 && !c.IsDue)?.Name ?? library.Classes.FirstOrDefault(c => !c.IsDue)?.Name ?? Configs.Unsorted;
-        await ShowClassAsync(pick);
+        // Home, unless the student was somewhere else: a class's home, or a class's lectures or Canvas page.
+        if (overviewOf is { } over) await ShowOverviewAsync(over);
+        else if (openClass is { } cls) await ShowClassAsync(cls);
+        else await ShowHomeAsync();
     }
 
     /// <summary>The library window asks for a tip atop the lecture list when <see cref="SupportAsk.Due"/> says it's
@@ -127,8 +131,10 @@ public static partial class Shell
     static async Task ShowClassAsync(string name)
     {
         int turn = ++libraryTurn;
+        LeaveOverview();
         if (openClass != name) allLectures = false;
-        library.CanShowClassPage = allLectures && CanvasClassRow(name) is not null;
+        // Back to the class's home from its lectures (Unsorted has no home).
+        library.CanShowClassPage = name != Configs.Unsorted;
         openClass = name;
         dueOpen = false;
         dueSelection = null;
@@ -257,7 +263,6 @@ public static partial class Shell
             Remember();
             allLectures = true;
             ShowLectureList();
-            library.CanShowClassPage = true;
         },
     };
 
@@ -402,6 +407,7 @@ public static partial class Shell
     static async Task ShowDueAsync()
     {
         int turn = ++libraryTurn;
+        LeaveOverview();
         dueOpen = true;
         foreach (var c in library.Classes) c.Selected = c.IsDue;
         library.Unsorted.Selected = false;
@@ -487,6 +493,7 @@ public static partial class Shell
         Remember();
         // Whichever load of the window finishes last (its class, or this lecture's) shows this lecture.
         openLecture = id;
+        overviewOf = null;
         ShowLibrary();
         _ = OpenLectureAsync(id, transcript);
     }
@@ -852,6 +859,7 @@ public static partial class Shell
             case QuickKind.Class when row.ClassName is { } c:
                 openClass = c;
                 openLecture = null;
+                overviewOf = c == Configs.Unsorted ? null : c;
                 ShowLibrary();
                 break;
             case QuickKind.Source or QuickKind.Passage when row.LectureId is { } id && row.At is double at:

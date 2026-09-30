@@ -202,6 +202,17 @@
         <v:WinComingUp DockPanel.Dock="Bottom" DataContext="{Binding ComingUp}" Margin="16,8,16,0" />
         <ScrollViewer Name="ClassList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:WindowHeader.MovesWindow="True">
         <StackPanel Spacing="4">
+          <!-- Home: every class at once -->
+          <Button Name="HomeRow" Classes="nav" Classes.selected="{Binding Home.Selected}"
+                  Command="{Binding PickClassCommand}" CommandParameter="{Binding Home}">
+            <Panel>
+              <Border Classes="pill" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
+              <Grid ColumnDefinitions="Auto,14,*">
+                <c:Icon Glyph="home" Size="16" Foreground="{DynamicResource AccentText}" />
+                <TextBlock Grid.Column="2" Text="Home" FontSize="14" VerticalAlignment="Center" />
+              </Grid>
+            </Panel>
+          </Button>
           <Button Classes="nav" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
                   Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
             <Panel>
@@ -253,6 +264,10 @@
       <!-- The content layer -->
       <Border Background="{DynamicResource Layer}" BorderBrush="{DynamicResource LayerStroke}" BorderThickness="1,1,0,0" CornerRadius="8,0,0,0">
         <Grid ColumnDefinitions="Auto,*">
+          <!-- Home, or a class's home: across the list and the page beside it -->
+          <Panel Grid.ColumnSpan="2" IsVisible="{Binding ShowOverview}">
+            <v:WinOverview Name="Overview" DataContext="{Binding Overview}" />
+          </Panel>
           <Panel Grid.ColumnSpan="{Binding ColumnSpan}" Width="{Binding ListWidth}" IsVisible="{Binding ShowListColumn}">
           <Border Width="1" Background="{DynamicResource Sep}" HorizontalAlignment="Right" IsVisible="{Binding !Narrow}" />
           <DockPanel Name="LectureList" Margin="0,0,1,0" IsVisible="{Binding ShowLectures}">
@@ -262,9 +277,9 @@
                          TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
               <StackPanel Orientation="Horizontal" Spacing="12">
                 <TextBlock Text="{Binding ClassCount}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-                <!-- All of a Canvas class's lectures: back to its own page, with its tabs -->
+                <!-- A class's lectures: back to the class's home -->
                 <Button Classes="command" Padding="6,2" IsVisible="{Binding CanShowClassPage}" Command="{Binding ShowClassPageCommand}">
-                  <TextBlock Text="Class page" FontSize="12" Foreground="{DynamicResource AccentText}" />
+                  <TextBlock Text="Class home" FontSize="12" Foreground="{DynamicResource AccentText}" />
                 </Button>
                 <!-- Attach to the class (drop files on the list, too): its files show here once there are some -->
                 <Button Classes="command" Padding="6,2" IsVisible="{Binding HasClassFiles}" Command="{Binding ClassFiles.AttachCommand, FallbackValue={x:Null}}"
