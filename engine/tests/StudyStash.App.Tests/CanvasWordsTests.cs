@@ -19,6 +19,31 @@ public class CanvasWordsTests
             Submitted = submitted, GradedAt = gradedAt, MarkedDone = markedDone,
         };
 
+    // ---- how soon, on a row's right ----
+
+    [Theory]
+    [InlineData("2025-09-25T23:00:00Z", "Today")]
+    [InlineData("2025-09-26T16:00:00Z", "Tomorrow")]
+    [InlineData("2025-09-30T06:59:00Z", "In 4 days")]
+    [InlineData("2025-10-08T06:59:00Z", "In 12 days")]
+    [InlineData("2025-10-21T06:59:00Z", "In 3 weeks")]
+    [InlineData("2025-09-22T06:59:00Z", "Late")]
+    public void RightLabel_says_how_soon_work_still_to_hand_in_is_due(string dueAt, string expected) =>
+        Assert.Equal(expected, CanvasWords.RightLabel(Item(status: "open", dueAt: DateTimeOffset.Parse(dueAt)), Zone, Now));
+
+    [Fact]
+    public void RightLabel_keeps_the_score_or_label_for_work_that_s_done() =>
+        Assert.Equal("18/20", CanvasWords.RightLabel(Item(status: "graded", label: "Graded", scoreText: "18/20", dueAt: Now.AddDays(-3)), Zone, Now));
+
+    [Fact]
+    public void RightLabel_with_no_due_date_says_nothing() =>
+        Assert.Equal("", CanvasWords.RightLabel(Item(status: "open"), Zone, Now));
+
+    [Fact]
+    public void BodyPreview_is_the_submission_s_plain_text_cut_at_a_word() =>
+        Assert.Equal("The hardest part was the codes…",
+            CanvasWords.BodyPreview("<p>The hardest part was the <b>codes</b> like 998 for &quot;Not Reported&quot;</p>", 33));
+
     // ---- Full date ----
 
     [Fact]
@@ -119,31 +144,31 @@ public class CanvasWordsTests
 
     [Fact]
     public void DueSub_an_overdue_item() =>
-        Assert.Equal("HIST 210 · Was due Mon 22 Sep, 11:59 PM", CanvasWords.DueSub(
+        Assert.Equal("Was due Mon 22 Sep, 11:59 PM · HIST 210", CanvasWords.DueSub(
             Item(cls: "HIST 210", status: "missing", label: "Missing", missing: true, dueAt: new DateTimeOffset(2025, 9, 23, 6, 59, 0, TimeSpan.Zero)),
             Zone, Now));
 
     [Fact]
     public void DueSub_something_still_to_do() =>
-        Assert.Equal("CALC II · Tomorrow, 9:00 AM", CanvasWords.DueSub(
+        Assert.Equal("Tomorrow, 9:00 AM · CALC II", CanvasWords.DueSub(
             Item(cls: "CALC II", status: "to_hand_in", label: "To do", dueAt: new DateTimeOffset(2025, 9, 26, 16, 0, 0, TimeSpan.Zero)),
             Zone, Now));
 
     [Fact]
     public void DueSub_something_submitted() =>
-        Assert.Equal("BIO 110 · Submitted Wed 24 Sep", CanvasWords.DueSub(
+        Assert.Equal("Submitted Wed 24 Sep · BIO 110", CanvasWords.DueSub(
             Item(cls: "BIO 110", status: "submitted", label: "Submitted", submitted: new DateTimeOffset(2025, 9, 25, 3, 15, 0, TimeSpan.Zero)),
             Zone, Now));
 
     [Fact]
     public void DueSub_something_graded() =>
-        Assert.Equal("CS 101 · Graded Mon 22 Sep", CanvasWords.DueSub(
+        Assert.Equal("Graded Mon 22 Sep · CS 101", CanvasWords.DueSub(
             Item(cls: "CS 101", status: "graded", label: "Graded", gradedAt: new DateTimeOffset(2025, 9, 22, 18, 0, 0, TimeSpan.Zero)),
             Zone, Now));
 
     [Fact]
     public void DueSub_something_marked_done() =>
-        Assert.Equal("CS 101 · Marked done Mon 22 Sep", CanvasWords.DueSub(
+        Assert.Equal("Marked done Mon 22 Sep · CS 101", CanvasWords.DueSub(
             Item(cls: "CS 101", status: "marked_done", label: "Done", markedDone: new DateTimeOffset(2025, 9, 22, 18, 0, 0, TimeSpan.Zero)),
             Zone, Now));
 
@@ -176,7 +201,7 @@ public class CanvasWordsTests
 
     [Fact]
     public void ClassTabRow_with_no_due_date() =>
-        Assert.Equal("Excused · No due date", CanvasWords.ClassTabRow(Item(status: "excused", label: "Excused"), Zone, Now));
+        Assert.Equal("Excused", CanvasWords.ClassTabRow(Item(status: "excused", label: "Excused"), Zone, Now));
 
     // ---- kind word, points, score ----
 
@@ -269,7 +294,7 @@ public class CanvasWordsTests
     [Theory]
     [InlineData("done", 14, "2025-09-20T18:00:00Z", "Scout explored this course · 14 files saved · 20 Sep")]
     [InlineData("exploring", 0, null, "Scout exploring…")]
-    [InlineData("failed", 0, null, "Scout didn’t finish")]
+    [InlineData("failed", 0, null, "")]
     public void ScoutHeaderLine_matches_the_design_s_words(string state, int files, string? when, string expected) =>
         Assert.Equal(expected, CanvasWords.ScoutHeaderLine(new CanvasApi.Scout { State = state, Files = files, When = when is null ? null : DateTimeOffset.Parse(when) }, Zone));
 

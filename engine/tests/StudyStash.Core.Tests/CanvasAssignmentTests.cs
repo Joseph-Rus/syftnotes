@@ -22,6 +22,10 @@ public class CanvasAssignmentTests
     [InlineData("""{"submission_types":["on_paper"]}""", "no submission", "Nothing to hand in", "")]
     [InlineData("""{"submission_types":["online_upload"],"due_at":"2025-09-20T00:00:00Z"}""", "past due", "Past due", "")]
     [InlineData("""{"submission_types":["online_upload"],"due_at":"2025-10-20T00:00:00Z"}""", "open", "To do", "")]
+    // Canvas stopped taking it ("available until" has passed) and nothing went in: closed, not still to do.
+    [InlineData("""{"submission_types":["online_upload"],"lock_at":"2025-09-20T00:00:00Z"}""", "closed", "Closed", "")]
+    [InlineData("""{"submission_types":["online_upload"],"lock_at":"2025-09-20T00:00:00Z","submission":{"submitted_at":"2025-09-19T00:00:00Z"}}""", "submitted", "Submitted", "")]
+    [InlineData("""{"submission_types":["online_upload"],"lock_at":"2025-10-20T00:00:00Z"}""", "open", "To do", "")]
     // Pass/fail and letter grades: the grade is the mark, with or without a score.
     [InlineData("""{"grading_type":"pass_fail","points_possible":5,"submission":{"workflow_state":"graded","score":5,"grade":"complete"}}""", "graded", "Graded", "Complete")]
     [InlineData("""{"grading_type":"pass_fail","submission":{"workflow_state":"graded","score":null,"grade":"incomplete"}}""", "graded", "Graded", "Incomplete")]

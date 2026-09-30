@@ -56,7 +56,7 @@ public class CanvasClassTests
     {
         var row = Assert.Single(Shown().ToHandIn);
         Assert.Equal("Lab 3: recursion traces", row.Title);
-        Assert.Equal("To do", row.Right);
+        Assert.Equal("In 5 days", row.Right);
         Assert.False(row.Strong);
         Assert.Equal("20 pts · Tue 30 Sep, 11:59 PM", row.Sub);
     }
@@ -66,9 +66,9 @@ public class CanvasClassTests
     {
         var done = Shown().Done;
         Assert.Equal(4, done.Count);
-        Assert.Equal(("Problem set 4", "18/20", "Graded · due Tue 16 Sep"), (done[0].Title, done[0].Right, done[0].Sub));
-        Assert.Equal(("Problem set 3", "20/20", "Graded · due Tue 9 Sep"), (done[1].Title, done[1].Right, done[1].Sub));
-        Assert.Equal(("Lab 2: tracing loops", "17/20", "Submitted late · due Thu 11 Sep"), (done[2].Title, done[2].Right, done[2].Sub));
+        Assert.Equal(("Problem set 4", "18/20", "Graded Mon 22 Sep"), (done[0].Title, done[0].Right, done[0].Sub));
+        Assert.Equal(("Problem set 3", "20/20", "Graded Mon 15 Sep"), (done[1].Title, done[1].Right, done[1].Sub));
+        Assert.Equal(("Lab 2: tracing loops", "17/20", "Graded Sun 14 Sep · late"), (done[2].Title, done[2].Right, done[2].Sub));
         Assert.Equal(("Syllabus quiz", "Excused", "Excused · due Fri 5 Sep"), (done[3].Title, done[3].Right, done[3].Sub));
     }
 

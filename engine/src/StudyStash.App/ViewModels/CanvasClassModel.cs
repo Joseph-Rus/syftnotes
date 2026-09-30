@@ -167,9 +167,8 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         {
             string? header = f.Folder != lastFolder ? f.Folder : null;
             lastFolder = f.Folder;
-            var name1 = f.Name;
-            var folder1 = f.Folder;
-            Files.Add(new FileRow(name1, CanvasWords.Size(f.Size), header, () => _ = OpenSavedFileAsync(CombinePath(folder1, name1))));
+            string path = f.Local is { Length: > 0 } saved ? saved : CombinePath(f.Folder, f.Name);
+            Files.Add(new FileRow(f.Name, CanvasWords.Size(f.Size), header, () => _ = OpenSavedFileAsync(path)));
         }
 
         AnnouncementsCount = announcements.Count;
@@ -218,7 +217,7 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         var row = new DueRow
         {
             Class = item.Class, Id = item.Id, Title = item.Name,
-            Right = CanvasWords.RightLabel(item), Strong = item.Missing,
+            Right = CanvasWords.RightLabel(item, zone, now), Strong = item.Missing,
             Sub = CanvasWords.ClassTabRow(item, zone, now), Dot = context.DotOf(item.Class),
         };
         row.OnSelectRow = SelectAssignment;
@@ -277,11 +276,14 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
                 else if (item.Url is { Length: > 0 } pageUrl) context.Actions.OpenUrl(pageUrl);
                 break;
             case "link":
-                if (item.Saved) await OpenSavedFileAsync(item.Title);
-                else if (item.ExternalUrl is { Length: > 0 } externalUrl) context.Actions.OpenUrl(externalUrl);
+                if (item.Saved && await OpenSavedFileAsync(item.Local is { Length: > 0 } savedLink ? savedLink : item.Title)) break;
+                if (item.ExternalUrl is { Length: > 0 } externalUrl) context.Actions.OpenUrl(externalUrl);
                 break;
             case "file":
-                await OpenSavedFileAsync(item.Title);
+                // The library's copy when the sync saved one; otherwise the file itself on Canvas, in the Chrome
+                // that's signed in to it (a slide deck too big to save, or one not synced yet).
+                if (item.Local is not null && await OpenSavedFileAsync(item.Local.Length > 0 ? item.Local : item.Title)) break;
+                if (item.Url is { Length: > 0 } fileUrl) context.Actions.OpenInChrome(fileUrl);
                 break;
             default:
                 if (item.Url is { Length: > 0 } url) context.Actions.OpenUrl(url);
@@ -289,12 +291,23 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         }
     }
 
-    async Task OpenSavedFileAsync(string path)
+    /// <summary>Opens the library's copy of a file (<paramref name="path"/> is relative to the class's folder, as the
+    /// library gives it); false when the library hasn't got it, so the caller can fall back to Canvas.</summary>
+    async Task<bool> OpenSavedFileAsync(string path)
     {
-        if (context.Client is not { } client) return;
+        if (context.Client is not { } client) return false;
         string dest = Path.Combine(context.Home, "cache", "canvas", cls, path.Replace('/', Path.DirectorySeparatorChar));
         Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-        if (await client.DownloadAsync(cls, path, dest)) context.Actions.OpenFile(dest);
+        try
+        {
+            if (!await client.DownloadAsync(cls, path, dest)) return false;
+        }
+        catch (Exception e) when (e is HttpRequestException or CanvasLibraryException or IOException or TaskCanceledException)
+        {
+            return false;
+        }
+        context.Actions.OpenFile(dest);
+        return true;
     }
 
     /// <summary>Opens the announcement with Canvas id <paramref name="id"/> in its reader, on the Announcements tab

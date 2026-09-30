@@ -92,6 +92,30 @@ public static class CanvasApi
         public override void Write(Utf8JsonWriter writer, bool value, JsonSerializerOptions options) => writer.WriteBooleanValue(value);
     }
 
+    /// <summary>Where the library saved a file, as it may send it: the path (relative to the class's folder); or, from
+    /// a library that only says whether it's saved, true ("", saved somewhere the caller works out) or false (null).</summary>
+    public sealed class SavedPathConverter : JsonConverter<string?>
+    {
+        public override bool HandleNull => true;
+
+        public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.String: return reader.GetString() is { Length: > 0 } path ? path : null;
+                case JsonTokenType.True: return "";
+                case JsonTokenType.StartObject or JsonTokenType.StartArray: reader.Skip(); return null;
+                default: return null;
+            }
+        }
+
+        public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options)
+        {
+            if (value is null) writer.WriteNullValue();
+            else writer.WriteStringValue(value);
+        }
+    }
+
     /// <summary>A number as the library may send it: a number, a number in text, or null or anything else (0).</summary>
     public static double ReadNumber(ref Utf8JsonReader reader)
     {
@@ -443,7 +467,8 @@ public static class CanvasApi
         public long Size { get; init; }
         public string? ContentType { get; init; }
         public string? Format { get; init; }
-        public bool Local { get; init; }
+        /// <summary>Where the library saved it, relative to the class's folder; null when it wasn't saved.</summary>
+        [JsonConverter(typeof(SavedPathConverter))] public string? Local { get; init; }
         public bool Skipped { get; init; }
         public string? Url { get; init; }
     }
@@ -542,7 +567,9 @@ public static class CanvasApi
         public int Indent { get; init; }
         public string? Format { get; init; }
         public long? Size { get; init; }
-        public bool Local { get; init; }
+        /// <summary>Where the library saved it, relative to the class's folder (Canvas/modules/…); null when it
+        /// wasn't saved (too big, a kind the sync skips, or not synced yet).</summary>
+        [JsonConverter(typeof(SavedPathConverter))] public string? Local { get; init; }
         public bool Saved { get; init; }
         public string? Source { get; init; } // box|drive|onedrive|youtube|null
         public string? Url { get; init; }
@@ -570,7 +597,8 @@ public static class CanvasApi
         public string? ContentType { get; init; }
         public string? Format { get; init; }
         public DateTimeOffset? UpdatedAt { get; init; }
-        public bool Local { get; init; }
+        /// <summary>Where the library saved it, relative to the class's folder; null when it wasn't saved.</summary>
+        [JsonConverter(typeof(SavedPathConverter))] public string? Local { get; init; }
         public bool Skipped { get; init; }
     }
 

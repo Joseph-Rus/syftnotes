@@ -69,7 +69,7 @@ public sealed partial class CanvasDueModel(CanvasContext context) : ObservableOb
                     Class = item.Class,
                     Id = item.Id,
                     Title = item.Name,
-                    Right = CanvasWords.RightLabel(item),
+                    Right = CanvasWords.RightLabel(item, zone, now),
                     Strong = item.Missing,
                     Sub = CanvasWords.DueSub(item, zone, now),
                     Dot = context.DotOf(item.Class),

@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
+using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
@@ -11,6 +12,8 @@ using Markdig.Extensions.Tables;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using StudyStash.App.Controls.Rich;
+using StudyStash.App.Services;
+using StudyStash.Core;
 using StudyStash.Core.Rich;
 using MdBlock = Markdig.Syntax.Block;
 using MdInline = Markdig.Syntax.Inlines.Inline;
@@ -51,6 +54,25 @@ public sealed partial class NoteView : StackPanel
 
     public static string? GetLink(Run run) => run.GetValue(LinkProperty);
 
+    /// <summary>What a click on one of these notes' links does, when they need their own way (an assignment's
+    /// instructions link into its saved files); unset, <see cref="OpenLink"/>.</summary>
+    public static readonly StyledProperty<Action<string>?> LinkHandlerProperty = AvaloniaProperty.Register<NoteView, Action<string>?>(nameof(LinkHandler));
+
+    public Action<string>? LinkHandler
+    {
+        get => GetValue(LinkHandlerProperty);
+        set => SetValue(LinkHandlerProperty, value);
+    }
+
+    /// <summary>What clicking a link does: a Canvas address opens in Chrome, where the student is signed in to
+    /// Canvas; anything else in the default browser. Tests swap it for one that records the address.</summary>
+    public static Action<string> OpenLink { get; set; } = url =>
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Host.EndsWith(".instructure.com", StringComparison.OrdinalIgnoreCase)
+            && Chrome.Open(url) is null) return;
+        Dialogs.OpenUrl(url);
+    };
+
     /// <summary>The class a section heading carries, and the one a table's header row carries: a page never ends
     /// just after either, leaving it cut off from what it heads.</summary>
     public const string HeadingClass = "note-heading", TableHeaderClass = "note-table-header";
@@ -59,7 +81,7 @@ public sealed partial class NoteView : StackPanel
     /// bubble); a click still opens it at full size.</summary>
     public const double CompactDiagramMaxHeight = 260;
 
-    static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseEmphasisExtras().UseMathematics().Build();
+    static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseEmphasisExtras().UseMathematics().UseAutoLinks().Build();
 
     /// <summary>Inline maths reads a touch smaller than the body (Latin Modern reads larger than the body fonts at
     /// equal size); a display formula, larger and centred. Past 2 000 characters, a formula goes straight to its
@@ -132,6 +154,7 @@ public sealed partial class NoteView : StackPanel
         var t = new TextBlock { FontSize = size, LineHeight = size * lineHeight, TextWrapping = TextWrapping.Wrap };
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(resourceFont));
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
+        FollowLinks(t);
         return t;
     }
 
@@ -143,6 +166,7 @@ public sealed partial class NoteView : StackPanel
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(BodyFont ?? "TextFont"));
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
         t.Bind(SelectableTextBlock.SelectionBrushProperty, t.GetResourceObservable("Hl"));
+        FollowLinks(t);
         return t;
     }
 
@@ -627,7 +651,12 @@ public sealed partial class NoteView : StackPanel
                 case LinkInline link:
                     foreach (var r in Runs(link, skip, weight, style, bodySize, fgKey))
                     {
-                        if (!link.IsImage && link.Url is { Length: > 0 } url && r is Run linked) linked.SetValue(LinkProperty, url);
+                        if (!link.IsImage && link.Url is { Length: > 0 } url && r is Run linked)
+                        {
+                            linked.SetValue(LinkProperty, url);
+                            linked.TextDecorations = TextDecorations.Underline;
+                            linked.Bind(Run.ForegroundProperty, linked.GetResourceObservable("Accent"));
+                        }
                         yield return r;
                     }
                     break;
@@ -636,6 +665,41 @@ public sealed partial class NoteView : StackPanel
                     break;
             }
         }
+    }
+
+    /// <summary>Makes the links in <paramref name="t"/> work: a hand over one, and a click opens it. A drag that
+    /// selects text in a selectable block isn't a click.</summary>
+    void FollowLinks(TextBlock t)
+    {
+        Point? down = null;
+        t.PointerMoved += (_, e) => t.Cursor = LinkAt(t, e.GetPosition(t)) is null ? null : new Cursor(StandardCursorType.Hand);
+        t.PointerExited += (_, _) => t.Cursor = null;
+        t.AddHandler(PointerPressedEvent, (_, e) => down = e.GetPosition(t), Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, true);
+        t.AddHandler(PointerReleasedEvent, (_, e) =>
+        {
+            var at = e.GetPosition(t);
+            if (e.InitialPressMouseButton != MouseButton.Left || down is not { } d || Math.Abs(d.X - at.X) + Math.Abs(d.Y - at.Y) > 4) return;
+            down = null;
+            if (LinkAt(t, at) is not { } url) return;
+            e.Handled = true;
+            (LinkHandler ?? OpenLink)(url);
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, true);
+    }
+
+    /// <summary>The address of the link under <paramref name="point"/> in <paramref name="t"/>, or null.</summary>
+    static string? LinkAt(TextBlock t, Point point)
+    {
+        if (t.Inlines is not { Count: > 0 } inlines) return null;
+        var hit = t.TextLayout.HitTestPoint(point - new Point(t.Padding.Left, t.Padding.Top));
+        if (!hit.IsInside) return null;
+        int index = hit.TextPosition, at = 0;
+        foreach (var inline in inlines)
+        {
+            int length = inline is Run r ? r.Text?.Length ?? 0 : 1;
+            if (index < at + length) return inline is Run run ? GetLink(run) : null;
+            at += length;
+        }
+        return null;
     }
 
     /// <summary>An inline <c>$…$</c> formula, typeset on the text's baseline; one CSharpMath can't typeset, or one

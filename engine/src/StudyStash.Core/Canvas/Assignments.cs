@@ -21,7 +21,7 @@ public sealed record Assignment(string ClassName, long Id, string Name, string D
     bool MarkedDone = false, string MarkedDoneAt = "")
 {
     /// <summary>Handed in, doesn't need anything more, or the student ticked it off themselves.</summary>
-    public bool Done => Status is "graded" or "submitted" or "excused" or "late" || MarkedDone;
+    public bool Done => Status is "graded" or "submitted" or "excused" or "late" or "closed" || MarkedDone;
 }
 
 /// <summary>Something that changed on Canvas between two syncs, in the design's words ("Graded: CS 101 · Problem set 4
@@ -48,12 +48,12 @@ public static class Assignments
     public static string StatusOf(JsonObject a, DateTimeOffset now)
     {
         var s = a["submission"] as JsonObject ?? [];
-        return StatusOf(SubmissionInfo.Summary(s), (a["submission_types"] as JsonArray ?? []).Select(S), S(a["due_at"]), now);
+        return StatusOf(SubmissionInfo.Summary(s), (a["submission_types"] as JsonArray ?? []).Select(S), S(a["due_at"]), now, S(a["lock_at"]));
     }
 
-    public static string StatusOf(AssignmentInfo a, DateTimeOffset now) => StatusOf(a.Submission, a.SubmissionTypes, a.DueAt, now);
+    public static string StatusOf(AssignmentInfo a, DateTimeOffset now) => StatusOf(a.Submission, a.SubmissionTypes, a.DueAt, now, a.LockAt);
 
-    static string StatusOf(SubmissionInfo? s, IEnumerable<string> submissionTypes, string? dueAt, DateTimeOffset now)
+    static string StatusOf(SubmissionInfo? s, IEnumerable<string> submissionTypes, string? dueAt, DateTimeOffset now, string? lockAt = null)
     {
         s ??= new SubmissionInfo();
         if (s.Excused) return "excused";
@@ -62,6 +62,9 @@ public static class Assignments
         if (s.Missing) return "missing";
         if (!string.IsNullOrEmpty(s.SubmittedAt) || s.State is "submitted" or "pending_review") return s.Late ? "late" : "submitted";
         if (submissionTypes.All(NoSubmit.Contains)) return "no submission";
+        // Canvas has stopped taking it (its "available until" has passed) and nothing went in: it can't be handed in
+        // any more, so it isn't still to do.
+        if (DateTimeOffset.TryParse(lockAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var locked) && locked < now) return "closed";
         return DateTimeOffset.TryParse(dueAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var due) && due < now
             ? "past due" : "open";
     }
@@ -77,6 +80,7 @@ public static class Assignments
         "submitted" => late ? "Submitted late" : "Submitted",
         "excused" => "Excused",
         "no submission" => "Nothing to hand in",
+        "closed" => "Closed",
         _ => status,
     };
 
