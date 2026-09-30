@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/preact';
 import { Api } from '../src/api/client';
 import type { DueList, LibraryOverview, VoiceMemo } from '../src/api/types';
 import { forget } from '../src/data/resource';
+import { ClassScreen } from '../src/screens/ClassScreen';
 import { DueScreen } from '../src/screens/Due';
 import { titleFrom, VoiceMemoScreen } from '../src/screens/VoiceMemo';
 
@@ -104,6 +105,39 @@ describe('Due', () => {
     );
     await screen.findByText('Nothing due');
     expect(screen.getByText(/Link your classes to Canvas/)).toBeTruthy();
+  });
+});
+
+describe('a class', () => {
+  test('its home starts with what is still to hand in for it, and only it', async () => {
+    const due: DueList = {
+      synced: null,
+      to_hand_in: 3,
+      next: null,
+      groups: [
+        { key: 'overdue', label: 'Overdue', items: [item('Lab 2', 'CS 101', '2029-12-20T23:59', { missing: true })] },
+        {
+          key: 'week',
+          label: 'This week',
+          items: [item('Lab 3', 'CS 101', '2030-01-02T23:59'), item('Cell essay', 'BIO 110', '2030-01-03T12:00')],
+        },
+        { key: 'handed_in', label: 'Handed in', items: [item('Lab 1', 'CS 101', '2029-12-10T23:59')] },
+      ],
+    };
+    render(
+      <ClassScreen api={fakeApi({ '/canvas/due': due, '/lectures': [], '/attachments': [] })} className="CS 101" />,
+    );
+    await screen.findByText('To hand in');
+    expect(screen.getByText('Lab 2')).toBeTruthy();
+    expect(screen.getByText('Lab 3')).toBeTruthy();
+    expect(screen.queryByText('Cell essay')).toBeNull();
+    expect(screen.queryByText('Lab 1')).toBeNull();
+  });
+
+  test('without Canvas there is no To hand in', async () => {
+    render(<ClassScreen api={fakeApi({ '/lectures': [], '/attachments': [] })} className="Chess club" />);
+    await screen.findByText('No lectures yet');
+    expect(screen.queryByText('To hand in')).toBeNull();
   });
 });
 
