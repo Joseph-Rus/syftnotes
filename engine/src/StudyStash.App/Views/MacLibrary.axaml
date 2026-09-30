@@ -178,7 +178,7 @@
         </StackPanel>
         <!-- The toolbar: move and export for a lecture, Open in Canvas for an assignment, search, and Settings -->
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
-          <c:Glass Height="36" CornerRadius="18" Padding="4,0" BoxShadow="{DynamicResource CtlGlassShadow}" IsVisible="{Binding ShowLecturePage}">
+          <c:Glass Height="36" CornerRadius="18" Padding="4,0" BoxShadow="{DynamicResource CtlGlassShadow}" IsVisible="{Binding ShowLectureTools}">
             <StackPanel Orientation="Horizontal">
               <Button Classes="tool" Command="{Binding MoveCommand}" ToolTip.Tip="Move to another class" IsEnabled="{Binding HasNote}">
                 <c:Icon Glyph="drive_file_move" Size="19" Foreground="{DynamicResource Fg}" />

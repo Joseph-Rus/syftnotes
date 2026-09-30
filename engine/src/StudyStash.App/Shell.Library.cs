@@ -236,6 +236,12 @@ public static partial class Shell
             library.Reader = reader;
             return Task.CompletedTask;
         }),
+        OnLecturesTab = () =>
+        {
+            if (library.Assignment is null && library.Reader is null) return;
+            Remember();
+            ClearDetail();
+        },
         OnAllLectures = () =>
         {
             Remember();

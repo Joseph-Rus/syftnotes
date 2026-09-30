@@ -89,7 +89,12 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         OnPropertyChanged(nameof(IsAssignmentsTab));
         OnPropertyChanged(nameof(IsModulesTab));
         OnPropertyChanged(nameof(IsAnnouncementsTab));
+        if (value == ClassTab.Lectures) OnLecturesTab?.Invoke();
     }
+
+    /// <summary>The Lectures tab was chosen: the page beside it goes back to the lecture, not an assignment or Canvas
+    /// page opened from another tab.</summary>
+    public Action? OnLecturesTab { get; set; }
 
     public ObservableCollection<DueRow> ToHandIn { get; } = [];
     public bool HasToHandIn => ToHandIn.Count > 0;

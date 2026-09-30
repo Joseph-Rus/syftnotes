@@ -164,6 +164,8 @@ public sealed partial class LibraryModel : ObservableObject
     public bool ShowReader => Assignment is null && Reader is not null;
     /// <summary>The lecture's page, with its toolbar and ask bar: whenever no assignment or Canvas page is open.</summary>
     public bool ShowLecturePage => Assignment is null && Reader is null;
+    /// <summary>Move, export and delete: only over a lecture that's open (not the empty "Choose a lecture" page).</summary>
+    public bool ShowLectureTools => ShowLecturePage && HasNote;
     public bool HasNotes => Notes is not null;
     public bool HasAsk => Ask is not null && HasNote && ShowLecturePage;
     /// <summary>An answer to show above the ask bar: the page gives it its own room, and the notes end above it.</summary>
@@ -222,6 +224,7 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(ShowAssignment));
         OnPropertyChanged(nameof(ShowReader));
         OnPropertyChanged(nameof(ShowLecturePage));
+        OnPropertyChanged(nameof(ShowLectureTools));
         OnPropertyChanged(nameof(HasAsk));
         OnPropertyChanged(nameof(HasAnswer));
     }
@@ -265,6 +268,7 @@ public sealed partial class LibraryModel : ObservableObject
     {
         if (LectureFiles is { } files && files.LectureId != value?.Id) LectureFiles = null; // another lecture's files don't stay
         OnPropertyChanged(nameof(HasNote));
+        OnPropertyChanged(nameof(ShowLectureTools));
         OnPropertyChanged(nameof(NoNote));
         OnPropertyChanged(nameof(HasAsk));
         OnPropertyChanged(nameof(HasAnswer));
