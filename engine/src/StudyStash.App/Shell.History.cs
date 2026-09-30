@@ -13,7 +13,7 @@ public static partial class Shell
     /// <summary>What the window showed: Due (and the row picked there), or a class (its lecture, and an assignment or a
     /// Canvas page over it).</summary>
     sealed record Place(bool Due, (string Class, string Id)? DueRow, string? Class, string? Lecture, bool AllLectures,
-        (string Class, string Id)? Assignment, CanvasReaderModel? Reader);
+        (string Class, string Id)? Assignment, CanvasReaderModel? Reader, ClassTab? Tab = null);
 
     const int HistoryLimit = 50;
     static readonly List<Place> backPlaces = [], forwardPlaces = [];
@@ -22,17 +22,19 @@ public static partial class Shell
     /// <summary>The assignment on the right, if any (the class and its id), for a place to come back to.</summary>
     static (string Class, string Id)? openAssignment;
 
-    static Place? Here()
+    static Place? Here(ClassTab? tab = null)
     {
         if (dueOpen) return new Place(true, dueSelection, null, null, false, null, null);
         if (openClass is not { Length: > 0 } cls) return null;
-        return new Place(false, null, cls, openLecture, allLectures, library.Assignment is null ? null : openAssignment, library.Reader);
+        return new Place(false, null, cls, openLecture, allLectures, library.Assignment is null ? null : openAssignment, library.Reader,
+            tab ?? library.CanvasClass?.Tab);
     }
 
     /// <summary>The student is about to leave this place for another: it's kept for Back, and Forward starts over.</summary>
-    static void Remember()
+    /// <param name="tab">The class page's tab this place was on, when it has just changed (<see cref="ClassTab"/>).</param>
+    static void Remember(ClassTab? tab = null)
     {
-        if (restoring || Here() is not { } here) return;
+        if (restoring || Here(tab) is not { } here) return;
         if (backPlaces.Count > 0 && backPlaces[^1] == here) return;
         backPlaces.Add(here);
         if (backPlaces.Count > HistoryLimit) backPlaces.RemoveAt(0);
@@ -69,6 +71,8 @@ public static partial class Shell
             openLecture = place.Lecture;
             allLectures = place.AllLectures;
             await ShowClassAsync(cls);
+            // The tab it was on, before what was open over the lecture: going back to Lectures clears that.
+            if (place.Tab is { } tab && library.CanvasClass is { } page) page.Tab = tab;
             if (place.Assignment is { } assignment) await ShowAssignmentAsync(assignment.Class, assignment.Id);
             else if (place.Reader is { } reader)
             {
