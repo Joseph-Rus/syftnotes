@@ -271,7 +271,7 @@
         <!-- The list: lectures by week, Canvas's Due list, or a linked class's own page -->
         <Panel Grid.Column="1" Grid.ColumnSpan="{Binding ColumnSpan}" Width="{Binding ListWidth}" IsVisible="{Binding ShowListColumn}">
         <DockPanel Name="LectureList" IsVisible="{Binding ShowLectures}">
-          <Border DockPanel.Dock="Top" Height="44" Margin="20,0,14,4">
+          <Border DockPanel.Dock="Top" Height="44" Margin="20,12,14,4">
             <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
               <StackPanel VerticalAlignment="Center">
                 <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold"

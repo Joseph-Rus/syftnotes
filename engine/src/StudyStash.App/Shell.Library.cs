@@ -151,7 +151,9 @@ public static partial class Shell
         library.ClassCount = $"{list.Count} lecture{(list.Count == 1 ? "" : "s")}";
         library.Groups.Clear();
         var lectures = list.OfType<JsonObject>().ToList();
-        library.Empty = lectures.Count == 0 ? $"No lectures in {name} yet. Record one and it lands here." : null;
+        library.Empty = lectures.Count > 0 ? null
+            : name == Configs.Unsorted ? "Nothing to sort. A lecture the library can't place in a class waits here for you to file."
+            : $"No lectures in {name} yet. Record one and it lands here.";
         var today = DateTime.Today;
         var weekStart = today.AddDays(-(((int)today.DayOfWeek + 6) % 7)); // Monday
         string GroupOf(JsonObject l)
@@ -214,6 +216,7 @@ public static partial class Shell
         }
         else ShowLectureList();
         library.NoNoteText = lectures.Count > 0 ? "Choose a lecture to read its notes."
+            : name == Configs.Unsorted ? "Every lecture is in a class."
             : library.List == LibraryList.CanvasClass ? $"No lectures in {name} yet. Pick an assignment to see it here."
             : $"No lectures in {name} yet.";
         string? pick = openLecture is not null && lectures.Any(l => S(l["id"]) == openLecture) ? openLecture : lectures.Select(l => S(l["id"])).FirstOrDefault();
