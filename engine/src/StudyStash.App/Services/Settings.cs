@@ -443,8 +443,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     void Refresh()
     {
         var cc = host.Client();
+        bool runsHere = host.Settings.Role != AppRole.Laptop && host.LocalLibrary?.State == LibraryServiceState.Running;
         LibraryLine = host.Library switch
         {
+            LibraryState.Connected when runsHere && !host.OlderLibrary =>
+                $"{cc.PoolName} runs on this {(OperatingSystem.IsMacOS() ? "Mac" : "PC")}, on port {host.LocalLibrary!.Cfg.WebPort}.",
             LibraryState.Connected when host.OlderLibrary => $"Connected to {cc.PoolName}. It runs an older Study Stash: update it to browse, search and ask from here.",
             LibraryState.Connected => $"Connected to {cc.PoolName} at {cc.ServerUrl}.",
             LibraryState.Starting => "Starting your library…",
@@ -455,6 +458,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
         LibraryServiceLine = host.Settings.Role == AppRole.Laptop ? "" : host.LocalLibrary?.State switch
         {
+            // Running and answering: the line above says so.
+            LibraryServiceState.Running when host.Library == LibraryState.Connected => "",
             LibraryServiceState.Running => $"Your library runs on this {device}, on port {host.LocalLibrary.Cfg.WebPort}.",
             LibraryServiceState.Starting => "Starting your library…",
             LibraryServiceState.Elsewhere => $"A library is already running on this {device}.",
