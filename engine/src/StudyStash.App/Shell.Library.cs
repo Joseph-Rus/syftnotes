@@ -27,17 +27,24 @@ public static partial class Shell
 
     /// <summary>A lecture was filed, or the library just came back: if its window is open, the class showing gets its
     /// new note within a second (not on every change in that second, just the last one).</summary>
-    static void RequestLibraryReload()
+    static void RequestLibraryReload(bool whole = false)
     {
+        libraryReloadWhole |= whole;
         if (libraryReloadQueued || mainWindow?.IsVisible != true) return;
         libraryReloadQueued = true;
         Avalonia.Threading.DispatcherTimer.RunOnce(() =>
         {
             libraryReloadQueued = false;
+            bool all = libraryReloadWhole;
+            libraryReloadWhole = false;
             if (quitting || mainWindow?.IsVisible != true) return;
-            _ = dueOpen ? ShowDueAsync() : openClass is { } cls ? ShowClassAsync(cls) : Task.CompletedTask;
+            // Back after being away (the window opened before the library was up, say): its classes too, not just the
+            // page showing, which may be "Can't reach your library" with no classes beside it.
+            _ = all ? LoadLibraryAsync() : dueOpen ? ShowDueAsync() : openClass is { } cls ? ShowClassAsync(cls) : Task.CompletedTask;
         }, TimeSpan.FromSeconds(1));
     }
+
+    static bool libraryReloadWhole;
 
     /// <summary>The library's classes changed in Settings: the library window (when open) lists them again, and the
     /// dropdown's class switcher follows.</summary>
@@ -178,7 +185,11 @@ public static partial class Shell
             page.SetLectures([.. lectures.Take(3).Select(l =>
             {
                 string id = S(l["id"]);
-                return new LectureRow(S(l["title"]), Date(S(l["date"])) is { } d ? CanvasWords.ShortDay(d, ctx.Clock.Zone) : "", () => OpenFromList(() => ShowLectureAsync(id)));
+                return new LectureRow(S(l["title"]), Date(S(l["date"])) is { } d ? CanvasWords.ShortDay(d, ctx.Clock.Zone) : "", () =>
+                {
+                    Remember();
+                    OpenFromList(() => ShowLectureAsync(id));
+                });
             })], lectures.Count);
             library.CanvasClass = page;
             library.List = LibraryList.CanvasClass;
@@ -213,15 +224,21 @@ public static partial class Shell
 
     static CanvasClassModel NewCanvasClass() => new(Canvas())
     {
-        OnAssignment = (cls, id) => OpenFromList(() => ShowAssignmentAsync(cls, id)),
+        OnAssignment = (cls, id) =>
+        {
+            Remember();
+            OpenFromList(() => ShowAssignmentAsync(cls, id));
+        },
         OnReader = reader => OpenFromList(() =>
         {
+            Remember();
             library.Assignment = null;
             library.Reader = reader;
             return Task.CompletedTask;
         }),
         OnAllLectures = () =>
         {
+            Remember();
             allLectures = true;
             ShowLectureList();
         },
@@ -392,6 +409,7 @@ public static partial class Shell
         {
             OnSelect = (cls, id) =>
             {
+                if (!picking) Remember();
                 dueSelection = (cls, id);
                 if (!picking) library.Opened();
                 _ = ShowAssignmentAsync(cls, id, due?.ItemOf(cls, id));
@@ -419,11 +437,13 @@ public static partial class Shell
             return;
         }
         library.Reader = null;
+        openAssignment = (cls, id);
         library.Assignment = page;
     }
 
     static void OpenLecture(string id, bool transcript = false)
     {
+        Remember();
         // Whichever load of the window finishes last (its class, or this lecture's) shows this lecture.
         openLecture = id;
         ShowLibrary();

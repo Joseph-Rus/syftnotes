@@ -158,6 +158,24 @@
     <DockPanel>
       <!-- The title bar: drag the window by it; the system's traffic lights sit in it, and the toolbar on its right. -->
       <c:WindowHeader Name="Header" DockPanel.Dock="Top" DrawChrome="{Binding DrawChrome}">
+        <!-- Beside the window buttons: fold the sidebar away, and back and forward through the places picked -->
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="{x:Static c:WindowHeader.AfterLights}">
+          <c:Glass Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}">
+            <Button Name="ToggleSidebar" Classes="round" Command="{Binding ToggleSidebarCommand}" ToolTip.Tip="Show or hide the sidebar (⌃⌘S)" AutomationProperties.Name="Toggle sidebar">
+              <c:Icon Glyph="dock_to_right" Size="19" Foreground="{DynamicResource Fg}" RenderTransform="scale(-1,1)" />
+            </Button>
+          </c:Glass>
+          <c:Glass Height="36" CornerRadius="18" Padding="1,0" BoxShadow="{DynamicResource CtlGlassShadow}">
+            <StackPanel Orientation="Horizontal">
+              <Button Classes="tool" Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack}" ToolTip.Tip="Back (⌘[)" AutomationProperties.Name="Back">
+                <c:Icon Glyph="arrow_back" Size="18" Foreground="{DynamicResource Fg}" />
+              </Button>
+              <Button Classes="tool" Command="{Binding GoForwardCommand}" IsEnabled="{Binding CanGoForward}" ToolTip.Tip="Forward (⌘])" AutomationProperties.Name="Forward">
+                <c:Icon Glyph="arrow_back" Size="18" Foreground="{DynamicResource Fg}" RenderTransform="scale(-1,1)" />
+              </Button>
+            </StackPanel>
+          </c:Glass>
+        </StackPanel>
         <!-- The toolbar: move and export for a lecture, Open in Canvas for an assignment, search, and Settings -->
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
           <c:Glass Height="36" CornerRadius="18" Padding="4,0" BoxShadow="{DynamicResource CtlGlassShadow}" IsVisible="{Binding ShowLecturePage}">
@@ -194,9 +212,9 @@
           </c:Glass>
         </StackPanel>
       </c:WindowHeader>
-      <Grid ColumnDefinitions="248,Auto,*">
-        <!-- Classes: a floating glass panel, below the title bar -->
-        <c:Glass Name="Sidebar" CornerRadius="18" BoxShadow="{DynamicResource SideGlassShadow}" Padding="10,6,10,14" Margin="8,0,0,8" c:WindowHeader.MovesWindow="True">
+      <Grid ColumnDefinitions="Auto,Auto,*">
+        <!-- Classes: a floating glass panel, below the title bar (folded away, the list starts at the window's edge) -->
+        <c:Glass Name="Sidebar" Width="240" IsVisible="{Binding ShowSidebar}" CornerRadius="18" BoxShadow="{DynamicResource SideGlassShadow}" Padding="10,6,10,14" Margin="8,0,0,8" c:WindowHeader.MovesWindow="True">
           <DockPanel>
             <!-- Whether the library answers: a row of its own at the bottom, never under the classes (they scroll). -->
             <Grid Name="StatusRow" DockPanel.Dock="Bottom" ColumnDefinitions="Auto,8,*" Margin="10,8,10,4">
@@ -345,16 +363,28 @@
               </StackPanel>
               <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource DisplayFont}" FontSize="30" FontWeight="Bold" LineHeight="34.5"
                          c:Typography.Extra="-0.6" TextWrapping="Wrap" />
-              <Border HorizontalAlignment="Left" Padding="3" CornerRadius="18" Background="{DynamicResource Fill}" BoxShadow="{DynamicResource EdgeSoft}" Margin="0,4,0,0">
-                <StackPanel Orientation="Horizontal">
-                  <Border Classes="seg" Classes.on="{Binding ShowNotes}" PointerPressed="OnNotesTab">
-                    <TextBlock Text="Notes" FontSize="12" FontWeight="Medium" />
-                  </Border>
-                  <Border Classes="seg" Classes.on="{Binding ShowTranscript}" PointerPressed="OnTranscriptTab">
-                    <TextBlock Text="Transcript" FontSize="12" FontWeight="Medium" />
-                  </Border>
-                </StackPanel>
-              </Border>
+              <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,0">
+                <Border HorizontalAlignment="Left" Padding="3" CornerRadius="18" Background="{DynamicResource Fill}" BoxShadow="{DynamicResource EdgeSoft}">
+                  <StackPanel Orientation="Horizontal">
+                    <Border Classes="seg" Classes.on="{Binding ShowNotes}" PointerPressed="OnNotesTab">
+                      <TextBlock Text="Notes" FontSize="12" FontWeight="Medium" />
+                    </Border>
+                    <Border Classes="seg" Classes.on="{Binding ShowTranscript}" PointerPressed="OnTranscriptTab">
+                      <TextBlock Text="Transcript" FontSize="12" FontWeight="Medium" />
+                    </Border>
+                  </StackPanel>
+                </Border>
+                <!-- Nothing attached yet: Attach sits beside the tabs rather than heading an empty list of its own -->
+                <Button Grid.Column="2" Classes="pill" VerticalAlignment="Center" Height="32"
+                        Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.AttachCommand, FallbackValue={x:Null}}"
+                        IsVisible="{Binding !$parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.ShowHeader, FallbackValue=False}"
+                        ToolTip.Tip="Attach your notes, slides or a handout (or drop files on the page)" AutomationProperties.Name="Attach">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Glyph="attach_file" Size="15" Foreground="{DynamicResource Fg}" />
+                    <TextBlock Text="Attach" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Button>
+              </Grid>
               <!-- What's attached to this lecture (drop files anywhere on the page) -->
               <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasLectureFiles}" Margin="0,2,0,0">
                 <v:MacAttachments Name="LectureAttachments" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles}" />

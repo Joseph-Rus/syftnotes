@@ -67,6 +67,9 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     [ObservableProperty] public partial string? Said { get; set; }
 
     public bool HasItems => Items.Count > 0;
+    /// <summary>The "Attachments" row with its Attach button: a class's always; a lecture's once something's attached
+    /// (until then the lecture page's own Attach, beside Notes and Transcript, is the way in).</summary>
+    public bool ShowHeader => HasItems || LectureId is null;
     public bool HasProblem => !string.IsNullOrEmpty(Problem);
     public bool HasSaid => !string.IsNullOrEmpty(Said);
 
@@ -144,6 +147,7 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
         }
         Reading = Items.Any(i => i.Reading);
         OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(ShowHeader));
     }
 
     [RelayCommand]
@@ -213,6 +217,7 @@ public sealed partial class AttachmentsModel(IAttachmentLibrary library, string?
     {
         Items.Remove(item);
         OnPropertyChanged(nameof(HasItems));
+        OnPropertyChanged(nameof(ShowHeader));
         try
         {
             await library.RemoveAttachmentAsync(item.Id);

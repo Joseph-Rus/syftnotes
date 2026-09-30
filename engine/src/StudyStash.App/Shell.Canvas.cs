@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Avalonia.Controls;
 using Avalonia.Threading;
 using StudyStash.App.Controls;
@@ -156,6 +157,10 @@ public static partial class Shell
             };
         if (host.Library == LibraryState.Connected && canvasWatch?.State is { Status: "connected" or "syncing" or "updated", LastSync: { } synced })
             status += $" · Canvas synced {CanvasWords.Clock(synced, TimeZoneInfo.Local)}";
+        // Lectures waiting for their notes aren't in a class yet (the notes say which): without this, a class that has
+        // a week of lectures queued reads 0 and they look lost.
+        if (host.Library == LibraryState.Connected && host.Overview?["writing"] is JsonValue w && w.TryGetValue(out int writing) && writing > 0)
+            status += writing == 1 ? " · Writing notes for 1 lecture" : $" · Writing notes for {writing} lectures";
         return status;
     }
 
@@ -196,6 +201,7 @@ public static partial class Shell
     /// notification).</summary>
     static void OpenDueItem(string cls, string id)
     {
+        Remember();
         panelWindow?.Hide();
         quickWindow?.Hide();
         dueSelection = (cls, id);

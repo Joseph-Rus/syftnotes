@@ -401,6 +401,27 @@ public sealed partial class LibraryModel : ObservableObject
     public Action? OnSettings { get; set; }
     public Action? OnMore { get; set; }
 
+    /// <summary>The sidebar is folded away, leaving the list and the page the whole window.</summary>
+    [ObservableProperty] public partial bool SidebarHidden { get; set; }
+    public bool ShowSidebar => !SidebarHidden;
+    partial void OnSidebarHiddenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowSidebar));
+        OnSidebarToggled?.Invoke(value);
+    }
+
+    /// <summary>There's somewhere to go back (or forward) to, as in a browser: the places the student picked.</summary>
+    [ObservableProperty] public partial bool CanGoBack { get; set; }
+    [ObservableProperty] public partial bool CanGoForward { get; set; }
+
+    public Action<bool>? OnSidebarToggled { get; set; }
+    public Action? OnGoBack { get; set; }
+    public Action? OnGoForward { get; set; }
+
+    [RelayCommand] void ToggleSidebar() => SidebarHidden = !SidebarHidden;
+    [RelayCommand] void GoBack() => OnGoBack?.Invoke();
+    [RelayCommand] void GoForward() => OnGoForward?.Invoke();
+
     [RelayCommand] void PickClass(ClassItem c) => OnClass?.Invoke(c);
     [RelayCommand] void PickLecture(LectureCard l) => OnLecture?.Invoke(l);
     [RelayCommand] void Move() => OnMove?.Invoke();
