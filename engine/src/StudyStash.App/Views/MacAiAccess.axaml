@@ -12,7 +12,7 @@
   </UserControl.Styles>
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="40,40,40,32" Spacing="24" MaxWidth="640">
+    <StackPanel Margin="40,12,40,32" Spacing="24" MaxWidth="640">
 
       <StackPanel Spacing="6">
         <Grid ColumnDefinitions="*,Auto">
