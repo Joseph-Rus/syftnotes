@@ -1,74 +1,140 @@
-# The build and release pipeline for Study Stash (C# on .NET 10, one app for both roles).
-#   One full test per change, when it reaches main: the engine's tests on macOS, Linux and Windows; the Mac app
-#   (one universal bundle, both roles' DMGs, self-tested here and again natively on an Intel runner); and the
-#   Windows app (both roles' Setup.exe, self-tested as a laptop and as just this computer, installed, updated in
-#   place, and uninstalled cleanly). The installers are built alongside the engine's tests, not after them.
-#   Branches and pull requests aren't tested on their own. Start a run on one by hand when it needs proving first
-#   (Actions → ci → Run workflow, or `gh workflow run ci --ref <branch>`), e.g. for Windows-only code.
-#   Push to main with a StudyStashVersion in engine/Directory.Build.props that has no tag yet: once all of the
-#   above passes, publish release v<version> with the four installers and SHA256SUMS.txt. Installed copies pick
-#   it up within a few hours (auto_update), or right away with Update now. A version already released is never
-#   published again.
-#   Code that already passed isn't tested twice: a push to main that only changes the version (and this file) on
-#   top of a commit that passed, or that merges a branch whose run by hand passed on exactly the same code, skips
-#   the tests and self-tests and only builds the installers with this version and publishes them.
+# The build and release pipeline for Study Stash (C# on .NET 10, one app for both roles). Two speeds, one workflow.
+#
+#   A merge (a push to main) proves the code, and nothing it would throw away:
+#     - the engine's two test projects (Core and App) on macOS, Linux and Windows, each in a job of its own, so all six
+#       run side by side (the old single job ran the two one after the other);
+#     - the Mac app and the Windows app built and self-tested for real (windows open, the pretend microphone records,
+#       Whisper hears it), once as a laptop and once as "just this computer"; the Mac's two run on two computers.
+#     No installers are made for it: no Setup.exe (the build leaves it out), no DMG kept (macos/build-app.sh makes
+#     it as its last step either way), no Intel Mac, no install, update or uninstall, and nothing is published.
+#
+#   A release is a push to main with a StudyStashVersion in engine/Directory.Build.props that has no tag yet. On top of
+#   all of the above it builds the installers, proves them where they will really run (the Mac app natively on an
+#   Intel Mac; Setup.exe installed, self-tested from the installed copy, updated in place with a silent Setup.exe and
+#   uninstalled cleanly), and then publishes release v<version> with the four installers and SHA256SUMS.txt. Installed
+#   copies pick it up within a few hours (auto_update), or right away with Update now. A version already released is
+#   never published again. Nothing is published unless every test and proof above passed.
+#
+#   Code that already passed isn't tested twice. A push to main skips the engine tests and the self-tests when it
+#     - changes only the version and files that can't change what the code does (the docs, the website, the
+#       README), on top of a commit whose run passed; or
+#     - merges a branch whose run by hand passed on exactly the same code (main hadn't moved meanwhile).
+#   A release that skips the tests still builds and proves its installers, unless that run by hand was a rehearsal of
+#   the release too (below) and still holds its installers: then those very installers, built and proved on exactly
+#   this code, are the ones published, with no rebuilding, and a merged version bump publishes within a minute.
+#   Changes to this workflow are never skipped.
+#
+#   Runs by hand (Actions → ci → Run workflow, or `gh workflow run ci --ref <branch>`) are how a branch is proved
+#   before it merges: Branches and pull requests aren't tested on their own. A run by hand tests like a merge does.
+#   On code whose version has no tag yet (a release branch), or with "installers" ticked
+#   (`gh workflow run ci --ref <branch> -f installers=true`), it rehearses the whole release too, down to the checksums,
+#   and publishes nothing, ever. Give it "reuse_run" (an earlier such run's id, on the same code) to rehearse the fast
+#   release above.
+#
+#   Runs are never cancelled by a later push: each push to main has a group of its own, so a release run isn't
+#   cancelled by the push after it, nor skipped while waiting for the one before. (Runs by hand on one branch
+#   replace each other.) The plan (what is tested, what is built, what is reused) is decided in the first job, by
+#   .github/scripts/plan.sh, and printed on the run's summary.
 name: ci
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      installers:
+        description: "Build and prove the installers too, as a release does (always on for code whose version has no tag yet). Nothing is published from a run by hand."
+        type: boolean
+        default: false
+      reuse_run:
+        description: "Rehearse a release's fast path: the id of an earlier run by hand on exactly this code, whose installers are reused, not rebuilt."
+        type: string
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
 
 jobs:
-  # The C# engine (engine/): every test on each system. Golden/ holds fixed expectations the tests compare byte
-  # for byte.
+  # What this run has to do: the version, whether it is a release, whether this code already passed, and whether a
+  # run by hand already built and proved the installers.
+  version:
+    name: version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read  # to see whether the commit before this one, or the pull request merged here, passed ci
+      pull-requests: read  # to find the pull request a push to main merged
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      new: ${{ steps.plan.outputs.new }}
+      installers: ${{ steps.plan.outputs.installers }}
+      tested: ${{ steps.plan.outputs.tested }}
+      reuse_run: ${{ steps.plan.outputs.reuse_run }}
+    steps:
+      - uses: actions/checkout@v4
+      # A run by hand keeps the exact tree it tests, so that merging that branch into main with the very same code
+      # (main hadn't moved meanwhile) is known to have passed already (plan.sh).
+      - if: github.event_name != 'push'
+        run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
+      - if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tested-tree
+          path: tested-tree.txt
+          retention-days: 30
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+          BEFORE: ${{ github.event.before }}
+          REPO: ${{ github.repository }}
+          WANT_INSTALLERS: ${{ inputs.installers }}
+          REUSE_RUN: ${{ inputs.reuse_run }}
+        run: bash .github/scripts/plan.sh
+
+  # The C# engine (engine/): every test on each system. Golden/ holds fixed expectations the tests compare byte for
+  # byte. The two test projects are two jobs per system: they used to run one after the other in one job, and the
+  # Windows one needed 12 to 14 minutes for it. Each has a machine of its own, so one is no busier than before.
   engine:
-    name: C# engine (${{ matrix.os }})
+    name: Engine ${{ matrix.suite }} tests (${{ matrix.os }})
     needs: [version]
     if: needs.version.outputs.tested != 'true'
     strategy:
-      fail-fast: false
+      fail-fast: false  # a flake in one doesn't hide the rest, and re-running a failed job re-runs only it
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    # Windows needs the room: restoring, building, ~4 min of engine tests and ~6 of app tests came to 14 m 50 s on a
-    # slow runner, and 15 cut it off mid-run with nothing failed.
-    timeout-minutes: 25
+        suite: [Core, App]
+    # A leg takes 2 to 9 minutes; the App tests on a slow Windows runner the most. 15 and 20 only bound a hang.
+    timeout-minutes: ${{ matrix.suite == 'Core' && 15 || 20 }}
     runs-on: ${{ matrix.os }}
-    env:
-      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
-      DOTNET_NOLOGO: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
-      # Whisper's smallest model, so the live tests hear real speech on each system (the app uses large-v3).
-      - uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/whisper
-          key: whisper-ggml-tiny-v1
-      - name: Whisper tiny, for the live transcription tests
+      - uses: ./.github/actions/whisper-tiny
+      - name: Where a crashed test process leaves its report
         shell: bash
-        run: |
-          mkdir -p "$RUNNER_TEMP/whisper" "$RUNNER_TEMP/crash"
-          [ -f "$RUNNER_TEMP/whisper/ggml-tiny.bin" ] || curl -fsSL -o "$RUNNER_TEMP/whisper/ggml-tiny.bin" \
-            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
-          echo "STUDYSTASH_WHISPER_MODEL=$RUNNER_TEMP/whisper/ggml-tiny.bin" >> "$GITHUB_ENV"
-      - name: Run tests
-        run: dotnet test engine/StudyStash.slnx
+        run: mkdir -p "$RUNNER_TEMP/crash"
+      - name: Run the ${{ matrix.suite }} tests
+        run: dotnet test engine/tests/StudyStash.${{ matrix.suite }}.Tests
         env:
           # Windows: also run the library as a real background service, from the Startup folder with no window.
-          STUDYSTASH_LIVE_SERVICE: ${{ runner.os == 'Windows' && '1' || '' }}
+          STUDYSTASH_LIVE_SERVICE: ${{ runner.os == 'Windows' && matrix.suite == 'Core' && '1' || '' }}
           # Windows: the pictures the tests draw are kept, so the notes' formulas and diagrams can be seen as Windows
           # draws them (its own fonts), in the Windows look, light and dark, at 100% and 150%.
-          STUDYSTASH_SHOTS: ${{ runner.os == 'Windows' && format('{0}\shots', runner.temp) || '' }}
+          STUDYSTASH_SHOTS: ${{ runner.os == 'Windows' && matrix.suite == 'App' && format('{0}\shots', runner.temp) || '' }}
           # A test process that dies in native code leaves a crash report (every thread's stack, native and .NET)
           # instead of only "exit code 139", so a crash that happens once in a while can be traced the first time.
           DOTNET_DbgEnableMiniDump: ${{ runner.os != 'Windows' && '1' || '' }}
@@ -79,11 +145,11 @@ jobs:
         if: ${{ failure() && runner.os != 'Windows' }}
         uses: actions/upload-artifact@v4
         with:
-          name: crash-${{ matrix.os }}
+          name: crash-${{ matrix.os }}-${{ matrix.suite }}
           path: ${{ runner.temp }}/crash/*.crashreport.json
           if-no-files-found: ignore
       - name: The notes' formulas and diagrams, as Windows draws them
-        if: ${{ always() && runner.os == 'Windows' }}
+        if: ${{ always() && runner.os == 'Windows' && matrix.suite == 'App' }}
         uses: actions/upload-artifact@v4
         with:
           name: windows-rich-notes
@@ -92,7 +158,7 @@ jobs:
             ${{ runner.temp }}\shots\rich-*-win-*
           if-no-files-found: error
       - name: Notifications, as Windows draws them, where they land above the taskbar
-        if: ${{ always() && runner.os == 'Windows' }}
+        if: ${{ always() && runner.os == 'Windows' && matrix.suite == 'App' }}
         uses: actions/upload-artifact@v4
         with:
           name: windows-notifications
@@ -101,13 +167,13 @@ jobs:
             ${{ runner.temp }}\shots\win-12-toast-*
           if-no-files-found: error
 
-  # The Mac app: one universal bundle for Apple silicon and Intel, started by its own launcher (D1); ad hoc
-  # signed with the microphone entitlement; both roles' DMGs (D2). Proved with the real self-test (D5): real
-  # windows open, the pretend microphone records, Whisper (Metal) hears the speech from inside the bundle.
+  # The Mac app: one universal bundle for Apple silicon and Intel, started by its own launcher (D1); ad hoc signed with
+  # the microphone entitlement; the DMG (D2). Proved with the real self-test (D5): real windows open, the pretend
+  # microphone records, Whisper (Metal) hears the speech from inside the bundle. Only a release uploads the DMG.
   mac-app:
-    name: Mac app (DMGs, self-test)
-    needs: [version]  # built alongside the engine tests, not after them; release waits for both
-    if: ${{ !cancelled() && !failure() }}
+    name: Mac app (self-test, DMG)
+    needs: [version]
+    if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
     timeout-minutes: 25
     runs-on: macos-latest
     steps:
@@ -115,16 +181,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
-      - uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/whisper
-          key: whisper-ggml-tiny-v1
-      - name: Whisper tiny, for the self-test
-        run: |
-          mkdir -p "$RUNNER_TEMP/whisper"
-          [ -f "$RUNNER_TEMP/whisper/ggml-tiny.bin" ] || curl -fsSL -o "$RUNNER_TEMP/whisper/ggml-tiny.bin" \
-            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
-          echo "STUDYSTASH_WHISPER_MODEL=$RUNNER_TEMP/whisper/ggml-tiny.bin" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/whisper-tiny
+        if: needs.version.outputs.tested != 'true'
       - name: install.sh parses
         run: sh -n install.sh
       - uses: actions/setup-node@v4
@@ -154,11 +212,6 @@ jobs:
       - name: Self-test (D5) - real windows, the pretend mic, Whisper from inside the bundle
         if: needs.version.outputs.tested != 'true'
         run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest"
-      - name: Self-test, just this computer - setup makes the app's own library, and the notes are written here
-        if: needs.version.outputs.tested != 'true'
-        env:
-          STUDYSTASH_SELFTEST_FLOW: one-computer
-        run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
       - name: The DMG holds the app with no role of its own (setup asks), and no model is bundled (D6)
         run: |
           mnt="$RUNNER_TEMP/mnt-dmg"
@@ -177,21 +230,54 @@ jobs:
           fi
           hdiutil detach -quiet "$mnt"
       - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.installers == 'true'
         with:
           name: mac-installers
           path: dist/mac/Study-Stash.dmg
+          retention-days: 30
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && needs.version.outputs.tested != 'true'
         with:
           name: mac-selftest
           path: ${{ runner.temp }}/selftest
 
-  # The Intel self-test (D5), for real: a physical Intel Mac, so the x64 tree runs natively (mac-app already
-  # checked it runs enough to print its version under Rosetta).
+  # The Mac app's second self-test, on a computer of its own so it runs beside the first: Just this computer, where
+  # setup makes the app's own library and the notes are written here.
+  mac-one-computer:
+    name: Mac app self-test (just this computer)
+    needs: [version]
+    if: needs.version.outputs.tested != 'true'
+    timeout-minutes: 25
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: ./.github/actions/whisper-tiny
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Build Study Stash.app
+        run: sh macos/build-app.sh dist/mac
+      - name: Self-test, just this computer - setup makes the app's own library, and the notes are written here
+        env:
+          STUDYSTASH_SELFTEST_FLOW: one-computer
+        run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-one-computer-selftest
+          path: ${{ runner.temp }}/selftest
+
+  # The Intel self-test (D5), for real: a physical Intel Mac, so the x64 tree runs natively (mac-app already checked
+  # it runs enough to print its version under Rosetta). A release only.
   mac-intel:
     name: Mac app self-test (Intel)
     needs: [version, mac-app]
-    if: ${{ !cancelled() && !failure() && needs.version.outputs.tested != 'true' }}
+    if: needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == ''
     timeout-minutes: 20
     runs-on: macos-15-intel
     steps:
@@ -200,16 +286,7 @@ jobs:
         with:
           name: mac-installers
           path: dist/mac
-      - uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}/whisper
-          key: whisper-ggml-tiny-v1
-      - name: Whisper tiny, for the self-test
-        run: |
-          mkdir -p "$RUNNER_TEMP/whisper"
-          [ -f "$RUNNER_TEMP/whisper/ggml-tiny.bin" ] || curl -fsSL -o "$RUNNER_TEMP/whisper/ggml-tiny.bin" \
-            https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
-          echo "STUDYSTASH_WHISPER_MODEL=$RUNNER_TEMP/whisper/ggml-tiny.bin" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/whisper-tiny
       - name: Mount the DMG and copy the app out (artifacts lose exec bits, so it travels as a DMG)
         run: |
           mkdir -p "$RUNNER_TEMP/mnt"
@@ -225,13 +302,15 @@ jobs:
           name: mac-intel-selftest
           path: ${{ runner.temp }}/selftest
 
-  # The Windows app: one Setup.exe with no role of its own (setup asks), self-tested (D5) as just this computer, installed, self-tested as a laptop from the
-  # installed copy (so what Setup.exe put there, native code and all, is what runs), updated in place with a silent Setup.exe, and uninstalled
-  # without touching lectures or settings outside the install folder.
+  # The Windows app: one Setup.exe with no role of its own (setup asks). Both trees are built and checked, then
+  # self-tested (D5) as just this computer and as a laptop. A merge stops there (the build leaves Setup.exe out). A
+  # release also builds Setup.exe, installs it, self-tests as a laptop from the installed copy (so what Setup.exe put
+  # there, native code and all, is what runs), updates it in place with a silent Setup.exe, and uninstalls it without
+  # touching lectures or settings outside the install folder.
   windows-app:
-    name: Windows app (Setup.exe, self-test, install)
-    needs: [version]  # built alongside the engine tests, not after them; release waits for both
-    if: ${{ !cancelled() && !failure() }}
+    name: Windows app (self-test, Setup.exe)
+    needs: [version]
+    if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
     timeout-minutes: 25
     runs-on: windows-latest
     steps:
@@ -240,22 +319,21 @@ jobs:
         with:
           dotnet-version: "10.0.x"
       - name: Inno Setup 6, if this image lacks it
+        if: needs.version.outputs.installers == 'true'
         shell: pwsh
         run: |
           if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
-      - uses: actions/cache@v4
-        with:
-          path: ${{ runner.temp }}\whisper
-          key: whisper-ggml-tiny-v1
-      - name: Whisper tiny, for the self-test
+      - name: A merge ships nothing, so Inno Setup is put aside and the build leaves Setup.exe out
+        if: needs.version.outputs.installers != 'true'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\whisper" | Out-Null
-          $model = "$env:RUNNER_TEMP\whisper\ggml-tiny.bin"
-          if (-not (Test-Path $model)) {
-            Invoke-WebRequest "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin" -OutFile $model
+          # windows\build.ps1 builds Setup.exe only where it finds Inno Setup 6, and says so when it doesn't.
+          $iscc = @((Get-Command iscc -ErrorAction SilentlyContinue).Source,
+                    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe")
+          foreach ($exe in $iscc) {
+            if ($exe -and (Test-Path $exe)) { Write-Host "putting $exe aside"; Rename-Item $exe "$(Split-Path -Leaf $exe).aside" }
           }
-          echo "STUDYSTASH_WHISPER_MODEL=$model" >> $env:GITHUB_ENV
+      - uses: ./.github/actions/whisper-tiny
       - name: install.ps1 parses
         shell: pwsh
         run: |
@@ -337,7 +415,7 @@ jobs:
           }
           if ($left.Count -ne 0) { $left | Stop-Process -Force; throw "the app's library (StudyStash.exe serve) was still running 20 s after the app quit" }
       - name: The installer puts Study Stash on this account, with no role of its own (setup asks)
-        if: needs.version.outputs.tested != 'true'
+        if: needs.version.outputs.installers == 'true'
         shell: pwsh
         run: |
           Start-Process "dist\windows\Study-Stash-Setup.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait
@@ -347,8 +425,9 @@ jobs:
           if (Select-String -Path "$app\study-stash.ini" -Pattern "^\s*role\s*=" -Quiet) { throw "the one download wrote a role" }
           $printed = (& "$app\StudyStash.exe" version | Out-String).Trim()
           if ($printed -ne $env:V) { throw "installed version '$printed', expected '$env:V'" }
-      - name: Self-test (D5), from the copy the installer put there - its native code came with it, and a lecture's formulas and flowchart draw
-        if: needs.version.outputs.tested != 'true'
+      # A release runs this from the copy the installer put there; a merge, which has no installer, from the build.
+      - name: Self-test (D5), as a laptop - its native code came with the installer, and a lecture's formulas and flowchart draw
+        if: needs.version.outputs.tested != 'true' || needs.version.outputs.installers == 'true'
         shell: pwsh
         run: |
           $selftestHome = "$env:RUNNER_TEMP\selftest-home"
@@ -358,7 +437,9 @@ jobs:
           $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
           $env:STUDYSTASH_MIC_SPEED = "4"
           $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
-          $p = Start-Process -FilePath "$env:LOCALAPPDATA\Programs\Study Stash\StudyStash.exe" -ArgumentList "--home", $selftestHome -PassThru
+          $exe = if ("${{ needs.version.outputs.installers }}" -eq "true") { "$env:LOCALAPPDATA\Programs\Study Stash\StudyStash.exe" } else { (Resolve-Path "dist\windows\win-x64\StudyStash.exe").Path }
+          Write-Host "Self-testing $exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
           if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Study Stash didn't exit within 480 s" }
           $lines = Get-Content "$out\selftest.txt"
           $lines | Write-Host
@@ -368,7 +449,7 @@ jobs:
           if (-not ($lines -match "^rich notes: .* typeset; a flowchart laid out")) { throw "the self-test didn't see the notes' formulas and flowchart drawn" }
           if (-not ($lines -match "^opened larger: ")) { throw "the self-test didn't open the flowchart larger" }
       - name: Installing again over an older role install (as an old copy's self-update does) is an in-place upgrade that keeps its role
-        if: needs.version.outputs.tested != 'true'
+        if: needs.version.outputs.installers == 'true'
         shell: pwsh
         run: |
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
@@ -381,7 +462,7 @@ jobs:
             Where-Object { $_.DisplayName -eq "Study Stash" })
           if ($entries.Count -ne 1) { throw "expected one uninstall entry for Study Stash, found $($entries.Count)" }
       - name: A silent update (relaunch=1) starts the app again from the same folder
-        if: needs.version.outputs.tested != 'true'
+        if: needs.version.outputs.installers == 'true'
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -401,7 +482,7 @@ jobs:
           if (-not $ok) { throw "no StudyStash.exe from $app running again within 30 s of the silent update" }
           Get-Process -Name StudyStash -ErrorAction SilentlyContinue | Stop-Process -Force
       - name: Uninstalling removes only the app; lectures and settings stay
-        if: needs.version.outputs.tested != 'true'
+        if: needs.version.outputs.installers == 'true'
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -419,110 +500,56 @@ jobs:
           if (-not (Test-Path $settingsKeep)) { throw "settings outside the app folder were deleted" }
           if (-not (Test-Path $lectureKeep)) { throw "a lecture outside the app folder was deleted" }
       - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.installers == 'true'
         with:
           name: windows-installers
           path: dist\windows\Study-Stash-Setup.exe
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: windows-selftest
           path: ${{ runner.temp }}\selftest
 
-  # Whether engine/Directory.Build.props holds a version with no tag yet: gates the release job below.
-  version:
-    name: version
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: read  # to see whether the commit before this one, or the pull request merged here, passed ci
-      pull-requests: read  # to find the pull request a push to main merged
-    outputs:
-      version: ${{ steps.v.outputs.version }}
-      new: ${{ steps.v.outputs.new }}
-      tested: ${{ steps.t.outputs.tested }}
-    steps:
-      - uses: actions/checkout@v4
-      # A run by hand on a branch keeps the exact tree it tests, so that merging that branch into main with the very
-      # same code (main hadn't moved meanwhile) is known to have passed already (step t below).
-      - if: github.event_name != 'push'
-        run: git rev-parse 'HEAD^{tree}' > tested-tree.txt
-      - if: github.event_name != 'push'
-        uses: actions/upload-artifact@v4
-        with:
-          name: tested-tree
-          path: tested-tree.txt
-          retention-days: 30
-      - id: v
-        run: |
-          V=$(sed -n 's:.*<StudyStashVersion>\(.*\)</StudyStashVersion>.*:\1:p' engine/Directory.Build.props)
-          if [ -z "$V" ]; then echo "no StudyStashVersion in engine/Directory.Build.props" >&2; exit 1; fi
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-          if [ -z "$(git ls-remote --tags origin "refs/tags/v$V")" ]; then
-            echo "new=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "new=false" >> "$GITHUB_OUTPUT"
-          fi
-      # "Already tested", for a push to main, either way:
-      #   - it changes only the version and this workflow, on top of a commit whose ci run passed; or
-      #   - it merges a branch (a pull request) whose run passed on exactly this tree (main hadn't moved since).
-      # The code is the one that passed, so only the installers are built again, with this version.
-      - id: t
-        env:
-          GH_TOKEN: ${{ github.token }}
-          BEFORE: ${{ github.event.before }}
-          REPO: ${{ github.repository }}
-          SHA: ${{ github.sha }}
-        run: |
-          tested=false
-          if [ "${{ github.event_name }}" = push ] && [ "${{ github.ref }}" = refs/heads/main ] && [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ]; then
-            git fetch -q --depth=1 origin "$BEFORE" && git fetch -q --deepen=1 origin "$SHA" || true
-            changed=$(git diff --name-only "$BEFORE" "$SHA" 2>/dev/null || echo unknown)
-            others=$(printf '%s\n' "$changed" | grep -v -x -e engine/Directory.Build.props -e .github/workflows/ci.yml | grep -c . || true)
-            passed=$(gh run list -R "$REPO" --workflow ci --commit "$BEFORE" --status success --json databaseId --jq length 2>/dev/null || echo 0)
-            echo "changed since $BEFORE: $(echo $changed); other files: $others; ci passed there: $passed"
-            if [ "$changed" != unknown ] && [ "$others" = 0 ] && [ "${passed:-0}" -gt 0 ]; then tested=true; fi
-          fi
-          if [ "$tested" = false ] && [ "${{ github.event_name }}" = push ] && [ "${{ github.ref }}" = refs/heads/main ]; then
-            tree=$(git rev-parse "$SHA^{tree}")
-            for head in $(gh api "repos/$REPO/commits/$SHA/pulls" --jq '.[].head.sha' 2>/dev/null); do
-              for run in $(gh run list -R "$REPO" --workflow ci --commit "$head" --status success --json databaseId --jq '.[].databaseId' 2>/dev/null); do
-                rm -rf prior && gh run download "$run" -R "$REPO" -n tested-tree -D prior >/dev/null 2>&1 || continue
-                echo "run $run (head $head) tested tree $(cat prior/tested-tree.txt); this push is tree $tree"
-                if [ "$(cat prior/tested-tree.txt)" = "$tree" ]; then tested=true; break 2; fi
-              done
-            done
-          fi
-          echo "tested=$tested"
-          echo "tested=$tested" >> "$GITHUB_OUTPUT"
-
   # Publish v<version> the first time it passes everything above, with the one download per system, the four old role
   # names as byte-for-byte copies of them (0.8.x and older copies update themselves by those names, and old libraries'
-  # "Connect your laptop" links point at them), and their checksums. A version already tagged is never published again.
+  # "Connect your laptop" links point at them), and their checksums. A version already tagged is never published
+  # again. The installers are the ones this run built and proved, or the ones a run by hand built and proved on
+  # exactly this code. A run by hand goes through all of it but the last step, and publishes nothing.
   release:
-    name: publish release
-    needs: [version, engine, mac-app, mac-intel, windows-app]
-    if: ${{ !cancelled() && !failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.version.outputs.new == 'true' && needs.mac-app.result == 'success' && needs.windows-app.result == 'success' }}
+    name: ${{ github.event_name == 'push' && 'publish release' || 'release (rehearsal, nothing published)' }}
+    needs: [version, engine, mac-app, mac-one-computer, mac-intel, windows-app]
+    if: ${{ !cancelled() && !failure() && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success')) }}
     timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read  # to download the installers a run by hand built
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: mac-installers
           path: dist
+          run-id: ${{ needs.version.outputs.reuse_run || github.run_id }}
+          github-token: ${{ github.token }}
       - uses: actions/download-artifact@v4
         with:
           name: windows-installers
           path: dist
+          run-id: ${{ needs.version.outputs.reuse_run || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Publish v${{ needs.version.outputs.version }}
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ needs.version.outputs.version }}
+          PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         run: |
+          test -s dist/Study-Stash.dmg && test -s dist/Study-Stash-Setup.exe || { echo "an installer is missing or empty"; ls -l dist; exit 1; }
           # Re-check the race: another push could have published this tag while this run was building.
-          if git rev-parse -q --verify "refs/tags/v$V" >/dev/null || gh release view "v$V" >/dev/null 2>&1; then
+          released=false
+          if git rev-parse -q --verify "refs/tags/v$V" >/dev/null || gh release view "v$V" >/dev/null 2>&1; then released=true; fi
+          if [ "$released" = true ] && [ "$PUBLISH" = true ]; then
             echo "v$V is already released; bump StudyStashVersion in engine/Directory.Build.props to publish a new one."
             exit 0
           fi
@@ -531,6 +558,13 @@ jobs:
             cp dist/Study-Stash-Setup.exe "dist/Study-Stash-$role-Setup.exe"
           done
           (cd dist && sha256sum Study-Stash* > SHA256SUMS.txt)
+          ls -l dist
+          cat dist/SHA256SUMS.txt
+          if [ "$PUBLISH" != true ]; then
+            echo "A rehearsal: v$V would be published now with the files above. Nothing was."
+            if [ "$released" = true ]; then echo "(v$V is already released, so a push would stop before this.)"; fi
+            exit 0
+          fi
           gh release create "v$V" --target "$GITHUB_SHA" --title "Study Stash $V" --generate-notes \
             dist/Study-Stash.dmg dist/Study-Stash-Setup.exe \
             dist/Study-Stash-Laptop.dmg dist/Study-Stash-Library.dmg \
