@@ -68,6 +68,24 @@ public sealed partial class NoteModel : ObservableObject
 
     [RelayCommand] void Notes() => ShowTranscript = false;
     [RelayCommand] void Transcripts() => ShowTranscript = true;
+
+    /// <summary>The transcript as timed lines, when it has times: what a diagram's box is looked for in.</summary>
+    public List<Spoken> Spoken { get; } = [];
+
+    /// <summary>The transcript's line to scroll to (its place in <see cref="Transcript"/>), once it's showing.</summary>
+    public event Action<int>? Jumped;
+
+    /// <summary>The transcript at a moment: its tab open, the line said then marked, and the page brought to it.</summary>
+    public void ShowAt(double seconds)
+    {
+        if (Transcript.Count == 0) return;
+        int at = 0;
+        for (int i = 0; i < Transcript.Count; i++)
+            if (Transcript[i].Start is double s && s <= seconds + 0.5) at = i;
+        for (int i = 0; i < Transcript.Count; i++) Transcript[i].Here = i == at;
+        ShowTranscript = true;
+        Jumped?.Invoke(at);
+    }
 }
 
 /// <summary>A lecture the student is deleting: which, and its title and class, for the confirmation and the "Deleted ·
@@ -139,6 +157,9 @@ public sealed partial class LibraryModel : ObservableObject
     [ObservableProperty] public partial AiNotesModel? Notes { get; set; }
     /// <summary>The ask bar under the open lecture, with its engine picker.</summary>
     [ObservableProperty] public partial AiAskModel? Ask { get; set; }
+    /// <summary>What a diagram in the open lecture's notes can do with the page: ask about a box, show the transcript or
+    /// play the recording at a moment (the page's views hand it to their diagrams).</summary>
+    public Controls.Rich.IDiagramHost? Diagrams { get; set; }
     /// <summary>What's attached to the open lecture (files dropped on it land here); null with no lecture open.</summary>
     [ObservableProperty] public partial AttachmentsModel? LectureFiles { get; set; }
     /// <summary>What's attached in the class showing (files dropped on its list land here); null on Due.</summary>

@@ -1,7 +1,12 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
+using Avalonia.LogicalTree;
+using Avalonia.Media;
+using Avalonia.Styling;
+using StudyStash.App.Controls;
 using StudyStash.App.Controls.Rich;
 using StudyStash.App.Views;
 
@@ -9,12 +14,18 @@ namespace StudyStash.App.Windows;
 
 /// <summary>
 /// A diagram from the notes, larger, in a window of its own: sized to show it at one and a half times (never more
-/// than 85% of the screen), fitted to whatever size the student makes the window (up to twice its own size). Esc or
-/// ⌘W (Ctrl+W) closes it. There's only ever one: opening another diagram shows it in the same window.
+/// than 85% of the screen), fitted to whatever size the student makes the window (up to twice its own size). A
+/// flowchart is the whole explorer here: a toolbar across the top (zoom, step through, test yourself, open or fold its
+/// groups, the moment of the lecture it comes from) and a strip along the bottom saying what's lit or where the steps
+/// are; a drawing zooms and pans. Esc (once nothing in it is picked) or ⌘W (Ctrl+W) closes it. There's only ever one:
+/// opening another diagram shows it in the same window.
 /// </summary>
 public static class DiagramWindow
 {
     const double Pad = 32, Grow = 1.5, MaxScale = 2, MinWidth = 420, MinHeight = 300;
+
+    /// <summary>The room the toolbar and the strip take, over the diagram's own.</summary>
+    const double Chrome = 92;
 
     /// <summary>The window, while one is open.</summary>
     public static Window? Current { get; private set; }
@@ -30,6 +41,7 @@ public static class DiagramWindow
             Look.Apply(w);
             w.KeyDown += (_, e) =>
             {
+                if (e.Handled) return;
                 if (e.Key == Key.Escape || (e.Key == Key.W && e.KeyModifiers is KeyModifiers.Meta or KeyModifiers.Control))
                 {
                     e.Handled = true;
@@ -40,7 +52,8 @@ public static class DiagramWindow
             {
                 if (ReferenceEquals(Current, w)) Current = null;
             };
-            var (width, height) = Size(Natural(request), Area(from ?? w));
+            var natural = Natural(request);
+            var (width, height) = Size(natural.WithHeight(natural.Height + (request.Chart is not null ? Chrome : 48) / Grow), Area(from ?? w));
             w.Width = width;
             w.Height = height;
             Current = w;
@@ -49,19 +62,152 @@ public static class DiagramWindow
         w.Content = content;
         w.Show();
         w.Activate();
+        // The keyboard starts on the diagram (a flowchart, or a drawing's stage), so its keys work at once; nothing is
+        // left focused in what the window showed before.
+        Control? keys = (Control?)content.GetLogicalDescendants().OfType<DiagramView>().FirstOrDefault()
+            ?? content.GetLogicalDescendants().OfType<Panel>().FirstOrDefault(p => p.Focusable);
+        if (keys is not null) keys.Focus(NavigationMethod.Pointer);
+        else w.Focus();
         return w;
     }
 
-    /// <summary>What the window shows: the diagram, centred on the window's ground with a margin, fitted to it.</summary>
+    /// <summary>What the window shows: a flowchart filling it with its toolbar and strip, or a drawing that zooms and
+    /// pans, on the window's ground.</summary>
     internal static Control Content(OpenDiagramEventArgs request)
     {
-        Control view = request.Chart is { } chart
-            ? new DiagramView(opensLarger: false) { Chart = chart, MaxScale = MaxScale }
-            : new SvgView(opensLarger: false) { Source = request.Svg, MaxScale = MaxScale };
-        view.VerticalAlignment = VerticalAlignment.Center;
-        var content = new Border { Padding = new Thickness(Pad), Child = view };
-        content.Bind(Border.BackgroundProperty, content.GetResourceObservable(Skin.Current == SkinKind.Mac ? "Win" : "Mica"));
-        return content;
+        Control content = request.Chart is { } chart ? Chart(request, chart) : Drawing(request);
+        var ground = new Border { Child = content };
+        ground.Bind(Border.BackgroundProperty, ground.GetResourceObservable(Skin.Current == SkinKind.Mac ? "Win" : "Mica"));
+        return ground;
+    }
+
+    static Control Chart(OpenDiagramEventArgs request, Core.Rich.Flowchart chart)
+    {
+        var origin = request.Source as Control;
+        var view = new DiagramView(opensLarger: false) { Source = request.Written, Folded = request.Folded, Origin = origin, MaxScale = MaxScale };
+        view.Chart = chart;
+        var chrome = view.Chrome!;
+        // A question asked, or a moment found, here goes to the lecture the note is on: its window comes forward.
+        view.Explorer!.AskedFromWindow = () => (TopLevel.GetTopLevel(origin) as Window)?.Activate();
+        var dock = new DockPanel();
+        DockPanel.SetDock(chrome.Tools, Dock.Top);
+        DockPanel.SetDock(chrome.Strip, Dock.Bottom);
+        dock.Children.Add(chrome.Tools);
+        dock.Children.Add(chrome.Strip);
+        dock.Children.Add(view);
+        return dock;
+    }
+
+    /// <summary>A drawing (an AI's SVG): fitted to the window, then zoomed (the buttons, ⌘/Ctrl + scroll, a pinch, + and
+    /// −) and moved about (a drag, or scrolling).</summary>
+    static Control Drawing(OpenDiagramEventArgs request)
+    {
+        var svg = new SvgView(opensLarger: false) { Source = request.Svg, MaxScale = MaxScale, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(Pad) };
+        var stage = new Panel { ClipToBounds = true, Background = Brushes.Transparent, Focusable = true, Children = { svg } };
+        AutomationProperties.SetName(stage, AutomationProperties.GetName(svg));
+        var zoomer = new Zoomer(svg, stage) { Max = 6 };
+        bool mac = Skin.Current == SkinKind.Mac;
+        Button Tool(string? glyph, string? words, string tip, Action click)
+        {
+            var b = new Button { Height = 28, MinWidth = 28, Padding = new Thickness(words is null ? 6 : 9, 0), CornerRadius = new CornerRadius(mac ? 7 : 4), HorizontalContentAlignment = HorizontalAlignment.Center };
+            if (Application.Current?.TryFindResource("Surface", out var theme) == true && theme is ControlTheme t) b.Theme = t;
+            Control content;
+            if (glyph is not null)
+            {
+                var icon = new Icon { Glyph = glyph, Size = 16 };
+                icon.Bind(Icon.ForegroundProperty, icon.GetResourceObservable("Fg"));
+                content = icon;
+            }
+            else
+            {
+                var text = new TextBlock { Text = words, FontSize = 12, FontWeight = FontWeight.Medium, VerticalAlignment = VerticalAlignment.Center };
+                text.Bind(TextBlock.ForegroundProperty, text.GetResourceObservable("Fg2"));
+                content = text;
+            }
+            b.Content = content;
+            ToolTip.SetTip(b, tip);
+            AutomationProperties.SetName(b, words ?? tip);
+            b.Click += (_, e) =>
+            {
+                e.Handled = true;
+                click();
+            };
+            return b;
+        }
+        var percent = Tool(null, "100%", "Fit the window (0)", () => zoomer.Fit());
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 1,
+            Children = { Tool("remove", null, "Zoom out (−)", () => zoomer.ZoomBy(1 / 1.25)), percent, Tool("add", null, "Zoom in (+)", () => zoomer.ZoomBy(1.25)) },
+        };
+        zoomer.Changed += () =>
+        {
+            if (percent.Content is TextBlock t) t.Text = $"{Math.Round(svg.Scale * zoomer.Zoom * 100):0}%";
+        };
+        var bar = new Border { Child = row, Padding = new Thickness(mac ? 14 : 12, 8) };
+        var rule = new Border { Height = 1, VerticalAlignment = VerticalAlignment.Bottom };
+        rule.Bind(Border.BackgroundProperty, rule.GetResourceObservable("Sep"));
+        var top = new Panel { Children = { bar, rule } };
+
+        Point? pressed = null;
+        Point last = default;
+        stage.PointerPressed += (_, e) =>
+        {
+            if (!e.GetCurrentPoint(stage).Properties.IsLeftButtonPressed) return;
+            pressed = last = e.GetPosition(stage);
+            e.Pointer.Capture(stage);
+            stage.Focus(NavigationMethod.Pointer);
+        };
+        stage.PointerMoved += (_, e) =>
+        {
+            if (pressed is null) return;
+            var p = e.GetPosition(stage);
+            zoomer.PanBy(p - last);
+            last = p;
+        };
+        stage.PointerReleased += (_, e) =>
+        {
+            pressed = null;
+            e.Pointer.Capture(null);
+        };
+        stage.PointerWheelChanged += (_, e) =>
+        {
+            if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Meta))
+                zoomer.ZoomBy(Math.Pow(1.18, e.Delta.Y + e.Delta.X), e.GetPosition(stage), glide: false);
+            else zoomer.PanBy(new Vector(e.Delta.X, e.Delta.Y) * 40);
+            e.Handled = true;
+        };
+        stage.PointerTouchPadGestureMagnify += (_, e) =>
+        {
+            zoomer.ZoomBy(1 + e.Delta.X, e.GetPosition(stage), glide: false);
+            e.Handled = true;
+        };
+        stage.KeyDown += (_, e) =>
+        {
+            switch (e.Key)
+            {
+                case Key.OemPlus or Key.Add:
+                    zoomer.ZoomBy(1.25);
+                    break;
+                case Key.OemMinus or Key.Subtract:
+                    zoomer.ZoomBy(1 / 1.25);
+                    break;
+                case Key.D0 or Key.NumPad0:
+                    zoomer.Fit();
+                    break;
+                case Key.Escape when zoomer.Zoom > 1.001:
+                    zoomer.Fit();
+                    break;
+                default:
+                    return;
+            }
+            e.Handled = true;
+        };
+        var dock = new DockPanel();
+        DockPanel.SetDock(top, Dock.Top);
+        dock.Children.Add(top);
+        dock.Children.Add(stage);
+        return dock;
     }
 
     /// <summary>The diagram's own size: a chart's laid-out scene, a drawing's natural width.</summary>

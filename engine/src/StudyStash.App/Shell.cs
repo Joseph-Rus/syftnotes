@@ -495,6 +495,11 @@ public static partial class Shell
         library.OnExport = () => _ = ExportAsync();
         library.OnMore = MoreMenu;
         library.OnSupportAnswer = answer => SupportAsk.Answer(host, answer, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
+        // A diagram in a lecture's notes asks about its boxes in the lecture's Ask bar and finds them in its transcript;
+        // how to explore one is shown once, ever.
+        library.Diagrams = new LectureDiagrams(library, id => File.Exists(host.Lectures.AudioPath(id)), (id, at) => Play(id, at));
+        Controls.Rich.DiagramExplorer.HintWasSeen = () => host.Settings.DiagramHintSeen;
+        Controls.Rich.DiagramExplorer.RememberHint = () => host.Save(s => s.DiagramHintSeen = true);
     }
 
     // --- recording ----------------------------------------------------------------------------------------------------

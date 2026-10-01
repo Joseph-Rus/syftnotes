@@ -324,10 +324,14 @@ public static partial class Shell
         };
         // A transcript without times (one pasted from another app) reads a paragraph per line it came with (each
         // speaker's turn), not as one wall of text.
-        foreach (var line in TimedText.HasTimes(S(l["transcript"])) ? TimedText.Parse(S(l["transcript"]))
+        bool timed = TimedText.HasTimes(S(l["transcript"]));
+        foreach (var line in timed ? TimedText.Parse(S(l["transcript"]))
                      : S(l["transcript"]).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                          .SelectMany(p => Paragraphs(p)).Select(p => new Spoken(0, 0, p)))
-            note.Transcript.Add(new HeardLine { Time = TimedText.HasTimes(S(l["transcript"])) ? TimedText.Clock(line.Start) : "", Text = line.Text });
+        {
+            note.Transcript.Add(new HeardLine { Time = timed ? TimedText.Clock(line.Start) : "", Text = line.Text, Start = timed ? line.Start : null });
+            if (timed) note.Spoken.Add(line);
+        }
         library.Note = note;
         ShowLectureAi(l, note);
         ShowLectureFiles(note);

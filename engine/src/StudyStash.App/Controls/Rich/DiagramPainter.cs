@@ -33,6 +33,10 @@ sealed class DiagramLook
 
     public bool Dims => Dim > 0.001 && (Lit is not null || LitEdges is not null);
 
+    /// <summary>Nothing to show over the still picture.</summary>
+    public bool IsEmpty => !Dims && Accented is not { Count: > 0 } && Picked is null && Ring is null && Hidden is not { Count: > 0 }
+        && Marks is not { Count: > 0 } && Folded is not { Count: > 0 } && GroupHover is null;
+
     public bool NodeLit(string id) => Lit?.Contains(id) ?? false;
 
     public bool EdgeLit(int i) => LitEdges?.Contains(i) ?? false;
@@ -70,9 +74,9 @@ sealed class DiagramPainter
     /// <summary>
     /// Draws the scene at <paramref name="scale"/>, boxes and words on whole pixels of a screen with
     /// <paramref name="snap"/> pixels to a unit of the scene, with <paramref name="look"/> over it (or none: the still
-    /// picture).
+    /// picture); without its boxes, when <paramref name="nodes"/> is false (they're drawn one at a time as they move).
     /// </summary>
-    public void Draw(DrawingContext context, double scale, double snap, DiagramLook? look = null)
+    public void Draw(DrawingContext context, double scale, double snap, DiagramLook? look = null, bool nodes = true)
     {
         var scaled = context.PushTransform(Matrix.CreateScale(scale, scale));
         bool dims = look?.Dims == true;
@@ -107,19 +111,19 @@ sealed class DiagramPainter
         if (!dims)
         {
             for (int i = 0; i < scene.Edges.Count; i++) DrawLabel(context, i, snap, look);
-            foreach (var n in scene.Nodes) DrawNode(context, n, snap, look);
+            if (nodes) foreach (var n in scene.Nodes) DrawNode(context, n, snap, look);
         }
         else
         {
             using (context.PushOpacity(faded))
             {
                 for (int i = 0; i < scene.Edges.Count; i++) if (!look!.EdgeLit(i)) DrawLabel(context, i, snap, look);
-                foreach (var n in scene.Nodes) if (!look!.NodeLit(n.Id)) DrawNode(context, n, snap, look);
+                if (nodes) foreach (var n in scene.Nodes) if (!look!.NodeLit(n.Id)) DrawNode(context, n, snap, look);
             }
             for (int i = 0; i < scene.Edges.Count; i++) if (look!.EdgeLit(i)) DrawLabel(context, i, snap, look);
             foreach (var n in scene.Nodes) if (look!.NodeLit(n.Id)) DrawNode(context, n, snap, look);
         }
-        if (look is not null) DrawRings(context, snap, look);
+        if (look is not null && nodes) DrawRings(context, snap, look);
     }
 
     /// <summary>The lines stop short of their words and of the groups' titles, so neither needs a background.</summary>
@@ -267,8 +271,8 @@ sealed class DiagramPainter
                 count ? palette.Quiet : palette.Ink, n.Box.Center.X, top + i * DiagramLayout.LineHeight, DiagramLayout.LineHeight, snap);
         }
         if (hidden && n.Lines.Count > 1) Bar(context, n.Box.Center.X, top, Width(n.Lines[0], DiagramLayout.TextSize, FontWeight.SemiBold), snap);
-        // The plus, in the corner the words leave clear.
-        var c = new Point(r.Right - 11, r.Y + 11);
+        // The plus, in the corner the words leave clear (beside the shorter count).
+        var c = new Point(r.Right - 11, n.Lines.Count > 1 ? r.Bottom - 11 : r.Y + 11);
         var plus = new Pen(palette.Quiet, 1.4, lineCap: PenLineCap.Round);
         context.DrawLine(plus, c + new Vector(-3.5, 0), c + new Vector(3.5, 0));
         context.DrawLine(plus, c + new Vector(0, -3.5), c + new Vector(0, 3.5));

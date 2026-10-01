@@ -6,10 +6,14 @@ using CommunityToolkit.Mvvm.Input;
 namespace StudyStash.App.ViewModels;
 
 /// <summary>A line of the live transcript: when it was said, and what.</summary>
-public sealed class HeardLine
+public sealed partial class HeardLine : ObservableObject
 {
     public string Time { get; init; } = "";
     public string Text { get; init; } = "";
+    /// <summary>Seconds into the lecture it was said at, where the transcript has times.</summary>
+    public double? Start { get; init; }
+    /// <summary>The line a diagram's "where was this said" (or its moment) points to, marked until another is.</summary>
+    [ObservableProperty] public partial bool Here { get; set; }
     /// <summary>The newest line reads in the full text color; older ones fade to secondary.</summary>
     public bool Latest { get; init; }
 }

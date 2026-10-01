@@ -18,6 +18,10 @@ public sealed class OpenDiagramEventArgs(object source) : RoutedEventArgs(OpenLa
     public Flowchart? Chart { get; init; }
     public DiagramScene? Scene { get; init; }
     public string? Svg { get; init; }
+    /// <summary>The chart's source as the note wrote it (it may say the moment of the lecture it comes from).</summary>
+    public string? Written { get; init; }
+    /// <summary>The groups the note showed folded, so the window opens the same way.</summary>
+    public IReadOnlyList<string>? Folded { get; init; }
 }
 
 /// <summary>
@@ -75,7 +79,9 @@ public static class OpenLarger
         };
     }
 
-    static void Raise(Control view, Func<OpenDiagramEventArgs?> request)
+    /// <summary>Asks for <paramref name="view"/>'s diagram larger; unless something on the way up shows it, a window
+    /// opens with it.</summary>
+    public static void Raise(Control view, Func<OpenDiagramEventArgs?> request)
     {
         if (request() is not { } e) return;
         view.RaiseEvent(e);

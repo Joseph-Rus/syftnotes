@@ -95,7 +95,7 @@ public class DiagramViewTests
         Assert.Equal(
             "Diagram: Assess pain on a 0 to 10 scale, Score above 4?, yes, Give the prescribed analgesic, no, Reposition and use non-drug comfort measures, Reassess in 30 to 60 minutes, still in pain",
             AutomationProperties.GetName(view));
-        Assert.Equal("Open larger", AutomationProperties.GetHelpText(view));
+        Assert.Equal(DiagramView.Help, AutomationProperties.GetHelpText(view));
         Assert.Null(ToolTip.GetTip(view)); // no tooltip popping up over the whole diagram while reading
     }
 
@@ -139,7 +139,8 @@ public class DiagramViewTests
         var view = new DiagramView { Chart = Flowchart.Parse(RichDemo.SearchTree) };
         var window = Show(620, SkinKind.Mac, ThemeVariant.Light, view);
         // A point inside the picture with no line or box on it (the top-left corner) still finds the view.
-        var corner = view.TranslatePoint(new Point(1, 1), window)!.Value;
+        var picture = view.GetVisualDescendants().OfType<DiagramCanvas>().Single();
+        var corner = picture.TranslatePoint(new Point(1, 1), window)!.Value;
         var hit = window.InputHitTest(corner);
         Assert.True(hit is Visual v && (ReferenceEquals(v, view) || v.GetSelfAndVisualAncestors().Contains(view)), $"hit {hit}");
         window.Close();

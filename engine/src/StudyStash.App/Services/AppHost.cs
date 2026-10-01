@@ -85,6 +85,8 @@ public sealed class AppSettings
     public DateTimeOffset? SupportAskLater { get; set; }
     /// <summary>The ask for a tip never shows again: they tipped, said don't ask again, or put it off twice.</summary>
     public bool SupportAskDone { get; set; }
+    /// <summary>The notes' diagrams have shown, once, how to explore one ("Click a box to follow its arrows").</summary>
+    public bool DiagramHintSeen { get; set; }
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 

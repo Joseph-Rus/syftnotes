@@ -133,7 +133,9 @@ public sealed partial class NoteView : StackPanel
         if (change.Property == CompactProperty || change.Property == BodyFontProperty || change.Property == BodySizeProperty
             || change.Property == BodyLineHeightProperty || change.Property == PageHeightProperty)
         {
-            blocks.Clear(); // every block's type changes: none can be kept
+            // Every block's type changes (a diagram on paper is another control from one on screen): none can be kept.
+            blocks.Clear();
+            diagrams.Clear();
             Build();
         }
         else if (change.Property == MarkdownProperty) Build();
@@ -211,6 +213,7 @@ public sealed partial class NoteView : StackPanel
         bool first = true;
         string section = "";
         int skipUntil = -1;
+        string? above = null;
         for (int at = 0; at < doc.Count; at++)
         {
             MdBlock block = doc[at];
@@ -221,6 +224,9 @@ public sealed partial class NoteView : StackPanel
             int end = Math.Max(at + 1 < doc.Count ? doc[at + 1].Span.Start : markdown.Length, svgEnd ?? 0);
             string key = $"{first}\u0001{section}\u0001{at == doc.Count - 1}\u0001{markdown[block.Span.Start..Math.Clamp(end, block.Span.Start, markdown.Length)]}";
             for (int n = 2; blocks.ContainsKey(key); n++) key = $"{n}\u0001{key}";
+            // A diagram takes the bold line just above it as its title (the diagram pass writes one there).
+            caption = above;
+            above = block is ParagraphBlock { Inline: { } line } && BoldLine(line) is { } bold ? bold : null;
             if (kept.Remove(key, out var same))
             {
                 // Its diagrams stay its own: none is handed on to a later block drawing the same thing.
@@ -280,6 +286,16 @@ public sealed partial class NoteView : StackPanel
 
     /// <summary>The Markdown being built.</summary>
     string source = "";
+
+    /// <summary>The bold line just above the block being built (a diagram's title, as the diagram pass writes it).</summary>
+    string? caption;
+
+    /// <summary>A paragraph that's one bold phrase and nothing else ("**The cardiac cycle**"): its words; else null.</summary>
+    static string? BoldLine(ContainerInline line)
+    {
+        var parts = line.Where(i => i is not LineBreakInline && !(i is LiteralInline l && l.Content.IsEmptyOrWhitespace())).ToList();
+        return parts is [EmphasisInline { DelimiterCount: 2 } bold] && Plain(bold) is { Length: > 0 } words ? words : null;
+    }
 
     /// <summary>Whether a block runs to the end of the notes: an unfinished diagram there is still arriving; one
     /// earlier on never will, and says it can't be drawn.</summary>
@@ -442,7 +458,8 @@ public sealed partial class NoteView : StackPanel
         // its space until then, and becomes the calm card if it can't be laid out.
         var font = this.FindResource("TextFont") as FontFamily ?? Application.Current?.FindResource("TextFont") as FontFamily ?? FontFamily.Default;
         SceneCache.Find(chart, chart.ToSource(), font, null);
-        var view = new DiagramView(opensLarger: !Print, fitWhole: Print) { Chart = chart, Source = source, Margin = new Thickness(0, 6) };
+        var view = new DiagramView(opensLarger: !Print, fitWhole: Print) { Source = source, Caption = caption, Margin = new Thickness(0, 6) };
+        view.Chart = chart;
         if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
         if (Print) view.MaxHeight = PageHeight;
         return view;

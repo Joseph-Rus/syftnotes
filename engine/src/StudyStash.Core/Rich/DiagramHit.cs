@@ -73,8 +73,11 @@ public static class DiagramHit
         return DiagramTarget.Nothing;
     }
 
-    /// <summary>An arrow's line as points, curves flattened, from the tip at its start to the tip at its end.</summary>
-    public static IReadOnlyList<Pt> Line(SceneEdge e) => DiagramLayout.Flatten(e);
+    /// <summary>An arrow's line as points, curves flattened, from the tip at its start to the tip at its end (worked out
+    /// once per arrow: the pointer asks on every move).</summary>
+    public static IReadOnlyList<Pt> Line(SceneEdge e) => Flat.GetValue(e, x => DiagramLayout.Flatten(x));
+
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<SceneEdge, List<Pt>> Flat = [];
 
     /// <summary>How far <paramref name="p"/> is from the nearest point of a run of points.</summary>
     public static double Distance(IReadOnlyList<Pt> line, Pt p)
