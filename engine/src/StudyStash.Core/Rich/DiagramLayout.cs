@@ -957,7 +957,11 @@ public static partial class DiagramLayout
         }
         foreach (var (i, first, nth) in alongside) edges[i] = Beside(f.Edges[i], labels[i], edges[first], nth, byId[f.Edges[i].From], byId[f.Edges[i].To]);
         for (int i = 0; i < f.Edges.Count; i++)
-            if (f.Edges[i].From == f.Edges[i].To) edges[i] = Loop(f.Edges[i], byId[f.Edges[i].From], labels[i]);
+            if (f.Edges[i].From == f.Edges[i].To)
+            {
+                var n = byId[f.Edges[i].From];
+                edges[i] = Loop(f.Edges[i], n, labels[i], QuietSide(n, edges.Where((x, j) => x is not null && j != i && f.Edges[j].From != f.Edges[j].To)!));
+            }
         var groups = f.Groups.Select(group =>
         {
             var r = clusters[group.Id].BoundingBox;
@@ -1275,16 +1279,45 @@ public static partial class DiagramLayout
         }
     }
 
-    /// <summary>An arrow from a box back to itself: a small loop off its right side.</summary>
-    static SceneEdge Loop(FlowEdge e, SceneNode n, Words label)
+    /// <summary>The side of a box (right, top, bottom or left, as a unit vector) the fewest of its other arrows meet:
+    /// where its loop goes.</summary>
+    static Pt QuietSide(SceneNode n, IEnumerable<SceneEdge> others)
     {
-        var b = n.Box;
-        double cy = b.Center.Y, right = Along(n, new Pt(1, 0), 0).X;
-        var start = new Pt(right, cy - 7);
-        var tip = new Pt(right, cy + 7);
-        var endBase = tip + new Pt(8, 4);
-        var path = new List<PathStep> { new(PathVerb.Move, start), new(PathVerb.Cubic, new Pt(right + 30, cy - 26), new Pt(right + 32, cy + 22), endBase) };
-        var box = label.Lines.Count > 0 ? new Box(right + 30, cy - label.H / 2, label.W, label.H) : new Box();
+        Pt[] sides = [new(1, 0), new(0, -1), new(0, 1), new(-1, 0)];
+        var count = new int[4];
+        foreach (var e in others)
+        {
+            foreach (var (id, at) in new[] { (e.From, e.StartTip), (e.To, e.Tip) })
+            {
+                if (id != n.Id) continue;
+                var d = (at - n.Box.Center).Unit();
+                int best = 0;
+                for (int k = 1; k < 4; k++) if (d.X * sides[k].X + d.Y * sides[k].Y > d.X * sides[best].X + d.Y * sides[best].Y) best = k;
+                count[best]++;
+            }
+        }
+        int pick = 0;
+        for (int k = 1; k < 4; k++) if (count[k] < count[pick]) pick = k;
+        return sides[pick];
+    }
+
+    /// <summary>An arrow from a box back to itself: a small loop off its <paramref name="side"/> (its right, unless
+    /// another side is quieter), its words just beyond it.</summary>
+    static SceneEdge Loop(FlowEdge e, SceneNode n, Words label, Pt? side = null)
+    {
+        var o = side ?? new Pt(1, 0);
+        var a = new Pt(-o.Y, o.X);
+        var p = Along(n, o, 0);
+        var start = p - a * 7;
+        var tip = p + a * 7;
+        var endBase = tip + o * 8 + a * 4;
+        var path = new List<PathStep> { new(PathVerb.Move, start), new(PathVerb.Cubic, p + o * 30 - a * 26, p + o * 32 + a * 22, endBase) };
+        var box = new Box();
+        if (label.Lines.Count > 0)
+        {
+            double reach = 34 + (Math.Abs(o.X) * label.W + Math.Abs(o.Y) * label.H) / 2;
+            box = Box.Around(p + o * reach, label.W, label.H);
+        }
         return new SceneEdge(e.From, e.To, path, e.Line, EdgeEnd.None, e.EndEnd, start, start, e.EndEnd == EdgeEnd.None ? endBase : tip, endBase, label.Lines, box);
     }
 
