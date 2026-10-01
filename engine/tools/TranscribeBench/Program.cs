@@ -9,17 +9,20 @@
 //   dotnet build -c Release engine/tools/TranscribeBench
 //   dotnet engine/tools/TranscribeBench/bin/Release/net10.0/TranscribeBench.dll <lecture.wav> \
 //       --model large-v3-turbo-q5|large-v3|parakeet-v3|small|… --mode live|after|whole \
-//       [--from 600] [--length 720] [--speed 1] [--models ~/.study-stash/models] [--out bench-results]
+//       [--from 600] [--length 720] [--speed 1] [--models ~/.study-stash/models] [--out bench-results] [--cpu]
 //   dotnet …/TranscribeBench.dll compare <reference.txt> <other.txt>…   (words different, as a share of the reference's)
 //
 // For each phase (while it records; after it stops, until all of it is written down) it writes, in <out>/<label>.json:
 //   wall time; CPU time (user + system); the CPU energy macOS bills to the process (proc_pid_rusage's ri_energy_nj:
 //   the processor's only, an estimate from its own power model); GPU time (this process's Metal time, from ioreg's
 //   AppUsage, Apple silicon only); peak memory (phys_footprint, which counts Metal's buffers, so a model on the GPU
-//   too); wakeups. None of it needs sudo. The transcript goes to <label>.txt, the worker's log (each piece and how
+//   too); wakeups; and, over a phase of a few minutes or more, what the whole computer drew (the battery gauge's
+//   AccumulatedSystemLoad: the screen and every other app too, so only comparable between runs on a quiet computer).
+//   None of it needs sudo. The transcript goes to <label>.txt, the worker's log (each piece and how
 //   long the model took over it) to <label>.log.
 // --mode whole sends the whole slice to the model in one go instead (no worker, no recorder): an experiment for after
-// class, where nothing has to keep up.
+// class, where nothing has to keep up. --cpu keeps Whisper off the GPU, as on a computer without one (a Mac's
+// processor is quicker than most such PCs', so read it as the best such a PC would do).
 // What isn't measured: the GPU's energy (only its time), the display, and the microphone itself (a file stands in).
 
 using System.Diagnostics;
@@ -40,20 +43,20 @@ static class Table
 {
     public static int Run(string dir)
     {
-        Console.WriteLine("| model | mode | lecture | during: CPU s | during: CPU J | during: GPU s | during: memory | wait after stop | after: CPU J | after: GPU s | peak memory | all: CPU J | all: GPU s | words |");
-        Console.WriteLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+        Console.WriteLine("| model | mode | lecture | during: CPU s | during: CPU J | during: GPU s | during: memory | during: whole Mac W | wait after stop | after: CPU J | after: GPU s | peak memory | all: CPU J | all: GPU s | words |");
+        Console.WriteLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
         foreach (string f in Directory.EnumerateFiles(dir, "*.json").Order(StringComparer.Ordinal))
         {
             var r = JsonNode.Parse(File.ReadAllText(f))!.AsObject();
             JsonNode? during = r["recording_phase"], after = r["after_stop"], all = r["total"] ?? r["after_stop"];
             string D(JsonNode? n, string key, string unit = "") => n?[key] is { } v ? $"{v}{unit}" : "–";
-            Console.WriteLine($"| {r["model"]} | {r["mode"]} | {TimedText.Clock((double)r["length_s"]!)} | {D(during, "cpu_s")} | {D(during, "cpu_energy_j")} | {D(during, "gpu_s")} | {D(during, "peak_footprint_mb", " MB")} | {D(after, "wall_s", " s")} | {D(after, "cpu_energy_j")} | {D(after, "gpu_s")} | {D(all, "peak_footprint_mb", " MB")} | {D(all, "cpu_energy_j")} | {D(all, "gpu_s")} | {r["words"]} |");
+            Console.WriteLine($"| {r["model"]} | {r["mode"]} | {TimedText.Clock((double)r["length_s"]!)} | {D(during, "cpu_s")} | {D(during, "cpu_energy_j")} | {D(during, "gpu_s")} | {D(during, "peak_footprint_mb", " MB")} | {D(during, "system_power_w")} | {D(after, "wall_s", " s")} | {D(after, "cpu_energy_j")} | {D(after, "gpu_s")} | {D(all, "peak_footprint_mb", " MB")} | {D(all, "cpu_energy_j")} | {D(all, "gpu_s")} | {r["words"]} |");
         }
         return 0;
     }
 }
 
-sealed record Options(string Wav, string Model, string Mode, double From, double Length, int Speed, string Models, string Out, string Label)
+sealed record Options(string Wav, string Model, string Mode, double From, double Length, int Speed, string Models, string Out, string Label, bool Cpu)
 {
     public static Options Parse(string[] args)
     {
@@ -61,7 +64,8 @@ sealed record Options(string Wav, string Model, string Mode, double From, double
         var named = new Dictionary<string, string>();
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i].StartsWith("--", StringComparison.Ordinal) && i + 1 < args.Length) named[args[i][2..]] = args[++i];
+            if (args[i] == "--cpu") named["cpu"] = "1";
+            else if (args[i].StartsWith("--", StringComparison.Ordinal) && i + 1 < args.Length) named[args[i][2..]] = args[++i];
             else wav = args[i];
         }
         if (wav is null) throw new ArgumentException("Give a lecture's WAV (16 kHz mono, as Study Stash records).");
@@ -74,12 +78,13 @@ sealed record Options(string Wav, string Model, string Mode, double From, double
             int.Parse(named.GetValueOrDefault("speed", "1"), CultureInfo.InvariantCulture),
             named.GetValueOrDefault("models", Path.Combine(home, ".study-stash", "models")),
             named.GetValueOrDefault("out", "bench-results"),
-            named.GetValueOrDefault("label", $"{model}-{mode}"));
+            named.GetValueOrDefault("label", $"{model}-{mode}{(named.ContainsKey("cpu") ? "-cpu" : "")}"), named.ContainsKey("cpu"));
     }
 }
 
 /// <summary>What this process has used so far: CPU, the energy macOS bills it, GPU time, memory, wakeups.</summary>
-sealed record Reading(double Wall, double CpuSeconds, double EnergyJoules, double GpuSeconds, long Footprint, long Wakeups)
+sealed record Reading(double Wall, double CpuSeconds, double EnergyJoules, double GpuSeconds, long Footprint, long Wakeups,
+    double SystemLoadSum, double SystemLoadCount)
 {
     public JsonObject Since(Reading start, long peakFootprint)
     {
@@ -95,6 +100,10 @@ sealed record Reading(double Wall, double CpuSeconds, double EnergyJoules, doubl
             ["gpu_busy"] = Math.Round(wall > 0 ? gpu / wall : 0, 3),
             ["wakeups_per_s"] = Math.Round(wall > 0 ? (Wakeups - start.Wakeups) / wall : 0, 1),
             ["peak_footprint_mb"] = peakFootprint / (1 << 20),
+            // The whole computer's draw (screen and every other app too), which the battery's gauge adds up about once a
+            // minute: only worth reading over a few minutes.
+            ["system_power_w"] = SystemLoadCount - start.SystemLoadCount >= 120
+                ? Math.Round((SystemLoadSum - start.SystemLoadSum) / (SystemLoadCount - start.SystemLoadCount) / 1000, 2) : null,
         };
     }
 }
@@ -126,30 +135,48 @@ static class Meter
     {
         var r = Rusage();
         using var me = Process.GetCurrentProcess();
+        var (load, count) = SystemLoad();
         return new Reading(Clock.Elapsed.TotalSeconds, me.TotalProcessorTime.TotalSeconds, r[EnergyNj] / 1e9, GpuSeconds(),
-            (long)r[PhysFootprint], (long)(r[IdleWakeups] + r[InterruptWakeups]));
+            (long)r[PhysFootprint], (long)(r[IdleWakeups] + r[InterruptWakeups]), load, count);
+    }
+
+    /// <summary>The battery gauge's running sum of what the whole computer draws (mW, about one sample a second, added
+    /// up about once a minute), and how many samples: a Mac laptop's, plugged in or not; zeros elsewhere.</summary>
+    static (double Sum, double Count) SystemLoad()
+    {
+        string text = Run("ioreg", "-r -c AppleSmartBattery -w 0");
+        var sum = Regex.Match(text, "\"AccumulatedSystemLoad\"=(\\d+)");
+        var count = Regex.Match(text, "\"SystemLoadAccumulatorCount\"=(\\d+)");
+        return sum.Success && count.Success
+            ? (double.Parse(sum.Groups[1].Value, CultureInfo.InvariantCulture), double.Parse(count.Groups[1].Value, CultureInfo.InvariantCulture))
+            : (0, 0);
+    }
+
+    static string Run(string file, string arguments)
+    {
+        try
+        {
+            using var p = Process.Start(new ProcessStartInfo(file, arguments) { RedirectStandardOutput = true })!;
+            string text = p.StandardOutput.ReadToEnd();
+            p.WaitForExit();
+            return text;
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            return "";
+        }
     }
 
     /// <summary>This process's Metal time so far, as Activity Monitor's GPU Time reads it (Apple silicon's GPU).</summary>
     static double GpuSeconds()
     {
-        try
+        long ns = 0;
+        foreach (string block in Run("ioreg", "-r -c AGXDeviceUserClient -l -w 0").Split("+-o "))
         {
-            using var p = Process.Start(new ProcessStartInfo("ioreg", "-r -c AGXDeviceUserClient -l -w 0") { RedirectStandardOutput = true })!;
-            string text = p.StandardOutput.ReadToEnd();
-            p.WaitForExit();
-            long ns = 0;
-            foreach (string block in text.Split("+-o "))
-            {
-                if (!block.Contains($"\"IOUserClientCreator\" = \"pid {Pid},", StringComparison.Ordinal)) continue;
-                foreach (Match m in Regex.Matches(block, "\"accumulatedGPUTime\"=(\\d+)")) ns += long.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
-            }
-            return ns / 1e9;
+            if (!block.Contains($"\"IOUserClientCreator\" = \"pid {Pid},", StringComparison.Ordinal)) continue;
+            foreach (Match m in Regex.Matches(block, "\"accumulatedGPUTime\"=(\\d+)")) ns += long.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture);
         }
-        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
-        {
-            return 0;
-        }
+        return ns / 1e9;
     }
 }
 
@@ -173,8 +200,8 @@ static class Bench
         string backend = "";
         ITranscriber Load()
         {
-            ITranscriber t = model.Engine == SpeechEngine.Parakeet ? new ParakeetTranscriber(modelPath) : new WhisperTranscriber(modelPath);
-            backend = t is ParakeetTranscriber p ? p.Backend : WhisperTranscriber.Backend;
+            ITranscriber t = model.Engine == SpeechEngine.Parakeet ? new ParakeetTranscriber(modelPath) : new WhisperTranscriber(modelPath, gpu: !o.Cpu);
+            backend = t is ParakeetTranscriber p ? p.Backend : ((WhisperTranscriber)t).Backend;
             Log($"[bench] {model.Name} loaded: {backend}");
             return t;
         }
@@ -188,7 +215,7 @@ static class Bench
 
             var result = new JsonObject
             {
-                ["label"] = o.Label, ["model"] = model.Id, ["mode"] = o.Mode, ["speed"] = o.Speed,
+                ["label"] = o.Label, ["model"] = model.Id, ["mode"] = o.Mode + (o.Cpu ? ", CPU only" : ""), ["speed"] = o.Speed,
                 ["recording"] = Path.GetFileName(o.Wav), ["from_s"] = o.From, ["length_s"] = Math.Round(length, 1),
                 ["machine"] = $"{RuntimeInformation.OSDescription}, {RuntimeInformation.ProcessArchitecture}, {Environment.ProcessorCount} threads",
             };

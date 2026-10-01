@@ -417,26 +417,29 @@ public sealed class WhisperTranscriber : ITranscriber
 {
     readonly WhisperFactory factory;
     readonly string fixedLanguage;
+    readonly bool gpu;
 
     /// <param name="language">"" or "auto" finds each lecture's language; "en" and so on fixes it.</param>
-    public WhisperTranscriber(string modelPath, string language = "")
+    /// <param name="gpu">False keeps it on the processor even where there's a GPU (to measure a computer without one).</param>
+    public WhisperTranscriber(string modelPath, string language = "", bool gpu = true)
     {
-        factory = WhisperFactory.FromPath(modelPath);
+        factory = WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { UseGpu = gpu });
+        this.gpu = gpu;
         fixedLanguage = language is "auto" ? "" : language;
     }
 
     /// <summary>Which of whisper.cpp's builds loaded (it says whether the GPU is in use).</summary>
     public static string Runtime => WhisperFactory.GetRuntimeInfo() ?? "";
 
-    /// <summary>For the log, once a model has loaded: what whisper.cpp runs on (Metal, Vulkan or the processor), and
-    /// its own line about the build it loaded ("MTL" in it is Metal).</summary>
-    public static string Backend
+    /// <summary>For the log: what this model runs on (Metal, Vulkan or the processor), and whisper.cpp's own line about
+    /// the build it loaded ("MTL" in it is Metal).</summary>
+    public string Backend
     {
         get
         {
             var loaded = Whisper.net.LibraryLoader.RuntimeOptions.LoadedLibrary;
             string info = Runtime.Trim().TrimEnd('|').Trim();
-            string on = info.Contains("MTL", StringComparison.Ordinal) ? "Metal"
+            string on = !gpu ? "the processor" : info.Contains("MTL", StringComparison.Ordinal) ? "Metal"
                 : loaded is Whisper.net.LibraryLoader.RuntimeLibrary.Vulkan ? "Vulkan" : "the processor";
             return $"{on} (whisper.cpp's {loaded?.ToString() ?? "unknown"} build: {info})";
         }

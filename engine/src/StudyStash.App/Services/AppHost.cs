@@ -488,7 +488,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         {
             var whisper = new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
             // Where the time goes, for a student's log: the GPU (Metal, Vulkan) or the processor.
-            log($"[whisper] {name} runs on {WhisperTranscriber.Backend}");
+            log($"[whisper] {name} runs on {whisper.Backend}");
             return whisper;
         }
         if (!ParakeetLanguages.Knows(Settings.Language))
