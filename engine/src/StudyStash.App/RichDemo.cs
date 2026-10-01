@@ -74,6 +74,10 @@ public static class RichDemo
         ("The nursing process", "Assessment feeds the diagnosis and the plan; evaluation sends you back to assess when the outcomes aren't met.", NursingProcess),
         ("Types of shock", "Four families, grouped by what fails: the volume, the pump, the vessels, or the way out of the heart.", TypesOfShock),
         ("A binary search tree", "Smaller keys go left and larger keys go right, so 4 sits under 6, under 3.", SearchTree),
+        ("Strings ending in 01", "The automaton accepts in q2, the double circle: it got there on a 1 straight after a 0.", StudyStash.Core.DiagramDesign.StateExample),
+        ("Logging in", "The server checks the password hash and answers one of two ways; later requests carry the cookie.", StudyStash.Core.DiagramDesign.SequenceExample),
+        ("Germ theory", "Four discoveries, in order, from washing hands to naming a bacterium.", StudyStash.Core.DiagramDesign.TimelineExample),
+        ("Tissue types", "Four families, each with what it does and its kinds.", StudyStash.Core.DiagramDesign.MindmapExample),
     ];
 
     /// <summary>The four chambers of the heart, drawn as an AI writes an SVG: the writers' palette (blue for the

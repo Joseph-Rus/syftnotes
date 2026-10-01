@@ -134,7 +134,7 @@ public static partial class DiagramLayout
 
     /// <summary>Which layout a chart gets: a sequence diagram, a timeline and a mind map their own; a big chart in
     /// groups, blocks (<see cref="Grouped"/>); a ring for one cycle of 3 to 10 boxes, a tree for a hierarchy of up to
-    /// 40, layered for everything else (and a small chart with groups).</summary>
+    /// 40 with no decisions in it, layered for everything else (and a small chart with groups).</summary>
     public static SceneKind Kind(Flowchart f)
     {
         switch (f.Form)
@@ -161,7 +161,10 @@ public static partial class DiagramLayout
             for (int i = 0; i < n; i++) { seen.Add(at); at = next[at]; }
             if (seen.Count == n && at == f.Nodes[0].Id) return SceneKind.Ring;
         }
-        if (n <= 40 && f.Edges.Count == n - 1 && f.Edges.All(e => e.From != e.To)
+        // A decision tree keeps its questions in a line, its answers aside, as a layered chart lays it out; the tidy
+        // tree, which centres every box over its children, would step it sideways at each question.
+        bool decisions = f.Nodes.Any(x => x.Shape == NodeShape.Decision) || f.Edges.Count(e => e.Label is not null) * 2 > Math.Max(1, f.Edges.Count);
+        if (!decisions && n <= 40 && f.Edges.Count == n - 1 && f.Edges.All(e => e.From != e.To)
             && f.Nodes.Count(x => ins[x.Id] == 0) == 1 && f.Nodes.All(x => ins[x.Id] <= 1))
         {
             var children = f.Edges.ToLookup(e => e.From, e => e.To);
