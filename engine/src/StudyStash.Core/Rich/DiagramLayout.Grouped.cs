@@ -71,6 +71,90 @@ public static partial class DiagramLayout
         return outs.All(c => c <= 1) && ins.All(c => c <= 1);
     }
 
+    /// <summary>
+    /// A run of steps as rows, read like lines of text: as many boxes to a row as fit <see cref="InnerMax"/>, each
+    /// arrow along a row straight, and the arrow from a row's last box down and back to the next row's first. Null
+    /// when the boxes aren't one run from a first to a last.
+    /// </summary>
+    static DiagramScene? Rows(Flowchart part, Dictionary<string, Sized> sizes, List<Words> labels)
+    {
+        var next = new Dictionary<string, int>();
+        for (int i = 0; i < part.Edges.Count; i++)
+        {
+            var e = part.Edges[i];
+            if (e.From == e.To || next.ContainsKey(e.From)) return null;
+            next[e.From] = i;
+        }
+        var first = part.Nodes.Where(n => part.Edges.All(e => e.To != n.Id)).ToList();
+        if (first.Count != 1) return null;
+        var order = new List<string> { first[0].Id };
+        while (next.TryGetValue(order[^1], out int i) && order.Count <= part.Nodes.Count) order.Add(part.Edges[i].To);
+        if (order.Count != part.Nodes.Count || order.Distinct().Count() != order.Count) return null;
+
+        // Rows, each as long as fits; the room between two boxes holds their arrow's words.
+        var rows = new List<List<string>> { new() };
+        double x = 0;
+        foreach (string id in order)
+        {
+            double gap = rows[^1].Count == 0 ? 0 : Math.Max(44, labels[next[rows[^1][^1]]].W + 24);
+            if (rows[^1].Count > 0 && x + gap + sizes[id].W > InnerMax)
+            {
+                rows.Add([]);
+                x = 0;
+                gap = 0;
+            }
+            rows[^1].Add(id);
+            x += gap + sizes[id].W;
+        }
+        var byId = part.Nodes.ToDictionary(n => n.Id);
+        var nodes = new Dictionary<string, SceneNode>();
+        double y = 0;
+        for (int r = 0; r < rows.Count; r++)
+        {
+            double h = rows[r].Max(id => sizes[id].H);
+            x = 0;
+            foreach (string id in rows[r])
+            {
+                if (x > 0) x += Math.Max(44, labels[next[rows[r][rows[r].IndexOf(id) - 1]]].W + 24);
+                nodes[id] = Placed(byId[id], sizes[id], new Box(x, y + (h - sizes[id].H) / 2, sizes[id].W, sizes[id].H));
+                x += sizes[id].W;
+            }
+            double wrapWords = r + 1 < rows.Count ? labels[next[rows[r][^1]]].H : 0;
+            y += h + Math.Max(40, wrapWords + 28);
+        }
+        var edges = new SceneEdge[part.Edges.Count];
+        for (int i = 0; i < part.Edges.Count; i++)
+        {
+            var e = part.Edges[i];
+            var (a, b) = (nodes[e.From], nodes[e.To]);
+            if (Math.Abs(a.Box.Center.Y - b.Box.Center.Y) < 1)
+            {
+                var start = new Pt(a.Box.Right, a.Box.Center.Y);
+                var tip = new Pt(b.Box.X, b.Box.Center.Y);
+                var w = labels[i];
+                var wordsAt = w.Lines.Count > 0 ? Box.Around(new Pt((start.X + tip.X) / 2, start.Y - w.H / 2 - 3), w.W, w.H) : new Box();
+                edges[i] = Drawn(e.From, e.To, e.Line, e.StartEnd, e.EndEnd, AlongFrom(a, a.Box.Center, new Pt(1, 0)), AlongFrom(b, b.Box.Center, new Pt(-1, 0)), w.Lines, wordsAt);
+            }
+            else
+            {
+                // Down from the row's last box, back along the gap, and down into the next row's first.
+                var from = AlongFrom(a, a.Box.Center, new Pt(0, 1));
+                var to = AlongFrom(b, b.Box.Center, new Pt(0, -1));
+                double mid = (a.Box.Bottom + b.Box.Y) / 2 + (labels[i].Lines.Count > 0 ? labels[i].H / 2 : 0);
+                var startBase = from + new Pt(0, MarkerLength(e.StartEnd));
+                var endBase = to - new Pt(0, MarkerLength(e.EndEnd));
+                var path = new List<PathStep>
+                {
+                    new(PathVerb.Move, startBase), new(PathVerb.Line, new Pt(from.X, mid)), new(PathVerb.Line, new Pt(to.X, mid)), new(PathVerb.Line, endBase),
+                };
+                var w = labels[i];
+                var wordsAt = w.Lines.Count > 0 ? Box.Around(new Pt((from.X + to.X) / 2, mid - w.H / 2 - 3), w.W, w.H) : new Box();
+                edges[i] = new SceneEdge(e.From, e.To, path, e.Line, e.StartEnd, e.EndEnd, from, startBase, to, endBase, w.Lines, wordsAt);
+            }
+        }
+        return Normalise(new DiagramScene(SceneKind.Layered, ChartDirection.LeftRight, 0, 0, part.Nodes.Select(n => nodes[n.Id]).ToList(), edges, []));
+    }
+
     /// <summary>A part of a chart laid out the plain way (a ring, a tree, or layered with its groups), at scale 1.</summary>
     static DiagramScene Plain(Flowchart part, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer m) =>
         Normalise(part.Groups.Count == 0 && Kind(part) is var k && k is SceneKind.Ring or SceneKind.Tree
@@ -99,7 +183,8 @@ public static partial class DiagramLayout
             var scene = Plain(part, sizes, partLabels, across, m);
             if (across == ChartDirection.LeftRight && scene.Width > InnerMax)
             {
-                var along = Plain(part.WithDirection(ChartDirection.TopDown), sizes, partLabels, ChartDirection.TopDown, m);
+                // A run too long for one row wraps onto the next, read like lines of text; anything else runs down.
+                var along = Rows(part, sizes, partLabels) ?? Plain(part.WithDirection(ChartDirection.TopDown), sizes, partLabels, ChartDirection.TopDown, m);
                 if (along.Width < scene.Width) scene = along;
             }
             double title = m.Width(g.Title, TitleSize, true) + 2 * GroupPad + 4;
