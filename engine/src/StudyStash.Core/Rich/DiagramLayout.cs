@@ -220,7 +220,7 @@ public static partial class DiagramLayout
         var own = Wrap(n.Lines, max, width);
         // Smaller words wrap at their own size (so they run to fewer lines), but the box is as wide as they'd be at
         // full size: a renderer that draws them like the rest still fits them.
-        var detail = Wrap(n.Detail, max * 1.2, t => m.Width(t, SceneShapes.DetailSize, false));
+        var detail = Wrap(n.Detail, max, t => m.Width(t, SceneShapes.DetailSize, false));
         var lines = own.Concat(detail).ToList();
         double tw = lines.Count == 0 ? 0 : lines.Max(width);
         double th = Math.Max(1, lines.Count) * LineHeight;

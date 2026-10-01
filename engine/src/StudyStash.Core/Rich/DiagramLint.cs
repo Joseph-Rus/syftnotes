@@ -20,9 +20,10 @@ public static class DiagramLint
     /// <summary>How tall a diagram may stand in the notes, at the scale it's shown, before it's too long to take in.</summary>
     public const double TallestShown = 1500;
 
-    /// <summary>Text widths without a font: an average letter of the app's sans-serif.</summary>
+    /// <summary>Text widths without a font: an average letter of the app's sans-serif, a little wide (diagram words
+    /// in Helvetica Neue and Segoe UI average about half their size).</summary>
     public static double Measure(string text, double size, bool bold) =>
-        new StringInfo(text).LengthInTextElements * size * (bold ? 0.6 : 0.56);
+        new StringInfo(text).LengthInTextElements * size * (bold ? 0.56 : 0.52);
 
     /// <summary>The problems with how <paramref name="chart"/> will look, worst first; none when it's fine.</summary>
     public static IReadOnlyList<string> Problems(Flowchart chart)
