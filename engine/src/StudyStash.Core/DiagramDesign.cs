@@ -569,7 +569,8 @@ public static partial class DiagramDesign
             - A big topic goes in 3 to 7 subgraphs of 3 to 7 boxes each ("subgraph ID ["Title"]" ... "end"), most arrows inside a group, a few between groups; flowchart LR shows the groups as columns.
             - Narrow enough for the notes: no more than four or five boxes side by side, five participants in a sequence diagram.
             - Arrows that cross: put the boxes in the order the arrows run, and drop arrows that repeat what the order shows.
-            - Colours keep their meaning, said in the caption. Quote every flowchart label. No style, classDef, linkStyle or click.
+            - Keep its colours (:::red and the rest) and what they mean, said in the caption. Quote every flowchart label. No style, classDef, linkStyle or click.
+            - Don't split a decision or an algorithm into groups just to have groups: groups are for a big topic's phases, places or parts.
 
             ## Answer
 

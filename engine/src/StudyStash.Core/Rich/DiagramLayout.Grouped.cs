@@ -63,6 +63,14 @@ public static partial class DiagramLayout
         return (new Flowchart(dir, null, members, index.Select(i => f.Edges[i]).ToList(), inner) { Form = f.Form }, index);
     }
 
+    /// <summary>Whether a group's boxes are a run of steps: none with more than one arrow in or out among them.</summary>
+    static bool Run(Flowchart part)
+    {
+        var outs = part.Edges.Where(e => e.From != e.To).GroupBy(e => e.From).Select(x => x.Select(e => e.To).Distinct().Count());
+        var ins = part.Edges.Where(e => e.From != e.To).GroupBy(e => e.To).Select(x => x.Select(e => e.From).Distinct().Count());
+        return outs.All(c => c <= 1) && ins.All(c => c <= 1);
+    }
+
     /// <summary>A part of a chart laid out the plain way (a ring, a tree, or layered with its groups), at scale 1.</summary>
     static DiagramScene Plain(Flowchart part, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer m) =>
         Normalise(part.Groups.Count == 0 && Kind(part) is var k && k is SceneKind.Ring or SceneKind.Tree
@@ -79,6 +87,13 @@ public static partial class DiagramLayout
         {
             var across = Across(dir);
             var (part, index) = Inside(f, g.Id, unit, across);
+            // Across the flow makes a row of a group in a top-down chart; a row reads well for a run of steps, not
+            // for a decision's branches, which keep to the chart's own direction.
+            if (across == ChartDirection.LeftRight && !Run(part))
+            {
+                across = dir;
+                part = part.WithDirection(dir);
+            }
             if (part.Nodes.Count == 0) continue;
             var partLabels = index.Select(i => labels[i]).ToList();
             var scene = Plain(part, sizes, partLabels, across, m);
@@ -269,7 +284,12 @@ public static partial class DiagramLayout
             var e = f.Edges[i];
             var me = new MsaglEdge(msagl[e.From], msagl[e.To]);
             var (fromBlock, toBlock) = (Block(e.From), Block(e.To));
-            me.SourcePort = new FloatingPort(msagl[e.From].BoundaryCurve, M(Port(byId[e.From], Facing(fromBlock, toBlock), byId[e.To].Box.Center)));
+            var outSide = Facing(fromBlock, toBlock);
+            // A decision's own answers leave from its lower corner (or its far one, across): an arrow to another group
+            // leaves from the side corner nearer where it's going.
+            if (byId[e.From].Shape == NodeShape.Decision && outSide.X == 0)
+                outSide = new Pt(byId[e.To].Box.Center.X < byId[e.From].Box.Center.X ? -1 : 1, 0);
+            me.SourcePort = new FloatingPort(msagl[e.From].BoundaryCurve, M(Port(byId[e.From], outSide, byId[e.To].Box.Center)));
             var inSide = Facing(toBlock, fromBlock);
             var target = byId[e.To];
             var aimFrom = byId[e.From].Box.Center;
@@ -382,10 +402,12 @@ public static partial class DiagramLayout
         }
         foreach (var g in f.Groups.Where(g => g.Parent is null))
         {
-            var (part, _) = Inside(f, g.Id, unit, Across(dir));
+            var inner = Across(dir);
+            var (part, _) = Inside(f, g.Id, unit, inner);
             if (part.Nodes.Count == 0) continue;
-            var (w, h) = Estimate(part, Across(dir));
-            if (Across(dir) == ChartDirection.LeftRight && w > InnerMax)
+            if (inner == ChartDirection.LeftRight && !Run(part)) inner = dir;
+            var (w, h) = Estimate(part, inner);
+            if (inner == ChartDirection.LeftRight && w > InnerMax)
             {
                 var (w2, h2) = Estimate(part, ChartDirection.TopDown);
                 if (w2 < w) (w, h) = (w2, h2);

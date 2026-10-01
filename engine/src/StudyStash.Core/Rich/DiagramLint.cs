@@ -40,7 +40,7 @@ public static class DiagramLint
         }
         double scale = Math.Min(1, Column / scene.Width);
         if (scale < ReadableScale)
-            found.Add($"it is {N(scene.Width)} px wide even laid out the narrower way, so in the {N(Column)} px notes column its words would shrink to {N(13 * scale)} px: {Narrower(chart)}");
+            found.Add($"it is {N(scene.Width)} px wide even laid out the narrower way, so in the {N(Column)} px notes column its words would shrink to {N(13 * scale)} px: {Widest(scene)}{Narrower(chart)}");
         double tall = scene.Height * scale;
         if (tall > TallestShown)
             found.Add($"it would stand {N(tall)} px tall in the notes, more than a screen and a half: use fewer boxes, fold minor steps into a box's <small> line, or lay its groups side by side (flowchart LR with subgraphs)");
@@ -89,7 +89,7 @@ public static class DiagramLint
         int boxes = chart.Nodes.Count(n => n.Role is NodeRole.Plain);
         if (chart.Groups.Count == 0)
         {
-            if (boxes > DiagramLayout.GroupedFrom)
+            if (boxes > NoGroupsFrom)
                 found.Add($"it has {boxes} boxes and no groups: put them in 3 to 7 subgraphs of 3 to 7 boxes each (the phases, places or parts the lecturer named), so the chart folds into an overview of its groups");
             return;
         }
@@ -120,6 +120,22 @@ public static class DiagramLint
         }
     }
 
+    /// <summary>A flowchart with more boxes than this and no groups is too much to take in as one.</summary>
+    public const int NoGroupsFrom = 16;
+
+    /// <summary>The boxes that make a laid-out diagram as wide as it is: its widest row (or column, for one laid out
+    /// left to right), named, when there are several side by side.</summary>
+    static string Widest(DiagramScene scene)
+    {
+        bool rows = scene.Direction is ChartDirection.TopDown or ChartDirection.BottomUp || scene.Kind is SceneKind.Mindmap or SceneKind.Sequence;
+        if (!rows || scene.Nodes.Count < 2) return "";
+        var row = scene.Nodes.Select(n => scene.Nodes.Where(o => o.Box.Y < n.Box.Bottom && n.Box.Y < o.Box.Bottom).ToList())
+            .MaxBy(r => r.Sum(o => o.Box.W))!;
+        if (row.Count < 3) return "";
+        var named = row.OrderBy(n => n.Box.X).Select(n => string.Join(" ", n.Lines.Take(n.Lines.Count - n.DetailLines)));
+        return $"{row.Count} boxes stand side by side ({Quoted(named)}): shorten their words and smaller lines, or have fewer of them in one row; ";
+    }
+
     /// <summary>What makes a too-wide diagram of this kind narrower.</summary>
     static string Narrower(Flowchart chart) => chart.Form switch
     {
@@ -127,7 +143,8 @@ public static class DiagramLint
         ChartForm.Timeline => "use fewer periods, or shorter words for each event",
         ChartForm.Mindmap => "use fewer words per branch, or fewer branches",
         _ when chart.Groups.Count > 0 => "make each group narrower (its boxes one under another) or use fewer groups side by side, and shorten long labels",
-        _ => "lay it out top-down (flowchart TD), put long rows of boxes into groups, and shorten long labels",
+        _ when chart.Direction is ChartDirection.LeftRight or ChartDirection.RightLeft => "lay it out top-down (flowchart TD), put long rows of boxes into groups, and shorten long labels",
+        _ => "shorten long labels, and move detail that doesn't need to be on the picture into the caption",
     };
 
     static int Depth(Flowchart chart)
