@@ -148,7 +148,10 @@ public class DocumentTextTests
             TimeLimit = TimeSpan.FromSeconds(1),
             PageReader = (_, pages, until, _) =>
             {
-                Assert.True(until > DateTime.UtcNow.AddMilliseconds(700));
+                // The whole second is left once it's this file's turn, less the time it took to open the PDF (on a busy
+                // runner, running cold, that has been over 300 ms). Counting the wait instead would leave a third file
+                // 200 ms and the last none, so 250 still tells the two apart.
+                Assert.True(until > DateTime.UtcNow.AddMilliseconds(250));
                 int at = Interlocked.Increment(ref now);
                 InterlockedMax(ref most, at);
                 Thread.Sleep(400);
