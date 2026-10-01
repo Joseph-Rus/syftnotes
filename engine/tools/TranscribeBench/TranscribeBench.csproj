@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Not in StudyStash.slnx: a measurement run by hand (see Program.cs and run.sh), never by CI. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StudyStash.Audio\StudyStash.Audio.csproj" />
+  </ItemGroup>
+
+</Project>
