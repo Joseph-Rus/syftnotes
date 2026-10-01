@@ -555,8 +555,10 @@ public static partial class Shell
         {
             liveId = l.Id;
             recorder.Lines.Clear();
-            recorder.Ask = LiveAsk();
-            recorder.Waiting = "What's said shows here a few seconds after it's said.";
+            // Written down after class: nothing to show or ask about until it stops, and the recorder says so.
+            recorder.AfterClass = l.AfterClass;
+            recorder.Ask = l.AfterClass ? null : LiveAsk();
+            panel.LastLine = l.AfterClass ? "Only recording. It's written down after class." : "";
             panelWindow?.Hide();
             ShowRecorder(expanded: false);
         }

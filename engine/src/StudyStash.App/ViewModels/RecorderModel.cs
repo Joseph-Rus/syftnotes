@@ -50,7 +50,13 @@ public sealed partial class RecorderModel : ObservableObject
     /// <summary>The pointer is over the small pill: Stop takes the level meter's place.</summary>
     [ObservableProperty] public partial bool Hovered { get; set; }
     /// <summary>Whisper hasn't anything yet: what the transcript area says instead.</summary>
-    [ObservableProperty] public partial string Waiting { get; set; } = "What's said shows here a few seconds after it's said.";
+    [ObservableProperty] public partial string Waiting { get; set; } = LiveWaiting;
+    /// <summary>This lecture is written down after class (Settings → Recording): it only records, so there's no
+    /// transcript to show and no chat about it until it stops.</summary>
+    [ObservableProperty] public partial bool AfterClass { get; set; }
+
+    public const string LiveWaiting = "What's said shows here a few seconds after it's said.";
+    public const string AfterClassWaiting = "Only recording, to save battery. It's written down after class: the transcript, and asking about it, come once you stop.";
 
     public ObservableCollection<HeardLine> Lines { get; } = [];
     /// <summary>Asking about the lecture so far, with any engine (design 16's compact chat).</summary>
@@ -80,6 +86,15 @@ public sealed partial class RecorderModel : ObservableObject
     }
 
     partial void OnClassNameChanged(string value) => OnPropertyChanged(nameof(DisplayClass));
+
+    partial void OnAfterClassChanged(bool value)
+    {
+        Waiting = value ? AfterClassWaiting : LiveWaiting;
+        OnPropertyChanged(nameof(Live));
+    }
+
+    /// <summary>Written down as it records: the transcript comes in, and the chat asks about it.</summary>
+    public bool Live => !AfterClass;
 
     partial void OnHoveredChanged(bool value)
     {
