@@ -180,11 +180,11 @@ public class DiagramDesignTests
     [Fact]
     public async Task A_diagram_that_would_look_wrong_goes_back_once_and_only_a_better_redesign_replaces_it()
     {
-        // Sixteen steps in a row, no groups: true to the lecture, but it would look wrong.
-        string row = "flowchart LR\n" + string.Join("\n", Enumerable.Range(0, 15).Select(i => $"  N{i}[\"Renin {i}\"] --> N{i + 1}[\"Renin {i + 1}\"]"));
+        // Twenty steps in a row, no groups: true to the lecture, but it would look wrong.
+        string row = "flowchart LR\n" + string.Join("\n", Enumerable.Range(0, 19).Select(i => $"  N{i}[\"Renin {i}\"] --> N{i + 1}[\"Renin {i + 1}\"]"));
         string grouped = "flowchart LR\n" + string.Join("\n", Enumerable.Range(0, 4).Select(g =>
-            $"  subgraph G{g} [\"Renin phase {g}\"]\n" + string.Join("\n", Enumerable.Range(g * 4, 3).Select(i => $"    N{i}[\"Renin {i}\"] --> N{i + 1}[\"Renin {i + 1}\"]")) + "\n  end"))
-            + "\n" + string.Join("\n", Enumerable.Range(0, 3).Select(g => $"  N{g * 4 + 3} --> N{g * 4 + 4}"));
+            $"  subgraph G{g} [\"Renin phase {g}\"]\n" + string.Join("\n", Enumerable.Range(g * 5, 4).Select(i => $"    N{i}[\"Renin {i}\"] --> N{i + 1}[\"Renin {i + 1}\"]")) + "\n  end"))
+            + "\n" + string.Join("\n", Enumerable.Range(0, 3).Select(g => $"  N{g * 5 + 4} --> N{g * 5 + 5}"));
         var prompts = new List<string>();
         Func<string, bool, Task<string>> Answers(string redesign) => (p, _) =>
         {
@@ -194,7 +194,7 @@ public class DiagramDesignTests
         var better = await DiagramDesign.DesignAsync(Lecture, Notes, Drawings.Flowcharts, Answers(grouped));
         Assert.Equal(2, prompts.Count);
         Assert.StartsWith("You designed this diagram", prompts[1]);
-        Assert.Contains("16 boxes and no groups", prompts[1]);
+        Assert.Contains("20 boxes and no groups", prompts[1]);
         Assert.Contains("\"after\": \"Key points\", \"at\": \"00:25\"", prompts[1]);
         Assert.Equal(1, better.Revised);
         Assert.Equal(grouped, Assert.Single(better.Drawn).Source);
