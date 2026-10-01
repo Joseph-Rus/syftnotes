@@ -13,8 +13,9 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
 ## What it does
 
 - **Records and transcribes on your computer.** Click **Record** in the menu bar (Mac) or tray
-  (Windows), or press ⌥⇧R / Ctrl+Alt+R. It transcribes as you go, and the audio never leaves your
-  computer. A Mac with Apple silicon or a PC with a graphics card uses Whisper (Metal or Vulkan),
+  (Windows), or press ⌥⇧R / Ctrl+Alt+R. It transcribes as you go, so the recorder shows what's
+  said and you can ask about it mid-lecture; or, to save battery, it only records during the lecture
+  and transcribes it after class (Settings → Recording). The audio never leaves your computer. A Mac with Apple silicon or a PC with a graphics card uses Whisper (Metal or Vulkan),
   starting on the compact large-v3 turbo, which keeps up and leaves room for everything else. A
   computer with no graphics card Whisper can use, and 4 fast cores and 8 GB of memory, starts on
   NVIDIA's Parakeet instead (a 2.5 GB download): it's made for the processor, nearly as accurate as
