@@ -12,7 +12,7 @@ public enum LectureState
     /// <summary>The microphone is on.</summary>
     Recording,
     Paused,
-    /// <summary>Recorded; Whisper is still writing down the rest.</summary>
+    /// <summary>Recorded; Whisper is still writing down the rest (or all of it, for one written down after class).</summary>
     Transcribing,
     /// <summary>Transcribed; waiting to reach the library (it's off, or this laptop is away from it).</summary>
     Sending,
@@ -39,6 +39,9 @@ public sealed class Lecture
     public LectureState State { get; set; } = LectureState.Recording;
     /// <summary>How far into the audio Whisper has got.</summary>
     public double TranscribedSeconds { get; set; }
+    /// <summary>Written down after class, not as it records (Settings → Recording, when it started): nothing is
+    /// written down while it records or is paused, so the computer only records; all of it is once it stops.</summary>
+    public bool AfterClass { get; set; }
     public List<Spoken> Segments { get; set; } = [];
     public string Language { get; set; } = "";
     /// <summary>The voices in it have been told apart (or it was sent without: it was too short, or that failed).</summary>

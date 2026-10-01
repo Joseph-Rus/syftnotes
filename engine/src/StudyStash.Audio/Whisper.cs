@@ -428,6 +428,20 @@ public sealed class WhisperTranscriber : ITranscriber
     /// <summary>Which of whisper.cpp's builds loaded (it says whether the GPU is in use).</summary>
     public static string Runtime => WhisperFactory.GetRuntimeInfo() ?? "";
 
+    /// <summary>For the log, once a model has loaded: what whisper.cpp runs on (Metal, Vulkan or the processor), and
+    /// its own line about the build it loaded ("MTL" in it is Metal).</summary>
+    public static string Backend
+    {
+        get
+        {
+            var loaded = Whisper.net.LibraryLoader.RuntimeOptions.LoadedLibrary;
+            string info = Runtime.Trim().TrimEnd('|').Trim();
+            string on = info.Contains("MTL", StringComparison.Ordinal) ? "Metal"
+                : loaded is Whisper.net.LibraryLoader.RuntimeLibrary.Vulkan ? "Vulkan" : "the processor";
+            return $"{on} (whisper.cpp's {loaded?.ToString() ?? "unknown"} build: {info})";
+        }
+    }
+
     public async Task<Transcription> TranscribeAsync(float[] samples, string prompt, string language, CancellationToken stop)
     {
         string lang = fixedLanguage.Length > 0 ? fixedLanguage : language.Length > 0 ? language : "auto";

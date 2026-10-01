@@ -138,9 +138,10 @@ public sealed class Recorder : IDisposable
         }
     }
 
-    /// <summary>Start recording a lecture for a class ("" lets the library sort it). Throws InvalidOperationException
-    /// with words to show when it can't: the microphone's, or the disk's.</summary>
-    public Lecture Start(string className, string owner = "")
+    /// <summary>Start recording a lecture for a class ("" lets the library sort it); <paramref name="afterClass"/>: it's
+    /// written down once it stops, not as it records (<see cref="Lecture.AfterClass"/>). Throws
+    /// InvalidOperationException with words to show when it can't: the microphone's, or the disk's.</summary>
+    public Lecture Start(string className, string owner = "", bool afterClass = false)
     {
         lock (transitions)
         {
@@ -154,7 +155,7 @@ public sealed class Recorder : IDisposable
             var lecture = new Lecture
             {
                 Id = Lecture.NewId(now), Started = now.ToString("yyyy-MM-dd'T'HH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture),
-                ClassName = className, Owner = owner,
+                ClassName = className, Owner = owner, AfterClass = afterClass,
             };
             try
             {
@@ -172,7 +173,7 @@ public sealed class Recorder : IDisposable
                 throw;
             }
             LastProblem = null;
-            log($"[recorder] recording {lecture.Id} for '{className}'");
+            log($"[recorder] recording {lecture.Id} for '{className}'{(afterClass ? ", written down after class" : "")}");
         }
         Changed?.Invoke();
         return Current!;
@@ -624,10 +625,12 @@ public sealed class Recorder : IDisposable
 
 /// <summary>
 /// Writes lectures down with Whisper, a piece at a time, straight from their WAV files: while a lecture records (so
-/// the recorder can show what was said), and after it stops. It works from the file and the lecture's own record of
-/// how far it got, so a restart carries on where it left off. Whisper that won't load leaves the lectures waiting
-/// (and says why in <see cref="Problem"/>); a piece Whisper fails on is tried three times before the lecture fails,
-/// and a failed lecture can be tried again (<see cref="Retry"/>).
+/// the recorder can show what was said), and after it stops. A lecture written down after class
+/// (<see cref="Lecture.AfterClass"/>) is only recorded while it records: nothing at all is written down then and the
+/// model isn't held in memory, so the computer does as little as it can; all of it is written down once it stops. It
+/// works from the file and the lecture's own record of how far it got, so a restart carries on where it left off.
+/// Whisper that won't load leaves the lectures waiting (and says why in <see cref="Problem"/>); a piece Whisper fails
+/// on is tried three times before the lecture fails, and a failed lecture can be tried again (<see cref="Retry"/>).
 /// </summary>
 public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> load, Func<Lecture?> recording,
     Action<string>? log = null, double minSeconds = 20, double maxSeconds = 29.5)
@@ -638,6 +641,8 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     // Counts wakes; one look takes them all (see RunAsync).
     readonly SemaphoreSlim wake = new(0);
     readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> tries = new();
+    // Seconds the model spent on each lecture since the app started, for the log line when it's done.
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, double> workSeconds = new();
     ITranscriber? model;
     DateTime usedAt;
     DateTime? loadFailedAt;
@@ -687,6 +692,9 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     public async Task<bool> StepAsync(CancellationToken stop)
     {
         var live = recording();
+        // A lecture written down after class is recording, or paused: class isn't over, so nothing is written down
+        // (not even an earlier lecture still waiting) until it stops.
+        if (live is { AfterClass: true }) return false;
         var candidates = store.All().Where(l => l.State == LectureState.Transcribing || (live is not null && l.Id == live.Id))
             .OrderBy(l => l.Id == live?.Id ? 1 : 0).ThenBy(l => l.Started, StringComparer.Ordinal).ToList();
         foreach (var l in candidates)
@@ -729,9 +737,15 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
             if (Model() is not { } whisper) return false;
             string prompt = string.Join(" ", l.Segments.TakeLast(6).Select(s => s.Text));
             Transcription t;
+            var took = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 t = await whisper.TranscribeAsync(chunk.Samples, prompt.Length > 600 ? prompt[^600..] : prompt, l.Language, stop);
+                // Where the time goes, in the log: each piece, and how long the model took over it.
+                double s = took.Elapsed.TotalSeconds;
+                workSeconds.AddOrUpdate(l.Id, s, (_, sum) => sum + s);
+                log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                    $"[whisper] {l.Id}: {TimedText.Clock(chunk.StartSeconds)}–{TimedText.Clock(chunk.EndSeconds)} in {s:0.0} s{(isLive ? ", live" : "")}"));
             }
             catch (Exception e) when (e is not OperationCanceledException)
             {
@@ -769,10 +783,19 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
         if (heard.Count > 0) Heard?.Invoke(saved, heard);
         if (done)
         {
-            log($"[whisper] {saved.Id}: {saved.Segments.Count} lines from {TimedText.Clock(saved.Seconds)}");
+            log($"[whisper] {saved.Id}: {saved.Segments.Count} lines from {TimedText.Clock(saved.Seconds)}{WorkedOn(saved)}");
             Finished?.Invoke(saved);
         }
         return true;
+    }
+
+    /// <summary>", the model worked 3:10 on it (14% of its length)": how long writing it down took the model, since
+    /// the app started (after a restart, only what came after it).</summary>
+    string WorkedOn(Lecture l)
+    {
+        if (!workSeconds.TryRemove(l.Id, out double s) || l.Seconds <= 0) return "";
+        return string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $", the model worked {TimedText.Clock(s)} on it ({s / l.Seconds:0%} of its length{(l.AfterClass ? ", after class" : "")})");
     }
 
     bool WantsVoices(Lecture l) => LabelVoices?.Invoke() == true && LoadVoices is not null && !l.SpeakersDone
@@ -818,9 +841,11 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
         if (loadFailedAt is { } failedAt && now - failedAt < LoadAgainAfter && !loadNow) return null;
         loadNow = false;
         log("[whisper] loading the model");
+        var took = System.Diagnostics.Stopwatch.StartNew();
         try
         {
             model = load();
+            log(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"[whisper] loaded the model in {took.Elapsed.TotalSeconds:0.0} s"));
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
@@ -874,7 +899,7 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     }
 
     /// <summary>Work until <paramref name="stop"/>: a piece at a time, then a look every few seconds while a lecture
-    /// records (every 30 when none does), or at once when woken.</summary>
+    /// records live (every 30 when none does, or it's written down after class), or at once when woken.</summary>
     public async Task RunAsync(CancellationToken stop)
     {
         try
@@ -893,13 +918,15 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
                     worked = false;
                 }
                 if (worked) continue;
-                if (model is not null && Clock() - usedAt > KeepLoaded && recording() is null)
+                var current = recording();
+                // Let go a while after the last piece; at once while a lecture written down after class records.
+                if (model is not null && (current is { AfterClass: true } || (current is null && Clock() - usedAt > KeepLoaded)))
                 {
                     model.Dispose();
                     model = null;
                     log("[whisper] unloaded the model");
                 }
-                await wake.WaitAsync(TimeSpan.FromSeconds(recording() is null ? 30 : 3), stop);
+                await wake.WaitAsync(TimeSpan.FromSeconds(current is { AfterClass: false } ? 3 : 30), stop);
                 while (wake.Wait(0)) { } // this look answers every wake so far
             }
         }
