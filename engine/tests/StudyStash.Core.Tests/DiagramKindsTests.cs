@@ -252,6 +252,21 @@ public class DiagramKindsTests
     }
 
     [Fact]
+    public void Every_kind_is_drawn_on_the_phone_and_saved_as_itself_with_its_picture()
+    {
+        string notes = string.Join("\n\n", new[] { Automaton, Handshake, History, Map }.Select(k => "```mermaid\n" + k.Trim() + "\n```"));
+        string html = StudyStash.Library.PhoneNotes.Render(notes);
+        Assert.Equal(4, System.Text.RegularExpressions.Regex.Matches(html, "<figure class=\"diagram\"><svg").Count);
+        Assert.DoesNotContain("language-mermaid", html);
+
+        var lecture = new System.Text.Json.Nodes.JsonObject { ["title"] = "Kinds", ["date"] = "2026-09-30", ["notes"] = notes };
+        var file = NoteExport.Lecture(lecture, transcript: false, source => DiagramSvg.Render(DiagramLayout.Lay(Flowchart.Parse(source), Measure)));
+        Assert.Equal(4, file.Assets.Count);
+        foreach (string start in new[] { "```mermaid\nstateDiagram-v2", "```mermaid\nsequenceDiagram", "```mermaid\ntimeline", "```mermaid\nmindmap" })
+            Assert.Contains(start, file.Markdown);
+    }
+
+    [Fact]
     public void Nothing_but_a_MermaidException_ever_escapes_the_new_kinds_and_whatever_reads_lays_out()
     {
         var random = new Random(7);
