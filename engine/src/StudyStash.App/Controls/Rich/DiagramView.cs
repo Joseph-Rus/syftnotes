@@ -319,111 +319,58 @@ sealed class DiagramCanvas : Control
             return;
         }
         if (Scene is not { } scene) return;
+        // Boxes and words land on whole pixels of the screen it's drawn on, so their hairlines stay crisp: at 125%,
+        // 150% or 175% a whole point isn't a whole pixel, so they snap to the screen's own pixels, not to points.
+        double snap = Scale * Zoom * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+        Painter(scene).Draw(context, Scale, snap, Look);
+    }
+
+    DiagramPainter? painter;
+
+    /// <summary>The painter for <paramref name="scene"/> in the look's colours now: the same one frame after frame
+    /// until the scene, the colours or the font change.</summary>
+    internal DiagramPainter Painter(DiagramScene scene)
+    {
         bool dark = ActualThemeVariant == ThemeVariant.Dark;
         var ink = Solid(Ink, dark ? Colors.White : Color.Parse("#1D1D1F"));
         var line = Line ?? new SolidColorBrush(ink.Color, 0.6);
         var accent = Solid(Accent, Color.Parse("#0A84A0")).Color;
         Color? tint = AccentTint is ISolidColorBrush t ? t.Color : null;
-        var (fill, stroke) = DiagramColours.Neutral(dark, ink.Color);
-        // Boxes and words land on whole pixels of the screen it's drawn on, so their hairlines stay crisp: at 125%,
-        // 150% or 175% a whole point isn't a whole pixel, so they snap to the screen's own pixels, not to points.
-        double snap = Scale * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
-        var scaled = context.PushTransform(Matrix.CreateScale(Scale, Scale));
+        var quiet = Quiet ?? Line ?? Brushes.Gray;
+        if (painter is { } p && ReferenceEquals(p.Scene, scene) && p.Palette.Dark == dark && ReferenceEquals(p.Palette.Ink, ink)
+            && ReferenceEquals(p.Palette.Line, line) && ReferenceEquals(p.Palette.GroupFill, GroupFill) && p.Palette.Accent == accent
+            && p.Palette.Tint == tint && ReferenceEquals(p.Palette.Quiet, quiet) && ReferenceEquals(p.Family, Family))
+            return p;
+        return painter = new DiagramPainter(scene, new DiagramPalette(dark, ink, line, GroupFill, accent, tint, quiet), Family);
+    }
 
-        foreach (var g in scene.Groups)
+    /// <summary>What's shown over the picture while it's explored (null: the still picture).</summary>
+    public DiagramLook? Look
+    {
+        get => look;
+        set
         {
-            context.DrawRectangle(GroupFill, null, new RoundedRect(Snap(ToRect(g.Box), snap, false), 12));
-            DrawCentred(context, g.Title, DiagramLayout.TitleSize, FontWeight.SemiBold, line, g.TitleBox.Center.X, g.TitleBox.Y, g.TitleBox.H, snap);
-        }
-
-        var labelled = scene.Edges.Where(e => e.LabelLines.Count > 0).ToList();
-        IDisposable? clip = null;
-        if (labelled.Count > 0 || scene.Groups.Count > 0)
-        {
-            // The lines stop short of their words and of the groups' titles, so neither needs a background.
-            var gaps = new GeometryGroup { FillRule = FillRule.NonZero };
-            foreach (var e in labelled) gaps.Children.Add(new RectangleGeometry(ToRect(e.LabelBox.Inflate(2))));
-            foreach (var g in scene.Groups) gaps.Children.Add(new RectangleGeometry(ToRect(g.TitleBox.Inflate(2))));
-            clip = context.PushGeometryClip(new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(new Rect(-50, -50, scene.Width + 100, scene.Height + 100)), gaps));
-        }
-        foreach (var e in scene.Edges)
-        {
-            var pen = new Pen(line, SceneShapes.Thickness(e.Line), e.Line == EdgeLine.Dotted ? new DashStyle(SceneShapes.Dashes.Select(d => d / SceneShapes.Thickness(e.Line)), 0) : null, PenLineCap.Round, PenLineJoin.Round);
-            var path = new StreamGeometry();
-            using (var g = path.Open())
-            {
-                bool open = false;
-                foreach (var step in e.Path)
-                {
-                    switch (step.Verb)
-                    {
-                        case PathVerb.Move:
-                            if (open) g.EndFigure(false);
-                            g.BeginFigure(P(step.A), false);
-                            open = true;
-                            break;
-                        case PathVerb.Line:
-                            g.LineTo(P(step.A));
-                            break;
-                        default:
-                            g.CubicBezierTo(P(step.A), P(step.B), P(step.C));
-                            break;
-                    }
-                }
-                if (open) g.EndFigure(false);
-            }
-            context.DrawGeometry(null, pen, path);
-            Marker(context, e.EndEnd, e.Tip, e.Base, line);
-            Marker(context, e.StartEnd, e.StartTip, e.StartBase, line);
-        }
-        clip?.Dispose();
-        // The scale again, afresh: drawn into a bitmap at 200% (a picture of the window, as the self-test takes), Avalonia
-        // puts the words and boxes that follow a clip taken off inside the same transform twice as far out.
-        scaled.Dispose();
-        using var _ = context.PushTransform(Matrix.CreateScale(Scale, Scale));
-
-        foreach (var e in labelled)
-        {
-            double top = e.LabelBox.Center.Y - e.LabelLines.Count * DiagramLayout.LabelLineHeight / 2;
-            for (int i = 0; i < e.LabelLines.Count; i++)
-                DrawCentred(context, e.LabelLines[i], DiagramLayout.LabelSize, FontWeight.Normal, line, e.LabelBox.Center.X, top + i * DiagramLayout.LabelLineHeight, DiagramLayout.LabelLineHeight, snap);
-        }
-
-        foreach (var n in scene.Nodes)
-        {
-            var (nodeFill, nodeStroke) = n.Tone == Tone.None ? (fill, stroke) : DiagramColours.Of(n.Tone, dark, accent, tint);
-            IBrush brush = new SolidColorBrush(nodeFill);
-            var pen = new Pen(new SolidColorBrush(nodeStroke), 1);
-            var b = ToRect(n.Box);
-            if (SceneShapes.Corners(n) is { } corners)
-            {
-                var poly = new StreamGeometry();
-                using (var g = poly.Open())
-                {
-                    g.BeginFigure(P(corners[0]), true);
-                    foreach (var c in corners.Skip(1)) g.LineTo(P(c));
-                    g.EndFigure(true);
-                }
-                context.DrawGeometry(brush, pen, poly);
-            }
-            else if (n.Shape == NodeShape.Circle) context.DrawEllipse(brush, pen, b.Center, b.Width / 2, b.Height / 2);
-            else if (n.Shape == NodeShape.Cylinder) Cylinder(context, Snap(b, snap, true), brush, pen);
-            else
-            {
-                var r = Snap(b, snap, true);
-                double radius = SceneShapes.Radius(n);
-                context.DrawRectangle(brush, pen, new RoundedRect(r, radius));
-                if (n.Shape == NodeShape.Subroutine)
-                {
-                    context.DrawLine(pen, new Point(r.X + 8, r.Y), new Point(r.X + 8, r.Bottom));
-                    context.DrawLine(pen, new Point(r.Right - 8, r.Y), new Point(r.Right - 8, r.Bottom));
-                }
-            }
-            double top = SceneShapes.TextTop(n);
-            for (int i = 0; i < n.Lines.Count; i++)
-                DrawCentred(context, n.Lines[i], DiagramLayout.TextSize, FontWeight.Medium, ink, n.Box.Center.X, top + i * DiagramLayout.LineHeight, DiagramLayout.LineHeight, snap);
+            look = value;
+            InvalidateVisual();
         }
     }
+
+    DiagramLook? look;
+
+    /// <summary>How far the picture is zoomed on top of its scale (by its view's zoom), so its hairlines snap to
+    /// the pixels they land on.</summary>
+    public double Zoom
+    {
+        get => zoom;
+        set
+        {
+            if (Math.Abs(zoom - value) < 1e-9) return;
+            zoom = value;
+            InvalidateVisual();
+        }
+    }
+
+    double zoom = 1;
 
     /// <summary>The space a diagram being laid out keeps: a soft rounded box, with a quiet word in the middle.</summary>
     void Placeholder(DrawingContext context)
@@ -437,74 +384,10 @@ sealed class DiagramCanvas : Control
         context.DrawText(t, new Point(Math.Round((box.Width - t.Width) / 2), Math.Round((box.Height - t.Height) / 2)));
     }
 
-    static void Cylinder(DrawingContext context, Rect b, IBrush fill, Pen pen)
-    {
-        double cap = SceneShapes.CylinderCap, rx = b.Width / 2;
-        var body = new StreamGeometry();
-        using (var g = body.Open())
-        {
-            g.BeginFigure(new Point(b.X, b.Y + cap), true);
-            g.LineTo(new Point(b.X, b.Bottom - cap));
-            g.ArcTo(new Point(b.Right, b.Bottom - cap), new Size(rx, cap), 0, false, SweepDirection.CounterClockwise);
-            g.LineTo(new Point(b.Right, b.Y + cap));
-            g.ArcTo(new Point(b.X, b.Y + cap), new Size(rx, cap), 0, false, SweepDirection.CounterClockwise);
-            g.EndFigure(true);
-        }
-        context.DrawGeometry(fill, pen, body);
-        var rim = new StreamGeometry();
-        using (var g = rim.Open())
-        {
-            g.BeginFigure(new Point(b.X, b.Y + cap), false);
-            g.ArcTo(new Point(b.Right, b.Y + cap), new Size(rx, cap), 0, false, SweepDirection.CounterClockwise);
-            g.EndFigure(false);
-        }
-        context.DrawGeometry(null, pen, rim);
-    }
-
-    static void Marker(DrawingContext context, EdgeEnd end, Pt tip, Pt @base, IBrush brush)
-    {
-        if (end == EdgeEnd.None || Pt.Distance(tip, @base) < 0.01) return;
-        switch (end)
-        {
-            case EdgeEnd.Arrow:
-                var head = SceneShapes.ArrowHead(tip, @base);
-                var geometry = new StreamGeometry();
-                using (var g = geometry.Open())
-                {
-                    g.BeginFigure(P(head[0]), true);
-                    g.LineTo(P(head[1]));
-                    g.LineTo(P(head[2]));
-                    g.EndFigure(true);
-                }
-                context.DrawGeometry(brush, null, geometry);
-                break;
-            case EdgeEnd.Circle:
-                context.DrawEllipse(brush, null, P(SceneShapes.Dot(tip, @base)), SceneShapes.DotRadius, SceneShapes.DotRadius);
-                break;
-            case EdgeEnd.Cross:
-                var (a, b, c, d) = SceneShapes.Cross(tip, @base);
-                var pen = new Pen(brush, 1.5, lineCap: PenLineCap.Round);
-                context.DrawLine(pen, P(a), P(b));
-                context.DrawLine(pen, P(c), P(d));
-                break;
-        }
-    }
-
-    void DrawCentred(DrawingContext context, string text, double size, FontWeight weight, IBrush brush, double centreX, double top, double lineHeight, double snap)
-    {
-        var t = Text(text, size, weight, brush);
-        double x = centreX - t.WidthIncludingTrailingWhitespace / 2, y = top + (lineHeight - t.Height) / 2;
-        context.DrawText(t, new Point(OnPixel(x, snap), OnPixel(y, snap)));
-    }
-
     FormattedText Text(string text, double size, FontWeight weight, IBrush brush) =>
         new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(Family, FontStyle.Normal, weight), size, brush);
 
     static SolidColorBrush Solid(IBrush? brush, Color fallback) => brush as SolidColorBrush ?? new SolidColorBrush(brush is ISolidColorBrush s ? s.Color : fallback);
-
-    static Point P(Pt p) => new(p.X, p.Y);
-
-    static Rect ToRect(Box b) => new(b.X, b.Y, b.W, b.H);
 
     /// <summary>A rectangle on whole pixels of the screen (<paramref name="pixels"/> of them to a unit of the scene);
     /// a 1-unit outline's half a unit in, so its outer edge falls on a pixel's edge and it covers one row exactly
