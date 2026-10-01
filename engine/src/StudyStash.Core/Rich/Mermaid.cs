@@ -939,19 +939,37 @@ public static partial class Mermaid
 
         Flowchart Build()
         {
-            // An arrow to a group's id means the group: point it at the group's first box instead.
+            // An arrow to a group's id means the group: it goes to where the group starts (its first box no arrow
+            // inside it comes into), and one from a group leaves from where it ends (each box no arrow inside it
+            // leaves), so "phase 1 --> phase 2" reads as the last step of one leading to the first of the next.
             var byId = groups.GroupBy(g => g.Id).ToDictionary(g => g.Key, g => g.First());
-            var retarget = new Dictionary<string, string>();
+            var asGroup = new Dictionary<string, MutGroup>();
             foreach (var n in order.ToList())
             {
                 if (n.Declared || !byId.TryGetValue(n.Id, out var g)) continue;
-                if (FirstMember(g, n.Id) is not { } member) continue;
-                retarget[n.Id] = member;
+                if (FirstMember(g, n.Id) is null) continue;
+                asGroup[n.Id] = g;
                 order.Remove(n);
                 n.Group?.Members.Remove(n.Id);
             }
-            string Map(string id) => retarget.TryGetValue(id, out string? to) ? to : id;
-            var finalEdges = edges.Select(e => e with { From = Map(e.From), To = Map(e.To) }).ToList();
+            List<string> Ends(MutGroup g, string self, bool last)
+            {
+                var inside = AllMembers(g).Where(m => m != self && !asGroup.ContainsKey(m)).ToList();
+                var set = inside.ToHashSet();
+                var own = edges.Where(e => set.Contains(e.From) && set.Contains(e.To) && e.From != e.To).ToList();
+                var ends = inside.Where(m => last ? own.All(e => e.From != m) : own.All(e => e.To != m)).ToList();
+                if (ends.Count == 0) ends = [last ? inside[^1] : inside[0]];
+                return last ? ends : [ends[0]];
+            }
+            var finalEdges = new List<FlowEdge>();
+            foreach (var e in edges)
+            {
+                var froms = asGroup.TryGetValue(e.From, out var gf) ? Ends(gf, e.From, last: true) : [e.From];
+                var tos = asGroup.TryGetValue(e.To, out var gt) ? Ends(gt, e.To, last: false) : [e.To];
+                foreach (string from in froms)
+                    foreach (string to in tos)
+                        if (finalEdges.Count < Flowchart.MaxEdges) finalEdges.Add(e with { From = from, To = to });
+            }
             if (order.Count == 0) throw new MermaidException("This flowchart has no boxes to draw.", LineNumber);
             // Groups keep ids unique against boxes, and only groups with something in them are drawn.
             var taken = new HashSet<string>(order.Select(n => n.Id));
@@ -968,6 +986,9 @@ public static partial class Mermaid
             var flowNodes = order.Select(n => new FlowNode(n.Id, n.Lines, n.Shape, n.Tone) { Detail = n.Detail }).ToList();
             return new Flowchart(direction, title, flowNodes, finalEdges, flowGroups);
         }
+
+        /// <summary>A group's boxes, its own then those of the groups inside it, in the order they were written.</summary>
+        IEnumerable<string> AllMembers(MutGroup g) => g.Members.Concat(groups.Where(c => c.Parent == g).SelectMany(AllMembers));
 
         string? FirstMember(MutGroup g, string except)
         {

@@ -259,6 +259,9 @@ public class MermaidTests
         Assert.DoesNotContain(f.Nodes, n => n.Id == "G");
         Assert.Contains(f.Edges, e => e.From == "Lungs" && e.To == "H1");
         Assert.Equal(["G"], f.Groups.Select(g => g.Id));
+        // From a group, an arrow leaves where the group ends: each of its last boxes.
+        var phases = P("flowchart LR\nsubgraph A [Clean]\nS[Select] --> Q{Missing?}\nQ -->|one| F[Fill in]\nQ -->|many| D[Drop]\nend\nsubgraph B [Model]\nC[Construct] --> W[Warehouse]\nend\nA --> B");
+        Assert.Equal([("F", "C"), ("D", "C")], phases.Edges.Where(e => e.To == "C").Select(e => (e.From, e.To)));
     }
 
     [Fact]

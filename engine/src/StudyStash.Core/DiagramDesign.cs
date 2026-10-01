@@ -271,7 +271,7 @@ public static partial class DiagramDesign
             ## Size and shape
 
             - A focused idea: 4 to {{MaxBoxes}} boxes.
-            - A big topic the lecturer built up over a long stretch (a whole system, a whole process with its phases): up to {{MaxGrouped}} boxes, in groups: 3 to 7 subgraphs of 3 to 7 boxes each, named for the phases, places or parts the lecturer named, one level of groups (two at most). Most arrows stay inside a group; a few arrows between groups carry the main thread. Read alone, the groups must make a diagram of their own: the app can fold each group into one box.
+            - A big topic the lecturer built up over a long stretch (a whole system, a whole process with its phases): up to {{MaxGrouped}} boxes, in groups: 3 to 7 subgraphs of 3 to 7 boxes each, named for the phases, places or parts the lecturer named, one level of groups (two at most). Most arrows stay inside a group; a few arrows between groups carry the main thread, each from the box where one group's part ends to the box where the next one's starts (arrows join boxes, not groups). Read alone, the groups must make a diagram of their own: the app can fold each group into one box.
             - A flowchart runs LR for a sequence, pathway or cycle (a grouped LR chart shows its groups as columns, each read downwards) and TD for a hierarchy or a decision tree. A cycle ends with an arrow from its last step back to its first. A decision is a {"Question?"} box with |yes| and |no| (or the answers) on its arrows.
             - Shapes mean something: {"Question?"} a decision, [/"Input"/] an input or output, [("Store")] stored data, ([...]) where a process starts or ends, [["..."]] a sub-procedure, ((...)) a hub, (((...))) an accepting state.
             - Colour only when the colour means something the lecture said, the same meaning everywhere in the diagram, and say in the caption what each colour means: :::red, :::blue, :::green, :::amber, :::purple or :::accent (in a state diagram, class name red). Never colour to decorate. Quote every flowchart label: A["..."]. No style, classDef, linkStyle, click, and no HTML but <br> and <small>.
@@ -566,7 +566,7 @@ public static partial class DiagramDesign
             ## How
 
             - A box is one to five words; its detail goes in a smaller line under it: A["Name<br><small>what, where, how much</small>"].
-            - A big topic goes in 3 to 7 subgraphs of 3 to 7 boxes each ("subgraph ID ["Title"]" ... "end"), most arrows inside a group, a few between groups; flowchart LR shows the groups as columns.
+            - A big topic goes in 3 to 7 subgraphs of 3 to 7 boxes each ("subgraph ID ["Title"]" ... "end"), most arrows inside a group, a few between groups, each joining the box where one group's part ends to the box where the next starts; flowchart LR shows the groups as columns.
             - Narrow enough for the notes: no more than four or five boxes side by side, five participants in a sequence diagram.
             - Arrows that cross: put the boxes in the order the arrows run, and drop arrows that repeat what the order shows.
             - Keep its colours (:::red and the rest) and what they mean, said in the caption. Quote every flowchart label. No style, classDef, linkStyle or click.
