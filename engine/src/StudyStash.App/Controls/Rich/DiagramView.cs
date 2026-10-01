@@ -69,6 +69,9 @@ public sealed class DiagramView : Decorator
         }
         windowed = !opensLarger;
         Focusable = true;
+        // Its own ring shows the keyboard is on it (round the picture, or round a box), not the theme's rectangle
+        // round the whole column.
+        FocusAdorner = null;
         AutomationProperties.SetHelpText(this, windowed ? WindowHelp : Help);
         ring = new Border { BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(8), Margin = new Thickness(-4), IsHitTestVisible = false, IsVisible = false };
         ring.Bind(Border.BorderBrushProperty, ring.GetResourceObservable("Accent"));
@@ -243,7 +246,9 @@ public sealed class DiagramView : Decorator
         explorer?.HintSeen();
         Rich.OpenLarger.Raise(this, () => new OpenDiagramEventArgs(this)
         {
-            Title = Title, Chart = chart, Scene = Scene, Written = Source, Folded = explorer?.Folded.ToList(),
+            // The window sizes itself to the chart laid out its own way (a left-to-right chart turned to fit a narrow
+            // column reads left to right again in a window wide enough).
+            Title = Title, Chart = chart, Scene = canvas.AsWritten() ?? Scene, Written = Source, Folded = explorer?.Folded.ToList(),
         });
     }
 
@@ -369,6 +374,9 @@ sealed class DiagramCanvas : Control
     }
 
     public DiagramScene? Scene { get; private set; }
+
+    /// <summary>The chart laid out the way it's written (not turned to fit), if it has been.</summary>
+    public DiagramScene? AsWritten() => chart is not null && source is not null ? SceneCache.Find(chart, source, Family, null).Scene ?? Scene : Scene;
 
     /// <summary>Whether a fold is gliding from one scene to the next.</summary>
     public bool IsMorphing => morph is not null;
