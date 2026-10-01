@@ -198,14 +198,17 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         {
             bool local = pick.Engine == "ollama" && Providers is null;
             int ctx = local ? await Core.Summarize.ContextSizeAsync(cfg, pick.Model) : 200_000;
-            var result = await DiagramDesign.DesignAsync(m, notes, pick.Drawings, Designer(pick, cfg, ctx, cts.Token), Core.Summarize.TranscriptBudget(ctx))
+            var result = await DiagramDesign.DesignAsync(m, notes, pick.Drawings, Designer(pick, cfg, ctx, cts.Token), Core.Summarize.TranscriptBudget(ctx),
+                    DiagramTimeout - watch.Elapsed)
                 .WaitAsync(cts.Token);
             if (pick.Engine != "ollama") Record(pick.Engine, true, "");
             string left = result.Dropped.Count > 0 ? $"; left out {string.Join("; ", result.Dropped)}" : "";
+            string revised = result.Revised > 0 ? $", {result.Revised} redesigned after a look at how {(result.Revised == 1 ? "it" : "they")} laid out" : "";
+            string looks = result.Problems.Count > 0 ? $"; still looks off: {string.Join("; ", result.Problems)}" : "";
             Log?.Invoke(result.Malformed
                 ? $"[diagrams] '{m.Title}': {who}'s answer couldn't be used ({string.Join("; ", result.Dropped)}); the notes are as written"
                 : result.Drawn.Count > 0
-                    ? $"[diagrams] '{m.Title}': {who} drew {result.Drawn.Count} ({string.Join(", ", result.Drawn.Select(d => d.Title))}) in {watch.Elapsed.TotalSeconds:0}s{left}"
+                    ? $"[diagrams] '{m.Title}': {who} drew {result.Drawn.Count} ({string.Join(", ", result.Drawn.Select(d => d.Title))}) in {watch.Elapsed.TotalSeconds:0}s{revised}{left}{looks}"
                     : $"[diagrams] '{m.Title}': {who} drew none: {result.Reason}{left}");
             return result.Notes;
         }
@@ -221,6 +224,11 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             if (pick.Engine != "ollama") Record(pick.Engine, false, why);
             Log?.Invoke($"[diagrams] '{m.Title}': {who} couldn't design diagrams ({why}); the notes are as written");
             return notes;
+        }
+        finally
+        {
+            // A revision given up on for running late may still be running: it's stopped with the pass.
+            cts.Cancel();
         }
     }
 
