@@ -24,12 +24,16 @@
 #   this code, are the ones published, with no rebuilding, and a merged version bump publishes within a minute.
 #   Changes to this workflow are never skipped.
 #
-#   Runs by hand (Actions → ci → Run workflow, or `gh workflow run ci --ref <branch>`) are how a branch is proved
-#   before it merges: Branches and pull requests aren't tested on their own. A run by hand tests like a merge does.
+#   Branches and pull requests aren't tested on their own. A run by hand (Actions → ci → Run workflow, or
+#   `gh workflow run ci --ref <branch>`) is how one is proved before it merges, and it tests as a merge does.
 #   On code whose version has no tag yet (a release branch), or with "installers" ticked
 #   (`gh workflow run ci --ref <branch> -f installers=true`), it rehearses the whole release too, down to the checksums,
 #   and publishes nothing, ever. Give it "reuse_run" (an earlier such run's id, on the same code) to rehearse the fast
 #   release above.
+#
+#   Measured when this shape was made, start to finish: a merge 9 to 11 minutes, a full rehearsal of a release 10
+#   (the old workflow took 12 to 16 for every merge and every release alike), and a release that publishes the
+#   installers a rehearsal already proved under a minute.
 #
 #   Runs are never cancelled by a later push: each push to main has a group of its own, so a release run isn't
 #   cancelled by the push after it, nor skipped while waiting for the one before. (Runs by hand on one branch
@@ -517,7 +521,7 @@ jobs:
   # again. The installers are the ones this run built and proved, or the ones a run by hand built and proved on
   # exactly this code. A run by hand goes through all of it but the last step, and publishes nothing.
   release:
-    name: ${{ github.event_name == 'push' && 'publish release' || 'release (rehearsal, nothing published)' }}
+    name: publish release
     needs: [version, engine, mac-app, mac-one-computer, mac-intel, windows-app]
     if: ${{ !cancelled() && !failure() && needs.version.outputs.installers == 'true' && (needs.version.outputs.reuse_run != '' || (needs.mac-app.result == 'success' && needs.mac-intel.result == 'success' && needs.windows-app.result == 'success')) }}
     timeout-minutes: 10
@@ -539,7 +543,7 @@ jobs:
           path: dist
           run-id: ${{ needs.version.outputs.reuse_run || github.run_id }}
           github-token: ${{ github.token }}
-      - name: Publish v${{ needs.version.outputs.version }}
+      - name: ${{ github.event_name == 'push' && 'Publish' || 'Rehearse publishing (a run by hand publishes nothing)' }} v${{ needs.version.outputs.version }}
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ needs.version.outputs.version }}
