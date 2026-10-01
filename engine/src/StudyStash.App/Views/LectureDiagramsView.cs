@@ -20,13 +20,40 @@ static class LectureDiagramsView
         DiagramHost.SetHost(notes, new Forward(() => page.DataContext as LibraryModel));
         LibraryModel? model = null;
         NoteModel? note = null;
+        // Where the notes were read up to when a diagram sent the page to the transcript: Notes brings the student back
+        // there, to the diagram, not to wherever the transcript was scrolled.
+        Vector? reading = null;
+        Vector? notesAt = null;
         void Jumped(int index) => ScrollTo(notes, transcript, index, 6);
+        void Showing(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(NoteModel.ShowTranscript) || note is null) return;
+            if (note.ShowTranscript) reading ??= notesAt;
+            else if (reading is { } back)
+            {
+                reading = null;
+                Dispatcher.UIThread.Post(() => notes.Offset = back, DispatcherPriority.Background);
+            }
+        }
+        notes.ScrollChanged += (_, _) =>
+        {
+            if (note is { ShowTranscript: false }) notesAt = notes.Offset;
+        };
         void NoteChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName != nameof(LibraryModel.Note)) return;
-            if (note is not null) note.Jumped -= Jumped;
+            if (note is not null)
+            {
+                note.Jumped -= Jumped;
+                note.PropertyChanged -= Showing;
+            }
             note = model?.Note;
-            if (note is not null) note.Jumped += Jumped;
+            reading = notesAt = null;
+            if (note is not null)
+            {
+                note.Jumped += Jumped;
+                note.PropertyChanged += Showing;
+            }
         }
         page.DataContextChanged += (_, _) =>
         {

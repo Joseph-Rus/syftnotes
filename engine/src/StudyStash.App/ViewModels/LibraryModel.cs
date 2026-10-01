@@ -64,7 +64,11 @@ public sealed partial class NoteModel : ObservableObject
     public bool HasPending => !string.IsNullOrEmpty(Pending);
     public bool NoTranscript => Transcript.Count == 0;
 
-    partial void OnShowTranscriptChanged(bool value) => OnPropertyChanged(nameof(ShowNotes));
+    partial void OnShowTranscriptChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowNotes));
+        if (!value) CanGoBack = false;
+    }
 
     [RelayCommand] void Notes() => ShowTranscript = false;
     [RelayCommand] void Transcripts() => ShowTranscript = true;
@@ -75,9 +79,16 @@ public sealed partial class NoteModel : ObservableObject
     /// <summary>The transcript's line to scroll to (its place in <see cref="Transcript"/>), once it's showing.</summary>
     public event Action<int>? Jumped;
 
+    /// <summary>The transcript was opened from the notes at a moment a diagram pointed to: a button takes the student
+    /// back to the notes (and the diagram) until they go there.</summary>
+    [ObservableProperty] public partial bool CanGoBack { get; set; }
+
+    [RelayCommand] void BackToNotes() => ShowTranscript = false;
+
     /// <summary>The transcript at a moment: its tab open, the line said then marked, and the page brought to it.</summary>
     public void ShowAt(double seconds)
     {
+        if (!ShowTranscript) CanGoBack = true;
         if (Transcript.Count == 0) return;
         int at = 0;
         for (int i = 0; i < Transcript.Count; i++)

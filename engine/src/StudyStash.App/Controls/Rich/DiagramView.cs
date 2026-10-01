@@ -118,6 +118,12 @@ public sealed class DiagramView : Decorator
             keyboard = e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional;
             Focused();
         };
+        // A click gives it the keyboard without scrolling the page to show all of it (the box under the pointer would
+        // move away mid-click); the keyboard's Tab still brings it into view.
+        AddHandler(RequestBringIntoViewEvent, (_, e) =>
+        {
+            if (ReferenceEquals(e.TargetObject, this) && !keyboard) e.Handled = true;
+        });
         LostFocus += (_, _) =>
         {
             keyboard = false;

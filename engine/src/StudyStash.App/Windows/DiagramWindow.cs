@@ -84,7 +84,10 @@ public static class DiagramWindow
     static Control Chart(OpenDiagramEventArgs request, Core.Rich.Flowchart chart)
     {
         var origin = request.Source as Control;
-        var view = new DiagramView(opensLarger: false) { Source = request.Written, Folded = request.Folded, Origin = origin, MaxScale = MaxScale };
+        var view = new DiagramView(opensLarger: false)
+        {
+            Source = request.Written, Folded = request.Folded, Origin = origin, MaxScale = MaxScale, Caption = (origin as DiagramView)?.Caption,
+        };
         view.Chart = chart;
         var chrome = view.Chrome!;
         // A question asked, or a moment found, here goes to the lecture the note is on: its window comes forward.

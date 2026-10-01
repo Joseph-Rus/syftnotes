@@ -480,6 +480,16 @@
 
               <!-- Where the notes fade out (the code-behind masks them over this strip; it paints nothing itself). -->
               <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" />
+              <!-- A diagram showed where it was said: one click back to the notes, where the diagram is -->
+              <Button Name="BackToNotes" Theme="{StaticResource Surface}" IsVisible="{Binding Note.CanGoBack, FallbackValue=False}"
+                      Command="{Binding Note.BackToNotesCommand, FallbackValue={x:Null}}" HorizontalAlignment="Center" VerticalAlignment="Top"
+                      Margin="0,12,0,0" Height="32" Padding="12,0,14,0" CornerRadius="4" Background="{DynamicResource PopupBg}"
+                      BorderBrush="{DynamicResource PopupStroke}" BorderThickness="1" AutomationProperties.Name="Back to the notes">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Glyph="arrow_back" Size="15" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+                  <TextBlock Text="Back to the notes" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
               </Panel>
               <!-- The latest answer, just above the ask bar -->
               <!-- Both 600 wide where there's room, narrower (never cut off) in a small window. -->

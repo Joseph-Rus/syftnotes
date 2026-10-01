@@ -392,6 +392,11 @@ public sealed class DiagramExploreTests : IDisposable
         Assert.True(note.ShowTranscript);
         Assert.Equal(1, jumped);
         Assert.Equal([false, true, false], note.Transcript.Select(l => l.Here));
+        // One click takes the student back to the notes, where the diagram is.
+        Assert.True(note.CanGoBack);
+        note.BackToNotesCommand.Execute(null);
+        Assert.False(note.ShowTranscript);
+        Assert.False(note.CanGoBack);
         Assert.Equal(3, host.Transcript.Count);
 
         Assert.True(host.CanAsk);

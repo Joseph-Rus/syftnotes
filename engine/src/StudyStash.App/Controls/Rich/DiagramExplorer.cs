@@ -264,6 +264,7 @@ sealed class DiagramExplorer
     // --- the pointer --------------------------------------------------------------------------------------------------
 
     Point? pressedAt;
+    DiagramTarget pressedOn = DiagramTarget.Nothing;
     int presses;
     Point lastDrag;
     bool dragging;
@@ -320,6 +321,7 @@ sealed class DiagramExplorer
             if (e.Source is Visual v && v.FindAncestorOfType<Avalonia.Controls.Primitives.ScrollBar>(includeSelf: true) is not null) return;
             pressedAt = lastDrag = point.Position;
             presses = e.ClickCount;
+            pressedOn = TargetAt(e.GetPosition(canvas));
             dragging = false;
             e.Pointer.Capture(room);
             view.Focus(NavigationMethod.Pointer);
@@ -334,12 +336,13 @@ sealed class DiagramExplorer
             room.Cursor = view.Cursor;
             if (!click || e.InitialPressMouseButton != MouseButton.Left) return;
             e.Handled = true;
-            if (presses >= 2 && TargetAt(e.GetPosition(canvas)) is { IsNode: true, Id: { } twice })
+            // What was pressed is what's clicked (the page may have moved under the pointer since).
+            if (presses >= 2 && pressedOn is { IsNode: true, Id: { } twice })
             {
                 ZoomTo(twice);
                 return;
             }
-            Click(TargetAt(e.GetPosition(canvas)));
+            Click(pressedOn);
         };
         room.PointerCaptureLost += (_, _) =>
         {

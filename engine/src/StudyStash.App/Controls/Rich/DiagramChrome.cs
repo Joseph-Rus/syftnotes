@@ -228,16 +228,24 @@ sealed class DiagramChrome
         AutomationProperties.SetLiveSetting(stripWords, AutomationLiveSetting.Polite);
         var lead = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 1, VerticalAlignment = VerticalAlignment.Center, Children = { prev, next, playSteps } };
         var trail = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 1, VerticalAlignment = VerticalAlignment.Center, Children = { knew, notYet, missed, shuffle, showAll, reset } };
-        var line = new DockPanel { VerticalAlignment = VerticalAlignment.Center, MinHeight = 28 };
-        DockPanel.SetDock(done, Dock.Right);
-        DockPanel.SetDock(lead, Dock.Left);
-        DockPanel.SetDock(stripTitle, Dock.Left);
-        DockPanel.SetDock(trail, Dock.Right);
-        line.Children.Add(done);
-        line.Children.Add(lead);
-        line.Children.Add(stripTitle);
-        line.Children.Add(trail);
-        line.Children.Add(stripWords);
+        // The step buttons, where it is, what's said, the recall buttons and Done on one line; where that leaves the words
+        // too little room (a narrow window, a quick answer), the recall buttons go on a line of their own under them.
+        var line = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto"), RowDefinitions = new RowDefinitions("Auto,Auto"), VerticalAlignment = VerticalAlignment.Center, MinHeight = 28 };
+        Grid.SetColumn(stripTitle, 1);
+        Grid.SetColumn(stripWords, 2);
+        Grid.SetColumn(trail, 3);
+        Grid.SetColumn(done, 4);
+        foreach (var c in new Control[] { lead, stripTitle, stripWords, trail, done }) line.Children.Add(c);
+        line.SizeChanged += (_, e) =>
+        {
+            trail.Measure(Size.Infinity);
+            bool narrow = e.NewSize.Width - trail.DesiredSize.Width - 40 < 260;
+            if (narrow == (Grid.GetRow(trail) == 1)) return;
+            Grid.SetRow(trail, narrow ? 1 : 0);
+            Grid.SetColumn(trail, narrow ? 0 : 3);
+            Grid.SetColumnSpan(trail, narrow ? 4 : 1);
+            trail.Margin = new Thickness(0, narrow ? 2 : 0, 0, 0);
+        };
         var strip = new Border { Child = line, Padding = new Thickness(windowed ? (Mac ? 10 : 8) : 4, 4), CornerRadius = new CornerRadius(windowed ? 0 : Mac ? 10 : 6) };
         if (!windowed)
         {

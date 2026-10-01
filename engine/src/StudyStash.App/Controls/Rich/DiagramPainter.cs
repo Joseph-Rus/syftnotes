@@ -80,9 +80,9 @@ sealed class DiagramPainter
     {
         var scaled = context.PushTransform(Matrix.CreateScale(scale, scale));
         bool dims = look?.Dims == true;
-        double faded = dims ? 1 - 0.78 * look!.Dim : 1;
+        double faded = dims ? 1 - 0.7 * look!.Dim : 1;
 
-        using (dims ? context.PushOpacity(1 - 0.45 * look!.Dim) : default(DrawingContext.PushedState?))
+        using (dims ? context.PushOpacity(1 - 0.4 * look!.Dim) : default(DrawingContext.PushedState?))
             foreach (var g in scene.Groups)
             {
                 context.DrawRectangle(palette.GroupFill, null, new RoundedRect(DiagramCanvas.Snap(ToRect(g.Box), snap, false), 12));
