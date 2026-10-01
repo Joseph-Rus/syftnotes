@@ -18,7 +18,7 @@ namespace StudyStash.Core.Rich;
 /// anything else — decisions, merges, groups — is a layered chart (MSAGL's Sugiyama layout). Words are measured by
 /// the caller, so the boxes fit the font they'll be drawn in.
 /// </summary>
-public static class DiagramLayout
+public static partial class DiagramLayout
 {
     /// <summary>Box words: 13 px, medium weight, lines 17 px apart. Arrow words: 12 px regular, 16 apart. Group
     /// titles: 12 px semibold.</summary>
@@ -45,6 +45,10 @@ public static class DiagramLayout
         {
             SceneKind.Ring => Ring(chart, sizes, labels),
             SceneKind.Tree => Tree(chart, sizes, labels, dir),
+            SceneKind.Grouped => Grouped(chart, sizes, labels, dir, m),
+            SceneKind.Sequence => Sequence(chart, sizes, labels, m),
+            SceneKind.Timeline => Timeline(chart, sizes, dir, m),
+            SceneKind.Mindmap => Mindmap(chart, sizes, labels, dir, m),
             _ => Layered(chart, sizes, labels, dir, m),
         };
         return Normalise(scene);
@@ -78,9 +82,18 @@ public static class DiagramLayout
         var sizes = chart.Nodes.ToDictionary(n => n.Id, n => Size(n, m));
         var labels = chart.Edges.Select(e => EdgeLabel(e.Label, m)).ToList();
         var kind = Kind(chart);
+        if (kind == SceneKind.Grouped) return GroupedEstimate(chart, m, dir);
         if (kind != SceneKind.Layered)
         {
-            var quick = Normalise(kind == SceneKind.Ring ? Ring(chart, sizes, labels) : Tree(chart, sizes, labels, dir));
+            // Rings, trees and the kinds with layouts of their own are quick to place for real.
+            var quick = Normalise(kind switch
+            {
+                SceneKind.Ring => Ring(chart, sizes, labels),
+                SceneKind.Tree => Tree(chart, sizes, labels, dir),
+                SceneKind.Sequence => Sequence(chart, sizes, labels, m),
+                SceneKind.Timeline => Timeline(chart, sizes, dir, m),
+                _ => Mindmap(chart, sizes, labels, dir, m),
+            });
             return (quick.Width, quick.Height);
         }
         var back = BackEdges(chart);
@@ -107,23 +120,32 @@ public static class DiagramLayout
     }
 
     /// <summary>
-    /// The way to try a chart that's too wide for its column: a left-to-right chart top-down, and a top-down tree
-    /// left-to-right (a classification reads as well across as down). Null when turning it wouldn't help (a ring).
+    /// The way to try a chart that's too wide for its column: a left-to-right chart top-down (a timeline down the
+    /// page, a mind map with every branch on one side), and a top-down tree left-to-right (a classification reads as
+    /// well across as down). Null when turning it wouldn't help (a ring, a sequence diagram).
     /// </summary>
     public static ChartDirection? Turned(Flowchart chart, SceneKind kind) => kind switch
     {
-        SceneKind.Ring => null,
+        SceneKind.Ring or SceneKind.Sequence => null,
         _ when chart.Direction is ChartDirection.LeftRight or ChartDirection.RightLeft => ChartDirection.TopDown,
         SceneKind.Tree => ChartDirection.LeftRight,
         _ => null,
     };
 
-    /// <summary>Which layout a chart gets: a ring for one cycle of 3 to 10 boxes, a tree for a hierarchy of up to 40,
-    /// layered for everything else (and anything with groups).</summary>
+    /// <summary>Which layout a chart gets: a sequence diagram, a timeline and a mind map their own; a big chart in
+    /// groups, blocks (<see cref="Grouped"/>); a ring for one cycle of 3 to 10 boxes, a tree for a hierarchy of up to
+    /// 40 with no decisions in it, layered for everything else (and a small chart with groups).</summary>
     public static SceneKind Kind(Flowchart f)
     {
+        switch (f.Form)
+        {
+            case ChartForm.Sequence: return SceneKind.Sequence;
+            case ChartForm.Timeline: return SceneKind.Timeline;
+            case ChartForm.Mindmap: return SceneKind.Mindmap;
+        }
         int n = f.Nodes.Count;
-        if (f.Groups.Count > 0) return SceneKind.Layered;
+        if (IsGrouped(f)) return SceneKind.Grouped;
+        if (f.Groups.Count > 0 || f.Form == ChartForm.State) return SceneKind.Layered;
         var outs = f.Nodes.ToDictionary(x => x.Id, _ => 0);
         var ins = f.Nodes.ToDictionary(x => x.Id, _ => 0);
         foreach (var e in f.Edges)
@@ -139,7 +161,10 @@ public static class DiagramLayout
             for (int i = 0; i < n; i++) { seen.Add(at); at = next[at]; }
             if (seen.Count == n && at == f.Nodes[0].Id) return SceneKind.Ring;
         }
-        if (n <= 40 && f.Edges.Count == n - 1 && f.Edges.All(e => e.From != e.To)
+        // A decision tree keeps its questions in a line, its answers aside, as a layered chart lays it out; the tidy
+        // tree, which centres every box over its children, would step it sideways at each question.
+        bool decisions = f.Nodes.Any(x => x.Shape == NodeShape.Decision) || f.Edges.Count(e => e.Label is not null) * 2 > Math.Max(1, f.Edges.Count);
+        if (!decisions && n <= 40 && f.Edges.Count == n - 1 && f.Edges.All(e => e.From != e.To)
             && f.Nodes.Count(x => ins[x.Id] == 0) == 1 && f.Nodes.All(x => ins[x.Id] <= 1))
         {
             var children = f.Edges.ToLookup(e => e.From, e => e.To);
@@ -169,37 +194,63 @@ public static class DiagramLayout
         }
     }
 
-    sealed record Sized(double W, double H, List<string> Lines);
+    /// <summary>A box's size and its words wrapped, the last <see cref="Detail"/> of them its smaller words.</summary>
+    sealed record Sized(double W, double H, List<string> Lines, int Detail = 0);
+
+    /// <summary>A box in its place: a state diagram's start and end in the accent, so they read as marks, not states.</summary>
+    static SceneNode Placed(FlowNode n, Sized s, Box box) =>
+        new(n.Id, box, n.Shape, n.Role is NodeRole.Start or NodeRole.End && n.Tone == Tone.None ? Tone.Accent : n.Tone, s.Lines) { DetailLines = s.Detail };
 
     sealed record Words(List<string> Lines, double W, double H);
 
+    /// <summary>
+    /// A box's size for its words (its smaller words wrapped and sized as its own are, so the box holds them drawn
+    /// either way): a state diagram's start a small dot, its end a small ring, a fork a bar, an empty choice a small
+    /// rhombus.
+    /// </summary>
     static Sized Size(FlowNode n, Measurer m)
     {
-        double max = n.Shape == NodeShape.Circle ? CircleLine : MaxLine;
+        switch (n.Role)
+        {
+            case NodeRole.Start: return new Sized(18, 18, []);
+            case NodeRole.End: return new Sized(22, 22, []);
+            case NodeRole.Bar: return new Sized(64, 8, []);
+        }
+        if (n.Shape == NodeShape.Decision && n.Lines.Count == 0 && n.Detail.Count == 0) return new Sized(30, 30, []);
+        bool round = n.Shape is NodeShape.Circle or NodeShape.DoubleCircle;
+        double max = round ? CircleLine : MaxLine;
         Func<string, double> width = s => m.Width(s, TextSize, true);
-        var lines = Wrap(n.Lines, max, width);
+        var own = Wrap(n.Lines, max, width);
+        // Smaller words wrap at their own size (so they run to fewer lines), but the box is as wide as they'd be at
+        // full size: a renderer that draws them like the rest still fits them.
+        var detail = Wrap(n.Detail, max, t => m.Width(t, SceneShapes.DetailSize, false));
+        var lines = own.Concat(detail).ToList();
         double tw = lines.Count == 0 ? 0 : lines.Max(width);
         double th = Math.Max(1, lines.Count) * LineHeight;
         double h = th + 2 * PadY;
+        int d = detail.Count;
         return n.Shape switch
         {
             NodeShape.Circle => Round(Math.Max(56, Math.Max(tw, th) + 36)),
+            NodeShape.DoubleCircle => Round(Math.Max(64, Math.Max(tw, th) + 44)),
             NodeShape.Decision => Diamond(),
-            NodeShape.Stadium => new Sized(Math.Max(MinWidth, tw + 2 * PadX + h / 2 - 6), h, lines),
-            NodeShape.Hexagon => new Sized(Math.Max(MinWidth, tw + 2 * PadX + h / 2), h, lines),
-            NodeShape.Subroutine => new Sized(Math.Max(MinWidth, tw + 2 * PadX + 16), h, lines),
-            NodeShape.Cylinder => new Sized(Math.Max(MinWidth, tw + 2 * PadX), h + 12, lines),
-            _ => new Sized(Math.Max(MinWidth, tw + 2 * PadX), h, lines),
+            NodeShape.Stadium => new Sized(Math.Max(MinWidth, tw + 2 * PadX + h / 2 - 6), h, lines, d),
+            NodeShape.Hexagon => new Sized(Math.Max(MinWidth, tw + 2 * PadX + h / 2), h, lines, d),
+            NodeShape.Subroutine => new Sized(Math.Max(MinWidth, tw + 2 * PadX + 16), h, lines, d),
+            NodeShape.Cylinder => new Sized(Math.Max(MinWidth, tw + 2 * PadX), h + 12, lines, d),
+            NodeShape.Parallelogram => new Sized(Math.Max(MinWidth, tw + 2 * PadX + SceneShapes.Slant(h)), h, lines, d),
+            NodeShape.Trapezoid => new Sized(Math.Max(MinWidth, tw + 2 * PadX + 2 * SceneShapes.Slant(h) * (1 - PadY / h)), h, lines, d),
+            _ => new Sized(Math.Max(MinWidth, tw + 2 * PadX), h, lines, d),
         };
 
-        Sized Round(double d) => new(d, d, lines);
+        Sized Round(double size) => new(size, size, lines, d);
 
         // A rhombus around the words: wide enough that their corners clear its sides, never taller than it needs.
         Sized Diamond()
         {
             double w = Math.Max(96, tw + th * 1.2 + 24);
             double hd = Math.Max(th + 30, th / (1 - tw / w) + 8);
-            return new Sized(w, hd, lines);
+            return new Sized(w, hd, lines, d);
         }
     }
 
@@ -311,7 +362,7 @@ public static class DiagramLayout
             {
                 var s = sizes[order[i]];
                 var node = f.Node(order[i])!;
-                nodes[i] = new SceneNode(node.Id, Box.Around(new Pt(rx * Math.Cos(angles[i]), ry * Math.Sin(angles[i])), s.W, s.H), node.Shape, node.Tone, s.Lines);
+                nodes[i] = Placed(node, s, Box.Around(new Pt(rx * Math.Cos(angles[i]), ry * Math.Sin(angles[i])), s.W, s.H));
             }
             bool crowded = false;
             for (int i = 0; i < n && !crowded; i++)
@@ -474,7 +525,7 @@ public static class DiagramLayout
         }
         double flip = dir is ChartDirection.BottomUp or ChartDirection.RightLeft ? -1 : 1;
         Pt Centre(string id) => vertical ? new Pt(across[id], flip * centreLine[depth[id]]) : new Pt(flip * centreLine[depth[id]], across[id]);
-        var nodes = f.Nodes.Select(x => new SceneNode(x.Id, Box.Around(Centre(x.Id), sizes[x.Id].W, sizes[x.Id].H), x.Shape, x.Tone, sizes[x.Id].Lines)).ToList();
+        var nodes = f.Nodes.Select(x => Placed(x, sizes[x.Id], Box.Around(Centre(x.Id), sizes[x.Id].W, sizes[x.Id].H))).ToList();
         var byId = nodes.ToDictionary(x => x.Id);
         var down = vertical ? new Pt(0, flip) : new Pt(flip, 0);
         var edges = new SceneEdge[f.Edges.Count];
@@ -883,7 +934,7 @@ public static class DiagramLayout
 
         // MSAGL's y points up; the scene's points down.
         static Pt P(MPoint p) => new(p.X, -p.Y);
-        var sceneNodes = f.Nodes.Select(n => new SceneNode(n.Id, Box.Around(P(nodes[n.Id].Center), sizes[n.Id].W, sizes[n.Id].H), n.Shape, n.Tone, sizes[n.Id].Lines)).ToList();
+        var sceneNodes = f.Nodes.Select(n => Placed(n, sizes[n.Id], Box.Around(P(nodes[n.Id].Center), sizes[n.Id].W, sizes[n.Id].H))).ToList();
         var byId = sceneNodes.ToDictionary(n => n.Id);
         var edges = new SceneEdge[f.Edges.Count];
         foreach (var (i, ge, reversed) in routed)
@@ -900,9 +951,20 @@ public static class DiagramLayout
                 ? new SceneEdge(e.From, e.To, Reverse(path), e.Line, e.StartEnd, e.EndEnd, targetTip, curveEnd, sourceTip, curveStart, labels[i].Lines, box)
                 : new SceneEdge(e.From, e.To, path, e.Line, e.StartEnd, e.EndEnd, sourceTip, curveStart, targetTip, curveEnd, labels[i].Lines, box);
         }
+        // A box with a loop was laid out wider than it is (room for the loop): an arrow that met that wider outline
+        // is brought on to the box's own.
+        foreach (var (i, _, _) in routed)
+        {
+            var e = f.Edges[i];
+            if (loops.Contains(e.From) || loops.Contains(e.To)) edges[i] = Reclipped(edges[i], e, byId[e.From], byId[e.To], loops);
+        }
         foreach (var (i, first, nth) in alongside) edges[i] = Beside(f.Edges[i], labels[i], edges[first], nth, byId[f.Edges[i].From], byId[f.Edges[i].To]);
         for (int i = 0; i < f.Edges.Count; i++)
-            if (f.Edges[i].From == f.Edges[i].To) edges[i] = Loop(f.Edges[i], byId[f.Edges[i].From], labels[i]);
+            if (f.Edges[i].From == f.Edges[i].To)
+            {
+                var n = byId[f.Edges[i].From];
+                edges[i] = Loop(f.Edges[i], n, labels[i], QuietSide(n, edges.Where((x, j) => x is not null && j != i && f.Edges[j].From != f.Edges[j].To)!));
+            }
         var groups = f.Groups.Select(group =>
         {
             var r = clusters[group.Id].BoundingBox;
@@ -956,6 +1018,42 @@ public static class DiagramLayout
             box = Box.Around(middle + away * (Math.Abs(away.X) * label.W / 2 + Math.Abs(away.Y) * label.H / 2 + 4), label.W, label.H);
         }
         return new SceneEdge(e.From, e.To, path, e.Line, e.StartEnd, e.EndEnd, startTip, startBase, tip, endBase, label.Lines, box);
+    }
+
+    /// <summary>An arrow ending on the outline of a box laid out wider than it is (see <see cref="Layered"/>), ended on
+    /// the box's own outline instead, its last stretch aimed at the box's middle; its markers cut again.</summary>
+    static SceneEdge Reclipped(SceneEdge e, FlowEdge fe, SceneNode from, SceneNode to, HashSet<string> wide)
+    {
+        var points = Flatten(e);
+        static void EndOn(List<Pt> pts, SceneNode n)
+        {
+            int k = pts.Count - 1;
+            while (k > 0 && Outline(n, pts[k]) <= 0) k--;
+            if (Outline(n, pts[k]) <= 0) return;
+            var outside = pts[k];
+            var inside = n.Box.Center;
+            for (int i = 0; i < 40; i++)
+            {
+                var mid = (outside + inside) * 0.5;
+                if (Outline(n, mid) > 0) outside = mid; else inside = mid;
+            }
+            pts.RemoveRange(k + 1, pts.Count - k - 1);
+            pts.Add(inside);
+        }
+        if (wide.Contains(to.Id)) EndOn(points, to);
+        if (wide.Contains(from.Id))
+        {
+            points.Reverse();
+            EndOn(points, from);
+            points.Reverse();
+        }
+        if (points.Count < 2) return e;
+        var (startTip, startBase) = Cut(points, MarkerLength(fe.StartEnd), fromEnd: false);
+        var (tip, endBase) = Cut(points, MarkerLength(fe.EndEnd), fromEnd: true);
+        var path = new List<PathStep> { new(PathVerb.Move, startBase) };
+        path.AddRange(points.Skip(1).SkipLast(1).Select(p => new PathStep(PathVerb.Line, p)));
+        path.Add(new PathStep(PathVerb.Line, endBase));
+        return e with { Path = path, StartTip = startTip, StartBase = startBase, Tip = tip, Base = endBase };
     }
 
     /// <summary>The same line with a point at least every <paramref name="spacing"/> pixels along it.</summary>
@@ -1127,8 +1225,14 @@ public static class DiagramLayout
         var c = new MPoint();
         switch (shape)
         {
-            case NodeShape.Circle:
+            case NodeShape.Circle or NodeShape.DoubleCircle:
                 return CurveFactory.CreateCircle(w / 2, c);
+            case NodeShape.Parallelogram or NodeShape.Trapezoid:
+                double slant = SceneShapes.Slant(h);
+                bool para = shape == NodeShape.Parallelogram;
+                return new Polyline(
+                    new MPoint(-w / 2 + slant, h / 2), new MPoint(para ? w / 2 : w / 2 - slant, h / 2),
+                    new MPoint(para ? w / 2 - slant : w / 2, -h / 2), new MPoint(-w / 2, -h / 2)) { Closed = true };
             case NodeShape.Decision:
                 return CurveFactory.CreateDiamond(w / 2, h / 2, c);
             case NodeShape.Hexagon:
@@ -1148,6 +1252,7 @@ public static class DiagramLayout
         NodeShape.Stadium => h / 2 - 0.5,
         NodeShape.Rounded => Math.Min(RoundedRadius, h / 2 - 0.5),
         NodeShape.Cylinder => 4,
+        NodeShape.Circle or NodeShape.DoubleCircle => h / 2,
         _ => BoxRadius,
     };
 
@@ -1177,16 +1282,45 @@ public static class DiagramLayout
         }
     }
 
-    /// <summary>An arrow from a box back to itself: a small loop off its right side.</summary>
-    static SceneEdge Loop(FlowEdge e, SceneNode n, Words label)
+    /// <summary>The side of a box (right, top, bottom or left, as a unit vector) the fewest of its other arrows meet:
+    /// where its loop goes.</summary>
+    static Pt QuietSide(SceneNode n, IEnumerable<SceneEdge> others)
     {
-        var b = n.Box;
-        double cy = b.Center.Y, right = Along(n, new Pt(1, 0), 0).X;
-        var start = new Pt(right, cy - 7);
-        var tip = new Pt(right, cy + 7);
-        var endBase = tip + new Pt(8, 4);
-        var path = new List<PathStep> { new(PathVerb.Move, start), new(PathVerb.Cubic, new Pt(right + 30, cy - 26), new Pt(right + 32, cy + 22), endBase) };
-        var box = label.Lines.Count > 0 ? new Box(right + 30, cy - label.H / 2, label.W, label.H) : new Box();
+        Pt[] sides = [new(1, 0), new(0, -1), new(0, 1), new(-1, 0)];
+        var count = new int[4];
+        foreach (var e in others)
+        {
+            foreach (var (id, at) in new[] { (e.From, e.StartTip), (e.To, e.Tip) })
+            {
+                if (id != n.Id) continue;
+                var d = (at - n.Box.Center).Unit();
+                int best = 0;
+                for (int k = 1; k < 4; k++) if (d.X * sides[k].X + d.Y * sides[k].Y > d.X * sides[best].X + d.Y * sides[best].Y) best = k;
+                count[best]++;
+            }
+        }
+        int pick = 0;
+        for (int k = 1; k < 4; k++) if (count[k] < count[pick]) pick = k;
+        return sides[pick];
+    }
+
+    /// <summary>An arrow from a box back to itself: a small loop off its <paramref name="side"/> (its right, unless
+    /// another side is quieter), its words just beyond it.</summary>
+    static SceneEdge Loop(FlowEdge e, SceneNode n, Words label, Pt? side = null)
+    {
+        var o = side ?? new Pt(1, 0);
+        var a = new Pt(-o.Y, o.X);
+        var p = Along(n, o, 0);
+        var start = p - a * 7;
+        var tip = p + a * 7;
+        var endBase = tip + o * 8 + a * 4;
+        var path = new List<PathStep> { new(PathVerb.Move, start), new(PathVerb.Cubic, p + o * 30 - a * 26, p + o * 32 + a * 22, endBase) };
+        var box = new Box();
+        if (label.Lines.Count > 0)
+        {
+            double reach = 34 + (Math.Abs(o.X) * label.W + Math.Abs(o.Y) * label.H) / 2;
+            box = Box.Around(p + o * reach, label.W, label.H);
+        }
         return new SceneEdge(e.From, e.To, path, e.Line, EdgeEnd.None, e.EndEnd, start, start, e.EndEnd == EdgeEnd.None ? endBase : tip, endBase, label.Lines, box);
     }
 
@@ -1202,11 +1336,10 @@ public static class DiagramLayout
         {
             case NodeShape.Decision:
                 return Polygon(p, [new Pt(c.X, b.Y), new Pt(b.Right, c.Y), new Pt(c.X, b.Bottom), new Pt(b.X, c.Y)]);
-            case NodeShape.Hexagon:
-                double inset = b.H / 4;
-                return Polygon(p, [new Pt(b.X, c.Y), new Pt(b.X + inset, b.Y), new Pt(b.Right - inset, b.Y), new Pt(b.Right, c.Y), new Pt(b.Right - inset, b.Bottom), new Pt(b.X + inset, b.Bottom)]);
+            case NodeShape.Hexagon or NodeShape.Parallelogram or NodeShape.Trapezoid:
+                return Polygon(p, SceneShapes.Corners(n)!);
             default:
-                double r = n.Shape == NodeShape.Circle ? hw : Radius(n.Shape, b.H);
+                double r = n.Shape is NodeShape.Circle or NodeShape.DoubleCircle ? hw : Radius(n.Shape, b.H);
                 double qx = Math.Abs(p.X - c.X) - (hw - r), qy = Math.Abs(p.Y - c.Y) - (hh - r);
                 double outside = Math.Sqrt(Math.Max(qx, 0) * Math.Max(qx, 0) + Math.Max(qy, 0) * Math.Max(qy, 0));
                 return outside + Math.Min(Math.Max(qx, qy), 0) - r;

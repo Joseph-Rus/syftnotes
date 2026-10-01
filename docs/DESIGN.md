@@ -41,9 +41,13 @@ laptop                                          library (a Mac mini, say — any
    and enqueues it (`Store.Enqueue`). `Pipeline.ProcessAsync` then, in the background: writes study
    notes from the transcript with the picked AI engine, has the diagrams engine design their diagrams
    (`DiagramDesign`: it reads the timed transcript and the notes, decides whether anything is clearer
-   as a picture, answers in JSON that's checked strictly, and each diagram it designs goes at the end
-   of its section, repaired once or left out if it doesn't draw; a pass that fails leaves the notes
-   exactly as written), sorts it into a class (the recorded class or
+   as a picture and which kind fits — a flowchart, in groups for a big topic, a state or sequence
+   diagram, a timeline or a mind map (`Mermaid` reads them all into one model; `DiagramLayout` lays
+   each out) — answers in JSON that's checked strictly, and each diagram it designs goes at the end
+   of its section, repaired once or left out if it doesn't draw or isn't true to the lecture;
+   `DiagramLint` then lays each out at the notes' width, and one that would look wrong goes back once,
+   its redesign kept only when better; a pass that fails leaves the notes exactly as written), sorts
+   it into a class (the recorded class or
    a title match wins outright; otherwise the AI reads the notes against each class's name, other
    names, what it covers and its Canvas course's name, and picks one with a strict schema, or it goes
    to Unsorted), and saves it as Markdown under `<library folder>/<Class>/`.

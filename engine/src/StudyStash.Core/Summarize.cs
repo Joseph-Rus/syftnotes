@@ -136,6 +136,7 @@ public static partial class Summarize
         if (svg)
             text += $$"""
 
+                Other Mermaid kinds are drawn too, when they fit better: stateDiagram-v2 for states and the events between them (an automaton: [*] --> q0, q0 --> q1 : a, class q2 accept), sequenceDiagram for who sends what to whom in order (A->>B: request, B-->>A: reply), timeline for events in order (1857 : event), and mindmap for a topic's themes by indentation.
 
                 Draw something spatial (a labelled structure, a physics setup with its forces, a circuit, the graph of a function, a data structure in memory) as SVG instead, in a ```svg block: {{SvgRules}} For example:
                 ```svg
@@ -415,7 +416,8 @@ public static partial class Summarize
         foreach (var (block, why) in broken)
         {
             bool svg = block.Kind == NoteBlockKind.Svg;
-            string prompt = $"This {(svg ? "SVG drawing" : "Mermaid flowchart")} has a problem: {why!.TrimEnd('.')}. "
+            string what = svg ? "SVG drawing" : NoteBlocks.StartsAsFlowchart(block.Text) ? "Mermaid flowchart" : "Mermaid diagram";
+            string prompt = $"This {what} has a problem: {why!.TrimEnd('.')}. "
                 + $"Reply with only the corrected block.\n\n```{(svg ? "svg" : "mermaid")}\n{block.Text}\n```";
             try
             {

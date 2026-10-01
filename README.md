@@ -186,12 +186,16 @@ Setup's notes step shows these commands with a Copy button, opens Terminal for y
 
 **Draws diagrams** is a pick of its own. Once a lecture's notes are written, a stronger model reads
 its timed transcript and the notes, decides whether the lecture teaches anything a picture makes
-clearer (a process, a cycle, a pathway, a decision rule, a hierarchy, a structure, a timeline, a
-comparison, or something spatial like the forces on an object), and if it does, designs it from
-what the lecturer said and puts it at the end of the section it illustrates, with a title, a
-short caption and the moment of the lecture it comes from. Most lectures get one at most (never
-more than three), one under about three minutes gets none, and so does a lecture of discussion,
-admin or definitions.
+clearer (a process, a cycle, a pathway, a decision rule, a hierarchy, a structure, states and what
+moves between them, an exchange between parties, a timeline, a topic's themes, a comparison, or
+something spatial like the forces on an object), and if it does, designs it from what the lecturer
+said and puts it at the end of the section it illustrates, with a title, a caption that says what
+to notice, and the moment of the lecture it comes from. It picks the kind that fits: a flowchart
+(a big topic as up to 36 boxes in groups, each box carrying the lecture's numbers and conditions in
+smaller words), a state diagram (an automaton's accepting states double-circled), a sequence
+diagram, a timeline or a mind map. A lecture gets one per idea worth drawing — up to four for a long
+one — one under about three minutes gets none, and so does a lecture of discussion, admin or
+definitions.
 
 - **Automatic** (the default) uses the strongest engine that already reads your lectures — the one
   that writes your notes or answers your questions — trying Claude Code (Opus, high effort), then
@@ -204,9 +208,12 @@ admin or definitions.
   **Off** leaves them out.
 
 A diagram that doesn't draw goes back once to be fixed and is otherwise left out, as is one with
-too many boxes or words the lecture never said. If the diagrams can't be designed (the engine is
-busy, over its limit, or takes longer than 8 minutes), the notes are kept exactly as written. The
-library's log says what was drawn, or why nothing was.
+too many boxes or words the lecture never said. Each one kept is laid out at the notes' width and
+looked over; one that would look wrong (too wide to read, arrows crossing, a sentence in a box, a
+big chart with no groups) goes back once with what's wrong, while there's time, and its redesign is
+used only when it's better. If the diagrams can't be designed (the engine is busy, over its limit,
+or takes longer than 8 minutes), the notes are kept exactly as written. The library's log says
+what was drawn and redesigned, or why nothing was.
 
 ## Notes
 
@@ -216,8 +223,10 @@ the notes, in a quick answer and in the Ask chat:
 - **Formulas** are LaTeX (`$...$` inline, `$$...$$` on their own line), typeset in the app's own
   type, light or dark. One CSharpMath can't typeset shows its plain source instead, calmly.
 - **Diagrams**: a process, cycle, pathway or hierarchy comes back as a Mermaid flowchart
-  (` ```mermaid `) and is drawn natively, in the theme's colours; something spatial (a structure, a
-  physics setup, a circuit) comes back as a sanitised SVG. They're designed after the notes by the
+  (` ```mermaid `) and is drawn natively, in the theme's colours — a big one in groups, laid out as
+  columns of its groups with square arrows between them; Mermaid state diagrams (automata too),
+  sequence diagrams, timelines and mind maps are drawn natively as well; something spatial (a
+  structure, a physics setup, a circuit) comes back as a sanitised SVG. They're designed after the notes by the
   engine that **Draws diagrams** (see [AI engines](#ai-engines)), each under a bold title with a
   caption and the moment of the lecture it comes from; rewriting a lecture's notes designs them
   again rather than adding more. Either kind opens larger on a click, and a diagram Study Stash

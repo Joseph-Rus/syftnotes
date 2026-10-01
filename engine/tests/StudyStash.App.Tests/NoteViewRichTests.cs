@@ -31,7 +31,7 @@ public class NoteViewRichTests
         Fence("svg", RichDemo.FourChambers),
         Fence("mermaid", RichDemo.BrokenChart),
         "- Blood flow, in a bullet:\n\n  " + Fence("mermaid", RichDemo.BloodFlow).Replace("\n", "\n  "),
-        Fence("mermaid", RichDemo.PainConversation),
+        Fence("mermaid", RichDemo.ClassChart),
         Fence("svg", """<!DOCTYPE svg [<!ENTITY a "a">]><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 9"><text>&a;</text></svg>"""),
         "```mermaid\nflowchart LR\n  A[Assess] --> B[Act");
 
@@ -76,9 +76,9 @@ public class NoteViewRichTests
         // The bullet's diagram sits inside the list, not after it.
         Assert.Contains(pieces[3].GetLogicalAncestors(), a => a is Grid);
         Assert.Equal("Line 2 has a box that isn't closed: “B[Give the dose”.", ((DiagramCard)pieces[2]).Reason);
-        Assert.Equal("Study Stash draws flowcharts; this is a sequence diagram.", ((DiagramCard)pieces[4]).Reason);
+        Assert.Equal("Study Stash draws flowcharts, state and sequence diagrams, timelines and mind maps; this is a class diagram.", ((DiagramCard)pieces[4]).Reason);
         Assert.Equal("This drawing declares its own document type, which isn't allowed.", ((DiagramCard)pieces[5]).Reason);
-        Assert.Contains("sequenceDiagram", ((DiagramCard)pieces[4]).Source);
+        Assert.Contains("classDiagram", ((DiagramCard)pieces[4]).Source);
         Assert.All(pieces.Take(2).Append(pieces[3]), p => Assert.True(p.Bounds.Width > 100 && p.Bounds.Height > 50, $"{p.GetType().Name} {p.Bounds}"));
         window.Close();
     }

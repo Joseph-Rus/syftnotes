@@ -7,8 +7,9 @@ namespace StudyStash.Core.Rich;
 /// <summary>Which way a flowchart reads: top to bottom (the default), bottom to top, left to right, right to left.</summary>
 public enum ChartDirection { TopDown, BottomUp, LeftRight, RightLeft }
 
-/// <summary>A box's outline. Mermaid's rarer shapes (trapezoids, flags) are drawn as plain boxes.</summary>
-public enum NodeShape { Box, Rounded, Stadium, Circle, Decision, Hexagon, Subroutine, Cylinder }
+/// <summary>A box's outline. A parallelogram is an input or output, a trapezoid a manual step, a double circle an
+/// accepting state (or a state diagram's end); Mermaid's rarer shapes (flags) are drawn as plain boxes.</summary>
+public enum NodeShape { Box, Rounded, Stadium, Circle, Decision, Hexagon, Subroutine, Cylinder, Parallelogram, Trapezoid, DoubleCircle }
 
 /// <summary>A box's colour, when the colour means something (oxygen-rich red, oxygen-poor blue).</summary>
 public enum Tone { None, Accent, Red, Blue, Green, Amber, Purple }
@@ -19,11 +20,46 @@ public enum EdgeLine { Solid, Dotted, Thick }
 /// <summary>What sits at an end of an arrow's line.</summary>
 public enum EdgeEnd { None, Arrow, Circle, Cross }
 
-/// <summary>A box: its id in the source, its words (one entry per line the writer broke), its outline and colour.</summary>
+/// <summary>
+/// What kind of diagram a chart is, from its first line: a flowchart (a process, a decision, a pathway, a concept map),
+/// a state diagram (states and the events between them, an automaton), a sequence diagram (who sends what to whom, in
+/// order), a timeline (periods and what happened in each) or a mind map (a topic broken into its themes). Every kind
+/// is read into the same boxes, arrows and groups, so search, export and drawing treat them alike.
+/// </summary>
+public enum ChartForm { Flowchart, State, Sequence, Timeline, Mindmap }
+
+/// <summary>What a box is in its kind of diagram, where that changes how it's laid out or drawn: a state diagram's
+/// start and end and its fork and join bars, a note, a sequence diagram's actor, a timeline's period and its events,
+/// a mind map's root.</summary>
+public enum NodeRole { Plain, Start, End, Note, Actor, Period, Event, Root, Bar }
+
+/// <summary>A box: its id in the source, its words (one entry per line the writer broke), its outline and colour.
+/// <see cref="Detail"/> is a second, smaller line or two of words under them (a step's where or what); <see
+/// cref="Role"/> what it is in its kind of diagram.</summary>
 public sealed record FlowNode(string Id, IReadOnlyList<string> Lines, NodeShape Shape, Tone Tone)
 {
     /// <summary>The box's words on one line.</summary>
     public string Label => string.Join(" ", Lines);
+
+    /// <summary>The smaller words under the box's own, one entry per line (none for most boxes).</summary>
+    public IReadOnlyList<string> Detail { get; init; } = [];
+
+    public NodeRole Role { get; init; }
+}
+
+/// <summary>What a row of a sequence diagram is: a message (an arrow), a note, or the start, divider or end of a
+/// block (a loop, alternatives, an option, things in parallel).</summary>
+public enum StepKind { Message, Note, Open, Else, Close }
+
+/// <summary>
+/// One row of a sequence diagram, in order. A message is <see cref="Flowchart.Edges"/>[<see cref="Index"/>]; a note
+/// is the box <see cref="Text"/> names, <see cref="Where"/> its side ("left of", "right of", "over") of the
+/// participants <see cref="Over"/>; a block's start has its keyword in <see cref="Where"/> (loop, alt, opt, par,
+/// critical, break) and its words in <see cref="Text"/>, and a divider its keyword (else, and, option) and words.
+/// </summary>
+public sealed record SeqStep(StepKind Kind, string Text = "", int Index = -1, string Where = "")
+{
+    public IReadOnlyList<string> Over { get; init; } = [];
 }
 
 /// <summary>An arrow (or a plain line) from one box to another, with its words, if any.</summary>
@@ -62,17 +98,29 @@ public sealed class Flowchart
         Groups = groups;
     }
 
-    /// <summary>Reads a flowchart; anything it can't draw throws a <see cref="MermaidException"/>, never anything else.</summary>
+    /// <summary>Reads a diagram (a flowchart, a state or sequence diagram, a timeline or a mind map); anything it
+    /// can't draw throws a <see cref="MermaidException"/>, never anything else.</summary>
     public static Flowchart Parse(string source) => Mermaid.Parse(source);
 
+    /// <summary>What kind of diagram this is (a flowchart unless its first line said otherwise).</summary>
+    public ChartForm Form { get; init; }
+
+    /// <summary>A sequence diagram's rows in order (its messages, notes and blocks); empty for every other kind.</summary>
+    public IReadOnlyList<SeqStep> Steps { get; init; } = [];
+
+    /// <summary>A sequence diagram whose messages are numbered (Mermaid's autonumber).</summary>
+    public bool Numbered { get; init; }
+
     /// <summary>The same flowchart, laid out another way (the app turns a too-wide left-to-right chart top-down).</summary>
-    public Flowchart WithDirection(ChartDirection direction) => new(direction, Title, Nodes, Edges, Groups);
+    public Flowchart WithDirection(ChartDirection direction) =>
+        new(direction, Title, Nodes, Edges, Groups) { Form = Form, Steps = Steps, Numbered = Numbered };
 
     public FlowNode? Node(string id) => Nodes.FirstOrDefault(n => n.Id == id);
 
     /// <summary>
     /// The chart's words in reading order, for search and screen readers: each arrow's boxes and words in the order
-    /// the arrows were written (a box once), then any box no arrow touches, then the groups' titles.
+    /// the arrows were written (a box once, its smaller words after its own), then any box no arrow touches, then the
+    /// groups' titles (a sequence diagram's blocks, where they open).
     /// </summary>
     public IReadOnlyList<string> Labels()
     {
@@ -80,7 +128,21 @@ public sealed class Flowchart
         var words = new List<string>();
         void Box(string id)
         {
-            if (said.Add(id) && Node(id) is { } n && n.Label.Length > 0) words.Add(n.Label);
+            if (!said.Add(id) || Node(id) is not { } n) return;
+            if (n.Label.Length > 0) words.Add(n.Label);
+            if (n.Detail.Count > 0) words.Add(string.Join(" ", n.Detail));
+        }
+        if (Form == ChartForm.Sequence)
+        {
+            foreach (var n in Nodes.Where(n => n.Role != NodeRole.Note)) Box(n.Id);
+            foreach (var step in Steps)
+            {
+                if (step.Kind == StepKind.Message && step.Index >= 0 && step.Index < Edges.Count && Edges[step.Index].Label is { Length: > 0 } said1)
+                    words.Add(said1.Replace('\n', ' '));
+                else if (step.Kind == StepKind.Note) Box(step.Text);
+                else if (step.Kind is StepKind.Open or StepKind.Else && step.Text.Length > 0) words.Add(step.Text);
+            }
+            return words;
         }
         foreach (var e in Edges)
         {
@@ -94,11 +156,57 @@ public sealed class Flowchart
     }
 
     /// <summary>
+    /// The overview of a chart whose boxes are in groups: each outermost group as one box (its title, in its place),
+    /// the boxes in no group as they are, and one arrow for each pair of them an arrow joined (its words kept when
+    /// every arrow between them said the same). What a folded chart shows, and what the designer is held to: a big
+    /// diagram's groups must read as a diagram of their own. Null for a chart with no groups, or one whose kind
+    /// doesn't fold (a sequence diagram, a timeline, a mind map).
+    /// </summary>
+    public Flowchart? Folded()
+    {
+        if (Groups.Count == 0 || Form is not (ChartForm.Flowchart or ChartForm.State)) return null;
+        var parent = Groups.ToDictionary(g => g.Id, g => g.Parent);
+        string Top(string group)
+        {
+            while (parent.TryGetValue(group, out var p) && p is not null) group = p;
+            return group;
+        }
+        var unitOf = new Dictionary<string, string>();
+        foreach (var g in Groups)
+            foreach (string m in g.Members) unitOf[m] = Top(g.Id);
+        string Unit(string id) => unitOf.TryGetValue(id, out var u) ? u : id;
+        var nodes = new List<FlowNode>();
+        var placed = new HashSet<string>();
+        foreach (var n in Nodes)
+        {
+            string u = Unit(n.Id);
+            if (!placed.Add(u)) continue;
+            if (u == n.Id) nodes.Add(n);
+            else
+            {
+                var g = Groups.First(x => x.Id == u);
+                int inside = Nodes.Count(x => Unit(x.Id) == u && x.Role is not (NodeRole.Start or NodeRole.End or NodeRole.Note));
+                nodes.Add(new FlowNode(u, g.Title.Length > 0 ? [g.Title] : [u], NodeShape.Rounded, Tone.None) { Detail = [inside == 1 ? "1 box" : $"{inside} boxes"] });
+            }
+        }
+        var edges = new List<FlowEdge>();
+        foreach (var pair in Edges.Select(e => (e, From: Unit(e.From), To: Unit(e.To))).Where(x => x.From != x.To).GroupBy(x => (x.From, x.To)))
+        {
+            var first = pair.First().e;
+            var words = pair.Select(x => x.e.Label).Distinct().ToList();
+            edges.Add(new FlowEdge(pair.Key.From, pair.Key.To, words.Count == 1 ? words[0] : null, first.Line, first.StartEnd, first.EndEnd));
+        }
+        return new Flowchart(Direction, Title, nodes, edges, []);
+    }
+
+    /// <summary>
     /// The chart as canonical Mermaid, every label quoted, so any Mermaid reader (Obsidian, Typora, GitHub) draws
-    /// what this lenient reader read: every box in order, then the groups naming their boxes, then the arrows.
+    /// what this lenient reader read: every box in order, then the groups naming their boxes, then the arrows. A
+    /// state or sequence diagram, a timeline or a mind map is written back as its own kind.
     /// </summary>
     public string ToSource()
     {
+        if (Form != ChartForm.Flowchart) return Mermaid.KindSource(this);
         var sb = new StringBuilder();
         if (Title is { Length: > 0 } title) sb.Append("---\ntitle: ").Append(title.Replace('\n', ' ')).Append("\n---\n");
         sb.Append("flowchart ").Append(Direction switch
@@ -115,13 +223,16 @@ public sealed class Flowchart
                 NodeShape.Rounded => ("(", ")"),
                 NodeShape.Stadium => ("([", "])"),
                 NodeShape.Circle => ("((", "))"),
+                NodeShape.DoubleCircle => ("(((", ")))"),
                 NodeShape.Decision => ("{", "}"),
                 NodeShape.Hexagon => ("{{", "}}"),
                 NodeShape.Subroutine => ("[[", "]]"),
                 NodeShape.Cylinder => ("[(", ")]"),
+                NodeShape.Parallelogram => ("[/", "/]"),
+                NodeShape.Trapezoid => ("[/", "\\]"),
                 _ => ("[", "]"),
             };
-            sb.Append("  ").Append(n.Id).Append(open).Append(Quote(string.Join("\n", n.Lines))).Append(close);
+            sb.Append("  ").Append(n.Id).Append(open).Append(BoxWords(n)).Append(close);
             if (n.Tone != Tone.None) sb.Append(":::").Append(n.Tone.ToString().ToLowerInvariant());
             sb.Append('\n');
         }
@@ -163,21 +274,32 @@ public sealed class Flowchart
 
     /// <summary>A label in Mermaid's quotes: its quotes and anything that would read as an entity or a tag escaped,
     /// its line breaks as &lt;br&gt;.</summary>
-    static string Quote(string text) =>
-        "\"" + Regex.Replace(text, @"[#&](?=#?\w+;)|<(?=[A-Za-z/])", m => m.Value switch { "#" => "#35;", "&" => "#38;", _ => "#lt;" })
-            .Replace("\"", "#quot;").Replace("\n", "<br>") + "\"";
+    internal static string Quote(string text) => "\"" + Escape(text) + "\"";
+
+    static string Escape(string text) =>
+        Regex.Replace(text, @"[#&](?=#?\w+;)|<(?=[A-Za-z/])", m => m.Value switch { "#" => "#35;", "&" => "#38;", _ => "#lt;" })
+            .Replace("\"", "#quot;").Replace("\n", "<br>");
+
+    /// <summary>A box's words quoted, its smaller words after them in &lt;small&gt; (which Mermaid itself draws small).</summary>
+    internal static string BoxWords(FlowNode n) => n.Detail.Count == 0
+        ? Quote(string.Join("\n", n.Lines))
+        : "\"" + Escape(string.Join("\n", n.Lines)) + "<br><small>" + Escape(string.Join("\n", n.Detail)) + "</small>\"";
 }
 
-/// <summary>Reads Mermaid flowchart source into a <see cref="Flowchart"/>.</summary>
+/// <summary>Reads Mermaid source (a flowchart, a state or sequence diagram, a timeline or a mind map) into a
+/// <see cref="Flowchart"/>.</summary>
 public static partial class Mermaid
 {
+    /// <summary>What every kind Study Stash draws is called, for a reason given about one it doesn't.</summary>
+    public const string Drawn = "Study Stash draws flowcharts, state and sequence diagrams, timelines and mind maps";
+
     static readonly Dictionary<string, string> OtherKinds = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["sequenceDiagram"] = "a sequence diagram", ["zenuml"] = "a sequence diagram", ["classDiagram"] = "a class diagram",
-        ["classDiagram-v2"] = "a class diagram", ["stateDiagram"] = "a state diagram", ["stateDiagram-v2"] = "a state diagram",
+        ["zenuml"] = "a ZenUML sequence diagram", ["classDiagram"] = "a class diagram",
+        ["classDiagram-v2"] = "a class diagram",
         ["erDiagram"] = "an entity-relationship diagram", ["journey"] = "a user journey", ["gantt"] = "a Gantt chart",
         ["pie"] = "a pie chart", ["quadrantChart"] = "a quadrant chart", ["requirementDiagram"] = "a requirement diagram",
-        ["gitGraph"] = "a git graph", ["mindmap"] = "a mind map", ["timeline"] = "a timeline", ["sankey-beta"] = "a Sankey diagram",
+        ["gitGraph"] = "a git graph", ["sankey-beta"] = "a Sankey diagram",
         ["sankey"] = "a Sankey diagram", ["xychart-beta"] = "an XY chart", ["xychart"] = "an XY chart", ["block-beta"] = "a block diagram",
         ["block"] = "a block diagram", ["packet-beta"] = "a packet diagram", ["packet"] = "a packet diagram", ["kanban"] = "a kanban board",
         ["architecture-beta"] = "an architecture diagram", ["architecture"] = "an architecture diagram", ["radar-beta"] = "a radar chart",
@@ -185,19 +307,37 @@ public static partial class Mermaid
         ["C4Component"] = "a C4 diagram", ["C4Dynamic"] = "a C4 diagram", ["C4Deployment"] = "a C4 diagram",
     };
 
+    /// <summary>The kinds besides flowcharts that are read, by the word their first line starts with.</summary>
+    static readonly Dictionary<string, ChartForm> Kinds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["stateDiagram"] = ChartForm.State, ["stateDiagram-v2"] = ChartForm.State, ["sequenceDiagram"] = ChartForm.Sequence,
+        ["timeline"] = ChartForm.Timeline, ["mindmap"] = ChartForm.Mindmap,
+    };
+
     static readonly HashSet<string> Ignored = new(StringComparer.Ordinal)
     {
         "classDef", "style", "linkStyle", "click", "callback", "accTitle", "accDescr", "direction",
     };
 
-    /// <summary>The shapes, longest opener first so "((" wins over "(".</summary>
+    /// <summary>The shapes, longest opener first so "((" wins over "(". A slanted box is a parallelogram when both its
+    /// sides lean the same way (/…/ or \…\), a trapezoid when they don't (see <see cref="Slanted"/>).</summary>
     static readonly (string Open, string[] Close, NodeShape Shape)[] Shapes =
     [
-        ("(((", [")))"], NodeShape.Circle), ("([", ["])"], NodeShape.Stadium), ("((", ["))"], NodeShape.Circle),
-        ("[[", ["]]"], NodeShape.Subroutine), ("[(", [")]"], NodeShape.Cylinder), ("[/", ["/]", "\\]"], NodeShape.Box),
-        ("[\\", ["\\]", "/]"], NodeShape.Box), ("{{", ["}}"], NodeShape.Hexagon), ("[", ["]"], NodeShape.Box),
+        ("(((", [")))"], NodeShape.DoubleCircle), ("([", ["])"], NodeShape.Stadium), ("((", ["))"], NodeShape.Circle),
+        ("[[", ["]]"], NodeShape.Subroutine), ("[(", [")]"], NodeShape.Cylinder), ("[/", ["/]", "\\]"], NodeShape.Parallelogram),
+        ("[\\", ["\\]", "/]"], NodeShape.Parallelogram), ("{{", ["}}"], NodeShape.Hexagon), ("[", ["]"], NodeShape.Box),
         ("(", [")"], NodeShape.Rounded), ("{", ["}"], NodeShape.Decision), (">", ["]"], NodeShape.Box),
     ];
+
+    /// <summary>A slanted box's shape from how it opened and closed: [/…/] and [\…\] are parallelograms, [/…\] and
+    /// [\…/] trapezoids.</summary>
+    static NodeShape Slanted(string open, string close) => open[^1] == close[0] ? NodeShape.Parallelogram : NodeShape.Trapezoid;
+
+    /// <summary>How many characters a box's smaller words may run to, all told.</summary>
+    public const int MaxDetail = 120;
+
+    [GeneratedRegex(@"<small>(.*?)</small>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex Small();
 
     [GeneratedRegex(@"<br\s*/?>", RegexOptions.IgnoreCase)]
     private static partial Regex LineBreak();
@@ -218,15 +358,17 @@ public static partial class Mermaid
     [GeneratedRegex(@"\$(?!\s)([^$]+?)(?<!\s)\$(?!\d)")]
     private static partial Regex InlineMath();
 
-    /// <summary>Reads a flowchart; anything it can't draw throws a <see cref="MermaidException"/>, never anything else.</summary>
+    /// <summary>Reads a diagram; anything it can't draw throws a <see cref="MermaidException"/>, never anything else.</summary>
     public static Flowchart Parse(string source)
     {
         if (string.IsNullOrWhiteSpace(source)) throw new MermaidException("There's no diagram here.", 0);
         if (source.Length > Flowchart.MaxSource) throw new MermaidException("This diagram is too long to draw (over 8 KB).", 0);
+        var form = FormOf(source);
         var reader = new Reader();
+        var kind = form is ChartForm.Flowchart ? null : new KindReader(form);
         try
         {
-            return reader.Read(source);
+            return kind is null ? reader.Read(source) : kind.Read(source);
         }
         catch (MermaidException)
         {
@@ -234,18 +376,70 @@ public static partial class Mermaid
         }
         catch (Exception)
         {
-            throw new MermaidException($"Couldn't read line {reader.LineNumber} of this diagram.", reader.LineNumber);
+            int line = kind?.LineNumber ?? reader.LineNumber;
+            throw new MermaidException($"Couldn't read line {line} of this diagram.", line);
         }
+    }
+
+    /// <summary>The kind a source says it is on its first line (after any front matter); a flowchart when it says
+    /// none this reader knows (the flowchart reader then says why it can't draw it).</summary>
+    static ChartForm FormOf(string source)
+    {
+        var lines = source.ReplaceLineEndings("\n").Split('\n');
+        int i = BodyStart(lines, out _);
+        if (i >= lines.Length) return ChartForm.Flowchart;
+        string line = lines[i].Trim();
+        int n = 0;
+        while (n < line.Length && (char.IsLetterOrDigit(line[n]) || line[n] == '-')) n++;
+        return Kinds.TryGetValue(line[..n], out var form) ? form : ChartForm.Flowchart;
+    }
+
+    /// <summary>Where a source's first line that says something is (front matter, blank lines and comments before it
+    /// skipped, the front matter's title kept); past the end when there's none.</summary>
+    static int BodyStart(string[] lines, out string? title)
+    {
+        title = null;
+        int i = 0;
+        static bool Blank(string l) => l.Trim().Length == 0 || l.TrimStart().StartsWith("%%", StringComparison.Ordinal);
+        while (i < lines.Length && Blank(lines[i])) i++;
+        if (i < lines.Length && lines[i].Trim() == "---")
+        {
+            for (i++; i < lines.Length && lines[i].Trim() != "---"; i++)
+                if (lines[i].TrimStart().StartsWith("title:", StringComparison.Ordinal)) title = Words(lines[i].Trim()[6..]) is { Count: > 0 } w ? string.Join(" ", w) : null;
+            i++;
+            while (i < lines.Length && Blank(lines[i])) i++;
+        }
+        return i;
     }
 
     /// <summary>A label as the writer meant it: quotes and markdown ticks gone, entities decoded, &lt;br&gt; as line
     /// breaks, other HTML dropped, maths made plain, at most <see cref="Flowchart.MaxLabel"/> characters.</summary>
-    internal static List<string> Words(string raw)
+    internal static List<string> Words(string raw) => Plain(Unquoted(raw), Flowchart.MaxLabel);
+
+    /// <summary>A box's words and, apart, its smaller ones (what's in &lt;small&gt;), each read as <see cref="Words"/>.</summary>
+    internal static (List<string> Lines, List<string> Detail) BoxLabel(string raw)
+    {
+        string t = Unquoted(raw);
+        var detail = new List<string>();
+        t = Small().Replace(t, m =>
+        {
+            detail.Add(m.Groups[1].Value);
+            return "";
+        });
+        return (Plain(t, Flowchart.MaxLabel), detail.Count == 0 ? [] : Plain(string.Join("<br>", detail), MaxDetail));
+    }
+
+    static string Unquoted(string raw)
     {
         string t = raw.Trim();
         if (t.Length >= 2 && t[0] == '"' && t[^1] == '"') t = t[1..^1];
         if (t.Length >= 2 && t[0] == '`' && t[^1] == '`') t = t[1..^1];
-        t = LineBreak().Replace(t, "\n").Replace("**", "");
+        return t;
+    }
+
+    static List<string> Plain(string text, int max)
+    {
+        string t = LineBreak().Replace(text, "\n").Replace("**", "");
         t = SubSup().Replace(t, m => Script(m.Groups[2].Value, m.Groups[1].Value.Equals("sup", StringComparison.OrdinalIgnoreCase)));
         t = Tag().Replace(t, "");
         t = FontAwesome().Replace(t, "");
@@ -253,7 +447,7 @@ public static partial class Mermaid
         t = Entity().Replace(t, m => WebUtility.HtmlDecode("&" + (m.Groups[1].Value == "#" && char.IsAsciiDigit(m.Groups[2].Value[0]) ? "#" : "") + m.Groups[2].Value + ";"));
         t = InlineMath().Replace(t, m => MathText.Plain(m.Groups[1].Value));
         var lines = new List<string>();
-        int budget = Flowchart.MaxLabel;
+        int budget = max;
         foreach (string part in t.Split('\n'))
         {
             string line = string.Join(' ', part.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
@@ -281,6 +475,7 @@ public static partial class Mermaid
     {
         public readonly string Id = id;
         public List<string> Lines = [id];
+        public List<string> Detail = [];
         public NodeShape Shape;
         public Tone Tone;
         public bool Declared;
@@ -294,7 +489,7 @@ public static partial class Mermaid
         public readonly List<string> Members = [];
     }
 
-    readonly record struct NodeRef(string Id, NodeShape? Shape, List<string>? Lines, Tone? Tone);
+    readonly record struct NodeRef(string Id, NodeShape? Shape, List<string>? Lines, Tone? Tone, List<string>? Detail = null);
 
     readonly record struct Link(EdgeLine Line, EdgeEnd Start, EdgeEnd End, string? Label, bool Invisible);
 
@@ -353,8 +548,8 @@ public static partial class Mermaid
                 && !word.Equals("flowchart-elk", StringComparison.OrdinalIgnoreCase))
             {
                 if (OtherKinds.TryGetValue(word, out string? kind))
-                    throw new MermaidException($"Study Stash draws flowcharts; this is {kind}.", LineNumber);
-                throw new MermaidException("This diagram doesn't start with flowchart or graph, so it isn't a flowchart Study Stash can draw.", LineNumber);
+                    throw new MermaidException($"{Drawn}; this is {kind}.", LineNumber);
+                throw new MermaidException("This diagram doesn't start with flowchart, graph, stateDiagram, sequenceDiagram, timeline or mindmap, so it isn't one Study Stash can draw.", LineNumber);
             }
             string rest = line[n..].TrimStart();
             int d = 0;
@@ -541,7 +736,7 @@ public static partial class Mermaid
             if (pos == start) return null;
             string id = s[start..pos];
             NodeShape? shape = null;
-            List<string>? lines = null;
+            List<string>? lines = null, detail = null;
             Tone? tone = null;
             int save = pos;
             Spaces();
@@ -549,8 +744,8 @@ public static partial class Mermaid
             {
                 if (!At(openText)) continue;
                 pos += openText.Length;
-                lines = Words(Label(closers));
-                shape = kind;
+                (lines, detail) = BoxLabel(Label(closers));
+                shape = kind == NodeShape.Parallelogram ? Slanted(openText, closedWith) : kind;
                 break;
             }
             if (shape is null) pos = save;
@@ -561,8 +756,11 @@ public static partial class Mermaid
                 while (pos < s.Length && (char.IsLetterOrDigit(s[pos]) || s[pos] is '_' or '-')) pos++;
                 tone = ToneOf(s[t..pos]) ?? Tone.None;
             }
-            return new NodeRef(id, shape, lines, tone);
+            return new NodeRef(id, shape, lines, tone, detail);
         }
+
+        /// <summary>The closer the last box's words ended with (a slanted box's shape depends on it).</summary>
+        string closedWith = "";
 
         /// <summary>
         /// A box's words up to its closer. Quoted words may hold anything; unquoted ones run to the first closer
@@ -585,6 +783,7 @@ public static partial class Mermaid
                         {
                             string text = s[(pos + 1)..end];
                             pos = after + c.Length;
+                            closedWith = c;
                             return text;
                         }
                 }
@@ -604,6 +803,7 @@ public static partial class Mermaid
             if (best < 0) throw new MermaidException($"Line {LineNumber} has a box that isn't closed: “{Snippet(start)}”.", LineNumber);
             string label = s[pos..best];
             pos = best + closer!.Length;
+            closedWith = closer;
             return label;
         }
 
@@ -725,6 +925,7 @@ public static partial class Mermaid
             {
                 node.Shape = shape;
                 node.Lines = r.Lines ?? [];
+                node.Detail = r.Detail ?? [];
                 node.Declared = true;
             }
             if (r.Tone is { } tone) node.Tone = tone;
@@ -738,19 +939,37 @@ public static partial class Mermaid
 
         Flowchart Build()
         {
-            // An arrow to a group's id means the group: point it at the group's first box instead.
+            // An arrow to a group's id means the group: it goes to where the group starts (its first box no arrow
+            // inside it comes into), and one from a group leaves from where it ends (each box no arrow inside it
+            // leaves), so "phase 1 --> phase 2" reads as the last step of one leading to the first of the next.
             var byId = groups.GroupBy(g => g.Id).ToDictionary(g => g.Key, g => g.First());
-            var retarget = new Dictionary<string, string>();
+            var asGroup = new Dictionary<string, MutGroup>();
             foreach (var n in order.ToList())
             {
                 if (n.Declared || !byId.TryGetValue(n.Id, out var g)) continue;
-                if (FirstMember(g, n.Id) is not { } member) continue;
-                retarget[n.Id] = member;
+                if (FirstMember(g, n.Id) is null) continue;
+                asGroup[n.Id] = g;
                 order.Remove(n);
                 n.Group?.Members.Remove(n.Id);
             }
-            string Map(string id) => retarget.TryGetValue(id, out string? to) ? to : id;
-            var finalEdges = edges.Select(e => e with { From = Map(e.From), To = Map(e.To) }).ToList();
+            List<string> Ends(MutGroup g, string self, bool last)
+            {
+                var inside = AllMembers(g).Where(m => m != self && !asGroup.ContainsKey(m)).ToList();
+                var set = inside.ToHashSet();
+                var own = edges.Where(e => set.Contains(e.From) && set.Contains(e.To) && e.From != e.To).ToList();
+                var ends = inside.Where(m => last ? own.All(e => e.From != m) : own.All(e => e.To != m)).ToList();
+                if (ends.Count == 0) ends = [last ? inside[^1] : inside[0]];
+                return last ? ends : [ends[0]];
+            }
+            var finalEdges = new List<FlowEdge>();
+            foreach (var e in edges)
+            {
+                var froms = asGroup.TryGetValue(e.From, out var gf) ? Ends(gf, e.From, last: true) : [e.From];
+                var tos = asGroup.TryGetValue(e.To, out var gt) ? Ends(gt, e.To, last: false) : [e.To];
+                foreach (string from in froms)
+                    foreach (string to in tos)
+                        if (finalEdges.Count < Flowchart.MaxEdges) finalEdges.Add(e with { From = from, To = to });
+            }
             if (order.Count == 0) throw new MermaidException("This flowchart has no boxes to draw.", LineNumber);
             // Groups keep ids unique against boxes, and only groups with something in them are drawn.
             var taken = new HashSet<string>(order.Select(n => n.Id));
@@ -764,9 +983,12 @@ public static partial class Mermaid
                 ids[g] = id;
             }
             var flowGroups = kept.Select(g => new FlowGroup(ids[g], g.Title, g.Members.ToList(), g.Parent is { } p && ids.TryGetValue(p, out string? pid) ? pid : null)).ToList();
-            var flowNodes = order.Select(n => new FlowNode(n.Id, n.Lines, n.Shape, n.Tone)).ToList();
+            var flowNodes = order.Select(n => new FlowNode(n.Id, n.Lines, n.Shape, n.Tone) { Detail = n.Detail }).ToList();
             return new Flowchart(direction, title, flowNodes, finalEdges, flowGroups);
         }
+
+        /// <summary>A group's boxes, its own then those of the groups inside it, in the order they were written.</summary>
+        IEnumerable<string> AllMembers(MutGroup g) => g.Members.Concat(groups.Where(c => c.Parent == g).SelectMany(AllMembers));
 
         string? FirstMember(MutGroup g, string except)
         {

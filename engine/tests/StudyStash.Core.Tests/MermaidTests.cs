@@ -26,15 +26,16 @@ public class MermaidTests
     [InlineData("A(Rounded)", NodeShape.Rounded, "Rounded")]
     [InlineData("A([Stadium])", NodeShape.Stadium, "Stadium")]
     [InlineData("A((Circle))", NodeShape.Circle, "Circle")]
-    [InlineData("A(((Double)))", NodeShape.Circle, "Double")]
+    [InlineData("A(((Double)))", NodeShape.DoubleCircle, "Double")]
     [InlineData("A{Decision?}", NodeShape.Decision, "Decision?")]
     [InlineData("A{{Hexagon}}", NodeShape.Hexagon, "Hexagon")]
     [InlineData("A[[Subroutine]]", NodeShape.Subroutine, "Subroutine")]
     [InlineData("A[(Database)]", NodeShape.Cylinder, "Database")]
     [InlineData("A>Flag]", NodeShape.Box, "Flag")]
-    [InlineData("A[/Lean right/]", NodeShape.Box, "Lean right")]
-    [InlineData("A[\\Lean left\\]", NodeShape.Box, "Lean left")]
-    [InlineData("A[/Trapezoid\\]", NodeShape.Box, "Trapezoid")]
+    [InlineData("A[/Lean right/]", NodeShape.Parallelogram, "Lean right")]
+    [InlineData("A[\\Lean left\\]", NodeShape.Parallelogram, "Lean left")]
+    [InlineData("A[/Trapezoid\\]", NodeShape.Trapezoid, "Trapezoid")]
+    [InlineData("A[\\Upside down/]", NodeShape.Trapezoid, "Upside down")]
     [InlineData("A", NodeShape.Box, "A")]
     [InlineData("A [Spaced]", NodeShape.Box, "Spaced")]
     public void Every_shape_reads(string node, NodeShape shape, string label)
@@ -258,6 +259,9 @@ public class MermaidTests
         Assert.DoesNotContain(f.Nodes, n => n.Id == "G");
         Assert.Contains(f.Edges, e => e.From == "Lungs" && e.To == "H1");
         Assert.Equal(["G"], f.Groups.Select(g => g.Id));
+        // From a group, an arrow leaves where the group ends: each of its last boxes.
+        var phases = P("flowchart LR\nsubgraph A [Clean]\nS[Select] --> Q{Missing?}\nQ -->|one| F[Fill in]\nQ -->|many| D[Drop]\nend\nsubgraph B [Model]\nC[Construct] --> W[Warehouse]\nend\nA --> B");
+        Assert.Equal([("F", "C"), ("D", "C")], phases.Edges.Where(e => e.To == "C").Select(e => (e.From, e.To)));
     }
 
     [Fact]
@@ -398,18 +402,14 @@ public class MermaidTests
     }
 
     [Theory]
-    [InlineData("sequenceDiagram\n  Alice->>Bob: Hi", "Study Stash draws flowcharts; this is a sequence diagram.")]
-    [InlineData("classDiagram\n  Animal <|-- Duck", "Study Stash draws flowcharts; this is a class diagram.")]
-    [InlineData("stateDiagram-v2\n  [*] --> Still", "Study Stash draws flowcharts; this is a state diagram.")]
-    [InlineData("erDiagram\n  A ||--o{ B : has", "Study Stash draws flowcharts; this is an entity-relationship diagram.")]
-    [InlineData("mindmap\n  root", "Study Stash draws flowcharts; this is a mind map.")]
-    [InlineData("pie title Pets\n  \"Dogs\" : 386", "Study Stash draws flowcharts; this is a pie chart.")]
-    [InlineData("gantt\n  title A", "Study Stash draws flowcharts; this is a Gantt chart.")]
-    [InlineData("timeline\n  title A", "Study Stash draws flowcharts; this is a timeline.")]
-    public void Other_diagram_types_say_what_they_are(string source, string message)
+    [InlineData("classDiagram\n  Animal <|-- Duck", "a class diagram.")]
+    [InlineData("erDiagram\n  A ||--o{ B : has", "an entity-relationship diagram.")]
+    [InlineData("pie title Pets\n  \"Dogs\" : 386", "a pie chart.")]
+    [InlineData("gantt\n  title A", "a Gantt chart.")]
+    public void Other_diagram_types_say_what_they_are(string source, string kind)
     {
         var e = Assert.Throws<MermaidException>(() => P(source));
-        Assert.Equal(message, e.Message);
+        Assert.Equal("Study Stash draws flowcharts, state and sequence diagrams, timelines and mind maps; this is " + kind, e.Message);
         Assert.Equal(1, e.Line);
     }
 

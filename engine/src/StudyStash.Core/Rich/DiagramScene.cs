@@ -43,8 +43,9 @@ public readonly record struct Box(double X, double Y, double W, double H)
     }
 }
 
-/// <summary>What a diagram was laid out as: a cycle on a ring, a tree, or a layered chart.</summary>
-public enum SceneKind { Ring, Tree, Layered }
+/// <summary>What a diagram was laid out as: a cycle on a ring, a tree, a layered chart, a big chart in groups laid
+/// out as blocks, a sequence diagram's columns and rows, a timeline, or a mind map around its root.</summary>
+public enum SceneKind { Ring, Tree, Layered, Grouped, Sequence, Timeline, Mindmap }
 
 public enum PathVerb { Move, Line, Cubic }
 
@@ -55,8 +56,14 @@ public readonly record struct PathStep(PathVerb Verb, Pt A, Pt B = default, Pt C
     public Pt End => Verb == PathVerb.Cubic ? C : A;
 }
 
-/// <summary>A box as drawn: where it sits, its outline and colour, and its words already wrapped into lines.</summary>
-public sealed record SceneNode(string Id, Box Box, NodeShape Shape, Tone Tone, IReadOnlyList<string> Lines);
+/// <summary>A box as drawn: where it sits, its outline and colour, and its words already wrapped into lines.
+/// <see cref="DetailLines"/> of those lines, at the end, are the box's smaller words (a step's where or what): the box
+/// has room for them at full size, so a renderer may draw them like the rest, or smaller and quieter
+/// (<see cref="SceneShapes.IsDetail"/>), as the exported SVG does.</summary>
+public sealed record SceneNode(string Id, Box Box, NodeShape Shape, Tone Tone, IReadOnlyList<string> Lines)
+{
+    public int DetailLines { get; init; }
+}
 
 /// <summary>
 /// An arrow as drawn. <see cref="Path"/> runs from <see cref="StartBase"/> to <see cref="Base"/>; each end's marker
@@ -82,21 +89,39 @@ public sealed record DiagramScene(
 /// <summary>The outlines and end markers every renderer of a scene draws the same way (the app and the SVG).</summary>
 public static class SceneShapes
 {
-    /// <summary>A shape's corners, for the ones drawn as polygons (a decision's rhombus, a hexagon); null otherwise.</summary>
+    /// <summary>A shape's corners, for the ones drawn as polygons (a decision's rhombus, a hexagon, a parallelogram, a
+    /// trapezoid), clockwise on screen; null otherwise.</summary>
     public static Pt[]? Corners(SceneNode n)
     {
         var b = n.Box;
         var c = b.Center;
+        double slant = Slant(b.H);
         return n.Shape switch
         {
             NodeShape.Decision => [new Pt(c.X, b.Y), new Pt(b.Right, c.Y), new Pt(c.X, b.Bottom), new Pt(b.X, c.Y)],
             NodeShape.Hexagon => [new Pt(b.X, c.Y), new Pt(b.X + b.H / 4, b.Y), new Pt(b.Right - b.H / 4, b.Y), new Pt(b.Right, c.Y), new Pt(b.Right - b.H / 4, b.Bottom), new Pt(b.X + b.H / 4, b.Bottom)],
+            NodeShape.Parallelogram => [new Pt(b.X + slant, b.Y), new Pt(b.Right, b.Y), new Pt(b.Right - slant, b.Bottom), new Pt(b.X, b.Bottom)],
+            NodeShape.Trapezoid => [new Pt(b.X + slant, b.Y), new Pt(b.Right - slant, b.Y), new Pt(b.Right, b.Bottom), new Pt(b.X, b.Bottom)],
             _ => null,
         };
     }
 
-    /// <summary>A rounded shape's corner radius (a circle's is half its width).</summary>
-    public static double Radius(SceneNode n) => n.Shape == NodeShape.Circle ? n.Box.W / 2 : DiagramLayout.Radius(n.Shape, n.Box.H);
+    /// <summary>How far a parallelogram's or trapezoid's sides lean over its height.</summary>
+    public static double Slant(double height) => Math.Min(18, height * 0.36);
+
+    /// <summary>A rounded shape's corner radius (a circle's, single or double, is half its width).</summary>
+    public static double Radius(SceneNode n) => n.Shape is NodeShape.Circle or NodeShape.DoubleCircle ? n.Box.W / 2 : DiagramLayout.Radius(n.Shape, n.Box.H);
+
+    /// <summary>A double circle's inner ring (an accepting state, a state diagram's end); null for every other shape.
+    /// The outer circle is drawn as a circle is, then this one inside it.</summary>
+    public static Box? InnerRing(SceneNode n) => n.Shape == NodeShape.DoubleCircle ? n.Box.Inflate(-Math.Min(4, n.Box.W / 5)) : null;
+
+    /// <summary>Whether line <paramref name="i"/> of a box's words is one of its smaller words (see
+    /// <see cref="SceneNode.DetailLines"/>).</summary>
+    public static bool IsDetail(SceneNode n, int i) => i >= n.Lines.Count - n.DetailLines;
+
+    /// <summary>Smaller words: 11.5 px, regular weight, in the quieter colour arrows' words have.</summary>
+    public const double DetailSize = 11.5;
 
     /// <summary>How far a cylinder's top and bottom curve.</summary>
     public const double CylinderCap = 6;

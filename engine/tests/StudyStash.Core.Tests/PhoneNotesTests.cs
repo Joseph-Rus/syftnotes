@@ -59,9 +59,9 @@ public class PhoneNotesTests
     [Fact]
     public void A_flowchart_that_cant_be_read_is_shown_as_it_was_written()
     {
-        string html = PhoneNotes.Render("```mermaid\nsequenceDiagram\n  A->>B: hi\n```");
-        Assert.Contains("<pre><code class=\"language-mermaid\">sequenceDiagram", html);
-        Assert.Contains("A-&gt;&gt;B: hi", html);
+        string html = PhoneNotes.Render("```mermaid\nclassDiagram\n  A <|-- B\n```");
+        Assert.Contains("<pre><code class=\"language-mermaid\">classDiagram", html);
+        Assert.Contains("A &lt;|-- B", html);
         Assert.DoesNotContain("<svg", html);
     }
 

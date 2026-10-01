@@ -54,7 +54,8 @@ public class RichShots
             {
                 string look = skin == SkinKind.Mac ? "mac" : "win";
                 Shot.Take($"rich-diagrams-1-{look}", skin, t, () => Page(skin, all.Take(3)), size: new Size(876, 1560));
-                Shot.Take($"rich-diagrams-2-{look}", skin, t, () => Page(skin, all.Skip(3)), size: new Size(876, 2000));
+                Shot.Take($"rich-diagrams-2-{look}", skin, t, () => Page(skin, all.Skip(3).Take(3)), size: new Size(876, 2000));
+                Shot.Take($"rich-diagrams-3-{look}", skin, t, () => Page(skin, all.Skip(6)), size: new Size(876, 2000));
             }
     }
 
