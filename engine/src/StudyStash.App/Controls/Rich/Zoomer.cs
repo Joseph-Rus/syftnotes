@@ -109,7 +109,7 @@ sealed class Zoomer
             Rested?.Invoke();
             return;
         }
-        gliding = Motion.Animate(TimeSpan.FromMilliseconds(200), t =>
+        gliding = Motion.Animate(target, TimeSpan.FromMilliseconds(200), t =>
         {
             // Zoom in equal ratios, so the glide feels even; the point being zoomed about stays put on the way.
             zoom = z0 * Math.Pow(z / z0, t);

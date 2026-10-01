@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
-using Avalonia.Threading;
+using Avalonia;
+using Avalonia.Controls;
 
 namespace StudyStash.App.Platform;
 
@@ -52,49 +53,59 @@ public static class Motion
 
     /// <summary>
     /// Runs <paramref name="step"/> from 0 to 1 over <paramref name="duration"/>, eased out (quick at first, settling
-    /// gently), then <paramref name="done"/>. Reduced motion: straight to 1. Dispose the result to stop it partway.
+    /// gently), a step each frame <paramref name="owner"/>'s window draws, then <paramref name="done"/>. Reduced motion,
+    /// or nothing on screen to draw it: straight to 1. Dispose the result to stop it partway.
     /// </summary>
-    public static IDisposable Animate(TimeSpan duration, Action<double> step, Action? done = null)
+    public static IDisposable Animate(Visual owner, TimeSpan duration, Action<double> step, Action? done = null)
     {
-        var run = new Run(duration, step, done);
+        var run = new Run(owner, duration, step, done);
         run.Start();
         return run;
     }
 
-    sealed class Run(TimeSpan duration, Action<double> step, Action? done) : IDisposable
+    sealed class Run(Visual owner, TimeSpan duration, Action<double> step, Action? done) : IDisposable
     {
-        DispatcherTimer? timer;
-        DateTime started;
+        bool stopped;
+        TimeSpan? first;
 
         public void Start()
         {
-            if (Reduced || duration <= TimeSpan.Zero)
+            if (Reduced || duration <= TimeSpan.Zero || TopLevel.GetTopLevel(owner) is null)
             {
                 step(1);
                 done?.Invoke();
                 return;
             }
-            started = DateTime.UtcNow;
             step(0);
-            timer = new DispatcherTimer(TimeSpan.FromMilliseconds(15), DispatcherPriority.Render, (_, _) => Tick());
-            timer.Start();
+            Next();
         }
 
-        void Tick()
+        void Next()
         {
-            double t = Math.Clamp((DateTime.UtcNow - started).TotalMilliseconds / duration.TotalMilliseconds, 0, 1);
+            if (TopLevel.GetTopLevel(owner) is { } top) top.RequestAnimationFrame(Frame);
+            else Finish();
+        }
+
+        void Frame(TimeSpan now)
+        {
+            if (stopped) return;
+            first ??= now;
+            double t = Math.Clamp((now - first.Value).TotalMilliseconds / duration.TotalMilliseconds, 0, 1);
+            // The first frame starts the clock; one that never moves on (no time between frames) still ends.
             step(1 - Math.Pow(1 - t, 3));
-            if (t < 1) return;
-            timer?.Stop();
-            timer = null;
+            if (t < 1) Next();
+            else Finish();
+        }
+
+        void Finish()
+        {
+            if (stopped) return;
+            stopped = true;
+            step(1);
             done?.Invoke();
         }
 
-        public void Dispose()
-        {
-            timer?.Stop();
-            timer = null;
-        }
+        public void Dispose() => stopped = true;
     }
 
     const string Lib = "/usr/lib/libobjc.A.dylib";

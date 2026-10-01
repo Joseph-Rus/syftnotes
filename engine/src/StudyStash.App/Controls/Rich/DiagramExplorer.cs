@@ -210,7 +210,7 @@ sealed class DiagramExplorer
             dimTo = to;
             dimming?.Dispose();
             double from = dim;
-            dimming = Motion.Animate(TimeSpan.FromMilliseconds(want ? 140 : 200), t =>
+            dimming = Motion.Animate(canvas, TimeSpan.FromMilliseconds(want ? 140 : 200), t =>
             {
                 dim = from + (to - from) * t;
                 Paint();

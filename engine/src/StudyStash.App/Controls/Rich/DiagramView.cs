@@ -473,7 +473,7 @@ sealed class DiagramCanvas : Control
 
     void StartMorph(Morphing m, Size to)
     {
-        m.Run = Platform.Motion.Animate(TimeSpan.FromMilliseconds(320), t =>
+        m.Run = Platform.Motion.Animate(this, TimeSpan.FromMilliseconds(320), t =>
         {
             m.T = t;
             InvalidateMeasure();
@@ -581,7 +581,9 @@ sealed class DiagramCanvas : Control
         }
         if (morph is { Run: null } waiting)
         {
-            waiting.From.Draw(context, waiting.FromScale, 0, Look);
+            // The picture as it was (its groups as they were) until the new one is laid out.
+            double was = waiting.FromScale * Zoom * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+            waiting.From.Draw(context, waiting.FromScale, was, new DiagramLook { Folded = waiting.Before.Inside.Keys.ToHashSet() });
             return;
         }
         if (Scene is not { } scene) return;
