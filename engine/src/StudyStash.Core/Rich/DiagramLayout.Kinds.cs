@@ -105,10 +105,19 @@ public static partial class DiagramLayout
         var edges = new SceneEdge?[f.Edges.Count];
         var extra = new List<SceneEdge>();
         var groups = new List<SceneGroup>();
-        var open = new Stack<(SeqStep Step, double Top, HashSet<int> Columns, List<(double Y, SeqStep Step)> Dividers)>();
+        var open = new Stack<(SeqStep Step, double Top, HashSet<int> Columns, List<(double Y, SeqStep Step)> Dividers, double[] Span)>();
         void Touch(params int[] cols)
         {
             foreach (var b in open) foreach (int c in cols) b.Columns.Add(c);
+        }
+        // What a block holds reaches this far across (a self-message's words, a note), so the block takes it in.
+        void Reach(double left, double right)
+        {
+            foreach (var b in open)
+            {
+                b.Span[0] = Math.Min(b.Span[0], left);
+                b.Span[1] = Math.Max(b.Span[1], right);
+            }
         }
         foreach (var step in f.Steps)
         {
@@ -127,6 +136,7 @@ public static partial class DiagramLayout
                         var edge = Drawn(e.From, e.To, e.Line, e.StartEnd, e.EndEnd, new Pt(xa, top), loopEnd, w.Lines,
                             w.Lines.Count > 0 ? new Box(xa + 36, top + 11 - w.H / 2, w.W, w.H) : new Box(), new Pt(xa + 40, top - 2), new Pt(xa + 40, top + 24));
                         edges[step.Index] = edge;
+                        Reach(xa, xa + 44 + (w.Lines.Count > 0 ? w.W : 0));
                         y = top + Math.Max(26, w.H) + SeqRow;
                     }
                     else
@@ -135,6 +145,7 @@ public static partial class DiagramLayout
                         double from = x[a], to = x[b];
                         var labelBox = w.Lines.Count > 0 ? new Box((from + to) / 2 - w.W / 2, arrowY - 3 - w.H, w.W, w.H) : new Box();
                         edges[step.Index] = Drawn(e.From, e.To, e.Line, e.StartEnd, e.EndEnd, new Pt(from, arrowY), new Pt(to, arrowY), w.Lines, labelBox);
+                        Reach(Math.Min(Math.Min(from, to), labelBox.W > 0 ? labelBox.X : double.MaxValue), Math.Max(Math.Max(from, to), labelBox.Right));
                         y = arrowY + SeqRow;
                     }
                     break;
@@ -153,11 +164,12 @@ public static partial class DiagramLayout
                         _ => (left + right) / 2 - w / 2,
                     };
                     nodes.Add(Placed(note, s, new Box(bx, y, w, s.H)));
+                    Reach(bx, bx + w);
                     y += s.H + SeqRow;
                     break;
                 }
                 case StepKind.Open:
-                    open.Push((step, y, [], []));
+                    open.Push((step, y, [], [], [double.MaxValue, double.MinValue]));
                     y += BlockTitle + 6;
                     break;
                 case StepKind.Else when open.Count > 0:
@@ -166,13 +178,15 @@ public static partial class DiagramLayout
                     break;
                 case StepKind.Close when open.Count > 0:
                 {
-                    var (s, top, cols, dividers) = open.Pop();
+                    var (s, top, cols, dividers, span) = open.Pop();
                     if (cols.Count == 0) cols = [.. Enumerable.Range(0, count)];
                     foreach (var outer in open) outer.Columns.UnionWith(cols);
                     double inset = open.Count * 7;
-                    double left = x[cols.Min()] - (cols.Count == 1 ? 60 : BlockPad + 40) + inset, right = x[cols.Max()] + (cols.Count == 1 ? 60 : BlockPad + 40) - inset;
-                    double bottom = y + 2;
                     string titleText = s.Text.Length > 0 ? $"{s.Where}: {s.Text}" : s.Where;
+                    double left = Math.Min(x[cols.Min()] - (cols.Count == 1 ? 60 : BlockPad + 40), span[0] - BlockPad) + inset;
+                    double right = Math.Max(Math.Max(x[cols.Max()] + (cols.Count == 1 ? 60 : BlockPad + 40), span[1] + BlockPad), left + m.Width(titleText, TitleSize, true) + 24) - inset;
+                    Reach(left, right);
+                    double bottom = y + 2;
                     var box = new Box(left, top, right - left, bottom - top);
                     groups.Add(new SceneGroup("block" + groups.Count, titleText, box, new Box(left + 10, top + 5, m.Width(titleText, TitleSize, true), 16), open.Count > 0 ? 1 : 0));
                     foreach (var (dy, d) in dividers)
