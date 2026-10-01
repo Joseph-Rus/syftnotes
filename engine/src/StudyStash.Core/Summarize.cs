@@ -132,6 +132,7 @@ public static partial class Summarize
             {{MermaidExample}}
             ```
             A few words per box, in quotes. LR for a sequence, TD for a hierarchy or a decision. A cycle ends with an arrow from its last step back to its first. A decision is a {"Question?"} box with |yes| and |no| on its arrows. Group boxes with subgraph "Title" ... end. Colour a box only when colour means something: :::red, :::blue, :::green, :::amber, :::purple or :::accent (above: oxygen-rich red, oxygen-poor blue). No style, classDef, click or HTML.
+            Other Mermaid kinds are drawn too, when they fit better: stateDiagram-v2 for states and the events between them (an automaton: [*] --> q0, q0 --> q1 : a, class q2 accept), sequenceDiagram for who sends what to whom in order (A->>B: request, B-->>A: reply), timeline for events in order (1857 : event), and mindmap for a topic's themes by indentation.
             """;
         if (svg)
             text += $$"""
@@ -415,7 +416,8 @@ public static partial class Summarize
         foreach (var (block, why) in broken)
         {
             bool svg = block.Kind == NoteBlockKind.Svg;
-            string prompt = $"This {(svg ? "SVG drawing" : "Mermaid flowchart")} has a problem: {why!.TrimEnd('.')}. "
+            string what = svg ? "SVG drawing" : NoteBlocks.StartsAsFlowchart(block.Text) ? "Mermaid flowchart" : "Mermaid diagram";
+            string prompt = $"This {what} has a problem: {why!.TrimEnd('.')}. "
                 + $"Reply with only the corrected block.\n\n```{(svg ? "svg" : "mermaid")}\n{block.Text}\n```";
             try
             {

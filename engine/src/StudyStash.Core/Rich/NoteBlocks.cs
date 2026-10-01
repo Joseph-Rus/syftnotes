@@ -55,6 +55,10 @@ public static partial class NoteBlocks
         return text.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Whether a text starts like a flowchart (not another kind of Mermaid diagram), or says no kind at all.</summary>
+    public static bool StartsAsFlowchart(string text) =>
+        !DiagramStart().IsMatch(text.TrimStart()) || text.TrimStart().StartsWith("flowchart", StringComparison.OrdinalIgnoreCase) || text.TrimStart().StartsWith("graph", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Whether a text starts like a diagram of its own: any kind of Mermaid diagram Study Stash draws, or an SVG.</summary>
     public static bool StartsAsDiagram(string text) => DiagramStart().IsMatch(text.TrimStart()) || IsSvg(text);
 
