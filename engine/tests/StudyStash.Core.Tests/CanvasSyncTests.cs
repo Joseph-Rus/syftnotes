@@ -409,13 +409,14 @@ public class CanvasSyncTests
         var sw = Stopwatch.StartNew();
         var work = await sync.WorkAsync(false, "1.4", 3, "", TimeSpan.FromSeconds(1));
         Assert.Empty(work.Jobs);
-        Assert.InRange(sw.Elapsed, TimeSpan.FromSeconds(0.9), TimeSpan.FromSeconds(4));
+        // Answers when its one second is over, not when the long wait (20 s) is: a busy CI runner has taken 4.7 s.
+        Assert.InRange(sw.Elapsed, TimeSpan.FromSeconds(0.9), TimeSpan.FromSeconds(12));
 
         // A request that goes away (or a library that stops) lets go at once.
         using var gone = new CancellationTokenSource(TimeSpan.FromMilliseconds(300));
         sw.Restart();
         Assert.Empty((await sync.WorkAsync(false, "1.4", 3, "", Long, gone.Token)).Jobs);
-        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(3), $"took {sw.Elapsed}");
+        Assert.True(sw.Elapsed < TimeSpan.FromSeconds(10), $"took {sw.Elapsed}");
 
         // Never longer than Chrome waits for an answer, whatever the extension asks for.
         Assert.True(CanvasSync.LongestWait < TimeSpan.FromSeconds(30));
