@@ -151,6 +151,40 @@ project or its author.
 - **Capture** asks the AI only for a plan (a class and title per item, as JSON); the engine moves
   the files, so it works with any AI and needs no write permission.
 
+## Diagrams on screen
+
+A ```` ```mermaid ```` fence is read into a `Flowchart` (`Core/Rich/Mermaid.cs`), laid out once away
+from the window (`DiagramLayout`, through the app's `SceneCache`) into a colour-free `DiagramScene`,
+and drawn by `DiagramView` with a `DiagramPainter` that keeps its outlines, lines and words between
+frames. On paper (`NoteView.PageHeight`, the PDF) that's all it is: the still picture. On screen a
+`DiagramExplorer` sits over it:
+
+- **What's under the pointer** is found in the scene (`Core/Rich/DiagramHit.cs`: boxes by their
+  outlines, arrows within a few pixels of their line, their words, groups' titles), and so is what
+  lights up with it and which box an arrow key goes to (the one joined to it that lies most that way
+  on the page).
+- **Zoom and pan** (`Zoomer`) move and scale the picture as drawn, so the page never re-lays out; in
+  a note the wheel still scrolls the page and only ⌘/Ctrl + wheel or a pinch zooms.
+- **Folding** (`Core/Rich/DiagramFold.cs`) is a chart-to-chart change: a folded group becomes one
+  box with its title and a count, standing where its first box was, and arrows re-attach to it (two
+  that end up joining the same boxes become one, with both their words); the folded chart is laid
+  out like any other, and the view glides each box from the old scene to the new. A chart of at
+  least 12 boxes in two or more groups opens folded.
+- **Steps** (`Core/Rich/DiagramSteps.cs`) read a chart from where it starts (a box no arrow points
+  to, or a cycle's first box), each box once after every box with a forward arrow to it, a branch to
+  its end before the next, a group finished before the walk leaves it; arrows back round a loop are
+  the last step's way out.
+- **Moments** (`Core/Rich/DiagramMoment.cs`): a designed diagram's `%% Study Stash diagram, from
+  12:34` mark, and where a box's words were said, found by matching their stems against the timed
+  transcript (rare words count for more).
+- The page a diagram is on answers for it through `IDiagramHost` (`DiagramHost.Host`, found by
+  walking up from the diagram): the lecture page's `LectureDiagrams` asks in its Ask bar, opens the
+  transcript at a line, and plays the recording from a moment. A diagram on no lecture's page (a
+  quick answer) offers none of that; the larger window asks the note it was opened from.
+
+Movement follows the system's Reduce motion (macOS) or Animation effects (Windows) setting
+(`Platform/Motion.cs`).
+
 ## Privacy
 
 - **Everything stays on the student's own computers** unless they pick an AI engine other than

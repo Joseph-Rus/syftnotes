@@ -222,6 +222,18 @@ the notes, in a quick answer and in the Ask chat:
   caption and the moment of the lecture it comes from; rewriting a lecture's notes designs them
   again rather than adding more. Either kind opens larger on a click, and a diagram Study Stash
   can't draw shows its source with a plain reason instead of failing.
+- **Studying from a diagram**: on screen a flowchart is there to explore, not just look at. The
+  pointer over a box lights it, its arrows and the boxes they join while the rest dims; a click pins
+  it, with **Explain this** and **Quiz me** (asked in the lecture's own Ask bar) and **Where was this
+  said?**, which opens the transcript at the line that says it (Back to the notes returns to the
+  diagram). Arrow keys walk along the arrows, ⌘ or Ctrl and the wheel (or a pinch) zoom and a drag
+  pans. **Step through** walks it a box at a time in reading order (Play, or Space and the arrow
+  keys), **Test yourself** hides its words to recall, a click checks one and a small score keeps
+  count, with Hide some and Practise the missed ones, and a big chart made of groups opens as an
+  overview, a group at a time. A designed diagram's **From 12:34 in the lecture** opens the
+  transcript where it comes from. Opened larger, the window has all of this with a toolbar, and an
+  SVG drawing zooms and pans there. Paper, the PDF and the Markdown download keep the still
+  picture.
 - **Download**: a lecture's "Download as Markdown…" (or a whole class's) saves a `.md` file that
   Obsidian, Typora and VS Code all open well — formulas stay LaTeX, a Mermaid diagram is saved
   again as an SVG beside it, and an SVG diagram becomes an image link to its own sanitised file.
