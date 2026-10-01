@@ -48,7 +48,7 @@ public static partial class DiagramLayout
             SceneKind.Grouped => Grouped(chart, sizes, labels, dir, m),
             SceneKind.Sequence => Sequence(chart, sizes, labels, m),
             SceneKind.Timeline => Timeline(chart, sizes, dir, m),
-            SceneKind.Mindmap => Mindmap(chart, sizes, labels, dir),
+            SceneKind.Mindmap => Mindmap(chart, sizes, labels, dir, m),
             _ => Layered(chart, sizes, labels, dir, m),
         };
         return Normalise(scene);
@@ -92,7 +92,7 @@ public static partial class DiagramLayout
                 SceneKind.Tree => Tree(chart, sizes, labels, dir),
                 SceneKind.Sequence => Sequence(chart, sizes, labels, m),
                 SceneKind.Timeline => Timeline(chart, sizes, dir, m),
-                _ => Mindmap(chart, sizes, labels, dir),
+                _ => Mindmap(chart, sizes, labels, dir, m),
             });
             return (quick.Width, quick.Height);
         }

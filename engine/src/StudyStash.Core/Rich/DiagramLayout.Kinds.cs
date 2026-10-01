@@ -343,8 +343,9 @@ public static partial class DiagramLayout
     /// <summary>The tones a mind map's branches take, in turn, when it gives none of its own.</summary>
     static readonly Tone[] BranchTones = [Tone.Blue, Tone.Green, Tone.Amber, Tone.Purple, Tone.Red];
 
-    static DiagramScene Mindmap(Flowchart f, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir)
+    static DiagramScene Mindmap(Flowchart f, Dictionary<string, Sized> sizes, List<Words> labels, ChartDirection dir, Measurer measure)
     {
+        sizes = new Dictionary<string, Sized>(sizes);
         var root = f.Nodes.FirstOrDefault(n => n.Role == NodeRole.Root) ?? f.Nodes[0];
         var kids = f.Edges.Select((e, i) => (e, i)).Where(x => x.e.From != x.e.To).ToLookup(x => x.e.From);
         var seen = new HashSet<string> { root.Id };
@@ -385,6 +386,9 @@ public static partial class DiagramLayout
         for (int k = 0; k < branches.Count; k++) tone[branches[k].E.To] = coloured ? Tone.None : BranchTones[k % BranchTones.Length];
         var boxes = new Dictionary<string, Box>();
         var edges = new SceneEdge?[f.Edges.Count];
+        // A root whose words make too big a circle is a pill instead.
+        var rootShape = root.Shape is NodeShape.Circle or NodeShape.DoubleCircle && sizes[root.Id].W > 140 ? NodeShape.Stadium : root.Shape;
+        if (rootShape != root.Shape) sizes[root.Id] = Size(root with { Shape = rootShape }, measure);
         var rootSize = sizes[root.Id];
         var rootBox = Box.Around(new Pt(0, 0), rootSize.W, rootSize.H);
         boxes[root.Id] = rootBox;
@@ -425,7 +429,7 @@ public static partial class DiagramLayout
                 Pt start = from == root.Id
                     ? new Pt(a.Center.X + side * Math.Min(a.W / 2, Math.Abs(b.Center.Y - a.Center.Y) < a.H / 2 ? a.W / 2 : a.W / 2 - 6), a.Center.Y + Math.Clamp(b.Center.Y - a.Center.Y, -a.H / 4, a.H / 4))
                     : new Pt(side > 0 ? a.Right : a.X, a.Center.Y);
-                if (from == root.Id && root.Shape is NodeShape.Circle or NodeShape.DoubleCircle)
+                if (from == root.Id && rootShape is NodeShape.Circle or NodeShape.DoubleCircle)
                 {
                     var toward = (b.Center - a.Center).Unit();
                     start = a.Center + toward * (a.W / 2);
@@ -438,7 +442,7 @@ public static partial class DiagramLayout
         var nodes = f.Nodes.Where(n => boxes.ContainsKey(n.Id)).Select(n =>
         {
             var t = n.Tone != Tone.None ? n.Tone : n.Id == root.Id && !coloured ? Tone.Accent : tone.GetValueOrDefault(n.Id, Tone.None);
-            return Placed(n, sizes[n.Id], boxes[n.Id]) with { Tone = t };
+            return Placed(n, sizes[n.Id], boxes[n.Id]) with { Tone = t, Shape = n.Id == root.Id ? rootShape : n.Shape };
         }).ToList();
         Unplaced(f, edges, nodes.ToDictionary(n => n.Id), labels);
         return new DiagramScene(SceneKind.Mindmap, dir, 0, 0, nodes, edges.Select(e => e!).ToList(), []);

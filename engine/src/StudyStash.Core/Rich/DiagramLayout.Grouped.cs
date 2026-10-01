@@ -142,7 +142,7 @@ public static partial class DiagramLayout
             if (edges[i] is null && f.Edges[i].From == f.Edges[i].To) edges[i] = Loop(f.Edges[i], byId[f.Edges[i].From], labels[i]);
 
         // The arrows between groups, routed around everything in the way.
-        foreach (var (i, edge) in Routed(f, between, byId, groups, labels)) edges[i] = edge;
+        foreach (var (i, edge) in Routed(f, between, byId, groups, labels, edges.Where(e => e is not null).Select(e => e!).ToList())) edges[i] = edge;
         var ordered = f.Nodes.Select(n => byId[n.Id]).ToList();
         var whole = new DiagramScene(SceneKind.Grouped, dir, 0, 0, ordered, edges.Select(e => e!).ToList(), groups);
         return Titles(ByTheirLines(whole), out _);
@@ -215,8 +215,12 @@ public static partial class DiagramLayout
     /// they reach, with rounded corners. One it can't route is a straight line from box to box. Each arrow's words sit
     /// above its longest level stretch.
     /// </summary>
-    static IEnumerable<(int Index, SceneEdge Edge)> Routed(Flowchart f, List<int> which, Dictionary<string, SceneNode> byId, List<SceneGroup> groups, List<Words> labels)
+    static IEnumerable<(int Index, SceneEdge Edge)> Routed(Flowchart f, List<int> which, Dictionary<string, SceneNode> byId, List<SceneGroup> groups, List<Words> labels,
+        List<SceneEdge> inside)
     {
+        // Whether one of a group's own arrows already meets a box on this side (left or right).
+        bool Taken(SceneNode n, double side) => inside.Any(e =>
+            (e.From == n.Id && Math.Abs(e.StartTip.X - (side > 0 ? n.Box.Right : n.Box.X)) < 3) || (e.To == n.Id && Math.Abs(e.Tip.X - (side > 0 ? n.Box.Right : n.Box.X)) < 3));
         if (which.Count == 0) yield break;
         static MPoint M(Pt p) => new(p.X, -p.Y);
         static Pt P(MPoint p) => new(p.X, -p.Y);
@@ -231,6 +235,14 @@ public static partial class DiagramLayout
             var parent = f.Groups.FirstOrDefault(x => x.Id == sg.Id)?.Parent;
             (parent is not null && clusters.TryGetValue(parent, out var p) ? p : g.RootCluster).AddChild(cluster);
             clusters[sg.Id] = cluster;
+        }
+        // Each group's title (top left) is in the way too, so no arrow runs through it.
+        foreach (var sg in groups)
+        {
+            var t = sg.TitleBox.Inflate(3);
+            var title = new MsaglNode(CurveFactory.CreateRectangle(t.W, t.H, M(t.Center)), "title:" + sg.Id);
+            g.Nodes.Add(title);
+            clusters[sg.Id].AddChild(title);
         }
         var msagl = new Dictionary<string, MsaglNode>();
         foreach (var n in byId.Values)
@@ -259,10 +271,21 @@ public static partial class DiagramLayout
             var (fromBlock, toBlock) = (Block(e.From), Block(e.To));
             me.SourcePort = new FloatingPort(msagl[e.From].BoundaryCurve, M(Port(byId[e.From], Facing(fromBlock, toBlock), byId[e.To].Box.Center)));
             var inSide = Facing(toBlock, fromBlock);
+            var target = byId[e.To];
             var aimFrom = byId[e.From].Box.Center;
-            // Coming down into a box at the top of its group, the arrow keeps clear of the group's title (top left).
-            if (inSide.Y < 0 && Block(e.To) is var tb && byId[e.To].Box.Y - tb.Y < GroupTop + 12 && tb != byId[e.To].Box) aimFrom = new Pt(byId[e.To].Box.Right + 1000, 0);
-            me.TargetPort = new FloatingPort(msagl[e.To].BoundaryCurve, M(Port(byId[e.To], inSide, aimFrom)));
+            // Coming down into a box at the top of its group, the arrow keeps clear of the group's title (top left):
+            // it comes in right of the title, or, when the title spans the box, from the box's side.
+            if (inSide.Y < 0 && groups.FirstOrDefault(x => x.Box.Contains(target.Box) && target.Box.Y - x.Box.Y < GroupTop + 12) is { } sg)
+            {
+                double clear = Math.Max(sg.TitleBox.Right + 12, target.Box.Center.X);
+                if (clear <= target.Box.Center.X + target.Box.W / 3) aimFrom = new Pt(clear, 0);
+                else
+                {
+                    double toward = aimFrom.X >= target.Box.Center.X ? 1 : -1;
+                    inSide = new Pt(Taken(target, toward) && !Taken(target, -toward) ? -toward : toward, 0);
+                }
+            }
+            me.TargetPort = new FloatingPort(msagl[e.To].BoundaryCurve, M(Port(target, inSide, aimFrom)));
             if (e.EndEnd != EdgeEnd.None) me.EdgeGeometry.TargetArrowhead = new Arrowhead { Length = MarkerLength(e.EndEnd) };
             if (e.StartEnd != EdgeEnd.None) me.EdgeGeometry.SourceArrowhead = new Arrowhead { Length = MarkerLength(e.StartEnd) };
             g.Edges.Add(me);
@@ -303,7 +326,7 @@ public static partial class DiagramLayout
     static Pt Port(SceneNode n, Pt side, Pt other)
     {
         var b = n.Box;
-        var along = new Pt(side.Y, side.X);
+        var along = side.X != 0 ? new Pt(0, 1) : new Pt(1, 0);
         double reach = side.X != 0 ? b.H / 4 : b.W / 3;
         double toward = side.X != 0 ? other.Y - b.Center.Y : other.X - b.Center.X;
         double by = Math.Clamp(toward, -reach, reach);
