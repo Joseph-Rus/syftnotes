@@ -234,16 +234,16 @@ public class NotesDrawingTests
     [Fact]
     public async Task A_fix_that_is_still_broken_or_an_engine_that_fails_leaves_the_diagram_as_it_was()
     {
-        string notes = "## Notes\n\n" + Broken + "\n\n```mermaid\nsequenceDiagram\n  Nurse->>Patient: How is the pain?\n```";
+        string notes = "## Notes\n\n" + Broken + "\n\n```mermaid\nclassDiagram\n  Nurse <|-- Patient\n```";
         var asked = new List<string>();
         string still = await Summarize.RepairDiagramsAsync(notes, p =>
         {
             asked.Add(p);
-            return Task.FromResult("```mermaid\nsequenceDiagram\n  A->>B: hi\n```");
+            return Task.FromResult("```mermaid\nclassDiagram\n  A <|-- B\n```");
         });
         Assert.Equal(notes, still);
         Assert.Equal(2, asked.Count);
-        Assert.StartsWith("This Mermaid flowchart has a problem: Study Stash draws flowcharts; this is a sequence diagram. Reply", asked[1]);
+        Assert.StartsWith("This Mermaid flowchart has a problem: Study Stash draws flowcharts, state and sequence diagrams, timelines and mind maps; this is a class diagram. Reply", asked[1]);
 
         Assert.Equal(notes, await Summarize.RepairDiagramsAsync(notes, _ => throw new InvalidOperationException("Claude: usage limit")));
         Assert.Equal(notes, await Summarize.RepairDiagramsAsync(notes, _ => throw new TimeoutException("Ollama did not answer within 15 minutes")));

@@ -42,7 +42,7 @@ public class PassagesRichTests
     {
         var passages = Passages.FromNotes("n", "## Care\n\n```mermaid\nflowchart TD\n  A[Assess pain] -->\n```\n\n"
             + "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 200\">\n<text x=\"20\" y=\"40\">Left ventricle</text>\n</svg>\n\n"
-            + "```mermaid\nsequenceDiagram\n  Nurse->>Patient: How is the pain?\n```");
+            + "```mermaid\nclassDiagram\n  Nurse <|-- Patient\n```");
         Assert.Equal(3, passages.Count);
         Assert.All(passages, p => Assert.Equal("Care", p.Section));
         Assert.StartsWith("Diagram: ", passages[0].Text);

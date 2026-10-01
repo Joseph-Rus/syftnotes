@@ -76,8 +76,12 @@ public static class DiagramSvg
             var b = n.Box;
             if (SceneShapes.Corners(n) is { } corners)
                 sb.Append($"  <polygon points=\"{string.Join(" ", corners.Select(c => N(c.X) + "," + N(c.Y)))}\"{paint}/>\n");
-            else if (n.Shape == NodeShape.Circle)
+            else if (n.Shape is NodeShape.Circle or NodeShape.DoubleCircle)
+            {
                 sb.Append($"  <circle cx=\"{N(b.Center.X)}\" cy=\"{N(b.Center.Y)}\" r=\"{N(b.W / 2)}\"{paint}/>\n");
+                if (SceneShapes.InnerRing(n) is { } ring)
+                    sb.Append($"  <circle cx=\"{N(ring.Center.X)}\" cy=\"{N(ring.Center.Y)}\" r=\"{N(ring.W / 2)}\" fill=\"none\" stroke=\"{stroke}\" stroke-width=\"1\"/>\n");
+            }
             else if (n.Shape == NodeShape.Cylinder)
             {
                 double cap = SceneShapes.CylinderCap, rx = b.W / 2;
@@ -93,7 +97,12 @@ public static class DiagramSvg
             }
             double top = SceneShapes.TextTop(n);
             for (int i = 0; i < n.Lines.Count; i++)
-                sb.Append($"  <text x=\"{N(b.Center.X)}\" y=\"{N(top + (i + 0.5) * DiagramLayout.LineHeight + DiagramLayout.TextSize * 0.35)}\" font-size=\"13\" font-weight=\"500\" text-anchor=\"middle\" fill=\"{p.Ink}\">{Esc(n.Lines[i])}</text>\n");
+            {
+                // A box's smaller words sit under its own, quieter, in the slots its own lines would take.
+                bool small = SceneShapes.IsDetail(n, i);
+                double size = small ? SceneShapes.DetailSize : DiagramLayout.TextSize;
+                sb.Append($"  <text x=\"{N(b.Center.X)}\" y=\"{N(top + (i + 0.5) * DiagramLayout.LineHeight + size * 0.35 - (small ? 1 : 0))}\" font-size=\"{N(size)}\" font-weight=\"{(small ? "400" : "500")}\" text-anchor=\"middle\" fill=\"{(small ? p.Words : p.Ink)}\">{Esc(n.Lines[i])}</text>\n");
+            }
         }
         sb.Append("</svg>\n");
         return sb.ToString();

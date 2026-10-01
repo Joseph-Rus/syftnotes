@@ -103,12 +103,19 @@ public static class RichDemo
         </svg>
         """;
 
-    /// <summary>A diagram Study Stash doesn't draw (a sequence diagram), for the calm card that shows its source.</summary>
+    /// <summary>A conversation as a sequence diagram: who says what to whom, in order.</summary>
     public const string PainConversation = """
         sequenceDiagram
           Nurse->>Patient: How bad is the pain, 0 to 10?
           Patient-->>Nurse: About a 7
           Nurse->>Patient: I'll bring your analgesic and check back in 30 minutes
+        """;
+
+    /// <summary>A diagram Study Stash doesn't draw (a class diagram), for the calm card that shows its source.</summary>
+    public const string ClassChart = """
+        classDiagram
+          Nurse <|-- ChargeNurse
+          Nurse : +assessPain()
         """;
 
     /// <summary>A flowchart with a box left open, for the card that says which line.</summary>
@@ -135,8 +142,8 @@ public static class RichDemo
     /// <summary>What a note shows when a diagram can't be drawn: a sequence diagram, and a chart with a box left open.</summary>
     public static string FallbackNotes { get; } = string.Join("\n\n",
         "## Talking about pain",
-        "The conversation, as the lecturer drew it on the board:",
-        Fence("mermaid", PainConversation),
+        "The care team, as the lecturer drew it on the board:",
+        Fence("mermaid", ClassChart),
         "And the order check, which lost a bracket on the way:",
         Fence("mermaid", BrokenChart));
 
