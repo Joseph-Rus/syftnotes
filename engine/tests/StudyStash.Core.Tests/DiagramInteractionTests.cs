@@ -48,6 +48,22 @@ public class DiagramInteractionTests
     }
 
     [Fact]
+    public void A_sequence_diagrams_lifelines_are_nothing_to_point_at_its_messages_are()
+    {
+        var chart = Flowchart.Parse(DiagramDesign.SequenceExample);
+        var scene = Lay(chart);
+        Assert.True(scene.Edges.Count > chart.Edges.Count); // the lifelines and the block's divider come after the messages
+        int arrows = chart.Edges.Count;
+        var lifeline = DiagramHit.Line(scene.Edges[arrows]);
+        var onIt = lifeline[lifeline.Count / 2];
+        Assert.False(DiagramHit.At(scene, onIt, arrows: arrows).IsEdge);
+        var message = DiagramHit.Line(scene.Edges[0]);
+        Assert.Equal(new DiagramTarget(DiagramPart.Edge, null, 0), DiagramHit.At(scene, message[message.Count / 2] + new Pt(0, 2), arrows: arrows));
+        // Lighting a participant lights its messages, never another's lifeline.
+        Assert.All(DiagramHit.Around(scene, DiagramTarget.Node("S"), arrows: arrows).Edges, i => Assert.True(i < arrows));
+    }
+
+    [Fact]
     public void A_box_lights_its_arrows_and_the_boxes_they_join_and_an_arrow_its_two_ends()
     {
         var chart = Flowchart.Parse(DiagramLayoutTests.Pain);
