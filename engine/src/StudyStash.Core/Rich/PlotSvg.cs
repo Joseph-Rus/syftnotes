@@ -90,7 +90,8 @@ public static class PlotSvg
         {
             var plot = Plot.Parse(source);
             var state = new PlotState(plot);
-            var scene = PlotLayout.Build(state, width, (text, size, bold) => text.Length * size * (bold ? 0.6 : 0.55), new PlotLook { Title = title });
+            // A heat map at the coarser detail: its picture stays a small file.
+            var scene = PlotLayout.Build(state, width, (text, size, bold) => text.Length * size * (bold ? 0.6 : 0.55), new PlotLook { Title = title, Detail = plot.Heavy ? 0.5 : 1 });
             return Render(scene, plot.Title ?? "Plot");
         }
         catch (PlotException)

@@ -380,8 +380,12 @@ public static partial class DiagramDesign
             case "svg" when drawings == Drawings.FlowchartsAndSvg:
                 kind = NoteBlockKind.Svg;
                 break;
-            case "plot" or "graph" or "function" or "chart":
+            case "plot":
                 kind = NoteBlockKind.Plot;
+                break;
+            // A name that could be either: what's in the source decides (graph TD is a flowchart).
+            case "graph" or "function" or "chart":
+                kind = NoteBlocks.StartsAsDiagram(Str(o["source"]) ?? "") ? NoteBlockKind.Mermaid : NoteBlockKind.Plot;
                 break;
             case "svg":
                 return (null, "an SVG drawing, which this engine doesn't draw");
