@@ -145,7 +145,10 @@ public static class WhisperModels
     /// The heaviest (most accurate) model that keeps up with a lecture on this computer, and one plain line why.
     /// <para>
     /// A lecture is written down live, a 30-second piece at a time, so the model has to finish each piece well inside
-    /// 30 seconds or the transcript falls further behind all lecture. What decides that:
+    /// 30 seconds or the transcript falls further behind all lecture. Written down after class (Settings → Recording)
+    /// it's the same pieces and the same model, so the same pick: on Apple silicon large-v3 already keeps up live (on
+    /// an M3 Pro, 12 minutes of lecture took it 81 s after class), and on the processor alone the compact turbo took
+    /// twice Parakeet's energy for a transcript about as close to large-v3's (engine/tools/TranscribeBench). What decides it:
     /// </para>
     /// <list type="bullet">
     /// <item>Apple silicon runs Whisper on its graphics (Metal) with memory the chip shares: large-v3 keeps up on every
