@@ -815,7 +815,7 @@ sealed class DiagramExplorer
         ActionsOpen = false;
         some = false;
         Hide(RecallBoxes());
-        Say("Words hidden. Say each box to yourself, then click it to check.");
+        Say("Words hidden. Say each hidden one to yourself, then click it to check.");
         Refresh();
     }
 
