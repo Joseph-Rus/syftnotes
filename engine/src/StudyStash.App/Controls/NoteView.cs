@@ -414,7 +414,7 @@ public sealed partial class NoteView : StackPanel
         return card;
     }
 
-    enum DiagramKind { Mermaid, Svg }
+    enum DiagramKind { Mermaid, Svg, Plot }
 
     /// <summary>Which fences are diagrams — the same rule search and the diagram repair read notes by
     /// (<see cref="NoteBlocks.KindOf"/>).</summary>
@@ -422,6 +422,7 @@ public sealed partial class NoteView : StackPanel
     {
         NoteBlockKind.Mermaid => DiagramKind.Mermaid,
         NoteBlockKind.Svg => DiagramKind.Svg,
+        NoteBlockKind.Plot => DiagramKind.Plot,
         _ => null,
     };
 
@@ -438,7 +439,12 @@ public sealed partial class NoteView : StackPanel
             Detach(kept);
             return diagrams[key] = kept;
         }
-        Control made = kind == DiagramKind.Mermaid ? ChartBlock(source) : SvgBlock(source);
+        Control made = kind switch
+        {
+            DiagramKind.Mermaid => ChartBlock(source),
+            DiagramKind.Plot => PlotBlock(source),
+            _ => SvgBlock(source),
+        };
         if (made is not DiagramCard) diagrams[key] = made;
         return made;
     }
@@ -463,6 +469,22 @@ public sealed partial class NoteView : StackPanel
         if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
         if (Print) view.MaxHeight = PageHeight;
         return view;
+    }
+
+    /// <summary>A ```plot: drawn exactly from its formulas, to play with (<see cref="PlotView"/>); on paper, at its
+    /// sliders' starting values. One that can't be read is the calm card, saying which line and why.</summary>
+    Control PlotBlock(string source)
+    {
+        Plot plot;
+        try
+        {
+            plot = Plot.Parse(source);
+        }
+        catch (PlotException e)
+        {
+            return new DiagramCard(e.Message, source);
+        }
+        return new PlotView(plot, source, still: Print) { Caption = caption, Margin = new Thickness(0, 6) };
     }
 
     Control SvgBlock(string source)

@@ -1116,7 +1116,8 @@ public sealed class Plot
         }
         foreach (var f in Scope.Functions.Values) Visit(f, []);
         // The x axis is the curves' own letter when they share one.
-        var letters = Items.OfType<PlotCurve>().Select(c => c.Variable).Concat(Items.OfType<PlotSeries>().Select(s => s.Variable)).Distinct().ToList();
+        var letters = Items.OfType<PlotCurve>().Where(c => c.Named is not null || !c.Flat).Select(c => c.Variable)
+            .Concat(Items.OfType<PlotSeries>().Select(s => s.Variable)).Distinct().ToList();
         XName = letters.Count == 1 ? letters[0] : Items.OfType<PlotHeat>().FirstOrDefault()?.Variables[0] ?? "x";
     }
 

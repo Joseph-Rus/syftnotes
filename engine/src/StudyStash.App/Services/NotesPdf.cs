@@ -370,7 +370,7 @@ public static class NotesPdf
         if (v is Control { IsVisible: false }) return;
         switch (v)
         {
-            case DiagramView or SvgView or MathDisplay:
+            case DiagramView or SvgView or MathDisplay or PlotView:
                 atoms.Add((y, y + v.Bounds.Height));
                 return;
             case TextBlock text:

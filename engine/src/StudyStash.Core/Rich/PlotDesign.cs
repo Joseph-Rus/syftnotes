@@ -90,6 +90,26 @@ public static class PlotDesign
         x = n p dashed "mean np"
         """.ReplaceLineEndings("\n");
 
+    /// <summary>The format, in brief: what a repair or an answer is told when it may write a ```plot.</summary>
+    public static readonly string Reference = """
+        A ```plot block is drawn exactly from its formulas: one statement a line.
+        - title Words naming what it shows
+        - x -6 to 6 "label" and y 0 to 1 "label": the ranges shown (leave y out to fit what's drawn; add ticks pi for multiples of π)
+        - param k = 1 from 0.2 to 5 "what k is": a slider (add step 1 for whole numbers); a Greek name is fine (μ, σ, η)
+        - f(x) = expression "label": a named curve, in the lecture's own letter (σ(z) = …), usable by later lines; y = expression for an unnamed one; y = 0.5 dashed "threshold" is a flat reference line and x = 2 dashed "asymptote" a vertical one
+        - curve (cos(t), sin(t)) for t from 0 to 2pi "label": a parametric curve
+        - bars P(k) = expression for k from 0 to n "label" (or stems, dots, steps): a sequence at whole numbers; a term may use earlier ones, a(n-1)
+        - points (1, 2), (2, 3.5) "label"; point (x, y) "label"; label (x, y) "words"
+        - shade f from a to b "label" (or shade f and g from a to b): {area} in its label is the area
+        - tangent f at a "slope {slope}"; secant f from a to b
+        - vector (x, y) "label"; vector (x0, y0) to (x, y); field (P, Q) for arrows of a field in x and y
+        - heat L(u, v) = expression "label": a function of two variables as a heat map with contours (contour L(u, v) = … for lines alone)
+        - descent L from (u0, v0) rate η steps 25 "gradient descent" (descent f from x0 rate η steps 10 on a curve)
+        - matrix [[a, b], [c, d]] morph "det = {det}": what a 2×2 matrix does to the plane (its grid, the unit square, where e₁ and e₂ go, its eigenvectors); morph adds a slider from the identity to it
+        - After a line's formula: a colour (blue, orange, green, purple, pink, red, grey), dashed or dotted, then its "label" last. {expression} in a label is worked out live ("k = {k}").
+        Expressions: + − * / ^, 2x or k x for times, brackets ( ) or { } (exponents in brackets: e^(-k x)), pi, e, sqrt, abs, exp, ln and log (both natural), log2, log10, sin, cos, tan, asin, sinh…, floor, ceil, round, min, max, mod, choose(n, k), n!, gamma, erf, Phi (the normal CDF), if(test, a, b), a < x < b, sum(k, 1, n, term), prod(k, 1, n, term), f'(x) for a named curve's slope, Greek letters by symbol or name.
+        """.ReplaceLineEndings("\n");
+
     /// <summary>Every example, with what it shows.</summary>
     public static IReadOnlyList<(string Title, string Words, string Source)> Examples { get; } =
     [

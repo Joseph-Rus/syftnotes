@@ -104,7 +104,9 @@ public static class PlotLayout
     /// <summary>The size words are measured at: (text, size, bold) to width in px.</summary>
     public delegate double Measure(string text, double size, bool bold);
 
-    public static PlotScene Build(PlotState state, double width, Measure measure, PlotLook? look = null)
+    /// <summary>The plot laid out at <paramref name="width"/>; its area <paramref name="areaHeight"/> tall when that's
+    /// given (a window of its own), else as tall as its width says (or its equal units do).</summary>
+    public static PlotScene Build(PlotState state, double width, Measure measure, PlotLook? look = null, double? areaHeight = null)
     {
         look ??= new PlotLook();
         var plot = state.Plot;
@@ -135,44 +137,44 @@ public static class PlotLayout
         else y += 6;
         double top = y;
 
-        // The area: as tall as its width says, or as its units do when they're equal.
+        // The area: as tall as its width says, or as its units do when they're equal (the window growing on the axis
+        // that has room to spare); as wide as the column less the y axis's widest number.
         var view = state.View;
-        double left = 40;
-        double areaW = width - left - Right, areaH;
+        double left = 40, areaW = 0, areaH = 0;
         List<(double V, string Label)> yTicks = [];
-        for (int pass = 0; pass < 2; pass++)
+        void Size()
         {
             areaW = width - left - Right;
-            if (plot.Square)
+            view = state.View;
+            if (!plot.Square)
             {
-                areaH = Math.Round(areaW * view.Height / view.Width);
-                double fitted = Math.Clamp(areaH, 200, Math.Max(200, Math.Min(560, areaW * 1.1)));
-                if (Math.Abs(fitted - areaH) > 0.5)
-                {
-                    // Keep the units equal: the window grows on the axis that has room to spare.
-                    areaH = fitted;
-                    double unit = areaW / view.Width, wantH = areaH / unit;
-                    if (wantH > view.Height)
-                    {
-                        double c = (view.Y0 + view.Y1) / 2;
-                        view = view with { Y0 = c - wantH / 2, Y1 = c + wantH / 2 };
-                    }
-                    else
-                    {
-                        double unitY = areaH / view.Height, wantW = areaW / unitY, c = (view.X0 + view.X1) / 2;
-                        view = view with { X0 = c - wantW / 2, X1 = c + wantW / 2 };
-                    }
-                }
+                areaH = areaHeight ?? AreaHeight(areaW);
+                return;
             }
-            else areaH = AreaHeight(areaW);
+            areaH = areaHeight ?? Math.Clamp(Math.Round(areaW * view.Height / view.Width), 200, Math.Max(200, Math.Min(560, areaW * 1.1)));
+            double unitX = areaW / view.Width, unitY = areaH / view.Height;
+            if (unitY > unitX * (1 + 1e-9))
+            {
+                double wantH = areaH / unitX, c = (view.Y0 + view.Y1) / 2;
+                view = view with { Y0 = c - wantH / 2, Y1 = c + wantH / 2 };
+            }
+            else if (unitX > unitY * (1 + 1e-9))
+            {
+                double wantW = areaW / unitY, c = (view.X0 + view.X1) / 2;
+                view = view with { X0 = c - wantW / 2, X1 = c + wantW / 2 };
+            }
+        }
+        for (int pass = 0; pass < 3; pass++)
+        {
+            Size();
             yTicks = Ticks(view.Y0, view.Y1, areaH, 34, plot.Y?.PiTicks == true);
             double widest = yTicks.Count == 0 ? 0 : yTicks.Max(t => measure(t.Label, TickSize, false));
             double need = Math.Max(26, Math.Ceiling(widest) + 9);
             if (Math.Abs(need - left) < 1) break;
             left = need;
         }
-        areaW = width - left - Right;
-        areaH = plot.Square ? Math.Round(areaW * view.Height / view.Width) : AreaHeight(areaW);
+        Size();
+        yTicks = Ticks(view.Y0, view.Y1, areaH, 34, plot.Y?.PiTicks == true);
         var map = new PlotMap(view, left, top, areaW, areaH);
         var xTicks = Ticks(view.X0, view.X1, areaW, 70, plot.X?.PiTicks == true);
 
