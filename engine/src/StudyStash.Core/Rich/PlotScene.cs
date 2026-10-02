@@ -132,7 +132,8 @@ public static class PlotLayout
         {
             double h = LabelSize * LineGap;
             front.Add(new PlotWords(new PlotRect(0, y, measure(yLabel, LabelSize, false), h), yLabel, LabelSize, false, PlotPaint.Ink2, false, null));
-            y += h + 4;
+            // Room under it for the top tick's number, which sits half above the area.
+            y += h + 4 + TickSize * LineGap / 2;
         }
         else y += 6;
         double top = y;

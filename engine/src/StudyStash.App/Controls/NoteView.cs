@@ -368,7 +368,7 @@ public sealed partial class NoteView : StackPanel
                 mv.Size = current.FontSize * DisplayMathFactor;
                 mv.InvalidateMeasure();
                 var lifted = new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 2) };
-                segments.Add(lifted);
+                segments.Add(Print || Compact ? lifted : PlotFormula.Wrap(lifted, mv.Latex ?? ""));
                 current = Body();
                 split = true;
                 continue;
@@ -376,10 +376,18 @@ public sealed partial class NoteView : StackPanel
             current.Inlines!.Add(piece);
         }
         if (current.Inlines!.Count > 0 || !split) segments.Add(current);
-        if (segments.Count == 1) return segments[0];
+        if (segments.Count == 1) return LoneFormula(inline) is { } latex && !Print && !Compact && segments[0] is not PlotFormula ? PlotFormula.Wrap(segments[0], latex) : segments[0];
         var stack = new StackPanel { Spacing = 6 };
         foreach (var s in segments) stack.Children.Add(s);
         return stack;
+    }
+
+    /// <summary>A paragraph that's one <c>$$…$$</c> formula and nothing else: its LaTeX (it can be asked for as a
+    /// plot); else null.</summary>
+    static string? LoneFormula(ContainerInline inline)
+    {
+        var parts = inline.Where(i => i is not LineBreakInline && !(i is LiteralInline l && l.Content.IsEmptyOrWhitespace())).ToList();
+        return parts is [MathInline { DelimiterCount: 2 } m] ? m.Content.ToString() : null;
     }
 
     /// <summary>A <c>$$…$$</c> formula on its own lines: centred, larger than the body, scaled down to fit the

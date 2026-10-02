@@ -141,6 +141,16 @@ public class PlotShots
                 window.MouseMove(hover);
                 Dispatcher.UIThread.RunJobs();
                 RichShots.Save($"plot-full-app-{look}", t, window, size);
+                // The formula above it, pointed at: Show what this looks like.
+                var formula = window.GetVisualDescendants().OfType<PlotFormula>().First();
+                if (scroller is not null)
+                {
+                    scroller.Offset = new Vector(0, Math.Max(0, scroller.Offset.Y + (formula.TranslatePoint(default, scroller)?.Y ?? 0) - 120));
+                    Dispatcher.UIThread.RunJobs();
+                }
+                window.MouseMove(formula.TranslatePoint(new Point(formula.Bounds.Width / 2, formula.Bounds.Height / 2), window)!.Value);
+                Dispatcher.UIThread.RunJobs();
+                RichShots.Save($"plot-formula-ask-{look}", t, window, size);
                 window.Close();
             }
     }
@@ -190,6 +200,28 @@ public class PlotShots
             RichShots.Save("plot-window-win", t, win, new Size(1000, 760));
             win.Close();
             host.Close();
+        }
+    }
+
+    /// <summary>Plots in the Windows look at 150% display scaling (each point one and a half pixels): their lines,
+    /// words and heat map as sharp as at 100%.</summary>
+    [AvaloniaFact]
+    public void Plots_at_150()
+    {
+        foreach (var t in Themes)
+        {
+            Skin.UseTheme(ColourThemes.Default);
+            ((App)Application.Current!).UseSkin(SkinKind.Win);
+            var content = RichShots.NotePage(SkinKind.Win, Notes(PlotDesign.Examples.Where((_, i) => i is 0 or 5)));
+            var size = new Size(876, 1500);
+            var window = new Window { Width = size.Width, Height = size.Height, RequestedThemeVariant = t, Content = content };
+            Views.Look.Apply(window);
+            window.SetRenderScaling(1.5);
+            window.Show();
+            Dispatcher.UIThread.RunJobs();
+            var frame = window.CaptureRenderedFrame()!;
+            using (var stream = File.Create(Path.Combine(Shot.Dir, $"plots-win-150-{(t == ThemeVariant.Dark ? "dark" : "light")}.png"))) frame.Save(stream, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+            window.Close();
         }
     }
 }
