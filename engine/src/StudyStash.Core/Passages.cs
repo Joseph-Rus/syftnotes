@@ -104,6 +104,16 @@ public static partial class Passages
                 var texts = drawing.Texts.Where(t => t.Trim().Length > 0).ToList();
                 if (drawing.Title.Length > 0 && !texts.Contains(drawing.Title)) texts.Insert(0, drawing.Title);
                 return texts.Count == 0 ? "" : DiagramPrefix + string.Join(", ", texts);
+            case NoteBlockKind.Plot:
+                try
+                {
+                    var words = Plot.Parse(block.Text).Words();
+                    return words.Count == 0 ? "" : "Plot: " + string.Join(", ", words);
+                }
+                catch (PlotException)
+                {
+                    return block.Text.Trim();
+                }
             case NoteBlockKind.Math:
                 return block.Text.Trim();
             default:

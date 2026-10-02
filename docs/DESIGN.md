@@ -43,7 +43,7 @@ laptop                                          library (a Mac mini, say — any
    (`DiagramDesign`: it reads the timed transcript and the notes, decides whether anything is clearer
    as a picture and which kind fits — a flowchart, in groups for a big topic, a state or sequence
    diagram, a timeline or a mind map (`Mermaid` reads them all into one model; `DiagramLayout` lays
-   each out) — answers in JSON that's checked strictly, and each diagram it designs goes at the end
+   each out), or a plot of a formula whose shape is the point (`Plot`, checked by `PlotLint`) — answers in JSON that's checked strictly, and each diagram it designs goes at the end
    of its section, repaired once or left out if it doesn't draw or isn't true to the lecture;
    `DiagramLint` then lays each out at the notes' width, and one that would look wrong goes back once,
    its redesign kept only when better; a pass that fails leaves the notes exactly as written), sorts
@@ -188,6 +188,47 @@ frames. On paper (`NoteView.PageHeight`, the PDF) that's all it is: the still pi
 
 Movement follows the system's Reduce motion (macOS) or Animation effects (Windows) setting
 (`Platform/Motion.cs`).
+
+## Plots
+
+A ```` ```plot ```` fence is a few plain lines (`Core/Rich/Plot.cs`): `title`, the axes (`x -6 to 6
+"z"`), sliders (`param k = 1 from 0.2 to 5 "steepness"`), then what's drawn — curves (`σ(z) = 1/(1 +
+e^(-k z))`, `y = …`, `x = …`), `curve (x(t), y(t)) for t from …`, `bars|stems|dots|steps P(k) = …
+for k from 0 to n` (a term may use earlier ones: recurrences), `points`, `point`, `label`, `shade f
+[and g] from a to b`, `tangent f at a`, `secant`, `vector`, `field (P, Q)`, `heat|contour L(u, v) =
+…`, `descent L from (u0, v0) rate η steps n` and `matrix [[a, b], [c, d]] morph`; a colour, `dashed`
+or `dotted`, then a `"label"` (whose `{…}` is worked out live: `{area}`, `{slope}`, `{det}`, `{k}`).
+It's read strictly (a mistake names its line, which is what a repair is sent back with) and written
+back canonically, each formula as written.
+
+- **Formulas** (`Core/Rich/PlotExpr.cs`) are read by a hand-written parser into a small tree that
+  only does arithmetic: no code runs. It reads what lecturers write (`2x`, `x²`, `e^{-x^2/2}`, `σ`
+  or `sigma`, `\frac`, `\sqrt`, `|x|`, `n!`, `sin 2x`, `kx` as k·x when both are names it knows,
+  `f'(x)`), with `if`, chained comparisons, `sum`/`prod` over a whole-number range, `choose`,
+  `gamma`, `erf`, `Phi`. Limits keep it safe: 400 pieces and 40 levels an expression, 50 000 steps
+  an evaluation (a sum's terms, a call to another curve), a frame's own budget across all of them
+  (`PlotEnv.FrameLeft`), sequences worked out once per slider setting, curves calling each other in
+  a circle refused. Past a limit a value is undefined, never a hang.
+- **Sampling** (`PlotSampler`) halves a stretch until the line between samples is within a fifth of
+  a pixel of the curve, breaks where it's undefined or jumps (no line across an asymptote or a
+  step), and keeps what's far off the screen to its two ends. Areas are Simpson's rule, slopes a
+  centred difference, gradient descent exact steps, contours marching squares, eigenvectors closed
+  form.
+- **Layout** (`PlotLayout`) makes one colour-free `PlotScene` for the app, paper, the SVG
+  (`PlotSvg`, the download's picture and the phone's) alike: ticks at 1, 2 or 5 × 10ⁿ (or π), the
+  series in a fixed, colour-blind-checked order (`PlotPalette`), a legend for two or more, labels
+  placed clear of each other and of the lines. A slider redraws it by laying it out again (well
+  under a millisecond for a curve, a couple for a heat map at a drag's coarser detail).
+- **On screen** `PlotView` holds a `PlotCanvas` (drawing, crosshair readings, pins, dragging a point
+  that's a slider, zoom by working the plane out again), `PlotSlider`s, and the diagrams' own kind
+  of toolbar, actions and strip; it asks through the same `IDiagramHost`. `PlotWindow` opens it
+  larger. `PlotFormula` puts **Show what this looks like** by a displayed formula, and Ask's prompt
+  carries the plot format when a question asks to see a shape (`PlotDesign.AsksForPlot`).
+- **The designer** is taught the format and a worked example of each kind (`PlotDesign.Brief`); a
+  plot it designs is grounded by its title and labels like any diagram, then `PlotLint` works it out
+  at its sliders' starting values and ends and sends it back once with what's wrong (undefined
+  almost everywhere, flat, off its axes, a slider that changes nothing or takes a curve off the
+  plot, a point outside it, too many curves).
 
 ## Privacy
 

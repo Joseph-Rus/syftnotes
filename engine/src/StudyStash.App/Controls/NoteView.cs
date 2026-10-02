@@ -368,7 +368,7 @@ public sealed partial class NoteView : StackPanel
                 mv.Size = current.FontSize * DisplayMathFactor;
                 mv.InvalidateMeasure();
                 var lifted = new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 2) };
-                segments.Add(lifted);
+                segments.Add(Print || Compact ? lifted : PlotFormula.Wrap(lifted, mv.Latex ?? ""));
                 current = Body();
                 split = true;
                 continue;
@@ -376,10 +376,18 @@ public sealed partial class NoteView : StackPanel
             current.Inlines!.Add(piece);
         }
         if (current.Inlines!.Count > 0 || !split) segments.Add(current);
-        if (segments.Count == 1) return segments[0];
+        if (segments.Count == 1) return LoneFormula(inline) is { } latex && !Print && !Compact && segments[0] is not PlotFormula ? PlotFormula.Wrap(segments[0], latex) : segments[0];
         var stack = new StackPanel { Spacing = 6 };
         foreach (var s in segments) stack.Children.Add(s);
         return stack;
+    }
+
+    /// <summary>A paragraph that's one <c>$$…$$</c> formula and nothing else: its LaTeX (it can be asked for as a
+    /// plot); else null.</summary>
+    static string? LoneFormula(ContainerInline inline)
+    {
+        var parts = inline.Where(i => i is not LineBreakInline && !(i is LiteralInline l && l.Content.IsEmptyOrWhitespace())).ToList();
+        return parts is [MathInline { DelimiterCount: 2 } m] ? m.Content.ToString() : null;
     }
 
     /// <summary>A <c>$$…$$</c> formula on its own lines: centred, larger than the body, scaled down to fit the
@@ -393,7 +401,9 @@ public sealed partial class NoteView : StackPanel
         mv.Bind(MathView.ForegroundProperty, mv.GetResourceObservable("Fg"));
         mv.Measure(Size.Infinity);
         if (mv.ErrorMessage is not null) return DisplayFallback(latex);
-        return new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 4) };
+        var display = new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 4) };
+        // In a lecture's notes on screen, a formula can be asked for as a plot.
+        return Print || Compact ? display : PlotFormula.Wrap(display, latex);
     }
 
     /// <summary>The code-box look, for a display formula that couldn't be typeset: one quiet line saying so, then
@@ -414,7 +424,7 @@ public sealed partial class NoteView : StackPanel
         return card;
     }
 
-    enum DiagramKind { Mermaid, Svg }
+    enum DiagramKind { Mermaid, Svg, Plot }
 
     /// <summary>Which fences are diagrams — the same rule search and the diagram repair read notes by
     /// (<see cref="NoteBlocks.KindOf"/>).</summary>
@@ -422,6 +432,7 @@ public sealed partial class NoteView : StackPanel
     {
         NoteBlockKind.Mermaid => DiagramKind.Mermaid,
         NoteBlockKind.Svg => DiagramKind.Svg,
+        NoteBlockKind.Plot => DiagramKind.Plot,
         _ => null,
     };
 
@@ -438,7 +449,12 @@ public sealed partial class NoteView : StackPanel
             Detach(kept);
             return diagrams[key] = kept;
         }
-        Control made = kind == DiagramKind.Mermaid ? ChartBlock(source) : SvgBlock(source);
+        Control made = kind switch
+        {
+            DiagramKind.Mermaid => ChartBlock(source),
+            DiagramKind.Plot => PlotBlock(source),
+            _ => SvgBlock(source),
+        };
         if (made is not DiagramCard) diagrams[key] = made;
         return made;
     }
@@ -463,6 +479,22 @@ public sealed partial class NoteView : StackPanel
         if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
         if (Print) view.MaxHeight = PageHeight;
         return view;
+    }
+
+    /// <summary>A ```plot: drawn exactly from its formulas, to play with (<see cref="PlotView"/>); on paper, at its
+    /// sliders' starting values. One that can't be read is the calm card, saying which line and why.</summary>
+    Control PlotBlock(string source)
+    {
+        Plot plot;
+        try
+        {
+            plot = Plot.Parse(source);
+        }
+        catch (PlotException e)
+        {
+            return new DiagramCard(e.Message, source);
+        }
+        return new PlotView(plot, source, still: Print) { Caption = caption, Margin = new Thickness(0, 6) };
     }
 
     Control SvgBlock(string source)

@@ -45,6 +45,7 @@ public static partial class PhoneNotes
         NoteBlockKind.Svg when block.Closed => SafeSvg.Clean(block.Text) is { Svg: { } svg }
             ? $"<figure class=\"diagram\">{svg}</figure>"
             : $"<p class=\"diagram-problem\"><em>{Ui.Esc(SafeSvg.Clean(block.Text).Problem)}</em></p>",
+        NoteBlockKind.Plot when block.Closed && PlotSvg.Render(block.Text, Column) is { } plot => $"<figure class=\"diagram\">{plot}</figure>",
         NoteBlockKind.Math => Math(block.Text, "div", display: true),
         _ => Code(block.Info, block.Text),
     };
