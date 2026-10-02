@@ -308,6 +308,8 @@ public class RichShots
 
     /// <summary>Captures the window as it stands right now (no extra layout pass), unlike <see cref="Shot.Take"/>
     /// which lays out and captures in the same breath — this shot needs to scroll in between.</summary>
+    internal static void Save(string name, ThemeVariant variant, Window window, Size size) => SaveShot(name, variant, window, size);
+
     static void SaveShot(string name, ThemeVariant variant, Window window, Size size)
     {
         var whole = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");

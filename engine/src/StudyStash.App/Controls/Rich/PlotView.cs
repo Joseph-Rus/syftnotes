@@ -419,8 +419,9 @@ public sealed class PlotView : Decorator
         wherePin = Button("graphic_eq", "Where was this said?", "The transcript where the lecture talks about this", FindSaid);
         var actions = Panel(new WrapPanel { Orientation = Orientation.Horizontal, ItemSpacing = 1, LineSpacing = 1, Children = { explainPin, quizPin, wherePin } }, 10);
         actions.HorizontalAlignment = HorizontalAlignment.Left;
-        actions.VerticalAlignment = VerticalAlignment.Top;
+        actions.VerticalAlignment = VerticalAlignment.Bottom;
         actions.MaxWidth = 460;
+        actions.SizeChanged += (_, _) => Update();
         actions.IsVisible = false;
         Actions = actions;
 
@@ -509,19 +510,19 @@ public sealed class PlotView : Decorator
         explainPin.IsVisible = quizPin.IsVisible = host?.CanAsk == true;
         wherePin.IsVisible = host?.Transcript.Count > 0;
         Actions.IsVisible = canvas.IsPinned && canvas.Pinned is not null && !predicting && (explainPin.IsVisible || wherePin.IsVisible);
+        if (Actions.IsVisible && canvas.Pinned is { } pin && canvas.Scene is { } scene)
+        {
+            // Along the bottom of the plot's area, centred on the pinned reading's x as far as the area allows.
+            var origin = canvas.TranslatePoint(default, stage) ?? default;
+            double width = Actions.Bounds.Width > 0 ? Actions.Bounds.Width : 370;
+            double lo = origin.X + scene.Map.Left, hi = Math.Max(lo, Math.Min(stage.Bounds.Width, origin.X + scene.Map.Right) - width);
+            double x = Math.Clamp(origin.X + pin.X - width / 2, lo, hi);
+            double below = stage.Bounds.Height > 0 ? Math.Max(0, stage.Bounds.Height - (origin.Y + scene.Map.Bottom) + 8) : 0;
+            Actions.Margin = new Thickness(Math.Max(0, x), 0, 0, below);
+        }
     }
 
-    void PlaceActions()
-    {
-        Update();
-        if (!Actions.IsVisible || canvas.Pinned is not { } pin || canvas.Scene is not { } scene) return;
-        Actions.Measure(Size.Infinity);
-        var size = Actions.DesiredSize;
-        var origin = canvas.TranslatePoint(default, stage) ?? default;
-        double x = Math.Clamp(origin.X + pin.X + 12, 4, Math.Max(4, stage.Bounds.Width - size.Width - 4));
-        double y = origin.Y + scene.Map.Bottom - size.Height - 6;
-        Actions.Margin = new Thickness(x, Math.Max(0, y), 0, 0);
-    }
+    void PlaceActions() => Update();
 
     // --- predict, then reveal ------------------------------------------------------------------------------------------
 

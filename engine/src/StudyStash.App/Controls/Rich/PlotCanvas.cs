@@ -376,8 +376,9 @@ sealed class PlotCanvas : Control
     /// <summary>Where the pointer is over the plot (null: not over its area).</summary>
     public PlotPt? Pointer { get; private set; }
 
-    /// <summary>A pinned reading's place (a click pins it; another click elsewhere moves it).</summary>
-    public PlotPt? Pinned { get; private set; }
+    /// <summary>A pinned reading's place on the canvas, while it's in view (a click pins it; another click elsewhere
+    /// moves it).</summary>
+    public PlotPt? Pinned => pinnedAt is { } pin && Scene is { } s && s.Map.Screen(pin.X, pin.Y) is var at && s.Map.Inside(at) ? at : null;
 
     /// <summary>The pinned place, in the plane (it stays put as the plot zooms and pans).</summary>
     (double X, double Y)? pinnedAt;
@@ -396,7 +397,6 @@ sealed class PlotCanvas : Control
     {
         if (pinnedAt is null) return;
         pinnedAt = null;
-        Pinned = null;
         PinChanged?.Invoke();
         InvalidateVisual();
     }
@@ -482,12 +482,7 @@ sealed class PlotCanvas : Control
     {
         if (sketch.Count > 1) DrawSketch(context, scene);
         if (look.Predicting) return;
-        if (pinnedAt is { } pin)
-        {
-            var at = scene.Map.Screen(pin.X, pin.Y);
-            Pinned = scene.Map.Inside(at) ? at : null;
-            if (Pinned is { } p && ReadAt(p) is { } pinned) Reading(context, scene, pinned, strong: true);
-        }
+        if (Pinned is { } p && ReadAt(p) is { } pinned) Reading(context, scene, pinned, strong: true);
         if (Pointer is { } ptr && !panning && handle is null && (Pinned is null || Distance(ptr, Pinned.Value) > 12) && ReadAt(ptr) is { } r)
             Reading(context, scene, r, strong: Pinned is null);
         if (handle is { } h || HandleAt(Pointer) is not null)
