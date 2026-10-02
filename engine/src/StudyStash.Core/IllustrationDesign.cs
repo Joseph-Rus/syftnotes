@@ -264,22 +264,24 @@ public static partial class IllustrationDesign
         return Build(transcript.Length <= room ? transcript : transcript[..Math.Max(0, transcript.LastIndexOf('\n', Math.Max(0, room - 1)))] + "\n[... the rest of the transcript didn't fit here ...]");
     }
 
-    /// <summary>The one revision: the drawing as it came, what was found wrong with it, and the same rules, for the
-    /// whole drawing again with every problem fixed and everything else kept.</summary>
+    /// <summary>The one revision: the drawing as it came, what was found wrong with it, and the same rules, for just the
+    /// groups that need to change (a part, a callout), redrawn with every problem fixed (<see cref="Patch"/> puts them in).</summary>
     public static string RevisePrompt(IllustrationPlan plan, string svg, IReadOnlyList<string> problems)
     {
         var sb = new StringBuilder();
         sb.Append("You drew this illustration for a university student's study notes. Study Stash measured it and found the problems listed under it. ")
-            .Append("Redraw it with every problem fixed, keeping everything that was right: the same parts with the same ids, the same look, the same callouts' words.\n\n");
+            .Append("Fix every problem, keeping everything that was right: the same parts with the same ids, the same look, the same callouts' words. ")
+            .Append("Send back only what changes: each part's group (<g id=\"...\">, whole, with everything in it) and each callout's group (<g id=\"label-...\">) that you redraw or add, ")
+            .Append("and a <defs> with any new gradients; Study Stash puts each one in place of the group with its id. If the whole drawing must change, send all of it.\n\n");
         sb.Append($"Title: {plan.Title}\nWhat it shows: {plan.Subject}\nIts parts:\n");
         foreach (var p in plan.Parts) sb.Append($"- id \"{p.Id}\": {p.Name}\n");
         sb.Append("\n```svg\n").Append(svg.Trim()).Append("\n```\n\nProblems:\n");
         foreach (string p in problems) sb.Append("- ").Append(p).Append('\n');
         sb.Append($$"""
 
-            Keep to the structure: each part a group with its id inside <g id="art">, each callout a group "label-" and the part's id inside <g id="labels"> (a leader polyline starting on the part, a small dot there, and the name). viewBox "0 0 {{Width}} H" (H up to {{MaxHeight}}); attributes only, no style, class, filter, mask, pattern or image; at most 150 KB.
+            Keep to the structure: each part a group with its id inside <g id="art">, each callout a group "label-" and the part's id inside <g id="labels"> (a leader polyline starting on the part, a small dot there, and the name). Attributes only, no style, class, filter, mask, pattern or image.
 
-            Answer with only the SVG in a ```svg block, nothing before or after it.
+            Answer with only the changed groups in one ```svg block, wrapped in <svg xmlns="http://www.w3.org/2000/svg">...</svg>, nothing before or after it.
             """);
         return sb.ToString().ReplaceLineEndings("\n");
     }
@@ -302,7 +304,7 @@ public static partial class IllustrationDesign
     /// out. Never throws but for cancelling.
     /// </summary>
     public static async Task<Outcome> DrawAllAsync(Meeting m, string notes, IReadOnlyList<IllustrationPlan> plans, string grounds,
-        Func<string, bool, Task<string>> ask, Func<TimeSpan> left, int maxPromptChars = int.MaxValue)
+        Func<string, Task<string>> ask, Func<TimeSpan> left, int maxPromptChars = int.MaxValue)
     {
         if (plans.Count == 0) return Outcome.None;
         var cap = Cap(m.Transcript);
@@ -324,7 +326,7 @@ public static partial class IllustrationDesign
 
     sealed record One(DesignedDiagram? Drawn, string? Dropped, IReadOnlyList<string> Problems, bool Revised);
 
-    static async Task<One> DrawAsync(Meeting m, string notes, IllustrationPlan plan, string grounds, Func<string, bool, Task<string>> ask,
+    static async Task<One> DrawAsync(Meeting m, string notes, IllustrationPlan plan, string grounds, Func<string, Task<string>> ask,
         Func<TimeSpan> left, int maxPromptChars)
     {
         string title = "“" + plan.Title + "”";
@@ -332,7 +334,7 @@ public static partial class IllustrationDesign
         {
             var room = left() - TimeSpan.FromSeconds(20);
             if (room <= TimeSpan.Zero) return new One(null, $"{title}: no time left to draw it", [], false);
-            string? svg = Drawing(await ask(DrawPrompt(m, notes, plan, maxPromptChars), false).WaitAsync(room));
+            string? svg = Drawing(await ask(DrawPrompt(m, notes, plan, maxPromptChars)).WaitAsync(room));
             if (svg is null) return new One(null, $"{title}: the illustrator's answer held no drawing", [], false);
             string named = Callouts.Tidy(Illustration.Name(svg, plan.Parts));
             if (SafeSvg.Clean(named) is { Problem: { } problem }) return new One(null, $"{title}: {problem.TrimEnd('.')}", [], false);
@@ -343,10 +345,10 @@ public static partial class IllustrationDesign
             {
                 try
                 {
-                    string? again = Drawing(await ask(RevisePrompt(plan, svg, problems), false).WaitAsync(left() - TimeSpan.FromSeconds(20)));
-                    if (again is not null)
+                    string? again = Drawing(await ask(RevisePrompt(plan, svg, problems)).WaitAsync(left() - TimeSpan.FromSeconds(20)));
+                    if (again is not null && Patch(svg, again) is { } patched)
                     {
-                        string fresh = Callouts.Tidy(Illustration.Name(again, plan.Parts));
+                        string fresh = Callouts.Tidy(Illustration.Name(patched, plan.Parts));
                         var after = SvgLint.Problems(fresh, plan.Parts);
                         if (SafeSvg.Clean(fresh).Problem is null && Unfaithful(fresh, grounds) is null && after.Count < problems.Count)
                         {
@@ -371,6 +373,47 @@ public static partial class IllustrationDesign
         {
             return new One(null, $"{title}: {e.Message}", [], false);
         }
+    }
+
+    /// <summary>
+    /// A drawing with the groups a revision sent in place of those with the same ids (a new part's group goes at the end
+    /// of the art, a new callout's at the end of the labels), and the gradients it sent added; a revision that sent a
+    /// whole drawing (with its art and its labels) is the drawing. Null when either can't be read.
+    /// </summary>
+    public static string? Patch(string svg, string revision)
+    {
+        static System.Xml.Linq.XDocument? Read(string text)
+        {
+            try
+            {
+                var settings = new System.Xml.XmlReaderSettings { DtdProcessing = System.Xml.DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = 800_000 };
+                using var reader = System.Xml.XmlReader.Create(new StringReader(text), settings);
+                return System.Xml.Linq.XDocument.Load(reader, System.Xml.Linq.LoadOptions.PreserveWhitespace);
+            }
+            catch (System.Xml.XmlException)
+            {
+                return null;
+            }
+        }
+        if (Read(svg) is not { Root: { } root } doc || Read(revision) is not { Root: { } patch }) return null;
+        static string? Id(System.Xml.Linq.XElement e) => (string?)e.Attribute("id");
+        if (patch.Descendants().Any(e => Id(e) == "art") && patch.Descendants().Any(e => Id(e) == "labels") && patch.Attribute("viewBox") is not null) return revision;
+        var ns = root.Name.Namespace;
+        System.Xml.Linq.XElement Into(System.Xml.Linq.XElement e) => new(ns + e.Name.LocalName, e.Attributes(), e.Nodes().Select(n => n is System.Xml.Linq.XElement c ? Into(c) : n));
+        var byId = root.Descendants().Where(e => Id(e) is { Length: > 0 }).GroupBy(e => Id(e)!).ToDictionary(g => g.Key, g => g.First());
+        var defs = root.Elements().FirstOrDefault(e => e.Name.LocalName == "defs");
+        if (defs is null) root.AddFirst(defs = new System.Xml.Linq.XElement(ns + "defs"));
+        foreach (var d in patch.Descendants().Where(e => e.Name.LocalName == "defs").SelectMany(d => d.Elements()))
+            if (Id(d) is not { } id || !byId.ContainsKey(id)) defs.Add(Into(d));
+        // The outermost groups sent, each in place of its namesake.
+        foreach (var g in patch.Descendants().Where(e => e.Name.LocalName == "g" && Id(e) is { Length: > 0 } && !e.Ancestors().Any(a => a.Name.LocalName == "g" && Id(a) is { Length: > 0 } && a != patch)).ToList())
+        {
+            string id = Id(g)!;
+            if (id is "art" or "labels") continue;
+            if (byId.TryGetValue(id, out var old)) old.ReplaceWith(Into(g));
+            else (byId.GetValueOrDefault(id.StartsWith("label-", StringComparison.Ordinal) ? "labels" : "art") ?? root).Add(Into(g));
+        }
+        return root.ToString(System.Xml.Linq.SaveOptions.DisableFormatting);
     }
 
     [GeneratedRegex(@"<svg[\s\S]*</svg>", RegexOptions.IgnoreCase)]

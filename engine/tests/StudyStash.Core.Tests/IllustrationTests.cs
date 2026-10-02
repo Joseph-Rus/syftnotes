@@ -96,6 +96,29 @@ public class IllustrationTests
         Assert.Contains(SvgLint.Problems(short_, Parts), p => p.Contains("leader line for “Motor” ends"));
     }
 
+    [Fact]
+    public void A_revision_sends_only_what_changes_and_each_group_goes_in_place_of_its_namesake()
+    {
+        const string fix = """
+            <svg xmlns="http://www.w3.org/2000/svg">
+              <defs><linearGradient id="g-gps"><stop offset="0" stop-color="#3B4045"/></linearGradient></defs>
+              <g id="label-motor"><polyline points="120,90 60,72" fill="none" stroke="#6E6E73"/><text x="56" y="76" text-anchor="end" fill="#1D1D1F">Motor</text></g>
+              <g id="gps"><circle cx="300" cy="60" r="10" fill="url(#g-gps)"/></g>
+            </svg>
+            """;
+        var root = XDocument.Parse(IllustrationDesign.Patch(Toy, fix)!).Root!;
+        XElement Id(string id) => root.Descendants().Single(e => (string?)e.Attribute("id") == id);
+        Assert.Equal("120,90 60,72", (string?)Id("label-motor").Elements().First().Attribute("points"));
+        Assert.Equal("labels", (string?)Id("label-motor").Parent!.Attribute("id"));
+        Assert.Equal("art", (string?)Id("gps").Parent!.Attribute("id")); // a new part goes with the others
+        Assert.Equal("defs", Id("g-gps").Parent!.Name.LocalName);
+        Assert.Equal(1, root.Descendants().Count(e => (string?)e.Attribute("id") == "label-motor"));
+        Assert.Contains(root.Descendants(), e => (string?)e.Attribute("id") == "battery"); // the rest as it was
+        // A whole drawing sent back is the drawing; one that can't be read changes nothing.
+        Assert.Equal(Toy, IllustrationDesign.Patch(Toy, Toy));
+        Assert.Null(IllustrationDesign.Patch(Toy, "<svg><g id="));
+    }
+
     // --- the designer, end to end ----------------------------------------------------------------------------------
 
     const string Said = "Today's drone: the X frame is carbon fibre, each motor is a brushless outrunner that spins clockwise or counter-clockwise, "

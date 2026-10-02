@@ -464,10 +464,11 @@ public static partial class DiagramDesign
     /// <see cref="RevisionRoom"/>, those that would look wrong go back together once, with what's wrong, and each
     /// redesign that draws, stays true and looks better takes its draft's place. A reply that can't be used, or a
     /// lecture too short, leaves <paramref name="notes"/> exactly as given. Only <paramref name="ask"/>'s own failures
-    /// in the first design (and cancelling) throw; a revision that fails or runs late keeps the drafts.
+    /// in the first design (and cancelling) throw; a revision that fails or runs late keeps the drafts. An illustration
+    /// the designer plans is drawn with <paramref name="draw"/> (<paramref name="ask"/> when there's none).
     /// </summary>
     public static async Task<DesignResult> DesignAsync(Meeting m, string notes, Drawings drawings, Func<string, bool, Task<string>> ask,
-        int maxPromptChars = int.MaxValue, TimeSpan? budget = null)
+        int maxPromptChars = int.MaxValue, TimeSpan? budget = null, Func<string, Task<string>>? draw = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         int cap = Cap(m.Transcript);
@@ -479,7 +480,7 @@ public static partial class DiagramDesign
         var dropped = reply.Dropped.ToList();
         string grounds = (TimedText.Plain(m.Transcript) + "\n" + clean).ToLowerInvariant();
         // Illustrations are drawn while the diagrams are checked, each in its own time.
-        var illustrating = IllustrationDesign.DrawAllAsync(m, clean, reply.Illustrations, grounds, ask, () => (budget ?? Timeout) - clock.Elapsed, maxPromptChars);
+        var illustrating = IllustrationDesign.DrawAllAsync(m, clean, reply.Illustrations, grounds, draw ?? (prompt => ask(prompt, false)), () => (budget ?? Timeout) - clock.Elapsed, maxPromptChars);
         foreach (var d in reply.Diagrams)
         {
             if (drawn.Count >= cap)

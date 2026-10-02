@@ -199,7 +199,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             bool local = pick.Engine == "ollama" && Providers is null;
             int ctx = local ? await Core.Summarize.ContextSizeAsync(cfg, pick.Model) : 200_000;
             var result = await DiagramDesign.DesignAsync(m, notes, pick.Drawings, Designer(pick, cfg, ctx, cts.Token), Core.Summarize.TranscriptBudget(ctx),
-                    DiagramTimeout - watch.Elapsed)
+                    DiagramTimeout - watch.Elapsed, Drawer(pick, cfg, cts.Token))
                 .WaitAsync(cts.Token);
             if (pick.Engine != "ollama") Record(pick.Engine, true, "");
             string left = result.Dropped.Count > 0 ? $"; left out {string.Join("; ", result.Dropped)}" : "";
@@ -230,6 +230,15 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             // A revision given up on for running late may still be running: it's stopped with the pass.
             cts.Cancel();
         }
+    }
+
+    /// <summary>The illustrator: the designer's engine and model at the effort a drawing gets
+    /// (<see cref="DiagramEngines.DrawEffort"/>); none for an engine that doesn't draw SVG.</summary>
+    Func<string, Task<string>>? Drawer(DiagramPick pick, Config cfg, CancellationToken ct)
+    {
+        if (pick.Drawings != Drawings.FlowchartsAndSvg) return null;
+        var illustrator = Designer(pick with { Effort = DiagramEngines.DrawEffort(pick.Engine) }, cfg, 200_000, ct);
+        return prompt => illustrator(prompt, false);
     }
 
     /// <summary>
