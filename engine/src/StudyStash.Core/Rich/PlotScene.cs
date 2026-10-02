@@ -120,14 +120,14 @@ public static class PlotLayout
         // Above the plot's area: its title, its legend, its y axis's label.
         double y = 0;
         var front = new List<PlotMark>();
-        if (look.Title && plot.Title is { } title)
+        if (look.Title && PlotNumber.Pretty(plot.Title) is { Length: > 0 } title)
         {
             double h = TitleSize * LineGap;
             front.Add(new PlotWords(new PlotRect(0, y, Math.Min(width, measure(title, TitleSize, true)), h), title, TitleSize, true, PlotPaint.Ink, false, null));
             y += h + 6;
         }
         var keys = Legend(plot, state, colours, hidden, width, measure, ref y);
-        string? yLabel = plot.Y?.Label ?? (plot.Items.OfType<PlotHeat>().FirstOrDefault() is { } heat ? heat.Variables[1] : null);
+        string? yLabel = PlotNumber.Pretty(plot.Y?.Label) is { Length: > 0 } yl ? yl : (plot.Items.OfType<PlotHeat>().FirstOrDefault() is { } heat ? PlotNumber.Pretty(heat.Variables[1]) : null);
         if (yLabel is not null)
         {
             double h = LabelSize * LineGap;
@@ -219,7 +219,7 @@ public static class PlotLayout
             front.Add(new PlotWords(box, label, TickSize, false, PlotPaint.Ink3, false, null));
         }
         double bottom = map.Bottom + 5 + TickSize * LineGap;
-        string? xLabel = plot.X?.Label ?? (plot.Items.OfType<PlotHeat>().FirstOrDefault() is { } hx ? hx.Variables[0] : null);
+        string? xLabel = PlotNumber.Pretty(plot.X?.Label) is { Length: > 0 } xl ? xl : (plot.Items.OfType<PlotHeat>().FirstOrDefault() is { } hx ? PlotNumber.Pretty(hx.Variables[0]) : null);
         if (xLabel is not null)
         {
             double w = measure(xLabel, LabelSize, false), h = LabelSize * LineGap;
@@ -402,7 +402,7 @@ public static class PlotLayout
         double x = 0, h = KeySize * LineGap, rowY = y;
         foreach (var i in items)
         {
-            string text = i.Label?.Text(state.Env) ?? i.Name;
+            string text = i.Label?.Text(state.Env) ?? PlotNumber.Pretty(i.Name);
             double w = 24 + measure(text, KeySize, false);
             if (x > 0 && x + w > width)
             {

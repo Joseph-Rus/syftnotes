@@ -53,10 +53,10 @@ public sealed class PlotLabel
     /// <summary>The words, with each {…} worked out now.</summary>
     public string Text(PlotEnv env)
     {
-        if (!Live) return Written;
+        if (!Live) return PlotNumber.Pretty(Written);
         var sb = new StringBuilder();
         foreach (var (text, expr) in pieces) sb.Append(expr is null ? text : PlotNumber.Format(expr.Eval(env)));
-        return sb.ToString();
+        return PlotNumber.Pretty(sb.ToString());
     }
 
     /// <summary>The words without what's worked out (search reads these).</summary>
@@ -95,6 +95,36 @@ public static class PlotNumber
     }
 
     static string Trim(string s) => s.Contains('.') ? s.TrimEnd('0').TrimEnd('.') : s;
+
+    /// <summary>A label as it's shown: a power or a subscript written plainly (10^40, x^2, w_1, x_{n}) set as one
+    /// (10⁴⁰, x², w₁, xₙ), where the characters exist.</summary>
+    public static string Pretty(string? words)
+    {
+        if (string.IsNullOrEmpty(words) || (words.IndexOf('^') < 0 && words.IndexOf('_') < 0)) return words ?? "";
+        const string sup = "⁰¹²³⁴⁵⁶⁷⁸⁹", sub = "₀₁₂₃₄₅₆₇₈₉";
+        static string Map(string s, string digits, char minus, char n, char i)
+        {
+            var sb = new StringBuilder();
+            foreach (char c in s)
+            {
+                if (char.IsAsciiDigit(c)) sb.Append(digits[c - '0']);
+                else if (c is '-' or '−') sb.Append(minus);
+                else if (c == 'n') sb.Append(n);
+                else if (c == 'i') sb.Append(i);
+                else return "";
+            }
+            return sb.ToString();
+        }
+        string Replace(string text, char mark, string digits, char minus, char n, char i) => System.Text.RegularExpressions.Regex.Replace(text,
+            "\\" + mark + "(?:\\{([-−0-9ni]{1,6})\\}|([-−]?[0-9]{1,6}|[ni]\\b))", m =>
+            {
+                string body = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
+                string mapped = Map(body, digits, minus, n, i);
+                return mapped.Length == 0 ? m.Value : mapped;
+            });
+        string t = Replace(words, '^', sup, '⁻', 'ⁿ', 'ⁱ');
+        return Replace(t, '_', sub, '₋', 'ₙ', 'ᵢ');
+    }
 
     public static string Super(int n) => string.Concat(n.ToString(CultureInfo.InvariantCulture).Select(c => c switch
     {
@@ -1099,8 +1129,8 @@ public sealed class Plot
     void Check()
     {
         if (Items.Count == 0) throw new PlotException("nothing to draw (a plot needs at least one curve, sequence, surface, matrix or set of points)");
-        if (!Items.Any(i => i is PlotCurve or PlotParametric or PlotSeries or PlotPoints or PlotHeat or PlotMatrix or PlotVector or PlotField or PlotVLine))
-            throw new PlotException("nothing to draw (a plot needs at least one curve, sequence, surface, matrix or set of points)");
+        if (!Items.Any(i => i is PlotCurve or PlotParametric or PlotSeries or PlotPoints or PlotPoint or PlotHeat or PlotMatrix or PlotVector or PlotField or PlotVLine))
+            throw new PlotException("nothing to draw (a plot needs at least one curve, sequence, surface, matrix or point)");
         // Curves that call each other in a circle can never be worked out (a sequence may use its own earlier terms).
         var state = new Dictionary<PlotFunction, int>();
         void Visit(PlotFunction f, List<string> path)

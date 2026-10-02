@@ -59,4 +59,31 @@ public class PlotShots
                     });
                 }), size: new Size(876, 760));
     }
+
+    /// <summary>A real answer from the Ask bar (Claude, asked to plot how a network's linear regions grow, on the
+    /// 28 Sep machine learning lecture): its sentences, then its plot, in the answer's compact column.</summary>
+    [AvaloniaFact]
+    public void Plot_in_an_answer()
+    {
+        if (Environment.GetEnvironmentVariable("STUDYSTASH_PLOT_ANSWER") is not { Length: > 0 } file) return;
+        string answer = File.ReadAllText(file);
+        foreach (var t in Themes)
+            Shot.Take("plot-answer-mac", SkinKind.Mac, t, () =>
+            {
+                var note = new NoteView { Markdown = answer, Compact = true, BodySize = 14, BodyLineHeight = 21, Width = 520 };
+                var page = new Border { Padding = new Thickness(24), Child = note };
+                page.Bind(Border.BackgroundProperty, page.GetResourceObservable("Win"));
+                return page;
+            }, size: new Size(700, 760));
+    }
+
+    /// <summary>A note the diagram designer drew a plot into (a real run), as the library's page shows it.</summary>
+    [AvaloniaFact]
+    public void Plot_in_designed_notes()
+    {
+        if (Environment.GetEnvironmentVariable("STUDYSTASH_PLOT_NOTE") is not { Length: > 0 } file) return;
+        string notes = File.ReadAllText(file);
+        foreach (var t in Themes)
+            Shot.Take("plot-designed-mac", SkinKind.Mac, t, () => RichShots.NotePage(SkinKind.Mac, notes), size: new Size(876, 1500));
+    }
 }

@@ -162,7 +162,7 @@ public sealed class PlotView : Decorator
         int index = Plot.Params.IndexOf(p);
         var label = new TextBlock
         {
-            Text = p.Label ?? p.Name, FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
+            Text = PlotNumber.Pretty(p.Label ?? p.Name), FontSize = 12.5, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 0, 10, 0),
         };
         label.Bind(TextBlock.ForegroundProperty, label.GetResourceObservable("Fg2"));

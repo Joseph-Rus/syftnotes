@@ -428,7 +428,7 @@ sealed class PlotCanvas : Control
                     if (!double.IsFinite(v)) continue;
                     crosshair = true;
                     var pt = map.Screen(x, v);
-                    rows.Add((PlotLayout.Paint(scene.Colours[c]), c.Label?.Text(State.Env) ?? c.Name, PlotNumber.Format(v), map.Inside(pt) ? pt : null));
+                    rows.Add((PlotLayout.Paint(scene.Colours[c]), c.Label?.Text(State.Env) ?? PlotNumber.Pretty(c.Name), PlotNumber.Format(v), map.Inside(pt) ? pt : null));
                     break;
                 case PlotSeries s:
                     double k = Math.Round(x);
@@ -460,8 +460,8 @@ sealed class PlotCanvas : Control
             }
         }
         if (rows.Count == 0) return null;
-        string heading = crosshair ? $"{xName} = {PlotNumber.Format(x)}"
-            : p.Items.OfType<PlotHeat>().FirstOrDefault() is { } heat ? $"{heat.Variables[0]} = {PlotNumber.Format(x)}, {heat.Variables[1]} = {PlotNumber.Format(y)}"
+        string heading = crosshair ? $"{PlotNumber.Pretty(xName)} = {PlotNumber.Format(x)}"
+            : p.Items.OfType<PlotHeat>().FirstOrDefault() is { } heat ? $"{PlotNumber.Pretty(heat.Variables[0])} = {PlotNumber.Format(x)}, {PlotNumber.Pretty(heat.Variables[1])} = {PlotNumber.Format(y)}"
             : $"({PlotNumber.Format(x)}, {PlotNumber.Format(y)})";
         return new PlotReading(heading, rows, crosshair ? x : null, at);
     }
