@@ -177,7 +177,7 @@ public static partial class DiagramDesign
             ? "The notes have no headings: leave \"after\" empty and the diagram goes at their end."
             : "Headings in the notes, for \"after\":\n" + string.Join("\n", heads.Select(h => "- " + h.Text));
         string many = cap == 1 ? "one diagram" : $"{cap} diagrams";
-        string kinds = svg ? "\"mermaid\" (every kind above) or \"svg\"" : "\"mermaid\" (every kind above)";
+        string kinds = svg ? "\"mermaid\" (every kind above), \"plot\" or \"svg\"" : "\"mermaid\" (every kind above) or \"plot\"";
 
         string Build(string t) => ($$"""
             You design the diagrams in a university student's study notes. Below are a lecture's transcript and the notes already written from it. Decide whether this lecture teaches anything a diagram would make clearer, and if it does, design the best study diagram you can: one a student could learn the topic from, and redraw from memory in an exam. A great diagram shows in a few seconds what took the lecturer minutes to say: the steps in order, what causes what, what is part of what, who sends what to whom, what changes when. A diagram that only repeats a list, or shows something the lecture didn't explain, is worse than none.
@@ -205,7 +205,8 @@ public static partial class DiagramDesign
             - an exchange between parties, in order (a client and a server, a handshake, cells signalling to each other)
             - a timeline the lecturer put in order
             - a topic broken into its themes, when the lecture's point is how they fit together
-            - a comparison, when two or three things share a structure and part ways at clear points{{(svg ? "\n- something spatial (the forces on an object, a circuit, a labelled structure, the graph of a function, memory during a function call)" : "")}}
+            - a comparison, when two or three things share a structure and part ways at clear points
+            - a formula, function or distribution the lecturer gave whose shape is the point (an activation or loss function, a distribution and its parameters, growth rates, gradient descent, a matrix's effect): a plot, drawn exactly from the formula{{(svg ? "\n- something spatial (the forces on an object, a circuit, a labelled structure, the graph of a function, memory during a function call)" : "")}}
 
             Draw nothing for:
             - discussion, opinion, stories, a case told as a story, or a review of unrelated questions
@@ -213,7 +214,8 @@ public static partial class DiagramDesign
             - definitions, or facts with no order or links between them
             - a topic only mentioned in passing, whose steps or parts were never explained
             - a short list the notes already make clear (three boxes in a row add nothing)
-            - anything the notes already show as a diagram
+            - anything the notes already show as a diagram or a plot
+            - a formula whose shape the lecture never talked about (a plot is for when how it looks is the point)
             When in doubt, draw nothing. No diagram is a normal, correct answer. This lecture may have at most {{many}}, each of a different idea; draw fewer unless each one earns its place.
 
             ## Choose the kind
@@ -258,6 +260,7 @@ public static partial class DiagramDesign
             """ : "") + $$"""
 
 
+            {{PlotDesign.Brief}}
             The examples show the form only: draw only what this lecture teaches.
 
             ## Put the lecture's detail in, and keep to it
@@ -287,7 +290,7 @@ public static partial class DiagramDesign
 
             ## Check before you answer
 
-            For each diagram: every label is something the lecture said; a student would see the main idea in five seconds; each box is one to five words with its detail in <small>; a big one is in groups that read as an overview; every colour means one thing, said in the caption; it is the kind that fits the idea; and its source is valid Mermaid (quoted labels, matched brackets, one statement a line, every block closed).
+            For each diagram: every label is something the lecture said (and a plot's formula is the lecturer's own); a student would see the main idea in five seconds; each box is one to five words with its detail in <small>; a big one is in groups that read as an overview; every colour means one thing, said in the caption; it is the kind that fits the idea; and its source is valid Mermaid (quoted labels, matched brackets, one statement a line, every block closed).
 
             ## Answer
 
@@ -295,7 +298,7 @@ public static partial class DiagramDesign
             {"reason": "...", "diagrams": [{"title": "...", "after": "...", "at": "{{(timed ? "mm:ss" : "")}}", "kind": "mermaid", "source": "flowchart LR\n  A[\"...\"] --> B[\"...\"]", "caption": "..."}]}
             - "reason": one sentence: what the diagrams show and why they help, or why this lecture needs none.
             - "diagrams": the most helpful first, at most {{many}}; an empty list [] when nothing is worth drawing.
-            - "kind": {{kinds}}. "source": the diagram's code alone, with no ``` fence, as a JSON string (\n between lines, \" for quotes).
+            - "kind": {{kinds}}. "source": the diagram's code (or the plot's lines) alone, with no ``` fence, as a JSON string (\n between lines, \" for quotes).
             - Every diagram needs all six fields; one missing any of them is left out.
             """).ReplaceLineEndings("\n");
 
@@ -376,6 +379,9 @@ public static partial class DiagramDesign
                 break;
             case "svg" when drawings == Drawings.FlowchartsAndSvg:
                 kind = NoteBlockKind.Svg;
+                break;
+            case "plot" or "graph" or "function" or "chart":
+                kind = NoteBlockKind.Plot;
                 break;
             case "svg":
                 return (null, "an SVG drawing, which this engine doesn't draw");
@@ -531,6 +537,17 @@ public static partial class DiagramDesign
     /// drawing, which draws as written.</summary>
     static IReadOnlyList<string> Looks(DesignedDiagram d)
     {
+        if (d.Kind == NoteBlockKind.Plot)
+        {
+            try
+            {
+                return PlotLint.Problems(Plot.Parse(d.Source));
+            }
+            catch (PlotException)
+            {
+                return [];
+            }
+        }
         if (d.Kind != NoteBlockKind.Mermaid) return [];
         try
         {
@@ -558,7 +575,7 @@ public static partial class DiagramDesign
         for (int i = 0; i < wrong.Count; i++)
         {
             var (d, problems) = wrong[i];
-            sb.Append($"\n## Diagram {i + 1}: {d.Title}\n\n\"after\": \"{d.After}\", \"at\": \"{(d.At is double at ? TimedText.Clock(at) : "")}\"\n\n```mermaid\n{d.Source}\n```\n\nCaption: {d.Caption}\n\nProblems:\n");
+            sb.Append($"\n## Diagram {i + 1}: {d.Title}\n\n\"after\": \"{d.After}\", \"at\": \"{(d.At is double at ? TimedText.Clock(at) : "")}\"\n\n```{Summarize.Fence(d.Kind)}\n{d.Source}\n```\n\nCaption: {d.Caption}\n\nProblems:\n");
             foreach (string p in problems) sb.Append("- ").Append(p).Append('\n');
         }
         sb.Append($$"""
@@ -571,11 +588,12 @@ public static partial class DiagramDesign
             - Arrows that cross: put the boxes in the order the arrows run, and drop arrows that repeat what the order shows.
             - Keep its colours (:::red and the rest) and what they mean, said in the caption. Quote every flowchart label. No style, classDef, linkStyle or click.
             - Don't split a decision or an algorithm into groups just to have groups: groups are for a big topic's phases, places or parts.
+            - A plot ("kind": "plot"): keep the lecturer's formula exactly; fix it with its ranges (x, y), its sliders' ranges and starting values, and its labels.{{(wrong.Any(w => w.Diagram.Kind == NoteBlockKind.Plot) ? "\n\n" + PlotDesign.Reference : "")}}
 
             ## Answer
 
             Answer with only this JSON object, nothing before or after it, with one diagram for each above, in the same order:
-            {"reason": "what you changed", "diagrams": [{"title": "...", "after": "", "at": "", "kind": "mermaid", "source": "...", "caption": "..."}]}
+            {"reason": "what you changed", "diagrams": [{"title": "...", "after": "", "at": "", "kind": "mermaid or plot, as it was", "source": "...", "caption": "..."}]}
             - "source": the diagram's code alone, with no ``` fence, as a JSON string (\n between lines, \" for quotes). "caption": one or two sentences, 50 words at most, saying what it shows and what to notice.
             - "after" and "at": each diagram's own, copied exactly as given above it.
             """);
@@ -586,7 +604,7 @@ public static partial class DiagramDesign
     static async Task<DesignedDiagram?> Drawable(DesignedDiagram d, Func<string, Task<string>> ask)
     {
         if (Summarize.DiagramProblem(d.Kind, d.Source) is null) return d;
-        string fence = d.Kind == NoteBlockKind.Svg ? "svg" : "mermaid";
+        string fence = Summarize.Fence(d.Kind);
         string repaired = await Summarize.RepairDiagramsAsync($"```{fence}\n{d.Source}\n```", ask);
         var block = NoteBlocks.Find(repaired).FirstOrDefault(b => b.Kind == d.Kind && b.Closed);
         return block is not null && Summarize.DiagramProblem(d.Kind, block.Text) is null ? d with { Source = block.Text } : null;
@@ -604,7 +622,15 @@ public static partial class DiagramDesign
     static string? Unfaithful(DesignedDiagram d, string grounds)
     {
         IReadOnlyList<string> words;
-        if (d.Kind == NoteBlockKind.Mermaid)
+        if (d.Kind == NoteBlockKind.Plot)
+        {
+            // A plot's formula is drawn exactly: what's checked is that it's about what the lecture said (its title and
+            // labels), and that it isn't a wall of curves.
+            var plot = Plot.Parse(d.Source);
+            if (plot.Items.Count(PlotLayout.Legendable) > PlotLint.MaxSeries + 2) return "too many curves to be one plot";
+            words = [d.Title, .. PlotDesign.Labels(plot)];
+        }
+        else if (d.Kind == NoteBlockKind.Mermaid)
         {
             var chart = Flowchart.Parse(d.Source);
             int boxes = chart.Nodes.Count(n => n.Role is not (NodeRole.Start or NodeRole.End or NodeRole.Note or NodeRole.Bar));
@@ -685,7 +711,7 @@ public static partial class DiagramDesign
         yield return "";
         yield return $"**{d.Title}**";
         yield return "";
-        yield return svg ? "```svg" : "```mermaid";
+        yield return "```" + Summarize.Fence(d.Kind);
         yield return svg ? $"<!-- {Mark}{from} -->" : $"%% {Mark}{from}";
         foreach (string line in d.Source.Split('\n')) yield return line;
         yield return "```";

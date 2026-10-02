@@ -393,7 +393,9 @@ public sealed partial class NoteView : StackPanel
         mv.Bind(MathView.ForegroundProperty, mv.GetResourceObservable("Fg"));
         mv.Measure(Size.Infinity);
         if (mv.ErrorMessage is not null) return DisplayFallback(latex);
-        return new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 4) };
+        var display = new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 4) };
+        // In a lecture's notes on screen, a formula can be asked for as a plot.
+        return Print || Compact ? display : PlotFormula.Wrap(display, latex);
     }
 
     /// <summary>The code-box look, for a display formula that couldn't be typeset: one quiet line saying so, then

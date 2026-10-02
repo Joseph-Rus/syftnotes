@@ -221,6 +221,11 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             Return JSON: answer (the answer), sources (the numbers of the sources you used, most important first).
 
             """);
+        // Asked what a formula looks like (or to plot one): the answer may draw it, exactly, as a plot to play with.
+        if (PlotDesign.AsksForPlot(question))
+            prompt.Append("If the student asks what a formula or function looks like, or asks you to plot or graph it, add one ```plot block after the sentences instead of a flowchart: ")
+                .Append("the formula as the sources give it, a slider for each parameter they vary, ranges where its shape shows. In the JSON, write its quotes as \\\" and its line breaks as \\n.\n")
+                .Append(PlotDesign.Reference).Append('\n');
         for (int i = 0; i < picked.Count; i++)
         {
             var (note, p) = picked[i];

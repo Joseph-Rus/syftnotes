@@ -108,8 +108,10 @@ public static class PlotSvg
         sb.Append("  <title>").Append(Esc(title)).Append("</title>\n");
         sb.Append($"  <rect width=\"{W}\" height=\"{H}\" fill=\"{p.Surface.Hex}\"/>\n");
         var a = scene.Area;
-        sb.Append($"  <defs><clipPath id=\"plot-area\"><rect x=\"{N(a.X)}\" y=\"{N(a.Y)}\" width=\"{N(a.W)}\" height=\"{N(a.H)}\"/></clipPath></defs>\n");
-        sb.Append("  <g clip-path=\"url(#plot-area)\">\n");
+        // Its own clip's name, so two plots on one page (the phone's) never share one.
+        string id = "plot-" + Fnv(title + "\u0001" + W + "\u0001" + H + "\u0001" + scene.Data.Count + "\u0001" + N(a.X) + N(a.Y));
+        sb.Append($"  <defs><clipPath id=\"{id}\"><rect x=\"{N(a.X)}\" y=\"{N(a.Y)}\" width=\"{N(a.W)}\" height=\"{N(a.H)}\"/></clipPath></defs>\n");
+        sb.Append($"  <g clip-path=\"url(#{id})\">\n");
         foreach (var m in scene.Data) Mark(sb, m, p, "    ");
         sb.Append("  </g>\n");
         foreach (var m in scene.Front) Mark(sb, m, p, "  ");
@@ -240,6 +242,13 @@ public static class PlotSvg
         PlotDash.Dotted => $" stroke-dasharray=\"0.1 {N(width * 2.4)}\"",
         _ => "",
     };
+
+    static string Fnv(string s)
+    {
+        uint h = 2166136261;
+        foreach (char c in s) h = (h ^ c) * 16777619;
+        return h.ToString("x8", CultureInfo.InvariantCulture);
+    }
 
     static string N(double v) => Math.Round(v, 2).ToString("0.##", CultureInfo.InvariantCulture);
 

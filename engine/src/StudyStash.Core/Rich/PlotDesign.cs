@@ -110,6 +110,69 @@ public static class PlotDesign
         Expressions: + − * / ^, 2x or k x for times, brackets ( ) or { } (exponents in brackets: e^(-k x)), pi, e, sqrt, abs, exp, ln and log (both natural), log2, log10, sin, cos, tan, asin, sinh…, floor, ceil, round, min, max, mod, choose(n, k), n!, gamma, erf, Phi (the normal CDF), if(test, a, b), a < x < b, sum(k, 1, n, term), prod(k, 1, n, term), f'(x) for a named curve's slope, Greek letters by symbol or name.
         """.ReplaceLineEndings("\n");
 
+    /// <summary>What the designer is told about plots: when one helps, that the app draws it exactly from the formula
+    /// (so the formula must be the lecturer's), the format, and a worked example of each kind.</summary>
+    public static string Brief => $$"""
+        A plot (kind "plot") for a formula, function, distribution, transform or growth rate the lecturer gave whose shape is the point: an activation or loss function, a probability distribution and its parameters, how running times grow, a recurrence, gradient descent on a loss surface, what a matrix does to the plane. Study Stash draws it exactly from the formula and the student can move its sliders, so write the formula exactly as the lecturer gave it, in their letters (σ(z), L(w), P(k)); you choose only the ranges, the sliders and the labels. Give each parameter the lecturer varied or named a slider (param), starting at the lecture's value; give x (and y, unless it should fit what's drawn) the range where the shape shows; shade the probability, mark the point and draw the tangent the lecture talked about. Never plot a formula the lecture didn't give, and never invent data. Its title is the diagram's title; it needs no title line of its own.
+
+        {{Reference}}
+        A curve with a slider; the sigmoid:
+        ```plot
+        {{Sigmoid}}
+        ```
+        A distribution, its parameters, and a probability shaded:
+        ```plot
+        {{Normal}}
+        ```
+        A discrete distribution (or a sequence, or a recurrence such as T(n) = 2T(n/2) + n) as bars:
+        ```plot
+        {{Binomial}}
+        ```
+        A loss surface, and gradient descent across it:
+        ```plot
+        {{Surface}}
+        ```
+        What a matrix does to the plane:
+        ```plot
+        {{Matrix}}
+        ```
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>Whether a question asks to see a formula's shape (to plot it, graph it, see what it looks like), so an
+    /// answer may draw a plot.</summary>
+    public static bool AsksForPlot(string question)
+    {
+        string q = question.ToLowerInvariant();
+        return q.Contains("plot") || q.Contains("graph") || q.Contains("looks like") || q.Contains("look like") || q.Contains("visuali")
+            || q.Contains("sketch") || q.Contains("curve") || q.Contains("draw");
+    }
+
+    /// <summary>The question "Show what this looks like" asks about a formula in the notes.</summary>
+    public static string ShowQuestion(string latex) =>
+        $"Show me what this formula looks like as a plot I can play with, with a slider for each parameter the lecture varied: $${latex.Trim()}$$";
+
+    /// <summary>Whether a displayed formula is worth offering to plot: short, with a variable, and an equation or a
+    /// function of something (not a lone symbol).</summary>
+    public static bool Plottable(string latex)
+    {
+        string t = latex.Trim();
+        if (t.Length is < 3 or > 300) return false;
+        if (!t.Any(char.IsLetter)) return false;
+        return t.Contains('=') || t.Contains('(') || t.Contains('^') || t.Contains("\\frac", StringComparison.Ordinal);
+    }
+
+    /// <summary>The words a plot's labels say (its title, axes, sliders, curves), to check against the lecture.</summary>
+    public static IReadOnlyList<string> Labels(Plot plot)
+    {
+        var words = new List<string>();
+        if (plot.Title is { } t) words.Add(t);
+        if (plot.X?.Label is { } x) words.Add(x);
+        if (plot.Y?.Label is { } y) words.Add(y);
+        foreach (var p in plot.Params) if (p.Label is { } l && !p.Name.StartsWith('\u0001')) words.Add(l);
+        foreach (var i in plot.Items) if (i.Label is { } l) words.Add(l.Plain);
+        return words;
+    }
+
     /// <summary>Every example, with what it shows.</summary>
     public static IReadOnlyList<(string Title, string Words, string Source)> Examples { get; } =
     [
