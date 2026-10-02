@@ -372,7 +372,7 @@ sealed class DiagramChrome
             else
             {
                 stripWords.Text = x.Some ? "Some words are hidden. Say each one to yourself, then click it to check."
-                    : "Say each box to yourself, then click it to check.";
+                    : "Say each hidden one to yourself, then click it to check.";
                 shuffle.IsVisible = showAll.IsVisible = true;
                 reset.IsVisible = x.Checked > 0;
             }
