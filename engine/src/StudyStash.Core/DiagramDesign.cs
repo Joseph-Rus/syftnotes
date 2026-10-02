@@ -18,6 +18,9 @@ public sealed record DesignReply(string Reason, IReadOnlyList<DesignedDiagram> D
 {
     public bool Malformed { get; init; }
     public static DesignReply Unusable(string why) => new("", [], [why]) { Malformed = true };
+
+    /// <summary>The illustrations it planned (<see cref="IllustrationDesign"/>), each checked like a diagram.</summary>
+    public IReadOnlyList<IllustrationPlan> Illustrations { get; init; } = [];
 }
 
 /// <summary>What a diagram pass did: the notes (the very string it was given when it added nothing), the diagrams
@@ -284,7 +287,7 @@ public static partial class DiagramDesign
             - "after" is the heading of the section it illustrates, copied exactly from the list below: the most specific one that fits, never Announcements or Questions to review.
 
             {{headings}}
-
+            {{(svg ? "\n" + IllustrationDesign.Brief(IllustrationDesign.Cap(m.Transcript)) : "")}}
             ## Check before you answer
 
             For each diagram: every label is something the lecture said; a student would see the main idea in five seconds; each box is one to five words with its detail in <small>; a big one is in groups that read as an overview; every colour means one thing, said in the caption; it is the kind that fits the idea; and its source is valid Mermaid (quoted labels, matched brackets, one statement a line, every block closed).
@@ -292,11 +295,11 @@ public static partial class DiagramDesign
             ## Answer
 
             Answer with only this JSON object, nothing before or after it:
-            {"reason": "...", "diagrams": [{"title": "...", "after": "...", "at": "{{(timed ? "mm:ss" : "")}}", "kind": "mermaid", "source": "flowchart LR\n  A[\"...\"] --> B[\"...\"]", "caption": "..."}]}
+            {"reason": "...", "diagrams": [{"title": "...", "after": "...", "at": "{{(timed ? "mm:ss" : "")}}", "kind": "mermaid", "source": "flowchart LR\n  A[\"...\"] --> B[\"...\"]", "caption": "..."}]{{(svg ? ", \"illustrations\": []" : "")}}}
             - "reason": one sentence: what the diagrams show and why they help, or why this lecture needs none.
             - "diagrams": the most helpful first, at most {{many}}; an empty list [] when nothing is worth drawing.
             - "kind": {{kinds}}. "source": the diagram's code alone, with no ``` fence, as a JSON string (\n between lines, \" for quotes).
-            - Every diagram needs all six fields; one missing any of them is left out.
+            - Every diagram needs all six fields; one missing any of them is left out.{{(svg ? "\n- " + IllustrationDesign.AnswerField + "." : "")}}
             """).ReplaceLineEndings("\n");
 
         string whole = Build(transcript);
@@ -361,7 +364,9 @@ public static partial class DiagramDesign
             if (d is not null) ok.Add(d);
             else dropped.Add($"diagram {i + 1}: {why}");
         }
-        return new DesignReply(reason, ok, dropped);
+        if (drawings != Drawings.FlowchartsAndSvg) return new DesignReply(reason, ok, dropped);
+        var (plans, unplanned) = IllustrationDesign.ReadPlans(o, heads.Select(h => h.Text).ToList(), end);
+        return new DesignReply(reason, ok, [.. dropped, .. unplanned]) { Illustrations = plans };
     }
 
     static (DesignedDiagram? D, string Why) Check(JsonObject? o, List<(int Line, int Level, string Text)> heads, double? end, Drawings drawings)
@@ -473,6 +478,8 @@ public static partial class DiagramDesign
         var drawn = new List<DesignedDiagram>();
         var dropped = reply.Dropped.ToList();
         string grounds = (TimedText.Plain(m.Transcript) + "\n" + clean).ToLowerInvariant();
+        // Illustrations are drawn while the diagrams are checked, each in its own time.
+        var illustrating = IllustrationDesign.DrawAllAsync(m, clean, reply.Illustrations, grounds, ask, () => (budget ?? Timeout) - clock.Elapsed, maxPromptChars);
         foreach (var d in reply.Diagrams)
         {
             if (drawn.Count >= cap)
@@ -524,7 +531,11 @@ public static partial class DiagramDesign
             }
         }
         var still = drawn.Select((d, i) => (d, i)).Where(x => problems[x.i].Count > 0).Select(x => $"“{x.d.Title}”: {string.Join("; ", problems[x.i])}").ToList();
-        return new DesignResult(drawn.Count == 0 ? clean : Insert(clean, drawn), drawn, reply.Reason, dropped) { Revised = revised, Problems = still };
+        var art = await illustrating;
+        drawn.AddRange(art.Drawn);
+        dropped.AddRange(art.Dropped);
+        still.AddRange(art.Problems);
+        return new DesignResult(drawn.Count == 0 ? clean : Insert(clean, drawn), drawn, reply.Reason, dropped) { Revised = revised + art.Revised, Problems = still };
     }
 
     /// <summary>What would look wrong with a diagram in the notes (<see cref="DiagramLint"/>); nothing for an SVG

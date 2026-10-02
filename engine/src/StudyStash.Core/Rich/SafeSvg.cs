@@ -71,7 +71,21 @@ public sealed record SafeSvgOptions
 public sealed record SafeSvgResult(string? Svg, string? Problem, string Title, IReadOnlyList<string> Texts, double Width, double Height)
 {
     public static SafeSvgResult Fail(string problem) => new(null, problem, "", [], 0, 0);
+
+    /// <summary>The parts an illustration names (see <see cref="SvgPart"/>), in the order it draws them; none for a
+    /// plain drawing.</summary>
+    public IReadOnlyList<SvgPart> Parts { get; init; } = [];
+
+    /// <summary>An illustration: a drawing whose parts are named, to be pointed at.</summary>
+    public bool Illustrated => Parts.Count > 0;
 }
+
+/// <summary>
+/// A part of an illustration a student can point at: a group with an id whose first child is a title (its name) and,
+/// usually, a desc (one line on what it is or does), as SVG itself names a part. Its callout, if it has one, is the
+/// group <c>label-{id}</c>.
+/// </summary>
+public sealed record SvgPart(string Id, string Name, string Note);
 
 /// <summary>
 /// Makes an SVG an AI wrote safe to draw: only shapes, text, markers, gradients and clips survive, with only the
@@ -81,7 +95,9 @@ public sealed record SafeSvgResult(string? Svg, string? Problem, string Title, I
 /// </summary>
 public static partial class SafeSvg
 {
-    public const int MaxBytes = 100 * 1024, MaxElements = 4000, MaxDepth = 32, MaxUses = 100;
+    /// <summary>The most a drawing may be: 192 KB (a detailed illustration is a few hundred shapes, most of them
+    /// curves), 4,000 elements, 32 deep, 100 copies of a part, 5,000 units either way.</summary>
+    public const int MaxBytes = 192 * 1024, MaxElements = 4000, MaxDepth = 32, MaxUses = 100;
     public const double MaxSize = 5000;
 
     static readonly XNamespace Ns = "http://www.w3.org/2000/svg";
@@ -133,7 +149,7 @@ public static partial class SafeSvg
 
     static SafeSvgResult CleanUnsafe(string svg, SafeSvgOptions options)
     {
-        if (Encoding.UTF8.GetByteCount(svg) > MaxBytes) return SafeSvgResult.Fail("This drawing is too big to show (over 100 KB).");
+        if (Encoding.UTF8.GetByteCount(svg) > MaxBytes) return SafeSvgResult.Fail($"This drawing is too big to show (over {MaxBytes / 1024} KB).");
         if (string.IsNullOrWhiteSpace(svg)) return SafeSvgResult.Fail("There's no drawing here.");
         XDocument doc;
         try
@@ -142,7 +158,7 @@ public static partial class SafeSvg
             {
                 DtdProcessing = DtdProcessing.Prohibit,
                 XmlResolver = null,
-                MaxCharactersInDocument = 400_000,
+                MaxCharactersInDocument = 800_000,
                 MaxCharactersFromEntities = 1024,
                 IgnoreComments = true,
                 IgnoreProcessingInstructions = true,
@@ -172,7 +188,9 @@ public static partial class SafeSvg
         if (!Sane(box)) return SafeSvgResult.Fail($"This drawing is too big to show (over {MaxSize:N0} units).");
 
         var map = options.Palette?.From(SvgPalette.Written);
-        var clean = Copy(root, options, map, depth: 0)!;
+        // An illustration's own colours are kept, and only moved into the lightness a dark page can carry.
+        bool art = root.Descendants().Any(e => PartName(e) is not null);
+        var clean = Copy(root, options, map, art, depth: 0)!;
         clean.SetAttributeValue("viewBox", string.Create(CultureInfo.InvariantCulture, $"{box.X:0.###} {box.Y:0.###} {box.W:0.###} {box.H:0.###}"));
         clean.SetAttributeValue("width", null);
         clean.SetAttributeValue("height", null);
@@ -191,11 +209,24 @@ public static partial class SafeSvg
 
         var texts = clean.Descendants(Ns + "text").Select(t => Words(t.Value)).Where(t => t.Length > 0).ToList();
         string title = clean.Elements(Ns + "title").Select(t => Words(t.Value)).FirstOrDefault(t => t.Length > 0) ?? texts.FirstOrDefault() ?? "";
-        return new SafeSvgResult(clean.ToString(SaveOptions.DisableFormatting), null, title, texts, box.W, box.H);
+        var parts = new List<SvgPart>();
+        foreach (var e in clean.Descendants())
+            if (PartName(e) is { } name && (string?)e.Attribute("id") is { } id && parts.All(p => p.Id != id))
+                parts.Add(new SvgPart(id, name, e.Elements(Ns + "desc").Select(d => Words(d.Value)).FirstOrDefault() ?? ""));
+        return new SafeSvgResult(clean.ToString(SaveOptions.DisableFormatting), null, title, texts, box.W, box.H) { Parts = parts };
+    }
+
+    /// <summary>A part's name: the words of the title that is the first child of an element with an id (never the
+    /// drawing's own title, nor a callout's); null for anything else.</summary>
+    static string? PartName(XElement e)
+    {
+        if (e.Parent is null || (string?)e.Attribute("id") is not { Length: > 0 } id || id == "labels" || id.StartsWith("label-", StringComparison.Ordinal)) return null;
+        if (e.Elements().FirstOrDefault() is not { } first || first.Name.LocalName != "title") return null;
+        return Words(first.Value) is { Length: > 0 } name ? name : null;
     }
 
     /// <summary>A copy of an allowed element with only its allowed attributes and children; null for anything else.</summary>
-    static XElement? Copy(XElement source, SafeSvgOptions options, IReadOnlyDictionary<string, string>? map, int depth)
+    static XElement? Copy(XElement source, SafeSvgOptions options, IReadOnlyDictionary<string, string>? map, bool art, int depth)
     {
         if (source.Name.Namespace != Ns && source.Name.Namespace != XNamespace.None) return null;
         string name = source.Name.LocalName;
@@ -235,7 +266,7 @@ public static partial class SafeSvg
         {
             string value = raw;
             if (key == "font-family") continue;
-            if (Colours.Contains(key)) value = Recolour(value, options, map);
+            if (Colours.Contains(key)) value = Recolour(value, options, map, art && name is not ("text" or "tspan"));
             copy.SetAttributeValue(key, value);
         }
         if (values.ContainsKey("font-family") && name != "svg") copy.SetAttributeValue("font-family", options.FontFamily);
@@ -244,7 +275,7 @@ public static partial class SafeSvg
         {
             if (node is XElement child)
             {
-                if (depth + 1 < MaxDepth && Copy(child, options, map, depth + 1) is { } kept) copy.Add(kept);
+                if (depth + 1 < MaxDepth && Copy(child, options, map, art, depth + 1) is { } kept) copy.Add(kept);
             }
             else if (node is XText text && name is "text" or "tspan" or "title" or "desc")
                 copy.Add(new XText(text.Value));
@@ -266,13 +297,17 @@ public static partial class SafeSvg
     }
 
     /// <summary>A written colour in the look's colour for the same role; in dark, an unknown near-black or near-white
-    /// flips so it stays visible. Anything else (none, a gradient, a colour of its own) as it was.</summary>
-    static string Recolour(string value, SafeSvgOptions options, IReadOnlyDictionary<string, string>? map)
+    /// flips so it stays visible, and an illustration's own colours (<paramref name="art"/>: a shape in one, not its
+    /// words) move into the lightness a dark page carries (<see cref="SvgColour.ForDark"/>). Anything else (none, a gradient, a colour of its own in
+    /// light) as it was.</summary>
+    static string Recolour(string value, SafeSvgOptions options, IReadOnlyDictionary<string, string>? map, bool art)
     {
         if (map is null) return value;
         string? key = NormalColour(value);
         if (key is null) return value;
-        if (map.TryGetValue(key, out var ours)) return ours;
+        // In an illustration black is a colour like any other (a motor's body, a shadow), not the ink words are in.
+        if (!(art && key == "#000000") && map.TryGetValue(key, out var ours)) return ours;
+        if (options.Dark && art && options.Palette is { } paper && key.StartsWith('#')) return SvgColour.ForDark(key, paper.Paper);
         if (options.Dark && options.Palette is { } palette && Lightness(key) is { } l)
         {
             if (l < 0.3) return palette.Ink;
