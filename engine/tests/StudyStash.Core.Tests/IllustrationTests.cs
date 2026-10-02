@@ -1,4 +1,6 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
+using StudyStash.Core.Ai;
 using System.Xml.Linq;
 using StudyStash.Core.Rich;
 using StudyStash.Library;
@@ -190,6 +192,50 @@ public class IllustrationTests
         Assert.True(result.Notes.IndexOf("**The quadcopter from above**", StringComparison.Ordinal) < result.Notes.IndexOf("## Questions to review", StringComparison.Ordinal));
         // A second pass replaces it rather than stacking another.
         Assert.Equal(Notes, DiagramDesign.Strip(result.Notes));
+    }
+
+    /// <summary>An engine that answers each prompt its own way, and keeps every request it was sent.</summary>
+    sealed class Answering(Func<string, CancellationToken, Task<string>> answer) : AiProvider
+    {
+        public override string Id => "claude";
+        public override string Name => "Claude";
+        public override string Binary => "claude";
+        public override string Site => "https://example.test/claude";
+        public override bool Available() => true;
+        public List<AiRequest> Requests { get; } = [];
+        public override List<string> Command(AiRequest req, bool stream) => [];
+        public override IEnumerable<AiEvent> Parse(string line) => [];
+
+        public override async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true, [EnumeratorCancellation] CancellationToken ct = default)
+        {
+            lock (Requests) Requests.Add(req);
+            yield return new AiEvent("final", await answer(req.Prompt, ct));
+        }
+    }
+
+    /// <summary>Through the notes as the library writes them: the drawing takes longer than the diagrams' time and is
+    /// still kept, drawn by the designer's engine and model at low effort, with time enough to finish.</summary>
+    [Fact]
+    public async Task Through_the_notes_an_illustration_may_take_longer_than_the_diagrams_and_is_drawn_at_low_effort()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { OllamaEnabled = true, OllamaModel = "qwen3:8b" };
+        new AiSettings { Provider = "claude", Fallback = false }.Save(cfg.Home);
+        var claude = new Answering(async (prompt, ct) =>
+        {
+            if (prompt.StartsWith("You design the diagrams", StringComparison.Ordinal)) return Designer(Plan());
+            if (!prompt.StartsWith("You are a scientific illustrator", StringComparison.Ordinal)) return Notes;
+            await Task.Delay(TimeSpan.FromSeconds(3), ct);
+            return "```svg\n" + Toy + "\n```";
+        });
+        var log = new List<string>();
+        var ai = new AiJobs(cfg.Home) { Providers = _ => claude, Checks = new FakeChecks().Installed("claude").Build(), Log = log.Add, DiagramTimeout = TimeSpan.FromSeconds(2) };
+
+        string notes = await ai.SummarizeAsync(Lecture, cfg);
+        Assert.Contains("```svg", notes);
+        Assert.Contains("drew 1 (The quadcopter from above)", log[^1]);
+        var drawing = claude.Requests.Single(r => r.Prompt.StartsWith("You are a scientific illustrator", StringComparison.Ordinal));
+        Assert.Equal(("opus", "low", IllustrationDesign.Timeout), (drawing.Model, drawing.Effort, drawing.Timeout));
     }
 
     [Fact]
