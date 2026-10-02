@@ -96,8 +96,10 @@ public sealed record SvgPart(string Id, string Name, string Note);
 public static partial class SafeSvg
 {
     /// <summary>The most a drawing may be: 192 KB (a detailed illustration is a few hundred shapes, most of them
-    /// curves), 4,000 elements, 32 deep, 100 copies of a part, 5,000 units either way.</summary>
-    public const int MaxBytes = 192 * 1024, MaxElements = 4000, MaxDepth = 32, MaxUses = 100;
+    /// curves), 4,000 elements, 32 deep, 1,000 copies of a part and 20,000 elements drawn by copies all told (a board's
+    /// hundred pins are a hundred copies of one small pin; a big part copied hundreds of times is a bomb), 5,000 units
+    /// either way.</summary>
+    public const int MaxBytes = 192 * 1024, MaxElements = 4000, MaxDepth = 32, MaxUses = 1000, MaxCopied = 20_000;
     public const double MaxSize = 5000;
 
     static readonly XNamespace Ns = "http://www.w3.org/2000/svg";
@@ -208,6 +210,10 @@ public static partial class SafeSvg
         var bombs = uses.Where(use => (string?)use.Attribute("href") is not { } href || !byId.TryGetValue(href[1..], out var target)
             || target.Name.LocalName is "use" or "svg" || target.Descendants(Ns + "use").Any()).ToList();
         foreach (var use in bombs) use.Remove();
+        long copied = 0;
+        foreach (var use in clean.Descendants(Ns + "use"))
+            if (byId.TryGetValue(((string)use.Attribute("href")!)[1..], out var target)) copied += target.DescendantsAndSelf().Count();
+        if (copied > MaxCopied) return SafeSvgResult.Fail("This drawing repeats its parts too many times to show.");
 
         var texts = clean.Descendants(Ns + "text").Select(t => Words(t.Value)).Where(t => t.Length > 0).ToList();
         string title = clean.Elements(Ns + "title").Select(t => Words(t.Value)).FirstOrDefault(t => t.Length > 0) ?? texts.FirstOrDefault() ?? "";

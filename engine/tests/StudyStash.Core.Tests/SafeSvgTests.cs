@@ -113,7 +113,12 @@ public class SafeSvgTests
     [Fact]
     public void A_use_bomb_is_defused_and_too_many_uses_refused()
     {
-        Assert.Equal("This drawing repeats its parts too many times to show.", Clean(UseBomb(11)).Problem);
+        Assert.Equal("This drawing repeats its parts too many times to show.", Clean(UseBomb(101)).Problem);
+        // A board's pins: hundreds of copies of one small pin are fine; hundreds of copies of a big part are not.
+        string Copies(int parts, int copies) => Open + "<defs><g id=\"p\">" + string.Concat(Enumerable.Repeat("<rect width=\"1\" height=\"1\"/>", parts))
+            + "</g></defs>" + string.Concat(Enumerable.Range(0, copies).Select(i => $"<use href=\"#p\" x=\"{i}\"/>")) + "</svg>";
+        Assert.Null(Clean(Copies(3, 400)).Problem);
+        Assert.Equal("This drawing repeats its parts too many times to show.", Clean(Copies(200, 300)).Problem);
 
         // Under the count, only the copies of a plain part are left: a copy of anything with a copy inside goes.
         var defused = Clean(UseBomb(5));
