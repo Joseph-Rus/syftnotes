@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Xml.Linq;
 using StudyStash.Core.Rich;
+using StudyStash.Library;
 
 namespace StudyStash.Core.Tests;
 
@@ -117,6 +118,26 @@ public class IllustrationTests
         // A whole drawing sent back is the drawing; one that can't be read changes nothing.
         Assert.Equal(Toy, IllustrationDesign.Patch(Toy, Toy));
         Assert.Null(IllustrationDesign.Patch(Toy, "<svg><g id="));
+    }
+
+    [Fact]
+    public void The_phone_and_a_markdown_download_list_an_illustrations_parts()
+    {
+        string notes = "## The drone\n\n```svg\n" + Illustration.Name(Toy, Parts) + "\n```\n";
+        string html = PhoneNotes.Render(notes);
+        Assert.Contains("<details class=\"parts\"><summary>Parts</summary><dl><dt>Frame</dt><dd>X-shaped carbon fibre frame</dd>", html);
+        Assert.Contains("<title>Motor</title>", html); // and a browser names each part under the pointer
+
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { Classes = [new ClassDef("ENGR 3350", [])] };
+        Directory.CreateDirectory(cfg.Home);
+        var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var m = new Meeting("lec-drone") { Title = "Quadcopters", Date = "2026-10-06" };
+        store.Save(m, new Classification("ENGR 3350", 0.9, "folder"), summaryMd: notes);
+        var file = NoteExport.Lecture(new LibraryReader(new Config("", ""), store).Lecture(m.Id)!, transcript: false, _ => null);
+        Assert.Contains("![Diagram: A small drone](", file.Markdown);
+        Assert.Contains("- **Battery pack and strap**: 4S LiPo strapped on top", file.Markdown);
+        Assert.Contains("<title>Frame</title>", Assert.Single(file.Assets).Text);
     }
 
     // --- the designer, end to end ----------------------------------------------------------------------------------
