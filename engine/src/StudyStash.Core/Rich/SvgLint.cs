@@ -81,8 +81,10 @@ public static class SvgLint
                 if (list[i].Words.Overlap(list[j].Words) > 4)
                     problems.Add($"The labels {Q(named.GetValueOrDefault(list[i].Id, list[i].Id))} and {Q(named.GetValueOrDefault(list[j].Id, list[j].Id))} overlap: space the labels at least 20 units apart.");
 
-        int tiny = m.Texts.Count(t => t.Size < MinWords - 0.01);
-        if (tiny > 0) problems.Add($"{tiny} {(tiny == 1 ? "piece of text is" : "pieces of text are")} smaller than {MinWords:0} units, too small to read in the notes: labels are 13 to 15.");
+        // Words drawn on the thing itself (a board's pin numbers) may be small; a label may not.
+        var labels = root.Descendants().FirstOrDefault(e => (string?)e.Attribute("id") == "labels");
+        int tiny = m.Texts.Count(t => t.Size < MinWords - 0.01 && labels is not null && t.Text.Ancestors().Contains(labels));
+        if (tiny > 0) problems.Add($"{tiny} {(tiny == 1 ? "label is" : "labels are")} smaller than {MinWords:0} units, too small to read in the notes: labels are 13 to 15.");
         return problems;
     }
 }
