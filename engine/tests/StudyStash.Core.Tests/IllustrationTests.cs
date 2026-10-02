@@ -140,6 +140,14 @@ public class IllustrationTests
         Assert.Contains("![Diagram: A small drone](", file.Markdown);
         Assert.Contains("- **Battery pack and strap**: 4S LiPo strapped on top", file.Markdown);
         Assert.Contains("<title>Frame</title>", Assert.Single(file.Assets).Text);
+
+        // A part whose name looks like markup is written as words, in the file and on the phone.
+        string sly = "## The drone\n\n```svg\n" + Illustration.Name(Toy, [new("motor", "<img src=x onerror=alert(1)>", "")]) + "\n```\n";
+        Assert.DoesNotContain("<img", PhoneNotes.Render(sly));
+        var m2 = new Meeting("lec-sly") { Title = "Sly", Date = "2026-10-07" };
+        store.Save(m2, new Classification("ENGR 3350", 0.9, "folder"), summaryMd: sly);
+        var file2 = NoteExport.Lecture(new LibraryReader(new Config("", ""), store).Lecture(m2.Id)!, transcript: false, _ => null);
+        Assert.Contains("- **&lt;img src=x onerror=alert(1)&gt;**", file2.Markdown);
     }
 
     // --- the designer, end to end ----------------------------------------------------------------------------------

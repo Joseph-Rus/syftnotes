@@ -146,8 +146,10 @@ public static class NoteExport
                     if (cleaned.Parts.Count > 0)
                     {
                         output.Add("");
+                        // Plain words only: a name that looks like markup is shown, never run, by whatever opens the file.
+                        static string Plain(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("*", "\\*");
                         foreach (var part in cleaned.Parts)
-                            output.Add($"{indent}- **{part.Name}**" + (part.Note.Length > 0 ? $": {part.Note}" : ""));
+                            output.Add($"{indent}- **{Plain(part.Name)}**" + (part.Note.Length > 0 ? $": {Plain(part.Note)}" : ""));
                     }
                 }
                 else
