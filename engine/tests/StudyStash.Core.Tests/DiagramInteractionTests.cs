@@ -115,16 +115,18 @@ public class DiagramInteractionTests
         // Its four boxes (two of them in the inner group) are one, where its first box was written.
         Assert.Equal(["Start", "assess", "P", "X", "E"], f.Nodes.Select(n => n.Id));
         var box = f.Node("assess")!;
-        Assert.Equal(["Assessment", "4 boxes inside"], box.Lines);
-        Assert.Equal(NodeShape.Subroutine, box.Shape);
+        Assert.Equal(["Assessment"], box.Lines);
+        Assert.Equal(["4 boxes"], box.Detail);
         Assert.Equal(4, folded.Inside["assess"]);
         Assert.All(new[] { "A", "B", "C", "D" }, id => Assert.Equal("assess", folded.Shown[id]));
         Assert.True(folded.IsFolded("assess"));
         // Arrows inside it are gone; arrows in and out join its box; two that now join the same boxes the same way are
-        // one, with both their words; the loop back still comes back to it.
+        // one (their words gone, since they said different things); the loop back still comes back to it.
         Assert.Equal(
-            [("Start", "assess", null), ("assess", "P", "stable"), ("assess", "X", "unstable / red flag"), ("P", "E", null), ("E", "assess", "not met")],
+            [("Start", "assess", null), ("assess", "P", "stable"), ("assess", "X", null), ("P", "E", null), ("E", "assess", "not met")],
             f.Edges.Select(e => (e.From, e.To, e.Label)));
+        // The overview the diagram designer is held to is this, every outermost group folded.
+        Assert.Equal(f.ToSource(), chart.Folded()!.ToSource());
         // Folding a group folds the groups inside it.
         Assert.Empty(f.Groups);
         // It reads and lays out like any chart (the app lays it out from its source).
@@ -142,7 +144,8 @@ public class DiagramInteractionTests
         var outer = Assert.Single(f.Groups);
         Assert.Equal("assess", outer.Id);
         Assert.Equal(["A", "B", "vitals"], outer.Members);
-        Assert.Equal(["Vital signs", "2 boxes inside"], f.Node("vitals")!.Lines);
+        Assert.Equal(["Vital signs"], f.Node("vitals")!.Lines);
+        Assert.Equal(["2 boxes"], f.Node("vitals")!.Detail);
         Assert.Contains(f.Edges, e => e.From == "B" && e.To == "vitals");
         Assert.Contains(f.Edges, e => e.From == "vitals" && e.To == "P" && e.Label == "stable");
         // Its own arrow (pulse to blood pressure) went with it; nothing else changed.
@@ -208,6 +211,49 @@ public class DiagramInteractionTests
         // A box nothing joins comes last; every box is a step exactly once.
         var loose = Flowchart.Parse("flowchart TD\n  N[Note this]\n  A[One] --> B[Two]");
         Assert.Equal(["A", "B", "N"], DiagramSteps.Order(loose).Select(s => s.Node));
+    }
+
+    [Fact]
+    public void A_state_diagrams_loop_on_a_state_stays_when_its_groups_fold_and_other_kinds_dont_fold()
+    {
+        var states = Flowchart.Parse("""
+            stateDiagram-v2
+              [*] --> Idle
+              Idle --> Idle : tick
+              state Busy {
+                Working --> Saving : done
+                Saving --> Working : more
+              }
+              Idle --> Working : job
+              Saving --> Idle : saved
+            """);
+        var folded = DiagramFold.Fold(states, DiagramFold.Outermost(states)).Chart;
+        Assert.Equal(ChartForm.State, folded.Form);
+        Assert.Contains(folded.Edges, e => e.From == "Idle" && e.To == "Idle" && e.Label == "tick");
+        Assert.Contains(folded.Edges, e => e.From == "Idle" && e.To == "Busy" && e.Label == "job");
+        Assert.Contains(folded.Edges, e => e.From == "Busy" && e.To == "Idle" && e.Label == "saved");
+        var sequence = Flowchart.Parse(DiagramDesign.SequenceExample);
+        Assert.False(DiagramFold.Folds(sequence));
+        Assert.Same(sequence, DiagramFold.Fold(sequence, sequence.Groups.Select(g => g.Id)).Chart);
+    }
+
+    [Fact]
+    public void A_sequence_diagram_steps_message_by_message_a_timeline_as_written_and_a_mind_map_from_its_root()
+    {
+        var sequence = Flowchart.Parse(DiagramDesign.SequenceExample);
+        var steps = DiagramSteps.Order(sequence);
+        Assert.Equal(["POST /login (email, password)", "look up the user", "password hash", "200 OK + session cookie", "401 Unauthorized", null],
+            steps.Select(s => s.Via));
+        Assert.Equal([0], steps[0].Arrives);
+        Assert.Empty(steps[^1].Arrives); // the note
+
+        var timeline = Flowchart.Parse(DiagramDesign.TimelineExample);
+        Assert.Equal(timeline.Nodes.Select(n => n.Id), DiagramSteps.Order(timeline).Select(s => s.Node));
+
+        var map = Flowchart.Parse(DiagramDesign.MindmapExample);
+        var read = DiagramSteps.Order(map).Select(s => map.Node(s.Node)!.Label).ToList();
+        Assert.Equal("Tissue types", read[0]);
+        Assert.Equal(["Epithelial", "Covers surfaces", "Squamous, cuboidal, columnar", "Connective"], read.Skip(1).Take(4));
     }
 
     [Fact]

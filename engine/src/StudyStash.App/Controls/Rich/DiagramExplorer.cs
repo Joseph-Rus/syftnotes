@@ -62,6 +62,12 @@ sealed class DiagramExplorer
 
     public DiagramScene? Scene => canvas.Scene;
 
+    /// <summary>How many of the scene's lines are the chart's own arrows (the rest are lines a layout adds: lifelines, a
+    /// timeline's axis, a block's divider).</summary>
+    int Arrows => shown?.Chart.Edges.Count ?? int.MaxValue;
+
+    ChartForm Form => written?.Form ?? ChartForm.Flowchart;
+
     /// <summary>The chart to explore (the one the note wrote), its groups folded as <paramref name="fold"/> says, or
     /// (for a big chart made of groups) all folded into its overview.</summary>
     public void Load(Flowchart? chart, IEnumerable<string>? fold = null)
@@ -75,7 +81,8 @@ sealed class DiagramExplorer
 
     public IReadOnlySet<string> Folded => folded;
 
-    public bool HasGroups => written?.Groups.Count > 0;
+    /// <summary>It has groups that fold (a flowchart's or a state diagram's; a sequence diagram's blocks don't).</summary>
+    public bool HasGroups => written is not null && DiagramFold.Folds(written);
 
     /// <summary>Some group shows folded.</summary>
     public bool AnyFolded => shown?.Inside.Count > 0;
@@ -86,7 +93,7 @@ sealed class DiagramExplorer
     /// <summary>Folds an open group, or opens a folded one (and the groups inside it stay as they were).</summary>
     public void ToggleGroup(string id)
     {
-        if (written is null) return;
+        if (written is null || !HasGroups || (written.Groups.All(g => g.Id != id) && shown?.IsFolded(id) != true)) return;
         if (shown?.IsFolded(id) == true || folded.Contains(id)) folded.Remove(id);
         else folded.Add(id);
         Refold(morph: true);
@@ -152,6 +159,8 @@ sealed class DiagramExplorer
     /// <summary>A box's words on one line (a folded group's title).</summary>
     public string Label(string id)
     {
+        if (EdgeOf(id) is int edge && shown is not null && edge < shown.Chart.Edges.Count)
+            return shown.Chart.Edges[edge].Label?.Replace('\n', ' ') ?? "";
         if (shown?.Chart.Node(id) is not { } n) return id;
         return shown.IsFolded(id) ? written?.Groups.FirstOrDefault(g => g.Id == id)?.Title ?? n.Label : n.Label;
     }
@@ -188,12 +197,12 @@ sealed class DiagramExplorer
         if (Scene is not { } scene) return DiagramFocus.None;
         if (mode == DiagramMode.Steps) return StepFocus(scene);
         if (mode == DiagramMode.Recall) return DiagramFocus.None;
-        if (pinned is not null) return DiagramHit.Around(scene, DiagramTarget.Node(pinned));
-        if (pinnedEdge >= 0) return DiagramHit.Around(scene, new DiagramTarget(DiagramPart.Edge, null, pinnedEdge));
-        if (hover.IsNode || hover.IsEdge) return DiagramHit.Around(scene, hover);
-        if (hover.Part == DiagramPart.GroupTitle && hover.Id is { } g && written is not null)
-            return DiagramHit.Around(scene, hover, id => DiagramFold.Members(written, id).Select(m => shown?.Shown.GetValueOrDefault(m, m) ?? m).Distinct());
-        if (ring is not null) return DiagramHit.Around(scene, DiagramTarget.Node(ring));
+        if (pinned is not null) return DiagramHit.Around(scene, DiagramTarget.Node(pinned), arrows: Arrows);
+        if (pinnedEdge >= 0) return DiagramHit.Around(scene, new DiagramTarget(DiagramPart.Edge, null, pinnedEdge), arrows: Arrows);
+        if (hover.IsNode || hover.IsEdge) return DiagramHit.Around(scene, hover, arrows: Arrows);
+        if (hover.Part == DiagramPart.GroupTitle && HasGroups && written is not null)
+            return DiagramHit.Around(scene, hover, id => DiagramFold.Members(written, id).Select(m => shown?.Shown.GetValueOrDefault(m, m) ?? m).Distinct(), Arrows);
+        if (ring is not null) return DiagramHit.Around(scene, DiagramTarget.Node(ring), arrows: Arrows);
         return DiagramFocus.None;
     }
 
@@ -243,7 +252,11 @@ sealed class DiagramExplorer
             picked = pinned;
         }
         else if (mode == DiagramMode.Explore && pinnedEdge >= 0) accented = [pinnedEdge];
-        else if (mode == DiagramMode.Recall) picked = asking;
+        else if (mode == DiagramMode.Recall)
+        {
+            if (asking is not null && EdgeOf(asking) is int words) accented = [words];
+            else picked = asking;
+        }
         var look = new DiagramLook
         {
             Lit = lit.IsEmpty ? null : lit.Nodes,
@@ -252,7 +265,8 @@ sealed class DiagramExplorer
             Accented = accented,
             Picked = picked,
             Ring = view.KeyboardFocused && mode != DiagramMode.Steps ? ring : null,
-            Hidden = mode == DiagramMode.Recall ? hidden.Where(h => !revealed.Contains(h)).ToHashSet() : null,
+            Hidden = mode == DiagramMode.Recall ? hidden.Where(h => !revealed.Contains(h) && EdgeOf(h) is null).ToHashSet() : null,
+            HiddenEdges = mode == DiagramMode.Recall ? hidden.Where(h => !revealed.Contains(h)).Select(EdgeOf).OfType<int>().ToHashSet() : null,
             Marks = mode == DiagramMode.Recall ? marks : null,
             Folded = shown?.Inside.Keys.ToHashSet(),
             GroupHover = hover.Part == DiagramPart.GroupTitle ? hover.Id : null,
@@ -275,7 +289,7 @@ sealed class DiagramExplorer
 
     /// <summary>What's under the pointer, in the scene.</summary>
     public DiagramTarget TargetAt(Point onCanvas) => Scene is { } scene
-        ? DiagramHit.At(scene, ToScene(onCanvas), DiagramHit.LineSlop / Math.Max(0.5, Zoomer.Zoom))
+        ? DiagramHit.At(scene, ToScene(onCanvas), DiagramHit.LineSlop / Math.Max(0.5, Zoomer.Zoom), Arrows)
         : DiagramTarget.Nothing;
 
     void Wire()
@@ -411,9 +425,11 @@ sealed class DiagramExplorer
         {
             case DiagramMode.Steps:
                 if (target is { IsNode: true, Id: { } id } && Steps.ToList().FindIndex(s => s.Node == id) is int k and >= 0) GoTo(k);
+                else if (target.IsEdge && Steps.ToList().FindIndex(s => s.Arrives.Contains(target.Edge)) is int m and >= 0) GoTo(m);
                 return;
             case DiagramMode.Recall:
                 if (target is { IsNode: true, Id: { } hiddenId } && hidden.Contains(hiddenId) && !revealed.Contains(hiddenId)) Reveal(hiddenId);
+                else if (target.IsEdge && EdgeKey(target.Edge) is var words && hidden.Contains(words) && !revealed.Contains(words)) Reveal(words);
                 else if (target is { Part: DiagramPart.GroupTitle, Id: { } g }) ToggleGroup(g);
                 return;
         }
@@ -595,7 +611,7 @@ sealed class DiagramExplorer
         if (Scene is not { } scene || scene.Nodes.Count == 0) return false;
         string? to = ring is null || scene.Nodes.All(n => n.Id != ring)
             ? Steps.FirstOrDefault()?.Node ?? scene.Nodes[0].Id
-            : dx == 0 && dy == 0 ? ring : DiagramHit.Toward(scene, ring, dx, dy);
+            : dx == 0 && dy == 0 ? ring : DiagramHit.Toward(scene, ring, dx, dy, Arrows);
         if (to is null) return true;
         ring = to;
         // The keyboard leads now: what it's on lights up, not what the pointer was last over.
@@ -636,6 +652,11 @@ sealed class DiagramExplorer
         get
         {
             if (CurrentStep is not { } s) return "";
+            if (Form == ChartForm.Sequence && s.Arrives.Count == 1 && shown is not null && s.Arrives[0] < shown.Chart.Edges.Count)
+            {
+                var message = shown.Chart.Edges[s.Arrives[0]];
+                return $"{Label(message.From)} → {Label(message.To)}" + (s.Via is { Length: > 0 } said ? $": {said}" : "");
+            }
             string words = Label(s.Node);
             if (s.Via is { Length: > 0 } via) words = $"{via} → {words}";
             if (step == Steps.Count - 1 && s.Returns.Count > 0 && shown is not null)
@@ -720,11 +741,25 @@ sealed class DiagramExplorer
 
     DiagramFocus StepFocus(DiagramScene scene)
     {
-        // The walk so far stays lit (each box taken and the arrows between them); what's still to come dims.
+        // The walk so far stays lit (each box taken and the arrows between them); what's still to come dims. A sequence
+        // diagram's walk is its messages: those sent so far, and who sent them. Lines the layout adds (lifelines, the
+        // axis) stay as they are.
         var nodes = new HashSet<string>();
-        for (int i = 0; i <= step && i < Steps.Count; i++) nodes.Add(Steps[i].Node);
         var edges = new HashSet<int>();
-        for (int i = 0; i < scene.Edges.Count; i++)
+        int real = Math.Min(Arrows, scene.Edges.Count);
+        for (int i = real; i < scene.Edges.Count; i++) edges.Add(i);
+        if (Form == ChartForm.Sequence)
+        {
+            foreach (var n in shown?.Chart.Nodes ?? []) if (n.Role != NodeRole.Note) nodes.Add(n.Id);
+            for (int i = 0; i <= step && i < Steps.Count; i++)
+            {
+                edges.UnionWith(Steps[i].Arrives);
+                if (Steps[i].Arrives.Count == 0) nodes.Add(Steps[i].Node);
+            }
+            return new DiagramFocus(nodes, edges);
+        }
+        for (int i = 0; i <= step && i < Steps.Count; i++) nodes.Add(Steps[i].Node);
+        for (int i = 0; i < real; i++)
             if (nodes.Contains(scene.Edges[i].From) && nodes.Contains(scene.Edges[i].To)) edges.Add(i);
         if (CurrentStep is { } s && step == Steps.Count - 1) edges.UnionWith(s.Returns);
         return new DiagramFocus(nodes, edges);
@@ -784,8 +819,38 @@ sealed class DiagramExplorer
         Refresh();
     }
 
-    /// <summary>The boxes worth recalling: every box with words (not a folded group's count).</summary>
-    IEnumerable<string> RecallBoxes() => shown?.Chart.Nodes.Where(n => n.Label.Trim().Length > 0 && !shown.IsFolded(n.Id)).Select(n => n.Id) ?? [];
+    /// <summary>
+    /// What's worth recalling, by kind: a flowchart's boxes; a state diagram's states and the words on its arrows (what
+    /// takes it from one to the next); a sequence diagram's messages and notes (who's in it stays as a clue); a
+    /// timeline's events (its periods stay as clues); a mind map's branches (its root stays). Never a folded group, a
+    /// start or end dot, or anything without words.
+    /// </summary>
+    IEnumerable<string> RecallBoxes()
+    {
+        if (shown is null) yield break;
+        var chart = shown.Chart;
+        bool Words(FlowNode n) => n.Label.Trim().Length > 0 && !shown.IsFolded(n.Id) && n.Role is not (NodeRole.Start or NodeRole.End or NodeRole.Bar);
+        foreach (var n in chart.Nodes)
+        {
+            bool take = Form switch
+            {
+                ChartForm.Sequence => n.Role == NodeRole.Note,
+                ChartForm.Timeline => n.Role == NodeRole.Event,
+                ChartForm.Mindmap => n.Role != NodeRole.Root,
+                _ => true,
+            };
+            if (take && Words(n)) yield return n.Id;
+        }
+        if (Form is ChartForm.Sequence or ChartForm.State)
+            for (int i = 0; i < chart.Edges.Count; i++)
+                if (chart.Edges[i].Label is { Length: > 0 })
+                    yield return EdgeKey(i);
+    }
+
+    /// <summary>How the words on arrow <paramref name="i"/> are named among what's hidden.</summary>
+    static string EdgeKey(int i) => "\u0001" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    static int? EdgeOf(string key) => key.StartsWith('\u0001') && int.TryParse(key.AsSpan(1), System.Globalization.CultureInfo.InvariantCulture, out int i) ? i : null;
 
     void Hide(IEnumerable<string> boxes)
     {
@@ -811,7 +876,7 @@ sealed class DiagramExplorer
     {
         revealed.Add(id);
         asking = id;
-        ring = id;
+        if (EdgeOf(id) is null) ring = id;
         Say($"{Label(id)}. Did you know it? Y for yes, N for not yet.");
         Refresh();
     }

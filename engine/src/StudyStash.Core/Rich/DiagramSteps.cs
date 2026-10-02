@@ -11,11 +11,51 @@ public sealed record DiagramStep(string Node, IReadOnlyList<int> Arrives, string
 /// The order a student reads a diagram in, to step through it: from where it starts (a box no arrow points to; for a
 /// cycle, its first box as written), along the arrows, each box once and only after every box with an arrow to it
 /// (except arrows that go back round a loop); a branch is read to its end before the next one starts, a group is
-/// finished before the walk leaves it, and boxes nothing joins come last, in the order written.
+/// finished before the walk leaves it, and boxes nothing joins come last, in the order written. A mind map reads so
+/// from its root outwards, a branch at a time. A sequence diagram is read row by row as written, a message a step (its
+/// arrow, to the one it's sent to) and a note a step; a timeline in the order it was written.
 /// </summary>
 public static class DiagramSteps
 {
-    public static IReadOnlyList<DiagramStep> Order(Flowchart chart)
+    public static IReadOnlyList<DiagramStep> Order(Flowchart chart) => chart.Form switch
+    {
+        ChartForm.Sequence => Rows(chart),
+        ChartForm.Timeline => Written(chart),
+        _ => Along(chart),
+    };
+
+    /// <summary>A sequence diagram's rows: each message, and each note, in the order written.</summary>
+    static List<DiagramStep> Rows(Flowchart chart)
+    {
+        var steps = new List<DiagramStep>();
+        foreach (var row in chart.Steps)
+        {
+            if (row.Kind == StepKind.Message && row.Index >= 0 && row.Index < chart.Edges.Count)
+            {
+                var e = chart.Edges[row.Index];
+                steps.Add(new DiagramStep(e.To, [row.Index], e.Label?.Replace('\n', ' '), []));
+            }
+            else if (row.Kind == StepKind.Note && chart.Node(row.Text) is { } note) steps.Add(new DiagramStep(note.Id, [], null, []));
+        }
+        return steps;
+    }
+
+    /// <summary>Every box in the order written, each with the arrows to it from boxes already read.</summary>
+    static List<DiagramStep> Written(Flowchart chart)
+    {
+        var read = new HashSet<string>();
+        var steps = new List<DiagramStep>();
+        foreach (var n in chart.Nodes)
+        {
+            var arrives = Enumerable.Range(0, chart.Edges.Count).Where(i => chart.Edges[i].To == n.Id && read.Contains(chart.Edges[i].From)).ToList();
+            var words = arrives.Select(i => chart.Edges[i].Label?.Replace('\n', ' ')).Where(w => w is { Length: > 0 }).Distinct().ToList();
+            steps.Add(new DiagramStep(n.Id, arrives, words.Count == 0 ? null : string.Join(" / ", words), []));
+            read.Add(n.Id);
+        }
+        return steps;
+    }
+
+    static List<DiagramStep> Along(Flowchart chart)
     {
         var index = new Dictionary<string, int>();
         for (int i = 0; i < chart.Nodes.Count; i++) index[chart.Nodes[i].Id] = i;

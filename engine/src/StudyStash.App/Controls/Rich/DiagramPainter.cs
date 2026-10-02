@@ -27,6 +27,8 @@ sealed class DiagramLook
     public string? Picked { get; init; }
     public string? Ring { get; init; }
     public IReadOnlySet<string>? Hidden { get; init; }
+    /// <summary>Arrows whose words are hidden for recall (a sequence diagram's messages, a state diagram's events).</summary>
+    public IReadOnlySet<int>? HiddenEdges { get; init; }
     public IReadOnlyDictionary<string, bool>? Marks { get; init; }
     public IReadOnlySet<string>? Folded { get; init; }
     public string? GroupHover { get; init; }
@@ -34,7 +36,7 @@ sealed class DiagramLook
     public bool Dims => Dim > 0.001 && (Lit is not null || LitEdges is not null);
 
     /// <summary>Nothing to show over the still picture.</summary>
-    public bool IsEmpty => !Dims && Accented is not { Count: > 0 } && Picked is null && Ring is null && Hidden is not { Count: > 0 }
+    public bool IsEmpty => !Dims && Accented is not { Count: > 0 } && Picked is null && Ring is null && Hidden is not { Count: > 0 } && HiddenEdges is not { Count: > 0 }
         && Marks is not { Count: > 0 } && Folded is not { Count: > 0 } && GroupHover is null;
 
     public bool NodeLit(string id) => Lit?.Contains(id) ?? false;
@@ -191,6 +193,12 @@ sealed class DiagramPainter
         if (e.LabelLines.Count == 0) return;
         IBrush brush = look?.Accented?.Contains(i) == true ? AccentBrush : palette.Line;
         double top = e.LabelBox.Center.Y - e.LabelLines.Count * DiagramLayout.LabelLineHeight / 2;
+        if (look?.HiddenEdges?.Contains(i) == true)
+        {
+            for (int k = 0; k < e.LabelLines.Count; k++)
+                Bar(context, e.LabelBox.Center.X, top + k * DiagramLayout.LabelLineHeight - 1, Math.Min(Width(e.LabelLines[k], DiagramLayout.LabelSize, FontWeight.Normal), e.LabelBox.W), snap);
+            return;
+        }
         for (int k = 0; k < e.LabelLines.Count; k++)
             DrawCentred(context, e.LabelLines[k], DiagramLayout.LabelSize, FontWeight.Normal, brush, e.LabelBox.Center.X, top + k * DiagramLayout.LabelLineHeight, DiagramLayout.LabelLineHeight, snap);
     }
@@ -227,7 +235,12 @@ sealed class DiagramPainter
             }
             context.DrawGeometry(brush, pen, poly);
         }
-        else if (n.Shape == NodeShape.Circle) context.DrawEllipse(brush, pen, b.Center, b.Width / 2, b.Height / 2);
+        else if (n.Shape is NodeShape.Circle or NodeShape.DoubleCircle)
+        {
+            context.DrawEllipse(brush, pen, b.Center, b.Width / 2, b.Height / 2);
+            // An accepting state's (or a state diagram's end's) second ring, inside the first.
+            if (SceneShapes.InnerRing(n) is { } ring) context.DrawEllipse(null, pen, P(ring.Center), ring.W / 2, ring.H / 2);
+        }
         else if (n.Shape == NodeShape.Cylinder) Cylinder(context, DiagramCanvas.Snap(b, snap, true), brush, pen);
         else
         {
@@ -247,7 +260,12 @@ sealed class DiagramPainter
             return;
         }
         for (int i = 0; i < n.Lines.Count; i++)
-            DrawCentred(context, n.Lines[i], DiagramLayout.TextSize, FontWeight.Medium, palette.Ink, n.Box.Center.X, top + i * DiagramLayout.LineHeight, DiagramLayout.LineHeight, snap);
+        {
+            // A box's smaller words (a step's where or what) sit under its own, quieter, in the slots its lines take.
+            if (SceneShapes.IsDetail(n, i))
+                DrawCentred(context, n.Lines[i], SceneShapes.DetailSize, FontWeight.Normal, palette.Line, n.Box.Center.X, top + i * DiagramLayout.LineHeight - 1, DiagramLayout.LineHeight, snap);
+            else DrawCentred(context, n.Lines[i], DiagramLayout.TextSize, FontWeight.Medium, palette.Ink, n.Box.Center.X, top + i * DiagramLayout.LineHeight, DiagramLayout.LineHeight, snap);
+        }
     }
 
     /// <summary>A folded group: a closed card in the groups' own fill, a second card's edge behind it (there's more
@@ -265,12 +283,15 @@ sealed class DiagramPainter
         bool hidden = look.Hidden?.Contains(n.Id) == true;
         for (int i = 0; i < n.Lines.Count; i++)
         {
-            bool count = i == n.Lines.Count - 1 && n.Lines.Count > 1;
-            if (hidden && !count) continue;
-            DrawCentred(context, n.Lines[i], count ? DiagramLayout.LabelSize : DiagramLayout.TextSize, count ? FontWeight.Normal : FontWeight.SemiBold,
-                count ? palette.Quiet : palette.Ink, n.Box.Center.X, top + i * DiagramLayout.LineHeight, DiagramLayout.LineHeight, snap);
+            bool count = SceneShapes.IsDetail(n, i);
+            if (hidden && !count)
+            {
+                Bar(context, n.Box.Center.X, top + i * DiagramLayout.LineHeight, Width(n.Lines[i], DiagramLayout.TextSize, FontWeight.SemiBold), snap);
+                continue;
+            }
+            DrawCentred(context, n.Lines[i], count ? SceneShapes.DetailSize : DiagramLayout.TextSize, count ? FontWeight.Normal : FontWeight.SemiBold,
+                count ? palette.Quiet : palette.Ink, n.Box.Center.X, top + i * DiagramLayout.LineHeight - (count ? 1 : 0), DiagramLayout.LineHeight, snap);
         }
-        if (hidden && n.Lines.Count > 1) Bar(context, n.Box.Center.X, top, Width(n.Lines[0], DiagramLayout.TextSize, FontWeight.SemiBold), snap);
         // The plus, in the corner the words leave clear (beside the shorter count).
         var c = new Point(r.Right - 11, n.Lines.Count > 1 ? r.Bottom - 11 : r.Y + 11);
         var plus = new Pen(palette.Quiet, 1.4, lineCap: PenLineCap.Round);
@@ -282,13 +303,17 @@ sealed class DiagramPainter
     void Hidden(DrawingContext context, SceneNode n, double top, double snap)
     {
         for (int i = 0; i < n.Lines.Count; i++)
-            Bar(context, n.Box.Center.X, top + i * DiagramLayout.LineHeight, Math.Min(Width(n.Lines[i], DiagramLayout.TextSize, FontWeight.Medium), n.Box.W - 20), snap);
+        {
+            bool small = SceneShapes.IsDetail(n, i);
+            double w = small ? Width(n.Lines[i], SceneShapes.DetailSize, FontWeight.Normal) : Width(n.Lines[i], DiagramLayout.TextSize, FontWeight.Medium);
+            Bar(context, n.Box.Center.X, top + i * DiagramLayout.LineHeight + (small ? 1 : 0), Math.Min(w, n.Box.W - 20), snap, small ? DiagramLayout.LineHeight - 8 : DiagramLayout.LineHeight - 6);
+        }
     }
 
-    void Bar(DrawingContext context, double centreX, double top, double width, double snap)
+    void Bar(DrawingContext context, double centreX, double top, double width, double snap, double height = DiagramLayout.LineHeight - 6)
     {
         width = Math.Max(24, width);
-        var bar = new Rect(DiagramCanvas.OnPixel(centreX - width / 2, snap), DiagramCanvas.OnPixel(top + 3, snap), width, DiagramLayout.LineHeight - 6);
+        var bar = new Rect(DiagramCanvas.OnPixel(centreX - width / 2, snap), DiagramCanvas.OnPixel(top + (DiagramLayout.LineHeight - height) / 2, snap), width, height);
         context.DrawRectangle(new SolidColorBrush(palette.Ink.Color, palette.Dark ? 0.16 : 0.10), null, new RoundedRect(bar, 5));
     }
 
@@ -302,16 +327,21 @@ sealed class DiagramPainter
             if (picked) Outline(context, n, 2.5, 2, AccentBrush);
             if (ring && !picked) Outline(context, n, 3.5, 2, AccentBrush);
             else if (ring) Outline(context, n, 6, 1.25, AccentBrush);
-            if (look.Marks?.TryGetValue(n.Id, out bool knew) == true) Mark(context, n, knew);
+            if (look.Marks?.TryGetValue(n.Id, out bool knew) == true) Mark(context, new Point(n.Box.Right - 2, n.Box.Y + 2), knew);
         }
+        // How the recalled words on arrows went, by their words' corner.
+        if (look.Marks is { Count: > 0 } marks)
+            foreach (var (key, knew) in marks)
+                if (key.StartsWith('\u0001') && int.TryParse(key.AsSpan(1), System.Globalization.CultureInfo.InvariantCulture, out int i) && i < scene.Edges.Count)
+                    Mark(context, new Point(scene.Edges[i].LabelBox.Right + 4, scene.Edges[i].LabelBox.Y + 2), knew);
     }
 
     void Outline(DrawingContext context, SceneNode n, double outset, double thickness, IBrush brush)
     {
         var pen = new Pen(brush, thickness);
         var b = ToRect(n.Box.Inflate(outset));
-        if (n.Shape == NodeShape.Circle) context.DrawEllipse(null, pen, b.Center, b.Width / 2, b.Height / 2);
-        else if (n.Shape is NodeShape.Decision or NodeShape.Hexagon && SceneShapes.Corners(n with { Box = n.Box.Inflate(outset) }) is { } corners)
+        if (n.Shape is NodeShape.Circle or NodeShape.DoubleCircle) context.DrawEllipse(null, pen, b.Center, b.Width / 2, b.Height / 2);
+        else if (SceneShapes.Corners(n with { Box = n.Box.Inflate(outset) }) is { } corners)
         {
             var g = new StreamGeometry();
             using (var c = g.Open())
@@ -325,9 +355,8 @@ sealed class DiagramPainter
         else context.DrawRectangle(null, pen, new RoundedRect(b, SceneShapes.Radius(n) + outset));
     }
 
-    void Mark(DrawingContext context, SceneNode n, bool knew)
+    void Mark(DrawingContext context, Point at, bool knew)
     {
-        var at = new Point(n.Box.Right - 2, n.Box.Y + 2);
         var (fill, stroke) = DiagramColours.Of(knew ? Tone.Green : Tone.Amber, palette.Dark, palette.Accent, palette.Tint);
         context.DrawEllipse(new SolidColorBrush(stroke), new Pen(new SolidColorBrush(fill), 1.5), at, 7, 7);
         var pen = new Pen(new SolidColorBrush(fill), 1.6, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);

@@ -40,23 +40,26 @@ public static class DiagramHit
 
     /// <summary>
     /// What's at <paramref name="p"/>: a box first (it's drawn over the lines), then an arrow's words, then the
-    /// nearest line within <paramref name="slop"/>, then a group's title, then the innermost group it's inside.
+    /// nearest line within <paramref name="slop"/>, then a group's title, then the innermost group it's inside. Only
+    /// the first <paramref name="arrows"/> of the scene's lines are arrows (the chart's own); any after them are lines a
+    /// layout adds (a sequence diagram's lifelines, a timeline's axis, a block's divider), which are nothing to point at.
     /// </summary>
-    public static DiagramTarget At(DiagramScene scene, Pt p, double slop = LineSlop)
+    public static DiagramTarget At(DiagramScene scene, Pt p, double slop = LineSlop, int arrows = int.MaxValue)
     {
+        int real = Math.Min(arrows, scene.Edges.Count);
         for (int i = scene.Nodes.Count - 1; i >= 0; i--)
         {
             var n = scene.Nodes[i];
             if (n.Box.Inflate(1).Contains(p) && DiagramLayout.Outline(n, p) <= 1) return DiagramTarget.Node(n.Id);
         }
-        for (int i = 0; i < scene.Edges.Count; i++)
+        for (int i = 0; i < real; i++)
         {
             var e = scene.Edges[i];
             if (e.LabelLines.Count > 0 && e.LabelBox.Inflate(2).Contains(p)) return new DiagramTarget(DiagramPart.EdgeLabel, null, i);
         }
         int nearest = -1;
         double best = slop;
-        for (int i = 0; i < scene.Edges.Count; i++)
+        for (int i = 0; i < real; i++)
         {
             double d = Distance(Line(scene.Edges[i]), p);
             if (d <= best)
@@ -101,15 +104,16 @@ public static class DiagramHit
     /// other ends; an arrow (or its words) with the two boxes it joins; a group with the boxes and arrows inside it
     /// (<paramref name="members"/> says which boxes those are). Nothing, for empty paper.
     /// </summary>
-    public static DiagramFocus Around(DiagramScene scene, DiagramTarget target, Func<string, IEnumerable<string>>? members = null)
+    public static DiagramFocus Around(DiagramScene scene, DiagramTarget target, Func<string, IEnumerable<string>>? members = null, int arrows = int.MaxValue)
     {
         var nodes = new HashSet<string>();
         var edges = new HashSet<int>();
+        int real = Math.Min(arrows, scene.Edges.Count);
         switch (target.Part)
         {
             case DiagramPart.Node when target.Id is { } id:
                 nodes.Add(id);
-                for (int i = 0; i < scene.Edges.Count; i++)
+                for (int i = 0; i < real; i++)
                 {
                     var e = scene.Edges[i];
                     if (e.From != id && e.To != id) continue;
@@ -118,7 +122,7 @@ public static class DiagramHit
                     nodes.Add(e.To);
                 }
                 break;
-            case DiagramPart.Edge or DiagramPart.EdgeLabel when target.Edge >= 0 && target.Edge < scene.Edges.Count:
+            case DiagramPart.Edge or DiagramPart.EdgeLabel when target.Edge >= 0 && target.Edge < real:
                 var edge = scene.Edges[target.Edge];
                 edges.Add(target.Edge);
                 nodes.Add(edge.From);
@@ -126,7 +130,7 @@ public static class DiagramHit
                 break;
             case DiagramPart.Group or DiagramPart.GroupTitle when target.Id is { } group && members is not null:
                 foreach (string m in members(group)) nodes.Add(m);
-                for (int i = 0; i < scene.Edges.Count; i++)
+                for (int i = 0; i < real; i++)
                     if (nodes.Contains(scene.Edges[i].From) && nodes.Contains(scene.Edges[i].To)) edges.Add(i);
                 break;
         }
@@ -139,12 +143,12 @@ public static class DiagramHit
     /// keys walk along the arrows whichever way a chart is laid out; failing that, the nearest box that way at all.
     /// Null when nothing lies that way.
     /// </summary>
-    public static string? Toward(DiagramScene scene, string from, double dx, double dy)
+    public static string? Toward(DiagramScene scene, string from, double dx, double dy, int arrows = int.MaxValue)
     {
         var start = scene.Nodes.FirstOrDefault(n => n.Id == from);
         if (start is null) return null;
         var joined = new HashSet<string>();
-        foreach (var e in scene.Edges)
+        foreach (var e in scene.Edges.Take(arrows))
         {
             if (e.From == from && e.To != from) joined.Add(e.To);
             if (e.To == from && e.From != from) joined.Add(e.From);

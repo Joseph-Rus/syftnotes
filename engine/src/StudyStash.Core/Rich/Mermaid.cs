@@ -162,42 +162,7 @@ public sealed class Flowchart
     /// diagram's groups must read as a diagram of their own. Null for a chart with no groups, or one whose kind
     /// doesn't fold (a sequence diagram, a timeline, a mind map).
     /// </summary>
-    public Flowchart? Folded()
-    {
-        if (Groups.Count == 0 || Form is not (ChartForm.Flowchart or ChartForm.State)) return null;
-        var parent = Groups.ToDictionary(g => g.Id, g => g.Parent);
-        string Top(string group)
-        {
-            while (parent.TryGetValue(group, out var p) && p is not null) group = p;
-            return group;
-        }
-        var unitOf = new Dictionary<string, string>();
-        foreach (var g in Groups)
-            foreach (string m in g.Members) unitOf[m] = Top(g.Id);
-        string Unit(string id) => unitOf.TryGetValue(id, out var u) ? u : id;
-        var nodes = new List<FlowNode>();
-        var placed = new HashSet<string>();
-        foreach (var n in Nodes)
-        {
-            string u = Unit(n.Id);
-            if (!placed.Add(u)) continue;
-            if (u == n.Id) nodes.Add(n);
-            else
-            {
-                var g = Groups.First(x => x.Id == u);
-                int inside = Nodes.Count(x => Unit(x.Id) == u && x.Role is not (NodeRole.Start or NodeRole.End or NodeRole.Note));
-                nodes.Add(new FlowNode(u, g.Title.Length > 0 ? [g.Title] : [u], NodeShape.Rounded, Tone.None) { Detail = [inside == 1 ? "1 box" : $"{inside} boxes"] });
-            }
-        }
-        var edges = new List<FlowEdge>();
-        foreach (var pair in Edges.Select(e => (e, From: Unit(e.From), To: Unit(e.To))).Where(x => x.From != x.To).GroupBy(x => (x.From, x.To)))
-        {
-            var first = pair.First().e;
-            var words = pair.Select(x => x.e.Label).Distinct().ToList();
-            edges.Add(new FlowEdge(pair.Key.From, pair.Key.To, words.Count == 1 ? words[0] : null, first.Line, first.StartEnd, first.EndEnd));
-        }
-        return new Flowchart(Direction, Title, nodes, edges, []);
-    }
+    public Flowchart? Folded() => DiagramFold.Folds(this) ? DiagramFold.Fold(this, DiagramFold.Outermost(this)).Chart : null;
 
     /// <summary>
     /// The chart as canonical Mermaid, every label quoted, so any Mermaid reader (Obsidian, Typora, GitHub) draws
