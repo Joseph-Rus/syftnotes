@@ -2,7 +2,7 @@ namespace StudyStash.Core.Rich;
 
 /// <summary>A part of the plane a plot shows: x from <see cref="X0"/> to <see cref="X1"/>, y from <see cref="Y0"/> to
 /// <see cref="Y1"/>.</summary>
-public readonly record struct PlotWindow(double X0, double X1, double Y0, double Y1)
+public readonly record struct PlotRange(double X0, double X1, double Y0, double Y1)
 {
     public double Width => X1 - X0;
     public double Height => Y1 - Y0;
@@ -10,11 +10,11 @@ public readonly record struct PlotWindow(double X0, double X1, double Y0, double
 
     /// <summary>Zoomed by <paramref name="factor"/> (above 1 closer in) about the point (<paramref name="cx"/>,
     /// <paramref name="cy"/>), which stays where it is.</summary>
-    public PlotWindow Zoom(double factor, double cx, double cy, bool xOnly = false) => new(
+    public PlotRange Zoom(double factor, double cx, double cy, bool xOnly = false) => new(
         cx - (cx - X0) / factor, cx + (X1 - cx) / factor,
         xOnly ? Y0 : cy - (cy - Y0) / factor, xOnly ? Y1 : cy + (Y1 - cy) / factor);
 
-    public PlotWindow Pan(double dx, double dy) => new(X0 + dx, X1 + dx, Y0 + dy, Y1 + dy);
+    public PlotRange Pan(double dx, double dy) => new(X0 + dx, X1 + dx, Y0 + dy, Y1 + dy);
 }
 
 /// <summary>
@@ -51,8 +51,8 @@ public sealed class PlotState
     public HashSet<PlotItem> Hidden { get; } = [];
 
     /// <summary>What's in view now, and what the plot shows to begin with (its axes, or what it draws).</summary>
-    public PlotWindow View { get; set; }
-    public PlotWindow Home { get; private set; }
+    public PlotRange View { get; set; }
+    public PlotRange Home { get; private set; }
 
     /// <summary>Changes whenever a slider does (what's drawn for the old values is stale).</summary>
     public int Generation => Env.Generation;
@@ -61,7 +61,7 @@ public sealed class PlotState
 
     public bool Zoomed => !Same(View, Home);
 
-    static bool Same(PlotWindow a, PlotWindow b) =>
+    static bool Same(PlotRange a, PlotRange b) =>
         Math.Abs(a.X0 - b.X0) <= 1e-9 * Math.Max(1, a.Width) && Math.Abs(a.X1 - b.X1) <= 1e-9 * Math.Max(1, a.Width)
         && Math.Abs(a.Y0 - b.Y0) <= 1e-9 * Math.Max(1, a.Height) && Math.Abs(a.Y1 - b.Y1) <= 1e-9 * Math.Max(1, a.Height);
 
@@ -178,7 +178,7 @@ public sealed class PlotState
     /// y over what its curves and points reach there (most of it, so one spike doesn't flatten the rest), with zero
     /// when it's near, and a little room above and below. A matrix's plane is square round where the unit square goes.
     /// </summary>
-    PlotWindow HomeWindow()
+    PlotRange HomeWindow()
     {
         var p = Plot;
         double x0, x1;
@@ -221,19 +221,19 @@ public sealed class PlotState
             }
             else (x0, x1) = (-10, 10);
         }
-        if (p.Y is { } ay) return new PlotWindow(x0, x1, ay.From, ay.To);
+        if (p.Y is { } ay) return new PlotRange(x0, x1, ay.From, ay.To);
         var (y0, y1) = AutoY(x0, x1);
-        return new PlotWindow(x0, x1, y0, y1);
+        return new PlotRange(x0, x1, y0, y1);
     }
 
-    PlotWindow MatrixWindow(PlotMatrix m)
+    PlotRange MatrixWindow(PlotMatrix m)
     {
         var (a, b, c, d) = Matrix(m);
         double r = new[] { 1.0, Math.Abs(a), Math.Abs(b), Math.Abs(c), Math.Abs(d), Math.Abs(a + b), Math.Abs(c + d) }.Where(double.IsFinite).Max();
         r = Math.Min(Math.Max(2, Math.Ceiling(r * 1.3)), 50);
         var y = Plot.Y is { } ay ? (ay.From, ay.To) : (-r, r);
         var x = Plot.X is { } ax ? (ax.From, ax.To) : (-r, r);
-        return new PlotWindow(x.Item1, x.Item2, y.Item1, y.Item2);
+        return new PlotRange(x.Item1, x.Item2, y.Item1, y.Item2);
     }
 
     (double, double) AutoY(double x0, double x1)

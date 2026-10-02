@@ -4,7 +4,7 @@ namespace StudyStash.Core.Rich;
 public readonly record struct PlotPt(double X, double Y);
 
 /// <summary>Where the plane lands on the screen: the window in view, drawn into <see cref="Area"/>.</summary>
-public readonly record struct PlotMap(PlotWindow View, double Left, double Top, double Width, double Height)
+public readonly record struct PlotMap(PlotRange View, double Left, double Top, double Width, double Height)
 {
     public double Sx => Width / View.Width;
     public double Sy => Height / View.Height;

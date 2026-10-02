@@ -100,4 +100,29 @@ public class PlotViewTests
             Assert.True(ms < 120, $"{title}: {ms:0.0} ms a frame");
         }
     }
+
+    /// <summary>On paper (a PDF), a plot's words are text and its lines are vectors, at the sliders' starting values.</summary>
+    [AvaloniaFact]
+    public async Task A_pdf_draws_the_plot_as_vectors_with_its_words_as_text()
+    {
+        Skin.UseTheme(ColourThemes.Default);
+        ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var lecture = new System.Text.Json.Nodes.JsonObject
+        {
+            ["title"] = "Logistic regression", ["class"] = "CSCI 4220", ["date"] = "2026-09-28T09:00:00",
+            ["notes"] = "## The sigmoid\n\n```plot\n" + PlotDesign.Sigmoid + "\n```\n\n## Growth\n\n```plot\n" + PlotDesign.Growth + "\n```",
+        };
+        using var output = new MemoryStream();
+        int pages = await Services.NotesPdf.WriteAsync(output, lecture, false, Services.Paper.Letter, Avalonia.Media.Colors.Teal);
+        var pdf = new PdfProbe(output.ToArray());
+        if (Environment.GetEnvironmentVariable("STUDYSTASH_SHOTS") is { Length: > 0 } dir) await File.WriteAllBytesAsync(Path.Combine(dir, "plot-paper.pdf"), output.ToArray());
+        Assert.True(pdf.IsPdf);
+        Assert.True(pdf.Count("threshold 0.5") == 1);
+        Assert.True(pdf.Count("Drawn at k = 1 (steepness k).") == 1);
+        Assert.True(pdf.Count("n log₂ n") >= 1);
+        Assert.False(pdf.HasImages);
+        Assert.Empty(pdf.FontsNotEmbedded);
+        Assert.InRange(pages, 1, 3);
+    }
 }

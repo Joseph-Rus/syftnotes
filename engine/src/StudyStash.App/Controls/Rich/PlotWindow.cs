@@ -31,8 +31,7 @@ public static class PlotWindow
         }
         var view = new PlotView(plot, from.Source, windowed: true) { Origin = from, Caption = from.Caption };
         // Where the note's sliders were, and what it hid.
-        for (int i = 0; i < plot.Params.Count && i < from.State.Values.Length; i++) view.State.Set(i, from.State.Values[i]);
-        view.Canvas.Look = view.Canvas.Look with { Hidden = from.Canvas.Look.Hidden.Select(h => plot.Items.ElementAtOrDefault(from.Plot.Items.IndexOf(h))).OfType<PlotItem>().ToHashSet() };
+        view.Restore(from.State.Values, from.Canvas.Look.Hidden.Select(h => plot.Items.ElementAtOrDefault(from.Plot.Items.IndexOf(h))).OfType<PlotItem>());
         view.AskedFromWindow = () => (TopLevel.GetTopLevel(from) as Window)?.Activate();
         var ground = new Border { Child = view };
         ground.Bind(Border.BackgroundProperty, ground.GetResourceObservable(Skin.Current == SkinKind.Mac ? "Win" : "Mica"));

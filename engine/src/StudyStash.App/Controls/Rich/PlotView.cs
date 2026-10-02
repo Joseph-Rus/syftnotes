@@ -191,6 +191,15 @@ public sealed class PlotView : Decorator
         rows.Add((p, slider, value, play));
     }
 
+    /// <summary>Its sliders set to <paramref name="values"/> and <paramref name="hidden"/> hidden (a window opened from
+    /// a note shows the plot as the note had it).</summary>
+    public void Restore(IReadOnlyList<double> values, IEnumerable<PlotItem> hidden)
+    {
+        for (int i = 0; i < Plot.Params.Count && i < values.Count; i++) State.Set(i, values[i]);
+        canvas.Look = canvas.Look with { Hidden = hidden.ToHashSet() };
+        Changed();
+    }
+
     /// <summary>The sliders' labels share one width (the widest, to a point), so the sliders line up.</summary>
     protected override Size MeasureOverride(Size availableSize)
     {

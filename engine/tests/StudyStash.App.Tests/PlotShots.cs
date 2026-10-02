@@ -144,4 +144,52 @@ public class PlotShots
                 window.Close();
             }
     }
+
+    /// <summary>A plot being predicted (the curve hidden, the student's sketch drawn, the strip asking to reveal), then
+    /// revealed (the sketch under the real curve, and how close it came); and the larger window, on the gradient
+    /// descent plot with its learning rate pushed past where it converges.</summary>
+    [AvaloniaFact]
+    public void Plot_predict_and_window()
+    {
+        foreach (var t in Themes)
+        {
+            foreach (bool revealed in new[] { false, true })
+                Shot.Take($"plot-predict{(revealed ? "-revealed" : "")}-mac", SkinKind.Mac, t, () => RichShots.NotePage(SkinKind.Mac, Notes(PlotDesign.Examples.Skip(4).Take(1)), note =>
+                {
+                    note.AttachedToVisualTree += (_, _) => Dispatcher.UIThread.Post(() =>
+                    {
+                        var view = note.GetLogicalDescendants().OfType<PlotView>().Single();
+                        var w = (Window)TopLevel.GetTopLevel(view)!;
+                        view.Focus();
+                        w.KeyPress(Key.P, RawInputModifiers.None, PhysicalKey.P, "p");
+                        var map = view.Canvas.Scene!.Map;
+                        Point At(double x, double y) => view.Canvas.TranslatePoint(new Point(map.ScreenX(x), map.ScreenY(y)), w)!.Value;
+                        // A guess that's the right shape but too shallow.
+                        w.MouseMove(At(-0.9, 2.2));
+                        w.MouseDown(At(-0.9, 2.2), MouseButton.Left);
+                        for (double x = -0.9; x <= 3.9; x += 0.1) w.MouseMove(At(x, 0.3 * (x - 1.2) * (x - 1.2) + 0.7), RawInputModifiers.LeftMouseButton);
+                        w.MouseUp(At(3.9, 2.9), MouseButton.Left);
+                        if (revealed)
+                            view.GetVisualDescendants().OfType<Button>().Single(b => Avalonia.Automation.AutomationProperties.GetName(b) == "Reveal")
+                                .RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                    });
+                }), size: new Size(876, 760));
+            Skin.UseTheme(ColourThemes.Default);
+            ((App)Application.Current!).UseSkin(SkinKind.Win);
+            var note = new NoteView { Markdown = Notes(PlotDesign.Examples.Skip(5).Take(1)), Width = 640 };
+            var host = new Window { Width = 800, Height = 900, RequestedThemeVariant = t, Content = note };
+            host.Show();
+            Dispatcher.UIThread.RunJobs();
+            var from = note.GetLogicalDescendants().OfType<PlotView>().Single();
+            from.State.Set(0, 0.205);
+            var win = PlotWindow.Open(from, host);
+            win.RequestedThemeVariant = t;
+            win.Width = 1000;
+            win.Height = 760;
+            Dispatcher.UIThread.RunJobs();
+            RichShots.Save("plot-window-win", t, win, new Size(1000, 760));
+            win.Close();
+            host.Close();
+        }
+    }
 }

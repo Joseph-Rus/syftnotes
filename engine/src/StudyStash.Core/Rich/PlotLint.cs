@@ -54,7 +54,7 @@ public static class PlotLint
         return problems.Distinct().ToList();
     }
 
-    static void Check(PlotState state, PlotItem item, PlotWindow view, List<string> problems)
+    static void Check(PlotState state, PlotItem item, PlotRange view, List<string> problems)
     {
         state.NewFrame();
         switch (item)
@@ -133,11 +133,11 @@ public static class PlotLint
         }
     }
 
-    static bool Inside(PlotWindow v, double x, double y, double slack) =>
+    static bool Inside(PlotRange v, double x, double y, double slack) =>
         x >= v.X0 - v.Width * slack && x <= v.X1 + v.Width * slack && y >= v.Y0 - v.Height * slack && y <= v.Y1 + v.Height * slack;
 
     /// <summary>A curve over the view: how many samples are defined, how many fall inside it, and its range.</summary>
-    static (int Finite, int Inside, double Lo, double Hi) Sample(PlotState state, PlotCurve c, PlotWindow view)
+    static (int Finite, int Inside, double Lo, double Hi) Sample(PlotState state, PlotCurve c, PlotRange view)
     {
         int finite = 0, inside = 0;
         double lo = double.PositiveInfinity, hi = double.NegativeInfinity;

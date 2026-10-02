@@ -191,6 +191,7 @@ sealed class PlotCanvas : Control
             PlotRole.Ink3 => ColorOf(Ink3, dark ? Color.Parse("#8E8E94") : Color.Parse("#86868B")),
             PlotRole.Grid => ColorOf(Grid, dark ? Color.FromArgb(30, 255, 255, 255) : Color.FromArgb(20, 0, 0, 0)),
             PlotRole.Axis => WithAlpha(ColorOf(Ink3, Colors.Gray), 0.75),
+            PlotRole.Surface when Still => Colors.White, // paper
             PlotRole.Surface => Over(ColorOf(Layer, Colors.Transparent), Opaque(ColorOf(Paper, dark ? Color.Parse("#1E1E20") : Colors.White), dark)),
             _ => dark ? Color.FromArgb(72, 255, 255, 255) : Color.FromArgb(80, 0, 0, 0),
         };
