@@ -193,9 +193,11 @@ said and puts it at the end of the section it illustrates, with a title, a capti
 to notice, and the moment of the lecture it comes from. It picks the kind that fits: a flowchart
 (a big topic as up to 36 boxes in groups, each box carrying the lecture's numbers and conditions in
 smaller words), a state diagram (an automaton's accepting states double-circled), a sequence
-diagram, a timeline or a mind map. A lecture gets one per idea worth drawing — up to four for a long
-one — one under about three minutes gets none, and so does a lecture of discussion, admin or
-definitions.
+diagram, a timeline or a mind map — or, when the lecturer gave a formula whose shape is the point (a
+sigmoid, a loss curve, a distribution and its parameters, how running times grow, gradient descent
+on a loss surface, what a matrix does to the plane), a plot of it. A lecture gets one per idea worth
+drawing — up to four for a long one — one under about three minutes gets none, and so does a
+lecture of discussion, admin or definitions.
 
 - **Automatic** (the default) uses the strongest engine that already reads your lectures — the one
   that writes your notes or answers your questions — trying Claude Code (Opus, high effort), then
@@ -211,7 +213,9 @@ A diagram that doesn't draw goes back once to be fixed and is otherwise left out
 too many boxes or words the lecture never said. Each one kept is laid out at the notes' width and
 looked over; one that would look wrong (too wide to read, arrows crossing, a sentence in a box, a
 big chart with no groups) goes back once with what's wrong, while there's time, and its redesign is
-used only when it's better. If the diagrams can't be designed (the engine is busy, over its limit,
+used only when it's better; a plot is worked out at its sliders' starting values and ends, and one
+that's flat, undefined, off its axes or has a slider that changes nothing goes back the same way. If
+the diagrams can't be designed (the engine is busy, over its limit,
 or takes longer than 8 minutes), the notes are kept exactly as written. The library's log says
 what was drawn and redesigned, or why nothing was.
 
@@ -243,6 +247,20 @@ the notes, in a quick answer and in the Ask chat:
   transcript where it comes from. Opened larger, the window has all of this with a toolbar, and an
   SVG drawing zooms and pans there. Paper, the PDF and the Markdown download keep the still
   picture.
+- **Plots**: a formula whose shape is the point is drawn as a ` ```plot `, exactly from the formula
+  itself (the AI only writes the formula as the lecturer gave it, its ranges, sliders and labels;
+  the app does the maths, so a curve is never drawn freehand): curves, parametric curves, bars for a
+  distribution or a recurrence, shaded probabilities with their area, tangents with their slope,
+  vectors and fields, a two-variable function as a heat map with contours and gradient descent
+  across it, and a 2×2 matrix's map of the plane with its eigenvectors. Each parameter gets a slider
+  (with a play button that sweeps it), the pointer reads every curve's value under a crosshair and a
+  click pins it (with **Explain this**, **Quiz me** and **Where was this said?**), a point that's a
+  slider can be dragged (a tangent along its curve), ⌘ or Ctrl and the wheel zoom (worked out again,
+  so it stays exact), a click on the legend hides a curve, and **Predict** hides the curve for you to
+  sketch first, then reveals it and says how close you came. A formula on its own line in the notes
+  offers **Show what this looks like**, which asks the Ask bar for it as a plot. Paper and the PDF
+  show it at its sliders' starting values; the Markdown download keeps its ` ```plot ` source with
+  its picture saved beside it, and the phone shows the picture.
 - **Download**: a lecture's "Download as Markdown…" (or a whole class's) saves a `.md` file that
   Obsidian, Typora and VS Code all open well — formulas stay LaTeX, a Mermaid diagram is saved
   again as an SVG beside it, and an SVG diagram becomes an image link to its own sanitised file.
