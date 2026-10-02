@@ -51,6 +51,24 @@ sealed class PartMap
 
     int? Owner(int x, int y) => x < 0 || y < 0 || x >= width || y >= height || owner[y * width + x] == 0 ? null : owner[y * width + x] - 1;
 
+    /// <summary>A point on the part itself (the one nearest the middle of its box), in the drawing's own units: where
+    /// the pointer goes to point at it.</summary>
+    public (double X, double Y)? Inside(string id)
+    {
+        if (Array.IndexOf(ids, id) is not (int i and >= 0) || boxes[i] is not { } b) return null;
+        int cx = (int)(b.CenterX * scale), cy = (int)(b.CenterY * scale);
+        (int X, int Y)? best = null;
+        double nearest = double.MaxValue;
+        for (int y = (int)(b.Y * scale); y <= (int)(b.Bottom * scale) && y < height; y++)
+            for (int x = (int)(b.X * scale); x <= (int)(b.Right * scale) && x < width; x++)
+                if (x >= 0 && y >= 0 && owner[y * width + x] == i + 1 && (x - cx) * (x - cx) + (y - cy) * (y - cy) is var d && d < nearest)
+                {
+                    nearest = d;
+                    best = (x, y);
+                }
+        return best is { } p ? ((p.X + 0.5) / scale, (p.Y + 0.5) / scale) : null;
+    }
+
     /// <summary>Where a part is drawn (its label not counted), in the drawing's own units.</summary>
     public Bounds? Of(string id) => Array.IndexOf(ids, id) is int i and >= 0 ? boxes[i] : null;
 

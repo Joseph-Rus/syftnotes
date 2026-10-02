@@ -6,25 +6,25 @@ namespace StudyStash.Core.Rich;
 /// How an illustration's own colours (a hand's skin, a drone's carbon frame, a board's green) are shown on a dark
 /// page: still themselves, so the subject reads as what it is, but moved into the lightness a dark page can carry.
 /// Darks are lifted clear of the dark paper (a black motor stays a visible dark grey), mid and light tones keep most of
-/// their lightness and contrast, and the lightest are held back from glaring; hue is kept, and the order of light to
-/// dark too, so shading still reads the right way up. A near-white with no colour in it is paper: a background left
-/// in becomes the dark paper, not a bright card. Worked in OKLab, where equal steps look equal.
+/// their lightness and contrast, and the lightest are held back from glaring (a highlight stays a highlight); hue is
+/// kept, and the order of light to dark too, so shading still reads the right way up. Worked in OKLab, where equal
+/// steps look equal. A background left in is the paper's (see <see cref="IsPaper"/>).
 /// </summary>
 public static class SvgColour
 {
     /// <summary>Where lightness lands in dark: (written, shown) points, joined by straight lines.</summary>
     static readonly (double From, double To)[] Curve = [(0, 0.44), (0.5, 0.6), (0.75, 0.77), (1, 0.9)];
 
-    /// <summary>The dark page's version of <paramref name="hex"/> (lower-case #rrggbb); <paramref name="paper"/> for a
-    /// near-white with no colour in it.</summary>
-    public static string ForDark(string hex, string paper)
+    /// <summary>The dark page's version of <paramref name="hex"/> (lower-case #rrggbb).</summary>
+    public static string ForDark(string hex)
     {
         if (Lab(hex) is not { } lab) return hex;
         var (l, a, b) = lab;
-        if (l > 0.96 && Math.Sqrt(a * a + b * b) < 0.02) return paper;
-        double to = Lift(l);
-        return Hex(to, a, b);
+        return Hex(Lift(l), a, b);
     }
+
+    /// <summary>A near-white with next to no colour in it: what a background left in is filled with.</summary>
+    public static bool IsPaper(string hex) => Lab(hex) is { } lab && lab.L > 0.9 && Math.Sqrt(lab.A * lab.A + lab.B * lab.B) < 0.03;
 
     /// <summary>Lightness on a dark page, for lightness <paramref name="l"/> on a light one.</summary>
     public static double Lift(double l)

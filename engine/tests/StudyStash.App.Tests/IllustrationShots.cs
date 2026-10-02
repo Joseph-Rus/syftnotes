@@ -51,14 +51,13 @@ public class IllustrationShots
                         Thread.Sleep(5);
                         Dispatcher.UIThread.RunJobs();
                     }
-                    // The part with the most to say, pinned with its card.
-                    var part = x.Parts.OrderByDescending(p => x.Map?.Of(p.Id) is { } b ? Math.Min(b.W, b.H) : 0).First();
-                    if (x.Map?.Of(part.Id) is { } box)
+                    // The part with the longest line from the lecture, pinned with its card.
+                    var part = x.Parts.OrderByDescending(p => p.Note.Length).First();
+                    if (x.Map?.Inside(part.Id) is { } on)
                     {
                         var canvas = view.GetVisualDescendants().OfType<SvgCanvas>().Single();
                         double k = canvas.Bounds.Width / x.Drawing!.Width;
-                        var p = canvas.TranslatePoint(new Point(box.CenterX * k, box.CenterY * k), window)!.Value;
-                        string? hit = x.PartAt(new Point(box.CenterX * k, box.CenterY * k));
+                        var p = canvas.TranslatePoint(new Point(on.X * k, on.Y * k), window)!.Value;
                         window.MouseMove(p);
                         window.MouseDown(p, MouseButton.Left);
                         window.MouseUp(p, MouseButton.Left);

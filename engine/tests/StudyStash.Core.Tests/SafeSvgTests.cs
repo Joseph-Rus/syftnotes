@@ -164,7 +164,7 @@ public class SafeSvgTests
     [Fact]
     public void An_illustration_keeps_its_colours_in_dark_moved_into_what_a_dark_page_carries()
     {
-        string art = Open + """<g id="hand"><title>Hand</title><rect width="5" height="5" fill="#F2C6A6" stroke="#A86F52"/></g><rect width="5" height="5" fill="#000000" stroke="#24272B"/><rect width="5" height="5" fill="#FAFAFA" stroke="#FFFFFF"/><linearGradient id="g"><stop offset="0" stop-color="#4A9AD1"/></linearGradient><text fill="#1D1D1F">Hand</text></svg>""";
+        string art = Open + """<g id="hand"><title>Hand</title><rect width="5" height="5" fill="#F2C6A6" stroke="#A86F52"/></g><rect width="5" height="5" fill="#000000" stroke="#24272B"/><rect width="200" height="100" fill="#FAFAFA" stroke="#FFFFFF"/><linearGradient id="g"><stop offset="0" stop-color="#4A9AD1"/></linearGradient><text fill="#1D1D1F">Hand</text><ellipse rx="3" ry="2" fill="#FCF6E8" fill-opacity="0.6"/></svg>""";
         var r = Clean(art, new SafeSvgOptions { Palette = Dark, Dark = true });
         var doc = XDocument.Parse(r.Svg!);
         var rects = doc.Descendants().Where(e => e.Name.LocalName == "rect").ToList();
@@ -176,11 +176,13 @@ public class SafeSvgTests
         Assert.InRange(Math.Abs(Hue(Fill(0)) - Hue("#f2c6a6")), 0, 0.15);
         Assert.InRange(L(Fill(0)), 0.75, 0.9);
         Assert.True(L(Stroke(0)) < L(Fill(0)));
-        // Black and near-black are lifted clear of the dark paper; a near-white background and white are paper.
+        // Black and near-black are lifted clear of the dark paper; a near-white background over the whole canvas is the
+        // paper, but a highlight (a light tint, or white) stays light.
         Assert.InRange(L(Fill(1)), 0.43, 0.5);
         Assert.True(L(Stroke(1)) > L(SvgPalette.DarkPaper.ToLowerInvariant()) + 0.15);
         Assert.Equal(SvgPalette.DarkPaper, Fill(2));
-        Assert.Equal(SvgPalette.DarkPaper, Stroke(2));
+        Assert.True(L(Stroke(2)) > 0.85);
+        Assert.True(L((string)doc.Descendants().Single(e => e.Name.LocalName == "ellipse").Attribute("fill")!) > 0.85);
         // Gradients follow, and the words keep the look's ink.
         Assert.NotEqual("#4A9AD1", (string?)doc.Descendants().Single(e => e.Name.LocalName == "stop").Attribute("stop-color"));
         Assert.Equal("#F5F5F7", (string?)doc.Descendants().Single(e => e.Name.LocalName == "text").Attribute("fill"));

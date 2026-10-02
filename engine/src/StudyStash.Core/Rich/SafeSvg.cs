@@ -190,7 +190,9 @@ public static partial class SafeSvg
         var map = options.Palette?.From(SvgPalette.Written);
         // An illustration's own colours are kept, and only moved into the lightness a dark page can carry.
         bool art = root.Descendants().Any(e => PartName(e) is not null);
-        var clean = Copy(root, options, map, art, depth: 0)!;
+        // A background an illustration left in (a near-white rectangle over the whole canvas) is the paper.
+        var grounds = art ? root.Descendants().Where(e => e.Name.LocalName == "rect" && Covers(e, box)).ToHashSet() : [];
+        var clean = Copy(root, options, map, art, grounds, depth: 0)!;
         clean.SetAttributeValue("viewBox", string.Create(CultureInfo.InvariantCulture, $"{box.X:0.###} {box.Y:0.###} {box.W:0.###} {box.H:0.###}"));
         clean.SetAttributeValue("width", null);
         clean.SetAttributeValue("height", null);
@@ -226,7 +228,7 @@ public static partial class SafeSvg
     }
 
     /// <summary>A copy of an allowed element with only its allowed attributes and children; null for anything else.</summary>
-    static XElement? Copy(XElement source, SafeSvgOptions options, IReadOnlyDictionary<string, string>? map, bool art, int depth)
+    static XElement? Copy(XElement source, SafeSvgOptions options, IReadOnlyDictionary<string, string>? map, bool art, HashSet<XElement> grounds, int depth)
     {
         if (source.Name.Namespace != Ns && source.Name.Namespace != XNamespace.None) return null;
         string name = source.Name.LocalName;
@@ -266,7 +268,10 @@ public static partial class SafeSvg
         {
             string value = raw;
             if (key == "font-family") continue;
-            if (Colours.Contains(key)) value = Recolour(value, options, map, art && name is not ("text" or "tspan"));
+            if (Colours.Contains(key))
+                value = grounds.Contains(source) && key == "fill" && options is { Dark: true, Palette: { } p } && NormalColour(value) is { } g && SvgColour.IsPaper(g)
+                    ? p.Paper
+                    : Recolour(value, options, map, art && name is not ("text" or "tspan"));
             copy.SetAttributeValue(key, value);
         }
         if (values.ContainsKey("font-family") && name != "svg") copy.SetAttributeValue("font-family", options.FontFamily);
@@ -275,7 +280,7 @@ public static partial class SafeSvg
         {
             if (node is XElement child)
             {
-                if (depth + 1 < MaxDepth && Copy(child, options, map, art, depth + 1) is { } kept) copy.Add(kept);
+                if (depth + 1 < MaxDepth && Copy(child, options, map, art, grounds, depth + 1) is { } kept) copy.Add(kept);
             }
             else if (node is XText text && name is "text" or "tspan" or "title" or "desc")
                 copy.Add(new XText(text.Value));
@@ -305,9 +310,10 @@ public static partial class SafeSvg
         if (map is null) return value;
         string? key = NormalColour(value);
         if (key is null) return value;
-        // In an illustration black is a colour like any other (a motor's body, a shadow), not the ink words are in.
-        if (!(art && key == "#000000") && map.TryGetValue(key, out var ours)) return ours;
-        if (options.Dark && art && options.Palette is { } paper && key.StartsWith('#')) return SvgColour.ForDark(key, paper.Paper);
+        // In an illustration black and white are colours like any other (a motor's body, a highlight), not the ink words
+        // are in or the paper.
+        if (!(art && key is "#000000" or "#ffffff") && map.TryGetValue(key, out var ours)) return ours;
+        if (options.Dark && art && key.StartsWith('#')) return SvgColour.ForDark(key);
         if (options.Dark && options.Palette is { } palette && Lightness(key) is { } l)
         {
             if (l < 0.3) return palette.Ink;
@@ -383,6 +389,16 @@ public static partial class SafeSvg
         string v = value.Trim();
         if (v.EndsWith("px", StringComparison.OrdinalIgnoreCase)) v = v[..^2];
         return double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out double d) ? d : null;
+    }
+
+    /// <summary>A rectangle over (nearly) the whole canvas, as written (no transform).</summary>
+    static bool Covers(XElement rect, Rect box)
+    {
+        if (rect.Attribute("transform") is not null) return false;
+        double x = Length((string?)rect.Attribute("x")) ?? 0, y = Length((string?)rect.Attribute("y")) ?? 0;
+        string? w = (string?)rect.Attribute("width"), h = (string?)rect.Attribute("height");
+        double width = w?.Trim() == "100%" ? box.W : Length(w) ?? 0, height = h?.Trim() == "100%" ? box.H : Length(h) ?? 0;
+        return x <= box.X + box.W * 0.03 && y <= box.Y + box.H * 0.03 && x + width >= box.X + box.W * 0.97 && y + height >= box.Y + box.H * 0.97;
     }
 
     static bool Sane(Rect r) =>
