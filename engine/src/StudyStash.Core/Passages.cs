@@ -103,6 +103,12 @@ public static partial class Passages
                 var drawing = SafeSvg.Clean(block.Text);
                 var texts = drawing.Texts.Where(t => t.Trim().Length > 0).ToList();
                 if (drawing.Title.Length > 0 && !texts.Contains(drawing.Title)) texts.Insert(0, drawing.Title);
+                // An illustration's parts are found by their names and what it says of each ("rotor" finds the drone).
+                foreach (var part in drawing.Parts)
+                {
+                    texts.Remove(part.Name);
+                    texts.Add(part.Note.Length > 0 ? $"{part.Name} ({part.Note})" : part.Name);
+                }
                 return texts.Count == 0 ? "" : DiagramPrefix + string.Join(", ", texts);
             case NoteBlockKind.Math:
                 return block.Text.Trim();

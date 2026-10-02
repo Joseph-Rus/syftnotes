@@ -53,7 +53,7 @@ public static class DiagramWindow
                 if (ReferenceEquals(Current, w)) Current = null;
             };
             var natural = Natural(request);
-            var (width, height) = Size(natural.WithHeight(natural.Height + (request.Chart is not null ? Chrome : 48) / Grow), Area(from ?? w));
+            var (width, height) = Size(natural.WithHeight(natural.Height + (request.Chart is not null || Illustrated(request) ? Chrome : 48) / Grow), Area(from ?? w));
             w.Width = width;
             w.Height = height;
             Current = w;
@@ -65,6 +65,7 @@ public static class DiagramWindow
         // The keyboard starts on the diagram (a flowchart, or a drawing's stage), so its keys work at once; nothing is
         // left focused in what the window showed before.
         Control? keys = (Control?)content.GetLogicalDescendants().OfType<DiagramView>().FirstOrDefault()
+            ?? (Control?)content.GetLogicalDescendants().OfType<SvgView>().FirstOrDefault(v => v.Explorer is not null)
             ?? content.GetLogicalDescendants().OfType<Panel>().FirstOrDefault(p => p.Focusable);
         if (keys is not null) keys.Focus(NavigationMethod.Pointer);
         else w.Focus();
@@ -75,7 +76,7 @@ public static class DiagramWindow
     /// pans, on the window's ground.</summary>
     internal static Control Content(OpenDiagramEventArgs request)
     {
-        Control content = request.Chart is { } chart ? Chart(request, chart) : Drawing(request);
+        Control content = request.Chart is { } chart ? Chart(request, chart) : Illustrated(request) ? Illustration(request) : Drawing(request);
         var ground = new Border { Child = content };
         ground.Bind(Border.BackgroundProperty, ground.GetResourceObservable(Skin.Current == SkinKind.Mac ? "Win" : "Mica"));
         return ground;
@@ -91,6 +92,27 @@ public static class DiagramWindow
         view.Chart = chart;
         var chrome = view.Chrome!;
         // A question asked, or a moment found, here goes to the lecture the note is on: its window comes forward.
+        view.Explorer!.AskedFromWindow = () => (TopLevel.GetTopLevel(origin) as Window)?.Activate();
+        var dock = new DockPanel();
+        DockPanel.SetDock(chrome.Tools, Dock.Top);
+        DockPanel.SetDock(chrome.Strip, Dock.Bottom);
+        dock.Children.Add(chrome.Tools);
+        dock.Children.Add(chrome.Strip);
+        dock.Children.Add(view);
+        return dock;
+    }
+
+    /// <summary>A drawing whose parts are named (an illustration).</summary>
+    static bool Illustrated(OpenDiagramEventArgs request) => request.Svg is { } svg && Core.Rich.SafeSvg.Clean(svg).Illustrated;
+
+    /// <summary>An illustration, explored as in its note but larger: its toolbar across the top (zoom, labels, the
+    /// tour, test yourself, the moment of the lecture) and a strip along the bottom naming the part the pointer is on.</summary>
+    static Control Illustration(OpenDiagramEventArgs request)
+    {
+        var origin = request.Source as Control;
+        var view = new SvgView(opensLarger: false) { Origin = origin, MaxScale = MaxScale };
+        view.Source = request.Svg;
+        var chrome = view.Chrome!;
         view.Explorer!.AskedFromWindow = () => (TopLevel.GetTopLevel(origin) as Window)?.Activate();
         var dock = new DockPanel();
         DockPanel.SetDock(chrome.Tools, Dock.Top);
