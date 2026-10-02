@@ -199,6 +199,24 @@
   max-width: 100%;
   height: auto;
 }
+/* An illustration's parts, under it: each one's name and what the drawing says of it. */
+.prose figure.diagram details.parts {
+  margin-top: 0.4em;
+  text-align: left;
+  font-size: 14px;
+}
+.prose figure.diagram details.parts summary {
+  color: var(--fg2);
+  cursor: pointer;
+}
+.prose figure.diagram details.parts dt {
+  font-weight: 600;
+  margin-top: 0.4em;
+}
+.prose figure.diagram details.parts dd {
+  margin: 0;
+  color: var(--fg2);
+}
 .prose table {
   width: 100%;
   border-collapse: collapse;

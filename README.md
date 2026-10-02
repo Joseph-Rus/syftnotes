@@ -200,6 +200,20 @@ on a loss surface, what a matrix does to the plane), a plot of it. A lecture get
 drawing — up to four for a long one — one under about three minutes gets none, and so does a
 lecture of discussion, admin or definitions.
 
+A lecture that describes a physical thing at length — a drone's frame, motors and battery, the
+bones and tendons of the hand, the heart cut open, a circuit board, a robot arm — can also get an
+**illustration**: a detailed, labelled drawing of the thing itself, like a figure in a textbook.
+The designer plans it (the view, where things go, and the parts the lecturer named, each with a line
+from what was said), then the same engine draws it in a house style: soft flat colours by material,
+gentle shading, every part outlined in its own colour, labels in columns with leader lines. Its
+labels must be the lecture's words or it's left out; labels that crowd or run off the edge are
+spaced out automatically, and one that still looks wrong (a part missing, a leader that misses its
+part, drawn too simply) goes back once while there's time. It's clean, stylised vector art, not a
+photograph, and only an engine that draws well is asked (Claude Code, Codex, Gemini — never a local
+Ollama model). A lecture gets one, two for a long one. A detailed drawing is long to write out (8 to
+14 minutes with Claude Code's Opus), so a lecture that gets one has its notes up to 18 minutes after
+its transcript, rather than 8.
+
 - **Automatic** (the default) uses the strongest engine that already reads your lectures — the one
   that writes your notes or answers your questions — trying Claude Code (Opus, high effort), then
   Codex (high effort), then Gemini (3.1 Pro); otherwise the biggest model Ollama runs on the
@@ -217,7 +231,7 @@ big chart with no groups) goes back once with what's wrong, while there's time, 
 used only when it's better; a plot is worked out at its sliders' starting values and ends, and one
 that's flat, undefined, off its axes or has a slider that changes nothing goes back the same way. If
 the diagrams can't be designed (the engine is busy, over its limit,
-or takes longer than 8 minutes), the notes are kept exactly as written. The library's log says
+or takes longer than 8 minutes, 18 with an illustration), the notes are kept exactly as written. The library's log says
 what was drawn and redesigned, or why nothing was.
 
 ## Notes
@@ -236,6 +250,13 @@ the notes, in a quick answer and in the Ask chat:
   caption and the moment of the lecture it comes from; rewriting a lecture's notes designs them
   again rather than adding more. Either kind opens larger on a click, and a diagram Study Stash
   can't draw shows its source with a plain reason instead of failing.
+- **Illustrations**: a drawing of a thing the lecture described has parts you can point at. The
+  pointer over a part lights it (and shows its name, even with the labels off) while the rest dims;
+  a click pins it with its name, its line from the lecture, **Explain this**, **Quiz me**, **Where
+  was this said?** and **Zoom in**. The labels turn off and on (L), **Tour the parts** walks them in
+  the order their labels are read, and **Test yourself** hides every label: name each part to
+  yourself and click it to check, with a small score. Search and Ask find an illustration by its
+  parts and what it says of each; the phone lists them under it, and so does the Markdown download.
 - **Studying from a diagram**: on screen a flowchart is there to explore, not just look at. The
   pointer over a box lights it, its arrows and the boxes they join while the rest dims; a click pins
   it, with **Explain this** and **Quiz me** (asked in the lecture's own Ask bar) and **Where was this

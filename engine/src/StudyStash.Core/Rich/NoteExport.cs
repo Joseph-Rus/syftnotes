@@ -158,6 +158,15 @@ public static class NoteExport
                     string path = $"{stem}.assets/diagram-{++diagramIndex}.svg";
                     assets.Add(new ExportAsset(path, svg));
                     output.Add($"{indent}![Diagram: {(cleaned.Title.Length > 0 ? cleaned.Title : "Diagram")}]({EncodePath(path)})");
+                    // An illustration's parts, each with what the drawing says of it, so the file still teaches them.
+                    if (cleaned.Parts.Count > 0)
+                    {
+                        output.Add("");
+                        // Plain words only: a name that looks like markup is shown, never run, by whatever opens the file.
+                        static string Plain(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("*", "\\*");
+                        foreach (var part in cleaned.Parts)
+                            output.Add($"{indent}- **{Plain(part.Name)}**" + (part.Note.Length > 0 ? $": {Plain(part.Note)}" : ""));
+                    }
                 }
                 else
                 {
