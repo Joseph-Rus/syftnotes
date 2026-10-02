@@ -623,14 +623,14 @@ public sealed class Plot
         }
         if (item is not null)
         {
+            if (colour is not null) canon.Append(' ').Append(colour);
+            if (dash is not null) canon.Append(' ').Append(dash);
+            foreach (string w in extra.Where(words.Contains)) canon.Append(' ').Append(w);
             if (label is not null)
             {
                 labels.Add(new Pending(lineNumber, () => item.Label = PlotLabel.Read(label, Scope, locals)));
                 canon.Append(" \"").Append(label).Append('"');
             }
-            if (colour is not null) canon.Append(' ').Append(colour);
-            if (dash is not null) canon.Append(' ').Append(dash);
-            foreach (string w in extra.Where(words.Contains)) canon.Append(' ').Append(w);
             item.Canonical += canon.ToString();
         }
         return words;

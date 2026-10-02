@@ -54,12 +54,11 @@ public static class PlotSampler
 
         void Refine(double xl, double yl, double xr, double yr, int depth)
         {
-            bool split = false;
-            double xm = 0, ym = 0;
-            if (depth < depthLimit && (xr - xl) * map.Sx > 1e-3 && env.FrameLeft > 0)
+            bool narrow = depth >= depthLimit || (xr - xl) * map.Sx <= 1e-3;
+            if (!narrow && env.FrameLeft > 0)
             {
-                xm = 0.5 * (xl + xr);
-                ym = f(xm);
+                double xm = 0.5 * (xl + xr), ym = f(xm);
+                bool split = false;
                 bool fl = double.IsFinite(yl), fm = double.IsFinite(ym), fr = double.IsFinite(yr);
                 if (fl != fm || fm != fr) split = (xr - xl) * map.Sx > 0.05;
                 else if (fl && fm && fr && !(Off(yl, 1) && Off(ym, 1) && Off(yr, 1)) && !(Off(yl, -1) && Off(ym, -1) && Off(yr, -1)))
@@ -68,15 +67,16 @@ public static class PlotSampler
                     double bend = Math.Abs(sym - 0.5 * (syl + syr));
                     split = bend > Tolerance || Math.Abs(syl - syr) > map.Height * 0.5;
                 }
+                if (split)
+                {
+                    Refine(xl, yl, xm, ym, depth + 1);
+                    Refine(xm, ym, xr, yr, depth + 1);
+                    return;
+                }
             }
-            if (split)
-            {
-                Refine(xl, yl, xm, ym, depth + 1);
-                Refine(xm, ym, xr, yr, depth + 1);
-                return;
-            }
-            // A stretch that still jumps most of the screen once it's as narrow as it gets is a jump, not a line.
-            bool jump = double.IsFinite(yl) && double.IsFinite(yr) && depth >= depthLimit - 1 && Math.Abs(Sy(yl) - Sy(yr)) > Math.Max(4, map.Height * 0.25);
+            // A stretch that still rises or falls a few pixels once it's a tiny fraction of a pixel wide is a jump (a step,
+            // an asymptote), not a line.
+            bool jump = narrow && double.IsFinite(yl) && double.IsFinite(yr) && Math.Abs(Sy(yl) - Sy(yr)) > 3;
             raw.Add((xr, yr, jump || !double.IsFinite(yl)));
         }
 
