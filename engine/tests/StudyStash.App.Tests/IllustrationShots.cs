@@ -83,6 +83,53 @@ public class IllustrationShots
         }
     }
 
+    /// <summary>The same drawing opened larger: its toolbar across the top, a part pointed at, the strip naming it.</summary>
+    [AvaloniaFact]
+    public void Illustration_opened_larger()
+    {
+        string svg = Environment.GetEnvironmentVariable("STUDYSTASH_ILLUSTRATION") is { Length: > 0 } path && File.Exists(path) ? File.ReadAllText(path) : IllustrationViewTests.Drone;
+        string name = Environment.GetEnvironmentVariable("STUDYSTASH_ILLUSTRATION_NAME") is { Length: > 0 } n ? n : "drone";
+        Platform.Motion.Override = true;
+        try
+        {
+            foreach (var (skin, t) in new[] { (SkinKind.Mac, ThemeVariant.Light), (SkinKind.Win, ThemeVariant.Dark) })
+            {
+                Skin.UseTheme(ColourThemes.Default);
+                ((App)Application.Current!).UseSkin(skin);
+                var request = new OpenDiagramEventArgs(new Border()) { Title = "Illustration", Svg = svg };
+                var natural = Windows.DiagramWindow.Natural(request);
+                var (w, h) = Windows.DiagramWindow.Size(natural.WithHeight(natural.Height + 92 / 1.5), new Size(1440, 900));
+                var content = new Border { Width = w, Height = h, Child = Windows.DiagramWindow.Content(request) };
+                var window = new Window { Width = w, Height = h, RequestedThemeVariant = t, Content = content };
+                Look.Apply(window);
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                var view = window.GetVisualDescendants().OfType<SvgView>().Single();
+                var x = view.Explorer!;
+                var until = DateTime.UtcNow.AddSeconds(30);
+                while (x.Map is null && DateTime.UtcNow < until)
+                {
+                    Thread.Sleep(5);
+                    Dispatcher.UIThread.RunJobs();
+                }
+                var part = x.Parts.OrderByDescending(p => p.Note.Length).Skip(1).First();
+                if (x.Map?.Inside(part.Id) is { } on)
+                {
+                    var canvas = view.GetVisualDescendants().OfType<SvgCanvas>().Single();
+                    double k = canvas.Bounds.Width / x.Drawing!.Width;
+                    window.MouseMove(canvas.TranslatePoint(new Point(on.X * k, on.Y * k), window)!.Value);
+                    Dispatcher.UIThread.RunJobs();
+                }
+                Save($"illustration-{name}-window-{(skin == SkinKind.Mac ? "mac" : "win")}", t, window, new Size(w, h));
+                window.Close();
+            }
+        }
+        finally
+        {
+            Platform.Motion.Override = null;
+        }
+    }
+
     static void Save(string name, ThemeVariant variant, Window window, Size size)
     {
         var whole = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");

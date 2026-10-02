@@ -119,6 +119,7 @@ public sealed class IllustrationViewTests : IDisposable
         Mapped(view);
         var canvas = Picture(view);
         Assert.Null(canvas.Look); // untouched, it's the still picture
+        Assert.Equal(SvgView.Natural(400), canvas.Bounds.Width, 1); // at its own size, as a plain drawing is
         Assert.Equal(["frame", "motor", "battery"], view.Explorer!.Parts.Select(p => p.Id)); // the order its labels are read
 
         window.MouseMove(At(view, 120, 90));
