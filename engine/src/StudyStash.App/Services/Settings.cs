@@ -197,6 +197,12 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     }
     List<WhisperModel> spare = [];
     [ObservableProperty] public partial string Language { get; set; } = "";
+    /// <summary>When a lecture is written down: as it records (the recorder's transcript and chat), or after class
+    /// (it only records, which saves battery). One setting, for the next lecture on.</summary>
+    [ObservableProperty] public partial bool LiveTranscript { get; set; } = true;
+    public bool AfterClass => !LiveTranscript;
+    /// <summary>Under the choice, while a lecture records the other way: it stays as it started.</summary>
+    [ObservableProperty] public partial string LiveTranscriptLine { get; set; } = "";
     [ObservableProperty] public partial bool ComputerAudio { get; set; }
     [ObservableProperty] public partial bool Speakers { get; set; }
     /// <summary>Under "Tell speakers apart": what it does, or where its model is.</summary>
@@ -370,6 +376,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         DisplayName = cc.DisplayName;
         LibraryHere = host.Settings.LibraryHere;
         Language = host.Settings.Language;
+        LiveTranscript = host.Settings.LiveTranscript;
         ComputerAudio = host.Settings.ComputerAudio;
         Speakers = host.Settings.Speakers;
         SpeakersLine = SpeakersWords(host);
@@ -486,6 +493,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         ShortcutsSay = Shell.ShortcutsSay();
         ModelLine = ModelWords(host);
         SpeakersLine = SpeakersWords(host);
+        LiveTranscriptLine = LiveTranscriptWords(host.Recorder.Current, host.Settings.LiveTranscript);
         ModelAdviceLine = AdviceWords(host.Model, advice);
         ModelDownloading = host.Downloading is not null;
         ModelProgress = host.Downloading?.Fraction ?? 0;
@@ -557,6 +565,25 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     {
         if (!loading) host.Save(s => s.Language = value.Trim());
     }
+
+    [RelayCommand] void PickLiveTranscript(string when) => LiveTranscript = when == "live";
+
+    partial void OnLiveTranscriptChanged(bool value)
+    {
+        OnPropertyChanged(nameof(AfterClass));
+        if (loading) return;
+        host.Save(s => s.LiveTranscript = value);
+        LiveTranscriptLine = LiveTranscriptWords(host.Recorder.Current, value);
+    }
+
+    /// <summary>The line under "When it's written down": nothing, unless the lecture recording now started the other
+    /// way, which it keeps (a lecture is written down one way, start to end).</summary>
+    public static string LiveTranscriptWords(Lecture? recording, bool live) => recording switch
+    {
+        { AfterClass: true } when live => "The lecture recording now is still written down after class. The next one is written down as you record.",
+        { AfterClass: false } when !live => "The lecture recording now is still written down as you record. The next one is written down after class.",
+        _ => "",
+    };
 
     partial void OnComputerAudioChanged(bool value)
     {

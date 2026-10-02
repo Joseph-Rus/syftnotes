@@ -145,7 +145,10 @@ public static class WhisperModels
     /// The heaviest (most accurate) model that keeps up with a lecture on this computer, and one plain line why.
     /// <para>
     /// A lecture is written down live, a 30-second piece at a time, so the model has to finish each piece well inside
-    /// 30 seconds or the transcript falls further behind all lecture. What decides that:
+    /// 30 seconds or the transcript falls further behind all lecture. Written down after class (Settings → Recording)
+    /// it's the same pieces and the same model, so the same pick: on Apple silicon large-v3 already keeps up live (on
+    /// an M3 Pro, 12 minutes of lecture took it 81 s after class), and on the processor alone the compact turbo took
+    /// twice Parakeet's energy for a transcript about as close to large-v3's (engine/tools/TranscribeBench). What decides it:
     /// </para>
     /// <list type="bullet">
     /// <item>Apple silicon runs Whisper on its graphics (Metal) with memory the chip shares: large-v3 keeps up on every
@@ -417,16 +420,33 @@ public sealed class WhisperTranscriber : ITranscriber
 {
     readonly WhisperFactory factory;
     readonly string fixedLanguage;
+    readonly bool gpu;
 
     /// <param name="language">"" or "auto" finds each lecture's language; "en" and so on fixes it.</param>
-    public WhisperTranscriber(string modelPath, string language = "")
+    /// <param name="gpu">False keeps it on the processor even where there's a GPU (to measure a computer without one).</param>
+    public WhisperTranscriber(string modelPath, string language = "", bool gpu = true)
     {
-        factory = WhisperFactory.FromPath(modelPath);
+        factory = WhisperFactory.FromPath(modelPath, new WhisperFactoryOptions { UseGpu = gpu });
+        this.gpu = gpu;
         fixedLanguage = language is "auto" ? "" : language;
     }
 
     /// <summary>Which of whisper.cpp's builds loaded (it says whether the GPU is in use).</summary>
     public static string Runtime => WhisperFactory.GetRuntimeInfo() ?? "";
+
+    /// <summary>For the log: what this model runs on (Metal, Vulkan or the processor), and whisper.cpp's own line about
+    /// the build it loaded ("MTL" in it is Metal).</summary>
+    public string Backend
+    {
+        get
+        {
+            var loaded = Whisper.net.LibraryLoader.RuntimeOptions.LoadedLibrary;
+            string info = Runtime.Trim().TrimEnd('|').Trim();
+            string on = !gpu ? "the processor" : info.Contains("MTL", StringComparison.Ordinal) ? "Metal"
+                : loaded is Whisper.net.LibraryLoader.RuntimeLibrary.Vulkan ? "Vulkan" : "the processor";
+            return $"{on} (whisper.cpp's {loaded?.ToString() ?? "unknown"} build: {info})";
+        }
+    }
 
     public async Task<Transcription> TranscribeAsync(float[] samples, string prompt, string language, CancellationToken stop)
     {

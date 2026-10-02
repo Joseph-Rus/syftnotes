@@ -560,8 +560,10 @@ public static partial class Shell
         {
             liveId = l.Id;
             recorder.Lines.Clear();
-            recorder.Ask = LiveAsk();
-            recorder.Waiting = "What's said shows here a few seconds after it's said.";
+            // Written down after class: nothing to show or ask about until it stops, and the recorder says so.
+            recorder.AfterClass = l.AfterClass;
+            recorder.Ask = l.AfterClass ? null : LiveAsk();
+            panel.LastLine = l.AfterClass ? "Only recording. It's written down after class." : "";
             panelWindow?.Hide();
             ShowRecorder(expanded: false);
         }
@@ -1540,6 +1542,8 @@ public static partial class Shell
     /// <summary>The dropdown's recent lectures: this laptop's (where each is on its way), newest first.</summary>
     static void RefreshRecent()
     {
+        // A lecture written down after class is recording: one still waiting for Whisper waits until it stops too.
+        bool inClass = host.Recorder.Current is { AfterClass: true };
         var items = host.Lectures.All().Where(l => l.Id != liveId).Take(4).Select(l =>
         {
             int color = host.ColorOf(l.FiledClass.Length > 0 ? l.FiledClass : l.ClassName);
@@ -1550,6 +1554,7 @@ public static partial class Shell
                 Title = l.FiledTitle.Length > 0 ? l.FiledTitle : l.ClassName.Length > 0 ? $"{l.ClassName} lecture" : "Lecture",
                 Detail = l.State switch
                 {
+                    LectureState.Transcribing when inClass => $"Transcribing after this class ({Math.Round(l.Progress * 100)}%)",
                     LectureState.Transcribing => $"Transcribing {Math.Round(l.Progress * 100)}%",
                     LectureState.Sending => host.Library == LibraryState.Connected ? "Sending…" : "Waiting for your library",
                     LectureState.Writing => "Writing notes…",

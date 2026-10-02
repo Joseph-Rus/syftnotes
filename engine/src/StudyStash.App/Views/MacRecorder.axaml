@@ -92,8 +92,9 @@
             </Border>
           </Grid>
 
-          <!-- Ask about this lecture, with any engine (design 16) -->
-          <v:MacAiAskChat Name="AskChat" DockPanel.Dock="Bottom" Margin="12,4,12,12" DataContext="{Binding Ask}" />
+          <!-- Ask about this lecture, with any engine (design 16); none for one written down after class -->
+          <v:MacAiAskChat Name="AskChat" DockPanel.Dock="Bottom" Margin="12,4,12,12" DataContext="{Binding Ask}"
+                          IsVisible="{Binding $parent[UserControl].((vm:RecorderModel)DataContext).Live}" />
 
           <!-- What's been said, newest at the bottom, fading out toward the top -->
           <ScrollViewer Name="Heard" Padding="20,0,20,16" VerticalScrollBarVisibility="Hidden">

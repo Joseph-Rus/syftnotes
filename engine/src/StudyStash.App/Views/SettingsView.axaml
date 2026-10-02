@@ -903,6 +903,38 @@
                     <Button Classes="pill primary" Command="{Binding RemoveSpareCommand}"><TextBlock Text="Remove" FontSize="13" FontWeight="Medium" /></Button>
                   </StackPanel>
                 </StackPanel>
+                <!-- When a lecture is written down: one choice, the model's cards' look. -->
+                <TextBlock Classes="section" Text="When it's written down" />
+                <StackPanel Width="480" HorizontalAlignment="Left" ClipToBounds="False">
+                  <Button Name="WrittenAsYouRecord" Classes="quiet card" Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
+                          Command="{Binding PickLiveTranscriptCommand}" CommandParameter="live">
+                    <Panel>
+                      <Border Classes="focusring cardring" Margin="-4" />
+                      <Border Classes="choice" Classes.on="{Binding LiveTranscript}">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="As you record" FontSize="13" FontWeight="SemiBold" />
+                          <TextBlock Text="The recorder shows the transcript as the lecture goes, and you can ask about what's been said so far."
+                                     FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Border>
+                    </Panel>
+                  </Button>
+                  <Button Name="WrittenAfterClass" Classes="quiet card" Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
+                          Command="{Binding PickLiveTranscriptCommand}" CommandParameter="after">
+                    <Panel>
+                      <Border Classes="focusring cardring" Margin="-4" />
+                      <Border Classes="choice" Classes.on="{Binding AfterClass}">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="After class" FontSize="13" FontWeight="SemiBold" />
+                          <TextBlock Text="Only records during the lecture, which saves battery. It's written down once you stop, so the transcript, and asking about it, come then."
+                                     FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Border>
+                    </Panel>
+                  </Button>
+                </StackPanel>
+                <TextBlock Classes="say" Text="{Binding LiveTranscriptLine}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left"
+                           IsVisible="{Binding LiveTranscriptLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <TextBlock Classes="section" Text="Language" />
                 <Border Classes="field" Width="240" HorizontalAlignment="Left"><TextBox Classes="bare" Text="{Binding Language}" PlaceholderText="Found for each lecture (or en, es, fr…)" FontSize="13" /></Border>
                 <CheckBox IsVisible="{Binding CanRecordComputerAudio}" IsChecked="{Binding ComputerAudio}" Margin="0,16,0,0">

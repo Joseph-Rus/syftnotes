@@ -94,8 +94,9 @@
           </StackPanel>
         </Grid>
 
-        <!-- Ask about this lecture, with any engine (design 16) -->
-        <Border DockPanel.Dock="Bottom" Background="{DynamicResource Footer}" BorderBrush="{DynamicResource Sep}" BorderThickness="0,1,0,0">
+        <!-- Ask about this lecture, with any engine (design 16); none for one written down after class -->
+        <Border DockPanel.Dock="Bottom" Background="{DynamicResource Footer}" BorderBrush="{DynamicResource Sep}" BorderThickness="0,1,0,0"
+                IsVisible="{Binding Live}">
           <v:WinAiAskChat Name="AskChat" Margin="16,14,16,16" DataContext="{Binding Ask}" />
         </Border>
 

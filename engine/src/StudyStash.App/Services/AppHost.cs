@@ -46,6 +46,10 @@ public sealed class AppSettings
     public bool ParakeetFailed { get; set; }
     /// <summary>Tell the voices in a lecture apart once it's written down, and say who's speaking in the transcript.</summary>
     public bool Speakers { get; set; }
+    /// <summary>Write a lecture down as it records (the recorder shows the transcript and can be asked about it); off,
+    /// after class: it only records, and is written down once it stops, which saves battery during the lecture. A
+    /// change applies from the next lecture.</summary>
+    public bool LiveTranscript { get; set; } = true;
     /// <summary>Filed lectures' audio is deleted after this many days (the notes and transcript stay). 0 keeps it.</summary>
     public int KeepAudioDays { get; set; } = 30;
     /// <summary>"Download as Markdown…" includes the transcript too (Settings' words: "Include transcripts").</summary>
@@ -430,7 +434,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// download, a Whisper that couldn't start).</summary>
     public (string Title, string Text)? FallingBehind()
     {
-        if (Recorder.Current is not { State: LectureState.Recording } live || !ModelReady || WhisperProblem is not null) return null;
+        // One written down after class isn't written down while it records, so it's never behind.
+        if (Recorder.Current is not { State: LectureState.Recording, AfterClass: false } live || !ModelReady || WhisperProblem is not null) return null;
         return BehindWords(Recorder.Elapsed, live.TranscribedSeconds, Model, Advice);
     }
 
@@ -480,12 +485,21 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     {
         if (!ModelReady) throw new InvalidOperationException("The transcription model isn't downloaded yet.");
         engineName = ModelFile is null && Model.Engine == SpeechEngine.Parakeet ? "Parakeet" : "Whisper";
-        if (engineName == "Whisper") return new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
+        string name = ModelFile is null ? Model.Name : Path.GetFileName(ModelFile);
+        if (engineName == "Whisper")
+        {
+            var whisper = new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
+            // Where the time goes, for a student's log: the GPU (Metal, Vulkan) or the processor.
+            log($"[whisper] {name} runs on {whisper.Backend}");
+            return whisper;
+        }
         if (!ParakeetLanguages.Knows(Settings.Language))
             throw new InvalidOperationException($"Parakeet doesn't read \"{Settings.Language}\": pick a Whisper model in Settings → Recording, or leave the language empty.");
         try
         {
-            return new ParakeetTranscriber(WhisperModels.PathFor(Home, Model), Settings.Language);
+            var parakeet = new ParakeetTranscriber(WhisperModels.PathFor(Home, Model), Settings.Language);
+            log($"[whisper] {name} runs on {parakeet.Backend}");
+            return parakeet;
         }
         catch (Exception e) when (e is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException)
         {
@@ -785,8 +799,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     {
         if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
         var calendar = CalendarStart(className);
-        var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName), calendar);
+        var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName, afterClass: !Settings.LiveTranscript), calendar);
         awake ??= new KeepAwake("Recording a lecture");
+        // Live, Whisper starts on it; after class, the look lets go of a model still loaded from the lecture before.
         Whisper.Wake();
         return l;
     }

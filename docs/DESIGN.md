@@ -31,7 +31,10 @@ laptop                                          library (a Mac mini, say — any
 
 1. **Record.** The app opens the microphone (`IAudioSource`), and Whisper transcribes it locally as
    it goes (`ITranscriber`), a piece at a time, carrying the previous piece's words as a prompt so
-   names and terms stay spelled the same.
+   names and terms stay spelled the same. With Settings → Recording's "After class" the lecture is
+   only recorded (`Lecture.AfterClass`: nothing is transcribed and no model is loaded while it records
+   or is paused) and the same pieces are transcribed from its WAV once it stops.
+   `engine/tools/TranscribeBench` measures what each way costs on a real lecture.
 2. **Pick a class, or don't.** Record lets the library sort the lecture unless the student picks a
    class in the dropdown; a lecture recorded with no class is sent with an empty `folder`.
 3. **Send it.** `LectureSender` POSTs the lecture (`Lecture.Payload()`) to `/api/ingest` once the
