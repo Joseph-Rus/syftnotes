@@ -30,8 +30,13 @@ public static partial class IllustrationDesign
     /// <summary>The drawing's width, in its own units; its height is the illustrator's, up to <see cref="MaxHeight"/>.</summary>
     public const int Width = 720, MaxHeight = 760;
 
-    /// <summary>How much time must be left for an illustration that would look wrong to go back once.</summary>
+    /// <summary>How much time must be left for an illustration that would look wrong to go back once (only what changes
+    /// comes back, so a fix is quicker than the drawing).</summary>
     public static readonly TimeSpan RevisionRoom = TimeSpan.FromSeconds(200);
+
+    /// <summary>How long a diagram pass that draws an illustration may take, all told: the designer's few minutes and
+    /// the drawing's (8 to 14 minutes for a detailed one, written out shape by shape).</summary>
+    public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(18);
 
     /// <summary>How many illustrations a lecture may get: none when it's too short for a diagram, else one (two for a
     /// long lecture).</summary>

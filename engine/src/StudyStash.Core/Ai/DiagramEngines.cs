@@ -32,9 +32,10 @@ public static class DiagramEngines
     /// model_reasoning_effort).</summary>
     public static string TopEffort(string engine) => engine is "claude" or "codex" ? "high" : "";
 
-    /// <summary>The reasoning effort an illustration is drawn with: the plan is already made, and a detailed drawing is
-    /// long to write out, so less thinking keeps it within the pass's time without making it worse.</summary>
-    public static string DrawEffort(string engine) => engine is "claude" or "codex" ? "medium" : "";
+    /// <summary>The reasoning effort an illustration is drawn with: the plan is already made and a detailed drawing is
+    /// long to write out, so the least thinking keeps it within the pass's time; drawn at low, medium and high effort the
+    /// pictures were alike, and only the time grew.</summary>
+    public static string DrawEffort(string engine) => engine is "claude" or "codex" ? "low" : "";
 
     /// <summary>
     /// Who designs the diagrams for notes written by <paramref name="notesEngine"/>, or null when nobody does (diagrams

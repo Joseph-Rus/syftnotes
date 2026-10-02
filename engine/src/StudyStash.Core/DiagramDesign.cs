@@ -465,10 +465,11 @@ public static partial class DiagramDesign
     /// redesign that draws, stays true and looks better takes its draft's place. A reply that can't be used, or a
     /// lecture too short, leaves <paramref name="notes"/> exactly as given. Only <paramref name="ask"/>'s own failures
     /// in the first design (and cancelling) throw; a revision that fails or runs late keeps the drafts. An illustration
-    /// the designer plans is drawn with <paramref name="draw"/> (<paramref name="ask"/> when there's none).
+    /// the designer plans is drawn with <paramref name="draw"/> (<paramref name="ask"/> when there's none), in
+    /// <see cref="IllustrationDesign.Timeout"/> from the start, the caller told so through <paramref name="longer"/>.
     /// </summary>
     public static async Task<DesignResult> DesignAsync(Meeting m, string notes, Drawings drawings, Func<string, bool, Task<string>> ask,
-        int maxPromptChars = int.MaxValue, TimeSpan? budget = null, Func<string, Task<string>>? draw = null)
+        int maxPromptChars = int.MaxValue, TimeSpan? budget = null, Func<string, Task<string>>? draw = null, Action<TimeSpan>? longer = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         int cap = Cap(m.Transcript);
@@ -479,8 +480,11 @@ public static partial class DiagramDesign
         var drawn = new List<DesignedDiagram>();
         var dropped = reply.Dropped.ToList();
         string grounds = (TimedText.Plain(m.Transcript) + "\n" + clean).ToLowerInvariant();
-        // Illustrations are drawn while the diagrams are checked, each in its own time.
-        var illustrating = IllustrationDesign.DrawAllAsync(m, clean, reply.Illustrations, grounds, draw ?? (prompt => ask(prompt, false)), () => (budget ?? Timeout) - clock.Elapsed, maxPromptChars);
+        // Illustrations are drawn while the diagrams are checked, in a time of their own: a detailed drawing takes several
+        // minutes, so a pass that draws one may run longer (the caller is told how long, all told).
+        if (reply.Illustrations.Count > 0) longer?.Invoke(IllustrationDesign.Timeout);
+        var illustrating = IllustrationDesign.DrawAllAsync(m, clean, reply.Illustrations, grounds, draw ?? (prompt => ask(prompt, false)),
+            () => (budget is { } b && longer is null ? b : IllustrationDesign.Timeout) - clock.Elapsed, maxPromptChars);
         foreach (var d in reply.Diagrams)
         {
             if (drawn.Count >= cap)

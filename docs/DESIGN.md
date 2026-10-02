@@ -46,7 +46,10 @@ laptop                                          library (a Mac mini, say — any
    each out) — answers in JSON that's checked strictly, and each diagram it designs goes at the end
    of its section, repaired once or left out if it doesn't draw or isn't true to the lecture;
    `DiagramLint` then lays each out at the notes' width, and one that would look wrong goes back once,
-   its redesign kept only when better; a pass that fails leaves the notes exactly as written), sorts
+   its redesign kept only when better; a lecture that describes a physical thing at length may also
+   get an illustration (`IllustrationDesign`: planned in the same reply, drawn by the same engine
+   from the plan, its parts named, its callouts spaced by `Callouts`, looked over by `SvgLint`; see
+   [Illustrations](#illustrations)); a pass that fails leaves the notes exactly as written), sorts
    it into a class (the recorded class or
    a title match wins outright; otherwise the AI reads the notes against each class's name, other
    names, what it covers and its Canvas course's name, and picks one with a strict schema, or it goes
@@ -188,6 +191,53 @@ frames. On paper (`NoteView.PageHeight`, the PDF) that's all it is: the still pi
 
 Movement follows the system's Reduce motion (macOS) or Animation effects (Windows) setting
 (`Platform/Motion.cs`).
+
+## Illustrations
+
+An illustration is an SVG drawing of a physical thing with its parts named the way SVG names
+things: each part a group with an id whose first children are a `<title>` (its name) and a `<desc>`
+(its line from the lecture), its callouts in `<g id="labels">`, one `<g id="label-{id}">` each
+(a leader line from the part, a dot, the name). Because the names live in the SVG, they travel
+everywhere the drawing does: `SafeSvg` reads them back as `Parts`, search and Ask read them
+(`Passages`), the phone and the Markdown export list them, and a browser shows them on hover.
+
+- **Designing** (`Core/IllustrationDesign.cs`): the diagram designer's brief has a section on when
+  a thing deserves a drawing (the lecturer described its parts and where they sit, at some length;
+  one view shows it) and its JSON reply may carry `illustrations`: a title, the section, the moment,
+  a caption, the subject and view, a layout, and 3 to 18 parts (`id`, `name`, `note`). The plan is
+  checked like a diagram. The illustrator is asked once per plan (in parallel with the diagrams'
+  checks) with the lecture, the plan, a house palette by material (light, base, shade, outline), the
+  order to draw in (base shapes, pieces, fine detail, gradient shading, callouts) and the structure
+  above; it answers with the SVG alone. Only engines that draw SVG (`Drawings.FlowchartsAndSvg`, the
+  cloud engines) are asked.
+- **Checking**: the parts are named in the drawing from the plan (`Illustration.Name`), the drawing
+  must clean (`SafeSvg`) and its words (labels, names, lines) must be the lecture's (the diagrams'
+  60% rule). `Core/Rich/SvgGeometry.cs` works out where everything is from the markup alone
+  (transforms, `use`, paths with their curves and arcs, a text's width from its letters), so
+  `Callouts.Tidy` can space a column of crowded labels and bring one back inside the canvas (with a
+  straight leader from the same point on its part), and `SvgLint` can say what's still wrong in
+  words: drawn too simply (under 120 shapes), a planned part missing, too small or off the canvas,
+  no callout, a leader that ends away from its part, labels overlapping or off the edge, words under
+  11 units. A drawing with problems goes back once while 200 seconds are left, for just the groups
+  that change (`IllustrationDesign.Patch` puts them in place of their namesakes), and the result is
+  kept only when it has fewer. Drawing is output-bound (a detailed figure is 25 to 35 KB written
+  shape by shape: 8 to 14 minutes for Opus whatever the effort, so it's drawn at low effort,
+  `DiagramEngines.DrawEffort`); a pass that plans one tells `AiJobs` it may run 18 minutes in all
+  (`IllustrationDesign.Timeout`) instead of the diagrams' 8, and a drawing not done by then is left
+  out.
+- **Colours**: in light, as written. In dark, an illustration's shapes keep their own colours,
+  moved into what a dark page carries (`Core/Rich/SvgColour.cs`, in OKLab: darks lifted clear of
+  the dark paper, lights held back from glaring, hue and the order of light to dark kept so shading
+  still reads; a near-white with no colour becomes the paper); its words and leader lines are in the
+  roles' colours, so they follow the theme like any drawing's.
+- **On screen** (`SvgView` with `PartsExplorer` and `PartsChrome`, the flowchart's own chrome):
+  `PartMap` draws the drawing again a part at a time (and each label with its part) onto a map at
+  about a pixel a unit, away from the window, so what's under the pointer is the part on top there,
+  by its real outline, a few units' slop for thin ones. A lit part is drawn again over the dimmed
+  drawing with a dilated accent ring; versions without the labels, with only their lines, or of one
+  part or label alone are cut from the cleaned SVG (`Illustration`) and drawn as pictures of their
+  own, kept until the colours change. Paper, the PDF and exports get the still picture with its
+  labels.
 
 ## Privacy
 

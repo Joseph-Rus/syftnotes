@@ -199,7 +199,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             bool local = pick.Engine == "ollama" && Providers is null;
             int ctx = local ? await Core.Summarize.ContextSizeAsync(cfg, pick.Model) : 200_000;
             var result = await DiagramDesign.DesignAsync(m, notes, pick.Drawings, Designer(pick, cfg, ctx, cts.Token), Core.Summarize.TranscriptBudget(ctx),
-                    DiagramTimeout - watch.Elapsed, Drawer(pick, cfg, cts.Token))
+                    DiagramTimeout - watch.Elapsed, Drawer(pick, cfg, cts.Token),
+                    longer: total => cts.CancelAfter(total > watch.Elapsed ? total - watch.Elapsed : TimeSpan.Zero))
                 .WaitAsync(cts.Token);
             if (pick.Engine != "ollama") Record(pick.Engine, true, "");
             string left = result.Dropped.Count > 0 ? $"; left out {string.Join("; ", result.Dropped)}" : "";
@@ -237,7 +238,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     Func<string, Task<string>>? Drawer(DiagramPick pick, Config cfg, CancellationToken ct)
     {
         if (pick.Drawings != Drawings.FlowchartsAndSvg) return null;
-        var illustrator = Designer(pick with { Effort = DiagramEngines.DrawEffort(pick.Engine) }, cfg, 200_000, ct);
+        var illustrator = Designer(pick with { Effort = DiagramEngines.DrawEffort(pick.Engine) }, cfg, 200_000, ct, IllustrationDesign.Timeout);
         return prompt => illustrator(prompt, false);
     }
 
@@ -247,12 +248,12 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// down (an older one without --effort, a plan without that model) is asked again as the student set it up, and
     /// so from then on; a usage limit or a sign-in problem isn't something asking again fixes.
     /// </summary>
-    Func<string, bool, Task<string>> Designer(DiagramPick pick, Config cfg, int ctx, CancellationToken ct)
+    Func<string, bool, Task<string>> Designer(DiagramPick pick, Config cfg, int ctx, CancellationToken ct, TimeSpan? timeout = null)
     {
         if (pick.Engine == "ollama" && Providers is null)
             return (prompt, json) => Core.Summarize.OllamaGenerateAsync(cfg, pick.Model, prompt, ctx, timeout: DiagramTimeout, json: json, ct: ct);
         var provider = Provider(pick.Engine);
-        var strong = new AiRequest("", Scratch()) { Model = pick.Model, Effort = pick.Effort, Timeout = DiagramTimeout };
+        var strong = new AiRequest("", Scratch()) { Model = pick.Model, Effort = pick.Effort, Timeout = timeout ?? DiagramTimeout };
         var plain = strong with { Model = pick.Engine == "ollama" ? "" : Settings.Models.GetValueOrDefault(pick.Engine, ""), Effort = "" };
         bool asSetUp = strong == plain;
         return async (prompt, _) =>
