@@ -1,0 +1,75 @@
+{
+  "about": "The second video's narration, one line per scene (VOICEOVER2.md). `at` is when the line starts, in seconds into its scene, chosen so the words land on the action. `direction` is how to say it. Run `npm run voice2 -- …` after changing anything here.",
+  "model": "eleven_v4",
+  "fallbackModel": "eleven_multilingual_v2",
+  "voiceSettings": {
+    "stability": 0.5,
+    "similarity_boost": 0.75,
+    "style": 0.15,
+    "use_speaker_boost": true,
+    "speed": 1.0
+  },
+  "seed": 2026,
+  "lines": [
+    {
+      "id": "opener",
+      "at": 0.45,
+      "text": "New in Study Stash: diagrams you can play with.",
+      "direction": "bright, a little proud, like showing a friend something new"
+    },
+    {
+      "id": "notes",
+      "at": 0.4,
+      "text": "Your notes come first… and a couple of minutes later, the diagrams drop right into the page.",
+      "direction": "easy, unhurried; a small lift on \"drop right in\""
+    },
+    {
+      "id": "explore",
+      "at": 0.3,
+      "text": "Point at a box to see what it connects to. Pin it, ask about it, or step through it.",
+      "direction": "curious, clear, a beat between the two sentences"
+    },
+    {
+      "id": "recall",
+      "at": 0.3,
+      "text": "Then hide the words, and test yourself.",
+      "direction": "playful, a little challenge in it"
+    },
+    {
+      "id": "kinds",
+      "at": 0.3,
+      "text": "State machines, sequence diagrams, timelines, mind maps.",
+      "direction": "brisk, a list on the beat"
+    },
+    {
+      "id": "drawings",
+      "at": 0.3,
+      "text": "When a lecture describes a drone or a hand, your notes can draw it: detailed, and labelled.",
+      "direction": "a spark of delight on \"draw it\""
+    },
+    {
+      "id": "plots",
+      "at": 0.3,
+      "text": "A formula becomes a graph you can drag: watch the sigmoid sharpen… and gradient descent overshoot.",
+      "direction": "enjoying it; a smile on \"overshoot\""
+    },
+    {
+      "id": "quiet",
+      "at": 0.3,
+      "text": "And it's light on your computer: quiet while it waits.",
+      "direction": "calm, softer, settling down"
+    },
+    {
+      "id": "proof",
+      "at": 0.3,
+      "text": "Your recordings still never leave your computers.",
+      "direction": "sincere, a touch slower"
+    },
+    {
+      "id": "cta",
+      "at": 0.6,
+      "text": "Study Stash. Free, for Mac and Windows.",
+      "direction": "warm and confident, a beat after \"Study Stash\""
+    }
+  ]
+}

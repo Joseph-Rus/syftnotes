@@ -2,7 +2,7 @@ import React from 'react';
 import {Audio, Sequence, staticFile} from 'remotion';
 import {sfxVolume} from '../config';
 
-export type SfxName = 'click' | 'key1' | 'key2' | 'key3' | 'pop' | 'whoosh' | 'marker' | 'chime-record' | 'chime-filed';
+export type SfxName = 'click' | 'key1' | 'key2' | 'key3' | 'pop' | 'whoosh' | 'marker' | 'chime-record' | 'chime-filed' | 'tick' | 'ding';
 
 /** A sound effect from public/audio/sfx (made by scripts/make_audio.py), played `at` frames into the scene. */
 export const Sfx: React.FC<{at: number; name: SfxName; volume?: number}> = ({at, name, volume = 0.5}) => (

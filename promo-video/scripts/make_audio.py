@@ -2,14 +2,17 @@
 """The promo's music and sound effects, made from scratch: every sound is synthesised here, nothing is sampled or
 downloaded, so there is nothing to license.
 
-    python3 scripts/make_audio.py        (or: npm run audio; needs numpy and scipy)
+    python3 scripts/make_audio.py              (or: npm run audio; needs numpy and scipy)
+    python3 scripts/make_audio.py --promo 2    (or: npm run audio2) the second video's music
 
-Writes public/audio/music.wav and public/audio/sfx/*.wav. The music follows the scene lengths in src/config.ts:
-at 100 BPM a beat is 18 frames, and each scene starts on a beat.
+Writes public/audio/music.wav (music2.wav for the second video) and public/audio/sfx/*.wav. The music follows the
+scene lengths in src/config.ts (src/promo2/config.ts): at 100 BPM a beat is 18 frames, and each scene starts on a beat.
+Both videos share the score and the sound effects; only where its moments fall differs (PROMOS below).
 
 The score, in D major: a warm pad over Dmaj7, Bm7, Gmaj7 and A6sus2; a plucked arpeggio from the reveal; soft drums
 and a bass from the recording; claps from the diagrams; a breakdown for the promise, a riser, and a Dmaj9 to end on.
 """
+import argparse
 import pathlib
 import re
 
@@ -28,11 +31,22 @@ rng = np.random.default_rng(7)
 
 # ---- The timeline, from src/config.ts -------------------------------------------------------------------------
 
-def timeline():
-    src = (ROOT / 'src' / 'config.ts').read_text()
+# Each video: where its scene lengths are, its recut to the narration, its music file, and which of its scenes carry
+# the score's moments: the riser, boom and bells (reveal), the drums and bass (record), the claps (claps), the
+# breakdown (proof) and the last chord (cta).
+PROMOS = {
+    '1': dict(config='src/config.ts', timeline='src/timeline.json', music='music.wav',
+              roles=dict(reveal='reveal', record='record', claps='diagrams', proof='proof', cta='cta')),
+    '2': dict(config='src/promo2/config.ts', timeline='src/promo2/timeline.json', music='music2.wav',
+              roles=dict(reveal='opener', record='notes', claps='explore', proof='quiet', cta='cta')),
+}
+
+
+def timeline(promo=PROMOS['1']):
+    src = (ROOT / promo['config']).read_text()
     block = re.search(r'export const baseDurations = \{(.*?)\};', src, re.S).group(1)
     lengths = [(k, int(v)) for k, v in re.findall(r'(\w+):\s*(\d+)', block)]
-    fitted = ROOT / 'src' / 'timeline.json'  # the recut to the narration, from make_voice.py
+    fitted = ROOT / promo['timeline']  # the recut to the narration, from make_voice.py
     if fitted.exists():
         over = __import__('json').loads(fitted.read_text()).get('durations', {})
         lengths = [(k, int(over.get(k, v))) for k, v in lengths]
@@ -179,7 +193,8 @@ CHORDS = {  # (pad voicing, bass root, arpeggio of eight eighth notes)
 PROGRESSION = ['Dmaj7', 'Bm7', 'Gmaj7', 'A6sus2']
 
 
-def music(starts, total):
+def music(starts, total, roles=PROMOS['1']['roles']):
+    starts = {**starts, **{role: starts[scene] for role, scene in roles.items()}}
     beat_of = {k: round(v / BEAT) for k, v in starts.items()}
     first_bar = beat_of['record'] % 4  # bars fall so the recording, Ask, the promise and the ending start on one
     n = int((total + 3) * SR)
@@ -224,7 +239,7 @@ def music(starts, total):
             place(drums, kick(), b * BEAT, 0.85)
         if bar_beat == 2 and ((b - first_bar) // 4) % 2 == 1:
             place(drums, kick(), (b + 0.5) * BEAT, 0.55)
-        if bar_beat in (1, 3) and b >= beat_of['diagrams']:
+        if bar_beat in (1, 3) and b >= beat_of['claps']:
             place(drums, clap(), b * BEAT, 0.32, pan=0.1)
         for half in (0, 0.5):
             open_ = half == 0.5 and bar_beat == 3
@@ -241,7 +256,8 @@ def music(starts, total):
     pad *= duck[:, None]
 
     # Moments: a riser into the reveal, bells and a low boom on it; a riser into the call to action, the last chord.
-    place(fx, riser(1.6), starts['reveal'] - 1.6, 0.22)
+    if starts['reveal'] >= 1.6:  # a riser into the reveal, when something comes before it
+        place(fx, riser(1.6), starts['reveal'] - 1.6, 0.22)
     place(fx, boom(), starts['reveal'], 0.55)
     for m, d in ((74, 0), (81, 0.06)):
         place(fx, bell(hz(m)), starts['reveal'] + d, 0.16, pan=-0.2 if d else 0.2)
@@ -293,6 +309,15 @@ def sfx():
         i = int(d * SR)
         filed[i:i + len(b)] += b[: len(filed) - i] * 0.45
     out['chime-filed'] = filed
+    # Added for the second video, from their own seed so the effects above stay exactly as they were.
+    own = np.random.default_rng(11)
+    t = times(0.05)  # a slider's detent as it's dragged: tiny, dry, high
+    out['tick'] = (bandpass(own.standard_normal(len(t)), 2500, 7000) * np.exp(-t / 0.0012) * 0.5
+                   + np.sin(2 * np.pi * 2300 * t) * np.exp(-t / 0.006) * 0.35)
+    ding = np.zeros(int(1.2 * SR))  # "Knew it": a soft, bright bell, a fifth above the record chime
+    b = bell(hz(88), 1.1, index=1.1, ratio=2.0)
+    ding[:len(b)] += b * 0.5
+    out['ding'] = ding
     return out
 
 
@@ -305,9 +330,15 @@ def write(path, x):
 
 
 if __name__ == '__main__':
-    starts, total = timeline()
-    write(OUT / 'music.wav', music(starts, total))
+    args = argparse.ArgumentParser(description='The promo videos\' music and sound effects.')
+    args.add_argument('--promo', choices=sorted(PROMOS), default='1', help='which video: 1 (the first) or 2 (what\'s new)')
+    promo = PROMOS[args.parse_args().promo]
+    starts, total = timeline(promo)
+    write(OUT / promo['music'], music(starts, total, promo['roles']))
     for name, x in sfx().items():
-        write(OUT / 'sfx' / f'{name}.wav', x)
+        # The first video's run makes them all. The second's only adds what's missing: its randomness runs on from the
+        # music, so remaking them here would change the first video's effects by a hair.
+        if promo is PROMOS['1'] or not (OUT / 'sfx' / f'{name}.wav').exists():
+            write(OUT / 'sfx' / f'{name}.wav', x)
     print(f'music: {total:.2f} s; scenes start at ' + ', '.join(f'{k} {v:.1f}s (beat {v / BEAT:.1f})' for k, v in starts.items()))
     print('sfx: ' + ', '.join(sorted(p.stem for p in (OUT / 'sfx').glob('*.wav'))))

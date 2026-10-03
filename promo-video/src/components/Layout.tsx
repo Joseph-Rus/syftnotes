@@ -146,7 +146,7 @@ const MenuGlyph: React.FC<{kind: string}> = ({kind}) => {
 };
 
 /** The Mac's menu bar, with Study Stash's icon among the system's. `lit` highlights the icon (its menu is open). */
-export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
+export const MenuBar: React.FC<{lit?: boolean; clock?: string}> = ({lit = false, clock = 'Tue 23 Sep  10:02'}) => {
   const {width} = useVideoConfig();
   const wide = width > 1200;
   const {x, slots} = slotX(width);
@@ -187,7 +187,7 @@ export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
             whiteSpace: 'nowrap',
           }}
         >
-          {key === 'app' ? <Img src={staticFile('mark-36.png')} style={{height: 21, filter: 'invert(1)'}} /> : key === 'clock' ? 'Tue 23 Sep  10:02' : <MenuGlyph kind={key} />}
+          {key === 'app' ? <Img src={staticFile('mark-36.png')} style={{height: 21, filter: 'invert(1)'}} /> : key === 'clock' ? clock : <MenuGlyph kind={key} />}
         </div>
       ))}
     </div>
@@ -195,11 +195,11 @@ export const MenuBar: React.FC<{lit?: boolean}> = ({lit = false}) => {
 };
 
 /** The desktop: wallpaper, whatever is open, and the menu bar on top. */
-export const Desktop: React.FC<{children?: React.ReactNode; lit?: boolean}> = ({children, lit}) => (
+export const Desktop: React.FC<{children?: React.ReactNode; lit?: boolean; clock?: string}> = ({children, lit, clock}) => (
   <AbsoluteFill style={{overflow: 'hidden'}}>
     <Wallpaper />
     {children}
-    <MenuBar lit={lit} />
+    <MenuBar lit={lit} clock={clock} />
   </AbsoluteFill>
 );
 

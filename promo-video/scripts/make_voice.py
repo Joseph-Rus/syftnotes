@@ -18,6 +18,9 @@ Without either, a scratch narration in the Mac's own voice, so the cut can be ch
 
     npm run voice -- --scratch
 
+The second video (VOICEOVER2.md) works the same way with --promo 2, or `npm run voice2 -- …`: its script is
+src/promo2/voiceover.json, its lines go to public/audio/vo2/, and its recut to src/promo2/timeline.json.
+
 Best practice from ElevenLabs' docs, followed here: one model, voice, set of voice settings and seed for every line;
 each line conditioned on the ones before it (request stitching: previous_request_ids, up to three, oldest first; not
 on eleven_v3) and on the text after it (next_text), so separate clips sound like one read; pacing from punctuation
@@ -40,10 +43,23 @@ import numpy as np
 from scipy.io import wavfile
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SCRIPT = ROOT / 'src' / 'voiceover.json'
-VOICE_JSON = ROOT / 'src' / 'voice.json'
-TIMELINE = ROOT / 'src' / 'timeline.json'
-OUT = ROOT / 'public' / 'audio' / 'vo'
+# Each video's files: its script, what was made, its recut, its lines, and its scene lengths. --promo picks one.
+PROMOS = {
+    '1': dict(script='src/voiceover.json', voice='src/voice.json', timeline='src/timeline.json', out='public/audio/vo', config='src/config.ts'),
+    '2': dict(script='src/promo2/voiceover.json', voice='src/promo2/voice.json', timeline='src/promo2/timeline.json',
+              out='public/audio/vo2', config='src/promo2/config.ts'),
+}
+SCRIPT = VOICE_JSON = TIMELINE = OUT = CONFIG = None  # set by use()
+
+
+def use(promo):
+    global SCRIPT, VOICE_JSON, TIMELINE, OUT, CONFIG
+    f = PROMOS[promo]
+    SCRIPT, VOICE_JSON, TIMELINE = ROOT / f['script'], ROOT / f['voice'], ROOT / f['timeline']
+    OUT, CONFIG = ROOT / f['out'], ROOT / f['config']
+
+
+use('1')
 API = 'https://api.elevenlabs.io/v1'
 SR = 48000
 FPS = 30
@@ -214,14 +230,14 @@ def from_files(folder, lines):
 # ---- The recut: each scene long enough for its line, still starting on a beat -------------------------------------
 
 def base_durations():
-    src = (ROOT / 'src' / 'config.ts').read_text()
+    src = CONFIG.read_text()
     block = re.search(r'export const baseDurations = \{(.*?)\};', src, re.S).group(1)
     return {k: int(v) for k, v in re.findall(r'(\w+):\s*(\d+)', block)}
 
 
 def fit(lines, seconds):
     base = base_durations()
-    transition = int(re.search(r'export const TRANSITION = (\d+);', (ROOT / 'src' / 'config.ts').read_text()).group(1))
+    transition = int(re.search(r'export const TRANSITION = (\d+);', CONFIG.read_text()).group(1))
     ids = list(base)
     at = {l['id']: l['at'] for l in lines}
     out = {}
@@ -253,8 +269,10 @@ def main():
     p.add_argument('--cuts', help='with --from-take: where each line ends, in seconds, e.g. 4.39,9.06,… (if the automatic split is off)')
     p.add_argument('--line', action='append', default=[], help='one line from its own file, e.g. --line handwriting=~/Downloads/handwriting.mp3')
     p.add_argument('--list-voices', action='store_true')
+    p.add_argument('--promo', choices=sorted(PROMOS), default='1', help="which video: 1 (the first) or 2 (what's new)")
     p.add_argument('--no-music', action='store_true', help="don't remake the music afterwards")
     a = p.parse_args()
+    use(a.promo)
 
     if a.list_voices:
         return list_voices()
@@ -321,10 +339,10 @@ def main():
     VOICE_JSON.write_text(json.dumps({'source': source, 'voice': who, 'model': None if a.scratch else model, 'seconds': seconds}, indent=2) + '\n')
     durations = fit(lines, seconds)
     TIMELINE.write_text(json.dumps({'durations': durations}, indent=2) + '\n')
-    total = sum(durations.values()) - (len(durations) - 1) * int(re.search(r'export const TRANSITION = (\d+);', (ROOT / 'src' / 'config.ts').read_text()).group(1))
+    total = sum(durations.values()) - (len(durations) - 1) * int(re.search(r'export const TRANSITION = (\d+);', CONFIG.read_text()).group(1))
     print(f"recut: {total / FPS:.1f} s — " + ', '.join(f'{k} {v / FPS:.1f}s' for k, v in durations.items()))
     if not a.no_music:
-        subprocess.run([sys.executable, str(ROOT / 'scripts' / 'make_audio.py')], check=True)
+        subprocess.run([sys.executable, str(ROOT / 'scripts' / 'make_audio.py'), '--promo', a.promo], check=True)
 
 
 if __name__ == '__main__':
