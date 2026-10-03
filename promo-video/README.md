@@ -11,6 +11,12 @@ the app's build.
 - `out/promo.mp4`: 1920×1080, 30 fps
 - `out/promo-vertical.mp4`: 1080×1920, for Reels, Shorts and TikTok
 
+A second video, about 50 seconds, shows what's new: diagrams you can play with, labelled drawings, formulas that move,
+and a lighter app (see [The second video](#the-second-video-whats-new) below).
+
+- `out/promo2.mp4`: 1920×1080, 30 fps
+- `out/promo2-vertical.mp4`: 1080×1920
+
 ## Preview and render
 
 You need Node.js 18 or later.
@@ -71,3 +77,56 @@ app, where the notes really use it. The pointer's path and clicks are the `stops
 Inter and Inter Display come from the app (`engine/src/StudyStash.App/Assets/Fonts`) under the SIL Open Font
 License (`public/fonts/Inter-OFL.txt`). The notes' serif is the computer's own (New York or Charter on a Mac,
 Georgia elsewhere).
+
+## The second video: what's new
+
+`Promo2` and `Promo2Vertical`, in `src/promo2/`, beside the first video and sharing its desktop, window, sidebar,
+pointer, titles, cross-fades, score and sound effects, so the two feel like one family. It tells it in the order a
+student lives it: the notes arrive, then you play with what's in them, then what's under the hood, and the first
+video's promise and ending.
+
+```sh
+npm run render2              # → out/promo2.mp4
+npm run render2:vertical     # → out/promo2-vertical.mp4
+npm run render2:all          # both
+npm run card2                # → out/ko-fi-preview-2.png, a 1200×630 picture for a shared link
+npm run audio2               # its music again, after changing a length in src/promo2/config.ts
+npm run voice2 -- --scratch  # its narration in the Mac's voice; VOICEOVER2.md for ElevenLabs
+```
+
+| Time | Scene | What happens |
+|---|---|---|
+| 0–3 s | Opener | The icon, **Study Stash** with a "New" tag, "Your notes, now with diagrams you can play with." |
+| 3–9 s | Notes first | BIO 110's "The cardiac cycle" is filed and its notes open at once; the byline says "Adding diagrams…"; "2 minutes later" (the menu bar clock moves on too) the diagram is added into the open note, pushing the key points down, and the byline says "Diagrams added" |
+| 9–16 s | Explore | The pointer rests on "Ventricles contract": it lights up with its arrows and neighbours, the rest dims. A click pins it (arrows in Lagoon; Explain this, Quiz me, Where was this said?, Zoom in). Step through, Next twice ("Step 3 of 8"), then Play, a step on every beat |
+| 16–20 s | Recall | Test yourself hides every box's words; a box is checked and marked Knew it, the rest with Y and N, up to "5 of 8 recalled" |
+| 20–25 s | Kinds | Four notes' diagrams land on the beat: a state diagram reading "01" into its double-circled accepting state, a sequence diagram of logging in, message by message, a timeline of germ theory, a mind map of tissue types |
+| 25–31 s | Drawings | ENGR 120's quadcopter: the pointer passes the battery and rests on the flight controller (ring, label lit, the rest dimmed), and a click pins its card (name, what the drawing says of it, Explain this, Quiz me, Where was this said?, Zoom in). Then NURS 210's hand, its deep flexor tendon pinned the same way |
+| 31–38 s | Plots | CS 340's notes: the steepness slider is dragged from 1 to 5 and the sigmoid sharpens into a step; the page scrolls to gradient descent, whose learning rate is dragged down to 0.05 and up to 0.21, where the path zigzags and then diverges |
+| 38–42 s | Quiet | "Light on your computer." Waiting: under half a percent of one core. Recording: about a quarter of what it used to take. Measured on an M-series Mac |
+| 42–45 s | Promise | The first video's: "Your recordings stay on your computer." Free and open source, for Mac and Windows |
+| 45–50 s | Call to action | The first video's: Free for Mac and Windows, study-stash-app.web.app |
+
+The times are for the scratch narration; the real take recuts them (VOICEOVER2.md).
+
+**What's real, what's drawn.** Everything is drawn in code, in the app's dark look, matched to the app's own
+screenshot tests (`art2/ref`: the pinned box, the step strip, the recall strip, the pinned part's card, the plots, the
+new kinds). The drawings are the app's own: `art2/svg/after-drone.svg` and `after-hand.svg`, drawn by Claude for Study
+Stash, made into modules by `python3 scripts/art2.py` (`src/promo2/art/`) and drawn inline, so a part can light up,
+dim and wear its ring. They don't use the parts library's composed drawings (those carry CC BY credits), so no
+credits are needed. The plots are recomputed every frame from the app's own definitions (`Core/Rich/PlotDesign.cs`:
+the sigmoid, k from 0.2 to 5; gradient descent on w₁² + 5w₂² from (−2.6, 1.5), 25 steps, η from 0.01 to 0.21), so
+the curve and the path are exactly what the app would draw at each slider value. The notes and diagrams are invented
+demo content (the cardiac cycle, a quadcopter, the hand, logistic regression), in the classes of the first video's
+library plus ENGR 120 and CS 340.
+
+**What to edit.**
+- **Words and lengths:** `src/promo2/config.ts` (`text2`, `baseDurations`). Each scene's key moments are constants at
+  the top of its file in `src/promo2/scenes/` (when the pointer hovers, pins, steps, drags).
+- **The pieces of the app:** `src/promo2/ui.tsx` (toolbar, strips, pinned actions, the note window), `Flow.tsx` (the
+  cardiac cycle), `Parts.tsx` (the drawings and their cards), `Plots.tsx` (the two plots and their sliders).
+- **Sound:** the same generator, `npm run audio2`; the score's moments fall on the opener (bells and boom), the notes
+  (drums and bass), the diagrams (claps), the quiet scene (the breakdown) and the ending. Two effects were added for
+  this video, `tick` (a slider's detent, a hover) and `ding` (Knew it, a diagram arriving), from their own seed, so the
+  first video's effects and music are byte for byte what they were. The mix measures about −14.4 LUFS.
+
