@@ -100,6 +100,23 @@ public class IdleCostTests
     }
 
     [AvaloniaFact]
+    public void A_hidden_view_lets_go_of_the_notes_it_built_before_when_they_change()
+    {
+        var note = new NoteView { Markdown = "## One\n\nWords." };
+        var holder = new StackPanel { Children = { note } };
+        var w = Show(holder);
+        Assert.NotEmpty(note.Children);
+        holder.IsVisible = false;
+        note.Markdown = "## Two\n\nOther words.";
+        Assert.Empty(note.Children); // the old notes, out of date and unseen, aren't kept
+        Assert.True(note.Unbuilt);
+        holder.IsVisible = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.NotEmpty(note.Children);
+        w.Close();
+    }
+
+    [AvaloniaFact]
     public void A_slider_left_playing_stops_when_the_window_is_closed_to_the_menu_bar()
     {
         var note = new NoteView { Markdown = "```plot\n" + PlotDesign.Normal + "\n```", Width = 620 };

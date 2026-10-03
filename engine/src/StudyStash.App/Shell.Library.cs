@@ -363,18 +363,22 @@ public static partial class Shell
     static void ShowLectureAi(JsonObject l, NoteModel note)
     {
         var ai = Ai();
-        library.Notes?.Dispose();
-        library.Notes = null;
+        // The new notes replace the old ones in one step: with none in between, the page never shows its plain Markdown
+        // (a view of the same notes that's only there for a lecture whose notes aren't written yet) for a moment, which
+        // built every diagram and plot in the lecture a second time just to hide it again.
+        var before = library.Notes;
+        AiNotesModel? notes = null;
         if (!note.HasPending)
         {
-            var notes = new AiNotesModel(ai);
+            notes = new AiNotesModel(ai);
             notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 if (openLecture == note.Id) _ = ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true);
             });
-            library.Notes = notes;
-            _ = notes.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]));
         }
+        library.Notes = notes;
+        before?.Dispose();
+        if (notes is not null) _ = notes.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]));
         var ask = new AiAskModel(ai)
         {
             LectureId = note.Id, ClassName = note.ClassName,

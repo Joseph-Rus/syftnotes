@@ -149,6 +149,14 @@ public sealed partial class NoteView : StackPanel
     {
         if (Hidden)
         {
+            // What it built before is out of date and nobody sees it: let it go, and build the new when it shows.
+            if (!unbuilt && Children.Count > 0)
+            {
+                Children.Clear();
+                blocks.Clear();
+                diagrams.Clear();
+                previous.Clear();
+            }
             unbuilt = true;
             return;
         }
