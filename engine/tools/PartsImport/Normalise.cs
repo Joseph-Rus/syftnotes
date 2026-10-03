@@ -11,7 +11,7 @@ sealed class Refused(string why) : Exception(why);
 
 /// <summary>A region of a part, as written in the manifest: which of its shapes (by where they sit, as fractions of the
 /// part's box, and/or by their place in the drawing order) make the named piece.</summary>
-sealed record RegionSpec(string Id, string Name, string Tags, double[]? Rect, string? Leaves, double[]? Anchor, string? Colour = null, string? Group = null);
+sealed record RegionSpec(string Id, string Name, string Tags, double[]? Rect, string? Leaves, double[]? Anchor, string? Colour = null, string? Group = null, string? Hue = null);
 
 sealed record PortSpec(string Id, double X, double Y);
 
@@ -235,6 +235,20 @@ static partial class Normalise
             for (int k = 0; k + 3 < q.Length; k += 4)
                 if (new Bounds(box.X + q[k] * box.W, box.Y + q[k + 1] * box.H, q[k + 2] * box.W, q[k + 3] * box.H).Contains(b.CenterX, b.CenterY)) inside = true;
             if (!inside) return false;
+            any = true;
+        }
+        if (r.Hue is not null)
+        {
+            // A family of colour (the blue of the veins, the red of the arteries), by the shape's fill.
+            string? fill = SafeSvg.NormalColour((string?)leaf.Attribute("fill") ?? "");
+            if (fill is null || SvgColour.Lab(fill) is not { } lab) return false;
+            bool match = r.Hue switch
+            {
+                "blue" => lab.B < -0.03 && lab.B < -Math.Abs(lab.A),
+                "red" => lab.A > 0.08 && lab.A > Math.Abs(lab.B) * 0.8,
+                _ => true,
+            };
+            if (!match) return false;
             any = true;
         }
         if (r.Colour is not null)
