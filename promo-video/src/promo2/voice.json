@@ -1,17 +1,17 @@
 {
-  "source": "scratch",
-  "voice": "Samantha",
-  "model": null,
+  "source": "elevenlabs website",
+  "voice": "adam-promo2-2026-10-02.mp3",
+  "model": "eleven_v4",
   "seconds": {
-    "opener": 1.295,
-    "notes": 4.602,
-    "explore": 4.886,
-    "recall": 2.276,
-    "kinds": 4.433,
-    "drawings": 4.251,
-    "plots": 5.557,
-    "quiet": 2.28,
-    "proof": 2.187,
-    "cta": 2.917
+    "opener": 1.11,
+    "notes": 3.974,
+    "explore": 4.5,
+    "recall": 1.856,
+    "kinds": 3.769,
+    "drawings": 3.981,
+    "plots": 5.604,
+    "quiet": 1.903,
+    "proof": 1.779,
+    "cta": 2.396
   }
 }
