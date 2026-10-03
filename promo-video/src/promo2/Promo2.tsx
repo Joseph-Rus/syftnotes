@@ -4,10 +4,8 @@ import {linearTiming, TransitionSeries} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
 import {colors, duckTo, FPS, voiceVolume} from '../config';
 import {Sfx} from '../components/Sfx';
-import {Proof} from '../scenes/Proof';
-import {Cta} from '../scenes/Cta';
 import {durations2, music2, musicVolume2, Scene2, sceneStart2, TOTAL_FRAMES2, TRANSITION, voiceLines2} from './config';
-import {Opener} from './scenes/Opener';
+import {Intro2} from './scenes/Intro2';
 import {NotesFirst} from './scenes/NotesFirst';
 import {Explore} from './scenes/Explore';
 import {Recall} from './scenes/Recall';
@@ -15,6 +13,7 @@ import {Kinds} from './scenes/Kinds';
 import {Drawings} from './scenes/Drawings';
 import {Plots} from './scenes/Plots';
 import {Quiet} from './scenes/Quiet';
+import {Cta2, Proof2} from './scenes/Outro2';
 
 // Where each narration line plays, in frames of the whole video.
 const VOICE = voiceLines2.map((l) => {
@@ -33,9 +32,9 @@ const musicAt = (f: number) => {
 };
 
 // The order a student lives it: the notes, then playing with what's in them, then what's under the hood, and the
-// same promise and ending as the first video.
+// same promise and ending as the first video, opened and closed on the night desktop (scenes/Intro2, scenes/Outro2).
 const SCENES: [Scene2, React.FC][] = [
-  ['opener', Opener],
+  ['opener', Intro2],
   ['notes', NotesFirst],
   ['explore', Explore],
   ['recall', Recall],
@@ -43,8 +42,8 @@ const SCENES: [Scene2, React.FC][] = [
   ['drawings', Drawings],
   ['plots', Plots],
   ['quiet', Quiet],
-  ['proof', Proof],
-  ['cta', Cta],
+  ['proof', Proof2],
+  ['cta', Cta2],
 ];
 
 /** The second video: what's new. Same desktop, window, pointer, titles, cross-fades and sound as the first. */
