@@ -245,7 +245,6 @@ export const Kinds: React.FC = () => {
       {KIND_AT.map((f) => (
         <Sfx key={f} at={f + 2} name="pop" volume={0.22} />
       ))}
-      <Sfx at={KIND_AT[0] + 54} name="ding" volume={0.18} />
       <Title text={text2.kinds as [string, string]} delay={4} width={vertical ? undefined : 1580} />
     </AbsoluteFill>
   );

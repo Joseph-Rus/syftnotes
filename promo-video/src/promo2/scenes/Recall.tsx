@@ -136,13 +136,9 @@ export const Recall: React.FC = () => {
           return p > 0 ? <Key key={t.id} k={t.key!} p={p} x={at.x + 34} y={at.y + 26} /> : null;
         })}
       </Desktop>
-      {TURNS.map((t) => (
-        <React.Fragment key={t.id}>
-          {t.key ? <Sfx at={t.grade - 1} name="key2" volume={0.35} /> : null}
-          {t.knew ? <Sfx at={t.grade + 1} name="ding" volume={0.22} /> : <Sfx at={t.grade + 1} name="pop" volume={0.18} />}
-        </React.Fragment>
+      {TURNS.filter((t) => t.key).map((t) => (
+        <Sfx key={t.id} at={t.grade - 1} name="key2" volume={0.35} />
       ))}
-      <Sfx at={TEST + 2} name="whoosh" volume={0.08} />
       <Title text={text2.recall as [string, string]} delay={8} />
     </AbsoluteFill>
   );

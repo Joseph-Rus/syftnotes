@@ -68,12 +68,6 @@ export const Plots: React.FC = () => {
     ...ETA.map(([f, v]) => [f, e(v).x, e(v).y] as [number, number, number]),
     [ETA[ETA.length - 1][0] + 30, e(0.21).x + 40, e(0.21).y - 90],
   ];
-  // A soft tick as the value moves, every few frames of each drag.
-  const ticks: number[] = [];
-  for (const keys of [K, ETA])
-    for (let i = 1; i < keys.length; i++)
-      if (keys[i][1] !== keys[i - 1][1]) for (let f = keys[i - 1][0] + 2; f < keys[i][0] - 1; f += 4) ticks.push(f);
-
   const bar = (p: number) => <FloatingBar icons={['edit', 'chat', 'schedule', 'open_in_full']} p={p} />;
   return (
     <AbsoluteFill>
@@ -106,10 +100,6 @@ export const Plots: React.FC = () => {
         </StageWindow>
         <Cursor softPress clickVolume={CLICK} stops={stops} clicks={[K[0][0] - 2, ETA[0][0] - 2]} />
       </Desktop>
-      {ticks.map((f) => (
-        <Sfx key={f} at={f} name="tick" volume={0.16} />
-      ))}
-      <Sfx at={SCROLL[0]} name="whoosh" volume={0.08} />
       <Title text={text2.plots as [string, string]} delay={8} />
     </AbsoluteFill>
   );

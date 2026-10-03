@@ -149,11 +149,7 @@ export const Explore: React.FC = () => {
           clicks={[PIN, STEPS, NEXT1, NEXT2, PLAY]}
         />
       </Desktop>
-      <Sfx at={HOVER + 2} name="tick" volume={0.25} />
       <Sfx at={PIN + 2} name="pop" volume={0.24} />
-      {Array.from({length: 5}, (_, i) => PLAY + EVERY * (i + 1)).map((f) => (
-        <Sfx key={f} at={f} name="tick" volume={0.3} />
-      ))}
       <Title text={text2.explore as [string, string]} delay={8} />
     </AbsoluteFill>
   );

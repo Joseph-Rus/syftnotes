@@ -3,7 +3,8 @@ import {AbsoluteFill, Audio, interpolate, Sequence, staticFile} from 'remotion';
 import {linearTiming, TransitionSeries} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
 import {colors, duckTo, FPS, voiceVolume} from '../config';
-import {Sfx} from '../components/Sfx';
+import {Sfx, SfxSetProvider} from '../components/Sfx';
+import {SFX2} from './sound';
 import {Proof} from '../scenes/Proof';
 import {Cta} from '../scenes/Cta';
 import {durations2, music2, musicVolume2, Scene2, sceneStart2, TOTAL_FRAMES2, TRANSITION, voiceLines2} from './config';
@@ -47,8 +48,9 @@ const SCENES: [Scene2, React.FC][] = [
   ['cta', Cta],
 ];
 
-/** The second video: what's new. Same desktop, window, pointer, titles, cross-fades and sound as the first. */
+/** The second video: what's new. Same desktop, window, pointer, titles and cross-fades as the first; softer effects. */
 export const Promo2: React.FC = () => (
+  <SfxSetProvider value={SFX2}>
   <AbsoluteFill style={{backgroundColor: colors.paper}}>
     <TransitionSeries>
       {SCENES.flatMap(([key, Scene], i) => [
@@ -74,4 +76,5 @@ export const Promo2: React.FC = () => (
       </Sequence>
     ))}
   </AbsoluteFill>
+  </SfxSetProvider>
 );

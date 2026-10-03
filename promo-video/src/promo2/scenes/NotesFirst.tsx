@@ -145,10 +145,8 @@ export const NotesFirst: React.FC = () => {
           </div>
         </div>
       </Desktop>
-      <Sfx at={FILED} name="chime-filed" volume={0.4} />
       <Sfx at={LATER} name="whoosh" volume={0.1} />
       <Sfx at={ADDED + 2} name="pop" volume={0.22} />
-      <Sfx at={ADDED + 6} name="ding" volume={0.3} />
       <Title text={text2.notes as [string, string]} delay={10} />
     </AbsoluteFill>
   );

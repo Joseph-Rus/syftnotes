@@ -91,6 +91,7 @@ npm run render2:vertical     # → out/promo2-vertical.mp4
 npm run render2:all          # both
 npm run card2                # → out/ko-fi-preview-2.png, a 1200×630 picture for a shared link
 npm run audio2               # its music again, after changing a length in src/promo2/config.ts
+npm run sfx2                 # its sound effects again, or yours from sfx2/ (SFX2.md)
 npm run voice2 -- --scratch  # its narration in the Mac's voice; VOICEOVER2.md for ElevenLabs
 ```
 
@@ -125,8 +126,10 @@ library plus ENGR 120 and CS 340.
   the top of its file in `src/promo2/scenes/` (when the pointer hovers, pins, steps, drags).
 - **The pieces of the app:** `src/promo2/ui.tsx` (toolbar, strips, pinned actions, the note window), `Flow.tsx` (the
   cardiac cycle), `Parts.tsx` (the drawings and their cards), `Plots.tsx` (the two plots and their sliders).
-- **Sound:** the same generator, `npm run audio2`; the score's moments fall on the opener (bells and boom), the notes
-  (drums and bass), the diagrams (claps), the quiet scene (the breakdown) and the ending. Two effects were added for
-  this video, `tick` (a slider's detent, a hover) and `ding` (Knew it, a diagram arriving), from their own seed, so the
-  first video's effects and music are byte for byte what they were. The mix measures about −14.4 LUFS.
+- **Sound:** the same generator, `npm run audio2`; the score's moments fall on the opener (a boom), the notes (drums
+  and bass), the diagrams (claps), the quiet scene (the breakdown) and the ending, without the first video's bells.
+  Its effects are its own, fewer and softer: five sounds in `public/audio/sfx2` (`npm run sfx2`), how loud each plays
+  in `src/promo2/sound.ts`, and no bells or ticks. SFX2.md lists them, with ElevenLabs prompts for making your own and
+  where to drop the files. The first video's effects and music are byte for byte what they were. After rendering,
+  `scripts/master.py` sets the sound to −14 LUFS with its true peak under −1 dBTP (the picture is copied as it is).
 

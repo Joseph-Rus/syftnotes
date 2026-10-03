@@ -37,8 +37,9 @@ rng = np.random.default_rng(7)
 PROMOS = {
     '1': dict(config='src/config.ts', timeline='src/timeline.json', music='music.wav',
               roles=dict(reveal='reveal', record='record', claps='diagrams', proof='proof', cta='cta')),
+    # The second video's score has no bells: on its opening and its ending they rang out over the voice.
     '2': dict(config='src/promo2/config.ts', timeline='src/promo2/timeline.json', music='music2.wav',
-              roles=dict(reveal='opener', record='notes', claps='explore', proof='quiet', cta='cta')),
+              roles=dict(reveal='opener', record='notes', claps='explore', proof='quiet', cta='cta'), bells=False),
 }
 
 
@@ -193,7 +194,7 @@ CHORDS = {  # (pad voicing, bass root, arpeggio of eight eighth notes)
 PROGRESSION = ['Dmaj7', 'Bm7', 'Gmaj7', 'A6sus2']
 
 
-def music(starts, total, roles=PROMOS['1']['roles']):
+def music(starts, total, roles=PROMOS['1']['roles'], bells=True):
     starts = {**starts, **{role: starts[scene] for role, scene in roles.items()}}
     beat_of = {k: round(v / BEAT) for k, v in starts.items()}
     first_bar = beat_of['record'] % 4  # bars fall so the recording, Ask, the promise and the ending start on one
@@ -258,12 +259,13 @@ def music(starts, total, roles=PROMOS['1']['roles']):
     # Moments: a riser into the reveal, bells and a low boom on it; a riser into the call to action, the last chord.
     if starts['reveal'] >= 1.6:  # a riser into the reveal, when something comes before it
         place(fx, riser(1.6), starts['reveal'] - 1.6, 0.22)
+    # (The bells draw on no randomness, so leaving them out changes nothing else in the score.)
     place(fx, boom(), starts['reveal'], 0.55)
-    for m, d in ((74, 0), (81, 0.06)):
+    for m, d in ((74, 0), (81, 0.06)) if bells else ():
         place(fx, bell(hz(m)), starts['reveal'] + d, 0.16, pan=-0.2 if d else 0.2)
     place(fx, riser(2.0), starts['cta'] - 2.0, 0.26)
     place(fx, boom(3.0), starts['cta'], 0.6)
-    for m, d in ((62, 0), (66, 0.05), (69, 0.1), (74, 0.15), (76, 0.2)):
+    for m, d in ((62, 0), (66, 0.05), (69, 0.1), (74, 0.15), (76, 0.2)) if bells else ():
         place(fx, bell(hz(m), 3.5), starts['cta'] + d, 0.12, pan=(d * 6 - 0.6))
 
     mix = (reverb(pad, 0.3) + reverb(arp, 0.35, decay=0.45) * 0.9 + bass + drums + reverb(fx, 0.45, decay=0.8))
@@ -329,16 +331,86 @@ def write(path, x):
     wavfile.write(path, SR, (x * 32767).astype(np.int16))
 
 
+# ---- The second video's effects: fewer and softer --------------------------------------------------------------
+# Five sounds, all quiet, rounded and dry: no bells. Each is written at the same peak (SFX2_PEAK); how loud it plays is
+# set in src/promo2/sound.ts. A file of your own in sfx2/ (click.mp3, key.mp3, pop.mp3, whoosh.mp3, marker.mp3; see
+# SFX2.md) takes the place of the made one: `npm run sfx2` trims it, levels it to the same peak and puts it in
+# public/audio/sfx2/, which is what the video plays.
+
+SFX2_PEAK = 0.5
+SFX2_LONGEST = dict(click=0.15, key=0.15, pop=0.4, whoosh=1.2, marker=0.8)  # seconds kept of a file of your own
+
+
+def sfx2():
+    own = np.random.default_rng(23)  # its own seed: the first video's effects and both scores stay as they were
+    out = {}
+    t = times(0.035)  # a trackpad's click, felt more than heard: a little body, the edge taken off
+    out['click'] = lowpass(np.sin(2 * np.pi * 820 * t) * np.exp(-t / 0.003) * 0.6
+                           + bandpass(own.standard_normal(len(t)), 900, 3200) * np.exp(-t / 0.0011) * 0.35, 3800)
+    t = times(0.06)  # a soft key, low and short
+    out['key'] = lowpass(bandpass(own.standard_normal(len(t)), 500, 2400) * np.exp(-t / 0.0028) * 0.6
+                         + np.sin(2 * np.pi * 240 * t) * np.exp(-t / 0.012) * 0.5, 3000)
+    t = times(0.13)  # something settling into place: a rounded "tok" that falls a little in pitch
+    ph = 2 * np.pi * np.cumsum(340 + 180 * np.exp(-t / 0.02)) / SR
+    out['pop'] = lowpass((np.sin(ph) + 0.08 * np.sin(2 * ph)) * np.exp(-t / 0.035) * (1 - np.exp(-t / 0.004)), 2500)
+    w = lowpass(swept_noise(0.55, np.concatenate([np.geomspace(280, 1100, 30), np.geomspace(1100, 450, 20)]), 1.2), 3000)
+    t = times(0.55)  # air moving past, low and smooth
+    w = w * np.sin(np.pi * np.clip(t / 0.55, 0, 1)) ** 2
+    pan = np.linspace(-0.4, 0.4, len(w))
+    out['whoosh'] = np.stack([w * np.cos((pan + 1) * np.pi / 4), w * np.sin((pan + 1) * np.pi / 4)], 1)
+    t = times(0.3)  # a felt-tip pen across paper
+    out['marker'] = lowpass(swept_noise(0.3, np.geomspace(1200, 1800, 12), 0.9), 4500) * np.sin(np.pi * t / 0.3) ** 0.8
+    return out
+
+
+def own_sound(path, longest):
+    """A sound from the ElevenLabs website (or anywhere): 48 kHz stereo, from its first sound, at most `longest` s."""
+    import subprocess
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        wav = pathlib.Path(d) / 'in.wav'
+        subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-i', str(path), '-ar', str(SR), '-ac', '2', str(wav)], check=True)
+        _, x = wavfile.read(wav)
+    x = x.astype(float) / 32768.0
+    level = np.abs(x).max(1)
+    start = int(np.argmax(level > level.max() * 10 ** (-40 / 20)))
+    x = x[max(0, start - int(0.002 * SR)):][: int(longest * SR)]
+    n = min(len(x), int(0.03 * SR))
+    x[len(x) - n:] *= np.linspace(1, 0, n)[:, None]  # no click where it's cut
+    return x
+
+
+def write_sfx2():
+    made = sfx2()
+    mine = ROOT / 'sfx2'
+    for name, x in made.items():
+        found = next((p for ext in ('wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg') for p in mine.glob(f'{name}.{ext}')), None)
+        if found:
+            x = own_sound(found, SFX2_LONGEST[name])
+        if x.ndim == 1:
+            x = np.stack([x, x], 1)
+        x = x * SFX2_PEAK / (np.max(np.abs(x)) + 1e-9)
+        # The video plays key1, key2 and key3 (key taps vary); one key sound serves all three.
+        for file in (('key1', 'key2', 'key3') if name == 'key' else (name,)):
+            write(OUT / 'sfx2' / f'{file}.wav', x)
+        print(f"sfx2: {name:<7} {'from ' + found.name if found else 'made here'}")
+
+
 if __name__ == '__main__':
     args = argparse.ArgumentParser(description='The promo videos\' music and sound effects.')
     args.add_argument('--promo', choices=sorted(PROMOS), default='1', help='which video: 1 (the first) or 2 (what\'s new)')
-    promo = PROMOS[args.parse_args().promo]
-    starts, total = timeline(promo)
-    write(OUT / promo['music'], music(starts, total, promo['roles']))
-    for name, x in sfx().items():
-        # The first video's run makes them all. The second's only adds what's missing: its randomness runs on from the
-        # music, so remaking them here would change the first video's effects by a hair.
-        if promo is PROMOS['1'] or not (OUT / 'sfx' / f'{name}.wav').exists():
-            write(OUT / 'sfx' / f'{name}.wav', x)
-    print(f'music: {total:.2f} s; scenes start at ' + ', '.join(f'{k} {v:.1f}s (beat {v / BEAT:.1f})' for k, v in starts.items()))
-    print('sfx: ' + ', '.join(sorted(p.stem for p in (OUT / 'sfx').glob('*.wav'))))
+    args.add_argument('--sfx-only', action='store_true', help='with --promo 2: only the second video\'s effects (npm run sfx2)')
+    a = args.parse_args()
+    promo = PROMOS[a.promo]
+    if not a.sfx_only:
+        starts, total = timeline(promo)
+        write(OUT / promo['music'], music(starts, total, promo['roles'], promo.get('bells', True)))
+        for name, x in sfx().items():
+            # The first video's run makes them all. The second's only adds what's missing: its randomness runs on from
+            # the music, so remaking them here would change the first video's effects by a hair.
+            if promo is PROMOS['1'] or not (OUT / 'sfx' / f'{name}.wav').exists():
+                write(OUT / 'sfx' / f'{name}.wav', x)
+        print(f'music: {total:.2f} s; scenes start at ' + ', '.join(f'{k} {v:.1f}s (beat {v / BEAT:.1f})' for k, v in starts.items()))
+        print('sfx: ' + ', '.join(sorted(p.stem for p in (OUT / 'sfx').glob('*.wav'))))
+    if promo is PROMOS['2']:
+        write_sfx2()  # after the music: the noise it draws on would otherwise shift the score's

@@ -110,11 +110,8 @@ export const Drawings: React.FC = () => {
           clicks={[DRONE.pin, HAND.pin]}
         />
       </Desktop>
-      <Sfx at={DRONE.hover - 18} name="tick" volume={0.22} />
-      <Sfx at={DRONE.hover} name="tick" volume={0.25} />
       <Sfx at={DRONE.pin + 2} name="pop" volume={0.24} />
       <Sfx at={SWITCH - 4} name="whoosh" volume={0.1} />
-      <Sfx at={HAND.hover} name="tick" volume={0.25} />
       <Sfx at={HAND.pin + 2} name="pop" volume={0.24} />
       <Title text={text2.drawings as [string, string]} delay={8} />
     </AbsoluteFill>

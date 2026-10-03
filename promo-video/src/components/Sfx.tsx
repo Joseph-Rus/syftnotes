@@ -4,12 +4,26 @@ import {sfxVolume} from '../config';
 
 export type SfxName = 'click' | 'key1' | 'key2' | 'key3' | 'pop' | 'whoosh' | 'marker' | 'chime-record' | 'chime-filed' | 'tick' | 'ding';
 
-/** A sound effect from public/audio/sfx (made by scripts/make_audio.py), played `at` frames into the scene. */
-export const Sfx: React.FC<{at: number; name: SfxName; volume?: number}> = ({at, name, volume = 0.5}) => (
-  <Sequence from={Math.round(at)} durationInFrames={75} layout="none">
-    <Audio src={staticFile(`audio/sfx/${name}.wav`)} volume={volume * sfxVolume} />
-  </Sequence>
-);
+/**
+ * Which sound effects a video plays: the folder in public/ its files are in, and a gain for each (times the volume each
+ * scene asks for), or null for one it leaves out. The first video's are public/audio/sfx, as they are.
+ */
+export type SfxSet = {folder: string; gain?: Partial<Record<SfxName, number | null>>};
+const SfxSetContext = React.createContext<SfxSet>({folder: 'audio/sfx'});
+/** Everything inside plays this set of effects (the second video's: src/promo2/sound.ts). */
+export const SfxSetProvider = SfxSetContext.Provider;
+
+/** A sound effect from the video's set (made by scripts/make_audio.py), played `at` frames into the scene. */
+export const Sfx: React.FC<{at: number; name: SfxName; volume?: number}> = ({at, name, volume = 0.5}) => {
+  const set = React.useContext(SfxSetContext);
+  const gain = set.gain?.[name];
+  if (gain === null) return null;
+  return (
+    <Sequence from={Math.round(at)} durationInFrames={75} layout="none">
+      <Audio src={staticFile(`${set.folder}/${name}.wav`)} volume={volume * sfxVolume * (gain ?? 1)} />
+    </Sequence>
+  );
+};
 
 /** Key taps while `count` characters are typed from `start`, one every `every` frames. */
 export const Typing: React.FC<{start: number; count: number; perSecond: number; every?: number; volume?: number}> = ({

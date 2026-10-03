@@ -94,7 +94,6 @@ export const Quiet: React.FC = () => {
         <div style={{opacity: note, fontFamily: fonts.ui, fontSize: vertical ? 24 : 22, color: '#7A8497', marginTop: 4}}>{text2.quietNote}</div>
       </AbsoluteFill>
       <Sfx at={13} name="marker" volume={0.28} />
-      <Sfx at={41} name="tick" volume={0.2} />
     </Paper>
   );
 };
