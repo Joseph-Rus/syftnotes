@@ -18,7 +18,8 @@ Non-commercial (NC), share-alike (SA) and GPL-family art is never imported.
 | ↳ [DBCLS Togo Picture Gallery](https://togotv.dbcls.jp/en/pics.html) | CC BY 4.0; required credit "© 2016 DBCLS TogoTV / CC-BY-4.0" | Bones of the hand and foot, joints, animals, plants, lab equipment | Same; the large anatomical files are simplified on import |
 | ↳ Bioicons' CC0 contributors (OpenClipart, Mariana Ruiz Villarreal, Simon Dürr and others) | CC0 1.0 | Glassware, lab stands, a prokaryote, computer hardware | Same |
 | [Wokwi elements](https://github.com/wokwi/wokwi-elements) (npm `@wokwi/elements`) | MIT, © 2020 Uri Shaked | Arduino Uno, Nano and Mega, ESP32, LEDs, resistor, buttons, potentiometers, servo, stepper, sensors, displays, keypad | The importer reads the package's SVG templates with every light off, expands their repeated pin patterns into shapes, drops the glow filters |
-| Study Stash's own parts (`engine/tools/PartsImport/house/`) | MIT, as the rest of this repo | Drone, robot-arm and machine parts, a server rack and its equipment: things no free illustration set covers well | Drawn for this library in the house style (by Claude, for this project), or cut out of illustrations the app's own illustrator drew |
+| [Wikimedia Commons](https://commons.wikimedia.org/) | **per file**, read from Commons' own licence field at import; only "Public domain", "CC0", "CC BY 3.0" and "CC BY 4.0" are accepted, anything else (CC BY-SA, GFDL) is refused | LadyofHats' (Mariana Ruiz Villarreal) animal and plant cells, both public domain | Their own labels and leader lines are taken out |
+| Study Stash's own parts (`engine/tools/PartsImport/house/`) | MIT, as the rest of this repo | Drone, robot-arm and machine parts, a server rack and its equipment: things no free illustration set covers well | The rack set drawn for this library, to scale in mm (by Claude, for this project); the drone and arm cut out of the illustrations the app's own illustrator drew for the earlier test lectures |
 
 ## Looked at and not used
 
@@ -52,4 +53,33 @@ Non-commercial (NC), share-alike (SA) and GPL-family art is never imported.
    regions (the left ventricle of a heart, the USB port of a board: these become parts a student can point at) and
    ports (points other parts and connectors attach to).
 7. Written, with its source, author and licence, into `src/StudyStash.Core/Rich/PartsLibrary.xml`, and the credits
-   into `PartsCredits.md` (README) and the app's About.
+   into [parts-credits.md](parts-credits.md) (linked from the README); the app's About builds its line from the
+   library. Wokwi's MIT notice ships inside the library file.
+
+Bulk rules add the rest of Bioicons by category (anatomy, cells, lab, chemistry, microbiology, plants, animals,
+computing), under the allowed licences, light enough once cleaned (22 KB, 33 KB for anatomy), with no words in them
+(a labelled diagram's words aren't the lecture's), one of each drawing (no colour variants), no brand names, and at
+most 45 from one author's category, what students meet most first.
+
+## What's in it (October 2026)
+
+317 parts, 3.9 MB: anatomy 50, lab 68, chemistry 39, microbiology 43, cells 34, electronics 27, computing 15,
+animals 16, plants 12, machines 13. Curated with regions and ports: the heart cut open (15 regions), the bones of the
+hand (14 regions, 21 ports), the Arduino Uno (12 regions, 23 pin ports), a burette on its stand (6 regions), the
+animal cell, the organelles, glassware, the quadcopter and robot arm (every part a region), a 42U rack with a U-slot
+port for each unit and ten kinds of equipment, 27 Wokwi modules.
+
+Covered well: the heart, the hand's bones, a cell and its organelles, lab glassware and a titration, Arduino-class
+boards and modules, a server rack, the drone and robot arm the test lectures described. Thin or missing: most
+organs beyond a single drawing each (no labelled regions), the skeleton beyond the hand, muscles, the nervous system,
+plants and animals as more than one drawing each, physics apparatus (pendulums, circuits as schematics, optics),
+mechanics (gears, engines, pumps), earth and space. Those subjects are drawn shape by shape as before, and each
+addition is a manifest entry in `curated.json`.
+
+## Rebuilding it
+
+    cd engine/tools/PartsImport && dotnet run -- build [folder for contact sheets]
+
+It needs the network once (Bioicons at the pinned commit, the Wokwi package, two Commons files; then everything is
+in `cache/`), and Node for the Wokwi templates. `dotnet run -- leaves <source> out.png` numbers a source's shapes over
+a grid of tenths, to write a part's regions by.

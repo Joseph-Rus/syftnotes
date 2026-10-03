@@ -16,6 +16,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:s="using:StudyStash.App.Services"
+             xmlns:rich="using:StudyStash.Core.Rich"
              xmlns:app="using:StudyStash.App"
              xmlns:c="using:StudyStash.App.Controls"
              xmlns:v="using:StudyStash.App.Views"
@@ -632,6 +633,14 @@
                       <StackPanel Spacing="2" VerticalAlignment="Center">
                         <TextBlock Classes="row-title" Text="Speech models" />
                         <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT); NVIDIA Parakeet TDT 0.6B v3 and TitaNet small (CC BY 4.0) and pyannote segmentation 3.0 (MIT), converted to ONNX by sherpa-onnx. They run on this computer and download only when you pick them." TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Border>
+                    <Border Classes="rowsep" />
+                    <!-- The credits the illustration parts' licences ask for (CC BY, MIT), from the parts library itself. -->
+                    <Border Classes="row">
+                      <StackPanel Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Classes="row-title" Text="Illustration parts" />
+                        <TextBlock Classes="row-sub" Text="{x:Static rich:PartsLibrary.AboutLine}" TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
                     <Border Classes="rowsep" />

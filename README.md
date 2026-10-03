@@ -201,18 +201,24 @@ drawing — up to four for a long one — one under about three minutes gets non
 lecture of discussion, admin or definitions.
 
 A lecture that describes a physical thing at length — a drone's frame, motors and battery, the
-bones and tendons of the hand, the heart cut open, a circuit board, a robot arm — can also get an
-**illustration**: a detailed, labelled drawing of the thing itself, like a figure in a textbook.
-The designer plans it (the view, where things go, and the parts the lecturer named, each with a line
-from what was said), then the same engine draws it in a house style: soft flat colours by material,
-gentle shading, every part outlined in its own colour, labels in columns with leader lines. Its
-labels must be the lecture's words or it's left out; labels that crowd or run off the edge are
-spaced out automatically, and one that still looks wrong (a part missing, a leader that misses its
-part, drawn too simply) goes back once while there's time. It's clean, stylised vector art, not a
-photograph, and only an engine that draws well is asked (Claude Code, Codex, Gemini — never a local
-Ollama model). A lecture gets one, two for a long one. A detailed drawing is long to write out (8 to
-14 minutes with Claude Code's Opus), so a lecture that gets one has its notes up to 18 minutes after
-its transcript, rather than 8.
+bones and tendons of the hand, the heart cut open, a circuit board, a robot arm, a cell, a titration
+set-up, a server rack — can also get an **illustration**: a detailed, labelled drawing of the thing
+itself, like a figure in a textbook. The designer plans it (the view, where things go, and the parts
+the lecturer named, each with a line from what was said). Then, most of the time, it's **composed
+from ready-made parts** in seconds: Study Stash ships a library of about 300 professionally drawn,
+openly licensed parts (Servier Medical Art's hearts, organs, organelles and glassware, DBCLS's bones,
+public-domain cells, Wokwi's Arduino boards and modules, and Study Stash's own drone, robot-arm and
+server-rack parts), finds the ones that fit the plan by its words, and a fast model (Claude Code's
+Sonnet) answers with a small plan of which parts go where; Study Stash draws the parts, any simple
+shapes nothing in the library shows (a tendon, a wire, a white tile) and the labels itself, in the
+house style. The same plan again (a class that comes back to the drone) is drawn at once from the
+last one. When the library has nothing for the subject, the same engine draws it shape by shape
+instead, as before: soft flat colours by material, gentle shading, labels in columns with leader
+lines, sent back once if it looks wrong. That takes 6 to 20 minutes with Claude Code's Opus, so only
+a lecture whose illustration is drawn has its notes up to 18 minutes after its transcript, rather
+than 8. Either way its labels must be the lecture's words or it's left out, and only an engine that
+draws well is asked (Claude Code, Codex, Gemini — never a local Ollama model). A lecture gets one,
+two for a long one. Parts under a CC BY licence are credited under the figure.
 
 - **Automatic** (the default) uses the strongest engine that already reads your lectures — the one
   that writes your notes or answers your questions — trying Claude Code (Opus, high effort), then
@@ -231,7 +237,7 @@ big chart with no groups) goes back once with what's wrong, while there's time, 
 used only when it's better; a plot is worked out at its sliders' starting values and ends, and one
 that's flat, undefined, off its axes or has a slider that changes nothing goes back the same way. If
 the diagrams can't be designed (the engine is busy, over its limit,
-or takes longer than 8 minutes, 18 with an illustration), the notes are kept exactly as written. The library's log says
+or takes longer than 8 minutes, 18 with an illustration that has to be drawn), the notes are kept exactly as written. The library's log says
 what was drawn and redesigned, or why nothing was.
 
 ## Notes
@@ -391,6 +397,15 @@ voices apart, when you turn that on, it uses
 [TitaNet small](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/titanet_small)
 (CC BY 4.0), also converted by sherpa-onnx. The models are downloaded when you pick them; none is
 bundled.
+
+Illustrations are composed from parts drawn by [Servier Medical Art](https://smart.servier.com/)
+(CC BY 3.0, via [Bioicons](https://bioicons.com)), the [DBCLS Togo Picture
+Gallery](https://togotv.dbcls.jp/en/pics.html) (© 2016 DBCLS TogoTV / CC-BY-4.0), Bioicons' CC0
+artists, Mariana Ruiz Villarreal (LadyofHats; public domain, via Wikimedia Commons) and
+[Wokwi elements](https://github.com/wokwi/wokwi-elements) (© 2020 Uri Shaked, MIT), every part
+recoloured to Study Stash's palette and simplified, and from Study Stash's own parts. Every part
+and its licence is listed in [docs/parts-credits.md](docs/parts-credits.md); where they come from
+and why, in [docs/parts-sources.md](docs/parts-sources.md).
 
 Notes and diagrams are drawn with [CSharpMath](https://github.com/verybadcat/CSharpMath) (MIT,
 bundling the [Latin Modern Math](https://www.gust.org.pl/projects/e-foundry/lm-math) font under

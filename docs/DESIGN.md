@@ -252,8 +252,40 @@ everywhere the drawing does: `SafeSvg` reads them back as `Parts`, search and As
   checked like a diagram. The illustrator is asked once per plan (in parallel with the diagrams'
   checks) with the lecture, the plan, a house palette by material (light, base, shade, outline), the
   order to draw in (base shapes, pieces, fine detail, gradient shading, callouts) and the structure
-  above; it answers with the SVG alone. Only engines that draw SVG (`Drawings.FlowchartsAndSvg`, the
-  cloud engines) are asked.
+  above; it answers with the SVG alone. This is for a plan the parts library can't compose (below).
+  Only engines that draw SVG (`Drawings.FlowchartsAndSvg`, the cloud engines) are asked, to compose
+  or to draw.
+- **Composing from parts, before drawing** (`Core/Rich/PartsLibrary.cs`, `Core/Rich/PartsScene.cs`,
+  `Core/IllustrationDesign.Compose.cs`): most subjects aren't drawn at all. `PartsLibrary.xml` (an
+  embedded resource, about 300 parts, 4 MB, built by `engine/tools/PartsImport`; sources and licences
+  in `docs/parts-sources.md`) holds ready-made parts, each an SVG symbol already through `SafeSvg`
+  (and through it again when it's first used: a part it refuses is never drawn), in the house
+  palette (every colour moved onto the nearest material ramp, in OKLab), with a name, tags, a
+  category, its view and real size, a point well inside it, **regions** (its shapes for the left
+  ventricle or the USB port, grouped as `r-{id}` without changing what's drawn over what) and
+  **ports** (a burette's tip, a board's pin 13, a rack's U slots). The app shortlists parts for a
+  plan by its words (BM25 over names, tags and regions; no model) and composes only when they seem
+  to cover 40% of the planned parts. The composer (the designer's engine with a fast model, Claude
+  Code's Sonnet, at low effort: `DiagramEngines.ComposeModel`) gets the plan and a catalogue of at
+  most 40 parts and answers with a scene of 1 to 2 KB: parts placed by middle and width (or a port
+  put on another's port, or at the scale of a part drawn to scale), turned or mirrored; at most 12
+  simple shapes in house materials for what no part shows (an ellipse, a rectangle, a blob, a band
+  for a tendon or a wire, an arrow); each label's target (a part, a region, a port, a shape), with an
+  optional short fact. `PartsScene.Read` takes it strictly (only shortlisted parts, finite numbers in
+  range, references to things that exist; two labels on one thing settled by its name), and
+  `PartsScene.Draw` draws it the same way every time: each part a safe copy of its library drawing
+  under one matrix (a part used twice written once and copied), labelled regions renamed to the
+  plan's ids with their title and desc, a small ring for a labelled point with no shapes, the art
+  scaled to fit, labels in columns either side (above and below a wide thing, its ends' labels in
+  columns), each column in the order its points sit, leaders bent at the art's edge; a big shape's
+  label points just inside its edge, clear of the others; a labelled thing too small to point at is
+  drawn a little bigger. The same checks as a drawing follow (safe, the lecture's words, `SvgLint`
+  without "drawn too simply"), and it's kept only when it labels 70% of the plan. CC BY parts are
+  credited in its caption. A plan composed before is drawn again from its scene (`ComposedScenes`:
+  in memory and in `illustration-scenes/` under the library's home, one small JSON a plan, read back
+  through `PartsScene.Read` like any answer). When it can't be composed (no parts, the composer says
+  no, too little labelled), it's drawn as above. Composing took 5 to 22 seconds where drawing took
+  3 to 20 minutes.
 - **Checking**: the parts are named in the drawing from the plan (`Illustration.Name`), the drawing
   must clean (`SafeSvg`) and its words (labels, names, lines) must be the lecture's (the diagrams'
   60% rule). `Core/Rich/SvgGeometry.cs` works out where everything is from the markup alone
@@ -266,9 +298,9 @@ everywhere the drawing does: `SafeSvg` reads them back as `Parts`, search and As
   that change (`IllustrationDesign.Patch` puts them in place of their namesakes), and the result is
   kept only when it has fewer. Drawing is output-bound (a detailed figure is 25 to 35 KB written
   shape by shape: 8 to 14 minutes for Opus whatever the effort, so it's drawn at low effort,
-  `DiagramEngines.DrawEffort`); a pass that plans one tells `AiJobs` it may run 18 minutes in all
-  (`IllustrationDesign.Timeout`) instead of the diagrams' 8, and a drawing not done by then is left
-  out.
+  `DiagramEngines.DrawEffort`); a pass that has to draw one tells `AiJobs` it may run 18 minutes in
+  all (`IllustrationDesign.Timeout`) instead of the diagrams' 8 (a pass whose illustrations are all
+  composed never does), and a drawing not done by then is left out.
 - **Colours**: in light, as written. In dark, an illustration's shapes keep their own colours,
   moved into what a dark page carries (`Core/Rich/SvgColour.cs`, in OKLab: darks lifted clear of
   the dark paper, lights held back from glaring, hue and the order of light to dark kept so shading

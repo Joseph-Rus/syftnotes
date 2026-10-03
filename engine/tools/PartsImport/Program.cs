@@ -168,7 +168,7 @@ static class Program
 
         var xml = Library(built);
         string target = Path.Combine(Tool.Engine, "src", "StudyStash.Core", "Rich", "PartsLibrary.xml");
-        string text = xml.ToString(SaveOptions.DisableFormatting).Replace("><part ", ">\n<part ").Replace("><credit ", ">\n<credit ");
+        string text = xml.ToString(SaveOptions.DisableFormatting).Replace("><part ", ">\n<part ").Replace("><notice ", ">\n<notice ");
         await File.WriteAllTextAsync(target, text + "\n");
         await File.WriteAllTextAsync(Path.Combine(Tool.Engine, "..", "docs", "parts-credits.md"), Credits(built));
         Console.WriteLine($"{built.Count} parts, {text.Length / 1024} KB -> {target}");
@@ -190,6 +190,8 @@ static class Program
     static XElement Library(List<Built> built)
     {
         var root = new XElement("parts", new XAttribute("version", "1"), new XAttribute("bioicons", Sources.BioiconsCommit), new XAttribute("wokwi", Sources.WokwiVersion));
+        // The MIT licence asks for its notice in every copy: it ships inside the library, with the parts.
+        if (built.Any(b => b.Origin.Source == "Wokwi elements")) root.Add(new XElement("notice", new XAttribute("source", "Wokwi elements"), WokwiMit));
         foreach (var b in built)
         {
             var e = b.Entry;

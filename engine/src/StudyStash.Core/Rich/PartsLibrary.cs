@@ -196,6 +196,29 @@ public sealed partial class PartsLibrary
         return scored.OrderByDescending(s => s.Item2).ThenBy(s => s.Item1.Id, StringComparer.Ordinal).Take(max).ToList();
     }
 
+    /// <summary>
+    /// The credits for the About box, from the library itself: each source whose licence asks for credit (CC BY, MIT)
+    /// by its own credit line, then how many more parts are public domain or CC0; and where every part is listed.
+    /// </summary>
+    public static string AboutLine => aboutLine ??= Describe(Default);
+
+    static string? aboutLine;
+
+    static string Describe(PartsLibrary library)
+    {
+        var credits = library.Credits();
+        var named = credits.Where(c => (c.Licence.StartsWith("CC BY", StringComparison.Ordinal) || c.Licence is "MIT" or "BSD") && !c.Credit.StartsWith("Study Stash", StringComparison.Ordinal))
+            .Select(c => c.Credit).Distinct().ToList();
+        int free = credits.Where(c => c.Licence is "CC0 1.0" or "Public domain").Sum(c => c.Parts);
+        int own = credits.Where(c => c.Credit.StartsWith("Study Stash", StringComparison.Ordinal)).Sum(c => c.Parts);
+        var sb = new System.Text.StringBuilder();
+        sb.Append(string.Join("; ", named));
+        if (free > 0) sb.Append($"; {free} public-domain and CC0 parts from Bioicons' artists and Wikimedia Commons");
+        if (own > 0) sb.Append($"; {own} of Study Stash's own");
+        sb.Append(". Recoloured and simplified; every part and its licence is listed in docs/parts-credits.md in Study Stash's repository.");
+        return sb.ToString();
+    }
+
     /// <summary>Who made the parts, by credit line and licence, most parts first.</summary>
     public IReadOnlyList<PartsCredit> Credits() =>
         Parts.GroupBy(p => (p.Credit, p.Licence)).Select(g => new PartsCredit(g.Key.Credit, g.Key.Licence, g.Count()))
