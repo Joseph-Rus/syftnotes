@@ -14,8 +14,8 @@ namespace StudyStash.App.Tests;
 /// <summary>
 /// What the app does while nobody is looking at it, or while it is looked at: a spinner that went on turning in a panel
 /// that's hidden, or in a library window closed to the menu bar, woke the app thirty times a second for as long as it
-/// ran, and the recording dot, redrawn sixty times a second, cost the recorder most of its CPU. Each stops when it can't
-/// be seen, and starts again when it can.
+/// ran; the recording dot, redrawn sixty times a second, cost the recorder most of its CPU; a notes view built the same
+/// lecture again for each hidden copy of it. Each stops when it can't be seen, and starts again when it can.
 /// </summary>
 public class IdleCostTests
 {
@@ -74,5 +74,26 @@ public class IdleCostTests
         for (double t = 0; t < 7; t += 0.1) Assert.InRange(PulseDot.OpacityAt(t), PulseDot.Faintest - 1e-9, 1 + 1e-9);
         // Ten steps a second, not sixty frames: that's what made it cheap.
         Assert.True(PulseDot.Step >= TimeSpan.FromMilliseconds(80));
+    }
+
+    [AvaloniaFact]
+    public void Notes_in_a_hidden_view_are_built_when_it_shows_not_before()
+    {
+        var note = new NoteView();
+        var holder = new StackPanel { Children = { note }, IsVisible = false };
+        var w = Show(holder);
+        note.Markdown = "## Summary\n\nSome words.\n\n- one\n- two";
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(note.Unbuilt);
+        Assert.Empty(note.Children);
+        holder.IsVisible = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(note.Unbuilt);
+        Assert.NotEmpty(note.Children);
+        // Shown, it builds as it always did.
+        note.Markdown = "## Another\n\nWords.";
+        Assert.False(note.Unbuilt);
+        Assert.NotEmpty(note.Children);
+        w.Close();
     }
 }
