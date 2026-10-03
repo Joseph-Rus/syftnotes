@@ -15,7 +15,8 @@ namespace StudyStash.App.Tests;
 /// What the app does while nobody is looking at it, or while it is looked at: a spinner that went on turning in a panel
 /// that's hidden, or in a library window closed to the menu bar, woke the app thirty times a second for as long as it
 /// ran; the recording dot, redrawn sixty times a second, cost the recorder most of its CPU; a notes view built the same
-/// lecture again for each hidden copy of it. Each stops when it can't be seen, and starts again when it can.
+/// lecture again for each hidden copy of it; a slider left playing went on being redrawn in a closed window. Each stops
+/// when it can't be seen, and starts again when it can.
 /// </summary>
 public class IdleCostTests
 {
@@ -94,6 +95,20 @@ public class IdleCostTests
         note.Markdown = "## Another\n\nWords.";
         Assert.False(note.Unbuilt);
         Assert.NotEmpty(note.Children);
+        w.Close();
+    }
+
+    [AvaloniaFact]
+    public void A_slider_left_playing_stops_when_the_window_is_closed_to_the_menu_bar()
+    {
+        var note = new NoteView { Markdown = "```plot\n" + PlotDesign.Normal + "\n```", Width = 620 };
+        var w = Show(note);
+        var plot = Assert.Single(note.GetLogicalDescendants().OfType<PlotView>());
+        var play = plot.GetVisualDescendants().OfType<Button>().First(b => (AutomationProperties.GetName(b) ?? "").StartsWith("Play", StringComparison.Ordinal));
+        play.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.True(plot.Playing);
+        w.Hide();
+        Assert.False(plot.Playing);
         w.Close();
     }
 }
