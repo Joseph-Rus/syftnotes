@@ -14,7 +14,9 @@ public enum RewriteState { Idle, Rewriting, Ready, Comparing, Failed }
 /// <summary>
 /// The lecture's notes with "Rewrite notes" (design 17): the current notes never change on screen until "Use new" is
 /// pressed, however long a rewrite takes or however it ends. Polls the library while a rewrite is running so a job
-/// started elsewhere (another device, or before the app was last opened) still shows up here. Reads and drives one
+/// started elsewhere (another device, or before the app was last opened) still shows up here. The notes arrive before
+/// their diagrams: while the library adds those, the byline says so quietly and the library is asked now and then, and
+/// the diagrams appear in the notes on screen where they go, the rest of the page as it was. Reads and drives one
 /// library's AI (<see cref="IAiLibrary"/>); the view is just this.
 /// </summary>
 public sealed partial class AiNotesModel : ObservableObject, IDisposable
@@ -52,7 +54,17 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     /// <summary>What the notes area shows: the draft once it's ready (or while comparing), the current notes
     /// otherwise — either way with a leading "Summary" heading dropped, since the header row already says it.</summary>
     public string ShownMarkdown => State is RewriteState.Ready or RewriteState.Comparing ? DraftBody : CurrentBody;
-    public string ShownByline => State is RewriteState.Ready or RewriteState.Comparing ? DraftByline : CurrentByline;
+    public string ShownByline => State is RewriteState.Ready or RewriteState.Comparing ? DraftByline
+        : DiagramsLine.Length == 0 ? CurrentByline : CurrentByline.Length == 0 ? DiagramsLine : $"{CurrentByline} · {DiagramsLine}";
+
+    /// <summary>"Adding diagrams…" while the library adds the current notes' diagrams (they follow the notes by a few
+    /// minutes), "Diagrams added" once they've appeared, until the lecture is left; "" otherwise. On the byline.</summary>
+    [ObservableProperty] public partial string DiagramsLine { get; set; } = "";
+    public bool AddingDiagrams { get; private set; }
+    /// <summary>The notes when the diagrams were first seen on their way: different once they're in.</summary>
+    string beforeDiagrams = "";
+
+    partial void OnDiagramsLineChanged(string value) => OnPropertyChanged(nameof(ShownByline));
     /// <summary>The current and draft notes, each with a leading "Summary" heading dropped: what the compare
     /// view's two columns show side by side.</summary>
     public string CurrentBody => AiWords.DropLeadingSummary(CurrentMarkdown);
@@ -76,7 +88,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     /// <summary>Fired once "Use new" saves the draft as the lecture's notes: the host reloads the lecture.</summary>
     public event Action? NotesChanged;
-    /// <summary>How long to wait between polls while working (2 s); tests make this instant.</summary>
+    /// <summary>How long to wait between polls while working (2 s; 5 s while only diagrams are on their way); tests
+    /// make this instant.</summary>
     public Func<TimeSpan, CancellationToken, Task> Delay { get; set; } = Task.Delay;
     /// <summary>What "now" is, for the draft's "just now"/"5 min ago" byline; tests can fix it.</summary>
     public Func<DateTime> Now { get; set; } = () => DateTime.Now;
@@ -201,9 +214,17 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             "failed" => RewriteState.Failed,
             _ => State == RewriteState.Comparing ? RewriteState.Comparing : RewriteState.Idle,
         };
-        if (State == RewriteState.Rewriting) { if (pollCts is null) StartPolling(); }
+        bool was = AddingDiagrams;
+        AddingDiagrams = info.Diagrams == "adding";
+        if (AddingDiagrams && !was) beforeDiagrams = CurrentMarkdown;
+        if (AddingDiagrams) DiagramsLine = "Adding diagrams…";
+        else if (was) DiagramsLine = CurrentMarkdown != beforeDiagrams ? "Diagrams added" : "";
+        if (Polls) { if (pollCts is null) StartPolling(); }
         else StopPolling();
     }
+
+    /// <summary>The library is asked again while a rewrite runs or diagrams are on their way.</summary>
+    bool Polls => State == RewriteState.Rewriting || AddingDiagrams;
 
     void StartPolling()
     {
@@ -221,9 +242,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     {
         try
         {
-            while (!ct.IsCancellationRequested && State == RewriteState.Rewriting)
+            while (!ct.IsCancellationRequested && Polls)
             {
-                await Delay(TimeSpan.FromSeconds(2), ct);
+                await Delay(TimeSpan.FromSeconds(State == RewriteState.Rewriting ? 2 : 5), ct);
                 if (ct.IsCancellationRequested) return;
                 RewriteInfo? info;
                 try

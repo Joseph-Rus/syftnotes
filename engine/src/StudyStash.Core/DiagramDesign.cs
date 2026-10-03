@@ -61,7 +61,8 @@ public static partial class DiagramDesign
     public static readonly TimeSpan RevisionRoom = TimeSpan.FromSeconds(150);
     /// <summary>How much of a diagram's wording must be found in the transcript or the notes.</summary>
     public const double MinGrounded = 0.6;
-    /// <summary>How long the whole pass may take, repairs included, before the notes go on without it.</summary>
+    /// <summary>How long the whole pass may take, repairs included, before it stops and the notes stay as filed (the
+    /// notes never wait for it: they're filed first, and the diagrams follow).</summary>
     public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(8);
 
     /// <summary>What marks a diagram this pass added: the first line inside its block.</summary>
@@ -706,6 +707,22 @@ public static partial class DiagramDesign
         }
         foreach (var (anchor, unit) in at.Reverse()) lines.InsertRange(anchor + 1, unit);
         return string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// Diagrams designed a while ago, put into the notes as they stand now: any an earlier pass added come out (so they're
+    /// replaced, never stacked), and each goes at the end of the section its heading starts while that heading is still
+    /// there (at the end of notes with no headings); one whose heading has gone is skipped. Nothing else in the notes
+    /// moves or changes. Notes the designer read unchanged come out exactly as the pass would have written them. None
+    /// placed: the notes, untouched.
+    /// </summary>
+    public static (string Notes, IReadOnlyList<DesignedDiagram> Placed, IReadOnlyList<DesignedDiagram> Skipped) Place(string notes, IReadOnlyList<DesignedDiagram> diagrams)
+    {
+        string clean = Strip(notes);
+        var heads = Headings(NoteBlocks.Lines(clean));
+        var placed = diagrams.Where(d => heads.Count == 0 || heads.Any(h => Norm(h.Text) == Norm(d.After))).ToList();
+        var skipped = diagrams.Where(d => !placed.Contains(d)).ToList();
+        return (placed.Count == 0 ? notes : Insert(clean, placed), placed, skipped);
     }
 
     /// <summary>The last line with anything on it in the section <paramref name="after"/> heads (or in the notes).</summary>

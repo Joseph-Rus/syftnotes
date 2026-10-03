@@ -268,8 +268,16 @@ public class DiagramDesignTests
         {
             Providers = _ => claude, Checks = new FakeChecks().Installed("claude").Build(), Log = log.Add, DiagramTimeout = TimeSpan.FromSeconds(2),
         };
+        // The notes as filed, then the diagram pass that follows them (DiagramJobs runs it after filing).
+        async Task<string> Written()
+        {
+            string notes = await ai.SummarizeAsync(Lecture, cfg);
+            if (ai.TakeDiagramsFollow(Lecture.Id) is not { } by || await ai.DesignerAsync(cfg, by) is not { } pick) return notes;
+            Assert.Equal(Notes, notes); // filed without waiting for any diagram
+            return (await ai.DesignDiagramsAsync(Lecture, cfg, notes, pick, CancellationToken.None))?.Notes ?? notes;
+        }
 
-        string drawn = await ai.SummarizeAsync(Lecture, cfg);
+        string drawn = await Written();
         Assert.Equal(DiagramDesign.Insert(Notes, [new DesignedDiagram("The renin chain", "Key points", 25, NoteBlockKind.Mermaid, Chain,
             "Low pressure releases renin, which leads to angiotensin II.")]), drawn);
         Assert.Contains("Diagrams: draw none", claude.Requests[0].Prompt);
@@ -281,21 +289,21 @@ public class DiagramDesignTests
 
         // Whatever goes wrong in the pass, the notes are exactly as written.
         design = (_, _) => throw new InvalidOperationException("unknown option '--effort'");
-        Assert.Equal(Notes, await ai.SummarizeAsync(Lecture, cfg));
+        Assert.Equal(Notes, await Written());
         Assert.Equal(("", ""), (claude.Requests[^1].Model, claude.Requests[^1].Effort)); // asked again as set up
         design = (_, ct) => Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => "", TaskScheduler.Default);
-        Assert.Equal(Notes, await ai.SummarizeAsync(Lecture, cfg));
+        Assert.Equal(Notes, await Written());
         Assert.Contains("took longer than", log[^1]);
         design = (_, _) => throw new InvalidOperationException("Claude usage limit reached, resets at 3pm");
-        Assert.Equal(Notes, await ai.SummarizeAsync(Lecture, cfg));
+        Assert.Equal(Notes, await Written());
         Assert.True(AiSettings.Load(cfg.Home).Limits.ContainsKey("claude"));
 
         // Same as notes: the notes engine draws its own, as before; off: no diagrams, and no pass.
         int before = claude.Requests.Count;
         new AiSettings { Provider = "claude", Fallback = false, Diagrams = "notes" }.Save(cfg.Home);
-        await ai.SummarizeAsync(Lecture, cfg);
+        await Written();
         new AiSettings { Provider = "claude", Fallback = false, Diagrams = "off" }.Save(cfg.Home);
-        await ai.SummarizeAsync(Lecture, cfg);
+        await Written();
         Assert.Equal(before + 2, claude.Requests.Count);
         Assert.Contains("```mermaid\n" + Summarize.MermaidExample, claude.Requests[before].Prompt);
         Assert.Contains("Diagrams: draw none", claude.Requests[before + 1].Prompt);

@@ -12,6 +12,7 @@ lecture library, and installs itself in one of two roles:
 laptop                                          library (a Mac mini, say — any computer that stays on)
   record → Whisper (local, no audio leaves it)    /api/ingest → a queue (SQLite)
   the class you picked, or none             ──▶   pipeline: study notes (an AI engine) → sort → Markdown
+                                                  then, after filing: diagrams (DiagramJobs) into the notes
   Study Stash app / quick panel                   web page, Claude/MCP, Canvas mirror — over Tailscale
 ```
 
@@ -42,8 +43,19 @@ laptop                                          library (a Mac mini, say — any
    the library is asleep or on another network: the laptop keeps trying.
 4. **Queue and write.** `LibraryWeb.Ingest` turns the payload into a `Meeting` (`Wire.MeetingFromJson`)
    and enqueues it (`Store.Enqueue`). `Pipeline.ProcessAsync` then, in the background: writes study
-   notes from the transcript with the picked AI engine, has the diagrams engine design their diagrams
-   (`DiagramDesign`: it reads the timed transcript and the notes, decides whether anything is clearer
+   notes from the transcript with the picked AI engine (told to draw none of their own when a designer
+   will add them), sorts it into a class (the recorded class or
+   a title match wins outright; otherwise the AI reads the notes against each class's name, other
+   names, what it covers and its Canvas course's name, and picks one with a strict schema, or it goes
+   to Unsorted), and saves it as Markdown under `<library folder>/<Class>/`: the lecture is **filed**
+   (status `done`), readable in the app, on the phone, in Ask, search and a Markdown download.
+5. **Diagrams, after.** Filing hands the lecture to `DiagramJobs` (`Pipeline`'s `filed`, with
+   `AiJobs.TakeDiagramsFollow` saying whether a designer adds them). A job is a file in
+   `home/diagram-jobs`; the queue runs one at a time, oldest first, never while notes are being written
+   (`Pipeline.Writing`), and a pass on Ollama stops for notes that come in and starts again after. It
+   picks the designer as the student's diagrams pick says now (`AiJobs.DesignerAsync`), and runs the
+   diagram pass (`AiJobs.DesignDiagramsAsync`, a hard stop past its own 8 or 18 minutes:
+   `DiagramDesign`: it reads the timed transcript and the notes, decides whether anything is clearer
    as a picture and which kind fits — a flowchart, in groups for a big topic, a state or sequence
    diagram, a timeline or a mind map (`Mermaid` reads them all into one model; `DiagramLayout` lays
    each out), or a plot of a formula whose shape is the point (`Plot`, checked by `PlotLint`) — answers in JSON that's checked strictly, and each diagram it designs goes at the end
@@ -52,12 +64,22 @@ laptop                                          library (a Mac mini, say — any
    its redesign kept only when better; a lecture that describes a physical thing at length may also
    get an illustration (`IllustrationDesign`: planned in the same reply, drawn by the same engine
    from the plan, its parts named, its callouts spaced by `Callouts`, looked over by `SvgLint`; see
-   [Illustrations](#illustrations)); a pass that fails leaves the notes exactly as written), sorts
-   it into a class (the recorded class or
-   a title match wins outright; otherwise the AI reads the notes against each class's name, other
-   names, what it covers and its Canvas course's name, and picks one with a strict schema, or it goes
-   to Unsorted), and saves it as Markdown under `<library folder>/<Class>/`.
-5. **Read it.** `studystash mcp` (stdio, for Claude Code or Claude Desktop on the library's own
+   [Illustrations](#illustrations)); a pass that fails leaves the notes exactly as filed). The job
+   remembers the notes it designed for (`Notes.Fingerprint`) and the diagrams once they're designed,
+   so a restart just puts them in; a pass cut off by a restart runs again, `MaxTries` (3) at most.
+   `Store.AddDiagrams` puts them in under the store's lock (`DiagramDesign.Place`): earlier passes'
+   marked diagrams come out, each new one goes at the end of its heading's section while that
+   heading is still there (else it's skipped), and nothing else moves; the note file is replaced in
+   one step (written beside it, then moved over it) — written afresh when nobody touched it, or, when
+   it was edited since filing, with the diagrams put into its `## Summary` in place and every other
+   line as it was. Notes filed again (a rewrite used, notes written afresh) replace the job, and the
+   older pass's result is dropped. `GET /api/v2/ai/rewrite/{id}` says `"diagrams": "adding"` meanwhile:
+   the app's `AiNotesModel` polls it, shows it on the byline, and sets the new notes on the same
+   `NoteView`, which keeps every unchanged block (a diagram's pins and folds) and the reader's place
+   (`NoteView.HoldPlace`). The laptop sees them the same way, over the library's API; the phone and
+   Ask read the notes afresh. **Rewrite notes with** (`Rewrites`) writes the draft without diagrams
+   (`AiJobs.WriteNotesPlannedAsync`) and queues them when it's used.
+6. **Read it.** `studystash mcp` (stdio, for Claude Code or Claude Desktop on the library's own
    computer) and the HTTP + OAuth 2.1 door for claude.ai both read the same library through
    `ClaudeTools`, so Claude can search lectures, read one, and read Canvas.
 
@@ -73,6 +95,7 @@ Everything lives under one home folder (`~/.study-stash`, `--home`, or `STUDYSTA
 | `recordings/` | The laptop's own lectures: audio state and what's been sent, one folder per lecture. |
 | `state.db` | The library's SQLite index: one row per lecture, for search and the queue. |
 | `<library folder>/<Class>/*.md` | The notes themselves, plain Markdown, one file per lecture. |
+| `diagram-jobs/` | The library's diagrams still to come, one file per lecture, so a restart picks them back up. |
 
 ## The service
 

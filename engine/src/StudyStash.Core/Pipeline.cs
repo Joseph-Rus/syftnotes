@@ -20,11 +20,13 @@ public sealed class SleptException(Exception inner) : Exception("the computer sl
 /// Turns queued lectures into filed ones: writes our notes from the transcript, sorts, saves. Runs in the
 /// background of the library, so an upload from the laptop returns at once even when a big model takes minutes.
 /// While the notes engine isn't answering, lectures stay in the queue and get their notes when it's back; notes cut
-/// off because the computer slept (<paramref name="sleep"/> tells) are written again after it wakes.
+/// off because the computer slept (<paramref name="sleep"/> tells) are written again after it wakes. A lecture is filed
+/// as soon as its notes are written: <paramref name="filed"/> hears its id then, and whatever follows the notes (their
+/// diagrams, <see cref="Ai.DiagramJobs"/>) is queued there, never waited for.
 /// </summary>
 public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
     Func<Meeting, Config, Task<string>>? summarize = null, Action<string>? log = null, Func<string>? notesModel = null,
-    Func<string>? notesEngine = null, SleepClock? sleep = null)
+    Func<string>? notesEngine = null, SleepClock? sleep = null, Action<string>? filed = null)
 {
     readonly SleepClock sleep = sleep ?? SleepClock.System;
     readonly Func<Meeting, Config, Task<string>> summarize = summarize ?? ((m, c) => Summarize.SummarizeTranscriptAsync(m, c));
@@ -37,6 +39,10 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
 
     /// <summary>The id of the lecture being written right now.</summary>
     public string? Current => current;
+
+    /// <summary>Notes are being written right now, or lectures wait for theirs with the notes engine answering: what
+    /// follows the notes (their diagrams) doesn't start meanwhile, so it never holds them up.</summary>
+    public bool Writing => current is not null || (engineProblem is null && store.StatusCounts().GetValueOrDefault(Store.Queued) > 0);
 
     /// <summary>"Ollama isn't answering on your library. New lectures wait and get their notes when it's back.", while
     /// it isn't; null once notes are written again.</summary>
@@ -121,6 +127,18 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
         log(path is null
             ? $"[pipeline] '{m.Title}' changed while it was being written; not saving the old result"
             : $"[pipeline] filed '{m.Title}' \u2192 {c.ClassName} ({c.By} {Py.FormatFixed(c.Confidence, 2)})");
+        if (path is not null && filed is not null)
+        {
+            try
+            {
+                filed(row.Id);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // The notes are filed whatever becomes of what follows them.
+                log($"[pipeline] '{m.Title}': couldn't queue what follows its notes ({e.Message})");
+            }
+        }
         return path;
     }
 

@@ -77,6 +77,9 @@ public sealed record RewriteInfo(string Lecture, string State)
     public int Parts { get; init; }
     public NotesVersion? Current { get; init; }
     public NotesVersion? Draft { get; init; }
+    /// <summary>"adding" while the designer adds the current notes' diagrams (they follow the notes, a few minutes
+    /// later); "" otherwise, and from a library older than that.</summary>
+    public string Diagrams { get; init; } = "";
 }
 
 public sealed record ReadingScopes(bool Lectures = true, bool Notes = true, bool Canvas = true, bool Audio = false);

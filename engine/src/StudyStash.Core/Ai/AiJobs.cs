@@ -132,12 +132,14 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// SVG holds together, may draw what's spatial too.</summary>
     public static Drawings DrawingsFor(string engine) => engine == "ollama" ? Drawings.Flowcharts : Drawings.FlowchartsAndSvg;
 
-    /// <summary>Writing study notes, then their diagrams (<see cref="DiagramsAsync"/>).</summary>
+    /// <summary>Writing study notes, and nothing more: when a designer adds their diagrams, that happens after the lecture
+    /// is filed (<see cref="DiagramJobs"/>), never before, and <see cref="TakeDiagramsFollow"/> says so.</summary>
     public async Task<string> SummarizeAsync(Meeting m, Config cfg)
     {
         var settings = Settings;
         bool onOllama = NotesOnOllama(settings);
-        var (drawings, designer) = await DiagramPlanAsync(m, cfg, settings, onOllama ? "ollama" : settings.For("notes").Provider);
+        string engine = onOllama ? "ollama" : settings.For("notes").Provider;
+        var (drawings, designer) = await DiagramPlanAsync(m, cfg, settings, engine);
         string notes;
         if (onOllama)
             notes = Providers is null
@@ -152,11 +154,35 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                 chat: (_, _, prompt, _) => AnswerAsync("notes", prompt),
                 show: (_, _) => Task.FromResult<int?>(200_000),
                 drawings: drawings);
-        return designer is null ? notes : await DiagramsAsync(m, cfg, notes, designer, CancellationToken.None);
+        if (designer is null) follow.TryRemove(m.Id, out _);
+        else follow[m.Id] = engine;
+        return notes;
     }
+
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> follow = new();
+
+    /// <summary>Whether a designer adds diagrams to the notes <see cref="SummarizeAsync"/> just wrote for a lecture
+    /// (they were written without any of their own, for it to add): the engine that wrote them, for the designer's
+    /// pick, or null when nothing follows. Asked once, when the lecture is filed.</summary>
+    public string? TakeDiagramsFollow(string lectureId) => follow.TryRemove(lectureId, out string? engine) ? engine : null;
 
     /// <summary>How long the notes' diagrams may take, all told (a test makes it short).</summary>
     public TimeSpan DiagramTimeout { get; init; } = DiagramDesign.Timeout;
+
+    /// <summary>
+    /// Who designs the diagrams for notes <paramref name="notesEngine"/> wrote, by the student's pick as it is now
+    /// (<see cref="DiagramEngines.PickAsync"/>: automatic keeps to engines that already read the lectures, Ollama draws
+    /// flowcharts only): null when nobody does now (diagrams turned off since, or no engine to be had).
+    /// </summary>
+    public Task<DiagramPick?> DesignerAsync(Config cfg, string notesEngine) => DiagramEngines.PickAsync(Settings, cfg, Checks, notesEngine);
+
+    /// <summary>
+    /// The diagram pass over a filed lecture's <paramref name="notes"/>, by <paramref name="pick"/>: what it designed, or
+    /// null when it couldn't (said in the log, with why). The notes themselves are never touched here: the caller puts
+    /// the diagrams in (<see cref="Store.AddDiagrams"/>). Only <paramref name="ct"/> cancelling throws.
+    /// </summary>
+    public Task<DesignResult?> DesignDiagramsAsync(Meeting m, Config cfg, string notes, DiagramPick pick, CancellationToken ct) =>
+        DiagramsAsync(m, cfg, notes, pick, ct);
 
     /// <summary>Where the library's own log goes (a lecture's diagram pass says what it did there); nowhere when unset.</summary>
     public Action<string>? Log { get; init; }
@@ -183,12 +209,12 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     }
 
     /// <summary>
-    /// The diagram pass over freshly written notes, with the designer <paramref name="pick"/> names: at most
-    /// <see cref="DiagramTimeout"/>, and never a failure of the notes — an engine that can't answer, a reply that
-    /// can't be used or a pass that runs out of time hands back <paramref name="notes"/> exactly as written. Says in
-    /// the log what it drew or why it drew nothing. Only the caller's own cancelling (a rewrite stopped) throws.
+    /// The diagram pass over filed notes, with the designer <paramref name="pick"/> names: at most
+    /// <see cref="DiagramTimeout"/> (longer for an illustration), and never a failure of the notes — an engine that
+    /// can't answer, a reply that can't be used or a pass that runs out of time is null, and the notes stay exactly as
+    /// filed. Says in the log what it drew or why it drew nothing. Only the caller's own cancelling throws.
     /// </summary>
-    async Task<string> DiagramsAsync(Meeting m, Config cfg, string notes, DiagramPick pick, CancellationToken ct)
+    async Task<DesignResult?> DiagramsAsync(Meeting m, Config cfg, string notes, DiagramPick pick, CancellationToken ct)
     {
         var watch = System.Diagnostics.Stopwatch.StartNew();
         string who = pick.Engine == "ollama" ? pick.Model : Provider(pick.Engine).Name + (pick.Model.Length > 0 ? " " + pick.Model : "");
@@ -207,11 +233,11 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             string revised = result.Revised > 0 ? $", {result.Revised} redesigned after a look at how {(result.Revised == 1 ? "it" : "they")} laid out" : "";
             string looks = result.Problems.Count > 0 ? $"; still looks off: {string.Join("; ", result.Problems)}" : "";
             Log?.Invoke(result.Malformed
-                ? $"[diagrams] '{m.Title}': {who}'s answer couldn't be used ({string.Join("; ", result.Dropped)}); the notes are as written"
+                ? $"[diagrams] '{m.Title}': {who}'s answer couldn't be used ({string.Join("; ", result.Dropped)}); the notes stay as filed"
                 : result.Drawn.Count > 0
                     ? $"[diagrams] '{m.Title}': {who} drew {result.Drawn.Count} ({string.Join(", ", result.Drawn.Select(d => d.Title))}) in {watch.Elapsed.TotalSeconds:0}s{revised}{left}{looks}"
                     : $"[diagrams] '{m.Title}': {who} drew none: {result.Reason}{left}");
-            return result.Notes;
+            return result;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -223,8 +249,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
                 ? $"it took longer than {(DiagramTimeout.TotalMinutes >= 1 ? $"{DiagramTimeout.TotalMinutes:0} minutes" : $"{DiagramTimeout.TotalSeconds:0} seconds")}"
                 : e.Message;
             if (pick.Engine != "ollama") Record(pick.Engine, false, why);
-            Log?.Invoke($"[diagrams] '{m.Title}': {who} couldn't design diagrams ({why}); the notes are as written");
-            return notes;
+            Log?.Invoke($"[diagrams] '{m.Title}': {who} couldn't design diagrams ({why}); the notes stay as filed");
+            return null;
         }
         finally
         {
@@ -277,16 +303,25 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// estimate of how many parts the transcript needs (long lectures may need a few more, to merge them). Cancelling
     /// a real Ollama run is best-effort only — Ollama's own call has no way to stop mid-generation — so the caller
     /// marks that job cancelled itself and drops whatever this returns.</summary>
-    public async Task<string> WriteNotesAsync(Meeting m, Config cfg, string engine, Action<int, int>? progress, CancellationToken ct)
+    public async Task<string> WriteNotesAsync(Meeting m, Config cfg, string engine, Action<int, int>? progress, CancellationToken ct) =>
+        (await WriteNotesPlannedAsync(m, cfg, engine, progress, ct)).Notes;
+
+    /// <summary>
+    /// <see cref="WriteNotesAsync"/>, saying too whether a designer adds the new notes' diagrams once they're the
+    /// lecture's (<c>DiagramsBy</c>: the engine that wrote them, for the designer's pick; null when nothing follows).
+    /// The notes come without them, as the pipeline's do: the draft is ready as soon as its words are.
+    /// </summary>
+    public async Task<(string Notes, string? DiagramsBy)> WriteNotesPlannedAsync(Meeting m, Config cfg, string engine, Action<int, int>? progress,
+        CancellationToken ct)
     {
-        // The diagrams come after the notes, from the student's diagrams pick, this rewrite's engine being the one
-        // that reads the lecture; a designer is one more step in the progress.
+        // The diagrams come after the notes are used, from the student's diagrams pick, this rewrite's engine being the
+        // one that reads the lecture.
         var (drawings, designer) = await DiagramPlanAsync(m, cfg, Settings, engine);
         string notes;
         int done = 0, parts;
         if (engine == "ollama" && Providers is null)
         {
-            parts = designer is null ? 1 : 2;
+            parts = 1;
             notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg, drawings: drawings);
             progress?.Invoke(++done, parts);
         }
@@ -296,7 +331,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             const int ctx = 200_000; // other models read a whole lecture at once: tell the splitter their context is large
             string text = Py.Strip(TimedText.Plain(m.Transcript));
             int budget = Core.Summarize.TranscriptBudget(ctx);
-            parts = (text.Length <= budget ? 1 : Core.Summarize.SplitTranscript(text, budget).Count) + (designer is null ? 0 : 1);
+            parts = text.Length <= budget ? 1 : Core.Summarize.SplitTranscript(text, budget).Count;
             async Task<string> ChatAsync(Config c, string mdl, string prompt, int numCtx)
             {
                 string result = await AnswerWithAsync(engine, model, prompt, ct);
@@ -306,10 +341,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             notes = await Core.Summarize.SummarizeTranscriptAsync(m, cfg, chat: ChatAsync, show: (_, _) => Task.FromResult<int?>(ctx),
                 drawings: drawings);
         }
-        if (designer is null) return notes;
-        notes = await DiagramsAsync(m, cfg, notes, designer, ct);
-        progress?.Invoke(++done, Math.Max(done, parts));
-        return notes;
+        return (notes, designer is null ? null : engine);
     }
 
     /// <summary>The name of what wrote something with a specific engine, not ai.json's own pick for a job — the

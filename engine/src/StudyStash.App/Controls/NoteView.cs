@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Markdig;
 using Markdig.Extensions.Mathematics;
 using Markdig.Extensions.Tables;
@@ -138,7 +139,55 @@ public sealed partial class NoteView : StackPanel
             diagrams.Clear();
             Build();
         }
-        else if (change.Property == MarkdownProperty) Build();
+        else if (change.Property == MarkdownProperty)
+        {
+            var hold = HoldPlace();
+            Build();
+            hold?.Invoke();
+        }
+    }
+
+    /// <summary>How long a page that changed keeps the reader's place while what's new in it settles.</summary>
+    static readonly TimeSpan Settles = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Notes that change while they're read (their diagrams arrive after them) keep the reader's place: the piece at the
+    /// top of the page now stays just where it is on screen, whatever goes in above it, until the new pieces have their
+    /// size, or the reader scrolls. Null when there's no place to keep (nothing scrolled, a compact answer, paper), and
+    /// the scroll is left alone when that piece itself changed. Its pieces are the same controls, kept by
+    /// <see cref="Build"/>, so a diagram's pins and folded groups stay too.
+    /// </summary>
+    Action? HoldPlace()
+    {
+        if (Compact || Print || Children.Count == 0 || this.FindAncestorOfType<ScrollViewer>() is not { } scroller || scroller.Offset.Y <= 0) return null;
+        Control? anchor = null;
+        double top = 0;
+        foreach (var child in Children)
+            if (child.TranslatePoint(default, scroller) is { } at && at.Y + child.Bounds.Height > 0)
+            {
+                (anchor, top) = (child, at.Y);
+                break;
+            }
+        if (anchor is null) return null;
+        return () =>
+        {
+            if (!Children.Contains(anchor)) return;
+            var until = DateTime.UtcNow + Settles;
+            double expected = scroller.Offset.Y;
+            void Keep(object? sender, EventArgs e)
+            {
+                // The reader scrolled meanwhile (or it's had time to settle): their scroll wins.
+                if (DateTime.UtcNow > until || Math.Abs(scroller.Offset.Y - expected) > 0.5 || anchor.TranslatePoint(default, scroller) is not { } now)
+                {
+                    scroller.LayoutUpdated -= Keep;
+                    return;
+                }
+                if (Math.Abs(now.Y - top) <= 0.5) return;
+                expected = Math.Max(0, scroller.Offset.Y + now.Y - top);
+                scroller.Offset = scroller.Offset.WithY(expected);
+            }
+            scroller.LayoutUpdated += Keep;
+        };
     }
 
     bool Mac => Skin.Current == SkinKind.Mac;
