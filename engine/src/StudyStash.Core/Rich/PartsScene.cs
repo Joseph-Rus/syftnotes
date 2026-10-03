@@ -26,7 +26,11 @@ public static partial class PartsScene
     /// <summary>A part placed: which library part, its name in the scene, its middle and width (its height keeps the
     /// part's proportions), how far it's turned (degrees, clockwise) and whether it's mirrored; or, instead of a middle,
     /// one of its ports put on a point.</summary>
-    public sealed record Placed(string As, LibraryPart Part, double X, double Y, double W, double Turn, bool Flip, string? On, Point? At);
+    public sealed record Placed(string As, LibraryPart Part, double X, double Y, double W, double Turn, bool Flip, string? On, Point? At)
+    {
+        /// <summary>A part placed before it whose scale this one takes (parts drawn to scale: a rack and a server).</summary>
+        public string? Like { get; init; }
+    }
 
     /// <summary>A point: a number pair, or a port or region of a part placed earlier (<c>stand.tip</c>).</summary>
     public sealed record Point(double X, double Y, string? Ref);
@@ -37,7 +41,11 @@ public static partial class PartsScene
 
     /// <summary>A label: the planned part it names, and what it points at (a placed part, one of its regions, or a
     /// shape), with an optional short fact under the name.</summary>
-    public sealed record Label(string Part, string To, string Fact);
+    public sealed record Label(string Part, string To, string Fact)
+    {
+        /// <summary>Where on its target the leader ends, when the composer says (in its units); else Study Stash picks.</summary>
+        public (double X, double Y)? At { get; init; }
+    }
 
     public sealed record Scene(IReadOnlyList<Placed> Parts, IReadOnlyList<Shape> Shapes, IReadOnlyList<Label> Labels);
 
@@ -69,6 +77,8 @@ public static partial class PartsScene
                 if (!Plain().IsMatch(name) || !names.Add(name)) { dropped.Add($"a part named '{Clip(name, 40)}' (names are plain and used once)"); continue; }
                 if (!allowed.TryGetValue(use, out var part)) { dropped.Add($"'{name}' uses '{Clip(use, 40)}', which isn't in the catalogue"); continue; }
                 double w = Num(p["w"]) ?? double.NaN;
+                string? like = Str(p["like"]) is { Length: > 0 } l && placed.Any(x => x.As == l) ? l : null;
+                if (like is not null) w = double.IsFinite(w) && w > 0 ? w : 1;
                 if (!(w > 0 && w <= Far)) { dropped.Add($"'{name}' has no width"); continue; }
                 double turn = Num(p["turn"]) ?? 0;
                 if (Math.Abs(turn) > 360) { dropped.Add($"'{name}' turns {turn:0} degrees"); continue; }
@@ -83,7 +93,7 @@ public static partial class PartsScene
                     if (at is null) { dropped.Add($"'{name}' is put on a point that isn't there"); continue; }
                 }
                 else if (!Finite(x) || !Finite(y)) { dropped.Add($"'{name}' has no place"); continue; }
-                placed.Add(new Placed(name, part, on is null ? x : 0, on is null ? y : 0, w, turn, flip, on, at));
+                placed.Add(new Placed(name, part, on is null ? x : 0, on is null ? y : 0, w, turn, flip, on, at) { Like = like });
             }
         var shapes = new List<Shape>();
         if (o["shapes"] is JsonArray ss)
@@ -121,7 +131,10 @@ public static partial class PartsScene
                 // Two labels on one thing would be one part with two names: the one the thing is named for keeps it, or
                 // else the first.
                 int other = labels.FindIndex(x => x.To == to);
-                var label = new Label(part, to, Clip(Str(l["fact"]), 48));
+                var label = new Label(part, to, Clip(Str(l["fact"]), 48))
+                {
+                    At = l["at"] is JsonArray a && a.Count == 2 && Num(a[0]) is double ax && Num(a[1]) is double ay && Finite(ax) && Finite(ay) ? (ax, ay) : null,
+                };
                 if (other >= 0)
                 {
                     if (Named(to, planned[part]) && !Named(to, planned[labels[other].Part]))
@@ -328,12 +341,14 @@ public static partial class PartsScene
         // Where each part goes, in the composer's units.
         var transforms = new Dictionary<string, SvgGeometry.Affine>(StringComparer.Ordinal);
         var drawings = new Dictionary<string, XElement>(StringComparer.Ordinal);
+        var scales = new Dictionary<string, double>(StringComparer.Ordinal);
         Bounds? extent = null;
         foreach (var p in scene.Parts)
         {
             if (library.Drawing(p.Part) is not { } drawing) continue;
             var b = p.Part.Box;
-            double s = p.W / b.W;
+            double s = p.Like is { } like && scales.TryGetValue(like, out double theirs) ? theirs : p.W / b.W;
+            scales[p.As] = s;
             var local = Rotate(p.Turn).Then(Scale(p.Flip ? -s : s, s)).Then(Move(-b.CenterX, -b.CenterY));
             double cx = p.X, cy = p.Y;
             if (p.On is { } on && p.At is { } at && Where(at, transforms, scene) is { } target && Spot(p.Part, on) is { } port)
@@ -362,9 +377,20 @@ public static partial class PartsScene
         // The callouts: each planned part labelled, at the point it names.
         var planned = plan.Parts.ToDictionary(p => p.Id, StringComparer.Ordinal);
         var callouts = new List<(Callout C, string To)>();
+        // Points on parts first; then on the big shapes (a cell's membrane and cytoplasm), each where it's clear of
+        // the others.
+        var targets = new Dictionary<Label, (double X, double Y)>();
+        foreach (var l in scene.Labels.Where(l => !Big(l.To)))
+            if (Target(l.To, transforms, shapePoints, scene) is { } t) targets[l] = t;
+        foreach (var l in scene.Labels.Where(l => Big(l.To)))
+            if (Clear(l.To, shapePoints, scene, targets.Values.ToList()) is { } t) targets[l] = t;
+        bool Big(string to) => scene.Shapes.FirstOrDefault(s => s.As == to) is { Kind: "ellipse" or "rect" or "blob" } shape && shapePoints.TryGetValue(to, out var pts)
+            && Bounds.Around(pts) is { } b && b.W * b.H > 0.04 * extent.Value.W * extent.Value.H;
         foreach (var l in scene.Labels)
         {
-            if (!planned.TryGetValue(l.Part, out var part) || Target(l.To, transforms, shapePoints, scene) is not { } point) continue;
+            if (!planned.TryGetValue(l.Part, out var part) || !targets.TryGetValue(l, out var point)) continue;
+            // The composer's own point, when it's on the thing.
+            if (l.At is { } at && Extent(l.To, transforms, shapePoints, scene) is { } on && on.Inflate(Math.Max(on.W, on.H) * 0.05).Contains(at.X, at.Y)) point = at;
             double width = Math.Max(SvgGeometry.Width(part.Name, LabelSize), l.Fact.Length > 0 ? SvgGeometry.Width(l.Fact, FactSize) : 0);
             callouts.Add((new Callout { Part = part, Fact = l.Fact, X = point.X, Y = point.Y, Width = width, Height = l.Fact.Length > 0 ? 34 : 18 }, l.To));
         }
@@ -436,6 +462,8 @@ public static partial class PartsScene
         var credits = new List<string>();
         var materials = new HashSet<string>(StringComparer.Ordinal);
 
+        var repeats = scene.Parts.GroupBy(p => p.Part.Id).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
+        var shared = new HashSet<string>(StringComparer.Ordinal);
         foreach (var s in scene.Shapes.Where(s => s.Under)) DrawShape(s);
         foreach (var p in scene.Parts)
         {
@@ -446,7 +474,18 @@ public static partial class PartsScene
                 if (p.Part.NeedsCredit && !credits.Contains(p.Part.Credit)) credits.Add(p.Part.Credit);
             }
             var m = canvas.Then(transforms[p.As]);
-            var body = new XElement(ns + "g", new XAttribute("transform", Matrix(m)), drawing.Elements().Where(e => e.Name != ns + "defs").Select(e => new XElement(e)));
+            // A part drawn more than once (four motors, a cell's ribosomes) is written once and copied, unless a copy
+            // has labelled regions or the part copies things itself (a copy may not hold copies).
+            bool copy = repeats.Contains(p.Part.Id)
+                && !p.Part.Regions.Any(r => labelled.ContainsKey($"{p.As}.{r.Id}")) && !p.Part.Ports.Any(q => labelled.ContainsKey($"{p.As}.{q.Id}"))
+                && !drawing.Descendants(ns + "use").Any();
+            if (copy && shared.Add(p.Part.Id))
+                defs.Add(new XElement(ns + "g", new XAttribute("id", p.Part.Id + "--whole"), drawing.Elements().Where(e => e.Name != ns + "defs").Select(e => new XElement(e))));
+            var body = copy
+                ? new XElement(ns + "g", new XAttribute("transform", Matrix(m)), new XElement(ns + "use", new XAttribute("href", "#" + p.Part.Id + "--whole")))
+                : new XElement(ns + "g", new XAttribute("transform", Matrix(m)), drawing.Elements().Where(e => e.Name != ns + "defs").Select(e => new XElement(e)));
+            if (copy)
+                foreach (var r in body.Descendants().Where(e => ((string?)e.Attribute("id"))?.StartsWith("r-", StringComparison.Ordinal) == true)) r.SetAttributeValue("id", null);
             // Regions: the labelled ones become parts; the rest are just drawing.
             foreach (var r in body.Descendants(ns + "g").Where(g => ((string?)g.Attribute("id"))?.StartsWith("r-", StringComparison.Ordinal) == true).ToList())
             {
@@ -633,6 +672,41 @@ public static partial class PartsScene
         if (!transforms.TryGetValue(name, out var m) || scene.Parts.FirstOrDefault(x => x.As == name) is not { } placed) return null;
         if (dot < 0) return m.Apply(placed.Part.X, placed.Part.Y);
         return Spot(placed.Part, to[(dot + 1)..]) is { } spot ? m.Apply(spot.X, spot.Y) : null;
+    }
+
+    /// <summary>A point just inside the edge of a big shape (a cell's membrane, its cytoplasm), of eight round it the one
+    /// farthest from every other label's point.</summary>
+    static (double X, double Y)? Clear(string name, Dictionary<string, List<(double X, double Y)>> shapes, Scene scene, List<(double X, double Y)> taken)
+    {
+        if (!shapes.TryGetValue(name, out var pts) || Bounds.Around(pts) is not { } b) return null;
+        var shape = scene.Shapes.First(s => s.As == name);
+        var candidates = new List<(double X, double Y)>();
+        for (int i = 0; i < 8; i++)
+        {
+            double angle = Math.PI / 4 * i + Math.PI / 8;
+            if (shape.Kind == "rect")
+            {
+                double cx = Math.Clamp(Math.Cos(angle) * 1.5, -1, 1), cy = Math.Clamp(Math.Sin(angle) * 1.5, -1, 1);
+                candidates.Add((b.CenterX + cx * b.W / 2 * 0.95, b.CenterY + cy * b.H / 2 * 0.95));
+            }
+            else candidates.Add((b.CenterX + Math.Cos(angle) * b.W / 2 * 0.975, b.CenterY + Math.Sin(angle) * b.H / 2 * 0.975));
+        }
+        foreach (var c in candidates.ToList())
+            if (taken.Any(t => Math.Abs(t.X - c.X) < 1e-6 && Math.Abs(t.Y - c.Y) < 1e-6)) candidates.Remove(c);
+        var best = candidates.OrderByDescending(c => taken.Count == 0 ? 0 : taken.Min(t => Math.Sqrt((t.X - c.X) * (t.X - c.X) + (t.Y - c.Y) * (t.Y - c.Y)))).FirstOrDefault();
+        taken.Add(best);
+        return best;
+    }
+
+    /// <summary>The box of what a label points at, in the composer's units.</summary>
+    static Bounds? Extent(string to, Dictionary<string, SvgGeometry.Affine> transforms, Dictionary<string, List<(double X, double Y)>> shapes, Scene scene)
+    {
+        int dot = to.IndexOf('.');
+        string name = dot < 0 ? to : to[..dot];
+        if (shapes.TryGetValue(name, out var pts)) return Bounds.Around(pts);
+        if (!transforms.TryGetValue(name, out var m) || scene.Parts.FirstOrDefault(x => x.As == name) is not { } placed) return null;
+        var b = placed.Part.Box;
+        return Bounds.Around(new[] { (b.X, b.Y), (b.Right, b.Y), (b.Right, b.Bottom), (b.X, b.Bottom) }.Select(c => m.Apply(c.Item1, c.Item2)).ToList());
     }
 
     /// <summary>A smooth path through points (Catmull-Rom as cubic curves).</summary>

@@ -31,6 +31,9 @@ public sealed record DesignResult(string Notes, IReadOnlyList<DesignedDiagram> D
     public bool Malformed { get; init; }
     public int Revised { get; init; }
     public IReadOnlyList<string> Problems { get; init; } = [];
+
+    /// <summary>How many illustrations were composed from the parts library rather than drawn.</summary>
+    public int Composed { get; init; }
 }
 
 /// <summary>
@@ -479,7 +482,8 @@ public static partial class DiagramDesign
     /// <see cref="IllustrationDesign.Timeout"/> from the start, the caller told so through <paramref name="longer"/>.
     /// </summary>
     public static async Task<DesignResult> DesignAsync(Meeting m, string notes, Drawings drawings, Func<string, bool, Task<string>> ask,
-        int maxPromptChars = int.MaxValue, TimeSpan? budget = null, Func<string, Task<string>>? draw = null, Action<TimeSpan>? longer = null)
+        int maxPromptChars = int.MaxValue, TimeSpan? budget = null, Func<string, Task<string>>? draw = null, Action<TimeSpan>? longer = null,
+        Func<string, Task<string>>? compose = null, SceneCache? scenes = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         int cap = Cap(m.Transcript);
@@ -492,9 +496,21 @@ public static partial class DiagramDesign
         string grounds = (TimedText.Plain(m.Transcript) + "\n" + clean).ToLowerInvariant();
         // Illustrations are drawn while the diagrams are checked, in a time of their own: a detailed drawing takes several
         // minutes, so a pass that draws one may run longer (the caller is told how long, all told).
-        if (reply.Illustrations.Count > 0) longer?.Invoke(IllustrationDesign.Timeout);
-        var illustrating = IllustrationDesign.DrawAllAsync(m, clean, reply.Illustrations, grounds, draw ?? (prompt => ask(prompt, false)),
-            () => (budget is { } b && longer is null ? b : IllustrationDesign.Timeout) - clock.Elapsed, maxPromptChars);
+        // One composed from the parts library takes seconds: the pass only runs longer when one must be drawn.
+        var drawer = draw ?? (prompt => ask(prompt, false));
+        int extended = 0;
+        if (reply.Illustrations.Count > 0 && compose is null) longer?.Invoke(IllustrationDesign.Timeout);
+        else if (compose is not null)
+        {
+            var asked = drawer;
+            drawer = prompt =>
+            {
+                if (Interlocked.Exchange(ref extended, 1) == 0) longer?.Invoke(IllustrationDesign.Timeout);
+                return asked(prompt);
+            };
+        }
+        var illustrating = IllustrationDesign.DrawAllAsync(m, clean, reply.Illustrations, grounds, drawer,
+            () => (budget is { } b && longer is null ? b : IllustrationDesign.Timeout) - clock.Elapsed, maxPromptChars, compose, scenes);
         foreach (var d in reply.Diagrams)
         {
             if (drawn.Count >= cap)
@@ -550,7 +566,7 @@ public static partial class DiagramDesign
         drawn.AddRange(art.Drawn);
         dropped.AddRange(art.Dropped);
         still.AddRange(art.Problems);
-        return new DesignResult(drawn.Count == 0 ? clean : Insert(clean, drawn), drawn, reply.Reason, dropped) { Revised = revised + art.Revised, Problems = still };
+        return new DesignResult(drawn.Count == 0 ? clean : Insert(clean, drawn), drawn, reply.Reason, dropped) { Revised = revised + art.Revised, Problems = still, Composed = art.Composed };
     }
 
     /// <summary>What would look wrong with a diagram in the notes (<see cref="DiagramLint"/>); nothing for an SVG

@@ -1,0 +1,194 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 2100">
+  <!-- Study Stash's own rack parts, front view, drawn to scale in millimetres: a 19-inch (482.6 mm) rack and the
+       equipment that mounts in it (1U = 44.45 mm). Each part is a group with its id; the importer cuts them out. -->
+  <defs>
+    <linearGradient id="g-panel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3F5F7"/><stop offset=".55" stop-color="#D7DCE1"/><stop offset="1" stop-color="#AEB6BE"/></linearGradient>
+    <linearGradient id="g-dark" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7D8389"/><stop offset=".5" stop-color="#555B61"/><stop offset="1" stop-color="#3B4045"/></linearGradient>
+    <linearGradient id="g-black" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#555B61"/><stop offset="1" stop-color="#24272B"/></linearGradient>
+    <linearGradient id="g-post" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3B4045"/><stop offset=".5" stop-color="#555B61"/><stop offset="1" stop-color="#3B4045"/></linearGradient>
+    <linearGradient id="g-screen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A9D3F0"/><stop offset="1" stop-color="#4A9AD1"/></linearGradient>
+    <g id="rj45"><rect width="11" height="9" rx="1" fill="#24272B" stroke="#6B747D" stroke-width=".6"/><rect x="2.5" y="1.5" width="6" height="4.5" fill="#3B4045"/><rect x="4" y="6" width="3" height="1.6" fill="#555B61"/></g>
+    <g id="sfp"><rect width="14" height="10" rx="1" fill="#AEB6BE" stroke="#6B747D" stroke-width=".6"/><rect x="2" y="2" width="10" height="6" fill="#24272B"/></g>
+    <g id="bay25"><rect width="68" height="15" rx="1.5" fill="url(#g-black)" stroke="#24272B" stroke-width=".6"/><rect x="3" y="4" width="44" height="7" rx="1" fill="#3B4045"/><line x1="5" y1="6" x2="45" y2="6" stroke="#555B61" stroke-width=".8" stroke-dasharray="2 1.5"/><line x1="5" y1="9" x2="45" y2="9" stroke="#555B61" stroke-width=".8" stroke-dasharray="2 1.5"/><circle cx="56" cy="7.5" r="1.6" fill="#4FAE73"/><circle cx="62" cy="7.5" r="1.6" fill="#4A9AD1"/></g>
+    <g id="bay35"><rect width="100" height="26" rx="2" fill="url(#g-black)" stroke="#24272B" stroke-width=".6"/><rect x="4" y="5" width="70" height="16" rx="1.5" fill="#3B4045"/><line x1="7" y1="9" x2="71" y2="9" stroke="#555B61" stroke-width=".9" stroke-dasharray="2.5 2"/><line x1="7" y1="13" x2="71" y2="13" stroke="#555B61" stroke-width=".9" stroke-dasharray="2.5 2"/><line x1="7" y1="17" x2="71" y2="17" stroke="#555B61" stroke-width=".9" stroke-dasharray="2.5 2"/><rect x="80" y="6" width="14" height="14" rx="2" fill="#AEB6BE" stroke="#6B747D" stroke-width=".5"/><circle cx="87" cy="13" r="2" fill="#4FAE73"/></g>
+    <g id="outlet"><rect width="18" height="14" rx="3" fill="#24272B" stroke="#555B61" stroke-width=".6"/><rect x="4" y="4" width="2.5" height="6" fill="#7D8389"/><rect x="11.5" y="4" width="2.5" height="6" fill="#7D8389"/></g>
+    <g id="ear"><rect width="16" height="40" rx="2" fill="url(#g-dark)" stroke="#24272B" stroke-width=".6"/><circle cx="8" cy="10" r="2.6" fill="#24272B"/><circle cx="8" cy="30" r="2.6" fill="#24272B"/></g>
+  </defs>
+
+  <!-- The rack: frame, posts and rails with their holes, U numbers every five units. -->
+  <g id="rack-frame">
+    <rect x="0" y="0" width="600" height="2000" rx="8" fill="url(#g-black)" stroke="#24272B" stroke-width="2"/>
+    <rect x="12" y="50" width="576" height="1880" fill="#3B4045" stroke="#24272B" stroke-width="1.2"/>
+    <rect x="12" y="12" width="576" height="38" rx="3" fill="url(#g-dark)" stroke="#24272B" stroke-width="1"/>
+    <line x1="60" y1="31" x2="540" y2="31" stroke="#24272B" stroke-width="5" stroke-dasharray="20 8"/>
+    <rect x="12" y="1928" width="576" height="52" rx="3" fill="url(#g-dark)" stroke="#24272B" stroke-width="1"/>
+    <rect x="30" y="1980" width="60" height="16" rx="3" fill="#24272B"/>
+    <rect x="510" y="1980" width="60" height="16" rx="3" fill="#24272B"/>
+    <rect x="22" y="58" width="36" height="1868" fill="url(#g-post)" stroke="#24272B" stroke-width="1"/>
+    <rect x="542" y="58" width="36" height="1868" fill="url(#g-post)" stroke="#24272B" stroke-width="1"/>
+    <line x1="50" y1="60" x2="50" y2="1926.9" stroke="#24272B" stroke-width="7" stroke-dasharray="7 7.82"/>
+    <line x1="550" y1="60" x2="550" y2="1926.9" stroke="#24272B" stroke-width="7" stroke-dasharray="7 7.82"/>
+    <g font-size="11" fill="#AEB6BE" text-anchor="middle">
+      <text x="34" y="1904">1</text><text x="34" y="1726">5</text><text x="34" y="1504">10</text><text x="34" y="1282">15</text><text x="34" y="1059">20</text>
+      <text x="34" y="837">25</text><text x="34" y="615">30</text><text x="34" y="393">35</text><text x="34" y="171">40</text><text x="34" y="82">42</text>
+    </g>
+  </g>
+
+  <!-- 1U server -->
+  <g id="server-1u" transform="translate(700 60)">
+    <rect x="0" y="0" width="482.6" height="43.6" rx="2" fill="url(#g-panel)" stroke="#6B747D" stroke-width="1"/>
+    <use href="#ear" x="1" y="1.8"/><use href="#ear" x="465.6" y="1.8"/>
+    <use href="#bay25" x="22" y="5"/><use href="#bay25" x="92" y="5"/><use href="#bay25" x="22" y="23"/><use href="#bay25" x="92" y="23"/>
+    <rect x="168" y="6" width="200" height="31" rx="2" fill="#AEB6BE" stroke="#6B747D" stroke-width=".6"/>
+    <line x1="172" y1="12" x2="364" y2="12" stroke="#6B747D" stroke-width="2.4" stroke-dasharray="3 2.4"/>
+    <line x1="172" y1="18.5" x2="364" y2="18.5" stroke="#6B747D" stroke-width="2.4" stroke-dasharray="3 2.4"/>
+    <line x1="172" y1="25" x2="364" y2="25" stroke="#6B747D" stroke-width="2.4" stroke-dasharray="3 2.4"/>
+    <line x1="172" y1="31.5" x2="364" y2="31.5" stroke="#6B747D" stroke-width="2.4" stroke-dasharray="3 2.4"/>
+    <rect x="378" y="10" width="18" height="10" rx="1" fill="#24272B"/>
+    <circle cx="420" cy="22" r="6" fill="#D7DCE1" stroke="#6B747D" stroke-width="1"/><circle cx="420" cy="22" r="2.4" fill="#4FAE73"/>
+    <circle cx="438" cy="14" r="2" fill="#4FAE73"/><circle cx="438" cy="22" r="2" fill="#4A9AD1"/><circle cx="438" cy="30" r="2" fill="#FFC85E"/>
+    <rect x="448" y="8" width="12" height="27" rx="1.5" fill="#F3F5F7" stroke="#AEB6BE" stroke-width=".6"/>
+  </g>
+
+  <!-- 2U server -->
+  <g id="server-2u" transform="translate(700 140)">
+    <rect x="0" y="0" width="482.6" height="88.1" rx="2.5" fill="url(#g-panel)" stroke="#6B747D" stroke-width="1"/>
+    <use href="#ear" x="1" y="4"/><use href="#ear" x="465.6" y="44"/><use href="#ear" x="465.6" y="4"/><use href="#ear" x="1" y="44"/>
+    <use href="#bay35" x="22" y="8"/><use href="#bay35" x="126" y="8"/><use href="#bay35" x="230" y="8"/>
+    <use href="#bay35" x="22" y="40"/><use href="#bay35" x="126" y="40"/><use href="#bay35" x="230" y="40"/>
+    <rect x="338" y="8" width="104" height="58" rx="2" fill="#AEB6BE" stroke="#6B747D" stroke-width=".6"/>
+    <line x1="342" y1="15" x2="438" y2="15" stroke="#6B747D" stroke-width="2.6" stroke-dasharray="3 2.4"/>
+    <line x1="342" y1="23" x2="438" y2="23" stroke="#6B747D" stroke-width="2.6" stroke-dasharray="3 2.4"/>
+    <line x1="342" y1="31" x2="438" y2="31" stroke="#6B747D" stroke-width="2.6" stroke-dasharray="3 2.4"/>
+    <line x1="342" y1="39" x2="438" y2="39" stroke="#6B747D" stroke-width="2.6" stroke-dasharray="3 2.4"/>
+    <line x1="342" y1="47" x2="438" y2="47" stroke="#6B747D" stroke-width="2.6" stroke-dasharray="3 2.4"/>
+    <line x1="342" y1="55" x2="438" y2="55" stroke="#6B747D" stroke-width="2.6" stroke-dasharray="3 2.4"/>
+    <circle cx="358" cy="77" r="6" fill="#D7DCE1" stroke="#6B747D" stroke-width="1"/><circle cx="358" cy="77" r="2.4" fill="#4FAE73"/>
+    <circle cx="378" cy="77" r="2" fill="#4FAE73"/><circle cx="388" cy="77" r="2" fill="#4A9AD1"/><circle cx="398" cy="77" r="2" fill="#4FAE73"/>
+    <rect x="410" y="72" width="16" height="10" rx="1" fill="#24272B"/>
+    <rect x="448" y="10" width="12" height="68" rx="2" fill="#F3F5F7" stroke="#AEB6BE" stroke-width=".6"/>
+  </g>
+
+  <!-- 48-port switch -->
+  <g id="network-switch" transform="translate(700 260)">
+    <rect x="0" y="0" width="482.6" height="43.6" rx="2" fill="url(#g-black)" stroke="#24272B" stroke-width="1"/>
+    <use href="#ear" x="1" y="1.8"/><use href="#ear" x="465.6" y="1.8"/>
+    <rect x="22" y="5" width="56" height="34" rx="2" fill="#3B4045"/>
+    <circle cx="30" cy="12" r="1.6" fill="#4FAE73"/><circle cx="30" cy="19" r="1.6" fill="#4FAE73"/><circle cx="30" cy="26" r="1.6" fill="#FFC85E"/>
+    <use href="#rj45" x="44" y="9"/><use href="#rj45" x="44" y="24"/>
+    <g>
+      <use href="#rj45" x="86" y="8"/><use href="#rj45" x="98" y="8"/><use href="#rj45" x="110" y="8"/><use href="#rj45" x="122" y="8"/><use href="#rj45" x="134" y="8"/><use href="#rj45" x="146" y="8"/>
+      <use href="#rj45" x="86" y="25"/><use href="#rj45" x="98" y="25"/><use href="#rj45" x="110" y="25"/><use href="#rj45" x="122" y="25"/><use href="#rj45" x="134" y="25"/><use href="#rj45" x="146" y="25"/>
+      <use href="#rj45" x="164" y="8"/><use href="#rj45" x="176" y="8"/><use href="#rj45" x="188" y="8"/><use href="#rj45" x="200" y="8"/><use href="#rj45" x="212" y="8"/><use href="#rj45" x="224" y="8"/>
+      <use href="#rj45" x="164" y="25"/><use href="#rj45" x="176" y="25"/><use href="#rj45" x="188" y="25"/><use href="#rj45" x="200" y="25"/><use href="#rj45" x="212" y="25"/><use href="#rj45" x="224" y="25"/>
+      <use href="#rj45" x="242" y="8"/><use href="#rj45" x="254" y="8"/><use href="#rj45" x="266" y="8"/><use href="#rj45" x="278" y="8"/><use href="#rj45" x="290" y="8"/><use href="#rj45" x="302" y="8"/>
+      <use href="#rj45" x="242" y="25"/><use href="#rj45" x="254" y="25"/><use href="#rj45" x="266" y="25"/><use href="#rj45" x="278" y="25"/><use href="#rj45" x="290" y="25"/><use href="#rj45" x="302" y="25"/>
+      <use href="#rj45" x="320" y="8"/><use href="#rj45" x="332" y="8"/><use href="#rj45" x="344" y="8"/><use href="#rj45" x="356" y="8"/><use href="#rj45" x="368" y="8"/><use href="#rj45" x="380" y="8"/>
+      <use href="#rj45" x="320" y="25"/><use href="#rj45" x="332" y="25"/><use href="#rj45" x="344" y="25"/><use href="#rj45" x="356" y="25"/><use href="#rj45" x="368" y="25"/><use href="#rj45" x="380" y="25"/>
+    </g>
+    <use href="#sfp" x="400" y="8"/><use href="#sfp" x="416" y="8"/><use href="#sfp" x="400" y="25"/><use href="#sfp" x="416" y="25"/>
+    <g fill="#4FAE73"><circle cx="440" cy="12" r="1.4"/><circle cx="446" cy="12" r="1.4"/><circle cx="452" cy="12" r="1.4"/><circle cx="440" cy="18" r="1.4"/><circle cx="446" cy="18" r="1.4"/><circle cx="452" cy="18" r="1.4"/></g>
+    <rect x="438" y="26" width="18" height="10" rx="1.5" fill="#4A9AD1" stroke="#174C75" stroke-width=".6"/>
+  </g>
+
+  <!-- 24-port patch panel -->
+  <g id="patch-panel" transform="translate(700 330)">
+    <rect x="0" y="0" width="482.6" height="43.6" rx="2" fill="url(#g-black)" stroke="#24272B" stroke-width="1"/>
+    <use href="#ear" x="1" y="1.8"/><use href="#ear" x="465.6" y="1.8"/>
+    <rect x="24" y="7" width="434" height="6" rx="1" fill="#F3F5F7" opacity=".85"/>
+    <g>
+      <use href="#rj45" x="28" y="18"/><use href="#rj45" x="45" y="18"/><use href="#rj45" x="62" y="18"/><use href="#rj45" x="79" y="18"/><use href="#rj45" x="96" y="18"/><use href="#rj45" x="113" y="18"/>
+      <use href="#rj45" x="138" y="18"/><use href="#rj45" x="155" y="18"/><use href="#rj45" x="172" y="18"/><use href="#rj45" x="189" y="18"/><use href="#rj45" x="206" y="18"/><use href="#rj45" x="223" y="18"/>
+      <use href="#rj45" x="248" y="18"/><use href="#rj45" x="265" y="18"/><use href="#rj45" x="282" y="18"/><use href="#rj45" x="299" y="18"/><use href="#rj45" x="316" y="18"/><use href="#rj45" x="333" y="18"/>
+      <use href="#rj45" x="358" y="18"/><use href="#rj45" x="375" y="18"/><use href="#rj45" x="392" y="18"/><use href="#rj45" x="409" y="18"/><use href="#rj45" x="426" y="18"/><use href="#rj45" x="443" y="18"/>
+    </g>
+    <line x1="24" y1="34" x2="458" y2="34" stroke="#7D8389" stroke-width=".8"/>
+  </g>
+
+  <!-- Router -->
+  <g id="router" transform="translate(700 400)">
+    <rect x="0" y="0" width="482.6" height="43.6" rx="2" fill="url(#g-dark)" stroke="#24272B" stroke-width="1"/>
+    <use href="#ear" x="1" y="1.8"/><use href="#ear" x="465.6" y="1.8"/>
+    <rect x="24" y="8" width="90" height="28" rx="2" fill="#3B4045"/>
+    <rect x="30" y="13" width="40" height="7" rx="1" fill="#4A9AD1"/>
+    <circle cx="82" cy="16" r="2" fill="#4FAE73"/><circle cx="92" cy="16" r="2" fill="#4FAE73"/><circle cx="102" cy="16" r="2" fill="#FFC85E"/>
+    <use href="#rj45" x="200" y="17"/><use href="#rj45" x="214" y="17"/><use href="#rj45" x="228" y="17"/><use href="#rj45" x="242" y="17"/>
+    <use href="#rj45" x="266" y="17"/><use href="#rj45" x="280" y="17"/><use href="#rj45" x="294" y="17"/><use href="#rj45" x="308" y="17"/>
+    <use href="#sfp" x="336" y="16"/><use href="#sfp" x="354" y="16"/>
+    <rect x="390" y="16" width="14" height="10" rx="1" fill="#4A9AD1" stroke="#174C75" stroke-width=".6"/>
+    <circle cx="430" cy="21" r="5" fill="#D7DCE1" stroke="#6B747D" stroke-width="1"/>
+  </g>
+
+  <!-- Firewall -->
+  <g id="firewall" transform="translate(700 470)">
+    <rect x="0" y="0" width="482.6" height="43.6" rx="2" fill="url(#g-dark)" stroke="#24272B" stroke-width="1"/>
+    <use href="#ear" x="1" y="1.8"/><use href="#ear" x="465.6" y="1.8"/>
+    <rect x="20" y="4" width="8" height="35.6" fill="#EE6F5C"/>
+    <rect x="40" y="8" width="96" height="28" rx="2" fill="#3B4045"/>
+    <rect x="46" y="13" width="56" height="18" rx="1" fill="url(#g-screen)"/>
+    <circle cx="116" cy="16" r="2" fill="#4FAE73"/><circle cx="126" cy="16" r="2" fill="#EE6F5C"/>
+    <use href="#rj45" x="190" y="17"/><use href="#rj45" x="204" y="17"/><use href="#rj45" x="218" y="17"/><use href="#rj45" x="232" y="17"/>
+    <use href="#rj45" x="256" y="17"/><use href="#rj45" x="270" y="17"/><use href="#rj45" x="284" y="17"/><use href="#rj45" x="298" y="17"/>
+    <use href="#sfp" x="326" y="16"/><use href="#sfp" x="344" y="16"/>
+    <rect x="440" y="10" width="12" height="24" rx="1.5" fill="#EE6F5C" stroke="#8C2A20" stroke-width=".6"/>
+  </g>
+
+  <!-- Storage array, 2U, twelve drives -->
+  <g id="storage-array" transform="translate(700 540)">
+    <rect x="0" y="0" width="482.6" height="88.1" rx="2.5" fill="url(#g-dark)" stroke="#24272B" stroke-width="1"/>
+    <use href="#ear" x="1" y="4"/><use href="#ear" x="465.6" y="4"/><use href="#ear" x="1" y="44"/><use href="#ear" x="465.6" y="44"/>
+    <use href="#bay35" x="22" y="4"/><use href="#bay35" x="126" y="4"/><use href="#bay35" x="230" y="4"/><use href="#bay35" x="334" y="4"/>
+    <use href="#bay35" x="22" y="31"/><use href="#bay35" x="126" y="31"/><use href="#bay35" x="230" y="31"/><use href="#bay35" x="334" y="31"/>
+    <use href="#bay35" x="22" y="58"/><use href="#bay35" x="126" y="58"/><use href="#bay35" x="230" y="58"/><use href="#bay35" x="334" y="58"/>
+    <circle cx="448" cy="16" r="2" fill="#4FAE73"/><circle cx="448" cy="26" r="2" fill="#4A9AD1"/>
+  </g>
+
+  <!-- UPS, 2U -->
+  <g id="ups" transform="translate(700 660)">
+    <rect x="0" y="0" width="482.6" height="88.1" rx="3" fill="url(#g-black)" stroke="#24272B" stroke-width="1"/>
+    <use href="#ear" x="1" y="4"/><use href="#ear" x="465.6" y="4"/><use href="#ear" x="1" y="44"/><use href="#ear" x="465.6" y="44"/>
+    <rect x="22" y="8" width="300" height="72" rx="3" fill="#3B4045"/>
+    <line x1="30" y1="18" x2="314" y2="18" stroke="#24272B" stroke-width="5" stroke-dasharray="4 3"/>
+    <line x1="30" y1="30" x2="314" y2="30" stroke="#24272B" stroke-width="5" stroke-dasharray="4 3"/>
+    <line x1="30" y1="42" x2="314" y2="42" stroke="#24272B" stroke-width="5" stroke-dasharray="4 3"/>
+    <line x1="30" y1="54" x2="314" y2="54" stroke="#24272B" stroke-width="5" stroke-dasharray="4 3"/>
+    <line x1="30" y1="66" x2="314" y2="66" stroke="#24272B" stroke-width="5" stroke-dasharray="4 3"/>
+    <rect x="336" y="12" width="76" height="36" rx="2" fill="url(#g-screen)" stroke="#174C75" stroke-width=".8"/>
+    <rect x="344" y="20" width="22" height="12" rx="1" fill="none" stroke="#174C75" stroke-width="1.2"/><rect x="366" y="23" width="3" height="6" fill="#174C75"/>
+    <rect x="346" y="22" width="14" height="8" fill="#174C75"/>
+    <circle cx="346" cy="64" r="5" fill="#D7DCE1" stroke="#6B747D"/><circle cx="364" cy="64" r="5" fill="#D7DCE1" stroke="#6B747D"/><circle cx="382" cy="64" r="5" fill="#D7DCE1" stroke="#6B747D"/>
+    <circle cx="430" cy="30" r="9" fill="#D7DCE1" stroke="#6B747D" stroke-width="1.2"/><circle cx="430" cy="30" r="3.4" fill="#4FAE73"/>
+    <circle cx="430" cy="58" r="2.4" fill="#4FAE73"/><circle cx="440" cy="58" r="2.4" fill="#FFC85E"/>
+  </g>
+
+  <!-- Horizontal cable manager, 1U -->
+  <g id="cable-manager" transform="translate(700 780)">
+    <rect x="0" y="0" width="482.6" height="43.6" rx="2" fill="url(#g-black)" stroke="#24272B" stroke-width="1"/>
+    <use href="#ear" x="1" y="1.8"/><use href="#ear" x="465.6" y="1.8"/>
+    <path d="M40 30 v-14 a14 10 0 0 1 28 0 v14" fill="none" stroke="#AEB6BE" stroke-width="4"/>
+    <path d="M135 30 v-14 a14 10 0 0 1 28 0 v14" fill="none" stroke="#AEB6BE" stroke-width="4"/>
+    <path d="M230 30 v-14 a14 10 0 0 1 28 0 v14" fill="none" stroke="#AEB6BE" stroke-width="4"/>
+    <path d="M325 30 v-14 a14 10 0 0 1 28 0 v14" fill="none" stroke="#AEB6BE" stroke-width="4"/>
+    <path d="M415 30 v-14 a14 10 0 0 1 28 0 v14" fill="none" stroke="#AEB6BE" stroke-width="4"/>
+    <rect x="22" y="31" width="438" height="5" fill="#24272B"/>
+  </g>
+
+  <!-- Blanking panel, 1U -->
+  <g id="blanking-panel" transform="translate(700 850)">
+    <rect x="0" y="0" width="482.6" height="43.6" rx="2" fill="url(#g-black)" stroke="#24272B" stroke-width="1"/>
+    <use href="#ear" x="1" y="1.8"/><use href="#ear" x="465.6" y="1.8"/>
+    <line x1="24" y1="14" x2="458" y2="14" stroke="#3B4045" stroke-width="1"/><line x1="24" y1="30" x2="458" y2="30" stroke="#3B4045" stroke-width="1"/>
+  </g>
+
+  <!-- Vertical PDU (zero-U power strip) -->
+  <g id="pdu" transform="translate(1300 60)">
+    <rect x="0" y="0" width="56" height="1700" rx="6" fill="url(#g-dark)" stroke="#24272B" stroke-width="1.2"/>
+    <rect x="8" y="14" width="40" height="40" rx="3" fill="#3B4045"/>
+    <rect x="13" y="20" width="30" height="14" rx="1" fill="url(#g-screen)"/><circle cx="20" cy="45" r="3" fill="#4FAE73"/><circle cx="36" cy="45" r="3" fill="#D7DCE1"/>
+    <use href="#outlet" x="19" y="80"/><use href="#outlet" x="19" y="148"/><use href="#outlet" x="19" y="216"/><use href="#outlet" x="19" y="284"/><use href="#outlet" x="19" y="352"/><use href="#outlet" x="19" y="420"/>
+    <use href="#outlet" x="19" y="488"/><use href="#outlet" x="19" y="556"/><use href="#outlet" x="19" y="624"/><use href="#outlet" x="19" y="692"/><use href="#outlet" x="19" y="760"/><use href="#outlet" x="19" y="828"/>
+    <use href="#outlet" x="19" y="896"/><use href="#outlet" x="19" y="964"/><use href="#outlet" x="19" y="1032"/><use href="#outlet" x="19" y="1100"/><use href="#outlet" x="19" y="1168"/><use href="#outlet" x="19" y="1236"/>
+    <use href="#outlet" x="19" y="1304"/><use href="#outlet" x="19" y="1372"/><use href="#outlet" x="19" y="1440"/><use href="#outlet" x="19" y="1508"/><use href="#outlet" x="19" y="1576"/>
+    <path d="M28 1700 C28 1740 60 1760 60 1800" fill="none" stroke="#24272B" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>

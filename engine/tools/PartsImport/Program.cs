@@ -47,6 +47,8 @@ sealed record Entry
     public string? DropStroke { get; init; }
     /// <summary>Where the part is best pointed at, as fractions of its box, when its middle isn't on it.</summary>
     public double[]? Anchor { get; init; }
+    /// <summary>Its ports are given in the source's own units, not as fractions of its box.</summary>
+    public bool PortsInUnits { get; init; }
 }
 
 static class Program
@@ -206,7 +208,7 @@ static class Program
             var box = b.Part.Box;
             foreach (var port in e.Ports)
                 p.Add(new XElement("port", new XAttribute("id", port.Id),
-                    new XAttribute("x", Math.Round(box.X + port.X * box.W, 2)), new XAttribute("y", Math.Round(box.Y + port.Y * box.H, 2))));
+                    new XAttribute("x", Math.Round(e.PortsInUnits ? port.X : box.X + port.X * box.W, 2)), new XAttribute("y", Math.Round(e.PortsInUnits ? port.Y : box.Y + port.Y * box.H, 2))));
             p.Add(b.Part.Symbol);
             root.Add(p);
         }
@@ -329,6 +331,8 @@ static partial class Bulk
             string stem = Path.GetFileNameWithoutExtension(segs[3]);
             var words = Separators().Split(stem.ToLowerInvariant()).Where(w => w.Length > 0).ToList();
             if (words.Any(w => w is "label" or "labels" or "labeled" or "labelled" or "text" or "legend" or "scheme" or "icon" or "logo")) continue;
+            // Brands and product names stay out (a logo is a trademark, whatever the drawing's licence).
+            if (words.Any(w => w is "nvidia" or "cytoflex" or "illumina" or "pacbio" or "nanopore" or "apple" or "intel")) continue;
             if (words.Count > 1 && Colours.Contains(words[^1])) continue;
             string baseName = string.Join(' ', words.Where(w => !w.All(char.IsDigit)));
             if (baseName.Length < 3) continue;
