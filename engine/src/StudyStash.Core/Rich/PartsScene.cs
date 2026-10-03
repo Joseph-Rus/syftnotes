@@ -459,6 +459,29 @@ public static partial class PartsScene
             Stack(callouts.Where(x => x.C.Side == Band.Right).Select(x => x.C).ToList(), height);
         }
 
+        // A labelled thing too small to see or point at once the art is scaled (a ribosome, a pore) is drawn a little
+        // bigger, about the point its label names, so nothing else moves.
+        const double Least = 12;
+        var pointedAt = scene.Labels.Select(l => l.To).ToHashSet(StringComparer.Ordinal);
+        foreach (var p in scene.Parts.Where(p => pointedAt.Contains(p.As) && transforms.ContainsKey(p.As)))
+        {
+            var t = transforms[p.As];
+            var b = p.Part.Box;
+            var seen = Bounds.Around(new[] { (b.X, b.Y), (b.Right, b.Y), (b.Right, b.Bottom), (b.X, b.Bottom) }.Select(c => canvas.Then(t).Apply(c.Item1, c.Item2)).ToList())!.Value;
+            double big = Math.Max(seen.W, seen.H);
+            if (big >= Least || big <= 0) continue;
+            var a = t.Apply(p.Part.X, p.Part.Y);
+            transforms[p.As] = Move(a.X, a.Y).Then(Scale(Least / big, Least / big)).Then(Move(-a.X, -a.Y)).Then(t);
+        }
+        foreach (var sh in scene.Shapes.Where(sh => pointedAt.Contains(sh.As) && sh.Kind is "ellipse" or "rect" && shapePoints.ContainsKey(sh.As)))
+        {
+            var pts = shapePoints[sh.As];
+            double w = Math.Abs(pts[1].X - pts[0].X), h = Math.Abs(pts[1].Y - pts[0].Y), big = Math.Max(w, h) * k;
+            if (big >= Least || big <= 0) continue;
+            double f = Least / big, cx = (pts[0].X + pts[1].X) / 2, cy = (pts[0].Y + pts[1].Y) / 2;
+            shapePoints[sh.As] = [(cx - w * f / 2, cy - h * f / 2), (cx + w * f / 2, cy + h * f / 2)];
+        }
+
         // The drawing.
         XNamespace ns = "http://www.w3.org/2000/svg";
         var svg = new XElement(ns + "svg", new XAttribute("viewBox", F($"0 0 {canvasW} {Math.Ceiling(height)}")),
