@@ -5,6 +5,7 @@ import {ease, spr} from '../../anim';
 import {Cursor, Desktop, Title} from '../../components/Layout';
 import {Sfx} from '../../components/Sfx';
 import {CLICK, text2} from '../config';
+import {settle} from '../settle';
 import {ArtName, artSize, Drawing, PartCard} from '../Parts';
 import {ClassKey, FloatingBar, H2, Serif, StageWindow, useStage} from '../ui';
 
@@ -60,7 +61,7 @@ const Figure: React.FC<{turn: Turn; f: number}> = ({turn, f}) => {
       </div>
       {pinned ? (
         <div style={{position: 'absolute', left: cardLeft, top: cardTop}}>
-          <PartCard name={turn.art} part={part} p={spr(f, turn.pin + 1, {damping: 20, stiffness: 200, mass: 0.7})} width={cardW} />
+          <PartCard name={turn.art} part={part} p={settle(f, turn.pin + 1, {damping: 20, stiffness: 200, mass: 0.7})} width={cardW} />
         </div>
       ) : null}
     </div>
@@ -95,7 +96,7 @@ export const Drawings: React.FC = () => {
             </div>
           ) : null}
         </StageWindow>
-        <Cursor clickVolume={CLICK}
+        <Cursor softPress clickVolume={CLICK}
           stops={[
             [8, ...d(DRONE, drone, 600, 330)],
             [DRONE.hover - 20, ...d(DRONE, drone, DRONE.pass![1], DRONE.pass![2], 2, 2)],

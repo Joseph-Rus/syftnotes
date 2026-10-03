@@ -6,6 +6,7 @@ import {Desktop, Title, useVertical} from '../../components/Layout';
 import {Sfx} from '../../components/Sfx';
 import {DrawnScale, textKey, useDrawnScale, useTextKey} from '../DrawnScale';
 import {text2} from '../config';
+import {settle} from '../settle';
 import {ui} from '../ui';
 
 // More kinds than flowcharts, each drawn as the app draws it in dark mode (the "new kinds" screenshot test): a state
@@ -123,7 +124,7 @@ const Timeline: React.FC<{f: number}> = ({f}) => {
       <path d={`M60 60 L${60 + 540 * axis} 60`} stroke={ui.arrow} strokeWidth={1.6} markerEnd={axis > 0.95 ? 'url(#t-head)' : undefined} />
       {events.map(([year, lines], i) => {
         const x = 92 + i * 152;
-        const p = spr(f, 8 + i * 9, {damping: 14, stiffness: 180, mass: 0.7});
+        const p = settle(f, 8 + i * 9, {damping: 14, stiffness: 180, mass: 0.7});
         return (
           <g key={`${year} ${textKey(drawn * (0.7 + 0.3 * p))}`} opacity={clamp(p * 1.5)} transform={`translate(${x} 60) scale(${0.7 + 0.3 * p}) translate(${-x} -60)`}>
             <rect x={x - 42} y={42} width={84} height={36} rx={18} fill="#24403F" stroke="#4E9E97" />
@@ -141,7 +142,7 @@ const Timeline: React.FC<{f: number}> = ({f}) => {
 };
 
 const MindMap: React.FC<{f: number}> = ({f}) => {
-  const hub = spr(f, 0, {damping: 14, stiffness: 160, mass: 0.7});
+  const hub = settle(f, 0, {damping: 14, stiffness: 160, mass: 0.7});
   const branches: [string, string, string, string][] = [
     ['Epithelial', 'Covers surfaces', '#4C7BE0', '#1A2848'],
     ['Connective', 'Supports and binds', '#3FAE6A', '#163824'],
@@ -202,7 +203,7 @@ export const Kinds: React.FC = () => {
       <Desktop clock="Tue 23 Sep  11:19">
         {CARDS.map(({title, kind, Draw}, i) => {
           const at = KIND_AT[i];
-          const p = spr(frame, at, {damping: 20, stiffness: 150, mass: 0.8});
+          const p = settle(frame, at, {damping: 20, stiffness: 150, mass: 0.8});
           const c = i % cols;
           const r = Math.floor(i / cols);
           return (

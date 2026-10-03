@@ -5,6 +5,7 @@ import {ease, spr} from '../../anim';
 import {Cursor, Desktop, Title} from '../../components/Layout';
 import {Sfx} from '../../components/Sfx';
 import {CLICK, text2} from '../config';
+import {settle} from '../settle';
 import {box as boxOf, BOXES} from '../Flow';
 import {BarButton, FloatingBar, Grow, StageWindow, Strip, StripIcon} from '../ui';
 import {FLOW_ICONS, FlowNote, useFlowStage} from './Explore';
@@ -60,7 +61,7 @@ export const Recall: React.FC = () => {
   let open: Turn | null = null;
   for (const t of TURNS) {
     if (frame >= t.click) shown[t.id] = ease(frame, t.click + 1, t.click + 8);
-    if (frame >= t.grade) marks[t.id] = {knew: t.knew, p: spr(frame, t.grade, {damping: 12, stiffness: 220, mass: 0.6})};
+    if (frame >= t.grade) marks[t.id] = {knew: t.knew, p: settle(frame, t.grade, {damping: 12, stiffness: 220, mass: 0.6})};
     // The question stays a moment after it's answered, so the click is seen to land on Knew it.
     if (frame >= t.click && frame < t.grade + (t.key ? 3 : 6)) open = t;
   }
@@ -68,8 +69,9 @@ export const Recall: React.FC = () => {
   const checked = TURNS.filter((t) => frame >= t.grade).length;
 
   const strip = testing ? (
-    <Strip p={spr(frame, TEST + 1, {damping: 22, stiffness: 180, mass: 0.8})}>
-      <span style={{fontWeight: 700, margin: '0 10px 0 6px'}}>{checked > 0 ? `${knew} of ${BOXES.length} recalled` : 'Test yourself'}</span>
+    <Strip p={settle(frame, TEST + 1, {damping: 22, stiffness: 180, mass: 0.8})}>
+      {/* One width for "Test yourself" and every count, so the words after it never jump sideways as it changes. */}
+      <span style={{fontWeight: 700, margin: '0 10px 0 6px', minWidth: 112, flexShrink: 0, fontVariantNumeric: 'tabular-nums'}}>{checked > 0 ? `${knew} of ${BOXES.length} recalled` : 'Test yourself'}</span>
       {open ? (
         <>
           <span style={{color: colors.text2}}>“{boxOf(open.id).title}”: did you know it?</span>
@@ -127,7 +129,7 @@ export const Recall: React.FC = () => {
             under={strip}
           />
         </StageWindow>
-        <Cursor clickVolume={CLICK} stops={stops} clicks={[TEST, ...TURNS.map((t) => t.click), TURNS[0].grade]} />
+        <Cursor softPress clickVolume={CLICK} stops={stops} clicks={[TEST, ...TURNS.map((t) => t.click), TURNS[0].grade]} />
         {TURNS.filter((t) => t.key).map((t) => {
           const p = ease(frame, t.grade - 4, t.grade) * (1 - ease(frame, t.grade + 6, t.grade + 10));
           const at = pointerAt(t.grade);

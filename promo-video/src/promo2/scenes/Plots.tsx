@@ -104,7 +104,7 @@ export const Plots: React.FC = () => {
             </div>
           </div>
         </StageWindow>
-        <Cursor clickVolume={CLICK} stops={stops} clicks={[K[0][0] - 2, ETA[0][0] - 2]} />
+        <Cursor softPress clickVolume={CLICK} stops={stops} clicks={[K[0][0] - 2, ETA[0][0] - 2]} />
       </Desktop>
       {ticks.map((f) => (
         <Sfx key={f} at={f} name="tick" volume={0.16} />

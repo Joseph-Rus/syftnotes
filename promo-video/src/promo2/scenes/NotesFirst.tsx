@@ -6,6 +6,7 @@ import {Desktop, Title} from '../../components/Layout';
 import {Group, ListHead, ListRow} from '../../components/Sidebar';
 import {Sfx} from '../../components/Sfx';
 import {text2} from '../config';
+import {settle} from '../settle';
 import {Flow, FLOW_H, FLOW_W} from '../Flow';
 import {Byline, H2, Icon, NoteHead, Serif, StageWindow, useStage} from '../ui';
 
@@ -38,7 +39,7 @@ export const NotesFirst: React.FC = () => {
   const open = ease(frame, ADDED, ADDED + 20);
   const sectionH = (52 + FLOW_H * scale + 18) * open;
   const build = interpolate(frame, [ADDED + 4, ADDED + 40], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
-  const later = spr(frame, LATER, {damping: 20, stiffness: 160, mass: 0.8});
+  const later = settle(frame, LATER, {damping: 20, stiffness: 160, mass: 0.8});
   const laterOut = ease(frame, ADDED - 2, ADDED + 8);
   const clock = frame >= LATER + 8 ? 'Tue 23 Sep  11:16' : 'Tue 23 Sep  11:14';
   const diagramsLine = !filed ? null : added ? (

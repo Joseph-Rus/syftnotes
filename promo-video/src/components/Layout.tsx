@@ -272,15 +272,22 @@ export const ClassDot: React.FC<{color: string; size?: number}> = ({color, size 
   <div style={{width: size, height: size, borderRadius: size / 2, background: color, flexShrink: 0}} />
 );
 
-/** The pointer, moving between `stops` ([frame, x, y]) with an ease, and pressed around each frame in `clicks`. */
-export const Cursor: React.FC<{stops: [number, number, number][]; clicks?: number[]; hideAfter?: number; clickVolume?: number}> = ({stops, clicks = [], hideAfter, clickVolume = 0.55}) => {
+/**
+ * The pointer, moving between `stops` ([frame, x, y]) with an ease, and pressed around each frame in `clicks`.
+ * `softPress` eases each press in and out over a few frames instead of snapping the pointer small for five (the second
+ * video clicks often, and the snap read as a jolt).
+ */
+export const Cursor: React.FC<{stops: [number, number, number][]; clicks?: number[]; hideAfter?: number; clickVolume?: number; softPress?: boolean}> = ({stops, clicks = [], hideAfter, clickVolume = 0.55, softPress = false}) => {
   const frame = useCurrentFrame();
   if (hideAfter !== undefined && frame > hideAfter) return null;
   const fs = stops.map((s) => s[0]);
   const opts = {easing: Easing.bezier(0.45, 0, 0.2, 1), extrapolateLeft: 'clamp' as const, extrapolateRight: 'clamp' as const};
   const x = interpolate(frame, fs, stops.map((s) => s[1]), opts);
   const y = interpolate(frame, fs, stops.map((s) => s[2]), opts);
-  const down = clicks.some((c) => frame >= c && frame < c + 5);
+  const clamp = {extrapolateLeft: 'clamp' as const, extrapolateRight: 'clamp' as const};
+  const press = softPress
+    ? Math.max(0, ...clicks.map((c) => interpolate(frame, [c - 1, c + 1, c + 3, c + 7], [0, 1, 1, 0], {...clamp, easing: Easing.inOut(Easing.quad)})))
+    : clicks.some((c) => frame >= c && frame < c + 5) ? 1 : 0;
   const appear = interpolate(frame, [fs[0], fs[0] + 6], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   return (
     <>
@@ -296,7 +303,7 @@ export const Cursor: React.FC<{stops: [number, number, number][]; clicks?: numbe
         left: x,
         top: y,
         opacity: appear,
-        transform: `scale(${down ? 0.86 : 1})`,
+        transform: `scale(${1 - 0.14 * press})`,
         transformOrigin: 'top left',
         filter: 'drop-shadow(0 2px 3px rgba(0,0,0,0.3))',
         zIndex: 50,

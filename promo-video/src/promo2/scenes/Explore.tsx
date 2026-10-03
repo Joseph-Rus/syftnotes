@@ -5,6 +5,7 @@ import {ease, spr} from '../../anim';
 import {Cursor, Desktop, Title} from '../../components/Layout';
 import {Sfx} from '../../components/Sfx';
 import {CLICK, text2} from '../config';
+import {settle} from '../settle';
 import {around, BOXES, boxAt, EDGES, Flow, FLOW_H, FLOW_W, FlowLook} from '../Flow';
 import {FloatingBar, Grow, H2, PinActions, Serif, StageWindow, Strip, StripIcon, useStage} from '../ui';
 
@@ -94,12 +95,12 @@ export const Explore: React.FC = () => {
   const pinTop = fs.flowTop - fs.top + (pinBox.y + pinBox.h / 2) * fs.s + 10;
   const actions = pinned ? (
     <div style={{position: 'absolute', left: pinLeft, top: pinTop, zIndex: 5}}>
-      <PinActions p={spr(frame, PIN + 1, {damping: 20, stiffness: 200, mass: 0.7})} hot={frame >= 92 && frame < 106 ? 'explain' : undefined} />
+      <PinActions p={settle(frame, PIN + 1, {damping: 20, stiffness: 200, mass: 0.7})} hot={frame >= 92 && frame < 106 ? 'explain' : undefined} />
     </div>
   ) : null;
 
   const strip = stepping ? (
-    <Strip p={spr(frame, STEPS + 1, {damping: 22, stiffness: 180, mass: 0.8})}>
+    <Strip p={settle(frame, STEPS + 1, {damping: 22, stiffness: 180, mass: 0.8})}>
       <StripIcon name="chevron_left" />
       <StripIcon name="chevron_right" hot={(frame >= NEXT1 - 2 && frame < NEXT1 + 6) || (frame >= NEXT2 - 2 && frame < NEXT2 + 6)} />
       <StripIcon name={playing ? 'pause' : 'play_arrow'} hot={frame >= PLAY - 2 && frame < PLAY + 6} />
@@ -129,7 +130,7 @@ export const Explore: React.FC = () => {
             over={actions}
           />
         </StageWindow>
-        <Cursor clickVolume={CLICK}
+        <Cursor softPress clickVolume={CLICK}
           stops={[
             [6, ...tip(box, 260, 230)],
             [HOVER, ...tip(box, 30, 4)],
