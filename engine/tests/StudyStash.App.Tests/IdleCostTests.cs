@@ -1,4 +1,5 @@
 using Avalonia.Automation;
+using StudyStash.App.Platform;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
@@ -16,7 +17,7 @@ namespace StudyStash.App.Tests;
 /// that's hidden, or in a library window closed to the menu bar, woke the app thirty times a second for as long as it
 /// ran; the recording dot, redrawn sixty times a second, cost the recorder most of its CPU; a notes view built the same
 /// lecture again for each hidden copy of it; a slider left playing went on being redrawn in a closed window. Each stops
-/// when it can't be seen, and starts again when it can.
+/// when it can't be seen, and starts again when it can. And a closed window, once nothing shows it, is let go.
 /// </summary>
 public class IdleCostTests
 {
@@ -110,5 +111,34 @@ public class IdleCostTests
         w.Hide();
         Assert.False(plot.Playing);
         w.Close();
+    }
+
+    /// <summary>Whether <paramref name="from"/> holds <paramref name="target"/>: through what a menu item does when it's
+    /// clicked, the objects its closures capture, and theirs in turn.</summary>
+    static bool Holds(object? from, object target, HashSet<object> seen)
+    {
+        if (from is null || from is string || from.GetType().IsPrimitive || !seen.Add(from)) return false;
+        if (ReferenceEquals(from, target)) return true;
+        if (from is Delegate d) return d.GetInvocationList().Any(i => Holds(i.Target, target, seen));
+        var type = from.GetType();
+        if (type.Namespace?.StartsWith("Avalonia", StringComparison.Ordinal) == true || type.Namespace?.StartsWith("System", StringComparison.Ordinal) == true) return false;
+        return type.GetFields(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic)
+            .Any(f => !f.FieldType.IsPrimitive && Holds(f.GetValue(from), target, seen));
+    }
+
+    [AvaloniaFact]
+    public void The_menu_a_window_gives_the_menu_bar_does_not_hold_the_window()
+    {
+        // The Mac's menu bar keeps the menu a window gave it (and so what its items do) for as long as the app runs. Items
+        // that held their window kept every Settings window ever opened in memory, with all of its pages: about 25 MB of
+        // the heap and 65 MB of the window's own memory each time it was opened.
+        var window = new Window();
+        var menu = AppMenu.ForWindow(window, () => { }, () => { });
+        var items = menu.Items.OfType<NativeMenuItem>().SelectMany(i => i.Menu?.Items.OfType<NativeMenuItem>() ?? []).ToList();
+        Assert.NotEmpty(items);
+        var click = typeof(NativeMenuItem).GetField("Click", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(click);
+        foreach (var item in items)
+            Assert.False(Holds(click!.GetValue(item), window, new HashSet<object>(ReferenceEqualityComparer.Instance)), $"\"{item.Header}\" holds its window");
     }
 }
