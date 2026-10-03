@@ -1,4 +1,5 @@
 import React from 'react';
+import {continueRender, delayRender} from 'remotion';
 import {colors, fonts} from '../config';
 import * as drone from './art/drone';
 import * as hand from './art/hand';
@@ -18,22 +19,39 @@ export const artSize = (name: ArtName) => {
 
 export type PartsLook = {hot?: string | null; dim?: number; ring?: number};
 
-const css = (n: ArtName, {hot = null, dim = 0, ring = 0}: PartsLook) => `
-  #${n}-labels text { fill: #D3D9DE; }
+// Labels dim by their colours' alpha, never by a group's opacity: Chrome sometimes clipped an see-through group of
+// text to stale bounds when frames were rendered in parallel, taking a label's first letter with it.
+const css = (n: ArtName, {hot = null, dim = 0, ring = 0}: PartsLook) => {
+  const a = 1 - 0.62 * dim;
+  return `
+  #${n}-labels text { fill: #D3D9DE; fill-opacity: ${a}; }
   #${n}-labels text[font-size="12"] { fill: #8C979F; }
-  #${n}-labels polyline { stroke: rgba(222, 228, 234, 0.42); }
-  #${n}-labels circle { fill: rgba(222, 228, 234, 0.7); }
-  #${n}-art > g, #${n}-labels > g { opacity: ${1 - 0.62 * dim}; }
+  #${n}-labels polyline { stroke: rgba(222, 228, 234, ${0.42 * a}); }
+  #${n}-labels circle { fill: rgba(222, 228, 234, ${0.7 * a}); }
+  #${n}-art > g { opacity: ${a}; }
   ${hot ? `
   #${n}-art > g#${n}-${hot} { opacity: 1; ${ring > 0.01 ? `filter: url(#${n}-ring);` : ''} }
-  #${n}-labels > g#${n}-label-${hot} { opacity: 1; }
-  #${n}-labels > g#${n}-label-${hot} text { fill: #FFFFFF; }
+  #${n}-labels > g#${n}-label-${hot} text { fill: #FFFFFF; fill-opacity: 1; }
   #${n}-labels > g#${n}-label-${hot} polyline { stroke: ${ui.accent}; }
   #${n}-labels > g#${n}-label-${hot} circle { fill: ${ui.accent}; }` : ''}
 `;
+};
+
+// The drawings' labels are in the computer's Helvetica Neue, as the app draws them. Wait for it before the first frame:
+// laid out in a stand-in font first, a centred label could keep the stand-in's narrower bounds and lose its first letter.
+const LABEL_FONT = 'Helvetica Neue';
+const useLabelFont = () => {
+  const [handle] = React.useState(() => delayRender(`${LABEL_FONT} for the drawings' labels`));
+  React.useEffect(() => {
+    Promise.all([document.fonts.load(`14px "${LABEL_FONT}"`), document.fonts.load(`12px "${LABEL_FONT}"`)])
+      .catch(() => undefined)
+      .then(() => continueRender(handle));
+  }, [handle]);
+};
 
 /** A drawing at `scale`, styled by `look`. */
 export const Drawing: React.FC<{name: ArtName; scale: number; look?: PartsLook}> = ({name, scale, look = {}}) => {
+  useLabelFont();
   const art = ART[name];
   const {w, h} = artSize(name);
   const inner = React.useMemo(() => ({__html: art.inner}), [art]);

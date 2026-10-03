@@ -1,4 +1,17 @@
 {
-  "source": "none yet",
-  "seconds": {}
+  "source": "scratch",
+  "voice": "Samantha",
+  "model": null,
+  "seconds": {
+    "opener": 1.295,
+    "notes": 4.602,
+    "explore": 4.886,
+    "recall": 2.276,
+    "kinds": 4.433,
+    "drawings": 4.251,
+    "plots": 5.557,
+    "quiet": 2.28,
+    "proof": 2.187,
+    "cta": 2.917
+  }
 }

@@ -273,7 +273,7 @@ export const ClassDot: React.FC<{color: string; size?: number}> = ({color, size 
 );
 
 /** The pointer, moving between `stops` ([frame, x, y]) with an ease, and pressed around each frame in `clicks`. */
-export const Cursor: React.FC<{stops: [number, number, number][]; clicks?: number[]; hideAfter?: number}> = ({stops, clicks = [], hideAfter}) => {
+export const Cursor: React.FC<{stops: [number, number, number][]; clicks?: number[]; hideAfter?: number; clickVolume?: number}> = ({stops, clicks = [], hideAfter, clickVolume = 0.55}) => {
   const frame = useCurrentFrame();
   if (hideAfter !== undefined && frame > hideAfter) return null;
   const fs = stops.map((s) => s[0]);
@@ -285,7 +285,7 @@ export const Cursor: React.FC<{stops: [number, number, number][]; clicks?: numbe
   return (
     <>
     {clicks.map((c) => (
-      <Sfx key={c} at={c} name="click" volume={0.55} />
+      <Sfx key={c} at={c} name="click" volume={clickVolume} />
     ))}
     <svg
       width="34"

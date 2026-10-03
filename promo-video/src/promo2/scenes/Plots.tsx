@@ -3,7 +3,7 @@ import {AbsoluteFill, Easing, interpolate, useCurrentFrame} from 'remotion';
 import {ease, spr} from '../../anim';
 import {Cursor, Desktop, Title} from '../../components/Layout';
 import {Sfx} from '../../components/Sfx';
-import {text2} from '../config';
+import {CLICK, text2} from '../config';
 import {DESCENT, DescentPlot, knobX, SIGMOID, SigmoidPlot, SLIDER, SliderRow} from '../Plots';
 import {FloatingBar, H2, Serif, StageWindow, useStage} from '../ui';
 
@@ -12,17 +12,17 @@ import {FloatingBar, H2, Serif, StageWindow, useStage} from '../ui';
 // (a smooth path) and up to 0.21, where the path zigzags and then flies off the bowl (it diverges past 0.2).
 // Every curve and path is computed for the slider's value at that frame.
 
-const SCROLL: [number, number] = [100, 118];
+const SCROLL: [number, number] = [92, 110];
 // Each slider's knob over time: [frame, value]. The pointer holds the knob, so it moves exactly with it.
 const K: [number, number][] = [
-  [36, SIGMOID.k.start],
-  [92, 5],
+  [32, SIGMOID.k.start],
+  [84, 5],
 ];
 const ETA: [number, number][] = [
-  [128, DESCENT.eta.start],
-  [148, 0.05],
-  [156, 0.05],
-  [198, 0.21],
+  [118, DESCENT.eta.start],
+  [136, 0.05],
+  [142, 0.05],
+  [180, 0.21],
 ];
 const curve = Easing.bezier(0.45, 0, 0.2, 1); // the pointer's own ease (Cursor)
 const valueAt = (f: number, keys: [number, number][]) =>
@@ -63,7 +63,7 @@ export const Plots: React.FC = () => {
     [K[0][0] - 8, k0.x, k0.y],
     ...K.map(([f, v]) => [f, knob(slider1, posK(v), 0).x, k0.y] as [number, number, number]),
     [K[1][0] + 8, k1.x, k1.y],
-    [SCROLL[1], k1.x - 60, k1.y - 120],
+    [SCROLL[1] - 6, k1.x - 60, k1.y - 120],
     [ETA[0][0] - 8, e(DESCENT.eta.start).x, e(DESCENT.eta.start).y],
     ...ETA.map(([f, v]) => [f, e(v).x, e(v).y] as [number, number, number]),
     [ETA[ETA.length - 1][0] + 30, e(0.21).x + 40, e(0.21).y - 90],
@@ -104,7 +104,7 @@ export const Plots: React.FC = () => {
             </div>
           </div>
         </StageWindow>
-        <Cursor stops={stops} clicks={[K[0][0] - 2, ETA[0][0] - 2]} />
+        <Cursor clickVolume={CLICK} stops={stops} clicks={[K[0][0] - 2, ETA[0][0] - 2]} />
       </Desktop>
       {ticks.map((f) => (
         <Sfx key={f} at={f} name="tick" volume={0.16} />

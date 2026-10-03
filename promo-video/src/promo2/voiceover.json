@@ -14,13 +14,13 @@
     {
       "id": "opener",
       "at": 0.45,
-      "text": "New in Study Stash: diagrams you can play with.",
+      "text": "New in Study Stash.",
       "direction": "bright, a little proud, like showing a friend something new"
     },
     {
       "id": "notes",
       "at": 0.4,
-      "text": "Your notes come first… and a couple of minutes later, the diagrams drop right into the page.",
+      "text": "Your notes come first. A couple of minutes later, the diagrams drop right in.",
       "direction": "easy, unhurried; a small lift on \"drop right in\""
     },
     {
@@ -38,31 +38,31 @@
     {
       "id": "kinds",
       "at": 0.3,
-      "text": "State machines, sequence diagrams, timelines, mind maps.",
+      "text": "Plus state machines, sequences, timelines, mind maps.",
       "direction": "brisk, a list on the beat"
     },
     {
       "id": "drawings",
       "at": 0.3,
-      "text": "When a lecture describes a drone or a hand, your notes can draw it: detailed, and labelled.",
+      "text": "When a lecture describes a drone or a hand, your notes can draw it, labelled.",
       "direction": "a spark of delight on \"draw it\""
     },
     {
       "id": "plots",
       "at": 0.3,
-      "text": "A formula becomes a graph you can drag: watch the sigmoid sharpen… and gradient descent overshoot.",
-      "direction": "enjoying it; a smile on \"overshoot\""
+      "text": "Formulas turn into graphs you can drag: the sigmoid sharpens… gradient descent overshoots.",
+      "direction": "enjoying it; a smile on \"overshoots\""
     },
     {
       "id": "quiet",
       "at": 0.3,
-      "text": "And it's light on your computer: quiet while it waits.",
+      "text": "Light, and quiet, on your computer.",
       "direction": "calm, softer, settling down"
     },
     {
       "id": "proof",
       "at": 0.3,
-      "text": "Your recordings still never leave your computers.",
+      "text": "Your recordings never leave your computers.",
       "direction": "sincere, a touch slower"
     },
     {

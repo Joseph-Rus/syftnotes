@@ -17,7 +17,7 @@ export const text2 = {
   plots: ['Formulas that move.', 'Drag a slider; the curve follows.'],
   // Measured on an M-series Mac (the app's own CPU benchmark): idle under 0.5% of one core, recording about a quarter
   // of its old cost. Said as "light" and "quiet": no promise about battery.
-  quiet: {before: 'Light on ', highlight: 'your computer', after: '.'},
+  quiet: {before: '', highlight: 'Light', after: ' on your computer.'},
   quietIdle: ['Waiting', 'under half a percent of one core'],
   quietRecord: ['Recording', 'about a quarter of what it used to take'],
   quietNote: 'Measured on an M-series Mac.',
@@ -30,13 +30,13 @@ export const TRANSITION = 12;
 // (writing src/promo2/timeline.json) and remakes the music; change a length here and run `npm run audio2`.
 export const baseDurations = {
   opener: 102,
-  notes: 228,
-  explore: 228,
-  recall: 156,
+  notes: 192,
+  explore: 210,
+  recall: 138,
   kinds: 138,
-  drawings: 228,
-  plots: 246,
-  quiet: 120,
+  drawings: 192,
+  plots: 228,
+  quiet: 102,
   proof: 84,
   cta: 144,
 };
@@ -52,6 +52,8 @@ const COUNT = Object.keys(durations2).length;
 export const TOTAL_FRAMES2 = Object.values(durations2).reduce((a, b) => a + b, 0) - (COUNT - 1) * TRANSITION;
 
 export const music2: string | null = 'audio/music2.wav';
+export const musicVolume2 = 0.6; // a touch above the first video's 0.55: the narration sits a little higher too
+export const CLICK = 0.42; // the pointer's clicks: this video has many, close together
 
 // The narration (src/promo2/voiceover.json, made by `npm run voice2`): each line, where it starts in its scene, how long.
 export const voiceLines2 = (voiceover.lines as {id: Scene2; at: number}[])

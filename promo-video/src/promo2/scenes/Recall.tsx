@@ -4,22 +4,22 @@ import {colors, fonts} from '../../config';
 import {ease, spr} from '../../anim';
 import {Cursor, Desktop, Title} from '../../components/Layout';
 import {Sfx} from '../../components/Sfx';
-import {text2} from '../config';
+import {CLICK, text2} from '../config';
 import {box as boxOf, BOXES} from '../Flow';
 import {BarButton, FloatingBar, Grow, StageWindow, Strip, StripIcon} from '../ui';
 import {FLOW_ICONS, FlowNote, useFlowStage} from './Explore';
 
 // Test yourself (DiagramChrome's recall): every box's words hide; click a box to check it, then Knew it or Not yet
 // (or Y and N on the keyboard); the strip keeps count, "5 of 8 recalled".
-const TEST = 20; // Test yourself is clicked
+const TEST = 16; // Test yourself is clicked
 type Turn = {id: string; click: number; grade: number; knew: boolean; key?: 'Y' | 'N'};
 const TURNS: Turn[] = [
-  {id: 'contract', click: 44, grade: 60, knew: true}, // graded with the strip's Knew it
-  {id: 'eject', click: 74, grade: 81, knew: true, key: 'Y'},
-  {id: 'slclose', click: 88, grade: 95, knew: false, key: 'N'},
-  {id: 'avclose', click: 102, grade: 109, knew: true, key: 'Y'},
-  {id: 'atria', click: 116, grade: 123, knew: true, key: 'Y'},
-  {id: 'relax', click: 130, grade: 137, knew: true, key: 'Y'},
+  {id: 'contract', click: 34, grade: 50, knew: true}, // graded with the strip's Knew it
+  {id: 'eject', click: 62, grade: 68, knew: true, key: 'Y'},
+  {id: 'slclose', click: 76, grade: 82, knew: false, key: 'N'},
+  {id: 'avclose', click: 90, grade: 96, knew: true, key: 'Y'},
+  {id: 'atria', click: 104, grade: 110, knew: true, key: 'Y'},
+  {id: 'relax', click: 118, grade: 124, knew: true, key: 'Y'},
 ];
 
 const Key: React.FC<{k: string; p: number; x: number; y: number}> = ({k, p, x, y}) => (
@@ -126,7 +126,7 @@ export const Recall: React.FC = () => {
             under={strip}
           />
         </StageWindow>
-        <Cursor stops={stops} clicks={[TEST, ...TURNS.map((t) => t.click), TURNS[0].grade]} />
+        <Cursor clickVolume={CLICK} stops={stops} clicks={[TEST, ...TURNS.map((t) => t.click), TURNS[0].grade]} />
         {TURNS.filter((t) => t.key).map((t) => {
           const p = ease(frame, t.grade - 4, t.grade) * (1 - ease(frame, t.grade + 6, t.grade + 10));
           const at = pointerAt(t.grade);

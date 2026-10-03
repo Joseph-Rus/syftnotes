@@ -4,7 +4,7 @@ import {colors} from '../../config';
 import {ease, spr} from '../../anim';
 import {Cursor, Desktop, Title} from '../../components/Layout';
 import {Sfx} from '../../components/Sfx';
-import {text2} from '../config';
+import {CLICK, text2} from '../config';
 import {around, BOXES, boxAt, EDGES, Flow, FLOW_H, FLOW_W, FlowLook} from '../Flow';
 import {FloatingBar, Grow, H2, PinActions, Serif, StageWindow, Strip, StripIcon, useStage} from '../ui';
 
@@ -49,12 +49,12 @@ export const FLOW_ICONS = ['play_circle', 'quiz', 'open_in_full'] as const;
 // The pointer's story: it comes to rest on a box (it lights up with its arrows and neighbours, the rest dims), clicks
 // to pin it (its arrows go Lagoon; Explain this, Quiz me, Where was this said? and Zoom in appear), then steps
 // through the cycle: Step through, Next twice, and Play.
-const HOVER = 30;
-const PIN = 84;
-const STEPS = 134;
-const NEXT1 = 156;
-const NEXT2 = 172;
-const PLAY = 190;
+const HOVER = 28;
+const PIN = 76;
+const STEPS = 118;
+const NEXT1 = 138;
+const NEXT2 = 154;
+const PLAY = 170;
 const EVERY = 18; // playing, a step a beat
 
 export const Explore: React.FC = () => {
@@ -94,7 +94,7 @@ export const Explore: React.FC = () => {
   const pinTop = fs.flowTop - fs.top + (pinBox.y + pinBox.h / 2) * fs.s + 10;
   const actions = pinned ? (
     <div style={{position: 'absolute', left: pinLeft, top: pinTop, zIndex: 5}}>
-      <PinActions p={spr(frame, PIN + 1, {damping: 20, stiffness: 200, mass: 0.7})} hot={frame >= 100 && frame < 118 ? 'explain' : undefined} />
+      <PinActions p={spr(frame, PIN + 1, {damping: 20, stiffness: 200, mass: 0.7})} hot={frame >= 92 && frame < 106 ? 'explain' : undefined} />
     </div>
   ) : null;
 
@@ -129,14 +129,14 @@ export const Explore: React.FC = () => {
             over={actions}
           />
         </StageWindow>
-        <Cursor
+        <Cursor clickVolume={CLICK}
           stops={[
             [6, ...tip(box, 260, 230)],
             [HOVER, ...tip(box, 30, 4)],
             [PIN - 6, ...tip(box, 34, 6)],
-            [PIN + 12, ...tip(box, 34, 6)],
+            [PIN + 8, ...tip(box, 34, 6)],
+            [92, ...tip(explainAt, 0, -6)],
             [102, ...tip(explainAt, 0, -6)],
-            [112, ...tip(explainAt, 0, -6)],
             [STEPS - 6, ...tip(fs.barIcon(0), -4, -6)],
             [STEPS + 6, ...tip(fs.barIcon(0), -4, -6)],
             [NEXT1 - 6, ...tip(fs.stripIcon(1), -4, -6)],

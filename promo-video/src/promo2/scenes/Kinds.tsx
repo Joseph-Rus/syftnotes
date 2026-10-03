@@ -179,7 +179,7 @@ const CARDS: {title: string; kind: string; Draw: React.FC<{f: number}>}[] = [
   {title: 'Germ theory', kind: 'Timeline', Draw: Timeline},
   {title: 'Tissue types', kind: 'Mind map', Draw: MindMap},
 ];
-export const KIND_AT = [4, 31, 58, 85]; // each card lands as the narration names it
+export const KIND_AT = [14, 44, 72, 98]; // each card lands as the narration names it
 
 export const Kinds: React.FC = () => {
   const frame = useCurrentFrame();

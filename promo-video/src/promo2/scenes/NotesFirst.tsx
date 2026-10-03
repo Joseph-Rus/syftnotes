@@ -12,8 +12,8 @@ import {Byline, H2, Icon, NoteHead, Serif, StageWindow, useStage} from '../ui';
 // Notes first: the lecture's notes are filed and open at once; its diagrams are added into the same open note a
 // couple of minutes later (the byline says "Adding diagrams…", then "Diagrams added", as AiNotesModel does).
 const FILED = 16; // the notes are filed
-const LATER = 74; // "a couple of minutes later"
-const ADDED = 104; // the diagram is added into the open note
+const LATER = 60; // "a couple of minutes later"
+const ADDED = 90; // the diagram is added into the open note
 
 const Dots: React.FC<{frame: number}> = ({frame}) => (
   <span style={{display: 'inline-flex', gap: 3, marginLeft: 2}}>

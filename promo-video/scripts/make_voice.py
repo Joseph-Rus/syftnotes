@@ -45,16 +45,18 @@ from scipy.io import wavfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 # Each video's files: its script, what was made, its recut, its lines, and its scene lengths. --promo picks one.
 PROMOS = {
-    '1': dict(script='src/voiceover.json', voice='src/voice.json', timeline='src/timeline.json', out='public/audio/vo', config='src/config.ts'),
+    '1': dict(script='src/voiceover.json', voice='src/voice.json', timeline='src/timeline.json', out='public/audio/vo', config='src/config.ts',
+              level=-19),
     '2': dict(script='src/promo2/voiceover.json', voice='src/promo2/voice.json', timeline='src/promo2/timeline.json',
-              out='public/audio/vo2', config='src/promo2/config.ts'),
+              out='public/audio/vo2', config='src/promo2/config.ts', level=-18),
 }
-SCRIPT = VOICE_JSON = TIMELINE = OUT = CONFIG = None  # set by use()
+SCRIPT = VOICE_JSON = TIMELINE = OUT = CONFIG = LEVEL = None  # set by use()
 
 
 def use(promo):
-    global SCRIPT, VOICE_JSON, TIMELINE, OUT, CONFIG
+    global SCRIPT, VOICE_JSON, TIMELINE, OUT, CONFIG, LEVEL
     f = PROMOS[promo]
+    LEVEL = f['level']  # each line's loudness, dB RMS
     SCRIPT, VOICE_JSON, TIMELINE = ROOT / f['script'], ROOT / f['voice'], ROOT / f['timeline']
     OUT, CONFIG = ROOT / f['out'], ROOT / f['config']
 
@@ -147,7 +149,7 @@ def tidy(path):
         b = min(len(x), loud[-1] + int(0.12 * sr))
         x = x[a:b]
     rms = np.sqrt(np.mean(x ** 2)) + 1e-9
-    x = x * (10 ** (-19 / 20) / rms)
+    x = x * (10 ** (LEVEL / 20) / rms)
     peak = np.max(np.abs(x))
     if peak > 0.89:
         x = x * 0.89 / peak

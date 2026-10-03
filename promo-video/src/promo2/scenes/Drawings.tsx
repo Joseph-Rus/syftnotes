@@ -4,7 +4,7 @@ import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {ease, spr} from '../../anim';
 import {Cursor, Desktop, Title} from '../../components/Layout';
 import {Sfx} from '../../components/Sfx';
-import {text2} from '../config';
+import {CLICK, text2} from '../config';
 import {ArtName, artSize, Drawing, PartCard} from '../Parts';
 import {ClassKey, FloatingBar, H2, Serif, StageWindow, useStage} from '../ui';
 
@@ -12,15 +12,15 @@ import {ClassKey, FloatingBar, H2, Serif, StageWindow, useStage} from '../ui';
 // passes over the battery and rests on the flight controller (it lights with a ring, the rest dims), and a click pins
 // it: its card says what it is, with Explain this, Quiz me, Where was this said? and Zoom in. Then the hand's deep
 // flexor tendon, the same way.
-const SWITCH = 118; // the hand's note
+const SWITCH = 86; // the hand's note
 type Turn = {art: ArtName; cls: ClassKey; title: string; line: string; pass?: [string, number, number]; part: [string, number, number]; hover: number; pin: number};
 const DRONE: Turn = {
   art: 'drone', cls: 'engr', title: 'The quadcopter, side on', line: 'Every part the lecture named, where it sits on the frame.',
-  pass: ['battery', 326, 146], part: ['flight-controller', 368, 182], hover: 40, pin: 60,
+  pass: ['battery', 326, 146], part: ['flight-controller', 368, 182], hover: 32, pin: 48,
 };
 const HAND: Turn = {
   art: 'hand', cls: 'nurs', title: 'The hand, palm up', line: 'The bones of the wrist and fingers, and the tendons that bend them.',
-  part: ['fdp-tendon', 236, 236], hover: SWITCH + 34, pin: SWITCH + 52,
+  part: ['fdp-tendon', 236, 236], hover: SWITCH + 26, pin: SWITCH + 42,
 };
 
 const useDrawingStage = (turn: Turn) => {
@@ -95,7 +95,7 @@ export const Drawings: React.FC = () => {
             </div>
           ) : null}
         </StageWindow>
-        <Cursor
+        <Cursor clickVolume={CLICK}
           stops={[
             [8, ...d(DRONE, drone, 600, 330)],
             [DRONE.hover - 20, ...d(DRONE, drone, DRONE.pass![1], DRONE.pass![2], 2, 2)],

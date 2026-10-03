@@ -2,11 +2,11 @@ import React from 'react';
 import {AbsoluteFill, Audio, interpolate, Sequence, staticFile} from 'remotion';
 import {linearTiming, TransitionSeries} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
-import {colors, duckTo, FPS, musicVolume, voiceVolume} from '../config';
+import {colors, duckTo, FPS, voiceVolume} from '../config';
 import {Sfx} from '../components/Sfx';
 import {Proof} from '../scenes/Proof';
 import {Cta} from '../scenes/Cta';
-import {durations2, music2, Scene2, sceneStart2, TOTAL_FRAMES2, TRANSITION, voiceLines2} from './config';
+import {durations2, music2, musicVolume2, Scene2, sceneStart2, TOTAL_FRAMES2, TRANSITION, voiceLines2} from './config';
 import {Opener} from './scenes/Opener';
 import {NotesFirst} from './scenes/NotesFirst';
 import {Explore} from './scenes/Explore';
@@ -29,7 +29,7 @@ const musicAt = (f: number) => {
     const d = interpolate(f, [v.from - 6, v.from + 2, v.to - 2, v.to + 10], [0, 1, 1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
     return Math.max(m, d);
   }, 0);
-  return musicVolume * ends * (1 - (1 - duckTo) * under);
+  return musicVolume2 * ends * (1 - (1 - duckTo) * under);
 };
 
 // The order a student lives it: the notes, then playing with what's in them, then what's under the hood, and the
