@@ -107,14 +107,13 @@ export const NotesFirst: React.FC = () => {
         <div
           style={{
             position: 'absolute',
-            // Where the diagram is about to go, under the summary.
             left: stage.at(page.x, 0).x,
-            top: stage.at(0, vertical ? 330 : 300).y,
+            top: stage.at(0, vertical ? 560 : 430).y,
             width: page.w * stage.z,
             display: 'flex',
             justifyContent: 'center',
             opacity: Math.min(1, later * 1.4) * (1 - laterOut),
-            transform: `scale(${0.9 + 0.1 * later})`,
+            transform: `scale(${0.85 + 0.15 * later})`,
             zIndex: 30,
           }}
         >
@@ -122,20 +121,25 @@ export const NotesFirst: React.FC = () => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 10,
-              padding: '12px 20px',
+              gap: 14,
+              padding: vertical ? '18px 32px' : '16px 30px',
               borderRadius: 999,
-              background: 'rgba(30, 38, 70, 0.82)',
-              border: '1px solid rgba(255,255,255,0.18)',
-              boxShadow: '0 18px 40px -12px rgba(0,0,20,0.7)',
+              background: 'rgba(30, 38, 70, 0.88)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              boxShadow: '0 24px 50px -14px rgba(0,0,20,0.75)',
               fontFamily: fonts.ui,
-              fontSize: vertical ? 24 : 20,
+              fontSize: vertical ? 36 : 30,
               fontWeight: 600,
               color: '#FFFFFF',
               whiteSpace: 'nowrap',
             }}
           >
-            <Icon name="schedule" size={vertical ? 26 : 22} color="#FFFFFF" />
+            {/* A clock whose hands run on through the two minutes. */}
+            <svg width={vertical ? 40 : 34} height={vertical ? 40 : 34} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 12 L12 6.5" transform={`rotate(${(frame - LATER) * 9} 12 12)`} />
+              <path d="M12 12 L15.5 12" transform={`rotate(${(frame - LATER) * 0.75} 12 12)`} />
+            </svg>
             2 minutes later
           </div>
         </div>

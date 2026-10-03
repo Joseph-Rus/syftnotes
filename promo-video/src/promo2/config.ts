@@ -11,10 +11,10 @@ export const text2 = {
   // Each caption is [the part in ink, the part in grey].
   notes: ['Notes first.', 'Diagrams a couple of minutes later.'],
   explore: ['Point at a box.', 'See what it connects to.'],
-  recall: ['Test yourself.', 'Hide the words, then recall them.'],
+  recall: ['Test yourself.', 'Hide the words, then recall\u00a0them.'], // no lone last word on a phone
   kinds: ['More kinds.', 'Automata, sequences, timelines, mind maps.'],
   drawings: ['Drawings of real things.', 'Detailed and labelled.'],
-  plots: ['Formulas that move.', 'Drag a slider; the curve follows.'],
+  plots: ['Formulas that move.', 'Drag a slider; the curve\u00a0follows.'],
   // Measured on an M-series Mac (the app's own CPU benchmark): idle under 0.5% of one core, recording about a quarter
   // of its old cost. Said as "light" and "quiet": no promise about battery.
   quiet: {before: '', highlight: 'Light', after: ' on your computer.'},

@@ -51,10 +51,10 @@ export const FLOW_ICONS = ['play_circle', 'quiz', 'open_in_full'] as const;
 // through the cycle: Step through, Next twice, and Play.
 const HOVER = 28;
 const PIN = 76;
-const STEPS = 118;
-const NEXT1 = 138;
-const NEXT2 = 154;
-const PLAY = 170;
+const STEPS = 112;
+const NEXT1 = 130;
+const NEXT2 = 146;
+const PLAY = 162; // then a step on every beat: the scene starts on one, so 180, 198, …
 const EVERY = 18; // playing, a step a beat
 
 export const Explore: React.FC = () => {
