@@ -100,7 +100,7 @@ public class DiagramsAfterFilingTests
                 Ai.SummarizeAsync, Say, filed: id => Jobs.AfterFiled(id, Ai.TakeDiagramsFollow(id)));
         }
 
-        void Say(string line)
+        public void Say(string line)
         {
             lock (Log) Log.Add(line);
         }
@@ -285,6 +285,36 @@ public class DiagramsAfterFilingTests
         rig.Claude.Design = (_, _) => Task.FromResult(Reply(("Key points", "The renin chain")));
         Assert.Equal(1, await rig.Jobs.RunPendingAsync());
         Assert.Contains("```mermaid", rig.Row("lec-3").SummaryMd);
+    }
+
+    [Fact]
+    public async Task A_pass_on_the_librarys_own_model_steps_aside_while_notes_are_written()
+    {
+        using var rig = new Rig();
+        await rig.FileAsync();
+        new AiSettings { Provider = "claude", Fallback = false, Diagrams = "ollama" }.Save(rig.Cfg.Home);
+        var local = new AiJobs(rig.Cfg.Home)
+        {
+            Providers = _ => rig.Claude, Checks = new FakeChecks().Installed("claude").Ollama(models: [("qwen3:30b", 18.6)]).Build(), Log = rig.Say,
+            DiagramTimeout = TimeSpan.FromSeconds(20),
+        };
+        bool busy = false;
+        rig.Jobs = new DiagramJobs(rig.Cfg, rig.Store, local, rig.Say) { NotesBusy = () => busy, YieldCheck = TimeSpan.FromMilliseconds(20) };
+        rig.Claude.Design = (_, ct) => Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => "", TaskScheduler.Default);
+
+        var running = rig.Jobs.RunPendingAsync();
+        await rig.AskedAsync();
+        busy = true; // a lecture comes in to be written
+        Assert.Equal(0, await running);
+        Assert.Contains("stepped aside while notes are written", rig.Logged());
+        Assert.Equal(0, await rig.Jobs.RunPendingAsync()); // nothing starts while notes are written
+        Assert.True(rig.Jobs.Adding("lec-1"));
+
+        busy = false;
+        rig.Claude.Design = (_, _) => Task.FromResult(Reply(("Key points", "The renin chain")));
+        Assert.Equal(1, await rig.Jobs.RunPendingAsync());
+        Assert.Equal(DiagramDesign.Insert(Notes, [Designed("Key points")]), rig.Row().SummaryMd);
+        Assert.Contains("qwen3:30b drew 1", rig.Logged());
     }
 
     [Fact]

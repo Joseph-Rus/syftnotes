@@ -265,7 +265,14 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             store.MarkAttachmentsUsed(job.AttachmentIds);
             jobs.Remove(id);
             Forget(cfg.Home, id);
-            diagrams?.AfterFiled(id, job.DiagramsBy);
+            try
+            {
+                diagrams?.AfterFiled(id, job.DiagramsBy);
+            }
+            catch (IOException e)
+            {
+                log($"[rewrite] '{m.Title}': its diagrams couldn't be queued ({e.Message}); the new notes are in");
+            }
             return Build(id, store.Get(id) ?? row, null);
         }
     }

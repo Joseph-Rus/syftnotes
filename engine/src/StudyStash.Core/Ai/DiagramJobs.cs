@@ -236,7 +236,16 @@ public sealed class DiagramJobs
             if (job is null) break;
             // A job that's to run again later (it stepped aside for notes, or its file waits to be written) isn't
             // picked again until then: notes are busy, or its time hasn't come.
-            if (await RunAsync(job, stop)) ended++;
+            try
+            {
+                if (await RunAsync(job, stop)) ended++;
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // Whatever it was, this lecture's diagrams don't hold up the rest, or stay "on their way" for ever.
+                End(job, $"its diagrams were given up on ({e.Message}); the notes stay as filed");
+                ended++;
+            }
         }
         return ended;
     }
