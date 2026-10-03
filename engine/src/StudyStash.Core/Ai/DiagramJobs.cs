@@ -120,7 +120,8 @@ public sealed class DiagramJobs
         return result;
     }
 
-    string Title(string id) => store.Get(id) is { } r ? (r.LectureTitle is { Length: > 0 } t ? t : r.Title ?? id) : id;
+    /// <summary>The lecture as the library's log names it (as the pipeline and the diagram pass do).</summary>
+    string Title(string id) => store.Get(id)?.Title is { Length: > 0 } t ? t : id;
 
     // --- what the library does ---------------------------------------------------------------------------------------
 

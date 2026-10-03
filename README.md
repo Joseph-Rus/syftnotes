@@ -185,8 +185,11 @@ npm install -g @openai/codex                        # Mac or Windows (or on a Ma
 Setup's notes step shows these commands with a Copy button, opens Terminal for you, and has
 **Check again** to pick the engine up once it's installed and signed in.
 
-**Draws diagrams** is a pick of its own. Once a lecture's notes are written, a stronger model reads
-its timed transcript and the notes, decides whether the lecture teaches anything a picture makes
+**Draws diagrams** is a pick of its own. Your notes never wait for it: a lecture is filed, readable
+in the app, on your phone and in Ask, the moment its notes are written, and its diagrams arrive a
+few minutes later, put into the notes where they go (an open lecture's byline says *Adding
+diagrams…* meanwhile, then *Diagrams added*; the page stays where you're reading). Once a lecture's
+notes are filed, a stronger model reads its timed transcript and the notes, decides whether the lecture teaches anything a picture makes
 clearer (a process, a cycle, a pathway, a decision rule, a hierarchy, a structure, states and what
 moves between them, an exchange between parties, a timeline, a topic's themes, a comparison, or
 something spatial like the forces on an object), and if it does, designs it from what the lecturer
@@ -211,8 +214,8 @@ spaced out automatically, and one that still looks wrong (a part missing, a lead
 part, drawn too simply) goes back once while there's time. It's clean, stylised vector art, not a
 photograph, and only an engine that draws well is asked (Claude Code, Codex, Gemini — never a local
 Ollama model). A lecture gets one, two for a long one. A detailed drawing is long to write out (8 to
-14 minutes with Claude Code's Opus), so a lecture that gets one has its notes up to 18 minutes after
-its transcript, rather than 8.
+14 minutes with Claude Code's Opus), so a lecture that gets one has its diagrams up to 18 minutes
+after its notes, rather than 8.
 
 - **Automatic** (the default) uses the strongest engine that already reads your lectures — the one
   that writes your notes or answers your questions — trying Claude Code (Opus, high effort), then
@@ -231,8 +234,18 @@ big chart with no groups) goes back once with what's wrong, while there's time, 
 used only when it's better; a plot is worked out at its sliders' starting values and ends, and one
 that's flat, undefined, off its axes or has a slider that changes nothing goes back the same way. If
 the diagrams can't be designed (the engine is busy, over its limit,
-or takes longer than 8 minutes, 18 with an illustration), the notes are kept exactly as written. The library's log says
+or takes longer than 8 minutes, 18 with an illustration), the notes stay exactly as filed. The library's log says
 what was drawn and redesigned, or why nothing was.
+
+The diagrams are designed one lecture at a time, never while notes are being written (a pass on the
+library's own Ollama model steps aside for new notes and starts again after), and they survive a
+restart: a pass cut off part-way runs again, three tries at most. They go in safely. If you (or an
+AI in a chat) edit a lecture's note file while its diagrams are being designed, every edit is kept
+and the diagrams go into its summary under their headings; a diagram whose heading has gone is left
+out rather than put somewhere it doesn't belong; notes written again (**Rewrite notes with**, or
+written afresh) get diagrams of their own instead, and a second pass replaces the first one's
+diagrams rather than adding more. **Rewrite notes with** goes the same way: the new notes are ready
+as soon as their words are, and their diagrams follow once you use them.
 
 ## Notes
 
