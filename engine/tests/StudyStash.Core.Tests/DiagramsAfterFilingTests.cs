@@ -318,6 +318,35 @@ public class DiagramsAfterFilingTests
     }
 
     [Fact]
+    public async Task Diagrams_start_moments_after_the_notes_are_done_not_half_a_minute_later()
+    {
+        using var rig = new Rig();
+        bool busy = true; // filing wakes the queue while its notes still count as being written
+        rig.Jobs = new DiagramJobs(rig.Cfg, rig.Store, rig.Ai, rig.Say)
+        {
+            NotesBusy = () => busy, Pause = TimeSpan.FromMinutes(10), YieldCheck = TimeSpan.FromMilliseconds(50),
+        };
+        using var stop = new CancellationTokenSource();
+        var queue = rig.Jobs.Start(stop.Token);
+
+        await rig.FileAsync();
+        await Task.Delay(300); // it looked, saw notes being written, and rests
+        Assert.Equal(0, rig.Claude.Designs);
+        busy = false; // the notes are done, and nothing says so
+        await rig.AskedAsync();
+
+        stop.Cancel();
+        try
+        {
+            await queue;
+        }
+        catch (OperationCanceledException)
+        {
+            // stopped mid-pass
+        }
+    }
+
+    [Fact]
     public async Task Diagrams_designed_before_a_restart_just_go_in_without_designing_them_again()
     {
         if (OperatingSystem.IsWindows()) return; // a folder that can't be written to, the way a Mac or Linux has it

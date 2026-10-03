@@ -214,13 +214,23 @@ public sealed class DiagramJobs
             }
             try
             {
-                await wake.WaitAsync(Pause, stop);
+                await wake.WaitAsync(HeldBack() ? YieldCheck : Pause, stop);
             }
             catch (OperationCanceledException)
             {
                 break;
             }
         }
+    }
+
+    /// <summary>Lectures wait for their diagrams while notes are being written: the queue looks again within
+    /// <see cref="YieldCheck"/>, not <see cref="Pause"/>, because nothing wakes it when the notes are done (filing wakes it
+    /// while those notes still count as being written, which left a lecture's diagrams half a minute late).</summary>
+    bool HeldBack()
+    {
+        lock (gate)
+            if (jobs.Count == 0) return false;
+        return NotesBusy();
     }
 
     /// <summary>Every job that can run now, one after another; stops while notes are being written. How many ended.</summary>
