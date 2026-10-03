@@ -61,7 +61,8 @@ export const Recall: React.FC = () => {
   for (const t of TURNS) {
     if (frame >= t.click) shown[t.id] = ease(frame, t.click + 1, t.click + 8);
     if (frame >= t.grade) marks[t.id] = {knew: t.knew, p: spr(frame, t.grade, {damping: 12, stiffness: 220, mass: 0.6})};
-    if (frame >= t.click && frame < t.grade) open = t;
+    // The question stays a moment after it's answered, so the click is seen to land on Knew it.
+    if (frame >= t.click && frame < t.grade + (t.key ? 3 : 6)) open = t;
   }
   const knew = TURNS.filter((t) => frame >= t.grade && t.knew).length;
   const checked = TURNS.filter((t) => frame >= t.grade).length;
@@ -73,7 +74,7 @@ export const Recall: React.FC = () => {
         <>
           <span style={{color: colors.text2}}>“{boxOf(open.id).title}”: did you know it?</span>
           <Grow />
-          <BarButton icon="check" label="Knew it" hot={frame >= TURNS[0].grade - 8 && frame < TURNS[0].grade + 2 && open.id === TURNS[0].id} />
+          <BarButton icon="check" label="Knew it" hot={frame >= TURNS[0].grade - 8 && frame < TURNS[0].grade + 6 && open.id === TURNS[0].id} />
           <BarButton label="Not yet" />
         </>
       ) : (
