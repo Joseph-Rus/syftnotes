@@ -298,6 +298,9 @@ public static partial class IllustrationDesign
     public sealed record Outcome(IReadOnlyList<DesignedDiagram> Drawn, IReadOnlyList<string> Dropped, IReadOnlyList<string> Problems, int Revised)
     {
         public static readonly Outcome None = new([], [], [], 0);
+
+        /// <summary>How many were composed from the parts library rather than drawn.</summary>
+        public int Composed { get; init; }
     }
 
     /// <summary>
@@ -309,15 +312,16 @@ public static partial class IllustrationDesign
     /// out. Never throws but for cancelling.
     /// </summary>
     public static async Task<Outcome> DrawAllAsync(Meeting m, string notes, IReadOnlyList<IllustrationPlan> plans, string grounds,
-        Func<string, Task<string>> ask, Func<TimeSpan> left, int maxPromptChars = int.MaxValue)
+        Func<string, Task<string>> ask, Func<TimeSpan> left, int maxPromptChars = int.MaxValue,
+        Func<string, Task<string>>? compose = null, ComposedScenes? scenes = null)
     {
         if (plans.Count == 0) return Outcome.None;
         var cap = Cap(m.Transcript);
         var dropped = plans.Skip(cap).Select(p => $"“{p.Title}”: this lecture has room for {cap} illustration{(cap == 1 ? "" : "s")}").ToList();
-        var runs = plans.Take(cap).Select(p => DrawAsync(m, notes, p, grounds, ask, left, maxPromptChars)).ToList();
+        var runs = plans.Take(cap).Select(p => DrawAsync(m, notes, p, grounds, ask, left, maxPromptChars, compose, scenes)).ToList();
         var drawn = new List<DesignedDiagram>();
         var problems = new List<string>();
-        int revised = 0;
+        int revised = 0, composed = 0;
         foreach (var run in runs)
         {
             var one = await run;
@@ -325,16 +329,27 @@ public static partial class IllustrationDesign
             if (one.Dropped is { } why) dropped.Add(why);
             if (one.Problems.Count > 0 && one.Drawn is { } still) problems.Add($"“{still.Title}”: {string.Join("; ", one.Problems)}");
             if (one.Revised) revised++;
+            if (one.Composed) composed++;
         }
-        return new Outcome(drawn, dropped, problems, revised);
+        return new Outcome(drawn, dropped, problems, revised) { Composed = composed };
     }
 
-    sealed record One(DesignedDiagram? Drawn, string? Dropped, IReadOnlyList<string> Problems, bool Revised);
+    sealed record One(DesignedDiagram? Drawn, string? Dropped, IReadOnlyList<string> Problems, bool Revised)
+    {
+        public bool Composed { get; init; }
+    }
 
+    /// <summary>One plan: composed from the parts library when <paramref name="compose"/> is given and the library has
+    /// what it needs (seconds), else drawn (minutes).</summary>
     static async Task<One> DrawAsync(Meeting m, string notes, IllustrationPlan plan, string grounds, Func<string, Task<string>> ask,
-        Func<TimeSpan> left, int maxPromptChars)
+        Func<TimeSpan> left, int maxPromptChars, Func<string, Task<string>>? compose, ComposedScenes? scenes)
     {
         string title = "“" + plan.Title + "”";
+        if (compose is not null)
+        {
+            var c = await ComposeAsync(m, plan, grounds, compose, scenes);
+            if (c.Drawn is { } made) return new One(made, null, c.Problems, false) { Composed = true };
+        }
         try
         {
             var room = left() - TimeSpan.FromSeconds(20);

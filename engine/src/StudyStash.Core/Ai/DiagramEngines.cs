@@ -37,6 +37,13 @@ public static class DiagramEngines
     /// pictures were alike, and only the time grew.</summary>
     public static string DrawEffort(string engine) => engine is "claude" or "codex" ? "low" : "";
 
+    /// <summary>The model an illustration is composed from parts with: a small JSON scene from a short catalogue, a job
+    /// a fast model does well in seconds (Claude Code's Sonnet; the others' own default).</summary>
+    public static string ComposeModel(string engine) => engine == "claude" ? "sonnet" : "";
+
+    /// <summary>The reasoning effort composing gets: little, as for drawing.</summary>
+    public static string ComposeEffort(string engine) => DrawEffort(engine);
+
     /// <summary>
     /// Who designs the diagrams for notes written by <paramref name="notesEngine"/>, or null when nobody does (diagrams
     /// off, or the notes engine draws them itself). A picked engine is used while it looks usable; when it doesn't

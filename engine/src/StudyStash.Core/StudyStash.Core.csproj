@@ -17,6 +17,11 @@
     <EmbeddedResource Include="../../../extension/*" LogicalName="extension/%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- The ready-made parts illustrations are composed from (built by tools/PartsImport; see docs/parts-sources.md). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Rich/PartsLibrary.xml" LogicalName="StudyStash.Core.Rich.PartsLibrary.xml" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="StudyStash.Core.Tests" />
   </ItemGroup>

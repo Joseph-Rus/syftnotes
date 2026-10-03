@@ -226,11 +226,13 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             int ctx = local ? await Core.Summarize.ContextSizeAsync(cfg, pick.Model) : 200_000;
             var result = await DiagramDesign.DesignAsync(m, notes, pick.Drawings, Designer(pick, cfg, ctx, cts.Token), Core.Summarize.TranscriptBudget(ctx),
                     DiagramTimeout - watch.Elapsed, Drawer(pick, cfg, cts.Token),
-                    longer: total => cts.CancelAfter(total > watch.Elapsed ? total - watch.Elapsed : TimeSpan.Zero))
+                    longer: total => cts.CancelAfter(total > watch.Elapsed ? total - watch.Elapsed : TimeSpan.Zero),
+                    compose: Composer(pick, cfg, cts.Token), scenes: Scenes)
                 .WaitAsync(cts.Token);
             if (pick.Engine != "ollama") Record(pick.Engine, true, "");
             string left = result.Dropped.Count > 0 ? $"; left out {string.Join("; ", result.Dropped)}" : "";
             string revised = result.Revised > 0 ? $", {result.Revised} redesigned after a look at how {(result.Revised == 1 ? "it" : "they")} laid out" : "";
+            if (result.Composed > 0) revised += $", {result.Composed} composed from the parts library";
             string looks = result.Problems.Count > 0 ? $"; still looks off: {string.Join("; ", result.Problems)}" : "";
             Log?.Invoke(result.Malformed
                 ? $"[diagrams] '{m.Title}': {who}'s answer couldn't be used ({string.Join("; ", result.Dropped)}); the notes stay as filed"
@@ -267,6 +269,20 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         var illustrator = Designer(pick with { Effort = DiagramEngines.DrawEffort(pick.Engine) }, cfg, 200_000, ct, IllustrationDesign.Timeout);
         return prompt => illustrator(prompt, false);
     }
+
+    /// <summary>The composer: the designer's engine with a fast model at low effort, for an illustration made of
+    /// ready-made parts (<see cref="IllustrationDesign.ComposeAsync"/>); none for an engine that doesn't draw SVG.</summary>
+    Func<string, Task<string>>? Composer(DiagramPick pick, Config cfg, CancellationToken ct)
+    {
+        if (pick.Drawings != Drawings.FlowchartsAndSvg) return null;
+        var composer = Designer(pick with { Model = DiagramEngines.ComposeModel(pick.Engine), Effort = DiagramEngines.ComposeEffort(pick.Engine) },
+            cfg, 200_000, ct, IllustrationDesign.ComposeTimeout);
+        return prompt => composer(prompt, false);
+    }
+
+    /// <summary>Illustrations composed before, by plan, so a class that comes back to a subject gets its figure at once.</summary>
+    ComposedScenes Scenes => sceneCache ??= new ComposedScenes(Path.Combine(home, "illustration-scenes"));
+    ComposedScenes? sceneCache;
 
     /// <summary>
     /// The designer, one prompt at a time (its design, then any repair): a local model straight through Ollama, held
