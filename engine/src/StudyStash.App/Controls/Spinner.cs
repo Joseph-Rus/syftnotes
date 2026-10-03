@@ -5,7 +5,10 @@ using Avalonia.Threading;
 
 namespace StudyStash.App.Controls;
 
-/// <summary>Busy: a quarter arc going round (Fluent's ProgressRing, small), in the accent.</summary>
+/// <summary>Busy: a quarter arc going round (Fluent's ProgressRing, small), in the accent. It only turns while it can be
+/// seen: a spinner in a panel that's hidden (an "Attaching…" row nothing is attaching to), or in a window that's
+/// closed to the menu bar, would otherwise wake the app thirty times a second, for as long as the app runs, to
+/// redraw something nobody is looking at.</summary>
 public sealed class Spinner : Control
 {
     public static readonly StyledProperty<IBrush?> ForegroundProperty = TextBlock.ForegroundProperty.AddOwner<Spinner>();
@@ -21,6 +24,16 @@ public sealed class Spinner : Control
             angle = (angle + 12) % 360;
             InvalidateVisual();
         };
+        _ = new Seen(this, Sync);
+    }
+
+    /// <summary>Whether it's turning: only while it's on screen (in a window that's showing, with nothing above it hidden).</summary>
+    internal bool Turning => timer.IsEnabled;
+
+    void Sync(bool inView)
+    {
+        if (inView && Environment.GetEnvironmentVariable("STUDYSTASH_STILL") != "1") timer.Start();
+        else timer.Stop();
     }
 
     public IBrush? Foreground
@@ -38,7 +51,6 @@ public sealed class Spinner : Control
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
-        if (Environment.GetEnvironmentVariable("STUDYSTASH_STILL") != "1") timer.Start();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)

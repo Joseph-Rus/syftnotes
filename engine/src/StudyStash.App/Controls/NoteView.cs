@@ -137,12 +137,12 @@ public sealed partial class NoteView : StackPanel
             // Every block's type changes (a diagram on paper is another control from one on screen): none can be kept.
             blocks.Clear();
             diagrams.Clear();
-            Build();
+            BuildWhenSeen();
         }
         else if (change.Property == MarkdownProperty)
         {
             var hold = HoldPlace();
-            Build();
+            BuildWhenSeen();
             hold?.Invoke();
         }
     }
@@ -189,6 +189,46 @@ public sealed partial class NoteView : StackPanel
             scroller.LayoutUpdated += Keep;
         };
     }
+
+    /// <summary>The notes changed while this view is hidden (the page keeps a view for each way of showing a lecture:
+    /// its notes, the two sides of a rewrite's comparison, the plain Markdown): it's built when it shows, not before.
+    /// Building is the whole cost of a lecture's notes (every formula typeset, every diagram laid out, every plot's
+    /// scene made), and a hidden view built the same notes again for nobody to see.</summary>
+    void BuildWhenSeen()
+    {
+        if (Hidden)
+        {
+            // What it built before is out of date and nobody sees it: let it go, and build the new when it shows.
+            if (!unbuilt && Children.Count > 0)
+            {
+                Children.Clear();
+                blocks.Clear();
+                diagrams.Clear();
+                previous.Clear();
+            }
+            unbuilt = true;
+            return;
+        }
+        unbuilt = false;
+        Build();
+    }
+
+    bool unbuilt;
+
+    /// <summary>In a window, but out of view: hidden itself, or under something hidden, or in a window that's closed to the
+    /// menu bar. One that isn't in a window at all (the notes laid out for a PDF, a view a test holds) isn't hidden: it
+    /// builds at once.</summary>
+    bool Hidden => VisualRoot is not null && seen is { InView: false };
+
+    readonly Seen seen;
+
+    public NoteView() => seen = new Seen(this, inView =>
+    {
+        if (inView && unbuilt) BuildWhenSeen();
+    });
+
+    /// <summary>Whether the notes are waiting to be built (the view is hidden and they changed since it was).</summary>
+    internal bool Unbuilt => unbuilt;
 
     bool Mac => Skin.Current == SkinKind.Mac;
 

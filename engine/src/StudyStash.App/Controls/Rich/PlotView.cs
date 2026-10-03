@@ -104,6 +104,12 @@ public sealed class PlotView : Decorator
             if (Key(e.Key, e.KeyModifiers)) e.Handled = true;
         };
         DetachedFromVisualTree += (_, _) => StopPlaying();
+        // A slider left playing in a window that's closed to the menu bar (hidden, not taken apart) would go on being
+        // moved and redrawn sixty times a second for as long as the app runs.
+        _ = new Seen(this, inView =>
+        {
+            if (!inView) StopPlaying();
+        });
         AutomationProperties.SetName(this, PlotLayout.Describe(State));
         Update();
     }
