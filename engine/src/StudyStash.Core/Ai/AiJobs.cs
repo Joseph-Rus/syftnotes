@@ -255,8 +255,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     }
 
     /// <summary>Illustrations composed before, by plan, so a class that comes back to a subject gets its figure at once.</summary>
-    SceneCache Scenes => sceneCache ??= new SceneCache(Path.Combine(home, "illustration-scenes"));
-    SceneCache? sceneCache;
+    ComposedScenes Scenes => sceneCache ??= new ComposedScenes(Path.Combine(home, "illustration-scenes"));
+    ComposedScenes? sceneCache;
 
     /// <summary>
     /// The designer, one prompt at a time (its design, then any repair): a local model straight through Ollama, held

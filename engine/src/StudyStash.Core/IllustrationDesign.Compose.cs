@@ -101,7 +101,7 @@ public static partial class IllustrationDesign
     /// (<paramref name="grounds"/>) and labels most of the plan. Never throws but for cancelling.
     /// </summary>
     public static async Task<Composed> ComposeAsync(Meeting m, IllustrationPlan plan, string grounds, Func<string, Task<string>> compose,
-        SceneCache? cache = null, PartsLibrary? library = null)
+        ComposedScenes? cache = null, PartsLibrary? library = null)
     {
         library ??= Library;
         var dropped = new List<string>();
@@ -110,7 +110,7 @@ public static partial class IllustrationDesign
             var (catalogue, coverage) = Shortlist(plan, library);
             if (catalogue.Count == 0 || coverage < MinCoverage)
                 return new Composed(null, [$"the parts library has little for this ({coverage:P0} of its parts)"], [], false);
-            string key = SceneCache.Key(plan, library);
+            string key = ComposedScenes.Key(plan, library);
             bool cached = false;
             string? answer = cache?.Get(key);
             if (answer is not null) cached = true;
@@ -149,7 +149,7 @@ public static partial class IllustrationDesign
 /// file a scene); a scene is only ever drawn through <see cref="PartsScene.Read"/>, so a file that's been tampered
 /// with can't put anything unsafe on the page.
 /// </summary>
-public sealed class SceneCache(string? folder = null)
+public sealed class ComposedScenes(string? folder = null)
 {
     readonly ConcurrentDictionary<string, string> memory = new(StringComparer.Ordinal);
 

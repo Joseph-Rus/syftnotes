@@ -138,9 +138,18 @@ public sealed partial class PartsLibrary
         lock (safe)
         {
             if (safe.TryGetValue(part.Id, out var done)) return done;
-            var svg = new XElement(Ns + "svg", new XAttribute("viewBox", F($"{part.Box.X} {part.Box.Y} {part.Box.W} {part.Box.H}")),
-                part.Symbol.Nodes().Select(n => n is XElement x ? Into(x) : n));
-            var cleaned = SafeSvg.Clean(svg.ToString(SaveOptions.DisableFormatting));
+            SafeSvgResult cleaned;
+            try
+            {
+                var svg = new XElement(Ns + "svg", new XAttribute("viewBox", F($"{part.Box.X} {part.Box.Y} {part.Box.W} {part.Box.H}")),
+                    part.Symbol.Nodes().Select(n => n is XElement x ? Into(x) : n));
+                cleaned = SafeSvg.Clean(svg.ToString(SaveOptions.DisableFormatting));
+            }
+            catch (Exception)
+            {
+                // Whatever the part holds, a part that can't be read is never drawn.
+                cleaned = SafeSvgResult.Fail("unreadable");
+            }
             XElement? drawing = null;
             if (cleaned.Svg is not null)
             {
@@ -156,7 +165,10 @@ public sealed partial class PartsLibrary
         }
     }
 
-    static XElement Into(XElement e) => new(Ns + e.Name.LocalName, e.Attributes(), e.Nodes().Select(n => n is XElement c ? Into(c) : n));
+    /// <summary>An element and all it holds in the SVG namespace (whatever namespace it claimed, which SafeSvg then judges
+    /// by its name), without namespace declarations of its own.</summary>
+    static XElement Into(XElement e) =>
+        new(Ns + e.Name.LocalName, e.Attributes().Where(a => !a.IsNamespaceDeclaration), e.Nodes().Select(n => n is XElement c ? Into(c) : n));
 
     static readonly XNamespace Ns = "http://www.w3.org/2000/svg";
 

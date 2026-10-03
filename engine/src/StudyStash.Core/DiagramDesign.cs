@@ -483,7 +483,7 @@ public static partial class DiagramDesign
     /// </summary>
     public static async Task<DesignResult> DesignAsync(Meeting m, string notes, Drawings drawings, Func<string, bool, Task<string>> ask,
         int maxPromptChars = int.MaxValue, TimeSpan? budget = null, Func<string, Task<string>>? draw = null, Action<TimeSpan>? longer = null,
-        Func<string, Task<string>>? compose = null, SceneCache? scenes = null)
+        Func<string, Task<string>>? compose = null, ComposedScenes? scenes = null)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
         int cap = Cap(m.Transcript);

@@ -313,7 +313,7 @@ public static partial class IllustrationDesign
     /// </summary>
     public static async Task<Outcome> DrawAllAsync(Meeting m, string notes, IReadOnlyList<IllustrationPlan> plans, string grounds,
         Func<string, Task<string>> ask, Func<TimeSpan> left, int maxPromptChars = int.MaxValue,
-        Func<string, Task<string>>? compose = null, SceneCache? scenes = null)
+        Func<string, Task<string>>? compose = null, ComposedScenes? scenes = null)
     {
         if (plans.Count == 0) return Outcome.None;
         var cap = Cap(m.Transcript);
@@ -342,7 +342,7 @@ public static partial class IllustrationDesign
     /// <summary>One plan: composed from the parts library when <paramref name="compose"/> is given and the library has
     /// what it needs (seconds), else drawn (minutes).</summary>
     static async Task<One> DrawAsync(Meeting m, string notes, IllustrationPlan plan, string grounds, Func<string, Task<string>> ask,
-        Func<TimeSpan> left, int maxPromptChars, Func<string, Task<string>>? compose, SceneCache? scenes)
+        Func<TimeSpan> left, int maxPromptChars, Func<string, Task<string>>? compose, ComposedScenes? scenes)
     {
         string title = "“" + plan.Title + "”";
         if (compose is not null)

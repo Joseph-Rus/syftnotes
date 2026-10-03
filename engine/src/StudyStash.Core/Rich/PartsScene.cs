@@ -69,15 +69,17 @@ public static partial class PartsScene
         }
         var placed = new List<Placed>();
         var names = new HashSet<string>(StringComparer.Ordinal);
+        var everyName = o["parts"] is JsonArray all ? all.OfType<JsonObject>().Select(p => Str(p["as"]).ToLowerInvariant()).ToHashSet(StringComparer.Ordinal) : [];
         if (o["parts"] is JsonArray ps)
             foreach (var p in ps.OfType<JsonObject>().Take(MaxPlaced * 2))
             {
                 if (placed.Count == MaxPlaced) { dropped.Add($"more than {MaxPlaced} parts placed"); break; }
-                string name = Str(p["as"]), use = Str(p["use"]);
+                string name = Str(p["as"]).ToLowerInvariant(), use = Str(p["use"]);
                 if (!Plain().IsMatch(name) || !names.Add(name)) { dropped.Add($"a part named '{Clip(name, 40)}' (names are plain and used once)"); continue; }
                 if (!allowed.TryGetValue(use, out var part)) { dropped.Add($"'{name}' uses '{Clip(use, 40)}', which isn't in the catalogue"); continue; }
                 double w = Num(p["w"]) ?? double.NaN;
-                string? like = Str(p["like"]) is { Length: > 0 } l && placed.Any(x => x.As == l) ? l : null;
+                // A scale may come from a part placed later (a PDU behind the rack it's sized like).
+                string? like = Str(p["like"]).ToLowerInvariant() is { Length: > 0 } l && l != name && everyName.Contains(l) ? l : null;
                 if (like is not null) w = double.IsFinite(w) && w > 0 ? w : 1;
                 if (!(w > 0 && w <= Far)) { dropped.Add($"'{name}' has no width"); continue; }
                 double turn = Num(p["turn"]) ?? 0;
@@ -100,7 +102,7 @@ public static partial class PartsScene
             foreach (var s in ss.OfType<JsonObject>().Take(MaxShapes * 2))
             {
                 if (shapes.Count == MaxShapes) { dropped.Add($"more than {MaxShapes} shapes"); break; }
-                string name = Str(s["as"]), kind = Str(s["kind"]), material = Str(s["material"]);
+                string name = Str(s["as"]).ToLowerInvariant(), kind = Str(s["kind"]), material = Str(s["material"]);
                 if (!Plain().IsMatch(name) || !names.Add(name)) { dropped.Add($"a shape named '{Clip(name, 40)}' (names are plain and used once)"); continue; }
                 if (kind is not ("ellipse" or "rect" or "blob" or "band" or "arrow")) { dropped.Add($"'{name}' is a {Clip(kind, 20)}, not a shape Study Stash draws"); continue; }
                 if (Material(material) is null) material = kind == "arrow" ? "ink" : "light-metal";
@@ -125,7 +127,7 @@ public static partial class PartsScene
         if (o["labels"] is JsonArray ls)
             foreach (var l in ls.OfType<JsonObject>())
             {
-                string part = Str(l["part"]), to = Str(l["to"]);
+                string part = Str(l["part"]), to = Lower(Str(l["to"]));
                 if (!planned.ContainsKey(part) || labels.Any(x => x.Part == part)) continue;
                 if (!Resolves(to, placed, shapes)) { dropped.Add($"the label '{planned[part].Name}' points at '{Clip(to, 40)}', which isn't in the picture"); continue; }
                 // Two labels on one thing would be one part with two names: the one the thing is named for keeps it, or
@@ -175,7 +177,7 @@ public static partial class PartsScene
     static Point? Pt(JsonNode? n, List<Placed> placed, List<Shape> shapes)
     {
         if (n is JsonArray a && a.Count == 2 && Num(a[0]) is double x && Num(a[1]) is double y && Finite(x) && Finite(y)) return new Point(x, y, null);
-        if (n is JsonValue v && v.GetValueKind() == JsonValueKind.String && v.GetValue<string>() is { } r)
+        if (n is JsonValue v && v.GetValueKind() == JsonValueKind.String && Lower(v.GetValue<string>()) is { } r)
         {
             int dot = r.IndexOf('.');
             if (dot <= 0) return null;
@@ -184,6 +186,13 @@ public static partial class PartsScene
                 return new Point(0, 0, r);
         }
         return null;
+    }
+
+    /// <summary>A reference as names are kept: the placed thing's name in lower case, the port or region as given.</summary>
+    static string Lower(string reference)
+    {
+        int dot = reference.IndexOf('.');
+        return dot < 0 ? reference.ToLowerInvariant() : reference[..dot].ToLowerInvariant() + reference[dot..];
     }
 
     static bool Finite(double d) => double.IsFinite(d) && Math.Abs(d) <= Far;
@@ -343,6 +352,7 @@ public static partial class PartsScene
         var drawings = new Dictionary<string, XElement>(StringComparer.Ordinal);
         var scales = new Dictionary<string, double>(StringComparer.Ordinal);
         Bounds? extent = null;
+        foreach (var p in scene.Parts.Where(p => p.Like is null)) scales[p.As] = p.W / p.Part.Box.W;
         foreach (var p in scene.Parts)
         {
             if (library.Drawing(p.Part) is not { } drawing) continue;
