@@ -16,16 +16,16 @@ const draw = Easing.bezier(0.4, 0, 0.2, 1); // a line of light: off quickly, the
 
 // Where the cards settle (their centres), how big, how near (1 nearest) and when they arrive.
 const CARDS_WIDE: Placement[] = [
-  {kind: 'diagram', x: 336, y: 236, s: 0.6, z: 1, at: 26},
-  {kind: 'drone', x: 1596, y: 252, s: 0.62, z: 0.8, at: 32},
-  {kind: 'sigmoid', x: 1640, y: 902, s: 0.56, z: 0.62, at: 38},
-  {kind: 'descent', x: 292, y: 906, s: 0.5, z: 0.45, at: 44},
+  {kind: 'diagram', x: 330, y: 236, s: 0.64, z: 1, at: 24},
+  {kind: 'drone', x: 1596, y: 252, s: 0.62, z: 0.8, at: 30},
+  {kind: 'sigmoid', x: 1646, y: 904, s: 0.56, z: 0.62, at: 36},
+  {kind: 'descent', x: 286, y: 910, s: 0.48, z: 0.42, at: 42},
 ];
 const CARDS_TALL: Placement[] = [
-  {kind: 'diagram', x: 318, y: 352, s: 0.76, z: 1, at: 26},
-  {kind: 'drone', x: 806, y: 520, s: 0.6, z: 0.75, at: 32},
-  {kind: 'sigmoid', x: 300, y: 1530, s: 0.66, z: 0.62, at: 38},
-  {kind: 'descent', x: 790, y: 1650, s: 0.56, z: 0.45, at: 44},
+  {kind: 'diagram', x: 318, y: 352, s: 0.76, z: 1, at: 24},
+  {kind: 'drone', x: 806, y: 520, s: 0.6, z: 0.75, at: 30},
+  {kind: 'sigmoid', x: 300, y: 1530, s: 0.66, z: 0.62, at: 36},
+  {kind: 'descent', x: 790, y: 1650, s: 0.56, z: 0.42, at: 42},
 ];
 
 export const Intro2: React.FC = () => {
@@ -42,13 +42,14 @@ export const Intro2: React.FC = () => {
   const dot = prog(f, 36, 48);
   const sheen = prog(f, 46, 70, inOut);
   // The words.
-  const name = prog(f, 20, 42);
-  const tag = prog(f, 34, 48);
-  const line1 = prog(f, 36, 58);
-  const line2 = prog(f, 41, 63);
-  // The way out, into the first scene: the night lifts as the words and cards go.
-  const lift = prog(f, D - 34, D - 8, inOut);
-  const leave = prog(f, D - 32, D - 6, inCubic);
+  const name = prog(f, 18, 40);
+  const tag = prog(f, 30, 44);
+  const line1 = prog(f, 30, 52);
+  const line2 = prog(f, 35, 57);
+  // The way out, into the first scene: the night lifts as the words and cards go (slowly at first, so the line under
+  // the name stays to be read).
+  const lift = prog(f, D - 30, D - 8, inOut);
+  const leave = prog(f, D - 26, D - 4, inCubic);
 
   const iconSize = vertical ? 212 : 172;
   const iconTop = vertical ? 676 : 300;

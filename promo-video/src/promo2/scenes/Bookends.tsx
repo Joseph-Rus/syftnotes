@@ -203,6 +203,9 @@ const GlimpseBody: React.FC<{kind: GlimpseKind; play: number}> = ({kind, play}) 
       return (
         <>
           <H2 style={{height: 40}}>The quadcopter, side on</H2>
+          {/* The labels in Inter, which is loaded before the first frame: this card's look never changes, so labels laid
+              out first in a stand-in for the computer's Helvetica Neue would stay that way in some renders. */}
+          <style>{'#drone-labels { font-family: Inter, sans-serif; }'}</style>
           <Drawing name="drone" scale={1} look={{hot: 'flight-controller', dim: 1, ring: 1}} />
         </>
       );
@@ -234,8 +237,8 @@ const GlimpseBody: React.FC<{kind: GlimpseKind; play: number}> = ({kind, play}) 
 export type Placement = {kind: GlimpseKind; x: number; y: number; s: number; z: number; at: number};
 
 /**
- * A card floating in from depth: it comes out from behind the centre of the frame (`cx`, `cy`), sharpens as it nears,
- * then drifts slowly outwards, nearer cards faster. `leave` (0 → 1) sends it on past the edges of the frame.
+ * A card floating in from depth: it comes out from behind the centre of the frame (`cx`, `cy`) and fades in as it
+ * nears, then drifts slowly outwards, nearer cards faster. `leave` (0 → 1) sends it on past the edges of the frame.
  */
 export const Glimpse: React.FC<{
   g: Placement;
@@ -254,9 +257,9 @@ export const Glimpse: React.FC<{
   const n = Math.hypot(dx, dy) || 1;
   const pace = 0.45 + 0.55 * g.z; // parallax: the near cards move more
   const along = -90 * (1 - a) + drift * pace * Math.max(0, f - g.at) + 300 * leave * leave * pace;
-  const scale = g.s * (0.9 + 0.1 * a) * (1 + 0.18 * leave * g.z);
-  const blur = (1 - g.z) * 2.2 + (1 - a) * 10;
-  const bright = (0.5 + 0.5 * g.z) * light;
+  // Further cards are darker. No CSS filter (blur, brightness): Chrome keeps a filtered layer's first picture, so a
+  // render split across tabs could show a card's labels in a stand-in font, or clipped, in some frames and not others.
+  const shade = 1 - (0.5 + 0.5 * g.z) * light;
   return (
     <div
       style={{
@@ -265,9 +268,9 @@ export const Glimpse: React.FC<{
         top: Math.round(g.y - h / 2),
         width: w,
         height: h,
-        transform: `translate(${px((dx / n) * along)}px, ${px((dy / n) * along)}px) scale(${px(scale * 10000) / 10000})`,
+        // Its scale never changes: Chrome sometimes kept an earlier picture of a card whose scale changed every frame.
+        transform: `translate(${px((dx / n) * along)}px, ${px((dy / n) * along)}px) scale(${g.s})`,
         opacity: px(a * (1 - leave) * 1000) / 1000,
-        filter: `blur(${px(blur)}px) brightness(${px(bright * 1000) / 1000})`,
       }}
     >
       <div
@@ -287,6 +290,7 @@ export const Glimpse: React.FC<{
       >
         <GlimpseBody kind={g.kind} play={prog(f, g.at + play[0], g.at + play[1], inOut)} />
       </div>
+      {shade > 0.005 ? <div style={{position: 'absolute', inset: 0, borderRadius: 22, background: `rgba(3, 4, 26, ${px(shade * 1000) / 1000})`}} /> : null}
     </div>
   );
 };

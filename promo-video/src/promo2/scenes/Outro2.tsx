@@ -30,7 +30,7 @@ export const Proof2: React.FC = () => {
   const clear = prog(f, D - 18, D - 4, inOut);
 
   const lapW = vertical ? 520 : 380;
-  const lapTop = vertical ? 470 : 186;
+  const lapTop = vertical ? 540 : 186;
   const textTop = lapTop + Math.round((lapW * 250) / 360) + (vertical ? 92 : 66);
   const size = vertical ? 92 : 84;
   const p = text.proof;
@@ -133,7 +133,7 @@ export const Cta2: React.FC = () => {
 
   const left = vertical ? 0 : 190;
   const iconSize = vertical ? 196 : 156;
-  const iconTop = vertical ? 652 : 226;
+  const iconTop = vertical ? 652 : 244;
   const nameSize = vertical ? 128 : 132;
   const nameTop = iconTop + iconSize + (vertical ? 40 : 34);
   const lineTop = nameTop + Math.round(nameSize * 1.12) + (vertical ? 22 : 16);
