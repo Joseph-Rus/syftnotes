@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Not in StudyStash.slnx: run by hand when the parts library changes (see Program.cs and README.md), never by CI or
+  <!-- Not in StudyStash.slnx: run by hand when the parts library changes (see docs/parts-sources.md), never by CI or
        the app. It downloads the chosen parts, makes them safe and in the house style, and writes the one embedded
        resource the app reads (src/StudyStash.Core/Rich/PartsLibrary.xml) and the credits. -->
   <PropertyGroup>

@@ -1,0 +1,187 @@
+[
+  // ---- Anatomy -------------------------------------------------------------------------------------------------------
+  {
+    "id": "heart-section", "from": "bio:cc-by-3.0/Human_physiology/Servier/heart-interior-1.svg",
+    "name": "Heart, cut open (frontal section)", "category": "anatomy", "view": "front, cut open; patient's right on the left", "size": "12 cm tall",
+    "tags": "heart, cardiac, chambers, atrium, atria, ventricle, ventricles, valve, valves, aorta, vena cava, pulmonary, septum, myocardium, circulation, cardiovascular, frontal section, interior",
+    "regions": [
+      {"id": "aortic-valve", "name": "Aortic valve", "tags": "semilunar valve", "rect": [0.4, 0.44, 0.135, 0.13], "anchor": [0.47, 0.51]},
+      {"id": "superior-vena-cava", "name": "Superior vena cava", "tags": "svc, vena cava, vein", "rect": [0.12, 0.08, 0.19, 0.32], "anchor": [0.22, 0.28]},
+      {"id": "inferior-vena-cava", "name": "Inferior vena cava", "tags": "ivc, vena cava, vein", "rect": [0.1, 0.84, 0.21, 0.16], "anchor": [0.22, 0.95]},
+      {"id": "pulmonary-trunk", "name": "Pulmonary trunk", "tags": "pulmonary artery, pulmonary arteries", "rect": [0.47, 0.18, 0.33, 0.17], "anchor": [0.7, 0.27]},
+      {"id": "aorta", "name": "Aorta", "tags": "aortic arch, ascending aorta, artery", "rect": [0.28, 0.0, 0.23, 0.44, 0.51, 0.0, 0.25, 0.18], "anchor": [0.45, 0.18]},
+      {"id": "pulmonary-veins", "name": "Pulmonary veins", "tags": "pulmonary vein", "rect": [0.0, 0.36, 0.13, 0.15, 0.76, 0.35, 0.16, 0.16], "anchor": [0.87, 0.46]},
+      {"id": "tricuspid-valve", "name": "Tricuspid valve", "tags": "right atrioventricular valve, av valve, chordae tendineae", "rect": [0.17, 0.57, 0.34, 0.24], "anchor": [0.32, 0.67]},
+      {"id": "mitral-valve", "name": "Mitral valve", "tags": "bicuspid valve, left atrioventricular valve, av valve, chordae tendineae", "rect": [0.5, 0.48, 0.3, 0.2], "anchor": [0.6, 0.6]},
+      {"id": "papillary-muscles", "name": "Papillary muscles", "tags": "papillary muscle, trabeculae", "rect": [0.68, 0.6, 0.22, 0.32], "anchor": [0.8, 0.78]},
+      {"id": "interventricular-septum", "name": "Interventricular septum", "tags": "septum", "rect": [0.53, 0.66, 0.13, 0.22], "anchor": [0.6, 0.79]},
+      {"id": "right-atrium", "name": "Right atrium", "tags": "atrium, ra", "rect": [0.07, 0.42, 0.29, 0.33], "anchor": [0.24, 0.56]},
+      {"id": "left-atrium", "name": "Left atrium", "tags": "atrium, la", "rect": [0.5, 0.35, 0.36, 0.2], "anchor": [0.68, 0.45]},
+      {"id": "right-ventricle", "name": "Right ventricle", "tags": "ventricle, rv", "rect": [0.2, 0.75, 0.35, 0.18], "anchor": [0.44, 0.86]},
+      {"id": "left-ventricle", "name": "Left ventricle", "tags": "ventricle, lv", "rect": [0.66, 0.55, 0.3, 0.38], "anchor": [0.88, 0.7]},
+      {"id": "apex", "name": "Apex", "tags": "tip of the heart", "rect": [0.3, 0.9, 0.7, 0.1], "anchor": [0.82, 0.97]}
+    ]
+  },
+  {
+    "id": "heart-outside", "from": "bio:cc-by-3.0/Human_physiology/Servier/heart-front.svg",
+    "name": "Heart from the front (outside)", "category": "anatomy", "view": "front, outside", "size": "12 cm tall",
+    "tags": "heart, cardiac, coronary arteries, aorta, vena cava, pulmonary trunk, outside, external, anterior"
+  },
+  {
+    "id": "heart-valves-above", "from": "bio:cc-by-3.0/Human_physiology/Servier/heart-valves.svg",
+    "name": "Heart valves from above", "category": "anatomy", "view": "from above, atria removed",
+    "tags": "heart, valves, tricuspid, mitral, aortic, pulmonary, semilunar, cardiac skeleton"
+  },
+  {
+    "id": "hand-bones", "from": "bio:cc-by-4.0/Human_physiology/DBCLS/Anterior_view_of_bones_of_right_hand.svg", "simplify": 1.2,
+    "name": "Bones of the right hand (palm side)", "category": "anatomy", "view": "palm side (anterior), fingers up, thumb on the right", "size": "19 cm tall",
+    "tags": "hand, bones, skeleton, wrist, carpals, carpal, metacarpals, phalanges, phalanx, fingers, thumb, radius, ulna, palm, scaphoid, lunate, triquetrum, pisiform, trapezium, trapezoid, capitate, hamate, tendons",
+    "regions": [
+      {"id": "scaphoid", "name": "Scaphoid", "tags": "carpal", "rect": [0.5, 0.705, 0.135, 0.06], "anchor": [0.56, 0.735]},
+      {"id": "lunate", "name": "Lunate", "tags": "carpal", "rect": [0.39, 0.72, 0.11, 0.07], "anchor": [0.44, 0.75]},
+      {"id": "pisiform", "name": "Pisiform", "tags": "carpal", "rect": [0.26, 0.66, 0.07, 0.07], "anchor": [0.3, 0.69]},
+      {"id": "triquetrum", "name": "Triquetrum", "tags": "carpal", "rect": [0.33, 0.69, 0.065, 0.05], "anchor": [0.36, 0.72]},
+      {"id": "hamate", "name": "Hamate", "tags": "carpal, hook of hamate", "rect": [0.33, 0.63, 0.115, 0.06], "anchor": [0.39, 0.67]},
+      {"id": "capitate", "name": "Capitate", "tags": "carpal", "rect": [0.45, 0.63, 0.09, 0.09], "anchor": [0.5, 0.68]},
+      {"id": "trapezoid", "name": "Trapezoid", "tags": "carpal", "rect": [0.54, 0.63, 0.08, 0.07], "anchor": [0.585, 0.67]},
+      {"id": "trapezium", "name": "Trapezium", "tags": "carpal", "rect": [0.62, 0.62, 0.11, 0.1], "anchor": [0.665, 0.68]},
+      {"id": "radius", "name": "Radius", "tags": "forearm bone", "rect": [0.38, 0.765, 0.27, 0.235], "anchor": [0.52, 0.9]},
+      {"id": "ulna", "name": "Ulna", "tags": "forearm bone", "rect": [0.24, 0.76, 0.14, 0.24], "anchor": [0.32, 0.9]},
+      {"id": "metacarpals", "name": "Metacarpals", "tags": "metacarpal, palm bones", "rect": [0.42, 0.42, 0.14, 0.22], "anchor": [0.5, 0.52]},
+      {"id": "proximal-phalanges", "name": "Proximal phalanges", "tags": "phalanx, phalanges", "rect": [0.42, 0.21, 0.14, 0.17], "anchor": [0.47, 0.3]},
+      {"id": "middle-phalanges", "name": "Middle phalanges", "tags": "phalanx, phalanges", "rect": [0.42, 0.095, 0.12, 0.11], "anchor": [0.46, 0.15]},
+      {"id": "distal-phalanges", "name": "Distal phalanges", "tags": "phalanx, phalanges, fingertip", "rect": [0.42, 0.0, 0.1, 0.09], "anchor": [0.45, 0.06]}
+    ],
+    "ports": [
+      {"id": "carpal-tunnel", "x": 0.49, "y": 0.7}, {"id": "wrist", "x": 0.47, "y": 0.86},
+      {"id": "thumb-mcp", "x": 0.82, "y": 0.52}, {"id": "thumb-ip", "x": 0.88, "y": 0.4}, {"id": "thumb-tip", "x": 0.95, "y": 0.33},
+      {"id": "index-mcp", "x": 0.65, "y": 0.41}, {"id": "index-pip", "x": 0.68, "y": 0.23}, {"id": "index-dip", "x": 0.69, "y": 0.13}, {"id": "index-tip", "x": 0.68, "y": 0.07},
+      {"id": "middle-mcp", "x": 0.48, "y": 0.4}, {"id": "middle-pip", "x": 0.47, "y": 0.21}, {"id": "middle-dip", "x": 0.45, "y": 0.095}, {"id": "middle-tip", "x": 0.44, "y": 0.02},
+      {"id": "ring-mcp", "x": 0.32, "y": 0.44}, {"id": "ring-pip", "x": 0.27, "y": 0.27}, {"id": "ring-dip", "x": 0.24, "y": 0.15}, {"id": "ring-tip", "x": 0.22, "y": 0.08},
+      {"id": "little-mcp", "x": 0.19, "y": 0.49}, {"id": "little-pip", "x": 0.11, "y": 0.37}, {"id": "little-dip", "x": 0.07, "y": 0.3}, {"id": "little-tip", "x": 0.05, "y": 0.25}
+    ]
+  },
+  {
+    "id": "hand-outline", "from": "bio:cc-by-3.0/Human_physiology/Servier/hand.svg",
+    "name": "Hand (skin, palm side)", "category": "anatomy", "view": "palm side, fingers up", "size": "19 cm tall",
+    "tags": "hand, skin, palm, fingers, thumb, outline"
+  },
+  // ---- Cells -----------------------------------------------------------------------------------------------------------
+  {
+    "id": "animal-cell", "from": "wiki:Animal_cell_structure_en.svg", "dropText": true, "dropStroke": "#DF0030",
+    "name": "Animal cell, cut away", "category": "cell", "view": "cut away, from the side",
+    "tags": "cell, animal cell, eukaryote, eukaryotic, organelles, nucleus, nucleolus, mitochondria, mitochondrion, golgi, endoplasmic reticulum, er, ribosomes, lysosome, centrioles, cytoplasm, cell membrane, plasma membrane, flagellum, vesicle, cytoskeleton",
+    "regions": [
+      {"id": "nucleolus", "name": "Nucleolus", "tags": "", "rect": [0.46, 0.4, 0.06, 0.08], "anchor": [0.48, 0.44]},
+      {"id": "nucleus", "name": "Nucleus", "tags": "nuclear envelope, chromatin, nuclear pore", "rect": [0.4, 0.33, 0.17, 0.2], "anchor": [0.44, 0.47]},
+      {"id": "mitochondria", "name": "Mitochondrion", "tags": "mitochondria, powerhouse", "rect": [0.66, 0.36, 0.13, 0.11, 0.49, 0.6, 0.13, 0.1], "anchor": [0.72, 0.43]},
+      {"id": "golgi", "name": "Golgi apparatus", "tags": "golgi body", "rect": [0.23, 0.35, 0.13, 0.12], "anchor": [0.31, 0.41]},
+      {"id": "flagellum", "name": "Flagellum", "tags": "tail", "rect": [0.0, 0.65, 0.33, 0.35], "anchor": [0.03, 0.75]},
+      {"id": "cell-membrane", "name": "Cell membrane", "tags": "plasma membrane", "rect": [0.15, 0.2, 0.85, 0.5], "anchor": [0.62, 0.22]}
+    ]
+  },
+  {
+    "id": "plant-cell", "from": "wiki:Plant_cell_structure-en.svg", "dropText": true, "dropStroke": "#000000",
+    "name": "Plant cell, cut away", "category": "cell", "view": "cut away",
+    "tags": "cell, plant cell, eukaryote, organelles, cell wall, chloroplast, chloroplasts, vacuole, nucleus, mitochondria, golgi, endoplasmic reticulum, plasmodesmata, cytoplasm"
+  },
+  {"id": "nucleus", "from": "bio:cc-by-3.0/Intracellular_components/Servier/nucleus-full-3d.svg", "name": "Nucleus", "category": "cell", "tags": "nucleus, nuclear envelope, nuclear pores, organelle, chromatin", "size": "6 µm"},
+  {"id": "mitochondrion", "from": "bio:cc-by-3.0/Intracellular_components/Servier/mitochondrium-1.svg", "name": "Mitochondrion", "category": "cell", "tags": "mitochondrion, mitochondria, cristae, organelle, atp, respiration", "size": "1 to 2 µm"},
+  {"id": "golgi-apparatus", "from": "bio:cc-by-3.0/Intracellular_components/Servier/golgi-2d-1.svg", "name": "Golgi apparatus", "category": "cell", "tags": "golgi, golgi apparatus, golgi body, cisternae, vesicles, organelle", "size": "1 to 3 µm"},
+  {"id": "rough-er", "from": "bio:cc-by-3.0/Intracellular_components/Servier/endoplasmatic-reticulum-rough.svg", "name": "Rough endoplasmic reticulum", "category": "cell", "tags": "rough er, rer, endoplasmic reticulum, ribosomes, organelle", "size": "a few µm"},
+  {"id": "smooth-er", "from": "bio:cc-by-3.0/Intracellular_components/Servier/endoplasmatic-reticulum-medium.svg", "name": "Smooth endoplasmic reticulum", "category": "cell", "tags": "smooth er, ser, endoplasmic reticulum, organelle", "size": "a few µm"},
+  {"id": "centrioles", "from": "bio:cc-by-3.0/Intracellular_components/Servier/centriole.svg", "name": "Centrioles", "category": "cell", "tags": "centriole, centrioles, centrosome, microtubules, organelle", "size": "0.5 µm"},
+  {"id": "ribosome", "from": "bio:cc-0/Intracellular_components/jaiganesh/ribosome.svg", "name": "Ribosome", "category": "cell", "tags": "ribosome, ribosomes, protein synthesis, organelle", "size": "25 nm"},
+  // ---- Lab and chemistry -------------------------------------------------------------------------------------------
+  {
+    "id": "burette-on-stand", "from": "bio:cc-by-3.0/Chemistry/Servier/burette-assembled.svg",
+    "name": "Burette on a retort stand", "category": "lab", "view": "front", "size": "75 cm tall",
+    "tags": "burette, retort stand, stand, clamp, boss, titration, stopcock, tap, graduations, volumetric, lab, chemistry, acid, base",
+    "regions": [
+      {"id": "stopcock", "name": "Stopcock", "tags": "tap, valve", "rect": [0.77, 0.68, 0.15, 0.065], "anchor": [0.84, 0.71]},
+      {"id": "burette", "name": "Burette", "tags": "graduated tube, scale", "rect": [0.79, 0.0, 0.08, 0.78], "anchor": [0.835, 0.3]},
+      {"id": "clamp", "name": "Burette clamp", "tags": "clamp", "rect": [0.62, 0.46, 0.32, 0.1], "anchor": [0.72, 0.51]},
+      {"id": "boss", "name": "Boss head", "tags": "boss, clamp holder", "rect": [0.0, 0.47, 0.2, 0.07], "anchor": [0.13, 0.505]},
+      {"id": "stand-rod", "name": "Retort stand", "tags": "stand, rod, support", "rect": [0.1, 0.1, 0.07, 0.84], "anchor": [0.135, 0.3]},
+      {"id": "stand-base", "name": "Stand base", "tags": "base", "rect": [0.0, 0.9, 1.0, 0.1], "anchor": [0.5, 0.96]}
+    ],
+    "ports": [{"id": "tip", "x": 0.835, "y": 0.77}, {"id": "base-top", "x": 0.835, "y": 0.925}, {"id": "zero-mark", "x": 0.835, "y": 0.03}]
+  },
+  {"id": "conical-flask", "from": "bio:cc-by-3.0/Chemistry/Servier/erlenmeyer-glass.svg", "name": "Conical flask", "category": "lab", "size": "15 cm tall", "tags": "conical flask, erlenmeyer flask, flask, glassware, titration, chemistry", "ports": [{"id": "mouth", "x": 0.5, "y": 0.0}, {"id": "base", "x": 0.5, "y": 1.0}]},
+  {"id": "conical-flask-solution", "from": "bio:cc-by-3.0/Chemistry/Servier/erlenmeyer-purple.svg", "keepColours": true, "name": "Conical flask with solution", "category": "lab", "size": "15 cm tall", "tags": "conical flask, erlenmeyer flask, flask, solution, indicator, analyte, titration, chemistry", "ports": [{"id": "mouth", "x": 0.5, "y": 0.0}, {"id": "base", "x": 0.5, "y": 1.0}]},
+  {"id": "beaker", "from": "bio:cc-by-3.0/Chemistry/Servier/beaker-empty.svg", "name": "Beaker", "category": "lab", "size": "10 cm tall", "tags": "beaker, glassware, lab, chemistry", "ports": [{"id": "mouth", "x": 0.5, "y": 0.0}, {"id": "base", "x": 0.5, "y": 1.0}]},
+  {"id": "funnel", "from": "bio:cc-by-3.0/Chemistry/Servier/funnel-glass.svg", "name": "Funnel", "category": "lab", "size": "10 cm tall", "tags": "funnel, filter funnel, glassware, filling a burette", "ports": [{"id": "stem", "x": 0.5, "y": 1.0}]},
+  {"id": "volumetric-pipette", "from": "bio:cc-by-3.0/Chemistry/Servier/pipette-glass.svg", "name": "Pipette", "category": "lab", "size": "40 cm long", "tags": "pipette, volumetric pipette, glassware, titration"},
+  {"id": "pipette-filler", "from": "bio:cc-by-3.0/Chemistry/Servier/pipette-bulb.svg", "name": "Pipette filler", "category": "lab", "tags": "pipette filler, pipette bulb, bulb"},
+  {"id": "measuring-cylinder", "from": "bio:cc-by-3.0/Chemistry/Servier/measuringcylinder-empty.svg", "name": "Measuring cylinder", "category": "lab", "size": "25 cm tall", "tags": "measuring cylinder, graduated cylinder, glassware"},
+  // ---- Electronics (Wokwi) -----------------------------------------------------------------------------------------
+  {
+    "id": "arduino-uno", "from": "wokwi:arduino-uno",
+    "name": "Arduino Uno board", "category": "electronics", "view": "from above, USB port at the top left", "size": "69 by 53 mm",
+    "tags": "arduino, uno, arduino uno, microcontroller, board, atmega328p, usb, barrel jack, headers, pins, digital pins, analog pins, power header, icsp, reset button, leds, embedded",
+    "regions": [
+      {"id": "usb-port", "name": "USB-B port", "tags": "usb, usb-b", "rect": [0.0, 0.17, 0.22, 0.26], "anchor": [0.1, 0.3]},
+      {"id": "barrel-jack", "name": "Barrel jack", "tags": "power jack, dc jack", "rect": [0.02, 0.74, 0.21, 0.24], "anchor": [0.12, 0.85]},
+      {"id": "reset-button", "name": "Reset button", "tags": "reset", "rect": [0.08, 0.02, 0.15, 0.14], "anchor": [0.155, 0.09]},
+      {"id": "digital-header", "name": "Digital pins", "tags": "digital header, d0 to d13, pwm pins", "rect": [0.29, 0.02, 0.67, 0.075], "anchor": [0.62, 0.06]},
+      {"id": "power-header", "name": "Power header", "tags": "power pins, 5v, 3.3v, gnd, vin, ioref", "rect": [0.42, 0.91, 0.29, 0.07], "anchor": [0.6, 0.94]},
+      {"id": "analog-header", "name": "Analog inputs", "tags": "analog header, a0 to a5", "rect": [0.72, 0.91, 0.24, 0.07], "anchor": [0.84, 0.94]},
+      {"id": "atmega328p", "name": "ATmega328P microcontroller", "tags": "microcontroller, mcu, chip, dip", "rect": [0.43, 0.59, 0.53, 0.2], "anchor": [0.69, 0.71]},
+      {"id": "icsp-header", "name": "ICSP header", "tags": "icsp, programming header", "rect": [0.9, 0.37, 0.1, 0.15], "anchor": [0.935, 0.45]},
+      {"id": "icsp-header-2", "name": "ICSP header for the USB chip", "tags": "icsp, second icsp header, 16u2", "rect": [0.24, 0.08, 0.12, 0.08], "anchor": [0.3, 0.13]},
+      {"id": "on-led", "name": "ON LED", "tags": "power led, led", "rect": [0.83, 0.29, 0.05, 0.05], "anchor": [0.855, 0.32]},
+      {"id": "l-led", "name": "L LED (pin 13)", "tags": "led, pin 13, built-in led", "rect": [0.42, 0.21, 0.05, 0.05], "anchor": [0.445, 0.24]},
+      {"id": "tx-rx-leds", "name": "TX and RX LEDs", "tags": "tx led, rx led, serial leds", "rect": [0.38, 0.28, 0.09, 0.11], "anchor": [0.445, 0.33]}
+    ],
+    "ports": [
+      {"id": "d13", "x": 0.46, "y": 0.06}, {"id": "d12", "x": 0.495, "y": 0.06}, {"id": "d11", "x": 0.53, "y": 0.06}, {"id": "d10", "x": 0.565, "y": 0.06}, {"id": "d9", "x": 0.595, "y": 0.06}, {"id": "d8", "x": 0.63, "y": 0.06},
+      {"id": "d7", "x": 0.685, "y": 0.06}, {"id": "d6", "x": 0.72, "y": 0.06}, {"id": "d5", "x": 0.755, "y": 0.06}, {"id": "d4", "x": 0.79, "y": 0.06}, {"id": "d3", "x": 0.825, "y": 0.06}, {"id": "d2", "x": 0.86, "y": 0.06},
+      {"id": "gnd-top", "x": 0.425, "y": 0.06}, {"id": "3v3", "x": 0.55, "y": 0.94}, {"id": "5v", "x": 0.585, "y": 0.94}, {"id": "gnd", "x": 0.62, "y": 0.94}, {"id": "vin", "x": 0.69, "y": 0.94},
+      {"id": "a0", "x": 0.75, "y": 0.94}, {"id": "a1", "x": 0.785, "y": 0.94}, {"id": "a2", "x": 0.82, "y": 0.94}, {"id": "a3", "x": 0.855, "y": 0.94}, {"id": "a4", "x": 0.89, "y": 0.94}, {"id": "a5", "x": 0.925, "y": 0.94}
+    ]
+  },
+  {"id": "arduino-nano", "from": "wokwi:arduino-nano", "name": "Arduino Nano", "category": "electronics", "view": "from above", "size": "45 by 18 mm", "tags": "arduino, nano, microcontroller, board, atmega328p"},
+  {"id": "arduino-mega", "from": "wokwi:arduino-mega", "name": "Arduino Mega", "category": "electronics", "view": "from above", "size": "102 by 53 mm", "tags": "arduino, mega, mega 2560, atmega2560, microcontroller, board"},
+  {"id": "esp32-devkit", "from": "wokwi:esp32-devkit-v1", "name": "ESP32 dev board", "category": "electronics", "view": "from above", "tags": "esp32, wifi, bluetooth, microcontroller, board, devkit"},
+  {"id": "led-red", "from": "wokwi:led", "name": "LED", "category": "electronics", "size": "5 mm", "tags": "led, light emitting diode, diode, anode, cathode, indicator", "ports": [{"id": "anode", "x": 0.58, "y": 1.0}, {"id": "cathode", "x": 0.42, "y": 1.0}]},
+  {"id": "rgb-led", "from": "wokwi:rgb-led", "name": "RGB LED", "category": "electronics", "tags": "rgb led, led, colour, common cathode"},
+  {"id": "resistor", "from": "wokwi:resistor", "name": "Resistor", "category": "electronics", "tags": "resistor, ohm, colour bands, current limiting", "ports": [{"id": "end-1", "x": 0.0, "y": 0.5}, {"id": "end-2", "x": 1.0, "y": 0.5}]},
+  {"id": "pushbutton", "from": "wokwi:pushbutton", "name": "Push button", "category": "electronics", "tags": "push button, button, switch, tactile switch, momentary"},
+  {"id": "potentiometer", "from": "wokwi:potentiometer", "name": "Potentiometer", "category": "electronics", "tags": "potentiometer, pot, variable resistor, knob, analog input"},
+  {"id": "servo-motor", "from": "wokwi:servo", "name": "Hobby servo", "category": "electronics", "tags": "servo, servo motor, sg90, pwm, actuator, horn"},
+  {"id": "stepper-motor", "from": "wokwi:stepper-motor", "name": "Stepper motor", "category": "electronics", "tags": "stepper, stepper motor, nema 17, motor, actuator"},
+  {"id": "buzzer", "from": "wokwi:buzzer", "name": "Buzzer", "category": "electronics", "tags": "buzzer, piezo, sound, beeper"},
+  {"id": "lcd-16x2", "from": "wokwi:lcd1602", "name": "16x2 LCD", "category": "electronics", "tags": "lcd, display, 16x2, character display, lcd1602, screen"},
+  {"id": "ultrasonic-sensor", "from": "wokwi:hc-sr04", "name": "Ultrasonic distance sensor", "category": "electronics", "tags": "ultrasonic, hc-sr04, distance sensor, sonar, sensor, trig, echo"},
+  {"id": "dht22-sensor", "from": "wokwi:dht22", "name": "Temperature and humidity sensor", "category": "electronics", "tags": "dht22, temperature, humidity, sensor"},
+  {"id": "pir-sensor", "from": "wokwi:pir-motion-sensor", "name": "PIR motion sensor", "category": "electronics", "tags": "pir, motion sensor, infrared, sensor"},
+  {"id": "light-sensor", "from": "wokwi:photoresistor-sensor", "name": "Light sensor (photoresistor)", "category": "electronics", "tags": "photoresistor, ldr, light sensor, sensor"},
+  {"id": "seven-segment", "from": "wokwi:7segment", "name": "Seven-segment display", "category": "electronics", "tags": "seven segment, 7-segment, display, digit"},
+  {"id": "imu-mpu6050", "from": "wokwi:mpu6050", "name": "MPU-6050 IMU", "category": "electronics", "tags": "imu, mpu6050, accelerometer, gyroscope, gyro, sensor, i2c"},
+  {"id": "relay-module", "from": "wokwi:ks2e-m-dc5", "name": "Relay", "category": "electronics", "tags": "relay, switch, coil"},
+  {"id": "keypad", "from": "wokwi:membrane-keypad", "name": "Membrane keypad", "category": "electronics", "tags": "keypad, membrane keypad, keys, input"},
+  {"id": "slide-switch", "from": "wokwi:slide-switch", "name": "Slide switch", "category": "electronics", "tags": "slide switch, switch, toggle"},
+  {"id": "microsd-module", "from": "wokwi:microsd-card", "name": "microSD card module", "category": "electronics", "tags": "sd card, microsd, storage, spi"},
+  {"id": "joystick", "from": "wokwi:analog-joystick", "name": "Analog joystick", "category": "electronics", "tags": "joystick, thumbstick, analog input"},
+  {"id": "rotary-encoder", "from": "wokwi:ky-040", "name": "Rotary encoder", "category": "electronics", "tags": "rotary encoder, encoder, ky-040, knob"},
+  {"id": "ir-receiver", "from": "wokwi:ir-receiver", "name": "IR receiver", "category": "electronics", "tags": "infrared, ir receiver, remote control"},
+  {"id": "oled-display", "from": "wokwi:ili9341", "name": "TFT display", "category": "electronics", "tags": "display, tft, ili9341, screen, lcd"},
+  {"id": "temperature-sensor", "from": "wokwi:ntc-temperature-sensor", "name": "NTC temperature sensor", "category": "electronics", "tags": "thermistor, ntc, temperature sensor"},
+  {"id": "neopixel-ring", "from": "wokwi:led-ring", "name": "LED ring", "category": "electronics", "tags": "neopixel, ws2812, led ring, addressable leds"},
+  // ---- Study Stash's own: drone, robot arm --------------------------------------------------------------------------
+  {"id": "quadcopter-side", "from": "house:drone-side.svg", "whole": true, "name": "Quadcopter drone, side view", "category": "machines", "view": "side, front at the left", "size": "45 cm across",
+   "tags": "drone, quadcopter, quadrotor, multirotor, uav, frame, arms, motors, brushless motor, propellers, esc, battery, lipo, flight controller, power distribution board, gps, receiver, antennas, gimbal, camera, landing gear, xt60"},
+  {"id": "robot-arm-side", "from": "house:arm-side.svg", "whole": true, "name": "Six-axis industrial robot arm, side view", "category": "machines", "view": "side", "size": "1.4 m reach",
+   "tags": "robot, robot arm, robotic arm, industrial robot, manipulator, six-axis, 6-axis, joints, base, waist, shoulder, elbow, wrist, forearm, gripper, end effector, tool flange, servo motor, reducer, counterbalance, controller cabinet, teach pendant, cables"},
+  {"id": "brushless-motor-side", "from": "house:drone-side.svg#motor", "name": "Brushless motor (side)", "category": "machines", "view": "side", "tags": "brushless motor, outrunner, motor, drone motor, bldc"},
+  {"id": "propeller-side", "from": "house:drone-side.svg#propeller", "name": "Propeller (side)", "category": "machines", "view": "side", "tags": "propeller, prop, rotor, blade"},
+  {"id": "lipo-battery", "from": "house:drone-side.svg#battery", "name": "LiPo battery pack", "category": "machines", "view": "side", "tags": "battery, lipo, lithium polymer, power, cells"},
+  {"id": "esc", "from": "house:drone-side.svg#esc", "name": "Electronic speed controller", "category": "machines", "view": "side", "tags": "esc, speed controller, motor driver"},
+  {"id": "gimbal-camera", "from": "house:drone-side.svg#gimbal", "name": "Camera gimbal", "category": "machines", "view": "side", "tags": "gimbal, stabiliser, camera mount"},
+  {"id": "action-camera", "from": "house:drone-side.svg#camera", "name": "Camera", "category": "machines", "view": "side", "tags": "camera, action camera, lens"},
+  {"id": "gps-module", "from": "house:drone-side.svg#gps-module", "name": "GPS module", "category": "machines", "view": "side", "tags": "gps, gnss, compass, puck"},
+  {"id": "robot-gripper", "from": "house:arm-side.svg#gripper", "name": "Robot gripper", "category": "machines", "view": "side", "tags": "gripper, end effector, jaws, fingers, robot hand"},
+  {"id": "servo-motor-industrial", "from": "house:arm-side.svg#servo-motor", "name": "Servo motor with gearbox", "category": "machines", "view": "side", "tags": "servo motor, ac servo, motor, encoder, gearbox, reducer"},
+  {"id": "robot-controller", "from": "house:arm-side.svg#controller-cabinet", "name": "Robot controller cabinet", "category": "machines", "view": "front", "tags": "controller, cabinet, robot controller, drives"},
+  {"id": "teach-pendant", "from": "house:arm-side.svg#teach-pendant", "name": "Teach pendant", "category": "machines", "view": "front", "tags": "teach pendant, pendant, programming, emergency stop, e-stop"}
+]
