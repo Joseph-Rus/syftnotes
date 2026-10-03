@@ -402,7 +402,8 @@ public sealed class DiagramJobs
         }
         static string Names(IEnumerable<DesignedDiagram> ds) => string.Join(", ", ds.Select(d => $"“{d.Title}”"));
         static string Count(int n) => n == 1 ? "1 diagram" : $"{n} diagrams";
-        string file = outcome.FileEdited ? " (the note file had edits of its own: they're kept, the diagrams put into its summary)" : "";
+        string file = outcome.FileLeft ? " (the note file had edits of its own and nowhere to put them: it's left as it is)"
+            : outcome.FileEdited ? " (the note file had edits of its own: they're kept, the diagrams put into its summary)" : "";
         End(job, outcome.How switch
         {
             DiagramsLanded.Added => $"added {Count(outcome.Placed.Count)} to the notes{file}",

@@ -25,6 +25,10 @@ public sealed record DiagramsOutcome(DiagramsLanded How, IReadOnlyList<DesignedD
     /// <summary>The note file had edits of its own (by hand, or by an AI in a chat): the diagrams went into its summary
     /// in place, and nothing else in it changed.</summary>
     public bool FileEdited { get; init; }
+
+    /// <summary>The note file had edits of its own and no summary with their headings to put them in: it was left
+    /// exactly as it is (the app, the phone and Ask still get them).</summary>
+    public bool FileLeft { get; init; }
 }
 
 public static partial class Notes
@@ -114,7 +118,7 @@ public sealed partial class Store
             string now = Now();
             Exec("UPDATE notes SET summary_md=?, updated_at=? WHERE id=?", updated, now, noteId);
             Index(noteId, updated, m.Transcript, now);
-            return new DiagramsOutcome(same ? DiagramsLanded.Added : DiagramsLanded.Reanchored, placed, skipped) { FileEdited = edited };
+            return new DiagramsOutcome(same ? DiagramsLanded.Added : DiagramsLanded.Reanchored, placed, skipped) { FileEdited = edited, FileLeft = file is null };
         }
     }
 
