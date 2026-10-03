@@ -3,8 +3,6 @@ import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {colors, fonts} from '../../config';
 import {ease, spr} from '../../anim';
 import {Paper, useVertical} from '../../components/Layout';
-import {Marked} from '../../components/Marked';
-import {Sfx} from '../../components/Sfx';
 import {text2} from '../config';
 
 // Quiet and light, said the way it was measured (the app's CPU benchmark on an M-series Mac): waiting, it uses under
@@ -68,7 +66,7 @@ export const Quiet: React.FC = () => {
           }}
         >
           {text2.quiet.before}
-          <Marked p={ease(frame, 14, 30)}>{text2.quiet.highlight}</Marked>
+          <span style={{color: colors.lagoon}}>{text2.quiet.highlight}</span>
           {text2.quiet.after}
         </div>
         <Row p={r1} label={text2.quietIdle[0]} value={text2.quietIdle[1]} vertical={vertical}>
@@ -93,7 +91,6 @@ export const Quiet: React.FC = () => {
         </Row>
         <div style={{opacity: note, fontFamily: fonts.ui, fontSize: vertical ? 24 : 22, color: '#7A8497', marginTop: 4}}>{text2.quietNote}</div>
       </AbsoluteFill>
-      <Sfx at={13} name="marker" volume={0.28} />
     </Paper>
   );
 };
