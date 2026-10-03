@@ -239,7 +239,10 @@ public class IllustrationTests
         var log = new List<string>();
         var ai = new AiJobs(cfg.Home) { Providers = _ => claude, Checks = new FakeChecks().Installed("claude").Build(), Log = log.Add, DiagramTimeout = TimeSpan.FromSeconds(2) };
 
-        string notes = await ai.SummarizeAsync(Lecture, cfg);
+        string filed = await ai.SummarizeAsync(Lecture, cfg);
+        Assert.DoesNotContain("```svg", filed); // filed first; the illustration follows
+        var pick = await ai.DesignerAsync(cfg, ai.TakeDiagramsFollow(Lecture.Id)!);
+        string notes = (await ai.DesignDiagramsAsync(Lecture, cfg, filed, pick!, CancellationToken.None))!.Notes;
         Assert.Contains("```svg", notes);
         Assert.Contains("drew 1 (The quadcopter from above)", log[^1]);
         var drawing = claude.Requests.Single(r => r.Prompt.StartsWith("You are a scientific illustrator", StringComparison.Ordinal));

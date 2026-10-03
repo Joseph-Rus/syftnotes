@@ -34,6 +34,9 @@ public sealed class LibraryWebOptions
     public LibraryReader.AskChatFn? AskChat { get; init; }
     /// <summary>The AI picked for each kind of work (ai.json): Settings shows and tests it. Null: kept beside the config.</summary>
     public StudyStash.Core.Ai.AiJobs? Ai { get; init; }
+    /// <summary>The diagrams that follow lectures' notes: a rewrite's used notes get theirs here, and the app hears
+    /// while they're on their way. Null: none follow a rewrite (tests, and `serve` without an AI).</summary>
+    public StudyStash.Core.Ai.DiagramJobs? Diagrams { get; init; }
     /// <summary>Canvas through the Chrome extension. Null: made here, with the library's class folders.</summary>
     public StudyStash.Core.Canvas.CanvasSync? Canvas { get; init; }
     /// <summary>The course scout. Null: exploring isn't offered (tests, and `serve` without an AI).</summary>

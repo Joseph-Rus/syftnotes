@@ -21,7 +21,7 @@ public sealed partial class LibraryWeb
     Rewrites? rewrites;
 
     AiJobs Jobs => options.Ai ?? (aiJobs ??= new AiJobs(cfg.Home, () => cfg.OllamaHost));
-    Rewrites Rewrites => rewrites ??= new Rewrites(cfg, store, Jobs);
+    Rewrites Rewrites => rewrites ??= new Rewrites(cfg, store, Jobs, diagrams: options.Diagrams);
 
     static IResult RewriteResult(Func<RewriteInfo> run)
     {

@@ -175,11 +175,16 @@ public static class Cli
             if (Flag("--no-ollama")) cfg.OllamaEnabled = false;
             Console.WriteLine($"studystash {Engine.Version}: pool '{cfg.PoolName}' on port {cfg.WebPort}");
             using var store = new Store(cfg.DbPath, cfg.PoolDir);
-            // Notes, sorting and Ask use the AI picked in Settings (ai.json): Ollama unless another is chosen. The notes'
-            // diagram pass says in the log what it drew, or why nothing.
+            // Notes, sorting and Ask use the AI picked in Settings (ai.json): Ollama unless another is chosen. A lecture is
+            // filed as soon as its notes are written; their diagrams follow, one lecture at a time, never holding up notes,
+            // and the diagram pass says in the log what it drew, or why nothing.
             var ai = new AiJobs(home, () => cfg.OllamaHost) { Log = Console.WriteLine };
-            var pipeline = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg));
+            Pipeline? writer = null; // the pipeline, below: the diagrams wait while it writes notes
+            var diagrams = new DiagramJobs(cfg, store, ai) { NotesBusy = () => writer?.Writing == true };
+            var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg),
+                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)));
             var working = pipeline.Start(stop.Token);
+            var designing = diagrams.Start(stop.Token);
             Task updating = Task.CompletedTask;
             var builder = WebApplication.CreateSlimBuilder();
             builder.Logging.ClearProviders();
@@ -204,7 +209,7 @@ public static class Cli
             var app = LibraryWeb.Build(builder, cfg, store, pipeline, new LibraryWebOptions
             {
                 Apply = (rel, h) => Updates.ApplyAsync(rel, h, UpdateHost.ThisComputer()), Claude = access, Reach = ClaudeReach.ThisComputer(), WebCheck = ReachCheck.ThisComputer(),
-                AskChat = ai.Ask(() => cfg), Ai = ai, Canvas = canvas, Scout = scout, Files = fileIndex,
+                AskChat = ai.Ask(() => cfg), Ai = ai, Diagrams = diagrams, Canvas = canvas, Scout = scout, Files = fileIndex,
                 Inbox = new Inbox(cfg.PoolDir, () => cfg.ClassNames(), c => store.ClassDir(c), ai, new History(cfg.PoolDir)),
                 StartAtLogin = LoginItems?.Invoke(home),
             });
@@ -227,7 +232,7 @@ public static class Cli
             await Until(stop.Token);
             await app.StopAsync(CancellationToken.None);
             await claude.StopAsync(CancellationToken.None);
-            await Task.WhenAll(working, updating, indexing);
+            await Task.WhenAll(working, designing, updating, indexing);
             return 0;
         }
 
