@@ -30,7 +30,7 @@ export const Proof2: React.FC = () => {
   const clear = prog(f, D - 18, D - 4, inOut);
 
   const lapW = vertical ? 520 : 380;
-  const lapTop = vertical ? 540 : 186;
+  const lapTop = vertical ? 540 : 250;
   const textTop = lapTop + Math.round((lapW * 250) / 360) + (vertical ? 92 : 66);
   const size = vertical ? 92 : 84;
   const p = text.proof;

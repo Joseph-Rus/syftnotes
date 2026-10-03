@@ -63,10 +63,13 @@ export const NightGround: React.FC<{dim: number; black?: number; zoom?: number; 
   </AbsoluteFill>
 );
 
-/** A line of words rising out of a mask: hidden at p = 0, in place at p = 1. */
+/**
+ * A line of words rising out of a mask: hidden at p = 0, in place at p = 1. The mask reaches well below the line, so
+ * a "y" or a "p" is never cut off on its own while the rest of the word is already up.
+ */
 export const Mask: React.FC<{p: number; children: React.ReactNode; style?: React.CSSProperties}> = ({p, children, style}) => (
-  <div style={{overflow: 'hidden', padding: '0.06em 0.08em 0.16em', margin: '-0.06em -0.08em -0.16em', ...style}}>
-    <div style={{transform: `translateY(${px((1 - p) * 112)}%)`, opacity: Math.min(1, p * 1.8)}}>{children}</div>
+  <div style={{overflow: 'hidden', padding: '0.06em 0.08em 0.34em', margin: '-0.06em -0.08em -0.34em', ...style}}>
+    <div style={{transform: `translateY(${px((1 - p) * 132)}%)`, opacity: Math.min(1, p * 1.8)}}>{children}</div>
   </div>
 );
 
