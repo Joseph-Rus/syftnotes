@@ -245,7 +245,18 @@ export const StageWindow: React.FC<{
   enter?: number;
   children: React.ReactNode;
 }> = ({stage, lit, pulse, list, enter = 1, children}) => (
-  <div style={{position: 'absolute', left: stage.left / stage.z, top: stage.top / stage.z, zoom: stage.z, opacity: enter, transform: `translateY(${(1 - enter) * 30}px) scale(${0.98 + 0.02 * enter})`}}>
+  // Scaled with a transform, not CSS zoom: under zoom, a scrolled page inside the window wasn't clipped to it.
+  <div
+    style={{
+      position: 'absolute',
+      left: stage.left,
+      top: stage.top,
+      opacity: enter,
+      transformOrigin: '0 0',
+      // Settles in from 98% of its size, about its top centre.
+      transform: `translate(${(stage.w * stage.z * (1 - (0.98 + 0.02 * enter))) / 2}px, ${(1 - enter) * 30}px) scale(${stage.z * (0.98 + 0.02 * enter)})`,
+    }}
+  >
     <Win w={stage.w} h={stage.h} style={{display: 'flex'}}>
       {stage.vertical ? null : <Sidebar rows={sidebarRows(lit, pulse)} />}
       {stage.list ? (
