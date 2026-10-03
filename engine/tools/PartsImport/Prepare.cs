@@ -74,6 +74,7 @@ static partial class Prepare
         foreach (var fo in root.Descendants().Where(e => e.Name.Namespace != Svg || e.Name.LocalName is "foreignObject" or "metadata").ToList()) fo.Remove();
         InlineStyles(root);
         Tile(root);
+        InlineSymbols(root);
         return root.ToString(SaveOptions.DisableFormatting);
     }
 
@@ -150,6 +151,39 @@ static partial class Prepare
             }
             pattern.Remove();
         }
+    }
+
+    /// <summary>A <c>use</c> of a symbol with its own viewBox becomes a copy of the symbol's drawing, scaled into the
+    /// box the use gives it: where everything sits can then be worked out from the markup alone.</summary>
+    static void InlineSymbols(XElement root)
+    {
+        var symbols = root.Descendants().Where(e => e.Name.LocalName == "symbol" && (string?)e.Attribute("id") is { Length: > 0 })
+            .GroupBy(e => (string)e.Attribute("id")!).ToDictionary(g => g.Key, g => g.First());
+        if (symbols.Count == 0) return;
+        foreach (var use in root.Descendants().Where(e => e.Name.LocalName == "use").ToList())
+        {
+            string href = ((string?)use.Attribute("href") ?? (string?)use.Attribute(XLink + "href") ?? "").TrimStart('#');
+            if (!symbols.TryGetValue(href, out var symbol)) continue;
+            var vb = ((string?)symbol.Attribute("viewBox") ?? "").Split([' ', ','], StringSplitOptions.RemoveEmptyEntries)
+                .Select(v => double.TryParse(v, NumberStyles.Float, CultureInfo.InvariantCulture, out double d) ? d : double.NaN).ToArray();
+            double x = N(use, "x"), y = N(use, "y"), w = N(use, "width"), h = N(use, "height");
+            string place = $"translate({F(x)} {F(y)})";
+            if (vb.Length == 4 && vb.All(double.IsFinite) && vb[2] > 0 && vb[3] > 0)
+            {
+                if (w <= 0) w = vb[2];
+                if (h <= 0) h = vb[3];
+                // preserveAspectRatio's default: fit, centred.
+                double k = Math.Min(w / vb[2], h / vb[3]);
+                double dx = (w - vb[2] * k) / 2, dy = (h - vb[3] * k) / 2;
+                place = $"translate({F(x + dx)} {F(y + dy)}) scale({F(k)}) translate({F(-vb[0])} {F(-vb[1])})";
+            }
+            string t = ((string?)use.Attribute("transform") is { } own ? own + " " : "") + place;
+            var g = new XElement(Svg + "g", new XAttribute("transform", t), symbol.Elements().Select(c => new XElement(c)));
+            foreach (string a in new[] { "fill", "stroke", "opacity", "stroke-width" })
+                if (use.Attribute(a) is { } v) g.SetAttributeValue(a, v.Value);
+            use.ReplaceWith(g);
+        }
+        foreach (var s in symbols.Values) s.Remove();
     }
 
     static double N(XElement e, string attr) =>

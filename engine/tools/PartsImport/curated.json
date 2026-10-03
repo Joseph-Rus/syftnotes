@@ -19,7 +19,8 @@
       {"id": "left-atrium", "name": "Left atrium", "tags": "atrium, la", "rect": [0.5, 0.35, 0.36, 0.2], "anchor": [0.68, 0.45]},
       {"id": "right-ventricle", "name": "Right ventricle", "tags": "ventricle, rv", "rect": [0.2, 0.75, 0.35, 0.18], "anchor": [0.44, 0.86]},
       {"id": "left-ventricle", "name": "Left ventricle", "tags": "ventricle, lv", "rect": [0.66, 0.55, 0.3, 0.38], "anchor": [0.88, 0.7]},
-      {"id": "apex", "name": "Apex", "tags": "tip of the heart", "rect": [0.3, 0.9, 0.7, 0.1], "anchor": [0.82, 0.97]}
+      {"id": "apex", "name": "Apex", "tags": "tip of the heart", "rect": [0.3, 0.9, 0.7, 0.1], "anchor": [0.82, 0.97]},
+      {"id": "chordae-tendineae", "name": "Chordae tendineae", "tags": "chordae, heart strings", "leaves": "9999", "anchor": [0.63, 0.66]}
     ]
   },
   {

@@ -99,7 +99,13 @@ static partial class Normalise
         foreach (var r in regions)
         {
             var picked = Enumerable.Range(0, leaves.Count).Where(i => !taken.Contains(leaves[i]) && Picks(r, leaves[i], boxes[i]!.Value, i, box, leaves.Count)).ToList();
-            if (picked.Count == 0) { notes.Add($"region {r.Id}: nothing picked"); continue; }
+            if (picked.Count == 0)
+            {
+                // A landmark (the apex of a heart) is a point to label, with no shapes of its own.
+                if (r.Anchor is { Length: 2 } only) placed.Add((r, box.X + only[0] * box.W, box.Y + only[1] * box.H));
+                else notes.Add($"region {r.Id}: nothing picked");
+                continue;
+            }
             takenNow = taken;
             var run = Gather(leaves, boxes, picked, out var left);
             if (left.Count > 0) notes.Add($"region {r.Id}: {left.Count} shape(s) couldn't join without changing the drawing");
@@ -350,23 +356,42 @@ static partial class Normalise
     }
 
     /// <summary>A point well inside a region's shapes (where its leader should end): of points on a grid over its box,
-    /// the one inside a filled shape farthest from the box's edge, or else the middle of the biggest shape.</summary>
+    /// the one deepest inside a filled shape (farthest from that shape's outline), so a region of two copies (two
+    /// motors) is pointed at on one of them, never in the gap between; the middle of its box when nothing's filled.</summary>
     static (double X, double Y) Inside(XElement group, Bounds box, List<XElement> resources)
     {
         var temp = new XElement(Ns + "svg", new XAttribute("viewBox", "0 0 1 1"), new XElement(group));
         var m = SvgGeometry.Of(temp);
-        var polys = m.Shapes.Where(s => (string?)s.Shape.Attribute("fill") != "none" && s.Points.Count >= 3).Select(s => s.Points).ToList();
+        var polys = m.Shapes.Where(s => (string?)s.Shape.AncestorsAndSelf().Select(a => a.Attribute("fill")).FirstOrDefault(a => a is not null) != "none" && s.Points.Count >= 3).Select(s => s.Points).ToList();
         (double, double)? best = null;
         double score = -1;
-        for (int i = 1; i < 12; i++)
-            for (int j = 1; j < 12; j++)
+        const int n = 20;
+        for (int i = 1; i < n; i++)
+            for (int j = 1; j < n; j++)
             {
-                double x = box.X + box.W * i / 12, y = box.Y + box.H * j / 12;
-                if (!polys.Any(p => In(p, x, y))) continue;
-                double s = Math.Min(Math.Min(x - box.X, box.Right - x) / box.W, Math.Min(y - box.Y, box.Bottom - y) / box.H);
-                if (s > score) { score = s; best = (x, y); }
+                double x = box.X + box.W * i / n, y = box.Y + box.H * j / n;
+                foreach (var p in polys)
+                {
+                    if (!In(p, x, y)) continue;
+                    double depth = double.MaxValue;
+                    for (int k = 0; k < p.Count; k++)
+                    {
+                        var (ax, ay) = p[k];
+                        var (bx, by) = p[(k + 1) % p.Count];
+                        depth = Math.Min(depth, Segment(x, y, ax, ay, bx, by));
+                    }
+                    if (depth > score) { score = depth; best = (x, y); }
+                }
             }
         return best ?? (box.CenterX, box.CenterY);
+    }
+
+    static double Segment(double px, double py, double ax, double ay, double bx, double by)
+    {
+        double dx = bx - ax, dy = by - ay, len = dx * dx + dy * dy;
+        double t = len == 0 ? 0 : Math.Clamp(((px - ax) * dx + (py - ay) * dy) / len, 0, 1);
+        double x = ax + t * dx - px, y = ay + t * dy - py;
+        return Math.Sqrt(x * x + y * y);
     }
 
     static bool In(IReadOnlyList<(double X, double Y)> poly, double x, double y)
@@ -498,8 +523,11 @@ static class House
         double len = dl * dl + da * da + db * db;
         double t = len == 0 ? 0 : Math.Clamp(((c.L - p.L) * dl + (c.A - p.A) * da + (c.B - p.B) * db) / len, 0, 1);
         var at = (p.L + t * dl, p.A + t * da, p.B + t * db);
-        // Hue matters more than lightness in choosing the material.
+        // Hue matters more than lightness in choosing the material, and a colour keeps its colourfulness: a mauve
+        // doesn't go grey.
         double d = Sq(c.L - at.Item1) * 0.5 + Sq(c.A - at.Item2) + Sq(c.B - at.Item3);
+        double chroma = Math.Sqrt(c.A * c.A + c.B * c.B), theirs = Math.Sqrt(at.Item2 * at.Item2 + at.Item3 * at.Item3);
+        if (chroma > 0.04 && theirs < chroma * 0.4) d += Sq(chroma - theirs) * 2;
         return (at, d);
     }
 
