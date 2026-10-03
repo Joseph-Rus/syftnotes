@@ -4,6 +4,7 @@ import {colors, fonts} from '../../config';
 import {ease, spr} from '../../anim';
 import {Desktop, Title, useVertical} from '../../components/Layout';
 import {Sfx} from '../../components/Sfx';
+import {DrawnScale, textKey, useDrawnScale, useTextKey} from '../DrawnScale';
 import {text2} from '../config';
 import {ui} from '../ui';
 
@@ -27,6 +28,7 @@ const Automaton: React.FC<{f: number}> = ({f}) => {
   const s2 = ease(f, 40, 48);
   const accept = spr(f, 50, {damping: 12, stiffness: 160, mass: 0.7});
   const at = f < 22 ? 'q0' : f < 40 ? 'q1' : 'q2';
+  const key = useTextKey();
   const node = (id: string, x: number, y: number, double = false) => {
     const on = at === id;
     return (
@@ -45,7 +47,7 @@ const Automaton: React.FC<{f: number}> = ({f}) => {
     </g>
   );
   return (
-    <svg viewBox="0 0 600 300" width="100%" height="100%">
+    <svg key={key} viewBox="0 0 600 300" width="100%" height="100%">
       <defs>{ARROW('k-head', ui.arrow)}{ARROW('k-on', ui.accent)}</defs>
       <g opacity={build}>
         <circle cx={34} cy={215} r={9} fill="#1E5F5E" stroke={ui.accent} strokeWidth={1.5} />
@@ -77,8 +79,9 @@ const Sequence: React.FC<{f: number}> = ({f}) => {
     ['Server', 'Browser', '200 OK + session cookie', true],
   ];
   const step = Math.floor((f - 14) / 13);
+  const key = useTextKey();
   return (
-    <svg viewBox="0 0 600 330" width="100%" height="100%">
+    <svg key={key} viewBox="0 0 600 330" width="100%" height="100%">
       <defs>{ARROW('s-head', ui.arrow)}{ARROW('s-on', ui.accent)}</defs>
       {(Object.keys(X) as (keyof typeof X)[]).map((k) => (
         <g key={k} opacity={build}>
@@ -113,15 +116,16 @@ const Timeline: React.FC<{f: number}> = ({f}) => {
     ['1867', ['Lister sterilises', 'wounds with', 'carbolic acid']],
     ['1882', ['Koch identifies', 'the TB', 'bacterium']],
   ];
+  const drawn = useDrawnScale();
   return (
-    <svg viewBox="0 0 640 260" width="100%" height="100%">
+    <svg key={textKey(drawn)} viewBox="0 0 640 260" width="100%" height="100%">
       <defs>{ARROW('t-head', ui.arrow)}</defs>
       <path d={`M60 60 L${60 + 540 * axis} 60`} stroke={ui.arrow} strokeWidth={1.6} markerEnd={axis > 0.95 ? 'url(#t-head)' : undefined} />
       {events.map(([year, lines], i) => {
         const x = 92 + i * 152;
         const p = spr(f, 8 + i * 9, {damping: 14, stiffness: 180, mass: 0.7});
         return (
-          <g key={year} opacity={clamp(p * 1.5)} transform={`translate(${x} 60) scale(${0.7 + 0.3 * p}) translate(${-x} -60)`}>
+          <g key={`${year} ${textKey(drawn * (0.7 + 0.3 * p))}`} opacity={clamp(p * 1.5)} transform={`translate(${x} 60) scale(${0.7 + 0.3 * p}) translate(${-x} -60)`}>
             <rect x={x - 42} y={42} width={84} height={36} rx={18} fill="#24403F" stroke="#4E9E97" />
             <text x={x} y={66} textAnchor="middle" {...T} fontWeight={700} fontSize="15">{year}</text>
             <line x1={x} y1={78} x2={x} y2={100} stroke={ui.arrow} strokeWidth={1.3} />
@@ -144,8 +148,9 @@ const MindMap: React.FC<{f: number}> = ({f}) => {
     ['Muscle', 'Contracts', '#D9A030', '#3A2A0C'],
     ['Nervous', 'Signals', '#9A7BE6', '#2B2346'],
   ];
+  const drawn = useDrawnScale();
   return (
-    <svg viewBox="0 0 640 320" width="100%" height="100%">
+    <svg key={textKey(drawn)} viewBox="0 0 640 320" width="100%" height="100%">
       {branches.map(([name, leaf, edge, fill], i) => {
         const y = 40 + i * 80;
         const p = ease(f, 8 + i * 6, 22 + i * 6);
@@ -165,7 +170,7 @@ const MindMap: React.FC<{f: number}> = ({f}) => {
           </g>
         );
       })}
-      <g transform={`translate(110 160) scale(${hub})`}>
+      <g key={textKey(drawn * hub)} transform={`translate(110 160) scale(${hub})`}>
         <circle r={60} fill="#24403F" stroke="#4E9E97" strokeWidth={1.5} />
         <text y={6} textAnchor="middle" {...T} fontWeight={700} fontSize="16">Tissue types</text>
       </g>
@@ -228,7 +233,9 @@ export const Kinds: React.FC = () => {
                 <div style={{fontSize: vertical ? 16 : 14.5, fontWeight: 600, color: colors.lagoonBright, padding: '3px 10px', borderRadius: 999, background: 'rgba(52,193,189,0.12)'}}>{kind}</div>
               </div>
               <div style={{flex: 1, minHeight: 0, marginTop: 8}}>
-                <Draw f={frame - at - 4} />
+                <DrawnScale by={0.94 + 0.06 * p}>
+                  <Draw f={frame - at - 4} />
+                </DrawnScale>
               </div>
             </div>
           );

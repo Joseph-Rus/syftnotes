@@ -3,6 +3,7 @@ import {useVideoConfig} from 'remotion';
 import {colors, fonts} from '../config';
 import {ClassDot, TrafficLights, useVertical, Win} from '../components/Layout';
 import {Sidebar, SidebarRow} from '../components/Sidebar';
+import {DrawnScale} from './DrawnScale';
 
 // The second video's pieces of the app, drawn as the app's own screenshot tests show them in dark mode: the toolbar
 // that appears over a diagram, drawing or plot while the pointer is on it; the strip under it (stepping, testing
@@ -257,18 +258,20 @@ export const StageWindow: React.FC<{
       transform: `translate(${(stage.w * stage.z * (1 - (0.98 + 0.02 * enter))) / 2}px, ${(1 - enter) * 30}px) scale(${stage.z * (0.98 + 0.02 * enter)})`,
     }}
   >
-    <Win w={stage.w} h={stage.h} style={{display: 'flex'}}>
-      {stage.vertical ? null : <Sidebar rows={sidebarRows(lit, pulse)} />}
-      {stage.list ? (
-        <div style={{width: stage.list, borderRight: `1px solid ${colors.line}`, padding: '0 12px', flexShrink: 0}}>
-          <div style={{height: 28}} />
-          {list}
+    <DrawnScale by={stage.z * (0.98 + 0.02 * enter)}>
+      <Win w={stage.w} h={stage.h} style={{display: 'flex'}}>
+        {stage.vertical ? null : <Sidebar rows={sidebarRows(lit, pulse)} />}
+        {stage.list ? (
+          <div style={{width: stage.list, borderRight: `1px solid ${colors.line}`, padding: '0 12px', flexShrink: 0}}>
+            <div style={{height: 28}} />
+            {list}
+          </div>
+        ) : null}
+        <div style={{flex: 1, position: 'relative', minWidth: 0, overflow: 'hidden'}}>
+          {stage.vertical ? <TrafficLights style={{padding: '22px 24px', position: 'absolute', left: 0, top: 0}} /> : null}
+          {children}
         </div>
-      ) : null}
-      <div style={{flex: 1, position: 'relative', minWidth: 0, overflow: 'hidden'}}>
-        {stage.vertical ? <TrafficLights style={{padding: '22px 24px', position: 'absolute', left: 0, top: 0}} /> : null}
-        {children}
-      </div>
-    </Win>
+      </Win>
+    </DrawnScale>
   </div>
 );

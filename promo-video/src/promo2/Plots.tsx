@@ -1,5 +1,6 @@
 import React from 'react';
 import {colors, fonts} from '../config';
+import {useTextKey} from './DrawnScale';
 import {Icon} from './ui';
 
 // Two of the app's plots (Core/Rich/PlotDesign.cs), computed here exactly as the app computes them and drawn in its
@@ -46,8 +47,9 @@ export const SigmoidPlot: React.FC<{k: number; scale: number}> = ({k, scale}) =>
     const z = -6 + (12 * i) / 240;
     return `${i ? 'L' : 'M'}${sx(z).toFixed(2)},${sy(1 / (1 + Math.exp(-k * z))).toFixed(2)}`;
   }).join('');
+  const textKey = useTextKey();
   return (
-    <svg width={P.w * scale} height={410 * scale} viewBox="0 0 620 410" style={{display: 'block', overflow: 'visible'}}>
+    <svg key={textKey} width={P.w * scale} height={410 * scale} viewBox="0 0 620 410" style={{display: 'block', overflow: 'visible'}}>
       <defs>
         <clipPath id="sig-area">
           <rect x={X0} y={Y0} width={X1 - X0} height={Y1 - Y0} />
@@ -112,8 +114,9 @@ export const DescentPlot: React.FC<{eta: number; scale: number}> = ({eta, scale}
   const pts = descentPath(eta);
   const d = pts.map(([a, b], i) => `${i ? 'L' : 'M'}${sx(a).toFixed(2)},${sy(b).toFixed(2)}`).join('');
   const inside = pts.filter(([a, b]) => Math.abs(a) <= 3 && Math.abs(b) <= 2);
+  const textKey = useTextKey();
   return (
-    <svg width={P.w * scale} height={430 * scale} viewBox="0 0 620 430" style={{display: 'block', overflow: 'visible'}}>
+    <svg key={textKey} width={P.w * scale} height={430 * scale} viewBox="0 0 620 430" style={{display: 'block', overflow: 'visible'}}>
       <defs>
         <clipPath id="gd-area">
           <rect x={X0} y={Y0} width={X1 - X0} height={Y1 - Y0} />

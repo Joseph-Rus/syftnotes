@@ -1,6 +1,7 @@
 import React from 'react';
 import {continueRender, delayRender} from 'remotion';
 import {colors, fonts} from '../config';
+import {useTextKey} from './DrawnScale';
 import * as drone from './art/drone';
 import * as hand from './art/hand';
 import {BarButton, ui} from './ui';
@@ -55,8 +56,9 @@ export const Drawing: React.FC<{name: ArtName; scale: number; look?: PartsLook}>
   const art = ART[name];
   const {w, h} = artSize(name);
   const inner = React.useMemo(() => ({__html: art.inner}), [art]);
+  const textKey = useTextKey();
   return (
-    <svg width={w * scale} height={h * scale} viewBox={art.viewBox} fontFamily="Helvetica Neue, Arial, sans-serif" style={{display: 'block', overflow: 'visible'}}>
+    <svg key={textKey} width={w * scale} height={h * scale} viewBox={art.viewBox} fontFamily="Helvetica Neue, Arial, sans-serif" style={{display: 'block', overflow: 'visible'}}>
       <style>{css(name, look)}</style>
       <defs>
         <filter id={`${name}-ring`} x="-30%" y="-30%" width="160%" height="160%">

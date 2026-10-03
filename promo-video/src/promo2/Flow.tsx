@@ -1,5 +1,6 @@
 import React from 'react';
 import {fonts} from '../config';
+import {useTextKey} from './DrawnScale';
 import {ui} from './ui';
 
 // BIO 110's diagram of the cardiac cycle, as the app paints a flowchart in dark mode (DiagramPainter): rounded boxes
@@ -78,8 +79,9 @@ const Bars: React.FC<{b: Box; p: number}> = ({b, p}) => {
 export const Flow: React.FC<{look: FlowLook; scale: number}> = ({look, scale}) => {
   const {build = 1, lit = null, dim = 0, accent = [], ring = null, ringP = 1, hidden = 0, shown = {}, marks = {}} = look;
   const fade = (on: boolean) => (on ? 1 : 1 - 0.72 * dim);
+  const textKey = useTextKey();
   return (
-    <svg width={FLOW_W * scale} height={FLOW_H * scale} viewBox={`0 0 ${FLOW_W} ${FLOW_H}`} style={{display: 'block', overflow: 'visible'}}>
+    <svg key={textKey} width={FLOW_W * scale} height={FLOW_H * scale} viewBox={`0 0 ${FLOW_W} ${FLOW_H}`} style={{display: 'block', overflow: 'visible'}}>
       <defs>
         <marker id="fl-head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7.5" markerHeight="7.5" orient="auto-start-reverse">
           <path d="M0 0.8L10 5L0 9.2z" fill={ui.arrow} />
