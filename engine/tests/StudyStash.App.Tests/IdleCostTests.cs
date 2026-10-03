@@ -12,9 +12,10 @@ using StudyStash.Core.Rich;
 namespace StudyStash.App.Tests;
 
 /// <summary>
-/// What the app does while nobody is looking at it. A spinner that went on turning in a panel that's hidden, or in a
-/// library window closed to the menu bar, woke the app thirty times a second for as long as it ran (about 1.7% of a core
-/// with a lecture opened once, against 0.5% without). It stops when it can't be seen, and starts again when it can.
+/// What the app does while nobody is looking at it, or while it is looked at: a spinner that went on turning in a panel
+/// that's hidden, or in a library window closed to the menu bar, woke the app thirty times a second for as long as it
+/// ran, and the recording dot, redrawn sixty times a second, cost the recorder most of its CPU. Each stops when it can't
+/// be seen, and starts again when it can.
 /// </summary>
 public class IdleCostTests
 {
@@ -51,5 +52,27 @@ public class IdleCostTests
         {
             Environment.SetEnvironmentVariable("STUDYSTASH_STILL", still);
         }
+    }
+
+    [AvaloniaFact]
+    public void The_recording_dot_breathes_only_while_it_can_be_seen_and_in_the_same_slow_breath()
+    {
+        var dot = new PulseDot { Width = 8, Height = 8 };
+        var row = new StackPanel { Children = { dot }, IsVisible = false };
+        var w = Show(row);
+        Assert.False(dot.Breathing);
+        row.IsVisible = true;
+        Assert.True(dot.Breathing);
+        w.Hide();
+        Assert.False(dot.Breathing);
+        Assert.Equal(1, dot.Opacity);
+        w.Close();
+        // Full at the start, a third at the faintest half a period on, and back: what the dot always did.
+        Assert.Equal(1, PulseDot.OpacityAt(0), 3);
+        Assert.Equal(PulseDot.Faintest, PulseDot.OpacityAt(PulseDot.Period / 2), 3);
+        Assert.Equal(1, PulseDot.OpacityAt(PulseDot.Period), 3);
+        for (double t = 0; t < 7; t += 0.1) Assert.InRange(PulseDot.OpacityAt(t), PulseDot.Faintest - 1e-9, 1 + 1e-9);
+        // Ten steps a second, not sixty frames: that's what made it cheap.
+        Assert.True(PulseDot.Step >= TimeSpan.FromMilliseconds(80));
     }
 }
