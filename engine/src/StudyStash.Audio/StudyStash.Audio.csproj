@@ -21,4 +21,7 @@
     <InternalsVisibleTo Include="StudyStash.Core.Tests" />
   </ItemGroup>
 
+  <!-- Cactus Whistle and its engine, carried in the app (see the file). -->
+  <Import Project="Needle.targets" />
+
 </Project>

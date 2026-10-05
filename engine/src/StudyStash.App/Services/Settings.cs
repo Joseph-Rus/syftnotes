@@ -497,7 +497,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         ModelAdviceLine = AdviceWords(host.Model, advice);
         ModelDownloading = host.Downloading is not null;
         ModelProgress = host.Downloading?.Fraction ?? 0;
-        spare = [.. WhisperModels.All.Where(m => m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
+        // Whistle comes with the app: it's never spare (nothing to free).
+        spare = [.. WhisperModels.All.Where(m => !m.Bundled && m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
         SpareLine = spare.Count == 0 ? ""
             : $"Also on this computer: {string.Join(", ", spare.Select(m => $"{m.Name} ({WhisperModel.SizeOf(m.Bytes)})"))}.";
         if (spare.Count == 0) ConfirmingRemove = false;

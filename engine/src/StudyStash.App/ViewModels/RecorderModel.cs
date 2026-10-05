@@ -58,8 +58,12 @@ public sealed partial class RecorderModel : ObservableObject
     /// <summary>This lecture is written down after class (Settings → Recording): it only records, so there's no
     /// transcript to show and no chat about it until it stops.</summary>
     [ObservableProperty] public partial bool AfterClass { get; set; }
+    /// <summary>The live words are on (Cactus Whistle runs here): what's said shows a second or two after it's said.
+    /// Off, the transcript's own lines show, about half a minute after.</summary>
+    [ObservableProperty] public partial bool QuickWords { get; set; } = true;
 
     public const string LiveWaiting = "What's said shows here a few seconds after it's said.";
+    public const string SlowWaiting = "What's said shows here about half a minute after it's said.";
     public const string AfterClassWaiting = "Only recording, to save battery. It's written down after class: the transcript, and asking about it, come once you stop.";
 
     public ObservableCollection<HeardLine> Lines { get; } = [];
@@ -93,9 +97,11 @@ public sealed partial class RecorderModel : ObservableObject
 
     partial void OnAfterClassChanged(bool value)
     {
-        Waiting = value ? AfterClassWaiting : LiveWaiting;
+        Waiting = value ? AfterClassWaiting : QuickWords ? LiveWaiting : SlowWaiting;
         OnPropertyChanged(nameof(Live));
     }
+
+    partial void OnQuickWordsChanged(bool value) => Waiting = AfterClass ? AfterClassWaiting : value ? LiveWaiting : SlowWaiting;
 
     /// <summary>Written down as it records: the transcript comes in, and the chat asks about it.</summary>
     public bool Live => !AfterClass;

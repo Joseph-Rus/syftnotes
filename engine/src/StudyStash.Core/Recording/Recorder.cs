@@ -75,6 +75,11 @@ public sealed class Recorder : IDisposable
     readonly double[] levels = new double[LevelCount];
     int levelAt;
     readonly List<float> levelBuf = [];
+    // The newest half minute of sound, for the live words (Recent): a ring in the lecture's own time. ringEnd is the
+    // samples recorded so far, ringFrom the oldest the ring holds of them.
+    const int RecentSamples = 30 * Sound.Rate;
+    readonly float[] ring = new float[RecentSamples];
+    long ringEnd, ringFrom;
 
     IAudioSource? source;
     IWavSink? wav;
@@ -124,6 +129,20 @@ public sealed class Recorder : IDisposable
         get
         {
             lock (gate) return wav?.Seconds ?? Current?.Seconds ?? 0;
+        }
+    }
+
+    /// <summary>The sound recorded from <paramref name="fromSeconds"/> (in the lecture, not counting pauses) to now, as
+    /// much of it as the last half minute holds; null while nothing records.</summary>
+    public RecentSound? Recent(double fromSeconds)
+    {
+        lock (gate)
+        {
+            if (wav is null) return null;
+            long from = Math.Clamp((long)Math.Round(fromSeconds * Sound.Rate), Math.Max(ringFrom, ringEnd - RecentSamples), ringEnd);
+            var samples = new float[ringEnd - from];
+            for (long i = from; i < ringEnd; i++) samples[i - from] = ring[i % RecentSamples];
+            return new RecentSound(samples, from / (double)Sound.Rate);
         }
     }
 
@@ -215,6 +234,9 @@ public sealed class Recorder : IDisposable
             {
                 source = s;
                 wav = file;
+                // A new lecture (or one the app picked up again): the ring starts where its file does.
+                long at = (long)Math.Round(file.Seconds * Sound.Rate);
+                if (at != ringEnd) ringEnd = ringFrom = at;
             }
             writer = Task.Run(() => WriteAll(file, r, p, id, turn));
             Save(id, l => l.State = LectureState.Recording);
@@ -288,6 +310,7 @@ public sealed class Recorder : IDisposable
         lock (gate)
         {
             w.Write(samples);
+            foreach (float s in samples) ring[ringEnd++ % RecentSamples] = s;
             foreach (float s in samples)
             {
                 levelBuf.Add(s);

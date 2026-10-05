@@ -101,7 +101,8 @@ public static partial class Shell
         // Before any window shows, so it never opens in the wrong mode and then flips.
         Skin.UseAppearance(host.Settings.Appearance);
         host.Changed += RequestRefresh;
-        host.Heard += (l, lines) => Dispatcher.UIThread.Post(() => AddHeard(l, lines));
+        host.Heard += (l, _) => ShowLiveSoon(l.Id);
+        host.LiveWords += l => ShowLiveSoon(l.Id);
         host.Filed += l => Dispatcher.UIThread.Post(() =>
         {
             var (title, text, action) = NoticeWords.Filed(l.FiledClass, l.FiledTitle, l.Error);
@@ -560,6 +561,7 @@ public static partial class Shell
         {
             liveId = l.Id;
             recorder.Lines.Clear();
+            recorder.QuickWords = host.LiveWordsOn;
             // Written down after class: nothing to show or ask about until it stops, and the recorder says so.
             recorder.AfterClass = l.AfterClass;
             recorder.Ask = l.AfterClass ? null : LiveAsk();
@@ -679,15 +681,39 @@ public static partial class Shell
         }
     }
 
-    static void AddHeard(Lecture l, IReadOnlyList<Spoken> lines)
+    /// <summary>A show is waiting on the UI thread: more news before it runs is shown by that one.</summary>
+    static int liveShowPending;
+
+    /// <summary>New words for a lecture (the live words, every second or so, or the transcript's own lines): shown once
+    /// the UI thread gets to it, however many came meanwhile.</summary>
+    static void ShowLiveSoon(string id)
     {
-        if (l.Id != liveId) return;
-        foreach (var old in recorder.Lines.Where(x => x.Latest).ToList())
-            recorder.Lines[recorder.Lines.IndexOf(old)] = new HeardLine { Time = old.Time, Text = old.Text };
-        for (int i = 0; i < lines.Count; i++)
-            recorder.Lines.Add(new HeardLine { Time = TimedText.Clock(lines[i].Start), Text = lines[i].Text, Latest = i == lines.Count - 1 });
-        while (recorder.Lines.Count > 200) recorder.Lines.RemoveAt(0);
-        panel.LastLine = $"“…{Trim(lines[^1].Text, 90)}”";
+        if (Interlocked.Exchange(ref liveShowPending, 1) == 1) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            Volatile.Write(ref liveShowPending, 0);
+            if (id == liveId) ShowLive();
+        });
+    }
+
+    /// <summary>
+    /// The recorder's transcript: what's been said so far (<see cref="AppHost.LiveLines"/>, the transcript's own lines
+    /// and the live words after them), its last 200 lines. Only what changed is redrawn: lines that scrolled off the top
+    /// go, the lines that read the same stay, and the rest (the live words' newest line, or live words the transcript
+    /// has now written down) are drawn again.
+    /// </summary>
+    static void ShowLive()
+    {
+        var lines = host.LiveLines();
+        if (lines.Count > 200) lines = lines[^200..];
+        while (recorder.Lines.Count > 0 && lines.Count > 0 && recorder.Lines[0].Start < lines[0].Start) recorder.Lines.RemoveAt(0);
+        int same = 0;
+        while (same < recorder.Lines.Count && same < lines.Count && recorder.Lines[same].Text == lines[same].Text
+               && recorder.Lines[same].Start == lines[same].Start && recorder.Lines[same].Latest == (same == lines.Count - 1)) same++;
+        while (recorder.Lines.Count > same) recorder.Lines.RemoveAt(recorder.Lines.Count - 1);
+        for (int i = same; i < lines.Count; i++)
+            recorder.Lines.Add(new HeardLine { Time = TimedText.Clock(lines[i].Start), Text = lines[i].Text, Start = lines[i].Start, Latest = i == lines.Count - 1 });
+        if (lines.Count > 0) panel.LastLine = $"“…{Trim(lines[^1].Text, 90)}”";
     }
 
     static string Trim(string s, int n) => s.Length <= n ? s : s[..n].TrimEnd() + "…";
@@ -698,7 +724,8 @@ public static partial class Shell
     {
         var ask = new AiAskModel(Ai())
         {
-            Live = () => host.Recorder.Current?.Transcript(),
+            // What's been said so far: the transcript as far as it has got, and the live words after it.
+            Live = host.LiveTranscript,
             LiveTitle = $"{(host.Recorder.Current?.ClassName is { Length: > 0 } c ? c : "This lecture")}, now",
             OpenSettings = () => ShowSettings("AI"),
             OnSource = s => Play(s.Id ?? liveId, s.At ?? 0),
