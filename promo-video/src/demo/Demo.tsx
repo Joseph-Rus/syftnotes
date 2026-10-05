@@ -55,8 +55,12 @@ const musicAt = (f: number) => {
   return MUSIC_VOLUME * ends * (1 - (1 - DUCK_TO) * under);
 };
 
-/** The demo: the night desktop, the app as it is, and the narration it was timed to (src/demo/plan.json). */
-export const Demo: React.FC = () => (
+/**
+ * The demo: the night desktop, the app as it is, and the narration it was timed to (src/demo/plan.json). `silent` is the
+ * picture alone (DemoSilent, DemoSilentVertical): no narration, no effects, no music, for Joey to lay his own sound
+ * under, by CUES.md.
+ */
+export const Demo: React.FC<{silent?: boolean}> = ({silent = false}) => (
   <SfxSetProvider value={SILENT}>
     <AbsoluteFill style={{backgroundColor: night.ground}}>
       <TransitionSeries>
@@ -71,7 +75,7 @@ export const Demo: React.FC = () => (
         })}
       </TransitionSeries>
 
-      {EFFECTS.map((e) => {
+      {silent ? null : EFFECTS.map((e) => {
         const gain = SFX_GAIN[e.sfx] ?? 0;
         if (gain <= 0) return null;
         const frames = e.frames ?? 180;
@@ -84,9 +88,9 @@ export const Demo: React.FC = () => (
         );
       })}
 
-      {MUSIC ? <Audio src={staticFile(MUSIC)} volume={musicAt} /> : null}
+      {MUSIC && !silent ? <Audio src={staticFile(MUSIC)} volume={musicAt} /> : null}
 
-      {VOICE.map((v) => (
+      {silent ? null : VOICE.map((v) => (
         <Sequence key={v.id} from={v.from} durationInFrames={v.frames + 10} layout="none">
           <Audio src={staticFile(v.file)} volume={VOICE_VOLUME} />
         </Sequence>

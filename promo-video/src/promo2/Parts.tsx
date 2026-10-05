@@ -50,8 +50,12 @@ const useLabelFont = () => {
   }, [handle]);
 };
 
-/** A drawing at `scale`, styled by `look`. */
-export const Drawing: React.FC<{name: ArtName; scale: number; look?: PartsLook}> = ({name, scale, look = {}}) => {
+/**
+ * A drawing at `scale`, styled by `look`. `halo` is how the lit part's ring is drawn: 'glow' (the second video's, a
+ * blurred glow) or 'app' (as the app draws it, SvgPicture.DrawExplored: the part's outline grown by 2.5 points in the
+ * accent at 150/255, the part on top, no blur, so every render of a frame comes out the same).
+ */
+export const Drawing: React.FC<{name: ArtName; scale: number; look?: PartsLook; halo?: 'glow' | 'app'}> = ({name, scale, look = {}, halo = 'glow'}) => {
   useLabelFont();
   const art = ART[name];
   const {w, h} = artSize(name);
@@ -61,17 +65,29 @@ export const Drawing: React.FC<{name: ArtName; scale: number; look?: PartsLook}>
     <svg key={textKey} width={w * scale} height={h * scale} viewBox={art.viewBox} fontFamily="Helvetica Neue, Arial, sans-serif" style={{display: 'block', overflow: 'visible'}}>
       <style>{css(name, look)}</style>
       <defs>
-        <filter id={`${name}-ring`} x="-30%" y="-30%" width="160%" height="160%">
-          <feMorphology in="SourceAlpha" operator="dilate" radius={2.2 * (look.ring ?? 0)} result="grown" />
-          <feFlood floodColor={ui.accent} />
-          <feComposite in2="grown" operator="in" result="ring" />
-          <feGaussianBlur in="ring" stdDeviation="2.4" result="glow" />
-          <feMerge>
-            <feMergeNode in="glow" />
-            <feMergeNode in="ring" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
+        {halo === 'app' ? (
+          <filter id={`${name}-ring`} x="-30%" y="-30%" width="160%" height="160%">
+            <feMorphology in="SourceAlpha" operator="dilate" radius={2.5 * (look.ring ?? 0)} result="grown" />
+            <feFlood floodColor={ui.accent} floodOpacity={150 / 255} />
+            <feComposite in2="grown" operator="in" result="ring" />
+            <feMerge>
+              <feMergeNode in="ring" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        ) : (
+          <filter id={`${name}-ring`} x="-30%" y="-30%" width="160%" height="160%">
+            <feMorphology in="SourceAlpha" operator="dilate" radius={2.2 * (look.ring ?? 0)} result="grown" />
+            <feFlood floodColor={ui.accent} />
+            <feComposite in2="grown" operator="in" result="ring" />
+            <feGaussianBlur in="ring" stdDeviation="2.4" result="glow" />
+            <feMerge>
+              <feMergeNode in="glow" />
+              <feMergeNode in="ring" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        )}
       </defs>
       <g dangerouslySetInnerHTML={inner} />
     </svg>

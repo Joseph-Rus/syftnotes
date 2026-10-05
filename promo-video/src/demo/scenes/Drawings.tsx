@@ -44,7 +44,7 @@ const Figure: React.FC<{turn: Turn; f: number}> = ({turn, f}) => {
       <H2>{turn.title}</H2>
       <Serif style={{marginTop: 6}}>{turn.line}</Serif>
       <div style={{position: 'absolute', left: ds.figLeft, top: ds.figTop - ds.top}}>
-        <Drawing name={turn.art} scale={s} look={{hot, dim, ring}} />
+        <Drawing name={turn.art} scale={s} look={{hot, dim, ring}} halo="app" />
       </div>
       <div style={{position: 'absolute', right: 0, top: ds.figTop - ds.top - 50}}>
         <FloatingBar icons={['subject', 'play_circle', 'quiz', 'open_in_full']} p={prog(f, 14, 22)} />

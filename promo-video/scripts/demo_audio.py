@@ -14,7 +14,7 @@ What it uses, from elevenlabs3/ (anything missing is made here instead):
   sfx-<name>.mp3   whoosh-soft, click, record-start, pop, shimmer, slider, keys, tap, swell (.wav, .m4a … also work).
 
 What it writes: public/audio/demo/vo/<scene>.wav, public/audio/demo/sfx/<name>.wav, public/audio/demo/music.wav and
-src/demo/timeline.json, the final times the video plays. The plan is a contract: a scene is only lengthened (by whole
+src/demo/timeline.json, the final times the video plays (and CUES.md, its cue sheet). The plan is a contract: a scene is only lengthened (by whole
 beats, 0.5 s) when its line doesn't fit, and everything after it moves by the same amount, effects included.
 """
 import argparse
@@ -546,6 +546,10 @@ def main():
     print(f'music: {music_source}')
     effects = write_timeline(plan, rows, total_f, seconds, voice_source, music_source)
     report(plan, rows, total_f, seconds, effects)
+    # The cue sheet for laying the sound under the picture-only render, from the timeline just written.
+    import demo_cues
+    demo_cues.OUT.write_text(demo_cues.build())
+    print(f'cues: {demo_cues.OUT.relative_to(ROOT)}')
 
 
 if __name__ == '__main__':

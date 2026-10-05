@@ -24,6 +24,9 @@ export const Root: React.FC = () => (
     {/* The third video: a full demo of the app (src/demo). */}
     <Composition id="Demo" component={Demo} durationInFrames={TOTAL_FRAMES3} fps={FPS} width={1920} height={1080} />
     <Composition id="DemoVertical" component={Demo} durationInFrames={TOTAL_FRAMES3} fps={FPS} width={1080} height={1920} />
+    {/* The demo's picture alone, no sound at all, for laying the real narration and effects under it (CUES.md). */}
+    <Composition id="DemoSilent" component={Demo} defaultProps={{silent: true}} durationInFrames={TOTAL_FRAMES3} fps={FPS} width={1920} height={1080} />
+    <Composition id="DemoSilentVertical" component={Demo} defaultProps={{silent: true}} durationInFrames={TOTAL_FRAMES3} fps={FPS} width={1080} height={1920} />
     <Still id="KofiCard3" component={KofiCard3} width={1200} height={630} />
   </>
 );

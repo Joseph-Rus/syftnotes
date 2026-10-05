@@ -150,3 +150,15 @@ loads and reads it); the words are cached, so running it again is instant.
 Other options: `npm run demo-audio -- --scratch` (the Mac's voice even with a take there), `-- --voice <file>` (another
 take), `-- --cuts …` (above). To check a take's split without touching the video:
 `python3 scripts/demo_audio.py --test-split <take.mp3> src/demo/plan.json` (it writes to a temporary folder).
+
+## Or: laying the sound under the picture in an editor
+
+`npm run render3:silent` renders **`out/demo-silent-vertical.mp4`**, the vertical video with no audio stream at all
+(no narration, effects or music), and **`CUES.md`** lists everything to lay under it: every scene's start and what's on
+screen, every line of Adam's with its exact words and its window (how long it may run before the next scene), and
+every effect with its file, the moment it marks, its ElevenLabs prompt and length, in one table in time order and
+again grouped by file, with times as m:ss.s and frames at 30 fps. Both orientations share one timeline, so the sheet
+fits the landscape cut too (`npm run render3:silent:landscape` → `out/demo-silent.mp4`). The sheet is made from
+`src/demo/timeline.json` by `npm run demo-cues`, and again by every `npm run demo-audio`, so it always matches the
+render.
+

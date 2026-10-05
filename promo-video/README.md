@@ -153,6 +153,8 @@ npm run render3              # → out/demo.mp4
 npm run render3:vertical     # → out/demo-vertical.mp4
 npm run render3:all          # both
 npm run card3                # → out/ko-fi-preview-3.png, a 1200×630 picture for a shared link
+npm run render3:silent       # → out/demo-silent-vertical.mp4, the vertical picture alone (no audio stream)
+npm run demo-cues            # → CUES.md, every scene, line and effect at its time and frame, for laying the sound under it
 ```
 
 | Time | Scene | What happens |
