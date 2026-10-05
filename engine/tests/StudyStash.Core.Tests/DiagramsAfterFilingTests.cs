@@ -374,6 +374,34 @@ public class DiagramsAfterFilingTests
     }
 
     [Fact]
+    public async Task Diagrams_designed_before_rich_notes_were_switched_off_never_go_in()
+    {
+        if (OperatingSystem.IsWindows()) return; // a folder that can't be written to, the way a Mac or Linux has it
+        using var rig = new Rig();
+        var row = await rig.FileAsync();
+        string folder = Path.GetDirectoryName(row.MdPath!)!;
+        File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        try
+        {
+            Assert.Equal(0, await rig.Jobs.RunPendingAsync()); // designed, but the file can't be written yet
+        }
+        finally
+        {
+            File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+        // The student switches diagrams off (rich notes stay on for the other kinds) before they go in.
+        var settings = AiSettings.Load(rig.Cfg.Home);
+        settings.SetRich(diagrams: false);
+        settings.Save(rig.Cfg.Home);
+        rig.Jobs = new DiagramJobs(rig.Cfg, rig.Store, rig.Ai, rig.Say) { RetryWait = TimeSpan.Zero };
+        Assert.Equal(1, await rig.Jobs.RunPendingAsync());
+        Assert.Equal(Notes, rig.Row().SummaryMd);
+        Assert.DoesNotContain("```mermaid", rig.File());
+        Assert.Contains("switched off before its diagrams went in", rig.Logged());
+        Assert.False(rig.Jobs.Adding("lec-1"));
+    }
+
+    [Fact]
     public async Task Rewritten_notes_show_at_once_and_their_diagrams_follow_once_theyre_used()
     {
         using var rig = new Rig();

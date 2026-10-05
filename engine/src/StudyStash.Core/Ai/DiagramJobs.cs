@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using StudyStash.Core.Rich;
 
 namespace StudyStash.Core.Ai;
 
@@ -394,14 +395,32 @@ public sealed class DiagramJobs
         }
     }
 
-    /// <summary>Designed diagrams into the notes (<see cref="Store.AddDiagrams"/>), and what became of them in the log.</summary>
+    /// <summary>A designed diagram's kind as the Rich notes switches name it.</summary>
+    static RichKinds KindOf(DesignedDiagram d) => d.Kind switch
+    {
+        NoteBlockKind.Mermaid => RichKinds.Diagrams,
+        NoteBlockKind.Plot => RichKinds.Plots,
+        NoteBlockKind.Svg => RichKinds.Drawings,
+        _ => RichKinds.None,
+    };
+
+    /// <summary>Designed diagrams into the notes (<see cref="Store.AddDiagrams"/>), and what became of them in the log.
+    /// Only the kinds still switched on go in: a student who switched rich notes (or a kind) off while they were designed,
+    /// or before a restart put them in, doesn't get them anyway.</summary>
     bool Land(Job job)
     {
+        var kinds = ai.KindsNow();
+        var wanted = job.Diagrams.Where(d => KindOf(d) == RichKinds.None || kinds.HasFlag(KindOf(d))).ToList();
+        if (wanted.Count == 0)
+        {
+            End(job, "rich notes were switched off before its diagrams went in; the notes stay as filed");
+            return true;
+        }
         DiagramsOutcome outcome;
         lock (gate)
         {
             if (!Current(job)) return true;
-            outcome = store.AddDiagrams(job.Id, job.Seen, job.Diagrams);
+            outcome = store.AddDiagrams(job.Id, job.Seen, wanted);
             if (outcome.How == DiagramsLanded.Unwritten && ++job.Writes < MaxTries)
             {
                 job.NotBefore = DateTimeOffset.UtcNow.Add(RetryWait).ToString("o");
