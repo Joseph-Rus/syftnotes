@@ -1,0 +1,79 @@
+{
+  "about": "The third video, a full demo of Study Stash: the contract it is built to. Each scene starts at `start` (seconds), its narration line at `vo`; every effect is at `at` (seconds, in this plan's own times). `listed` effects are the ones on Joey's ElevenLabs list; the rest are clicks the pointer makes on the way (the same soft click). `npm run demo-audio` reads this, fits the narration (a scene whose line runs long is stretched on the beat and everything after it moves, effects included), and writes the final times to src/demo/timeline.json, which the video plays.",
+  "fps": 30,
+  "bpm": 120,
+  "transition": 12,
+  "end": 132.0,
+  "scenes": [
+    {"id": "opener", "start": 0.0, "vo": 1.0, "line": "This is Study Stash. Your lectures, written up and filed by class.", "direction": "warm and confident; a small beat after \"Study Stash\""},
+    {"id": "setup", "start": 6.0, "vo": 6.5, "line": "Setting up is quick. Pick your AI, and it walks you through the rest.", "direction": "easy and friendly, no hurry"},
+    {"id": "record", "start": 15.0, "vo": 15.5, "line": "Press record when class starts. The words show up as they're said, and the recording never leaves your computer.", "direction": "clear; a little lift on \"as they're said\", sincere on the last part"},
+    {"id": "notes", "start": 28.0, "vo": 28.5, "line": "Stop, and your notes are written for you, filed in the right class. The diagrams follow a minute later.", "direction": "unhurried, a beat before \"The diagrams\""},
+    {"id": "explore", "start": 40.0, "vo": 40.5, "line": "Every diagram is alive. Point at a box to see what it connects to, pin it, ask about it, step through it, or hide the words and test yourself.", "direction": "curious; the list with momentum, a little playful on \"test yourself\""},
+    {"id": "plots", "start": 54.0, "vo": 54.5, "line": "Formulas become graphs you can drag, so you can see what every number does.", "direction": "enjoying it"},
+    {"id": "drawings", "start": 64.0, "vo": 64.5, "line": "When a lecture describes something, like a drone or a hand, your notes can draw it, labelled.", "direction": "a spark of delight on \"draw it\""},
+    {"id": "ask", "start": 72.0, "vo": 72.5, "line": "Ask anything about your lectures, and get answers from what was actually said in class.", "direction": "plain and confident"},
+    {"id": "canvas", "start": 83.0, "vo": 83.5, "line": "Connect Canvas to see what's due next, with every assignment's details in one place.", "direction": "practical, helpful"},
+    {"id": "phone", "start": 92.0, "vo": 92.5, "line": "Your library comes with you on your phone: your notes, what's due, and Ask.", "direction": "light; a small pause at the colon"},
+    {"id": "settings", "start": 100.0, "vo": 100.5, "line": "Make it yours. Turn rich notes on or off, use Claude Code's fast mode, or write lectures down after class, so your laptop stays quiet.", "direction": "relaxed; a list, settling down on \"stays quiet\""},
+    {"id": "aiapps", "start": 111.0, "vo": 111.5, "line": "Connect Claude, Codex or Gemini to your library in one click.", "direction": "brisk"},
+    {"id": "promise", "start": 118.0, "vo": 118.5, "line": "Your recordings never leave your computers. Free and open source, for Mac and Windows.", "direction": "sincere, a touch slower; a beat between the sentences"},
+    {"id": "end", "start": 125.0, "vo": 125.5, "line": "Study Stash. Download it free.", "direction": "warm and confident, a beat after \"Study Stash\""}
+  ],
+  "effects": [
+    {"key": "opener-whoosh", "scene": "opener", "sfx": "whoosh-soft", "at": 0.3, "listed": true, "what": "the screen lights up"},
+
+    {"key": "setup-whoosh", "scene": "setup", "sfx": "whoosh-soft", "at": 6.0, "listed": true, "what": "into the guided setup"},
+    {"key": "setup-pick", "scene": "setup", "sfx": "click", "at": 7.8, "listed": false, "what": "Claude is picked"},
+    {"key": "setup-mac", "scene": "setup", "sfx": "click", "at": 9.5, "listed": true, "what": "Just this Mac, Set up"},
+    {"key": "setup-open", "scene": "setup", "sfx": "click", "at": 12.0, "listed": true, "what": "Open Study Stash"},
+
+    {"key": "record-menu", "scene": "record", "sfx": "click", "at": 15.3, "listed": false, "what": "the S. in the menu bar opens its dropdown"},
+    {"key": "record-click", "scene": "record", "sfx": "click", "at": 16.5, "listed": true, "what": "Record, in the menu bar's dropdown"},
+    {"key": "record-start", "scene": "record", "sfx": "record-start", "at": 16.7, "listed": true, "what": "recording starts: the recorder pill appears"},
+    {"key": "record-pill", "scene": "record", "sfx": "click", "at": 18.2, "listed": false, "what": "the pill opens the recorder"},
+    {"key": "record-stop", "scene": "record", "sfx": "click", "at": 26.5, "listed": true, "what": "Stop"},
+
+    {"key": "notes-whoosh", "scene": "notes", "sfx": "whoosh-soft", "at": 28.0, "listed": true, "what": "into the library"},
+    {"key": "notes-filed", "scene": "notes", "sfx": "pop", "at": 31.0, "listed": true, "what": "filed in BIO 110, the notes open"},
+    {"key": "notes-diagrams", "scene": "notes", "sfx": "shimmer", "at": 36.5, "listed": true, "what": "the diagram drops into the notes"},
+
+    {"key": "explore-pin", "scene": "explore", "sfx": "click", "at": 44.0, "listed": true, "what": "a box is pinned"},
+    {"key": "explore-card", "scene": "explore", "sfx": "pop", "at": 44.3, "listed": true, "what": "its actions appear"},
+    {"key": "explore-steps", "scene": "explore", "sfx": "click", "at": 45.8, "listed": false, "what": "Step through"},
+    {"key": "explore-next", "scene": "explore", "sfx": "click", "at": 47.0, "listed": true, "what": "Next step"},
+    {"key": "explore-test", "scene": "explore", "sfx": "click", "at": 48.2, "listed": false, "what": "Test yourself"},
+    {"key": "explore-check", "scene": "explore", "sfx": "click", "at": 49.1, "listed": false, "what": "a hidden box is checked"},
+    {"key": "explore-knew", "scene": "explore", "sfx": "click", "at": 50.0, "listed": true, "what": "Knew it"},
+
+    {"key": "plots-whoosh", "scene": "plots", "sfx": "whoosh-soft", "at": 54.0, "listed": true, "what": "into the plots"},
+    {"key": "plots-k", "scene": "plots", "sfx": "slider", "at": 56.0, "len": 1.6, "listed": true, "what": "the sigmoid's steepness is dragged"},
+    {"key": "plots-eta", "scene": "plots", "sfx": "slider", "at": 60.0, "len": 1.8, "listed": true, "what": "gradient descent's learning rate is dragged"},
+
+    {"key": "drawings-pin", "scene": "drawings", "sfx": "click", "at": 67.0, "listed": true, "what": "the drone's flight controller is pinned"},
+    {"key": "drawings-card", "scene": "drawings", "sfx": "pop", "at": 67.3, "listed": true, "what": "its card appears"},
+
+    {"key": "ask-whoosh", "scene": "ask", "sfx": "whoosh-soft", "at": 72.0, "listed": true, "what": "into Ask"},
+    {"key": "ask-keys", "scene": "ask", "sfx": "keys", "at": 73.5, "len": 1.9, "listed": true, "what": "typing \"What's on the midterm?\""},
+    {"key": "ask-send", "scene": "ask", "sfx": "click", "at": 76.0, "listed": true, "what": "send"},
+
+    {"key": "canvas-open", "scene": "canvas", "sfx": "click", "at": 86.0, "listed": true, "what": "an assignment is opened"},
+
+    {"key": "phone-lecture", "scene": "phone", "sfx": "tap", "at": 94.5, "listed": true, "what": "a lecture is tapped"},
+    {"key": "phone-due", "scene": "phone", "sfx": "tap", "at": 95.5, "listed": false, "what": "the Due tab"},
+    {"key": "phone-ask", "scene": "phone", "sfx": "tap", "at": 96.5, "listed": true, "what": "the Ask tab"},
+
+    {"key": "settings-whoosh", "scene": "settings", "sfx": "whoosh-soft", "at": 100.0, "listed": true, "what": "into Settings"},
+    {"key": "settings-rich", "scene": "settings", "sfx": "click", "at": 103.0, "listed": true, "what": "the Rich notes switch"},
+    {"key": "settings-speed", "scene": "settings", "sfx": "click", "at": 104.6, "listed": false, "what": "the Claude Code speed menu opens"},
+    {"key": "settings-fast", "scene": "settings", "sfx": "click", "at": 105.5, "listed": true, "what": "Fast mode"},
+    {"key": "settings-recording", "scene": "settings", "sfx": "click", "at": 106.5, "listed": false, "what": "Recording, in the sidebar"},
+    {"key": "settings-after", "scene": "settings", "sfx": "click", "at": 107.5, "listed": true, "what": "When it's written down: After class"},
+
+    {"key": "aiapps-connect", "scene": "aiapps", "sfx": "click", "at": 113.0, "listed": true, "what": "Connect, for Claude Desktop"},
+
+    {"key": "promise-whoosh", "scene": "promise", "sfx": "whoosh-soft", "at": 118.0, "listed": true, "what": "into the promise"},
+
+    {"key": "end-swell", "scene": "end", "sfx": "swell", "at": 125.0, "listed": true, "what": "the end card"}
+  ]
+}

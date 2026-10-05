@@ -13,12 +13,17 @@
     "render2:vertical": "remotion render src/index.ts Promo2Vertical out/promo2-vertical.mp4 && python3 scripts/master.py out/promo2-vertical.mp4",
     "render2:all": "npm run render2 && npm run render2:vertical",
     "card2": "remotion still src/index.ts KofiCard2 out/ko-fi-preview-2.png",
+    "render3": "remotion render src/index.ts Demo out/demo.mp4 && python3 scripts/master.py out/demo.mp4",
+    "render3:vertical": "remotion render src/index.ts DemoVertical out/demo-vertical.mp4 && python3 scripts/master.py out/demo-vertical.mp4",
+    "render3:all": "npm run render3 && npm run render3:vertical",
+    "card3": "remotion still src/index.ts KofiCard3 out/ko-fi-preview-3.png",
     "typecheck": "tsc --noEmit",
     "audio": "python3 scripts/make_audio.py",
     "audio2": "python3 scripts/make_audio.py --promo 2",
     "sfx2": "python3 scripts/make_audio.py --promo 2 --sfx-only",
     "voice": "python3 scripts/make_voice.py",
-    "voice2": "python3 scripts/make_voice.py --promo 2"
+    "voice2": "python3 scripts/make_voice.py --promo 2",
+    "demo-audio": "python3 scripts/demo_audio.py"
   },
   "dependencies": {
     "@remotion/cli": "4.0.529",
