@@ -117,9 +117,11 @@ CNF
       echo "Deleting the signing keychain..."
       limit 30 security delete-keychain "$KC" || echo "(couldn't delete the signing keychain)"
     fi
-    if [ -f "$DIR/cert.pem" ]; then
+    # On a runner GitHub hosts, the whole machine is thrown away after the run, and taking trust away asks for an
+    # authorization nobody can give there (the first rehearsal waited 30 s for it): only a runner of your own needs it.
+    if [ -f "$DIR/cert.pem" ] && [ "${RUNNER_ENVIRONMENT:-}" != github-hosted ]; then
       echo "Taking the rehearsal's trust away..."
-      limit 30 sudo -n security remove-trusted-cert -d "$DIR/cert.pem" || echo "(couldn't take the trust away; this runner is thrown away after the run)"
+      limit 30 sudo -n security remove-trusted-cert -d "$DIR/cert.pem" || echo "(couldn't take the trust away)"
     fi
     for f in cert.p12 cert.pem key.pem identity.p12 openssl.cnf DeveloperIDG2CA.cer notary-key.p8 searchlist; do
       rm -f "$DIR/$f"

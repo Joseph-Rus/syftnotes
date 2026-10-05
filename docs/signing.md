@@ -250,6 +250,32 @@ and open them the way a student would (download from a browser, so they're quara
 release can reuse exactly those installers (`reuse_run`), as before. Do the real rehearsal **before** the release
 you want signed: the first notarization may be slow, and it's the likeliest thing to need a second try.
 
+## What has been tested, and what hasn't
+
+The pipeline was written before any certificate existed, so this is what two rehearsals by hand (`test_signing`) on
+GitHub's runners showed, in October 2026:
+
+- **Worked, on the Mac:** a throwaway self-signed identity in a temporary keychain; every file in the bundle signed
+  with the hardened runtime and a real Apple timestamp (a minute for the lot); the bundle and the DMG signed;
+  `codesign --verify --deep --strict` on the Apple silicon runner and again on the Intel one; the signed app's
+  self-test on both (windows, microphone, Whisper with Metal); the checks and the clean-up. The runner then
+  discards the identity.
+- **Worked, on Windows:** the self-signed certificate, and signing the 74 and 69 unsigned exe and dll files of the
+  two trees (the rest are Microsoft's, already signed).
+- **Not proved yet, on Windows:** Inno Setup signing Setup.exe and the uninstaller, and everything after it (the
+  signed installer installing, updating and uninstalling). The first rehearsal stopped there, because the signing
+  script asked PowerShell to read a signature from Inno's temporary files, which it can't; that is fixed, and the
+  scripts now leave a log of why a signature failed. The second rehearsal then stopped on a typo that the new
+  parse step caught, also fixed. **Run the rehearsal again first (`gh workflow run ci --ref signing -f
+  installers=true -f test_signing=true`); if the Windows job fails, its log says why.**
+- **Can't be proved without your accounts:** notarization and stapling (the code is Apple's documented flow, with the
+  log printed on a refusal), Azure Artifact Signing (the commands are Microsoft's own, from the page above), and
+  `Valid` status on Windows.
+- **Can't be proved with a self-signed identity:** that the app runs with `disable-library-validation` gone. A
+  self-signed identity has no Team ID, so the rehearsal keeps the exemption (it says so). With a Developer ID the build
+  drops it, and the self-test of the signed app is the proof: if it fails, the release isn't published, and the
+  `STUDYSTASH_LIBRARY_VALIDATION` variable above puts it back.
+
 ## When it's live
 
 Once a signed release is out and you've opened it on a Mac and a Windows PC the way a student would, change what
