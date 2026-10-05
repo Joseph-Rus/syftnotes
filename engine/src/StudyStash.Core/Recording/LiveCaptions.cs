@@ -3,8 +3,10 @@ namespace StudyStash.Core;
 /// <summary>One word heard, with when it starts and ends (seconds) and how sure the model was of it (0 to 1).</summary>
 public sealed record TimedWord(double Start, double End, string Text, double Probability = 1);
 
-/// <summary>What a pass heard: the words with their times in it, and the language it took them for ("" for none).</summary>
-public sealed record HeardWords(IReadOnlyList<TimedWord> Words, string Language);
+/// <summary>What a pass heard: the words with their times in it, the language it took them for ("" for none), and,
+/// when the hearer timed it itself, the seconds the hearing took without its one-off setting up (a small Whisper sets up
+/// for each length of pass and language once: that isn't this computer being slow).</summary>
+public sealed record HeardWords(IReadOnlyList<TimedWord> Words, string Language, double? Took = null);
 
 /// <summary>A model quick enough to hear the newest few seconds of a lecture again and again (Cactus Whistle): 16 kHz
 /// mono, at most 30 seconds a pass, to words with their times in the pass.</summary>
@@ -280,11 +282,13 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
         }
         double started = Clock();
         IReadOnlyList<TimedWord> words;
+        double? hearing;
         Passes++;
         try
         {
             var heard = h.Hearer.Hear(samples, h.Language.Length > 0 ? h.Language : found, Keywords(l.ClassName));
             words = heard.Words;
+            hearing = heard.Took;
             if (h.Language.Length == 0 && found.Length == 0 && heard.Language.Length > 0 && end - from >= 3
                 && (votes[heard.Language] = votes.GetValueOrDefault(heard.Language) + 1) >= 3)
                 found = heard.Language;
@@ -295,7 +299,7 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             told = true;
             return false;
         }
-        double took = Clock() - started;
+        double took = hearing ?? Clock() - started;
         lock (gate)
         {
             s.Heard(from, end, words);

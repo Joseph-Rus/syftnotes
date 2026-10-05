@@ -91,12 +91,14 @@ public sealed class LiveWhisperHearer : IWordHearer, IDisposable
             }
             var words = new List<TimedWord>();
             string found = "";
+            // Timed here, without setting up a processor for a new length or language (once each): that's not slowness.
+            var took = System.Diagnostics.Stopwatch.StartNew();
             foreach (var segment in p.ProcessAsync(samples).ToBlockingEnumerable())
             {
                 if (found.Length == 0 && !string.IsNullOrEmpty(segment.Language)) found = segment.Language;
                 Words(segment, words, seconds);
             }
-            return new(words, lang == "auto" ? found : lang);
+            return new(words, lang == "auto" ? found : lang, took.Elapsed.TotalSeconds);
         }
     }
 
