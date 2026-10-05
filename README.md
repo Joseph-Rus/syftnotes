@@ -345,7 +345,8 @@ and Canvas work (read-only). Set it up in **Settings → Your library → AI too
 Installed copies update themselves: they check for a new release a few minutes after starting and
 every 6 hours, and install it when nothing is recording or being transcribed. To update right
 away, click **Update now** in **Settings → Your library → Library** (on a laptop that updates your
-library; the laptop itself installs each new version on its own). On a Mac an update swaps in the
+library). A laptop has its own **Check now**, **Update now** and **Update automatically** under
+**Settings → General → Updates**, apart from the library's. On a Mac an update swaps in the
 new **Study Stash.app**; on Windows it runs the new Setup.exe quietly. Every download is checked against the release's
 `SHA256SUMS.txt` first.
 

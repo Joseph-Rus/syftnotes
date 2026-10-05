@@ -153,9 +153,12 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [ObservableProperty] public partial bool CanUpdateNow { get; set; }
     [ObservableProperty] public partial bool AutoUpdate { get; set; }
 
-    /// <summary>A library on this computer is the app's own: the switch updates both, and never mid-lecture.</summary>
+    /// <summary>A library on this computer is the app's own: the switch updates both, and never mid-lecture. A laptop's
+    /// own switch is in General, and says so, so this one is taken for the library's.</summary>
     public string AutoUpdateSub => IsHere ? "Study Stash installs each new version by itself, never while you're recording"
-        : "The library installs each new version by itself";
+        : "The library's computer installs each new version by itself. This laptop has its own switch in General.";
+    /// <summary>On a laptop, these are the library's updates (General has this laptop's own).</summary>
+    public string UpdatesHeading => IsHere ? "Updates" : "Library updates";
     public string PasswordLine => HasPassword ? "Set. Your laptop connects with it." : "None: anyone who can reach the library can read it.";
     /// <summary>Only this computer uses the library: no laptop, so no password or addresses to show.</summary>
     public bool OnlyThisComputer => IsHere && !LaptopsCanConnect;
@@ -317,9 +320,17 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         if (!filling) _ = SendAsync(new JsonObject { ["notes"] = new JsonObject { ["sort"] = value } }, "Sorting");
     }
 
+    /// <summary>A library on this computer is the app's own, so its Update automatically is this computer's too: the app
+    /// reads client.toml's switch as well and installs only when both are on. Where the library's is on, the one shown
+    /// is this one (<see cref="AppAutoUpdate"/>); changing it sets both (<see cref="AppAutoUpdateChanged"/>).</summary>
+    public Func<bool>? AppAutoUpdate { get; init; }
+    public Action<bool>? AppAutoUpdateChanged { get; init; }
+
     partial void OnAutoUpdateChanged(bool value)
     {
-        if (!filling) _ = SendAsync(new JsonObject { ["auto_update"] = value }, "Automatic updates");
+        if (filling) return;
+        if (IsHere) AppAutoUpdateChanged?.Invoke(value);
+        _ = SendAsync(new JsonObject { ["auto_update"] = value }, "Automatic updates");
     }
 
     // --- reading ---------------------------------------------------------------------------------------------------
@@ -379,8 +390,8 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             Version = Str(u?["version"]);
             bool newer = Flag(u?["newer"]);
             CanUpdateNow = newer && Flag(u?["can_update"]);
-            UpdateLine = newer ? $"Version {Str(u?["latest"]).TrimStart('v')} is out. The library has {Version}." : $"Study Stash {Version}, the newest.";
-            AutoUpdate = Flag(u?["auto"]);
+            UpdateLine = newer ? $"Version {Str(u?["latest"]).TrimStart('v')} is out. The library has {Version}." : IsHere ? $"Study Stash {Version}, the newest." : $"Your library has Study Stash {Version}, the newest.";
+            AutoUpdate = Flag(u?["auto"]) && (!IsHere || AppAutoUpdate?.Invoke() != false);
 
             int i = 0;
             var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select(c => new LibraryClassRow

@@ -601,6 +601,38 @@
                     </Grid>
                   </Border>
                 </Border>
+                <!-- A laptop's own updates: this computer's version and switch. The library's are under Your library → Library;
+                     on a computer that is the library there's only that one place. -->
+                <StackPanel Spacing="8" IsVisible="{Binding IsLaptopRole}">
+                  <TextBlock Classes="section" Text="Updates" />
+                  <Border Classes="group">
+                    <StackPanel>
+                      <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Classes="row-title" Text="{Binding UpdateHereLine}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                          <StackPanel Grid.Column="1" Classes="act" Orientation="Horizontal" Spacing="8" Margin="12,0,0,0">
+                            <Button Classes="pill" Command="{Binding CheckUpdateHereCommand}" IsEnabled="{Binding !UpdateHereBusy}">
+                              <TextBlock Text="Check now" FontSize="13" />
+                            </Button>
+                            <Button Classes="pill primary" Command="{Binding UpdateHereNowCommand}" IsVisible="{Binding CanUpdateHere}" IsEnabled="{Binding !UpdateHereBusy}">
+                              <TextBlock Text="Update now" FontSize="13" FontWeight="Medium" />
+                            </Button>
+                          </StackPanel>
+                        </Grid>
+                      </Border>
+                      <Border Classes="rowsep" />
+                      <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="row-title" Text="Update automatically" />
+                            <TextBlock Classes="row-sub" Text="{Binding AutoUpdateHereSub}" TextWrapping="Wrap" />
+                          </StackPanel>
+                          <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding AutoUpdateHere}" Margin="12,0,0,0" />
+                        </Grid>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
                 <TextBlock Classes="section" Text="Setup" />
                 <Border Classes="group">
                   <Border Classes="row">
@@ -1117,7 +1149,7 @@
                       </Border>
                     </Border>
 
-                    <TextBlock Classes="section gap" Text="Updates" />
+                    <TextBlock Classes="section gap" Text="{Binding Lib.UpdatesHeading}" />
                     <Border Classes="group">
                       <StackPanel>
                         <Border Classes="row">
