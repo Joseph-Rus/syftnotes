@@ -90,7 +90,7 @@ public static partial class AiWords
 
     /// <summary>The Rich notes row's line: what's added after the notes, or that nothing more is asked of the AI.</summary>
     public static string RichAbout(bool on) => on
-        ? "Diagrams, formula plots and labelled drawings are added after each lecture's notes, where they help"
+        ? "Diagrams, formula plots and labelled drawings, added after each lecture's notes"
         : "Plain notes only. Nothing extra is asked of your AI";
 
     /// <summary>A speed as its menu says it: Standard · Fast mode · Quicker model.</summary>
@@ -107,7 +107,7 @@ public static partial class AiWords
         AiSpeed.Fast => "The same Opus, up to 2.5 times faster for notes and diagrams, but billed at a higher rate. "
             + "It needs usage credits on your Claude account, and without them Claude Code runs at its normal speed",
         AiSpeed.Quick => "Sonnet at low effort for the notes and diagrams: quicker and lighter on your plan, with shallower notes and diagrams",
-        _ => "Claude Code as it's set up, at its usual pace for notes and diagrams",
+        _ => "Claude Code as it's set up, at its usual pace",
     };
 
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup

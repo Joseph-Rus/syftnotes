@@ -53,7 +53,11 @@ laptop                                          library (a Mac mini, say — any
    `AiJobs.TakeDiagramsFollow` saying whether a designer adds them). A job is a file in
    `home/diagram-jobs`; the queue runs one at a time, oldest first, never while notes are being written
    (`Pipeline.Writing`), and a pass on Ollama stops for notes that come in and starts again after. It
-   picks the designer as the student's diagrams pick says now (`AiJobs.DesignerAsync`), and runs the
+   picks the designer as the student's diagrams pick says now (`AiJobs.DesignerAsync`: nobody when
+   rich notes are off, `AiSettings.Kinds()` — the **Rich notes** switch and one for diagrams, formula plots
+   and drawings, in `ai.json` — and the pick carries which kinds are on, so `DiagramDesign.Prompt` leaves a
+   switched-off kind out of the brief, `Read` drops one it's given anyway, and no illustrator or composer is
+   made when drawings are off; and `AiSpeed` says how Claude Code is run, below), and runs the
    diagram pass (`AiJobs.DesignDiagramsAsync`, a hard stop past its own 8 or 18 minutes:
    `DiagramDesign`: it reads the timed transcript and the notes, decides whether anything is clearer
    as a picture and which kind fits — a flowchart, in groups for a big topic, a state or sequence
@@ -172,6 +176,30 @@ project or its author.
   never holds a key — Claude Code (`claude -p`, edits allowed only inside the working folder),
   Codex (`codex exec`, read-only or workspace-write), Antigravity for Gemini (`agy -p`). Ollama
   answers plain questions directly; as an agent it runs through Codex (`--oss`).
+- **Speed** (`Core/Ai/AiSpeed.cs`, `ai.json`'s `speed`, Settings → AI engines → Claude Code speed): how
+  Claude Code writes the notes (`AiJobs` for the `notes` job and a rewrite) and designs the rich notes
+  (`DiagramEngines.PickAsync`, carried by `DiagramPick`, so the illustrator and the revise round get it too);
+  sorting and answers never change, and neither does any other engine. *Standard* is as it was (the notes with
+  the model picked or Claude Code's default, the designer `opus` at `high`). *Fast* is Claude Code's fast mode:
+  `AiRequest.Fast` adds `--settings '{"fastMode":true}'` to that one `claude -p` run (nothing is saved in the
+  student's own settings; Claude Code 2.1.205 or later, else it's ignored), with the model named `opus`, because
+  fast mode is Opus's (Opus 5.5, 5 and 4.8 only) and turning it on for another model switches it; a notes model
+  picked as Sonnet or Haiku stays as picked, and the composer (Sonnet, low) never gets it. The run's `system`
+  event says `fast_mode_state` (`on`) and its `usage` says `speed` (`fast`). It bills at a higher rate and, on a
+  subscription plan, only from usage credits (which the account must have turned on); an account that can't use
+  it runs at normal speed rather than failing (Claude Code itself retries a fast request it can't have at
+  standard speed), and a designer run the CLI turns down is asked again as the student set it up, like any
+  strongest-model run. *Quick* is `sonnet` at `low` effort for the notes and `medium` for the
+  designer. The notes' byline names the model that wrote them (`Claude opus`, `Claude sonnet`).
+- **Rich notes** (`AiSettings.RichNotes`, `RichDiagrams`, `RichPlots`, `RichDrawings`; `RichKinds`): off,
+  `AiJobs` tells the notes to draw nothing and queues no diagram pass, so nothing extra is asked of the AI. The
+  designer's brief is built from the kinds that are on (`DiagramDesign.Prompt`'s `kinds`: with all on it is
+  byte for byte what it was), a reply with a kind that's off is cut in `Read`, and with drawings off no
+  illustration is planned or drawn. `AiSettings.SetRich` keeps them consistent (turning off the last kind turns
+  rich notes off; turning them on again from a stored `diagrams: off` goes back to automatic). The laptop reads
+  and changes all of it over `/api/v2/ai/engines` and `/api/v2/ai/defaults` (`rich`, `rich_diagrams`,
+  `rich_plots`, `rich_drawings`, `speed`; `AiOverview.Rich` and `.Speed`, absent from an older library, whose
+  rows the pane then hides), and the library's own web settings page has the same switches.
 - **Canvas** (`Core/Canvas`): a small Chrome extension (`extension/`, embedded in the engine and
   written out for Chrome to load) is a read-only fetch proxy. It asks the library for work
   (`/api/v2/canvas/work`) with its own key, fetches Canvas URLs with the browser's own session, and

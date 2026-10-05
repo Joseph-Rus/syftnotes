@@ -11,9 +11,10 @@ public sealed record DiagramPick(string Engine, string Model, string Effort, Dra
 }
 
 /// <summary>
-/// Settings → AI engines → Draws diagrams, kept in ai.json as <see cref="AiSettings.Diagrams"/>: <c>auto</c> (the
+/// Settings → AI engines → Rich notes → Drawn by, kept in ai.json as <see cref="AiSettings.Diagrams"/>: <c>auto</c> (the
 /// default), <c>notes</c> (the notes engine draws them as it writes, the way it did before there was a diagram pass),
-/// <c>off</c> (no diagrams), or an engine's id. Which engine that comes to, on the library's computer, right now.
+/// <c>off</c> (no diagrams: how they were turned off before the Rich notes switch, which is what Settings uses now), or an
+/// engine's id. Which engine that comes to, on the library's computer, right now.
 /// </summary>
 public static class DiagramEngines
 {
