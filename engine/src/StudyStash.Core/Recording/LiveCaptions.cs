@@ -3,13 +3,16 @@ namespace StudyStash.Core;
 /// <summary>One word heard, with when it starts and ends (seconds) and how sure the model was of it (0 to 1).</summary>
 public sealed record TimedWord(double Start, double End, string Text, double Probability = 1);
 
+/// <summary>What a pass heard: the words with their times in it, and the language it took them for ("" for none).</summary>
+public sealed record HeardWords(IReadOnlyList<TimedWord> Words, string Language);
+
 /// <summary>A model quick enough to hear the newest few seconds of a lecture again and again (Cactus Whistle): 16 kHz
 /// mono, at most 30 seconds a pass, to words with their times in the pass.</summary>
 public interface IWordHearer
 {
     /// <summary><paramref name="language"/>: a language code, or "" to find it. <paramref name="keywords"/>: words and
     /// names to favour, one a line ("" for none).</summary>
-    IReadOnlyList<TimedWord> Hear(float[] samples, string language, string keywords);
+    HeardWords Hear(float[] samples, string language, string keywords);
 }
 
 /// <summary>A stretch of the recording: its 16 kHz mono sound and where it starts in the lecture (seconds).</summary>
@@ -149,8 +152,11 @@ public sealed class CaptionStitcher
 /// <summary>
 /// The words of the lecture being recorded, a second or two after they're said: a quick model (<see cref="IWordHearer"/>)
 /// hears the newest sound about once a second, on a thread of its own, and <see cref="CaptionStitcher"/> puts the
-/// passes together. Only while a lecture records and is written down as it records: a lecture written down after
-/// class (<see cref="Lecture.AfterClass"/>) only records, and a paused one has nothing new. These words are only for
+/// passes together. Only while a lecture records and is written down as it records (a lecture written down after
+/// class, <see cref="Lecture.AfterClass"/>, only records, and a paused one has nothing new), and only while someone
+/// can see them (<see cref="Watched"/>: the recorder open, or the menu's panel): hearing every second costs about a
+/// sixth of one core of an M3 Pro, and nobody reads the words in the closed pill. Opened, the first pass hears the last
+/// half minute at once, so the words are there within a second or two. These words are only for
 /// the recorder to show and to ask about; the transcript the notes are made from is the <see cref="TranscriptionWorker"/>'s,
 /// and <see cref="Merge"/> puts its lines first wherever it has got to.
 /// </summary>
@@ -165,9 +171,21 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
     string? lectureId;
     double heardTo;
     bool told;
+    // The language the passes found, when the lecture's isn't known: a few seconds can sound like another language, so
+    // a language is kept once three passes of a few seconds or more agree on it.
+    readonly Dictionary<string, int> votes = [];
+    string found = "";
 
     /// <summary>How often it hears the newest sound.</summary>
     public TimeSpan Every { get; init; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>Someone can see the live words (the recorder is open): only then is the sound heard.</summary>
+    public Func<bool> Watched { get; init; } = () => true;
+
+    readonly AutoResetEvent woken = new(false);
+
+    /// <summary>Hear now, not at the next second (the recorder just opened).</summary>
+    public void Wake() => woken.Set();
 
     /// <summary>The live words changed: the lecture they're for.</summary>
     public event Action<Lecture>? Changed;
@@ -193,11 +211,12 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             return false;
         }
         if (l.Id != lectureId) Reset(l);
-        if (hearer(l) is not { } h) return false;
+        if (!Watched() || hearer(l) is not { } h) return false;
         var s = stitcher!;
-        var sound = recent(s.Next);
+        // What the transcript has written down already isn't heard again.
+        var sound = recent(Math.Max(s.Next, l.TranscribedSeconds));
         if (sound is null || sound.End - heardTo < LeastNew) return false;
-        double from = s.From(sound.End);
+        double from = Math.Max(s.From(sound.End), sound.Start);
         var samples = from > sound.Start ? sound.Samples[(int)Math.Round((from - sound.Start) * Sound.Rate)..] : sound.Samples;
         from = Math.Max(from, sound.Start);
         double end = sound.End;
@@ -211,7 +230,11 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
         IReadOnlyList<TimedWord> words;
         try
         {
-            words = h.Hearer.Hear(samples, h.Language, Keywords(l.ClassName));
+            var heard = h.Hearer.Hear(samples, h.Language.Length > 0 ? h.Language : found, Keywords(l.ClassName));
+            words = heard.Words;
+            if (h.Language.Length == 0 && found.Length == 0 && heard.Language.Length > 0 && end - from >= 3
+                && (votes[heard.Language] = votes.GetValueOrDefault(heard.Language) + 1) >= 3)
+                found = heard.Language;
         }
         catch (Exception e)
         {
@@ -246,6 +269,8 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             heardTo = 0;
             told = false;
             First = null;
+            votes.Clear();
+            found = "";
         }
     }
 
@@ -272,7 +297,7 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             var left = (took * 4 > Every ? took * 4 : Every) - took;
             // Nothing recording: look less often.
             if (recording() is not { State: LectureState.Recording, AfterClass: false }) left = TimeSpan.FromSeconds(2);
-            if (left > TimeSpan.Zero) stop.WaitHandle.WaitOne(left);
+            if (left > TimeSpan.Zero) WaitHandle.WaitAny([stop.WaitHandle, woken], left);
         }
     }
 

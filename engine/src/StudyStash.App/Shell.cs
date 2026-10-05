@@ -446,7 +446,11 @@ public static partial class Shell
 
         recorder.OnPause = TogglePause;
         recorder.OnStop = () => StopRecording();
-        recorder.OnExpand = expanded => recorderWindow?.Refit(PlaceRecorder);
+        recorder.OnExpand = expanded =>
+        {
+            recorderWindow?.Refit(PlaceRecorder);
+            host.WatchLiveWords(WatchingWords());
+        };
         recorder.Busy = () => recorderWindow?.Refitting == true;
 
         quick.OnQuery = q => _ = SearchAsync(q);
@@ -792,7 +796,11 @@ public static partial class Shell
         panelWindow.Show();
         panelWindow.Activate();
         Desktop.Activate();
+        host.WatchLiveWords(true);
     }
+
+    /// <summary>The live words can be seen: the recorder is open on screen, or the menu's panel (its last line) is.</summary>
+    static bool WatchingWords() => (recorder.Expanded && recorderWindow?.IsVisible == true) || panelWindow?.IsVisible == true;
 
     static void ShowRecorder(bool expanded)
     {
@@ -803,12 +811,14 @@ public static partial class Shell
         {
             // On screen already: a change of size goes through Refit, never a resize in view.
             if (changed) recorderWindow.Refit(PlaceRecorder);
+            host.WatchLiveWords(WatchingWords());
             return;
         }
         recorderWindow.SizeToContent = SizeToContent.WidthAndHeight;
         PlaceRecorder();
         recorderWindow.Show();
         Dispatcher.UIThread.Post(PlaceRecorder, DispatcherPriority.Loaded);
+        host.WatchLiveWords(WatchingWords());
     }
 
     static Floating MakeRecorderWindow()
@@ -1418,6 +1428,7 @@ public static partial class Shell
             Program.Log($"[whisper] {live.Id}: the transcript is {TimedText.Clock(host.Recorder.Elapsed - live.TranscribedSeconds)} behind with {host.Model.Name}");
             Toast(behind.Title, behind.Text, "Settings", () => ShowSettings("Recording"), NoticeTimes.Advice);
         }
+        host.WatchLiveWords(WatchingWords());
         string elapsed = TimedText.Clock(host.Recorder.Elapsed);
         var levels = host.Recorder.Levels();
         panel.Elapsed = recorder.Elapsed = elapsed;

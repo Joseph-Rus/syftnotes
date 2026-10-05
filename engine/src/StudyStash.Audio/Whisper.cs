@@ -101,9 +101,12 @@ public static class WhisperModels
         "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe", "The lightest that still follows a lecture, for an older computer or one with little memory.");
     /// <summary>Cactus Whistle (2 October 2026; the model and its engine Apache-2.0): 17 MB, carried inside the app, on
     /// the processor. It hears the newest sound of a lecture every second for the recorder's live words (see
-    /// <see cref="LiveCaptioner"/>), whatever model writes the transcript.</summary>
+    /// <see cref="LiveCaptioner"/>), whatever model writes the transcript. As the transcript itself it's a choice, not
+    /// what any computer starts on: measured against large-v3 on two 12-minute stretches of recorded lectures it had 32%
+    /// and 24% of words different, about Whisper base's 32% and 21%, where the compact turbo had 10% and 7% and Parakeet
+    /// 14% and 9% (engine/tools/TranscribeBench); it wrote the 12 minutes down in 11 seconds on an M3 Pro's processor.</summary>
     public static readonly WhisperModel Whistle = new("whistle", "Cactus Whistle", WhistleTranscriber.File, 16919407,
-        "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb", "The smallest and fastest, and already on this computer: nothing to download. Misses more words than the others in a busy classroom. Reads English, German, French, Spanish, Italian, Dutch and Polish.")
+        "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb", "Fastest and smallest, and already on this computer: nothing to download. About as accurate as Whisper base, so it misses more names and terms than the others. Reads English, German, French, Spanish, Italian, Dutch and Polish.")
     {
         Engine = SpeechEngine.Whistle,
         Bundled = true,

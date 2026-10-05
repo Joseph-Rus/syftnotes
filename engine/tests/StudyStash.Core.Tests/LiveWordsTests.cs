@@ -78,12 +78,12 @@ public class LiveWordsTests
         public int Calls;
         public string Keywords = "";
 
-        public IReadOnlyList<TimedWord> Hear(float[] samples, string language, string keywords)
+        public HeardWords Hear(float[] samples, string language, string keywords)
         {
             Calls++;
             Keywords = keywords;
             double seconds = samples.Length / (double)Sound.Rate;
-            return seconds < 0.6 ? [] : [new TimedWord(0.1, 0.4, "Hello")];
+            return new(seconds < 0.6 ? [] : [new TimedWord(0.1, 0.4, "Hello")], "en");
         }
     }
 
@@ -94,8 +94,9 @@ public class LiveWordsTests
         Assert.True(done());
     }
 
-    /// <summary>Words show a second in, for a lecture written down as it records; one written down after class only
-    /// records (as Settings promises): nothing hears it, and nothing is written down, until it stops.</summary>
+    /// <summary>Words show a second in, for a lecture written down as it records, once the recorder is open (closed,
+    /// nothing is heard); one written down after class only records (as Settings promises): nothing hears it, and
+    /// nothing is written down, until it stops.</summary>
     [Fact]
     public async Task Live_words_come_a_second_in_but_never_for_a_lecture_written_down_after_class()
     {
@@ -104,7 +105,8 @@ public class LiveWordsTests
         FakeMic? mic = null;
         using var rec = new Recorder(store, () => mic = new FakeMic());
         var hearer = new FakeHearer();
-        var captions = new LiveCaptioner(() => rec.Current, rec.Recent, _ => (hearer, "en"));
+        bool open = false;
+        var captions = new LiveCaptioner(() => rec.Current, rec.Recent, _ => (hearer, "en")) { Watched = () => open };
         var heard = new List<string>();
         captions.Changed += l => heard.Add(l.Id);
 
@@ -112,6 +114,9 @@ public class LiveWordsTests
         Assert.False(captions.Step()); // nothing recorded yet
         mic!.Play(1.5);
         WaitFor(() => rec.Elapsed >= 1.45);
+        Assert.False(captions.Step()); // the recorder is closed: nobody sees the words, so nothing hears them
+        Assert.Equal(0, hearer.Calls);
+        open = true;
         Assert.True(captions.Step());
         Assert.Equal(["Hello"], captions.Words(live.Id).Select(w => w.Text));
         Assert.Equal([live.Id], heard);
@@ -157,10 +162,11 @@ public class LiveWordsTests
         Assert.Contains("midterm", said);
         Assert.Contains("recursion", said);
         Assert.Equal("en", t.Language);
-        var words = whistle.Hear(speech, "en", "");
+        var words = whistle.Hear(speech, "", "").Words;
         Assert.True(words.Count >= 8, string.Join(" ", words.Select(w => w.Text)));
         for (int i = 1; i < words.Count; i++) Assert.True(words[i].Start >= words[i - 1].Start && words[i].End >= words[i].Start);
         Assert.InRange(words[^1].End, 3, speech.Length / (double)Sound.Rate + 0.1);
-        Assert.Empty(whistle.Hear(new float[Sound.Rate * 3], "en", ""));
+        Assert.Equal("en", whistle.Hear(speech, "", "").Language);
+        Assert.Empty(whistle.Hear(new float[Sound.Rate * 3], "en", "").Words);
     }
 }

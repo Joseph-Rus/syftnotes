@@ -256,7 +256,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Lectures = new LectureStore(home);
         Recorder.Recover(Lectures, this.log);
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
-        Captions = new LiveCaptioner(() => Recorder.Current, Recorder.Recent, LiveHearer, this.log);
+        Captions = new LiveCaptioner(() => Recorder.Current, Recorder.Recent, LiveHearer, this.log) { Watched = () => liveWordsWatched };
         Captions.Changed += l => LiveWords?.Invoke(l);
         Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log)
         {
@@ -534,6 +534,15 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     WhistleTranscriber? liveHearer;
     bool liveHearerFailed;
+    volatile bool liveWordsWatched;
+
+    /// <summary>The recorder (or the menu's panel) is open, so the live words can be seen: they're heard only then.</summary>
+    public void WatchLiveWords(bool watched)
+    {
+        if (liveWordsWatched == watched) return;
+        liveWordsWatched = watched;
+        if (watched) Captions.Wake();
+    }
 
     /// <summary>The recorder can show what's said a second or two after it's said: Cactus Whistle is in this copy of the
     /// app, runs here, and reads the lecture's language. Otherwise it shows the transcript's own lines, which come about

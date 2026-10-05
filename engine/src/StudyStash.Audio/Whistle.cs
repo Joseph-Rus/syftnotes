@@ -96,8 +96,11 @@ public sealed class WhistleTranscriber : ITranscriber, IWordHearer
             return new Transcription(WordLines.Lines(words), fixedLanguage.Length > 0 ? fixedLanguage : lang.Length > 0 ? lang : found);
         }, stop);
 
-    public IReadOnlyList<TimedWord> Hear(float[] samples, string language, string keywords) =>
-        Pass(samples, WhistleLanguages.Code(language) ?? fixedLanguage, keywords).Words;
+    public HeardWords Hear(float[] samples, string language, string keywords)
+    {
+        var (words, heard) = Pass(samples, WhistleLanguages.Code(language) ?? fixedLanguage, keywords);
+        return new HeardWords(words, heard);
+    }
 
     /// <summary>One pass of at most 30 seconds: its words, and the language it heard ("" for silence).</summary>
     static (List<TimedWord> Words, string Language) Pass(float[] samples, string language, string keywords)

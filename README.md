@@ -21,7 +21,13 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
   NVIDIA's Parakeet instead (a 2.5 GB download): it's made for the processor, nearly as accurate as
   the compact turbo, and never makes up words over silence; it reads 25 European languages, and a
   lecture in another language uses Whisper. A computer too weak for either gets a lighter Whisper.
-  The bigger, more accurate models are a choice in setup and Settings → Recording, where an
+  The bigger, more accurate models are a choice in setup and Settings → Recording, and so is Cactus
+  Whistle, the fastest and smallest, which comes with the app (about as accurate as Whisper base).
+  Whatever the model, while a lecture is transcribed as you go the recorder shows what's said a
+  second or two after it's said: Whistle hears the newest sound every second, and the chosen model's
+  more accurate lines take its place as they come (about half a minute behind). Whistle reads
+  English, German, French, Spanish, Italian, Dutch and Polish; a lecture in another language shows
+  the chosen model's lines only. In Settings → Recording, an
   experimental **Tell speakers apart** also marks in a transcript ("Speaker 2:") where a voice other
   than the lecturer's seems to speak; it is careful rather than complete, and can be wrong. While it
   records, a tiny pill shows the time and the level; pause or stop from the menu bar.
@@ -408,8 +414,12 @@ run with [Whisper.net](https://github.com/sandrohanea/whisper.net)) or, if you c
 voices apart, when you turn that on, it uses
 [pyannote's segmentation 3.0](https://huggingface.co/pyannote/segmentation-3.0) (MIT) and NVIDIA's
 [TitaNet small](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/titanet_small)
-(CC BY 4.0), also converted by sherpa-onnx. The models are downloaded when you pick them; none is
-bundled.
+(CC BY 4.0), also converted by sherpa-onnx. The models are downloaded when you pick them, except
+[Cactus Whistle](https://huggingface.co/Cactus-Compute/whistle) and the
+[needle](https://github.com/cactus-compute/needle) engine that runs it (both Apache-2.0, by Cactus
+Compute), which come inside the app unchanged with their licence (needle/LICENSE.txt beside the app).
+Study Stash calls the engine's library directly: the anonymous usage counts that Cactus's Python
+package sends aren't part of it, and nothing it hears leaves the computer.
 
 Illustrations are composed from parts drawn by [Servier Medical Art](https://smart.servier.com/)
 (CC BY 3.0, via [Bioicons](https://bioicons.com)), the [DBCLS Togo Picture
