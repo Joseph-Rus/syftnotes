@@ -553,8 +553,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             int n = Lectures.PruneAudio(Settings.KeepAudioDays, DateTimeOffset.Now);
             if (n > 0) log($"[app] removed the recordings of {n} filed lecture{(n == 1 ? "" : "s")} older than {Settings.KeepAudioDays} days (their notes and transcripts stay)");
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        catch (Exception e)
         {
+            // On a timer's thread: anything thrown here (a lecture whose date can't be read, a file in use) would end
+            // the app, so it's only said, and tried again at the next look.
             log($"[app] couldn't remove old recordings: {e.Message}");
         }
     }
