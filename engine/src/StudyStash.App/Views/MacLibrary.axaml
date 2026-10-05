@@ -408,11 +408,11 @@
         <!-- The right: the lecture, an assignment, or a Canvas page -->
         <Panel Grid.Column="{Binding DetailColumn}" Grid.ColumnSpan="{Binding ColumnSpan}" IsVisible="{Binding ShowDetailColumn}">
           <!-- The list folded away: one arrow at the page's left edge brings it back -->
-          <Button Name="ShowList" Classes="tool" ZIndex="5" IsVisible="{Binding ShowListOpener}" Command="{Binding ToggleListCommand}"
-                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,14,0,0" ToolTip.Tip="Show the list (⌃⌘L)" AutomationProperties.Name="Show the list">
+          <Button Name="ShowList" Theme="{StaticResource Surface}" Height="32" CornerRadius="16" Padding="8,0,12,0" Background="{DynamicResource Fill}" ZIndex="5" IsVisible="{Binding ShowListOpener}" Command="{Binding ToggleListCommand}"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,12,0,0" ToolTip.Tip="Show the list (⌃⌘L)" AutomationProperties.Name="Show the list">
             <StackPanel Orientation="Horizontal" Spacing="2">
-              <c:Icon Glyph="chevron_right" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-              <TextBlock Text="List" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <c:Icon Glyph="chevron_right" Size="18" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+              <TextBlock Text="List" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <Border Width="1" Background="{DynamicResource Sep}" HorizontalAlignment="Left" IsVisible="{Binding !Narrow}" />
