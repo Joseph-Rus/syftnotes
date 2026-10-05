@@ -15,6 +15,9 @@ public sealed partial class LibraryClassRow : ObservableObject
     [ObservableProperty] public partial string Name { get; set; } = "";
     [ObservableProperty] public partial string Aliases { get; set; } = "";
     [ObservableProperty] public partial string Description { get; set; } = "";
+    /// <summary>The name the library knows it by ("" for a class just added here): a different <see cref="Name"/> is a
+    /// rename, which takes its lectures, folder and Canvas course with it.</summary>
+    public string Was { get; set; } = "";
     public string Folder { get; init; } = "";
     public int Lectures { get; init; }
     public IBrush Dot { get; init; } = Brushes.Gray;
@@ -150,9 +153,12 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     [ObservableProperty] public partial bool CanUpdateNow { get; set; }
     [ObservableProperty] public partial bool AutoUpdate { get; set; }
 
-    /// <summary>A library on this computer is the app's own: the switch updates both, and never mid-lecture.</summary>
+    /// <summary>A library on this computer is the app's own: the switch updates both, and never mid-lecture. A laptop's
+    /// own switch is in General, and says so, so this one is taken for the library's.</summary>
     public string AutoUpdateSub => IsHere ? "Study Stash installs each new version by itself, never while you're recording"
-        : "The library installs each new version by itself";
+        : "The library's computer installs each new version by itself. This laptop has its own switch in General.";
+    /// <summary>On a laptop, these are the library's updates (General has this laptop's own).</summary>
+    public string UpdatesHeading => IsHere ? "Updates" : "Library updates";
     public string PasswordLine => HasPassword ? "Set. Your laptop connects with it." : "None: anyone who can reach the library can read it.";
     /// <summary>Only this computer uses the library: no laptop, so no password or addresses to show.</summary>
     public bool OnlyThisComputer => IsHere && !LaptopsCanConnect;
@@ -314,9 +320,17 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         if (!filling) _ = SendAsync(new JsonObject { ["notes"] = new JsonObject { ["sort"] = value } }, "Sorting");
     }
 
+    /// <summary>A library on this computer is the app's own, so its Update automatically is this computer's too: the app
+    /// reads client.toml's switch as well and installs only when both are on. Where the library's is on, the one shown
+    /// is this one (<see cref="AppAutoUpdate"/>); changing it sets both (<see cref="AppAutoUpdateChanged"/>).</summary>
+    public Func<bool>? AppAutoUpdate { get; init; }
+    public Action<bool>? AppAutoUpdateChanged { get; init; }
+
     partial void OnAutoUpdateChanged(bool value)
     {
-        if (!filling) _ = SendAsync(new JsonObject { ["auto_update"] = value }, "Automatic updates");
+        if (filling) return;
+        if (IsHere) AppAutoUpdateChanged?.Invoke(value);
+        _ = SendAsync(new JsonObject { ["auto_update"] = value }, "Automatic updates");
     }
 
     // --- reading ---------------------------------------------------------------------------------------------------
@@ -376,13 +390,13 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             Version = Str(u?["version"]);
             bool newer = Flag(u?["newer"]);
             CanUpdateNow = newer && Flag(u?["can_update"]);
-            UpdateLine = newer ? $"Version {Str(u?["latest"]).TrimStart('v')} is out. The library has {Version}." : $"Study Stash {Version}, the newest.";
-            AutoUpdate = Flag(u?["auto"]);
+            UpdateLine = newer ? $"Version {Str(u?["latest"]).TrimStart('v')} is out. The library has {Version}." : IsHere ? $"Study Stash {Version}, the newest." : $"Your library has Study Stash {Version}, the newest.";
+            AutoUpdate = Flag(u?["auto"]) && (!IsHere || AppAutoUpdate?.Invoke() != false);
 
             int i = 0;
             var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select(c => new LibraryClassRow
             {
-                Name = Str(c["name"]), Description = Str(c["description"]), Folder = Str(c["folder"]),
+                Name = Str(c["name"]), Was = Str(c["name"]), Description = Str(c["description"]), Folder = Str(c["folder"]),
                 Aliases = string.Join(", ", (c["aliases"] as JsonArray ?? []).Select(Str).Where(a => a.Length > 0)),
                 Lectures = c["lectures"] is JsonValue cl && cl.TryGetValue(out int k) ? k : 0, Dot = Skin.ClassDot(i++),
             }).ToList();
@@ -634,15 +648,29 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         ["classes"] = new JsonArray(Classes.Select(c => (JsonNode?)new JsonObject
         {
             ["name"] = c.Name.Trim(),
+            // What it was called, so the library moves its lectures with a rename instead of leaving them under the old name.
+            ["was"] = c.Was,
             ["aliases"] = new JsonArray(c.Aliases.Split(',').Select(a => a.Trim()).Where(a => a.Length > 0).Select(a => (JsonNode?)a).ToArray()),
             ["description"] = c.Description.Trim(),
         }).ToArray()),
     };
 
+    /// <summary>Sends the classes; once the library has them, a class whose name was changed here is known by its new
+    /// one, and this computer's waiting lectures follow it.</summary>
+    async Task<bool> SendClassesAsync(string what)
+    {
+        var renamed = Classes.Where(c => c.Was.Length > 0 && c.Name.Trim().Length > 0 && c.Was != c.Name.Trim()).Select(c => (c.Was, c.Name.Trim())).ToList();
+        if (!await SendAsync(ClassesChange(), what)) return false;
+        foreach (var c in Classes.Where(c => c.Was.Length > 0)) c.Was = c.Name.Trim();
+        if (renamed.Count > 0) ClassesRenamed?.Invoke(renamed);
+        ClassesChanged?.Invoke();
+        return true;
+    }
+
     [RelayCommand]
     async Task SaveClasses()
     {
-        if (!filling && State == LibrarySettingsState.Ready && await SendAsync(ClassesChange(), "The classes")) ClassesChanged?.Invoke();
+        if (!filling && State == LibrarySettingsState.Ready) await SendClassesAsync("The classes");
     }
 
     [RelayCommand]
@@ -651,16 +679,14 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         string name = NewClass.Trim();
         if (name.Length == 0) return;
         Classes.Add(new LibraryClassRow { Name = name, Dot = Skin.ClassDot(Classes.Count) });
-        if (!await SendAsync(ClassesChange(), $"{name}")) return;
-        NewClass = "";
-        ClassesChanged?.Invoke();
+        if (await SendClassesAsync($"{name}")) NewClass = "";
     }
 
     [RelayCommand]
     async Task RemoveClass(LibraryClassRow row)
     {
         Classes.Remove(row);
-        if (await SendAsync(ClassesChange(), $"{row.Name}")) ClassesChanged?.Invoke();
+        await SendClassesAsync($"{row.Name}");
     }
 
     // Use Canvas course names: the preview, then the renames.

@@ -101,6 +101,18 @@ public static class NoticeWords
         _ => "Study Stash is up to date.",
     };
 
+    /// <summary>A laptop's own Updates row (Settings → General) after Check now: what it found, and whether Update now
+    /// can install it. "This laptop" and "your library" are told apart, since the library has an Updates row of its own.</summary>
+    public static (string Line, bool CanUpdate) UpdateChecked(UpdateCheck found, string running) => found.Result switch
+    {
+        AppUpdates.Available => ($"Version {Newer(found)} is out. This laptop has {Plain(running)}.", true),
+        AppUpdates.CantHere => ($"Version {Newer(found)} is out. {found.Why}", false),
+        AppUpdates.UpToDate => ($"Study Stash {Plain(running)} on this laptop, the newest.", false),
+        _ => (UpdateNowLine(found.Result), false),
+    };
+
+    static string Newer(UpdateCheck found) => found.Release is { } r ? string.Join('.', r.Version) : "";
+
     static string Plain(string version) => string.Join('.', Updates.ParseVersion(version));
 
     /// <summary>The problems worth a notification when they start (not just a line in the dropdown): each stops

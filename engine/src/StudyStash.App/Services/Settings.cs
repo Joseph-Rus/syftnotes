@@ -265,6 +265,24 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
     public string Version => Engine.Version;
 
+    // This laptop's own updates (General → Updates, a laptop only: on a computer that is the library the one switch and
+    // Update now are Your library → Library's, which update the app and the library together). client.toml's
+    // auto_update, which the app reads each round; the library's own is a different switch on its own page.
+    [ObservableProperty] public partial string UpdateHereLine { get; set; } = "";
+    /// <summary>Check now found a newer version this copy can install: Update now shows.</summary>
+    [ObservableProperty] public partial bool CanUpdateHere { get; set; }
+    [ObservableProperty] public partial bool UpdateHereBusy { get; set; }
+    [ObservableProperty] public partial bool AutoUpdateHere { get; set; }
+    public string AutoUpdateHereSub => "Study Stash on this laptop installs each new version by itself, never while you're recording. Your library has its own switch under Your library → Library.";
+    Func<AppUpdates?> updater = () => AppUpdates.Current;
+
+    /// <summary>For a test: Check now and Update now go through <paramref name="updates"/>, not the running app's.</summary>
+    public SettingsModel WithUpdater(AppUpdates updates)
+    {
+        updater = () => updates;
+        return this;
+    }
+
     /// <summary>Hands a web page to the system's browser; a test catches it here instead.</summary>
     public Action<string> OpenUrl { get; set; } = url => Dialogs.OpenUrl(url);
 
@@ -333,6 +351,13 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         {
             IsHere = host.Settings.LibraryHere,
             UpdateHere = AppUpdates.Current is { } updates ? async () => NoticeWords.UpdateNowLine(await Task.Run(updates.NowAsync)) : null,
+            AppAutoUpdate = () => host.Client().AutoUpdate,
+            AppAutoUpdateChanged = on =>
+            {
+                var c = host.Client();
+                c.AutoUpdate = on;
+                host.SaveClient(c);
+            },
             Renamed = name =>
             {
                 var c = host.Client();
@@ -383,6 +408,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         KeepAudio = host.Settings.KeepAudioDays.ToString(System.Globalization.CultureInfo.InvariantCulture);
         Shortcuts = host.Settings.Shortcuts;
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
+        AutoUpdateHere = cc.AutoUpdate;
+        UpdateHereLine = $"Study Stash {Version} on this laptop";
         ColourTheme = host.Settings.Theme;
         Appearance = host.Settings.Appearance;
         advice = host.Advice;
@@ -537,6 +564,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                  })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;
+        // A library on this computer starts at login through the same login item as the app (Your library → Start the
+        // library when this Mac starts): General shows it as it is now, not as it was when Settings opened.
+        if (value == "General" && !loading)
+        {
+            settingLogin = true;
+            StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
+            settingLogin = false;
+        }
         LoadSection(value);
     }
 
@@ -633,9 +668,59 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         }
     }
 
+    partial void OnAutoUpdateHereChanged(bool value)
+    {
+        if (loading) return;
+        var c = host.Client();
+        c.AutoUpdate = value;
+        host.SaveClient(c);
+    }
+
+    /// <summary>Check now: is a newer version out for this laptop? Says so without installing it.</summary>
+    [RelayCommand]
+    async Task CheckUpdateHere()
+    {
+        if (UpdateHereBusy) return;
+        if (updater() is not { } updates)
+        {
+            UpdateHereLine = NoticeWords.UpdateNowLine(AppUpdates.Off);
+            return;
+        }
+        UpdateHereBusy = true;
+        UpdateHereLine = "Looking for a new version…";
+        try
+        {
+            (UpdateHereLine, CanUpdateHere) = NoticeWords.UpdateChecked(await Task.Run(updates.CheckAsync), Version);
+        }
+        finally
+        {
+            UpdateHereBusy = false;
+        }
+    }
+
+    /// <summary>Update now: this laptop installs the newest version (once a lecture being recorded is over) and opens again.</summary>
+    [RelayCommand]
+    async Task UpdateHereNow()
+    {
+        if (UpdateHereBusy || updater() is not { } updates) return;
+        UpdateHereBusy = true;
+        CanUpdateHere = false;
+        UpdateHereLine = "Downloading the new version…";
+        try
+        {
+            UpdateHereLine = NoticeWords.UpdateNowLine(await Task.Run(updates.NowAsync));
+        }
+        finally
+        {
+            UpdateHereBusy = false;
+        }
+    }
+
     partial void OnKeepAudioChanged(string value)
     {
-        if (!loading && int.TryParse(value, out int days) && days >= 0) host.Save(s => s.KeepAudioDays = days);
+        if (loading || !int.TryParse(value, out int days) || days < 0) return;
+        host.Save(s => s.KeepAudioDays = days);
+        host.PruneAudioSoon();
     }
 
     partial void OnDisplayNameChanged(string value)

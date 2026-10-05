@@ -793,12 +793,16 @@ public sealed partial class LibraryWeb
                 + $"<input type=\"text\" name=\"class_aliases_{i}\" value=\"{Ui.Esc(string.Join(", ", k.Aliases))}\" placeholder=\"Other names\" aria-label=\"Other names, comma separated\">"
                 + remove
                 + $"<input class=\"wide\" type=\"text\" name=\"class_desc_{i}\" value=\"{Ui.Esc(k.Description)}\" placeholder=\"What it covers (helps the AI)\" aria-label=\"Description\">"
+                // What it's called now, so typing a new name renames it (its lectures and folder go with it) instead of
+                // adding a class. Last, since the row's styles count its inputs by position.
+                + (k.Name.Length > 0 ? $"<input type=\"hidden\" name=\"class_was_{i}\" value=\"{Ui.Esc(k.Name)}\">" : "")
                 + "</div>");
         }
         string classes = $"<div class=\"group-head\" id=\"classes\">Classes</div><div class=\"group\">{string.Concat(rows)}</div>"
             + "<p class=\"group-foot\">Lectures are sorted into these. A lecture recorded for a class, or whose title "
             + "matches a name here, is filed without asking the AI. Removing a class keeps its lectures; move them "
-            + "from their pages. Fill in the last row to add a class.</p>";
+            + "from their pages. Type a new name over a class to rename it: its lectures and folder go with it. Fill in the last row "
+            + "to add a class.</p>";
         string form = $"<form method=\"post\" action=\"/settings\">{ai}{classes}"
             + "<div class=\"actions\"><button class=\"primary\">Save settings</button></div></form>" + CourseNamesGroup(renamed);
 
@@ -851,15 +855,10 @@ public sealed partial class LibraryWeb
     async Task<IResult> SaveSettings(HttpContext ctx) => await WithMemberAsync(ctx, async _ =>
     {
         var f = await Http.FormAsync(ctx.Request);
-        cfg.SummaryModel = Py.Strip(f.Get("summary_model", cfg.SummaryModel));
-        string sort = Py.Strip(f.Get("ollama_model", cfg.OllamaModel));
-        if (sort.Length > 0) cfg.OllamaModel = sort;
-        cfg.SummaryEnabled = f.Get("summary_enabled") == "1";
-        cfg.OllamaEnabled = f.Get("ollama_enabled") == "1";
-        if (double.TryParse(Py.Strip(f.Get("min_confidence", Py.FloatRepr(cfg.MinConfidence))), NumberStyles.Float,
-                CultureInfo.InvariantCulture, out double confidence) && !double.IsNaN(confidence))
-            cfg.MinConfidence = Math.Clamp(confidence, 0.0, 1.0);
+        // The classes first: a class typed over with a new name is renamed (as the app's Settings does), or the whole
+        // save is turned down, with nothing changed, while Canvas is syncing.
         var classes = new List<ClassDef>();
+        var renames = new List<ClassRenameStep>();
         var seen = new HashSet<string>();
         for (int i = 0; f.ContainsKey($"class_name_{i}"); i++)
         {
@@ -868,7 +867,25 @@ public sealed partial class LibraryWeb
             var aliases = f.Get($"class_aliases_{i}").Split(',').Select(Py.Strip).Where(a => a.Length > 0).ToList();
             classes.Add(new ClassDef(name, aliases, Py.Strip(f.Get($"class_desc_{i}"))));
             seen.Add(name);
+            if (Py.Strip(f.Get($"class_was_{i}")) is { Length: > 0 } was && was != name && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, name, 0, ""));
         }
+        string? refused = renames.Count == 0 ? null
+            : ClassRename.Blocked(Canvas.Crawl)
+              ?? (renames.FirstOrDefault(r => r.To.Length > StudyStash.Core.Canvas.CourseNames.MaxLength) is { } tooLong ? $"“{tooLong.To[..20]}…” is too long for a class name (up to {StudyStash.Core.Canvas.CourseNames.MaxLength} characters)." : null)
+              ?? RenameClasses(renames, classes);
+        if (refused is not null)
+        {
+            lastRenameProblem = refused;
+            return Http.SeeOther("/settings?renamed=0#classes");
+        }
+        cfg.SummaryModel = Py.Strip(f.Get("summary_model", cfg.SummaryModel));
+        string sort = Py.Strip(f.Get("ollama_model", cfg.OllamaModel));
+        if (sort.Length > 0) cfg.OllamaModel = sort;
+        cfg.SummaryEnabled = f.Get("summary_enabled") == "1";
+        cfg.OllamaEnabled = f.Get("ollama_enabled") == "1";
+        if (double.TryParse(Py.Strip(f.Get("min_confidence", Py.FloatRepr(cfg.MinConfidence))), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out double confidence) && !double.IsNaN(confidence))
+            cfg.MinConfidence = Math.Clamp(confidence, 0.0, 1.0);
         cfg.Classes = classes;
         Configs.Save(cfg);
         if (f.ContainsKey("ai_provider"))

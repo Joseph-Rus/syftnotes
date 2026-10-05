@@ -126,4 +126,41 @@ public sealed class LibrarySettingsRoundTripTests
         Assert.Contains("value=\"BIO 110\"", page);
         Assert.Contains("name=\"ollama_enabled\" value=\"1\" checked", page);
     }
+
+    /// <summary>A class renamed by typing its new name in Settings → Classes takes its lectures and folder with it (and
+    /// this laptop's waiting recordings), instead of leaving them behind as a second class under the old name.</summary>
+    [AvaloniaFact]
+    public async Task Renaming_a_class_takes_its_lectures_with_it()
+    {
+        using var home = new TempHome();
+        var (url, app, cfg, store) = await LibraryAsync(home);
+        await using var _app = app;
+        using var _store = store;
+        store.Save(new Meeting("rec-1") { Title = "CS 101 lecture", Date = "2026-09-23T10:02:12-07:00", Folder = "CS 101", Transcript = "[00:05] Recursion." },
+            new Classification("CS 101", 0.95, "folder"), summaryMd: "## Summary\nRecursion.");
+        string laptopHome = home["laptop"];
+        Directory.CreateDirectory(laptopHome);
+        new AppSettings { SetupDone = true, Role = AppRole.Laptop }.Save(laptopHome);
+        var cc = Configs.LoadClient(laptopHome);
+        cc.ServerUrl = url;
+        cc.PoolKey = "old-pw";
+        Configs.SaveClient(cc);
+        using var host = new AppHost(laptopHome, log: _ => { });
+        host.Lectures.Add(new Lecture { Id = "rec-2", Started = "2026-09-30T10:00:00-07:00", ClassName = "CS 101", State = LectureState.Sending });
+        using var settings = SettingsModel.Make(host);
+        settings.Section = "Classes";
+        await Until(() => settings.Lib.IsReady);
+
+        settings.Lib.Classes[0].Name = "CS 1010";
+        await settings.Lib.SaveClassesCommand.ExecuteAsync(null);
+
+        Assert.Null(settings.Lib.Say);
+        var saved = Configs.Load(cfg.Home).Classes.Single();
+        Assert.Equal("CS 1010", saved.Name);
+        Assert.Contains("CS 101", saved.Aliases);
+        Assert.Contains("cs101", saved.Aliases);
+        Assert.Equal([("CS 1010", 1)], store.ClassesSummary());
+        Assert.False(Directory.Exists(Path.Combine(cfg.PoolDir, "CS 101")));
+        Assert.Equal("CS 1010", host.Lectures.Get("rec-2")!.ClassName);
+    }
 }

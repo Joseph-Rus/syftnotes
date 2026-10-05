@@ -28,6 +28,12 @@ public sealed record UpdateNews(UpdateNewsKind Kind, Release Release, string? Wh
     public string Version => string.Join('.', Release.Version);
 }
 
+/// <summary>What <see cref="AppUpdates.CheckAsync"/> found (Settings' Check now): <see cref="Result"/> is one of
+/// <see cref="AppUpdates.Off"/>, <see cref="AppUpdates.CheckFailed"/>, <see cref="AppUpdates.UpToDate"/>,
+/// <see cref="AppUpdates.Available"/> or <see cref="AppUpdates.CantHere"/> (with <see cref="Why"/>); the last two
+/// name the newer <see cref="Release"/>.</summary>
+public sealed record UpdateCheck(string Result, Release? Release = null, string? Why = null);
+
 /// <summary>
 /// The running app checking for a new release on its own (D4): 10 minutes after it starts, then every 6 hours,
 /// installing it once nothing is recording, paused or transcribing, then quitting so the new copy starts in its
@@ -58,6 +64,9 @@ public sealed class AppUpdates
     public static AppUpdates? Current { get; private set; }
 
     public required Func<Task<Release?>> Latest { get; init; }
+    /// <summary>What Check now asks: GitHub itself, not what it learned in the last hour (<see cref="Latest"/>, which
+    /// the rounds use, if not given).</summary>
+    public Func<Task<Release?>>? LatestNow { get; init; }
     /// <summary>Nothing recording, paused or transcribing right now.</summary>
     public required Func<bool> Idle { get; init; }
     /// <summary>Looks for new releases at all: an installed copy (or one that can't replace itself, to say so), and
@@ -208,6 +217,25 @@ public sealed class AppUpdates
         Tell(news);
     }
 
+    /// <summary>Check now (Settings): whether a newer release is out, said without installing anything (Update now,
+    /// <see cref="NowAsync"/>, installs it). Never throws: a GitHub that can't be reached is <see cref="CheckFailed"/>.</summary>
+    public async Task<UpdateCheck> CheckAsync()
+    {
+        if (!Enabled()) return new(Off);
+        Release? release;
+        try
+        {
+            release = await (LatestNow ?? Latest)();
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
+        {
+            Log($"[update] check failed: {e.Message}");
+            return new(CheckFailed);
+        }
+        if (release is null || !Updates.IsNewer(release)) return new(UpToDate);
+        return CantInstall() is { } why ? new(CantHere, release, why) : new(Available, release);
+    }
+
     /// <summary>Update now (Settings, or the notification's Update): the newest release installs now, auto_update or
     /// not, or as soon as the lecture being recorded is over. What happened, as <see cref="RoundAsync"/> says.</summary>
     public async Task<string> NowAsync()
@@ -301,7 +329,7 @@ public sealed class AppUpdates
     /// <summary>auto_update, read fresh each round: client.toml's, and config.toml's too when the library is on this
     /// computer (Settings → Your library → Update automatically writes that one). Either off is off; a file that
     /// can't be read counts as off, so nothing installs on a guess.</summary>
-    static bool AutoUpdateOn(AppHost host)
+    internal static bool AutoUpdateOn(AppHost host)
     {
         try
         {
@@ -330,6 +358,7 @@ public sealed class AppUpdates
         var updates = new AppUpdates
         {
             Latest = () => Updates.CachedLatestAsync(),
+            LatestNow = () => Updates.LatestAsync(),
             Idle = Idle,
             Enabled = () => (updateHost.AppDir.Length > 0 || updateHost.CantReplace) && !Desktop.SystemChangesOff,
             Automatic = () => AutoUpdateOn(host),
