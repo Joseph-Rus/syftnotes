@@ -74,6 +74,11 @@ public sealed class CaptionStitcher
     public const double MostSeconds = 29.5;
     /// <summary>Words that ended this long before the newest sound are settled.</summary>
     public double SettleAfter { get; init; } = 2.5;
+    /// <summary>A pass also hears this much of what's settled before <see cref="Next"/>, so the model has the start of
+    /// the sentence to go on; the words it hears there again are dropped. 3 seconds of it took the live words on two
+    /// 12-minute stretches of recorded lectures from 53% and 51% of words different from large-v3 to 34% and 29%
+    /// (Whistle), and from 69% and 67% to 58% and 48% (Whisper tiny), for about 1.5 times the work.</summary>
+    public double Context { get; init; } = 3;
 
     readonly List<TimedWord> settled = [];
     List<TimedWord> tentative = [];
@@ -93,7 +98,7 @@ public sealed class CaptionStitcher
     /// <summary>Where a pass over the sound up to <paramref name="end"/> starts: <see cref="Next"/>, or, when that's
     /// further back than a pass takes (the computer fell behind), as far back as a pass takes. What's skipped isn't
     /// lost: the transcript's own model writes all of it down.</summary>
-    public double From(double end) => Math.Max(Next, end - MostSeconds);
+    public double From(double end) => Math.Max(Math.Max(0, Next - Context), end - MostSeconds);
 
     /// <summary>A pass over <paramref name="from"/> to <paramref name="end"/> (seconds in the lecture) heard
     /// <paramref name="words"/> (their times from the start of the pass).</summary>
@@ -107,8 +112,11 @@ public sealed class CaptionStitcher
             double start = from + Math.Max(0, w.Start), stop = from + Math.Max(w.Start, w.End);
             heard.Add(new TimedWord(start, Math.Min(stop, end), text, w.Probability));
         }
-        // The pass began where the last settled word ended: a word it hears again right there is that same word.
-        if (heard.Count > 0 && settled.Count > 0 && heard[0].Start < from + 0.3 && Same(heard[0].Text, settled[^1].Text))
+        // What it heard before Next is settled already (the context it was given).
+        double next = Next;
+        heard.RemoveAll(w => (w.Start + w.End) / 2 < next);
+        // The pass's new sound began where the last settled word ended: a word it hears again right there is that same word.
+        if (heard.Count > 0 && settled.Count > 0 && heard[0].Start < Math.Max(from, next) + 0.3 && Same(heard[0].Text, settled[^1].Text))
             heard.RemoveAt(0);
 
         double settleBefore = end - SettleAfter;
@@ -118,7 +126,7 @@ public sealed class CaptionStitcher
         {
             settled.AddRange(heard.Take(k));
             Next = k < heard.Count ? (heard[k - 1].End + heard[k].Start) / 2 : heard[k - 1].End;
-            Next = Math.Clamp(Next, from, end);
+            Next = Math.Clamp(Next, Math.Max(from, next), end);
         }
         else
         {
@@ -164,10 +172,11 @@ public sealed class CaptionStitcher
 /// without a core to themselves. Until a pass has shown this computer is fast enough its words aren't shown, and a pass
 /// hears 2 seconds at most; after that a pass hears no more than about <see cref="PassBudget"/> seconds of work. One
 /// pass slower than the sound itself, or two slow passes in a row (three once it has kept up), and the live words
-/// are off (<see cref="TooSlow"/>): nothing hears
-/// them again, and the recorder shows the transcript's own lines, as it did before there were live words. A CI Intel
-/// Mac took 25 s over 17 s of sound (1.5×) while Whisper wrote the transcript on the same processor; an M3 Pro takes
-/// under 0.04× even with every core busy.</para>
+/// are off for this lecture (<see cref="TooSlow"/>): nothing hears them again until the next lecture, which is judged
+/// afresh, and the recorder shows the transcript's own lines, as it did before there were live words. Whistle on a CI
+/// Intel Mac took 25 s over 17 s of sound (1.5×) while Whisper wrote the transcript on the same processor, which is
+/// why x64 computers hear the live words with a small Whisper instead; an M3 Pro takes under 0.04× even with every
+/// core busy.</para>
 /// </summary>
 public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentSound?> recent, Func<Lecture, (IWordHearer Hearer, string Language)?> hearer,
     Action<string>? log = null)
@@ -216,7 +225,8 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
     /// <summary>Seconds, for timing passes (a test's own clock).</summary>
     public Func<double> Clock { get; init; } = () => System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
 
-    /// <summary>This computer is too slow for the live words: no pass is heard again.</summary>
+    /// <summary>This computer is too slow for the live words in the lecture now recording: no pass is heard again
+    /// until the next lecture.</summary>
     public bool TooSlow { get; private set; }
 
     /// <summary>The live words turned off for being too slow: how long a pass took for each second it heard.</summary>
@@ -244,7 +254,6 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
     /// <summary>One pass, if there's new sound to hear: true when it heard (or skipped quiet) some.</summary>
     public bool Step()
     {
-        if (TooSlow) return false;
         var l = recording();
         if (l is null || l.AfterClass || l.State != LectureState.Recording)
         {
@@ -252,10 +261,10 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             return false;
         }
         if (l.Id != lectureId) Reset(l);
-        if (!Watched() || hearer(l) is not { } h) return false;
+        if (TooSlow || !Watched() || hearer(l) is not { } h) return false;
         var s = stitcher!;
-        // What the transcript has written down already isn't heard again.
-        var sound = recent(Math.Max(s.Next, l.TranscribedSeconds));
+        // What the transcript has written down already isn't heard again, bar a few seconds before it for context.
+        var sound = recent(Math.Max(0, Math.Max(s.Next, l.TranscribedSeconds) - s.Context));
         if (sound is null || sound.End - heardTo < LeastNew) return false;
         double from = Math.Max(s.From(sound.End), sound.Start);
         // A pass hears from where the last left off, no more than this computer gets through in a moment: the rest
@@ -296,7 +305,7 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
         if (!Timed(took, end - from))
         {
             log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
-                $"[live] Cactus Whistle took {ratio:0.00}× the sound it heard on this computer (at most {MostRatio}× keeps up): the live words are off here, and the recorder shows the transcript's own lines"));
+                $"[live] {l.Id}: the live words took {ratio:0.00}× the sound they heard (at most {MostRatio}× keeps up): they're off for this lecture, and the recorder shows the transcript's own lines"));
             FoundTooSlow?.Invoke(ratio ?? 0);
             Changed?.Invoke(l);
             return true;
@@ -347,6 +356,12 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             First = null;
             votes.Clear();
             found = "";
+            // Each lecture is judged afresh: a busy moment in one (the transcript's model loading, another app) doesn't
+            // switch the next one's live words off.
+            ratio = null;
+            fastEnough = false;
+            slowInARow = 0;
+            TooSlow = false;
         }
     }
 

@@ -39,6 +39,7 @@ using StudyStash.Audio;
 using StudyStash.Core;
 
 if (args.Length > 0 && args[0] == "compare") return Compare.Run(args[1..]);
+if (args.Length > 1 && args[0] == "livewords") return LiveSim.Run(args[1..]);
 if (args.Length > 1 && args[0] == "table") return Table.Run(args[1]);
 return await Bench.RunAsync(args);
 
@@ -310,6 +311,79 @@ static class Bench
         {
             Directory.Delete(work, recursive: true);
         }
+    }
+}
+
+/// <summary>
+/// The recorder's live words over a slice, as the app hears them: a pass every second of the lecture over the sound
+/// not yet settled, put together by the app's own <see cref="CaptionStitcher"/> (no waiting: one pass after another,
+/// so it measures what each pass costs, not the cadence).
+///   TranscribeBench livewords &lt;lecture.wav&gt; --engine whistle|whisper [--model live-whisper.bin] [--threads 2] [--cpu]
+///       [--from 600] [--length 720] [--out dir] [--label name]
+/// Writes &lt;label&gt;.txt (the live words as a transcript, to compare) and &lt;label&gt;.json: the passes, how long they
+/// took for each second they heard (median, 90th percentile, worst), CPU time and energy.
+/// </summary>
+static class LiveSim
+{
+    public static int Run(string[] args)
+    {
+        string wav = args[0];
+        var named = new Dictionary<string, string>();
+        for (int i = 1; i < args.Length; i++)
+            if (args[i] == "--cpu") named["cpu"] = "1";
+            else if (args[i].StartsWith("--", StringComparison.Ordinal) && i + 1 < args.Length) named[args[i][2..]] = args[++i];
+        string engine = named.GetValueOrDefault("engine", "whistle");
+        double from0 = double.Parse(named.GetValueOrDefault("from", "600"), CultureInfo.InvariantCulture);
+        double length = double.Parse(named.GetValueOrDefault("length", "720"), CultureInfo.InvariantCulture);
+        string out_ = named.GetValueOrDefault("out", "bench-results");
+        string label = named.GetValueOrDefault("label", $"live-{engine}");
+        Directory.CreateDirectory(out_);
+        var samples = Sound.ReadWav(wav, (long)(from0 * Sound.Rate), (long)(length * Sound.Rate));
+        length = samples.Length / (double)Sound.Rate;
+        IWordHearer hearer = engine == "whistle"
+            ? new WhistleTranscriber(WhisperModels.PathFor("", WhisperModels.Whistle))
+            : new LiveWhisperHearer(named.GetValueOrDefault("model", LiveWhisperHearer.BundledModel),
+                int.Parse(named.GetValueOrDefault("threads", "0"), CultureInfo.InvariantCulture), gpu: !named.ContainsKey("cpu"));
+        var s = new CaptionStitcher
+        {
+            Context = double.Parse(named.GetValueOrDefault("context", "0"), CultureInfo.InvariantCulture),
+            SettleAfter = double.Parse(named.GetValueOrDefault("settle", "2.5"), CultureInfo.InvariantCulture),
+        };
+        var passes = new List<(double Took, double Heard)>();
+        var before = Meter.Read();
+        for (double t = 1; t <= length + 1e-6; t += 1)
+        {
+            double from = Math.Max(s.From(t), 0), end = Math.Min(t, from + CaptionStitcher.MostSeconds);
+            var window = samples[(int)(from * Sound.Rate)..(int)Math.Min(samples.Length, end * Sound.Rate)];
+            if (new Chunk(0, window).Silent())
+            {
+                s.Quiet(end);
+                continue;
+            }
+            var took = Stopwatch.StartNew();
+            var heard = hearer.Hear(window, "en", "");
+            passes.Add((took.Elapsed.TotalSeconds, end - from));
+            s.Heard(from, end, heard.Words);
+        }
+        var after = Meter.Read();
+        (hearer as IDisposable)?.Dispose();
+        string transcript = TimedText.Format(WordLines.Lines(s.Words));
+        File.WriteAllText(Path.Combine(out_, label + ".txt"), transcript);
+        var ratios = passes.Where(p => p.Heard >= 1).Select(p => p.Took / p.Heard).Order().ToList();
+        double At(double q) => ratios.Count == 0 ? 0 : ratios[Math.Min(ratios.Count - 1, (int)(q * ratios.Count))];
+        var result = new JsonObject
+        {
+            ["label"] = label, ["engine"] = engine, ["model"] = named.GetValueOrDefault("model", ""), ["length_s"] = Math.Round(length, 1),
+            ["machine"] = $"{RuntimeInformation.OSDescription}, {RuntimeInformation.ProcessArchitecture}, {Environment.ProcessorCount} threads",
+            ["passes"] = passes.Count, ["mean_heard_s"] = Math.Round(passes.Average(p => p.Heard), 2),
+            ["ratio_median"] = Math.Round(At(0.5), 4), ["ratio_p90"] = Math.Round(At(0.9), 4), ["ratio_worst"] = Math.Round(At(1), 4),
+            ["longest_pass_s"] = Math.Round(passes.Max(p => p.Took), 3),
+            ["all"] = after.Since(before, Meter.LifetimeMaxFootprint()),
+            ["words"] = Compare.Words(transcript).Count,
+        };
+        File.WriteAllText(Path.Combine(out_, label + ".json"), result.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        Console.WriteLine(result.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+        return 0;
     }
 }
 

@@ -50,10 +50,6 @@ public sealed class AppSettings
     /// after class: it only records, and is written down once it stops, which saves battery during the lecture. A
     /// change applies from the next lecture.</summary>
     public bool LiveTranscript { get; set; } = true;
-    /// <summary>The live words were too slow on this computer (Cactus Whistle took too long over the sound it heard),
-    /// with this app and engine: the app, the engine and the processor it was, so a new version tries again. Empty
-    /// when they weren't.</summary>
-    public string LiveWordsTooSlow { get; set; } = "";
     /// <summary>Filed lectures' audio is deleted after this many days (the notes and transcript stay). 0 keeps it.</summary>
     public int KeepAudioDays { get; set; } = 30;
     /// <summary>"Download as Markdown…" includes the transcript too (Settings' words: "Include transcripts").</summary>
@@ -264,11 +260,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Recorder.Recover(Lectures, this.log);
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
         Captions = new LiveCaptioner(() => Recorder.Current, Recorder.Recent, LiveHearer, this.log) { Watched = () => liveWordsWatched };
+        // Too slow is judged for each lecture afresh (an app.json from a 0.11 build before it may still say
+        // "live_words_too_slow": nothing reads it, and the next save leaves it out).
         Captions.Changed += l => LiveWords?.Invoke(l);
-        // Too slow here: remembered, so the next lecture doesn't try again until the app or the engine changes.
-        Captions.FoundTooSlow += _ => Save(s => s.LiveWordsTooSlow = LiveWordsKey);
-        if (Settings.LiveWordsTooSlow == LiveWordsKey)
-            this.log("[live] the live words are off on this computer: Cactus Whistle was too slow here with this version; the recorder shows the transcript's own lines");
         Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log)
         {
             EngineName = () => engineName,
@@ -388,7 +382,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <summary>The transcription model: the one the environment names, else the one picked in setup or Settings, else
     /// the one for this computer (<see cref="Advice"/>).</summary>
-    public WhisperModel Model => models.Model ?? WhisperModels.Find(Settings.Model) ?? Advice.Model;
+    public WhisperModel Model => models.Model ?? (WhisperModels.Find(Settings.Model) is { } m && (!m.Bundled || WhistleTranscriber.Available) ? m : null) ?? Advice.Model;
 
     /// <summary>What this computer has. Asked once, on the thread pool, as the app starts; the first to want it before
     /// then waits the moment it takes.</summary>
@@ -543,7 +537,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     // --- the live words ----------------------------------------------------------------------------------------------
 
-    WhistleTranscriber? liveHearer;
+    IWordHearer? liveHearer;
     bool liveHearerFailed;
     volatile bool liveWordsWatched;
 
@@ -555,34 +549,51 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         if (watched) Captions.Wake();
     }
 
-    /// <summary>The recorder can show what's said a second or two after it's said: Cactus Whistle is in this copy of the
-    /// app, runs here, and reads the lecture's language. Otherwise it shows the transcript's own lines, which come about
-    /// half a minute after.</summary>
-    public bool LiveWordsOn => !liveHearerFailed && !Captions.TooSlow && Settings.LiveWordsTooSlow != LiveWordsKey
-        && WhistleTranscriber.Available && WhistleLanguages.Knows(Settings.Language);
+    /// <summary>What hears the live words on this computer: Cactus Whistle on ARM (Apple silicon, Windows on ARM), a
+    /// small Whisper on x64 (Intel Macs, most PCs); None where this copy of the app carries neither.</summary>
+    public LiveEngine LiveEngine { get; } = LiveEngines.Here;
 
-    /// <summary>What the live words' speed was judged with: this app, its engine and the processor.</summary>
-    static string LiveWordsKey => $"{Engine.Version} {WhistleTranscriber.EngineBuild}";
+    /// <summary>The recorder can show what's said a second or two after it's said: this computer's live words' engine is
+    /// in this copy of the app, runs here, and reads the lecture's language. Otherwise it shows the transcript's own
+    /// lines, which come about half a minute after. A lecture can still turn them off for being too slow
+    /// (<see cref="LiveWordsNow"/>).</summary>
+    public bool LiveWordsOn => !liveHearerFailed && LiveEngine != LiveEngine.None && LiveEngines.Reads(LiveEngine, Settings.Language);
+
+    /// <summary>The live words are on for the lecture now recording: on here, and it hasn't turned them off for being
+    /// too slow.</summary>
+    public bool LiveWordsNow => LiveWordsOn && !Captions.TooSlow;
 
     /// <summary>What hears the live words of <paramref name="l"/>, and in which language; null when they're off (see
     /// <see cref="LiveWordsOn"/>, or a lecture the transcript found to be in a language Whistle doesn't read).</summary>
     (IWordHearer, string)? LiveHearer(Lecture l)
     {
         if (!LiveWordsOn) return null;
-        string language = WhistleLanguages.Code(Settings.Language) ?? "";
-        if (language.Length == 0 && l.Language.Length > 0)
+        string language;
+        if (LiveEngine == LiveEngine.Whistle)
         {
-            if (WhistleLanguages.Code(l.Language) is not { } found) return null;
-            language = found;
+            language = WhistleLanguages.Code(Settings.Language) ?? "";
+            if (language.Length == 0 && l.Language.Length > 0)
+            {
+                if (WhistleLanguages.Code(l.Language) is not { } found) return null;
+                language = found;
+            }
+        }
+        else
+        {
+            // Whisper reads the lecture's language whatever it is: the one set, or the one the transcript found.
+            language = Settings.Language is "" or "auto" ? l.Language : Settings.Language;
         }
         try
         {
-            liveHearer ??= new WhistleTranscriber(WhistleTranscriber.BundledModel);
+            liveHearer ??= LiveEngine == LiveEngine.Whistle
+                ? new WhistleTranscriber(WhistleTranscriber.BundledModel)
+                : new LiveWhisperHearer(LiveWhisperHearer.BundledModel);
         }
-        catch (Exception e) when (e is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException or InvalidOperationException or IOException)
+        catch (Exception e) when (e is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException or InvalidOperationException
+                                     or IOException or global::Whisper.net.WhisperModelLoadException)
         {
             liveHearerFailed = true;
-            log($"[live] Cactus Whistle can't run here ({e.GetType().Name}: {e.Message}): the recorder shows the transcript's own lines");
+            log($"[live] the live words can't run here ({e.GetType().Name}: {e.Message}): the recorder shows the transcript's own lines");
             return null;
         }
         return (liveHearer, language);
