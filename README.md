@@ -93,7 +93,8 @@ One download for every computer, on the [latest release](https://github.com/Jose
 | [Study-Stash.dmg](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash.dmg) | [Study-Stash-Setup.exe](https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Setup.exe) |
 
 It's the same app either way; what a computer is for is chosen when you first open it, not when
-you download it.
+you download it. The Mac app needs macOS 15 (Sequoia) or later, on Apple silicon or Intel; the
+Windows one, Windows 10 or 11.
 
 - **Mac:** open the DMG and drag **Study Stash** into Applications. Study Stash isn't signed with a
   paid Apple Developer ID yet, so the first time macOS asks: click **Done**, then **System Settings
@@ -343,25 +344,30 @@ and Canvas work (read-only). Set it up in **Settings → Your library → AI too
 
 Installed copies update themselves: they check for a new release a few minutes after starting and
 every 6 hours, and install it when nothing is recording or being transcribed. To update right
-away, click **Update now** in Settings. On a Mac an update swaps in the new **Study Stash.app**; on
-Windows it runs the new Setup.exe quietly. Every download is checked against the release's
+away, click **Update now** in **Settings → Your library → Library** (on a laptop that updates your
+library; the laptop itself installs each new version on its own). On a Mac an update swaps in the
+new **Study Stash.app**; on Windows it runs the new Setup.exe quietly. Every download is checked against the release's
 `SHA256SUMS.txt` first.
 
 ## Uninstall
 
-**Mac:** quit Study Stash and drag it from Applications to the Trash. **Windows:** Settings → Apps →
-**Study Stash** → Uninstall. Your lectures and settings stay where they are; only the app goes.
+**Mac:** if you turned on **Open when you log in** (Settings → General), turn it off first, so no
+login item is left behind; then quit Study Stash and drag it from Applications to the Trash.
+**Windows:** Settings → Apps → **Study Stash** → Uninstall. Your lectures and settings stay where
+they are; only the app goes. To remove them too, delete the folders under
+[Where your data lives](#where-your-data-lives).
 
 [docs/claude-connector.md](docs/claude-connector.md) walks through adding Study Stash as a custom connector in Claude,
 what Claude can read, troubleshooting, and how each requirement of Claude's connectors is met and tested.
 
 ## Where your data lives
 
-Everything is under `~/.study-stash` (or `--home`, or the `STUDYSTASH_HOME` environment variable):
-your settings, the lecture database, and the notes themselves as plain Markdown files in a folder
-per class, which you can open, back up or sync however you like. On a Mac the Chrome extension's
-folder is the one exception: `~/Study Stash/Chrome extension`, because Chrome's Load unpacked window
-doesn't show folders whose names start with a dot.
+Your settings, the lecture database and the recordings are under `~/.study-stash` (or `--home`, or
+the `STUDYSTASH_HOME` environment variable). The notes themselves are plain Markdown files in a
+folder per class, by default in **Documents/Study Stash** on the library's computer (Settings → Your library →
+Library → Notes folder shows where), which you can open, back up or sync however you like. On a Mac
+the Chrome extension's folder is `~/Study Stash/Chrome extension`, because Chrome's Load unpacked
+window doesn't show folders whose names start with a dot.
 
 ## Build from source
 
