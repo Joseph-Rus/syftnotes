@@ -169,6 +169,7 @@ public static partial class Shell
         public static Task Search(string query) => SearchAsync(query);
         public static QuickModel QuickModel => quick;
         public static PanelModel PanelModel => panel;
+        public static RecorderModel RecorderModel => recorder;
         /// <summary>The notifications on screen, newest first, and the display they're on.</summary>
         public static ToastShelf Toasts => Shelf();
 
