@@ -59,6 +59,8 @@ why=""
 has_installers() {
   local names
   names=$(gh api "repos/$REPO/actions/runs/$1/artifacts" --paginate --jq '.artifacts[] | select(.expired == false) | .name' 2>/dev/null) || return 1
+  # Installers signed by a rehearsal's throwaway identities (signing-plan.sh) are never published, so never reused.
+  if printf '%s\n' "$names" | grep -qxE 'signing-(mac|windows)-rehearsal'; then return 1; fi
   printf '%s\n' "$names" | grep -qx mac-installers && printf '%s\n' "$names" | grep -qx windows-installers
 }
 
@@ -116,7 +118,7 @@ fi
 if [ "$EVENT_NAME" = workflow_dispatch ] && [ -n "$REUSE_RUN" ]; then
   [ "$(gh run view "$REUSE_RUN" -R "$REPO" --json conclusion --jq .conclusion 2> /dev/null)" = success ] || fail "run $REUSE_RUN didn't pass"
   tested_this_tree "$REUSE_RUN" || fail "run $REUSE_RUN tested other code than this"
-  has_installers "$REUSE_RUN" || fail "run $REUSE_RUN has no installers left to reuse"
+  has_installers "$REUSE_RUN" || fail "run $REUSE_RUN has no installers left to reuse (or they were signed by a rehearsal of signing, which are never published)"
   tested=true
   reuse=$REUSE_RUN
   why="rehearsing a release from run $REUSE_RUN"
