@@ -351,7 +351,9 @@ sealed class DiagramChrome
         {
             prev.IsVisible = next.IsVisible = playSteps.IsVisible = true;
             Glyph(playSteps, x.Playing ? "pause" : "play_arrow");
-            ToolTip.SetTip(playSteps, x.Playing ? "Pause (P)" : "Play the steps (P)");
+            string playing = x.Playing ? "Pause (P)" : "Play the steps (P)";
+            ToolTip.SetTip(playSteps, playing);
+            AutomationProperties.SetName(playSteps, playing); // a screen reader says what pressing it does now
             stripTitle.Text = $"Step {x.Step + 1} of {x.Steps.Count}";
             stripWords.Text = x.StepCaption;
         }

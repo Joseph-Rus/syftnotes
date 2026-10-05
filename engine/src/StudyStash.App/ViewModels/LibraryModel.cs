@@ -235,6 +235,15 @@ public sealed partial class LibraryModel : ObservableObject
         };
     }
 
+    /// <summary>The sidebar's counts as the library says them now, the list itself left as it is: what's selected stays
+    /// selected. A lecture filed while the window is open changes a class's count without anything else being reloaded.</summary>
+    public void ShowCounts(IEnumerable<(string Name, int Lectures)> classes, int unsorted)
+    {
+        foreach (var (name, lectures) in classes)
+            if (Classes.FirstOrDefault(c => c.Name == name && !c.IsDue && !c.IsHome) is { } item) item.Count = lectures;
+        Unsorted.Count = unsorted;
+    }
+
     partial void OnListChanged(LibraryList value)
     {
         OnPropertyChanged(nameof(ShowLectures));

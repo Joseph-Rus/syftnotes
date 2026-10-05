@@ -56,7 +56,7 @@
                       HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowMeter}" />
           <c:Icon Glyph="pause" Filled="True" Size="12" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center"
                   IsVisible="{Binding ShowPausedMark}" />
-          <Button Classes="stop control" Command="{Binding StopCommand}" ToolTip.Tip="Stop" IsVisible="{Binding Hovered}">
+          <Button AutomationProperties.Name="Stop" Classes="stop control" Command="{Binding StopCommand}" ToolTip.Tip="Stop" IsVisible="{Binding Hovered}">
             <c:Icon Glyph="stop" Filled="True" Size="12" Foreground="{DynamicResource Fg}" />
           </Button>
         </Panel>
@@ -73,13 +73,13 @@
           <TextBlock Grid.Column="2" Text="{Binding DisplayClass}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
           <TextBlock Grid.Column="4" Classes="num" Text="{Binding Elapsed}" FontSize="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
           <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4">
-            <Button Classes="square" Command="{Binding ToggleCommand}" ToolTip.Tip="Make it small">
+            <Button AutomationProperties.Name="Make it small" Classes="square" Command="{Binding ToggleCommand}" ToolTip.Tip="Make it small">
               <c:Icon Glyph="close_fullscreen" Size="16" Foreground="{DynamicResource Fg2}" />
             </Button>
-            <Button Classes="square control" Command="{Binding PauseCommand}" ToolTip.Tip="{Binding PauseTip}">
+            <Button AutomationProperties.Name="{Binding PauseTip}" Classes="square control" Command="{Binding PauseCommand}" ToolTip.Tip="{Binding PauseTip}">
               <c:Icon Glyph="{Binding PauseGlyph}" Filled="True" Size="16" Foreground="{DynamicResource Fg}" />
             </Button>
-            <Button Classes="square" Background="{DynamicResource Accent}" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
+            <Button AutomationProperties.Name="Stop" Classes="square" Background="{DynamicResource Accent}" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
               <c:Icon Glyph="stop" Filled="True" Size="16" Foreground="{DynamicResource OnAccent}" />
             </Button>
           </StackPanel>

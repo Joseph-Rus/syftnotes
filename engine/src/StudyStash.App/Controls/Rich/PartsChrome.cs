@@ -328,7 +328,9 @@ sealed class PartsChrome
         {
             prev.IsVisible = next.IsVisible = playTour.IsVisible = true;
             Glyph(playTour, x.Playing ? "pause" : "play_arrow");
-            ToolTip.SetTip(playTour, x.Playing ? "Pause (P)" : "Play the tour (P)");
+            string playing = x.Playing ? "Pause (P)" : "Play the tour (P)";
+            ToolTip.SetTip(playTour, playing);
+            AutomationProperties.SetName(playTour, playing); // a screen reader says what pressing it does now
             stripTitle.Text = $"{x.Step + 1} of {x.Parts.Count}: {x.Name(stepId)}";
             stripWords.Text = x.Part(stepId)?.Note ?? "";
         }

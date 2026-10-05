@@ -392,15 +392,51 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         return Provider(engine).Name + (model.Length > 0 ? " " + model : "");
     }
 
+    /// <summary>
+    /// The engine that sorts instead of Ollama, or null when sorting stays as it is. Sorting follows the library's main
+    /// AI, which is Ollama unless it's changed; a student who picked Claude Code (or Codex, or Gemini) to write the notes
+    /// and has no Ollama model to sort with would otherwise see every lecture filed Unsorted. So while Ollama isn't
+    /// answering with the sorting model, a sort that follows the main AI goes to the notes engine, when that one looks
+    /// usable. A sorting engine the student picked in Settings, and a library whose Ollama works, are never changed.
+    /// </summary>
+    public static async Task<string?> SortFollowsNotesAsync(AiSettings settings, Config cfg, EngineChecks checks)
+    {
+        if (!settings.Local("sort") || (settings.ByJob.TryGetValue("sort", out var own) && own.Provider.Length > 0)) return null;
+        string notes = settings.For("notes").Provider;
+        if (notes == "ollama" || Engines.KnownUnusableWhy(notes, settings, checks) is not null) return null;
+        bool ollamaSorts = await checks.OllamaModels(cfg.OllamaHost) is { } models
+            && Ollama.HasModel(models.Select(m => m.Name).ToList(), cfg.OllamaModel);
+        return ollamaSorts ? null : notes;
+    }
+
     /// <summary>Sorting into classes.</summary>
-    public Task<string> SortAsync(Config cfg, string prompt, JsonObject schema) => Settings.Local("sort")
-        ? Classify.OllamaChatAsync(cfg, prompt, schema)
-        : JsonAnswerAsync("sort", prompt, schema);
+    public async Task<string> SortAsync(Config cfg, string prompt, JsonObject schema)
+    {
+        var settings = Settings;
+        if (await SortFollowsNotesAsync(settings, cfg, Checks) is { } follows)
+        {
+            string text = await AnswerWithAsync(follows, settings.For("notes").Model, prompt
+                + "\n\nAnswer with only a JSON object that fits this JSON schema, and nothing else:\n" + schema.ToJsonString(), CancellationToken.None);
+            return FirstObject(text) ?? throw new InvalidDataException("the answer wasn't JSON");
+        }
+        if (settings.Local("sort") && Providers is null) return await Classify.OllamaChatAsync(cfg, prompt, schema);
+        return await JsonAnswerAsync("sort", prompt, schema); // another engine's pick, or a test's fake Ollama
+    }
 
     /// <summary>Asking your notes.</summary>
     public LibraryReader.AskChatFn Ask(Func<Config> cfg) => (prompt, schema) => Settings.Local("ask")
         ? LibraryReader.OllamaAskAsync(cfg(), prompt, schema)
         : JsonAnswerAsync("ask", prompt, schema);
+
+    /// <summary>Whether the notes are being written in Claude Code's fast mode right now (it has to be what writes them, on
+    /// Opus, with the speed set to fast), for the log to say so.</summary>
+    public bool NotesInFastMode()
+    {
+        var settings = Settings;
+        if (NotesOnOllama(settings)) return false;
+        var c = settings.For("notes");
+        return AiSpeed.ForNotes(c.Provider, c.Model, settings.Speed).Fast;
+    }
 
     /// <summary>The name of what does a job, for the log ("Claude sonnet", "qwen3:8b").</summary>
     public string Describe(string job, Config cfg)

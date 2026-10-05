@@ -60,7 +60,7 @@
           <DataTemplate x:DataType="vm:CoursePick">
             <StackPanel>
               <Grid Classes="pk-row" ColumnDefinitions="20,12,*,Auto">
-                <CheckBox Classes="pk-tick" IsChecked="{Binding Ticked}" />
+                <CheckBox AutomationProperties.Name="{Binding Title}" Classes="pk-tick" IsChecked="{Binding Ticked}" />
                 <StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="1" MinWidth="0">
                   <TextBlock Classes="pk-title" Text="{Binding Title}" />
                   <TextBlock Classes="pk-detail" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" />

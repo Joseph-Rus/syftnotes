@@ -540,7 +540,7 @@
       <Setter Property="MinWidth" Value="180" />
     </ControlTheme>
     <DataTemplate x:Key="NavRow" x:DataType="s:NavItem">
-      <Button Classes="nav" Classes.on="{Binding On}" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).GoCommand}" CommandParameter="{Binding Id}">
+      <Button AutomationProperties.Name="{Binding Label}" Classes="nav" Classes.on="{Binding On}" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).GoCommand}" CommandParameter="{Binding Id}">
         <Panel>
           <Border Classes="indicator" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" Margin="-12,0,0,0" />
           <StackPanel Orientation="Horizontal" Spacing="10">
@@ -597,7 +597,7 @@
                         <TextBlock Classes="row-title" Text="Open when you log in" />
                         <TextBlock Classes="row-sub" Text="To the menu bar or tray" />
                       </StackPanel>
-                      <ToggleButton Grid.Column="1" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
+                      <ToggleButton AutomationProperties.Name="Open when you log in" Grid.Column="1" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
                     </Grid>
                   </Border>
                 </Border>
@@ -627,7 +627,7 @@
                             <TextBlock Classes="row-title" Text="Update automatically" />
                             <TextBlock Classes="row-sub" Text="{Binding AutoUpdateHereSub}" TextWrapping="Wrap" />
                           </StackPanel>
-                          <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding AutoUpdateHere}" Margin="12,0,0,0" />
+                          <ToggleButton AutomationProperties.Name="Update automatically" Grid.Column="1" Classes="switch act" IsChecked="{Binding AutoUpdateHere}" Margin="12,0,0,0" />
                         </Grid>
                       </Border>
                     </StackPanel>
@@ -760,7 +760,7 @@
                     <ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="5" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="app:ThemeSwatch">
-                        <Button Classes="quiet swatch" Theme="{StaticResource Surface}" Padding="0" Margin="0,0,0,10"
+                        <Button AutomationProperties.Name="{Binding Name}" Classes="quiet swatch" Theme="{StaticResource Surface}" Padding="0" Margin="0,0,0,10"
                                 Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).PickThemeCommand}" CommandParameter="{Binding Name}">
                           <StackPanel Spacing="6" HorizontalAlignment="Center">
                             <Panel IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).ShowMacSwatch}" Width="52" Height="52" HorizontalAlignment="Center">
@@ -906,7 +906,7 @@
                 <ItemsControl ItemsSource="{Binding Models}" MaxWidth="480" HorizontalAlignment="Left" ClipToBounds="False">
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="s:ModelChoice">
-                      <Button Classes="quiet card" Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
+                      <Button AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding About}" Classes="quiet card" Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
                               Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).PickModelCommand}" CommandParameter="{Binding}">
                         <Panel>
                           <Border Classes="focusring cardring" Margin="-4" />
@@ -948,7 +948,7 @@
                 <!-- When a lecture is written down: one choice, the model's cards' look. -->
                 <TextBlock Classes="section" Text="When it's written down" />
                 <StackPanel Width="480" HorizontalAlignment="Left" ClipToBounds="False">
-                  <Button Name="WrittenAsYouRecord" Classes="quiet card" Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
+                  <Button AutomationProperties.Name="As you record" AutomationProperties.HelpText="The recorder shows the transcript as the lecture goes, and you can ask about what's been said so far." Name="WrittenAsYouRecord" Classes="quiet card" Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
                           Command="{Binding PickLiveTranscriptCommand}" CommandParameter="live">
                     <Panel>
                       <Border Classes="focusring cardring" Margin="-4" />
@@ -961,7 +961,7 @@
                       </Border>
                     </Panel>
                   </Button>
-                  <Button Name="WrittenAfterClass" Classes="quiet card" Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
+                  <Button AutomationProperties.Name="After class" AutomationProperties.HelpText="Only records during the lecture, which saves battery. It's written down once you stop, so the transcript, and asking about it, come then." Name="WrittenAfterClass" Classes="quiet card" Theme="{StaticResource Surface}" Margin="0,0,0,8" Padding="0"
                           Command="{Binding PickLiveTranscriptCommand}" CommandParameter="after">
                     <Panel>
                       <Border Classes="focusring cardring" Margin="-4" />
@@ -1118,7 +1118,7 @@
                               <TextBlock Classes="row-title" Text="{Binding Lib.StartAtLoginTitle}" />
                               <TextBlock Classes="row-sub" Text="{Binding Lib.StartAtLoginSub}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.StartAtLoginOn}" IsEnabled="{Binding Lib.CanStartAtLogin}" Margin="12,0,0,0" />
+                            <ToggleButton AutomationProperties.Name="{Binding Lib.StartAtLoginTitle}" Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.StartAtLoginOn}" IsEnabled="{Binding Lib.CanStartAtLogin}" Margin="12,0,0,0" />
                           </Grid>
                         </Border>
                         <Border Classes="rowsep" />
@@ -1168,7 +1168,7 @@
                               <TextBlock Classes="row-title" Text="Update automatically" />
                               <TextBlock Classes="row-sub" Text="{Binding Lib.AutoUpdateSub}" TextWrapping="Wrap" />
                             </StackPanel>
-                            <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.AutoUpdate}" />
+                            <ToggleButton AutomationProperties.Name="Update automatically" Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.AutoUpdate}" />
                           </Grid>
                         </Border>
                       </StackPanel>
@@ -1257,7 +1257,7 @@
                               <TextBlock Classes="row-title" Text="Write study notes from each lecture" />
                               <TextBlock Classes="row-sub" Text="{Binding Lib.WriteNotesSub}" />
                             </StackPanel>
-                            <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.WriteNotes}" />
+                            <ToggleButton AutomationProperties.Name="Write study notes from each lecture" Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.WriteNotes}" />
                           </Grid>
                         </Border>
                         <Border Classes="rowsep" />
@@ -1267,7 +1267,7 @@
                               <TextBlock Classes="row-title" Text="Sort lectures into classes with AI" />
                               <TextBlock Classes="row-sub" Text="Otherwise only the class it was recorded for, or its title, sorts it" />
                             </StackPanel>
-                            <ToggleButton Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.SortWithAi}" />
+                            <ToggleButton AutomationProperties.Name="Sort lectures into classes with AI" Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.SortWithAi}" />
                           </Grid>
                         </Border>
                         <Border Classes="rowsep" IsVisible="{Binding Lib.SortWithAi}" />
@@ -1411,9 +1411,9 @@
                                     <TextBlock Classes="row-sub" Text="{Binding Path}" TextTrimming="PrefixCharacterEllipsis" />
                                   </StackPanel>
                                   <TextBlock Grid.Column="4" Classes="row-sub" Text="AI reads" VerticalAlignment="Center" />
-                                  <ToggleButton Grid.Column="6" Classes="switch" IsChecked="{Binding Ai}" VerticalAlignment="Center" />
+                                  <ToggleButton AutomationProperties.Name="{Binding Name, StringFormat='AI reads {0}'}" Grid.Column="6" Classes="switch" IsChecked="{Binding Ai}" VerticalAlignment="Center" />
                                   <TextBlock Grid.Column="8" Classes="row-sub" Text="Private" VerticalAlignment="Center" />
-                                  <ToggleButton Grid.Column="10" Classes="switch" IsChecked="{Binding Private}" VerticalAlignment="Center" />
+                                  <ToggleButton AutomationProperties.Name="{Binding Name, StringFormat='{}{0} is private'}" Grid.Column="10" Classes="switch" IsChecked="{Binding Private}" VerticalAlignment="Center" />
                                   <Button Grid.Column="12" Theme="{StaticResource Surface}" Width="30" Height="30" CornerRadius="{DynamicResource RadiusControl}" HorizontalContentAlignment="Center" VerticalAlignment="Center"
                                           Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).Lib.RemoveFolderCommand}" CommandParameter="{Binding}" ToolTip.Tip="Stop reading this folder">
                                     <c:Icon Glyph="close" Size="15" Foreground="{DynamicResource Fg3}" />

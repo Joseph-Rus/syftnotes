@@ -16,8 +16,8 @@ public sealed partial class ModelChoice : ObservableObject
 {
     public required WhisperModel Model { get; init; }
     public string Name => Model.Name;
-    /// <summary>"574 MB", "3 GB": as setup says it.</summary>
-    public string Size => Setup.About(Model.Bytes);
+    /// <summary>"574 MB", "3 GB": as setup says it; Cactus Whistle isn't a download, so it says it comes with the app.</summary>
+    public string Size => Model.Bundled ? "Comes with the app" : Setup.About(Model.Bytes);
     public string About => $"{Model.Size}. {Model.About}";
     /// <summary>The model that keeps up with a lecture on this computer.</summary>
     public bool Recommended { get; init; }

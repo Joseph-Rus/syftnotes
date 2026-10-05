@@ -32,7 +32,7 @@
                 <TextBlock Classes="ai-row-title" Text="Writes your notes" />
                 <TextBlock Classes="ai-row-sub" Text="After each lecture, on your library" />
               </StackPanel>
-              <Button Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
+              <Button AutomationProperties.Name="Writes your notes" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
                 <Border Classes="ai-select">
                   <Grid ColumnDefinitions="*,6,Auto">
                     <TextBlock Text="{Binding SelectedNotesName}" TextTrimming="CharacterEllipsis" />
@@ -50,7 +50,7 @@
                 <TextBlock Classes="ai-row-title" Text="Answers your questions" />
                 <TextBlock Classes="ai-row-sub" Text="Ask bar, recorder chat and quick panel" />
               </StackPanel>
-              <Button Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
+              <Button AutomationProperties.Name="Answers your questions" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
                 <Border Classes="ai-select">
                   <Grid ColumnDefinitions="*,6,Auto">
                     <TextBlock Text="{Binding SelectedAskName}" TextTrimming="CharacterEllipsis" />
@@ -76,7 +76,7 @@
                 <TextBlock Classes="ai-row-title" Text="Rich notes" />
                 <TextBlock Classes="ai-row-sub" Text="{Binding RichAbout}" TextWrapping="Wrap" />
               </StackPanel>
-              <ToggleButton Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichOn}" VerticalAlignment="Center" />
+              <ToggleButton AutomationProperties.Name="Rich notes" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichOn}" VerticalAlignment="Center" />
             </Grid>
             <StackPanel IsVisible="{Binding ShowKinds}">
               <Border Classes="ai-sep" />
@@ -85,7 +85,7 @@
                   <TextBlock Classes="ai-row-title" Text="Diagrams" />
                   <TextBlock Classes="ai-row-sub" Text="Flowcharts, state and sequence diagrams, timelines and mind maps" TextWrapping="Wrap" />
                 </StackPanel>
-                <ToggleButton Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDiagrams}" VerticalAlignment="Center" />
+                <ToggleButton AutomationProperties.Name="Diagrams" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDiagrams}" VerticalAlignment="Center" />
               </Grid>
               <Border Classes="ai-sep" />
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
@@ -93,7 +93,7 @@
                   <TextBlock Classes="ai-row-title" Text="Formula plots" />
                   <TextBlock Classes="ai-row-sub" Text="A curve or distribution drawn from the lecturer's formula, with sliders" TextWrapping="Wrap" />
                 </StackPanel>
-                <ToggleButton Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichPlots}" VerticalAlignment="Center" />
+                <ToggleButton AutomationProperties.Name="Formula plots" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichPlots}" VerticalAlignment="Center" />
               </Grid>
               <Border Classes="ai-sep" />
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
@@ -101,7 +101,7 @@
                   <TextBlock Classes="ai-row-title" Text="Drawings" />
                   <TextBlock Classes="ai-row-sub" Text="Labelled figures of what a lecture describes (not on Ollama)" TextWrapping="Wrap" />
                 </StackPanel>
-                <ToggleButton Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDrawings}" VerticalAlignment="Center" />
+                <ToggleButton AutomationProperties.Name="Drawings" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDrawings}" VerticalAlignment="Center" />
               </Grid>
             </StackPanel>
             <StackPanel IsVisible="{Binding ShowDrawnBy}">
@@ -111,7 +111,7 @@
                   <TextBlock Classes="ai-row-title" Text="Drawn by" />
                   <TextBlock Classes="ai-row-sub" Text="{Binding DiagramsAbout}" TextWrapping="Wrap" />
                 </StackPanel>
-                <Button Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
+                <Button AutomationProperties.Name="Drawn by" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
                   <Border Classes="ai-select">
                     <Grid ColumnDefinitions="*,6,Auto">
                       <TextBlock Text="{Binding SelectedDiagramsName}" TextTrimming="CharacterEllipsis" />
@@ -137,7 +137,7 @@
               <TextBlock Classes="ai-row-title" Text="Notes and diagrams" />
               <TextBlock Classes="ai-row-sub" Text="{Binding SpeedAbout}" TextWrapping="Wrap" />
             </StackPanel>
-            <Button Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
+            <Button AutomationProperties.Name="Notes and diagrams" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
               <Border Classes="ai-select">
                 <Grid ColumnDefinitions="*,6,Auto">
                   <TextBlock Text="{Binding SelectedSpeedName}" TextTrimming="CharacterEllipsis" />
@@ -225,7 +225,7 @@
               <TextBlock Classes="ai-row-title" Text="Use Ollama instead" />
               <TextBlock Classes="ai-row-sub" Text="So notes and answers never stall" />
             </StackPanel>
-            <ToggleButton Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" VerticalAlignment="Center" />
+            <ToggleButton AutomationProperties.Name="Use Ollama instead" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" VerticalAlignment="Center" />
           </Grid>
         </Border>
       </StackPanel>

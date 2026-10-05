@@ -60,6 +60,30 @@ public class PipelineTests
     }
 
     [Fact]
+    public async Task The_log_says_when_the_notes_were_written_in_fast_mode()
+    {
+        using var dir = new TempDir();
+        var cfg = CfgFor(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var log = new List<string>();
+        bool fast = true;
+        var p = new Pipeline(cfg, store, Sort, (_, _) => Task.FromResult("## Summary\nRecursion."), log.Add,
+            notesModel: () => "Claude opus", notesFast: () => fast);
+        store.Enqueue(new Meeting("l1") { Title = "First", Transcript = Lines(40) });
+        store.Enqueue(new Meeting("l2") { Title = "Second", Transcript = Lines(40) });
+        await p.RunPendingAsync();
+        fast = false;
+        store.Enqueue(new Meeting("l3") { Title = "Third", Transcript = Lines(40) });
+        await p.RunPendingAsync();
+
+        var said = log.Where(l => l.Contains("summarized", StringComparison.Ordinal)).ToList();
+        Assert.Equal(3, said.Count);
+        Assert.Contains("with Claude opus in fast mode in ", said[0]);
+        Assert.DoesNotContain("fast mode", said[2]);
+        Assert.Contains("with Claude opus in ", said[2]);
+    }
+
+    [Fact]
     public async Task No_answer_in_time_waits_too_and_the_engine_is_named()
     {
         using var dir = new TempDir();
