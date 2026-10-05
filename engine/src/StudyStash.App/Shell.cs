@@ -481,10 +481,9 @@ public static partial class Shell
                 _ = ShowDueAsync();
                 return;
             }
-            // A class opens on its lectures (with Canvas's switcher over them when it's linked); its home is a click away
-            // in the list's header.
+            // A class opens on its home; Unsorted, which has none, on its lectures.
             allLectures = false;
-            _ = ShowClassAsync(c.Name);
+            _ = c.IsUnsorted ? ShowClassAsync(c.Name) : ShowClassHomeAsync(c.Name);
         };
         library.OnMoveToFolder = MoveToFolderAsync;
         library.OnLecture = l =>

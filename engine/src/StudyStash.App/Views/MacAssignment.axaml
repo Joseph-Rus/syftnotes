@@ -28,7 +28,7 @@
   </UserControl.Styles>
   <Panel ClipToBounds="True">
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-      <StackPanel Classes="page" MaxWidth="600" Spacing="12" HorizontalAlignment="Left">
+      <StackPanel Classes="page" MaxWidth="600" Spacing="12" HorizontalAlignment="Center">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
           <TextBlock Classes="cv-meta" Text="{Binding Meta}" />

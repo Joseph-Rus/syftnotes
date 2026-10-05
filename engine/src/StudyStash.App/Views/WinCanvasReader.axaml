@@ -10,7 +10,7 @@
     <StyleInclude Source="avares://StudyStash/Views/WinCanvasStyles.axaml" />
   </UserControl.Styles>
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel MaxWidth="620" Margin="48,40,48,40" Spacing="10" HorizontalAlignment="Left">
+    <StackPanel MaxWidth="620" Margin="48,40,48,40" Spacing="10" HorizontalAlignment="Center">
       <TextBlock Classes="cv-meta" Text="{Binding Meta}" />
       <TextBlock Classes="cv-detail-title" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
       <c:NoteView Markdown="{Binding Body}" />

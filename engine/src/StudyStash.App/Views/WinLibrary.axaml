@@ -442,7 +442,7 @@
             <Grid RowDefinitions="*,Auto">
               <Panel>
               <ScrollViewer Name="NoteScroll" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasNote}">
-                <StackPanel MaxWidth="640" HorizontalAlignment="Left" Margin="56,8,56,140" Spacing="12" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
+                <StackPanel MaxWidth="700" HorizontalAlignment="Center" Margin="56,8,56,140" Spacing="12" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
                     <TextBlock Text="{Binding Meta}" FontSize="12" Foreground="{DynamicResource Fg2}" />
