@@ -127,7 +127,7 @@ public class ClaudeTests
         Assert.Equal("Sam's library", lib["name"]!.GetValue<string>());
         // This computer's own app asking isn't a laptop.
         Assert.Equal("[]", lib["laptops"]!.ToJsonString());
-        Assert.Equal("[{\"name\":\"CS 101\",\"lectures\":1,\"color\":0,\"description\":\"\",\"code\":\"\",\"aliases\":[\"cs101\"]},{\"name\":\"BIO 110\",\"lectures\":1,\"color\":1,\"description\":\"\",\"code\":\"\",\"aliases\":[]}]",
+        Assert.Equal("[{\"name\":\"CS 101\",\"lectures\":1,\"color\":0,\"description\":\"\",\"group\":\"\",\"folders\":[],\"code\":\"\",\"aliases\":[\"cs101\"]},{\"name\":\"BIO 110\",\"lectures\":1,\"color\":1,\"description\":\"\",\"group\":\"\",\"folders\":[],\"code\":\"\",\"aliases\":[]}]",
             lib["classes"]!.ToJsonString());
         Assert.Equal("[]", lib["gone"]!.ToJsonString()); // nothing deleted for good
 
