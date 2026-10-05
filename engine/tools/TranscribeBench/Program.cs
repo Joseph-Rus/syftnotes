@@ -9,7 +9,7 @@
 //   dotnet build -c Release engine/tools/TranscribeBench
 //   dotnet engine/tools/TranscribeBench/bin/Release/net10.0/TranscribeBench.dll <lecture.wav> \
 //       --model large-v3-turbo-q5|large-v3|parakeet-v3|small|… --mode live|after|whole \
-//       [--from 600] [--length 720] [--speed 1] [--models ~/.study-stash/models] [--out bench-results] [--cpu]
+//       [--from 600] [--length 720] [--speed 1] [--models ~/.study-stash/models] [--out bench-results] [--cpu] [--live-words]
 //   dotnet …/TranscribeBench.dll compare <reference.txt> <other.txt>…   (words different, as a share of the reference's)
 //
 // For each phase (while it records; after it stops, until all of it is written down) it writes, in <out>/<label>.json:
@@ -23,6 +23,10 @@
 // --mode whole sends the whole slice to the model in one go instead (no worker, no recorder): an experiment for after
 // class, where nothing has to keep up. --cpu keeps Whisper off the GPU, as on a computer without one (a Mac's
 // processor is quicker than most such PCs', so read it as the best such a PC would do).
+// --live-words (live mode) also runs the recorder's live words (Cactus Whistle hearing the newest sound every second,
+// as the app does), so the CPU and energy while it records include them; first_words_s is when the recorder first had
+// words to show (seconds after recording started) and first_words_late_s how long after they were said, for the
+// transcript's own pieces and, with --live-words, for the live words.
 // What isn't measured: the GPU's energy (only its time), the display, and the microphone itself (a file stands in).
 
 using System.Diagnostics;
@@ -56,7 +60,7 @@ static class Table
     }
 }
 
-sealed record Options(string Wav, string Model, string Mode, double From, double Length, int Speed, string Models, string Out, string Label, bool Cpu)
+sealed record Options(string Wav, string Model, string Mode, double From, double Length, int Speed, string Models, string Out, string Label, bool Cpu, bool LiveWords)
 {
     public static Options Parse(string[] args)
     {
@@ -64,7 +68,7 @@ sealed record Options(string Wav, string Model, string Mode, double From, double
         var named = new Dictionary<string, string>();
         for (int i = 0; i < args.Length; i++)
         {
-            if (args[i] == "--cpu") named["cpu"] = "1";
+            if (args[i] is "--cpu" or "--live-words") named[args[i][2..]] = "1";
             else if (args[i].StartsWith("--", StringComparison.Ordinal) && i + 1 < args.Length) named[args[i][2..]] = args[++i];
             else wav = args[i];
         }
@@ -78,7 +82,8 @@ sealed record Options(string Wav, string Model, string Mode, double From, double
             int.Parse(named.GetValueOrDefault("speed", "1"), CultureInfo.InvariantCulture),
             named.GetValueOrDefault("models", Path.Combine(home, ".study-stash", "models")),
             named.GetValueOrDefault("out", "bench-results"),
-            named.GetValueOrDefault("label", $"{model}-{mode}{(named.ContainsKey("cpu") ? "-cpu" : "")}"), named.ContainsKey("cpu"));
+            named.GetValueOrDefault("label", $"{model}-{mode}{(named.ContainsKey("cpu") ? "-cpu" : "")}{(named.ContainsKey("live-words") ? "-livewords" : "")}"),
+            named.ContainsKey("cpu"), named.ContainsKey("live-words"));
     }
 }
 
@@ -187,7 +192,7 @@ static class Bench
         var o = Options.Parse(args);
         Directory.CreateDirectory(o.Out);
         var model = WhisperModels.Find(o.Model) ?? throw new ArgumentException($"No model called {o.Model}");
-        string modelPath = Path.Combine(o.Models, model.File);
+        string modelPath = model.Bundled ? WhisperModels.PathFor("", model) : Path.Combine(o.Models, model.File);
         string work = Directory.CreateTempSubdirectory("transcribe-bench-").FullName;
         using var logFile = new StreamWriter(Path.Combine(o.Out, o.Label + ".log")) { AutoFlush = true };
         var started = Stopwatch.StartNew();
@@ -200,8 +205,13 @@ static class Bench
         string backend = "";
         ITranscriber Load()
         {
-            ITranscriber t = model.Engine == SpeechEngine.Parakeet ? new ParakeetTranscriber(modelPath) : new WhisperTranscriber(modelPath, gpu: !o.Cpu);
-            backend = t is ParakeetTranscriber p ? p.Backend : ((WhisperTranscriber)t).Backend;
+            ITranscriber t = model.Engine switch
+            {
+                SpeechEngine.Parakeet => new ParakeetTranscriber(modelPath),
+                SpeechEngine.Whistle => new WhistleTranscriber(modelPath),
+                _ => new WhisperTranscriber(modelPath, gpu: !o.Cpu),
+            };
+            backend = t switch { ParakeetTranscriber p => p.Backend, WhistleTranscriber w => w.Backend, _ => ((WhisperTranscriber)t).Backend };
             Log($"[bench] {model.Name} loaded: {backend}");
             return t;
         }
@@ -236,10 +246,29 @@ static class Bench
                 var worker = new TranscriptionWorker(store, Load, () => recorder.Current, Log);
                 using var stop = new CancellationTokenSource();
                 var running = Task.Run(() => worker.RunAsync(stop.Token));
+                // When the recorder first had words to show, and how long after they were said.
+                var clock = Stopwatch.StartNew();
+                (double At, double Late)? firstPiece = null, firstLive = null;
+                worker.Heard += (_, lines) => firstPiece ??= (clock.Elapsed.TotalSeconds, clock.Elapsed.TotalSeconds * o.Speed - lines[0].Start);
+                LiveCaptioner? captions = null;
+                Thread? live = null;
+                if (o.LiveWords)
+                {
+                    var hearer = new WhistleTranscriber(WhisperModels.PathFor("", WhisperModels.Whistle));
+                    captions = new LiveCaptioner(() => recorder.Current, recorder.Recent, _ => (hearer, "en"), Log) { Every = TimeSpan.FromSeconds(1.0 / o.Speed) };
+                    captions.Changed += l =>
+                    {
+                        if (firstLive is null && captions.Words(l.Id) is { Count: > 0 } w)
+                            firstLive = (clock.Elapsed.TotalSeconds, clock.Elapsed.TotalSeconds * o.Speed - w[0].Start);
+                    };
+                    live = new Thread(() => captions.Run(stop.Token)) { IsBackground = true, Priority = ThreadPriority.BelowNormal, Name = "live words" };
+                }
 
                 var start = Meter.Read();
                 long peak = 0;
+                clock.Restart();
                 var lecture = recorder.Start("Bench", afterClass: o.Mode == "after");
+                live?.Start();
                 worker.Wake();
                 while (recorder.Elapsed < length - 0.05)
                 {
@@ -248,6 +277,10 @@ static class Bench
                 }
                 var stopped = Meter.Read();
                 result["recording_phase"] = stopped.Since(start, Math.Max(peak, stopped.Footprint));
+                result["first_words_s"] = firstPiece is { } fp ? Math.Round(fp.At, 1) : null;
+                result["first_words_late_s"] = firstPiece is { } fp2 ? Math.Round(fp2.Late, 1) : null;
+                result["first_live_words_s"] = firstLive is { } fl ? Math.Round(fl.At, 1) : null;
+                result["first_live_words_late_s"] = firstLive is { } fl2 ? Math.Round(fl2.Late, 1) : null;
                 var l = recorder.Stop() ?? throw new InvalidOperationException("The recording wasn't kept.");
                 worker.Wake();
                 peak = 0;

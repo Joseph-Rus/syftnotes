@@ -660,11 +660,12 @@
                       </Grid>
                     </Border>
                     <Border Classes="rowsep" />
-                    <!-- The credit NVIDIA's licence (CC BY 4.0) asks for, beside OpenAI's. -->
+                    <!-- The credit NVIDIA's licence (CC BY 4.0) asks for, beside OpenAI's; Cactus Whistle and its engine are
+                         carried in the app under Apache-2.0, whose text is beside it (needle/LICENSE.txt). -->
                     <Border Classes="row">
                       <StackPanel Spacing="2" VerticalAlignment="Center">
                         <TextBlock Classes="row-title" Text="Speech models" />
-                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT); NVIDIA Parakeet TDT 0.6B v3 and TitaNet small (CC BY 4.0) and pyannote segmentation 3.0 (MIT), converted to ONNX by sherpa-onnx. They run on this computer and download only when you pick them." TextWrapping="Wrap" />
+                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT); NVIDIA Parakeet TDT 0.6B v3 and TitaNet small (CC BY 4.0) and pyannote segmentation 3.0 (MIT), converted to ONNX by sherpa-onnx; Cactus Whistle and its needle engine by Cactus Compute (Apache-2.0), which come with Study Stash. They run on this computer, and the others download only when you pick them." TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
                     <Border Classes="rowsep" />

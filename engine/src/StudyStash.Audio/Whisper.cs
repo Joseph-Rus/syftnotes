@@ -7,7 +7,7 @@ using Whisper.net;
 namespace StudyStash.Audio;
 
 /// <summary>Which program reads a model's files.</summary>
-public enum SpeechEngine { Whisper, Parakeet }
+public enum SpeechEngine { Whisper, Parakeet, Whistle }
 
 /// <summary>One file of a model that comes as several: its name in the model's folder, its size and its SHA-256, and
 /// where it downloads from when that isn't the model's <see cref="WhisperModel.Source"/>.</summary>
@@ -23,6 +23,9 @@ public sealed record WhisperModel(string Id, string Name, string File, long Byte
 
     /// <summary>Where the files are: Hugging Face's address up to the file's name.</summary>
     public string Source { get; init; } = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
+
+    /// <summary>The app carries it (Cactus Whistle): nothing to download, and it can't be deleted.</summary>
+    public bool Bundled { get; init; }
 
     /// <summary>The files, when the model is a folder called <see cref="File"/> of several; null for one file.</summary>
     public IReadOnlyList<ModelPart>? Parts { get; init; }
@@ -96,13 +99,26 @@ public static class WhisperModels
         "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b", "Quick on any processor. Misses more names and terms than the large ones.");
     public static readonly WhisperModel Base = new("base", "Whisper base", "ggml-base.bin", 147951465,
         "60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe", "The lightest that still follows a lecture, for an older computer or one with little memory.");
+    /// <summary>Cactus Whistle (2 October 2026; the model and its engine Apache-2.0): 17 MB, carried inside the app, on
+    /// the processor. It hears the newest sound of a lecture every second for the recorder's live words (see
+    /// <see cref="LiveCaptioner"/>), whatever model writes the transcript. As the transcript itself it's a choice, not
+    /// what any computer starts on: measured against large-v3 on two 12-minute stretches of recorded lectures it had 32%
+    /// and 24% of words different, about Whisper base's 32% and 21%, where the compact turbo had 10% and 7% and Parakeet
+    /// 14% and 9% (engine/tools/TranscribeBench); it wrote the 12 minutes down in 11 seconds on an M3 Pro's processor.</summary>
+    public static readonly WhisperModel Whistle = new("whistle", "Cactus Whistle", WhistleTranscriber.File, 16919407,
+        "b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb", "Fastest and smallest, and already on this computer: nothing to download. About as accurate as Whisper base, so it misses more names and terms than the others. Reads English, German, French, Spanish, Italian, Dutch and Polish.")
+    {
+        Engine = SpeechEngine.Whistle,
+        Bundled = true,
+        Source = "https://huggingface.co/Cactus-Compute/whistle/resolve/b358ddadd89b7a713b5aa131f23032d3cca1b251",
+    };
     /// <summary>For tests: small and fast, not good enough for lectures.</summary>
     public static readonly WhisperModel Tiny = new("tiny", "Whisper tiny", "ggml-tiny.bin", 77691713,
         "be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21", "For trying things out.");
 
     /// <summary>Every model, heaviest first (Parakeet asks less of the processor than the compact turbo, but more
     /// memory; it sits below it, where a computer that keeps up with the compact turbo keeps up with it).</summary>
-    public static readonly IReadOnlyList<WhisperModel> All = [LargeV3, LargeV3Turbo, LargeV3TurboSmall, Parakeet, Small, Base, Tiny];
+    public static readonly IReadOnlyList<WhisperModel> All = [LargeV3, LargeV3Turbo, LargeV3TurboSmall, Parakeet, Small, Base, Whistle, Tiny];
 
     public static WhisperModel? Find(string id) => All.FirstOrDefault(m => m.Id == id);
 
@@ -206,8 +222,8 @@ public static class WhisperModels
 
     public static string Dir(string home) => Path.Combine(home, "models");
 
-    /// <summary>The model's file, or its folder when it's several files.</summary>
-    public static string PathFor(string home, WhisperModel m) => Path.Combine(Dir(home), m.File);
+    /// <summary>The model's file, or its folder when it's several files; the app's own copy of one it carries.</summary>
+    public static string PathFor(string home, WhisperModel m) => m.Bundled ? WhistleTranscriber.BundledModel : Path.Combine(Dir(home), m.File);
 
     /// <summary>Where one of the model's files is.</summary>
     public static string PathOf(string home, WhisperModel m, ModelPart part) =>
@@ -232,6 +248,7 @@ public static class WhisperModels
     /// when a file can't be removed.</summary>
     public static void Delete(string home, WhisperModel m)
     {
+        if (m.Bundled) return;
         foreach (var p in m.Files)
         {
             string path = PathOf(home, m, p);
@@ -287,6 +304,8 @@ public static class ModelDownload
         string? mirror = null)
     {
         string path = WhisperModels.PathFor(home, m);
+        if (m.Bundled)
+            return WhisperModels.IsDownloaded(home, m) ? path : throw new InvalidDataException($"{m.Name} is missing from this copy of Study Stash: install it again.");
         Directory.CreateDirectory(m.Parts is null ? Path.GetDirectoryName(path)! : path);
         if (WhisperModels.IsDownloaded(home, m)) return path;
         if (m.Parts is not null)

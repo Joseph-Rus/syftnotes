@@ -39,4 +39,15 @@
     <InternalsVisibleTo Include="StudyStash.App.Tests" />
   </ItemGroup>
 
+  <!-- StudyStash.Audio carries Cactus Whistle's engine for every processor (needle/<rid>/); a publish for one processor
+       (the installers) keeps only its own, beside the model and the licence. -->
+  <Target Name="KeepThisProcessorsWhistleEngine" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(RuntimeIdentifier)' != ''">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\','/').StartsWith('needle/'))
+                                        and $([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\','/').Contains('/libneedle'))
+                                        and !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\','/').StartsWith('needle/$(RuntimeIdentifier)/'))" />
+    </ItemGroup>
+  </Target>
+
 </Project>

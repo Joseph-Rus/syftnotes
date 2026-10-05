@@ -275,6 +275,17 @@ jobs:
               test -f "dist/mac/Study Stash.app/Contents/MacOS/$arch/web/$f" || { echo "no web/$f in the $arch tree"; exit 1; }
             done
           done
+      - name: Both trees carry Cactus Whistle (the live words) - its model, its licence, and its engine built for their own processor and signed
+        run: |
+          for arch in arm64 x64; do
+            tree="dist/mac/Study Stash.app/Contents/MacOS/$arch"
+            for f in models/whistle.cact needle/LICENSE.txt "needle/osx-$arch/libneedle3.dylib"; do
+              test -f "$tree/$f" || { echo "no $f in the $arch tree"; exit 1; }
+            done
+            want=$([ "$arch" = x64 ] && echo x86_64 || echo arm64)
+            [ "$(lipo -archs "$tree/needle/osx-$arch/libneedle3.dylib")" = "$want" ] || { echo "the $arch tree's libneedle3.dylib isn't $want"; exit 1; }
+            codesign --verify --strict "$tree/needle/osx-$arch/libneedle3.dylib"
+          done
       - name: Signed, universal, and reports its version on both architectures
         run: |
           APP="dist/mac/Study Stash.app"
@@ -497,6 +508,18 @@ jobs:
             foreach ($f in "index.html", "sw.js", "manifest.webmanifest") {
               if (-not (Test-Path "dist\windows\$rid\web\$f")) { throw "no web\$f in the $rid tree" }
             }
+          }
+      - name: Both trees carry Cactus Whistle (the live words) - its model, its licence, and its engine built for their own processor
+        shell: pwsh
+        run: |
+          foreach ($tree in @(@("win-x64", 0x8664), @("win-arm64", 0xAA64))) {
+            $rid = $tree[0]; $machine = $tree[1]
+            foreach ($f in "models\whistle.cact", "needle\LICENSE.txt", "needle\$rid\libneedle3.dll") {
+              if (-not (Test-Path "dist\windows\$rid\$f")) { throw "$rid has no $f" }
+            }
+            $bytes = [IO.File]::ReadAllBytes("dist\windows\$rid\needle\$rid\libneedle3.dll")
+            $built = [BitConverter]::ToUInt16($bytes, [BitConverter]::ToInt32($bytes, 0x3C) + 4)
+            if ($built -ne $machine) { throw "$rid's libneedle3.dll is built for machine 0x$('{0:X}' -f $built), not 0x$('{0:X}' -f $machine)" }
           }
       - name: Reports the version from Directory.Build.props, and no model is bundled (D6)
         shell: pwsh

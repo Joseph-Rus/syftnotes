@@ -30,9 +30,10 @@ public sealed partial class ModelChoice : ObservableObject
     [ObservableProperty] public partial bool Here { get; set; }
 
     /// <summary>The models to offer, the one in use (<paramref name="chosen"/>) marked: Whisper tiny is only for
-    /// trying things out, so it's there only when it's the one in use.</summary>
+    /// trying things out, so it's there only when it's the one in use, and Cactus Whistle only where this copy of the
+    /// app carries its engine (every Mac and Windows installer; not a build on Linux).</summary>
     public static IEnumerable<ModelChoice> For(WhisperModel chosen, ModelAdvice advice, string home) =>
-        WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == chosen.Id).Select(m => new ModelChoice
+        WhisperModels.All.Where(m => (m.Id != WhisperModels.Tiny.Id && (!m.Bundled || WhistleTranscriber.Available)) || m.Id == chosen.Id).Select(m => new ModelChoice
         {
             Model = m,
             Recommended = m.Id == advice.Model.Id,
@@ -522,7 +523,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         ModelAdviceLine = AdviceWords(host.Model, advice);
         ModelDownloading = host.Downloading is not null;
         ModelProgress = host.Downloading?.Fraction ?? 0;
-        spare = [.. WhisperModels.All.Where(m => m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
+        // Whistle comes with the app: it's never spare (nothing to free).
+        spare = [.. WhisperModels.All.Where(m => !m.Bundled && m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
         SpareLine = spare.Count == 0 ? ""
             : $"Also on this computer: {string.Join(", ", spare.Select(m => $"{m.Name} ({WhisperModel.SizeOf(m.Bytes)})"))}.";
         if (spare.Count == 0) ConfirmingRemove = false;

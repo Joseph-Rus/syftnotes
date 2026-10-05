@@ -454,6 +454,34 @@ public static partial class SelfTest
         await Wait(0.3);
     }
 
+    /// <summary>The recorder opened shows what's being said within a couple of seconds (Cactus Whistle's live words,
+    /// where this computer runs it): how long the first line took, said in the report, and a failure past 8 s (a slow CI runner).</summary>
+    static async Task CheckLiveWordsAsync(AppHost host)
+    {
+        var lines = Shell.Windows.RecorderModel.Lines;
+        lines.Clear();
+        var opened = System.Diagnostics.Stopwatch.StartNew();
+        Shell.Windows.ShowRecorder(expanded: true);
+        bool shown = await Until(() => lines.Count > 0, 10);
+        double took = opened.Elapsed.TotalSeconds;
+        if (!host.LiveWordsOn) Say($"live words: off here (Cactus Whistle can't run on this computer); the recorder showed {(shown ? $"a line after {took:0.0} s" : "no line in 10 s")}");
+        else if (shown && took <= 8) Say($"live words: the recorder showed \"{lines[^1].Text}\" {took:0.0} s after it opened");
+        else Say($"FAILED live words: {(shown ? $"the first line took {took:0.0} s" : "no line 10 s after the recorder opened")}");
+        await Wait(2);
+        // The newest line is where the student looks: in view, at the bottom.
+        if (Shell.Windows.Recorder?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(v => v.Name == "Heard") is { } heard
+            && lines.Count > 0)
+        {
+            var newest = heard.GetVisualDescendants().OfType<TextBlock>().LastOrDefault(t => t.Text == lines[^1].Text);
+            var bottom = newest?.TranslatePoint(new Point(0, newest.Bounds.Height), heard);
+            Say(bottom is { } b && b.Y >= 0 && b.Y <= heard.Viewport.Height + 1
+                ? $"live words: {lines.Count} line(s), the newest in view"
+                : $"FAILED live words: the newest line isn't in view ({lines.Count} lines, scrolled {heard.Offset.Y:0} of {heard.Extent.Height - heard.Viewport.Height:0})");
+        }
+        Shot(Shell.Windows.Recorder, "recorder-live-words");
+        Shell.Windows.ShowRecorder(expanded: false);
+    }
+
     static async Task RunRecordingAsync(AppHost host)
     {
         await PanelShot("panel-idle");
@@ -471,6 +499,7 @@ public static partial class SelfTest
         await Wait(0.5);
         Shot(Shell.Windows.Recorder, "recorder-paused");
         Shell.Windows.TogglePause();
+        await CheckLiveWordsAsync(host);
 
         await PanelShot("panel-recording");
 

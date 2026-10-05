@@ -5,8 +5,8 @@
 #   engine/tools/TranscribeBench/run.sh ~/.study-stash/recordings/rec-….wav [out-dir]
 #
 # FROM and LENGTH pick the slice (seconds; 600 and 720: twelve minutes from ten minutes in), MODELS the models (all
-# must be downloaded; default this Mac's own, Parakeet and large-v3), SPEED how fast the recording plays (1: real
-# time, which live needs to mean anything). Runs one after another, about an hour and a half with the defaults:
+# must be downloaded, but Cactus Whistle comes with the build; default Whistle, this Mac's own, Parakeet and large-v3),
+# SPEED how fast the recording plays (1: real time, which live needs to mean anything). Runs one after another, about an hour and a half with the defaults:
 # leave the computer alone meanwhile, plugged in or not, but the same for every run.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -15,7 +15,7 @@ out="${2:-bench-results}"
 mkdir -p "$out"
 dotnet build -c Release "$here" >/dev/null
 bench=(dotnet "$here/bin/Release/net10.0/TranscribeBench.dll")
-for model in ${MODELS:-large-v3-turbo-q5 parakeet-v3 large-v3}; do
+for model in ${MODELS:-whistle large-v3-turbo-q5 parakeet-v3 large-v3}; do
   for mode in live after whole; do
     # Parakeet takes a few minutes of sound at a time at most; a whole lecture at once is Whisper's experiment.
     [ "$mode" = whole ] && [ "$model" = parakeet-v3 ] && continue
