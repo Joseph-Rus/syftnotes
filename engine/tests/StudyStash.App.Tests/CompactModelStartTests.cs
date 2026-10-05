@@ -97,7 +97,7 @@ public class CompactModelStartTests
         var advice = WhisperModels.Advise(FakeHardware.AppleSilicon().Probe());
         using var home = new TempHome();
         var choices = ModelChoice.For(WhisperModels.LargeV3, advice, home.Path).ToList();
-        Assert.Equal(["large-v3", "large-v3-turbo", "large-v3-turbo-q5", "parakeet-v3", "small", "base", "whistle"], choices.Select(c => c.Model.Id));
+        Assert.Equal(["large-v3", "large-v3-turbo", "large-v3-turbo-q5", "parakeet-v3", "small", "base", .. (WhistleTranscriber.Available ? ["whistle"] : Array.Empty<string>())], choices.Select(c => c.Model.Id));
         var marked = Assert.Single(choices, c => c.Recommended);
         Assert.Same(WhisperModels.LargeV3TurboSmall, marked.Model);
         Assert.StartsWith("The compact model keeps up with a lecture and leaves this Mac room", marked.Line, StringComparison.Ordinal);

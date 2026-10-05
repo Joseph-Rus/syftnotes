@@ -30,9 +30,10 @@ public sealed partial class ModelChoice : ObservableObject
     [ObservableProperty] public partial bool Here { get; set; }
 
     /// <summary>The models to offer, the one in use (<paramref name="chosen"/>) marked: Whisper tiny is only for
-    /// trying things out, so it's there only when it's the one in use.</summary>
+    /// trying things out, so it's there only when it's the one in use, and Cactus Whistle only where this copy of the
+    /// app carries its engine (every Mac and Windows installer; not a build on Linux).</summary>
     public static IEnumerable<ModelChoice> For(WhisperModel chosen, ModelAdvice advice, string home) =>
-        WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == chosen.Id).Select(m => new ModelChoice
+        WhisperModels.All.Where(m => (m.Id != WhisperModels.Tiny.Id && (!m.Bundled || WhistleTranscriber.Available)) || m.Id == chosen.Id).Select(m => new ModelChoice
         {
             Model = m,
             Recommended = m.Id == advice.Model.Id,
