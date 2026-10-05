@@ -25,7 +25,7 @@ public class LibrarySettingsApiTests
         return (cfg, new Store(cfg.DbPath, cfg.PoolDir));
     }
 
-    static LibraryWebOptions Options(LoginSwitch? login = null, Func<Release, string, Task>? apply = null, Release? latest = null) => new()
+    static LibraryWebOptions Options(LoginSwitch? login = null, Func<Release, string, Task>? apply = null, Release? latest = null, Canvas.CanvasSync? canvas = null) => new()
     {
         ListModels = _ => Task.FromResult<List<(string, double)>?>([("qwen3:1.7b", 1.4), ("gemma4:e4b", 9.6)]),
         Tailscale = () => Tailnet,
@@ -34,6 +34,7 @@ public class LibrarySettingsApiTests
         RamGb = () => 16,
         HostName = () => "mac-mini",
         StartAtLogin = login,
+        Canvas = canvas,
     };
 
     static Task<TestSite> Site(Config cfg, Store store, LibraryWebOptions? options = null) =>
@@ -123,6 +124,69 @@ public class LibrarySettingsApiTests
         Assert.Contains("Renamed 1 class to its Canvas course name.", after, StringComparison.Ordinal);
         Assert.DoesNotContain("→ <strong>", after, StringComparison.Ordinal);
         Assert.Equal(["Software Engineering", "CS 101", "BIO 110"], Configs.Load(cfg.Home).ClassNames());
+    }
+
+    /// <summary>What a browser sends when Save settings is pressed on the library page with one class's name retyped: the
+    /// class rows exactly as the page drew them (hidden fields too), with that name changed.</summary>
+    static async Task<HttpResponseMessage> SaveRetyping(TestSite site, string from, string to)
+    {
+        string page = await site.Text("/settings");
+        var fields = System.Text.RegularExpressions.Regex.Matches(page, "<input[^>]*type=\"(?:text|hidden)\"[^>]*>")
+            .Select(m => (Name: System.Text.RegularExpressions.Regex.Match(m.Value, "name=\"(class_[a-z]+_\\d+)\"").Groups[1].Value,
+                          Value: WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Match(m.Value, "value=\"([^\"]*)\"").Groups[1].Value)))
+            .Where(f => f.Name.Length > 0 && !f.Name.StartsWith("class_remove_", StringComparison.Ordinal))
+            .Select(f => f.Value == from && f.Name.StartsWith("class_name_", StringComparison.Ordinal) ? (f.Name, to) : f)
+            .ToArray();
+        return await site.PostForm("/settings", fields);
+    }
+
+    /// <summary>Retyping a class's name on the library's own page renames it the way the app's Settings does: its
+    /// lectures and folder go with it and the old name stays as another name, instead of the lectures staying behind
+    /// as a second class under the old name.</summary>
+    [Fact]
+    public async Task Retyping_a_class_name_on_the_library_page_takes_its_lectures_with_it()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        store.Save(new Meeting("m1") { Title = "Recursion", Date = "2026-09-01", Transcript = "Today." }, new Classification("CS 101", 0.9, "folder"), summaryMd: "## Summary\nRecursion.");
+        await using var site = await Site(cfg, store);
+        await site.PostForm("/login", ("password", "pw"), ("next", "/"));
+
+        var r = await SaveRetyping(site, "CS 101", "CS 1010");
+
+        Assert.Equal("/settings?saved=1", r.Headers.Location!.OriginalString);
+        var saved = Configs.Load(cfg.Home);
+        Assert.Equal(["CS 1010", "BIO 110"], saved.ClassNames());
+        Assert.Equal([("CS 1010", 1)], store.ClassesSummary());
+        Assert.Equal("CS 1010", store.Get("m1")!.ClassName);
+        Assert.Contains("CS 101", saved.Classes[0].Aliases);
+        Assert.Contains("cs101", saved.Classes[0].Aliases);
+        Assert.Equal("Recursion and the call stack", saved.Classes[0].Description);
+        Assert.True(File.Exists(store.Get("m1")!.MdPath));
+        Assert.False(Directory.Exists(Path.Combine(cfg.PoolDir, "CS 101")));
+        Assert.DoesNotContain("name=\"class_name_0\" value=\"CS 101\"", await site.Text("/settings"), StringComparison.Ordinal);
+    }
+
+    /// <summary>The same refusal as the app gets: nothing is renamed, and nothing else on the page is saved either,
+    /// while Canvas is syncing; the page says why.</summary>
+    [Fact]
+    public async Task The_library_page_wont_rename_a_class_while_Canvas_is_syncing()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = CodeNamedLibrary(dir);
+        using var _s = store;
+        var sync = new Canvas.CanvasSync(cfg.Home, store.ClassFolder, _ => { });
+        Assert.True(sync.Crawl.Start("https://school.instructure.com", Canvas.CanvasSettings.Load(cfg.Home).Courses));
+        await using var site = await Site(cfg, store, Options(canvas: sync));
+        await site.PostForm("/login", ("password", "pw"), ("next", "/"));
+
+        var r = await SaveRetyping(site, "202710.TS.CSCI321.A", "Software Engineering");
+
+        Assert.Equal("/settings?renamed=0#classes", r.Headers.Location!.OriginalString);
+        Assert.Contains("Canvas is syncing. Try again when it", await site.Text("/settings?renamed=0"), StringComparison.Ordinal);
+        Assert.Equal(["202710.TS.CSCI321.A", "CS 101", "BIO 110"], Configs.Load(cfg.Home).ClassNames());
+        Assert.Equal("202710.TS.CSCI321.A", store.Get("m1")!.ClassName);
     }
 
     [Fact]

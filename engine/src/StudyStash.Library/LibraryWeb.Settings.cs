@@ -185,6 +185,25 @@ public sealed partial class LibraryWeb
 
     static string? Text(JsonNode? node) => node is JsonValue v && v.TryGetValue(out string? s) ? s.Trim() : null;
 
+    /// <summary>The classes a new class list renames, each from the name it had to the one typed (the app's Settings and the
+    /// library's own web page both send which was which): the way "Use Canvas course names" does it, a class's lectures,
+    /// folder and Canvas course move with it, instead of staying behind under the old name. Its old name stays as another
+    /// name in <paramref name="classes"/> (the list about to be saved), so a lecture a laptop recorded under it still files
+    /// here. Null when done, or why not ("Canvas is syncing…"); some of them may be done by then, and stay done.</summary>
+    string? RenameClasses(List<ClassRenameStep> renames, List<ClassDef> classes)
+    {
+        var outcome = ClassRename.Apply(cfg, store, renames, Canvas.Crawl);
+        if (outcome.Renamed.Count > 0)
+        {
+            Console.WriteLine($"[classes] renamed in Settings: {string.Join(", ", outcome.Renamed.Select(st => $"{st.From} → {st.To}"))} ({outcome.Lectures} lectures moved)");
+            pipeline.Wake();
+        }
+        foreach (var st in outcome.Renamed)
+            if (classes.FirstOrDefault(c => c.Name == st.To) is { } sent && cfg.Classes.FirstOrDefault(c => c.Name == st.To) is { } kept)
+                sent.Aliases = [.. sent.Aliases.Concat(kept.Aliases).Distinct(StringComparer.OrdinalIgnoreCase)];
+        return outcome.Problem;
+    }
+
     /// <summary>Changes what the body names and leaves the rest; null when done, or why not (nothing is changed then).</summary>
     IResult? ChangeSettings(JsonObject body)
     {
@@ -249,20 +268,7 @@ public sealed partial class LibraryWeb
             }
         }
         if (name is not null) cfg.PoolName = name;
-        if (renames.Count > 0)
-        {
-            var outcome = ClassRename.Apply(cfg, store, renames, Canvas.Crawl);
-            if (outcome.Renamed.Count > 0)
-            {
-                Console.WriteLine($"[classes] renamed in Settings: {string.Join(", ", outcome.Renamed.Select(st => $"{st.From} → {st.To}"))} ({outcome.Lectures} lectures moved)");
-                pipeline.Wake();
-            }
-            // The rename keeps the old name as another name, so a lecture a laptop recorded under it still files here.
-            foreach (var st in outcome.Renamed)
-                if (classes!.FirstOrDefault(c => c.Name == st.To) is { } sent && cfg.Classes.FirstOrDefault(c => c.Name == st.To) is { } kept)
-                    sent.Aliases = [.. sent.Aliases.Concat(kept.Aliases).Distinct(StringComparer.OrdinalIgnoreCase)];
-            if (outcome.Problem is { } problem) return Http.Detail(409, problem);
-        }
+        if (renames.Count > 0 && RenameClasses(renames, classes!) is { } problem) return Http.Detail(409, problem);
         if (classes is not null) cfg.Classes = classes;
         if (body["notes"] is JsonObject notes)
         {
