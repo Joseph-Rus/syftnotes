@@ -12,6 +12,8 @@ public partial class MacLibrary : UserControl
         InitializeComponent();
         // Files dropped on the lecture are attached to it; on the list of lectures, to the class.
         AttachFiles.AcceptDrops(NoteScroll, () => (DataContext as LibraryModel)?.LectureFiles);
+        // The notes' diagrams ask about their boxes in this lecture's Ask bar, and find them in its transcript.
+        LectureDiagramsView.Wire(this, NoteScroll, TranscriptLines);
         AttachFiles.AcceptDrops(LectureList, () => (DataContext as LibraryModel)?.ClassFiles);
         // Below 900 px the right column has no room: the list fills the window, and what's opened takes its place.
         SizeChanged += (_, e) =>

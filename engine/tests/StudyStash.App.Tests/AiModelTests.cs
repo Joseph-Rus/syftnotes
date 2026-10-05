@@ -1,4 +1,5 @@
 using Avalonia.Headless.XUnit;
+using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
@@ -147,24 +148,72 @@ public class AiEnginesModelTests
     [AvaloniaFact]
     public async Task Who_draws_diagrams_says_where_transcripts_go_and_picking_posts_it()
     {
-        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() with { Diagrams = "auto", DiagramsBy = "claude" } };
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() with { Diagrams = "auto", DiagramsBy = "claude", Rich = new RichNotesInfo(true, true, true, true), Speed = "standard" } };
         var model = new AiEnginesModel(lib);
         await model.Load();
 
-        Assert.True(model.HasDiagrams);
-        Assert.Equal(["Automatic", "Same as notes", "Ollama", "Claude Code", "Codex", "Gemini", "Off"], model.DiagramsChoices.Select(c => c.Name));
+        Assert.True(model.ShowDrawnBy);
+        Assert.Equal(["Automatic", "Same as notes", "Ollama", "Claude Code", "Codex", "Gemini"], model.DiagramsChoices.Select(c => c.Name)); // off is the Rich notes switch's
         Assert.Equal("Automatic", model.SelectedDiagramsName);
         Assert.Equal("Claude Code reads each transcript", model.DiagramsAbout);
         Assert.Empty(lib.DefaultsCalls);
 
-        model.SelectedDiagrams = "off";
+        model.SelectedDiagrams = "codex";
 
-        Assert.Equal("off", lib.DefaultsCalls.Single().Diagrams);
-        Assert.Equal("New notes have no diagrams", model.DiagramsAbout);
+        Assert.Equal("codex", lib.DefaultsCalls.Single().Diagrams);
 
         var older = new AiEnginesModel(new FakeAiLibrary { Overview = AiTestData.MixedOverview() });
         await older.Load();
-        Assert.False(older.HasDiagrams); // a library too old to design diagrams shows no row for it
+        Assert.False(older.HasRich); // a library too old to have rich notes shows none of its rows
+        Assert.False(older.ShowDrawnBy);
+        Assert.False(older.HasSpeed);
+    }
+
+    [AvaloniaFact]
+    public async Task The_rich_notes_switches_and_Claude_Codes_speed_post_and_show_what_the_library_makes_of_them()
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() with { Diagrams = "auto", DiagramsBy = "claude", Rich = new RichNotesInfo(true, true, true, true), Speed = "standard" } };
+        var model = new AiEnginesModel(lib);
+        await model.Load();
+
+        Assert.True(model.RichOn && model.ShowKinds && model.HasSpeed); // Claude Code is installed on this library
+        Assert.Equal("Standard", model.SelectedSpeedName);
+        Assert.Equal(["Standard", "Fast mode", "Quicker model"], model.SpeedChoices.Select(c => c.Name));
+        Assert.Empty(lib.RichCalls); // loading what the library says posts nothing back
+
+        // Fast mode says what it trades: speed for money, and that it needs usage credits.
+        model.SelectedSpeed = "fast";
+        Assert.Equal("fast", lib.RichCalls.Single().Speed);
+        Assert.Contains("billed at a higher rate", model.SpeedAbout);
+        Assert.Contains("usage credits", model.SpeedAbout);
+
+        model.RichPlots = false;
+        Assert.Equal(false, lib.RichCalls[^1].Plots);
+        Assert.False(model.RichPlots);
+
+        // Switching off the last kind switches rich notes off (the library does that, and the pane shows it).
+        model.RichDiagrams = false;
+        model.RichDrawings = false;
+        Assert.False(model.RichOn);
+        Assert.False(model.ShowKinds);
+        Assert.False(model.ShowDrawnBy);
+        Assert.Equal("Plain notes only. Nothing extra is asked of your AI", model.RichAbout);
+
+        model.RichOn = true;
+        Assert.Equal(true, lib.RichCalls[^1].On);
+        Assert.True(model.RichOn && model.RichDiagrams && model.RichPlots && model.RichDrawings);
+
+        // Without Claude Code on the library, its speed isn't something to set.
+        var without = new AiEnginesModel(new FakeAiLibrary
+        {
+            Overview = AiTestData.MixedOverview() with
+            {
+                Engines = [new EngineInfo("ollama", "Ollama", "ready") { Installed = true }, new EngineInfo("claude", "Claude Code", "not_installed")],
+                Rich = new RichNotesInfo(true, true, true, true), Speed = "standard",
+            },
+        });
+        await without.Load();
+        Assert.False(without.HasSpeed);
     }
 
     [AvaloniaFact]
@@ -1169,63 +1218,30 @@ public class AiAccessModelTests
     }
 
     [AvaloniaFact]
-    public async Task Copying_claude_code_or_codex_puts_the_right_text_on_the_clipboard()
+    public async Task Connecting_an_app_from_its_row_shows_what_was_written_and_where_it_stands()
     {
         var (model, _) = Loaded();
+        bool added = false;
+        model.ReadApps = () => [new AiAppState("claude-desktop", "Claude Desktop", true, added, false, added ? Now : null, null, "/c.json")];
+        model.ConnectApp = id =>
+        {
+            added = id == "claude-desktop";
+            return new AiAppChange(true, "Added Study Stash to Claude Desktop.", "/c.json", "/c.json.study-stash-backup", "{\"mcpServers\":{}}");
+        };
         await model.Load();
-        model.ClaudeCodeCommand = "claude mcp add ...";
-        model.CodexSetup = "[mcp_servers.study-stash]";
-        var copied = new List<string>();
-        model.Copy = s => { copied.Add(s); return Task.CompletedTask; };
+        var row = Assert.Single(model.Apps);
+        Assert.Equal("Not connected", row.Status);
+        Assert.DoesNotContain(model.Connected, c => c.Name == "Claude Desktop"); // the apps here aren't library connections
 
-        await model.CopyClaudeCodeCommand.ExecuteAsync(null);
-        Assert.Equal("claude mcp add ...", copied[^1]);
-        Assert.Contains("terminal", model.Say);
+        await row.Connect!.ExecuteAsync(null);
 
-        await model.CopyCodexCommand.ExecuteAsync(null);
-        Assert.Equal("[mcp_servers.study-stash]", copied[^1]);
-        Assert.Contains("config.toml", model.Say);
-    }
-
-    [AvaloniaFact]
-    public async Task Adding_claude_desktop_shows_up_as_a_connected_row()
-    {
-        var (model, _) = Loaded();
-        await model.Load();
-        model.AddToClaudeDesktop = () => Task.FromResult("Added to Claude Desktop.");
-        model.CheckInClaudeDesktop = () => true;
-
-        await model.AddClaudeDesktopCommand.ExecuteAsync(null);
-
-        Assert.Equal("Added to Claude Desktop.", model.Say);
-        Assert.Contains(model.Connected, c => c.Id == "claude-desktop");
-    }
-
-    [AvaloniaFact]
-    public async Task Removing_claude_desktop_takes_its_row_away()
-    {
-        var (model, _) = Loaded();
-        model.CheckInClaudeDesktop = () => true;
-        await model.Load();
-        var row = model.Connected.Single(c => c.Id == "claude-desktop");
-        model.RemoveFromClaudeDesktopHook = () => Task.FromResult("Removed from Claude Desktop.");
-        model.CheckInClaudeDesktop = () => false;
-
-        await row.Remove!.ExecuteAsync(null);
-
-        Assert.DoesNotContain(model.Connected, c => c.Id == "claude-desktop");
-    }
-
-    [AvaloniaFact]
-    public async Task Claude_code_on_this_computer_has_no_remove()
-    {
-        var (model, _) = Loaded();
-        model.CheckInClaudeCode = () => true;
-
-        await model.Load();
-
-        var row = model.Connected.Single(c => c.Id == "claude-code");
-        Assert.Null(row.Remove);
+        Assert.Same(row, Assert.Single(model.Apps));
+        Assert.Equal("Added. Quit and reopen Claude Desktop to load it.", row.Status);
+        Assert.True(row.CanDisconnect);
+        Assert.Equal("Added Study Stash to Claude Desktop.", model.Say);
+        Assert.True(model.ShowWritten);
+        Assert.Equal("/c.json", model.WrittenFile);
+        Assert.Contains("/c.json.study-stash-backup", model.WrittenBackupWords);
     }
 
     [AvaloniaFact]
@@ -1248,7 +1264,7 @@ public class AiAccessModelTests
         Assert.Empty(model.Connected);
     }
 
-    // Claude (desktop and web): the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
+    // Claude on the web and phone: the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
     // (task 4). FakeAiLibrary's unscripted SetWebAsync turns Funnel on at "https://mini.tail1234.ts.net" and answers
     // reachable straight away; OnSetWeb/OnCheckWeb script something else (a problem, a slow check, an older library).
 

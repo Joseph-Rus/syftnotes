@@ -16,6 +16,7 @@ public sealed class FakeAiLibrary : IAiLibrary
     public List<string> Calls { get; } = [];
     public List<(string? Notes, string? Ask, bool? Fallback, string? Diagrams)> DefaultsCalls { get; } = [];
     public List<AskRequest> AskRequests { get; } = [];
+    public List<(bool? On, bool? Diagrams, bool? Plots, bool? Drawings, string? Speed)> RichCalls { get; } = [];
 
     public Func<string, AiSaid?>? OnStart { get; set; }
     public Func<string, AiSaid?>? OnDownload { get; set; }
@@ -53,6 +54,18 @@ public sealed class FakeAiLibrary : IAiLibrary
             Notes = notes ?? Overview.Notes, Ask = ask ?? Overview.Ask, Fallback = fallback ?? Overview.Fallback,
             Diagrams = diagrams ?? Overview.Diagrams,
         };
+        return Task.FromResult<AiOverview?>(Overview);
+    }
+
+    public Task<AiOverview?> RichAsync(bool? on = null, bool? diagrams = null, bool? plots = null, bool? drawings = null, string? speed = null)
+    {
+        Calls.Add("rich");
+        RichCalls.Add((on, diagrams, plots, drawings, speed));
+        if (Overview?.Rich is not { } rich) return Task.FromResult<AiOverview?>(null);
+        // As the library does: turning off the last kind switches rich notes off.
+        var kinds = new RichNotesInfo(on ?? rich.On, diagrams ?? rich.Diagrams, plots ?? rich.Plots, drawings ?? rich.Drawings);
+        if (!kinds.Diagrams && !kinds.Plots && !kinds.Drawings) kinds = new RichNotesInfo(false, true, true, true);
+        Overview = Overview with { Rich = kinds, Speed = speed ?? Overview.Speed };
         return Task.FromResult<AiOverview?>(Overview);
     }
 

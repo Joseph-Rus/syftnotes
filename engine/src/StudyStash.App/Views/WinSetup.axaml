@@ -314,7 +314,7 @@
             <TextBlock Classes="h1" Text="{Binding WelcomeTitle}" />
             <TextBlock Classes="lede" Text="{Binding WelcomeBody}" />
             <StackPanel Name="Choices" Spacing="8" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
-              <Button Name="OneComputer" Classes="choice" Classes.on="{Binding IsOneComputer}" Command="{Binding ChooseOneComputerCommand}" IsEnabled="{Binding CanChooseOneComputer}">
+              <Button AutomationProperties.Name="Just this computer" AutomationProperties.HelpText="{Binding OneComputerAbout}" Name="OneComputer" Classes="choice" Classes.on="{Binding IsOneComputer}" Command="{Binding ChooseOneComputerCommand}" IsEnabled="{Binding CanChooseOneComputer}">
                 <Grid ColumnDefinitions="24,12,*,12,Auto">
                   <c:Icon Glyph="desktop_windows" Size="22" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                   <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
@@ -327,7 +327,7 @@
                   <Border Grid.Column="4" Classes="radio" Classes.on="{Binding IsOneComputer}"><Ellipse /></Border>
                 </Grid>
               </Button>
-              <Button Name="Laptop" Classes="choice" Classes.on="{Binding IsLaptop}" Command="{Binding ChooseLaptopCommand}" IsEnabled="{Binding CanChooseLaptop}">
+              <Button AutomationProperties.Name="This is my laptop" AutomationProperties.HelpText="{x:Static vm:SetupModel.LaptopAbout}" Name="Laptop" Classes="choice" Classes.on="{Binding IsLaptop}" Command="{Binding ChooseLaptopCommand}" IsEnabled="{Binding CanChooseLaptop}">
                 <Grid ColumnDefinitions="24,12,*,12,Auto">
                   <c:Icon Glyph="laptop_mac" Size="22" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                   <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
@@ -337,7 +337,7 @@
                   <Border Grid.Column="4" Classes="radio" Classes.on="{Binding IsLaptop}"><Ellipse /></Border>
                 </Grid>
               </Button>
-              <Button Name="Library" Classes="choice" Classes.on="{Binding IsLibrary}" Command="{Binding ChooseLibraryCommand}" IsEnabled="{Binding CanChooseLibrary}">
+              <Button AutomationProperties.Name="This is my library" AutomationProperties.HelpText="{Binding LibraryAbout}" Name="Library" Classes="choice" Classes.on="{Binding IsLibrary}" Command="{Binding ChooseLibraryCommand}" IsEnabled="{Binding CanChooseLibrary}">
                 <Grid ColumnDefinitions="24,12,*,12,Auto">
                   <c:Icon Glyph="dns" Size="22" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                   <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
@@ -455,7 +455,7 @@
             <TextBlock Classes="lede" Text="{Binding ModelBody}" />
             <!-- The model for this computer (Recommended, with why) or the one picked instead, its size, and Change, which
                  opens every model as a one-line list in place of the card and the download. -->
-            <Button Classes="choice" IsVisible="{Binding ShowModelCard}" Command="{Binding ChangeModelCommand}" Margin="0,20,0,0"
+            <Button AutomationProperties.Name="{Binding ChosenModel.Name}" AutomationProperties.HelpText="{Binding ChosenModel.Line}" Classes="choice" IsVisible="{Binding ShowModelCard}" Command="{Binding ChangeModelCommand}" Margin="0,20,0,0"
                     MaxWidth="440" HorizontalAlignment="Stretch">
               <Grid ColumnDefinitions="*,16,Auto">
                 <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -477,7 +477,7 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="s:ModelChoice">
-                  <Button Classes="choice row" Classes.on="{Binding Chosen}" CommandParameter="{Binding}"
+                  <Button AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding Size}" Classes="choice row" Classes.on="{Binding Chosen}" CommandParameter="{Binding}"
                           Command="{Binding $parent[UserControl].((vm:SetupModel)DataContext).PickModelCommand}">
                     <Grid ColumnDefinitions="*,12,Auto,16,Auto">
                       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -518,7 +518,7 @@
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:SetupCourse">
                     <Grid ColumnDefinitions="20,10,150,10,*,10,Auto" Height="48">
-                      <CheckBox Classes="tick" IsChecked="{Binding Ticked}" VerticalAlignment="Center" />
+                      <CheckBox AutomationProperties.Name="{Binding Name}" Classes="tick" IsChecked="{Binding Ticked}" VerticalAlignment="Center" />
                       <StackPanel Grid.Column="2" Grid.ColumnSpan="5" VerticalAlignment="Center" Spacing="1">
                         <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="{Binding Code}" IsVisible="{Binding HasCode}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis"
@@ -559,7 +559,7 @@
                   <TextBlock Text="Start Study Stash when I sign in" FontSize="14" />
                   <TextBlock Text="{Binding StartAtLoginHint}" FontSize="12" Foreground="{DynamicResource Fg2}" />
                 </StackPanel>
-                <ToggleButton Grid.Column="2" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
+                <ToggleButton AutomationProperties.Name="Start Study Stash when I log in" Grid.Column="2" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
               </Grid>
             </Border>
           </StackPanel>

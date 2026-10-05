@@ -52,7 +52,7 @@
             <MenuFlyout Placement="Top" VerticalOffset="-20" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding ScopeChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
           </Button.Flyout>
         </Button>
-        <Button Grid.Column="6" Classes="ai-send" Command="{Binding AskCommand}" VerticalAlignment="Center" IsVisible="{Binding !Busy}">
+        <Button AutomationProperties.Name="Send question" Grid.Column="6" Classes="ai-send" Command="{Binding AskCommand}" VerticalAlignment="Center" IsVisible="{Binding !Busy}">
           <c:Icon Glyph="send" Size="18" Foreground="{DynamicResource Fg3}" />
         </Button>
         <!-- While an answer is being written, the same place stops it -->

@@ -10,6 +10,15 @@
              x:Class="StudyStash.App.Views.MacLibrary"
              x:DataType="vm:LibraryModel">
   <UserControl.Styles>
+    <!-- A transcript line a diagram pointed to: marked, a little room round it, the words where they were. -->
+    <Style Selector="Border.heard">
+      <Setter Property="Margin" Value="-8,-4" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="Border.heard.here">
+      <Setter Property="Background" Value="{DynamicResource Hl}" />
+    </Style>
     <!-- The real window has its own rounded corners and shadow; a screenshot draws both itself. -->
     <Style Selector="Border#Chrome.chrome">
       <Setter Property="CornerRadius" Value="26" />
@@ -429,17 +438,20 @@
               </Panel>
               <StackPanel IsVisible="{Binding ShowTranscript}" Margin="0,18,0,0">
                 <TextBlock IsVisible="{Binding NoTranscript}" Text="This lecture has no transcript." FontSize="13" Foreground="{DynamicResource Fg2}" />
-                <ItemsControl ItemsSource="{Binding Transcript}">
+                <ItemsControl Name="TranscriptLines" ItemsSource="{Binding Transcript}">
                   <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:HeardLine">
-                      <Grid ColumnDefinitions="Auto,*">
-                        <TextBlock Classes="num" Width="48" Text="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,3,12,0" />
-                        <SelectableTextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="{DynamicResource SerifFont}" FontSize="16" LineHeight="25.6" TextWrapping="Wrap"
-                                             SelectionBrush="{DynamicResource Hl}" />
-                      </Grid>
+                      <!-- The line a diagram pointed to ("where was this said"), marked -->
+                      <Border Classes="heard" Classes.here="{Binding Here}">
+                        <Grid ColumnDefinitions="Auto,*">
+                          <TextBlock Classes="num" Width="48" Text="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="12" Foreground="{DynamicResource Fg2}" Margin="0,3,12,0" />
+                          <SelectableTextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="{DynamicResource SerifFont}" FontSize="16" LineHeight="25.6" TextWrapping="Wrap"
+                                               SelectionBrush="{DynamicResource Hl}" />
+                        </Grid>
+                      </Border>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
@@ -452,6 +464,16 @@
           <!-- The page fades under the title bar, and out under the ask bar (or above the answer) -->
           <Border Name="TopFade" Height="20" VerticalAlignment="Top" IsHitTestVisible="False" />
           <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" />
+          <!-- A diagram showed where it was said: one click back to the notes, where the diagram is -->
+          <Button Name="BackToNotes" Theme="{StaticResource Surface}" IsVisible="{Binding Note.CanGoBack, FallbackValue=False}"
+                  Command="{Binding Note.BackToNotesCommand, FallbackValue={x:Null}}" HorizontalAlignment="Center" VerticalAlignment="Top"
+                  Margin="0,16,0,0" Height="32" Padding="12,0,14,0" CornerRadius="16" Background="{DynamicResource PopupBg}"
+                  BorderBrush="{DynamicResource PopupStroke}" BorderThickness="1" AutomationProperties.Name="Back to the notes">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Glyph="arrow_back" Size="15" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+              <TextBlock Text="Back to the notes" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
           </Panel>
 
           <!-- The latest answer, just above the ask bar -->

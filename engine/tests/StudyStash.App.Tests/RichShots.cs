@@ -54,7 +54,8 @@ public class RichShots
             {
                 string look = skin == SkinKind.Mac ? "mac" : "win";
                 Shot.Take($"rich-diagrams-1-{look}", skin, t, () => Page(skin, all.Take(3)), size: new Size(876, 1560));
-                Shot.Take($"rich-diagrams-2-{look}", skin, t, () => Page(skin, all.Skip(3)), size: new Size(876, 2000));
+                Shot.Take($"rich-diagrams-2-{look}", skin, t, () => Page(skin, all.Skip(3).Take(3)), size: new Size(876, 2000));
+                Shot.Take($"rich-diagrams-3-{look}", skin, t, () => Page(skin, all.Skip(6)), size: new Size(876, 2000));
             }
     }
 
@@ -307,6 +308,8 @@ public class RichShots
 
     /// <summary>Captures the window as it stands right now (no extra layout pass), unlike <see cref="Shot.Take"/>
     /// which lays out and captures in the same breath — this shot needs to scroll in between.</summary>
+    internal static void Save(string name, ThemeVariant variant, Window window, Size size) => SaveShot(name, variant, window, size);
+
     static void SaveShot(string name, ThemeVariant variant, Window window, Size size)
     {
         var whole = window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");

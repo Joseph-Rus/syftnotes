@@ -18,22 +18,36 @@ public sealed record DesignReply(string Reason, IReadOnlyList<DesignedDiagram> D
 {
     public bool Malformed { get; init; }
     public static DesignReply Unusable(string why) => new("", [], [why]) { Malformed = true };
+
+    /// <summary>The illustrations it planned (<see cref="IllustrationDesign"/>), each checked like a diagram.</summary>
+    public IReadOnlyList<IllustrationPlan> Illustrations { get; init; } = [];
 }
 
 /// <summary>What a diagram pass did: the notes (the very string it was given when it added nothing), the diagrams
-/// it added, the designer's reason, and why any it designed were left out.</summary>
+/// it added, the designer's reason, and why any it designed were left out. <see cref="Revised"/>: how many it
+/// redesigned after seeing how they'd look; <see cref="Problems"/>, what still looks wrong with the ones drawn.</summary>
 public sealed record DesignResult(string Notes, IReadOnlyList<DesignedDiagram> Drawn, string Reason, IReadOnlyList<string> Dropped)
 {
     public bool Malformed { get; init; }
+    public int Revised { get; init; }
+    public IReadOnlyList<string> Problems { get; init; } = [];
+
+    /// <summary>How many illustrations were composed from the parts library rather than drawn.</summary>
+    public int Composed { get; init; }
 }
 
 /// <summary>
 /// The diagram pass: after a lecture's notes are written, a stronger model reads its timed transcript and the notes,
 /// decides whether the lecture teaches anything a picture makes clearer (a process, cycle, pathway, decision rule,
-/// hierarchy, structure, timeline, comparison, or something spatial), and designs at most a few, each placed at the
-/// end of the section it illustrates. Its JSON reply is read strictly; a diagram that doesn't parse goes back once
-/// for repair (<see cref="Summarize.RepairDiagramsAsync"/>) and is otherwise left out, as is one with too many boxes
-/// or labels the lecture never said. Nothing here ever fails the notes: a pass that adds nothing hands back the
+/// hierarchy, structure, states and transitions, an exchange between parties, a timeline, a topic's themes, a
+/// comparison, or something spatial), and designs at most a few, each placed at the end of the section it
+/// illustrates: a flowchart (a big topic in groups, its boxes carrying the lecture's specifics in smaller words), a
+/// state or sequence diagram, a timeline or a mind map, or SVG. Its JSON reply is read strictly; a diagram that
+/// doesn't parse goes back once for repair (<see cref="Summarize.RepairDiagramsAsync"/>) and is otherwise left out,
+/// as is one with too many boxes or labels the lecture never said. Each one that's kept is laid out at the notes'
+/// width and looked over (<see cref="DiagramLint"/>); one that would look wrong (too wide to read, crossing arrows,
+/// sentences in boxes, a big chart with no groups) goes back once, with what's wrong, while there's time, and its
+/// redesign is used only when it's better. Nothing here ever fails the notes: a pass that adds nothing hands back the
 /// notes it was given, byte for byte. Diagrams it added carry a mark, so a later pass replaces them, never stacks.
 /// </summary>
 public static partial class DiagramDesign
@@ -41,37 +55,197 @@ public static partial class DiagramDesign
     /// <summary>Below this (about three minutes of speech) a lecture is too short for a diagram to matter.</summary>
     public const int MinTranscriptChars = 3000;
     /// <summary>The most diagrams one lecture gets (a long one; shorter ones get fewer, see <see cref="Cap"/>).</summary>
-    public const int MaxDiagrams = 3;
-    /// <summary>The boxes the brief allows, and the most a flowchart may come back with before it's left out.</summary>
-    public const int MaxBoxes = 12, MaxNodes = 14, MinNodes = 3;
-    public const int MaxTitle = 80, MaxCaption = 300;
+    public const int MaxDiagrams = 4;
+    /// <summary>The boxes the brief allows a focused diagram and a big one (in groups), and the most a diagram may
+    /// come back with before it's left out.</summary>
+    public const int MaxBoxes = 12, MaxGrouped = 36, MaxNodes = 40, MinNodes = 3;
+    public const int MaxTitle = 80, MaxCaption = 420;
+    /// <summary>How much of the pass's time must be left for a diagram that would look wrong to go back once.</summary>
+    public static readonly TimeSpan RevisionRoom = TimeSpan.FromSeconds(150);
     /// <summary>How much of a diagram's wording must be found in the transcript or the notes.</summary>
     public const double MinGrounded = 0.6;
-    /// <summary>How long the whole pass may take, repairs included, before the notes go on without it.</summary>
+    /// <summary>How long the whole pass may take, repairs included, before it stops and the notes stay as filed (the
+    /// notes never wait for it: they're filed first, and the diagrams follow).</summary>
     public static readonly TimeSpan Timeout = TimeSpan.FromMinutes(8);
 
     /// <summary>What marks a diagram this pass added: the first line inside its block.</summary>
     const string Mark = "Study Stash diagram";
 
     /// <summary>How many diagrams a lecture may get: none under <see cref="MinTranscriptChars"/>, one for a short
-    /// lecture (under about 13 minutes), two under about half an hour, three for a full one.</summary>
+    /// lecture (under about ten minutes), two under about twenty, three under about forty, four for a long one.</summary>
     public static int Cap(string transcript)
     {
         int n = Py.Strip(TimedText.Plain(transcript ?? "")).Length;
-        return n < MinTranscriptChars ? 0 : n < 12_000 ? 1 : n < 30_000 ? 2 : MaxDiagrams;
+        return n < MinTranscriptChars ? 0 : n < 10_000 ? 1 : n < 22_000 ? 2 : n < 40_000 ? 3 : MaxDiagrams;
     }
+
+    // --- the examples the brief shows: each one parses, and lays out well at the notes' width ----------------------
+
+    /// <summary>A big topic as a flowchart in groups: cellular respiration by where it happens, each step's yield in its
+    /// smaller words, coloured by what the colour means. Its groups fold into an overview of their own.</summary>
+    public static readonly string GroupedExample = """
+        flowchart LR
+          subgraph CYTO ["Cytoplasm"]
+            GLU["Glucose"] --> GLY["Glycolysis<br><small>2 ATP, 2 NADH</small>"] --> PYR["2 pyruvate"]
+          end
+          subgraph MATRIX ["Mitochondrial matrix"]
+            OX["Pyruvate oxidation<br><small>CO2 released</small>"] --> ACO["Acetyl-CoA"] --> KREBS["Krebs cycle<br><small>2 ATP, NADH, FADH2</small>"]
+          end
+          subgraph MEMBRANE ["Inner membrane"]
+            ETC["Electron transport chain"]:::amber --> GRAD["H+ gradient"] --> SYN["ATP synthase<br><small>about 34 ATP</small>"]:::green
+            O2(["O2 accepts electrons"]):::blue --> H2O["Water"]
+          end
+          PYR -->|"with oxygen"| OX
+          KREBS -->|"NADH, FADH2"| ETC
+          ETC --> O2
+          PYR -.->|"no oxygen"| FER["Fermentation<br><small>lactate, 2 ATP total</small>"]:::red
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>An automaton as a state diagram: binary strings ending in 01, its accepting state double.</summary>
+    public static readonly string StateExample = """
+        stateDiagram-v2
+          direction LR
+          [*] --> q0
+          q0 --> q0 : 1
+          q0 --> q1 : 0
+          q1 --> q1 : 0
+          q1 --> q2 : 1
+          q2 --> q1 : 0
+          q2 --> q0 : 1
+          class q2 accept
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>An exchange as a sequence diagram: logging in, with the two ways it can go.</summary>
+    public static readonly string SequenceExample = """
+        sequenceDiagram
+          participant B as Browser
+          participant S as Server
+          participant D as Database
+          B->>S: POST /login (email, password)
+          S->>D: look up the user
+          D-->>S: password hash
+          alt hash matches
+            S-->>B: 200 OK + session cookie
+          else no match
+            S-->>B: 401 Unauthorized
+          end
+          Note over B,S: later requests send the cookie
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>Events in order as a timeline.</summary>
+    public static readonly string TimelineExample = """
+        timeline
+          title Germ theory
+          1847 : Semmelweis has doctors wash their hands
+          1857 : Pasteur shows microbes cause fermentation
+          1867 : Lister sterilises wounds with carbolic acid
+          1882 : Koch identifies the TB bacterium
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>A topic broken into its themes as a mind map.</summary>
+    public static readonly string MindmapExample = """
+        mindmap
+          root((Tissue types))
+            Epithelial
+              Covers surfaces
+              Squamous, cuboidal, columnar
+            Connective
+              Supports and binds
+              Bone, blood, cartilage
+            Muscle
+              Contracts
+              Skeletal, cardiac, smooth
+            Nervous
+              Signals
+              Neurons and glia
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>Every example the brief shows, for the checks that each one parses and lays out well.</summary>
+    public static IReadOnlyList<string> Examples => [Summarize.MermaidExample, GroupedExample, StateExample, SequenceExample, TimelineExample, MindmapExample];
 
     // --- the brief -------------------------------------------------------------------------------------------------
 
+    /// <summary>The ideas a diagram (Mermaid) is for, as the brief lists them under "Decide".</summary>
+    const string DecideDiagrams = """
+        - a process, pathway or algorithm: steps in order, decisions, loops (the nursing process, a signalling cascade, how a scanner reads a token)
+        - a cycle (the cardiac cycle, the Krebs cycle)
+        - a structure whose parts connect (the layers of a network, the parts of a compiler, a data warehouse's tiers)
+        - a hierarchy or classification (the types of tissue, a class hierarchy)
+        - states and the events or inputs that move between them (an automaton, a process's states, a protocol)
+        - an exchange between parties, in order (a client and a server, a handshake, cells signalling to each other)
+        - a timeline the lecturer put in order
+        - a topic broken into its themes, when the lecture's point is how they fit together
+        - a comparison, when two or three things share a structure and part ways at clear points
+        """;
+
+    /// <summary>The one a plot is for.</summary>
+    const string DecidePlot = "- a formula, function or distribution the lecturer gave whose shape is the point (an activation or loss function, a distribution and its parameters, growth rates, gradient descent, a matrix's effect): a plot, drawn exactly from the formula";
+
+    /// <summary>The one an SVG drawing is for.</summary>
+    const string DecideSvg = "- something spatial (the forces on an object, a circuit, a labelled structure, the graph of a function, memory during a function call)";
+
+    /// <summary>The kinds of Mermaid diagram the brief teaches, each with an example that itself parses and lays out well.</summary>
+    static string MermaidKinds => $$"""
+        A flowchart (flowchart LR or TD) for processes, pathways, decisions, cycles, structures and hierarchies, and for a concept map: the ideas as boxes, joined by arrows labelled with how they relate (causes, is a, requires, produces). A focused idea, small; blood flow through the heart, a cycle coloured by what the colour means:
+        ```mermaid
+        {{Summarize.MermaidExample}}
+        ```
+        A big topic, in groups; cellular respiration by where each step happens, each step's yield in its smaller words:
+        ```mermaid
+        {{GroupedExample}}
+        ```
+
+        A state diagram (stateDiagram-v2) for states and what moves between them: each transition labelled with its event or input, [*] where it starts (and ends). An automaton names its states as the lecturer did (q0, q1…) and marks each accepting state with class name accept; binary strings ending in 01:
+        ```mermaid
+        {{StateExample}}
+        ```
+
+        A sequence diagram (sequenceDiagram) for who sends what to whom, in order: participants left to right in the order they first act, one message a line (->> a request or call, -->> a reply), alt/else, opt and loop blocks closed with end, a Note over two participants for what holds throughout; logging in:
+        ```mermaid
+        {{SequenceExample}}
+        ```
+
+        A timeline (timeline) for events the lecturer put in order: one period a line, then its events after colons, section lines to group eras:
+        ```mermaid
+        {{TimelineExample}}
+        ```
+
+        A mind map (mindmap) for a topic broken into its themes and their key points, by indentation: the root as root((Topic)), two or three levels below it:
+        ```mermaid
+        {{MindmapExample}}
+        ```
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>The two bullets of detail that are about a diagram's boxes and arrows.</summary>
+    const string DetailSpecifics = """
+        - Put the lecturer's specifics in: the numbers, conditions, units, names and examples they gave belong on the boxes and arrows, not left vague. A box's name is one to five words; what it does, where, or how much goes in a smaller line under it: G["Glycolysis<br><small>cytoplasm, 2 ATP</small>"] (flowcharts; in a state diagram, a line q0 : what it means).
+        - Label an arrow with what it carries, the condition that takes it, or the event that fires it, whenever that says more than "then": one to four words.
+        """;
+
+    /// <summary>How big a diagram may be and how a flowchart is shaped, coloured and fitted to the notes' column.</summary>
+    static string SizeAndShape => $$"""
+        ## Size and shape
+
+        - A focused idea: 4 to {{MaxBoxes}} boxes.
+        - A big topic the lecturer built up over a long stretch (a whole system, a whole process with its phases): up to {{MaxGrouped}} boxes, in groups: 3 to 7 subgraphs of 3 to 7 boxes each, named for the phases, places or parts the lecturer named, one level of groups (two at most). Most arrows stay inside a group; a few arrows between groups carry the main thread, each from the box where one group's part ends to the box where the next one's starts (arrows join boxes, not groups). Read alone, the groups must make a diagram of their own: the app can fold each group into one box.
+        - A flowchart runs LR for a sequence, pathway or cycle (a grouped LR chart shows its groups as columns, each read downwards) and TD for a hierarchy or a decision tree. A cycle ends with an arrow from its last step back to its first. A decision is a {"Question?"} box with |yes| and |no| (or the answers) on its arrows.
+        - Shapes mean something: {"Question?"} a decision, [/"Input"/] an input or output, [("Store")] stored data, ([...]) where a process starts or ends, [["..."]] a sub-procedure, ((...)) a hub, (((...))) an accepting state.
+        - Colour only when the colour means something the lecture said, the same meaning everywhere in the diagram, and say in the caption what each colour means: :::red, :::blue, :::green, :::amber, :::purple or :::accent (in a state diagram, class name red). Never colour to decorate. Quote every flowchart label: A["..."]. No style, classDef, linkStyle, click, and no HTML but <br> and <small>.
+        - Fit the notes' column (about 620 px): no more than four or five boxes side by side, five participants in a sequence diagram, labels short enough not to wrap more than twice.
+        """.ReplaceLineEndings("\n");
+
     /// <summary>
     /// What the designer is asked: the lecture, its transcript (with times, when it has them) and its notes first,
-    /// then when a diagram helps and when it doesn't, how to stay true to the lecture, how to lay one out, the form
-    /// (with the notes' own examples), the headings it may go under, and the JSON to answer with. A prompt longer than
-    /// <paramref name="maxChars"/> (a local model's context) keeps the notes whole and cuts the transcript's end.
+    /// then when a diagram helps and when it doesn't, which kind of diagram fits which idea (each with an example that
+    /// itself parses and lays out well), how to put the lecture's detail in and stay true to it, how big a diagram may
+    /// be and how a big one is grouped, the style, the caption, a check to run before answering, the headings it may
+    /// go under, and the JSON to answer with. A prompt longer than <paramref name="maxChars"/> (a local model's
+    /// context) keeps the notes whole and cuts the transcript's end.
     /// </summary>
-    public static string Prompt(Meeting m, string notes, Drawings drawings, int cap, int maxChars = int.MaxValue)
+    public static string Prompt(Meeting m, string notes, Drawings drawings, int cap, int maxChars = int.MaxValue, RichKinds kinds = RichKinds.All)
     {
-        bool svg = drawings == Drawings.FlowchartsAndSvg;
+        bool svg = drawings == Drawings.FlowchartsAndSvg && kinds.HasFlag(RichKinds.Drawings);
+        bool mermaid = kinds.HasFlag(RichKinds.Diagrams), plots = kinds.HasFlag(RichKinds.Plots);
         bool timed = TimedText.HasTimes(m.Transcript);
         string transcript = timed ? string.Join("\n", NoteBlocks.Lines(m.Transcript).Select(l => l.Trim()).Where(l => l.Length > 0)) : Py.Strip(m.Transcript);
         if (Speakers.HasLabels(transcript)) transcript = Speakers.NotesHint + "\n\n" + transcript;
@@ -80,10 +254,31 @@ public static partial class DiagramDesign
             ? "The notes have no headings: leave \"after\" empty and the diagram goes at their end."
             : "Headings in the notes, for \"after\":\n" + string.Join("\n", heads.Select(h => "- " + h.Text));
         string many = cap == 1 ? "one diagram" : $"{cap} diagrams";
-        string kinds = svg ? "\"mermaid\" or \"svg\"" : "\"mermaid\"";
+        var kindNames = new List<string>();
+        if (mermaid) kindNames.Add("\"mermaid\" (every kind above)");
+        if (plots) kindNames.Add("\"plot\"");
+        if (svg) kindNames.Add("\"svg\"");
+        string kindList = kindNames.Count == 1 ? kindNames[0] : string.Join(", ", kindNames[..^1]) + " or " + kindNames[^1];
+        // What each kind the student has switched on adds to the brief; a kind that's off is never mentioned, so never asked for.
+        string decide = string.Join("\n", new[] { mermaid ? DecideDiagrams : "", plots ? DecidePlot : "", svg ? DecideSvg : "" }.Where(x => x.Length > 0));
+        string notPlot = plots ? "\n- a formula whose shape the lecture never talked about (a plot is for when how it looks is the point)" : "";
+        string[] checks = [$"every label is something the lecture said{(plots ? " (and a plot's formula is the lecturer's own)" : "")}", "a student would see the main idea in five seconds",
+            .. mermaid ? (string[])["each box is one to five words with its detail in <small>", "a big one is in groups that read as an overview", "every colour means one thing, said in the caption"] : [],
+            "it is the kind that fits the idea",
+            .. mermaid ? (string[])["its source is valid Mermaid (quoted labels, matched brackets, one statement a line, every block closed)"] : []];
+        checks[^1] = "and " + checks[^1];
+        string exampleKind = mermaid ? "mermaid" : plots ? "plot" : "svg";
+        string exampleSource = mermaid ? "flowchart LR\\n  A[\\\"...\\\"] --> B[\\\"...\\\"]" : plots ? "title ...\\nx -3 to 3 \\\"x\\\"\\nf(x) = ..." : "<svg viewBox=\\\"0 0 640 280\\\">...</svg>";
+        string choose = (mermaid ? "Pick the kind whose shape matches the idea. Every one is Mermaid, written in a ```mermaid block's syntax.\n\n" + MermaidKinds
+            : "Pick the kind whose shape matches the idea.");
+        string instead = mermaid ? " instead" : "";
+        string plotBrief = plots ? PlotDesign.Brief + "\n" : "";
+        string specifics = mermaid ? "\n" + DetailSpecifics : "";
+        string size = mermaid ? SizeAndShape + "\n\n" : "";
+        string check = string.Join("; ", checks) + ".";
 
         string Build(string t) => ($$"""
-            You design the diagrams in a university student's study notes. Below are a lecture's transcript and the notes already written from it. Decide whether this lecture teaches anything a diagram would make clearer, and if it does, design that diagram well. A good diagram lets a student see in a few seconds what took the lecturer minutes to say. A diagram that only repeats a list, or shows something the lecture didn't explain, is worse than none.
+            You design the diagrams in a university student's study notes. Below are a lecture's transcript and the notes already written from it. Decide whether this lecture teaches anything a diagram would make clearer, and if it does, design the best study diagram you can: one a student could learn the topic from, and redraw from memory in an exam. A great diagram shows in a few seconds what took the lecturer minutes to say: the steps in order, what causes what, what is part of what, who sends what to whom, what changes when. A diagram that only repeats a list, or shows something the lecture didn't explain, is worse than none.
 
             <lecture>
             {{Summarize.Header(m)}}
@@ -100,14 +295,7 @@ public static partial class DiagramDesign
             ## Decide
 
             Draw a diagram only for something the lecturer explained at some length, whose shape is the point:
-            - a process or sequence of steps (the nursing process, how a bill becomes law, the phases of mitosis)
-            - a cycle (the cardiac cycle, the Krebs cycle, the water cycle)
-            - a pathway or flow (blood through the heart, a signalling cascade, a drug from dose to effect)
-            - a decision rule or algorithm (when to escalate care, a diagnostic rule, what a loop does on each pass)
-            - a hierarchy or classification (the types of tissue, a taxonomy, a class hierarchy)
-            - a structure whose parts connect (the parts of a neuron, the layers of a network, a linked list)
-            - a timeline the lecturer put in order
-            - a comparison, when two or three things share a structure and part ways at clear points (aerobic and anaerobic respiration after glycolysis){{(svg ? "\n- something spatial (the forces on an object, a circuit, a labelled structure, the graph of a function, memory during a function call)" : "")}}
+            {{decide}}
 
             Draw nothing for:
             - discussion, opinion, stories, a case told as a story, or a review of unrelated questions
@@ -115,52 +303,50 @@ public static partial class DiagramDesign
             - definitions, or facts with no order or links between them
             - a topic only mentioned in passing, whose steps or parts were never explained
             - a short list the notes already make clear (three boxes in a row add nothing)
-            - anything the notes already show as a diagram
-            When in doubt, draw nothing. No diagram is a normal, correct answer, and most lectures need one at most. This lecture may have at most {{many}}.
+            - anything the notes already show as a diagram{{(plots ? " or a plot" : "")}}{{notPlot}}
+            When in doubt, draw nothing. No diagram is a normal, correct answer. This lecture may have at most {{many}}, each of a different idea; draw fewer unless each one earns its place.
 
-            ## Stay true to the lecture
+            ## Choose the kind
 
-            - Every box, arrow and label comes from what the lecturer said. Never add a step, part, name, number or example the lecture didn't give, even one you know is true. If the lecturer skipped a step, so does the diagram.
-            - The transcript comes from speech recognition: fix obvious mis-hearings of technical terms (the notes usually have them right), and write in the language of the lecture.
-            - {{(timed ? "\"at\" is the time of the transcript line where the lecturer starts explaining what the diagram shows, as written there (mm:ss, or h:mm:ss past the first hour)." : "This transcript has no times: leave \"at\" empty.")}}
-
-            ## Design it
-
-            - One idea per diagram, drawn as a Mermaid flowchart{{(svg ? ", or as SVG when the idea is spatial" : "")}}.
-            - At most {{MaxBoxes}} boxes; four to nine usually reads best. For a bigger topic, draw its main path and leave the detail to the notes.
-            - Box labels: one to five words, in quotes, in the lecturer's terms. Arrow labels: one to three words, only where the arrow means more than "then" (a valve, a condition, an enzyme, yes or no).
-            - Direction: LR for a sequence, pathway or cycle; TD for a hierarchy, a decision or a timeline. A cycle ends with an arrow from its last step back to its first. A decision is a {"Question?"} box with |yes| and |no| on its arrows.
-            - Group boxes with subgraph "Title" ... end only where the lecturer grouped them (phases, organs, layers), at most two levels deep.
-            - Colour a box only when its colour means something the lecture said (oxygen-rich red and oxygen-poor blue; stimulating green and inhibiting red), with :::red, :::blue, :::green, :::amber, :::purple or :::accent. Never colour to decorate. No style, classDef, linkStyle, click or HTML.
-            - Give it a short title that names what it shows, and a caption: one short sentence (25 words at most) that says in words what the diagram shows, so the notes still teach it without the picture.
-            - "after" is the heading of the section it illustrates, copied exactly from the list below: the most specific one that fits, never Announcements or Questions to review.
-
-            For example, blood flow through the heart as one lecture explained it, a cycle coloured by what the colour means:
-            ```mermaid
-            {{Summarize.MermaidExample}}
-            ```
+            {{choose}}
             """ + (svg ? $$"""
 
 
-            Something spatial is SVG instead: {{Summarize.SvgRules}} For example, the forces on a block on a slope:
+            Something spatial is SVG{{instead}}: {{Summarize.SvgRules}} For example, the forces on a block on a slope:
             ```svg
             {{Summarize.SvgExample}}
             ```
             """ : "") + $$"""
 
 
-            The examples show the form only: draw only what this lecture teaches.
+            {{plotBrief}}The examples show the form only: draw only what this lecture teaches.
+
+            ## Put the lecture's detail in, and keep to it
+
+            - Every box, arrow and label comes from what the lecturer said. Never add a step, part, name, number or example the lecture didn't give, even one you know is true. If the lecturer skipped a step, so does the diagram.{{specifics}}
+            - The transcript comes from speech recognition: fix obvious mis-hearings of technical terms (the notes usually have them right), and write in the language of the lecture.
+            - {{(timed ? "\"at\" is the time of the transcript line where the lecturer starts explaining what the diagram shows, as written there (mm:ss, or h:mm:ss past the first hour)." : "This transcript has no times: leave \"at\" empty.")}}
+
+            {{size}}## Title and caption
+
+            - A short title that names what the diagram shows.
+            - A caption of one or two sentences (50 words at most) that teaches: what the diagram shows and what to notice in it (the turning point, the loop back, where two paths part, what each colour means), so the notes still teach it without the picture.
+            - "after" is the heading of the section it illustrates, copied exactly from the list below: the most specific one that fits, never Announcements or Questions to review.
 
             {{headings}}
+            {{(svg ? "\n" + IllustrationDesign.Brief(IllustrationDesign.Cap(m.Transcript)) : "")}}
+            ## Check before you answer
+
+            For each diagram: {{check}}
 
             ## Answer
 
             Answer with only this JSON object, nothing before or after it:
-            {"reason": "...", "diagrams": [{"title": "...", "after": "...", "at": "{{(timed ? "mm:ss" : "")}}", "kind": "mermaid", "source": "flowchart LR\n  A[\"...\"] --> B[\"...\"]", "caption": "..."}]}
+            {"reason": "...", "diagrams": [{"title": "...", "after": "...", "at": "{{(timed ? "mm:ss" : "")}}", "kind": "{{exampleKind}}", "source": "{{exampleSource}}", "caption": "..."}]{{(svg ? ", \"illustrations\": []" : "")}}}
             - "reason": one sentence: what the diagrams show and why they help, or why this lecture needs none.
             - "diagrams": the most helpful first, at most {{many}}; an empty list [] when nothing is worth drawing.
-            - "kind": {{kinds}}. "source": the diagram's code alone, with no ``` fence, as a JSON string (\n between lines, \" for quotes).
-            - Every diagram needs all six fields; one missing any of them is left out.
+            - "kind": {{kindList}}. "source": the diagram's code{{(plots ? " (or the plot's lines)" : "")}} alone, with no ``` fence, as a JSON string (\n between lines, \" for quotes).
+            - Every diagram needs all six fields; one missing any of them is left out.{{(svg ? "\n- " + IllustrationDesign.AnswerField + "." : "")}}
             """).ReplaceLineEndings("\n");
 
         string whole = Build(transcript);
@@ -200,7 +386,7 @@ public static partial class DiagramDesign
     /// none; one that misses any of them is left out, with a word on why. Whether its source draws is checked later,
     /// where a broken one can be sent back once.
     /// </summary>
-    public static DesignReply Read(string reply, string notes, string transcript, Drawings drawings)
+    public static DesignReply Read(string reply, string notes, string transcript, Drawings drawings, RichKinds kinds = RichKinds.All)
     {
         string text = Py.Strip(Summarize.Thinking().Replace(reply ?? "", ""));
         JsonObject? o = null;
@@ -221,30 +407,44 @@ public static partial class DiagramDesign
         var dropped = new List<string>();
         for (int i = 0; i < list.Count; i++)
         {
-            var (d, why) = Check(list[i] as JsonObject, heads, end, drawings);
+            var (d, why) = Check(list[i] as JsonObject, heads, end, drawings, kinds);
             if (d is not null) ok.Add(d);
             else dropped.Add($"diagram {i + 1}: {why}");
         }
-        return new DesignReply(reason, ok, dropped);
+        // A kind that's switched off is never asked for, and one the designer draws anyway is left out.
+        if (drawings != Drawings.FlowchartsAndSvg || !kinds.HasFlag(RichKinds.Drawings)) return new DesignReply(reason, ok, dropped);
+        var (plans, unplanned) = IllustrationDesign.ReadPlans(o, heads.Select(h => h.Text).ToList(), end);
+        return new DesignReply(reason, ok, [.. dropped, .. unplanned]) { Illustrations = plans };
     }
 
-    static (DesignedDiagram? D, string Why) Check(JsonObject? o, List<(int Line, int Level, string Text)> heads, double? end, Drawings drawings)
+    static (DesignedDiagram? D, string Why) Check(JsonObject? o, List<(int Line, int Level, string Text)> heads, double? end, Drawings drawings,
+        RichKinds kinds = RichKinds.All)
     {
         if (o is null) return (null, "not an object");
         NoteBlockKind kind;
-        switch (Str(o["kind"])?.Trim().ToLowerInvariant())
+        switch (Str(o["kind"])?.Trim().ToLowerInvariant().Replace(" ", "").Replace("-", ""))
         {
-            case "mermaid" or "flowchart":
+            // Mermaid by name, or by any of the kinds it draws (what's in the source decides).
+            case "mermaid" or "flowchart" or "statediagram" or "state" or "statediagramv2" or "sequencediagram" or "sequence" or "timeline" or "mindmap":
                 kind = NoteBlockKind.Mermaid;
                 break;
-            case "svg" when drawings == Drawings.FlowchartsAndSvg:
+            case "svg" when drawings == Drawings.FlowchartsAndSvg && kinds.HasFlag(RichKinds.Drawings):
                 kind = NoteBlockKind.Svg;
                 break;
+            case "plot":
+                kind = NoteBlockKind.Plot;
+                break;
+            // A name that could be either: what's in the source decides (graph TD is a flowchart).
+            case "graph" or "function" or "chart":
+                kind = NoteBlocks.StartsAsDiagram(Str(o["source"]) ?? "") ? NoteBlockKind.Mermaid : NoteBlockKind.Plot;
+                break;
             case "svg":
-                return (null, "an SVG drawing, which this engine doesn't draw");
+                return (null, kinds.HasFlag(RichKinds.Drawings) ? "an SVG drawing, which this engine doesn't draw" : "an SVG drawing, which is switched off");
             default:
                 return (null, "no kind it can be drawn as");
         }
+        if (kind == NoteBlockKind.Mermaid && !kinds.HasFlag(RichKinds.Diagrams)) return (null, "a diagram, which is switched off");
+        if (kind == NoteBlockKind.Plot && !kinds.HasFlag(RichKinds.Plots)) return (null, "a plot, which is switched off");
         string source = Unfenced(Str(o["source"]) ?? "", kind);
         if (source.Trim().Length == 0) return (null, "no source");
         if (kind == NoteBlockKind.Svg && !NoteBlocks.IsSvg(source)) return (null, "its source isn't an SVG drawing");
@@ -317,21 +517,46 @@ public static partial class DiagramDesign
     /// <summary>
     /// One diagram pass over freshly written <paramref name="notes"/>: any diagrams an earlier pass added come out
     /// first, the designer is asked once (<paramref name="ask"/>, told the answer must be JSON), and what it designed
-    /// goes in, each checked, a broken one sent back once (a plain answer, this time) or left out. A reply that can't
-    /// be used, or a lecture too short, leaves <paramref name="notes"/> exactly as given. Only
-    /// <paramref name="ask"/>'s own failures (and cancelling) throw.
+    /// is checked: a broken one sent back once (a plain answer, this time) or left out, one untrue to the lecture left
+    /// out. Then each one that's kept is laid out as the notes will show it; while <paramref name="budget"/> leaves
+    /// <see cref="RevisionRoom"/>, those that would look wrong go back together once, with what's wrong, and each
+    /// redesign that draws, stays true and looks better takes its draft's place. A reply that can't be used, or a
+    /// lecture too short, leaves <paramref name="notes"/> exactly as given. Only <paramref name="ask"/>'s own failures
+    /// in the first design (and cancelling) throw; a revision that fails or runs late keeps the drafts. An illustration
+    /// the designer plans is drawn with <paramref name="draw"/> (<paramref name="ask"/> when there's none), in
+    /// <see cref="IllustrationDesign.Timeout"/> from the start, the caller told so through <paramref name="longer"/>.
+    /// <paramref name="kinds"/> are the kinds of rich notes the student has switched on: the designer is asked for no other.
     /// </summary>
     public static async Task<DesignResult> DesignAsync(Meeting m, string notes, Drawings drawings, Func<string, bool, Task<string>> ask,
-        int maxPromptChars = int.MaxValue)
+        int maxPromptChars = int.MaxValue, TimeSpan? budget = null, Func<string, Task<string>>? draw = null, Action<TimeSpan>? longer = null,
+        Func<string, Task<string>>? compose = null, ComposedScenes? scenes = null, RichKinds kinds = RichKinds.All)
     {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
         int cap = Cap(m.Transcript);
         if (cap == 0) return new DesignResult(notes, [], "the lecture is too short for a diagram", []);
         string clean = Strip(notes);
-        var reply = Read(await ask(Prompt(m, clean, drawings, cap, maxPromptChars), true), clean, m.Transcript, drawings);
+        var reply = Read(await ask(Prompt(m, clean, drawings, cap, maxPromptChars, kinds), true), clean, m.Transcript, drawings, kinds);
         if (reply.Malformed) return new DesignResult(notes, [], "", reply.Dropped) { Malformed = true };
         var drawn = new List<DesignedDiagram>();
         var dropped = reply.Dropped.ToList();
         string grounds = (TimedText.Plain(m.Transcript) + "\n" + clean).ToLowerInvariant();
+        // Illustrations are drawn while the diagrams are checked, in a time of their own: a detailed drawing takes several
+        // minutes, so a pass that draws one may run longer (the caller is told how long, all told).
+        // One composed from the parts library takes seconds: the pass only runs longer when one must be drawn.
+        var drawer = draw ?? (prompt => ask(prompt, false));
+        int extended = 0;
+        if (reply.Illustrations.Count > 0 && compose is null) longer?.Invoke(IllustrationDesign.Timeout);
+        else if (compose is not null)
+        {
+            var asked = drawer;
+            drawer = prompt =>
+            {
+                if (Interlocked.Exchange(ref extended, 1) == 0) longer?.Invoke(IllustrationDesign.Timeout);
+                return asked(prompt);
+            };
+        }
+        var illustrating = IllustrationDesign.DrawAllAsync(m, clean, reply.Illustrations, grounds, drawer,
+            () => (budget is { } b && longer is null ? b : IllustrationDesign.Timeout) - clock.Elapsed, maxPromptChars, compose, scenes);
         foreach (var d in reply.Diagrams)
         {
             if (drawn.Count >= cap)
@@ -352,14 +577,116 @@ public static partial class DiagramDesign
             if (drawn.Any(x => x.Source == ready.Source)) continue;
             drawn.Add(ready);
         }
-        return new DesignResult(drawn.Count == 0 ? clean : Insert(clean, drawn), drawn, reply.Reason, dropped);
+
+        // How each would look in the notes; those that would look wrong go back once, while there's time.
+        var problems = drawn.Select(Looks).ToList();
+        int revised = 0;
+        var left = (budget ?? Timeout) - clock.Elapsed;
+        var wrong = Enumerable.Range(0, drawn.Count).Where(i => problems[i].Count > 0).ToList();
+        if (wrong.Count > 0 && left > RevisionRoom)
+        {
+            try
+            {
+                string answer = await ask(RevisePrompt(m, clean, wrong.Select(i => (drawn[i], problems[i])).ToList(), drawings), true)
+                    .WaitAsync(left - TimeSpan.FromSeconds(20));
+                var again = Read(answer, clean, m.Transcript, drawings, kinds);
+                for (int k = 0; k < wrong.Count && k < again.Diagrams.Count; k++)
+                {
+                    int i = wrong[k];
+                    var fresh = again.Diagrams[k] with { After = drawn[i].After, At = again.Diagrams[k].At ?? drawn[i].At };
+                    if (fresh.Kind != drawn[i].Kind || Summarize.DiagramProblem(fresh.Kind, fresh.Source) is not null || Unfaithful(fresh, grounds) is not null) continue;
+                    var looks = Looks(fresh);
+                    if (looks.Count >= problems[i].Count) continue;
+                    drawn[i] = fresh;
+                    problems[i] = looks;
+                    revised++;
+                }
+            }
+            catch (Exception e) when (e is not OperationCanceledException)
+            {
+                // A revision that fails or runs late changes nothing: the drafts stand.
+            }
+        }
+        var still = drawn.Select((d, i) => (d, i)).Where(x => problems[x.i].Count > 0).Select(x => $"“{x.d.Title}”: {string.Join("; ", problems[x.i])}").ToList();
+        var art = await illustrating;
+        drawn.AddRange(art.Drawn);
+        dropped.AddRange(art.Dropped);
+        still.AddRange(art.Problems);
+        return new DesignResult(drawn.Count == 0 ? clean : Insert(clean, drawn), drawn, reply.Reason, dropped) { Revised = revised + art.Revised, Problems = still, Composed = art.Composed };
+    }
+
+    /// <summary>What would look wrong with a diagram in the notes (<see cref="DiagramLint"/>); nothing for an SVG
+    /// drawing, which draws as written.</summary>
+    static IReadOnlyList<string> Looks(DesignedDiagram d)
+    {
+        if (d.Kind == NoteBlockKind.Plot)
+        {
+            try
+            {
+                return PlotLint.Problems(Plot.Parse(d.Source));
+            }
+            catch (PlotException)
+            {
+                return [];
+            }
+        }
+        if (d.Kind != NoteBlockKind.Mermaid) return [];
+        try
+        {
+            return DiagramLint.Problems(Flowchart.Parse(d.Source));
+        }
+        catch (MermaidException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// The one revision: the diagrams that would look wrong, each with its title, caption and source and what was
+    /// found wrong with it laid out at the notes' width, the notes to keep it true, the essentials of the brief, and
+    /// the same JSON to answer with, a diagram for each in the same order.
+    /// </summary>
+    public static string RevisePrompt(Meeting m, string notes, IReadOnlyList<(DesignedDiagram Diagram, IReadOnlyList<string> Problems)> wrong, Drawings drawings)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"You designed {(wrong.Count == 1 ? "this diagram" : "these diagrams")} for a university student's study notes on a lecture. ")
+            .Append("Study Stash laid each one out at the width of the notes (about 620 px) and found the problems listed under it. ")
+            .Append("Redesign each one so every problem is fixed, keeping what was good about it and keeping it true to the lecture: every label must still be something the lecture said (the notes below are written from it). ")
+            .Append("Keep the same kind of diagram unless another kind fixes the problem better.\n\n");
+        sb.Append("<lecture>\n").Append(Summarize.Header(m)).Append("\n</lecture>\n\n<notes>\n").Append(notes).Append("\n</notes>\n");
+        for (int i = 0; i < wrong.Count; i++)
+        {
+            var (d, problems) = wrong[i];
+            sb.Append($"\n## Diagram {i + 1}: {d.Title}\n\n\"after\": \"{d.After}\", \"at\": \"{(d.At is double at ? TimedText.Clock(at) : "")}\"\n\n```{Summarize.Fence(d.Kind)}\n{d.Source}\n```\n\nCaption: {d.Caption}\n\nProblems:\n");
+            foreach (string p in problems) sb.Append("- ").Append(p).Append('\n');
+        }
+        sb.Append($$"""
+
+            ## How
+
+            - A box is one to five words; its detail goes in a smaller line under it: A["Name<br><small>what, where, how much</small>"].
+            - A big topic goes in 3 to 7 subgraphs of 3 to 7 boxes each ("subgraph ID ["Title"]" ... "end"), most arrows inside a group, a few between groups, each joining the box where one group's part ends to the box where the next starts; flowchart LR shows the groups as columns.
+            - Narrow enough for the notes: no more than four or five boxes side by side, five participants in a sequence diagram.
+            - Arrows that cross: put the boxes in the order the arrows run, and drop arrows that repeat what the order shows.
+            - Keep its colours (:::red and the rest) and what they mean, said in the caption. Quote every flowchart label. No style, classDef, linkStyle or click.
+            - Don't split a decision or an algorithm into groups just to have groups: groups are for a big topic's phases, places or parts.
+            - A plot ("kind": "plot"): keep the lecturer's formula exactly; fix it with its ranges (x, y), its sliders' ranges and starting values, and its labels.{{(wrong.Any(w => w.Diagram.Kind == NoteBlockKind.Plot) ? "\n\n" + PlotDesign.Reference : "")}}
+
+            ## Answer
+
+            Answer with only this JSON object, nothing before or after it, with one diagram for each above, in the same order:
+            {"reason": "what you changed", "diagrams": [{"title": "...", "after": "", "at": "", "kind": "mermaid or plot, as it was", "source": "...", "caption": "..."}]}
+            - "source": the diagram's code alone, with no ``` fence, as a JSON string (\n between lines, \" for quotes). "caption": one or two sentences, 50 words at most, saying what it shows and what to notice.
+            - "after" and "at": each diagram's own, copied exactly as given above it.
+            """);
+        return sb.ToString().ReplaceLineEndings("\n");
     }
 
     /// <summary>The diagram as it can be drawn: as designed, or as its one repair came back; null when neither draws.</summary>
     static async Task<DesignedDiagram?> Drawable(DesignedDiagram d, Func<string, Task<string>> ask)
     {
         if (Summarize.DiagramProblem(d.Kind, d.Source) is null) return d;
-        string fence = d.Kind == NoteBlockKind.Svg ? "svg" : "mermaid";
+        string fence = Summarize.Fence(d.Kind);
         string repaired = await Summarize.RepairDiagramsAsync($"```{fence}\n{d.Source}\n```", ask);
         var block = NoteBlocks.Find(repaired).FirstOrDefault(b => b.Kind == d.Kind && b.Closed);
         return block is not null && Summarize.DiagramProblem(d.Kind, block.Text) is null ? d with { Source = block.Text } : null;
@@ -371,17 +698,30 @@ public static partial class DiagramDesign
         "they", "them", "more", "less", "than", "back", "also", "step", "steps", "start", "until", "after", "before", "next",
     ];
 
-    /// <summary>Why a drawable diagram still isn't one for these notes: too few or too many boxes, or wording the
-    /// transcript and notes don't have (a diagram about something the lecture never said). Null when it's fine.</summary>
+    /// <summary>Why a drawable diagram still isn't one for these notes: too few or too many boxes, boxes that don't
+    /// join up, or wording the transcript and notes don't have (a diagram about something the lecture never said).
+    /// Null when it's fine.</summary>
     static string? Unfaithful(DesignedDiagram d, string grounds)
     {
         IReadOnlyList<string> words;
-        if (d.Kind == NoteBlockKind.Mermaid)
+        if (d.Kind == NoteBlockKind.Plot)
+        {
+            // A plot's formula is drawn exactly: what's checked is that it's about what the lecture said (its title and
+            // labels), and that it isn't a wall of curves.
+            var plot = Plot.Parse(d.Source);
+            if (plot.Items.Count(PlotLayout.Legendable) > PlotLint.MaxSeries + 2) return "too many curves to be one plot";
+            words = [d.Title, .. PlotDesign.Labels(plot)];
+        }
+        else if (d.Kind == NoteBlockKind.Mermaid)
         {
             var chart = Flowchart.Parse(d.Source);
-            if (chart.Nodes.Count > MaxNodes) return $"{chart.Nodes.Count} boxes, more than a diagram in the notes should have";
-            if (chart.Nodes.Count < MinNodes) return "too few boxes to be worth a diagram";
-            if (Pieces(chart) > 2) return "its boxes don't join up into one picture";
+            int boxes = chart.Nodes.Count(n => n.Role is not (NodeRole.Start or NodeRole.End or NodeRole.Note or NodeRole.Bar));
+            if (boxes > MaxNodes) return $"{boxes} boxes, more than a diagram in the notes should have";
+            if (boxes < MinNodes && chart.Form != ChartForm.Sequence) return "too few boxes to be worth a diagram";
+            if (chart.Form == ChartForm.Sequence && chart.Edges.Count < 2) return "too few messages to be worth a diagram";
+            // A flowchart or state diagram is one idea (two, side by side, for a comparison); a sequence diagram,
+            // a timeline and a mind map hold together by their kind.
+            if (chart.Form is ChartForm.Flowchart or ChartForm.State && Pieces(chart) > Math.Max(2, chart.Groups.Count(g => g.Parent is null))) return "its boxes don't join up into one picture";
             words = chart.Labels();
         }
         else words = SafeSvg.Clean(d.Source).Texts;
@@ -395,7 +735,7 @@ public static partial class DiagramDesign
     /// idea is one piece (two, for things compared side by side); a scatter of pairs is no diagram at all.</summary>
     static int Pieces(Flowchart chart)
     {
-        var root = chart.Nodes.ToDictionary(n => n.Id, n => n.Id);
+        var root = chart.Nodes.Where(n => n.Role != NodeRole.Note).ToDictionary(n => n.Id, n => n.Id);
         string Find(string id)
         {
             while (root[id] != id) id = root[id] = root[root[id]];
@@ -403,7 +743,7 @@ public static partial class DiagramDesign
         }
         foreach (var e in chart.Edges)
             if (root.ContainsKey(e.From) && root.ContainsKey(e.To)) root[Find(e.From)] = Find(e.To);
-        return chart.Nodes.Select(n => Find(n.Id)).Distinct().Count();
+        return root.Keys.Select(Find).Distinct().Count();
     }
 
     // --- in and out of the notes -----------------------------------------------------------------------------------
@@ -430,6 +770,22 @@ public static partial class DiagramDesign
         return string.Join("\n", lines);
     }
 
+    /// <summary>
+    /// Diagrams designed a while ago, put into the notes as they stand now: any an earlier pass added come out (so they're
+    /// replaced, never stacked), and each goes at the end of the section its heading starts while that heading is still
+    /// there (at the end of notes with no headings); one whose heading has gone is skipped. Nothing else in the notes
+    /// moves or changes. Notes the designer read unchanged come out exactly as the pass would have written them. None
+    /// placed: the notes, untouched.
+    /// </summary>
+    public static (string Notes, IReadOnlyList<DesignedDiagram> Placed, IReadOnlyList<DesignedDiagram> Skipped) Place(string notes, IReadOnlyList<DesignedDiagram> diagrams)
+    {
+        string clean = Strip(notes);
+        var heads = Headings(NoteBlocks.Lines(clean));
+        var placed = diagrams.Where(d => heads.Count == 0 || heads.Any(h => Norm(h.Text) == Norm(d.After))).ToList();
+        var skipped = diagrams.Where(d => !placed.Contains(d)).ToList();
+        return (placed.Count == 0 ? notes : Insert(clean, placed), placed, skipped);
+    }
+
     /// <summary>The last line with anything on it in the section <paramref name="after"/> heads (or in the notes).</summary>
     static int Anchor(List<string> lines, List<(int Line, int Level, string Text)> heads, string after)
     {
@@ -453,7 +809,7 @@ public static partial class DiagramDesign
         yield return "";
         yield return $"**{d.Title}**";
         yield return "";
-        yield return svg ? "```svg" : "```mermaid";
+        yield return "```" + Summarize.Fence(d.Kind);
         yield return svg ? $"<!-- {Mark}{from} -->" : $"%% {Mark}{from}";
         foreach (string line in d.Source.Split('\n')) yield return line;
         yield return "```";

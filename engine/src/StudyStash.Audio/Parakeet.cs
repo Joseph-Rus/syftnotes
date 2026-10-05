@@ -45,6 +45,9 @@ public sealed class ParakeetTranscriber : ITranscriber
     readonly OfflineRecognizer recognizer;
     readonly string fixedLanguage;
 
+    /// <summary>For the log, once it has loaded: what it runs on (sherpa-onnx's onnxruntime, on the processor).</summary>
+    public string Backend { get; }
+
     /// <param name="folder">Where the model's four files are.</param>
     /// <param name="language">A language the lecture is fixed to (reported back as its language), or "" for none.</param>
     public ParakeetTranscriber(string folder, string language = "", int threads = 0)
@@ -59,6 +62,7 @@ public sealed class ParakeetTranscriber : ITranscriber
         config.ModelConfig.NumThreads = threads > 0 ? threads : Math.Clamp(Environment.ProcessorCount / 2, 2, 8);
         recognizer = new OfflineRecognizer(config);
         fixedLanguage = language is "auto" ? "" : language;
+        Backend = $"sherpa-onnx on the {config.ModelConfig.Provider}, {config.ModelConfig.NumThreads} threads";
     }
 
     public Task<Transcription> TranscribeAsync(float[] samples, string prompt, string language, CancellationToken stop) =>

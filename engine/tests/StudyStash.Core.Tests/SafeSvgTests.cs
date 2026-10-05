@@ -76,6 +76,7 @@ public class SafeSvgTests
         { "garbage", """<svg viewBox="0 0 10 10"><rect""" },
         { "empty", "" },
         { "processing instruction", """<?xml-stylesheet href="http://example.com/x.css"?>""" + Open + """<rect width="1" height="1"/></svg>""" },
+        { "a part's name and line", Open + """<g id="m"><title>Motor<script>alert(1)</script></title><desc onload="alert(2)">Spins <a href="http://example.com">here</a></desc><rect width="5" height="5" onclick="x()"/></g></svg>""" },
         { "base href", """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" xml:base="http://example.com/"><rect width="1" height="1"/></svg>""" },
     };
 
@@ -112,7 +113,12 @@ public class SafeSvgTests
     [Fact]
     public void A_use_bomb_is_defused_and_too_many_uses_refused()
     {
-        Assert.Equal("This drawing repeats its parts too many times to show.", Clean(UseBomb(11)).Problem);
+        Assert.Equal("This drawing repeats its parts too many times to show.", Clean(UseBomb(101)).Problem);
+        // A board's pins: hundreds of copies of one small pin are fine; hundreds of copies of a big part are not.
+        string Copies(int parts, int copies) => Open + "<defs><g id=\"p\">" + string.Concat(Enumerable.Repeat("<rect width=\"1\" height=\"1\"/>", parts))
+            + "</g></defs>" + string.Concat(Enumerable.Range(0, copies).Select(i => $"<use href=\"#p\" x=\"{i}\"/>")) + "</svg>";
+        Assert.Null(Clean(Copies(3, 400)).Problem);
+        Assert.Equal("This drawing repeats its parts too many times to show.", Clean(Copies(200, 300)).Problem);
 
         // Under the count, only the copies of a plain part are left: a copy of anything with a copy inside goes.
         var defused = Clean(UseBomb(5));
@@ -132,11 +138,61 @@ public class SafeSvgTests
         string deep = Open + string.Concat(Enumerable.Repeat("<g>", 100)) + "<rect width=\"1\" height=\"1\"/>" + string.Concat(Enumerable.Repeat("</g>", 100)) + "</svg>";
         Assert.Equal("This drawing is nested too deeply to show.", Clean(deep).Problem);
         string huge = Open + "<text>" + new string('x', 5 * 1024 * 1024) + "</text></svg>";
-        Assert.Equal("This drawing is too big to show (over 100 KB).", Clean(huge).Problem);
+        Assert.Equal("This drawing is too big to show (over 192 KB).", Clean(huge).Problem);
         Assert.Equal("This drawing is too big to show (over 5,000 units).", Clean("""<svg xmlns="http://www.w3.org/2000/svg" width="1e9" height="100"/>""").Problem);
         Assert.Equal("This drawing has no size: it needs a viewBox, or a width and height.", Clean("""<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1"/></svg>""").Problem);
         Assert.Equal("This isn't an SVG drawing.", Clean("<html/>").Problem);
         Assert.StartsWith("This drawing isn't well-formed SVG", Clean("<svg viewBox=\"0 0 1 1\"><rect></svg>").Problem);
+    }
+
+    /// <summary>A detailed illustration is a few hundred curves: one of about 150 KB is shown, and whatever hides
+    /// among its parts (a script, a handler, an embedded page, a link out, a style sheet) still goes.</summary>
+    [Fact]
+    public void A_detailed_illustration_is_shown_and_nothing_that_runs_survives_among_its_parts()
+    {
+        var sb = new StringBuilder(Open.Replace("0 0 200 100", "0 0 720 600") + "<title>A hand</title><g id='art'>");
+        for (int i = 0; sb.Length < 150 * 1024; i++)
+            sb.Append($"<g id='bone-{i}'><title>Bone {i}</title><desc>A bone</desc><path d='M{i % 700} 10 C {i % 700 + 5} 40 {i % 700 + 9} 80 {i % 700 + 3} 120 S {i % 700 + 7} 160 {i % 700} 200' fill='#F2E4C4' stroke='#A88C5C' stroke-width='1.5'/></g>");
+        sb.Append("""<g id="evil"><title>Evil</title><script>alert(1)</script><rect width="5" height="5" onmouseover="steal()" style="fill:url(http://example.com/x)"/><foreignObject><iframe src="http://example.com"/></foreignObject><use href="http://example.com/x.svg#a"/><style>@import url(http://example.com/x.css);</style><image href="data:image/png;base64,AAAA"/></g>""");
+        string svg = sb.Append("</g></svg>").ToString();
+        Assert.InRange(Encoding.UTF8.GetByteCount(svg), 150 * 1024, SafeSvg.MaxBytes);
+        var r = Clean(svg, new SafeSvgOptions { Palette = SvgPalette.Written, Dark = true });
+        Assert.Null(r.Problem);
+        Harmless(r);
+        Assert.True(r.Parts.Count > 300);
+        Assert.Equal(("evil", "Evil"), (r.Parts[^1].Id, r.Parts[^1].Name));
+    }
+
+    /// <summary>On a dark page an illustration keeps its own colours (a hand still skin-coloured, a frame still
+    /// dark), lifted clear of the dark paper and held back from glaring; a background left in becomes the paper. A
+    /// plain drawing keeps the old rule (see the test above).</summary>
+    [Fact]
+    public void An_illustration_keeps_its_colours_in_dark_moved_into_what_a_dark_page_carries()
+    {
+        string art = Open + """<g id="hand"><title>Hand</title><rect width="5" height="5" fill="#F2C6A6" stroke="#A86F52"/></g><rect width="5" height="5" fill="#000000" stroke="#24272B"/><rect width="200" height="100" fill="#FAFAFA" stroke="#FFFFFF"/><linearGradient id="g"><stop offset="0" stop-color="#4A9AD1"/></linearGradient><text fill="#1D1D1F">Hand</text><ellipse rx="3" ry="2" fill="#FCF6E8" fill-opacity="0.6"/></svg>""";
+        var r = Clean(art, new SafeSvgOptions { Palette = Dark, Dark = true });
+        var doc = XDocument.Parse(r.Svg!);
+        var rects = doc.Descendants().Where(e => e.Name.LocalName == "rect").ToList();
+        string Fill(int i) => (string)rects[i].Attribute("fill")!;
+        string Stroke(int i) => (string)rects[i].Attribute("stroke")!;
+        double L(string hex) => SvgColour.Lab(hex)!.Value.L;
+        double Hue(string hex) => Math.Atan2(SvgColour.Lab(hex)!.Value.B, SvgColour.Lab(hex)!.Value.A);
+        // Skin stays skin: about the same hue and lightness; its outline still darker than it.
+        Assert.InRange(Math.Abs(Hue(Fill(0)) - Hue("#f2c6a6")), 0, 0.15);
+        Assert.InRange(L(Fill(0)), 0.75, 0.9);
+        Assert.True(L(Stroke(0)) < L(Fill(0)));
+        // Black and near-black are lifted clear of the dark paper; a near-white background over the whole canvas is the
+        // paper, but a highlight (a light tint, or white) stays light.
+        Assert.InRange(L(Fill(1)), 0.43, 0.5);
+        Assert.True(L(Stroke(1)) > L(SvgPalette.DarkPaper.ToLowerInvariant()) + 0.15);
+        Assert.Equal(SvgPalette.DarkPaper, Fill(2));
+        Assert.True(L(Stroke(2)) > 0.85);
+        Assert.True(L((string)doc.Descendants().Single(e => e.Name.LocalName == "ellipse").Attribute("fill")!) > 0.85);
+        // Gradients follow, and the words keep the look's ink.
+        Assert.NotEqual("#4A9AD1", (string?)doc.Descendants().Single(e => e.Name.LocalName == "stop").Attribute("stop-color"));
+        Assert.Equal("#F5F5F7", (string?)doc.Descendants().Single(e => e.Name.LocalName == "text").Attribute("fill"));
+        // Light keeps every colour as written.
+        Assert.Contains("fill=\"#F2C6A6\"", Clean(art, new SafeSvgOptions { Palette = SvgPalette.Written }).Svg);
     }
 
     [Fact]

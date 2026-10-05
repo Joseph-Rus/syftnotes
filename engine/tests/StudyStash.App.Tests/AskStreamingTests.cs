@@ -344,7 +344,7 @@ public class AskStreamingTests
     public void A_formula_block_still_being_written_is_a_quiet_line_until_it_closes()
     {
         var note = new NoteView { Compact = true, Markdown = "The mean:\n\n$$\n\\bar{x} = \\frac{1}{n}" };
-        Assert.Equal(NoteView.FormulaWords, Assert.IsType<TextBlock>(note.Children[^1]).Text);
+        Assert.Equal(NoteView.FormulaWords, Assert.IsAssignableFrom<TextBlock>(note.Children[^1]).Text);
 
         note.Markdown += "\\sum x_i\n$$";
         Assert.IsNotType<TextBlock>(note.Children[^1]);

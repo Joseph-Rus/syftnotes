@@ -106,6 +106,8 @@ public sealed partial class LibraryWeb
         var ts = options.Tailscale();
         var rel = await options.Latest(3600);
         var picked = AiSettings.Load(cfg.Home);
+        // What sorting follows: the main AI, or the notes engine while Ollama has no model to sort with (AiJobs.SortAsync).
+        string sortsWith = await AiJobs.SortFollowsNotesAsync(picked, cfg, Jobs.Checks) ?? picked.Provider;
         var counts = store.ClassesSummary().ToDictionary(c => c.ClassName, c => c.Count);
         bool? atLogin = null;
         try
@@ -144,7 +146,7 @@ public sealed partial class LibraryWeb
             ["sorting"] = new JsonObject
             {
                 ["engine"] = picked.ByJob.TryGetValue("sort", out var sorts) ? sorts.Provider : "",
-                ["default"] = AiProviders.All(() => cfg.OllamaHost).FirstOrDefault(p => p.Id == picked.Provider)?.Name ?? picked.Provider,
+                ["default"] = AiProviders.All(() => cfg.OllamaHost).FirstOrDefault(p => p.Id == sortsWith)?.Name ?? sortsWith,
                 ["engines"] = new JsonArray(AiProviders.All(() => cfg.OllamaHost).Select(p => (JsonNode?)new JsonObject
                 {
                     ["id"] = p.Id, ["name"] = p.Name, ["installed"] = p.Available(),
@@ -185,6 +187,25 @@ public sealed partial class LibraryWeb
 
     static string? Text(JsonNode? node) => node is JsonValue v && v.TryGetValue(out string? s) ? s.Trim() : null;
 
+    /// <summary>The classes a new class list renames, each from the name it had to the one typed (the app's Settings and the
+    /// library's own web page both send which was which): the way "Use Canvas course names" does it, a class's lectures,
+    /// folder and Canvas course move with it, instead of staying behind under the old name. Its old name stays as another
+    /// name in <paramref name="classes"/> (the list about to be saved), so a lecture a laptop recorded under it still files
+    /// here. Null when done, or why not ("Canvas is syncing…"); some of them may be done by then, and stay done.</summary>
+    string? RenameClasses(List<ClassRenameStep> renames, List<ClassDef> classes)
+    {
+        var outcome = ClassRename.Apply(cfg, store, renames, Canvas.Crawl);
+        if (outcome.Renamed.Count > 0)
+        {
+            Console.WriteLine($"[classes] renamed in Settings: {string.Join(", ", outcome.Renamed.Select(st => $"{st.From} → {st.To}"))} ({outcome.Lectures} lectures moved)");
+            pipeline.Wake();
+        }
+        foreach (var st in outcome.Renamed)
+            if (classes.FirstOrDefault(c => c.Name == st.To) is { } sent && cfg.Classes.FirstOrDefault(c => c.Name == st.To) is { } kept)
+                sent.Aliases = [.. sent.Aliases.Concat(kept.Aliases).Distinct(StringComparer.OrdinalIgnoreCase)];
+        return outcome.Problem;
+    }
+
     /// <summary>Changes what the body names and leaves the rest; null when done, or why not (nothing is changed then).</summary>
     IResult? ChangeSettings(JsonObject body)
     {
@@ -192,6 +213,9 @@ public sealed partial class LibraryWeb
         string? name = Text(body["name"]);
         if (name is not null && (name.Length == 0 || name.Length > 80)) return Http.Detail(400, "Give the library a name (up to 80 characters).");
         List<ClassDef>? classes = null;
+        // A class sent with the name it had ("was") under a new one is a rename: its lectures, folder and Canvas course
+        // go with it (as "Use Canvas course names" does), rather than staying behind under the old name.
+        var renames = new List<ClassRenameStep>();
         if (body["classes"] is JsonArray list)
         {
             classes = [];
@@ -205,7 +229,9 @@ public sealed partial class LibraryWeb
                 if (!seen.Add(cls)) return Http.Detail(400, $"There are two classes called {cls}.");
                 var aliases = (item["aliases"] as JsonArray)?.Select(Text).OfType<string>().Where(a => a.Length > 0).Distinct().ToList() ?? [];
                 classes.Add(new ClassDef(cls, aliases, Text(item["description"]) ?? ""));
+                if (Text(item["was"]) is { Length: > 0 } was && was != cls && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, cls, 0, ""));
             }
+            if (renames.Count > 0 && ClassRename.Blocked(Canvas.Crawl) is { } busy) return Http.Detail(409, busy);
         }
         double? confidence = body["notes"]?["min_confidence"] is JsonValue cv && cv.TryGetValue(out double d) && !double.IsNaN(d) ? Math.Clamp(d, 0, 1) : null;
         string? sortEngine = Text(body["sort_engine"]);
@@ -244,6 +270,7 @@ public sealed partial class LibraryWeb
             }
         }
         if (name is not null) cfg.PoolName = name;
+        if (renames.Count > 0 && RenameClasses(renames, classes!) is { } problem) return Http.Detail(409, problem);
         if (classes is not null) cfg.Classes = classes;
         if (body["notes"] is JsonObject notes)
         {

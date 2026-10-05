@@ -66,9 +66,9 @@ public sealed partial class AiEngineRow : ObservableObject
 }
 
 /// <summary>
-/// Settings → AI engines (design 13): who writes the notes, who draws their diagrams and who answers questions, every
-/// engine's state and what to do about it, and the Ollama fallback. Reads and drives one library's AI (`IAiLibrary`);
-/// the view is just this.
+/// Settings → AI engines (design 13): who writes the notes and who answers questions, the rich notes switches (diagrams,
+/// formula plots and drawings, and who designs them), Claude Code's speed, every engine's state and what to do about it,
+/// and the Ollama fallback. Reads and drives one library's AI (`IAiLibrary`); the view is just this.
 /// </summary>
 public sealed partial class AiEnginesModel : ObservableObject
 {
@@ -85,8 +85,10 @@ public sealed partial class AiEnginesModel : ObservableObject
     public ObservableCollection<AiEngineRow> AddChoices { get; } = [];
     public List<EngineChoice> NotesChoices { get; private set; } = [];
     public List<EngineChoice> AskChoices { get; private set; } = [];
-    /// <summary>Who draws the diagrams: Automatic, Same as notes, each engine, Off.</summary>
+    /// <summary>Who draws the diagrams: Automatic, Same as notes, each engine. (Off is the Rich notes switch.)</summary>
     public List<EngineChoice> DiagramsChoices { get; private set; } = [];
+    /// <summary>How fast Claude Code writes the notes and designs the rich notes: Standard, Fast mode, Quicker model.</summary>
+    public List<EngineChoice> SpeedChoices { get; private set; } = [];
 
     [ObservableProperty] public partial string SelectedNotes { get; set; } = "";
     [ObservableProperty] public partial string SelectedAsk { get; set; } = "";
@@ -94,6 +96,18 @@ public sealed partial class AiEnginesModel : ObservableObject
     [ObservableProperty] public partial string SelectedDiagrams { get; set; } = "";
     /// <summary>The engine that pick comes to on the library right now ("" when nobody draws them).</summary>
     [ObservableProperty] public partial string DiagramsBy { get; set; } = "";
+    /// <summary>The library has the Rich notes switches (a library too old to have them shows none of them).</summary>
+    [ObservableProperty] public partial bool HasRich { get; set; }
+    /// <summary>Rich notes: diagrams, formula plots and drawings are added after the notes; off, plain notes and nothing more
+    /// is asked of the AI.</summary>
+    [ObservableProperty] public partial bool RichOn { get; set; }
+    [ObservableProperty] public partial bool RichDiagrams { get; set; }
+    [ObservableProperty] public partial bool RichPlots { get; set; }
+    [ObservableProperty] public partial bool RichDrawings { get; set; }
+    /// <summary>Claude Code's speed ("" from a library too old to have it: the row isn't shown).</summary>
+    [ObservableProperty] public partial string SelectedSpeed { get; set; } = "";
+    /// <summary>Claude Code is installed on the library: its speed only matters then.</summary>
+    [ObservableProperty] public partial bool HasClaude { get; set; }
     [ObservableProperty] public partial bool Fallback { get; set; }
     [ObservableProperty] public partial bool Busy { get; set; }
     [ObservableProperty] public partial string? Say { get; set; }
@@ -106,6 +120,14 @@ public sealed partial class AiEnginesModel : ObservableObject
     /// <summary>The diagrams row's line: who reads each transcript to draw them, or that nobody does.</summary>
     public string DiagramsAbout => AiWords.DiagramsAbout(SelectedDiagrams, DiagramsBy);
     public bool HasDiagrams => SelectedDiagrams.Length > 0;
+    /// <summary>The "Drawn by" row: while rich notes are on.</summary>
+    public bool ShowDrawnBy => HasDiagrams && HasRich && RichOn;
+    /// <summary>The Rich notes group's per-kind switches: shown while rich notes are on.</summary>
+    public bool ShowKinds => HasRich && RichOn;
+    public string RichAbout => AiWords.RichAbout(RichOn);
+    public bool HasSpeed => SelectedSpeed.Length > 0 && HasClaude;
+    public string SelectedSpeedName => SpeedChoices.FirstOrDefault(c => c.Id == SelectedSpeed)?.Name ?? SelectedSpeed;
+    public string SpeedAbout => AiWords.SpeedAbout(SelectedSpeed);
     public bool HasAddChoices => AddChoices.Count > 0;
     public string OlderLibraryWords => AiWords.OlderLibraryWords;
 
@@ -132,8 +154,49 @@ public sealed partial class AiEnginesModel : ObservableObject
         OnPropertyChanged(nameof(SelectedDiagramsName));
         OnPropertyChanged(nameof(DiagramsAbout));
         OnPropertyChanged(nameof(HasDiagrams));
+        OnPropertyChanged(nameof(ShowDrawnBy));
         if (!loading && value.Length > 0) _ = PostDefaultsAsync(diagrams: value);
     }
+
+    partial void OnHasRichChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowDrawnBy));
+        OnPropertyChanged(nameof(ShowKinds));
+    }
+
+    partial void OnRichOnChanged(bool value)
+    {
+        OnPropertyChanged(nameof(RichAbout));
+        OnPropertyChanged(nameof(ShowDrawnBy));
+        OnPropertyChanged(nameof(ShowKinds));
+        if (!loading) _ = PostRichAsync(on: value);
+    }
+
+    partial void OnRichDiagramsChanged(bool value)
+    {
+        if (!loading) _ = PostRichAsync(diagrams: value);
+    }
+
+    partial void OnRichPlotsChanged(bool value)
+    {
+        if (!loading) _ = PostRichAsync(plots: value);
+    }
+
+    partial void OnRichDrawingsChanged(bool value)
+    {
+        if (!loading) _ = PostRichAsync(drawings: value);
+    }
+
+    partial void OnSelectedSpeedChanged(string value)
+    {
+        EngineChoice.Mark(SpeedChoices, value);
+        OnPropertyChanged(nameof(SelectedSpeedName));
+        OnPropertyChanged(nameof(SpeedAbout));
+        OnPropertyChanged(nameof(HasSpeed));
+        if (!loading && value.Length > 0) _ = PostRichAsync(speed: value);
+    }
+
+    partial void OnHasClaudeChanged(bool value) => OnPropertyChanged(nameof(HasSpeed));
 
     partial void OnDiagramsByChanged(string value) => OnPropertyChanged(nameof(DiagramsAbout));
 
@@ -178,19 +241,31 @@ public sealed partial class AiEnginesModel : ObservableObject
             foreach (var c in NotesChoices) c.Pick = new RelayCommand(() => SelectedNotes = c.Id);
             AskChoices = [.. overview.Engines.Select(e => new EngineChoice(e.Id, e.Name))];
             foreach (var c in AskChoices) c.Pick = new RelayCommand(() => SelectedAsk = c.Id);
-            DiagramsChoices = [.. DiagramEngines.Choices.Select(id => new EngineChoice(id, AiWords.DiagramsChoiceName(id)))];
+            DiagramsChoices = [.. DiagramEngines.Picks.Select(id => new EngineChoice(id, AiWords.DiagramsChoiceName(id)))];
             foreach (var c in DiagramsChoices) c.Pick = new RelayCommand(() => SelectedDiagrams = c.Id);
+            SpeedChoices = [.. AiSpeed.Choices.Select(id => new EngineChoice(id, AiWords.SpeedChoiceName(id)))];
+            foreach (var c in SpeedChoices) c.Pick = new RelayCommand(() => SelectedSpeed = c.Id);
             OnPropertyChanged(nameof(NotesChoices));
             OnPropertyChanged(nameof(AskChoices));
             OnPropertyChanged(nameof(DiagramsChoices));
+            OnPropertyChanged(nameof(SpeedChoices));
             SelectedNotes = overview.Notes;
             SelectedAsk = overview.Ask;
             DiagramsBy = overview.DiagramsBy;
-            SelectedDiagrams = overview.Diagrams;
+            SelectedDiagrams = overview.Diagrams == DiagramEngines.Off ? DiagramEngines.Auto : overview.Diagrams; // off is the switch's now
+            HasRich = overview.Rich is not null;
+            RichOn = overview.Rich?.On ?? false;
+            RichDiagrams = overview.Rich?.Diagrams ?? true;
+            RichPlots = overview.Rich?.Plots ?? true;
+            RichDrawings = overview.Rich?.Drawings ?? true;
+            HasClaude = overview.Engines.Any(e => e.Id == "claude" && e.Installed);
+            SelectedSpeed = overview.Speed;
             EngineChoice.Mark(NotesChoices, SelectedNotes);
             EngineChoice.Mark(AskChoices, SelectedAsk);
             EngineChoice.Mark(DiagramsChoices, SelectedDiagrams);
+            EngineChoice.Mark(SpeedChoices, SelectedSpeed);
             OnPropertyChanged(nameof(SelectedDiagramsName));
+            OnPropertyChanged(nameof(SelectedSpeedName));
             Fallback = overview.Fallback;
 
             Engines.Clear();
@@ -331,6 +406,29 @@ public sealed partial class AiEnginesModel : ObservableObject
         {
             var overview = await library.DefaultsAsync(notes, ask, fallback, diagrams);
             Apply(overview);
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    /// <summary>A rich notes switch or Claude Code's speed changed: the library keeps it and says what it all comes to (turning
+    /// off the last kind, say, switches rich notes off).</summary>
+    async Task PostRichAsync(bool? on = null, bool? diagrams = null, bool? plots = null, bool? drawings = null, string? speed = null)
+    {
+        Busy = true;
+        try
+        {
+            Apply(await library.RichAsync(on, diagrams, plots, drawings, speed));
         }
         catch (LibraryRefusedException ex)
         {

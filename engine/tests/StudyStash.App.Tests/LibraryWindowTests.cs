@@ -157,6 +157,23 @@ public class LibraryWindowTests
     }
 
     [Fact]
+    public void A_lecture_filed_while_the_window_is_open_changes_the_sidebars_counts_and_nothing_else()
+    {
+        var m = Lectures(out var cards);
+        m.Classes.Add(new ClassItem { Name = "BIO 110", Count = 1 });
+        m.Classes.Add(new ClassItem { Name = "Due soon", IsDue = true, Count = 4 });
+        m.Unsorted.Count = 0;
+
+        m.ShowCounts([("CS 101", 4), ("BIO 110", 1), ("HIST 210", 7)], unsorted: 2);
+
+        Assert.Equal([4, 1, 4], m.Classes.Select(c => c.Count)); // the due item isn't a class; one the sidebar doesn't list is skipped
+        Assert.Equal(2, m.Unsorted.Count);
+        Assert.True(m.Classes[0].Selected);
+        Assert.Equal("3 lectures", m.ClassCount); // the page showing is the class page's own to redraw
+        Assert.Equal(3, m.Groups.Sum(g => g.Items.Count));
+    }
+
+    [Fact]
     public async Task Deleting_asks_first_then_the_lecture_leaves_the_list_at_once_and_the_next_one_opens()
     {
         var m = Lectures(out var cards);

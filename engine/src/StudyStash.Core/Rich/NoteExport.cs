@@ -115,7 +115,8 @@ public static class NoteExport
     /// <summary>Rewrites a note's fenced diagrams for a saved file: a Mermaid flowchart that parses becomes canonical
     /// Mermaid (what mermaid.js reads back) with its picture saved beside the file, but no link to it (Obsidian
     /// already draws the fence — a link would show it twice); one that doesn't parse is kept exactly as written. A
-    /// safe SVG becomes an image link to its cleaned, saved picture; an unsafe one becomes its reason, in italics.
+    /// safe SVG becomes an image link to its cleaned, saved picture; an unsafe one becomes its reason, in italics. A plot
+    /// keeps its canonical ```plot source, with its picture (at its sliders' starting values) saved and linked under it.
     /// Everything else (code, formulas, prose) is untouched.</summary>
     static string DrawDiagrams(string notes, string stem, Func<string, string?> mermaidSvg, List<ExportAsset> assets, ref int diagramIndex)
     {
@@ -134,6 +135,21 @@ public static class NoteExport
                 if (mermaidSvg(block.Text) is { Length: > 0 } svg)
                     assets.Add(new ExportAsset($"{stem}.assets/diagram-{++diagramIndex}.svg", svg));
             }
+            else if (block.Kind == NoteBlockKind.Plot && block.Closed && TryPlot(block.Text) is { } plot)
+            {
+                // Its canonical source (what Study Stash reads back), then its picture at its sliders' starting values,
+                // which any Markdown reader shows.
+                output.Add(indent + "```plot");
+                foreach (string line in plot.ToSource().Split('\n')) output.Add(indent + line);
+                output.Add(indent + "```");
+                if (PlotSvg.Render(block.Text) is { } svg)
+                {
+                    string path = $"{stem}.assets/diagram-{++diagramIndex}.svg";
+                    assets.Add(new ExportAsset(path, svg));
+                    output.Add("");
+                    output.Add($"{indent}![Plot: {plot.Title ?? "Plot"}]({EncodePath(path)})");
+                }
+            }
             else if (block.Kind == NoteBlockKind.Svg && block.Closed)
             {
                 var cleaned = SafeSvg.Clean(block.Text);
@@ -142,6 +158,15 @@ public static class NoteExport
                     string path = $"{stem}.assets/diagram-{++diagramIndex}.svg";
                     assets.Add(new ExportAsset(path, svg));
                     output.Add($"{indent}![Diagram: {(cleaned.Title.Length > 0 ? cleaned.Title : "Diagram")}]({EncodePath(path)})");
+                    // An illustration's parts, each with what the drawing says of it, so the file still teaches them.
+                    if (cleaned.Parts.Count > 0)
+                    {
+                        output.Add("");
+                        // Plain words only: a name that looks like markup is shown, never run, by whatever opens the file.
+                        static string Plain(string s) => s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("*", "\\*");
+                        foreach (var part in cleaned.Parts)
+                            output.Add($"{indent}- **{Plain(part.Name)}**" + (part.Note.Length > 0 ? $": {Plain(part.Note)}" : ""));
+                    }
                 }
                 else
                 {
@@ -156,6 +181,12 @@ public static class NoteExport
         }
         for (; at < lines.Length; at++) output.Add(lines[at]);
         return string.Join("\n", output);
+    }
+
+    static Plot? TryPlot(string source)
+    {
+        try { return Plot.Parse(source); }
+        catch (PlotException) { return null; }
     }
 
     static Flowchart? TryParse(string source)

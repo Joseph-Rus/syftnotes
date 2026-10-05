@@ -3,16 +3,16 @@ using System.Text.RegularExpressions;
 namespace StudyStash.Core.Rich;
 
 /// <summary>What a block of a note that isn't prose holds.</summary>
-public enum NoteBlockKind { Code, Mermaid, Svg, Math }
+public enum NoteBlockKind { Code, Mermaid, Svg, Math, Plot }
 
 /// <summary>
-/// One block of a note that isn't prose: a fenced block (code, a Mermaid flowchart, an SVG drawing), a <c>$$</c>
+/// One block of a note that isn't prose: a fenced block (code, a Mermaid flowchart, an SVG drawing, a plot), a <c>$$</c>
 /// formula on lines of its own, or an SVG written straight into the Markdown. <see cref="First"/> and
 /// <see cref="Last"/> are its first and last line, fences included; <see cref="Text"/> is what's inside.
 /// </summary>
 public sealed record NoteBlock(NoteBlockKind Kind, string Info, string Text, int First, int Last, bool Closed)
 {
-    public bool IsDiagram => Kind is NoteBlockKind.Mermaid or NoteBlockKind.Svg;
+    public bool IsDiagram => Kind is NoteBlockKind.Mermaid or NoteBlockKind.Svg or NoteBlockKind.Plot;
 }
 
 /// <summary>
@@ -22,11 +22,17 @@ public sealed record NoteBlock(NoteBlockKind Kind, string Info, string Text, int
 /// </summary>
 public static partial class NoteBlocks
 {
-    [GeneratedRegex(@"^(flowchart|graph)\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^(flowchart|graph|sequenceDiagram|stateDiagram(-v2)?)\b", RegexOptions.IgnoreCase)]
     private static partial Regex FlowchartStart();
 
+    /// <summary>Every kind of Mermaid diagram Study Stash draws, as its first word; timeline and mindmap only count
+    /// where a diagram is expected (a repair's reply), not on a bare fence, where they'd be ordinary words.</summary>
+    [GeneratedRegex(@"^(flowchart|graph|sequenceDiagram|stateDiagram(-v2)?|timeline|mindmap)\b", RegexOptions.IgnoreCase)]
+    private static partial Regex DiagramStart();
+
     /// <summary>Whether a fenced block with this info holds a diagram, and which: ```mermaid (or ```mmd), ```svg,
-    /// an ```xml or ```html one holding an SVG, and a bare fence that starts like a flowchart.</summary>
+    /// an ```xml or ```html one holding an SVG, a ```plot, and a bare fence that starts like a flowchart, a sequence or
+    /// a state diagram.</summary>
     public static NoteBlockKind KindOf(string info, string text)
     {
         info = info.Trim().ToLowerInvariant();
@@ -34,6 +40,7 @@ public static partial class NoteBlocks
         {
             "mermaid" or "mmd" => NoteBlockKind.Mermaid,
             "svg" => NoteBlockKind.Svg,
+            "plot" => NoteBlockKind.Plot,
             "xml" or "html" when IsSvg(text) => NoteBlockKind.Svg,
             "" when FlowchartStart().IsMatch(text.TrimStart()) => NoteBlockKind.Mermaid,
             _ => NoteBlockKind.Code,
@@ -49,8 +56,12 @@ public static partial class NoteBlocks
         return text.StartsWith("<svg", StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Whether a text starts like a diagram of its own: a flowchart, or an SVG.</summary>
-    public static bool StartsAsDiagram(string text) => FlowchartStart().IsMatch(text.TrimStart()) || IsSvg(text);
+    /// <summary>Whether a text starts like a flowchart (not another kind of Mermaid diagram), or says no kind at all.</summary>
+    public static bool StartsAsFlowchart(string text) =>
+        !DiagramStart().IsMatch(text.TrimStart()) || text.TrimStart().StartsWith("flowchart", StringComparison.OrdinalIgnoreCase) || text.TrimStart().StartsWith("graph", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Whether a text starts like a diagram of its own: any kind of Mermaid diagram Study Stash draws, or an SVG.</summary>
+    public static bool StartsAsDiagram(string text) => DiagramStart().IsMatch(text.TrimStart()) || IsSvg(text);
 
     /// <summary>A fence line: its character (` or ~), how many, and the info after them; null when it isn't one.</summary>
     public static (char Char, int Count, string Info)? Fence(string line)

@@ -46,7 +46,7 @@ public class DiagramDesignTests
             Diagram(at: "mm:ss"),
             Diagram(at: "59:00"),
             Diagram(caption: ""),
-            Diagram(kind: "sequence")) + "\n```";
+            Diagram(kind: "pie")) + "\n```";
         var read = DiagramDesign.Read(reply, Notes, Lecture.Transcript, Drawings.Flowcharts);
         Assert.False(read.Malformed);
         Assert.Equal("The chain is the lecture's point.", read.Reason);
@@ -138,13 +138,89 @@ public class DiagramDesignTests
 
         string invented = "flowchart TD\n  K[\"Krebs cycle\"] --> G[\"Glycolysis pyruvate\"] --> E[\"Electron transport chain\"] --> M[\"Mitochondrial membrane\"]";
         string scattered = "flowchart LR\n  A[\"Renin\"] --> B[\"JG cells\"]\n  C[\"Angiotensin I\"] --> D[\"Lungs\"]\n  E[\"Blood pressure\"] --> F[\"Renin\"]";
-        string crowded = "flowchart LR\n" + string.Join("\n", Enumerable.Range(0, 15).Select(i => $"  N{i}[\"Renin {i}\"] --> N{i + 1}[\"Renin {i + 1}\"]"));
+        string crowded = "flowchart LR\n" + string.Join("\n", Enumerable.Range(0, DiagramDesign.MaxNodes).Select(i => $"  N{i}[\"Renin {i}\"] --> N{i + 1}[\"Renin {i + 1}\"]"));
         foreach (string source in new[] { invented, scattered, crowded })
         {
             var left = await DiagramDesign.DesignAsync(Lecture, Notes, Drawings.Flowcharts, (_, _) => Task.FromResult(Reply("x", Diagram(source: source))));
             Assert.Same(Notes, left.Notes);
             Assert.Single(left.Dropped);
         }
+    }
+
+    [Fact]
+    public void Every_example_the_brief_shows_parses_and_lays_out_well_in_the_notes()
+    {
+        string prompt = DiagramDesign.Prompt(Lecture, Notes, Drawings.FlowchartsAndSvg, 3);
+        foreach (string example in DiagramDesign.Examples)
+        {
+            Assert.Contains("```mermaid\n" + example + "\n```", prompt);
+            Assert.Empty(DiagramLint.Problems(Flowchart.Parse(example)));
+        }
+        Assert.Equal([ChartForm.Flowchart, ChartForm.Flowchart, ChartForm.State, ChartForm.Sequence, ChartForm.Timeline, ChartForm.Mindmap],
+            DiagramDesign.Examples.Select(e => Flowchart.Parse(e).Form));
+        Assert.Contains("at most 3 diagrams", prompt);
+        Assert.Equal([0, 1, 2, 3, 4], new[] { 2000, 9000, 20_000, 39_000, 60_000 }.Select(n => DiagramDesign.Cap(new string('a', n))));
+    }
+
+    [Fact]
+    public void How_a_diagram_would_look_is_checked_at_the_notes_width()
+    {
+        // Fine: a small cycle, and a big chart in groups.
+        Assert.Empty(DiagramLint.Problems(Flowchart.Parse(Summarize.MermaidExample)));
+        Assert.Empty(DiagramLint.Problems(Flowchart.Parse(DiagramDesign.GroupedExample)));
+        // Twenty boxes in a row with no groups; a box that's a sentence; a sequence with too many people.
+        string row = "flowchart LR\n" + string.Join("\n", Enumerable.Range(0, 19).Select(i => $"  N{i}[\"Step {i}\"] --> N{i + 1}[\"Step {i + 1}\"]"));
+        Assert.Contains(DiagramLint.Problems(Flowchart.Parse(row)), p => p.Contains("20 boxes and no groups"));
+        Assert.Contains(DiagramLint.Problems(Flowchart.Parse("flowchart TD\n  A[\"The renin is released by the JG cells when pressure falls\"] --> B[\"Renin\"] --> C[\"ACE\"]")),
+            p => p.Contains("is a sentence, not a box"));
+        string crowd = "sequenceDiagram\n" + string.Join("\n", Enumerable.Range(0, 7).Select(i => $"  P{i}->>P{i + 1}: pass it on"));
+        Assert.Contains(DiagramLint.Problems(Flowchart.Parse(crowd)), p => p.Contains("8 participants"));
+    }
+
+    [Fact]
+    public async Task A_diagram_that_would_look_wrong_goes_back_once_and_only_a_better_redesign_replaces_it()
+    {
+        // Twenty steps in a row, no groups: true to the lecture, but it would look wrong.
+        string row = "flowchart LR\n" + string.Join("\n", Enumerable.Range(0, 19).Select(i => $"  N{i}[\"Renin {i}\"] --> N{i + 1}[\"Renin {i + 1}\"]"));
+        string grouped = "flowchart LR\n" + string.Join("\n", Enumerable.Range(0, 4).Select(g =>
+            $"  subgraph G{g} [\"Renin phase {g}\"]\n" + string.Join("\n", Enumerable.Range(g * 5, 4).Select(i => $"    N{i}[\"Renin {i}\"] --> N{i + 1}[\"Renin {i + 1}\"]")) + "\n  end"))
+            + "\n" + string.Join("\n", Enumerable.Range(0, 3).Select(g => $"  N{g * 5 + 4} --> N{g * 5 + 5}"));
+        var prompts = new List<string>();
+        Func<string, bool, Task<string>> Answers(string redesign) => (p, _) =>
+        {
+            prompts.Add(p);
+            return Task.FromResult(prompts.Count == 1 ? Reply("The chain.", Diagram(source: row)) : Reply("Grouped.", Diagram(source: redesign)));
+        };
+        var better = await DiagramDesign.DesignAsync(Lecture, Notes, Drawings.Flowcharts, Answers(grouped));
+        Assert.Equal(2, prompts.Count);
+        Assert.StartsWith("You designed this diagram", prompts[1]);
+        Assert.Contains("20 boxes and no groups", prompts[1]);
+        Assert.Contains("\"after\": \"Key points\", \"at\": \"00:25\"", prompts[1]);
+        Assert.Equal(1, better.Revised);
+        Assert.Equal(grouped, Assert.Single(better.Drawn).Source);
+        Assert.Equal("Key points", better.Drawn[0].After);
+        Assert.Empty(better.Problems);
+
+        // A redesign that's no better, or one that doesn't draw, leaves the draft as it was.
+        foreach (string worse in new[] { row, "flowchart LR\n  A[\"Renin\"] -->" })
+        {
+            prompts.Clear();
+            var kept = await DiagramDesign.DesignAsync(Lecture, Notes, Drawings.Flowcharts, Answers(worse));
+            Assert.Equal(0, kept.Revised);
+            Assert.Equal(row, Assert.Single(kept.Drawn).Source);
+            Assert.NotEmpty(kept.Problems);
+        }
+        // A revision that fails keeps the draft; with no time left there's none.
+        prompts.Clear();
+        var failed = await DiagramDesign.DesignAsync(Lecture, Notes, Drawings.Flowcharts, (p, _) =>
+        {
+            prompts.Add(p);
+            return prompts.Count == 1 ? Task.FromResult(Reply("The chain.", Diagram(source: row))) : throw new InvalidOperationException("Claude: usage limit");
+        });
+        Assert.Equal(row, Assert.Single(failed.Drawn).Source);
+        prompts.Clear();
+        await DiagramDesign.DesignAsync(Lecture, Notes, Drawings.Flowcharts, Answers(grouped), budget: TimeSpan.FromSeconds(30));
+        Assert.Single(prompts);
     }
 
     // --- through AiJobs: which engine, and never a failure of the notes -----------------------------------------------
@@ -192,8 +268,16 @@ public class DiagramDesignTests
         {
             Providers = _ => claude, Checks = new FakeChecks().Installed("claude").Build(), Log = log.Add, DiagramTimeout = TimeSpan.FromSeconds(2),
         };
+        // The notes as filed, then the diagram pass that follows them (DiagramJobs runs it after filing).
+        async Task<string> Written()
+        {
+            string notes = await ai.SummarizeAsync(Lecture, cfg);
+            if (ai.TakeDiagramsFollow(Lecture.Id) is not { } by || await ai.DesignerAsync(cfg, by) is not { } pick) return notes;
+            Assert.Equal(Notes, notes); // filed without waiting for any diagram
+            return (await ai.DesignDiagramsAsync(Lecture, cfg, notes, pick, CancellationToken.None))?.Notes ?? notes;
+        }
 
-        string drawn = await ai.SummarizeAsync(Lecture, cfg);
+        string drawn = await Written();
         Assert.Equal(DiagramDesign.Insert(Notes, [new DesignedDiagram("The renin chain", "Key points", 25, NoteBlockKind.Mermaid, Chain,
             "Low pressure releases renin, which leads to angiotensin II.")]), drawn);
         Assert.Contains("Diagrams: draw none", claude.Requests[0].Prompt);
@@ -205,21 +289,21 @@ public class DiagramDesignTests
 
         // Whatever goes wrong in the pass, the notes are exactly as written.
         design = (_, _) => throw new InvalidOperationException("unknown option '--effort'");
-        Assert.Equal(Notes, await ai.SummarizeAsync(Lecture, cfg));
+        Assert.Equal(Notes, await Written());
         Assert.Equal(("", ""), (claude.Requests[^1].Model, claude.Requests[^1].Effort)); // asked again as set up
         design = (_, ct) => Task.Delay(Timeout.Infinite, ct).ContinueWith(_ => "", TaskScheduler.Default);
-        Assert.Equal(Notes, await ai.SummarizeAsync(Lecture, cfg));
+        Assert.Equal(Notes, await Written());
         Assert.Contains("took longer than", log[^1]);
         design = (_, _) => throw new InvalidOperationException("Claude usage limit reached, resets at 3pm");
-        Assert.Equal(Notes, await ai.SummarizeAsync(Lecture, cfg));
+        Assert.Equal(Notes, await Written());
         Assert.True(AiSettings.Load(cfg.Home).Limits.ContainsKey("claude"));
 
         // Same as notes: the notes engine draws its own, as before; off: no diagrams, and no pass.
         int before = claude.Requests.Count;
         new AiSettings { Provider = "claude", Fallback = false, Diagrams = "notes" }.Save(cfg.Home);
-        await ai.SummarizeAsync(Lecture, cfg);
+        await Written();
         new AiSettings { Provider = "claude", Fallback = false, Diagrams = "off" }.Save(cfg.Home);
-        await ai.SummarizeAsync(Lecture, cfg);
+        await Written();
         Assert.Equal(before + 2, claude.Requests.Count);
         Assert.Contains("```mermaid\n" + Summarize.MermaidExample, claude.Requests[before].Prompt);
         Assert.Contains("Diagrams: draw none", claude.Requests[before + 1].Prompt);

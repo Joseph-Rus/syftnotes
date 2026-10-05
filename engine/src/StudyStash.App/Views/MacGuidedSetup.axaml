@@ -319,7 +319,7 @@
                   </ItemsControl.ItemsPanel>
                   <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:ChecklistRow">
-                      <Button Classes="item" Classes.now="{Binding IsNow}" IsHitTestVisible="{Binding Clickable}"
+                      <Button AutomationProperties.Name="{Binding Title}" Classes="item" Classes.now="{Binding IsNow}" IsHitTestVisible="{Binding Clickable}"
                               Command="{Binding $parent[UserControl].((vm:GuidedSetupModel)DataContext).ClickItemCommand}" CommandParameter="{Binding}">
                         <Grid ColumnDefinitions="Auto,10,*,Auto" RowDefinitions="Auto,Auto">
                           <Panel Width="18" Height="18" VerticalAlignment="Center">
@@ -364,7 +364,7 @@
                   <TextBlock Classes="lede" Text="{x:Static vm:GuidedSetupModel.PickLede}" />
                   <Grid ColumnDefinitions="*,12,*" Margin="0,18,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
                     <Panel>
-                      <Button Name="PickClaude" Classes="card" Classes.on="{Binding PickedClaude}" Command="{Binding PickCommand}" CommandParameter="claude">
+                      <Button AutomationProperties.Name="Claude" Name="PickClaude" Classes="card" Classes.on="{Binding PickedClaude}" Command="{Binding PickCommand}" CommandParameter="claude">
                         <StackPanel Spacing="6">
                           <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Text="Claude" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -390,7 +390,7 @@
                       </StackPanel>
                     </Panel>
                     <Panel Grid.Column="2">
-                      <Button Name="PickCodex" Classes="card" Classes.on="{Binding PickedCodex}" Command="{Binding PickCommand}" CommandParameter="codex">
+                      <Button AutomationProperties.Name="ChatGPT" Name="PickCodex" Classes="card" Classes.on="{Binding PickedCodex}" Command="{Binding PickCommand}" CommandParameter="codex">
                         <StackPanel Spacing="6">
                           <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Text="ChatGPT" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
@@ -630,7 +630,7 @@
 
                             <!-- How you'll use it -->
                             <StackPanel Spacing="6" IsVisible="{Binding IsComputer}">
-                              <Button Classes="row" Classes.on="{Binding ChoseOne}" Command="{Binding ChooseCommand}" CommandParameter="one">
+                              <Button AutomationProperties.Name="{Binding JustThis}" Classes="row" Classes.on="{Binding ChoseOne}" Command="{Binding ChooseCommand}" CommandParameter="one">
                                 <Grid ColumnDefinitions="Auto,10,*">
                                   <Border Classes="radio" Classes.on="{Binding ChoseOne}"><Ellipse /></Border>
                                   <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
@@ -639,13 +639,13 @@
                                   </StackPanel>
                                 </Grid>
                               </Button>
-                              <Button Classes="row" Classes.on="{Binding ChoseLaptop}" Command="{Binding ChooseCommand}" CommandParameter="laptop">
+                              <Button AutomationProperties.Name="This is my laptop" Classes="row" Classes.on="{Binding ChoseLaptop}" Command="{Binding ChooseCommand}" CommandParameter="laptop">
                                 <Grid ColumnDefinitions="Auto,10,*">
                                   <Border Classes="radio" Classes.on="{Binding ChoseLaptop}"><Ellipse /></Border>
                                   <TextBlock Grid.Column="2" FontSize="13" VerticalAlignment="Center"><Run Text="This is my laptop" /><Run Text="  (library elsewhere)" Foreground="{DynamicResource Fg2}" /></TextBlock>
                                 </Grid>
                               </Button>
-                              <Button Classes="row" Classes.on="{Binding ChoseLibrary}" Command="{Binding ChooseCommand}" CommandParameter="library">
+                              <Button AutomationProperties.Name="This is my library" Classes="row" Classes.on="{Binding ChoseLibrary}" Command="{Binding ChooseCommand}" CommandParameter="library">
                                 <Grid ColumnDefinitions="Auto,10,*">
                                   <Border Classes="radio" Classes.on="{Binding ChoseLibrary}"><Ellipse /></Border>
                                   <TextBlock Grid.Column="2" FontSize="13" VerticalAlignment="Center"><Run Text="This is my library" /><Run Text="  (a computer that stays on)" Foreground="{DynamicResource Fg2}" /></TextBlock>
@@ -711,7 +711,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                   <DataTemplate x:DataType="s:ModelChoice">
-                                    <Button Classes="row" Command="{Binding $parent[ItemsControl].((vm:CardEntry)DataContext).PickModelCommand}" CommandParameter="{Binding}">
+                                    <Button AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding Size}" Classes="row" Command="{Binding $parent[ItemsControl].((vm:CardEntry)DataContext).PickModelCommand}" CommandParameter="{Binding}">
                                       <Grid ColumnDefinitions="*,Auto">
                                         <TextBlock Text="{Binding Name}" FontSize="12" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                         <TextBlock Grid.Column="1" Text="{Binding Size}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
@@ -786,7 +786,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                   <DataTemplate x:DataType="vm:SetupCourse">
-                                    <CheckBox IsChecked="{Binding Ticked}">
+                                    <CheckBox AutomationProperties.Name="{Binding Name}" IsChecked="{Binding Ticked}">
                                       <TextBlock FontSize="13" TextTrimming="CharacterEllipsis"><Run Text="{Binding Name}" /><Run Text="  " /><Run Text="{Binding Code}" Foreground="{DynamicResource Fg2}" FontSize="12" /></TextBlock>
                                     </CheckBox>
                                   </DataTemplate>

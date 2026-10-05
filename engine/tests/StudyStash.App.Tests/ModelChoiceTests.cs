@@ -72,6 +72,18 @@ public class ModelChoiceTests
     }
 
     [Fact]
+    public void Cactus_Whistle_is_listed_as_coming_with_the_app_not_as_a_download_of_17_MB()
+    {
+        var whistle = new ModelChoice { Model = WhisperModels.Whistle };
+        Assert.Equal("Comes with the app", whistle.Size);
+        Assert.Equal("574 MB", new ModelChoice { Model = WhisperModels.LargeV3TurboSmall }.Size);
+        var setup = SetupModel.For(SkinKind.Mac, AppRole.Both);
+        setup.ChosenModel = whistle;
+        Assert.Contains("comes with the app", setup.ModelBody);
+        Assert.DoesNotContain("17 MB", setup.ModelBody);
+    }
+
+    [Fact]
     public void The_environment_names_a_model_a_file_or_a_mirror()
     {
         using var home = new TempHome();

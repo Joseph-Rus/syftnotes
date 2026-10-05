@@ -31,7 +31,7 @@ public class NoteViewRichTests
         Fence("svg", RichDemo.FourChambers),
         Fence("mermaid", RichDemo.BrokenChart),
         "- Blood flow, in a bullet:\n\n  " + Fence("mermaid", RichDemo.BloodFlow).Replace("\n", "\n  "),
-        Fence("mermaid", RichDemo.PainConversation),
+        Fence("mermaid", RichDemo.ClassChart),
         Fence("svg", """<!DOCTYPE svg [<!ENTITY a "a">]><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 9 9"><text>&a;</text></svg>"""),
         "```mermaid\nflowchart LR\n  A[Assess] --> B[Act");
 
@@ -71,14 +71,14 @@ public class NoteViewRichTests
         var window = Show(note);
         var pieces = Pieces(note);
         Assert.Equal(
-            [typeof(DiagramView), typeof(SvgView), typeof(DiagramCard), typeof(DiagramView), typeof(DiagramCard), typeof(DiagramCard), typeof(TextBlock)],
+            [typeof(DiagramView), typeof(SvgView), typeof(DiagramCard), typeof(DiagramView), typeof(DiagramCard), typeof(DiagramCard), typeof(SpokenText)],
             pieces.Select(p => p.GetType()));
         // The bullet's diagram sits inside the list, not after it.
         Assert.Contains(pieces[3].GetLogicalAncestors(), a => a is Grid);
         Assert.Equal("Line 2 has a box that isn't closed: “B[Give the dose”.", ((DiagramCard)pieces[2]).Reason);
-        Assert.Equal("Study Stash draws flowcharts; this is a sequence diagram.", ((DiagramCard)pieces[4]).Reason);
+        Assert.Equal("Study Stash draws flowcharts, state and sequence diagrams, timelines and mind maps; this is a class diagram.", ((DiagramCard)pieces[4]).Reason);
         Assert.Equal("This drawing declares its own document type, which isn't allowed.", ((DiagramCard)pieces[5]).Reason);
-        Assert.Contains("sequenceDiagram", ((DiagramCard)pieces[4]).Source);
+        Assert.Contains("classDiagram", ((DiagramCard)pieces[4]).Source);
         Assert.All(pieces.Take(2).Append(pieces[3]), p => Assert.True(p.Bounds.Width > 100 && p.Bounds.Height > 50, $"{p.GetType().Name} {p.Bounds}"));
         window.Close();
     }
@@ -244,7 +244,7 @@ public class NoteViewRichTests
     {
         var note = new NoteView { Markdown = "Here's the cycle:\n\n```mermaid\n" + RichDemo.CardiacCycle[..40] };
         var window = Show(note);
-        Assert.IsType<TextBlock>(Assert.Single(Pieces(note)));
+        Assert.IsAssignableFrom<TextBlock>(Assert.Single(Pieces(note)));
         note.Markdown = "Here's the cycle:\n\n" + Fence("mermaid", RichDemo.CardiacCycle);
         Dispatcher.UIThread.RunJobs();
         Assert.IsType<DiagramView>(Assert.Single(Pieces(note)));
@@ -264,6 +264,9 @@ public class NoteViewRichTests
         Assert.StartsWith("This drawing isn't well-formed SVG", ((DiagramCard)Pieces(note)[1]).Reason);
         window.Close();
     }
+
+    /// <summary>The picture a flowchart draws (its view spans the column; the picture is centred in it).</summary>
+    static Visual Picture(Control view) => view is DiagramView ? view.GetVisualDescendants().OfType<DiagramCanvas>().Single() : view;
 
     static void Click(Visual target, Point? at = null)
     {
@@ -288,7 +291,8 @@ public class NoteViewRichTests
         });
         var pieces = Pieces(note);
         var chart = (DiagramView)pieces[0];
-        Click(chart, new Point(2, 2));
+        // A click on the picture's paper (a box's click picks the box).
+        Click(Picture(chart), new Point(2, 2));
         var e = Assert.Single(asked);
         Assert.Same(chart.Scene, e.Scene);
         Assert.Same(chart.Chart, e.Chart);
@@ -317,12 +321,14 @@ public class NoteViewRichTests
         var window = Show(note);
         foreach (var view in Pieces(note))
         {
-            Assert.Equal(OpenLarger.Help, AutomationProperties.GetHelpText(view));
-            var badge = view.GetVisualDescendants().OfType<Icon>().Single(i => i.Glyph == "open_in_full").Parent as Control;
-            Assert.False(badge!.IsVisible);
-            window.MouseMove(view.TranslatePoint(new Point(10, 10), window)!.Value);
+            Assert.Equal(view is DiagramView ? DiagramView.Help : OpenLarger.Help, AutomationProperties.GetHelpText(view));
+            var badge = view.GetLogicalDescendants().OfType<Icon>().Single(i => i.Glyph == "open_in_full");
+            // Shown when it and everything round it up to the view is (a hidden toolbar's buttons aren't even laid out).
+            bool Shown() => badge.GetLogicalAncestors().OfType<Control>().TakeWhile(c => c != view).Prepend(badge).All(c => c.IsVisible);
+            Assert.False(Shown(), view.GetType().Name);
+            window.MouseMove(Picture(view).TranslatePoint(new Point(10, 10), window)!.Value);
             Dispatcher.UIThread.RunJobs();
-            Assert.True(badge.IsVisible, view.GetType().Name);
+            Assert.True(Shown(), view.GetType().Name);
         }
         window.MouseMove(new Point(0, 2990));
         window.Close();
@@ -334,12 +340,12 @@ public class NoteViewRichTests
         var note = new NoteView { Markdown = RichDemo.DiagramNotes };
         var window = Show(note);
         var pieces = Pieces(note);
-        Click(pieces[0], new Point(2, 2));
+        Click(Picture(pieces[0]), new Point(2, 2));
         var larger = DiagramWindow.Current;
         Assert.NotNull(larger);
         Assert.Equal("Atrial systole", larger.Title);
         var big = larger.GetVisualDescendants().OfType<DiagramView>().Single();
-        Assert.Null(AutomationProperties.GetHelpText(big));
+        Assert.Equal(DiagramView.WindowHelp, AutomationProperties.GetHelpText(big));
         Assert.True(larger.Width >= 420 && larger.Height >= 300);
 
         Click(pieces[1]);

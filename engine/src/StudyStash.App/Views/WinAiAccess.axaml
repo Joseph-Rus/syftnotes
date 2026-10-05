@@ -1,8 +1,7 @@
-<!-- Settings → AI tool access (design 14, Windows): the off switch, what Claude and other MCP tools may read, the
-     "Claude (desktop and web)" card (connectors task 5: Funnel on/off, the address, a live check, its problems),
-     connecting a tool, and the connected list. The pane's own padding and scrolling; the settings window is the
-     host's. An "Other…" text button follows Codex — not in the design, added so Claude Desktop stays reachable here
-     too (see WIRING.md). -->
+<!-- Settings → AI tool access (design 14, Windows): the off switch, what AI apps may read, the AI apps on this
+     computer (one click each, no Tailscale), the "Claude on the web and phone" card (Funnel on/off, the address, a
+     live check, its problems, and what this computer needs first), and the other connections. The pane's own
+     padding and scrolling; the settings window is the host's. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -18,7 +17,11 @@
 
       <TextBlock Classes="ai-title" Text="AI tool access" />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left"
-                 Text="Claude Code, Codex and other tools that support MCP can read your library. They can't change or delete anything." />
+                 Text="Claude, Codex, Gemini and other apps that support MCP can read your library. They can't change or delete anything." />
+      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left" Foreground="{DynamicResource Warn}" IsVisible="{Binding Offline}"
+                 Text="Can't reach your library right now, so what's below may be out of date." />
+      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left" IsVisible="{Binding OlderLibrary}"
+                 Text="Your library runs an older Study Stash. Update it to change these." />
       <Border Height="12" />
 
       <Border Classes="ai-card">
@@ -30,7 +33,7 @@
           </StackPanel>
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
             <TextBlock Text="{Binding On, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
-            <ToggleButton Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" />
+            <ToggleButton AutomationProperties.Name="Let AI tools read your library" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" />
           </StackPanel>
         </Grid>
       </Border>
@@ -77,7 +80,62 @@
         </StackPanel>
       </Border>
 
-      <TextBlock Classes="ai-section" Text="Claude (desktop and web)" Margin="0,18,0,8" />
+      <TextBlock Classes="ai-section" Text="AI apps on this computer" Margin="0,18,0,8" />
+      <Border Classes="ai-card">
+        <StackPanel Spacing="4">
+          <ItemsControl ItemsSource="{Binding Apps}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:AiAppRow">
+                <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="48" Margin="0,4">
+                  <c:Icon Glyph="{Binding Icon}" Size="18" />
+                  <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
+                    <Grid ColumnDefinitions="Auto,*">
+                      <Ellipse Classes="ai-dot good" IsVisible="{Binding Ok}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                      <TextBlock Grid.Column="1" Classes="ai-row-sub" Text="{Binding Status}" TextWrapping="Wrap" />
+                    </Grid>
+                  </StackPanel>
+                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Button Classes="ai-textbtn" Command="{Binding Disconnect}" IsVisible="{Binding CanDisconnect}" VerticalAlignment="Center">
+                      <TextBlock Text="Disconnect" FontSize="14" />
+                    </Button>
+                    <Button Classes="ai-pillbtn" Command="{Binding Connect}" IsVisible="{Binding CanConnect}">
+                      <Border Classes="ai-pill primary"><TextBlock Text="{Binding ConnectWords}" /></Border>
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="44">
+            <c:Icon Glyph="hub" Size="18" />
+            <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Another app that supports MCP: copy the setup, then paste it into the app's settings." />
+            <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CopyOtherCommand}" VerticalAlignment="Center" Margin="12,0,0,0">
+              <Border Classes="ai-pill"><TextBlock Text="Copy setup" /></Border>
+            </Button>
+          </Grid>
+        </StackPanel>
+      </Border>
+      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap"
+                 Text="Each app starts Study Stash itself and reads your library through this computer. No Tailscale, no internet address, and no password goes into the app's settings." />
+      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
+      <Border Classes="ai-card" Margin="0,8,0,0" IsVisible="{Binding ShowWritten}">
+        <StackPanel Spacing="6">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="ai-row-title" Text="What was written" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ai-textbtn" Command="{Binding CopyWrittenCommand}" IsVisible="{Binding HasWrittenText}">
+              <TextBlock Text="Copy" FontSize="14" />
+            </Button>
+          </Grid>
+          <SelectableTextBlock Classes="ai-row-sub" Text="{Binding WrittenFile}" TextWrapping="Wrap" />
+          <TextBlock Classes="ai-row-sub" Text="{Binding WrittenBackupWords}" TextWrapping="Wrap" />
+          <SelectableTextBlock Text="{Binding WrittenText}" IsVisible="{Binding HasWrittenText}" TextWrapping="Wrap"
+                               FontFamily="Cascadia Mono, Consolas, SF Mono, Menlo, monospace" FontSize="12" Foreground="{DynamicResource Fg2}" />
+        </StackPanel>
+      </Border>
+
+      <TextBlock Classes="ai-section" Text="Claude on the web and phone" Margin="0,18,0,8" />
       <Border Classes="ai-card">
         <StackPanel>
           <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="52">
@@ -85,11 +143,11 @@
             <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
               <TextBlock Classes="ai-row-title" Text="Let Claude reach your library from the internet" TextWrapping="Wrap" />
               <TextBlock Classes="ai-row-sub" TextWrapping="Wrap"
-                         Text="Claude on the web, the desktop app and your phone connect over HTTPS. Only someone with your library password can let them in." />
+                         Text="claude.ai in a browser and the Claude phone app run on Anthropic's servers, so they need an internet address. Study Stash makes one with Tailscale Funnel, and only someone with your library password can let them in. The apps above don't need this." />
             </StackPanel>
             <Panel Grid.Column="3" VerticalAlignment="Center">
               <c:Spinner IsVisible="{Binding WebBusy}" Width="16" Height="16" Foreground="{DynamicResource Fg2}" />
-              <ToggleButton IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
+              <ToggleButton AutomationProperties.Name="Let Claude reach your library from the internet" IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
                             IsChecked="{Binding WebOn}" IsEnabled="{Binding WebToggleEnabled}" />
             </Panel>
           </Grid>
@@ -152,6 +210,14 @@
             </StackPanel>
           </Grid>
 
+          <Grid IsVisible="{Binding ShowWebNeeds}" ColumnDefinitions="20,16,*,Auto" Margin="0,10,0,0" MinHeight="40">
+            <c:Icon Glyph="info" Size="16" Foreground="{DynamicResource Fg3}" />
+            <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap" Text="{Binding WebNeeds}" VerticalAlignment="Center" />
+            <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding OpenWebNeedsCommand}" IsVisible="{Binding ShowWebNeedsAction}" VerticalAlignment="Center" Margin="12,0,0,0">
+              <Border Classes="ai-pill"><TextBlock Text="Open" /></Border>
+            </Button>
+          </Grid>
+
           <Grid IsVisible="{Binding ShowToolsOffNote}" ColumnDefinitions="20,16,*" Margin="0,10,0,0" MinHeight="32">
             <c:Icon Glyph="info" Size="16" Foreground="{DynamicResource Fg3}" />
             <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap"
@@ -177,45 +243,7 @@
         </StackPanel>
       </Border>
 
-      <TextBlock Classes="ai-section" Text="Connect a tool" Margin="0,18,0,8" />
-      <Border Classes="ai-card">
-        <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
-          <c:Icon Glyph="add_link" Size="20" />
-          <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
-            <TextBlock Classes="ai-row-title" Text="Add Study Stash to a tool" />
-            <TextBlock Classes="ai-row-sub" Text="Copies the setup, then paste it into the tool's settings" TextWrapping="Wrap" />
-          </StackPanel>
-          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-            <Button Classes="ai-pillbtn" Command="{Binding CopyClaudeCodeCommand}">
-              <Border Classes="ai-pill">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <c:Icon Glyph="content_copy" Size="16" />
-                  <TextBlock Text="Claude Code" />
-                </StackPanel>
-              </Border>
-            </Button>
-            <Button Classes="ai-pillbtn" Command="{Binding CopyCodexCommand}">
-              <Border Classes="ai-pill">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <c:Icon Glyph="content_copy" Size="16" />
-                  <TextBlock Text="Codex" />
-                </StackPanel>
-              </Border>
-            </Button>
-            <Button Classes="ai-textbtn" VerticalAlignment="Center">
-              <TextBlock Text="Other…" FontSize="14" />
-              <Button.Flyout>
-                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}">
-                  <MenuItem Theme="{StaticResource AiMenuItem}" Header="Claude Desktop: add it for me" Command="{Binding AddClaudeDesktopCommand}" />
-                  <MenuItem Theme="{StaticResource AiMenuItem}" Header="Another tool: copy the JSON" Command="{Binding CopyOtherCommand}" />
-                </MenuFlyout>
-              </Button.Flyout>
-            </Button>
-          </StackPanel>
-        </Grid>
-      </Border>
-
-      <TextBlock Classes="ai-section" Text="Connected tools" Margin="0,18,0,8" IsVisible="{Binding HasConnections}" />
+      <TextBlock Classes="ai-section" Text="Other connections" Margin="0,18,0,8" IsVisible="{Binding HasConnections}" />
       <ItemsControl ItemsSource="{Binding Connected}" IsVisible="{Binding HasConnections}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:AiConnectionRow">
@@ -236,7 +264,6 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
-      <TextBlock Classes="ai-sub" Text="No tools connected yet." IsVisible="{Binding !HasConnections}" Margin="0,18,0,0" />
 
     </StackPanel>
   </ScrollViewer>

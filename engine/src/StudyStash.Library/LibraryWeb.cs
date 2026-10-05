@@ -34,6 +34,9 @@ public sealed class LibraryWebOptions
     public LibraryReader.AskChatFn? AskChat { get; init; }
     /// <summary>The AI picked for each kind of work (ai.json): Settings shows and tests it. Null: kept beside the config.</summary>
     public StudyStash.Core.Ai.AiJobs? Ai { get; init; }
+    /// <summary>The diagrams that follow lectures' notes: a rewrite's used notes get theirs here, and the app hears
+    /// while they're on their way. Null: none follow a rewrite (tests, and `serve` without an AI).</summary>
+    public StudyStash.Core.Ai.DiagramJobs? Diagrams { get; init; }
     /// <summary>Canvas through the Chrome extension. Null: made here, with the library's class folders.</summary>
     public StudyStash.Core.Canvas.CanvasSync? Canvas { get; init; }
     /// <summary>The course scout. Null: exploring isn't offered (tests, and `serve` without an AI).</summary>
@@ -722,6 +725,7 @@ public sealed partial class LibraryWeb
         string DiagramsRow()
         {
             string current = DiagramEngines.Normal(picked.Diagrams);
+            if (current == DiagramEngines.Off) current = DiagramEngines.Auto; // off is the Rich notes switch's now
             string Engine(string id)
             {
                 var p = providers.First(x => x.Id == id);
@@ -734,8 +738,22 @@ public sealed partial class LibraryWeb
                 DiagramEngines.Off => "Off",
                 _ => Engine(c),
             };
-            string opts = string.Concat(DiagramEngines.Choices.Select(c => $"<option value=\"{c}\"{(c == current ? " selected" : "")}>{Ui.Esc(Label(c))}</option>"));
-            return $"<div class=\"row\"><label class=\"grow\" for=\"ai_diagrams\">Draws diagrams</label><select id=\"ai_diagrams\" name=\"ai_diagrams\">{opts}</select></div>";
+            string opts = string.Concat(DiagramEngines.Picks.Select(c => $"<option value=\"{c}\"{(c == current ? " selected" : "")}>{Ui.Esc(Label(c))}</option>"));
+            return Switch("ai_rich", picked.RichNotes && DiagramEngines.Normal(picked.Diagrams) != DiagramEngines.Off, "Rich notes: diagrams, formula plots and drawings after the notes")
+                + Switch("ai_rich_diagrams", picked.RichDiagrams, "Diagrams") + Switch("ai_rich_plots", picked.RichPlots, "Formula plots")
+                + Switch("ai_rich_drawings", picked.RichDrawings, "Drawings")
+                + $"<div class=\"row\"><label class=\"grow\" for=\"ai_diagrams\">Drawn by</label><select id=\"ai_diagrams\" name=\"ai_diagrams\">{opts}</select></div>";
+        }
+        string SpeedRow()
+        {
+            string Label(string c) => c switch
+            {
+                AiSpeed.Fast => "Fast mode: the same Opus, up to 2.5 times faster, billed at a higher rate",
+                AiSpeed.Quick => "Quicker model: Sonnet at low effort, shallower notes",
+                _ => "Standard",
+            };
+            string opts = string.Concat(AiSpeed.Choices.Select(c => $"<option value=\"{c}\"{(c == AiSpeed.Normal(picked.Speed) ? " selected" : "")}>{Ui.Esc(Label(c))}</option>"));
+            return $"<div class=\"row\"><label class=\"grow\" for=\"ai_speed\">Claude Code speed</label><select id=\"ai_speed\" name=\"ai_speed\">{opts}</select></div>";
         }
         var main = providers.First(p => p.Id == picked.Provider);
         string modelOpts = string.Concat(main.Models.Select(m =>
@@ -749,7 +767,7 @@ public sealed partial class LibraryWeb
         string brain = "<div class=\"group-head\">AI</div><div class=\"group\">"
             + $"<div class=\"row\"><label class=\"grow\" for=\"ai_provider\">Does the work</label>{tested}{ProviderSelect("ai_provider", picked.Provider, null)}</div>"
             + (main.Id == "ollama" ? "" : $"<div class=\"row\"><label class=\"grow\" for=\"ai_model\">Model</label><select id=\"ai_model\" name=\"ai_model\">{modelOpts}</select></div>")
-            + JobRow("notes", "Writes study notes") + DiagramsRow() + JobRow("sort", "Sorts lectures") + JobRow("ask", "Answers questions")
+            + JobRow("notes", "Writes study notes") + DiagramsRow() + SpeedRow() + JobRow("sort", "Sorts lectures") + JobRow("ask", "Answers questions")
             + (Terminal.Available() is { Count: > 0 } terms
                 ? "<div class=\"row\"><label class=\"grow\" for=\"terminal\">Open in… uses</label><select id=\"terminal\" name=\"terminal\">"
                   + string.Concat(terms.Select(t => $"<option value=\"{t.Id}\"{(t.Id == picked.Terminal ? " selected" : "")}>{Ui.Esc(t.Name)}</option>")) + "</select></div>"
@@ -790,12 +808,16 @@ public sealed partial class LibraryWeb
                 + $"<input type=\"text\" name=\"class_aliases_{i}\" value=\"{Ui.Esc(string.Join(", ", k.Aliases))}\" placeholder=\"Other names\" aria-label=\"Other names, comma separated\">"
                 + remove
                 + $"<input class=\"wide\" type=\"text\" name=\"class_desc_{i}\" value=\"{Ui.Esc(k.Description)}\" placeholder=\"What it covers (helps the AI)\" aria-label=\"Description\">"
+                // What it's called now, so typing a new name renames it (its lectures and folder go with it) instead of
+                // adding a class. Last, since the row's styles count its inputs by position.
+                + (k.Name.Length > 0 ? $"<input type=\"hidden\" name=\"class_was_{i}\" value=\"{Ui.Esc(k.Name)}\">" : "")
                 + "</div>");
         }
         string classes = $"<div class=\"group-head\" id=\"classes\">Classes</div><div class=\"group\">{string.Concat(rows)}</div>"
             + "<p class=\"group-foot\">Lectures are sorted into these. A lecture recorded for a class, or whose title "
             + "matches a name here, is filed without asking the AI. Removing a class keeps its lectures; move them "
-            + "from their pages. Fill in the last row to add a class.</p>";
+            + "from their pages. Type a new name over a class to rename it: its lectures and folder go with it. Fill in the last row "
+            + "to add a class.</p>";
         string form = $"<form method=\"post\" action=\"/settings\">{ai}{classes}"
             + "<div class=\"actions\"><button class=\"primary\">Save settings</button></div></form>" + CourseNamesGroup(renamed);
 
@@ -848,15 +870,10 @@ public sealed partial class LibraryWeb
     async Task<IResult> SaveSettings(HttpContext ctx) => await WithMemberAsync(ctx, async _ =>
     {
         var f = await Http.FormAsync(ctx.Request);
-        cfg.SummaryModel = Py.Strip(f.Get("summary_model", cfg.SummaryModel));
-        string sort = Py.Strip(f.Get("ollama_model", cfg.OllamaModel));
-        if (sort.Length > 0) cfg.OllamaModel = sort;
-        cfg.SummaryEnabled = f.Get("summary_enabled") == "1";
-        cfg.OllamaEnabled = f.Get("ollama_enabled") == "1";
-        if (double.TryParse(Py.Strip(f.Get("min_confidence", Py.FloatRepr(cfg.MinConfidence))), NumberStyles.Float,
-                CultureInfo.InvariantCulture, out double confidence) && !double.IsNaN(confidence))
-            cfg.MinConfidence = Math.Clamp(confidence, 0.0, 1.0);
+        // The classes first: a class typed over with a new name is renamed (as the app's Settings does), or the whole
+        // save is turned down, with nothing changed, while Canvas is syncing.
         var classes = new List<ClassDef>();
+        var renames = new List<ClassRenameStep>();
         var seen = new HashSet<string>();
         for (int i = 0; f.ContainsKey($"class_name_{i}"); i++)
         {
@@ -865,7 +882,25 @@ public sealed partial class LibraryWeb
             var aliases = f.Get($"class_aliases_{i}").Split(',').Select(Py.Strip).Where(a => a.Length > 0).ToList();
             classes.Add(new ClassDef(name, aliases, Py.Strip(f.Get($"class_desc_{i}"))));
             seen.Add(name);
+            if (Py.Strip(f.Get($"class_was_{i}")) is { Length: > 0 } was && was != name && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, name, 0, ""));
         }
+        string? refused = renames.Count == 0 ? null
+            : ClassRename.Blocked(Canvas.Crawl)
+              ?? (renames.FirstOrDefault(r => r.To.Length > StudyStash.Core.Canvas.CourseNames.MaxLength) is { } tooLong ? $"“{tooLong.To[..20]}…” is too long for a class name (up to {StudyStash.Core.Canvas.CourseNames.MaxLength} characters)." : null)
+              ?? RenameClasses(renames, classes);
+        if (refused is not null)
+        {
+            lastRenameProblem = refused;
+            return Http.SeeOther("/settings?renamed=0#classes");
+        }
+        cfg.SummaryModel = Py.Strip(f.Get("summary_model", cfg.SummaryModel));
+        string sort = Py.Strip(f.Get("ollama_model", cfg.OllamaModel));
+        if (sort.Length > 0) cfg.OllamaModel = sort;
+        cfg.SummaryEnabled = f.Get("summary_enabled") == "1";
+        cfg.OllamaEnabled = f.Get("ollama_enabled") == "1";
+        if (double.TryParse(Py.Strip(f.Get("min_confidence", Py.FloatRepr(cfg.MinConfidence))), NumberStyles.Float,
+                CultureInfo.InvariantCulture, out double confidence) && !double.IsNaN(confidence))
+            cfg.MinConfidence = Math.Clamp(confidence, 0.0, 1.0);
         cfg.Classes = classes;
         Configs.Save(cfg);
         if (f.ContainsKey("ai_provider"))
@@ -886,7 +921,10 @@ public sealed partial class LibraryWeb
                 if (known.Contains(p)) picked.ByJob[job] = new AiChoice(p);
                 else picked.ByJob.Remove(job);
             }
-            if (DiagramEngines.Choices.Contains(Py.Strip(f.Get("ai_diagrams")))) picked.Diagrams = Py.Strip(f.Get("ai_diagrams"));
+            if (DiagramEngines.Picks.Contains(Py.Strip(f.Get("ai_diagrams")))) picked.Diagrams = Py.Strip(f.Get("ai_diagrams"));
+            // The page always sends every rich notes switch it shows: one that's missing is one that's off.
+            picked.SetRich(on: f.ContainsKey("ai_rich"), f.ContainsKey("ai_rich_diagrams"), f.ContainsKey("ai_rich_plots"), f.ContainsKey("ai_rich_drawings"));
+            if (AiSpeed.Choices.Contains(Py.Strip(f.Get("ai_speed")))) picked.Speed = Py.Strip(f.Get("ai_speed"));
             picked.Save(cfg.Home);
         }
         return Http.SeeOther("/settings?saved=1");

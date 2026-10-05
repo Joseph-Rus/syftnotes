@@ -80,8 +80,10 @@ public static class Problems
 
         if (host.WhisperProblem is { } whisper)
         {
-            string engine = whisper.StartsWith("Parakeet couldn't start: ", StringComparison.Ordinal) ? "Parakeet" : "Whisper";
-            yield return new(ProblemKind.WhisperFailed, $"{engine} couldn't start", WithoutPrefix(whisper, $"{engine} couldn't start: "), "Download again");
+            string engine = new[] { "Parakeet", "Cactus Whistle" }.FirstOrDefault(e => whisper.StartsWith($"{e} couldn't start: ", StringComparison.Ordinal)) ?? "Whisper";
+            // Cactus Whistle comes with the app: downloading again can't help it, and its words say what can.
+            yield return new(ProblemKind.WhisperFailed, $"{engine} couldn't start", WithoutPrefix(whisper, $"{engine} couldn't start: "),
+                engine == "Cactus Whistle" ? "" : "Download again");
         }
 
         if (host.DownloadProblem is { } download)

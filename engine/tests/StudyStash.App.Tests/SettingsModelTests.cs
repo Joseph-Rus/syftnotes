@@ -82,4 +82,35 @@ public class SettingsModelTests
         Assert.Equal([true], login.Calls);
         Assert.False(model.StartAtLogin);
     }
+
+    /// <summary>Keep recordings takes effect while the app runs (a Mac's can run for weeks), not only the next time it
+    /// starts: a filed lecture's audio older than the days kept goes, and its notes and transcript stay.</summary>
+    [AvaloniaFact]
+    public async Task Keeping_recordings_fewer_days_drops_old_audio_without_a_restart()
+    {
+        using var home = new TempHome();
+        new AppSettings { SetupDone = true, KeepAudioDays = 0 }.Save(home.Path);
+        File.WriteAllBytes(home["model.bin"], [1]);
+        var store = new LectureStore(home.Path);
+        store.Add(new Lecture
+        {
+            Id = "rec-old", State = LectureState.Filed,
+            Started = DateTimeOffset.Now.AddDays(-10).ToString("yyyy-MM-dd'T'HH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture),
+        });
+        using (new WavWriter(store.AudioPath("rec-old"))) { }
+        using var host = new AppHost(home.Path, log: _ => { }, loginItems: new CountingLoginItems(), models: new ModelSetting(File: home["model.bin"]))
+        {
+            PruneAfterChange = TimeSpan.Zero,
+        };
+        host.Start();
+        using var model = SettingsModel.Make(host);
+        await Task.Delay(300);
+        Assert.True(File.Exists(store.AudioPath("rec-old"))); // 0 keeps every recording
+
+        model.KeepAudio = "7";
+
+        for (int i = 0; i < 200 && File.Exists(store.AudioPath("rec-old")); i++) await Task.Delay(25);
+        Assert.False(File.Exists(store.AudioPath("rec-old")));
+        Assert.NotNull(host.Lectures.Get("rec-old"));
+    }
 }

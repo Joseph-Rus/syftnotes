@@ -18,8 +18,11 @@ namespace StudyStash.App.Controls.Rich;
 /// then fitted to its column. A chart too wide for it turns (a left-to-right chart goes
 /// top-down, a top-down tree left-to-right); then the picture scales down, never below <see cref="MinScale"/> (its
 /// words stay at least 8 px), and past that it scrolls sideways. It never grows past <see cref="MaxScale"/> (1 in a
-/// note). In a note, a click opens it larger (<see cref="OpenLarger"/>). A chart that can't be laid out becomes the
-/// calm card that says so, with its source.
+/// note). On screen it can be explored (<see cref="DiagramExplorer"/>): a box under the pointer lights its arrows, a
+/// click pins it with its actions, it zooms and pans, steps through, folds its groups and hides its words to test
+/// yourself; in a note a click on its paper (or its corner's button) opens it larger (<see cref="OpenLarger"/>), in a
+/// window of its own it fills the window. On paper it's only ever the still picture. A chart that can't be laid out
+/// becomes the calm card that says so, with its source.
 /// </summary>
 public sealed class DiagramView : Decorator
 {
@@ -29,8 +32,19 @@ public sealed class DiagramView : Decorator
     /// <summary>The smallest the picture is drawn: 13 px box words stay at least 8 px.</summary>
     public const double MinScale = 0.6;
 
+    /// <summary>What a screen reader hears it does.</summary>
+    public const string Help = "Arrow keys move along the arrows and Enter picks a box. S steps through it, H hides its words to test yourself. Enter with no box picked opens it larger.";
+
+    /// <summary>The same, in a window of its own.</summary>
+    public const string WindowHelp = "Arrow keys move along the arrows and Enter picks a box. S steps through it, H hides its words to test yourself, plus and minus zoom.";
+
     readonly DiagramCanvas canvas = new();
-    readonly ScrollViewer scroller;
+    readonly ScrollViewer? scroller;
+    readonly DiagramExplorer? explorer;
+    readonly DiagramChrome? chrome;
+    readonly Border? ring;
+    readonly Panel? stage;
+    readonly bool windowed;
     bool failed;
 
     static DiagramView() => AffectsMeasure<DiagramView>(ChartProperty, MaxScaleProperty);
@@ -42,33 +56,118 @@ public sealed class DiagramView : Decorator
 
     /// <summary><paramref name="fitWhole"/>: on paper, where there's nothing to scroll, the whole picture fits the room
     /// it's given (the column, and the page's height), however small that makes it, rather than stopping at
-    /// <see cref="MinScale"/>; and it doesn't open larger.</summary>
+    /// <see cref="MinScale"/>; and it doesn't open larger, nor answer the pointer.</summary>
     public DiagramView(bool opensLarger, bool fitWhole)
     {
         canvas.FitWhole = fitWhole;
-        scroller = new ScrollViewer
-        {
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Content = canvas,
-        };
-        HorizontalAlignment = HorizontalAlignment.Center;
         canvas.Failed = ShowProblem;
+        HorizontalAlignment = HorizontalAlignment.Center;
         if (fitWhole)
         {
-            scroller.Content = null;
             Child = canvas;
             return;
         }
-        if (!opensLarger)
+        windowed = !opensLarger;
+        Focusable = true;
+        // Its own ring shows the keyboard is on it (round the picture, or round a box), not the theme's rectangle
+        // round the whole column.
+        FocusAdorner = null;
+        AutomationProperties.SetHelpText(this, windowed ? WindowHelp : Help);
+        ring = new Border { BorderThickness = new Thickness(2), CornerRadius = new CornerRadius(8), Margin = new Thickness(-4), IsHitTestVisible = false, IsVisible = false };
+        ring.Bind(Border.BorderBrushProperty, ring.GetResourceObservable("Accent"));
+        if (windowed)
         {
-            Child = scroller;
-            return;
+            canvas.HorizontalAlignment = HorizontalAlignment.Center;
+            canvas.VerticalAlignment = VerticalAlignment.Center;
+            canvas.Margin = new Thickness(WindowPad);
+            stage = new Panel { ClipToBounds = true, Background = Brushes.Transparent, Children = { canvas } };
+            HorizontalAlignment = HorizontalAlignment.Stretch;
+            VerticalAlignment = VerticalAlignment.Stretch;
+            explorer = new DiagramExplorer(this, canvas, stage, windowed: true);
         }
-        var badge = OpenLarger.Badge();
-        Child = new Panel { Children = { scroller, badge } };
-        OpenLarger.Wire(this, badge, () => !failed && Chart is { } chart ? new OpenDiagramEventArgs(this) { Title = Title, Chart = chart, Scene = Scene } : null);
+        else
+        {
+            scroller = new ScrollViewer
+            {
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = canvas,
+            };
+            stage = new Panel { HorizontalAlignment = HorizontalAlignment.Center, Children = { scroller, ring } };
+            Cursor = new Cursor(StandardCursorType.Hand);
+            HorizontalAlignment = HorizontalAlignment.Stretch;
+            explorer = new DiagramExplorer(this, canvas, canvas, windowed: false);
+        }
+        chrome = new DiagramChrome(explorer, this, windowed);
+        stage.Children.Add(chrome.Actions);
+        stage.Children.Add(chrome.Announcer);
+        if (windowed) Child = stage; // its strip says how it works
+        else
+        {
+            // The toolbar and the hint sit in the column's corners, clear of a picture narrower than the column.
+            var picture = new Panel { Children = { stage, chrome.Tools, chrome.Hint } };
+            var rows = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto") };
+            rows.Children.Add(picture);
+            Grid.SetRow(chrome.Strip, 1);
+            rows.Children.Add(chrome.Strip);
+            Child = rows;
+        }
+        explorer.Changed += Place;
+        explorer.Zoomer.Changed += Place;
+        PointerEntered += (_, _) => chrome.Update();
+        PointerExited += (_, _) => chrome.Update();
+        GotFocus += (_, e) =>
+        {
+            keyboard = e.NavigationMethod is NavigationMethod.Tab or NavigationMethod.Directional;
+            Focused();
+        };
+        // A click gives it the keyboard without scrolling the page to show all of it (the box under the pointer would
+        // move away mid-click); the keyboard's Tab still brings it into view.
+        AddHandler(RequestBringIntoViewEvent, (_, e) =>
+        {
+            if (ReferenceEquals(e.TargetObject, this) && !keyboard) e.Handled = true;
+        });
+        LostFocus += (_, _) =>
+        {
+            keyboard = false;
+            Focused();
+        };
+        KeyDown += (_, e) =>
+        {
+            if (e.Handled || explorer.Written is null) return;
+            if (explorer.Key(e.Key, e.KeyModifiers))
+            {
+                keyboard = true;
+                e.Handled = true;
+                Focused();
+            }
+        };
     }
+
+    /// <summary>The margin round the picture in a window of its own.</summary>
+    public const double WindowPad = 32;
+
+    bool keyboard;
+
+    /// <summary>Whether the keyboard (not a click) brought it focus: its ring shows only then.</summary>
+    internal bool KeyboardFocused => keyboard && IsKeyboardFocusWithin;
+
+    void Focused()
+    {
+        if (ring is not null) ring.IsVisible = KeyboardFocused && explorer?.Ring is null;
+        explorer?.FocusChanged();
+        chrome?.Update();
+    }
+
+    /// <summary>What explores it (null on paper).</summary>
+    internal DiagramExplorer? Explorer => explorer;
+
+    /// <summary>The controls round it (null on paper): a window of its own puts its toolbar and strip where it wants them.</summary>
+    internal DiagramChrome? Chrome => chrome;
+
+    /// <summary>The diagram in the note this window's diagram was opened from: questions about it go to that note's
+    /// lecture.</summary>
+    public Control? Origin { get; set; }
 
     public Flowchart? Chart
     {
@@ -82,12 +181,24 @@ public sealed class DiagramView : Decorator
         set => SetValue(MaxScaleProperty, value);
     }
 
-    /// <summary>What the diagram is called: its own title, or else its first words.</summary>
-    public string Title => Chart is not { } chart ? "Diagram" : chart.Title is { Length: > 0 } t ? t : chart.Labels().FirstOrDefault() ?? "Diagram";
+    /// <summary>What the diagram is called: its own title, or the note's bold line just above it, or else its first
+    /// words.</summary>
+    public string Title => Named ?? Chart?.Labels().FirstOrDefault() ?? "Diagram";
+
+    /// <summary>The diagram's own title, or the bold line the note gives it (the diagram pass writes one above each),
+    /// or null when it has neither.</summary>
+    public string? Named => Chart?.Title is { Length: > 0 } t ? t : Caption is { Length: > 0 } c ? c : null;
+
+    /// <summary>The bold line just above it in the note, if there's one (its title, as the diagram pass writes it).</summary>
+    public string? Caption { get; init; }
 
     /// <summary>The chart as the note wrote it, shown on the card if it can't be laid out (else its own
     /// canonical source is).</summary>
     public string? Source { get; init; }
+
+    /// <summary>The groups to show folded when it opens (a window opened from a note shows them as the note did); null
+    /// lets a big chart made of groups open as its overview.</summary>
+    public IEnumerable<string>? Folded { get; init; }
 
     /// <summary>The diagram as laid out for its column, or null until it has been.</summary>
     public DiagramScene? Scene => canvas.Scene;
@@ -101,13 +212,13 @@ public sealed class DiagramView : Decorator
     /// <summary>How much the picture is scaled to fit its column.</summary>
     public double Scale => canvas.Scale;
 
-
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
         if (change.Property == ChartProperty)
         {
-            canvas.Chart = Chart;
+            if (explorer is not null) explorer.Load(Chart, Folded);
+            else canvas.Chart = Chart;
             AutomationProperties.SetName(this, Chart is { } chart ? "Diagram: " + string.Join(", ", chart.Labels()) : null);
         }
         else if (change.Property == MaxScaleProperty) canvas.MaxScale = MaxScale;
@@ -115,15 +226,48 @@ public sealed class DiagramView : Decorator
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        // The scroller measures its content as if it had all the width in the world; the picture needs the column's.
-        canvas.Room = availableSize;
+        // The scroller measures its content as if it had all the width in the world; the picture needs the column's
+        // (less the strip under it, while one shows, where the column's height is limited).
+        var room = availableSize;
+        if (windowed) room = new Size(Math.Max(0, room.Width - 2 * WindowPad), Math.Max(0, room.Height - 2 * WindowPad));
+        else if (chrome is { Strip.IsVisible: true } c && double.IsFinite(room.Height))
+        {
+            c.Strip.Measure(new Size(room.Width, double.PositiveInfinity));
+            room = room.WithHeight(Math.Max(0, room.Height - c.Strip.DesiredSize.Height));
+        }
+        canvas.Room = room;
         return base.MeasureOverride(availableSize);
     }
 
-    public override void Render(DrawingContext context)
+    /// <summary>Opens it larger, in a window of its own (unless something on the way up shows it another way).</summary>
+    public void OpenLarger()
     {
-        // Clear, but there: the whole picture answers a click, not just its lines.
-        context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size));
+        if (failed || Chart is not { } chart || windowed) return;
+        explorer?.HintSeen();
+        Rich.OpenLarger.Raise(this, () => new OpenDiagramEventArgs(this)
+        {
+            // The window sizes itself to the chart laid out its own way (a left-to-right chart turned to fit a narrow
+            // column reads left to right again in a window wide enough).
+            Title = Title, Chart = chart, Scene = canvas.AsWritten() ?? Scene, Written = Source, Folded = explorer?.Folded.ToList(),
+        });
+    }
+
+    /// <summary>Puts a pinned box's actions just under it (or over it, where there's no room under), and keeps them
+    /// there as the picture zooms and pans.</summary>
+    void Place()
+    {
+        if (chrome is null || explorer is null || stage is null) return;
+        chrome.Update();
+        if (!chrome.Actions.IsVisible || explorer.Pinned is not { } id || Scene?.Nodes.FirstOrDefault(n => n.Id == id) is not { } n) return;
+        double s = canvas.Scale;
+        var top = canvas.TranslatePoint(new Point(n.Box.X * s, n.Box.Y * s), stage);
+        var bottom = canvas.TranslatePoint(new Point(n.Box.X * s, n.Box.Bottom * s), stage);
+        if (top is not { } t || bottom is not { } b) return;
+        chrome.Actions.Measure(Size.Infinity);
+        var size = chrome.Actions.DesiredSize;
+        double x = Math.Clamp(b.X, 4, Math.Max(4, stage.Bounds.Width - size.Width - 4));
+        double y = b.Y + 6 + size.Height <= stage.Bounds.Height ? b.Y + 6 : t.Y - 6 - size.Height >= 0 ? t.Y - 6 - size.Height : Math.Max(0, stage.Bounds.Height - size.Height - 4);
+        chrome.Actions.Margin = new Thickness(x, y, 0, 0);
     }
 
     /// <summary>The chart couldn't be laid out: the calm card takes its place, across the column, and it no longer
@@ -231,6 +375,12 @@ sealed class DiagramCanvas : Control
 
     public DiagramScene? Scene { get; private set; }
 
+    /// <summary>The chart laid out the way it's written (not turned to fit), if it has been.</summary>
+    public DiagramScene? AsWritten() => chart is not null && source is not null ? SceneCache.Find(chart, source, Family, null).Scene ?? Scene : Scene;
+
+    /// <summary>Whether a fold is gliding from one scene to the next.</summary>
+    public bool IsMorphing => morph is not null;
+
     public double Scale { get; private set; } = 1;
 
     /// <summary>No floor on the scale: a diagram on paper (see <see cref="DiagramView(bool, bool)"/>).</summary>
@@ -243,7 +393,7 @@ sealed class DiagramCanvas : Control
         Laying = false;
         if (chart is null || source is null)
         {
-            Scene = null;
+            SetScene(null);
             return default;
         }
         double width = double.IsFinite(room.Width) ? room.Width : double.PositiveInfinity;
@@ -251,7 +401,7 @@ sealed class DiagramCanvas : Control
         var written = SceneCache.Find(chart, source, Family, null);
         if (written.Failed)
         {
-            Scene = null;
+            SetScene(null);
             Fail();
             return default;
         }
@@ -266,16 +416,135 @@ sealed class DiagramCanvas : Control
         if ((written.Laying ?? other?.Laying) is { } laying)
         {
             Wait(laying);
-            Scene = null;
+            if (morph is { Run: null } waiting)
+            {
+                // The old picture stays as it was until the new one is ready to take its place.
+                Laying = false;
+                return waiting.FromSize;
+            }
+            SetScene(null);
             Laying = true;
             Scale = Fit(guess.Width, guess.Height, width);
             return new Size(Math.Ceiling(Math.Min(guess.Width * Scale, width)), Math.Ceiling(guess.Height * Scale));
         }
         var scene = written.Scene!;
         if (other?.Scene is { } otherScene && otherScene.Width < scene.Width) scene = otherScene;
-        Scene = scene;
+        SetScene(scene);
         Scale = Fit(scene.Width, scene.Height, width);
-        return new Size(Math.Ceiling(scene.Width * Scale), Math.Ceiling(scene.Height * Scale));
+        var size = new Size(Math.Ceiling(scene.Width * Scale), Math.Ceiling(scene.Height * Scale));
+        if (morph is { } m)
+        {
+            // Folding or opening a group: the room it takes grows or shrinks with the picture, not in one jump.
+            if (m.Run is null) StartMorph(m, size);
+            return new Size(Math.Ceiling(Lerp(m.FromSize.Width, size.Width, m.T)), Math.Ceiling(Lerp(m.FromSize.Height, size.Height, m.T)));
+        }
+        return size;
+    }
+
+    static double Lerp(double a, double b, double t) => a + (b - a) * t;
+
+    void SetScene(DiagramScene? scene)
+    {
+        if (ReferenceEquals(Scene, scene)) return;
+        Scene = scene;
+        if (SceneChanged is { } changed) Dispatcher.UIThread.Post(() => changed());
+    }
+
+    /// <summary>Called (after the measure) whenever the picture's scene changes: first laid out, folded, turned.</summary>
+    public event Action? SceneChanged;
+
+    // --- folding and opening groups, as a change the eye can follow ----------------------------------------------------
+
+    sealed class Morphing(DiagramPainter from, double fromScale, Size fromSize, FoldedChart before, FoldedChart after)
+    {
+        public DiagramPainter From { get; } = from;
+        public double FromScale { get; } = fromScale;
+        public Size FromSize { get; } = fromSize;
+        public FoldedChart Before { get; } = before;
+        public FoldedChart After { get; } = after;
+        public double T { get; set; }
+        public IDisposable? Run { get; set; }
+    }
+
+    Morphing? morph;
+
+    /// <summary>The next scene (the chart <paramref name="after"/> some groups were folded or opened) arrives as a change
+    /// from this one (<paramref name="before"/>): each box glides from where it was to where it goes, a group's boxes
+    /// into its folded box or out of it, and the lines fade across. Null: the next scene simply replaces this one.</summary>
+    public void Morph(FoldedChart? before, FoldedChart? after)
+    {
+        morph?.Run?.Dispose();
+        morph = null;
+        if (before is null || after is null || Scene is not { } scene || Laying) return;
+        morph = new Morphing(Painter(scene), Scale, Bounds.Size, before, after);
+    }
+
+    void StartMorph(Morphing m, Size to)
+    {
+        m.Run = Platform.Motion.Animate(this, TimeSpan.FromMilliseconds(320), t =>
+        {
+            m.T = t;
+            InvalidateMeasure();
+            InvalidateVisual();
+        }, () =>
+        {
+            if (ReferenceEquals(morph, m)) morph = null;
+            InvalidateMeasure();
+            InvalidateVisual();
+        });
+    }
+
+    /// <summary>A frame of the change from one scene to the next.</summary>
+    void DrawMorph(DrawingContext context, Morphing m, DiagramPainter to)
+    {
+        double t = m.T, fs = m.FromScale, ts = Scale;
+        static double Ease(double x) => Math.Clamp(x, 0, 1);
+        using (context.PushOpacity(1 - Ease(t * 1.8))) m.From.Draw(context, fs, 0, null, nodes: false);
+        using (context.PushOpacity(Ease((t - 0.35) / 0.65))) to.Draw(context, ts, 0, null, nodes: false);
+        var fromBoxes = m.From.Scene.Nodes.ToDictionary(n => n.Id, n => Scaled(n.Box, fs));
+        var toBoxes = to.Scene.Nodes.ToDictionary(n => n.Id, n => Scaled(n.Box, ts));
+        var beforeLook = new DiagramLook { Folded = m.Before.Inside.Keys.ToHashSet() };
+        var afterLook = new DiagramLook { Folded = m.After.Inside.Keys.ToHashSet() };
+        // What's going: each box into the box that shows it now (its folded group), fading.
+        foreach (var n in m.From.Scene.Nodes)
+        {
+            if (toBoxes.ContainsKey(n.Id)) continue;
+            Rect end = m.After.Shown.TryGetValue(n.Id, out string? into) && toBoxes.TryGetValue(into, out var r) ? Shrink(r) : Shrink(fromBoxes[n.Id]);
+            Node(context, m.From, n, Between(fromBoxes[n.Id], end, t), 1 - t, beforeLook);
+        }
+        // What stays, moving to its new place; what's new, coming out of the box that showed it (or gathering from the
+        // boxes it now holds).
+        foreach (var n in to.Scene.Nodes)
+        {
+            Rect start;
+            double opacity = 1;
+            if (fromBoxes.TryGetValue(n.Id, out var was)) start = was;
+            else
+            {
+                opacity = t;
+                var members = m.After.Shown.Where(s => s.Value == n.Id && fromBoxes.ContainsKey(s.Key)).Select(s => fromBoxes[s.Key]).ToList();
+                start = m.Before.Shown.TryGetValue(n.Id, out string? from) && fromBoxes.TryGetValue(from, out var folded) ? Shrink(folded)
+                    : members.Count > 0 ? members.Aggregate((a, b) => a.Union(b)) : Shrink(toBoxes[n.Id]);
+            }
+            Node(context, to, n, Between(start, toBoxes[n.Id], t), opacity, afterLook);
+        }
+    }
+
+    static Rect Scaled(Box b, double s) => new(b.X * s, b.Y * s, b.W * s, b.H * s);
+
+    static Rect Shrink(Rect r) => new(r.Center.X - r.Width * 0.2, r.Center.Y - r.Height * 0.2, r.Width * 0.4, r.Height * 0.4);
+
+    static Rect Between(Rect a, Rect b, double t) => new(Lerp(a.X, b.X, t), Lerp(a.Y, b.Y, t), Lerp(a.Width, b.Width, t), Lerp(a.Height, b.Height, t));
+
+    /// <summary>A box drawn into <paramref name="at"/> (the canvas's pixels), its words scaled with it.</summary>
+    static void Node(DrawingContext context, DiagramPainter painter, SceneNode n, Rect at, double opacity, DiagramLook look)
+    {
+        if (opacity <= 0.01 || n.Box.W <= 0 || n.Box.H <= 0) return;
+        double k = Math.Sqrt(at.Width * at.Height / (n.Box.W * n.Box.H));
+        var c = n.Box.Center;
+        using (context.PushOpacity(opacity))
+        using (context.PushTransform(Matrix.CreateTranslation(-c.X, -c.Y) * Matrix.CreateScale(k, k) * Matrix.CreateTranslation(at.Center.X, at.Center.Y)))
+            painter.DrawNode(context, n, 0, look);
     }
 
     /// <summary>The scale a picture this size is drawn at in the room given: no larger than the most allowed, no
@@ -318,112 +587,71 @@ sealed class DiagramCanvas : Control
             Placeholder(context);
             return;
         }
+        if (morph is { Run: null } waiting)
+        {
+            // The picture as it was (its groups as they were) until the new one is laid out.
+            double was = waiting.FromScale * Zoom * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+            waiting.From.Draw(context, waiting.FromScale, was, new DiagramLook { Folded = waiting.Before.Inside.Keys.ToHashSet() });
+            return;
+        }
         if (Scene is not { } scene) return;
+        if (morph is { } m)
+        {
+            DrawMorph(context, m, Painter(scene));
+            return;
+        }
+        // Boxes and words land on whole pixels of the screen it's drawn on, so their hairlines stay crisp: at 125%,
+        // 150% or 175% a whole point isn't a whole pixel, so they snap to the screen's own pixels, not to points.
+        double snap = Scale * Zoom * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
+        Painter(scene).Draw(context, Scale, snap, Look);
+    }
+
+    DiagramPainter? painter;
+
+    /// <summary>The painter for <paramref name="scene"/> in the look's colours now: the same one frame after frame
+    /// until the scene, the colours or the font change.</summary>
+    internal DiagramPainter Painter(DiagramScene scene)
+    {
         bool dark = ActualThemeVariant == ThemeVariant.Dark;
         var ink = Solid(Ink, dark ? Colors.White : Color.Parse("#1D1D1F"));
         var line = Line ?? new SolidColorBrush(ink.Color, 0.6);
         var accent = Solid(Accent, Color.Parse("#0A84A0")).Color;
         Color? tint = AccentTint is ISolidColorBrush t ? t.Color : null;
-        var (fill, stroke) = DiagramColours.Neutral(dark, ink.Color);
-        // Boxes and words land on whole pixels of the screen it's drawn on, so their hairlines stay crisp: at 125%,
-        // 150% or 175% a whole point isn't a whole pixel, so they snap to the screen's own pixels, not to points.
-        double snap = Scale * (TopLevel.GetTopLevel(this)?.RenderScaling ?? 1);
-        var scaled = context.PushTransform(Matrix.CreateScale(Scale, Scale));
+        var quiet = Quiet ?? Line ?? Brushes.Gray;
+        if (painter is { } p && ReferenceEquals(p.Scene, scene) && p.Palette.Dark == dark && p.Palette.Ink.Color == ink.Color
+            && ReferenceEquals(p.Palette.Line, line) && ReferenceEquals(p.Palette.GroupFill, GroupFill) && p.Palette.Accent == accent
+            && p.Palette.Tint == tint && ReferenceEquals(p.Palette.Quiet, quiet) && ReferenceEquals(p.Family, Family))
+            return p;
+        return painter = new DiagramPainter(scene, new DiagramPalette(dark, ink, line, GroupFill, accent, tint, quiet), Family);
+    }
 
-        foreach (var g in scene.Groups)
+    /// <summary>What's shown over the picture while it's explored (null: the still picture).</summary>
+    public DiagramLook? Look
+    {
+        get => look;
+        set
         {
-            context.DrawRectangle(GroupFill, null, new RoundedRect(Snap(ToRect(g.Box), snap, false), 12));
-            DrawCentred(context, g.Title, DiagramLayout.TitleSize, FontWeight.SemiBold, line, g.TitleBox.Center.X, g.TitleBox.Y, g.TitleBox.H, snap);
-        }
-
-        var labelled = scene.Edges.Where(e => e.LabelLines.Count > 0).ToList();
-        IDisposable? clip = null;
-        if (labelled.Count > 0 || scene.Groups.Count > 0)
-        {
-            // The lines stop short of their words and of the groups' titles, so neither needs a background.
-            var gaps = new GeometryGroup { FillRule = FillRule.NonZero };
-            foreach (var e in labelled) gaps.Children.Add(new RectangleGeometry(ToRect(e.LabelBox.Inflate(2))));
-            foreach (var g in scene.Groups) gaps.Children.Add(new RectangleGeometry(ToRect(g.TitleBox.Inflate(2))));
-            clip = context.PushGeometryClip(new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(new Rect(-50, -50, scene.Width + 100, scene.Height + 100)), gaps));
-        }
-        foreach (var e in scene.Edges)
-        {
-            var pen = new Pen(line, SceneShapes.Thickness(e.Line), e.Line == EdgeLine.Dotted ? new DashStyle(SceneShapes.Dashes.Select(d => d / SceneShapes.Thickness(e.Line)), 0) : null, PenLineCap.Round, PenLineJoin.Round);
-            var path = new StreamGeometry();
-            using (var g = path.Open())
-            {
-                bool open = false;
-                foreach (var step in e.Path)
-                {
-                    switch (step.Verb)
-                    {
-                        case PathVerb.Move:
-                            if (open) g.EndFigure(false);
-                            g.BeginFigure(P(step.A), false);
-                            open = true;
-                            break;
-                        case PathVerb.Line:
-                            g.LineTo(P(step.A));
-                            break;
-                        default:
-                            g.CubicBezierTo(P(step.A), P(step.B), P(step.C));
-                            break;
-                    }
-                }
-                if (open) g.EndFigure(false);
-            }
-            context.DrawGeometry(null, pen, path);
-            Marker(context, e.EndEnd, e.Tip, e.Base, line);
-            Marker(context, e.StartEnd, e.StartTip, e.StartBase, line);
-        }
-        clip?.Dispose();
-        // The scale again, afresh: drawn into a bitmap at 200% (a picture of the window, as the self-test takes), Avalonia
-        // puts the words and boxes that follow a clip taken off inside the same transform twice as far out.
-        scaled.Dispose();
-        using var _ = context.PushTransform(Matrix.CreateScale(Scale, Scale));
-
-        foreach (var e in labelled)
-        {
-            double top = e.LabelBox.Center.Y - e.LabelLines.Count * DiagramLayout.LabelLineHeight / 2;
-            for (int i = 0; i < e.LabelLines.Count; i++)
-                DrawCentred(context, e.LabelLines[i], DiagramLayout.LabelSize, FontWeight.Normal, line, e.LabelBox.Center.X, top + i * DiagramLayout.LabelLineHeight, DiagramLayout.LabelLineHeight, snap);
-        }
-
-        foreach (var n in scene.Nodes)
-        {
-            var (nodeFill, nodeStroke) = n.Tone == Tone.None ? (fill, stroke) : DiagramColours.Of(n.Tone, dark, accent, tint);
-            IBrush brush = new SolidColorBrush(nodeFill);
-            var pen = new Pen(new SolidColorBrush(nodeStroke), 1);
-            var b = ToRect(n.Box);
-            if (SceneShapes.Corners(n) is { } corners)
-            {
-                var poly = new StreamGeometry();
-                using (var g = poly.Open())
-                {
-                    g.BeginFigure(P(corners[0]), true);
-                    foreach (var c in corners.Skip(1)) g.LineTo(P(c));
-                    g.EndFigure(true);
-                }
-                context.DrawGeometry(brush, pen, poly);
-            }
-            else if (n.Shape == NodeShape.Circle) context.DrawEllipse(brush, pen, b.Center, b.Width / 2, b.Height / 2);
-            else if (n.Shape == NodeShape.Cylinder) Cylinder(context, Snap(b, snap, true), brush, pen);
-            else
-            {
-                var r = Snap(b, snap, true);
-                double radius = SceneShapes.Radius(n);
-                context.DrawRectangle(brush, pen, new RoundedRect(r, radius));
-                if (n.Shape == NodeShape.Subroutine)
-                {
-                    context.DrawLine(pen, new Point(r.X + 8, r.Y), new Point(r.X + 8, r.Bottom));
-                    context.DrawLine(pen, new Point(r.Right - 8, r.Y), new Point(r.Right - 8, r.Bottom));
-                }
-            }
-            double top = SceneShapes.TextTop(n);
-            for (int i = 0; i < n.Lines.Count; i++)
-                DrawCentred(context, n.Lines[i], DiagramLayout.TextSize, FontWeight.Medium, ink, n.Box.Center.X, top + i * DiagramLayout.LineHeight, DiagramLayout.LineHeight, snap);
+            look = value;
+            InvalidateVisual();
         }
     }
+
+    DiagramLook? look;
+
+    /// <summary>How far the picture is zoomed on top of its scale (by its view's zoom), so its hairlines snap to
+    /// the pixels they land on.</summary>
+    public double Zoom
+    {
+        get => zoom;
+        set
+        {
+            if (Math.Abs(zoom - value) < 1e-9) return;
+            zoom = value;
+            InvalidateVisual();
+        }
+    }
+
+    double zoom = 1;
 
     /// <summary>The space a diagram being laid out keeps: a soft rounded box, with a quiet word in the middle.</summary>
     void Placeholder(DrawingContext context)
@@ -437,74 +665,10 @@ sealed class DiagramCanvas : Control
         context.DrawText(t, new Point(Math.Round((box.Width - t.Width) / 2), Math.Round((box.Height - t.Height) / 2)));
     }
 
-    static void Cylinder(DrawingContext context, Rect b, IBrush fill, Pen pen)
-    {
-        double cap = SceneShapes.CylinderCap, rx = b.Width / 2;
-        var body = new StreamGeometry();
-        using (var g = body.Open())
-        {
-            g.BeginFigure(new Point(b.X, b.Y + cap), true);
-            g.LineTo(new Point(b.X, b.Bottom - cap));
-            g.ArcTo(new Point(b.Right, b.Bottom - cap), new Size(rx, cap), 0, false, SweepDirection.CounterClockwise);
-            g.LineTo(new Point(b.Right, b.Y + cap));
-            g.ArcTo(new Point(b.X, b.Y + cap), new Size(rx, cap), 0, false, SweepDirection.CounterClockwise);
-            g.EndFigure(true);
-        }
-        context.DrawGeometry(fill, pen, body);
-        var rim = new StreamGeometry();
-        using (var g = rim.Open())
-        {
-            g.BeginFigure(new Point(b.X, b.Y + cap), false);
-            g.ArcTo(new Point(b.Right, b.Y + cap), new Size(rx, cap), 0, false, SweepDirection.CounterClockwise);
-            g.EndFigure(false);
-        }
-        context.DrawGeometry(null, pen, rim);
-    }
-
-    static void Marker(DrawingContext context, EdgeEnd end, Pt tip, Pt @base, IBrush brush)
-    {
-        if (end == EdgeEnd.None || Pt.Distance(tip, @base) < 0.01) return;
-        switch (end)
-        {
-            case EdgeEnd.Arrow:
-                var head = SceneShapes.ArrowHead(tip, @base);
-                var geometry = new StreamGeometry();
-                using (var g = geometry.Open())
-                {
-                    g.BeginFigure(P(head[0]), true);
-                    g.LineTo(P(head[1]));
-                    g.LineTo(P(head[2]));
-                    g.EndFigure(true);
-                }
-                context.DrawGeometry(brush, null, geometry);
-                break;
-            case EdgeEnd.Circle:
-                context.DrawEllipse(brush, null, P(SceneShapes.Dot(tip, @base)), SceneShapes.DotRadius, SceneShapes.DotRadius);
-                break;
-            case EdgeEnd.Cross:
-                var (a, b, c, d) = SceneShapes.Cross(tip, @base);
-                var pen = new Pen(brush, 1.5, lineCap: PenLineCap.Round);
-                context.DrawLine(pen, P(a), P(b));
-                context.DrawLine(pen, P(c), P(d));
-                break;
-        }
-    }
-
-    void DrawCentred(DrawingContext context, string text, double size, FontWeight weight, IBrush brush, double centreX, double top, double lineHeight, double snap)
-    {
-        var t = Text(text, size, weight, brush);
-        double x = centreX - t.WidthIncludingTrailingWhitespace / 2, y = top + (lineHeight - t.Height) / 2;
-        context.DrawText(t, new Point(OnPixel(x, snap), OnPixel(y, snap)));
-    }
-
     FormattedText Text(string text, double size, FontWeight weight, IBrush brush) =>
         new(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(Family, FontStyle.Normal, weight), size, brush);
 
     static SolidColorBrush Solid(IBrush? brush, Color fallback) => brush as SolidColorBrush ?? new SolidColorBrush(brush is ISolidColorBrush s ? s.Color : fallback);
-
-    static Point P(Pt p) => new(p.X, p.Y);
-
-    static Rect ToRect(Box b) => new(b.X, b.Y, b.W, b.H);
 
     /// <summary>A rectangle on whole pixels of the screen (<paramref name="pixels"/> of them to a unit of the scene);
     /// a 1-unit outline's half a unit in, so its outer edge falls on a pixel's edge and it covers one row exactly

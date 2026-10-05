@@ -42,7 +42,7 @@ public class PassagesRichTests
     {
         var passages = Passages.FromNotes("n", "## Care\n\n```mermaid\nflowchart TD\n  A[Assess pain] -->\n```\n\n"
             + "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 200\">\n<text x=\"20\" y=\"40\">Left ventricle</text>\n</svg>\n\n"
-            + "```mermaid\nsequenceDiagram\n  Nurse->>Patient: How is the pain?\n```");
+            + "```mermaid\nclassDiagram\n  Nurse <|-- Patient\n```");
         Assert.Equal(3, passages.Count);
         Assert.All(passages, p => Assert.Equal("Care", p.Section));
         Assert.StartsWith("Diagram: ", passages[0].Text);
@@ -51,6 +51,22 @@ public class PassagesRichTests
         Assert.Equal("Diagram: Left ventricle", passages[1].Text);
         Assert.Contains("nurse", passages[2].Text);
         Assert.DoesNotContain("->>", passages[2].Text);
+    }
+
+    /// <summary>An illustration is found by its parts' names and what it says of each, not only by its labels.</summary>
+    [Fact]
+    public void An_illustrations_parts_and_their_lines_are_found_by_search()
+    {
+        const string drone = """
+            ```svg
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"><title>The quadcopter</title>
+            <g id="art"><g id="motor"><title>Motor</title><desc>Brushless outrunner; the rotor bell spins</desc><circle cx="50" cy="50" r="20" fill="#555B61"/></g>
+            <g id="battery"><title>Battery</title><desc>4S LiPo, 5000 mAh</desc><rect x="100" y="100" width="60" height="30" fill="#4A9AD1"/></g></g>
+            <g id="labels"><g id="label-motor"><text x="200" y="40">Motor</text></g></g></svg>
+            ```
+            """;
+        var passage = Assert.Single(Passages.FromNotes("n", "## The drone\n\n" + drone));
+        Assert.Equal("Diagram: The quadcopter, Motor (Brushless outrunner; the rotor bell spins), Battery (4S LiPo, 5000 mAh)", passage.Text);
     }
 
     [Fact]

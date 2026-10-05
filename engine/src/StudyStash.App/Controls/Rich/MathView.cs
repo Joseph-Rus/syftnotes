@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
@@ -59,6 +60,8 @@ public sealed class MathView : Control
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        // What a screen reader says in place of the drawing: the formula in words, as plain as its source reads.
+        if (change.Property == LatexProperty) AutomationProperties.SetName(this, Reading(Latex));
         // A theme switch only recolours the drawing already laid out; it never re-measures.
         if (change.Property == ForegroundProperty && painter is not null)
         {
@@ -66,6 +69,10 @@ public sealed class MathView : Control
             InvalidateVisual();
         }
     }
+
+    /// <summary>A formula in plain words for a screen reader (its source read as plainly as it goes: "a/b", "x²"),
+    /// or null when there's none.</summary>
+    internal static string? Reading(string? latex) => string.IsNullOrWhiteSpace(latex) ? null : MathText.Plain(latex);
 
     protected override AvaloniaSize MeasureOverride(AvaloniaSize availableSize)
     {

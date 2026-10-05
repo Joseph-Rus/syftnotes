@@ -20,7 +20,7 @@ public static class Cli
     public const string Usage = "usage: studystash run | serve | setup --page [--no-browser] | init\n"
         + "       | doctor [--role server|client] | update [--check] [--force]\n"
         + "       | autostart install|uninstall|status --role server | version\n"
-        + "       | mcp   (the MCP server for Claude, over stdin and stdout)\n"
+        + "       | mcp [--client claude-desktop|claude-code|codex|gemini]   (the MCP server for AI apps, over stdin and stdout)\n"
         + "       | extension-zip OUT.zip   (the Canvas extension, packed for the Chrome Web Store)\n"
         + "       | ai [use PROVIDER [--job notes|sort|ask|agent] [--model M] | test [PROVIDER] | ask QUESTION]   (each takes --home DIR)";
 
@@ -60,7 +60,7 @@ public static class Cli
     /// <summary>True when these arguments name a command (options may come first: <c>--home DIR run</c>).</summary>
     public static bool IsCommand(IReadOnlyList<string> args)
     {
-        string[] valued = ["--home", "--role"];
+        string[] valued = ["--home", "--role", McpClients.Option];
         for (int i = 0; i < args.Count; i++)
         {
             if (valued.Contains(args[i])) { i++; continue; }
@@ -77,7 +77,7 @@ public static class Cli
         //   Claude and AI: mcp | ai
         //   Both:          doctor | update | autostart | version
         //   Publishing:    extension-zip
-        string[] valued = ["--home", "--role"];
+        string[] valued = ["--home", "--role", McpClients.Option];
         string? Option(string name) => Array.IndexOf(args, name) is int i and >= 0 && i + 1 < args.Length ? args[i + 1] : null;
         bool Flag(string name) => args.Contains(name);
         // The command and its words, wherever the options are: a service runs `studystash --home DIR run`.
@@ -175,11 +175,16 @@ public static class Cli
             if (Flag("--no-ollama")) cfg.OllamaEnabled = false;
             Console.WriteLine($"studystash {Engine.Version}: pool '{cfg.PoolName}' on port {cfg.WebPort}");
             using var store = new Store(cfg.DbPath, cfg.PoolDir);
-            // Notes, sorting and Ask use the AI picked in Settings (ai.json): Ollama unless another is chosen. The notes'
-            // diagram pass says in the log what it drew, or why nothing.
+            // Notes, sorting and Ask use the AI picked in Settings (ai.json): Ollama unless another is chosen. A lecture is
+            // filed as soon as its notes are written; their diagrams follow, one lecture at a time, never holding up notes,
+            // and the diagram pass says in the log what it drew, or why nothing.
             var ai = new AiJobs(home, () => cfg.OllamaHost) { Log = Console.WriteLine };
-            var pipeline = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg));
+            Pipeline? writer = null; // the pipeline, below: the diagrams wait while it writes notes
+            var diagrams = new DiagramJobs(cfg, store, ai) { NotesBusy = () => writer?.Writing == true };
+            var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg), notesFast: ai.NotesInFastMode,
+                filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)));
             var working = pipeline.Start(stop.Token);
+            var designing = diagrams.Start(stop.Token);
             Task updating = Task.CompletedTask;
             var builder = WebApplication.CreateSlimBuilder();
             builder.Logging.ClearProviders();
@@ -204,7 +209,7 @@ public static class Cli
             var app = LibraryWeb.Build(builder, cfg, store, pipeline, new LibraryWebOptions
             {
                 Apply = (rel, h) => Updates.ApplyAsync(rel, h, UpdateHost.ThisComputer()), Claude = access, Reach = ClaudeReach.ThisComputer(), WebCheck = ReachCheck.ThisComputer(),
-                AskChat = ai.Ask(() => cfg), Ai = ai, Canvas = canvas, Scout = scout, Files = fileIndex,
+                AskChat = ai.Ask(() => cfg), Ai = ai, Diagrams = diagrams, Canvas = canvas, Scout = scout, Files = fileIndex,
                 Inbox = new Inbox(cfg.PoolDir, () => cfg.ClassNames(), c => store.ClassDir(c), ai, new History(cfg.PoolDir)),
                 StartAtLogin = LoginItems?.Invoke(home),
             });
@@ -212,7 +217,7 @@ public static class Cli
             // Claude's door: MCP and its sign-in, on this computer only; Tailscale Serve or Funnel passes it on when that's on.
             var claudeBuilder = WebApplication.CreateSlimBuilder();
             claudeBuilder.Logging.ClearProviders();
-            claudeBuilder.WebHost.ConfigureKestrel(k => k.Listen(IPAddress.Loopback, ClaudeWeb.PortFor(cfg)));
+            claudeBuilder.WebHost.ConfigureKestrel(k => ClaudeWeb.ListenHere(k, ClaudeWeb.PortFor(cfg)));
             var claude = ClaudeWeb.Build(claudeBuilder, cfg, new LibraryReader(cfg, store), access, canvas, fileIndex);
             try
             {
@@ -227,7 +232,7 @@ public static class Cli
             await Until(stop.Token);
             await app.StopAsync(CancellationToken.None);
             await claude.StopAsync(CancellationToken.None);
-            await Task.WhenAll(working, updating, indexing);
+            await Task.WhenAll(working, designing, updating, indexing);
             return 0;
         }
 
@@ -240,6 +245,8 @@ public static class Cli
         {
             var (url, key) = McpTarget(home);
             if (url is null) return Print("Study Stash isn't set up on this computer yet: open the Study Stash app first.", 1);
+            // Which AI app started this (Settings writes `--client ID` into each app's setup): Settings shows it connected.
+            McpClients.Started(home, Option(McpClients.Option));
             var ai = new AiRemote(url, key);
             (bool On, ReadingScopes Reading) cached = (true, new ReadingScopes());
             DateTime cachedAt = DateTime.MinValue;

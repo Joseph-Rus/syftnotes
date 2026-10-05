@@ -370,7 +370,12 @@ public class SurfaceShots
         pills.Children.Add(view(hovered));
         pills.Children.Add(view(Demo.Recorder(paused: true)));
         if (extra is not null) pills.Children.Add(extra);
-        return Shot.Side(pills, view(Demo.Recorder(expanded: true)));
+        // Written down after class (Settings → Recording): no transcript or chat yet, and it says why.
+        var afterClass = Demo.Recorder(expanded: true);
+        afterClass.Lines.Clear();
+        afterClass.Ask = null;
+        afterClass.AfterClass = true;
+        return Shot.Side(pills, Shot.Side(view(Demo.Recorder(expanded: true)), view(afterClass)));
     }
 
     [AvaloniaFact]
@@ -662,6 +667,9 @@ public class SurfaceShots
         // downloading.
         bool heavier = section == "Recording-heavier";
         if (heavier) new Services.AppSettings { SetupDone = true, Model = Audio.WhisperModels.LargeV3.Id }.Save(home);
+        // "Recording-after": written down after class (in a window tall enough to show the choice under the models).
+        bool after = section == "Recording-after";
+        if (after) new Services.AppSettings { SetupDone = true, LiveTranscript = false }.Save(home);
         // "Recording-remove": switched to the lighter model, asked whether to remove the one before (Whisper small).
         bool removing = section == "Recording-remove";
         if (removing)
@@ -683,7 +691,7 @@ public class SurfaceShots
         bool renaming = section == "Rename";
         if (renaming) library.Settings = FakeLibrarySettings.CodeNamed();
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
-        model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : heavier || removing ? "Recording" : section;
+        model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : heavier || removing || after ? "Recording" : section;
         if (removing) model.AskRemoveSpareCommand.Execute(null);
         if (heavier)
         {
@@ -704,14 +712,16 @@ public class SurfaceShots
 
     static void SettingsShots(SkinKind skin, Size size)
     {
-        foreach (string section in new[] { "General", "Appearance", "Recording", "Recording-heavier", "Recording-remove", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
+        foreach (string section in new[] { "General", "Appearance", "Recording", "Recording-heavier", "Recording-remove", "Recording-after", "Library", "Classes", "Rename", "Notes", "Folders", "Unreachable", "One-computer", "One-computer-adding", "One-computer-on" })
         {
             var (model, host, home) = MakeSettings(section, skin);
+            bool tall = section == "Recording-after";
             try
             {
                 foreach (var t in Themes)
                     Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-settings-{section.ToLowerInvariant()}", skin, t,
-                        () => new SettingsView { DataContext = model, DrawChrome = true }, size: size);
+                        () => tall ? new SettingsView { DataContext = model, DrawChrome = true, Height = 1340 } : new SettingsView { DataContext = model, DrawChrome = true },
+                        size: tall ? new Size(size.Width, 1480) : size);
             }
             finally
             {

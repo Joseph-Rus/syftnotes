@@ -6,10 +6,14 @@ using CommunityToolkit.Mvvm.Input;
 namespace StudyStash.App.ViewModels;
 
 /// <summary>A line of the live transcript: when it was said, and what.</summary>
-public sealed class HeardLine
+public sealed partial class HeardLine : ObservableObject
 {
     public string Time { get; init; } = "";
     public string Text { get; init; } = "";
+    /// <summary>Seconds into the lecture it was said at, where the transcript has times.</summary>
+    public double? Start { get; init; }
+    /// <summary>The line a diagram's "where was this said" (or its moment) points to, marked until another is.</summary>
+    [ObservableProperty] public partial bool Here { get; set; }
     /// <summary>The newest line reads in the full text color; older ones fade to secondary.</summary>
     public bool Latest { get; init; }
 }
@@ -50,7 +54,18 @@ public sealed partial class RecorderModel : ObservableObject
     /// <summary>The pointer is over the small pill: Stop takes the level meter's place.</summary>
     [ObservableProperty] public partial bool Hovered { get; set; }
     /// <summary>Whisper hasn't anything yet: what the transcript area says instead.</summary>
-    [ObservableProperty] public partial string Waiting { get; set; } = "What's said shows here a few seconds after it's said.";
+    [ObservableProperty] public partial string Waiting { get; set; } = LiveWaiting;
+    /// <summary>This lecture is written down after class (Settings → Recording): it only records, so there's no
+    /// transcript to show and no chat about it until it stops.</summary>
+    [ObservableProperty] public partial bool AfterClass { get; set; }
+    /// <summary>The live words are on (Cactus Whistle on ARM, a small Whisper on x64, keeping up in this lecture): what's
+    /// said shows a second or two after it's said.
+    /// Off, the transcript's own lines show, about half a minute after.</summary>
+    [ObservableProperty] public partial bool QuickWords { get; set; } = true;
+
+    public const string LiveWaiting = "What's said shows here a few seconds after it's said.";
+    public const string SlowWaiting = "What's said shows here about half a minute after it's said.";
+    public const string AfterClassWaiting = "Only recording, to save battery. It's written down after class: the transcript, and asking about it, come once you stop.";
 
     public ObservableCollection<HeardLine> Lines { get; } = [];
     /// <summary>Asking about the lecture so far, with any engine (design 16's compact chat).</summary>
@@ -80,6 +95,17 @@ public sealed partial class RecorderModel : ObservableObject
     }
 
     partial void OnClassNameChanged(string value) => OnPropertyChanged(nameof(DisplayClass));
+
+    partial void OnAfterClassChanged(bool value)
+    {
+        Waiting = value ? AfterClassWaiting : QuickWords ? LiveWaiting : SlowWaiting;
+        OnPropertyChanged(nameof(Live));
+    }
+
+    partial void OnQuickWordsChanged(bool value) => Waiting = AfterClass ? AfterClassWaiting : value ? LiveWaiting : SlowWaiting;
+
+    /// <summary>Written down as it records: the transcript comes in, and the chat asks about it.</summary>
+    public bool Live => !AfterClass;
 
     partial void OnHoveredChanged(bool value)
     {

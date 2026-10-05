@@ -101,8 +101,10 @@ public class RichWindowsShots
         "## A drawing",
         Fence("svg", RichDemo.FourChambers),
         Fence("svg", SignsDrawing),
-        "## A sequence diagram, which isn't drawn",
-        Fence("mermaid", RichDemo.PainConversation));
+        "## A sequence diagram",
+        Fence("mermaid", RichDemo.PainConversation),
+        "## A class diagram, which isn't drawn",
+        Fence("mermaid", RichDemo.ClassChart));
 
     /// <summary>
     /// Draws <paramref name="build"/> in the Windows look on the design's ground at <paramref name="scale"/> (a
@@ -166,7 +168,8 @@ public class RichWindowsShots
             {
                 var window = Take("diagrams", t, scale, () => RichShots.NotePage(SkinKind.Win, DiagramNotes), new Size(876, 3600));
                 AllDrawn(window);
-                Assert.Equal(5, window.GetVisualDescendants().OfType<DiagramView>().Count());
+                // Five flowcharts and the sequence diagram; the class diagram is the card.
+                Assert.Equal(6, window.GetVisualDescendants().OfType<DiagramView>().Count());
                 Assert.Equal(2, window.GetVisualDescendants().OfType<SvgView>().Count());
                 Assert.Single(window.GetVisualDescendants().OfType<DiagramCard>());
                 window.Close();

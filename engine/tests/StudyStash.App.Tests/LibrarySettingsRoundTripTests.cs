@@ -8,6 +8,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StudyStash.App.Services;
 using StudyStash.Core;
+using StudyStash.Core.Ai;
+using StudyStash.App.ViewModels;
 using StudyStash.Library;
 
 namespace StudyStash.App.Tests;
@@ -125,5 +127,81 @@ public sealed class LibrarySettingsRoundTripTests
         Assert.Contains("Sam&#x27;s home library", page);
         Assert.Contains("value=\"BIO 110\"", page);
         Assert.Contains("name=\"ollama_enabled\" value=\"1\" checked", page);
+    }
+
+    /// <summary>A class renamed by typing its new name in Settings → Classes takes its lectures and folder with it (and
+    /// this laptop's waiting recordings), instead of leaving them behind as a second class under the old name.</summary>
+    [AvaloniaFact]
+    public async Task Renaming_a_class_takes_its_lectures_with_it()
+    {
+        using var home = new TempHome();
+        var (url, app, cfg, store) = await LibraryAsync(home);
+        await using var _app = app;
+        using var _store = store;
+        store.Save(new Meeting("rec-1") { Title = "CS 101 lecture", Date = "2026-09-23T10:02:12-07:00", Folder = "CS 101", Transcript = "[00:05] Recursion." },
+            new Classification("CS 101", 0.95, "folder"), summaryMd: "## Summary\nRecursion.");
+        string laptopHome = home["laptop"];
+        Directory.CreateDirectory(laptopHome);
+        new AppSettings { SetupDone = true, Role = AppRole.Laptop }.Save(laptopHome);
+        var cc = Configs.LoadClient(laptopHome);
+        cc.ServerUrl = url;
+        cc.PoolKey = "old-pw";
+        Configs.SaveClient(cc);
+        using var host = new AppHost(laptopHome, log: _ => { });
+        host.Lectures.Add(new Lecture { Id = "rec-2", Started = "2026-09-30T10:00:00-07:00", ClassName = "CS 101", State = LectureState.Sending });
+        using var settings = SettingsModel.Make(host);
+        settings.Section = "Classes";
+        await Until(() => settings.Lib.IsReady);
+
+        settings.Lib.Classes[0].Name = "CS 1010";
+        await settings.Lib.SaveClassesCommand.ExecuteAsync(null);
+
+        Assert.Null(settings.Lib.Say);
+        var saved = Configs.Load(cfg.Home).Classes.Single();
+        Assert.Equal("CS 1010", saved.Name);
+        Assert.Contains("CS 101", saved.Aliases);
+        Assert.Contains("cs101", saved.Aliases);
+        Assert.Equal([("CS 1010", 1)], store.ClassesSummary());
+        Assert.False(Directory.Exists(Path.Combine(cfg.PoolDir, "CS 101")));
+        Assert.Equal("CS 1010", host.Lectures.Get("rec-2")!.ClassName);
+    }
+
+    [AvaloniaFact]
+    public async Task The_rich_notes_switches_and_Claude_Codes_speed_set_on_the_laptop_reach_the_librarys_ai_json_and_web_page()
+    {
+        using var home = new TempHome();
+        var (url, app, cfg, store) = await LibraryAsync(home);
+        await using var _app = app;
+        using var _store = store;
+
+        // The laptop's Settings → AI engines, reading and changing the library's AI over its API.
+        var model = new AiEnginesModel(new AiRemote(url, "old-pw"));
+        await model.Load();
+        Assert.True(model.HasRich && model.RichOn && model.RichDiagrams && model.RichPlots && model.RichDrawings); // on, as before
+        Assert.Equal("standard", model.SelectedSpeed);
+
+        model.RichPlots = false;
+        await Until(() => !AiSettings.Load(cfg.Home).RichPlots);
+        model.SelectedSpeed = "fast";
+        await Until(() => AiSettings.Load(cfg.Home).Speed == "fast");
+        Assert.Equal(RichKinds.Diagrams | RichKinds.Drawings, AiSettings.Load(cfg.Home).Kinds());
+
+        // The library's own web page shows what the laptop set: the speed picked, the kind off, rich notes still on.
+        var (loggedIn, page) = await WebPageAsync(url, "old-pw");
+        Assert.True(loggedIn);
+        Assert.Contains("<option value=\"fast\" selected>", page);
+        Assert.Contains("name=\"ai_rich\" value=\"1\" checked", page);
+        Assert.Contains("name=\"ai_rich_diagrams\" value=\"1\" checked", page);
+        Assert.Contains("name=\"ai_rich_plots\" value=\"1\">", page);
+
+        // Rich notes off: plain notes, nothing extra asked; the laptop reading the library again still shows it off.
+        model.RichOn = false;
+        await Until(() => !AiSettings.Load(cfg.Home).RichNotes);
+        Assert.Equal(RichKinds.None, AiSettings.Load(cfg.Home).Kinds());
+        var again = new AiEnginesModel(new AiRemote(url, "old-pw"));
+        await again.Load();
+        Assert.False(again.RichOn);
+        Assert.Equal("fast", again.SelectedSpeed);
+        Assert.Contains("name=\"ai_rich\" value=\"1\">", (await WebPageAsync(url, "old-pw")).Settings);
     }
 }

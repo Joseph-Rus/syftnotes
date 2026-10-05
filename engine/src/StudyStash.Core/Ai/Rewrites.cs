@@ -14,9 +14,11 @@ public sealed class RewriteRefusedException(int status, string message) : Except
 /// while the lecture's current notes stay exactly as they are. When it's ready the student keeps the old notes,
 /// compares, or uses the new ones — <see cref="Use"/> is the only thing that actually changes the lecture. A ready
 /// (or failed, or cancelled) job is written to <c>home/rewrites</c> as it happens, so it survives a restart; one
-/// still working when the library stopped comes back failed, since nothing here can pick a run back up mid-way.
+/// still working when the library stopped comes back failed, since nothing here can pick a run back up mid-way. As
+/// with the pipeline's notes, the new notes come without the designer's diagrams, ready as soon as their words are:
+/// once they're used, <paramref name="diagrams"/> adds those (and says so, while it does, in <see cref="Get"/>).
 /// </summary>
-public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>? log = null)
+public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>? log = null, DiagramJobs? diagrams = null)
 {
     readonly Lock gate = new();
     readonly Dictionary<string, Job> jobs = LoadAll(cfg.Home);
@@ -37,6 +39,8 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
         public string DraftAt = "";
         /// <summary>The attachments whose words went into the draft (not kept across a restart: then none count as used).</summary>
         public List<string> AttachmentIds = [];
+        /// <summary>The engine that wrote the draft when a designer adds its diagrams once it's used; null when none do.</summary>
+        public string? DiagramsBy;
         /// <summary>Null once the job's finished — nothing left for <see cref="Cancel"/> to stop.</summary>
         public CancellationTokenSource? Cts;
     }
@@ -45,7 +49,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     /// lecture id it's for (a file's name is a hash of that, not the id itself, so nothing about it needs to survive
     /// a round trip through a file name).</summary>
     sealed record Saved(string Id, string Engine, string State, string Started, string Error, int Done, int Parts,
-        string? DraftMarkdown, string DraftModel, string DraftAt);
+        string? DraftMarkdown, string DraftModel, string DraftAt, string? DiagramsBy = null);
 
     static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
@@ -58,7 +62,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     {
         Directory.CreateDirectory(Dir(home));
         var saved = new Saved(id, job.Engine, job.State, job.Started, job.Error, job.Done, job.Parts,
-            job.DraftMarkdown, job.DraftModel, job.DraftAt);
+            job.DraftMarkdown, job.DraftModel, job.DraftAt, job.DiagramsBy);
         Py.WriteText(FileFor(home, id), JsonSerializer.Serialize(saved, JsonOptions));
     }
 
@@ -90,7 +94,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             {
                 Engine = saved.Engine, State = saved.State, Started = saved.Started, Error = saved.Error,
                 Done = saved.Done, Parts = saved.Parts, DraftMarkdown = saved.DraftMarkdown,
-                DraftModel = saved.DraftModel, DraftAt = saved.DraftAt,
+                DraftModel = saved.DraftModel, DraftAt = saved.DraftAt, DiagramsBy = saved.DiagramsBy,
             };
             if (job.State == "working")
             {
@@ -112,11 +116,12 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     RewriteInfo Build(string id, NoteRow row, Job? job)
     {
         var current = new NotesVersion(row.SummaryMd ?? "", Engines.WhoWrote(row.SummaryModel ?? ""), row.UpdatedAt ?? "");
-        if (job is null) return new RewriteInfo(id, "none") { Current = current };
+        string adding = diagrams?.Adding(id) == true ? "adding" : "";
+        if (job is null) return new RewriteInfo(id, "none") { Current = current, Diagrams = adding };
         return new RewriteInfo(id, job.State)
         {
             Engine = job.Engine, EngineName = Engines.Name(job.Engine), Started = job.Started, Error = job.Error,
-            Done = job.Done, Parts = job.Parts, Current = current,
+            Done = job.Done, Parts = job.Parts, Current = current, Diagrams = adding,
             Draft = job.State == "ready" && job.DraftMarkdown is { } md
                 ? new NotesVersion(md, Engines.WhoWrote(job.DraftModel), job.DraftAt) : null,
         };
@@ -162,10 +167,11 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     async Task RunAsync(string id, Meeting m, Job job, CancellationToken ct)
     {
         string draft = "";
+        string? diagramsBy = null;
         Exception? failure = null;
         try
         {
-            draft = await ai.WriteNotesAsync(m, cfg, job.Engine, (done, parts) =>
+            (draft, diagramsBy) = await ai.WriteNotesPlannedAsync(m, cfg, job.Engine, (done, parts) =>
             {
                 lock (gate) { job.Done = done; job.Parts = parts; }
             }, ct);
@@ -196,6 +202,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             {
                 job.State = "ready";
                 job.DraftMarkdown = draft;
+                job.DiagramsBy = diagramsBy;
                 job.DraftModel = ai.DescribeChoice(job.Engine, cfg);
                 job.DraftAt = ai.Checks.Now().ToString("o");
                 ai.Record(job.Engine, true, "");
@@ -239,9 +246,9 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
         }
     }
 
-    /// <summary>Save the ready draft as the lecture's notes. Refuses (409) with no ready draft, or while the
-    /// pipeline has this lecture queued or working right now — checked here, not just at <see cref="Start"/>, since
-    /// the two can race on the same row.</summary>
+    /// <summary>Save the ready draft as the lecture's notes, shown at once; their diagrams follow (any still coming for
+    /// the old notes are dropped). Refuses (409) with no ready draft, or while the pipeline has this lecture queued or
+    /// working right now — checked here, not just at <see cref="Start"/>, since the two can race on the same row.</summary>
     public RewriteInfo Use(string id)
     {
         var row = Require(id);
@@ -258,6 +265,14 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             store.MarkAttachmentsUsed(job.AttachmentIds);
             jobs.Remove(id);
             Forget(cfg.Home, id);
+            try
+            {
+                diagrams?.AfterFiled(id, job.DiagramsBy);
+            }
+            catch (IOException e)
+            {
+                log($"[rewrite] '{m.Title}': its diagrams couldn't be queued ({e.Message}); the new notes are in");
+            }
             return Build(id, store.Get(id) ?? row, null);
         }
     }

@@ -21,6 +21,12 @@ public static class ClaudeWeb
 
     public static int PortFor(Config cfg) => cfg.WebPort + 1;
 
+    /// <summary>Where the door listens: on this computer only (loopback), never on the network, whatever the
+    /// library's own pages do. An app on this computer reaches it at http://127.0.0.1:PORT/mcp with a sign-in or a
+    /// token; Tailscale Serve or Funnel, when they're on, pass requests to it from here.</summary>
+    public static void ListenHere(Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions kestrel, int port) =>
+        kestrel.Listen(System.Net.IPAddress.Loopback, port);
+
     public static WebApplication Build(WebApplicationBuilder builder, Config cfg, LibraryReader reader, ClaudeAccess access, StudyStash.Core.Canvas.CanvasSync? canvas = null, StudyStash.Core.Ai.FileIndex? files = null)
     {
         var source = new LocalLibrary(reader, canvas, cfg.Home, files);

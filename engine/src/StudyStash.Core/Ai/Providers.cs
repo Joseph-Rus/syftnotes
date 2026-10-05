@@ -20,6 +20,9 @@ public sealed record AiRequest(string Prompt, string Cwd)
     public string Model { get; init; } = "";
     /// <summary>How hard the model thinks ("high"), where its command takes a reasoning effort; "" for its own default.</summary>
     public string Effort { get; init; } = "";
+    /// <summary>Claude Code's fast mode: the same Opus with faster output, billed at a higher rate
+    /// (<see cref="ClaudeProvider.FastSettings"/>). Only Claude Code has one; every other provider ignores it.</summary>
+    public bool Fast { get; init; }
     public bool Tools { get; init; }
     /// <summary>The command that starts Study Stash's MCP server (the engine itself, told `mcp`).</summary>
     public IReadOnlyList<string> McpCommand { get; init; } = [];
@@ -297,6 +300,11 @@ public sealed class ClaudeProvider : AiProvider
     public override IReadOnlyList<(string Id, string Label)> Models =>
         [("sonnet", "Sonnet: fast, great for studying"), ("opus", "Opus: strongest, costs more"), ("haiku", "Haiku: fastest, cheapest")];
 
+    /// <summary>What turns fast mode on for one `claude -p` run: its own settings, for that run only (nothing is saved to
+    /// the person's settings). Needs Claude Code 2.1.205 or later and an Opus model; an older Claude Code ignores it, and
+    /// a Claude account that can't use fast mode runs at normal speed.</summary>
+    public const string FastSettings = """{"fastMode":true}""";
+
     /// <summary>A folder as Claude Code's rules spell it: "/Users/x" stays; Windows' "C:\Users\x" is "/c/Users/x".</summary>
     internal static string ClaudePath(string full) =>
         full.Length > 1 && full[1] == ':' ? "/" + char.ToLowerInvariant(full[0]) + full[2..].Replace('\\', '/').TrimEnd('/')
@@ -331,6 +339,7 @@ public sealed class ClaudeProvider : AiProvider
         foreach (string d in req.ReadDirs) cmd.AddRange(["--add-dir", d]);
         if (req.Model.Length > 0) cmd.AddRange(["--model", req.Model]);
         if (req.Effort.Length > 0) cmd.AddRange(["--effort", req.Effort]);
+        if (req.Fast) cmd.AddRange(["--settings", FastSettings]);
         if (req.Session.Length > 0) cmd.AddRange(["--resume", req.Session]);
         return cmd;
     }

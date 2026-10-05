@@ -101,7 +101,8 @@ public static partial class Shell
         // Before any window shows, so it never opens in the wrong mode and then flips.
         Skin.UseAppearance(host.Settings.Appearance);
         host.Changed += RequestRefresh;
-        host.Heard += (l, lines) => Dispatcher.UIThread.Post(() => AddHeard(l, lines));
+        host.Heard += (l, _) => ShowLiveSoon(l.Id);
+        host.LiveWords += l => ShowLiveSoon(l.Id);
         host.Filed += l => Dispatcher.UIThread.Post(() =>
         {
             var (title, text, action) = NoticeWords.Filed(l.FiledClass, l.FiledTitle, l.Error);
@@ -168,6 +169,7 @@ public static partial class Shell
         public static Task Search(string query) => SearchAsync(query);
         public static QuickModel QuickModel => quick;
         public static PanelModel PanelModel => panel;
+        public static RecorderModel RecorderModel => recorder;
         /// <summary>The notifications on screen, newest first, and the display they're on.</summary>
         public static ToastShelf Toasts => Shelf();
 
@@ -445,7 +447,11 @@ public static partial class Shell
 
         recorder.OnPause = TogglePause;
         recorder.OnStop = () => StopRecording();
-        recorder.OnExpand = expanded => recorderWindow?.Refit(PlaceRecorder);
+        recorder.OnExpand = expanded =>
+        {
+            recorderWindow?.Refit(PlaceRecorder);
+            host.WatchLiveWords(WatchingWords());
+        };
         recorder.Busy = () => recorderWindow?.Refitting == true;
 
         quick.OnQuery = q => _ = SearchAsync(q);
@@ -495,6 +501,11 @@ public static partial class Shell
         library.OnExport = () => _ = ExportAsync();
         library.OnMore = MoreMenu;
         library.OnSupportAnswer = answer => SupportAsk.Answer(host, answer, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
+        // A diagram in a lecture's notes asks about its boxes in the lecture's Ask bar and finds them in its transcript;
+        // how to explore one is shown once, ever.
+        library.Diagrams = new LectureDiagrams(library, id => File.Exists(host.Lectures.AudioPath(id)), (id, at) => Play(id, at));
+        Controls.Rich.DiagramExplorer.HintWasSeen = () => host.Settings.DiagramHintSeen;
+        Controls.Rich.DiagramExplorer.RememberHint = () => host.Save(s => s.DiagramHintSeen = true);
     }
 
     // --- recording ----------------------------------------------------------------------------------------------------
@@ -555,8 +566,11 @@ public static partial class Shell
         {
             liveId = l.Id;
             recorder.Lines.Clear();
-            recorder.Ask = LiveAsk();
-            recorder.Waiting = "What's said shows here a few seconds after it's said.";
+            recorder.QuickWords = host.LiveWordsOn;
+            // Written down after class: nothing to show or ask about until it stops, and the recorder says so.
+            recorder.AfterClass = l.AfterClass;
+            recorder.Ask = l.AfterClass ? null : LiveAsk();
+            panel.LastLine = l.AfterClass ? "Only recording. It's written down after class." : "";
             panelWindow?.Hide();
             ShowRecorder(expanded: false);
         }
@@ -672,15 +686,41 @@ public static partial class Shell
         }
     }
 
-    static void AddHeard(Lecture l, IReadOnlyList<Spoken> lines)
+    /// <summary>A show is waiting on the UI thread: more news before it runs is shown by that one.</summary>
+    static int liveShowPending;
+
+    /// <summary>New words for a lecture (the live words, every second or so, or the transcript's own lines): shown once
+    /// the UI thread gets to it, however many came meanwhile.</summary>
+    static void ShowLiveSoon(string id)
     {
-        if (l.Id != liveId) return;
-        foreach (var old in recorder.Lines.Where(x => x.Latest).ToList())
-            recorder.Lines[recorder.Lines.IndexOf(old)] = new HeardLine { Time = old.Time, Text = old.Text };
-        for (int i = 0; i < lines.Count; i++)
-            recorder.Lines.Add(new HeardLine { Time = TimedText.Clock(lines[i].Start), Text = lines[i].Text, Latest = i == lines.Count - 1 });
-        while (recorder.Lines.Count > 200) recorder.Lines.RemoveAt(0);
-        panel.LastLine = $"“…{Trim(lines[^1].Text, 90)}”";
+        if (Interlocked.Exchange(ref liveShowPending, 1) == 1) return;
+        Dispatcher.UIThread.Post(() =>
+        {
+            Volatile.Write(ref liveShowPending, 0);
+            if (id == liveId) ShowLive();
+        });
+    }
+
+    /// <summary>
+    /// The recorder's transcript: what's been said so far (<see cref="AppHost.LiveLines"/>, the transcript's own lines
+    /// and the live words after them), its last 200 lines. Only what changed is redrawn: lines that scrolled off the top
+    /// go, the lines that read the same stay, and the rest (the live words' newest line, or live words the transcript
+    /// has now written down) are drawn again.
+    /// </summary>
+    static void ShowLive()
+    {
+        // The live words turned off for being too slow in this lecture: the waiting line says when the transcript's lines come.
+        recorder.QuickWords = host.LiveWordsNow;
+        var lines = host.LiveLines();
+        if (lines.Count > 200) lines = lines[^200..];
+        while (recorder.Lines.Count > 0 && lines.Count > 0 && recorder.Lines[0].Start < lines[0].Start) recorder.Lines.RemoveAt(0);
+        int same = 0;
+        while (same < recorder.Lines.Count && same < lines.Count && recorder.Lines[same].Text == lines[same].Text
+               && recorder.Lines[same].Start == lines[same].Start && recorder.Lines[same].Latest == (same == lines.Count - 1)) same++;
+        while (recorder.Lines.Count > same) recorder.Lines.RemoveAt(recorder.Lines.Count - 1);
+        for (int i = same; i < lines.Count; i++)
+            recorder.Lines.Add(new HeardLine { Time = TimedText.Clock(lines[i].Start), Text = lines[i].Text, Start = lines[i].Start, Latest = i == lines.Count - 1 });
+        if (lines.Count > 0) panel.LastLine = $"“…{Trim(lines[^1].Text, 90)}”";
     }
 
     static string Trim(string s, int n) => s.Length <= n ? s : s[..n].TrimEnd() + "…";
@@ -691,7 +731,8 @@ public static partial class Shell
     {
         var ask = new AiAskModel(Ai())
         {
-            Live = () => host.Recorder.Current?.Transcript(),
+            // What's been said so far: the transcript as far as it has got, and the live words after it.
+            Live = host.LiveTranscript,
             LiveTitle = $"{(host.Recorder.Current?.ClassName is { Length: > 0 } c ? c : "This lecture")}, now",
             OpenSettings = () => ShowSettings("AI"),
             OnSource = s => Play(s.Id ?? liveId, s.At ?? 0),
@@ -758,7 +799,11 @@ public static partial class Shell
         panelWindow.Show();
         panelWindow.Activate();
         Desktop.Activate();
+        host.WatchLiveWords(true);
     }
+
+    /// <summary>The live words can be seen: the recorder is open on screen, or the menu's panel (its last line) is.</summary>
+    static bool WatchingWords() => (recorder.Expanded && recorderWindow?.IsVisible == true) || panelWindow?.IsVisible == true;
 
     static void ShowRecorder(bool expanded)
     {
@@ -769,12 +814,14 @@ public static partial class Shell
         {
             // On screen already: a change of size goes through Refit, never a resize in view.
             if (changed) recorderWindow.Refit(PlaceRecorder);
+            host.WatchLiveWords(WatchingWords());
             return;
         }
         recorderWindow.SizeToContent = SizeToContent.WidthAndHeight;
         PlaceRecorder();
         recorderWindow.Show();
         Dispatcher.UIThread.Post(PlaceRecorder, DispatcherPriority.Loaded);
+        host.WatchLiveWords(WatchingWords());
     }
 
     static Floating MakeRecorderWindow()
@@ -1346,6 +1393,8 @@ public static partial class Shell
         Look.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         model.Lib.Copy = text => _ = w.Clipboard?.SetTextAsync(text);
+        // AI tool access's Copy buttons (the web address, a fix link, the setup for another app).
+        model.Access.Copy = text => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
         model.Lib.ClassesChanged = LibraryClassesChanged;
         model.Canvas.OnClassesChanged = LibraryClassesChanged;
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
@@ -1384,6 +1433,7 @@ public static partial class Shell
             Program.Log($"[whisper] {live.Id}: the transcript is {TimedText.Clock(host.Recorder.Elapsed - live.TranscribedSeconds)} behind with {host.Model.Name}");
             Toast(behind.Title, behind.Text, "Settings", () => ShowSettings("Recording"), NoticeTimes.Advice);
         }
+        host.WatchLiveWords(WatchingWords());
         string elapsed = TimedText.Clock(host.Recorder.Elapsed);
         var levels = host.Recorder.Levels();
         panel.Elapsed = recorder.Elapsed = elapsed;
@@ -1535,6 +1585,8 @@ public static partial class Shell
     /// <summary>The dropdown's recent lectures: this laptop's (where each is on its way), newest first.</summary>
     static void RefreshRecent()
     {
+        // A lecture written down after class is recording: one still waiting for Whisper waits until it stops too.
+        bool inClass = host.Recorder.Current is { AfterClass: true };
         var items = host.Lectures.All().Where(l => l.Id != liveId).Take(4).Select(l =>
         {
             int color = host.ColorOf(l.FiledClass.Length > 0 ? l.FiledClass : l.ClassName);
@@ -1545,6 +1597,7 @@ public static partial class Shell
                 Title = l.FiledTitle.Length > 0 ? l.FiledTitle : l.ClassName.Length > 0 ? $"{l.ClassName} lecture" : "Lecture",
                 Detail = l.State switch
                 {
+                    LectureState.Transcribing when inClass => $"Transcribing after this class ({Math.Round(l.Progress * 100)}%)",
                     LectureState.Transcribing => $"Transcribing {Math.Round(l.Progress * 100)}%",
                     LectureState.Sending => host.Library == LibraryState.Connected ? "Sending…" : "Waiting for your library",
                     LectureState.Writing => "Writing notes…",

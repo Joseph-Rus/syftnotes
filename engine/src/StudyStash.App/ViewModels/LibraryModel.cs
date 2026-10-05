@@ -64,10 +64,39 @@ public sealed partial class NoteModel : ObservableObject
     public bool HasPending => !string.IsNullOrEmpty(Pending);
     public bool NoTranscript => Transcript.Count == 0;
 
-    partial void OnShowTranscriptChanged(bool value) => OnPropertyChanged(nameof(ShowNotes));
+    partial void OnShowTranscriptChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowNotes));
+        if (!value) CanGoBack = false;
+    }
 
     [RelayCommand] void Notes() => ShowTranscript = false;
     [RelayCommand] void Transcripts() => ShowTranscript = true;
+
+    /// <summary>The transcript as timed lines, when it has times: what a diagram's box is looked for in.</summary>
+    public List<Spoken> Spoken { get; } = [];
+
+    /// <summary>The transcript's line to scroll to (its place in <see cref="Transcript"/>), once it's showing.</summary>
+    public event Action<int>? Jumped;
+
+    /// <summary>The transcript was opened from the notes at a moment a diagram pointed to: a button takes the student
+    /// back to the notes (and the diagram) until they go there.</summary>
+    [ObservableProperty] public partial bool CanGoBack { get; set; }
+
+    [RelayCommand] void BackToNotes() => ShowTranscript = false;
+
+    /// <summary>The transcript at a moment: its tab open, the line said then marked, and the page brought to it.</summary>
+    public void ShowAt(double seconds)
+    {
+        if (!ShowTranscript) CanGoBack = true;
+        if (Transcript.Count == 0) return;
+        int at = 0;
+        for (int i = 0; i < Transcript.Count; i++)
+            if (Transcript[i].Start is double s && s <= seconds + 0.5) at = i;
+        for (int i = 0; i < Transcript.Count; i++) Transcript[i].Here = i == at;
+        ShowTranscript = true;
+        Jumped?.Invoke(at);
+    }
 }
 
 /// <summary>A lecture the student is deleting: which, and its title and class, for the confirmation and the "Deleted ·
@@ -139,6 +168,9 @@ public sealed partial class LibraryModel : ObservableObject
     [ObservableProperty] public partial AiNotesModel? Notes { get; set; }
     /// <summary>The ask bar under the open lecture, with its engine picker.</summary>
     [ObservableProperty] public partial AiAskModel? Ask { get; set; }
+    /// <summary>What a diagram in the open lecture's notes can do with the page: ask about a box, show the transcript or
+    /// play the recording at a moment (the page's views hand it to their diagrams).</summary>
+    public Controls.Rich.IDiagramHost? Diagrams { get; set; }
     /// <summary>What's attached to the open lecture (files dropped on it land here); null with no lecture open.</summary>
     [ObservableProperty] public partial AttachmentsModel? LectureFiles { get; set; }
     /// <summary>What's attached in the class showing (files dropped on its list land here); null on Due.</summary>
@@ -201,6 +233,15 @@ public sealed partial class LibraryModel : ObservableObject
             OnPropertyChanged(nameof(Due));
             OnPropertyChanged(nameof(HasDue));
         };
+    }
+
+    /// <summary>The sidebar's counts as the library says them now, the list itself left as it is: what's selected stays
+    /// selected. A lecture filed while the window is open changes a class's count without anything else being reloaded.</summary>
+    public void ShowCounts(IEnumerable<(string Name, int Lectures)> classes, int unsorted)
+    {
+        foreach (var (name, lectures) in classes)
+            if (Classes.FirstOrDefault(c => c.Name == name && !c.IsDue && !c.IsHome) is { } item) item.Count = lectures;
+        Unsorted.Count = unsorted;
     }
 
     partial void OnListChanged(LibraryList value)

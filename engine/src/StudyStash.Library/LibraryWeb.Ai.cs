@@ -21,7 +21,7 @@ public sealed partial class LibraryWeb
     Rewrites? rewrites;
 
     AiJobs Jobs => options.Ai ?? (aiJobs ??= new AiJobs(cfg.Home, () => cfg.OllamaHost));
-    Rewrites Rewrites => rewrites ??= new Rewrites(cfg, store, Jobs);
+    Rewrites Rewrites => rewrites ??= new Rewrites(cfg, store, Jobs, diagrams: options.Diagrams);
 
     static IResult RewriteResult(Func<RewriteInfo> run)
     {
@@ -110,6 +110,10 @@ public sealed partial class LibraryWeb
             var body = await Http.JsonBodyAsync(ctx.Request);
             string? notes = Str(body, "notes"), ask = Str(body, "ask"), diagrams = Str(body, "diagrams");
             bool? fallback = body?["fallback"] is JsonValue fv && fv.TryGetValue(out bool f) ? f : null;
+            bool? Switch(string key) => body?[key] is JsonValue sv && sv.TryGetValue(out bool b) ? b : null;
+            bool? rich = Switch("rich"), richDiagrams = Switch("rich_diagrams"), richPlots = Switch("rich_plots"), richDrawings = Switch("rich_drawings");
+            string? speed = Str(body, "speed");
+            if (speed is not null && !AiSpeed.Choices.Contains(speed)) return Http.Detail(400, $"there's no speed called {speed}");
             foreach (string? id in new[] { notes, ask })
                 if (id is not null && !Engines.Order.Contains(id)) return Http.Detail(400, $"there's no AI called {id}");
             if (diagrams is not null && !DiagramEngines.Choices.Contains(diagrams)) return Http.Detail(400, $"there's no AI called {diagrams}");
@@ -126,6 +130,8 @@ public sealed partial class LibraryWeb
             }
             if (fallback is not null) settings.Fallback = fallback.Value;
             if (diagrams is not null) settings.Diagrams = diagrams;
+            settings.SetRich(rich, richDiagrams, richPlots, richDrawings);
+            if (speed is not null) settings.Speed = speed;
             settings.Save(cfg.Home);
             return AiJson(await AiOverviewAsync());
         })));
@@ -257,6 +263,7 @@ public sealed partial class LibraryWeb
         app.MapGet("/api/v2/ai/access", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             await NoticeFunnelOffAsync(force: false);
+            await NoticeTailscaleAsync(force: false);
             return AiJson(ToolAccessJson());
         })));
         app.MapPost("/api/v2/ai/access", Http.Handle(ctx => ApiAsync(ctx, async () =>
@@ -294,6 +301,7 @@ public sealed partial class LibraryWeb
         app.MapPost("/api/v2/ai/access/web/check", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             await NoticeFunnelOffAsync(force: true);
+            await NoticeTailscaleAsync(force: true);
             await CheckWebAsync(ctx.RequestAborted);
             return AiJson(ToolAccessJson());
         })));
@@ -306,6 +314,9 @@ public sealed partial class LibraryWeb
         public ReachProblem? Problem;
         public (string Url, bool Reachable, string Words, double At)? Check;
         public long StatusAt = long.MinValue / 2;
+        /// <summary>What Tailscale still needs before Claude's address can go on (null: ready), and when it was asked.</summary>
+        public ReachProblem? Needs;
+        public long NeedsAt = long.MinValue / 2;
     }
 
     readonly WebState web = new();
@@ -323,6 +334,29 @@ public sealed partial class LibraryWeb
         if (await Task.Run(() => options.Reach.Status(ClaudeWeb.PortFor(cfg))) == false) Claude.PublicUrl = "";
     }
 
+    /// <summary>While Claude's address is off, what Tailscale still needs on this computer (asked at most once a minute
+    /// unless forced), so Settings can say so before the switch is tried: a computer on its own, without Tailscale,
+    /// is told what the web needs rather than shown an address that goes nowhere.</summary>
+    async Task NoticeTailscaleAsync(bool force)
+    {
+        if (Claude.PublicUrl.Length > 0) return;
+        lock (web)
+        {
+            if (!force && Environment.TickCount64 - web.NeedsAt < 60_000) return;
+            web.NeedsAt = Environment.TickCount64;
+        }
+        ReachProblem? needs;
+        try
+        {
+            needs = await Task.Run(options.Reach.Missing);
+        }
+        catch (InvalidOperationException)
+        {
+            needs = null;
+        }
+        lock (web) web.Needs = needs;
+    }
+
     /// <summary>Checks the address from the internet (10 seconds at most) and keeps what it found.</summary>
     async Task CheckWebAsync(CancellationToken ct)
     {
@@ -338,8 +372,10 @@ public sealed partial class LibraryWeb
         lock (web)
         {
             var check = web.Check is { } c && c.Url == url && url.Length > 0 ? c : ((string, bool, string, double)?)null;
+            var needs = url.Length == 0 ? web.Needs : null;
             return new WebReach(url.Length > 0, "Study Stash", url.Length > 0 ? url + ClaudeWeb.McpPath : null, web.Problem?.Words, web.Problem?.FixUrl,
-                check?.Item2, check?.Item3, check?.Item4, cfg.PoolPassword.Length > 0);
+                check?.Item2, check?.Item3, check?.Item4, cfg.PoolPassword.Length > 0)
+            { Needs = needs?.Words, NeedsUrl = needs?.FixUrl };
         }
     }
 

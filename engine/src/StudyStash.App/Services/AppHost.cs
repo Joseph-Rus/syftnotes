@@ -46,6 +46,10 @@ public sealed class AppSettings
     public bool ParakeetFailed { get; set; }
     /// <summary>Tell the voices in a lecture apart once it's written down, and say who's speaking in the transcript.</summary>
     public bool Speakers { get; set; }
+    /// <summary>Write a lecture down as it records (the recorder shows the transcript and can be asked about it); off,
+    /// after class: it only records, and is written down once it stops, which saves battery during the lecture. A
+    /// change applies from the next lecture.</summary>
+    public bool LiveTranscript { get; set; } = true;
     /// <summary>Filed lectures' audio is deleted after this many days (the notes and transcript stay). 0 keeps it.</summary>
     public int KeepAudioDays { get; set; } = 30;
     /// <summary>"Download as Markdown…" includes the transcript too (Settings' words: "Include transcripts").</summary>
@@ -85,6 +89,8 @@ public sealed class AppSettings
     public DateTimeOffset? SupportAskLater { get; set; }
     /// <summary>The ask for a tip never shows again: they tipped, said don't ask again, or put it off twice.</summary>
     public bool SupportAskDone { get; set; }
+    /// <summary>The notes' diagrams have shown, once, how to explore one ("Click a box to follow its arrows").</summary>
+    public bool DiagramHintSeen { get; set; }
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 
@@ -148,6 +154,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     readonly IMicPermissions mics;
     readonly List<Task> running = [];
     Timer? watchdog;
+    /// <summary>Drops old recordings' audio (Settings → Recording → Keep recordings): as the app starts, every
+    /// <see cref="PruneEvery"/> after, and <see cref="PruneAfterChange"/> after that setting changes.</summary>
+    Timer? pruning;
     int checking;
     KeepAwake? awake;
     readonly ModelSetting models;
@@ -169,6 +178,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public Recorder Recorder { get; }
     public TranscriptionWorker Whisper { get; }
     public LectureSender Sender { get; }
+    /// <summary>The recorder's live words: Cactus Whistle hearing the newest sound every second (see <see cref="LiveLines"/>).</summary>
+    public LiveCaptioner Captions { get; }
 
     public LibraryState Library { get; private set; } = LibraryState.NotSetUp;
     /// <summary>This computer's own library, for Both/Library roles: started in <see cref="Start"/>, stopped in
@@ -200,6 +211,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public event Action<Lecture>? Filed;
     /// <summary>Whisper wrote down more of the lecture being recorded.</summary>
     public event Action<Lecture, IReadOnlyList<Spoken>>? Heard;
+    /// <summary>The live words of the lecture being recorded changed (a second or so after they're said).</summary>
+    public event Action<Lecture>? LiveWords;
     /// <summary>Something went wrong that the person should hear about now: a title and what to know.</summary>
     public event Action<string, string>? Problem;
 
@@ -246,6 +259,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Lectures = new LectureStore(home);
         Recorder.Recover(Lectures, this.log);
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
+        Captions = new LiveCaptioner(() => Recorder.Current, Recorder.Recent, LiveHearer, this.log) { Watched = () => liveWordsWatched };
+        // Too slow is judged for each lecture afresh (an app.json from a 0.11 build before it may still say
+        // "live_words_too_slow": nothing reads it, and the next save leaves it out).
+        Captions.Changed += l => LiveWords?.Invoke(l);
         Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log)
         {
             EngineName = () => engineName,
@@ -365,7 +382,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <summary>The transcription model: the one the environment names, else the one picked in setup or Settings, else
     /// the one for this computer (<see cref="Advice"/>).</summary>
-    public WhisperModel Model => models.Model ?? WhisperModels.Find(Settings.Model) ?? Advice.Model;
+    public WhisperModel Model => models.Model ?? (WhisperModels.Find(Settings.Model) is { } m && (!m.Bundled || WhistleTranscriber.Available) ? m : null) ?? Advice.Model;
 
     /// <summary>What this computer has. Asked once, on the thread pool, as the app starts; the first to want it before
     /// then waits the moment it takes.</summary>
@@ -387,8 +404,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     void KeepModelInUse()
     {
         if (!Settings.SetupDone || Settings.Model.Length > 0 || Settings.Role == AppRole.Library || ModelFromEnvironment) return;
-        var had = WhisperModels.All.FirstOrDefault(m => WhisperModels.IsDownloaded(Home, m))
-                  ?? WhisperModels.All.FirstOrDefault(m => WhisperModels.OnDisk(Home, m) > 0);
+        // Whistle comes with the app, so it's here whatever the student had: only a downloaded model counts.
+        var had = WhisperModels.All.FirstOrDefault(m => !m.Bundled && WhisperModels.IsDownloaded(Home, m))
+                  ?? WhisperModels.All.FirstOrDefault(m => !m.Bundled && WhisperModels.OnDisk(Home, m) > 0);
         if (had is null) return;
         Settings.Model = had.Id;
         try
@@ -428,7 +446,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// download, a Whisper that couldn't start).</summary>
     public (string Title, string Text)? FallingBehind()
     {
-        if (Recorder.Current is not { State: LectureState.Recording } live || !ModelReady || WhisperProblem is not null) return null;
+        // One written down after class isn't written down while it records, so it's never behind.
+        if (Recorder.Current is not { State: LectureState.Recording, AfterClass: false } live || !ModelReady || WhisperProblem is not null) return null;
         return BehindWords(Recorder.Elapsed, live.TranscribedSeconds, Model, Advice);
     }
 
@@ -471,19 +490,35 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         _ = DownloadModelAsync(WhisperModels.Speakers);
     }
 
-    /// <summary>What the model being loaded is called, for the words about it (Whisper, or Parakeet).</summary>
+    /// <summary>What the model being loaded is called, for the words about it (Whisper, Parakeet, or Cactus Whistle).</summary>
     string engineName = "Whisper";
 
     ITranscriber LoadWhisper()
     {
         if (!ModelReady) throw new InvalidOperationException("The transcription model isn't downloaded yet.");
-        engineName = ModelFile is null && Model.Engine == SpeechEngine.Parakeet ? "Parakeet" : "Whisper";
-        if (engineName == "Whisper") return new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
+        var engine = ModelFile is null ? Model.Engine : SpeechEngine.Whisper;
+        engineName = engine switch { SpeechEngine.Parakeet => "Parakeet", SpeechEngine.Whistle => "Cactus Whistle", _ => "Whisper" };
+        string name = ModelFile is null ? Model.Name : Path.GetFileName(ModelFile);
+        if (engine == SpeechEngine.Whistle)
+        {
+            var whistle = new WhistleTranscriber(WhisperModels.PathFor(Home, Model), Settings.Language);
+            log($"[whisper] {name} runs on {whistle.Backend}");
+            return whistle;
+        }
+        if (engine == SpeechEngine.Whisper)
+        {
+            var whisper = new WhisperTranscriber(ModelFile ?? WhisperModels.PathFor(Home, Model), Settings.Language);
+            // Where the time goes, for a student's log: the GPU (Metal, Vulkan) or the processor.
+            log($"[whisper] {name} runs on {whisper.Backend}");
+            return whisper;
+        }
         if (!ParakeetLanguages.Knows(Settings.Language))
             throw new InvalidOperationException($"Parakeet doesn't read \"{Settings.Language}\": pick a Whisper model in Settings → Recording, or leave the language empty.");
         try
         {
-            return new ParakeetTranscriber(WhisperModels.PathFor(Home, Model), Settings.Language);
+            var parakeet = new ParakeetTranscriber(WhisperModels.PathFor(Home, Model), Settings.Language);
+            log($"[whisper] {name} runs on {parakeet.Backend}");
+            return parakeet;
         }
         catch (Exception e) when (e is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException)
         {
@@ -500,21 +535,121 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         }
     }
 
+    // --- the live words ----------------------------------------------------------------------------------------------
+
+    IWordHearer? liveHearer;
+    bool liveHearerFailed;
+    volatile bool liveWordsWatched;
+
+    /// <summary>The recorder (or the menu's panel) is open, so the live words can be seen: they're heard only then.</summary>
+    public void WatchLiveWords(bool watched)
+    {
+        if (liveWordsWatched == watched) return;
+        liveWordsWatched = watched;
+        if (watched) Captions.Wake();
+    }
+
+    /// <summary>What hears the live words on this computer: Cactus Whistle on ARM (Apple silicon, Windows on ARM), a
+    /// small Whisper on x64 (Intel Macs, most PCs); None where this copy of the app carries neither.</summary>
+    public LiveEngine LiveEngine { get; } = LiveEngines.Here;
+
+    /// <summary>The recorder can show what's said a second or two after it's said: this computer's live words' engine is
+    /// in this copy of the app, runs here, and reads the lecture's language. Otherwise it shows the transcript's own
+    /// lines, which come about half a minute after. A lecture can still turn them off for being too slow
+    /// (<see cref="LiveWordsNow"/>).</summary>
+    public bool LiveWordsOn => !liveHearerFailed && LiveEngine != LiveEngine.None && LiveEngines.Reads(LiveEngine, Settings.Language);
+
+    /// <summary>The live words are on for the lecture now recording: on here, and it hasn't turned them off for being
+    /// too slow.</summary>
+    public bool LiveWordsNow => LiveWordsOn && !Captions.TooSlow;
+
+    /// <summary>What hears the live words of <paramref name="l"/>, and in which language; null when they're off (see
+    /// <see cref="LiveWordsOn"/>, or a lecture the transcript found to be in a language Whistle doesn't read).</summary>
+    (IWordHearer, string)? LiveHearer(Lecture l)
+    {
+        if (!LiveWordsOn) return null;
+        string language;
+        if (LiveEngine == LiveEngine.Whistle)
+        {
+            language = WhistleLanguages.Code(Settings.Language) ?? "";
+            if (language.Length == 0 && l.Language.Length > 0)
+            {
+                if (WhistleLanguages.Code(l.Language) is not { } found) return null;
+                language = found;
+            }
+        }
+        else
+        {
+            // Whisper reads the lecture's language whatever it is: the one set, or the one the transcript found.
+            language = Settings.Language is "" or "auto" ? l.Language : Settings.Language;
+        }
+        try
+        {
+            liveHearer ??= LiveEngine == LiveEngine.Whistle
+                ? new WhistleTranscriber(WhistleTranscriber.BundledModel)
+                : new LiveWhisperHearer(LiveWhisperHearer.BundledModel);
+        }
+        catch (Exception e) when (e is DllNotFoundException or BadImageFormatException or EntryPointNotFoundException or InvalidOperationException
+                                     or IOException or global::Whisper.net.WhisperModelLoadException)
+        {
+            liveHearerFailed = true;
+            log($"[live] the live words can't run here ({e.GetType().Name}: {e.Message}): the recorder shows the transcript's own lines");
+            return null;
+        }
+        return (liveHearer, language);
+    }
+
+    /// <summary>What's been said in the lecture being recorded, as lines: the transcript as far as it has got, then the
+    /// live words after it. Empty when nothing records.</summary>
+    public List<Spoken> LiveLines() =>
+        Recorder.Current is { } l ? LiveCaptioner.Merge(l.Segments, l.TranscribedSeconds, Captions.Words(l.Id, l.TranscribedSeconds - 0.05)) : [];
+
+    /// <summary><see cref="LiveLines"/> as a transcript (the recorder's chat asks with it); null when nothing records.</summary>
+    public string? LiveTranscript() => Recorder.Current is null ? null : TimedText.Format(LiveLines());
+
     public void Start()
     {
         running.Add(Task.Run(() => Whisper.RunAsync(stop.Token)));
+        // The live words, on a thread of their own below the app's own work: a library-only computer never records.
+        if (Settings.Role != AppRole.Library)
+            new Thread(() => Captions.Run(stop.Token)) { IsBackground = true, Priority = ThreadPriority.BelowNormal, Name = "live words" }.Start();
         running.Add(Task.Run(() => Sender.RunAsync(stop.Token)));
         running.Add(Task.Run(WatchLibrary));
         StartCalendars();
         // Voice memos sent from the phone are written down where lectures are recorded; a library-only computer can't.
         if (Settings.Role != AppRole.Library) running.Add(Task.Run(() => Memos.RunAsync(stop.Token)));
-        running.Add(Task.Run(() => Lectures.PruneAudio(Settings.KeepAudioDays, DateTimeOffset.Now)));
+        pruning = new Timer(_ => PruneAudio(), null, TimeSpan.Zero, PruneEvery);
         watchdog = new Timer(_ => CheckRecorder(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         // A download that quitting (or a closed laptop) cut short picks up where it stopped. A library-only
         // computer never records, so it never needs the model.
         if (Settings.SetupDone && Settings.Role != AppRole.Library && !ModelReady) _ = DownloadModelAsync();
         else EnsureSpeakerModel();
         if (Settings.Role != AppRole.Laptop && Settings.SetupDone) _ = RefreshLocalLibraryAsync();
+    }
+
+    /// <summary>How often old recordings' audio is looked for while the app runs: a Mac's app can run for weeks.</summary>
+    internal static readonly TimeSpan PruneEvery = TimeSpan.FromHours(6);
+
+    /// <summary>How long after Keep recordings changes the audio is looked at again: long enough that typing "14" is
+    /// never taken for "1" on the way.</summary>
+    internal TimeSpan PruneAfterChange { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>Keep recordings changed: drop the audio it no longer keeps soon, rather than at the next look.</summary>
+    public void PruneAudioSoon() => pruning?.Change(PruneAfterChange, PruneEvery);
+
+    void PruneAudio()
+    {
+        try
+        {
+            int n = Lectures.PruneAudio(Settings.KeepAudioDays, DateTimeOffset.Now);
+            if (n > 0) log($"[app] removed the recordings of {n} filed lecture{(n == 1 ? "" : "s")} older than {Settings.KeepAudioDays} days (their notes and transcripts stay)");
+        }
+        catch (Exception e)
+        {
+            // On a timer's thread: anything thrown here (a lecture whose date can't be read, a file in use) would end
+            // the app, so it's only said, and tried again at the next look.
+            log($"[app] couldn't remove old recordings: {e.Message}");
+        }
     }
 
     /// <summary>Take this as this computer's own library: the one <see cref="LocalLibrary"/> shows from now on, stopped
@@ -783,8 +918,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     {
         if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
         var calendar = CalendarStart(className);
-        var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName), calendar);
+        var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName, afterClass: !Settings.LiveTranscript), calendar);
         awake ??= new KeepAwake("Recording a lecture");
+        // Live, Whisper starts on it; after class, the look lets go of a model still loaded from the lecture before.
         Whisper.Wake();
         return l;
     }
@@ -1055,6 +1191,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         if (disposed) return;
         disposed = true;
         watchdog?.Dispose();
+        pruning?.Dispose();
         try
         {
             if (Recorder.Current is not null) StopRecording();

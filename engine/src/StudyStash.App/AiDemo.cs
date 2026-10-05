@@ -17,7 +17,7 @@ public static class AiDemo
 
     public static AiOverview Overview() => new(Engines: Engines_, Notes: "ollama", Ask: "claude", Fallback: true, Problems: [])
     {
-        Diagrams = "auto", DiagramsBy = "claude",
+        Diagrams = "auto", DiagramsBy = "claude", Rich = new RichNotesInfo(true, true, true, true), Speed = "standard",
     };
 
     /// <summary>The library setup step's own overview: nobody has picked who answers yet, so it starts as Same as
@@ -43,6 +43,7 @@ public static class AiDemo
     {
         public Task<AiOverview?> EnginesAsync() => Task.FromResult<AiOverview?>(overview);
         public Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null, string? diagrams = null) => Task.FromResult<AiOverview?>(overview);
+        public Task<AiOverview?> RichAsync(bool? on = null, bool? diagrams = null, bool? plots = null, bool? drawings = null, string? speed = null) => Task.FromResult<AiOverview?>(overview);
         public Task<AiSaid?> StartAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> DownloadAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> SignInAsync(string engine) => Task.FromResult<AiSaid?>(null);

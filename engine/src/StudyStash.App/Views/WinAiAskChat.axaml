@@ -109,7 +109,7 @@
               </Flyout>
             </Button.Flyout>
           </Button>
-          <Button Grid.Column="4" Classes="ai-send" Command="{Binding AskCommand}" Height="30" VerticalAlignment="Center" IsVisible="{Binding !Busy}">
+          <Button AutomationProperties.Name="Send question" Grid.Column="4" Classes="ai-send" Command="{Binding AskCommand}" Height="30" VerticalAlignment="Center" IsVisible="{Binding !Busy}">
             <c:Icon Glyph="send" Size="18" Foreground="{DynamicResource Fg}" />
           </Button>
           <!-- While an answer is being written, the same place stops it -->

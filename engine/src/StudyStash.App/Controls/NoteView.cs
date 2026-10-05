@@ -1,11 +1,13 @@
 using System.Text.RegularExpressions;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.LogicalTree;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using Markdig;
 using Markdig.Extensions.Mathematics;
 using Markdig.Extensions.Tables;
@@ -133,11 +135,101 @@ public sealed partial class NoteView : StackPanel
         if (change.Property == CompactProperty || change.Property == BodyFontProperty || change.Property == BodySizeProperty
             || change.Property == BodyLineHeightProperty || change.Property == PageHeightProperty)
         {
-            blocks.Clear(); // every block's type changes: none can be kept
-            Build();
+            // Every block's type changes (a diagram on paper is another control from one on screen): none can be kept.
+            blocks.Clear();
+            diagrams.Clear();
+            BuildWhenSeen();
         }
-        else if (change.Property == MarkdownProperty) Build();
+        else if (change.Property == MarkdownProperty)
+        {
+            var hold = HoldPlace();
+            BuildWhenSeen();
+            hold?.Invoke();
+        }
     }
+
+    /// <summary>How long a page that changed keeps the reader's place while what's new in it settles.</summary>
+    static readonly TimeSpan Settles = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Notes that change while they're read (their diagrams arrive after them) keep the reader's place: the piece at the
+    /// top of the page now stays just where it is on screen, whatever goes in above it, until the new pieces have their
+    /// size, or the reader scrolls. Null when there's no place to keep (nothing scrolled, a compact answer, paper), and
+    /// the scroll is left alone when that piece itself changed. Its pieces are the same controls, kept by
+    /// <see cref="Build"/>, so a diagram's pins and folded groups stay too.
+    /// </summary>
+    Action? HoldPlace()
+    {
+        if (Compact || Print || Children.Count == 0 || this.FindAncestorOfType<ScrollViewer>() is not { } scroller || scroller.Offset.Y <= 0) return null;
+        Control? anchor = null;
+        double top = 0;
+        foreach (var child in Children)
+            if (child.TranslatePoint(default, scroller) is { } at && at.Y + child.Bounds.Height > 0)
+            {
+                (anchor, top) = (child, at.Y);
+                break;
+            }
+        if (anchor is null) return null;
+        return () =>
+        {
+            if (!Children.Contains(anchor)) return;
+            var until = DateTime.UtcNow + Settles;
+            double expected = scroller.Offset.Y;
+            void Keep(object? sender, EventArgs e)
+            {
+                // The reader scrolled meanwhile (or it's had time to settle): their scroll wins.
+                if (DateTime.UtcNow > until || Math.Abs(scroller.Offset.Y - expected) > 0.5 || anchor.TranslatePoint(default, scroller) is not { } now)
+                {
+                    scroller.LayoutUpdated -= Keep;
+                    return;
+                }
+                if (Math.Abs(now.Y - top) <= 0.5) return;
+                expected = Math.Max(0, scroller.Offset.Y + now.Y - top);
+                scroller.Offset = scroller.Offset.WithY(expected);
+            }
+            scroller.LayoutUpdated += Keep;
+        };
+    }
+
+    /// <summary>The notes changed while this view is hidden (the page keeps a view for each way of showing a lecture:
+    /// its notes, the two sides of a rewrite's comparison, the plain Markdown): it's built when it shows, not before.
+    /// Building is the whole cost of a lecture's notes (every formula typeset, every diagram laid out, every plot's
+    /// scene made), and a hidden view built the same notes again for nobody to see.</summary>
+    void BuildWhenSeen()
+    {
+        if (Hidden)
+        {
+            // What it built before is out of date and nobody sees it: let it go, and build the new when it shows.
+            if (!unbuilt && Children.Count > 0)
+            {
+                Children.Clear();
+                blocks.Clear();
+                diagrams.Clear();
+                previous.Clear();
+            }
+            unbuilt = true;
+            return;
+        }
+        unbuilt = false;
+        Build();
+    }
+
+    bool unbuilt;
+
+    /// <summary>In a window, but out of view: hidden itself, or under something hidden, or in a window that's closed to the
+    /// menu bar. One that isn't in a window at all (the notes laid out for a PDF, a view a test holds) isn't hidden: it
+    /// builds at once.</summary>
+    bool Hidden => VisualRoot is not null && seen is { InView: false };
+
+    readonly Seen seen;
+
+    public NoteView() => seen = new Seen(this, inView =>
+    {
+        if (inView && unbuilt) BuildWhenSeen();
+    });
+
+    /// <summary>Whether the notes are waiting to be built (the view is hidden and they changed since it was).</summary>
+    internal bool Unbuilt => unbuilt;
 
     bool Mac => Skin.Current == SkinKind.Mac;
 
@@ -151,7 +243,7 @@ public sealed partial class NoteView : StackPanel
 
     TextBlock Text(string resourceFont, double size, double lineHeight)
     {
-        var t = new TextBlock { FontSize = size, LineHeight = size * lineHeight, TextWrapping = TextWrapping.Wrap };
+        var t = new SpokenText { FontSize = size, LineHeight = size * lineHeight, TextWrapping = TextWrapping.Wrap };
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(resourceFont));
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
         FollowLinks(t);
@@ -162,7 +254,7 @@ public sealed partial class NoteView : StackPanel
     /// can be copied a sentence at a time, not just as a whole).</summary>
     TextBlock CompactText()
     {
-        var t = new SelectableTextBlock { FontSize = BodySize, LineHeight = BodyLineHeight, TextWrapping = TextWrapping.Wrap };
+        var t = new SpokenSelectableText { FontSize = BodySize, LineHeight = BodyLineHeight, TextWrapping = TextWrapping.Wrap };
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(BodyFont ?? "TextFont"));
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
         t.Bind(SelectableTextBlock.SelectionBrushProperty, t.GetResourceObservable("Hl"));
@@ -211,6 +303,7 @@ public sealed partial class NoteView : StackPanel
         bool first = true;
         string section = "";
         int skipUntil = -1;
+        string? above = null;
         for (int at = 0; at < doc.Count; at++)
         {
             MdBlock block = doc[at];
@@ -221,6 +314,9 @@ public sealed partial class NoteView : StackPanel
             int end = Math.Max(at + 1 < doc.Count ? doc[at + 1].Span.Start : markdown.Length, svgEnd ?? 0);
             string key = $"{first}\u0001{section}\u0001{at == doc.Count - 1}\u0001{markdown[block.Span.Start..Math.Clamp(end, block.Span.Start, markdown.Length)]}";
             for (int n = 2; blocks.ContainsKey(key); n++) key = $"{n}\u0001{key}";
+            // A diagram takes the bold line just above it as its title (the diagram pass writes one there).
+            caption = above;
+            above = block is ParagraphBlock { Inline: { } line } && BoldLine(line) is { } bold ? bold : null;
             if (kept.Remove(key, out var same))
             {
                 // Its diagrams stay its own: none is handed on to a later block drawing the same thing.
@@ -280,6 +376,16 @@ public sealed partial class NoteView : StackPanel
 
     /// <summary>The Markdown being built.</summary>
     string source = "";
+
+    /// <summary>The bold line just above the block being built (a diagram's title, as the diagram pass writes it).</summary>
+    string? caption;
+
+    /// <summary>A paragraph that's one bold phrase and nothing else ("**The cardiac cycle**"): its words; else null.</summary>
+    static string? BoldLine(ContainerInline line)
+    {
+        var parts = line.Where(i => i is not LineBreakInline && !(i is LiteralInline l && l.Content.IsEmptyOrWhitespace())).ToList();
+        return parts is [EmphasisInline { DelimiterCount: 2 } bold] && Plain(bold) is { Length: > 0 } words ? words : null;
+    }
 
     /// <summary>Whether a block runs to the end of the notes: an unfinished diagram there is still arriving; one
     /// earlier on never will, and says it can't be drawn.</summary>
@@ -352,7 +458,7 @@ public sealed partial class NoteView : StackPanel
                 mv.Size = current.FontSize * DisplayMathFactor;
                 mv.InvalidateMeasure();
                 var lifted = new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 2) };
-                segments.Add(lifted);
+                segments.Add(Print || Compact ? lifted : PlotFormula.Wrap(lifted, mv.Latex ?? ""));
                 current = Body();
                 split = true;
                 continue;
@@ -360,10 +466,19 @@ public sealed partial class NoteView : StackPanel
             current.Inlines!.Add(piece);
         }
         if (current.Inlines!.Count > 0 || !split) segments.Add(current);
-        if (segments.Count == 1) return segments[0];
+        foreach (var segment in segments.OfType<TextBlock>()) SayFormulas(segment);
+        if (segments.Count == 1) return LoneFormula(inline) is { } latex && !Print && !Compact && segments[0] is not PlotFormula ? PlotFormula.Wrap(segments[0], latex) : segments[0];
         var stack = new StackPanel { Spacing = 6 };
         foreach (var s in segments) stack.Children.Add(s);
         return stack;
+    }
+
+    /// <summary>A paragraph that's one <c>$$…$$</c> formula and nothing else: its LaTeX (it can be asked for as a
+    /// plot); else null.</summary>
+    static string? LoneFormula(ContainerInline inline)
+    {
+        var parts = inline.Where(i => i is not LineBreakInline && !(i is LiteralInline l && l.Content.IsEmptyOrWhitespace())).ToList();
+        return parts is [MathInline { DelimiterCount: 2 } m] ? m.Content.ToString() : null;
     }
 
     /// <summary>A <c>$$…$$</c> formula on its own lines: centred, larger than the body, scaled down to fit the
@@ -377,7 +492,9 @@ public sealed partial class NoteView : StackPanel
         mv.Bind(MathView.ForegroundProperty, mv.GetResourceObservable("Fg"));
         mv.Measure(Size.Infinity);
         if (mv.ErrorMessage is not null) return DisplayFallback(latex);
-        return new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 4) };
+        var display = new MathDisplay(mv, fitWhole: Print) { Margin = new Thickness(0, 4) };
+        // In a lecture's notes on screen, a formula can be asked for as a plot.
+        return Print || Compact ? display : PlotFormula.Wrap(display, latex);
     }
 
     /// <summary>The code-box look, for a display formula that couldn't be typeset: one quiet line saying so, then
@@ -398,7 +515,7 @@ public sealed partial class NoteView : StackPanel
         return card;
     }
 
-    enum DiagramKind { Mermaid, Svg }
+    enum DiagramKind { Mermaid, Svg, Plot }
 
     /// <summary>Which fences are diagrams — the same rule search and the diagram repair read notes by
     /// (<see cref="NoteBlocks.KindOf"/>).</summary>
@@ -406,6 +523,7 @@ public sealed partial class NoteView : StackPanel
     {
         NoteBlockKind.Mermaid => DiagramKind.Mermaid,
         NoteBlockKind.Svg => DiagramKind.Svg,
+        NoteBlockKind.Plot => DiagramKind.Plot,
         _ => null,
     };
 
@@ -422,7 +540,12 @@ public sealed partial class NoteView : StackPanel
             Detach(kept);
             return diagrams[key] = kept;
         }
-        Control made = kind == DiagramKind.Mermaid ? ChartBlock(source) : SvgBlock(source);
+        Control made = kind switch
+        {
+            DiagramKind.Mermaid => ChartBlock(source),
+            DiagramKind.Plot => PlotBlock(source),
+            _ => SvgBlock(source),
+        };
         if (made is not DiagramCard) diagrams[key] = made;
         return made;
     }
@@ -442,10 +565,27 @@ public sealed partial class NoteView : StackPanel
         // its space until then, and becomes the calm card if it can't be laid out.
         var font = this.FindResource("TextFont") as FontFamily ?? Application.Current?.FindResource("TextFont") as FontFamily ?? FontFamily.Default;
         SceneCache.Find(chart, chart.ToSource(), font, null);
-        var view = new DiagramView(opensLarger: !Print, fitWhole: Print) { Chart = chart, Source = source, Margin = new Thickness(0, 6) };
+        var view = new DiagramView(opensLarger: !Print, fitWhole: Print) { Source = source, Caption = caption, Margin = new Thickness(0, 6) };
+        view.Chart = chart;
         if (Compact) view.MaxHeight = CompactDiagramMaxHeight;
         if (Print) view.MaxHeight = PageHeight;
         return view;
+    }
+
+    /// <summary>A ```plot: drawn exactly from its formulas, to play with (<see cref="PlotView"/>); on paper, at its
+    /// sliders' starting values. One that can't be read is the calm card, saying which line and why.</summary>
+    Control PlotBlock(string source)
+    {
+        Plot plot;
+        try
+        {
+            plot = Plot.Parse(source);
+        }
+        catch (PlotException e)
+        {
+            return new DiagramCard(e.Message, source);
+        }
+        return new PlotView(plot, source, still: Print) { Caption = caption, Margin = new Thickness(0, 6) };
     }
 
     Control SvgBlock(string source)
@@ -619,6 +759,22 @@ public sealed partial class NoteView : StackPanel
             }
             t.Inlines.Add(piece);
         }
+        SayFormulas(t);
+    }
+
+    /// <summary>What a screen reader reads for a paragraph with formulas in it: Avalonia gives each formula's place in a
+    /// text as one object-replacement character ("\uFFFC"), so such a paragraph is named with its formulas in words
+    /// (<see cref="MathView.Reading"/>) in their places instead.</summary>
+    static void SayFormulas(TextBlock t)
+    {
+        if (t.Inlines is not { Count: > 0 } inlines || !inlines.Any(i => i is InlineUIContainer { Child: MathView })) return;
+        var said = new System.Text.StringBuilder();
+        foreach (var i in inlines)
+        {
+            if (i is Run r) said.Append(r.Text);
+            else if (i is InlineUIContainer { Child: MathView mv }) said.Append(' ').Append(MathView.Reading(mv.Latex)).Append(' ');
+        }
+        AutomationProperties.SetName(t, string.Join(' ', said.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries)));
     }
 
     /// <summary>The text as runs (or an inline formula's <see cref="InlineUIContainer"/>); weight and style are set

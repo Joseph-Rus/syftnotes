@@ -136,6 +136,7 @@ public static partial class Summarize
         if (svg)
             text += $$"""
 
+                Other Mermaid kinds are drawn too, when they fit better: stateDiagram-v2 for states and the events between them (an automaton: [*] --> q0, q0 --> q1 : a, class q2 accept), sequenceDiagram for who sends what to whom in order (A->>B: request, B-->>A: reply), timeline for events in order (1857 : event), and mindmap for a topic's themes by indentation.
 
                 Draw something spatial (a labelled structure, a physics setup with its forces, a circuit, the graph of a function, a data structure in memory) as SVG instead, in a ```svg block: {{SvgRules}} For example:
                 ```svg
@@ -414,9 +415,10 @@ public static partial class Summarize
         var fixes = new List<(NoteBlock Block, string Text)>();
         foreach (var (block, why) in broken)
         {
-            bool svg = block.Kind == NoteBlockKind.Svg;
-            string prompt = $"This {(svg ? "SVG drawing" : "Mermaid flowchart")} has a problem: {why!.TrimEnd('.')}. "
-                + $"Reply with only the corrected block.\n\n```{(svg ? "svg" : "mermaid")}\n{block.Text}\n```";
+            bool svg = block.Kind == NoteBlockKind.Svg, plot = block.Kind == NoteBlockKind.Plot;
+            string what = svg ? "SVG drawing" : plot ? "plot" : NoteBlocks.StartsAsFlowchart(block.Text) ? "Mermaid flowchart" : "Mermaid diagram";
+            string prompt = $"This {what} has a problem: {why!.TrimEnd('.')}. " + (plot ? PlotDesign.Reference + "\n\n" : "")
+                + $"Reply with only the corrected block.\n\n```{Fence(block.Kind)}\n{block.Text}\n```";
             try
             {
                 if (Corrected(await ask(prompt), block.Kind) is { } text) fixes.Add((block, text));
@@ -429,7 +431,7 @@ public static partial class Summarize
         foreach (var (block, text) in fixes.OrderByDescending(f => f.Block.First))
         {
             string first = lines[block.First], indent = first[..(first.Length - first.TrimStart().Length)];
-            var fresh = new List<string> { indent + "```" + (block.Kind == NoteBlockKind.Svg ? "svg" : "mermaid") };
+            var fresh = new List<string> { indent + "```" + Fence(block.Kind) };
             fresh.AddRange(text.Split('\n').Select(l => l.Length == 0 ? l : indent + l));
             fresh.Add(indent + "```");
             lines.RemoveRange(block.First, block.Last - block.First + 1);
@@ -438,10 +440,19 @@ public static partial class Summarize
         return string.Join("\n", lines);
     }
 
+    /// <summary>The fence a diagram of this kind is written in: ```svg, ```plot or ```mermaid.</summary>
+    public static string Fence(NoteBlockKind kind) => kind switch
+    {
+        NoteBlockKind.Svg => "svg",
+        NoteBlockKind.Plot => "plot",
+        _ => "mermaid",
+    };
+
     /// <summary>Why a diagram can't be drawn, in plain English, or null when it can.</summary>
     public static string? DiagramProblem(NoteBlockKind kind, string text)
     {
         if (kind == NoteBlockKind.Svg) return SafeSvg.Clean(text).Problem;
+        if (kind == NoteBlockKind.Plot) return Plot.Problem(text);
         try
         {
             Flowchart.Parse(text);
@@ -458,7 +469,7 @@ public static partial class Summarize
     {
         string t = Py.Strip(Thinking().Replace(reply ?? "", ""));
         string candidate = NoteBlocks.Find(t).FirstOrDefault(b => b.Kind == kind)?.Text
-            ?? (NoteBlocks.StartsAsDiagram(t) ? t : "");
+            ?? (NoteBlocks.StartsAsDiagram(t) || (kind == NoteBlockKind.Plot && Plot.Problem(t) is null) ? t : "");
         candidate = candidate.Trim('\n', '\r');
         return candidate.Trim().Length > 0 && DiagramProblem(kind, candidate) is null ? candidate : null;
     }

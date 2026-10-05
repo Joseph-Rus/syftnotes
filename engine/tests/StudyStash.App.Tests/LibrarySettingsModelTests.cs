@@ -471,4 +471,107 @@ public class LibrarySettingsModelTests
         Assert.DoesNotContain(fake.Calls, c => c.Method == "POST");
         Assert.Contains("without the Study Stash app", model.Lib.StartAtLoginSub);
     }
+
+    /// <summary>A laptop updates itself on its own say: General's Update automatically is client.toml's, it survives a
+    /// restart, and it and the library's switch (Your library → Library) never change each other.</summary>
+    [AvaloniaFact]
+    public async Task A_laptops_own_Update_automatically_and_its_librarys_are_two_switches()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        Assert.True(model.IsLaptopRole);
+        Assert.True(model.AutoUpdateHere);
+
+        model.AutoUpdateHere = false;
+
+        Assert.False(Configs.LoadClient(home.Path).AutoUpdate);
+        Assert.False(AppUpdates.AutoUpdateOn(host));
+        Assert.DoesNotContain(fake.Calls, c => c.Method == "POST");
+        Assert.True(fake.Settings["updates"]!["auto"]!.GetValue<bool>());
+        using (var again = new AppHost(home.Path, log: _ => { }))
+        using (var reopened = SettingsModel.Make(again, library: () => fake.Call))
+            Assert.False(reopened.AutoUpdateHere);
+
+        // The library's switch shows the library's, not this laptop's, and changes only the library.
+        model.AutoUpdateHere = true;
+        model.Section = "Library";
+        Assert.True(model.Lib.AutoUpdate);
+        model.Lib.AutoUpdate = false;
+        await Task.Yield();
+
+        Assert.False(fake.Settings["updates"]!["auto"]!.GetValue<bool>());
+        Assert.True(Configs.LoadClient(home.Path).AutoUpdate);
+        Assert.True(AppUpdates.AutoUpdateOn(host));
+    }
+
+    /// <summary>A computer that is the library has one switch, Your library's: the app reads client.toml's too, so
+    /// that switch sets both, and shows off when this computer's is off whatever the library says.</summary>
+    [AvaloniaFact]
+    public async Task On_the_librarys_own_computer_its_one_switch_sets_both()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake, AppRole.Both);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        Assert.False(model.IsLaptopRole);
+        var cc = host.Client();
+        cc.AutoUpdate = false; // switched off back when this was a laptop
+        host.SaveClient(cc);
+
+        model.Section = "Library";
+        Assert.False(model.Lib.AutoUpdate);
+
+        model.Lib.AutoUpdate = true;
+        await Task.Yield();
+        Assert.True(Configs.LoadClient(home.Path).AutoUpdate);
+        Assert.True(fake.Settings["updates"]!["auto"]!.GetValue<bool>());
+
+        model.Lib.AutoUpdate = false;
+        await Task.Yield();
+        Assert.False(Configs.LoadClient(home.Path).AutoUpdate);
+        Assert.False(fake.Settings["updates"]!["auto"]!.GetValue<bool>());
+    }
+
+    /// <summary>General's Check now says whether a newer version is out without installing it; Update now installs it.</summary>
+    [AvaloniaFact]
+    public async Task A_laptops_Check_now_looks_and_Update_now_installs()
+    {
+        var fake = new FakeLibrarySettings();
+        var (model, host, home) = Open(fake);
+        using var _h = home;
+        using var _host = host;
+        using var _m = model;
+        Release? out_ = null;
+        bool applied = false;
+        model.WithUpdater(new AppUpdates
+        {
+            Latest = () => Task.FromResult(out_),
+            Idle = () => true,
+            Enabled = () => true,
+            OnDiskVersion = () => Engine.Version,
+            Apply = (_, _, _, _) => { applied = true; return Task.FromResult(true); },
+            RelaunchAndQuit = () => { },
+            Log = _ => { },
+            Home = home.Path,
+        });
+
+        await model.CheckUpdateHereCommand.ExecuteAsync(null);
+        Assert.Contains("the newest", model.UpdateHereLine);
+        Assert.False(model.CanUpdateHere);
+
+        out_ = new Release("v99.0.0", Updates.ParseVersion("99.0.0"), "https://example.com/99", "https://example.com");
+        await model.CheckUpdateHereCommand.ExecuteAsync(null);
+        Assert.Equal($"Version 99.0.0 is out. This laptop has {Engine.Version}.", model.UpdateHereLine);
+        Assert.True(model.CanUpdateHere);
+        Assert.False(applied);
+
+        await model.UpdateHereNowCommand.ExecuteAsync(null);
+        Assert.True(applied);
+        Assert.False(model.CanUpdateHere);
+        Assert.StartsWith("Updating", model.UpdateHereLine);
+    }
 }

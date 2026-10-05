@@ -10,6 +10,15 @@
              x:Class="StudyStash.App.Views.WinLibrary"
              x:DataType="vm:LibraryModel">
   <UserControl.Styles>
+    <!-- A transcript line a diagram pointed to: marked, a little room round it, the words where they were. -->
+    <Style Selector="Border.heard">
+      <Setter Property="Margin" Value="-8,-4" />
+      <Setter Property="Padding" Value="8,4" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="Border.heard.here">
+      <Setter Property="Background" Value="{DynamicResource Hl}" />
+    </Style>
     <Style Selector="Button.nav">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Height" Value="40" />
@@ -447,16 +456,19 @@
                   </Panel>
                   <StackPanel IsVisible="{Binding ShowTranscript}" Margin="0,16,0,0">
                     <TextBlock IsVisible="{Binding NoTranscript}" Text="This lecture has no transcript." FontSize="14" Foreground="{DynamicResource Fg2}" />
-                    <ItemsControl ItemsSource="{Binding Transcript}">
+                    <ItemsControl Name="TranscriptLines" ItemsSource="{Binding Transcript}">
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
                       </ItemsControl.ItemsPanel>
                       <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:HeardLine">
-                          <Grid ColumnDefinitions="Auto,*">
-                            <TextBlock Classes="num" Width="52" Text="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="12" Foreground="{DynamicResource Fg3}" Margin="0,3,12,0" />
-                            <SelectableTextBlock Grid.Column="1" Text="{Binding Text}" FontSize="15" LineHeight="24" TextWrapping="Wrap" SelectionBrush="{DynamicResource Hl}" />
-                          </Grid>
+                          <!-- The line a diagram pointed to ("where was this said"), marked -->
+                          <Border Classes="heard" Classes.here="{Binding Here}">
+                            <Grid ColumnDefinitions="Auto,*">
+                              <TextBlock Classes="num" Width="52" Text="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" FontSize="12" Foreground="{DynamicResource Fg3}" Margin="0,3,12,0" />
+                              <SelectableTextBlock Grid.Column="1" Text="{Binding Text}" FontSize="15" LineHeight="24" TextWrapping="Wrap" SelectionBrush="{DynamicResource Hl}" />
+                            </Grid>
+                          </Border>
                         </DataTemplate>
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -468,6 +480,16 @@
 
               <!-- Where the notes fade out (the code-behind masks them over this strip; it paints nothing itself). -->
               <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" />
+              <!-- A diagram showed where it was said: one click back to the notes, where the diagram is -->
+              <Button Name="BackToNotes" Theme="{StaticResource Surface}" IsVisible="{Binding Note.CanGoBack, FallbackValue=False}"
+                      Command="{Binding Note.BackToNotesCommand, FallbackValue={x:Null}}" HorizontalAlignment="Center" VerticalAlignment="Top"
+                      Margin="0,12,0,0" Height="32" Padding="12,0,14,0" CornerRadius="4" Background="{DynamicResource PopupBg}"
+                      BorderBrush="{DynamicResource PopupStroke}" BorderThickness="1" AutomationProperties.Name="Back to the notes">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Glyph="arrow_back" Size="15" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+                  <TextBlock Text="Back to the notes" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
               </Panel>
               <!-- The latest answer, just above the ask bar -->
               <!-- Both 600 wide where there's room, narrower (never cut off) in a small window. -->

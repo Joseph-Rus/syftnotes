@@ -42,7 +42,17 @@ public static partial class Shell
             // page showing, which may be "Can't reach your library" with no classes beside it.
             _ = all ? LoadLibraryAsync() : dueOpen ? ShowDueAsync() : overviewOf is { } over ? ShowOverviewAsync(over)
                 : openClass is { } cls ? ShowClassAsync(cls) : Task.CompletedTask;
+            // The page showing has its new note; the sidebar's counts beside it follow (a whole load does its own).
+            if (!all) _ = RefreshCountsAsync();
         }, TimeSpan.FromSeconds(1));
+    }
+
+    /// <summary>The sidebar's lecture counts, as the library says them now: only the numbers change, not the page showing.</summary>
+    static async Task RefreshCountsAsync()
+    {
+        await host.CheckLibraryAsync();
+        if (quitting || host.Library != LibraryState.Connected) return;
+        library.ShowCounts(host.Classes().Select(c => (c.Name, c.Lectures)), host.Overview?["unsorted"]?.GetValue<int>() ?? 0);
     }
 
     static bool libraryReloadWhole;
@@ -324,10 +334,14 @@ public static partial class Shell
         };
         // A transcript without times (one pasted from another app) reads a paragraph per line it came with (each
         // speaker's turn), not as one wall of text.
-        foreach (var line in TimedText.HasTimes(S(l["transcript"])) ? TimedText.Parse(S(l["transcript"]))
+        bool timed = TimedText.HasTimes(S(l["transcript"]));
+        foreach (var line in timed ? TimedText.Parse(S(l["transcript"]))
                      : S(l["transcript"]).Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                          .SelectMany(p => Paragraphs(p)).Select(p => new Spoken(0, 0, p)))
-            note.Transcript.Add(new HeardLine { Time = TimedText.HasTimes(S(l["transcript"])) ? TimedText.Clock(line.Start) : "", Text = line.Text });
+        {
+            note.Transcript.Add(new HeardLine { Time = timed ? TimedText.Clock(line.Start) : "", Text = line.Text, Start = timed ? line.Start : null });
+            if (timed) note.Spoken.Add(line);
+        }
         library.Note = note;
         ShowLectureAi(l, note);
         ShowLectureFiles(note);
@@ -359,18 +373,22 @@ public static partial class Shell
     static void ShowLectureAi(JsonObject l, NoteModel note)
     {
         var ai = Ai();
-        library.Notes?.Dispose();
-        library.Notes = null;
+        // The new notes replace the old ones in one step: with none in between, the page never shows its plain Markdown
+        // (a view of the same notes that's only there for a lecture whose notes aren't written yet) for a moment, which
+        // built every diagram and plot in the lecture a second time just to hide it again.
+        var before = library.Notes;
+        AiNotesModel? notes = null;
         if (!note.HasPending)
         {
-            var notes = new AiNotesModel(ai);
+            notes = new AiNotesModel(ai);
             notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 if (openLecture == note.Id) _ = ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true);
             });
-            library.Notes = notes;
-            _ = notes.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]));
         }
+        library.Notes = notes;
+        before?.Dispose();
+        if (notes is not null) _ = notes.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]));
         var ask = new AiAskModel(ai)
         {
             LectureId = note.Id, ClassName = note.ClassName,

@@ -70,13 +70,20 @@ public static class AppMenu
     /// then the library and Settings).</summary>
     public static NativeMenu ForWindow(Window window, Action library, Action settings)
     {
-        var items = new NativeMenu();
-        items.Add(Item("Minimize", () => window.WindowState = WindowState.Minimized, new KeyGesture(Key.M, KeyModifiers.Meta)));
-        items.Add(Item("Zoom", () =>
+        // The items hold the window weakly: the system's menu bar keeps the menu (and so its items) for as long as the app
+        // runs, and items that held the window would keep every closed Settings window, with everything in it, alive.
+        var weak = new WeakReference<Window>(window);
+        void On(Action<Window> act)
         {
-            if (window.CanResize) window.WindowState = window.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-        }));
-        items.Add(Item("Close", window.Close, new KeyGesture(Key.W, KeyModifiers.Meta)));
+            if (weak.TryGetTarget(out var w)) act(w);
+        }
+        var items = new NativeMenu();
+        items.Add(Item("Minimize", () => On(w => w.WindowState = WindowState.Minimized), new KeyGesture(Key.M, KeyModifiers.Meta)));
+        items.Add(Item("Zoom", () => On(w =>
+        {
+            if (w.CanResize) w.WindowState = w.WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        })));
+        items.Add(Item("Close", () => On(w => w.Close()), new KeyGesture(Key.W, KeyModifiers.Meta)));
         items.Add(new NativeMenuItemSeparator());
         items.Add(Item("Study Stash library", library));
         items.Add(Item("Settings…", settings));

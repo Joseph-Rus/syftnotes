@@ -5,6 +5,8 @@
 #   sh macos/build-app.sh [out-dir]      default: dist/mac
 # Needs the .NET 10 SDK and the Xcode command line tools (clang, lipo, codesign, hdiutil, PlistBuddy, iconutil,
 # xcrun swift, vtool, ditto, SetFile, osascript). Publishing both architectures downloads their runtime packs on first use.
+# What this makes is signed ad hoc. A release that has an Apple Developer ID then signs it properly, notarizes it and
+# makes the DMG again, with macos/sign-release.sh (docs/signing.md); nothing here depends on that.
 set -eu
 
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -38,8 +40,9 @@ for arch in arm64 x64; do
 done
 rm -f "$MACOS/x64/ggml-metal.metal"   # no Metal on Intel
 
-# D6: the Whisper model is never bundled.
-big=$(find "$OUT" -name '*.bin' -size +1M -o -iname 'ggml-*.bin')
+# D6: the transcription model is never bundled. The one model file that is: the live words' small Whisper in the
+# Intel tree (models/live-whisper-*.bin, 43.5 MB), so an Intel Mac shows the first words with no download.
+big=$(find "$OUT" \( -name '*.bin' -size +1M -o -iname 'ggml-*.bin' \) ! -name 'live-whisper-*.bin')
 if [ -n "$big" ]; then
   echo "build-app.sh: a model file ended up in the bundle:" >&2
   echo "$big" >&2
@@ -98,33 +101,9 @@ codesign --verify --deep --strict --verbose=2 "$APP"
 echo "Built Study Stash $VERSION (universal, min $MINOS):"
 du -sh "$APP"
 
-# The DMG: a stage folder with the app plus a link to /Applications. The disk shows the app's icon when it opens
-# (.VolumeIcon.icns, flagged on the volume, which only a mounted read-write copy can take), and the .dmg file itself
-# wears it too.
-stage_dmg() {
-  app_path=$1
-  volname=$2
-  dmg=$3
-  stage="$OUT/stage"
-  rw="$OUT/stage.dmg"
-  mnt="$OUT/mount"
-  rm -rf "$stage" "$rw" "$mnt"
-  mkdir -p "$stage" "$mnt"
-  ditto "$app_path" "$stage/Study Stash.app"
-  ln -s /Applications "$stage/Applications"
-  cp "$app_path/Contents/Resources/AppIcon.icns" "$stage/.VolumeIcon.icns"
-  SetFile -c icnC "$stage/.VolumeIcon.icns" 2>/dev/null || true
-  hdiutil create -quiet -volname "$volname" -srcfolder "$stage" -ov -format UDRW "$rw"
-  if hdiutil attach -quiet -nobrowse -mountpoint "$mnt" "$rw"; then
-    SetFile -a C "$mnt" 2>/dev/null || true
-    hdiutil detach -quiet "$mnt"
-  fi
-  rm -f "$dmg"
-  hdiutil convert -quiet "$rw" -format UDZO -o "$dmg"
-  osascript -l JavaScript -e 'ObjC.import("AppKit"); function run(a) { $.NSWorkspace.sharedWorkspace.setIconForFileOptions($.NSImage.alloc.initWithContentsOfFile(a[0]), a[1], 0); }' \
-    "$app_path/Contents/Resources/AppIcon.icns" "$dmg" >/dev/null 2>&1 || true
-  rm -rf "$stage" "$rw" "$mnt"
-}
+# The DMG (macos/dmg.sh): a stage folder with the app plus a link to /Applications, with the app's icon on the disk.
+# shellcheck source=macos/dmg.sh
+. "$HERE/dmg.sh"
 stage_dmg "$APP" "Study Stash" "$OUT/Study-Stash.dmg"
 
 echo "DMG:"

@@ -1,4 +1,4 @@
-<!-- Settings → AI engines (design 13, Windows): who writes the notes, who draws their diagrams and who answers
+<!-- Settings → AI engines (design 13, Windows): who writes the notes, the rich notes switches and who designs them, who answers
      questions, every engine's state and what to do about it, and the Ollama fallback. The pane's own padding and scrolling; the settings window is
      the host's. -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -30,7 +30,7 @@
             <TextBlock Classes="ai-row-title" Text="Writes your notes" />
             <TextBlock Classes="ai-row-sub" Text="After each lecture, on your library" />
           </StackPanel>
-          <Button Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
+          <Button AutomationProperties.Name="Writes your notes" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
             <Border Classes="ai-select">
               <Grid ColumnDefinitions="*,8,Auto">
                 <TextBlock Text="{Binding SelectedNotesName}" TextTrimming="CharacterEllipsis" />
@@ -43,26 +43,6 @@
           </Button>
         </Grid>
       </Border>
-      <Border Classes="ai-card" Margin="0,8,0,0" IsVisible="{Binding HasDiagrams}">
-        <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
-          <c:Icon Glyph="hub" Size="20" />
-          <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
-            <TextBlock Classes="ai-row-title" Text="Draws diagrams" />
-            <TextBlock Classes="ai-row-sub" Text="{Binding DiagramsAbout}" TextWrapping="Wrap" />
-          </StackPanel>
-          <Button Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
-            <Border Classes="ai-select">
-              <Grid ColumnDefinitions="*,8,Auto">
-                <TextBlock Text="{Binding SelectedDiagramsName}" TextTrimming="CharacterEllipsis" />
-                <c:Icon Grid.Column="2" Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" />
-              </Grid>
-            </Border>
-            <Button.Flyout>
-              <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding DiagramsChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
-            </Button.Flyout>
-          </Button>
-        </Grid>
-      </Border>
       <Border Classes="ai-card" Margin="0,8,0,0">
         <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
           <c:Icon Glyph="forum" Size="20" />
@@ -70,7 +50,7 @@
             <TextBlock Classes="ai-row-title" Text="Answers your questions" />
             <TextBlock Classes="ai-row-sub" Text="Ask bar, recorder chat and quick panel" />
           </StackPanel>
-          <Button Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
+          <Button AutomationProperties.Name="Answers your questions" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
             <Border Classes="ai-select">
               <Grid ColumnDefinitions="*,8,Auto">
                 <TextBlock Text="{Binding SelectedAskName}" TextTrimming="CharacterEllipsis" />
@@ -83,6 +63,112 @@
           </Button>
         </Grid>
       </Border>
+
+      <!-- Rich notes: diagrams, formula plots and drawings after the notes, and who designs them -->
+      <StackPanel IsVisible="{Binding HasRich}">
+        <TextBlock Classes="ai-section" Text="Rich notes" Margin="0,18,0,8" />
+        <Border Classes="ai-card" Margin="0">
+          <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
+            <c:Icon Glyph="auto_awesome" Size="20" />
+            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+              <TextBlock Classes="ai-row-title" Text="Rich notes" />
+              <TextBlock Classes="ai-row-sub" Text="{Binding RichAbout}" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <TextBlock Text="{Binding RichOn, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
+              <ToggleButton AutomationProperties.Name="Rich notes" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichOn}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+        <StackPanel IsVisible="{Binding ShowKinds}">
+        <Border Classes="ai-card" Margin="0,8,0,0">
+          <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
+            <c:Icon Glyph="hub" Size="20" />
+            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+              <TextBlock Classes="ai-row-title" Text="Diagrams" />
+              <TextBlock Classes="ai-row-sub" Text="Flowcharts, state and sequence diagrams, timelines and mind maps" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <TextBlock Text="{Binding RichDiagrams, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
+              <ToggleButton AutomationProperties.Name="Diagrams" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDiagrams}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+        <Border Classes="ai-card" Margin="0,8,0,0">
+          <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
+            <c:Icon Glyph="tune" Size="20" />
+            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+              <TextBlock Classes="ai-row-title" Text="Formula plots" />
+              <TextBlock Classes="ai-row-sub" Text="A curve or distribution drawn from the lecturer's formula, with sliders" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <TextBlock Text="{Binding RichPlots, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
+              <ToggleButton AutomationProperties.Name="Formula plots" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichPlots}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+        <Border Classes="ai-card" Margin="0,8,0,0">
+          <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
+            <c:Icon Glyph="palette" Size="20" />
+            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+              <TextBlock Classes="ai-row-title" Text="Drawings" />
+              <TextBlock Classes="ai-row-sub" Text="Labelled figures of what a lecture describes (not on Ollama)" TextWrapping="Wrap" />
+            </StackPanel>
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+              <TextBlock Text="{Binding RichDrawings, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
+              <ToggleButton AutomationProperties.Name="Drawings" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDrawings}" />
+            </StackPanel>
+          </Grid>
+        </Border>
+        </StackPanel>
+        <StackPanel IsVisible="{Binding ShowDrawnBy}">
+        <Border Classes="ai-card" Margin="0,8,0,0">
+          <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
+            <c:Icon Glyph="memory" Size="20" />
+            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+              <TextBlock Classes="ai-row-title" Text="Drawn by" />
+              <TextBlock Classes="ai-row-sub" Text="{Binding DiagramsAbout}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button AutomationProperties.Name="Drawn by" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
+              <Border Classes="ai-select">
+                <Grid ColumnDefinitions="*,8,Auto">
+                  <TextBlock Text="{Binding SelectedDiagramsName}" TextTrimming="CharacterEllipsis" />
+                  <c:Icon Grid.Column="2" Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" />
+                </Grid>
+              </Border>
+              <Button.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding DiagramsChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
+              </Button.Flyout>
+            </Button>
+          </Grid>
+        </Border>
+        </StackPanel>
+      </StackPanel>
+
+      <!-- How fast Claude Code writes the notes and designs the rich notes -->
+      <StackPanel IsVisible="{Binding HasSpeed}">
+        <TextBlock Classes="ai-section" Text="Claude Code speed" Margin="0,18,0,8" />
+        <Border Classes="ai-card" Margin="0">
+          <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
+            <c:Icon Glyph="schedule" Size="20" />
+            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
+              <TextBlock Classes="ai-row-title" Text="Notes and diagrams" />
+              <TextBlock Classes="ai-row-sub" Text="{Binding SpeedAbout}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button AutomationProperties.Name="Notes and diagrams" Grid.Column="3" Classes="ai-select-btn" VerticalAlignment="Center">
+              <Border Classes="ai-select">
+                <Grid ColumnDefinitions="*,8,Auto">
+                  <TextBlock Text="{Binding SelectedSpeedName}" TextTrimming="CharacterEllipsis" />
+                  <c:Icon Grid.Column="2" Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" />
+                </Grid>
+              </Border>
+              <Button.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding SpeedChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
+              </Button.Flyout>
+            </Button>
+          </Grid>
+        </Border>
+      </StackPanel>
 
       <!-- Engines -->
       <Grid ColumnDefinitions="*,Auto" Margin="0,18,0,8">
@@ -152,7 +238,7 @@
           </StackPanel>
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
             <TextBlock Text="{Binding Fallback, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
-            <ToggleButton Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" />
+            <ToggleButton AutomationProperties.Name="Use Ollama instead" Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" />
           </StackPanel>
         </Grid>
       </Border>

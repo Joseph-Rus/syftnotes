@@ -256,7 +256,11 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial bool ChoosingModel { get; set; }
     public bool ShowModelCard => ChosenModel is not null && !ChoosingModel;
     public bool ShowModelDownload => !ChoosingModel;
-    partial void OnChosenModelChanged(ModelChoice? value) => OnPropertyChanged(nameof(ShowModelCard));
+    partial void OnChosenModelChanged(ModelChoice? value)
+    {
+        OnPropertyChanged(nameof(ShowModelCard));
+        OnPropertyChanged(nameof(ModelBody));
+    }
     partial void OnChoosingModelChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowModelCard));
@@ -333,7 +337,9 @@ public sealed partial class SetupModel : ObservableObject
     public bool ModelDownloading => !ModelReady && !HasModelProblem;
     public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 440;
     public double ModelBarWidthWin => Math.Clamp(ModelProgress, 0, 1) * 440;
-    public string ModelBody => $"Study Stash turns speech into text on this {DeviceWord}, so your recordings never leave it. The model is about {ModelSize} and only downloads once.";
+    public string ModelBody => ChosenModel is { Model.Bundled: true } bundled
+        ? $"Study Stash turns speech into text on this {DeviceWord}, so your recordings never leave it. {bundled.Name} comes with the app: there's nothing to download."
+        : $"Study Stash turns speech into text on this {DeviceWord}, so your recordings never leave it. The model is about {ModelSize} and only downloads once.";
 
     /// <summary>Setup in <paramref name="skin"/>'s look, starting on <paramref name="role"/>'s choice (just this
     /// computer unless said).</summary>

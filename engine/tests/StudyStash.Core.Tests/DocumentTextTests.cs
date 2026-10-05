@@ -145,13 +145,17 @@ public class DocumentTextTests
         int now = 0, most = 0;
         var options = NoCache with
         {
-            TimeLimit = TimeSpan.FromSeconds(1),
+            TimeLimit = TimeSpan.FromSeconds(3),
             PageReader = (_, pages, until, _) =>
             {
-                Assert.True(until > DateTime.UtcNow.AddMilliseconds(700));
+                // The whole three seconds are left once it's this file's turn, less the time it took to open the PDF (on
+                // a busy runner, running cold, that has been well over 300 ms, so every file came back unread with less
+                // room). Counting the wait instead would leave a third file 0.6 s and the last none, so 1.5 s still tells
+                // the two apart.
+                Assert.True(until > DateTime.UtcNow.AddMilliseconds(1500));
                 int at = Interlocked.Increment(ref now);
                 InterlockedMax(ref most, at);
-                Thread.Sleep(400);
+                Thread.Sleep(1200);
                 Interlocked.Decrement(ref now);
                 return pages.ToDictionary(p => p, _ => "read");
             },

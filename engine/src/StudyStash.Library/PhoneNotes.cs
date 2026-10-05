@@ -42,12 +42,20 @@ public static partial class PhoneNotes
     static string Block(NoteBlock block) => block.Kind switch
     {
         NoteBlockKind.Mermaid when block.Closed && Flowchart(block.Text) is { } svg => $"<figure class=\"diagram\">{svg}</figure>",
-        NoteBlockKind.Svg when block.Closed => SafeSvg.Clean(block.Text) is { Svg: { } svg }
-            ? $"<figure class=\"diagram\">{svg}</figure>"
+        NoteBlockKind.Svg when block.Closed => SafeSvg.Clean(block.Text) is { Svg: { } svg } drawing
+            ? $"<figure class=\"diagram\">{svg}{Parts(drawing)}</figure>"
             : $"<p class=\"diagram-problem\"><em>{Ui.Esc(SafeSvg.Clean(block.Text).Problem)}</em></p>",
+        NoteBlockKind.Plot when block.Closed && PlotSvg.Render(block.Text, Column) is { } plot => $"<figure class=\"diagram\">{plot}</figure>",
         NoteBlockKind.Math => Math(block.Text, "div", display: true),
         _ => Code(block.Info, block.Text),
     };
+
+    /// <summary>An illustration's parts under it, folded away: on a phone there's no pointing at them, so each one's name
+    /// and what the drawing says of it can be read here.</summary>
+    static string Parts(SafeSvgResult drawing) => drawing.Parts.Count == 0 ? ""
+        : "<details class=\"parts\"><summary>Parts</summary><dl>"
+          + string.Concat(drawing.Parts.Select(p => $"<dt>{Ui.Esc(p.Name)}</dt>" + (p.Note.Length > 0 ? $"<dd>{Ui.Esc(p.Note)}</dd>" : "")))
+          + "</dl></details>";
 
     static string Code(string info, string text)
     {

@@ -76,7 +76,7 @@
                         <Grid ColumnDefinitions="Auto,10,*,16,Auto">
                           <Ellipse Width="10" Height="10" Fill="{Binding Dot}" VerticalAlignment="Center" />
                           <TextBlock Grid.Column="2" Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                          <ToggleButton Grid.Column="4" Classes="switch" IsChecked="{Binding On}" VerticalAlignment="Center" />
+                          <ToggleButton AutomationProperties.Name="{Binding Name}" Grid.Column="4" Classes="switch" IsChecked="{Binding On}" VerticalAlignment="Center" />
                         </Grid>
                       </Border>
                     </StackPanel>

@@ -74,6 +74,10 @@ public static class RichDemo
         ("The nursing process", "Assessment feeds the diagnosis and the plan; evaluation sends you back to assess when the outcomes aren't met.", NursingProcess),
         ("Types of shock", "Four families, grouped by what fails: the volume, the pump, the vessels, or the way out of the heart.", TypesOfShock),
         ("A binary search tree", "Smaller keys go left and larger keys go right, so 4 sits under 6, under 3.", SearchTree),
+        ("Strings ending in 01", "The automaton accepts in q2, the double circle: it got there on a 1 straight after a 0.", StudyStash.Core.DiagramDesign.StateExample),
+        ("Logging in", "The server checks the password hash and answers one of two ways; later requests carry the cookie.", StudyStash.Core.DiagramDesign.SequenceExample),
+        ("Germ theory", "Four discoveries, in order, from washing hands to naming a bacterium.", StudyStash.Core.DiagramDesign.TimelineExample),
+        ("Tissue types", "Four families, each with what it does and its kinds.", StudyStash.Core.DiagramDesign.MindmapExample),
     ];
 
     /// <summary>The four chambers of the heart, drawn as an AI writes an SVG: the writers' palette (blue for the
@@ -103,12 +107,19 @@ public static class RichDemo
         </svg>
         """;
 
-    /// <summary>A diagram Study Stash doesn't draw (a sequence diagram), for the calm card that shows its source.</summary>
+    /// <summary>A conversation as a sequence diagram: who says what to whom, in order.</summary>
     public const string PainConversation = """
         sequenceDiagram
           Nurse->>Patient: How bad is the pain, 0 to 10?
           Patient-->>Nurse: About a 7
           Nurse->>Patient: I'll bring your analgesic and check back in 30 minutes
+        """;
+
+    /// <summary>A diagram Study Stash doesn't draw (a class diagram), for the calm card that shows its source.</summary>
+    public const string ClassChart = """
+        classDiagram
+          Nurse <|-- ChargeNurse
+          Nurse : +assessPain()
         """;
 
     /// <summary>A flowchart with a box left open, for the card that says which line.</summary>
@@ -135,8 +146,8 @@ public static class RichDemo
     /// <summary>What a note shows when a diagram can't be drawn: a sequence diagram, and a chart with a box left open.</summary>
     public static string FallbackNotes { get; } = string.Join("\n\n",
         "## Talking about pain",
-        "The conversation, as the lecturer drew it on the board:",
-        Fence("mermaid", PainConversation),
+        "The care team, as the lecturer drew it on the board:",
+        Fence("mermaid", ClassChart),
         "And the order check, which lost a bracket on the way:",
         Fence("mermaid", BrokenChart));
 

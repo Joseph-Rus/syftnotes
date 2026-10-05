@@ -178,7 +178,7 @@ public class ModelAdviceTests
         using (host)
         {
             var setup = Setup.Make(host, AppRole.Laptop);
-            Assert.Equal(["large-v3", "large-v3-turbo", "large-v3-turbo-q5", "parakeet-v3", "small", "base"], setup.Models.Select(c => c.Model.Id));
+            Assert.Equal(["large-v3", "large-v3-turbo", "large-v3-turbo-q5", "parakeet-v3", "small", "base", .. (WhistleTranscriber.Available ? ["whistle"] : Array.Empty<string>())], setup.Models.Select(c => c.Model.Id));
             var recommended = Assert.Single(setup.Models, c => c.Recommended);
             Assert.Same(WhisperModels.LargeV3TurboSmall, recommended.Model);
             Assert.Same(recommended, setup.ChosenModel);

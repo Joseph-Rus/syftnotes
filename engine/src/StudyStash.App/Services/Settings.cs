@@ -16,8 +16,8 @@ public sealed partial class ModelChoice : ObservableObject
 {
     public required WhisperModel Model { get; init; }
     public string Name => Model.Name;
-    /// <summary>"574 MB", "3 GB": as setup says it.</summary>
-    public string Size => Setup.About(Model.Bytes);
+    /// <summary>"574 MB", "3 GB": as setup says it; Cactus Whistle isn't a download, so it says it comes with the app.</summary>
+    public string Size => Model.Bundled ? "Comes with the app" : Setup.About(Model.Bytes);
     public string About => $"{Model.Size}. {Model.About}";
     /// <summary>The model that keeps up with a lecture on this computer.</summary>
     public bool Recommended { get; init; }
@@ -30,9 +30,10 @@ public sealed partial class ModelChoice : ObservableObject
     [ObservableProperty] public partial bool Here { get; set; }
 
     /// <summary>The models to offer, the one in use (<paramref name="chosen"/>) marked: Whisper tiny is only for
-    /// trying things out, so it's there only when it's the one in use.</summary>
+    /// trying things out, so it's there only when it's the one in use, and Cactus Whistle only where this copy of the
+    /// app carries its engine (every Mac and Windows installer; not a build on Linux).</summary>
     public static IEnumerable<ModelChoice> For(WhisperModel chosen, ModelAdvice advice, string home) =>
-        WhisperModels.All.Where(m => m.Id != WhisperModels.Tiny.Id || m.Id == chosen.Id).Select(m => new ModelChoice
+        WhisperModels.All.Where(m => (m.Id != WhisperModels.Tiny.Id && (!m.Bundled || WhistleTranscriber.Available)) || m.Id == chosen.Id).Select(m => new ModelChoice
         {
             Model = m,
             Recommended = m.Id == advice.Model.Id,
@@ -197,6 +198,12 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     }
     List<WhisperModel> spare = [];
     [ObservableProperty] public partial string Language { get; set; } = "";
+    /// <summary>When a lecture is written down: as it records (the recorder's transcript and chat), or after class
+    /// (it only records, which saves battery). One setting, for the next lecture on.</summary>
+    [ObservableProperty] public partial bool LiveTranscript { get; set; } = true;
+    public bool AfterClass => !LiveTranscript;
+    /// <summary>Under the choice, while a lecture records the other way: it stays as it started.</summary>
+    [ObservableProperty] public partial string LiveTranscriptLine { get; set; } = "";
     [ObservableProperty] public partial bool ComputerAudio { get; set; }
     [ObservableProperty] public partial bool Speakers { get; set; }
     /// <summary>Under "Tell speakers apart": what it does, or where its model is.</summary>
@@ -258,6 +265,24 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     // General
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
     public string Version => Engine.Version;
+
+    // This laptop's own updates (General → Updates, a laptop only: on a computer that is the library the one switch and
+    // Update now are Your library → Library's, which update the app and the library together). client.toml's
+    // auto_update, which the app reads each round; the library's own is a different switch on its own page.
+    [ObservableProperty] public partial string UpdateHereLine { get; set; } = "";
+    /// <summary>Check now found a newer version this copy can install: Update now shows.</summary>
+    [ObservableProperty] public partial bool CanUpdateHere { get; set; }
+    [ObservableProperty] public partial bool UpdateHereBusy { get; set; }
+    [ObservableProperty] public partial bool AutoUpdateHere { get; set; }
+    public string AutoUpdateHereSub => "Study Stash on this laptop installs each new version by itself, never while you're recording. Your library has its own switch under Your library → Library.";
+    Func<AppUpdates?> updater = () => AppUpdates.Current;
+
+    /// <summary>For a test: Check now and Update now go through <paramref name="updates"/>, not the running app's.</summary>
+    public SettingsModel WithUpdater(AppUpdates updates)
+    {
+        updater = () => updates;
+        return this;
+    }
 
     /// <summary>Hands a web page to the system's browser; a test catches it here instead.</summary>
     public Action<string> OpenUrl { get; set; } = url => Dialogs.OpenUrl(url);
@@ -327,6 +352,13 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         {
             IsHere = host.Settings.LibraryHere,
             UpdateHere = AppUpdates.Current is { } updates ? async () => NoticeWords.UpdateNowLine(await Task.Run(updates.NowAsync)) : null,
+            AppAutoUpdate = () => host.Client().AutoUpdate,
+            AppAutoUpdateChanged = on =>
+            {
+                var c = host.Client();
+                c.AutoUpdate = on;
+                host.SaveClient(c);
+            },
             Renamed = name =>
             {
                 var c = host.Client();
@@ -370,12 +402,15 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         DisplayName = cc.DisplayName;
         LibraryHere = host.Settings.LibraryHere;
         Language = host.Settings.Language;
+        LiveTranscript = host.Settings.LiveTranscript;
         ComputerAudio = host.Settings.ComputerAudio;
         Speakers = host.Settings.Speakers;
         SpeakersLine = SpeakersWords(host);
         KeepAudio = host.Settings.KeepAudioDays.ToString(System.Globalization.CultureInfo.InvariantCulture);
         Shortcuts = host.Settings.Shortcuts;
         StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
+        AutoUpdateHere = cc.AutoUpdate;
+        UpdateHereLine = $"Study Stash {Version} on this laptop";
         ColourTheme = host.Settings.Theme;
         Appearance = host.Settings.Appearance;
         advice = host.Advice;
@@ -388,20 +423,18 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Refresh();
     }
 
-    /// <summary>AI tool access, with this computer's own Claude Code, Claude Desktop and Codex setup, and the
-    /// library's Claude routes for turning on the web address and removing a connection.</summary>
+    /// <summary>AI tool access, with the AI apps on this computer (Claude Desktop, Claude Code, Codex, Gemini CLI: each
+    /// connected to the library with one click), and the library's Claude routes for turning on the web address and
+    /// removing a connection.</summary>
     static AiAccessModel MakeAccess(IAiLibrary ai, AppHost host)
     {
         var setup = ClaudeSetup.ThisComputer(host.Home);
         return new AiAccessModel(ai)
         {
-            ClaudeCodeCommand = setup.ClaudeCodeCommand,
-            CodexSetup = setup.CodexSetup,
             McpJson = setup.McpJson,
-            CheckInClaudeCode = setup.InClaudeCode,
-            CheckInClaudeDesktop = setup.InClaudeDesktop,
-            AddToClaudeDesktop = () => Task.FromResult(setup.AddToClaudeDesktop()),
-            RemoveFromClaudeDesktopHook = () => Task.FromResult(setup.RemoveFromClaudeDesktop()),
+            ReadApps = setup.States,
+            ConnectApp = setup.Connect,
+            DisconnectApp = setup.Disconnect,
             OpenUrl = url => Dialogs.OpenUrl(url),
             RevokeConnection = async id =>
             {
@@ -486,10 +519,12 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         ShortcutsSay = Shell.ShortcutsSay();
         ModelLine = ModelWords(host);
         SpeakersLine = SpeakersWords(host);
+        LiveTranscriptLine = LiveTranscriptWords(host.Recorder.Current, host.Settings.LiveTranscript);
         ModelAdviceLine = AdviceWords(host.Model, advice);
         ModelDownloading = host.Downloading is not null;
         ModelProgress = host.Downloading?.Fraction ?? 0;
-        spare = [.. WhisperModels.All.Where(m => m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
+        // Whistle comes with the app: it's never spare (nothing to free).
+        spare = [.. WhisperModels.All.Where(m => !m.Bundled && m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
         SpareLine = spare.Count == 0 ? ""
             : $"Also on this computer: {string.Join(", ", spare.Select(m => $"{m.Name} ({WhisperModel.SizeOf(m.Bytes)})"))}.";
         if (spare.Count == 0) ConfirmingRemove = false;
@@ -529,6 +564,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                  })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;
+        // A library on this computer starts at login through the same login item as the app (Your library → Start the
+        // library when this Mac starts): General shows it as it is now, not as it was when Settings opened.
+        if (value == "General" && !loading)
+        {
+            settingLogin = true;
+            StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
+            settingLogin = false;
+        }
         LoadSection(value);
     }
 
@@ -557,6 +600,25 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     {
         if (!loading) host.Save(s => s.Language = value.Trim());
     }
+
+    [RelayCommand] void PickLiveTranscript(string when) => LiveTranscript = when == "live";
+
+    partial void OnLiveTranscriptChanged(bool value)
+    {
+        OnPropertyChanged(nameof(AfterClass));
+        if (loading) return;
+        host.Save(s => s.LiveTranscript = value);
+        LiveTranscriptLine = LiveTranscriptWords(host.Recorder.Current, value);
+    }
+
+    /// <summary>The line under "When it's written down": nothing, unless the lecture recording now started the other
+    /// way, which it keeps (a lecture is written down one way, start to end).</summary>
+    public static string LiveTranscriptWords(Lecture? recording, bool live) => recording switch
+    {
+        { AfterClass: true } when live => "The lecture recording now is still written down after class. The next one is written down as you record.",
+        { AfterClass: false } when !live => "The lecture recording now is still written down as you record. The next one is written down after class.",
+        _ => "",
+    };
 
     partial void OnComputerAudioChanged(bool value)
     {
@@ -606,9 +668,59 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         }
     }
 
+    partial void OnAutoUpdateHereChanged(bool value)
+    {
+        if (loading) return;
+        var c = host.Client();
+        c.AutoUpdate = value;
+        host.SaveClient(c);
+    }
+
+    /// <summary>Check now: is a newer version out for this laptop? Says so without installing it.</summary>
+    [RelayCommand]
+    async Task CheckUpdateHere()
+    {
+        if (UpdateHereBusy) return;
+        if (updater() is not { } updates)
+        {
+            UpdateHereLine = NoticeWords.UpdateNowLine(AppUpdates.Off);
+            return;
+        }
+        UpdateHereBusy = true;
+        UpdateHereLine = "Looking for a new version…";
+        try
+        {
+            (UpdateHereLine, CanUpdateHere) = NoticeWords.UpdateChecked(await Task.Run(updates.CheckAsync), Version);
+        }
+        finally
+        {
+            UpdateHereBusy = false;
+        }
+    }
+
+    /// <summary>Update now: this laptop installs the newest version (once a lecture being recorded is over) and opens again.</summary>
+    [RelayCommand]
+    async Task UpdateHereNow()
+    {
+        if (UpdateHereBusy || updater() is not { } updates) return;
+        UpdateHereBusy = true;
+        CanUpdateHere = false;
+        UpdateHereLine = "Downloading the new version…";
+        try
+        {
+            UpdateHereLine = NoticeWords.UpdateNowLine(await Task.Run(updates.NowAsync));
+        }
+        finally
+        {
+            UpdateHereBusy = false;
+        }
+    }
+
     partial void OnKeepAudioChanged(string value)
     {
-        if (!loading && int.TryParse(value, out int days) && days >= 0) host.Save(s => s.KeepAudioDays = days);
+        if (loading || !int.TryParse(value, out int days) || days < 0) return;
+        host.Save(s => s.KeepAudioDays = days);
+        host.PruneAudioSoon();
     }
 
     partial void OnDisplayNameChanged(string value)
