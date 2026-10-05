@@ -175,11 +175,6 @@
               <c:Icon Glyph="dock_to_right" Size="19" Foreground="{DynamicResource Fg}" RenderTransform="scale(-1,1)" />
             </Button>
           </c:Glass>
-          <c:Glass Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}" IsVisible="{Binding CanToggleList}">
-            <Button Name="ToggleList" Classes="round" Command="{Binding ToggleListCommand}" ToolTip.Tip="Show or hide the list (⌃⌘L)" AutomationProperties.Name="Toggle list">
-              <c:Icon Glyph="notes" Size="19" Foreground="{DynamicResource Fg}" />
-            </Button>
-          </c:Glass>
           <c:Glass Height="36" CornerRadius="18" Padding="1,0" BoxShadow="{DynamicResource CtlGlassShadow}">
             <StackPanel Orientation="Horizontal">
               <Button Classes="tool" Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack}" ToolTip.Tip="Back (⌘[)" AutomationProperties.Name="Back">
@@ -249,14 +244,6 @@
                   <TextBlock Grid.Column="2" Classes="title" Text="Home" FontSize="13" VerticalAlignment="Center" />
                 </Grid>
               </Button>
-              <Button Classes="cls" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
-                      Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
-                <Grid ColumnDefinitions="Auto,8,*,10,Auto">
-                  <c:Icon Glyph="event_upcoming" Size="17" Width="16" Foreground="{DynamicResource AccentText}" />
-                  <TextBlock Grid.Column="2" Classes="title" Text="Due" FontSize="13" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="4" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" FontSize="13" VerticalAlignment="Center" />
-                </Grid>
-              </Button>
               <TextBlock Classes="classes" Text="Classes" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
               <ItemsControl ItemsSource="{Binding Classes}">
                 <ItemsControl.ItemsPanel>
@@ -323,12 +310,19 @@
                   </Button>
                 </StackPanel>
               </StackPanel>
-              <!-- Attach to the class (drop files on the list, too): its files show under the name once there are some -->
-              <Button Grid.Column="1" Classes="tool" VerticalAlignment="Center" Command="{Binding ClassFiles.AttachCommand, FallbackValue={x:Null}}"
-                      IsVisible="{Binding HasClassFiles}" ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the list)"
-                      AutomationProperties.Name="Attach to class">
-                <c:Icon Glyph="attach_file" Size="17" Foreground="{DynamicResource Fg2}" />
-              </Button>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Attach to the class (drop files on the list, too): its files show under the name once there are some -->
+                <Button Classes="tool" VerticalAlignment="Center" Command="{Binding ClassFiles.AttachCommand, FallbackValue={x:Null}}"
+                        IsVisible="{Binding HasClassFiles}" ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the list)"
+                        AutomationProperties.Name="Attach to class">
+                  <c:Icon Glyph="attach_file" Size="17" Foreground="{DynamicResource Fg2}" />
+                </Button>
+                <!-- Fold the list away, giving the page its room -->
+                <Button Name="HideList" Classes="tool" VerticalAlignment="Center" Command="{Binding ToggleListCommand}" IsVisible="{Binding CanToggleList}"
+                        ToolTip.Tip="Hide the list (⌃⌘L)" AutomationProperties.Name="Hide the list">
+                  <c:Icon Glyph="chevron_left" Size="18" Foreground="{DynamicResource Fg2}" />
+                </Button>
+              </StackPanel>
             </Grid>
           </Border>
           <!-- A Canvas class: switch between its lectures (the list below) and Canvas's own lists -->
@@ -413,6 +407,14 @@
 
         <!-- The right: the lecture, an assignment, or a Canvas page -->
         <Panel Grid.Column="{Binding DetailColumn}" Grid.ColumnSpan="{Binding ColumnSpan}" IsVisible="{Binding ShowDetailColumn}">
+          <!-- The list folded away: one arrow at the page's left edge brings it back -->
+          <Button Name="ShowList" Classes="tool" ZIndex="5" IsVisible="{Binding ShowListOpener}" Command="{Binding ToggleListCommand}"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,14,0,0" ToolTip.Tip="Show the list (⌃⌘L)" AutomationProperties.Name="Show the list">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+              <c:Icon Glyph="chevron_right" Size="18" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+              <TextBlock Text="List" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" Margin="0,0,6,0" />
+            </StackPanel>
+          </Button>
           <Border Width="1" Background="{DynamicResource Sep}" HorizontalAlignment="Left" IsVisible="{Binding !Narrow}" />
           <Panel IsVisible="{Binding ShowAssignment}" Margin="1,0,0,0">
             <v:MacAssignment DataContext="{Binding Assignment}" Classes="inwindow" />

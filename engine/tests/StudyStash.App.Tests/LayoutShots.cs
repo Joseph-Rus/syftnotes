@@ -13,7 +13,7 @@ public class LayoutShots
         var m = Demo.Library();
         m.Notes = AiDemo.LectureNotes(Demo.Notes);
         m.Ask = AiDemo.AskIdle();
-        m.SidebarHidden = true;
+        m.SidebarHidden = !listHidden;
         m.ListHidden = listHidden;
         return m;
     }
@@ -28,6 +28,12 @@ public class LayoutShots
             Shot.Take($"mac-04-{name}", SkinKind.Mac, ThemeVariant.Dark, () => new MacLibrary { DataContext = Lecture(list), Width = 1280, Height = 800 }, size: size);
             Shot.Take($"win-04-{name}", SkinKind.Win, ThemeVariant.Light, () => new WinLibrary { DataContext = Lecture(list), Width = 1280, Height = 800 }, size: size);
         }
+        var home = Demo.Overview();
+        home.Overview!.OnRecord = () => { };
+        home.Overview.Ask = AiDemo.AskIdle();
+        home.Overview.Ask.OnlyScopes("all");
+        Shot.Take("mac-19-home", SkinKind.Mac, ThemeVariant.Dark, () => new MacLibrary { DataContext = home, Width = 1280, Height = 800 }, size: size);
+        Shot.Take("win-19-home", SkinKind.Win, ThemeVariant.Light, () => new WinLibrary { DataContext = home, Width = 1280, Height = 800 }, size: size);
         Shot.Take("mac-19-class-home", SkinKind.Mac, ThemeVariant.Dark, () => new MacLibrary { DataContext = Demo.Overview("CS 101"), Width = 1280, Height = 900 }, size: new Avalonia.Size(1408, 1028));
     }
 

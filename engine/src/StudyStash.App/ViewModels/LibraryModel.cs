@@ -315,6 +315,7 @@ public sealed partial class LibraryModel : ObservableObject
         if (newValue is not null) newValue.Narrow = Narrow;
         OnPropertyChanged(nameof(ShowOverview));
         OnPropertyChanged(nameof(CanToggleList));
+        OnPropertyChanged(nameof(ShowListOpener));
         OnPropertyChanged(nameof(ShowListColumn));
         OnPropertyChanged(nameof(ShowDetailColumn));
         OnPropertyChanged(nameof(ShowLectureTools));
@@ -328,6 +329,7 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(ListWidth));
         OnPropertyChanged(nameof(DetailColumn));
         OnPropertyChanged(nameof(CanToggleList));
+        OnPropertyChanged(nameof(ShowListOpener));
         OnPropertyChanged(nameof(ColumnSpan));
         OnPropertyChanged(nameof(ShowListColumn));
         OnPropertyChanged(nameof(ShowDetailColumn));
@@ -564,10 +566,13 @@ public sealed partial class LibraryModel : ObservableObject
     [ObservableProperty] public partial bool ListHidden { get; set; }
     /// <summary>The list button: wherever there's a list beside a page (not on Home or a class's home, nor narrow).</summary>
     public bool CanToggleList => Overview is null && !Narrow;
+    /// <summary>The list is folded away: a small arrow at the page's left edge brings it back.</summary>
+    public bool ShowListOpener => ListHidden && CanToggleList;
     public Action<bool>? OnListToggled { get; set; }
     partial void OnListHiddenChanged(bool value)
     {
         OnPropertyChanged(nameof(ShowListColumn));
+        OnPropertyChanged(nameof(ShowListOpener));
         OnListToggled?.Invoke(value);
     }
     [RelayCommand] void ToggleList() => ListHidden = !ListHidden;
