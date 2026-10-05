@@ -111,7 +111,7 @@ public sealed partial class AiAccessModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(WebToggleEnabled))]
     public partial bool HasPassword { get; set; }
 
-    // Claude (desktop and web): whether Claude can reach this library over the internet, through Tailscale Funnel
+    // Claude on the web and phone: whether Claude can reach this library over the internet, through Tailscale Funnel
     // (task 4's ClaudeReach/ReachCheck, read through ToolAccessInfo.Web). WebOn is the switch Settings shows; the
     // library is the truth, so every change round-trips through it before the switch visibly moves.
     [ObservableProperty]

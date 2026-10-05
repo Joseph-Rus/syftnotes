@@ -1216,7 +1216,7 @@ public class AiAccessModelTests
         Assert.Empty(model.Connected);
     }
 
-    // Claude (desktop and web): the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
+    // Claude on the web and phone: the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
     // (task 4). FakeAiLibrary's unscripted SetWebAsync turns Funnel on at "https://mini.tail1234.ts.net" and answers
     // reachable straight away; OnSetWeb/OnCheckWeb script something else (a problem, a slow check, an older library).
 

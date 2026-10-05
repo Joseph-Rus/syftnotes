@@ -694,7 +694,7 @@ public class AiShots
             Shot.Take("win-14-ai-tool-access", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel() }));
     }
 
-    // --- 14: the "Claude (desktop and web)" card (connectors task 5): off, on and answering, and a Funnel problem.
+    // --- 14: the "Claude on the web and phone" card (connectors task 5): off, on and answering, and a Funnel problem.
 
     [AvaloniaFact]
     public void Mac_ai_tool_access_claude_off()
