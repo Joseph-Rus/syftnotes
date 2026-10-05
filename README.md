@@ -155,9 +155,9 @@ irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | 
 
 ## AI engines
 
-Pick who writes your notes, who draws their diagrams and who answers your questions in setup or in
+Pick who writes your notes and who answers your questions in setup or in
 **Settings → Your library → AI engines** — one engine for everything, or a different one for each
-job. The engines run on your library's computer (with one computer, that's your laptop). Without an
+job. The same page switches the rich notes (below) and sets how fast Claude Code works. The engines run on your library's computer (with one computer, that's your laptop). Without an
 engine, lectures are still filed and keep their transcripts. With Claude Code, Codex or Gemini, a
 lecture's transcript (and, for its diagrams, its notes) goes to that AI under your own account;
 with Ollama nothing leaves your computer.
@@ -186,7 +186,14 @@ npm install -g @openai/codex                        # Mac or Windows (or on a Ma
 Setup's notes step shows these commands with a Copy button, opens Terminal for you, and has
 **Check again** to pick the engine up once it's installed and signed in.
 
-**Draws diagrams** is a pick of its own. Your notes never wait for it: a lecture is filed, readable
+**Rich notes** are the diagrams, formula plots and drawings a lecture's notes get after they're written.
+They're on, as they always were; **Settings → AI engines → Rich notes** switches them off (plain
+notes only, and no second call to your AI at all) or one kind at a time: **Diagrams** (flowcharts, state
+and sequence diagrams, timelines, mind maps), **Formula plots** and **Drawings** (labelled figures of
+what a lecture describes). A kind that's switched off is never asked of the AI — its part of the
+designer's brief isn't even sent — and one the designer draws anyway is left out. Switching off the last
+kind switches rich notes off. **Drawn by** (below) is their pick of who designs them; the old *Off*
+choice is the Rich notes switch now. Your notes never wait for it: a lecture is filed, readable
 in the app, on your phone and in Ask, the moment its notes are written, and its diagrams arrive a
 few minutes later, put into the notes where they go (an open lecture's byline says *Adding
 diagrams…* meanwhile, then *Diagrams added*; the page stays where you're reading). Once a lecture's
@@ -231,8 +238,31 @@ two for a long one. Parts under a CC BY licence are credited under the figure.
   already going to.
 - **An engine of your own choice** uses its strongest model; one that isn't signed in or is over
   its limit falls back to Ollama when **Use Ollama instead** is on, as the notes do.
-- **Same as notes** has the notes engine draw them as it writes, the way it did before 0.10.1;
-  **Off** leaves them out.
+- **Same as notes** has the notes engine draw them as it writes, the way it did before 0.10.1
+  (flowcharts, and drawings where its engine draws them; never plots).
+
+**Claude Code speed** sets how fast Claude Code writes the notes and designs the rich notes (the
+engine's other jobs, sorting and answers, never change). It's the same Claude Code run as before,
+told one thing more, so a library's other engines aren't touched:
+
+- **Standard**: as it's set up — the notes with the model you picked (or Claude Code's own default),
+  the designer on Opus at high effort.
+- **Fast mode**: Claude Code's own fast mode (`claude -p --settings '{"fastMode":true}'`, for that run
+  only; it needs Claude Code 2.1.205 or later). It's the same Opus (5.5) with up to 2.5 times faster
+  output, so the notes and the diagrams are as deep as ever, only sooner, but it's **billed at a higher
+  rate** (Claude Code's own estimate came to about twice a standard run's) and, on a Pro, Max, Team or Enterprise plan, **only from your
+  Claude account's usage credits**, which must be turned on (Settings → Usage on claude.ai) and are used
+  even while your plan has usage left. A Claude account that can't use it (no usage credits, an
+  organization that hasn't turned it on) just runs at its normal speed. A notes model you picked
+  as Sonnet or Haiku stays as picked: fast mode is Opus's. The composer (Sonnet) never needs it.
+- **Quicker model**: Sonnet at low effort for the notes and at medium for the designer. Quicker and lighter
+  on your plan than Opus, with shallower notes and diagrams (a smaller model decides less well what's worth
+  drawing).
+
+On a 3,300-character test lecture on a Mac with Claude Code 2.1.289, the notes took 29.7 s
+(3,475 tokens out) in standard speed and 12.3 s (3,757) in fast mode, and the designer 26.2 s (2,476) and
+6.5 s (1,533): 56 s for both, down to 19 s. Claude Code estimated the cost at $0.33 and $0.66 for the
+notes, and $0.21 and $0.37 for the designer.
 
 A diagram that doesn't draw goes back once to be fixed and is otherwise left out, as is one with
 too many boxes or words the lecture never said. Each one kept is laid out at the notes' width and
@@ -266,7 +296,7 @@ the notes, in a quick answer and in the Ask chat:
   columns of its groups with square arrows between them; Mermaid state diagrams (automata too),
   sequence diagrams, timelines and mind maps are drawn natively as well; something spatial (a
   structure, a physics setup, a circuit) comes back as a sanitised SVG. They're designed after the notes by the
-  engine that **Draws diagrams** (see [AI engines](#ai-engines)), each under a bold title with a
+  engine that draws them (**Rich notes → Drawn by**, see [AI engines](#ai-engines)), each under a bold title with a
   caption and the moment of the lecture it comes from; rewriting a lecture's notes designs them
   again rather than adding more. Either kind opens larger on a click, and a diagram Study Stash
   can't draw shows its source with a plain reason instead of failing.
