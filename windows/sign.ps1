@@ -20,6 +20,13 @@ param(
 )
 $ErrorActionPreference = "Stop"
 
+# Windows PowerShell started from PowerShell 7 (a pwsh CI step, and Inno's SignTool under it) inherits 7's module
+# folders first, and then can't load 7's Microsoft.PowerShell.Security for Get-AuthenticodeSignature ("the module could
+# not be loaded"). Load its own, by path.
+if ($PSVersionTable.PSEdition -eq "Desktop") {
+  Import-Module (Join-Path $PSHOME "Modules\Microsoft.PowerShell.Security\Microsoft.PowerShell.Security.psd1")
+}
+
 function Test-Env([string[]]$Names) {
   foreach ($n in $Names) { if (-not [Environment]::GetEnvironmentVariable($n)) { return $false } }
   return $true
