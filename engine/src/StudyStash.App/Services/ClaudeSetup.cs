@@ -253,9 +253,12 @@ public sealed class ClaudeSetup
         if (string.IsNullOrWhiteSpace(before)) root = [];
         else if (JsonOf(before, lenient: false) is { } strict) root = strict;
         else
+        {
+            string byHand = add ? "Add the setup below to it by hand." : $"Take {ClaudeTools.ServerName} out of its mcpServers by hand.";
             return new(false, JsonOf(before, lenient: true) is not null
-                ? $"{name}'s settings file has comments in it, which rewriting it would lose, so it's left alone. Add the setup below to it by hand."
-                : $"{name}'s settings file isn't valid JSON, so it's left alone. Fix it, or add the setup below to it by hand.", path, null, add ? written : null);
+                ? $"{name}'s settings file has comments in it, which rewriting it would lose, so it's left alone. {byHand}"
+                : $"{name}'s settings file isn't valid JSON, so it's left alone. Fix it, or {char.ToLowerInvariant(byHand[0])}{byHand[1..]}", path, null, add ? written : null);
+        }
         if (root["mcpServers"] is { } existing && existing is not JsonObject)
             return new(false, $"{name}'s settings have mcpServers in a shape Study Stash doesn't know, so they're left alone.", path, null, add ? written : null);
         var servers = root["mcpServers"] as JsonObject;
@@ -284,7 +287,7 @@ public sealed class ClaudeSetup
     AiAppChange ChangeToml(string name, string path, bool add, string written)
     {
         string before = File.Exists(path) ? File.ReadAllText(path) : "";
-        string Manual(string why) => why + (add ? " Add the setup below to it by hand." : "");
+        string Manual(string why) => why + (add ? " Add the setup below to it by hand." : $" Take [mcp_servers.{ClaudeTools.ServerName}] out of it by hand.");
         if (before.Trim().Length > 0 && TomlOf(before) is null)
             return new(false, Manual($"{name}'s config.toml isn't valid TOML, so it's left alone."), path, null, add ? written : null);
         string nl = before.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
