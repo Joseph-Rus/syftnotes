@@ -38,6 +38,12 @@ SolidCompression=yes
 WizardStyle=modern
 CloseApplications=force
 RestartApplications=no
+#ifdef SignInstaller
+; windows\sign-release.ps1 passes /DSignInstaller and the sign tool's command: Setup.exe, the uninstaller and any
+; temporary copy of it that Setup makes are all signed (docs/signing.md).
+SignTool=studystash
+SignedUninstaller=yes
+#endif
 
 [Tasks]
 Name: "desktopicon"; Description: "Add a desktop icon"; Flags: unchecked
