@@ -23,6 +23,12 @@ A third, about 2 minutes 12 seconds, is a full demo of the app, from the first l
 - `out/demo.mp4`: 1920×1080, 30 fps
 - `out/demo-vertical.mp4`: 1080×1920
 
+And a 57.5-second Instagram reel cut from the demo, fast, inside Reels' safe area (see
+[The Instagram reel](#the-instagram-reel) below).
+
+- `out/reel-silent.mp4`: 1080×1920, 30 fps, the picture alone, with `ELEVENLABS-reel.md` (Adam's script, the effects' prompts and where each goes)
+- `out/reel-cover.png`: its cover
+
 ## Preview and render
 
 You need Node.js 18 or later.
@@ -176,6 +182,23 @@ npm run demo-cues            # → CUES.md, every scene, line and effect at its 
 
 The times are the plan's; a line that runs long stretches its scene and moves what follows (`src/demo/timeline.json`,
 printed by `npm run demo-audio`).
+
+## The Instagram reel
+
+`Reel`, in `src/reel/`: the demo's own scenes, each given a shorter cut as a prop (its moments from `src/reel/plan.json`,
+quicker pointer paths and reveals, fewer steps), in the demo's order with Canvas and Settings kept, and each laid inside
+the area Instagram doesn't draw over: nothing that matters in the top 220 px, the bottom 420 px or the right 130 px.
+Record looks close at the Mac's top right corner behind its black bezel, so the menu bar sits below Instagram's top bar.
+Without a cut every scene is the demo's, frame for frame. The Reel's `guides` prop (in the Studio) shades those areas.
+
+```sh
+npm run render:reel:silent   # → out/reel-silent.mp4, the picture alone (no audio stream)
+npm run reel-cues            # → ELEVENLABS-reel.md: Adam's script, the effects' prompts, when each line and effect starts
+npm run reelcover            # → out/reel-cover.png, 1080×1920, inside the safe area and the grid's 3:4
+```
+
+The plan's times are final: nothing stretches to fit a line, so the render and the prompt sheet always agree. The reel
+has no sound of its own; Joey lays Adam's voice and the effects under it in an editor.
 
 **What's real, what's drawn.** Everything is drawn in code to match the app's own screenshot tests
 (`engine/tests/StudyStash.App.Tests`: `mac-05-setup-guided-*`, `mac-01-dropdown`, `mac-02-recorder`, `mac-12-toast`,

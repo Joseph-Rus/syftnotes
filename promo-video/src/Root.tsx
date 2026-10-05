@@ -31,10 +31,8 @@ export const Root: React.FC = () => (
     <Composition id="DemoSilent" component={Demo} defaultProps={{silent: true}} durationInFrames={TOTAL_FRAMES3} fps={FPS} width={1920} height={1080} />
     <Composition id="DemoSilentVertical" component={Demo} defaultProps={{silent: true}} durationInFrames={TOTAL_FRAMES3} fps={FPS} width={1080} height={1920} />
     <Still id="KofiCard3" component={KofiCard3} width={1200} height={630} />
-    {/* The Instagram reel (src/reel): the demo, fast, under a minute, inside Reels' safe area (CUES-reel.md). */}
-    <Composition id="Reel" component={Reel} defaultProps={{silent: false, guides: false}} durationInFrames={REEL_TOTAL} fps={REEL_FPS} width={REEL_W} height={REEL_H} />
-    {/* The same with Instagram's overlays shaded, for checking where things sit. */}
-    <Composition id="ReelGuides" component={Reel} defaultProps={{silent: true, guides: true}} durationInFrames={REEL_TOTAL} fps={REEL_FPS} width={REEL_W} height={REEL_H} />
+    {/* The Instagram reel (src/reel): the demo, fast, under a minute, inside Reels' safe area; picture only (ELEVENLABS-reel.md). */}
+    <Composition id="Reel" component={Reel} defaultProps={{guides: false}} durationInFrames={REEL_TOTAL} fps={REEL_FPS} width={REEL_W} height={REEL_H} />
     <Still id="ReelCover" component={ReelCover} width={REEL_W} height={REEL_H} />
   </>
 );

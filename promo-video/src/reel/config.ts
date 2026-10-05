@@ -1,11 +1,11 @@
 import plan from './plan.json';
-import sound from './sound.json';
 import {Cut, DemoScene} from '../demo/config';
 import {StageFit} from '../promo2/ui';
 
-// The Instagram reel: a fast cut of the demo, under a minute (57.5 s), 1080×1920 at 30 fps (src/reel/plan.json is its contract,
-// and its times are final). It plays the demo's own scenes, each given a Cut: its moments from the plan, and its place
-// inside Instagram's safe area.
+// The Instagram reel: a fast cut of the demo, under a minute (57.5 s), 1080×1920 at 30 fps, picture only (Joey lays
+// Adam's voice and the effects under it himself, by ELEVENLABS-reel.md). src/reel/plan.json is its contract and its
+// times are final. It plays the demo's own scenes, each given a Cut: its moments from the plan, and its place inside
+// Instagram's safe area.
 
 export const FPS = 30;
 export const WIDTH = 1080;
@@ -51,9 +51,3 @@ export const cutOf = (id: DemoScene): Cut => {
   }
   return {at, len, length: s.duration};
 };
-
-// The sound, once `npm run reel-audio` has made it from Joey's files (src/reel/sound.json); until then, none.
-export type Voice = {id: DemoScene; from: number; frames: number; file: string};
-export type Effect = {key: string; sfx: string; from: number; frames: number | null; file: string};
-export const VOICE = sound.voice as Voice[];
-export const EFFECTS = sound.effects as Effect[];

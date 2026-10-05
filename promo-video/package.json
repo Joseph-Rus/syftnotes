@@ -19,7 +19,7 @@
     "render3:silent": "remotion render src/index.ts DemoSilentVertical out/demo-silent-vertical.mp4 --muted",
     "render3:silent:landscape": "remotion render src/index.ts DemoSilent out/demo-silent.mp4 --muted",
     "card3": "remotion still src/index.ts KofiCard3 out/ko-fi-preview-3.png",
-    "render:reel:silent": "remotion render src/index.ts Reel out/reel-silent.mp4 --muted --props='{\"silent\":true}'",
+    "render:reel:silent": "remotion render src/index.ts Reel out/reel-silent.mp4 --muted",
     "reelcover": "remotion still src/index.ts ReelCover out/reel-cover.png",
     "typecheck": "tsc --noEmit",
     "audio": "python3 scripts/make_audio.py",

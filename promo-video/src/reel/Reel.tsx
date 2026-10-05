@@ -1,12 +1,11 @@
 import React from 'react';
-import {AbsoluteFill, Audio, interpolate, Sequence, staticFile} from 'remotion';
+import {AbsoluteFill} from 'remotion';
 import {linearTiming, TransitionSeries} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
 import {SfxName, SfxSetProvider} from '../components/Sfx';
 import {night} from '../promo2/scenes/Bookends';
 import {StageFitContext} from '../promo2/ui';
 import {Cut, DemoScene} from '../demo/config';
-import {SFX_GAIN, VOICE_VOLUME} from '../demo/sound';
 import {Opener} from '../demo/scenes/Opener';
 import {Record} from '../demo/scenes/Record';
 import {Notes} from '../demo/scenes/Notes';
@@ -18,7 +17,7 @@ import {Canvas} from '../demo/scenes/Canvas';
 import {Phone} from '../demo/scenes/Phone';
 import {Settings} from '../demo/scenes/Settings';
 import {End} from '../demo/scenes/End';
-import {cutOf, EFFECTS, FIT, SCENES, TRANSITION, VOICE} from './config';
+import {cutOf, FIT, SCENES, TRANSITION} from './config';
 import {ReelTitle, SafeGuides} from './Title';
 
 const SCENE: Partial<Record<DemoScene, React.FC<{cut?: Cut}>>> = {
@@ -36,39 +35,16 @@ const SCENE: Partial<Record<DemoScene, React.FC<{cut?: Cut}>>> = {
 };
 const CUTS = Object.fromEntries(SCENES.map((s) => [s.id, cutOf(s.id)])) as Record<DemoScene, Cut>;
 
-// The pointer's own clicks (the shared Cursor) are silenced: every sound is placed by the plan.
+// Picture only: the pointer's own clicks (the shared Cursor) are silenced too, so the reel has no sound at all.
 const NAMES: SfxName[] = ['click', 'key1', 'key2', 'key3', 'pop', 'whoosh', 'marker', 'chime-record', 'chime-filed', 'tick', 'ding'];
 const SILENT = {folder: 'audio/sfx2', gain: Object.fromEntries(NAMES.map((n) => [n, null]))};
-const clamp = {extrapolateLeft: 'clamp' as const, extrapolateRight: 'clamp' as const};
-
-/** Adam's lines and the effects, once `npm run reel-audio` has placed Joey's files (src/reel/sound.json). */
-const Sound: React.FC = () => (
-  <>
-    {EFFECTS.map((e) => {
-      const gain = SFX_GAIN[e.sfx] ?? 0;
-      if (gain <= 0) return null;
-      const frames = e.frames ?? 180;
-      const volume = e.frames ? (f: number) => gain * interpolate(f, [frames - 6, frames], [1, 0], clamp) : gain;
-      return (
-        <Sequence key={e.key} from={e.from} durationInFrames={frames} layout="none">
-          <Audio src={staticFile(e.file)} volume={volume} />
-        </Sequence>
-      );
-    })}
-    {VOICE.map((v) => (
-      <Sequence key={v.id} from={v.from} durationInFrames={v.frames + 10} layout="none">
-        <Audio src={staticFile(v.file)} volume={VOICE_VOLUME} />
-      </Sequence>
-    ))}
-  </>
-);
 
 /**
  * The Instagram reel (src/reel/plan.json): the demo's own scenes, each cut shorter and laid inside Instagram's safe
- * area, with the reel's own headlines. `silent` leaves the sound out (it's rendered with --muted as well, so the file
- * has no audio stream at all); `guides` shades where Instagram draws over a reel.
+ * area, with the reel's own headlines. Picture only (rendered with --muted, so the file has no audio stream at all).
+ * `guides` shades where Instagram draws over a reel, for checking a frame in the Studio.
  */
-export const Reel: React.FC<{silent?: boolean; guides?: boolean}> = ({silent = false, guides = false}) => (
+export const Reel: React.FC<{guides?: boolean}> = ({guides = false}) => (
   <SfxSetProvider value={SILENT}>
     <StageFitContext.Provider value={FIT}>
       <AbsoluteFill style={{backgroundColor: night.ground}}>
@@ -84,7 +60,6 @@ export const Reel: React.FC<{silent?: boolean; guides?: boolean}> = ({silent = f
             ];
           })}
         </TransitionSeries>
-        {silent ? null : <Sound />}
         {guides ? <SafeGuides /> : null}
       </AbsoluteFill>
     </StageFitContext.Provider>

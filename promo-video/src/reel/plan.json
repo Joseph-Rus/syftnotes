@@ -1,5 +1,5 @@
 {
-  "about": "The Instagram reel: a fast cut of the demo (src/demo), 1080×1920 at 30 fps, under a minute. Each scene starts at `start` (seconds, the start of its cross-fade in), Adam's line at `vo`; every effect is at `at` (seconds into the reel) and `moments` are the scenes' silent moments. These times are final: nothing is stretched to fit a line, so the picture never moves under a sound laid by CUES-reel.md. `npm run reel-cues` writes the cue sheet from this file.",
+  "about": "The Instagram reel: a fast cut of the demo (src/demo), 1080×1920 at 30 fps, under a minute. Each scene starts at `start` (seconds, the start of its cross-fade in), Adam's line at `vo`; every effect is at `at` (seconds into the reel) and `moments` are the scenes' silent moments. These times are final: nothing is stretched to fit a line, so the picture never moves under a sound laid by ELEVENLABS-reel.md, which `npm run reel-cues` writes from this file.",
   "fps": 30,
   "transition": 10,
   "end": 57.5,

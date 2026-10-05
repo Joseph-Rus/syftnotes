@@ -37,7 +37,7 @@ export const ReelTitle: React.FC<{text: [string, string]; at: 'top' | 'bottom'; 
   );
 };
 
-/** Where Instagram draws over a reel, shaded (the ReelGuides composition, for checking a frame). */
+/** Where Instagram draws over a reel, shaded (the Reel's `guides` prop in the Studio, for checking a frame). */
 export const SafeGuides: React.FC = () => {
   const shade = 'rgba(255, 40, 80, 0.28)';
   return (
