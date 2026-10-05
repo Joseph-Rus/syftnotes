@@ -18,7 +18,7 @@ foreach ($f in $Files) {
     if ($signtool) { $timestamped = [bool]((& $signtool.FullName verify /pa /all /v $f 2>&1 | Out-String) -match "timestamped") }
   }
   if (-not $timestamped) {
-    if ($Rehearsal) { Write-Host "(warning: $f: PowerShell sees no timestamp)" } else { throw "$f has no secure timestamp" }
+    if ($Rehearsal) { Write-Host "(warning: ${f}: PowerShell sees no timestamp)" } else { throw "$f has no secure timestamp" }
   }
   if ($Rehearsal) {
     if ($sig.SignerCertificate.Thumbprint -ne $env:STUDYSTASH_REHEARSAL_THUMBPRINT) { throw "$f isn't signed by the rehearsal's certificate" }

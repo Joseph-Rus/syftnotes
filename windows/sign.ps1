@@ -66,7 +66,10 @@ try {
       if (-not $Dlib) { throw "sign.ps1: Azure.CodeSigning.Dlib.dll isn't in Microsoft.ArtifactSigning.Client $Version" }
     }
     $MetaPath = Join-Path $Work "artifact-signing-metadata.json"
-    @{ Endpoint = $env:WINDOWS_SIGNING_ENDPOINT; CodeSigningAccountName = $env:WINDOWS_SIGNING_ACCOUNT; CertificateProfileName = $env:WINDOWS_SIGNING_PROFILE } |
+    # Only the service principal's own credentials (AZURE_CLIENT_*) are tried; Microsoft's list of the others to skip.
+    $skip = @("ManagedIdentityCredential", "WorkloadIdentityCredential", "SharedTokenCacheCredential", "VisualStudioCredential", "VisualStudioCodeCredential",
+      "AzureCliCredential", "AzurePowerShellCredential", "AzureDeveloperCliCredential", "InteractiveBrowserCredential")
+    @{ Endpoint = $env:WINDOWS_SIGNING_ENDPOINT; CodeSigningAccountName = $env:WINDOWS_SIGNING_ACCOUNT; CertificateProfileName = $env:WINDOWS_SIGNING_PROFILE; ExcludeCredentials = $skip } |
       ConvertTo-Json | Set-Content -Path $MetaPath -Encoding ASCII
     $Timestamp = "http://timestamp.acs.microsoft.com"
     $Identity = @("/dlib", $Dlib.FullName, "/dmdf", $MetaPath)
