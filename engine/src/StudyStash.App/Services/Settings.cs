@@ -635,7 +635,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     partial void OnKeepAudioChanged(string value)
     {
-        if (!loading && int.TryParse(value, out int days) && days >= 0) host.Save(s => s.KeepAudioDays = days);
+        if (loading || !int.TryParse(value, out int days) || days < 0) return;
+        host.Save(s => s.KeepAudioDays = days);
+        host.PruneAudioSoon();
     }
 
     partial void OnDisplayNameChanged(string value)

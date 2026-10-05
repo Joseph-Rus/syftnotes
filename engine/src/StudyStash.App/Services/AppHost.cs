@@ -154,6 +154,9 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     readonly IMicPermissions mics;
     readonly List<Task> running = [];
     Timer? watchdog;
+    /// <summary>Drops old recordings' audio (Settings → Recording → Keep recordings): as the app starts, every
+    /// <see cref="PruneEvery"/> after, and <see cref="PruneAfterChange"/> after that setting changes.</summary>
+    Timer? pruning;
     int checking;
     KeepAwake? awake;
     readonly ModelSetting models;
@@ -524,13 +527,36 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         StartCalendars();
         // Voice memos sent from the phone are written down where lectures are recorded; a library-only computer can't.
         if (Settings.Role != AppRole.Library) running.Add(Task.Run(() => Memos.RunAsync(stop.Token)));
-        running.Add(Task.Run(() => Lectures.PruneAudio(Settings.KeepAudioDays, DateTimeOffset.Now)));
+        pruning = new Timer(_ => PruneAudio(), null, TimeSpan.Zero, PruneEvery);
         watchdog = new Timer(_ => CheckRecorder(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         // A download that quitting (or a closed laptop) cut short picks up where it stopped. A library-only
         // computer never records, so it never needs the model.
         if (Settings.SetupDone && Settings.Role != AppRole.Library && !ModelReady) _ = DownloadModelAsync();
         else EnsureSpeakerModel();
         if (Settings.Role != AppRole.Laptop && Settings.SetupDone) _ = RefreshLocalLibraryAsync();
+    }
+
+    /// <summary>How often old recordings' audio is looked for while the app runs: a Mac's app can run for weeks.</summary>
+    internal static readonly TimeSpan PruneEvery = TimeSpan.FromHours(6);
+
+    /// <summary>How long after Keep recordings changes the audio is looked at again: long enough that typing "14" is
+    /// never taken for "1" on the way.</summary>
+    internal TimeSpan PruneAfterChange { get; set; } = TimeSpan.FromMinutes(1);
+
+    /// <summary>Keep recordings changed: drop the audio it no longer keeps soon, rather than at the next look.</summary>
+    public void PruneAudioSoon() => pruning?.Change(PruneAfterChange, PruneEvery);
+
+    void PruneAudio()
+    {
+        try
+        {
+            int n = Lectures.PruneAudio(Settings.KeepAudioDays, DateTimeOffset.Now);
+            if (n > 0) log($"[app] removed the recordings of {n} filed lecture{(n == 1 ? "" : "s")} older than {Settings.KeepAudioDays} days (their notes and transcripts stay)");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            log($"[app] couldn't remove old recordings: {e.Message}");
+        }
     }
 
     /// <summary>Take this as this computer's own library: the one <see cref="LocalLibrary"/> shows from now on, stopped
@@ -1072,6 +1098,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         if (disposed) return;
         disposed = true;
         watchdog?.Dispose();
+        pruning?.Dispose();
         try
         {
             if (Recorder.Current is not null) StopRecording();
