@@ -159,12 +159,31 @@ public sealed class CaptionStitcher
 /// half minute at once, so the words are there within a second or two. These words are only for
 /// the recorder to show and to ask about; the transcript the notes are made from is the <see cref="TranscriptionWorker"/>'s,
 /// and <see cref="Merge"/> puts its lines first wherever it has got to.
+/// <para>Only where this computer is fast enough: every pass is timed against the sound it heard. A pass may take at
+/// most <see cref="MostRatio"/> of it (3 seconds of sound in under a second), or the live words couldn't keep up
+/// without a core to themselves. Until a pass has shown this computer is fast enough its words aren't shown, and a pass
+/// hears 2 seconds at most; after that a pass hears no more than about <see cref="PassBudget"/> seconds of work. One
+/// pass slower than the sound itself, or two slow passes in a row (three once it has kept up), and the live words
+/// are off (<see cref="TooSlow"/>): nothing hears
+/// them again, and the recorder shows the transcript's own lines, as it did before there were live words. A CI Intel
+/// Mac took 25 s over 17 s of sound (1.5×) while Whisper wrote the transcript on the same processor; an M3 Pro takes
+/// under 0.04× even with every core busy.</para>
 /// </summary>
 public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentSound?> recent, Func<Lecture, (IWordHearer Hearer, string Language)?> hearer,
     Action<string>? log = null)
 {
     /// <summary>Less new sound than this since the last pass waits for more.</summary>
     const double LeastNew = 0.5;
+    /// <summary>The most a pass may take, as a share of the sound it hears, for the live words to be on.</summary>
+    public const double MostRatio = 0.3;
+    /// <summary>How much sound a pass hears until this computer's speed is known.</summary>
+    public const double ProbeSeconds = 2;
+    /// <summary>About the longest a pass should take, once the speed is known: it hears no more than that much work.</summary>
+    public const double PassBudget = 1.5;
+    // The speed: seconds a pass takes for each second it hears, leaning to the slowest lately; null until timed.
+    double? ratio;
+    bool fastEnough;
+    int slowInARow;
     readonly Action<string> log = log ?? (_ => { });
     readonly Lock gate = new();
     CaptionStitcher? stitcher;
@@ -194,16 +213,38 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
     /// seconds the pass took), for the log; null until then.</summary>
     public (double At, double Took)? First { get; private set; }
 
-    /// <summary>The live words of lecture <paramref name="id"/> from <paramref name="from"/> seconds on; empty for any other.</summary>
+    /// <summary>Seconds, for timing passes (a test's own clock).</summary>
+    public Func<double> Clock { get; init; } = () => System.Diagnostics.Stopwatch.GetTimestamp() / (double)System.Diagnostics.Stopwatch.Frequency;
+
+    /// <summary>This computer is too slow for the live words: no pass is heard again.</summary>
+    public bool TooSlow { get; private set; }
+
+    /// <summary>The live words turned off for being too slow: how long a pass took for each second it heard.</summary>
+    public event Action<double>? FoundTooSlow;
+
+    /// <summary>How long a pass takes for each second of sound it hears on this computer (leaning to the slowest
+    /// lately); null until a pass has been timed.</summary>
+    public double? Ratio => ratio;
+
+    /// <summary>Passes heard so far (the self-test checks none are once the live words are off).</summary>
+    public int Passes { get; private set; }
+
+    /// <summary>The live words of lecture <paramref name="id"/> from <paramref name="from"/> seconds on; empty for any other,
+    /// and until this computer has shown it's fast enough.</summary>
     public IReadOnlyList<TimedWord> Words(string id, double from = 0)
     {
         lock (gate)
-            return stitcher is not null && lectureId == id ? [.. stitcher.Words.Where(w => w.Start >= from)] : [];
+            return stitcher is not null && lectureId == id && fastEnough && !TooSlow ? [.. stitcher.Words.Where(w => w.Start >= from)] : [];
     }
+
+    /// <summary>The most sound the next pass hears: a short one until the speed is known, then about
+    /// <see cref="PassBudget"/> seconds of work.</summary>
+    double MostToHear => ratio is not { } r ? ProbeSeconds : Math.Clamp(PassBudget / Math.Max(r, 1e-3), ProbeSeconds, CaptionStitcher.MostSeconds);
 
     /// <summary>One pass, if there's new sound to hear: true when it heard (or skipped quiet) some.</summary>
     public bool Step()
     {
+        if (TooSlow) return false;
         var l = recording();
         if (l is null || l.AfterClass || l.State != LectureState.Recording)
         {
@@ -217,17 +258,20 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
         var sound = recent(Math.Max(s.Next, l.TranscribedSeconds));
         if (sound is null || sound.End - heardTo < LeastNew) return false;
         double from = Math.Max(s.From(sound.End), sound.Start);
-        var samples = from > sound.Start ? sound.Samples[(int)Math.Round((from - sound.Start) * Sound.Rate)..] : sound.Samples;
-        from = Math.Max(from, sound.Start);
-        double end = sound.End;
+        // A pass hears from where the last left off, no more than this computer gets through in a moment: the rest
+        // is the next pass's.
+        double end = Math.Min(sound.End, from + MostToHear);
+        int skip = (int)Math.Round((from - sound.Start) * Sound.Rate);
+        var samples = sound.Samples[Math.Min(skip, sound.Samples.Length)..Math.Min(sound.Samples.Length, skip + (int)Math.Round((end - from) * Sound.Rate))];
         heardTo = end;
         if (new Chunk(0, samples).Silent())
         {
             lock (gate) s.Quiet(end);
             return true;
         }
-        var took = System.Diagnostics.Stopwatch.StartNew();
+        double started = Clock();
         IReadOnlyList<TimedWord> words;
+        Passes++;
         try
         {
             var heard = h.Hearer.Hear(samples, h.Language.Length > 0 ? h.Language : found, Keywords(l.ClassName));
@@ -242,20 +286,52 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             told = true;
             return false;
         }
+        double took = Clock() - started;
         lock (gate)
         {
             s.Heard(from, end, words);
             // What the transcript has written down is its to show: the live words before it aren't needed any more.
             s.Forget(l.TranscribedSeconds - 5);
         }
+        if (!Timed(took, end - from))
+        {
+            log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"[live] Cactus Whistle took {ratio:0.00}× the sound it heard on this computer (at most {MostRatio}× keeps up): the live words are off here, and the recorder shows the transcript's own lines"));
+            FoundTooSlow?.Invoke(ratio ?? 0);
+            Changed?.Invoke(l);
+            return true;
+        }
+        if (!fastEnough) return true;
         if (First is null && words.Count > 0)
         {
-            First = (from + words[0].Start, took.Elapsed.TotalSeconds);
+            First = (from + words[0].Start, took);
             log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
-                $"[live] {l.Id}: first words at {from + words[0].Start:0.0} s into the lecture, heard {end - from - words[0].Start:0.0} s later in a {took.Elapsed.TotalMilliseconds:0} ms pass"));
+                $"[live] {l.Id}: first words at {from + words[0].Start:0.0} s into the lecture, heard {sound.End - from - words[0].Start:0.0} s later in a {took * 1000:0} ms pass ({ratio:0.000}× the sound)"));
         }
         Changed?.Invoke(l);
         return true;
+    }
+
+    /// <summary>A pass took <paramref name="took"/> seconds over <paramref name="heard"/> seconds of sound: false once
+    /// that makes this computer too slow for the live words. A pass under a second of sound says little (it's mostly
+    /// the engine's own setup), so it isn't counted.</summary>
+    bool Timed(double took, double heard)
+    {
+        if (heard < 1) return true;
+        double r = took / heard;
+        ratio = ratio is { } before ? Math.Max(r, before * 0.7 + r * 0.3) : r;
+        if (r <= MostRatio)
+        {
+            slowInARow = 0;
+            fastEnough = true;
+            return true;
+        }
+        // Slower than the sound itself can never keep up: off at once. Slow but not that slow may be a moment's
+        // hiccup (the transcript's model loading): off after two in a row, or three once it has kept up.
+        if (r <= 1 && ++slowInARow < (fastEnough ? 3 : 2)) return true;
+        ratio = Math.Max(r, ratio ?? r);
+        TooSlow = true;
+        return false;
     }
 
     void Reset(Lecture? l)

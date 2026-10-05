@@ -50,6 +50,10 @@ public sealed class AppSettings
     /// after class: it only records, and is written down once it stops, which saves battery during the lecture. A
     /// change applies from the next lecture.</summary>
     public bool LiveTranscript { get; set; } = true;
+    /// <summary>The live words were too slow on this computer (Cactus Whistle took too long over the sound it heard),
+    /// with this app and engine: the app, the engine and the processor it was, so a new version tries again. Empty
+    /// when they weren't.</summary>
+    public string LiveWordsTooSlow { get; set; } = "";
     /// <summary>Filed lectures' audio is deleted after this many days (the notes and transcript stay). 0 keeps it.</summary>
     public int KeepAudioDays { get; set; } = 30;
     /// <summary>"Download as Markdown…" includes the transcript too (Settings' words: "Include transcripts").</summary>
@@ -261,6 +265,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Recorder = new Recorder(Lectures, OpenMic, log: this.log);
         Captions = new LiveCaptioner(() => Recorder.Current, Recorder.Recent, LiveHearer, this.log) { Watched = () => liveWordsWatched };
         Captions.Changed += l => LiveWords?.Invoke(l);
+        // Too slow here: remembered, so the next lecture doesn't try again until the app or the engine changes.
+        Captions.FoundTooSlow += _ => Save(s => s.LiveWordsTooSlow = LiveWordsKey);
+        if (Settings.LiveWordsTooSlow == LiveWordsKey)
+            this.log("[live] the live words are off on this computer: Cactus Whistle was too slow here with this version; the recorder shows the transcript's own lines");
         Whisper = new TranscriptionWorker(Lectures, whisper ?? LoadWhisper, () => Recorder.Current, this.log)
         {
             EngineName = () => engineName,
@@ -550,7 +558,11 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// <summary>The recorder can show what's said a second or two after it's said: Cactus Whistle is in this copy of the
     /// app, runs here, and reads the lecture's language. Otherwise it shows the transcript's own lines, which come about
     /// half a minute after.</summary>
-    public bool LiveWordsOn => !liveHearerFailed && WhistleTranscriber.Available && WhistleLanguages.Knows(Settings.Language);
+    public bool LiveWordsOn => !liveHearerFailed && !Captions.TooSlow && Settings.LiveWordsTooSlow != LiveWordsKey
+        && WhistleTranscriber.Available && WhistleLanguages.Knows(Settings.Language);
+
+    /// <summary>What the live words' speed was judged with: this app, its engine and the processor.</summary>
+    static string LiveWordsKey => $"{Engine.Version} {WhistleTranscriber.EngineBuild}";
 
     /// <summary>What hears the live words of <paramref name="l"/>, and in which language; null when they're off (see
     /// <see cref="LiveWordsOn"/>, or a lecture the transcript found to be in a language Whistle doesn't read).</summary>
