@@ -33,6 +33,10 @@ public sealed record AiProblemInfo(string Id, string Kind, string Engine, string
 
 public sealed record PullInfo(string Model, double Fraction, string Why);
 
+/// <summary>Rich notes as Settings shows them: <see cref="On"/> (diagrams, formula plots and drawings are added after the
+/// notes; off, the notes are plain and nothing more is asked of the AI) and each kind that's switched on while it is.</summary>
+public sealed record RichNotesInfo(bool On, bool Diagrams, bool Plots, bool Drawings);
+
 public sealed record AiOverview(List<EngineInfo> Engines, string Notes, string Ask, bool Fallback, List<AiProblemInfo> Problems)
 {
     public PullInfo? Pulling { get; init; }
@@ -40,6 +44,11 @@ public sealed record AiOverview(List<EngineInfo> Engines, string Notes, string A
     public string Diagrams { get; init; } = "";
     /// <summary>The engine that choice comes to right now on the library ("" when nobody draws them).</summary>
     public string DiagramsBy { get; init; } = "";
+    /// <summary>The rich notes switches; null from a library too old to have them.</summary>
+    public RichNotesInfo? Rich { get; init; }
+    /// <summary>How fast Claude Code writes the notes and designs the rich notes: standard | fast | quick (<see cref="AiSpeed"/>;
+    /// "" from a library too old to have it).</summary>
+    public string Speed { get; init; } = "";
 }
 
 /// <summary>What an action said, and the library's state right after doing it.</summary>
@@ -114,6 +123,10 @@ public interface IAiLibrary
 {
     Task<AiOverview?> EnginesAsync();
     Task<AiOverview?> DefaultsAsync(string? notes = null, string? ask = null, bool? fallback = null, string? diagrams = null);
+    /// <summary>The rich notes switches and Claude Code's speed: whatever is given is changed (a library too old to have them
+    /// answers null).</summary>
+    Task<AiOverview?> RichAsync(bool? on = null, bool? diagrams = null, bool? plots = null, bool? drawings = null, string? speed = null) =>
+        Task.FromResult<AiOverview?>(null);
     Task<AiSaid?> StartAsync(string engine);
     Task<AiSaid?> DownloadAsync(string engine);
     Task<AiSaid?> SignInAsync(string engine);
@@ -194,6 +207,17 @@ public sealed class AiRemote(string serverUrl, string key, HttpClient? http = nu
         if (ask is not null) body["ask"] = ask;
         if (fallback is not null) body["fallback"] = fallback.Value;
         if (diagrams is not null) body["diagrams"] = diagrams;
+        return As<AiOverview>(await SendAsync(HttpMethod.Post, "/defaults", body));
+    }
+
+    public async Task<AiOverview?> RichAsync(bool? on = null, bool? diagrams = null, bool? plots = null, bool? drawings = null, string? speed = null)
+    {
+        var body = new JsonObject();
+        if (on is not null) body["rich"] = on.Value;
+        if (diagrams is not null) body["rich_diagrams"] = diagrams.Value;
+        if (plots is not null) body["rich_plots"] = plots.Value;
+        if (drawings is not null) body["rich_drawings"] = drawings.Value;
+        if (speed is not null) body["speed"] = speed;
         return As<AiOverview>(await SendAsync(HttpMethod.Post, "/defaults", body));
     }
 

@@ -37,9 +37,15 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
 
     async Task<string> AnswerAsync(string job, string prompt, CancellationToken ct = default)
     {
-        var choice = Settings.For(job);
+        var settings = Settings;
+        var choice = settings.For(job);
         var provider = Provider(choice.Provider);
-        var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch()) { Model = choice.Model, Timeout = TimeSpan.FromMinutes(15) }, ct);
+        // Only the notes take the speed Settings sets for Claude Code: sorting and answers stay as set up.
+        var how = job == "notes" ? AiSpeed.ForNotes(choice.Provider, choice.Model, settings.Speed) : new AiSpeed.How(choice.Model, "", false);
+        var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch())
+        {
+            Model = how.Model, Effort = how.Effort, Fast = how.Fast, Timeout = TimeSpan.FromMinutes(15),
+        }, ct);
         if (!result.Ok) throw new InvalidOperationException($"{provider.Name}: {result.Text}");
         return result.Text;
     }
@@ -54,10 +60,14 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
 
     /// <summary>Answering with a specific engine, not the one ai.json picks for a job — the "Answer with" menu's
     /// choice, and this class's own fallback to Ollama in <see cref="AskAsync"/>.</summary>
-    async Task<string> AnswerWithAsync(string engine, string model, string prompt, CancellationToken ct, Action<string>? soFar = null)
+    async Task<string> AnswerWithAsync(string engine, string model, string prompt, CancellationToken ct, Action<string>? soFar = null,
+        string effort = "", bool fast = false)
     {
         var provider = Provider(engine);
-        var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch()) { Model = model, Timeout = TimeSpan.FromMinutes(15) }, ct, soFar);
+        var result = await provider.CompleteAsync(new AiRequest(prompt, Scratch())
+        {
+            Model = model, Effort = effort, Fast = fast, Timeout = TimeSpan.FromMinutes(15),
+        }, ct, soFar);
         if (!result.Ok) throw new InvalidOperationException(result.Text);
         return result.Text;
     }
@@ -189,24 +199,28 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
 
     /// <summary>
     /// What notes written by <paramref name="notesEngine"/> are told about diagrams, and who designs them after:
-    /// diagrams off, or a lecture too short for one, draws none; "same as notes" (or no designer to be had) leaves the
-    /// notes engine drawing its own, as before there was a diagram pass; otherwise the notes draw none and the
-    /// designer (<see cref="DiagramEngines.PickAsync"/>) adds them.
+    /// rich notes off (or every kind switched off), or a lecture too short for a diagram, draws none and asks nothing
+    /// more; "same as notes" (or no designer to be had) leaves the notes engine drawing its own, as before there was a
+    /// diagram pass; otherwise the notes draw none and the designer (<see cref="DiagramEngines.PickAsync"/>) adds them.
     /// </summary>
     async Task<(Drawings Notes, DiagramPick? Designer)> DiagramPlanAsync(Meeting m, Config cfg, AiSettings settings, string notesEngine)
     {
-        Drawings own = DrawingsFor(notesEngine);
-        switch (DiagramEngines.Normal(settings.Diagrams))
-        {
-            case DiagramEngines.Off:
-                return (Drawings.None, null);
-            case DiagramEngines.SameAsNotes:
-                return (own, null);
-        }
+        var kinds = settings.Kinds();
+        if (kinds == RichKinds.None) return (Drawings.None, null);
+        Drawings own = NotesDrawings(notesEngine, kinds);
+        if (DiagramEngines.Normal(settings.Diagrams) == DiagramEngines.SameAsNotes) return (own, null);
         if (DiagramDesign.Cap(m.Transcript) == 0) return (Drawings.None, null);
         var pick = await DiagramEngines.PickAsync(settings, cfg, Checks, notesEngine);
         return pick is null ? (own, null) : (Drawings.None, pick);
     }
+
+    /// <summary>What notes that draw as they write may draw (<see cref="DrawingsFor"/>), less what's switched off: a
+    /// flowchart is a diagram, so with diagrams off (or with only plots on, which notes never draw) they draw none, and
+    /// with drawings off they keep to flowcharts.</summary>
+    public static Drawings NotesDrawings(string engine, RichKinds kinds) =>
+        !kinds.HasFlag(RichKinds.Diagrams) ? Drawings.None
+        : !kinds.HasFlag(RichKinds.Drawings) ? Drawings.Flowcharts
+        : DrawingsFor(engine);
 
     /// <summary>
     /// The diagram pass over filed notes, with the designer <paramref name="pick"/> names: at most
@@ -217,7 +231,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     async Task<DesignResult?> DiagramsAsync(Meeting m, Config cfg, string notes, DiagramPick pick, CancellationToken ct)
     {
         var watch = System.Diagnostics.Stopwatch.StartNew();
-        string who = pick.Engine == "ollama" ? pick.Model : Provider(pick.Engine).Name + (pick.Model.Length > 0 ? " " + pick.Model : "");
+        string who = pick.Engine == "ollama" ? pick.Model
+            : Provider(pick.Engine).Name + (pick.Model.Length > 0 ? " " + pick.Model : "") + (pick.Fast ? " in fast mode" : "");
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(DiagramTimeout);
         try
@@ -227,7 +242,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             var result = await DiagramDesign.DesignAsync(m, notes, pick.Drawings, Designer(pick, cfg, ctx, cts.Token), Core.Summarize.TranscriptBudget(ctx),
                     DiagramTimeout - watch.Elapsed, Drawer(pick, cfg, cts.Token),
                     longer: total => cts.CancelAfter(total > watch.Elapsed ? total - watch.Elapsed : TimeSpan.Zero),
-                    compose: Composer(pick, cfg, cts.Token), scenes: Scenes)
+                    compose: Composer(pick, cfg, cts.Token), scenes: Scenes, kinds: pick.Kinds)
                 .WaitAsync(cts.Token);
             if (pick.Engine != "ollama") Record(pick.Engine, true, "");
             string left = result.Dropped.Count > 0 ? $"; left out {string.Join("; ", result.Dropped)}" : "";
@@ -265,7 +280,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// (<see cref="DiagramEngines.DrawEffort"/>); none for an engine that doesn't draw SVG.</summary>
     Func<string, Task<string>>? Drawer(DiagramPick pick, Config cfg, CancellationToken ct)
     {
-        if (pick.Drawings != Drawings.FlowchartsAndSvg) return null;
+        if (pick.Drawings != Drawings.FlowchartsAndSvg || !pick.Kinds.HasFlag(RichKinds.Drawings)) return null;
         var illustrator = Designer(pick with { Effort = DiagramEngines.DrawEffort(pick.Engine) }, cfg, 200_000, ct, IllustrationDesign.Timeout);
         return prompt => illustrator(prompt, false);
     }
@@ -274,8 +289,9 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// ready-made parts (<see cref="IllustrationDesign.ComposeAsync"/>); none for an engine that doesn't draw SVG.</summary>
     Func<string, Task<string>>? Composer(DiagramPick pick, Config cfg, CancellationToken ct)
     {
-        if (pick.Drawings != Drawings.FlowchartsAndSvg) return null;
-        var composer = Designer(pick with { Model = DiagramEngines.ComposeModel(pick.Engine), Effort = DiagramEngines.ComposeEffort(pick.Engine) },
+        if (pick.Drawings != Drawings.FlowchartsAndSvg || !pick.Kinds.HasFlag(RichKinds.Drawings)) return null;
+        // Sonnet has no fast mode: composing stays as it is, quick already.
+        var composer = Designer(pick with { Model = DiagramEngines.ComposeModel(pick.Engine), Effort = DiagramEngines.ComposeEffort(pick.Engine), Fast = false },
             cfg, 200_000, ct, IllustrationDesign.ComposeTimeout);
         return prompt => composer(prompt, false);
     }
@@ -286,7 +302,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
 
     /// <summary>
     /// The designer, one prompt at a time (its design, then any repair): a local model straight through Ollama, held
-    /// to JSON where the answer must be; a CLI engine with its strongest model and high effort. A CLI that turns those
+    /// to JSON where the answer must be; a CLI engine as the pick says (by default its strongest model and high effort,
+    /// in Claude Code's fast mode or on a smaller model when Settings says so). A CLI that turns those
     /// down (an older one without --effort, a plan without that model) is asked again as the student set it up, and
     /// so from then on; a usage limit or a sign-in problem isn't something asking again fixes.
     /// </summary>
@@ -295,8 +312,8 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         if (pick.Engine == "ollama" && Providers is null)
             return (prompt, json) => Core.Summarize.OllamaGenerateAsync(cfg, pick.Model, prompt, ctx, timeout: DiagramTimeout, json: json, ct: ct);
         var provider = Provider(pick.Engine);
-        var strong = new AiRequest("", Scratch()) { Model = pick.Model, Effort = pick.Effort, Timeout = timeout ?? DiagramTimeout };
-        var plain = strong with { Model = pick.Engine == "ollama" ? "" : Settings.Models.GetValueOrDefault(pick.Engine, ""), Effort = "" };
+        var strong = new AiRequest("", Scratch()) { Model = pick.Model, Effort = pick.Effort, Fast = pick.Fast, Timeout = timeout ?? DiagramTimeout };
+        var plain = strong with { Model = pick.Engine == "ollama" ? "" : Settings.Models.GetValueOrDefault(pick.Engine, ""), Effort = "", Fast = false };
         bool asSetUp = strong == plain;
         return async (prompt, _) =>
         {
@@ -343,14 +360,14 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         }
         else
         {
-            string model = Settings.Models.GetValueOrDefault(engine, "");
+            var how = AiSpeed.ForNotes(engine, Settings.Models.GetValueOrDefault(engine, ""), Settings.Speed);
             const int ctx = 200_000; // other models read a whole lecture at once: tell the splitter their context is large
             string text = Py.Strip(TimedText.Plain(m.Transcript));
             int budget = Core.Summarize.TranscriptBudget(ctx);
             parts = text.Length <= budget ? 1 : Core.Summarize.SplitTranscript(text, budget).Count;
             async Task<string> ChatAsync(Config c, string mdl, string prompt, int numCtx)
             {
-                string result = await AnswerWithAsync(engine, model, prompt, ct);
+                string result = await AnswerWithAsync(engine, how.Model, prompt, ct, effort: how.Effort, fast: how.Fast);
                 progress?.Invoke(++done, Math.Max(done, parts));
                 return result;
             }
@@ -363,9 +380,13 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// <summary>The name of what wrote something with a specific engine, not ai.json's own pick for a job — the
     /// rewrite job's choice, kept as the note's <c>summary_model</c> so <see cref="Engines.WhoWrote"/> maps it back
     /// to a display name later, the same way it does for the notes ai.json actually picked.</summary>
-    public string DescribeChoice(string engine, Config cfg) => engine == "ollama"
-        ? cfg.EffectiveSummaryModel
-        : Provider(engine).Name + (Settings.Models.GetValueOrDefault(engine, "") is { Length: > 0 } model ? " " + model : "");
+    public string DescribeChoice(string engine, Config cfg)
+    {
+        if (engine == "ollama") return cfg.EffectiveSummaryModel;
+        var settings = Settings;
+        string model = AiSpeed.ForNotes(engine, settings.Models.GetValueOrDefault(engine, ""), settings.Speed).Model;
+        return Provider(engine).Name + (model.Length > 0 ? " " + model : "");
+    }
 
     /// <summary>Sorting into classes.</summary>
     public Task<string> SortAsync(Config cfg, string prompt, JsonObject schema) => Settings.Local("sort")
@@ -380,10 +401,12 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// <summary>The name of what does a job, for the log ("Claude sonnet", "qwen3:8b").</summary>
     public string Describe(string job, Config cfg)
     {
-        var c = Settings.For(job);
-        if (c.Provider == "ollama" || (job == "notes" && NotesOnOllama(Settings)))
+        var settings = Settings;
+        var c = settings.For(job);
+        if (c.Provider == "ollama" || (job == "notes" && NotesOnOllama(settings)))
             return job == "notes" ? cfg.EffectiveSummaryModel : cfg.OllamaModel;
-        return Provider(c.Provider).Name + (c.Model.Length > 0 ? " " + c.Model : "");
+        string model = job == "notes" ? AiSpeed.ForNotes(c.Provider, c.Model, settings.Speed).Model : c.Model;
+        return Provider(c.Provider).Name + (model.Length > 0 ? " " + model : "");
     }
 
     /// <summary>The command that starts this engine's MCP server (the Canvas and library tools), for agents.</summary>

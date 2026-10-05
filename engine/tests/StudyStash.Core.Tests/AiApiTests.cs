@@ -63,6 +63,36 @@ public class AiApiTests
     }
 
     [Fact]
+    public async Task Rich_notes_switches_and_Claude_Codes_speed_round_trip_through_the_librarys_ai_json()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var ai = new AiJobs(cfg.Home) { Checks = new FakeChecks().Installed("claude").Build() };
+        await using var site = await Site(cfg, store, ai);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+
+        // As it was: rich notes on, every kind, Claude Code as set up.
+        var start = (await remote.EnginesAsync())!;
+        Assert.Equal((new RichNotesInfo(true, true, true, true), "standard"), (start.Rich, start.Speed));
+
+        // The laptop switches rich notes off, then on with one kind less, and picks fast mode.
+        Assert.Equal(new RichNotesInfo(false, true, true, true), (await remote.RichAsync(on: false))!.Rich);
+        var changed = (await remote.RichAsync(on: true, plots: false, speed: "fast"))!;
+        Assert.Equal((new RichNotesInfo(true, true, false, true), "fast"), (changed.Rich, changed.Speed));
+        var saved = AiSettings.Load(cfg.Home); // the library's own ai.json holds it, and the designer reads it from there
+        Assert.Equal((RichKinds.Diagrams | RichKinds.Drawings, AiSpeed.Fast), (saved.Kinds(), saved.Speed));
+        Assert.Equal(("claude", RichKinds.Diagrams | RichKinds.Drawings, true), await ai.DesignerAsync(cfg, "claude") is { } pick ? (pick.Engine, pick.Kinds, pick.Fast) : default);
+
+        // Nothing left to draw means rich notes off; and the old "off" pick of diagrams reads as the switch being off.
+        Assert.False((await remote.RichAsync(diagrams: false, drawings: false))!.Rich!.On);
+        Assert.False((await remote.DefaultsAsync(diagrams: "off"))!.Rich!.On);
+        Assert.True((await remote.RichAsync(on: true))!.Rich!.On);
+        Assert.Equal("auto", AiSettings.Load(cfg.Home).Diagrams);
+        Assert.Equal(400, (await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.RichAsync(speed: "warp"))).Status);
+    }
+
+    [Fact]
     public async Task Ask_answers_with_the_engine_you_pick()
     {
         using var dir = new TempDir();

@@ -253,11 +253,13 @@ public static class Engines
         string notesNow = settings.For("notes").Provider;
         if (notesNow != "ollama" && settings.Fallback && KnownUnusableWhy(notesNow, settings, checks) is not null) notesNow = "ollama";
         string diagrams = DiagramEngines.Normal(settings.Diagrams);
-        string by = diagrams == DiagramEngines.Off ? ""
+        string by = settings.Kinds() == RichKinds.None ? ""
             : (await DiagramEngines.PickAsync(settings, cfg, checks, notesNow))?.Engine ?? notesNow;
         return new AiOverview(engines, settings.For("notes").Provider, settings.For("ask").Provider, settings.Fallback, problems)
         {
             Diagrams = diagrams, DiagramsBy = by,
+            Rich = new RichNotesInfo(settings.RichNotes && diagrams != DiagramEngines.Off, settings.RichDiagrams, settings.RichPlots, settings.RichDrawings),
+            Speed = AiSpeed.Normal(settings.Speed),
         };
     }
 }

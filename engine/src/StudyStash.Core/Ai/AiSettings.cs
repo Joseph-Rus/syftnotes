@@ -15,7 +15,9 @@ public sealed record AiChoice(string Provider, string Model = "");
 /// <item><c>ask</c>: answering questions from your notes;</item>
 /// <item><c>agent</c>: work that reads around and uses tools (Canvas, the chat that can change notes).</item>
 /// </list>
-/// Diagrams have a pick of their own (<see cref="Diagrams"/>): a separate pass after the notes, automatic by default.
+/// Rich notes (diagrams, formula plots and drawings) have their own switches (<see cref="RichNotes"/> and one for each kind)
+/// and a pick of who designs them (<see cref="Diagrams"/>): a separate pass after the notes, automatic by default.
+/// <see cref="Speed"/> says how fast Claude Code writes the notes and designs them.
 /// With no ai.json, everything is the library's Ollama model, as before.
 /// </summary>
 public sealed class AiSettings
@@ -40,6 +42,15 @@ public sealed class AiSettings
     /// <summary>Who draws the diagrams in the notes: <c>auto</c>, <c>notes</c> (the notes engine, as it writes),
     /// <c>off</c>, or an engine's id (<see cref="DiagramEngines"/>).</summary>
     public string Diagrams { get; set; } = DiagramEngines.Auto;
+    /// <summary>Rich notes: diagrams, formula plots and drawings added after the notes. Off: plain notes, and nothing extra
+    /// is asked of the AI (a stored <see cref="Diagrams"/> of <c>off</c>, from before this switch, means the same).</summary>
+    public bool RichNotes { get; set; } = true;
+    /// <summary>Which kinds of rich notes (<see cref="Kinds"/>), while they're on.</summary>
+    public bool RichDiagrams { get; set; } = true;
+    public bool RichPlots { get; set; } = true;
+    public bool RichDrawings { get; set; } = true;
+    /// <summary>How fast Claude Code writes the notes and designs the rich notes: <see cref="AiSpeed"/>.</summary>
+    public string Speed { get; set; } = AiSpeed.Standard;
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "ai.json");
 
@@ -49,6 +60,36 @@ public sealed class AiSettings
         if (ByJob.TryGetValue(job, out var c) && c.Provider.Length > 0)
             return c.Model.Length > 0 ? c : c with { Model = Models.GetValueOrDefault(c.Provider, "") };
         return new AiChoice(Provider, Models.GetValueOrDefault(Provider, ""));
+    }
+
+    /// <summary>The kinds of rich notes to make now: none when rich notes are off (or diagrams were turned off the way
+    /// they were before the switch), else those switched on.</summary>
+    public RichKinds Kinds() => !RichNotes || DiagramEngines.Normal(Diagrams) == DiagramEngines.Off ? RichKinds.None
+        : (RichDiagrams ? RichKinds.Diagrams : 0) | (RichPlots ? RichKinds.Plots : 0) | (RichDrawings ? RichKinds.Drawings : 0);
+
+    /// <summary>
+    /// Changes the rich notes switches as a student's click would: whatever is given. Switching them on from diagrams
+    /// that were turned off the old way (<see cref="Diagrams"/> = off) goes back to automatic, and rich notes with no
+    /// kind left are no rich notes: switching on with none on puts every kind on, and switching off the last kind
+    /// switches rich notes off (every kind back on, for the next time).
+    /// </summary>
+    public void SetRich(bool? on = null, bool? diagrams = null, bool? plots = null, bool? drawings = null)
+    {
+        if (diagrams is { } d) RichDiagrams = d;
+        if (plots is { } p) RichPlots = p;
+        if (drawings is { } w) RichDrawings = w;
+        if (on is { } o)
+        {
+            RichNotes = o;
+            if (o && DiagramEngines.Normal(Diagrams) == DiagramEngines.Off) Diagrams = DiagramEngines.Auto;
+        }
+        if (RichDiagrams || RichPlots || RichDrawings) return;
+        if (on == true) RichDiagrams = RichPlots = RichDrawings = true;
+        else
+        {
+            RichNotes = false;
+            RichDiagrams = RichPlots = RichDrawings = true;
+        }
     }
 
     /// <summary>True when a job runs on the library's own Ollama, the way the engine always has.</summary>

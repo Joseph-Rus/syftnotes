@@ -110,6 +110,10 @@ public sealed partial class LibraryWeb
             var body = await Http.JsonBodyAsync(ctx.Request);
             string? notes = Str(body, "notes"), ask = Str(body, "ask"), diagrams = Str(body, "diagrams");
             bool? fallback = body?["fallback"] is JsonValue fv && fv.TryGetValue(out bool f) ? f : null;
+            bool? Switch(string key) => body?[key] is JsonValue sv && sv.TryGetValue(out bool b) ? b : null;
+            bool? rich = Switch("rich"), richDiagrams = Switch("rich_diagrams"), richPlots = Switch("rich_plots"), richDrawings = Switch("rich_drawings");
+            string? speed = Str(body, "speed");
+            if (speed is not null && !AiSpeed.Choices.Contains(speed)) return Http.Detail(400, $"there's no speed called {speed}");
             foreach (string? id in new[] { notes, ask })
                 if (id is not null && !Engines.Order.Contains(id)) return Http.Detail(400, $"there's no AI called {id}");
             if (diagrams is not null && !DiagramEngines.Choices.Contains(diagrams)) return Http.Detail(400, $"there's no AI called {diagrams}");
@@ -126,6 +130,8 @@ public sealed partial class LibraryWeb
             }
             if (fallback is not null) settings.Fallback = fallback.Value;
             if (diagrams is not null) settings.Diagrams = diagrams;
+            settings.SetRich(rich, richDiagrams, richPlots, richDrawings);
+            if (speed is not null) settings.Speed = speed;
             settings.Save(cfg.Home);
             return AiJson(await AiOverviewAsync());
         })));

@@ -725,6 +725,7 @@ public sealed partial class LibraryWeb
         string DiagramsRow()
         {
             string current = DiagramEngines.Normal(picked.Diagrams);
+            if (current == DiagramEngines.Off) current = DiagramEngines.Auto; // off is the Rich notes switch's now
             string Engine(string id)
             {
                 var p = providers.First(x => x.Id == id);
@@ -737,8 +738,22 @@ public sealed partial class LibraryWeb
                 DiagramEngines.Off => "Off",
                 _ => Engine(c),
             };
-            string opts = string.Concat(DiagramEngines.Choices.Select(c => $"<option value=\"{c}\"{(c == current ? " selected" : "")}>{Ui.Esc(Label(c))}</option>"));
-            return $"<div class=\"row\"><label class=\"grow\" for=\"ai_diagrams\">Draws diagrams</label><select id=\"ai_diagrams\" name=\"ai_diagrams\">{opts}</select></div>";
+            string opts = string.Concat(DiagramEngines.Picks.Select(c => $"<option value=\"{c}\"{(c == current ? " selected" : "")}>{Ui.Esc(Label(c))}</option>"));
+            return Switch("ai_rich", picked.RichNotes && DiagramEngines.Normal(picked.Diagrams) != DiagramEngines.Off, "Rich notes: diagrams, formula plots and drawings after the notes")
+                + Switch("ai_rich_diagrams", picked.RichDiagrams, "Diagrams") + Switch("ai_rich_plots", picked.RichPlots, "Formula plots")
+                + Switch("ai_rich_drawings", picked.RichDrawings, "Drawings")
+                + $"<div class=\"row\"><label class=\"grow\" for=\"ai_diagrams\">Drawn by</label><select id=\"ai_diagrams\" name=\"ai_diagrams\">{opts}</select></div>";
+        }
+        string SpeedRow()
+        {
+            string Label(string c) => c switch
+            {
+                AiSpeed.Fast => "Fast mode: the same Opus, up to 2.5 times faster, billed at a higher rate",
+                AiSpeed.Quick => "Quicker model: Sonnet at low effort, shallower notes",
+                _ => "Standard",
+            };
+            string opts = string.Concat(AiSpeed.Choices.Select(c => $"<option value=\"{c}\"{(c == AiSpeed.Normal(picked.Speed) ? " selected" : "")}>{Ui.Esc(Label(c))}</option>"));
+            return $"<div class=\"row\"><label class=\"grow\" for=\"ai_speed\">Claude Code speed</label><select id=\"ai_speed\" name=\"ai_speed\">{opts}</select></div>";
         }
         var main = providers.First(p => p.Id == picked.Provider);
         string modelOpts = string.Concat(main.Models.Select(m =>
@@ -752,7 +767,7 @@ public sealed partial class LibraryWeb
         string brain = "<div class=\"group-head\">AI</div><div class=\"group\">"
             + $"<div class=\"row\"><label class=\"grow\" for=\"ai_provider\">Does the work</label>{tested}{ProviderSelect("ai_provider", picked.Provider, null)}</div>"
             + (main.Id == "ollama" ? "" : $"<div class=\"row\"><label class=\"grow\" for=\"ai_model\">Model</label><select id=\"ai_model\" name=\"ai_model\">{modelOpts}</select></div>")
-            + JobRow("notes", "Writes study notes") + DiagramsRow() + JobRow("sort", "Sorts lectures") + JobRow("ask", "Answers questions")
+            + JobRow("notes", "Writes study notes") + DiagramsRow() + SpeedRow() + JobRow("sort", "Sorts lectures") + JobRow("ask", "Answers questions")
             + (Terminal.Available() is { Count: > 0 } terms
                 ? "<div class=\"row\"><label class=\"grow\" for=\"terminal\">Open in… uses</label><select id=\"terminal\" name=\"terminal\">"
                   + string.Concat(terms.Select(t => $"<option value=\"{t.Id}\"{(t.Id == picked.Terminal ? " selected" : "")}>{Ui.Esc(t.Name)}</option>")) + "</select></div>"
@@ -889,7 +904,10 @@ public sealed partial class LibraryWeb
                 if (known.Contains(p)) picked.ByJob[job] = new AiChoice(p);
                 else picked.ByJob.Remove(job);
             }
-            if (DiagramEngines.Choices.Contains(Py.Strip(f.Get("ai_diagrams")))) picked.Diagrams = Py.Strip(f.Get("ai_diagrams"));
+            if (DiagramEngines.Picks.Contains(Py.Strip(f.Get("ai_diagrams")))) picked.Diagrams = Py.Strip(f.Get("ai_diagrams"));
+            // The page always sends every rich notes switch it shows: one that's missing is one that's off.
+            picked.SetRich(on: f.ContainsKey("ai_rich"), f.ContainsKey("ai_rich_diagrams"), f.ContainsKey("ai_rich_plots"), f.ContainsKey("ai_rich_drawings"));
+            if (AiSpeed.Choices.Contains(Py.Strip(f.Get("ai_speed")))) picked.Speed = Py.Strip(f.Get("ai_speed"));
             picked.Save(cfg.Home);
         }
         return Http.SeeOther("/settings?saved=1");
