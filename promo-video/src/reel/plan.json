@@ -1,0 +1,81 @@
+{
+  "about": "The Instagram reel: a fast cut of the demo (src/demo), 1080×1920 at 30 fps, under a minute. Each scene starts at `start` (seconds, the start of its cross-fade in), Adam's line at `vo`; every effect is at `at` (seconds into the reel) and `moments` are the scenes' silent moments. These times are final: nothing is stretched to fit a line, so the picture never moves under a sound laid by CUES-reel.md. `npm run reel-cues` writes the cue sheet from this file.",
+  "fps": 30,
+  "transition": 10,
+  "end": 57.0,
+  "safeArea": {"width": 1080, "height": 1920, "top": 220, "bottom": 420, "right": 130},
+  "scenes": [
+    {"id": "opener", "start": 0.0, "vo": 0.3, "line": "Study Stash.", "title": null, "shows": "The black intro, fast: a line of light draws the icon from the first frame, “Study Stash” rises, glimpses of what’s to come float in, and the night lifts into the app", "direction": "warm and confident, quick"},
+    {"id": "record", "start": 2.5, "vo": 2.8, "line": "Hit record in class, and the words show up as they're said.", "title": ["Hit record.", "Words show up live."], "titleAt": "bottom", "shows": "The Mac’s top right corner, close: the menu bar’s S. opens its dropdown; Record · BIO 110; the recorder’s pill; the recorder opens and the live words come in; “50 minutes later”; Stop", "direction": "bright, a little lift on \"as they're said\""},
+    {"id": "notes", "start": 8.5, "vo": 8.8, "line": "Stop, and your notes are written and filed for you, diagrams and all.", "title": ["Notes, written for you.", "Diagrams and all."], "shows": "BIO 110’s window: “Writing the notes…”; filed (the notes open, the notification “Filed in BIO 110”) with “Adding diagrams…”; “A minute later”; the diagram drops in; “Diagrams added”", "direction": "a small beat after \"Stop\", then easy"},
+    {"id": "explore", "start": 16.5, "vo": 16.8, "line": "Point at a box, pin it, step through it, or test yourself.", "title": ["Diagrams you explore.", "Point, pin, step, test."], "shows": "The cardiac cycle diagram: a box lit with its neighbours, pinned (Explain this, Quiz me, Where was this said?, Zoom in); Step through, Next; Test yourself, a hidden box checked, Knew it", "direction": "a list with momentum, playful on \"test yourself\""},
+    {"id": "plots", "start": 23.5, "vo": 23.8, "line": "Drag a formula and watch it move.", "title": ["Graphs you can drag.", "Watch the formula move."], "shows": "CS 340’s notes: the sigmoid’s steepness dragged up to 5 and partway back", "direction": "enjoying it"},
+    {"id": "drawings", "start": 28.0, "vo": 28.3, "line": "It can even draw what the lecture describes.", "title": ["Labelled drawings.", "Of what class describes."], "shows": "ENGR 120’s drone: the battery passed, the flight controller lit and pinned (its card)", "direction": "a spark of delight on \"draw\""},
+    {"id": "ask", "start": 32.5, "vo": 32.8, "line": "Ask your lectures anything, and get answers from class.", "title": ["Ask your lectures.", "Answers from class."], "shows": "CS 101’s notes with the Ask bar: “What’s on the midterm?” typed and sent; the answer streams in from what was said", "direction": "plain and confident"},
+    {"id": "canvas", "start": 38.0, "vo": 38.3, "line": "See what's due from Canvas, soonest first.", "title": ["Canvas, connected.", "What’s due, soonest first."], "shows": "Due: Lab 2 write-up marked Missing, then this week’s, soonest first; Lab 3 opened: due date, points, instructions, rubric", "direction": "practical, brisk"},
+    {"id": "phone", "start": 42.5, "vo": 42.8, "line": "Your notes and what's due, on your phone too.", "title": ["On your phone, too.", "Notes and what’s due."], "shows": "The phone app: Library; a tap into The cardiac cycle’s notes; a tap on Due", "direction": "light"},
+    {"id": "settings", "start": 47.0, "vo": 47.3, "line": "Make it yours: rich notes, fast mode, after class.", "title": ["Make it yours.", "Notes your way."], "shows": "Settings → AI engines: Rich notes switched off; Claude Code speed → Fast mode; Recording: When it’s written down → After class", "direction": "relaxed, a little pause at the colon, then a quick list"},
+    {"id": "end", "start": 52.0, "vo": 52.3, "line": "Study Stash. Free for Mac and Windows.", "title": null, "shows": "The end card: the icon, Study Stash, Free for Mac and Windows, study-stash-app.web.app, the marks for Mac and Windows; held to the last frame", "direction": "warm, a beat after \"Study Stash\""}
+  ],
+  "sounds": [
+    {"sfx": "whoosh-soft", "file": "sfx-whoosh-soft.mp3", "length": "1 s", "prompt": "Very soft, gentle airy whoosh for a slide transition, low and smooth, soft air moving, no hiss, no reverb tail"},
+    {"sfx": "click", "file": "sfx-click.mp3", "length": "0.5 s (the shortest)", "prompt": "Very soft trackpad click, a single muted tap, close-miked, dry, no reverb, no high-pitched tick"},
+    {"sfx": "record-start", "file": "sfx-record-start.mp3", "length": "1 s", "prompt": "Soft rounded start-recording sound, a low muted thup with a gentle rise, like a small button pressed into felt, dry, no beep, no bell, no chime"},
+    {"sfx": "pop", "file": "sfx-pop.mp3", "length": "0.5 s", "prompt": "Soft rounded interface pop, like a small card settling into place, a gentle low wooden tok, dry, no bell, no chime, no reverb"},
+    {"sfx": "shimmer", "file": "sfx-shimmer.mp3", "length": "1.5 s", "prompt": "Soft airy shimmer, a breath of light rising, like a gentle brush sweep over fine sand, warm and quiet, no bells, no chimes, no ringing tones"},
+    {"sfx": "slider", "file": "sfx-slider.mp3", "length": "2 s", "prompt": "Soft friction of a small knob slid smoothly along a track, quiet and steady, close-miked, no clicks, no ticks"},
+    {"sfx": "keys", "file": "sfx-keys.mp3", "length": "2 s", "prompt": "Quiet laptop typing, about two seconds of soft key presses, low muted thocks, a short sentence typed at an easy pace, dry, no clatter"},
+    {"sfx": "tap", "file": "sfx-tap.mp3", "length": "0.5 s (the shortest)", "prompt": "One soft tap of a fingertip on a phone's glass screen, muted and rounded, very short, dry, no click, no tick"},
+    {"sfx": "swell", "file": "sfx-swell.mp3", "length": "4 s", "prompt": "Warm soft swell of a felt piano and string pad chord in D major, rising gently over a second then fading over three seconds, calm and hopeful, no bells, no chimes, no percussion"}
+  ],
+  "effects": [
+    {"key": "opener-whoosh", "scene": "opener", "sfx": "whoosh-soft", "at": 0.2, "what": "the screen lights up"},
+
+    {"key": "record-menu", "scene": "record", "sfx": "click", "at": 2.8, "what": "the S. in the menu bar opens its dropdown"},
+    {"key": "record-click", "scene": "record", "sfx": "click", "at": 3.4, "what": "Record, in the dropdown"},
+    {"key": "record-start", "scene": "record", "sfx": "record-start", "at": 3.5, "what": "recording starts: the recorder pill appears"},
+    {"key": "record-pill", "scene": "record", "sfx": "click", "at": 4.1, "what": "the pill opens the recorder"},
+    {"key": "record-stop", "scene": "record", "sfx": "click", "at": 8.0, "what": "Stop"},
+
+    {"key": "notes-whoosh", "scene": "notes", "sfx": "whoosh-soft", "at": 8.5, "what": "into the library"},
+    {"key": "notes-filed", "scene": "notes", "sfx": "pop", "at": 10.0, "what": "filed in BIO 110: the notes open"},
+    {"key": "notes-diagrams", "scene": "notes", "sfx": "shimmer", "at": 12.7, "what": "the diagram drops into the notes"},
+
+    {"key": "explore-pin", "scene": "explore", "sfx": "click", "at": 17.9, "what": "a box is pinned: its four actions appear"},
+    {"key": "explore-steps", "scene": "explore", "sfx": "click", "at": 18.9, "what": "Step through"},
+    {"key": "explore-next", "scene": "explore", "sfx": "click", "at": 19.6, "what": "Next step"},
+    {"key": "explore-test", "scene": "explore", "sfx": "click", "at": 20.3, "what": "Test yourself"},
+    {"key": "explore-check", "scene": "explore", "sfx": "click", "at": 21.0, "what": "a hidden box is checked"},
+    {"key": "explore-knew", "scene": "explore", "sfx": "click", "at": 21.7, "what": "Knew it"},
+
+    {"key": "plots-whoosh", "scene": "plots", "sfx": "whoosh-soft", "at": 23.5, "what": "into the plots"},
+    {"key": "plots-k", "scene": "plots", "sfx": "slider", "at": 24.1, "len": 2.0, "what": "the sigmoid's steepness is dragged up, and partway back"},
+
+    {"key": "drawings-pin", "scene": "drawings", "sfx": "click", "at": 29.5, "what": "the drone's flight controller is pinned"},
+    {"key": "drawings-card", "scene": "drawings", "sfx": "pop", "at": 29.6, "what": "its card appears"},
+
+    {"key": "ask-keys", "scene": "ask", "sfx": "keys", "at": 33.1, "len": 1.2, "what": "typing \"What's on the midterm?\""},
+    {"key": "ask-send", "scene": "ask", "sfx": "click", "at": 34.5, "what": "send"},
+
+    {"key": "canvas-whoosh", "scene": "canvas", "sfx": "whoosh-soft", "at": 38.0, "what": "into Due, from Canvas"},
+    {"key": "canvas-open", "scene": "canvas", "sfx": "click", "at": 40.5, "what": "Lab 3 is opened"},
+
+    {"key": "phone-whoosh", "scene": "phone", "sfx": "whoosh-soft", "at": 42.5, "what": "onto the phone"},
+    {"key": "phone-lecture", "scene": "phone", "sfx": "tap", "at": 43.3, "what": "a lecture is tapped"},
+    {"key": "phone-due", "scene": "phone", "sfx": "tap", "at": 44.7, "what": "the Due tab"},
+
+    {"key": "settings-rich", "scene": "settings", "sfx": "click", "at": 48.0, "what": "the Rich notes switch"},
+    {"key": "settings-speed", "scene": "settings", "sfx": "click", "at": 48.7, "what": "the Claude Code speed menu opens"},
+    {"key": "settings-fast", "scene": "settings", "sfx": "click", "at": 49.2, "what": "Fast mode"},
+    {"key": "settings-recording", "scene": "settings", "sfx": "click", "at": 49.8, "what": "Recording, in the sidebar"},
+    {"key": "settings-after", "scene": "settings", "sfx": "click", "at": 50.4, "what": "When it's written down: After class"},
+
+    {"key": "end-swell", "scene": "end", "sfx": "swell", "at": 52.0, "what": "the end card"}
+  ],
+  "moments": [
+    {"key": "record-jump", "scene": "record", "at": 7.1, "what": "“50 minutes later”"},
+    {"key": "notes-later", "scene": "notes", "at": 11.5, "what": "“A minute later”"},
+    {"key": "explore-hover", "scene": "explore", "at": 17.2, "what": "the pointer rests on a box"},
+    {"key": "explore-card", "scene": "explore", "at": 18.0, "what": "the pinned box's actions appear"}
+  ]
+}

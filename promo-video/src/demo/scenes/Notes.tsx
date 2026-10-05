@@ -52,7 +52,7 @@ export const Notes: React.FC<{cut?: Cut}> = ({cut}) => {
   const later = prog(frame, LATER, LATER + 10) * (1 - prog(frame, ADDED - 8, ADDED + 4));
   // The notes take a couple of minutes to write, and the diagrams a minute more: the menu bar's clock says so.
   const clock = frame < (cut ? 14 : 40) ? 'Tue 23 Sep  10:53' : frame < LATER + 10 ? 'Tue 23 Sep  10:55' : 'Tue 23 Sep  10:56';
-  const toast = prog(frame, FILED, FILED + 12) * (1 - (cut ? prog(frame, FILED + 62, FILED + 72) : prog(frame, FILED + 120, FILED + 132)));
+  const toast = prog(frame, FILED, FILED + 12) * (1 - (cut ? prog(frame, FILED + 38, FILED + 48) : prog(frame, FILED + 120, FILED + 132)));
   // The reel's notification: larger, and low on the window's right, inside the safe area, clear of the notes as they open.
   const TOAST_Z = 1.3;
   const toastAt: React.CSSProperties = cut
