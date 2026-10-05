@@ -290,6 +290,47 @@
         </ItemsControl>
       </StackPanel>
 
+      <!-- A class's home: folders on the computer that go with it (a project's repo), linked, not copied in -->
+      <StackPanel Name="LinkedFolders" IsVisible="{Binding ShowFolders}">
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+          <TextBlock Classes="ov-h2" Text="Linked folders" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ov-pill" Command="{Binding LinkFolderCommand}" IsVisible="{Binding CanLinkFolders}"
+                  ToolTip.Tip="Link a folder on this computer to the class: it stays where it is, and search and the AI can read it">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Glyph="add" Size="15" Foreground="{DynamicResource Fg}" />
+              <TextBlock Text="Link a folder" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </Grid>
+        <TextBlock Classes="ov-sub" IsVisible="{Binding !HasFolders}" TextWrapping="Wrap"
+                   Text="A project's repo, a shared drive, anything that goes with this class but isn't notes. It stays where it is." />
+        <ItemsControl ItemsSource="{Binding Folders}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:LinkedFolder">
+              <Button Classes="ov-card" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenFolderCommand}" CommandParameter="{Binding}"
+                      ToolTip.Tip="Open the folder">
+                <Button.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="Unlink from this class" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).UnlinkFolderCommand}" CommandParameter="{Binding}" />
+                  </ContextMenu>
+                </Button.ContextMenu>
+                <Grid ColumnDefinitions="Auto,10,*,Auto">
+                  <c:Icon Glyph="folder" Size="18" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="ov-sub" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <c:Icon Grid.Column="3" Glyph="open_in_new" Size="15" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
       <!-- A class's home: what's attached to it (drop files anywhere on the page) -->
       <StackPanel Name="ClassFiles" IsVisible="{Binding HasFiles}">
         <TextBlock Classes="ov-h2" Text="Files" Margin="0,0,0,8" IsVisible="{Binding Files.HasItems, FallbackValue=False}" />

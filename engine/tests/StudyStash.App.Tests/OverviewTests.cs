@@ -45,6 +45,7 @@ public class OverviewTests
         Unsorted = 2,
         Writing = 1,
         OpenClass = c => opened?.Add("class:" + c),
+        OpenAllLectures = c => opened?.Add("lectures:" + c),
         OpenLecture = (c, id) => opened?.Add($"lecture:{c}/{id}"),
         OpenAssignment = (c, id) => opened?.Add($"assignment:{c}/{id}"),
         OpenDueList = () => opened?.Add("due"),
@@ -138,7 +139,7 @@ public class OverviewTests
         Assert.Equal("3 · 1 new", m.Links[3].Detail);
         foreach (var link in m.Links) m.OpenLinkCommand.Execute(link);
         m.AllLecturesCommand.Execute(null);
-        Assert.Equal(["all", "tab:Assignments", "tab:Modules", "tab:Announcements", "class:CS 101"], opened);
+        Assert.Equal(["all", "tab:Assignments", "tab:Modules", "tab:Announcements", "lectures:CS 101"], opened);
     }
 
     [Fact]

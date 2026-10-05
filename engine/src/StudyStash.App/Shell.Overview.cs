@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
@@ -89,10 +90,48 @@ public static partial class Shell
             Remember();
             _ = ShowClassTabAsync(name, tab);
         });
+        page.SetFolders(LinkedFolders(lib, name, info), host.Settings.LibraryHere ? () => _ = LinkFolderAsync(lib, name) : null);
         var files = new AttachmentsModel(lib, name, null);
         page.Files = files;
         _ = files.LoadAsync();
         library.Overview = page;
+    }
+
+    /// <summary>The folders linked to a class, as the library's overview lists them.</summary>
+    static IEnumerable<LinkedFolder> LinkedFolders(RemoteLibrary lib, string cls, JsonObject? info) =>
+        (info?["folders"] as JsonArray ?? []).OfType<JsonObject>().Select(f =>
+        {
+            string path = S(f["path"]);
+            return new LinkedFolder(S(f["name"]), path, f["here"]?.GetValue<bool>() ?? true,
+                () => Dialogs.OpenUrl(path),
+                () => _ = ChangeFolderAsync(lib, cls, path, remove: true));
+        });
+
+    /// <summary>Link a folder: the folder dialog, then the library lists it on the class's home.</summary>
+    static async Task LinkFolderAsync(RemoteLibrary lib, string cls)
+    {
+        if (mainWindow is null) return;
+        var picked = await mainWindow.StorageProvider.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+        {
+            Title = $"Link a folder to {cls}",
+        });
+        if (picked.Count == 0 || picked[0].TryGetLocalPath() is not { } path) return;
+        await ChangeFolderAsync(lib, cls, path, remove: false);
+    }
+
+    static async Task ChangeFolderAsync(RemoteLibrary lib, string cls, string path, bool remove)
+    {
+        try
+        {
+            await lib.ClassFolderAsync(cls, path, remove);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            Toast("Couldn't link the folder", e.Message, null, null);
+            return;
+        }
+        await host.CheckLibraryAsync();
+        if (overviewOf == cls) await ShowClassHomeAsync(cls);
     }
 
     /// <summary>A class's Canvas page, on one of its tabs.</summary>
@@ -150,6 +189,12 @@ public static partial class Shell
             {
                 Remember();
                 _ = ShowClassHomeAsync(cls);
+            },
+            OpenAllLectures = cls =>
+            {
+                Remember();
+                allLectures = true;
+                _ = ShowClassAsync(cls);
             },
             OpenLecture = (cls, id) =>
             {

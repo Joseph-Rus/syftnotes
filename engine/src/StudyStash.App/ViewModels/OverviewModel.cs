@@ -39,6 +39,12 @@ public sealed record OverviewClass(string Name, IBrush Dot, string Lectures, str
 public sealed record OverviewLink(string Glyph, string Label, string Detail, Action Open);
 
 /// <summary>What a class's home is made from: the class, its lectures, and (when linked) its Canvas course.</summary>
+/// <summary>A folder linked to a class: its name, where it is, whether it's still there, and what its buttons do.</summary>
+public sealed record LinkedFolder(string Name, string Path, bool Here, Action Open, Action Unlink)
+{
+    public string Detail => Here ? Path : $"{Path} (not found)";
+}
+
 public sealed record ClassHomeFacts(string Name, IBrush Dot, int Lectures, string? Code, string? CourseTitle, string? Description,
     CanvasApi.Counts? Canvas);
 
@@ -94,6 +100,29 @@ public sealed partial class OverviewModel : ObservableObject
     public Action? OnAllLectures { get; init; }
     public bool CanSeeAllDue => OnAllDue is not null && Due.Count > 0;
     public bool CanSeeAllLectures => OnAllLectures is not null && Lectures.Count > 0;
+
+    /// <summary>Folders on the computer that go with the class (a project's repo, say), linked rather than copied in.</summary>
+    public ObservableCollection<LinkedFolder> Folders { get; } = [];
+    public bool HasFolders => Folders.Count > 0;
+    /// <summary>Link a folder: set on a class's home when the library is on this computer (its folders are this one's).</summary>
+    public Action? OnLinkFolder { get; set; }
+    public bool CanLinkFolders => OnLinkFolder is not null;
+    /// <summary>The Linked folders section: when there are some, or one can be linked.</summary>
+    public bool ShowFolders => IsClass && (HasFolders || CanLinkFolders);
+    [RelayCommand] void LinkFolder() => OnLinkFolder?.Invoke();
+    [RelayCommand] static void OpenFolder(LinkedFolder f) => f.Open();
+    [RelayCommand] static void UnlinkFolder(LinkedFolder f) => f.Unlink();
+
+    /// <summary>Shows the class's linked folders (and whether more can be linked here).</summary>
+    public void SetFolders(IEnumerable<LinkedFolder> folders, Action? link)
+    {
+        Folders.Clear();
+        foreach (var f in folders) Folders.Add(f);
+        OnLinkFolder = link;
+        OnPropertyChanged(nameof(HasFolders));
+        OnPropertyChanged(nameof(CanLinkFolders));
+        OnPropertyChanged(nameof(ShowFolders));
+    }
 
     /// <summary>What's attached to the class (its home only): drop files on the page, or Attach.</summary>
     [ObservableProperty] public partial AttachmentsModel? Files { get; set; }
@@ -151,6 +180,8 @@ public sealed partial class OverviewModel : ObservableObject
         public int Unsorted { get; init; }
         public int Writing { get; init; }
         public Action<string>? OpenClass { get; init; }
+        /// <summary>A class's lectures by week (its All lectures), rather than its home.</summary>
+        public Action<string>? OpenAllLectures { get; init; }
         /// <summary>Opens a lecture (its class, its id) beside its class's list.</summary>
         public Action<string, string>? OpenLecture { get; init; }
         public Action<string, string>? OpenAssignment { get; init; }
@@ -259,7 +290,7 @@ public sealed partial class OverviewModel : ObservableObject
             Description = c.Description ?? "",
             HasCanvas = canvas,
             HasCalendars = s.Events is not null,
-            OnAllLectures = () => s.OpenClass?.Invoke(c.Name),
+            OnAllLectures = () => (s.OpenAllLectures ?? s.OpenClass)?.Invoke(c.Name),
             LecturesEmpty = $"No lectures in {c.Name} yet. Record one and it lands here.",
         };
         var toHandIn = StillToHandIn(s.Due).Where(i => i.Class == c.Name).ToList();
