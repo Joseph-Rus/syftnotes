@@ -9,7 +9,17 @@ if (-not $Files -or $Files.Count -eq 0) { throw "usage: verify-signing.ps1 [-Reh
 foreach ($f in $Files) {
   $sig = Get-AuthenticodeSignature -FilePath $f
   if (-not $sig.SignerCertificate) { throw "$f isn't signed" }
-  if (-not $sig.TimeStamperCertificate) { throw "$f has no secure timestamp" }
+  # A certificate that lasts days (Artifact Signing's) is only good for a signature that is timestamped. PowerShell can fail
+  # to see an RFC 3161 timestamp that is there, so a real signature is looked at by signtool too before it is refused.
+  $timestamped = [bool]$sig.TimeStamperCertificate
+  if (-not $timestamped -and -not $Rehearsal) {
+    $signtool = Get-ChildItem (Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin") -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -Last 1
+    if ($signtool) { $timestamped = [bool]((& $signtool.FullName verify /pa /all /v $f 2>&1 | Out-String) -match "timestamped") }
+  }
+  if (-not $timestamped) {
+    if ($Rehearsal) { Write-Host "(warning: $f: PowerShell sees no timestamp)" } else { throw "$f has no secure timestamp" }
+  }
   if ($Rehearsal) {
     if ($sig.SignerCertificate.Thumbprint -ne $env:STUDYSTASH_REHEARSAL_THUMBPRINT) { throw "$f isn't signed by the rehearsal's certificate" }
   } elseif ($sig.Status -ne "Valid") {

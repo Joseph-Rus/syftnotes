@@ -14,6 +14,9 @@ set -eu
 DIR="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/study-stash-signing"
 KC="$DIR/signing.keychain-db"
 fail() { echo "signing-setup.sh: $*" >&2; exit 1; }
+# macOS has no timeout command, and the security tool can wait for a password nobody can type: a call that takes too long
+# is given up on (the runner is thrown away after the run), not waited for until the job's own timeout.
+limit() { perl -e 'alarm shift; exec @ARGV' "$@"; }
 emit() {
   case "$2" in *'
 '*) fail "$1 has a line break in it" ;; esac
@@ -84,7 +87,8 @@ CNF
     allow_codesign
     # codesign only offers an identity whose certificate the system trusts: trust this one, for code signing only.
     # This is for a runner that's thrown away after the run (sudo needs no password there), never a Mac of your own.
-    sudo security add-trusted-cert -d -r trustRoot -p codeSign -k "$KC" "$DIR/cert.pem"
+    limit 120 sudo -n security add-trusted-cert -d -r trustRoot -p codeSign -k "$KC" "$DIR/cert.pem" \
+      || fail "couldn't make the system trust the rehearsal's identity for code signing (a runner with passwordless sudo is needed)"
     list=$(security find-identity -v -p codesigning "$KC" | grep ')' | grep -v 'valid identities' || true)
     [ -n "$list" ] || { security find-identity -p codesigning "$KC" >&2; fail "the self-signed identity isn't usable for code signing"; }
     emit STUDYSTASH_SIGN_KEYCHAIN "$KC"
@@ -104,12 +108,19 @@ CNF
     ;;
   cleanup)
     if [ -f "$DIR/searchlist" ]; then
+      echo "Putting the keychain search list back..."
       set --
       while IFS= read -r line; do set -- "$@" "$line"; done < "$DIR/searchlist"
-      security list-keychains -d user -s "$@" || true
+      limit 30 security list-keychains -d user -s "$@" || echo "(couldn't put the search list back)"
     fi
-    [ ! -f "$KC" ] || security delete-keychain "$KC" || true
-    if [ -f "$DIR/cert.pem" ]; then sudo security remove-trusted-cert -d "$DIR/cert.pem" || true; fi
+    if [ -f "$KC" ]; then
+      echo "Deleting the signing keychain..."
+      limit 30 security delete-keychain "$KC" || echo "(couldn't delete the signing keychain)"
+    fi
+    if [ -f "$DIR/cert.pem" ]; then
+      echo "Taking the rehearsal's trust away..."
+      limit 30 sudo -n security remove-trusted-cert -d "$DIR/cert.pem" || echo "(couldn't take the trust away; this runner is thrown away after the run)"
+    fi
     for f in cert.p12 cert.pem key.pem identity.p12 openssl.cnf DeveloperIDG2CA.cer notary-key.p8 searchlist; do
       rm -f "$DIR/$f"
     done

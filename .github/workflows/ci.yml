@@ -487,8 +487,9 @@ jobs:
         env:
           HOW: ${{ needs.version.outputs.win_signing }}
         run: |
-          $rehearsal = if ($env:HOW -eq "rehearsal") { @("-Rehearsal") } else { @() }
-          .\windows\verify-signing.ps1 @rehearsal dist\windows\Study-Stash-Setup.exe dist\windows\win-x64\StudyStash.exe dist\windows\win-arm64\StudyStash.exe dist\windows\win-x64\StudyStash.Core.dll dist\windows\win-x64\libSkiaSharp.dll
+          $check = @{}
+          if ($env:HOW -eq "rehearsal") { $check.Rehearsal = $true }
+          .\windows\verify-signing.ps1 @check dist\windows\Study-Stash-Setup.exe dist\windows\win-x64\StudyStash.exe dist\windows\win-arm64\StudyStash.exe dist\windows\win-x64\StudyStash.Core.dll dist\windows\win-x64\libSkiaSharp.dll
       - name: Both trees carry the phone app, which the library serves at /app/
         shell: pwsh
         run: |
@@ -573,8 +574,9 @@ jobs:
           HOW: ${{ needs.version.outputs.win_signing }}
         run: |
           $app = "$env:LOCALAPPDATA\Programs\Study Stash"
-          $rehearsal = if ($env:HOW -eq "rehearsal") { @("-Rehearsal") } else { @() }
-          .\windows\verify-signing.ps1 @rehearsal "$app\StudyStash.exe" "$app\unins000.exe" "$app\libSkiaSharp.dll"
+          $check = @{}
+          if ($env:HOW -eq "rehearsal") { $check.Rehearsal = $true }
+          .\windows\verify-signing.ps1 @check "$app\StudyStash.exe" "$app\unins000.exe" "$app\libSkiaSharp.dll"
       # A release runs this from the copy the installer put there; a merge, which has no installer, from the build.
       - name: Self-test (D5), as a laptop - its native code came with the installer, and a lecture's formulas and flowchart draw
         if: needs.version.outputs.tested != 'true' || needs.version.outputs.installers == 'true'
