@@ -8,8 +8,8 @@
                          the wheels are zip files whose needle/libneedle3.* is the shared library), one per processor.
        The engine is binary only (its source isn't published); it reaches no network (it imports no sockets or HTTP),
        and the telemetry the README speaks of is the Python package's, which Study Stash doesn't use.
-       Output: models/whistle.cact, and needle/<rid>/libneedle3.(dylib|dll): every processor's for a plain build (tests,
-       running from source), only the published one's for a publish with a runtime (the installers). -->
+       Output: models/whistle.cact, needle/LICENSE.txt and needle/<rid>/libneedle3.(dylib|dll) for every processor; the
+       app's publish for one processor (the installers) keeps only its own (StudyStash.App.csproj). -->
   <PropertyGroup>
     <NeedleVersion>3.1.0</NeedleVersion>
     <NeedleRevision>c7c415a3d1b3d929014bc6e866d51ebb971f7089</NeedleRevision>
@@ -27,9 +27,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- A publish for one processor carries only its engine; a build (no runtime named) carries every one. -->
-    <NeedleWanted Include="@(NeedleEngine)" Condition="'$(RuntimeIdentifier)' == ''" />
-    <NeedleWanted Include="@(NeedleEngine->WithMetadataValue('Rid', '$(RuntimeIdentifier)'))" Condition="'$(RuntimeIdentifier)' != ''" />
+    <NeedleWanted Include="@(NeedleEngine)" />
     <None Include="$(NeedleCache)whistle.cact" Link="models/whistle.cact" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
     <None Include="@(NeedleWanted->'$(NeedleCache)%(Rid)/needle/%(Library)')" Link="needle/%(Rid)/%(Library)"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />

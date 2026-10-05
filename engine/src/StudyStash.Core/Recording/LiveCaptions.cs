@@ -253,7 +253,8 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
     static string Keywords(string className) => className.Trim().Length > 2 && className.Any(char.IsLetter) ? className.Trim() : "";
 
     /// <summary>Hear about every <see cref="Every"/> until <paramref name="stop"/>: on its own thread, below the app's
-    /// own work, so the recorder and the transcript never wait for it.</summary>
+    /// own work, so the recorder and the transcript never wait for it. A computer that takes long over a pass hears less
+    /// often (a pass's time at most a quarter of the time), so the live words never cost it much.</summary>
     public void Run(CancellationToken stop)
     {
         while (!stop.IsCancellationRequested)
@@ -267,7 +268,8 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             {
                 log($"[live] {e.Message}");
             }
-            var left = Every - (DateTime.UtcNow - started);
+            var took = DateTime.UtcNow - started;
+            var left = (took * 4 > Every ? took * 4 : Every) - took;
             // Nothing recording: look less often.
             if (recording() is not { State: LectureState.Recording, AfterClass: false }) left = TimeSpan.FromSeconds(2);
             if (left > TimeSpan.Zero) stop.WaitHandle.WaitOne(left);
