@@ -126,7 +126,7 @@ public sealed partial class CardEntry : ChatEntry
     public Services.ModelChoice? Model => Setup.Models.FirstOrDefault(m => m.Model.Id == ModelId);
     public string ModelTitle => Model is { } m ? $"Download {m.Name}?" : "Download the transcription model?";
     public string ModelBody => Model is { } m
-        ? $"{m.Size}, once. It turns speech into text on this {Setup.DeviceWord}, so recordings never leave it."
+        ? (m.Model.Bundled ? "It comes with the app, so there's nothing to download. " : $"{m.Size}, once. ") + $"It turns speech into text on this {Setup.DeviceWord}, so recordings never leave it."
         : "";
 
     /// <summary>The finish card's recap: one line an item.</summary>

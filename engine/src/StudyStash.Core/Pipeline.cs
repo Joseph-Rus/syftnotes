@@ -26,7 +26,7 @@ public sealed class SleptException(Exception inner) : Exception("the computer sl
 /// </summary>
 public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
     Func<Meeting, Config, Task<string>>? summarize = null, Action<string>? log = null, Func<string>? notesModel = null,
-    Func<string>? notesEngine = null, SleepClock? sleep = null, Action<string>? filed = null)
+    Func<string>? notesEngine = null, SleepClock? sleep = null, Action<string>? filed = null, Func<bool>? notesFast = null)
 {
     readonly SleepClock sleep = sleep ?? SleepClock.System;
     readonly Func<Meeting, Config, Task<string>> summarize = summarize ?? ((m, c) => Summarize.SummarizeTranscriptAsync(m, c));
@@ -68,6 +68,7 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
         if (Summarize.WantsSummary(m, Cfg))
         {
             model = notesModel?.Invoke() ?? Cfg.EffectiveSummaryModel; // what writes the notes, as the note records it
+            string how = notesFast?.Invoke() == true ? " in fast mode" : ""; // Claude Code's fast mode costs more: the log says when it was used
             var watch = Stopwatch.StartNew();
             var slept = sleep.Start();
             try
@@ -80,7 +81,7 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
                     engineProblem = null;
                     log("[pipeline] the notes engine is answering again");
                 }
-                log($"[pipeline] summarized '{m.Title}' with {model} in {watch.Elapsed.TotalSeconds:0}s");
+                log($"[pipeline] summarized '{m.Title}' with {model}{how} in {watch.Elapsed.TotalSeconds:0}s");
             }
             catch (Exception e) when (IsOffline(e))
             {

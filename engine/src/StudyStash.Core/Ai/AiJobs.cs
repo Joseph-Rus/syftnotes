@@ -428,6 +428,16 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         ? LibraryReader.OllamaAskAsync(cfg(), prompt, schema)
         : JsonAnswerAsync("ask", prompt, schema);
 
+    /// <summary>Whether the notes are being written in Claude Code's fast mode right now (it has to be what writes them, on
+    /// Opus, with the speed set to fast), for the log to say so.</summary>
+    public bool NotesInFastMode()
+    {
+        var settings = Settings;
+        if (NotesOnOllama(settings)) return false;
+        var c = settings.For("notes");
+        return AiSpeed.ForNotes(c.Provider, c.Model, settings.Speed).Fast;
+    }
+
     /// <summary>The name of what does a job, for the log ("Claude sonnet", "qwen3:8b").</summary>
     public string Describe(string job, Config cfg)
     {

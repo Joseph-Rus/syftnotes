@@ -42,7 +42,17 @@ public static partial class Shell
             // page showing, which may be "Can't reach your library" with no classes beside it.
             _ = all ? LoadLibraryAsync() : dueOpen ? ShowDueAsync() : overviewOf is { } over ? ShowOverviewAsync(over)
                 : openClass is { } cls ? ShowClassAsync(cls) : Task.CompletedTask;
+            // The page showing has its new note; the sidebar's counts beside it follow (a whole load does its own).
+            if (!all) _ = RefreshCountsAsync();
         }, TimeSpan.FromSeconds(1));
+    }
+
+    /// <summary>The sidebar's lecture counts, as the library says them now: only the numbers change, not the page showing.</summary>
+    static async Task RefreshCountsAsync()
+    {
+        await host.CheckLibraryAsync();
+        if (quitting || host.Library != LibraryState.Connected) return;
+        library.ShowCounts(host.Classes().Select(c => (c.Name, c.Lectures)), host.Overview?["unsorted"]?.GetValue<int>() ?? 0);
     }
 
     static bool libraryReloadWhole;

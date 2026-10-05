@@ -181,7 +181,7 @@ public static class Cli
             var ai = new AiJobs(home, () => cfg.OllamaHost) { Log = Console.WriteLine };
             Pipeline? writer = null; // the pipeline, below: the diagrams wait while it writes notes
             var diagrams = new DiagramJobs(cfg, store, ai) { NotesBusy = () => writer?.Writing == true };
-            var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg),
+            var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg), notesFast: ai.NotesInFastMode,
                 filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)));
             var working = pipeline.Start(stop.Token);
             var designing = diagrams.Start(stop.Token);

@@ -123,4 +123,21 @@ public class SortingFollowsNotesTests
         Assert.Equal(Configs.Unsorted, (await Sort(ai, cfg)).ClassName); // no ai.json at all
         Assert.Empty(claude.Prompts);
     }
+
+    [Theory]
+    [InlineData("claude", "fast", "", true)]
+    [InlineData("claude", "fast", "opus", true)]
+    [InlineData("claude", "fast", "sonnet", false)] // fast mode is Opus's
+    [InlineData("claude", "standard", "", false)]
+    [InlineData("codex", "fast", "", false)] // only Claude Code has it
+    [InlineData("ollama", "fast", "", false)]
+    public void Fast_mode_is_only_claimed_when_Claude_Code_really_writes_the_notes_with_it(string engine, string speed, string model, bool fast)
+    {
+        using var dir = new TempDir();
+        var s = new AiSettings { Speed = speed };
+        s.ByJob["notes"] = new AiChoice(engine, model);
+        s.Save(dir.Path);
+        var ai = new AiJobs(dir.Path) { Checks = new FakeChecks().Installed("claude", "codex").Build() };
+        Assert.Equal(fast, ai.NotesInFastMode());
+    }
 }
