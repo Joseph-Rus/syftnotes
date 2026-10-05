@@ -43,8 +43,10 @@
     <DownloadFile Condition="!Exists('$(NeedleCache)%(NeedleWanted.Identity)/needle/%(NeedleWanted.Library)')"
                   SourceUrl="https://huggingface.co/Cactus-Compute/needle3/resolve/$(NeedleRevision)/python/cactus_needle-$(NeedleVersion)-py3-none-%(NeedleWanted.Tag).whl"
                   DestinationFolder="$(NeedleCache)%(NeedleWanted.Identity)" DestinationFileName="engine.whl" Retries="3" />
+    <!-- The whole wheel (the library and a few small Python files): an Include filter such as "needle/*" matched
+         nothing on Windows, where the pattern is compared with backslashes, so nothing came out and the hash failed. -->
     <Unzip Condition="!Exists('$(NeedleCache)%(NeedleWanted.Identity)/needle/%(NeedleWanted.Library)')"
-           SourceFiles="$(NeedleCache)%(NeedleWanted.Identity)/engine.whl" DestinationFolder="$(NeedleCache)%(NeedleWanted.Identity)" Include="needle/*" />
+           SourceFiles="$(NeedleCache)%(NeedleWanted.Identity)/engine.whl" DestinationFolder="$(NeedleCache)%(NeedleWanted.Identity)" />
     <VerifyFileHash File="$(NeedleCache)%(NeedleWanted.Identity)/needle/%(NeedleWanted.Library)" Hash="%(NeedleWanted.Sha256)" Algorithm="SHA256" />
     <!-- The wheels keep the library readable by its owner only: an app installed by one account and run by another
          has to read it too. -->
