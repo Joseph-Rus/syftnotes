@@ -106,6 +106,8 @@ public sealed partial class LibraryWeb
         var ts = options.Tailscale();
         var rel = await options.Latest(3600);
         var picked = AiSettings.Load(cfg.Home);
+        // What sorting follows: the main AI, or the notes engine while Ollama has no model to sort with (AiJobs.SortAsync).
+        string sortsWith = await AiJobs.SortFollowsNotesAsync(picked, cfg, Jobs.Checks) ?? picked.Provider;
         var counts = store.ClassesSummary().ToDictionary(c => c.ClassName, c => c.Count);
         bool? atLogin = null;
         try
@@ -144,7 +146,7 @@ public sealed partial class LibraryWeb
             ["sorting"] = new JsonObject
             {
                 ["engine"] = picked.ByJob.TryGetValue("sort", out var sorts) ? sorts.Provider : "",
-                ["default"] = AiProviders.All(() => cfg.OllamaHost).FirstOrDefault(p => p.Id == picked.Provider)?.Name ?? picked.Provider,
+                ["default"] = AiProviders.All(() => cfg.OllamaHost).FirstOrDefault(p => p.Id == sortsWith)?.Name ?? sortsWith,
                 ["engines"] = new JsonArray(AiProviders.All(() => cfg.OllamaHost).Select(p => (JsonNode?)new JsonObject
                 {
                     ["id"] = p.Id, ["name"] = p.Name, ["installed"] = p.Available(),
