@@ -537,6 +537,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                  })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;
+        // A library on this computer starts at login through the same login item as the app (Your library → Start the
+        // library when this Mac starts): General shows it as it is now, not as it was when Settings opened.
+        if (value == "General" && !loading)
+        {
+            settingLogin = true;
+            StartAtLogin = host.LoginItems.StartsAtLogin(host.Home);
+            settingLogin = false;
+        }
         LoadSection(value);
     }
 
