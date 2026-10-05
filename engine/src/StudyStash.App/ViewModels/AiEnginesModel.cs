@@ -85,7 +85,7 @@ public sealed partial class ApiKeyRow : ObservableObject
     [ObservableProperty] public partial string Hint { get; set; } = "";
     [ObservableProperty] public partial string Draft { get; set; } = "";
     public bool HasKey => Hint.Length > 0;
-    public string Sub => HasKey ? $"Key {Hint} saved. Used for notes and answers; tools still need the app." : $"Paste a key from {Where}.";
+    public string Sub => HasKey ? $"Key {Hint} saved" : $"From {Where}";
     partial void OnHintChanged(string value)
     {
         OnPropertyChanged(nameof(HasKey));

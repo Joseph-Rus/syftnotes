@@ -241,8 +241,8 @@
                     <TextBlock Classes="ai-row-sub" Text="{Binding Sub}" TextWrapping="Wrap" />
                   </StackPanel>
                   <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <Border Classes="field" Width="200">
-                      <TextBox Classes="bare" Text="{Binding Draft}" PasswordChar="•" FontSize="14"
+                    <Border Width="200" Height="30" CornerRadius="{DynamicResource RadiusControl}" BorderThickness="1" Padding="9,0" Background="{DynamicResource Ctrl}" BorderBrush="{DynamicResource CtrlBorder}">
+                      <TextBox Classes="bare" VerticalAlignment="Center" Text="{Binding Draft}" PasswordChar="•" FontSize="14"
                                PlaceholderText="{Binding HasKey, Converter={x:Static vm:KeyWords.Placeholder}}"
                                AutomationProperties.Name="{Binding Name, StringFormat='{}{0} API key'}">
                         <TextBox.KeyBindings>
