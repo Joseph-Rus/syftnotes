@@ -37,9 +37,15 @@ $Iscc = @((Get-Command iscc -ErrorAction SilentlyContinue).Source,
         Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 if (-not $Iscc) { throw "Inno Setup 6 isn't installed (choco install innosetup)" }
 # Inno runs this command for Setup.exe and the uninstaller; $q is a quote mark and $f the (quoted) file, Inno's own.
-$SignCommand = '/Sstudystash=powershell.exe -NoProfile -ExecutionPolicy Bypass -File $q' + $SignScript + '$q $f'
+$Quoted = if ($SignScript -match '\s') { '$q' + $SignScript + '$q' } else { $SignScript }
+$SignCommand = '/Sstudystash=powershell.exe -NoProfile -ExecutionPolicy Bypass -File ' + $Quoted + ' $f'
+Write-Host "Inno Setup's sign tool: $SignCommand"
 & $Iscc "/Qp" "/DAppVersion=$Version" "/DSource=$Out" "/O$Out" "/DSignInstaller" $SignCommand (Join-Path $Here "setup.iss")
-if ($LASTEXITCODE -ne 0) { throw "the signed installer didn't build" }
+if ($LASTEXITCODE -ne 0) {
+  $SignLog = Join-Path (Join-Path $(if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }) "study-stash-signing") "sign.log"
+  if (Test-Path $SignLog) { Write-Host "--- what the sign tool said"; Get-Content $SignLog | Write-Host }
+  throw "the signed installer didn't build"
+}
 $Setup = Join-Path $Out "Study-Stash-Setup.exe"
 if (-not (Get-AuthenticodeSignature -FilePath $Setup).SignerCertificate) { throw "$Setup isn't signed" }
 Write-Host "Signed Study-Stash-Setup.exe ($Method)."

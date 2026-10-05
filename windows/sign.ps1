@@ -37,6 +37,8 @@ if (-not $Files -or $Files.Count -eq 0) { throw "sign.ps1: no files to sign" }
 
 $Work = Join-Path $(if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { $env:TEMP }) "study-stash-signing"
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
+# Inno Setup runs this with no console to show anything on, so a failure is also written here, for sign-release.ps1 to print.
+$Log = Join-Path $Work "sign.log"
 
 # The newest 64-bit signtool.exe of the Windows SDK (Artifact Signing needs 10.0.2261.755 or newer).
 function Find-SignTool {
@@ -46,49 +48,56 @@ function Find-SignTool {
   $best = $all | Sort-Object { $v = $_.VersionInfo; [version]::new($v.FileMajorPart, $v.FileMinorPart, $v.FileBuildPart, $v.FilePrivatePart) } -Descending | Select-Object -First 1
   return $best.FullName
 }
-$SignTool = Find-SignTool
-
-if ($Kind -eq "azure") {
-  # Microsoft's dlib for signtool, from NuGet (a .nupkg is a zip).
-  $Version = if ($env:ARTIFACT_SIGNING_CLIENT_VERSION) { $env:ARTIFACT_SIGNING_CLIENT_VERSION } else { "1.0.128" }
-  $Tools = Join-Path $Work "artifact-signing-client-$Version"
-  $Dlib = Get-ChildItem $Tools -Recurse -Filter Azure.CodeSigning.Dlib.dll -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
-  if (-not $Dlib) {
-    $zip = "$Tools.zip"
-    Invoke-WebRequest -UseBasicParsing -Uri "https://www.nuget.org/api/v2/package/Microsoft.ArtifactSigning.Client/$Version" -OutFile $zip
-    Expand-Archive -Path $zip -DestinationPath $Tools -Force
-    Remove-Item $zip -Force
-    $Dlib = Get-ChildItem $Tools -Recurse -Filter Azure.CodeSigning.Dlib.dll | Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
-    if (-not $Dlib) { throw "sign.ps1: Azure.CodeSigning.Dlib.dll isn't in Microsoft.ArtifactSigning.Client $Version" }
-  }
-  $MetaPath = Join-Path $Work "artifact-signing-metadata.json"
-  @{ Endpoint = $env:WINDOWS_SIGNING_ENDPOINT; CodeSigningAccountName = $env:WINDOWS_SIGNING_ACCOUNT; CertificateProfileName = $env:WINDOWS_SIGNING_PROFILE } |
-    ConvertTo-Json | Set-Content -Path $MetaPath -Encoding ASCII
-  $Timestamp = "http://timestamp.acs.microsoft.com"
-  $Identity = @("/dlib", $Dlib.FullName, "/dmdf", $MetaPath)
-} else {
-  $Pfx = Join-Path $Work "signing-certificate.pfx"
-  [IO.File]::WriteAllBytes($Pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
-  $Timestamp = if ($env:WINDOWS_TIMESTAMP_URL) { $env:WINDOWS_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }
-  $Identity = @("/f", $Pfx, "/p", $env:WINDOWS_CERT_PASSWORD)
-}
-
+$Pfx = $null
 try {
+  $SignTool = Find-SignTool
+
+  if ($Kind -eq "azure") {
+    # Microsoft's dlib for signtool, from NuGet (a .nupkg is a zip).
+    $Version = if ($env:ARTIFACT_SIGNING_CLIENT_VERSION) { $env:ARTIFACT_SIGNING_CLIENT_VERSION } else { "1.0.128" }
+    $Tools = Join-Path $Work "artifact-signing-client-$Version"
+    $Dlib = Get-ChildItem $Tools -Recurse -Filter Azure.CodeSigning.Dlib.dll -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
+    if (-not $Dlib) {
+      $zip = "$Tools.zip"
+      Invoke-WebRequest -UseBasicParsing -Uri "https://www.nuget.org/api/v2/package/Microsoft.ArtifactSigning.Client/$Version" -OutFile $zip
+      Expand-Archive -Path $zip -DestinationPath $Tools -Force
+      Remove-Item $zip -Force
+      $Dlib = Get-ChildItem $Tools -Recurse -Filter Azure.CodeSigning.Dlib.dll | Where-Object { $_.FullName -match '\\x64\\' } | Select-Object -First 1
+      if (-not $Dlib) { throw "sign.ps1: Azure.CodeSigning.Dlib.dll isn't in Microsoft.ArtifactSigning.Client $Version" }
+    }
+    $MetaPath = Join-Path $Work "artifact-signing-metadata.json"
+    @{ Endpoint = $env:WINDOWS_SIGNING_ENDPOINT; CodeSigningAccountName = $env:WINDOWS_SIGNING_ACCOUNT; CertificateProfileName = $env:WINDOWS_SIGNING_PROFILE } |
+      ConvertTo-Json | Set-Content -Path $MetaPath -Encoding ASCII
+    $Timestamp = "http://timestamp.acs.microsoft.com"
+    $Identity = @("/dlib", $Dlib.FullName, "/dmdf", $MetaPath)
+  } else {
+    $Pfx = Join-Path $Work "signing-certificate.pfx"
+    [IO.File]::WriteAllBytes($Pfx, [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+    $Timestamp = if ($env:WINDOWS_TIMESTAMP_URL) { $env:WINDOWS_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }
+    $Identity = @("/f", $Pfx, "/p", $env:WINDOWS_CERT_PASSWORD)
+  }
+
   # A few files to a signtool, so a command line stays short; each batch is tried again, as the timestamp server (and
   # Azure) now and then don't answer.
   for ($i = 0; $i -lt $Files.Count; $i += 20) {
     $batch = @($Files[$i..([Math]::Min($i + 19, $Files.Count - 1))])
     for ($attempt = 1; ; $attempt++) {
-      $log = & $SignTool sign /q /fd SHA256 /tr $Timestamp /td SHA256 @Identity @batch 2>&1 | Out-String
+      $said = & $SignTool sign /q /fd SHA256 /tr $Timestamp /td SHA256 @Identity @batch 2>&1 | Out-String
       if ($LASTEXITCODE -eq 0) { break }
-      if ($attempt -ge 3) { throw "sign.ps1: signtool failed on $($batch -join ', '): $log" }
+      if ($attempt -ge 3) { throw "signtool failed on $($batch -join ', '): $said" }
       Start-Sleep -Seconds (10 * $attempt)
     }
   }
+  # signtool's success is the proof for most files; for an exe or dll, Windows is asked as well. (Get-AuthenticodeSignature
+  # can't read the temporary files Inno Setup signs, which have no such extension.)
   foreach ($f in $Files) {
-    if (-not (Get-AuthenticodeSignature -FilePath $f).SignerCertificate) { throw "sign.ps1: $f has no signature after signing" }
+    if ($f -match '\.(exe|dll)$' -and -not (Get-AuthenticodeSignature -FilePath $f).SignerCertificate) { throw "$f has no signature after signing" }
   }
   Write-Host "sign.ps1: signed $($Files.Count) file(s) ($Kind)"
+} catch {
+  Add-Content -Path $Log -Value "sign.ps1 ($Kind) failed for $($Files -join ' '): $($_.Exception.Message)"
+  [Console]::Error.WriteLine("sign.ps1: $($_.Exception.Message)")
+  exit 1
 } finally {
-  if ($Kind -eq "pfx") { Remove-Item $Pfx -Force -ErrorAction SilentlyContinue }
+  if ($Pfx) { Remove-Item $Pfx -Force -ErrorAction SilentlyContinue }
 }
