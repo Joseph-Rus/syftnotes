@@ -21,15 +21,20 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
   NVIDIA's Parakeet instead (a 2.5 GB download): it's made for the processor, nearly as accurate as
   the compact turbo, and never makes up words over silence; it reads 25 European languages, and a
   lecture in another language uses Whisper. A computer too weak for either gets a lighter Whisper.
-  The bigger, more accurate models are a choice in setup and Settings → Recording, and so is Cactus
-  Whistle, the fastest and smallest, which comes with the app (about as accurate as Whisper base).
+  The bigger, more accurate models are a choice in setup and Settings → Recording, and so, on a Mac
+  with Apple silicon or a PC with an ARM processor, is Cactus Whistle, the fastest and smallest, which
+  comes with the app (about as accurate as Whisper base).
   Whatever the model, while a lecture is transcribed as you go, the open recorder shows what's said
-  a second or two after it's said, where this computer is fast enough: Whistle hears the newest
-  sound every second, and the chosen model's more accurate lines take its place as they come (about
-  half a minute behind). Each pass is timed; on a computer where Whistle can't keep up cheaply (a
-  pass taking more than 0.3× the sound it hears) the live words turn off and the recorder shows the
-  chosen model's lines only, as it does for a lecture in a language Whistle doesn't read (it reads
-  English, German, French, Spanish, Italian, Dutch and Polish). In Settings → Recording, an
+  a second or two after it's said: a quick model hears the newest sound every second, and the chosen
+  model's more accurate lines take its place as they come (about half a minute behind). The quick
+  model comes with the app: Cactus Whistle on Apple silicon and Windows on ARM, where its engine is
+  fastest; a small Whisper (tiny, 44 MB) on Intel Macs and other PCs, where Whistle's engine is
+  slow. Every pass is timed, and each lecture's first is a short test: where this computer can't
+  keep up cheaply during a lecture (a pass taking more than 0.3× the sound it hears), the live words
+  switch themselves off for that lecture and the recorder shows the chosen model's lines only; the
+  next lecture tries again. Whistle reads English, German, French, Spanish, Italian, Dutch and
+  Polish; on a computer that hears the live words with it, a lecture in another language shows the
+  chosen model's lines only. In Settings → Recording, an
   experimental **Tell speakers apart** also marks in a transcript ("Speaker 2:") where a voice other
   than the lecturer's seems to speak; it is careful rather than complete, and can be wrong. While it
   records, a tiny pill shows the time and the level; pause or stop from the menu bar.
@@ -469,12 +474,14 @@ run with [Whisper.net](https://github.com/sandrohanea/whisper.net)) or, if you c
 voices apart, when you turn that on, it uses
 [pyannote's segmentation 3.0](https://huggingface.co/pyannote/segmentation-3.0) (MIT) and NVIDIA's
 [TitaNet small](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/titanet_small)
-(CC BY 4.0), also converted by sherpa-onnx. The models are downloaded when you pick them, except
+(CC BY 4.0), also converted by sherpa-onnx. The models are downloaded when you pick them, except the
+live words' models, which come inside the app unchanged with their licences: on ARM,
 [Cactus Whistle](https://huggingface.co/Cactus-Compute/whistle) and the
 [needle](https://github.com/cactus-compute/needle) engine that runs it (both Apache-2.0, by Cactus
-Compute), which come inside the app unchanged with their licence (needle/LICENSE.txt beside the app).
-Study Stash calls the engine's library directly: the anonymous usage counts that Cactus's Python
-package sends aren't part of it, and nothing it hears leaves the computer.
+Compute; needle/LICENSE.txt beside the app); on x64, Whisper tiny (MIT, OpenAI; whisper.cpp's
+ggml-tiny-q8_0 file; models/live-whisper-LICENSE.txt beside the app). Study Stash calls needle's
+library directly: the anonymous usage counts that Cactus's Python package sends aren't part of it,
+and nothing either model hears leaves the computer.
 
 Illustrations are composed from parts drawn by [Servier Medical Art](https://smart.servier.com/)
 (CC BY 3.0, via [Bioicons](https://bioicons.com)), the [DBCLS Togo Picture
