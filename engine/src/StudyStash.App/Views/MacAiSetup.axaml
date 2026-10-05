@@ -72,7 +72,7 @@
                   <StackPanel>
                     <Border Classes="ai-sep" Margin="44,0,0,0" IsVisible="{Binding !First}" />
                     <Grid ColumnDefinitions="Auto,12,*,Auto" MinHeight="41" Margin="16,8">
-                      <Button Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+                      <Button AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding About}" Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
                         <Grid ColumnDefinitions="Auto,12,*">
                           <Border Classes="ai-radio" Classes.on="{Binding Selected}" Classes.dim="{Binding !CanWrite}" VerticalAlignment="Center">
                             <Ellipse Width="6" Height="6" Fill="White" IsVisible="{Binding Selected}" />
@@ -86,12 +86,12 @@
                       </Button>
                       <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                         <TextBlock Classes="ai-row-sub" Text="Recommended" IsVisible="{Binding Recommended}" VerticalAlignment="Center" />
-                        <Button Classes="ai-pillbtn" Command="{Binding SignInCommand}" IsVisible="{Binding ShowSignIn}">
+                        <Button AutomationProperties.Name="Sign in" Classes="ai-pillbtn" Command="{Binding SignInCommand}" IsVisible="{Binding ShowSignIn}">
                           <Border Classes="ai-pill">
                             <TextBlock Text="Sign in" />
                           </Border>
                         </Button>
-                        <Button Classes="ai-pillbtn" Command="{Binding ToggleHelpCommand}" IsVisible="{Binding HasHelp}">
+                        <Button AutomationProperties.Name="{Binding HelpLabel}" Classes="ai-pillbtn" Command="{Binding ToggleHelpCommand}" IsVisible="{Binding HasHelp}">
                           <Border Classes="ai-pill">
                             <TextBlock Text="{Binding HelpLabel}" />
                           </Border>
@@ -113,7 +113,7 @@
                                 <Border Classes="code" IsVisible="{Binding HasCommand}">
                                   <Grid ColumnDefinitions="*,8,Auto">
                                     <SelectableTextBlock Text="{Binding Command}" />
-                                    <Button Grid.Column="2" Classes="ai-pillbtn" Command="{Binding CopyCommand}" VerticalAlignment="Center">
+                                    <Button AutomationProperties.Name="Copy" Grid.Column="2" Classes="ai-pillbtn" Command="{Binding CopyCommand}" VerticalAlignment="Center">
                                       <Border Classes="ai-pill small">
                                         <StackPanel Orientation="Horizontal" Spacing="4">
                                           <c:Icon Glyph="content_copy" Size="13" Foreground="{DynamicResource Fg2}" />
@@ -130,12 +130,12 @@
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
                       <Grid ColumnDefinitions="28,*,Auto">
-                        <Button Grid.Column="1" Classes="ai-pillbtn" Command="{Binding OpenCommand}" HorizontalAlignment="Left">
+                        <Button AutomationProperties.Name="{Binding OpenLabel}" Grid.Column="1" Classes="ai-pillbtn" Command="{Binding OpenCommand}" HorizontalAlignment="Left">
                           <Border Classes="ai-pill small">
                             <TextBlock Text="{Binding OpenLabel}" />
                           </Border>
                         </Button>
-                        <Button Grid.Column="2" Classes="ai-pillbtn" Command="{Binding CheckAgainCommand}">
+                        <Button AutomationProperties.Name="Check again" Grid.Column="2" Classes="ai-pillbtn" Command="{Binding CheckAgainCommand}">
                           <Border Classes="ai-pill small">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                               <c:Icon Glyph="refresh" Size="13" Foreground="{DynamicResource Fg2}" />
@@ -153,7 +153,7 @@
             <StackPanel IsVisible="{Binding OffersNoAi}">
               <Border Classes="ai-sep" Margin="44,0,0,0" />
               <Grid ColumnDefinitions="Auto,12,*,Auto" MinHeight="41" Margin="16,8">
-                <Button Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding PickNoAiCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+                <Button AutomationProperties.Name="No AI for now" AutomationProperties.HelpText="Just transcripts. Turn notes on later in Settings." Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding PickNoAiCommand}" HorizontalContentAlignment="Stretch" Padding="0">
                   <Grid ColumnDefinitions="Auto,12,*">
                     <Border Classes="ai-radio" Classes.on="{Binding NoAi}" VerticalAlignment="Center">
                       <Ellipse Width="6" Height="6" Fill="White" IsVisible="{Binding NoAi}" />
@@ -181,7 +181,7 @@
             <TextBlock Classes="ai-row-title" Text="Who answers your questions" />
             <TextBlock Classes="ai-row-sub" Text="You can pick per question too" />
           </StackPanel>
-          <Button Grid.Column="1" Classes="ai-select-btn" VerticalAlignment="Center">
+          <Button AutomationProperties.Name="Who answers your questions" Grid.Column="1" Classes="ai-select-btn" VerticalAlignment="Center">
             <Border Classes="ai-select">
               <Grid ColumnDefinitions="*,6,Auto">
                 <TextBlock Text="{Binding SelectedAskName}" TextTrimming="CharacterEllipsis" />

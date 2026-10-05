@@ -33,7 +33,7 @@
           </StackPanel>
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
             <TextBlock Text="{Binding On, Converter={x:Static c:Converters.OnOff}}" FontSize="14" />
-            <ToggleButton Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" />
+            <ToggleButton AutomationProperties.Name="Let AI tools read your library" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" />
           </StackPanel>
         </Grid>
       </Border>
@@ -147,7 +147,7 @@
             </StackPanel>
             <Panel Grid.Column="3" VerticalAlignment="Center">
               <c:Spinner IsVisible="{Binding WebBusy}" Width="16" Height="16" Foreground="{DynamicResource Fg2}" />
-              <ToggleButton IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
+              <ToggleButton AutomationProperties.Name="Let Claude reach your library from the internet" IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
                             IsChecked="{Binding WebOn}" IsEnabled="{Binding WebToggleEnabled}" />
             </Panel>
           </Grid>

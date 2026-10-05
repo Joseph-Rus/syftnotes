@@ -71,7 +71,7 @@ public class NoteViewRichTests
         var window = Show(note);
         var pieces = Pieces(note);
         Assert.Equal(
-            [typeof(DiagramView), typeof(SvgView), typeof(DiagramCard), typeof(DiagramView), typeof(DiagramCard), typeof(DiagramCard), typeof(TextBlock)],
+            [typeof(DiagramView), typeof(SvgView), typeof(DiagramCard), typeof(DiagramView), typeof(DiagramCard), typeof(DiagramCard), typeof(SpokenText)],
             pieces.Select(p => p.GetType()));
         // The bullet's diagram sits inside the list, not after it.
         Assert.Contains(pieces[3].GetLogicalAncestors(), a => a is Grid);
@@ -244,7 +244,7 @@ public class NoteViewRichTests
     {
         var note = new NoteView { Markdown = "Here's the cycle:\n\n```mermaid\n" + RichDemo.CardiacCycle[..40] };
         var window = Show(note);
-        Assert.IsType<TextBlock>(Assert.Single(Pieces(note)));
+        Assert.IsAssignableFrom<TextBlock>(Assert.Single(Pieces(note)));
         note.Markdown = "Here's the cycle:\n\n" + Fence("mermaid", RichDemo.CardiacCycle);
         Dispatcher.UIThread.RunJobs();
         Assert.IsType<DiagramView>(Assert.Single(Pieces(note)));

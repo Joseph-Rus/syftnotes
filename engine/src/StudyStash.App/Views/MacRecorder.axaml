@@ -50,7 +50,7 @@
                       HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowMeter}" />
           <c:Icon Glyph="pause" Filled="True" Size="12" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center"
                   IsVisible="{Binding ShowPausedMark}" />
-          <Button Classes="stop fill2" Command="{Binding StopCommand}" ToolTip.Tip="Stop" IsVisible="{Binding Hovered}">
+          <Button AutomationProperties.Name="Stop" Classes="stop fill2" Command="{Binding StopCommand}" ToolTip.Tip="Stop" IsVisible="{Binding Hovered}">
             <c:Icon Glyph="stop" Filled="True" Size="12" Foreground="{DynamicResource Fg}" />
           </Button>
         </Panel>
@@ -70,13 +70,13 @@
             <!-- Make it small, pause, stop: one pill of three round buttons -->
             <Border Grid.Column="6" Classes="fill" CornerRadius="20" Padding="3" VerticalAlignment="Center">
               <StackPanel Orientation="Horizontal" Spacing="2">
-                <Button Classes="small" Command="{Binding ToggleCommand}" ToolTip.Tip="Make it small">
+                <Button AutomationProperties.Name="Make it small" Classes="small" Command="{Binding ToggleCommand}" ToolTip.Tip="Make it small">
                   <c:Icon Glyph="close_fullscreen" Size="18" Foreground="{DynamicResource Fg2}" />
                 </Button>
-                <Button Classes="small" Command="{Binding PauseCommand}" ToolTip.Tip="{Binding PauseTip}">
+                <Button AutomationProperties.Name="{Binding PauseTip}" Classes="small" Command="{Binding PauseCommand}" ToolTip.Tip="{Binding PauseTip}">
                   <c:Icon Glyph="{Binding PauseGlyph}" Filled="True" Size="18" Foreground="{DynamicResource Fg}" />
                 </Button>
-                <Button Classes="small tint" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
+                <Button AutomationProperties.Name="Stop" Classes="small tint" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
                   <c:Icon Glyph="stop" Filled="True" Size="18" Foreground="{DynamicResource OnAccent}" />
                 </Button>
               </StackPanel>

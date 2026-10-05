@@ -18,7 +18,7 @@
       <StackPanel Spacing="6">
         <Grid ColumnDefinitions="*,Auto">
           <TextBlock Classes="ai-title" Text="AI tool access" c:Typography.Extra="-0.39" />
-          <ToggleButton Grid.Column="1" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" VerticalAlignment="Center" />
+          <ToggleButton AutomationProperties.Name="AI tool access" Grid.Column="1" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" VerticalAlignment="Center" />
         </Grid>
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left"
                    Text="Claude, Codex, Gemini and other apps that support MCP can read your library. They can't change or delete anything." />
@@ -158,7 +158,7 @@
               </StackPanel>
               <Panel Grid.Column="3" VerticalAlignment="Center">
                 <c:Spinner IsVisible="{Binding WebBusy}" Width="16" Height="16" Foreground="{DynamicResource Fg2}" />
-                <ToggleButton IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
+                <ToggleButton AutomationProperties.Name="Let Claude reach your library from the internet" IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
                               IsChecked="{Binding WebOn}" IsEnabled="{Binding WebToggleEnabled}" />
               </Panel>
             </Grid>

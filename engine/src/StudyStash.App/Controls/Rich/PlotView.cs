@@ -507,7 +507,9 @@ public sealed class PlotView : Decorator
         {
             bool on = playing == Plot.Params.IndexOf(r.Param);
             Glyph(r.Play, on ? "pause" : "play_arrow");
-            ToolTip.SetTip(r.Play, on ? "Pause" : $"Play {r.Param.Label ?? r.Param.Name}: sweep it back and forth");
+            string says = on ? $"Pause {r.Param.Label ?? r.Param.Name}" : $"Play {r.Param.Label ?? r.Param.Name}: sweep it back and forth";
+            ToolTip.SetTip(r.Play, says);
+            AutomationProperties.SetName(r.Play, says); // a screen reader says what pressing it does now, as the tooltip does
         }
 
         // The strip.

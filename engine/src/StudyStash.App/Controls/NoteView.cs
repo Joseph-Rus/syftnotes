@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
@@ -242,7 +243,7 @@ public sealed partial class NoteView : StackPanel
 
     TextBlock Text(string resourceFont, double size, double lineHeight)
     {
-        var t = new TextBlock { FontSize = size, LineHeight = size * lineHeight, TextWrapping = TextWrapping.Wrap };
+        var t = new SpokenText { FontSize = size, LineHeight = size * lineHeight, TextWrapping = TextWrapping.Wrap };
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(resourceFont));
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
         FollowLinks(t);
@@ -253,7 +254,7 @@ public sealed partial class NoteView : StackPanel
     /// can be copied a sentence at a time, not just as a whole).</summary>
     TextBlock CompactText()
     {
-        var t = new SelectableTextBlock { FontSize = BodySize, LineHeight = BodyLineHeight, TextWrapping = TextWrapping.Wrap };
+        var t = new SpokenSelectableText { FontSize = BodySize, LineHeight = BodyLineHeight, TextWrapping = TextWrapping.Wrap };
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(BodyFont ?? "TextFont"));
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
         t.Bind(SelectableTextBlock.SelectionBrushProperty, t.GetResourceObservable("Hl"));
@@ -465,6 +466,7 @@ public sealed partial class NoteView : StackPanel
             current.Inlines!.Add(piece);
         }
         if (current.Inlines!.Count > 0 || !split) segments.Add(current);
+        foreach (var segment in segments.OfType<TextBlock>()) SayFormulas(segment);
         if (segments.Count == 1) return LoneFormula(inline) is { } latex && !Print && !Compact && segments[0] is not PlotFormula ? PlotFormula.Wrap(segments[0], latex) : segments[0];
         var stack = new StackPanel { Spacing = 6 };
         foreach (var s in segments) stack.Children.Add(s);
@@ -757,6 +759,22 @@ public sealed partial class NoteView : StackPanel
             }
             t.Inlines.Add(piece);
         }
+        SayFormulas(t);
+    }
+
+    /// <summary>What a screen reader reads for a paragraph with formulas in it: Avalonia gives each formula's place in a
+    /// text as one object-replacement character ("\uFFFC"), so such a paragraph is named with its formulas in words
+    /// (<see cref="MathView.Reading"/>) in their places instead.</summary>
+    static void SayFormulas(TextBlock t)
+    {
+        if (t.Inlines is not { Count: > 0 } inlines || !inlines.Any(i => i is InlineUIContainer { Child: MathView })) return;
+        var said = new System.Text.StringBuilder();
+        foreach (var i in inlines)
+        {
+            if (i is Run r) said.Append(r.Text);
+            else if (i is InlineUIContainer { Child: MathView mv }) said.Append(' ').Append(MathView.Reading(mv.Latex)).Append(' ');
+        }
+        AutomationProperties.SetName(t, string.Join(' ', said.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries)));
     }
 
     /// <summary>The text as runs (or an inline formula's <see cref="InlineUIContainer"/>); weight and style are set
