@@ -160,10 +160,11 @@ public sealed class CaptionStitcher
 /// the recorder to show and to ask about; the transcript the notes are made from is the <see cref="TranscriptionWorker"/>'s,
 /// and <see cref="Merge"/> puts its lines first wherever it has got to.
 /// <para>Only where this computer is fast enough: every pass is timed against the sound it heard. A pass may take at
-/// most <see cref="MostRatio"/> of it (a pass over 3 seconds in under a second), or the live words couldn't keep up
+/// most <see cref="MostRatio"/> of it (3 seconds of sound in under a second), or the live words couldn't keep up
 /// without a core to themselves. Until a pass has shown this computer is fast enough its words aren't shown, and a pass
-/// hears 3 seconds at most; after that a pass hears no more than about <see cref="PassBudget"/> seconds of work. Two
-/// slow passes in a row before that (three after) and the live words are off (<see cref="TooSlow"/>): nothing hears
+/// hears 2 seconds at most; after that a pass hears no more than about <see cref="PassBudget"/> seconds of work. One
+/// pass slower than the sound itself, or two slow passes in a row (three once it has kept up), and the live words
+/// are off (<see cref="TooSlow"/>): nothing hears
 /// them again, and the recorder shows the transcript's own lines, as it did before there were live words. A CI Intel
 /// Mac took 25 s over 17 s of sound (1.5×) while Whisper wrote the transcript on the same processor; an M3 Pro takes
 /// under 0.04× even with every core busy.</para>
@@ -176,7 +177,7 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
     /// <summary>The most a pass may take, as a share of the sound it hears, for the live words to be on.</summary>
     public const double MostRatio = 0.3;
     /// <summary>How much sound a pass hears until this computer's speed is known.</summary>
-    public const double ProbeSeconds = 3;
+    public const double ProbeSeconds = 2;
     /// <summary>About the longest a pass should take, once the speed is known: it hears no more than that much work.</summary>
     public const double PassBudget = 1.5;
     // The speed: seconds a pass takes for each second it hears, leaning to the slowest lately; null until timed.
@@ -325,7 +326,9 @@ public sealed class LiveCaptioner(Func<Lecture?> recording, Func<double, RecentS
             fastEnough = true;
             return true;
         }
-        if (++slowInARow < (fastEnough ? 3 : 2)) return true;
+        // Slower than the sound itself can never keep up: off at once. Slow but not that slow may be a moment's
+        // hiccup (the transcript's model loading): off after two in a row, or three once it has kept up.
+        if (r <= 1 && ++slowInARow < (fastEnough ? 3 : 2)) return true;
         ratio = Math.Max(r, ratio ?? r);
         TooSlow = true;
         return false;

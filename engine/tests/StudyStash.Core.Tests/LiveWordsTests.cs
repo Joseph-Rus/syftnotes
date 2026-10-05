@@ -167,11 +167,12 @@ public class LiveWordsTests
         }
     }
 
-    /// <summary>The recorder opens on a lecture 20 s in. Where a pass takes 1.5× the sound it hears (a CI Intel Mac),
-    /// two short passes say so and the live words are off: no word shown, never a long pass, nothing heard again. Where
-    /// it takes 0.01×, a short first pass, then the rest in one, and the words show from the first.</summary>
+    /// <summary>The recorder opens on a lecture 12 s in. Where a pass takes 1.5× the sound it hears (a CI Intel Mac), one
+    /// short pass says so, and at 0.5× two; then the live words are off: no word shown, never a long pass, nothing heard
+    /// again. Where it takes 0.01×, a short first pass, then the rest in one, and the words show from the first.</summary>
     [Theory]
     [InlineData(1.5)]
+    [InlineData(0.5)]
     [InlineData(0.01)]
     public void The_live_words_are_off_where_this_computer_is_too_slow_for_them(double ratio)
     {
@@ -186,22 +187,27 @@ public class LiveWordsTests
         int changes = 0;
         captions.Changed += _ => changes++;
         var l = rec.Start("Data Mining");
-        mic!.Play(20);
-        WaitFor(() => rec.Elapsed >= 19.95);
+        mic!.Play(12);
+        WaitFor(() => rec.Elapsed >= 11.95);
 
         Assert.True(captions.Step());
-        Assert.InRange(hearer.Longest, 2.9, LiveCaptioner.ProbeSeconds + 0.01); // a short first pass, timed
+        Assert.InRange(hearer.Longest, LiveCaptioner.ProbeSeconds - 0.1, LiveCaptioner.ProbeSeconds + 0.01); // a short first pass, timed
         if (ratio > LiveCaptioner.MostRatio)
         {
             Assert.Empty(captions.Words(l.Id)); // not shown until this computer has shown it keeps up
-            Assert.Equal(0, changes);
-            Assert.True(captions.Step());
+            if (ratio <= 1)
+            {
+                Assert.Equal(0, changes);
+                Assert.False(captions.TooSlow);
+                Assert.True(captions.Step());
+            }
             Assert.True(captions.TooSlow);
-            Assert.Equal(1.5, slow!.Value, 2);
+            Assert.Equal(ratio, slow!.Value, 2);
             Assert.Empty(captions.Words(l.Id));
             Assert.False(captions.Step());
-            Assert.Equal(2, hearer.Calls);
-            Assert.True(hearer.Longest <= LiveCaptioner.ProbeSeconds + 0.01);
+            Assert.Equal(ratio <= 1 ? 2 : 1, hearer.Calls);
+            // No pass ever took longer than the short first one, or about a second and a half once the speed was known.
+            Assert.True(hearer.Longest * ratio <= Math.Max(LiveCaptioner.PassBudget, LiveCaptioner.ProbeSeconds * ratio) + 0.01, $"{hearer.Longest} s heard");
         }
         else
         {
@@ -210,7 +216,7 @@ public class LiveWordsTests
             Assert.Equal(2, hearer.Calls);
             Assert.False(captions.TooSlow);
             Assert.Null(slow);
-            Assert.Contains(captions.Words(l.Id), w => w.Start > 17);
+            Assert.Contains(captions.Words(l.Id), w => w.Start > 9);
         }
     }
 

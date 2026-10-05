@@ -470,8 +470,9 @@ public static partial class SelfTest
         double allowed = appleSilicon ? 2.5 : 8;
         var opened = System.Diagnostics.Stopwatch.StartNew();
         Shell.Windows.ShowRecorder(expanded: true);
-        // A line, or the verdict that this computer is too slow (two slow passes, of 3 s of sound at most each).
-        bool shown = await Until(() => lines.Count > 0 || host.Captions.TooSlow, appleSilicon ? allowed : 30);
+        // A line of live words, or the verdict that this computer is too slow (one or two short passes, of 2 s of sound
+        // at most each). The transcript's own first line may come meanwhile: that's not the live words.
+        bool shown = await Until(() => (host.Captions.First is not null && lines.Count > 0) || host.Captions.TooSlow, appleSilicon ? allowed : 30);
         double took = opened.Elapsed.TotalSeconds;
         string speed = host.Captions.Ratio is { } r ? $"{r:0.000}× the sound it heard" : "no pass timed";
         if (host.Captions.TooSlow || !host.LiveWordsOn)
