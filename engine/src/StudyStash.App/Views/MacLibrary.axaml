@@ -244,6 +244,14 @@
                   <TextBlock Grid.Column="2" Classes="title" Text="Home" FontSize="13" VerticalAlignment="Center" />
                 </Grid>
               </Button>
+              <Button Classes="cls" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
+                      Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
+                <Grid ColumnDefinitions="Auto,8,*,10,Auto">
+                  <c:Icon Glyph="event_upcoming" Size="17" Width="16" Foreground="{DynamicResource AccentText}" />
+                  <TextBlock Grid.Column="2" Classes="title" Text="Due" FontSize="13" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="4" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" FontSize="13" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
               <TextBlock Classes="classes" Text="Classes" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
               <ItemsControl ItemsSource="{Binding Classes}">
                 <ItemsControl.ItemsPanel>

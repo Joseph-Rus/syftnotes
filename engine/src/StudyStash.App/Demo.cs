@@ -178,7 +178,13 @@ public static class Demo
             Events = calendars ? events : null,
             Unsorted = 2,
         };
-        if (cls is null) m.Overview = OverviewModel.Home(sources);
+        if (cls == "\u0001due")
+        {
+            foreach (var c in m.Classes) c.Selected = c.IsDue;
+            m.Home.Selected = false;
+            m.Overview = OverviewModel.ForDue(sources);
+        }
+        else if (cls is null) m.Overview = OverviewModel.Home(sources);
         else
         {
             var facts = new ClassHomeFacts(cls, Cs, 12, canvas ? "CS 101" : null, canvas ? "Introduction to Computer Science" : null,

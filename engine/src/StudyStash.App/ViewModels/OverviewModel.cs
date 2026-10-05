@@ -30,6 +30,9 @@ public sealed record OverviewEvent(string When, string Title, string Detail, IBr
 }
 
 /// <summary>A class's card on Home: its dot and name, how many lectures and when the last was, and what's next.</summary>
+/// <summary>Due's home: one stretch of time ("Overdue", "This week") and what falls in it.</summary>
+public sealed record OverviewDueGroup(string Heading, IReadOnlyList<OverviewDue> Items, bool Strong);
+
 public sealed record OverviewClass(string Name, IBrush Dot, string Lectures, string Next, bool NextStrong, Action Open)
 {
     public bool HasNext => Next.Length > 0;
@@ -61,7 +64,13 @@ public sealed partial class OverviewModel : ObservableObject
 
     /// <summary>Home, or a class's home (<see cref="ClassName"/>).</summary>
     public bool IsHome { get; init; }
-    public bool IsClass => !IsHome;
+    /// <summary>Due's own home: what's to hand in by when, and by class, with the full list a click away.</summary>
+    public bool IsDuePage { get; init; }
+    public bool IsClass => !IsHome && !IsDuePage;
+    /// <summary>The lectures beside what's due and coming up: Home and a class's home, not Due's.</summary>
+    public bool ShowMain => !IsDuePage;
+    public ObservableCollection<OverviewDueGroup> DueGroups { get; } = [];
+    public string ClassesHeading => IsDuePage ? "By class" : "Classes";
     public string ClassName { get; init; } = "";
     public string Title { get; init; } = "";
     public string Subtitle { get; init; } = "";
@@ -211,6 +220,8 @@ public sealed partial class OverviewModel : ObservableObject
         public Action<string, string>? OpenLecture { get; init; }
         public Action<string, string>? OpenAssignment { get; init; }
         public Action? OpenDueList { get; init; }
+        /// <summary>Due's home (Home's See all and To hand in lead there).</summary>
+        public Action? OpenDueHome { get; init; }
         public Action? OpenUnsorted { get; init; }
     }
 
@@ -239,7 +250,7 @@ public sealed partial class OverviewModel : ObservableObject
     static bool Overdue(CanvasApi.Item i, DateTimeOffset now) => i.Missing || i.Status is "missing" or "overdue" or "past due" || i.DueAt < now;
 
     OverviewDue DueRow(CanvasApi.Item i, Sources s, Func<string, IBrush> dot) => new(i.Class, i.Id, i.Name, CanvasWords.RightLabel(i, s.Zone, s.Now),
-        i.Missing || Overdue(i, s.Now), IsHome ? CanvasWords.DueSub(i, s.Zone, s.Now) : CanvasWords.ClassTabRow(i, s.Zone, s.Now), dot(i.Class),
+        i.Missing || Overdue(i, s.Now), !IsClass ? CanvasWords.DueSub(i, s.Zone, s.Now) : CanvasWords.ClassTabRow(i, s.Zone, s.Now), dot(i.Class),
         () => s.OpenAssignment?.Invoke(i.Class, i.Id));
 
     OverviewLecture LectureRow(LectureFacts l, Sources s, Func<string, IBrush> dot) => new(l.Id, l.Title, LectureMeta(l, s.Zone),
@@ -265,7 +276,7 @@ public sealed partial class OverviewModel : ObservableObject
             Subtitle = local.ToString("dddd d MMMM", CultureInfo.InvariantCulture),
             HasCanvas = canvas,
             HasCalendars = s.Events is not null,
-            OnAllDue = canvas ? s.OpenDueList : null,
+            OnAllDue = canvas ? s.OpenDueHome ?? s.OpenDueList : null,
             LecturesEmpty = "No lectures yet. Record one from the menu bar and its notes land here.",
         };
         var toHandIn = StillToHandIn(s.Due).ToList();
@@ -273,9 +284,9 @@ public sealed partial class OverviewModel : ObservableObject
         m.Stats.Add(new OverviewStat(s.Classes.Count.ToString(CultureInfo.InvariantCulture), s.Classes.Count == 1 ? "Class" : "Classes"));
         if (canvas)
         {
-            m.Stats.Add(new OverviewStat(toHandIn.Count.ToString(CultureInfo.InvariantCulture), "To hand in", Open: s.OpenDueList));
+            m.Stats.Add(new OverviewStat(toHandIn.Count.ToString(CultureInfo.InvariantCulture), "To hand in", Open: s.OpenDueHome ?? s.OpenDueList));
             int late = toHandIn.Count(i => Overdue(i, s.Now));
-            if (late > 0) m.Stats.Add(new OverviewStat(late.ToString(CultureInfo.InvariantCulture), "Overdue", Strong: true, Open: s.OpenDueList));
+            if (late > 0) m.Stats.Add(new OverviewStat(late.ToString(CultureInfo.InvariantCulture), "Overdue", Strong: true, Open: s.OpenDueHome ?? s.OpenDueList));
         }
         if (s.Writing > 0) m.Stats.Add(new OverviewStat(s.Writing.ToString(CultureInfo.InvariantCulture), "Writing notes"));
         if (s.Unsorted > 0) m.Stats.Add(new OverviewStat(s.Unsorted.ToString(CultureInfo.InvariantCulture), "Unsorted", Open: s.OpenUnsorted));
@@ -294,6 +305,64 @@ public sealed partial class OverviewModel : ObservableObject
             string nextWords = next is null ? "" : when.Length > 0 ? $"{next.Name} · {when}" : next.Name;
             string cls = name;
             m.Classes.Add(new OverviewClass(name, classDot, words, nextWords, next is not null && Overdue(next, s.Now), () => s.OpenClass?.Invoke(cls)));
+        }
+        return m;
+    }
+
+    /// <summary>
+    /// Due's home: what's to hand in across every class, in stretches of time (overdue, this week, next week, later),
+    /// then a card for each class with its next one. The two-column list (each assignment beside its detail) is its
+    /// Full list.
+    /// </summary>
+    public static OverviewModel ForDue(Sources s)
+    {
+        var dot = DotsOf(s);
+        var toHandIn = StillToHandIn(s.Due).OrderBy(i => i.DueAt ?? DateTimeOffset.MaxValue).ToList();
+        int late = toHandIn.Count(i => Overdue(i, s.Now));
+        int handedIn = s.Due?.Groups.Where(g => g.Key == "handed_in").Sum(g => g.Items.Count) ?? 0;
+        var local = TimeZoneInfo.ConvertTime(s.Now, s.Zone).Date;
+        var weekEnd = local.AddDays(7 - ((int)local.DayOfWeek + 6) % 7); // the Monday after this week
+        DateTimeOffset Local(DateTimeOffset d) => TimeZoneInfo.ConvertTime(d, s.Zone);
+        bool ThisWeek(CanvasApi.Item i) => i.DueAt is { } d && Local(d).Date < weekEnd;
+        bool NextWeek(CanvasApi.Item i) => i.DueAt is { } d && Local(d).Date >= weekEnd && Local(d).Date < weekEnd.AddDays(7);
+        var m = new OverviewModel
+        {
+            IsDuePage = true,
+            Title = "Due",
+            Subtitle = toHandIn.Count == 0 ? "Nothing to hand in. You're all caught up."
+                : late > 0 ? $"{toHandIn.Count} to hand in · {late} overdue" : $"{toHandIn.Count} to hand in",
+            HasCanvas = s.Due is not null,
+            OnAllDue = s.OpenDueList,
+        };
+        int week = toHandIn.Count(i => !Overdue(i, s.Now) && ThisWeek(i));
+        m.Stats.Add(new OverviewStat(toHandIn.Count.ToString(CultureInfo.InvariantCulture), "To hand in", Open: s.OpenDueList));
+        if (late > 0) m.Stats.Add(new OverviewStat(late.ToString(CultureInfo.InvariantCulture), "Overdue", Strong: true));
+        m.Stats.Add(new OverviewStat(week.ToString(CultureInfo.InvariantCulture), "Due this week"));
+        m.Stats.Add(new OverviewStat(handedIn.ToString(CultureInfo.InvariantCulture), "Handed in"));
+
+        var left = toHandIn;
+        void Group(string heading, Func<CanvasApi.Item, bool> pick, bool strong = false)
+        {
+            var items = left.Where(pick).ToList();
+            left = [.. left.Except(items)];
+            if (items.Count > 0) m.DueGroups.Add(new OverviewDueGroup(heading, [.. items.Select(i => m.DueRow(i, s, dot))], strong));
+        }
+        Group("Overdue", i => Overdue(i, s.Now), strong: true);
+        Group("This week", ThisWeek);
+        Group("Next week", NextWeek);
+        Group("Later", i => i.DueAt is not null);
+        Group("No due date", _ => true);
+
+        foreach (var (name, classDot, _) in s.Classes)
+        {
+            var mine = toHandIn.Where(i => i.Class == name).ToList();
+            if (mine.Count == 0 && s.Canvas.All(c => c.Class != name || !c.Linked)) continue;
+            var next = mine.FirstOrDefault();
+            string when = next is null ? "" : CanvasWords.RightLabel(next, s.Zone, s.Now);
+            string nextWords = next is null ? "" : when.Length > 0 ? $"{next.Name} · {when}" : next.Name;
+            string cls = name;
+            m.Classes.Add(new OverviewClass(name, classDot, mine.Count == 0 ? "Nothing to hand in" : $"{mine.Count} to hand in", nextWords,
+                next is not null && Overdue(next, s.Now), () => s.OpenClass?.Invoke(cls)));
         }
         return m;
     }

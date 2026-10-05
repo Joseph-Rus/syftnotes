@@ -15,8 +15,33 @@ public static partial class Shell
     /// <summary>The overview showing: "" for Home, a class's name for its home, null for neither.</summary>
     static string? overviewOf;
 
-    /// <summary>Home ("") or a class's home.</summary>
-    static Task ShowOverviewAsync(string of) => of.Length == 0 ? ShowHomeAsync() : ShowClassHomeAsync(of);
+    /// <summary>What <see cref="overviewOf"/> holds while Due's home shows (no class can be called this).</summary>
+    const string DueHome = "\u0001due";
+
+    /// <summary>Home (""), Due's home, or a class's home.</summary>
+    static Task ShowOverviewAsync(string of) => of.Length == 0 ? ShowHomeAsync() : of == DueHome ? ShowDueHomeAsync() : ShowClassHomeAsync(of);
+
+    /// <summary>Due's home: what's to hand in by when and by class; Full list opens the two-column list.</summary>
+    static async Task ShowDueHomeAsync()
+    {
+        int turn = ++libraryTurn;
+        overviewOf = DueHome;
+        library.Home.Selected = false;
+        foreach (var c in library.Classes) c.Selected = c.IsDue;
+        library.Unsorted.Selected = false;
+        ClearForOverview();
+        if (host.Remote() is null) return;
+        await Task.Yield();
+        if (turn != libraryTurn) return;
+        var page = OverviewModel.ForDue(OverviewSources([], events: null));
+        var ask = new AiAskModel(Ai()) { OpenSettings = () => ShowSettings("AI") };
+        ask.OnlyScopes("all");
+        library.Ask?.Stop();
+        library.Ask = null;
+        page.Ask = ask;
+        _ = ask.Load();
+        library.Overview = page;
+    }
 
     /// <summary>Whatever opens next (a class's lectures, Due) takes the overview's place.</summary>
     static void LeaveOverview()
@@ -237,12 +262,17 @@ public static partial class Shell
             {
                 Remember();
                 // From a class's home, the assignment opens on its class's page; from Home, on the Due page.
-                if (overviewOf is { Length: > 0 } && CanvasClassRow(cls) is not null) _ = OpenClassAssignmentAsync(cls, id);
+                if (overviewOf is { Length: > 0 } && overviewOf != DueHome && CanvasClassRow(cls) is not null) _ = OpenClassAssignmentAsync(cls, id);
                 else
                 {
                     dueSelection = (cls, id);
                     _ = ShowDueAsync();
                 }
+            },
+            OpenDueHome = () =>
+            {
+                Remember();
+                _ = ShowDueHomeAsync();
             },
             OpenDueList = () =>
             {

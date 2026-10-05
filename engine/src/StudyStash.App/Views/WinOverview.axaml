@@ -107,6 +107,13 @@
                      TextWrapping="Wrap" MaxWidth="620" HorizontalAlignment="Left" Margin="0,4,0,0" MaxLines="3" TextTrimming="CharacterEllipsis" />
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top" Margin="12,4,0,0">
+          <!-- Due's home: the two-column list, each assignment beside its detail -->
+          <Button Name="FullList" Classes="ov-pill" Command="{Binding AllDueCommand}" IsVisible="{Binding IsDuePage}" Height="44" Padding="16,0,18,0">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Glyph="assignment" Size="18" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+              <TextBlock Text="Full list" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
           <!-- Record from here: into this class on its home, sorted by the library on Home -->
           <Button Name="Record" Theme="{StaticResource Surface}" Height="44" CornerRadius="6" Padding="18,0,22,0" Background="{DynamicResource Rec}"
                   Command="{Binding RecordCommand}" IsVisible="{Binding CanRecord}" AutomationProperties.Name="{Binding RecordWords}" ToolTip.Tip="Start recording a lecture">
@@ -149,7 +156,7 @@
       </ItemsControl>
 
       <!-- The newest lectures, beside what's due and what's coming up (under them in a narrow window) -->
-      <Grid Classes="ov-body" Classes.narrow="{Binding Narrow}" ColumnDefinitions="*,24,*" RowDefinitions="Auto,Auto">
+      <Grid Classes="ov-body" Classes.narrow="{Binding Narrow}" ColumnDefinitions="*,24,*" RowDefinitions="Auto,Auto" IsVisible="{Binding ShowMain}">
         <StackPanel Name="Recent" Grid.ColumnSpan="{Binding LecturesSpan}">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Classes="ov-h2" Text="Recent lectures" />
@@ -243,9 +250,43 @@
         </StackPanel>
       </Grid>
 
+      <!-- Due's home: what's to hand in, by when -->
+      <ItemsControl Name="DueGroups" ItemsSource="{Binding DueGroups}" IsVisible="{Binding IsDuePage}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Spacing="24" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:OverviewDueGroup">
+            <StackPanel>
+              <TextBlock Classes="ov-h2" Text="{Binding Heading}" Margin="0,0,0,8" />
+              <Border Classes="ov-group">
+                <ItemsControl ItemsSource="{Binding Items}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:OverviewDue">
+                      <Button Classes="ov-row" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenDueCommand}" CommandParameter="{Binding}">
+                        <StackPanel Spacing="3">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1" Classes="ov-right" Classes.strong="{Binding Strong}" Text="{Binding Right}" Margin="8,0,0,0" VerticalAlignment="Bottom" />
+                          </Grid>
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Ellipse Width="7" Height="7" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                            <TextBlock Classes="ov-sub" Text="{Binding Sub}" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
       <!-- Home: a card for every class -->
       <StackPanel Name="ClassCards" IsVisible="{Binding HasClasses}">
-        <TextBlock Classes="ov-h2" Text="Classes" Margin="0,0,0,8" />
+        <TextBlock Classes="ov-h2" Text="{Binding ClassesHeading}" Margin="0,0,0,8" />
         <ItemsControl ItemsSource="{Binding Classes}" Margin="0,0,-10,-10">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><UniformGrid Columns="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).CardColumns}" /></ItemsPanelTemplate>

@@ -461,9 +461,7 @@ public static partial class Shell
         int turn = ++libraryTurn;
         LeaveOverview();
         dueOpen = true;
-        // What's due is part of Home now: Home stays picked in the sidebar while its full list is open.
-        foreach (var c in library.Classes) c.Selected = false;
-        library.Home.Selected = true;
+        foreach (var c in library.Classes) c.Selected = c.IsDue;
         library.Unsorted.Selected = false;
         library.ClassTitle = "Due";
         library.Empty = null;

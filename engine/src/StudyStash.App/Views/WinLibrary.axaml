@@ -223,6 +223,17 @@
               </Grid>
             </Panel>
           </Button>
+          <Button Classes="nav" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
+                  Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
+            <Panel>
+              <Border Classes="pill" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
+              <Grid ColumnDefinitions="Auto,14,*,12,Auto">
+                <c:Icon Glyph="event_upcoming" Size="16" Foreground="{DynamicResource AccentText}" />
+                <TextBlock Grid.Column="2" Text="Due" FontSize="14" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="4" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" FontSize="12" VerticalAlignment="Center" />
+              </Grid>
+            </Panel>
+          </Button>
           <TextBlock Classes="classes" Text="Classes" FontSize="14" FontWeight="SemiBold" />
           <ItemsControl ItemsSource="{Binding Classes}">
             <ItemsControl.ItemsPanel>

@@ -34,6 +34,8 @@ public class LayoutShots
         home.Overview.Ask.OnlyScopes("all");
         Shot.Take("mac-19-home", SkinKind.Mac, ThemeVariant.Dark, () => new MacLibrary { DataContext = home, Width = 1280, Height = 800 }, size: size);
         Shot.Take("win-19-home", SkinKind.Win, ThemeVariant.Light, () => new WinLibrary { DataContext = home, Width = 1280, Height = 800 }, size: size);
+        Shot.Take("mac-19-due-home", SkinKind.Mac, ThemeVariant.Dark, () => new MacLibrary { DataContext = Demo.Overview("\u0001due"), Width = 1280, Height = 900 }, size: new Avalonia.Size(1408, 1028));
+        Shot.Take("win-19-due-home", SkinKind.Win, ThemeVariant.Light, () => new WinLibrary { DataContext = Demo.Overview("\u0001due"), Width = 1280, Height = 900 }, size: new Avalonia.Size(1408, 1028));
         Shot.Take("mac-19-class-home", SkinKind.Mac, ThemeVariant.Dark, () => new MacLibrary { DataContext = Demo.Overview("CS 101"), Width = 1280, Height = 900 }, size: new Avalonia.Size(1408, 1028));
     }
 

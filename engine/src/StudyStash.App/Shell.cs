@@ -475,10 +475,11 @@ public static partial class Shell
                 _ = ShowHomeAsync();
                 return;
             }
+            // Due opens on its home (what's to hand in, by when and by class); its Full list is the two-column list.
             if (c.IsDue)
             {
                 dueSelection = null;
-                _ = ShowDueAsync();
+                _ = ShowDueHomeAsync();
                 return;
             }
             // A class opens on its home; Unsorted, which has none, on its lectures.
