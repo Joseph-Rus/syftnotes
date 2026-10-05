@@ -154,4 +154,5 @@ between two libraries directly (pages, a second go changing nothing, wrong passw
 `LibraryWebTests`
 and `LibrarySetupTests` cover the library's own pages linking to the one download instead of the old Laptop names.
 The Mac and Windows CI jobs build the one DMG and the one Setup.exe, check the DMG carries no `StudyStashRole`, and
-install, self-test and update each in place.
+self-test the app on every merge; a release run also installs, self-tests and updates each in place (the Windows
+Setup.exe) and runs the DMG's app natively on an Intel Mac.

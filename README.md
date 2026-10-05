@@ -378,15 +378,21 @@ dotnet run --project engine/src/StudyStash.App -- --home /some/temp/dir
 `macos/build-app.sh` builds "Study Stash.app" and `Study-Stash.dmg` (with Xcode's command line tools), and
 `windows/build.ps1` `Study-Stash-Setup.exe`; both build the phone app into it first. `engine/README.md` has more on the projects and tests.
 
-Releases come from CI (`.github/workflows/ci.yml`). Every change is tested once, when it reaches
-`main`: on macOS, Linux and Windows, with both apps built, self-tested and installed. Branches and
-pull requests aren't tested on their own; to prove one first (say, Windows-only code), start a run
-by hand with **Actions → ci → Run workflow** or `gh workflow run ci --ref <branch>`. To ship a
-release, bump `StudyStashVersion` in `engine/Directory.Build.props` and merge to `main`; CI
-publishes `Study-Stash.dmg`, `Study-Stash-Setup.exe` (and copies under the old installers' names, so
-older copies still update) and `SHA256SUMS.txt`. Code that already passed isn't tested twice: a
-push that only changes the version on top of a commit that passed, or a merge of a branch whose run
-passed on the very same code, just builds and publishes.
+Releases come from CI (`.github/workflows/ci.yml`), at two speeds. A change that reaches `main` is
+tested once: the engine's tests on macOS, Linux and Windows (side by side), and both apps built and
+self-tested for real. No installer is kept, installed or published for it. A release is a push to `main` with a new
+`StudyStashVersion` in `engine/Directory.Build.props` (no tag yet): CI also builds the installers,
+proves them (the Mac app natively on an Intel Mac; Setup.exe installed, updated in place and
+uninstalled), and publishes `Study-Stash.dmg`, `Study-Stash-Setup.exe` (and copies under the old
+installers' names, so older copies still update) and `SHA256SUMS.txt`. A version already released is
+never published again. Code that already passed isn't tested twice: a push that only changes the
+version (or the docs) on top of a commit that passed, or a merge of a branch whose run passed on the
+very same code, skips the tests, and a release then only builds and proves its installers. Branches
+and pull requests aren't tested on their own: to prove one first (say, Windows-only code), start a
+run by hand with **Actions → ci → Run workflow** or `gh workflow run ci --ref <branch>`. On a release
+branch (a version with no tag yet) that run rehearses the whole release, installers included, down to
+the checksums and short of publishing; merging that branch unchanged then publishes those very
+installers, with no rebuild, within a minute. Add `-f installers=true` to rehearse it on any branch.
 
 ## Support Study Stash
 

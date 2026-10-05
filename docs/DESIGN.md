@@ -136,9 +136,12 @@ runs on a computer.
   (without them macOS kills the app on first mic use), `StudyStashRole` for the role preset, and
   `CFBundleShortVersionString`/`CFBundleVersion` set to `StudyStashVersion` so an installed copy
   can report its own version without running .NET.
-- CI tests the engine on macOS, Linux, and Windows, builds and self-tests both apps (a fake
-  microphone, the tiny Whisper model, real windows), installs each with its own installer, and
-  publishes a release only when `StudyStashVersion` in `Directory.Build.props` is new.
+- CI tests the engine on macOS, Linux, and Windows and self-tests both apps (a fake microphone, the
+  tiny Whisper model, real windows) for every change that reaches `main`. A release (a
+  `StudyStashVersion` in `Directory.Build.props` that has no tag yet) also builds both installers,
+  installs and updates the Windows one, runs the Mac app natively on an Intel Mac, and only then
+  publishes. Code that already passed on the same tree isn't tested twice. The shape is described at
+  the top of `.github/workflows/ci.yml`.
 
 ## Security model
 

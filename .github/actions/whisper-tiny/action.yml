@@ -1,0 +1,18 @@
+# Whisper's smallest model (about 75 MB), so the live tests and the self-tests hear real speech on each system (the
+# app itself uses large-v3). Cached, so the download is only the first time; STUDYSTASH_WHISPER_MODEL points at it for
+# the steps after.
+name: Whisper tiny
+description: Fetch Whisper's tiny model (cached) and point STUDYSTASH_WHISPER_MODEL at it.
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/whisper
+        key: whisper-ggml-tiny-v1
+    - shell: bash
+      run: |
+        mkdir -p "$RUNNER_TEMP/whisper"
+        [ -f "$RUNNER_TEMP/whisper/ggml-tiny.bin" ] || curl -fsSL --retry 3 --retry-delay 5 -o "$RUNNER_TEMP/whisper/ggml-tiny.bin" \
+          https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+        echo "STUDYSTASH_WHISPER_MODEL=$RUNNER_TEMP/whisper/ggml-tiny.bin" >> "$GITHUB_ENV"
