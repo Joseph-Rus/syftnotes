@@ -186,6 +186,10 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// </summary>
     public Task<DiagramPick?> DesignerAsync(Config cfg, string notesEngine) => DiagramEngines.PickAsync(Settings, cfg, Checks, notesEngine);
 
+    /// <summary>The kinds of rich notes switched on now (none while rich notes are off): what designed diagrams may still
+    /// put into the notes.</summary>
+    public RichKinds KindsNow() => Settings.Kinds();
+
     /// <summary>
     /// The diagram pass over a filed lecture's <paramref name="notes"/>, by <paramref name="pick"/>: what it designed, or
     /// null when it couldn't (said in the log, with why). The notes themselves are never touched here: the caller puts
