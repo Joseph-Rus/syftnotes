@@ -1,13 +1,14 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StudyStash.App.Services;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
 
 namespace StudyStash.App.ViewModels;
 
-/// <summary>One connected tool: a library grant (signed in from the web, or a token made in Settings), or this
-/// computer's own Claude Code / Claude Desktop. The row owns its own Remove, closed over its id.</summary>
+/// <summary>One library grant: an app signed in from the web, or a token made in Settings. The row owns its own
+/// Remove, closed over its id. (The AI apps on this computer are <see cref="AiAppRow"/>s.)</summary>
 public sealed class AiConnectionRow
 {
     public string Id { get; init; } = "";
@@ -26,11 +27,61 @@ public sealed class AiConnectionRow
     public bool First { get; set; }
 }
 
+/// <summary>One AI app on this computer (Claude Desktop, Claude Code, Codex, Gemini CLI): what it's called, where it
+/// stands, and its own Connect and Disconnect, closed over its id.</summary>
+public sealed partial class AiAppRow : ObservableObject
+{
+    public string Id { get; init; } = "";
+    public string Name { get; init; } = "";
+    /// <summary>What the app is, under its name ("The app, the CLI and the IDE extension").</summary>
+    public string About { get; init; } = "";
+    public string Icon => Id switch { "codex" => "code", "gemini" => "auto_awesome", "claude-code" => "terminal", _ => "desktop_windows" };
+    [ObservableProperty] public partial string Status { get; set; } = "";
+    /// <summary>Connected: an app started Study Stash since it was added.</summary>
+    [ObservableProperty] public partial bool Ok { get; set; }
+    [ObservableProperty] public partial bool CanConnect { get; set; }
+    [ObservableProperty] public partial bool CanDisconnect { get; set; }
+    /// <summary>"Connect", or "Fix" when the app has another copy of Study Stash set up.</summary>
+    [ObservableProperty] public partial string ConnectWords { get; set; } = "Connect";
+    public bool First { get; set; }
+    public IAsyncRelayCommand? Connect { get; internal set; }
+    public IAsyncRelayCommand? Disconnect { get; internal set; }
+    /// <summary>Windows shows the status in the one subtitle line.</summary>
+    public string WinDetail => Status;
+    partial void OnStatusChanged(string value) => OnPropertyChanged(nameof(WinDetail));
+
+    /// <summary>Where an app stands, in words: not here, not connected, added but not loaded yet, connected (and when
+    /// it last started Study Stash), or set up for another copy of Study Stash.</summary>
+    public void Show(AiAppState s, DateTime now)
+    {
+        Ok = false;
+        CanConnect = s.Installed && (!s.Added || s.OtherCopy);
+        CanDisconnect = s.Added;
+        ConnectWords = s.OtherCopy ? "Fix" : "Connect";
+        if (!s.Installed) Status = "Not on this computer";
+        else if (!s.Added) Status = "Not connected";
+        else if (s.OtherCopy) Status = "Set up for another copy of Study Stash. Choose Fix to use this one.";
+        else if (s.Started is { } started && (s.AddedAt is null || started >= s.AddedAt))
+        {
+            Ok = true;
+            Status = "Connected · " + (started.Date == now.Date ? $"started {started:H:mm}" : now - started < TimeSpan.FromDays(7) ? $"started {started:ddd}" : $"started {started:d MMM}");
+        }
+        else Status = s.Name switch
+        {
+            "Claude Desktop" => "Added. Quit and reopen Claude Desktop to load it.",
+            "Claude Code" => "Added. Start a new Claude Code session to load it.",
+            "Codex" => "Added. Restart Codex to load it.",
+            _ => $"Added. Start {s.Name} again to load it.",
+        };
+    }
+}
+
 /// <summary>
-/// Settings → AI tool access (design 14): the off switch, what Claude and other MCP tools may read, connecting a
-/// tool, and the connected list. Reads and drives one library's AI (<see cref="IAiLibrary"/>); the two things it
-/// can't do through that (checking and changing what's on this computer's own Claude Code / Claude Desktop) go
-/// through hooks the host sets, so this model never touches a file or a process itself.
+/// Settings → AI tool access (design 14): the off switch, what AI apps may read, the AI apps on this computer (each
+/// connected with one click, no Tailscale needed), Claude on the web (Tailscale Funnel), and the other connections.
+/// Reads and drives one library's AI (<see cref="IAiLibrary"/>); what it can't do through that (reading and changing
+/// the AI apps' own settings on this computer) goes through hooks the host sets, so this model never touches a file
+/// or a process itself.
 /// </summary>
 public sealed partial class AiAccessModel : ObservableObject
 {
@@ -55,8 +106,6 @@ public sealed partial class AiAccessModel : ObservableObject
     [ObservableProperty] public partial string? Say { get; set; }
     [ObservableProperty] public partial bool OlderLibrary { get; set; }
     [ObservableProperty] public partial bool Offline { get; set; }
-    [ObservableProperty] public partial bool InClaudeCode { get; set; }
-    [ObservableProperty] public partial bool InClaudeDesktop { get; set; }
     [ObservableProperty] public partial string? PublicUrl { get; set; }
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WebToggleEnabled))]
@@ -66,7 +115,7 @@ public sealed partial class AiAccessModel : ObservableObject
     // (task 4's ClaudeReach/ReachCheck, read through ToolAccessInfo.Web). WebOn is the switch Settings shows; the
     // library is the truth, so every change round-trips through it before the switch visibly moves.
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowWebReady))]
+    [NotifyPropertyChangedFor(nameof(ShowWebReady), nameof(ShowWebNeeds), nameof(ShowWebNeedsAction))]
     public partial bool WebOn { get; set; }
     [ObservableProperty] public partial bool WebBusy { get; set; }
     [ObservableProperty]
@@ -90,11 +139,21 @@ public sealed partial class AiAccessModel : ObservableObject
     /// older library), or null when there's nothing to say. Set directly at each transition, not computed from
     /// several flags at once, so a test can assert it without reconstructing the priority rules by hand.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowWebNote), nameof(ShowWebReady))]
+    [NotifyPropertyChangedFor(nameof(ShowWebNote), nameof(ShowWebReady), nameof(ShowWebNeeds), nameof(ShowWebNeedsAction))]
     public partial string? WebNote { get; set; }
     /// <summary>The problem's own fix page, when it has one ("Open" + "Copy link"); null for "no password" and
     /// "older library", which have no page to send the student to.</summary>
     [ObservableProperty] public partial string? WebNoteFixUrl { get; set; }
+    /// <summary>While Claude's address is off: what this computer needs first (Tailscale), from the library, and the
+    /// page that gets it. A computer on its own without Tailscale sees this, not a switch that fails.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowWebNeeds), nameof(ShowWebNeedsAction))]
+    public partial string? WebNeeds { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowWebNeedsAction))]
+    public partial string? WebNeedsUrl { get; set; }
+    public bool ShowWebNeeds => WebNeeds is { Length: > 0 } && !WebOn && !ShowWebNote;
+    public bool ShowWebNeedsAction => ShowWebNeeds && WebNeedsUrl is { Length: > 0 };
 
     public bool ShowWebReady => WebSupported && WebOn && WebNote is null && WebUrl is { Length: > 0 };
     public bool ShowWebNote => WebNote is { Length: > 0 };
@@ -116,21 +175,37 @@ public sealed partial class AiAccessModel : ObservableObject
     public ObservableCollection<AiConnectionRow> Connected { get; } = [];
     public bool HasConnections => Connected.Count > 0;
 
-    /// <summary>What to type into Claude Code's own terminal, and what to paste into Codex's config.toml — the
-    /// host fills these in once, from <c>ClaudeSetup</c>.</summary>
-    public string ClaudeCodeCommand { get; set; } = "";
-    public string CodexSetup { get; set; } = "";
+    /// <summary>The AI apps on this computer, each with its status and its own Connect / Disconnect.</summary>
+    public ObservableCollection<AiAppRow> Apps { get; } = [];
+
+    /// <summary>The <c>mcpServers</c> JSON for any other MCP app, to paste in by hand (from <c>ClaudeSetup</c>).</summary>
     public string McpJson { get; set; } = "";
 
     /// <summary>Puts text on the clipboard (write-only: this model never reads it).</summary>
     public Func<string, Task>? Copy { get; set; }
-    /// <summary>Whether Claude Code / Claude Desktop already have Study Stash, asked fresh each <see cref="Load"/>.</summary>
-    public Func<bool>? CheckInClaudeCode { get; set; }
-    public Func<bool>? CheckInClaudeDesktop { get; set; }
-    /// <summary>Adds Study Stash to Claude Desktop's own config. Answers what to say.</summary>
-    public Func<Task<string>>? AddToClaudeDesktop { get; set; }
-    /// <summary>Takes Study Stash out of Claude Desktop's own config. Answers what to say.</summary>
-    public Func<Task<string>>? RemoveFromClaudeDesktopHook { get; set; }
+    /// <summary>Reads every AI app's settings on this computer (read only), asked fresh each <see cref="Load"/>.</summary>
+    public Func<IReadOnlyList<AiAppState>>? ReadApps { get; set; }
+    /// <summary>Adds Study Stash to one app's settings, or takes it out; answers what happened.</summary>
+    public Func<string, AiAppChange>? ConnectApp { get; set; }
+    public Func<string, AiAppChange>? DisconnectApp { get; set; }
+
+    /// <summary>The "what was written" panel after a change: the app's settings file, the copy of it from before, and
+    /// the setup that went in (no secrets: the apps start Study Stash, which reads its own settings).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowWritten))]
+    public partial string? WrittenFile { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(WrittenBackupWords))]
+    public partial string? WrittenBackup { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasWrittenText))]
+    public partial string? WrittenText { get; set; }
+    public bool ShowWritten => WrittenFile is { Length: > 0 };
+    public bool HasWrittenText => WrittenText is { Length: > 0 };
+    public string WrittenBackupWords => WrittenBackup is { Length: > 0 } b ? "As it was before: " + b : "It's a new file: there was nothing to keep.";
+    public bool HasSay => Say is { Length: > 0 };
+    partial void OnSayChanged(string? value) => OnPropertyChanged(nameof(HasSay));
+
     /// <summary>Revokes one library grant (DELETE /api/v2/claude/connections/{id}). Whether it worked.</summary>
     public Func<string, Task<bool>>? RevokeConnection { get; set; }
     /// <summary>Opens a problem's fix page in the system browser (<c>Dialogs.OpenUrl</c> in <c>Settings.MakeAccess</c>).</summary>
@@ -172,8 +247,7 @@ public sealed partial class AiAccessModel : ObservableObject
     /// when the pane opens.</summary>
     public async Task Load()
     {
-        InClaudeCode = CheckInClaudeCode?.Invoke() ?? false;
-        InClaudeDesktop = CheckInClaudeDesktop?.Invoke() ?? false;
+        await LoadApps();
         ToolAccessInfo? info;
         try
         {
@@ -224,8 +298,6 @@ public sealed partial class AiAccessModel : ObservableObject
                 row.Remove = new AsyncRelayCommand(() => RemoveAsync(row.Id));
                 (c.Kind == "signin" ? claudeRows : rows).Add(row);
             }
-            if (InClaudeCode) rows.Add(new AiConnectionRow { Id = "claude-code", Name = "Claude Code", Detail = "This computer" });
-            if (InClaudeDesktop) rows.Add(NewDesktopRow());
             if (rows.Count > 0) rows[0].First = true;
             if (claudeRows.Count > 0) claudeRows[0].First = true;
             Connected.Clear();
@@ -255,9 +327,12 @@ public sealed partial class AiAccessModel : ObservableObject
             WebReachable = null;
             WebNote = "Update the library to turn this on.";
             WebNoteFixUrl = null;
+            WebNeeds = WebNeedsUrl = null;
             return;
         }
         WebOn = web.On;
+        WebNeeds = web.Needs;
+        WebNeedsUrl = web.NeedsUrl;
         WebUrl = web.McpUrl;
         WebWords = web.Words;
         WebReachable = web.Reachable;
@@ -272,29 +347,6 @@ public sealed partial class AiAccessModel : ObservableObject
 
     static DateTime Epoch(double seconds) => DateTimeOffset.FromUnixTimeMilliseconds((long)(seconds * 1000)).LocalDateTime;
 
-    AiConnectionRow NewDesktopRow()
-    {
-        var row = new AiConnectionRow { Id = "claude-desktop", Name = "Claude Desktop", Detail = "This computer", CanRemove = true };
-        row.Remove = new AsyncRelayCommand(RemoveDesktopAsync);
-        return row;
-    }
-
-    [RelayCommand]
-    public async Task CopyClaudeCode()
-    {
-        if (Copy is null) return;
-        await Copy(ClaudeCodeCommand);
-        Say = "Copied. Paste it into a terminal and press Return.";
-    }
-
-    [RelayCommand]
-    public async Task CopyCodex()
-    {
-        if (Copy is null) return;
-        await Copy(CodexSetup);
-        Say = "Copied. Paste it into ~/.codex/config.toml.";
-    }
-
     [RelayCommand]
     public async Task CopyOther()
     {
@@ -303,19 +355,69 @@ public sealed partial class AiAccessModel : ObservableObject
         Say = "Copied. Paste it into the tool's settings.";
     }
 
-    [RelayCommand]
-    public async Task AddClaudeDesktop()
+    /// <summary>Reads every app's settings again and shows where each stands (off the UI thread: Claude Code's
+    /// settings file can be large).</summary>
+    async Task LoadApps()
     {
-        if (AddToClaudeDesktop is null) return;
-        Say = await AddToClaudeDesktop();
-        InClaudeDesktop = CheckInClaudeDesktop?.Invoke() ?? InClaudeDesktop;
-        if (InClaudeDesktop && Connected.All(c => c.Id != "claude-desktop"))
+        if (ReadApps is null) return;
+        IReadOnlyList<AiAppState> states;
+        try
         {
-            var row = NewDesktopRow();
-            row.First = Connected.Count == 0;
-            Connected.Add(row);
-            OnPropertyChanged(nameof(HasConnections));
+            states = await Task.Run(ReadApps);
         }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return;
+        }
+        foreach (var s in states)
+        {
+            var row = Apps.FirstOrDefault(a => a.Id == s.Id);
+            if (row is null)
+            {
+                row = new AiAppRow { Id = s.Id, Name = s.Name, About = AppAbout(s.Id), First = Apps.Count == 0 };
+                string id = s.Id;
+                row.Connect = new AsyncRelayCommand(() => ChangeAppAsync(id, add: true));
+                row.Disconnect = new AsyncRelayCommand(() => ChangeAppAsync(id, add: false));
+                Apps.Add(row);
+            }
+            row.Show(s, now());
+        }
+    }
+
+    static string AppAbout(string id) => id switch
+    {
+        "claude-desktop" => "The Claude app on this computer",
+        "claude-code" => "In the terminal, the Claude app's Code tab, or your editor",
+        "codex" => "The Codex app, CLI and IDE extension share one setup",
+        "gemini" => "Google's Gemini in the terminal",
+        _ => "",
+    };
+
+    async Task ChangeAppAsync(string id, bool add)
+    {
+        if ((add ? ConnectApp : DisconnectApp) is not { } change) return;
+        Busy = true;
+        try
+        {
+            var done = await Task.Run(() => change(id));
+            Say = done.Say;
+            WrittenFile = done.File;
+            WrittenBackup = done.Backup;
+            WrittenText = done.Written;
+            await LoadApps();
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    [RelayCommand]
+    public async Task CopyWritten()
+    {
+        if (Copy is null || WrittenText is not { Length: > 0 } text) return;
+        await Copy(text);
+        Say = "Copied.";
     }
 
     /// <summary>Turns Claude's address on or off through the library (task 4's <c>/api/v2/ai/access/web</c>), then,
@@ -422,6 +524,12 @@ public sealed partial class AiAccessModel : ObservableObject
     }
 
     [RelayCommand]
+    public void OpenWebNeeds()
+    {
+        if (WebNeedsUrl is { Length: > 0 } url) OpenUrl?.Invoke(url);
+    }
+
+    [RelayCommand]
     public void OpenWebFix()
     {
         if (WebNoteFixUrl is { Length: > 0 } url) OpenUrl?.Invoke(url);
@@ -484,27 +592,6 @@ public sealed partial class AiAccessModel : ObservableObject
         try
         {
             if (await RevokeConnection(id)) await Load();
-        }
-        finally
-        {
-            Busy = false;
-        }
-    }
-
-    async Task RemoveDesktopAsync()
-    {
-        if (RemoveFromClaudeDesktopHook is null) return;
-        Busy = true;
-        try
-        {
-            Say = await RemoveFromClaudeDesktopHook();
-            InClaudeDesktop = CheckInClaudeDesktop?.Invoke() ?? false;
-            var row = Connected.FirstOrDefault(c => c.Id == "claude-desktop");
-            if (!InClaudeDesktop && row is not null)
-            {
-                Connected.Remove(row);
-                OnPropertyChanged(nameof(HasConnections));
-            }
         }
         finally
         {

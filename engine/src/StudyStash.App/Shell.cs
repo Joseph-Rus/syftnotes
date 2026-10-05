@@ -1353,6 +1353,8 @@ public static partial class Shell
         Look.Apply(w);
         AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
         model.Lib.Copy = text => _ = w.Clipboard?.SetTextAsync(text);
+        // AI tool access's Copy buttons (the web address, a fix link, the setup for another app).
+        model.Access.Copy = text => w.Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
         model.Lib.ClassesChanged = LibraryClassesChanged;
         model.Canvas.OnClassesChanged = LibraryClassesChanged;
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);

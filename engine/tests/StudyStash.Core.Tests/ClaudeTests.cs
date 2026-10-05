@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Authentication;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -367,6 +368,49 @@ public class ClaudeTests
         Assert.Equal("Claude", grant.Name);
         Assert.True(access.Revoke(grant.Id));
         Assert.Null(access.Check(renewed["access_token"]!.GetValue<string>()));
+    }
+
+    /// <summary>The door as `serve` opens it, on a real port: only on this computer (never the network), shut to a
+    /// request without a key, and open to an app on this computer with one, which lists the tools. That's a computer on
+    /// its own reaching its library over MCP with no Tailscale.</summary>
+    [Fact]
+    public async Task The_door_answers_only_on_this_computer_refuses_without_a_key_and_lists_its_tools_with_one()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        var access = new ClaudeAccess(cfg.Home);
+        var builder = Microsoft.AspNetCore.Builder.WebApplication.CreateSlimBuilder();
+        Microsoft.AspNetCore.Hosting.WebHostBuilderKestrelExtensions.ConfigureKestrel(builder.WebHost, k => ClaudeWeb.ListenHere(k, 0));
+        builder.Logging.ClearProviders();
+        await using var door = ClaudeWeb.Build(builder, cfg, new LibraryReader(cfg, store), access);
+        await door.StartAsync();
+        var urls = door.Urls.Select(u => new Uri(u)).ToList();
+        Assert.NotEmpty(urls);
+        Assert.All(urls, u => Assert.True(IPAddress.IsLoopback(IPAddress.Parse(u.Host.Trim('[', ']'))), $"{u} is on the network"));
+        var here = new Uri($"http://127.0.0.1:{urls[0].Port}/mcp");
+
+        using var http = new HttpClient();
+        var refused = await http.PostAsync(here, JsonContent.Create(new { jsonrpc = "2.0", id = 1, method = "tools/list" }));
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+        Assert.Contains("resource_metadata=", refused.Headers.WwwAuthenticate.ToString());
+        var wrong = await http.SendAsync(new HttpRequestMessage(HttpMethod.Post, here)
+        {
+            Content = JsonContent.Create(new { jsonrpc = "2.0", id = 1, method = "tools/list" }),
+            Headers = { Authorization = new("Bearer", "not-a-key") },
+        });
+        Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+
+        var (token, _) = access.CreateToken("An app on this computer");
+        await using var mcp = await McpClient.CreateAsync(new HttpClientTransport(new HttpClientTransportOptions
+        {
+            Endpoint = here, TransportMode = HttpTransportMode.StreamableHttp,
+            AdditionalHeaders = new Dictionary<string, string> { ["Authorization"] = "Bearer " + token },
+        }));
+        var tools = (await mcp.ListToolsAsync()).Select(t => t.Name).ToList();
+        Assert.Contains("search_notes", tools);
+        Assert.Contains("list_classes", tools);
+        await door.StopAsync();
     }
 
     static async Task<McpClient> Connect(TestSite site, string token) =>
