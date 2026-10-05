@@ -46,6 +46,9 @@ public sealed class WhistleTranscriber : ITranscriber, IWordHearer
 
     readonly string fixedLanguage;
 
+    /// <summary>The engine and the build of it this computer runs: "needle 3.1.0 osx-x64".</summary>
+    public static string EngineBuild => $"needle {Needle.Version} {Needle.Rid ?? "none"}";
+
     /// <summary>For the log: what it runs on.</summary>
     public string Backend => $"Cactus needle {Needle.Version} on the processor ({Needle.Rid})";
 

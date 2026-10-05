@@ -454,19 +454,41 @@ public static partial class SelfTest
         await Wait(0.3);
     }
 
-    /// <summary>The recorder opened shows what's being said within a couple of seconds (Cactus Whistle's live words,
-    /// where this computer runs it): how long the first line took, said in the report, and a failure past 8 s (a slow CI runner).</summary>
+    /// <summary>
+    /// The recorder opened shows what's being said within a couple of seconds (Cactus Whistle's live words) where this
+    /// computer is fast enough for them: within 2.5 s on Apple silicon, 8 s elsewhere (a slow CI runner). Where a pass
+    /// takes more than <see cref="LiveCaptioner.MostRatio"/> of the sound it hears (a CI Intel Mac: 1.5×), the documented
+    /// fallback instead: nothing hears the live words any more, the recorder says the lines come in about half a minute,
+    /// and the transcript's own lines do come. Too slow on Apple silicon is a failure.
+    /// </summary>
     static async Task CheckLiveWordsAsync(AppHost host)
     {
-        var lines = Shell.Windows.RecorderModel.Lines;
+        var recorder = Shell.Windows.RecorderModel;
+        var lines = recorder.Lines;
         lines.Clear();
+        bool appleSilicon = OperatingSystem.IsMacOS() && System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture == System.Runtime.InteropServices.Architecture.Arm64;
+        double allowed = appleSilicon ? 2.5 : 8;
         var opened = System.Diagnostics.Stopwatch.StartNew();
         Shell.Windows.ShowRecorder(expanded: true);
-        bool shown = await Until(() => lines.Count > 0, 10);
+        // A line, or the verdict that this computer is too slow (two slow passes, of 3 s of sound at most each).
+        bool shown = await Until(() => lines.Count > 0 || host.Captions.TooSlow, appleSilicon ? allowed : 30);
         double took = opened.Elapsed.TotalSeconds;
-        if (!host.LiveWordsOn) Say($"live words: off here (Cactus Whistle can't run on this computer); the recorder showed {(shown ? $"a line after {took:0.0} s" : "no line in 10 s")}");
-        else if (shown && took <= 8) Say($"live words: the recorder showed \"{lines[^1].Text}\" {took:0.0} s after it opened");
-        else Say($"FAILED live words: {(shown ? $"the first line took {took:0.0} s" : "no line 10 s after the recorder opened")}");
+        string speed = host.Captions.Ratio is { } r ? $"{r:0.000}× the sound it heard" : "no pass timed";
+        if (host.Captions.TooSlow || !host.LiveWordsOn)
+        {
+            int passes = host.Captions.Passes;
+            bool came = await Until(() => lines.Count > 0, 90);
+            double waited = opened.Elapsed.TotalSeconds;
+            bool stillHearing = host.Captions.Passes != passes;
+            if (appleSilicon && host.Captions.TooSlow) Say($"FAILED live words: judged too slow on Apple silicon ({speed})");
+            else if (!came) Say($"FAILED live words: off here ({speed}), and the transcript's own lines didn't come either in 90 s");
+            else if (stillHearing) Say($"FAILED live words: off here ({speed}), yet {host.Captions.Passes - passes} more pass(es) heard the sound");
+            else if (recorder.QuickWords) Say("FAILED live words: off here, yet the recorder still says the words come in a few seconds");
+            else Say($"live words: off on this computer ({(host.Captions.TooSlow ? $"too slow: {speed}" : "Cactus Whistle can't run here")}); nothing hears them, "
+                     + $"and the recorder showed the transcript's own line {waited:0.0} s after it opened");
+        }
+        else if (shown && took <= allowed) Say($"live words: the recorder showed \"{lines[^1].Text}\" {took:0.0} s after it opened ({speed})");
+        else Say($"FAILED live words: {(shown ? $"the first line took {took:0.0} s" : $"no line {took:0} s after the recorder opened")} ({speed})");
         await Wait(2);
         // The newest line is where the student looks: in view, at the bottom.
         if (Shell.Windows.Recorder?.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault(v => v.Name == "Heard") is { } heard

@@ -23,11 +23,13 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
   lecture in another language uses Whisper. A computer too weak for either gets a lighter Whisper.
   The bigger, more accurate models are a choice in setup and Settings → Recording, and so is Cactus
   Whistle, the fastest and smallest, which comes with the app (about as accurate as Whisper base).
-  Whatever the model, while a lecture is transcribed as you go the recorder shows what's said a
-  second or two after it's said: Whistle hears the newest sound every second, and the chosen model's
-  more accurate lines take its place as they come (about half a minute behind). Whistle reads
-  English, German, French, Spanish, Italian, Dutch and Polish; a lecture in another language shows
-  the chosen model's lines only. In Settings → Recording, an
+  Whatever the model, while a lecture is transcribed as you go, the open recorder shows what's said
+  a second or two after it's said, where this computer is fast enough: Whistle hears the newest
+  sound every second, and the chosen model's more accurate lines take its place as they come (about
+  half a minute behind). Each pass is timed; on a computer where Whistle can't keep up cheaply (a
+  pass taking more than 0.3× the sound it hears) the live words turn off and the recorder shows the
+  chosen model's lines only, as it does for a lecture in a language Whistle doesn't read (it reads
+  English, German, French, Spanish, Italian, Dutch and Polish). In Settings → Recording, an
   experimental **Tell speakers apart** also marks in a transcript ("Speaker 2:") where a voice other
   than the lecturer's seems to speak; it is careful rather than complete, and can be wrong. While it
   records, a tiny pill shows the time and the level; pause or stop from the menu bar.

@@ -149,6 +149,71 @@ public class LiveWordsTests
         Assert.Equal(35, rec.Stop()!.Seconds, 1);
     }
 
+    /// <summary>A hearer that takes <paramref name="ratio"/> seconds (on a pretend clock) for each second it hears, and
+    /// hears a word a second.</summary>
+    sealed class TimedHearer(double ratio) : IWordHearer
+    {
+        public double Now;
+        public int Calls;
+        public double Longest;
+
+        public HeardWords Hear(float[] samples, string language, string keywords)
+        {
+            Calls++;
+            double seconds = samples.Length / (double)Sound.Rate;
+            Longest = Math.Max(Longest, seconds);
+            Now += ratio * seconds;
+            return new([.. Enumerable.Range(0, (int)seconds).Select(i => new TimedWord(i + 0.1, i + 0.5, $"w{i}"))], "en");
+        }
+    }
+
+    /// <summary>The recorder opens on a lecture 20 s in. Where a pass takes 1.5× the sound it hears (a CI Intel Mac),
+    /// two short passes say so and the live words are off: no word shown, never a long pass, nothing heard again. Where
+    /// it takes 0.01×, a short first pass, then the rest in one, and the words show from the first.</summary>
+    [Theory]
+    [InlineData(1.5)]
+    [InlineData(0.01)]
+    public void The_live_words_are_off_where_this_computer_is_too_slow_for_them(double ratio)
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        FakeMic? mic = null;
+        using var rec = new Recorder(store, () => mic = new FakeMic());
+        var hearer = new TimedHearer(ratio);
+        var captions = new LiveCaptioner(() => rec.Current, rec.Recent, _ => (hearer, "en")) { Clock = () => hearer.Now };
+        double? slow = null;
+        captions.FoundTooSlow += r => slow = r;
+        int changes = 0;
+        captions.Changed += _ => changes++;
+        var l = rec.Start("Data Mining");
+        mic!.Play(20);
+        WaitFor(() => rec.Elapsed >= 19.95);
+
+        Assert.True(captions.Step());
+        Assert.InRange(hearer.Longest, 2.9, LiveCaptioner.ProbeSeconds + 0.01); // a short first pass, timed
+        if (ratio > LiveCaptioner.MostRatio)
+        {
+            Assert.Empty(captions.Words(l.Id)); // not shown until this computer has shown it keeps up
+            Assert.Equal(0, changes);
+            Assert.True(captions.Step());
+            Assert.True(captions.TooSlow);
+            Assert.Equal(1.5, slow!.Value, 2);
+            Assert.Empty(captions.Words(l.Id));
+            Assert.False(captions.Step());
+            Assert.Equal(2, hearer.Calls);
+            Assert.True(hearer.Longest <= LiveCaptioner.ProbeSeconds + 0.01);
+        }
+        else
+        {
+            Assert.NotEmpty(captions.Words(l.Id));
+            Assert.True(captions.Step()); // the rest, in one pass
+            Assert.Equal(2, hearer.Calls);
+            Assert.False(captions.TooSlow);
+            Assert.Null(slow);
+            Assert.Contains(captions.Words(l.Id), w => w.Start > 17);
+        }
+    }
+
     /// <summary>Real Cactus Whistle on the recording of speech (Fixtures/speech.wav), where the app carries its engine for
     /// this computer (Mac, Windows; not Linux): the words, their times, and nothing made up over silence.</summary>
     [Fact]
