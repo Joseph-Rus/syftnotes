@@ -176,6 +176,9 @@ static unsafe class Needle
     {
         if (library != 0) return;
         string path = LibraryPath() ?? throw new DllNotFoundException($"Study Stash has no Cactus Whistle engine for {RuntimeInformation.OSDescription} on {RuntimeInformation.ProcessArchitecture}.");
+        // needle's README says its binary counts usage unless this is 0. The engine library imports nothing that reaches
+        // the network (its usage counts are the Python package's, not used here), but it costs nothing to say no.
+        Environment.SetEnvironmentVariable("NEEDLE_TELEMETRY", "0");
         nint lib = NativeLibrary.Load(path);
         load = (delegate* unmanaged[Cdecl]<byte*, ulong, int>)NativeLibrary.GetExport(lib, "needle_load");
         transcribe = (delegate* unmanaged[Cdecl]<float*, int, byte*, byte*, int, byte*, int, int>)NativeLibrary.GetExport(lib, "needle_transcribe");
