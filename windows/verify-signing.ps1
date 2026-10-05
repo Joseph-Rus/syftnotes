@@ -21,7 +21,8 @@ foreach ($f in $Files) {
     if ($Rehearsal) { Write-Host "(warning: ${f}: PowerShell sees no timestamp)" } else { throw "$f has no secure timestamp" }
   }
   if ($Rehearsal) {
-    if ($sig.SignerCertificate.Thumbprint -ne $env:STUDYSTASH_REHEARSAL_THUMBPRINT) { throw "$f isn't signed by the rehearsal's certificate" }
+    # A library its maker signed (SkiaSharp's, say) keeps that signature, which sign.ps1 leaves alone: Windows accepts it.
+    if ($sig.SignerCertificate.Thumbprint -ne $env:STUDYSTASH_REHEARSAL_THUMBPRINT -and $sig.Status -ne "Valid") { throw "$f isn't signed by the rehearsal's certificate" }
   } elseif ($sig.Status -ne "Valid") {
     throw "$f has a signature Windows doesn't accept: $($sig.Status) $($sig.StatusMessage)"
   }
