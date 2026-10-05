@@ -83,14 +83,15 @@ export const SettingsWindow: React.FC<{on: Section; h: number; scroll?: number; 
   </div>
 );
 
-/** Where the window sits and how big: under the headline (landscape), or larger on a phone-shaped frame. */
-export const useSettingsStage = () => {
+/** Where the window sits and how big: under the headline (landscape), or larger on a phone-shaped frame; or where a
+ * cut puts it (`fit`: its scale, left and top edges, and the lowest it may reach). */
+export const useSettingsStage = (fit?: {z: number; left: number; top: number; bottom: number}) => {
   const {width} = useVideoConfig();
   const vertical = useVertical();
-  const z = vertical ? 1.18 : 1.25;
-  const h = vertical ? 1100 : 690;
-  const left = vertical ? Math.round((width - SW * z) / 2) : COLUMN;
-  const top = vertical ? 420 : 200;
+  const z = fit ? fit.z : vertical ? 1.18 : 1.25;
+  const h = fit ? Math.floor((fit.bottom - fit.top) / fit.z) : vertical ? 1100 : 690;
+  const left = fit ? fit.left : vertical ? Math.round((width - SW * z) / 2) : COLUMN;
+  const top = fit ? fit.top : vertical ? 420 : 200;
   /** A point of the window (its own points) on the screen. */
   const at = (x: number, y: number) => ({x: left + x * z, y: top + y * z});
   return {vertical, z, h, left, top, at};

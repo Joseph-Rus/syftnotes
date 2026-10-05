@@ -56,6 +56,28 @@ export const voAt = (id: DemoScene) => {
 /** A scene's length in frames, with the cross-fade into the next. */
 export const length = (id: DemoScene) => scene(id).duration;
 
+/**
+ * A shorter cut of a scene, as the reel plays it (src/reel): its moments by the plan's keys, in frames from the scene's
+ * own start; how long the long ones last (a drag, the typing); and its length in frames, with the cross-fade into the
+ * next. A scene given a cut leaves out its own headline (the reel draws its own, inside Instagram's safe area), moves
+ * faster, and leaves out what the cut has no moment for. Without one, a scene is the demo's, frame for frame.
+ */
+export type Cut = {at: Record<string, number>; len: Record<string, number>; length: number};
+
+/** A moment of a scene: the cut's (which must have it), or the demo's. */
+export const cueIn = (cut: Cut | undefined, key: string) => {
+  if (!cut) return cue(key);
+  const f = cut.at[key];
+  if (f === undefined) throw new Error(`The reel's plan has no moment "${key}"`);
+  return f;
+};
+
+/** How long a moment lasts, the cut's or the demo's. */
+export const lenIn = (cut: Cut | undefined, key: string) => (cut ? cut.len[key] ?? 0 : cueLength(key));
+
+/** A scene's length in frames, the cut's or the demo's. */
+export const lengthIn = (cut: Cut | undefined, id: DemoScene) => (cut ? cut.length : length(id));
+
 export type Voice = {id: DemoScene; from: number; frames: number; file: string};
 export const VOICE = timeline.voice as Voice[];
 export type Effect = {key: string; sfx: string; from: number; frames: number | null; listed: boolean; file: string};

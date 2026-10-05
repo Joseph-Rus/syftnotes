@@ -4,7 +4,7 @@ import {Cursor, Desktop, Title} from '../../components/Layout';
 import {prog} from '../../promo2/scenes/Bookends';
 import {DESCENT, DescentPlot, knobX, SIGMOID, SigmoidPlot, SLIDER, SliderRow} from '../../promo2/Plots';
 import {FloatingBar, H2, Serif, useStage} from '../../promo2/ui';
-import {cue, cueLength, titles} from '../config';
+import {Cut, cueIn, lenIn, titles} from '../config';
 import {DemoWindow} from '../chrome';
 
 // Formulas you can drag: CS 340's notes on logistic regression, the second video's two plots (Core/Rich/PlotDesign.cs,
@@ -18,22 +18,30 @@ const valueAt = (f: number, keys: [number, number][]) =>
 const posK = (k: number) => (k - SIGMOID.k.from) / (SIGMOID.k.to - SIGMOID.k.from);
 const posEta = (e: number) => (e - DESCENT.eta.from) / (DESCENT.eta.to - DESCENT.eta.from);
 
-export const Plots: React.FC = () => {
+// The reel's: only the sigmoid, its steepness dragged up to 5 and partway back, in one hold of the knob.
+export const Plots: React.FC<{cut?: Cut}> = ({cut}) => {
   const frame = useCurrentFrame();
   const stage = useStage({vh: 790});
   const {page, vertical, h} = stage;
-  const enter = prog(frame, 0, 18);
+  const enter = prog(frame, 0, cut ? 14 : 18);
 
-  const K0 = cue('plots-k');
-  const K1 = K0 + cueLength('plots-k');
-  const E0 = cue('plots-eta');
-  const E1 = E0 + cueLength('plots-eta');
-  const SCROLL: [number, number] = [K1 + 18, K1 + 38];
+  const K0 = cueIn(cut, 'plots-k');
+  const K1 = K0 + lenIn(cut, 'plots-k');
+  // The reel never gets to gradient descent: its moments lie past the scene's end.
+  const E0 = cut ? 100000 : cueIn(cut, 'plots-eta');
+  const E1 = E0 + (cut ? 60 : lenIn(cut, 'plots-eta'));
+  const SCROLL: [number, number] = cut ? [99000, 99020] : [K1 + 18, K1 + 38];
   // Each slider's knob over time: [frame, value]. The pointer holds the knob, so it moves exactly with it.
-  const K: [number, number][] = [
-    [K0, SIGMOID.k.start],
-    [K1, 5],
-  ];
+  const K: [number, number][] = cut
+    ? [
+        [K0, SIGMOID.k.start],
+        [K0 + Math.round((K1 - K0) * 0.6), 5],
+        [K1, 2.4],
+      ]
+    : [
+        [K0, SIGMOID.k.start],
+        [K1, 5],
+      ];
   const ETA: [number, number][] = [
     [E0, DESCENT.eta.start],
     [E0 + 18, 0.05],
@@ -63,7 +71,16 @@ export const Plots: React.FC = () => {
   const k0 = knob(slider1, posK(SIGMOID.k.start), 0);
   const k1 = knob(slider1, posK(5), 0);
   const e = (v: number) => knob(slider2, posEta(v), scrollTo);
-  const stops: [number, number, number][] = [
+  const kEnd = knob(slider1, posK(K[K.length - 1][1]), 0);
+  const stops: [number, number, number][] = cut
+    ? [
+        [2, k0.x + 300, k0.y - 260],
+        [K0 - 8, k0.x, k0.y],
+        ...K.map(([f, v]) => [f, knob(slider1, posK(v), 0).x, k0.y] as [number, number, number]),
+        [K1 + 8, kEnd.x, kEnd.y],
+        [K1 + 40, kEnd.x + 60, kEnd.y + 110],
+      ]
+    : [
     [6, k0.x + 300, k0.y - 260],
     [K0 - 8, k0.x, k0.y],
     ...K.map(([f, v]) => [f, knob(slider1, posK(v), 0).x, k0.y] as [number, number, number]),
@@ -105,7 +122,7 @@ export const Plots: React.FC = () => {
         </DemoWindow>
         <Cursor softPress stops={stops} clicks={[K0 - 2, E0 - 2]} />
       </Desktop>
-      <Title text={titles.plots!} delay={8} />
+      {cut ? null : <Title text={titles.plots!} delay={8} />}
     </AbsoluteFill>
   );
 };

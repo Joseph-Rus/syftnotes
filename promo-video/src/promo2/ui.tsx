@@ -216,6 +216,13 @@ export const sidebarRows = (lit: ClassKey, pulse?: number): SidebarRow[] =>
   (Object.keys(CLASSES) as ClassKey[]).map((k) => ({...CLASSES[k], lit: k === lit, pulse: k === lit ? pulse : undefined}));
 
 /**
+ * Where a phone-shaped frame's window goes when a cut wants it somewhere else (the reel keeps it inside Instagram's
+ * safe area): its scale, its left and top edges, and the lowest it may reach. Without one, the videos' own place.
+ */
+export type StageFit = {z: number; left: number; top: number; bottom: number};
+export const StageFitContext = React.createContext<StageFit | null>(null);
+
+/**
  * Where the note window goes and how big: on a landscape frame the library window with its sidebar (the list column
  * tucked away) under the headline; on a phone-shaped frame just the page, 1.2 times as big, as the first video does.
  * `page` is where the page's content starts in the window, and its width.
@@ -223,11 +230,14 @@ export const sidebarRows = (lit: ClassKey, pulse?: number): SidebarRow[] =>
 export const useStage = (opts: {list?: boolean; vh?: number} = {}) => {
   const {width} = useVideoConfig();
   const vertical = useVertical();
-  const z = vertical ? 1.2 : 1;
+  const fitted = React.useContext(StageFitContext);
+  const fit = vertical ? fitted : null;
+  const z = vertical ? fit?.z ?? 1.2 : 1;
   const w = vertical ? 784 : 1320;
-  const h = vertical ? opts.vh ?? 1020 : 800; // on a phone, as tall as the figure needs
-  const left = (width - w * z) / 2;
-  const top = vertical ? 430 : 196;
+  const tall = vertical ? opts.vh ?? 1020 : 800; // on a phone, as tall as the figure needs
+  const h = fit ? Math.min(tall, Math.floor((fit.bottom - fit.top) / fit.z)) : tall;
+  const left = fit ? fit.left : (width - w * z) / 2;
+  const top = fit ? fit.top : vertical ? 430 : 196;
   const sidebar = vertical ? 0 : 252;
   const list = vertical || !opts.list ? 0 : 290;
   const pad = vertical ? 40 : 48;

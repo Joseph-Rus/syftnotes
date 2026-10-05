@@ -3,7 +3,7 @@ import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remoti
 import {colors, fonts} from '../../config';
 import {ClassDot, Cursor, Desktop, MENU_H, menuIconX, Title, useVertical} from '../../components/Layout';
 import {inOut, prog, px} from '../../promo2/scenes/Bookends';
-import {cue, length, titles} from '../config';
+import {Cut, cueIn, lengthIn, titles} from '../config';
 import {G, Toast} from '../chrome';
 
 // Recording, as the app does it on a Mac. The S. in the menu bar opens its dropdown (MacPanel, "mac-01-dropdown");
@@ -174,35 +174,42 @@ const Dropdown: React.FC<{press: number}> = ({press}) => (
 );
 
 // What the lecturer says, as the live words bring it in. The class starts at 10:02; fifty minutes later, it ends.
-const START_LINES = (s: number): Line[] => [
-  {time: '0:01', chunks: [[s + 54, 'Okay, let’s get'], [s + 70, 'going.']]},
-  {time: '0:03', chunks: [[s + 96, 'Today is the'], [s + 118, 'cardiac cycle:'], [s + 142, 'everything one'], [s + 160, 'heartbeat does.']]},
-  {time: '0:08', chunks: [[s + 196, 'First the atria'], [s + 222, 'fill, and then']]},
+// `pace` is when each piece arrives after the recorder opens (the reel's come quicker).
+const START_PACE = [54, 70, 96, 118, 142, 160, 196, 222];
+const START_PACE_FAST = [10, 19, 30, 40, 51, 60, 72, 82];
+const START_LINES = (s: number, p = START_PACE): Line[] => [
+  {time: '0:01', chunks: [[s + p[0], 'Okay, let’s get'], [s + p[1], 'going.']]},
+  {time: '0:03', chunks: [[s + p[2], 'Today is the'], [s + p[3], 'cardiac cycle:'], [s + p[4], 'everything one'], [s + p[5], 'heartbeat does.']]},
+  {time: '0:08', chunks: [[s + p[6], 'First the atria'], [s + p[7], 'fill, and then']]},
 ];
-const END_LINES = (j: number): Line[] => [
+const END_LINES = (j: number, p = [26, 52]): Line[] => [
   {time: '48:31', chunks: [[j, 'So the valves closing are what you hear: lub, then dub.']]},
   {time: '49:12', chunks: [[j, 'For Thursday, read chapter 12, the conduction system.']]},
-  {time: '49:56', chunks: [[j + 26, 'That’s it'], [j + 52, 'for today.']]},
+  {time: '49:56', chunks: [[j + p[0], 'That’s it'], [j + p[1], 'for today.']]},
 ];
 
-export const Record: React.FC = () => {
+// The reel's camera: the Mac's top right corner, close, behind the screen's black bezel, so the menu bar and the
+// recorder sit inside Instagram's safe area (the bezel takes the top and the right, where Instagram draws its own).
+export const REEL_SCREEN = {zoom: 1.5, right: 975, top: 200, corner: 46};
+
+export const Record: React.FC<{cut?: Cut}> = ({cut}) => {
   const f = useCurrentFrame();
-  const {width} = useVideoConfig();
+  const {width, height} = useVideoConfig();
   const vertical = useVertical();
-  const D = length('record');
-  const MENU = cue('record-menu');
-  const RECORD = cue('record-click');
-  const START = cue('record-start');
-  const PILL = cue('record-pill');
-  const STOP = cue('record-stop');
-  const JUMP = PILL + 120; // fifty minutes later
+  const D = lengthIn(cut, 'record');
+  const MENU = cueIn(cut, 'record-menu');
+  const RECORD = cueIn(cut, 'record-click');
+  const START = cueIn(cut, 'record-start');
+  const PILL = cueIn(cut, 'record-pill');
+  const STOP = cueIn(cut, 'record-stop');
+  const JUMP = cut ? cueIn(cut, 'record-jump') : PILL + 120; // fifty minutes later
   const LIVE = PILL; // the recorder opens: the live words show from here
 
-  // The camera: in on the menu bar's corner, out again at the end into the library.
-  const S = vertical ? 2.0 : 1.4;
-  const zoom = prog(f, 0, 26, inOut) * (1 - prog(f, D - 40, D - 8, inOut));
+  // The camera: in on the menu bar's corner, out again at the end into the library. The reel's holds still on it.
+  const S = cut ? REEL_SCREEN.zoom : vertical ? 2.0 : 1.4;
+  const zoom = cut ? 1 : prog(f, 0, 26, inOut) * (1 - prog(f, D - 40, D - 8, inOut));
   const s = 1 + (S - 1) * zoom;
-  const tx = (width - width * s);
+  const tx = cut ? REEL_SCREEN.right - width * s : (width - width * s);
 
   const iconX = menuIconX(width);
   const right = width - 16; // the recorder's corner, under the menu bar
@@ -219,19 +226,51 @@ export const Record: React.FC = () => {
   const jumped = f >= JUMP;
   const elapsedS = jumped ? 2995 + Math.floor((f - JUMP) / 30) : Math.max(0, Math.floor((f - START) / 30));
   const elapsed = clock(elapsedS);
-  const lines = jumped ? heard(END_LINES(JUMP), f) : heard(START_LINES(LIVE), f);
+  const lines = jumped ? heard(cut ? END_LINES(JUMP, [8, 16]) : END_LINES(JUMP), f) : heard(START_LINES(LIVE, cut ? START_PACE_FAST : START_PACE), f);
   const waiting = !jumped && lines.length === 0;
-  const later = prog(f, JUMP - 4, JUMP + 8) * (1 - prog(f, JUMP + 44, JUMP + 56));
-  const saved = prog(f, STOP + 12, STOP + 24);
+  const later = cut ? prog(f, JUMP - 4, JUMP + 6) * (1 - prog(f, JUMP + 22, JUMP + 30)) : prog(f, JUMP - 4, JUMP + 8) * (1 - prog(f, JUMP + 44, JUMP + 56));
+  // The reel goes on into the library straight after Stop, so it leaves the notification out.
+  const saved = cut ? 0 : prog(f, STOP + 12, STOP + 24);
 
   const pillW = 98;
   const pillAt = {x: right - pillW * K + 46 * K, y: top + 14 * K}; // the pill's time
   const stopAt = {x: right - (12 + 3 + 16) * K, y: top + 30 * K};
   const recordAt = {x: dropLeft + 110 * K, y: MENU_H + 8 + 8 * K + 16 * K};
 
-  return (
-    <AbsoluteFill>
-      <AbsoluteFill style={{transform: `translate(${px(tx)}px, 0px) scale(${px(s * 10000) / 10000})`, transformOrigin: '0 0'}}>
+  // The pointer's path: the reel's is quicker, and rests beside the recorder while the words come in.
+  const rest = {x: right - 360 * K - 70, y: top + 300};
+  const stops: [number, number, number][] = cut
+    ? [
+        [0, iconX + 40, 64],
+        [MENU - 3, iconX - 6, 14],
+        [MENU + 3, iconX - 6, 14],
+        [RECORD - 5, recordAt.x, recordAt.y],
+        [RECORD + 3, recordAt.x, recordAt.y],
+        [PILL - 7, pillAt.x, pillAt.y],
+        [PILL + 3, pillAt.x, pillAt.y],
+        [PILL + 22, rest.x, rest.y],
+        [STOP - 22, rest.x + 10, rest.y - 10],
+        [STOP - 6, stopAt.x, stopAt.y],
+        [STOP + 6, stopAt.x, stopAt.y],
+        [D, stopAt.x - 100, stopAt.y + 200],
+      ]
+    : [
+        [0, iconX - 6, 14],
+        [MENU + 6, iconX - 6, 14],
+        [RECORD - 6, recordAt.x, recordAt.y],
+        [RECORD + 4, recordAt.x, recordAt.y],
+        [PILL - 16, pillAt.x, pillAt.y],
+        [PILL + 2, pillAt.x, pillAt.y],
+        [PILL + 26, rest.x, rest.y],
+        [JUMP + 40, right - 360 * K - 60, top + 290],
+        [STOP - 10, stopAt.x, stopAt.y],
+        [STOP + 8, stopAt.x, stopAt.y],
+        [D - 10, stopAt.x - 160, stopAt.y + 300],
+      ];
+  const camera = `translate(${px(tx)}px, 0px) scale(${px(s * 10000) / 10000})`;
+
+  const desk = (
+    <>
         <Desktop lit={f >= MENU && f < RECORD + 4} clock={jumped ? (f >= STOP ? 'Tue 23 Sep  10:53' : 'Tue 23 Sep  10:52') : 'Tue 23 Sep  10:02'}>
           {/* While recording, the S. wears a small red dot at its top right. */}
           {recording ? <div style={{position: 'absolute', left: iconX + 7, top: 8, width: 7, height: 7, borderRadius: 4, background: REC, boxShadow: '0 0 0 1.5px rgba(8,10,40,0.6)'}} /> : null}
@@ -272,37 +311,54 @@ export const Record: React.FC = () => {
             <Toast title="Recording saved" body="Study Stash is writing it down; the library files it and writes your notes." />
           </div>
         </Desktop>
-        <Cursor
-          softPress
-          stops={[
-            [0, iconX - 6, 14],
-            [MENU + 6, iconX - 6, 14],
-            [RECORD - 6, recordAt.x, recordAt.y],
-            [RECORD + 4, recordAt.x, recordAt.y],
-            [PILL - 16, pillAt.x, pillAt.y],
-            [PILL + 2, pillAt.x, pillAt.y],
-            [PILL + 26, right - 360 * K - 70, top + 300],
-            [JUMP + 40, right - 360 * K - 60, top + 290],
-            [STOP - 10, stopAt.x, stopAt.y],
-            [STOP + 8, stopAt.x, stopAt.y],
-            [D - 10, stopAt.x - 160, stopAt.y + 300],
-          ]}
-          clicks={[MENU, RECORD, PILL, STOP]}
-        />
-      </AbsoluteFill>
+        <Cursor softPress stops={stops} clicks={[MENU, RECORD, PILL, STOP]} />
+    </>
+  );
 
-      {/* The rest of the lecture goes by. */}
-      <div style={{position: 'absolute', left: 0, right: vertical ? 0 : width - 1180, top: vertical ? 1470 : 520, display: 'flex', justifyContent: 'center', opacity: later, transform: `translateY(${px((1 - later) * 10)}px)`}}>
-        <div style={{display: 'flex', alignItems: 'center', gap: 14, padding: vertical ? '18px 32px' : '16px 30px', borderRadius: 999, background: 'rgba(30, 38, 70, 0.9)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 24px 50px -14px rgba(0,0,20,0.75)', fontFamily: fonts.ui, fontSize: vertical ? 36 : 30, fontWeight: 600, color: '#FFFFFF', whiteSpace: 'nowrap'}}>
-          <svg width={vertical ? 40 : 34} height={vertical ? 40 : 34} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M12 12 L12 6.5" transform={`rotate(${px(interpolate(f, [JUMP - 4, JUMP + 56], [0, 360], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}))} 12 12)`} />
-            <path d="M12 12 L15.5 12" />
-          </svg>
-          50 minutes later
-        </div>
+  // The rest of the lecture goes by. The reel's sits over the recorder's quiet top, inside the safe area.
+  const reelRec = cut ? {left: REEL_SCREEN.right - (16 + 360 * K) * S, right: width - (REEL_SCREEN.right - 16 * S)} : null;
+  const chip = (
+    <div
+      style={{
+        position: 'absolute',
+        left: reelRec ? reelRec.left : 0,
+        right: reelRec ? reelRec.right : vertical ? 0 : width - 1180,
+        top: cut ? 600 : vertical ? 1470 : 520,
+        display: 'flex',
+        justifyContent: 'center',
+        opacity: later,
+        transform: `translateY(${px((1 - later) * 10)}px)`,
+      }}
+    >
+      <div style={{display: 'flex', alignItems: 'center', gap: 14, padding: vertical ? '18px 32px' : '16px 30px', borderRadius: 999, background: 'rgba(30, 38, 70, 0.9)', border: '1px solid rgba(255,255,255,0.2)', boxShadow: '0 24px 50px -14px rgba(0,0,20,0.75)', fontFamily: fonts.ui, fontSize: vertical ? 36 : 30, fontWeight: 600, color: '#FFFFFF', whiteSpace: 'nowrap'}}>
+        <svg width={vertical ? 40 : 34} height={vertical ? 40 : 34} viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 12 L12 6.5" transform={`rotate(${px(interpolate(f, [JUMP - 4, JUMP + (cut ? 30 : 56)], [0, 360], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}))} 12 12)`} />
+          <path d="M12 12 L15.5 12" />
+        </svg>
+        50 minutes later
       </div>
+    </div>
+  );
 
+  if (cut) {
+    const {right: sr, top: st, corner} = REEL_SCREEN;
+    return (
+      <AbsoluteFill style={{background: '#050507'}}>
+        <div style={{position: 'absolute', left: 0, top: st, width: sr, height: height - st, overflow: 'hidden', borderTopRightRadius: corner}}>
+          <div style={{position: 'absolute', left: 0, top: 0, width, height, transform: camera, transformOrigin: '0 0'}}>{desk}</div>
+        </div>
+        {/* The screen's edge against the bezel, a hairline of light. */}
+        <div style={{position: 'absolute', left: -2, top: st - 1, width: sr + 1, height: height - st + 4, borderTopRightRadius: corner + 1, boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.09)', pointerEvents: 'none'}} />
+        {chip}
+      </AbsoluteFill>
+    );
+  }
+
+  return (
+    <AbsoluteFill>
+      <AbsoluteFill style={{transform: camera, transformOrigin: '0 0'}}>{desk}</AbsoluteFill>
+      {chip}
       <div style={{opacity: 1 - prog(f, D - 44, D - 30)}}>
         <Title text={titles.record!} delay={10} width={vertical ? undefined : 840} under />
       </div>

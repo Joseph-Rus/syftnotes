@@ -3,7 +3,7 @@ import {AbsoluteFill, Easing, interpolate, useCurrentFrame} from 'remotion';
 import {colors} from '../../config';
 import {Cursor, Desktop, Title} from '../../components/Layout';
 import {prog, px} from '../../promo2/scenes/Bookends';
-import {cue, titles} from '../config';
+import {Cut, cueIn, titles} from '../config';
 import {G} from '../chrome';
 import {ChoiceCard, CW, CX, GroupBox, Head, PageTitle, RowText, Select, Sep, SetRow, SettingsWindow, sideRow, Switch, useSettingsStage} from '../settings';
 
@@ -119,16 +119,20 @@ const SPEED_Y = 484;
 const AFTER_Y = 956;
 const AFTER_SCROLL = 420;
 
-export const Settings: React.FC = () => {
+// The reel's window: a little smaller, so everything that's clicked sits inside Instagram's safe area (its right
+// edge, past the switches, goes under the buttons), and short enough to stay above the caption.
+export const REEL_SETTINGS = {z: 1.08, left: 34, top: 404, bottom: 1490};
+
+export const Settings: React.FC<{cut?: Cut}> = ({cut}) => {
   const f = useCurrentFrame();
-  const st = useSettingsStage();
+  const st = useSettingsStage(cut ? REEL_SETTINGS : undefined);
   const {vertical, z, h, left, top} = st;
-  const RICH = cue('settings-rich');
-  const SPEED = cue('settings-speed');
-  const FAST = cue('settings-fast');
-  const REC = cue('settings-recording');
-  const AFTER = cue('settings-after');
-  const enter = prog(f, 0, 18);
+  const RICH = cueIn(cut, 'settings-rich');
+  const SPEED = cueIn(cut, 'settings-speed');
+  const FAST = cueIn(cut, 'settings-fast');
+  const REC = cueIn(cut, 'settings-recording');
+  const AFTER = cueIn(cut, 'settings-after');
+  const enter = prog(f, 0, cut ? 14 : 18);
   const onRecording = f >= REC + 1;
   const scroll = vertical ? 0 : interpolate(f, [REC + 5, REC + 22], [0, AFTER_SCROLL], {easing: Easing.inOut(Easing.cubic), extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
   const after = prog(f, AFTER + 1, AFTER + 7);
@@ -150,7 +154,7 @@ export const Settings: React.FC = () => {
         <Cursor
           softPress
           stops={[
-            [6, switchAt.x - 240, switchAt.y + 200],
+            [cut ? 2 : 6, switchAt.x - 240, switchAt.y + 200],
             [RICH - 6, switchAt.x - 4, switchAt.y - 4],
             [RICH + 8, switchAt.x - 4, switchAt.y - 4],
             [SPEED - 6, selectAt.x, selectAt.y - 4],
@@ -161,12 +165,12 @@ export const Settings: React.FC = () => {
             [REC + 6, recAt.x, recAt.y - 4],
             [AFTER - 6, afterAt.x, afterAt.y],
             [AFTER + 10, afterAt.x, afterAt.y],
-            [AFTER + 60, afterAt.x + 160, afterAt.y + 120],
+            [AFTER + (cut ? 40 : 60), afterAt.x + 160, afterAt.y + (cut ? 60 : 120)],
           ]}
           clicks={[RICH, SPEED, FAST, REC, AFTER]}
         />
       </Desktop>
-      <Title text={titles.settings!} delay={10} />
+      {cut ? null : <Title text={titles.settings!} delay={10} />}
     </AbsoluteFill>
   );
 };

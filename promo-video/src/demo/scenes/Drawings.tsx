@@ -4,7 +4,7 @@ import {Cursor, Desktop, Title} from '../../components/Layout';
 import {prog} from '../../promo2/scenes/Bookends';
 import {ArtName, artSize, Drawing, PartCard} from '../../promo2/Parts';
 import {FloatingBar, H2, Serif, useStage} from '../../promo2/ui';
-import {cue, titles} from '../config';
+import {Cut, cueIn, titles} from '../config';
 import {ClassId, DemoWindow} from '../chrome';
 
 // The app's own labelled drawings (the second video's drone and hand, art2/svg): ENGR 120's quadcopter; the pointer
@@ -12,7 +12,8 @@ import {ClassId, DemoWindow} from '../chrome';
 // it (its card: what it is, Explain this, Quiz me, Where was this said?, Zoom in). Then NURS 210's hand, its deep
 // flexor tendon lit the same way.
 
-type Turn = {art: ArtName; cls: ClassId; title: string; line: string; pass?: [string, number, number]; part: [string, number, number]; hover: number; pin?: number};
+// `lead`: how long before resting on its part the pointer passes the other one (`pass`).
+type Turn = {art: ArtName; cls: ClassId; title: string; line: string; pass?: [string, number, number]; part: [string, number, number]; hover: number; pin?: number; lead?: number};
 
 const useDrawingStage = (turn: Turn) => {
   const stage = useStage();
@@ -27,15 +28,15 @@ const useDrawingStage = (turn: Turn) => {
   return {stage, top, figTop, s, figLeft, onScreen};
 };
 
-const Figure: React.FC<{turn: Turn; f: number}> = ({turn, f}) => {
+const Figure: React.FC<{turn: Turn; f: number; card: number}> = ({turn, f, card}) => {
   const ds = useDrawingStage(turn);
   const {stage, s} = ds;
   const [part, px, py] = turn.part;
-  const hot = f >= turn.hover ? part : turn.pass && f >= turn.hover - 22 ? turn.pass[0] : null;
-  const dim = turn.pass ? prog(f, turn.hover - 22, turn.hover - 16) : prog(f, turn.hover, turn.hover + 6);
-  const ring = hot === part ? prog(f, turn.hover, turn.hover + 6) : prog(f, turn.hover - 22, turn.hover - 16);
+  const lead = turn.lead ?? 22;
+  const hot = f >= turn.hover ? part : turn.pass && f >= turn.hover - lead ? turn.pass[0] : null;
+  const dim = turn.pass ? prog(f, turn.hover - lead, turn.hover - lead + 6) : prog(f, turn.hover, turn.hover + 6);
+  const ring = hot === part ? prog(f, turn.hover, turn.hover + 6) : prog(f, turn.hover - lead, turn.hover - lead + 6);
   const pinned = turn.pin !== undefined && f >= turn.pin;
-  const card = cue('drawings-card');
   const cardW = 420;
   const cardLeft = Math.max(0, Math.min(stage.page.w - cardW, ds.figLeft + px * s - 60));
   const cardTop = ds.figTop - ds.top + py * s + 26;
@@ -58,14 +59,17 @@ const Figure: React.FC<{turn: Turn; f: number}> = ({turn, f}) => {
   );
 };
 
-export const Drawings: React.FC = () => {
+// The reel's: the drone alone, its battery passed and its flight controller pinned, a little quicker.
+export const Drawings: React.FC<{cut?: Cut}> = ({cut}) => {
   const frame = useCurrentFrame();
-  const enter = prog(frame, 0, 18);
-  const PIN = cue('drawings-pin');
-  const SWITCH = PIN + 60; // the hand's note
+  const enter = prog(frame, 0, cut ? 14 : 18);
+  const PIN = cueIn(cut, 'drawings-pin');
+  const CARD = cueIn(cut, 'drawings-card');
+  const SWITCH = cut ? 100000 : PIN + 60; // the hand's note (never, in the reel)
+  const lead = cut ? 14 : 22;
   const DRONE: Turn = {
     art: 'drone', cls: 'engr', title: 'The quadcopter, side on', line: 'Every part the lecture named, where it sits on the frame.',
-    pass: ['battery', 326, 146], part: ['flight-controller', 368, 182], hover: PIN - 24, pin: PIN,
+    pass: ['battery', 326, 146], part: ['flight-controller', 368, 182], hover: PIN - (cut ? 14 : 24), pin: PIN, lead,
   };
   const HAND: Turn = {
     art: 'hand', cls: 'nurs', title: 'The hand, palm up', line: 'The bones of the wrist and fingers, and the tendons that bend them.',
@@ -87,31 +91,35 @@ export const Drawings: React.FC = () => {
         <DemoWindow stage={stage} lit={turn.cls} enter={enter}>
           {frame < SWITCH + 6 ? (
             <div style={{opacity: 1 - swap}}>
-              <Figure turn={DRONE} f={frame} />
+              <Figure turn={DRONE} f={frame} card={CARD} />
             </div>
           ) : null}
           {frame >= SWITCH - 6 ? (
             <div style={{opacity: swap}}>
-              <Figure turn={HAND} f={frame} />
+              <Figure turn={HAND} f={frame} card={CARD} />
             </div>
           ) : null}
         </DemoWindow>
         <Cursor
           softPress
           stops={[
-            [8, ...d(drone, 600, 330)],
-            [DRONE.hover - 24, ...d(drone, DRONE.pass![1], DRONE.pass![2], 2, 2)],
-            [DRONE.hover - 6, ...d(drone, DRONE.pass![1], DRONE.pass![2], 2, 2)],
+            [cut ? 2 : 8, ...d(drone, 600, 330)],
+            [DRONE.hover - (cut ? 16 : 24), ...d(drone, DRONE.pass![1], DRONE.pass![2], 2, 2)],
+            [DRONE.hover - (cut ? 4 : 6), ...d(drone, DRONE.pass![1], DRONE.pass![2], 2, 2)],
             [DRONE.hover, ...d(drone, DRONE.part[1], DRONE.part[2], 2, 2)],
             [PIN + 30, ...d(drone, DRONE.part[1], DRONE.part[2], 2, 2)],
-            [SWITCH + 6, ...d(hand, 470, 420)],
-            [HAND.hover, ...d(hand, HAND.part[1], HAND.part[2], 2, 2)],
-            [HAND.hover + 60, ...d(hand, HAND.part[1], HAND.part[2], 2, 2)],
+            ...(cut
+              ? []
+              : ([
+                  [SWITCH + 6, ...d(hand, 470, 420)],
+                  [HAND.hover, ...d(hand, HAND.part[1], HAND.part[2], 2, 2)],
+                  [HAND.hover + 60, ...d(hand, HAND.part[1], HAND.part[2], 2, 2)],
+                ] as [number, number, number][])),
           ]}
           clicks={[PIN]}
         />
       </Desktop>
-      <Title text={titles.drawings!} delay={8} />
+      {cut ? null : <Title text={titles.drawings!} delay={8} />}
     </AbsoluteFill>
   );
 };

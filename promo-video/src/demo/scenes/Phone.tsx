@@ -5,7 +5,7 @@ import {Desktop, Title, useVertical} from '../../components/Layout';
 import {inOut, prog, px} from '../../promo2/scenes/Bookends';
 import {Flow} from '../../promo2/Flow';
 import {DrawnScale} from '../../promo2/DrawnScale';
-import {cue, titles} from '../config';
+import {Cut, cueIn, titles} from '../config';
 import {G, Glyph} from '../chrome';
 
 // The library on a phone: Study Stash's own web app (web/src: TabBar, Home, LectureScreen, Due, Ask), in its dark
@@ -267,21 +267,25 @@ const Touch: React.FC<{f: number; at: number; x: number; y: number}> = ({f, at, 
   return <div style={{position: 'absolute', left: x - r, top: y - r, width: r * 2, height: r * 2, borderRadius: r, background: `rgba(255,255,255,${px(0.28 * o)})`, border: `2px solid rgba(255,255,255,${px(0.5 * o)})`, zIndex: 20}} />;
 };
 
-export const Phone: React.FC = () => {
+// The reel's phone: under its headline and above Instagram's caption, centred in the safe area (clear of the buttons
+// down the right).
+export const REEL_PHONE = {top: 412, bottom: 1490, centre: 508};
+
+export const Phone: React.FC<{cut?: Cut}> = ({cut}) => {
   const f = useCurrentFrame();
   const {width} = useVideoConfig();
   const vertical = useVertical();
-  const LECTURE = cue('phone-lecture');
-  const DUE = cue('phone-due');
-  const ASK = cue('phone-ask');
+  const LECTURE = cueIn(cut, 'phone-lecture');
+  const DUE = cueIn(cut, 'phone-due');
+  const ASK = cut ? 100000 : cueIn(cut, 'phone-ask'); // the reel stays on Due
 
-  const z = vertical ? 1.7 : 0.98;
   const bezel = 13;
   const PW = SW + bezel * 2;
   const PH = SH + bezel * 2;
-  const left = Math.round((width - PW * z) / 2);
-  const top = vertical ? 330 : 200;
-  const enter = prog(f, 0, 22, inOut);
+  const z = cut ? Math.floor(((REEL_PHONE.bottom - REEL_PHONE.top) / PH) * 1000) / 1000 : vertical ? 1.7 : 0.98;
+  const left = cut ? Math.round(REEL_PHONE.centre - (PW * z) / 2) : Math.round((width - PW * z) / 2);
+  const top = cut ? REEL_PHONE.top : vertical ? 330 : 200;
+  const enter = prog(f, 0, cut ? 16 : 22, inOut);
 
   const push = prog(f, LECTURE + 2, LECTURE + 14, inOut);
   const screen = f < LECTURE + 2 ? 'library' : f < DUE ? 'lecture' : f < ASK ? 'due' : 'ask';
@@ -335,7 +339,7 @@ export const Phone: React.FC = () => {
           </DrawnScale>
         </div>
       </Desktop>
-      <Title text={titles.phone!} delay={10} />
+      {cut ? null : <Title text={titles.phone!} delay={10} />}
     </AbsoluteFill>
   );
 };

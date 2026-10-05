@@ -5,7 +5,7 @@ import {Cursor, Desktop, Title} from '../../components/Layout';
 import {prog} from '../../promo2/scenes/Bookends';
 import {around, BOXES, box as boxOf, boxAt, EDGES, Flow, FLOW_H, FLOW_W, FlowLook} from '../../promo2/Flow';
 import {BarButton, FloatingBar, Grow, H2, PinActions, Serif, Strip, StripIcon, useStage} from '../../promo2/ui';
-import {cue, titles} from '../config';
+import {Cut, cueIn, titles} from '../config';
 import {DemoWindow} from '../chrome';
 
 // Every diagram is alive (DiagramChrome, as the second video showed it): the pointer rests on "Ventricles contract"
@@ -36,19 +36,19 @@ export const useFlowStage = () => {
 
 const ICONS = ['play_circle', 'quiz', 'open_in_full'] as const;
 
-export const Explore: React.FC = () => {
+export const Explore: React.FC<{cut?: Cut}> = ({cut}) => {
   const f = useCurrentFrame();
   const fs = useFlowStage();
   const {stage} = fs;
-  const enter = prog(f, 0, 18);
+  const enter = prog(f, 0, cut ? 14 : 18);
 
-  const HOVER = 44;
-  const PIN = cue('explore-pin');
-  const STEPS = cue('explore-steps');
-  const NEXT = cue('explore-next');
-  const TEST = cue('explore-test');
-  const CHECK = cue('explore-check');
-  const KNEW = cue('explore-knew');
+  const HOVER = cut ? cueIn(cut, 'explore-hover') : 44;
+  const PIN = cueIn(cut, 'explore-pin');
+  const STEPS = cueIn(cut, 'explore-steps');
+  const NEXT = cueIn(cut, 'explore-next');
+  const TEST = cueIn(cut, 'explore-test');
+  const CHECK = cueIn(cut, 'explore-check');
+  const KNEW = cueIn(cut, 'explore-knew');
 
   const pinned = f >= PIN && f < STEPS;
   const stepping = f >= STEPS && f < TEST;
@@ -81,11 +81,11 @@ export const Explore: React.FC = () => {
   const pinBox = boxAt('contract');
   const pinLeft = fs.flowLeft + (pinBox.x - pinBox.w / 2) * fs.s;
   const pinTop = fs.flowTop - fs.top + (pinBox.y + pinBox.h / 2) * fs.s + 10;
-  const card = cue('explore-card');
+  const card = cueIn(cut, 'explore-card');
   const explainAt = stage.at(stage.page.x + pinLeft + 60, fs.flowTop + (pinBox.y + pinBox.h / 2) * fs.s + 30);
   const actions = pinned ? (
     <div style={{position: 'absolute', left: pinLeft, top: pinTop, zIndex: 5}}>
-      <PinActions p={prog(f, card - 1, card + 7)} hot={f >= card + 14 && f < STEPS - 10 ? 'explain' : undefined} />
+      <PinActions p={prog(f, card - 1, card + 7)} hot={!cut && f >= card + 14 && f < STEPS - 10 ? 'explain' : undefined} />
     </div>
   ) : null;
 
@@ -148,7 +148,7 @@ export const Explore: React.FC = () => {
               <Flow look={look} scale={fs.s} />
             </div>
             <div style={{position: 'absolute', left: fs.barLeft, top: fs.barTop - fs.top}}>
-              <FloatingBar icons={[...ICONS]} p={prog(f, 16, 24)} on={stepping ? 'play_circle' : testing ? 'quiz' : null} hot={pressed(STEPS) ? 'play_circle' : pressed(TEST) ? 'quiz' : null} />
+              <FloatingBar icons={[...ICONS]} p={cut ? prog(f, 8, 16) : prog(f, 16, 24)} on={stepping ? 'play_circle' : testing ? 'quiz' : null} hot={pressed(STEPS) ? 'play_circle' : pressed(TEST) ? 'quiz' : null} />
             </div>
             {strip ? <div style={{position: 'absolute', left: 0, right: 0, top: fs.stripTop - fs.top}}>{strip}</div> : null}
             {actions}
@@ -157,12 +157,15 @@ export const Explore: React.FC = () => {
         <Cursor
           softPress
           stops={[
-            [6, ...tip(box, 260, 230)],
+            [cut ? 2 : 6, ...tip(box, 260, 230)],
             [HOVER, ...tip(box, 30, 4)],
             [PIN - 6, ...tip(box, 34, 6)],
             [PIN + 6, ...tip(box, 34, 6)],
-            [card + 12, ...tip(explainAt, 0, -6)],
-            [card + 22, ...tip(explainAt, 0, -6)],
+            // The demo's pointer rests on Explain this a moment; the reel's goes straight on to Step through.
+            ...(cut ? [] : ([
+              [card + 12, ...tip(explainAt, 0, -6)],
+              [card + 22, ...tip(explainAt, 0, -6)],
+            ] as [number, number, number][])),
             [STEPS - 6, ...tip(fs.barIcon(0), -4, -6)],
             [STEPS + 6, ...tip(fs.barIcon(0), -4, -6)],
             [NEXT - 6, ...tip(nextAt, -4, -6)],
@@ -173,12 +176,12 @@ export const Explore: React.FC = () => {
             [CHECK + 4, ...tip(box, 30, 6)],
             [KNEW - 5, knewAt.x - 4, knewAt.y - 6],
             [KNEW + 6, knewAt.x - 4, knewAt.y - 6],
-            [KNEW + 50, knewAt.x - 320, knewAt.y - 250],
+            [KNEW + (cut ? 30 : 50), knewAt.x - 320, knewAt.y - 250],
           ]}
           clicks={[PIN, STEPS, NEXT, TEST, CHECK, KNEW]}
         />
       </Desktop>
-      <Title text={titles.explore!} delay={8} />
+      {cut ? null : <Title text={titles.explore!} delay={8} />}
     </AbsoluteFill>
   );
 };

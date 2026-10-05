@@ -5,7 +5,7 @@ import {ClassDot, Cursor, Desktop, Title} from '../../components/Layout';
 import {Group, ListHead} from '../../components/Sidebar';
 import {prog, px} from '../../promo2/scenes/Bookends';
 import {useStage} from '../../promo2/ui';
-import {cue, cueLength, titles} from '../config';
+import {Cut, cueIn, lenIn, titles} from '../config';
 import {DemoWindow, G, LectureRow} from '../chrome';
 
 // Asking about a lecture, as the app does it (MacAiAskBar and MacAiAnswer, the "mac-04-full-app-answer" and
@@ -25,14 +25,15 @@ const Chip: React.FC<{children: React.ReactNode}> = ({children}) => (
   </div>
 );
 
-export const Ask: React.FC = () => {
+export const Ask: React.FC<{cut?: Cut}> = ({cut}) => {
   const f = useCurrentFrame();
   const stage = useStage({list: true});
   const {vertical, page, h} = stage;
-  const enter = prog(f, 0, 18);
-  const KEYS = cue('ask-keys');
-  const TYPED = KEYS + cueLength('ask-keys');
-  const SEND = cue('ask-send');
+  const enter = prog(f, 0, cut ? 14 : 18);
+  const KEYS = cueIn(cut, 'ask-keys');
+  const TYPED = KEYS + lenIn(cut, 'ask-keys');
+  const SEND = cueIn(cut, 'ask-send');
+  const PER_WORD = cut ? 2.2 : 4.2; // frames a word of the answer takes to come (the reel's, as quick as Claude writes)
 
   // Typed at an even pace over the keys' sound.
   const n = Math.max(0, Math.min(QUESTION.length, Math.floor(((f - KEYS) / (TYPED - KEYS)) * QUESTION.length + 0.5)));
@@ -41,7 +42,7 @@ export const Ask: React.FC = () => {
   const card = prog(f, SEND + 2, SEND + 12);
   // The answer is written in as it comes: a few words a moment.
   const words = ANSWER.split(' ');
-  const shown = Math.max(0, Math.min(words.length, Math.floor((f - SEND - 12) / 4.2)));
+  const shown = Math.max(0, Math.min(words.length, Math.floor((f - SEND - 12) / PER_WORD)));
   const done = shown >= words.length;
 
   const barW = page.w;
@@ -113,7 +114,7 @@ export const Ask: React.FC = () => {
                 {words.slice(0, shown).join(' ')}
                 {!done ? <span style={{color: colors.lagoonBright}}> ▍</span> : null}
               </div>
-              <div style={{fontSize: 14, color: colors.text2, marginTop: 6, opacity: prog(f, SEND + 12 + words.length * 4.2, SEND + 20 + words.length * 4.2)}}>Claude Code · from 12:40, 31:05 and 44:20</div>
+              <div style={{fontSize: 14, color: colors.text2, marginTop: 6, opacity: prog(f, SEND + 12 + words.length * PER_WORD, SEND + 20 + words.length * PER_WORD)}}>Claude Code · from 12:40, 31:05 and 44:20</div>
             </div>
           ) : null}
 
@@ -167,7 +168,7 @@ export const Ask: React.FC = () => {
           clicks={[SEND]}
         />
       </Desktop>
-      <Title text={titles.ask!} delay={10} />
+      {cut ? null : <Title text={titles.ask!} delay={10} />}
     </AbsoluteFill>
   );
 };

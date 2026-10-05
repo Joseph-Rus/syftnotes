@@ -1,12 +1,12 @@
 import React from 'react';
-import {AbsoluteFill, interpolate, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, fonts} from '../../config';
 import {Desktop, Title} from '../../components/Layout';
 import {Group, ListHead} from '../../components/Sidebar';
 import {inOut, prog, px} from '../../promo2/scenes/Bookends';
 import {Flow, FLOW_H, FLOW_W} from '../../promo2/Flow';
 import {H2, Icon, NoteHead, Serif, useStage} from '../../promo2/ui';
-import {cue, titles} from '../config';
+import {Cut, cueIn, titles} from '../config';
 import {DemoWindow, LectureRow, Toast} from '../chrome';
 
 // Notes first, diagrams after, as the app does it: Claude Code writes the notes (they take a couple of minutes: the
@@ -29,14 +29,15 @@ const Dots: React.FC<{frame: number}> = ({frame}) => (
   </span>
 );
 
-export const Notes: React.FC = () => {
+export const Notes: React.FC<{cut?: Cut}> = ({cut}) => {
   const frame = useCurrentFrame();
-  const FILED = cue('notes-filed');
-  const ADDED = cue('notes-diagrams');
-  const LATER = FILED + 72; // "A minute later"
+  const {width} = useVideoConfig();
+  const FILED = cueIn(cut, 'notes-filed');
+  const ADDED = cueIn(cut, 'notes-diagrams');
+  const LATER = cut ? cueIn(cut, 'notes-later') : FILED + 72; // "A minute later"
   const stage = useStage({list: true});
   const {vertical, page} = stage;
-  const enter = prog(frame, 0, 18);
+  const enter = prog(frame, 0, cut ? 14 : 18);
   const filed = frame >= FILED;
   const notes = (i: number): React.CSSProperties => {
     const p = prog(frame, FILED + 2 + i * 4, FILED + 16 + i * 4);
@@ -50,8 +51,13 @@ export const Notes: React.FC = () => {
   const sheen = prog(frame, ADDED + 6, ADDED + 40, inOut);
   const later = prog(frame, LATER, LATER + 10) * (1 - prog(frame, ADDED - 8, ADDED + 4));
   // The notes take a couple of minutes to write, and the diagrams a minute more: the menu bar's clock says so.
-  const clock = frame < 40 ? 'Tue 23 Sep  10:53' : frame < LATER + 10 ? 'Tue 23 Sep  10:55' : 'Tue 23 Sep  10:56';
-  const toast = prog(frame, FILED, FILED + 12) * (1 - prog(frame, FILED + 120, FILED + 132));
+  const clock = frame < (cut ? 14 : 40) ? 'Tue 23 Sep  10:53' : frame < LATER + 10 ? 'Tue 23 Sep  10:55' : 'Tue 23 Sep  10:56';
+  const toast = prog(frame, FILED, FILED + 12) * (1 - (cut ? prog(frame, FILED + 62, FILED + 72) : prog(frame, FILED + 120, FILED + 132)));
+  // The reel's notification: larger, and low on the window's right, inside the safe area, clear of the notes as they open.
+  const TOAST_Z = 1.3;
+  const toastAt: React.CSSProperties = cut
+    ? {right: width - (stage.left + stage.w * stage.z) + 22, top: stage.top + stage.h * stage.z - 22 - 150 * TOAST_Z, transformOrigin: '100% 0'}
+    : {right: vertical ? 24 : 18, top: 50};
   const diagramsLine = !filed ? null : added ? (
     <span style={{display: 'inline-flex', alignItems: 'center', gap: 5, color: colors.lagoonBright, fontWeight: 600}}>
       <Icon name="check" size={15} color={colors.lagoonBright} /> Diagrams added
@@ -119,7 +125,7 @@ export const Notes: React.FC = () => {
         </DemoWindow>
 
         {/* The notification the app shows as the lecture is filed. */}
-        <div style={{position: 'absolute', right: vertical ? 24 : 18, top: 50, opacity: toast, transform: `translateX(${px((1 - toast) * 30)}px)`}}>
+        <div style={{position: 'absolute', ...toastAt, opacity: toast, transform: `translateX(${px((1 - toast) * 30)}px)${cut ? ` scale(${TOAST_Z})` : ''}`}}>
           <Toast title="Filed in BIO 110" body="The cardiac cycle" button="Open note" width={vertical ? 520 : 444} />
         </div>
 
@@ -147,7 +153,7 @@ export const Notes: React.FC = () => {
           </div>
         </div>
       </Desktop>
-      <Title text={titles.notes!} delay={10} />
+      {cut ? null : <Title text={titles.notes!} delay={10} />}
     </AbsoluteFill>
   );
 };

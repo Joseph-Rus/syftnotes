@@ -3,7 +3,7 @@ import {AbsoluteFill, Easing, useCurrentFrame, useVideoConfig} from 'remotion';
 import {colors, fonts, text} from '../../config';
 import {useVertical} from '../../components/Layout';
 import {DrawnIcon, Glimpse, inCubic, inOut, Mask, NightGround, night, Placement, prog, px} from '../../promo2/scenes/Bookends';
-import {length, voAt} from '../config';
+import {Cut, cueIn, lengthIn, voAt} from '../config';
 
 const draw = Easing.bezier(0.4, 0, 0.2, 1);
 
@@ -25,27 +25,32 @@ const CARDS_TALL: Placement[] = [
   {kind: 'descent', x: 790, y: 1650, s: 0.56, z: 0.42, at: 64},
 ];
 
-export const Opener: React.FC = () => {
+// The reel's: the same glimpses, arriving sooner.
+const CARDS_TALL_FAST: Placement[] = CARDS_TALL.map((g, i) => ({...g, at: 4 + i * 4}));
+
+export const Opener: React.FC<{cut?: Cut}> = ({cut}) => {
   const f = useCurrentFrame();
   const vertical = useVertical();
   const {width} = useVideoConfig();
-  const D = length('opener');
-  const vo = voAt('opener'); // "This is Study Stash."
+  const D = lengthIn(cut, 'opener');
+  const vo = cut ? cueIn(cut, 'vo') : voAt('opener'); // "This is Study Stash." (the reel's: "Study Stash.")
 
-  // The icon, put together before the first word.
-  const trace = prog(f, 4, 30, draw);
-  const tile = prog(f, 22, 40, inOut);
-  const s = prog(f, 30, 50, inOut);
-  const ink = prog(f, 40, 54);
-  const dot = prog(f, 46, 60);
-  const sheen = prog(f, 58, 88, inOut);
+  // The icon, put together before the first word. The reel's starts drawing on the first frame and is whole in under a
+  // second, the name rising as it's said, and no tagline: it's straight into the app.
+  const trace = cut ? prog(f, 0, 16, draw) : prog(f, 4, 30, draw);
+  const tile = cut ? prog(f, 9, 21, inOut) : prog(f, 22, 40, inOut);
+  const s = cut ? prog(f, 13, 25, inOut) : prog(f, 30, 50, inOut);
+  const ink = cut ? prog(f, 19, 29) : prog(f, 40, 54);
+  const dot = cut ? prog(f, 22, 31) : prog(f, 46, 60);
+  const sheen = cut ? prog(f, 30, 50, inOut) : prog(f, 58, 88, inOut);
   // The name as it's said ("Study Stash" about a third of a second into the line), then the tagline.
-  const name = prog(f, vo + 6, vo + 30);
-  const line1 = prog(f, vo + 44, vo + 68);
-  const line2 = prog(f, vo + 50, vo + 74);
+  const name = cut ? prog(f, vo, vo + 18) : prog(f, vo + 6, vo + 30);
+  const line1 = cut ? 0 : prog(f, vo + 44, vo + 68);
+  const line2 = cut ? 0 : prog(f, vo + 50, vo + 74);
   // Out into the setup, over the same desktop.
-  const lift = prog(f, D - 34, D - 8, inOut);
-  const leave = prog(f, D - 30, D - 4, inCubic);
+  const lift = cut ? prog(f, D - 26, D - 6, inOut) : prog(f, D - 34, D - 8, inOut);
+  const leave = cut ? prog(f, D - 24, D - 4, inCubic) : prog(f, D - 30, D - 4, inCubic);
+  const cards = vertical ? (cut ? CARDS_TALL_FAST : CARDS_TALL) : CARDS_WIDE;
 
   const iconSize = vertical ? 212 : 172;
   const iconTop = vertical ? 676 : 292;
@@ -61,9 +66,9 @@ export const Opener: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <NightGround dim={0.62 * (1 - lift)} black={1 - prog(f, 0, 44, inOut)} zoom={1.06 - 0.06 * prog(f, 0, D - 10, inOut)} glow={{x: width / 2, y: centreY, r: vertical ? 760 : 820, a: tile * (1 - leave)}} />
+      <NightGround dim={0.62 * (1 - lift)} black={1 - prog(f, 0, cut ? 14 : 44, inOut)} zoom={1.06 - 0.06 * prog(f, 0, D - 10, inOut)} glow={{x: width / 2, y: centreY, r: vertical ? 760 : 820, a: tile * (1 - leave)}} />
 
-      {(vertical ? CARDS_TALL : CARDS_WIDE).map((g) => (
+      {cards.map((g) => (
         <Glimpse key={g.kind} g={g} f={f} cx={width / 2} cy={vertical ? 960 : 540} leave={leave} drift={0.22} />
       ))}
 

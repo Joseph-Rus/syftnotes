@@ -5,7 +5,7 @@ import {ClassDot, Cursor, Desktop, Title} from '../../components/Layout';
 import {Group, ListHead} from '../../components/Sidebar';
 import {inOut, prog, px} from '../../promo2/scenes/Bookends';
 import {useStage} from '../../promo2/ui';
-import {cue, titles} from '../config';
+import {Cut, cueIn, titles} from '../config';
 import {DemoWindow, LectureRow} from '../chrome';
 
 // Canvas in the library (MacCanvasDue and MacAssignment, the "mac-09-canvas-due-app" shot): Due in the sidebar, what's
@@ -88,12 +88,12 @@ const Detail: React.FC<{f: number; from: number}> = ({f, from}) => {
   );
 };
 
-export const Canvas: React.FC = () => {
+export const Canvas: React.FC<{cut?: Cut}> = ({cut}) => {
   const f = useCurrentFrame();
   const stage = useStage({list: true});
   const {vertical, page} = stage;
-  const enter = prog(f, 0, 18);
-  const OPEN = cue('canvas-open');
+  const enter = prog(f, 0, cut ? 14 : 18);
+  const OPEN = cueIn(cut, 'canvas-open');
   const chosen = f >= OPEN;
   const listW = stage.list;
   // Lab 3's row, on the screen: in the list column (landscape) or in the page (phone-shaped).
@@ -126,7 +126,7 @@ export const Canvas: React.FC = () => {
         <Cursor
           softPress
           stops={[
-            [12, lab.x + 380, lab.y + 300],
+            [cut ? 4 : 12, lab.x + 380, lab.y + 300],
             [OPEN - 6, lab.x, lab.y],
             [OPEN + 20, lab.x, lab.y],
             [OPEN + 70, lab.x + 520, lab.y + 280],
@@ -134,7 +134,7 @@ export const Canvas: React.FC = () => {
           clicks={[OPEN]}
         />
       </Desktop>
-      <Title text={titles.canvas!} delay={10} />
+      {cut ? null : <Title text={titles.canvas!} delay={10} />}
     </AbsoluteFill>
   );
 };
