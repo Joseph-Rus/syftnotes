@@ -266,6 +266,8 @@ public sealed class ClaudeSetup
         }
         else if (servers is null || !servers.Remove(ClaudeTools.ServerName))
             return new(true, $"{name} doesn't have Study Stash.", path);
+        else if (servers.Count == 0) root.Remove("mcpServers"); // the file goes back to how it was before Study Stash
+
         string after = root.ToJsonString(Indented);
         if (before is not null && before.Contains("\r\n", StringComparison.Ordinal)) after = after.ReplaceLineEndings("\r\n");
         if (before is null || before.EndsWith('\n')) after += before?.Contains("\r\n", StringComparison.Ordinal) == true ? "\r\n" : "\n";

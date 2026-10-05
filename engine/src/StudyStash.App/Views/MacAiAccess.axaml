@@ -87,7 +87,7 @@
                 <DataTemplate x:DataType="vm:AiAppRow">
                   <StackPanel>
                     <Border Classes="ai-sep" IsVisible="{Binding !First}" />
-                    <Grid Classes="ai-row" ColumnDefinitions="28,12,*,Auto" MinHeight="56" Margin="16,8">
+                    <Grid Classes="ai-row" ColumnDefinitions="28,12,*,Auto" MinHeight="56" Margin="16,2">
                       <Panel Classes="ai-lead">
                         <Border Classes="ai-tile"><c:Icon Glyph="{Binding Icon}" Size="15" Foreground="{DynamicResource Fg}" /></Border>
                       </Panel>

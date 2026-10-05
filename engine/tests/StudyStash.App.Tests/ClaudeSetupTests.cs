@@ -146,6 +146,12 @@ public class ClaudeSetupTests
         Assert.True(added.Ok, added.Say);
         Assert.Null(added.Backup);
         Assert.NotNull(JsonNode.Parse(File.ReadAllText(setup.DesktopConfig))!["mcpServers"]![ClaudeTools.ServerName]);
+
+        // A file that had no servers before has none after: not an empty mcpServers left behind.
+        Write(setup.GeminiConfig, "{\n  \"theme\": \"Default\"\n}\n");
+        Assert.True(setup.Connect("gemini").Ok);
+        Assert.True(setup.Disconnect("gemini").Ok);
+        Assert.Equal("{\n  \"theme\": \"Default\"\n}\n", File.ReadAllText(setup.GeminiConfig).ReplaceLineEndings("\n"));
     }
 
     [Fact]
