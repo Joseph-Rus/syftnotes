@@ -175,6 +175,10 @@
                   ToolTip.Tip="Show or hide the sidebar (Ctrl+Shift+S)" AutomationProperties.Name="Toggle sidebar">
             <c:Icon Glyph="dock_to_right" Size="16" Foreground="{DynamicResource Fg}" RenderTransform="scale(-1,1)" />
           </Button>
+          <Button Name="ToggleList" Classes="command" Width="36" Padding="0" HorizontalContentAlignment="Center" Command="{Binding ToggleListCommand}"
+                  IsVisible="{Binding CanToggleList}" ToolTip.Tip="Show or hide the list (Ctrl+Shift+L)" AutomationProperties.Name="Toggle list">
+            <c:Icon Glyph="notes" Size="16" Foreground="{DynamicResource Fg}" />
+          </Button>
           <Button Classes="command" Width="36" Padding="0" HorizontalContentAlignment="Center" Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack}"
                   ToolTip.Tip="Back (Alt+Left)" AutomationProperties.Name="Back">
             <c:Icon Glyph="arrow_back" Size="16" Foreground="{DynamicResource Fg}" />

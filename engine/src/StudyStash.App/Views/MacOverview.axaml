@@ -109,12 +109,6 @@
               <TextBlock Text="Attach" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Name="AllLectures" Classes="ov-pill" Command="{Binding AllLecturesCommand}" AutomationProperties.Name="All lectures">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <c:Icon Glyph="school" Size="15" Foreground="{DynamicResource Fg}" />
-              <TextBlock Text="All lectures" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
         </StackPanel>
       </Grid>
 
@@ -264,7 +258,7 @@
 
       <!-- A class's home: the ways further in -->
       <StackPanel Name="Links" IsVisible="{Binding HasLinks}">
-        <TextBlock Classes="ov-h2" Text="In this class" Margin="0,0,0,8" />
+        <TextBlock Classes="ov-h2" Text="On Canvas" Margin="0,0,0,8" />
         <ItemsControl ItemsSource="{Binding Links}" Margin="0,0,-10,-10">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><UniformGrid Columns="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).LinkColumns}" /></ItemsPanelTemplate>

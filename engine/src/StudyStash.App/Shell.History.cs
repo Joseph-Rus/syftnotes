@@ -106,6 +106,8 @@ public static partial class Shell
         void Bind(KeyGesture gesture, Action act) => w.KeyBindings.Add(new KeyBinding { Gesture = gesture, Command = new CommunityToolkit.Mvvm.Input.RelayCommand(act) });
         Bind(mac ? new KeyGesture(Key.S, KeyModifiers.Meta | KeyModifiers.Control) : new KeyGesture(Key.S, KeyModifiers.Control | KeyModifiers.Shift),
             () => library.SidebarHidden = !library.SidebarHidden);
+        Bind(mac ? new KeyGesture(Key.L, KeyModifiers.Meta | KeyModifiers.Control) : new KeyGesture(Key.L, KeyModifiers.Control | KeyModifiers.Shift),
+            () => library.ListHidden = !library.ListHidden);
         Bind(mac ? new KeyGesture(Key.OemOpenBrackets, KeyModifiers.Meta) : new KeyGesture(Key.Left, KeyModifiers.Alt), GoBack);
         Bind(mac ? new KeyGesture(Key.OemCloseBrackets, KeyModifiers.Meta) : new KeyGesture(Key.Right, KeyModifiers.Alt), GoForward);
         w.AddHandler(Avalonia.Input.InputElement.PointerReleasedEvent, (_, e) =>

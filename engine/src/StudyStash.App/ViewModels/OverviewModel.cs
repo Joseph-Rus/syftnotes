@@ -87,8 +87,8 @@ public sealed partial class OverviewModel : ObservableObject
     public bool NoEvents => Events.Count == 0;
     public bool NoLectures => Lectures.Count == 0;
     public bool HasClasses => Classes.Count > 0;
-    /// <summary>More than the one way in (All lectures, which the header has already): a Canvas class's lists.</summary>
-    public bool HasLinks => Links.Count > 1;
+    /// <summary>A Canvas class's lists (its lectures are Recent lectures' "See all").</summary>
+    public bool HasLinks => Links.Count > 0;
 
     public string DueHeading => IsHome ? "Due soon" : "To hand in";
     public string DueEmpty => IsHome ? "Nothing to hand in. You're all caught up." : $"Nothing to hand in for {ClassName}.";
@@ -295,7 +295,9 @@ public sealed partial class OverviewModel : ObservableObject
         };
         var toHandIn = StillToHandIn(s.Due).Where(i => i.Class == c.Name).ToList();
         var events = (s.Events ?? []).Where(e => e.ClassName == c.Name).ToList();
-        m.Stats.Add(new OverviewStat(c.Lectures.ToString(CultureInfo.InvariantCulture), c.Lectures == 1 ? "Lecture" : "Lectures"));
+        // The count opens the lectures, as To hand in opens what's due.
+        m.Stats.Add(new OverviewStat(c.Lectures.ToString(CultureInfo.InvariantCulture), c.Lectures == 1 ? "Lecture" : "Lectures",
+            Open: c.Lectures > 0 ? m.OnAllLectures : null));
         if (canvas)
         {
             m.Stats.Add(new OverviewStat(toHandIn.Count.ToString(CultureInfo.InvariantCulture), "To hand in"));
@@ -317,7 +319,7 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>A class's ways further in: its lectures by week, and on Canvas its tabs.</summary>
     public void AddLinks(ClassHomeFacts c, Action allLectures, Action<ClassTab>? tab)
     {
-        Links.Add(new OverviewLink("school", "All lectures", CanvasWords.LectureCountText(c.Lectures), allLectures));
+        // Its lectures are under Recent lectures' "See all": the cards are Canvas's lists alone.
         if (c.Canvas is not { } k || tab is null) return;
         Links.Add(new OverviewLink("assignment", "Assignments", $"{k.ToHandIn} to hand in · {k.Done} done", () => tab(ClassTab.Assignments)));
         Links.Add(new OverviewLink("subject", "Modules", k.Modules == 1 ? "1 module" : $"{k.Modules} modules", () => tab(ClassTab.Modules)));

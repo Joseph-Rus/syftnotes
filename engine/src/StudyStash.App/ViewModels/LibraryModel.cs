@@ -249,7 +249,7 @@ public sealed partial class LibraryModel : ObservableObject
         LibraryList.CanvasClass => 360,
         _ => 340,
     };
-    public bool ShowListColumn => Overview is null && (!Narrow || !NarrowDetail);
+    public bool ShowListColumn => Overview is null && (Narrow ? !NarrowDetail : !ListHidden);
     public bool ShowDetailColumn => Overview is null && (!Narrow || NarrowDetail);
     /// <summary>Where the right column sits: its own column, or the list's when it's narrow.</summary>
     public int DetailColumn => Narrow ? 1 : 2;
@@ -314,6 +314,7 @@ public sealed partial class LibraryModel : ObservableObject
         if (oldValue?.Files is { } files && !ReferenceEquals(files, newValue?.Files) && !ReferenceEquals(files, ClassFiles)) files.Dispose();
         if (newValue is not null) newValue.Narrow = Narrow;
         OnPropertyChanged(nameof(ShowOverview));
+        OnPropertyChanged(nameof(CanToggleList));
         OnPropertyChanged(nameof(ShowListColumn));
         OnPropertyChanged(nameof(ShowDetailColumn));
         OnPropertyChanged(nameof(ShowLectureTools));
@@ -326,6 +327,7 @@ public sealed partial class LibraryModel : ObservableObject
         if (!value) NarrowDetail = false;
         OnPropertyChanged(nameof(ListWidth));
         OnPropertyChanged(nameof(DetailColumn));
+        OnPropertyChanged(nameof(CanToggleList));
         OnPropertyChanged(nameof(ColumnSpan));
         OnPropertyChanged(nameof(ShowListColumn));
         OnPropertyChanged(nameof(ShowDetailColumn));
@@ -556,6 +558,19 @@ public sealed partial class LibraryModel : ObservableObject
     [RelayCommand] void ShowClassPage() => OnClassPage?.Invoke();
 
     [RelayCommand] void ToggleSidebar() => SidebarHidden = !SidebarHidden;
+
+    /// <summary>The list (a class's lectures, Due) is folded away, leaving the page beside it the room: the toolbar's
+    /// list button, ⌃⌘L or Ctrl+Shift+L. A narrow window, which shows one or the other, ignores it.</summary>
+    [ObservableProperty] public partial bool ListHidden { get; set; }
+    /// <summary>The list button: wherever there's a list beside a page (not on Home or a class's home, nor narrow).</summary>
+    public bool CanToggleList => Overview is null && !Narrow;
+    public Action<bool>? OnListToggled { get; set; }
+    partial void OnListHiddenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowListColumn));
+        OnListToggled?.Invoke(value);
+    }
+    [RelayCommand] void ToggleList() => ListHidden = !ListHidden;
     [RelayCommand] void GoBack() => OnGoBack?.Invoke();
     [RelayCommand] void GoForward() => OnGoForward?.Invoke();
 

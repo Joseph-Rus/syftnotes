@@ -175,6 +175,11 @@
               <c:Icon Glyph="dock_to_right" Size="19" Foreground="{DynamicResource Fg}" RenderTransform="scale(-1,1)" />
             </Button>
           </c:Glass>
+          <c:Glass Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}" IsVisible="{Binding CanToggleList}">
+            <Button Name="ToggleList" Classes="round" Command="{Binding ToggleListCommand}" ToolTip.Tip="Show or hide the list (⌃⌘L)" AutomationProperties.Name="Toggle list">
+              <c:Icon Glyph="notes" Size="19" Foreground="{DynamicResource Fg}" />
+            </Button>
+          </c:Glass>
           <c:Glass Height="36" CornerRadius="18" Padding="1,0" BoxShadow="{DynamicResource CtlGlassShadow}">
             <StackPanel Orientation="Horizontal">
               <Button Classes="tool" Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack}" ToolTip.Tip="Back (⌘[)" AutomationProperties.Name="Back">

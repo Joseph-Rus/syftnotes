@@ -69,6 +69,8 @@ public sealed class AppSettings
     public WindowPlace? LibraryWindow { get; set; }
     /// <summary>The library window's sidebar is folded away (the toolbar's sidebar button, ⌃⌘S or Ctrl+Shift+S).</summary>
     public bool SidebarHidden { get; set; }
+    /// <summary>The library window's list column is folded away (the toolbar's list button, ⌃⌘L or Ctrl+Shift+L).</summary>
+    public bool ListHidden { get; set; }
     /// <summary>The colour theme's name (Settings → Appearance): "Lagoon", "Plum"…</summary>
     public string Theme { get; set; } = "Lagoon";
     /// <summary>Light, dark, or match the computer (Settings → Appearance). Settings files saved before this

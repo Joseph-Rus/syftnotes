@@ -501,6 +501,8 @@ public static partial class Shell
         library.OnGoForward = GoForward;
         library.SidebarHidden = host.Settings.SidebarHidden;
         library.OnSidebarToggled = hidden => host.Save(s => s.SidebarHidden = hidden);
+        library.ListHidden = host.Settings.ListHidden;
+        library.OnListToggled = hidden => host.Save(s => s.ListHidden = hidden);
         library.OnSearch = ToggleQuick;
         library.OnSettings = ShowSettings;
         library.OnMove = MoveLecture;
