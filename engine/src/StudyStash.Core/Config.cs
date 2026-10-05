@@ -6,11 +6,14 @@ using Tomlyn.Model;
 
 namespace StudyStash.Core;
 
-public sealed class ClassDef(string name, List<string>? aliases = null, string description = "")
+public sealed class ClassDef(string name, List<string>? aliases = null, string description = "", string group = "")
 {
     public string Name { get; set; } = name;
     public List<string> Aliases { get; set; } = aliases ?? [];
     public string Description { get; set; } = description;
+    /// <summary>The sidebar section it sits in: "" for Classes, or a folder of the student's own ("Projects", "Clubs",
+    /// "Research"). Lectures, notes, files and Ask work the same in either.</summary>
+    public string Group { get; set; } = group;
 }
 
 /// <summary>The library: where lectures are summarized, sorted, and served. Lives in config.toml.</summary>
@@ -149,6 +152,7 @@ public static class Configs
                 $"aliases = {Toml(c.Aliases)}",
                 $"description = {Toml(c.Description)}",
             ]);
+            if (c.Group.Length > 0) lines.Add($"group = {Toml(c.Group)}");
         }
         return string.Join("\n", lines) + "\n";
     }
@@ -221,7 +225,7 @@ public static class Configs
                 if (item is not TomlTable c || !c.TryGetValue("name", out var name))
                     throw new FormatException("config.toml: every [[classes]] needs a name");
                 var aliases = c.TryGetValue("aliases", out var a) && a is TomlArray arr ? arr.Select(x => Str(x!)).ToList() : [];
-                classes.Add(new ClassDef(Str(name), aliases, Str(Get(c, "description", ""))));
+                classes.Add(new ClassDef(Str(name), aliases, Str(Get(c, "description", "")), Str(Get(c, "group", ""))));
             }
         }
         return new Config(home, Py.ExpandUser(Str(Get(data, "pool_dir", DefaultPoolDir))))

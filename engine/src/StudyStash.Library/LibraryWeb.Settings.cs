@@ -28,6 +28,42 @@ public sealed partial class LibraryWeb
             if (body is null) return Http.Detail(422, "send the settings to change as a JSON object");
             return ChangeSettings(body) is { } refused ? refused : Http.Json(await SettingsJsonAsync());
         })));
+        // A class's own folders: link one on this computer (a project's repo, say) or let it go. The folder stays where
+        // it is; it's listed on the class's home, searched, and read by the AI like the folders in Settings.
+        app.MapPost("/api/v2/classes/folders", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string cls = Text(body?["class"]) ?? "", typed = Text(body?["path"]) ?? "";
+            bool remove = Bool(body?["remove"]) == true;
+            if (cfg.Classes.All(c => c.Name != cls)) return Http.Detail(404, $"There's no class called {cls}.");
+            if (typed.Trim().Length == 0) return Http.Detail(400, "Which folder?");
+            string full = Path.GetFullPath(Py.ExpandUser(typed.Trim()));
+            var list = Folders.Load(cfg.Home);
+            if (remove) list.RemoveAll(f => f.Class == cls && Path.GetFullPath(f.Path) == full);
+            else
+            {
+                if (!Directory.Exists(full)) return Http.Detail(400, "There's no folder there on the library's computer.");
+                if (full.StartsWith(Path.GetFullPath(cfg.PoolDir), StringComparison.Ordinal))
+                    return Http.Detail(400, "That folder is in the library already.");
+                list.RemoveAll(f => Path.GetFullPath(f.Path) == full);
+                list.Add(new ReadFolder(full, Path.GetFileName(full.TrimEnd(Path.DirectorySeparatorChar)), Class: cls));
+            }
+            Folders.Save(cfg.Home, list);
+            _ = Files.UpdateAsync(Console.WriteLine);
+            return Http.Json(Reader.Overview());
+        })));
+        // A class's sidebar folder: "" puts it back under Classes.
+        app.MapPost("/api/v2/classes/group", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string cls = Text(body?["class"]) ?? "", group = (Text(body?["group"]) ?? "").Trim();
+            if (cfg.Classes.FirstOrDefault(c => c.Name == cls) is not { } found) return Http.Detail(404, $"There's no class called {cls}.");
+            if (group.Length > 40) return Http.Detail(400, "Keep a folder's name to 40 characters.");
+            if (group.Equals("Classes", StringComparison.OrdinalIgnoreCase)) group = "";
+            found.Group = group;
+            Configs.Save(cfg);
+            return Http.Json(Reader.Overview());
+        })));
         app.MapPost("/api/v2/settings/password", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             string password = (await Http.JsonBodyAsync(ctx.Request))?["password"] is JsonValue v && v.TryGetValue(out string? p) ? p.Trim() : "";
@@ -126,6 +162,7 @@ public sealed partial class LibraryWeb
             ["classes"] = new JsonArray(cfg.Classes.Select(c => (JsonNode?)new JsonObject
             {
                 ["name"] = c.Name, ["aliases"] = new JsonArray(c.Aliases.Select(a => (JsonNode?)a).ToArray()), ["description"] = c.Description,
+                ["group"] = c.Group,
                 ["folder"] = store.ClassDir(c.Name), ["lectures"] = counts.GetValueOrDefault(c.Name, 0),
             }).ToArray()),
             ["course_names"] = CourseNamesJson(),
@@ -159,7 +196,7 @@ public sealed partial class LibraryWeb
             },
             ["folders"] = new JsonArray(Folders.Load(cfg.Home).Select(f => (JsonNode?)new JsonObject
             {
-                ["name"] = f.Name, ["path"] = f.Path, ["ai"] = f.Ai, ["private"] = f.Private,
+                ["name"] = f.Name, ["path"] = f.Path, ["ai"] = f.Ai, ["private"] = f.Private, ["class"] = f.Class,
             }).ToArray()),
             ["files"] = Files.Files,
             ["reach"] = new JsonObject
@@ -228,7 +265,9 @@ public sealed partial class LibraryWeb
                 if (cls.Equals(Configs.Unsorted, StringComparison.OrdinalIgnoreCase)) return Http.Detail(400, $"“{Configs.Unsorted}” is taken: lectures wait there to be filed.");
                 if (!seen.Add(cls)) return Http.Detail(400, $"There are two classes called {cls}.");
                 var aliases = (item["aliases"] as JsonArray)?.Select(Text).OfType<string>().Where(a => a.Length > 0).Distinct().ToList() ?? [];
-                classes.Add(new ClassDef(cls, aliases, Text(item["description"]) ?? ""));
+                // A class's sidebar folder: as sent, else what it had (under this name, or the one it's renamed from).
+                string group = Text(item["group"]) ?? cfg.Classes.FirstOrDefault(c => c.Name == cls || c.Name == Text(item["was"]))?.Group ?? "";
+                classes.Add(new ClassDef(cls, aliases, Text(item["description"]) ?? "", group.Trim()));
                 if (Text(item["was"]) is { Length: > 0 } was && was != cls && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, cls, 0, ""));
             }
             if (renames.Count > 0 && ClassRename.Blocked(Canvas.Crawl) is { } busy) return Http.Detail(409, busy);
@@ -271,6 +310,11 @@ public sealed partial class LibraryWeb
         }
         if (name is not null) cfg.PoolName = name;
         if (renames.Count > 0 && RenameClasses(renames, classes!) is { } problem) return Http.Detail(409, problem);
+        if (renames.Count > 0)
+        {
+            var linked = folders ?? Folders.Load(cfg.Home);
+            folders = [.. linked.Select(f => renames.FirstOrDefault(r => r.From == f.Class) is { } r ? f with { Class = r.To } : f)];
+        }
         if (classes is not null) cfg.Classes = classes;
         if (body["notes"] is JsonObject notes)
         {

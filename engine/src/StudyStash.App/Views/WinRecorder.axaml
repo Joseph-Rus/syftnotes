@@ -40,27 +40,25 @@
     </Style>
   </UserControl.Styles>
   <Panel>
-    <!-- The pill: small, and only says it's recording. The red dot pulses slowly (no glow), then the time and a tiny
-         level meter; with the pointer over it Stop takes the meter's place, and a click opens the recorder. -->
-    <Border Name="Pill" IsVisible="{Binding !Expanded}" Height="32" CornerRadius="8" Background="{DynamicResource Acrylic}" BoxShadow="{DynamicResource Shadow}"
-            BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1" Padding="12,0,5,0" HorizontalAlignment="Left">
-      <StackPanel Orientation="Horizontal" Spacing="8">
-        <Panel Width="8" Height="8" VerticalAlignment="Center">
-          <c:PulseDot Fill="{DynamicResource Rec}" IsVisible="{Binding IsRunning}" />
-          <Ellipse Fill="{DynamicResource Fg3}" IsVisible="{Binding IsPaused}" />
-        </Panel>
-        <TextBlock Classes="num" Text="{Binding Elapsed}" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"
-                   Classes.paused="{Binding IsPaused}" />
-        <Panel Width="22" Height="22" VerticalAlignment="Center">
-          <c:Waveform Bars="3" Height="10" MinBar="2" Levels="{Binding Levels}" Foreground="{DynamicResource Fg2}"
+    <!-- The pill (after Granola's): a small dark capsule standing upright, Study Stash's mark on top and three green bars
+         under it that move with what the microphone hears. Paused, a pause mark takes the bars' place; with the pointer
+         over it, Stop does; the time is its tooltip, and a click opens the recorder. -->
+    <Border Name="Pill" IsVisible="{Binding !Expanded}" Width="44" Height="84" CornerRadius="22" Background="#F2161618"
+            BorderBrush="#33FFFFFF" BorderThickness="1" BoxShadow="0 6 18 0 #59000000" HorizontalAlignment="Left"
+            ToolTip.Tip="{Binding Elapsed}" ToolTip.Placement="Left">
+      <Grid RowDefinitions="*,Auto,*" Margin="0,12">
+        <c:AppMarkGlyph Grid.Row="0" Width="22" Height="22" Foreground="#FFFFFFFF" HorizontalAlignment="Center" VerticalAlignment="Top" />
+        <Panel Grid.Row="2" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Bottom">
+          <c:Waveform Bars="3" Height="14" MinBar="4" Levels="{Binding Levels}" Foreground="{DynamicResource Good}"
                       HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowMeter}" />
-          <c:Icon Glyph="pause" Filled="True" Size="12" Foreground="{DynamicResource Fg2}" HorizontalAlignment="Center" VerticalAlignment="Center"
+          <c:Icon Glyph="pause" Filled="True" Size="13" Foreground="#99FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
                   IsVisible="{Binding ShowPausedMark}" />
-          <Button AutomationProperties.Name="Stop" Classes="stop control" Command="{Binding StopCommand}" ToolTip.Tip="Stop" IsVisible="{Binding Hovered}">
-            <c:Icon Glyph="stop" Filled="True" Size="12" Foreground="{DynamicResource Fg}" />
+          <Button AutomationProperties.Name="Stop" Classes="stop" Command="{Binding StopCommand}" ToolTip.Tip="Stop" IsVisible="{Binding Hovered}"
+                  Width="22" Height="22" CornerRadius="11" Background="#33FFFFFF">
+            <c:Icon Glyph="stop" Filled="True" Size="12" Foreground="#FFFFFFFF" />
           </Button>
         </Panel>
-      </StackPanel>
+      </Grid>
     </Border>
 
     <!-- Expanded -->

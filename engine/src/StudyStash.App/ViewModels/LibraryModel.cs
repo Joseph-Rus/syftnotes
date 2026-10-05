@@ -21,6 +21,28 @@ public sealed partial class ClassItem : ObservableObject
     [ObservableProperty] public partial int Count { get; set; }
     [ObservableProperty] public partial bool Selected { get; set; }
     public bool HasDot => !IsUnsorted;
+    /// <summary>The sidebar folder it's in ("" for Classes).</summary>
+    public string Group { get; init; } = "";
+    /// <summary>The first of its folder: the folder's name heads it in the sidebar.</summary>
+    public string Section { get; set; } = "";
+    public bool HasSection => Section.Length > 0;
+    /// <summary>Its context menu's Move to folder: Classes, every folder it isn't in, and New folder….</summary>
+    public List<FolderChoice> MoveChoices { get; set; } = [];
+}
+
+/// <summary>One place a class can move to in the sidebar, as its context menu lists it.</summary>
+public sealed class FolderChoice(string label, IRelayCommand pick)
+{
+    public string Label { get; } = label;
+    public IRelayCommand Pick { get; } = pick;
+}
+
+/// <summary>"Move CS 101 to a new folder": the name being typed, over the library window.</summary>
+public sealed partial class NewFolderAsk(string className) : ObservableObject
+{
+    public string ClassName { get; } = className;
+    public string Title => $"Put {ClassName} in a new folder";
+    [ObservableProperty] public partial string Name { get; set; } = "";
 }
 
 /// <summary>A lecture in the middle column: title, "Tue 23 Sep · 1 h 12 min", and the lecture in a sentence.</summary>
@@ -195,9 +217,15 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Narrow, and showing what was opened in the list's place.</summary>
     [ObservableProperty] public partial bool NarrowDetail { get; set; }
 
-    public bool ShowLectures => List == LibraryList.Lectures;
+    /// <summary>A class's column (its header, and the Canvas tabs when it's linked): every class but Due.</summary>
+    public bool ShowLectures => List is LibraryList.Lectures or LibraryList.CanvasClass;
     public bool ShowDueList => List == LibraryList.Due;
-    public bool ShowCanvasClass => List == LibraryList.CanvasClass;
+    /// <summary>A Canvas-linked class: the Lectures / Assignments / Modules / Announcements switcher over its list.</summary>
+    public bool HasClassTabs => List == LibraryList.CanvasClass && CanvasClass is not null;
+    /// <summary>The lectures by week: a plain class, or a Canvas class on its Lectures tab.</summary>
+    public bool ShowLectureGroups => !HasClassTabs || CanvasClass!.IsLecturesTab;
+    /// <summary>One of a Canvas class's own lists, under the switcher.</summary>
+    public bool ShowClassTabBody => HasClassTabs && !CanvasClass!.IsLecturesTab;
 
     public bool ShowAssignment => Assignment is not null;
     public bool ShowReader => Assignment is null && Reader is not null;
@@ -217,10 +245,11 @@ public sealed partial class LibraryModel : ObservableObject
     public double ListWidth => Narrow ? double.NaN : List switch
     {
         LibraryList.Lectures => Skin.Current == SkinKind.Mac ? 312 : 320,
-        LibraryList.CanvasClass when Skin.Current == SkinKind.Win => 360,
+        LibraryList.CanvasClass when Skin.Current == SkinKind.Win => 380,
+        LibraryList.CanvasClass => 360,
         _ => 340,
     };
-    public bool ShowListColumn => Overview is null && (!Narrow || !NarrowDetail);
+    public bool ShowListColumn => Overview is null && (Narrow ? !NarrowDetail : !ListHidden);
     public bool ShowDetailColumn => Overview is null && (!Narrow || NarrowDetail);
     /// <summary>Where the right column sits: its own column, or the list's when it's narrow.</summary>
     public int DetailColumn => Narrow ? 1 : 2;
@@ -248,7 +277,7 @@ public sealed partial class LibraryModel : ObservableObject
     {
         OnPropertyChanged(nameof(ShowLectures));
         OnPropertyChanged(nameof(ShowDueList));
-        OnPropertyChanged(nameof(ShowCanvasClass));
+        ClassTabsChanged();
         OnPropertyChanged(nameof(ListWidth));
     }
 
@@ -285,6 +314,8 @@ public sealed partial class LibraryModel : ObservableObject
         if (oldValue?.Files is { } files && !ReferenceEquals(files, newValue?.Files) && !ReferenceEquals(files, ClassFiles)) files.Dispose();
         if (newValue is not null) newValue.Narrow = Narrow;
         OnPropertyChanged(nameof(ShowOverview));
+        OnPropertyChanged(nameof(CanToggleList));
+        OnPropertyChanged(nameof(ShowListOpener));
         OnPropertyChanged(nameof(ShowListColumn));
         OnPropertyChanged(nameof(ShowDetailColumn));
         OnPropertyChanged(nameof(ShowLectureTools));
@@ -295,9 +326,10 @@ public sealed partial class LibraryModel : ObservableObject
     {
         if (Overview is { } o) o.Narrow = value;
         if (!value) NarrowDetail = false;
-        if (CanvasClass is { } c) c.Layout = value ? ClassLayout.Sections : ClassLayout.Tabs;
         OnPropertyChanged(nameof(ListWidth));
         OnPropertyChanged(nameof(DetailColumn));
+        OnPropertyChanged(nameof(CanToggleList));
+        OnPropertyChanged(nameof(ShowListOpener));
         OnPropertyChanged(nameof(ColumnSpan));
         OnPropertyChanged(nameof(ShowListColumn));
         OnPropertyChanged(nameof(ShowDetailColumn));
@@ -309,9 +341,29 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(ShowDetailColumn));
     }
 
-    partial void OnCanvasClassChanged(CanvasClassModel? value)
+    partial void OnCanvasClassChanged(CanvasClassModel? oldValue, CanvasClassModel? newValue)
     {
-        if (value is not null) value.Layout = Narrow ? ClassLayout.Sections : ClassLayout.Tabs;
+        if (oldValue is not null) oldValue.PropertyChanged -= CanvasClassPropertyChanged;
+        if (newValue is not null)
+        {
+            // The library window draws the class's header and switcher itself, over its own lecture list.
+            newValue.Layout = ClassLayout.Tabs;
+            newValue.Embedded = true;
+            newValue.PropertyChanged += CanvasClassPropertyChanged;
+        }
+        ClassTabsChanged();
+    }
+
+    void CanvasClassPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CanvasClassModel.Tab)) ClassTabsChanged();
+    }
+
+    void ClassTabsChanged()
+    {
+        OnPropertyChanged(nameof(HasClassTabs));
+        OnPropertyChanged(nameof(ShowLectureGroups));
+        OnPropertyChanged(nameof(ShowClassTabBody));
     }
 
     /// <summary>Shows what the student opened (a lecture, an assignment, a page): in a narrow window it takes the
@@ -367,6 +419,21 @@ public sealed partial class LibraryModel : ObservableObject
     // --- deleting a lecture ---------------------------------------------------------------------------------------
 
     /// <summary>The lecture being deleted, while the window asks "Delete this lecture?"; null when it isn't asking.</summary>
+    /// <summary>A new sidebar folder being named for a class; null when nobody's asking.</summary>
+    [ObservableProperty] public partial NewFolderAsk? NamingFolder { get; set; }
+    public bool AskingFolder => NamingFolder is not null;
+    partial void OnNamingFolderChanged(NewFolderAsk? value) => OnPropertyChanged(nameof(AskingFolder));
+    /// <summary>Moves a class into a sidebar folder ("" for Classes).</summary>
+    public Func<string, string, Task>? OnMoveToFolder { get; set; }
+    [RelayCommand] void CancelFolder() => NamingFolder = null;
+    [RelayCommand]
+    async Task ConfirmFolder()
+    {
+        if (NamingFolder is not { } ask || ask.Name.Trim().Length == 0) return;
+        NamingFolder = null;
+        if (OnMoveToFolder is { } move) await move(ask.ClassName, ask.Name.Trim());
+    }
+
     [ObservableProperty] public partial LectureDeletion? Deleting { get; set; }
     /// <summary>The lecture just deleted, while the "Deleted · Undo" toast shows.</summary>
     [ObservableProperty] public partial LectureDeletion? Deleted { get; set; }
@@ -493,6 +560,22 @@ public sealed partial class LibraryModel : ObservableObject
     [RelayCommand] void ShowClassPage() => OnClassPage?.Invoke();
 
     [RelayCommand] void ToggleSidebar() => SidebarHidden = !SidebarHidden;
+
+    /// <summary>The list (a class's lectures, Due) is folded away, leaving the page beside it the room: the toolbar's
+    /// list button, ⌃⌘L or Ctrl+Shift+L. A narrow window, which shows one or the other, ignores it.</summary>
+    [ObservableProperty] public partial bool ListHidden { get; set; }
+    /// <summary>The list button: wherever there's a list beside a page (not on Home or a class's home, nor narrow).</summary>
+    public bool CanToggleList => Overview is null && !Narrow;
+    /// <summary>The list is folded away: a small arrow at the page's left edge brings it back.</summary>
+    public bool ShowListOpener => ListHidden && CanToggleList;
+    public Action<bool>? OnListToggled { get; set; }
+    partial void OnListHiddenChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowListColumn));
+        OnPropertyChanged(nameof(ShowListOpener));
+        OnListToggled?.Invoke(value);
+    }
+    [RelayCommand] void ToggleList() => ListHidden = !ListHidden;
     [RelayCommand] void GoBack() => OnGoBack?.Invoke();
     [RelayCommand] void GoForward() => OnGoForward?.Invoke();
 

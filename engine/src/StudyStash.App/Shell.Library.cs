@@ -83,14 +83,46 @@ public static partial class Shell
         return l["seconds"] is JsonValue v && v.TryGetValue(out double s) ? $"{day} · {TimedText.Length(s)}" : day;
     }
 
+    /// <summary>Puts a class in a sidebar folder of the student's own ("" back to Classes), then shows the sidebar again.</summary>
+    static async Task MoveToFolderAsync(string cls, string group)
+    {
+        if (host.Remote() is not { } lib) return;
+        try
+        {
+            await lib.ClassGroupAsync(cls, group);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            Toast("Couldn't move it", e.Message, null, null);
+            return;
+        }
+        bool wasSelected = library.Classes.Any(c => c.Name == cls && c.Selected);
+        await LoadLibraryAsync();
+        if (wasSelected) foreach (var c in library.Classes) c.Selected = c.Name == cls;
+    }
+
     static async Task LoadLibraryAsync()
     {
         int turn = ++libraryTurn;
         await host.CheckLibraryAsync();
         if (turn != libraryTurn) return; // a later load (or an explicit class) has already taken over
         library.Classes.Clear();
-        foreach (var (name, color, count) in host.Classes())
-            library.Classes.Add(new ClassItem { Name = name, Dot = Skin.ClassDot(color), Count = count });
+        // Classes first, then each folder of the student's own ("Projects") under its name, in the order they were made.
+        var all = host.Classes().Select(c => (c.Name, c.Color, c.Lectures, Group: host.GroupOf(c.Name))).ToList();
+        var folders = all.Select(c => c.Group).Where(g => g.Length > 0).Distinct().ToList();
+        foreach (var group in new[] { "" }.Concat(folders))
+        {
+            bool first = true;
+            foreach (var (name, color, count, _) in all.Where(c => c.Group == group))
+            {
+                var item = new ClassItem { Name = name, Dot = Skin.ClassDot(color), Count = count, Group = group, Section = first && group.Length > 0 ? group : "" };
+                item.MoveChoices = [.. new[] { "" }.Concat(folders).Where(g => g != group)
+                    .Select(g => new FolderChoice(g.Length == 0 ? "Classes" : g, new CommunityToolkit.Mvvm.Input.RelayCommand(() => _ = MoveToFolderAsync(name, g)))),
+                    new FolderChoice("New folder…", new CommunityToolkit.Mvvm.Input.RelayCommand(() => library.NamingFolder = new NewFolderAsk(name)))];
+                library.Classes.Add(item);
+                first = false;
+            }
+        }
         // A class removed (in Settings, say) isn't left open.
         if (openClass is not null && openClass != Configs.Unsorted && library.Classes.All(c => c.Name != openClass)) openClass = null;
         if (host.Library == LibraryState.Connected && !host.OlderLibrary && canvasDue is null) await LoadCanvasAsync();
@@ -196,7 +228,8 @@ public static partial class Shell
             library.Groups.Add(group);
         }
         // A class linked to Canvas gets its own page: its lectures, what's to hand in, modules, files, announcements.
-        if (CanvasClassRow(name) is { } row && !allLectures)
+        // Its Lectures tab is the full list above, by week; the other tabs are Canvas's own lists.
+        if (CanvasClassRow(name) is { } row)
         {
             bool fresh = !(library.CanvasClass is { } open && openCanvasClass == name);
             var page = fresh ? NewCanvasClass() : library.CanvasClass!;
@@ -212,7 +245,8 @@ public static partial class Shell
                 });
             })], lectures.Count);
             // Nothing recorded for it yet: its page opens on what's to hand in, not an empty Lectures tab.
-            if (fresh && lectures.Count == 0) page.Tab = ClassTab.Assignments;
+            if (allLectures) page.Tab = ClassTab.Lectures;
+            else if (fresh && lectures.Count == 0) page.Tab = ClassTab.Assignments;
             library.CanvasClass = page;
             library.List = LibraryList.CanvasClass;
             try
@@ -233,7 +267,7 @@ public static partial class Shell
         else ShowLectureList();
         library.NoNoteText = lectures.Count > 0 ? "Choose a lecture to read its notes."
             : name == Configs.Unsorted ? "Every lecture is in a class."
-            : library.List == LibraryList.CanvasClass ? $"No lectures in {name} yet. Pick an assignment to see it here."
+            : library.List == LibraryList.CanvasClass ? $"No lectures in {name} yet. Its assignments are on the Assignments tab."
             : $"No lectures in {name} yet.";
         string? pick = openLecture is not null && lectures.Any(l => S(l["id"]) == openLecture) ? openLecture : lectures.Select(l => S(l["id"])).FirstOrDefault();
         if (pick is not null) await ShowLectureAsync(pick);
@@ -272,7 +306,7 @@ public static partial class Shell
         {
             Remember();
             allLectures = true;
-            ShowLectureList();
+            if (library.CanvasClass is { } page) page.Tab = ClassTab.Lectures;
         },
     };
 

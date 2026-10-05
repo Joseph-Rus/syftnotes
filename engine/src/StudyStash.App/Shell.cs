@@ -119,6 +119,8 @@ public static partial class Shell
         host.Start();
         _ = SuggestLighterModelAsync();
         AppUpdates.Start(host, stop.Token, SayUpdate);
+        if (AppUpdates.Current is { } updater)
+            updater.FoundChanged += () => Dispatcher.UIThread.Post(() => panel.UpdateVersion = updater.Found is { } r ? string.Join('.', r.Version) : null);
         MakeTray();
         // A Mac's app menu (About, Settings… ⌘,, and the system's Hide and Quit ⌘Q) while a window is in front.
         Keybindings.Saved = () => host.Settings.Keys;
@@ -441,6 +443,11 @@ public static partial class Shell
             ShowLibrary();
         };
         panel.OnSettings = SettingsFromAnywhere;
+        panel.OnUpdate = () =>
+        {
+            panel.UpdateVersion = null;
+            _ = UpdateNowAsync();
+        };
         panel.OnSwitchClass = PickClass;
         panel.OnFixProblem = FixProblem;
         panel.OnOpenLecture = OpenRecentLecture;
@@ -468,16 +475,18 @@ public static partial class Shell
                 _ = ShowHomeAsync();
                 return;
             }
+            // Due opens on its home (what's to hand in, by when and by class); its Full list is the two-column list.
             if (c.IsDue)
             {
                 dueSelection = null;
-                _ = ShowDueAsync();
+                _ = ShowDueHomeAsync();
                 return;
             }
             // A class opens on its home; Unsorted, which has none, on its lectures.
             allLectures = false;
             _ = c.IsUnsorted ? ShowClassAsync(c.Name) : ShowClassHomeAsync(c.Name);
         };
+        library.OnMoveToFolder = MoveToFolderAsync;
         library.OnLecture = l =>
         {
             Remember();
@@ -493,6 +502,8 @@ public static partial class Shell
         library.OnGoForward = GoForward;
         library.SidebarHidden = host.Settings.SidebarHidden;
         library.OnSidebarToggled = hidden => host.Save(s => s.SidebarHidden = hidden);
+        library.ListHidden = host.Settings.ListHidden;
+        library.OnListToggled = hidden => host.Save(s => s.ListHidden = hidden);
         library.OnSearch = ToggleQuick;
         library.OnSettings = ShowSettings;
         library.OnMove = MoveLecture;

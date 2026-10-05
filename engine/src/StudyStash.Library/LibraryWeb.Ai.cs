@@ -180,6 +180,23 @@ public sealed partial class LibraryWeb
             return AiJson(new AiSaid(ok ? $"{Engines.Name(id)} is ready." : why, await AiOverviewAsync()));
         })));
 
+        app.MapPost("/api/v2/ai/engines/{id}/key", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            string id = (string)ctx.Request.RouteValues["id"]!;
+            if (!ApiKeys.Engines.Contains(id)) return Http.Detail(400, $"{Engines.Name(id)} doesn't take an API key.");
+            string key = Str(await Http.JsonBodyAsync(ctx.Request), "key") ?? "";
+            ApiKeys.Set(cfg.Home, id, key);
+            // What the last try said was about the command (or the old key): try again with what it has now.
+            var settings = AiSettings.Load(cfg.Home);
+            settings.Tests.Remove(id);
+            settings.Limits.Remove(id);
+            settings.Save(cfg.Home);
+            if (key.Trim().Length == 0) return AiJson(new AiSaid($"{Engines.Name(id)}'s API key is gone.", await AiOverviewAsync()));
+            var (ok, why) = await Jobs.TestAsync(id);
+            return AiJson(new AiSaid(ok ? $"{Engines.Name(id)} works with your API key." : $"The key was saved, but {Engines.Name(id)} said: {why}",
+                await AiOverviewAsync()));
+        })));
+
         app.MapPost("/api/v2/ai/engines/{id}/model", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             string id = (string)ctx.Request.RouteValues["id"]!;

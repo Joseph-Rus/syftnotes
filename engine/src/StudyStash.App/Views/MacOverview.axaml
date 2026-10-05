@@ -86,8 +86,9 @@
     </Style>
   </UserControl.Styles>
 
+  <Panel>
   <ScrollViewer Name="Page" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel MaxWidth="1040" HorizontalAlignment="Stretch" Margin="36,18,36,36" Spacing="24">
+    <StackPanel MaxWidth="1040" HorizontalAlignment="Stretch" Margin="36,18,36,130" Spacing="24">
 
       <!-- The greeting and the day, or the class, what it is on Canvas, and what it covers -->
       <Grid ColumnDefinitions="*,Auto">
@@ -101,18 +102,27 @@
           <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" FontSize="13" LineHeight="19" Foreground="{DynamicResource Fg2}"
                      TextWrapping="Wrap" MaxWidth="620" HorizontalAlignment="Left" Margin="0,4,0,0" MaxLines="3" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top" Margin="12,4,0,0" IsVisible="{Binding IsClass}">
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top" Margin="12,4,0,0">
+          <!-- Due's home: the two-column list, each assignment beside its detail -->
+          <Button Name="FullList" Classes="ov-pill" Command="{Binding AllDueCommand}" IsVisible="{Binding IsDuePage}" Height="44" Padding="16,0,18,0">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Glyph="assignment" Size="18" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+              <TextBlock Text="Full list" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <!-- Record from here: into this class on its home, sorted by the library on Home -->
+          <Button Name="Record" Theme="{StaticResource Surface}" Height="44" CornerRadius="22" Padding="18,0,22,0" Background="{DynamicResource Rec}"
+                  Command="{Binding RecordCommand}" IsVisible="{Binding CanRecord}" AutomationProperties.Name="{Binding RecordWords}" ToolTip.Tip="Start recording a lecture">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Glyph="mic" Size="20" Foreground="#FFFFFFFF" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding RecordWords}" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFFFF" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
           <Button Classes="ov-pill" Command="{Binding Files.AttachCommand, FallbackValue={x:Null}}" IsVisible="{Binding HasFiles}"
                   ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the page)" AutomationProperties.Name="Attach to class">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Glyph="attach_file" Size="15" Foreground="{DynamicResource Fg}" />
               <TextBlock Text="Attach" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
-          <Button Name="AllLectures" Classes="ov-pill" Command="{Binding AllLecturesCommand}" AutomationProperties.Name="All lectures">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <c:Icon Glyph="school" Size="15" Foreground="{DynamicResource Fg}" />
-              <TextBlock Text="All lectures" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
         </StackPanel>
@@ -142,7 +152,7 @@
       </ItemsControl>
 
       <!-- The newest lectures, beside what's due and what's coming up (under them in a narrow window) -->
-      <Grid Classes="ov-body" Classes.narrow="{Binding Narrow}" ColumnDefinitions="*,24,*" RowDefinitions="Auto,Auto">
+      <Grid Classes="ov-body" Classes.narrow="{Binding Narrow}" ColumnDefinitions="*,24,*" RowDefinitions="Auto,Auto" IsVisible="{Binding ShowMain}">
         <StackPanel Name="Recent" Grid.ColumnSpan="{Binding LecturesSpan}">
           <Grid ColumnDefinitions="*,Auto">
             <TextBlock Classes="ov-h2" Text="Recent lectures" />
@@ -236,9 +246,43 @@
         </StackPanel>
       </Grid>
 
+      <!-- Due's home: what's to hand in, by when -->
+      <ItemsControl Name="DueGroups" ItemsSource="{Binding DueGroups}" IsVisible="{Binding IsDuePage}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Spacing="24" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:OverviewDueGroup">
+            <StackPanel>
+              <TextBlock Classes="ov-h2" Text="{Binding Heading}" Margin="0,0,0,8" />
+              <Border Classes="ov-group">
+                <ItemsControl ItemsSource="{Binding Items}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:OverviewDue">
+                      <Button Classes="ov-row" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenDueCommand}" CommandParameter="{Binding}">
+                        <StackPanel Spacing="3">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1" Classes="ov-right" Classes.strong="{Binding Strong}" Text="{Binding Right}" Margin="8,0,0,0" VerticalAlignment="Bottom" />
+                          </Grid>
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <Ellipse Width="7" Height="7" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                            <TextBlock Classes="ov-sub" Text="{Binding Sub}" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Border>
+            </StackPanel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
       <!-- Home: a card for every class -->
       <StackPanel Name="ClassCards" IsVisible="{Binding HasClasses}">
-        <TextBlock Classes="ov-h2" Text="Classes" Margin="0,0,0,8" />
+        <TextBlock Classes="ov-h2" Text="{Binding ClassesHeading}" Margin="0,0,0,8" />
         <ItemsControl ItemsSource="{Binding Classes}" Margin="0,0,-10,-10">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><UniformGrid Columns="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).CardColumns}" /></ItemsPanelTemplate>
@@ -264,7 +308,7 @@
 
       <!-- A class's home: the ways further in -->
       <StackPanel Name="Links" IsVisible="{Binding HasLinks}">
-        <TextBlock Classes="ov-h2" Text="In this class" Margin="0,0,0,8" />
+        <TextBlock Classes="ov-h2" Text="On Canvas" Margin="0,0,0,8" />
         <ItemsControl ItemsSource="{Binding Links}" Margin="0,0,-10,-10">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><UniformGrid Columns="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).LinkColumns}" /></ItemsPanelTemplate>
@@ -286,6 +330,47 @@
         </ItemsControl>
       </StackPanel>
 
+      <!-- A class's home: folders on the computer that go with it (a project's repo), linked, not copied in -->
+      <StackPanel Name="LinkedFolders" IsVisible="{Binding ShowFolders}">
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+          <TextBlock Classes="ov-h2" Text="Linked folders" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ov-pill" Command="{Binding LinkFolderCommand}" IsVisible="{Binding CanLinkFolders}"
+                  ToolTip.Tip="Link a folder on this computer to the class: it stays where it is, and search and the AI can read it">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Glyph="add" Size="15" Foreground="{DynamicResource Fg}" />
+              <TextBlock Text="Link a folder" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </Grid>
+        <TextBlock Classes="ov-sub" IsVisible="{Binding !HasFolders}" TextWrapping="Wrap"
+                   Text="A project's repo, a shared drive, anything that goes with this class but isn't notes. It stays where it is." />
+        <ItemsControl ItemsSource="{Binding Folders}" Margin="0,0,-10,-10">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:LinkedFolder">
+              <Button Classes="ov-card" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenFolderCommand}" CommandParameter="{Binding}"
+                      ToolTip.Tip="Open the folder">
+                <Button.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem Header="Unlink from this class" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).UnlinkFolderCommand}" CommandParameter="{Binding}" />
+                  </ContextMenu>
+                </Button.ContextMenu>
+                <Grid ColumnDefinitions="Auto,10,*,Auto">
+                  <c:Icon Glyph="folder" Size="18" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="ov-sub" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+                  <c:Icon Grid.Column="3" Glyph="open_in_new" Size="15" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
       <!-- A class's home: what's attached to it (drop files anywhere on the page) -->
       <StackPanel Name="ClassFiles" IsVisible="{Binding HasFiles}">
         <TextBlock Classes="ov-h2" Text="Files" Margin="0,0,0,8" IsVisible="{Binding Files.HasItems, FallbackValue=False}" />
@@ -293,4 +378,10 @@
       </StackPanel>
     </StackPanel>
   </ScrollViewer>
+  <!-- Ask about everything (Home) or this class, at the foot of the page; its latest answer just above -->
+  <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24" Spacing="8" IsVisible="{Binding HasAsk}">
+    <v:MacAiAnswer DataContext="{Binding Ask}" IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).HasAnswer}" MaxHeight="420" />
+    <v:MacAiAskBar DataContext="{Binding Ask}" />
+  </StackPanel>
+  </Panel>
 </UserControl>

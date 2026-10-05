@@ -153,6 +153,14 @@
           <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
         </Grid>
         <Border Height="1" Background="{DynamicResource Sep}" Margin="8,2" />
+        <!-- A newer version is out: install it now, from here -->
+        <Button Name="UpdateNow" Classes="row" Padding="8,3" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"
+                Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}">
+          <Grid ColumnDefinitions="Auto,6,*">
+            <c:Icon Glyph="download" Size="14" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Text="{Binding UpdateWords}" FontSize="13" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+          </Grid>
+        </Button>
         <!-- The app and its Settings, like a menu bar extra's last row: the gear's right edge is the search field's. -->
         <Grid ColumnDefinitions="*,4,Auto">
           <Button Name="OpenApp" Classes="row" Padding="8,3" Height="26" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center"

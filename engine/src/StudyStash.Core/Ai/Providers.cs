@@ -60,6 +60,11 @@ public abstract class AiProvider
     /// <summary>Where its command is, when that's not where <see cref="Which"/> looks (a test's stand-in).</summary>
     public string? At { get; init; }
 
+    /// <summary>An API key the student gave this engine (<see cref="ApiKeys"/>): with one, work that only answers
+    /// (no tools, no files to change) goes to the engine's API instead of its command, and everything does when the
+    /// command isn't installed.</summary>
+    public string? ApiKey { get; set; }
+
     public virtual string? Exe() => At ?? Which(Binary);
     public virtual bool Available() => Exe() is not null;
 
@@ -85,6 +90,11 @@ public abstract class AiProvider
     public virtual async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
+        if (ApiKey is { } key && (!Available() || !req.Tools && !req.Write))
+        {
+            await foreach (var e in ApiKeys.RunAsync(Id, key, req, ct)) yield return e;
+            yield break;
+        }
         if (!Available())
         {
             yield return AiEvent.Error($"{Name} isn't installed on this computer ({Site}).");

@@ -20,7 +20,8 @@ public class AppWiringTests
         Assert.False(m.ShowLectures);
 
         m.List = LibraryList.CanvasClass;
-        Assert.Equal(Skin.Current == SkinKind.Mac ? 340 : 360, m.ListWidth);
+        Assert.Equal(Skin.Current == SkinKind.Mac ? 360 : 380, m.ListWidth);
+        Assert.True(m.ShowLectures); // a Canvas class is the lecture list with its switcher over it
     }
 
     [Fact]
@@ -34,7 +35,7 @@ public class AppWiringTests
         Assert.Equal(ClassLayout.Tabs, m.CanvasClass.Layout);
 
         m.Narrow = true;
-        Assert.Equal(ClassLayout.Sections, m.CanvasClass.Layout);
+        Assert.Equal(ClassLayout.Tabs, m.CanvasClass.Layout); // the switcher stays: one class page at every width
         Assert.True(double.IsNaN(m.ListWidth));
         Assert.True(m.ShowListColumn);
         Assert.False(m.ShowDetailColumn);

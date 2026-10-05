@@ -30,6 +30,9 @@ public sealed record OverviewEvent(string When, string Title, string Detail, IBr
 }
 
 /// <summary>A class's card on Home: its dot and name, how many lectures and when the last was, and what's next.</summary>
+/// <summary>Due's home: one stretch of time ("Overdue", "This week") and what falls in it.</summary>
+public sealed record OverviewDueGroup(string Heading, IReadOnlyList<OverviewDue> Items, bool Strong);
+
 public sealed record OverviewClass(string Name, IBrush Dot, string Lectures, string Next, bool NextStrong, Action Open)
 {
     public bool HasNext => Next.Length > 0;
@@ -39,6 +42,12 @@ public sealed record OverviewClass(string Name, IBrush Dot, string Lectures, str
 public sealed record OverviewLink(string Glyph, string Label, string Detail, Action Open);
 
 /// <summary>What a class's home is made from: the class, its lectures, and (when linked) its Canvas course.</summary>
+/// <summary>A folder linked to a class: its name, where it is, whether it's still there, and what its buttons do.</summary>
+public sealed record LinkedFolder(string Name, string Path, bool Here, Action Open, Action Unlink)
+{
+    public string Detail => Here ? Path : $"{Path} (not found)";
+}
+
 public sealed record ClassHomeFacts(string Name, IBrush Dot, int Lectures, string? Code, string? CourseTitle, string? Description,
     CanvasApi.Counts? Canvas);
 
@@ -55,7 +64,13 @@ public sealed partial class OverviewModel : ObservableObject
 
     /// <summary>Home, or a class's home (<see cref="ClassName"/>).</summary>
     public bool IsHome { get; init; }
-    public bool IsClass => !IsHome;
+    /// <summary>Due's own home: what's to hand in by when, and by class, with the full list a click away.</summary>
+    public bool IsDuePage { get; init; }
+    public bool IsClass => !IsHome && !IsDuePage;
+    /// <summary>The lectures beside what's due and coming up: Home and a class's home, not Due's.</summary>
+    public bool ShowMain => !IsDuePage;
+    public ObservableCollection<OverviewDueGroup> DueGroups { get; } = [];
+    public string ClassesHeading => IsDuePage ? "By class" : "Classes";
     public string ClassName { get; init; } = "";
     public string Title { get; init; } = "";
     public string Subtitle { get; init; } = "";
@@ -81,8 +96,8 @@ public sealed partial class OverviewModel : ObservableObject
     public bool NoEvents => Events.Count == 0;
     public bool NoLectures => Lectures.Count == 0;
     public bool HasClasses => Classes.Count > 0;
-    /// <summary>More than the one way in (All lectures, which the header has already): a Canvas class's lists.</summary>
-    public bool HasLinks => Links.Count > 1;
+    /// <summary>A Canvas class's lists (its lectures are Recent lectures' "See all").</summary>
+    public bool HasLinks => Links.Count > 0;
 
     public string DueHeading => IsHome ? "Due soon" : "To hand in";
     public string DueEmpty => IsHome ? "Nothing to hand in. You're all caught up." : $"Nothing to hand in for {ClassName}.";
@@ -94,6 +109,54 @@ public sealed partial class OverviewModel : ObservableObject
     public Action? OnAllLectures { get; init; }
     public bool CanSeeAllDue => OnAllDue is not null && Due.Count > 0;
     public bool CanSeeAllLectures => OnAllLectures is not null && Lectures.Count > 0;
+
+    /// <summary>Record from here: Home lets the library sort the lecture, a class's home records into that class.
+    /// While a lecture records it opens the recorder instead (never stops it by surprise).</summary>
+    public Action? OnRecord { get; set; }
+    public bool CanRecord => OnRecord is not null;
+    [ObservableProperty] public partial bool Recording { get; set; }
+    public string RecordWords => Recording ? "Recording…" : IsHome ? "Record" : $"Record {ClassName}";
+    partial void OnRecordingChanged(bool value) => OnPropertyChanged(nameof(RecordWords));
+    [RelayCommand] void Record() => OnRecord?.Invoke();
+
+    /// <summary>Ask about every class (Home) or this one (its home), floating at the foot of the page as under a lecture.</summary>
+    [ObservableProperty] public partial AiAskModel? Ask { get; set; }
+    public bool HasAsk => Ask is not null;
+    public bool HasAnswer => Ask?.HasLatest == true;
+    partial void OnAskChanged(AiAskModel? oldValue, AiAskModel? newValue)
+    {
+        if (oldValue is not null) oldValue.PropertyChanged -= AskChanged;
+        if (newValue is not null) newValue.PropertyChanged += AskChanged;
+        OnPropertyChanged(nameof(HasAsk));
+        OnPropertyChanged(nameof(HasAnswer));
+    }
+    void AskChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AiAskModel.HasLatest)) OnPropertyChanged(nameof(HasAnswer));
+    }
+
+    /// <summary>Folders on the computer that go with the class (a project's repo, say), linked rather than copied in.</summary>
+    public ObservableCollection<LinkedFolder> Folders { get; } = [];
+    public bool HasFolders => Folders.Count > 0;
+    /// <summary>Link a folder: set on a class's home when the library is on this computer (its folders are this one's).</summary>
+    public Action? OnLinkFolder { get; set; }
+    public bool CanLinkFolders => OnLinkFolder is not null;
+    /// <summary>The Linked folders section: when there are some, or one can be linked.</summary>
+    public bool ShowFolders => IsClass && (HasFolders || CanLinkFolders);
+    [RelayCommand] void LinkFolder() => OnLinkFolder?.Invoke();
+    [RelayCommand] static void OpenFolder(LinkedFolder f) => f.Open();
+    [RelayCommand] static void UnlinkFolder(LinkedFolder f) => f.Unlink();
+
+    /// <summary>Shows the class's linked folders (and whether more can be linked here).</summary>
+    public void SetFolders(IEnumerable<LinkedFolder> folders, Action? link)
+    {
+        Folders.Clear();
+        foreach (var f in folders) Folders.Add(f);
+        OnLinkFolder = link;
+        OnPropertyChanged(nameof(HasFolders));
+        OnPropertyChanged(nameof(CanLinkFolders));
+        OnPropertyChanged(nameof(ShowFolders));
+    }
 
     /// <summary>What's attached to the class (its home only): drop files on the page, or Attach.</summary>
     [ObservableProperty] public partial AttachmentsModel? Files { get; set; }
@@ -151,10 +214,14 @@ public sealed partial class OverviewModel : ObservableObject
         public int Unsorted { get; init; }
         public int Writing { get; init; }
         public Action<string>? OpenClass { get; init; }
+        /// <summary>A class's lectures by week (its All lectures), rather than its home.</summary>
+        public Action<string>? OpenAllLectures { get; init; }
         /// <summary>Opens a lecture (its class, its id) beside its class's list.</summary>
         public Action<string, string>? OpenLecture { get; init; }
         public Action<string, string>? OpenAssignment { get; init; }
         public Action? OpenDueList { get; init; }
+        /// <summary>Due's home (Home's See all and To hand in lead there).</summary>
+        public Action? OpenDueHome { get; init; }
         public Action? OpenUnsorted { get; init; }
     }
 
@@ -183,7 +250,7 @@ public sealed partial class OverviewModel : ObservableObject
     static bool Overdue(CanvasApi.Item i, DateTimeOffset now) => i.Missing || i.Status is "missing" or "overdue" or "past due" || i.DueAt < now;
 
     OverviewDue DueRow(CanvasApi.Item i, Sources s, Func<string, IBrush> dot) => new(i.Class, i.Id, i.Name, CanvasWords.RightLabel(i, s.Zone, s.Now),
-        i.Missing || Overdue(i, s.Now), IsHome ? CanvasWords.DueSub(i, s.Zone, s.Now) : CanvasWords.ClassTabRow(i, s.Zone, s.Now), dot(i.Class),
+        i.Missing || Overdue(i, s.Now), !IsClass ? CanvasWords.DueSub(i, s.Zone, s.Now) : CanvasWords.ClassTabRow(i, s.Zone, s.Now), dot(i.Class),
         () => s.OpenAssignment?.Invoke(i.Class, i.Id));
 
     OverviewLecture LectureRow(LectureFacts l, Sources s, Func<string, IBrush> dot) => new(l.Id, l.Title, LectureMeta(l, s.Zone),
@@ -209,7 +276,7 @@ public sealed partial class OverviewModel : ObservableObject
             Subtitle = local.ToString("dddd d MMMM", CultureInfo.InvariantCulture),
             HasCanvas = canvas,
             HasCalendars = s.Events is not null,
-            OnAllDue = canvas ? s.OpenDueList : null,
+            OnAllDue = canvas ? s.OpenDueHome ?? s.OpenDueList : null,
             LecturesEmpty = "No lectures yet. Record one from the menu bar and its notes land here.",
         };
         var toHandIn = StillToHandIn(s.Due).ToList();
@@ -217,9 +284,9 @@ public sealed partial class OverviewModel : ObservableObject
         m.Stats.Add(new OverviewStat(s.Classes.Count.ToString(CultureInfo.InvariantCulture), s.Classes.Count == 1 ? "Class" : "Classes"));
         if (canvas)
         {
-            m.Stats.Add(new OverviewStat(toHandIn.Count.ToString(CultureInfo.InvariantCulture), "To hand in", Open: s.OpenDueList));
+            m.Stats.Add(new OverviewStat(toHandIn.Count.ToString(CultureInfo.InvariantCulture), "To hand in", Open: s.OpenDueHome ?? s.OpenDueList));
             int late = toHandIn.Count(i => Overdue(i, s.Now));
-            if (late > 0) m.Stats.Add(new OverviewStat(late.ToString(CultureInfo.InvariantCulture), "Overdue", Strong: true, Open: s.OpenDueList));
+            if (late > 0) m.Stats.Add(new OverviewStat(late.ToString(CultureInfo.InvariantCulture), "Overdue", Strong: true, Open: s.OpenDueHome ?? s.OpenDueList));
         }
         if (s.Writing > 0) m.Stats.Add(new OverviewStat(s.Writing.ToString(CultureInfo.InvariantCulture), "Writing notes"));
         if (s.Unsorted > 0) m.Stats.Add(new OverviewStat(s.Unsorted.ToString(CultureInfo.InvariantCulture), "Unsorted", Open: s.OpenUnsorted));
@@ -242,6 +309,64 @@ public sealed partial class OverviewModel : ObservableObject
         return m;
     }
 
+    /// <summary>
+    /// Due's home: what's to hand in across every class, in stretches of time (overdue, this week, next week, later),
+    /// then a card for each class with its next one. The two-column list (each assignment beside its detail) is its
+    /// Full list.
+    /// </summary>
+    public static OverviewModel ForDue(Sources s)
+    {
+        var dot = DotsOf(s);
+        var toHandIn = StillToHandIn(s.Due).OrderBy(i => i.DueAt ?? DateTimeOffset.MaxValue).ToList();
+        int late = toHandIn.Count(i => Overdue(i, s.Now));
+        int handedIn = s.Due?.Groups.Where(g => g.Key == "handed_in").Sum(g => g.Items.Count) ?? 0;
+        var local = TimeZoneInfo.ConvertTime(s.Now, s.Zone).Date;
+        var weekEnd = local.AddDays(7 - ((int)local.DayOfWeek + 6) % 7); // the Monday after this week
+        DateTimeOffset Local(DateTimeOffset d) => TimeZoneInfo.ConvertTime(d, s.Zone);
+        bool ThisWeek(CanvasApi.Item i) => i.DueAt is { } d && Local(d).Date < weekEnd;
+        bool NextWeek(CanvasApi.Item i) => i.DueAt is { } d && Local(d).Date >= weekEnd && Local(d).Date < weekEnd.AddDays(7);
+        var m = new OverviewModel
+        {
+            IsDuePage = true,
+            Title = "Due",
+            Subtitle = toHandIn.Count == 0 ? "Nothing to hand in. You're all caught up."
+                : late > 0 ? $"{toHandIn.Count} to hand in · {late} overdue" : $"{toHandIn.Count} to hand in",
+            HasCanvas = s.Due is not null,
+            OnAllDue = s.OpenDueList,
+        };
+        int week = toHandIn.Count(i => !Overdue(i, s.Now) && ThisWeek(i));
+        m.Stats.Add(new OverviewStat(toHandIn.Count.ToString(CultureInfo.InvariantCulture), "To hand in", Open: s.OpenDueList));
+        if (late > 0) m.Stats.Add(new OverviewStat(late.ToString(CultureInfo.InvariantCulture), "Overdue", Strong: true));
+        m.Stats.Add(new OverviewStat(week.ToString(CultureInfo.InvariantCulture), "Due this week"));
+        m.Stats.Add(new OverviewStat(handedIn.ToString(CultureInfo.InvariantCulture), "Handed in"));
+
+        var left = toHandIn;
+        void Group(string heading, Func<CanvasApi.Item, bool> pick, bool strong = false)
+        {
+            var items = left.Where(pick).ToList();
+            left = [.. left.Except(items)];
+            if (items.Count > 0) m.DueGroups.Add(new OverviewDueGroup(heading, [.. items.Select(i => m.DueRow(i, s, dot))], strong));
+        }
+        Group("Overdue", i => Overdue(i, s.Now), strong: true);
+        Group("This week", ThisWeek);
+        Group("Next week", NextWeek);
+        Group("Later", i => i.DueAt is not null);
+        Group("No due date", _ => true);
+
+        foreach (var (name, classDot, _) in s.Classes)
+        {
+            var mine = toHandIn.Where(i => i.Class == name).ToList();
+            if (mine.Count == 0 && s.Canvas.All(c => c.Class != name || !c.Linked)) continue;
+            var next = mine.FirstOrDefault();
+            string when = next is null ? "" : CanvasWords.RightLabel(next, s.Zone, s.Now);
+            string nextWords = next is null ? "" : when.Length > 0 ? $"{next.Name} · {when}" : next.Name;
+            string cls = name;
+            m.Classes.Add(new OverviewClass(name, classDot, mine.Count == 0 ? "Nothing to hand in" : $"{mine.Count} to hand in", nextWords,
+                next is not null && Overdue(next, s.Now), () => s.OpenClass?.Invoke(cls)));
+        }
+        return m;
+    }
+
     /// <summary>A class's home: that class alone, with the ways further in.</summary>
     public static OverviewModel ForClass(ClassHomeFacts c, Sources s)
     {
@@ -259,12 +384,14 @@ public sealed partial class OverviewModel : ObservableObject
             Description = c.Description ?? "",
             HasCanvas = canvas,
             HasCalendars = s.Events is not null,
-            OnAllLectures = () => s.OpenClass?.Invoke(c.Name),
+            OnAllLectures = () => (s.OpenAllLectures ?? s.OpenClass)?.Invoke(c.Name),
             LecturesEmpty = $"No lectures in {c.Name} yet. Record one and it lands here.",
         };
         var toHandIn = StillToHandIn(s.Due).Where(i => i.Class == c.Name).ToList();
         var events = (s.Events ?? []).Where(e => e.ClassName == c.Name).ToList();
-        m.Stats.Add(new OverviewStat(c.Lectures.ToString(CultureInfo.InvariantCulture), c.Lectures == 1 ? "Lecture" : "Lectures"));
+        // The count opens the lectures, as To hand in opens what's due.
+        m.Stats.Add(new OverviewStat(c.Lectures.ToString(CultureInfo.InvariantCulture), c.Lectures == 1 ? "Lecture" : "Lectures",
+            Open: c.Lectures > 0 ? m.OnAllLectures : null));
         if (canvas)
         {
             m.Stats.Add(new OverviewStat(toHandIn.Count.ToString(CultureInfo.InvariantCulture), "To hand in"));
@@ -286,7 +413,7 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>A class's ways further in: its lectures by week, and on Canvas its tabs.</summary>
     public void AddLinks(ClassHomeFacts c, Action allLectures, Action<ClassTab>? tab)
     {
-        Links.Add(new OverviewLink("school", "All lectures", CanvasWords.LectureCountText(c.Lectures), allLectures));
+        // Its lectures are under Recent lectures' "See all": the cards are Canvas's lists alone.
         if (c.Canvas is not { } k || tab is null) return;
         Links.Add(new OverviewLink("assignment", "Assignments", $"{k.ToHandIn} to hand in · {k.Done} done", () => tab(ClassTab.Assignments)));
         Links.Add(new OverviewLink("subject", "Modules", k.Modules == 1 ? "1 module" : $"{k.Modules} modules", () => tab(ClassTab.Modules)));

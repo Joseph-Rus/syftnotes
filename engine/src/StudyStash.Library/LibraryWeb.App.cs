@@ -118,7 +118,8 @@ public sealed partial class LibraryWeb
             var known = cfg.Classes.FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (known is null)
             {
-                cfg.Classes.Add(new ClassDef(name, [], about));
+                // "group": a sidebar folder of the student's own ("Projects") rather than Classes.
+                cfg.Classes.Add(new ClassDef(name, [], about, (Str(body, "group") ?? "").Trim()));
                 Configs.Save(cfg);
             }
             else if (known.Description.Length == 0 && about.Length > 0)

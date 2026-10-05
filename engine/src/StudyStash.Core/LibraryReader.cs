@@ -23,10 +23,18 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         var classes = new JsonArray();
         int index = 0;
         var canvas = Canvas.CanvasSettings.Load(Cfg.Home);
+        var linked = Ai.Folders.Load(Cfg.Home);
         foreach (var c in Cfg.Classes)
             classes.Add(new JsonObject
             {
                 ["name"] = c.Name, ["lectures"] = counts.GetValueOrDefault(c.Name), ["color"] = index++, ["description"] = c.Description,
+                // The sidebar section it's in: "" for Classes, else one of the student's own folders ("Projects").
+                ["group"] = c.Group,
+                // Folders on the library's computer that go with it (a project's repo, say), not part of the library.
+                ["folders"] = new JsonArray(linked.Where(f => f.Class == c.Name).Select(f => (JsonNode?)new JsonObject
+                {
+                    ["path"] = f.Path, ["name"] = f.Name, ["here"] = Directory.Exists(f.Path),
+                }).ToArray()),
                 // The linked Canvas course's short code ("CSCI 321"), a label beside the name; "" when there's none.
                 ["code"] = ShortCodeOf(canvas, c.Name),
                 // Its other names (one it had before a rename, say), so a laptop's lectures filed under an old name can follow it.

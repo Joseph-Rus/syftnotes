@@ -239,8 +239,16 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     public async Task<JsonObject?> RestoreAsync(string id) => await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/restore", new JsonObject()) as JsonObject;
 
     /// <summary>Adds a class to the library, with what it covers when given (the AI reads it to sort lectures).</summary>
-    public async Task<JsonObject> AddClassAsync(string name, string? description = null) =>
-        (JsonObject)(await SendAsync(HttpMethod.Post, "/classes", new JsonObject { ["name"] = name, ["description"] = description }))!;
+    public async Task<JsonObject> AddClassAsync(string name, string? description = null, string? group = null) =>
+        (JsonObject)(await SendAsync(HttpMethod.Post, "/classes", new JsonObject { ["name"] = name, ["description"] = description, ["group"] = group }))!;
+
+    /// <summary>Links a folder on the library's computer to a class (or, with <paramref name="remove"/>, lets it go).</summary>
+    public async Task<JsonObject?> ClassFolderAsync(string className, string path, bool remove = false) =>
+        await SendAsync(HttpMethod.Post, "/classes/folders", new JsonObject { ["class"] = className, ["path"] = path, ["remove"] = remove }) as JsonObject;
+
+    /// <summary>Puts a class in a sidebar folder of the student's own ("" for Classes).</summary>
+    public async Task<JsonObject?> ClassGroupAsync(string className, string group) =>
+        await SendAsync(HttpMethod.Post, "/classes/group", new JsonObject { ["class"] = className, ["group"] = group }) as JsonObject;
 
     public async Task<JsonObject?> ClaudeAsync(HttpMethod method, string path = "", JsonObject? body = null) =>
         await SendAsync(method, "/claude" + path, body) as JsonObject;

@@ -32,16 +32,16 @@ public class RecorderPillTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public void The_pill_is_small_and_shows_only_the_time(SkinKind skin)
+    public void The_pill_is_a_small_upright_capsule_with_no_words(SkinKind skin)
     {
         var model = Demo.Recorder();
         var (_, pill) = Show(skin, model);
 
-        Assert.True(pill.Bounds.Height <= 32, $"{skin}: the pill is {pill.Bounds.Height} tall");
-        Assert.True(pill.Bounds.Width <= 110, $"{skin}: the pill is {pill.Bounds.Width} wide");
-        var words = Showing<TextBlock>(pill).Select(t => t.Text).ToList();
-        Assert.Equal(["24:18"], words);
-        Assert.DoesNotContain(model.ClassName, string.Concat(words));
+        Assert.True(pill.Bounds.Height <= 90, $"{skin}: the pill is {pill.Bounds.Height} tall");
+        Assert.True(pill.Bounds.Width <= 48, $"{skin}: the pill is {pill.Bounds.Width} wide");
+        // Its mark and the level meter only: the time is its tooltip, the class is the recorder's.
+        Assert.Empty(Showing<TextBlock>(pill));
+        Assert.Equal("24:18", ToolTip.GetTip(pill));
         Assert.Empty(Showing<Button>(pill));
     }
 

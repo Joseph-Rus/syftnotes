@@ -45,6 +45,7 @@ public class OverviewTests
         Unsorted = 2,
         Writing = 1,
         OpenClass = c => opened?.Add("class:" + c),
+        OpenAllLectures = c => opened?.Add("lectures:" + c),
         OpenLecture = (c, id) => opened?.Add($"lecture:{c}/{id}"),
         OpenAssignment = (c, id) => opened?.Add($"assignment:{c}/{id}"),
         OpenDueList = () => opened?.Add("due"),
@@ -133,12 +134,12 @@ public class OverviewTests
         Assert.False(m.HasClasses);
         Assert.Equal("To hand in", m.DueHeading);
 
-        Assert.Equal(["All lectures", "Assignments", "Modules", "Announcements"], m.Links.Select(l => l.Label));
-        Assert.Equal("1 to hand in · 4 done", m.Links[1].Detail);
-        Assert.Equal("3 · 1 new", m.Links[3].Detail);
+        Assert.Equal(["Assignments", "Modules", "Announcements"], m.Links.Select(l => l.Label));
+        Assert.Equal("1 to hand in · 4 done", m.Links[0].Detail);
+        Assert.Equal("3 · 1 new", m.Links[2].Detail);
         foreach (var link in m.Links) m.OpenLinkCommand.Execute(link);
         m.AllLecturesCommand.Execute(null);
-        Assert.Equal(["all", "tab:Assignments", "tab:Modules", "tab:Announcements", "class:CS 101"], opened);
+        Assert.Equal(["tab:Assignments", "tab:Modules", "tab:Announcements", "lectures:CS 101"], opened);
     }
 
     [Fact]
@@ -153,11 +154,10 @@ public class OverviewTests
         Assert.True(m.NoLectures);
         Assert.Equal("No lectures in Chess club yet. Record one and it lands here.", m.LecturesEmpty);
         Assert.False(m.CanSeeAllLectures);
-        // Its calendar shows (nothing of it this week), and the one way in is its lectures.
+        // Its calendar shows (nothing of it this week); with no Canvas there are no Canvas cards.
         Assert.True(m.ShowEvents);
         Assert.Equal("No Chess club on your calendar this week.", m.EventsEmpty);
-        Assert.Equal("All lectures", Assert.Single(m.Links).Label);
-        // The header's All lectures is that one way in already: no section for it alone.
+        Assert.Empty(m.Links);
         Assert.False(m.HasLinks);
         Assert.Equal(["0 Lectures"], m.Stats.Select(x => $"{x.Value} {x.Label}"));
     }
@@ -271,11 +271,11 @@ public class OverviewTests
             Assert.DoesNotContain("selected", view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "HomeRow").Classes);
             var page = view.GetVisualDescendants().OfType<UserControl>().First(u => u is MacOverview or WinOverview);
             var words = page.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
-            Assert.Contains("In this class", words);
+            Assert.Contains("On Canvas", words);
             Assert.Contains("Assignments", words);
             Assert.Contains("To hand in", words);
             Assert.DoesNotContain("Classes", words);
-            Assert.Contains(page.GetVisualDescendants().OfType<Button>(), b => b.Name == "AllLectures" && b.IsEffectivelyVisible);
+            Assert.Contains("See all", words); // the class's lectures, beside Recent lectures
         }
         finally
         {

@@ -151,6 +151,17 @@ public sealed partial class PanelModel : ObservableObject
     public Action? OnSearch { get; set; }
     public Action? OnOpenApp { get; set; }
     public Action? OnSettings { get; set; }
+    public Action? OnUpdate { get; set; }
+
+    /// <summary>A newer version this computer can install ("0.12.0"), or null: the dropdown's Update row.</summary>
+    [ObservableProperty] public partial string? UpdateVersion { get; set; }
+    public bool HasUpdate => UpdateVersion is { Length: > 0 };
+    public string UpdateWords => $"Update to {UpdateVersion}";
+    partial void OnUpdateVersionChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasUpdate));
+        OnPropertyChanged(nameof(UpdateWords));
+    }
     public Action<LectureItem>? OnOpenLecture { get; set; }
     public Action? OnFixProblem { get; set; }
 
@@ -163,5 +174,6 @@ public sealed partial class PanelModel : ObservableObject
     [RelayCommand] void Search() => OnSearch?.Invoke();
     [RelayCommand] void OpenApp() => OnOpenApp?.Invoke();
     [RelayCommand] void Settings() => OnSettings?.Invoke();
+    [RelayCommand] void Update() => OnUpdate?.Invoke();
     [RelayCommand] void OpenLecture(LectureItem item) => OnOpenLecture?.Invoke(item);
 }

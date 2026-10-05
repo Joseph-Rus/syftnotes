@@ -53,12 +53,13 @@ public class AppShots
         return m;
     }
 
-    static LibraryModel ClassApp(bool narrow)
+    static LibraryModel ClassApp(bool narrow, ClassTab tab = ClassTab.Assignments)
     {
         var m = Sidebar("CS 101");
         m.ClassTitle = "CS 101";
+        foreach (var g in Demo.Library().Groups) m.Groups.Add(g);
         var cls = CanvasShots.ClassModel();
-        cls.Tab = ClassTab.Assignments;
+        cls.Tab = tab;
         cls.Done[0].SelectCommand.Execute(null); // Problem set 4
         m.CanvasClass = cls;
         m.List = LibraryList.CanvasClass;
@@ -89,6 +90,9 @@ public class AppShots
         var cls = ClassApp(narrow: false);
         foreach (var t in Themes)
             Shot.Take("mac-10-canvas-class-tabs-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = cls, Width = 1280, Height = 800 });
+        var lectures = ClassApp(narrow: false, ClassTab.Lectures);
+        foreach (var t in Themes)
+            Shot.Take("mac-10-canvas-class-lectures-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = lectures, Width = 1280, Height = 800 });
         var narrow = ClassApp(narrow: true);
         foreach (var t in Themes)
             Shot.Take("mac-11-canvas-class-sections-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = narrow, Width = 588, Height = 800 });

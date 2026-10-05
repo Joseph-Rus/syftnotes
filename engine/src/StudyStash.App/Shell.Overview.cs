@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
@@ -14,8 +15,33 @@ public static partial class Shell
     /// <summary>The overview showing: "" for Home, a class's name for its home, null for neither.</summary>
     static string? overviewOf;
 
-    /// <summary>Home ("") or a class's home.</summary>
-    static Task ShowOverviewAsync(string of) => of.Length == 0 ? ShowHomeAsync() : ShowClassHomeAsync(of);
+    /// <summary>What <see cref="overviewOf"/> holds while Due's home shows (no class can be called this).</summary>
+    const string DueHome = "\u0001due";
+
+    /// <summary>Home (""), Due's home, or a class's home.</summary>
+    static Task ShowOverviewAsync(string of) => of.Length == 0 ? ShowHomeAsync() : of == DueHome ? ShowDueHomeAsync() : ShowClassHomeAsync(of);
+
+    /// <summary>Due's home: what's to hand in by when and by class; Full list opens the two-column list.</summary>
+    static async Task ShowDueHomeAsync()
+    {
+        int turn = ++libraryTurn;
+        overviewOf = DueHome;
+        library.Home.Selected = false;
+        foreach (var c in library.Classes) c.Selected = c.IsDue;
+        library.Unsorted.Selected = false;
+        ClearForOverview();
+        if (host.Remote() is null) return;
+        await Task.Yield();
+        if (turn != libraryTurn) return;
+        var page = OverviewModel.ForDue(OverviewSources([], events: null));
+        var ask = new AiAskModel(Ai()) { OpenSettings = () => ShowSettings("AI") };
+        ask.OnlyScopes("all");
+        library.Ask?.Stop();
+        library.Ask = null;
+        page.Ask = ask;
+        _ = ask.Load();
+        library.Overview = page;
+    }
 
     /// <summary>Whatever opens next (a class's lectures, Due) takes the overview's place.</summary>
     static void LeaveOverview()
@@ -53,7 +79,9 @@ public static partial class Shell
         if (host.Remote() is not { } lib) return;
         var lectures = await OverviewLecturesAsync(lib, null, 60);
         if (turn != libraryTurn) return;
-        library.Overview = OverviewModel.Home(OverviewSources(lectures, events: library.ComingUp.HasCalendars ? [.. library.ComingUp.Rows] : null));
+        var home = OverviewModel.Home(OverviewSources(lectures, events: library.ComingUp.HasCalendars ? [.. library.ComingUp.Rows] : null));
+        Equip(home, null);
+        library.Overview = home;
     }
 
     static async Task ShowClassHomeAsync(string name)
@@ -89,10 +117,76 @@ public static partial class Shell
             Remember();
             _ = ShowClassTabAsync(name, tab);
         });
+        page.SetFolders(LinkedFolders(lib, name, info), host.Settings.LibraryHere ? () => _ = LinkFolderAsync(lib, name) : null);
+        Equip(page, name);
         var files = new AttachmentsModel(lib, name, null);
         page.Files = files;
         _ = files.LoadAsync();
         library.Overview = page;
+    }
+
+    /// <summary>Home's and a class's home's Record and ask bar: everything (Home) or that class.</summary>
+    static void Equip(OverviewModel page, string? cls)
+    {
+        if (host.Settings.Role != AppRole.Library)
+        {
+            page.Recording = host.Recorder.Current is not null;
+            page.OnRecord = () =>
+            {
+                if (host.Recorder.Current is not null)
+                {
+                    ShowRecorder(expanded: true);
+                    return;
+                }
+                chosenClass = cls ?? "";
+                ToggleRecording();
+                page.Recording = true;
+            };
+        }
+        var ask = new AiAskModel(Ai()) { ClassName = cls, OpenSettings = () => ShowSettings("AI") };
+        if (cls is null) ask.OnlyScopes("all");
+        else ask.OnlyScopes("class", "all");
+        library.Ask?.Stop();
+        library.Ask = null;
+        page.Ask = ask;
+        _ = ask.Load();
+    }
+
+    /// <summary>The folders linked to a class, as the library's overview lists them.</summary>
+    static IEnumerable<LinkedFolder> LinkedFolders(RemoteLibrary lib, string cls, JsonObject? info) =>
+        (info?["folders"] as JsonArray ?? []).OfType<JsonObject>().Select(f =>
+        {
+            string path = S(f["path"]);
+            return new LinkedFolder(S(f["name"]), path, f["here"]?.GetValue<bool>() ?? true,
+                () => Dialogs.OpenUrl(path),
+                () => _ = ChangeFolderAsync(lib, cls, path, remove: true));
+        });
+
+    /// <summary>Link a folder: the folder dialog, then the library lists it on the class's home.</summary>
+    static async Task LinkFolderAsync(RemoteLibrary lib, string cls)
+    {
+        if (mainWindow is null) return;
+        var picked = await mainWindow.StorageProvider.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+        {
+            Title = $"Link a folder to {cls}",
+        });
+        if (picked.Count == 0 || picked[0].TryGetLocalPath() is not { } path) return;
+        await ChangeFolderAsync(lib, cls, path, remove: false);
+    }
+
+    static async Task ChangeFolderAsync(RemoteLibrary lib, string cls, string path, bool remove)
+    {
+        try
+        {
+            await lib.ClassFolderAsync(cls, path, remove);
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            Toast("Couldn't link the folder", e.Message, null, null);
+            return;
+        }
+        await host.CheckLibraryAsync();
+        if (overviewOf == cls) await ShowClassHomeAsync(cls);
     }
 
     /// <summary>A class's Canvas page, on one of its tabs.</summary>
@@ -151,6 +245,12 @@ public static partial class Shell
                 Remember();
                 _ = ShowClassHomeAsync(cls);
             },
+            OpenAllLectures = cls =>
+            {
+                Remember();
+                allLectures = true;
+                _ = ShowClassAsync(cls);
+            },
             OpenLecture = (cls, id) =>
             {
                 Remember();
@@ -162,12 +262,17 @@ public static partial class Shell
             {
                 Remember();
                 // From a class's home, the assignment opens on its class's page; from Home, on the Due page.
-                if (overviewOf is { Length: > 0 } && CanvasClassRow(cls) is not null) _ = OpenClassAssignmentAsync(cls, id);
+                if (overviewOf is { Length: > 0 } && overviewOf != DueHome && CanvasClassRow(cls) is not null) _ = OpenClassAssignmentAsync(cls, id);
                 else
                 {
                     dueSelection = (cls, id);
                     _ = ShowDueAsync();
                 }
+            },
+            OpenDueHome = () =>
+            {
+                Remember();
+                _ = ShowDueHomeAsync();
             },
             OpenDueList = () =>
             {

@@ -198,6 +198,7 @@
     <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
   </Style>
   <Style Selector="Button.cv-due-row">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="CornerRadius" Value="14" />
     <Setter Property="Padding" Value="12,10" />
@@ -421,6 +422,7 @@
     <Setter Property="Background" Value="{DynamicResource Fill2}" />
   </Style>
   <Style Selector="Button.cv-mod-item">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Margin" Value="10,0" />
     <Setter Property="Padding" Value="12,6" />
@@ -434,6 +436,7 @@
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
   <Style Selector="Button.cv-mod-collapsed">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Margin" Value="10,0" />
     <Setter Property="Padding" Value="12,6" />
@@ -446,6 +449,7 @@
 
   <!-- a lecture row -->
   <Style Selector="Button.cv-lecture-row">
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="Theme" Value="{StaticResource Surface}" />
     <Setter Property="Margin" Value="10,0" />
     <Setter Property="Padding" Value="12,7" />

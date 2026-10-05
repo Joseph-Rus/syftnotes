@@ -10,6 +10,7 @@
              x:Class="StudyStash.App.Views.MacLibrary"
              x:DataType="vm:LibraryModel">
   <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
     <!-- A transcript line a diagram pointed to: marked, a little room round it, the words where they were. -->
     <Style Selector="Border.heard">
       <Setter Property="Margin" Value="-8,-4" />
@@ -258,8 +259,22 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:ClassItem">
-                    <Button Classes="cls" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
+                    <StackPanel>
+                      <TextBlock Classes="classes" Text="{Binding Section}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" IsVisible="{Binding HasSection}" />
+                      <Button Classes="cls" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
                             Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
+                      <Button.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Move to folder" ItemsSource="{Binding MoveChoices}">
+                            <MenuItem.ItemContainerTheme>
+                              <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:FolderChoice">
+                                <Setter Property="Header" Value="{Binding Label}" />
+                                <Setter Property="Command" Value="{Binding Pick}" />
+                              </ControlTheme>
+                            </MenuItem.ItemContainerTheme>
+                          </MenuItem>
+                        </ContextMenu>
+                      </Button.ContextMenu>
                       <!-- dot | name, cut short with "…" (the whole name on hover) | the count, in its own column -->
                       <Grid ColumnDefinitions="Auto,8,*,10,Auto">
                         <Panel Classes="slot">
@@ -269,6 +284,7 @@
                         <TextBlock Grid.Column="4" Classes="count" Text="{Binding Count}" FontSize="13" VerticalAlignment="Center" />
                       </Grid>
                     </Button>
+                    </StackPanel>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
@@ -294,19 +310,37 @@
                 <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold"
                            TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
+                  <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" IsVisible="{Binding !HasClassTabs}" />
+                  <TextBlock Text="{Binding CanvasClass.HeaderLine, FallbackValue=''}" FontSize="11" Foreground="{DynamicResource Fg2}" IsVisible="{Binding HasClassTabs}" />
                   <!-- A class's lectures: back to the class's home -->
                   <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding CanShowClassPage}" Command="{Binding ShowClassPageCommand}">
                     <TextBlock Text="· Class home" FontSize="11" Foreground="{DynamicResource AccentText}" />
                   </Button>
                 </StackPanel>
               </StackPanel>
-              <!-- Attach to the class (drop files on the list, too): its files show under the name once there are some -->
-              <Button Grid.Column="1" Classes="tool" VerticalAlignment="Center" Command="{Binding ClassFiles.AttachCommand, FallbackValue={x:Null}}"
-                      IsVisible="{Binding HasClassFiles}" ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the list)"
-                      AutomationProperties.Name="Attach to class">
-                <c:Icon Glyph="attach_file" Size="17" Foreground="{DynamicResource Fg2}" />
-              </Button>
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Attach to the class (drop files on the list, too): its files show under the name once there are some -->
+                <Button Classes="tool" VerticalAlignment="Center" Command="{Binding ClassFiles.AttachCommand, FallbackValue={x:Null}}"
+                        IsVisible="{Binding HasClassFiles}" ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the list)"
+                        AutomationProperties.Name="Attach to class">
+                  <c:Icon Glyph="attach_file" Size="17" Foreground="{DynamicResource Fg2}" />
+                </Button>
+                <!-- Fold the list away, giving the page its room -->
+                <Button Name="HideList" Classes="tool" VerticalAlignment="Center" Command="{Binding ToggleListCommand}" IsVisible="{Binding CanToggleList}"
+                        ToolTip.Tip="Hide the list (⌃⌘L)" AutomationProperties.Name="Hide the list">
+                  <c:Icon Glyph="chevron_left" Size="18" Foreground="{DynamicResource Fg2}" />
+                </Button>
+              </StackPanel>
+            </Grid>
+          </Border>
+          <!-- A Canvas class: switch between its lectures (the list below) and Canvas's own lists -->
+          <Border DockPanel.Dock="Top" Classes="cv-seg" Margin="14,2,14,8" HorizontalAlignment="Left" IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasClassTabs}"
+                  DataContext="{Binding CanvasClass}" x:DataType="vm:CanvasClassModel">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto">
+              <Button Grid.Column="0" Classes="cv-seg-item" Classes.cv-on="{Binding IsLecturesTab}" Content="Lectures" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Lectures}" />
+              <Button Grid.Column="1" Classes="cv-seg-item" Classes.cv-on="{Binding IsAssignmentsTab}" Content="Assignments" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Assignments}" />
+              <Button Grid.Column="2" Classes="cv-seg-item" Classes.cv-on="{Binding IsModulesTab}" Content="Modules" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Modules}" />
+              <Button Grid.Column="3" Classes="cv-seg-item" Classes.cv-on="{Binding IsAnnouncementsTab}" Content="Announcements" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Announcements}" />
             </Grid>
           </Border>
           <!-- The one gentle ask for a tip, when it's due: in the list's flow, lined up with the lectures, covering nothing -->
@@ -317,7 +351,11 @@
           <ScrollViewer DockPanel.Dock="Top" MaxHeight="200" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasClassFiles}" Margin="20,0,20,8">
             <v:MacAttachments Name="ClassAttachments" DataContext="{Binding ClassFiles}" />
           </ScrollViewer>
-          <DockPanel>
+          <!-- A Canvas class on one of Canvas's tabs: that list, in the lectures' place -->
+          <Panel IsVisible="{Binding ShowClassTabBody}">
+            <v:MacCanvasClass DataContext="{Binding CanvasClass}" />
+          </Panel>
+          <DockPanel IsVisible="{Binding ShowLectureGroups}">
             <TextBlock DockPanel.Dock="Top" IsVisible="{Binding HasEmpty}" Text="{Binding Empty}" FontSize="13" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="20,10" />
             <ScrollViewer VerticalScrollBarVisibility="Auto">
               <ItemsControl ItemsSource="{Binding Groups}">
@@ -359,9 +397,6 @@
           </Panel>
           <v:MacCanvasDue DataContext="{Binding DueList}" />
         </DockPanel>
-        <Panel IsVisible="{Binding ShowCanvasClass}">
-          <v:MacCanvasClass DataContext="{Binding CanvasClass}" />
-        </Panel>
           <!-- "Deleted · Undo", for a few seconds after a lecture goes -->
           <Border Name="UndoToast" Classes="undo" IsVisible="{Binding HasDeleted}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="16,0,16,28">
             <Grid ColumnDefinitions="*,10,Auto" VerticalAlignment="Center">
@@ -380,6 +415,14 @@
 
         <!-- The right: the lecture, an assignment, or a Canvas page -->
         <Panel Grid.Column="{Binding DetailColumn}" Grid.ColumnSpan="{Binding ColumnSpan}" IsVisible="{Binding ShowDetailColumn}">
+          <!-- The list folded away: one arrow at the page's left edge brings it back -->
+          <Button Name="ShowList" Theme="{StaticResource Surface}" Height="32" CornerRadius="16" Padding="8,0,12,0" Background="{DynamicResource Fill}" ZIndex="5" IsVisible="{Binding ShowListOpener}" Command="{Binding ToggleListCommand}"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,12,0,0" ToolTip.Tip="Show the list (⌃⌘L)" AutomationProperties.Name="Show the list">
+            <StackPanel Orientation="Horizontal" Spacing="2">
+              <c:Icon Glyph="chevron_right" Size="18" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+              <TextBlock Text="List" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
           <Border Width="1" Background="{DynamicResource Sep}" HorizontalAlignment="Left" IsVisible="{Binding !Narrow}" />
           <Panel IsVisible="{Binding ShowAssignment}" Margin="1,0,0,0">
             <v:MacAssignment DataContext="{Binding Assignment}" Classes="inwindow" />
@@ -392,7 +435,7 @@
         <Grid IsVisible="{Binding ShowLecturePage}" RowDefinitions="*,Auto" ClipToBounds="False">
           <Panel>
           <ScrollViewer Name="NoteScroll" Margin="1,0,0,0" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasNote}">
-            <StackPanel MaxWidth="620" HorizontalAlignment="Left" Margin="56,28,56,140" Spacing="14" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
+            <StackPanel MaxWidth="680" HorizontalAlignment="Center" Margin="56,28,56,140" Spacing="14" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
                 <TextBlock Text="{Binding Meta}" FontSize="12" Foreground="{DynamicResource Fg2}" />
@@ -499,6 +542,10 @@
     </DockPanel>
 
     <!-- "Delete this lecture?", over the window: a click outside it is Cancel -->
+    <!-- "Put CS 101 in a new folder": its name, over the window -->
+    <Panel Name="FolderAsk" IsVisible="{Binding AskingFolder}" Background="Transparent">
+      <v:MacNewFolder HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Panel>
     <Panel Name="DeleteAsk" IsVisible="{Binding AskingDelete}" Background="Transparent" PointerPressed="OnDeleteAskPressed">
       <v:MacDeleteLecture HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Panel>

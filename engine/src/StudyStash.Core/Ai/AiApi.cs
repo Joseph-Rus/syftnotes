@@ -19,6 +19,10 @@ public sealed record EngineInfo(string Id, string Name, string State)
     public string Site { get; init; } = "";
     public string Until { get; init; } = "";
     public string Why { get; init; } = "";
+    /// <summary>The student gave it an API key (it runs on that when its command isn't here, or for plain answers).</summary>
+    public bool HasKey { get; init; }
+    /// <summary>The key's last four characters ("…a1b2"), to tell which one it is.</summary>
+    public string KeyHint { get; init; } = "";
 }
 
 /// <summary>kind: engine_offline | not_signed_in | model_missing | usage_limit (the app adds fell_back,
@@ -140,6 +144,8 @@ public interface IAiLibrary
     Task<AiSaid?> CheckAsync(string engine, string model = "");
     Task<AiOverview?> ModelAsync(string engine, string model);
     Task<AiOverview?> DismissAsync(string problemId);
+    /// <summary>Gives an engine an API key, or with "" takes it away. Null from a library too old to take keys.</summary>
+    Task<AiSaid?> KeyAsync(string engine, string key) => Task.FromResult<AiSaid?>(null);
     Task<AskReply?> AskAsync(AskRequest request);
     /// <summary>Asks, with the answer shown as it's written: <paramref name="answerSoFar"/> hears all of it so far
     /// each time more arrives. <paramref name="stop"/> ends it where it is. A library too old to stream (or a
@@ -241,6 +247,9 @@ public sealed class AiRemote(string serverUrl, string key, HttpClient? http = nu
 
     public async Task<AiOverview?> ModelAsync(string engine, string model) =>
         As<AiOverview>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/model", new JsonObject { ["model"] = model }));
+
+    public async Task<AiSaid?> KeyAsync(string engine, string key) =>
+        As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/key", new JsonObject { ["key"] = key }));
 
     public async Task<AiOverview?> DismissAsync(string problemId) =>
         As<AiOverview>(await SendAsync(HttpMethod.Post, $"/problems/{Seg(problemId)}/dismiss"));
