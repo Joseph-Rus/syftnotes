@@ -3,7 +3,7 @@ import sound from './sound.json';
 import {Cut, DemoScene} from '../demo/config';
 import {StageFit} from '../promo2/ui';
 
-// The Instagram reel: a fast cut of the demo, 57 seconds, 1080×1920 at 30 fps (src/reel/plan.json is its contract,
+// The Instagram reel: a fast cut of the demo, under a minute (57.5 s), 1080×1920 at 30 fps (src/reel/plan.json is its contract,
 // and its times are final). It plays the demo's own scenes, each given a Cut: its moments from the plan, and its place
 // inside Instagram's safe area.
 

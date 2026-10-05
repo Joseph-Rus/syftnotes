@@ -19,6 +19,8 @@
     "render3:silent": "remotion render src/index.ts DemoSilentVertical out/demo-silent-vertical.mp4 --muted",
     "render3:silent:landscape": "remotion render src/index.ts DemoSilent out/demo-silent.mp4 --muted",
     "card3": "remotion still src/index.ts KofiCard3 out/ko-fi-preview-3.png",
+    "render:reel:silent": "remotion render src/index.ts Reel out/reel-silent.mp4 --muted --props='{\"silent\":true}'",
+    "reelcover": "remotion still src/index.ts ReelCover out/reel-cover.png",
     "typecheck": "tsc --noEmit",
     "audio": "python3 scripts/make_audio.py",
     "audio2": "python3 scripts/make_audio.py --promo 2",
@@ -26,7 +28,8 @@
     "voice": "python3 scripts/make_voice.py",
     "voice2": "python3 scripts/make_voice.py --promo 2",
     "demo-audio": "python3 scripts/demo_audio.py",
-    "demo-cues": "python3 scripts/demo_cues.py"
+    "demo-cues": "python3 scripts/demo_cues.py",
+    "reel-cues": "python3 scripts/reel_cues.py"
   },
   "dependencies": {
     "@remotion/cli": "4.0.529",

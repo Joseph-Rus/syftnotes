@@ -2,7 +2,7 @@
   "about": "The Instagram reel: a fast cut of the demo (src/demo), 1080×1920 at 30 fps, under a minute. Each scene starts at `start` (seconds, the start of its cross-fade in), Adam's line at `vo`; every effect is at `at` (seconds into the reel) and `moments` are the scenes' silent moments. These times are final: nothing is stretched to fit a line, so the picture never moves under a sound laid by CUES-reel.md. `npm run reel-cues` writes the cue sheet from this file.",
   "fps": 30,
   "transition": 10,
-  "end": 57.0,
+  "end": 57.5,
   "safeArea": {"width": 1080, "height": 1920, "top": 220, "bottom": 420, "right": 130},
   "scenes": [
     {"id": "opener", "start": 0.0, "vo": 0.3, "line": "Study Stash.", "title": null, "shows": "The black intro, fast: a line of light draws the icon from the first frame, “Study Stash” rises, glimpses of what’s to come float in, and the night lifts into the app", "direction": "warm and confident, quick"},
@@ -15,7 +15,7 @@
     {"id": "canvas", "start": 38.0, "vo": 38.3, "line": "See what's due from Canvas, soonest first.", "title": ["Canvas, connected.", "What’s due, soonest first."], "shows": "Due: Lab 2 write-up marked Missing, then this week’s, soonest first; Lab 3 opened: due date, points, instructions, rubric", "direction": "practical, brisk"},
     {"id": "phone", "start": 42.5, "vo": 42.8, "line": "Your notes and what's due, on your phone too.", "title": ["On your phone, too.", "Notes and what’s due."], "shows": "The phone app: Library; a tap into The cardiac cycle’s notes; a tap on Due", "direction": "light"},
     {"id": "settings", "start": 47.0, "vo": 47.3, "line": "Make it yours: rich notes, fast mode, after class.", "title": ["Make it yours.", "Notes your way."], "shows": "Settings → AI engines: Rich notes switched off; Claude Code speed → Fast mode; Recording: When it’s written down → After class", "direction": "relaxed, a little pause at the colon, then a quick list"},
-    {"id": "end", "start": 52.0, "vo": 52.3, "line": "Study Stash. Free for Mac and Windows.", "title": null, "shows": "The end card: the icon, Study Stash, Free for Mac and Windows, study-stash-app.web.app, the marks for Mac and Windows; held to the last frame", "direction": "warm, a beat after \"Study Stash\""}
+    {"id": "end", "start": 52.5, "vo": 52.8, "line": "Study Stash. Free for Mac and Windows.", "title": null, "shows": "The end card: the icon, Study Stash, Free for Mac and Windows, study-stash-app.web.app, the marks for Mac and Windows; held to the last frame", "direction": "warm, a beat after \"Study Stash\""}
   ],
   "sounds": [
     {"sfx": "whoosh-soft", "file": "sfx-whoosh-soft.mp3", "length": "1 s", "prompt": "Very soft, gentle airy whoosh for a slide transition, low and smooth, soft air moving, no hiss, no reverb tail"},
@@ -64,13 +64,13 @@
     {"key": "phone-lecture", "scene": "phone", "sfx": "tap", "at": 43.3, "what": "a lecture is tapped"},
     {"key": "phone-due", "scene": "phone", "sfx": "tap", "at": 44.7, "what": "the Due tab"},
 
-    {"key": "settings-rich", "scene": "settings", "sfx": "click", "at": 48.0, "what": "the Rich notes switch"},
-    {"key": "settings-speed", "scene": "settings", "sfx": "click", "at": 48.7, "what": "the Claude Code speed menu opens"},
-    {"key": "settings-fast", "scene": "settings", "sfx": "click", "at": 49.2, "what": "Fast mode"},
-    {"key": "settings-recording", "scene": "settings", "sfx": "click", "at": 49.8, "what": "Recording, in the sidebar"},
-    {"key": "settings-after", "scene": "settings", "sfx": "click", "at": 50.4, "what": "When it's written down: After class"},
+    {"key": "settings-rich", "scene": "settings", "sfx": "click", "at": 48.2, "what": "the Rich notes switch"},
+    {"key": "settings-speed", "scene": "settings", "sfx": "click", "at": 48.9, "what": "the Claude Code speed menu opens"},
+    {"key": "settings-fast", "scene": "settings", "sfx": "click", "at": 49.4, "what": "Fast mode"},
+    {"key": "settings-recording", "scene": "settings", "sfx": "click", "at": 50.0, "what": "Recording, in the sidebar"},
+    {"key": "settings-after", "scene": "settings", "sfx": "click", "at": 50.6, "what": "When it's written down: After class"},
 
-    {"key": "end-swell", "scene": "end", "sfx": "swell", "at": 52.0, "what": "the end card"}
+    {"key": "end-swell", "scene": "end", "sfx": "swell", "at": 52.5, "what": "the end card"}
   ],
   "moments": [
     {"key": "record-jump", "scene": "record", "at": 7.1, "what": "“50 minutes later”"},
