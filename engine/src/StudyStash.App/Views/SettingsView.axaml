@@ -665,7 +665,7 @@
                     <Border Classes="row">
                       <StackPanel Spacing="2" VerticalAlignment="Center">
                         <TextBlock Classes="row-title" Text="Speech models" />
-                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT); NVIDIA Parakeet TDT 0.6B v3 and TitaNet small (CC BY 4.0) and pyannote segmentation 3.0 (MIT), converted to ONNX by sherpa-onnx; Cactus Whistle and its needle engine by Cactus Compute (Apache-2.0), which come with Study Stash. They run on this computer, and the others download only when you pick them." TextWrapping="Wrap" />
+                        <TextBlock Classes="row-sub" Text="Whisper by OpenAI (MIT); NVIDIA Parakeet TDT 0.6B v3 and TitaNet small (CC BY 4.0) and pyannote segmentation 3.0 (MIT), converted to ONNX by sherpa-onnx; for the recorder's live words, Cactus Whistle and its needle engine by Cactus Compute (Apache-2.0) on ARM, and Whisper tiny on x64, which come with Study Stash. They run on this computer, and the others download only when you pick them." TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
                     <Border Classes="rowsep" />

@@ -275,17 +275,18 @@ jobs:
               test -f "dist/mac/Study Stash.app/Contents/MacOS/$arch/web/$f" || { echo "no web/$f in the $arch tree"; exit 1; }
             done
           done
-      - name: Both trees carry Cactus Whistle (the live words) - its model, its licence, and its engine built for their own processor and signed
+      - name: Each tree carries its own live words - Cactus Whistle (model, licence, its arm64 engine, signed) for Apple silicon, the small Whisper (model, licence) for Intel - and not the other's
         run: |
-          for arch in arm64 x64; do
-            tree="dist/mac/Study Stash.app/Contents/MacOS/$arch"
-            for f in models/whistle.cact needle/LICENSE.txt "needle/osx-$arch/libneedle3.dylib"; do
-              test -f "$tree/$f" || { echo "no $f in the $arch tree"; exit 1; }
-            done
-            want=$([ "$arch" = x64 ] && echo x86_64 || echo arm64)
-            [ "$(lipo -archs "$tree/needle/osx-$arch/libneedle3.dylib")" = "$want" ] || { echo "the $arch tree's libneedle3.dylib isn't $want"; exit 1; }
-            codesign --verify --strict "$tree/needle/osx-$arch/libneedle3.dylib"
+          arm="dist/mac/Study Stash.app/Contents/MacOS/arm64"; intel="dist/mac/Study Stash.app/Contents/MacOS/x64"
+          for f in "$arm/models/whistle.cact" "$arm/needle/LICENSE.txt" "$arm/needle/osx-arm64/libneedle3.dylib" \
+                   "$intel/models/live-whisper-tiny-q8_0.bin" "$intel/models/live-whisper-LICENSE.txt"; do
+            test -f "$f" || { echo "no $f"; exit 1; }
           done
+          [ "$(lipo -archs "$arm/needle/osx-arm64/libneedle3.dylib")" = arm64 ] || { echo "the arm64 tree's libneedle3.dylib isn't arm64"; exit 1; }
+          codesign --verify --strict "$arm/needle/osx-arm64/libneedle3.dylib"
+          if [ -e "$arm/models/live-whisper-tiny-q8_0.bin" ] || [ -e "$intel/models/whistle.cact" ] || [ -e "$intel/needle" ]; then
+            echo "a tree carries the other processor's live words"; exit 1
+          fi
       - name: Signed, universal, and reports its version on both architectures
         run: |
           APP="dist/mac/Study Stash.app"
@@ -310,7 +311,8 @@ jobs:
             exit 1
           fi
           [ -L "$mnt/Applications" ]
-          if find "$mnt" -iname 'ggml-*.bin' -o -name '*.bin' -size +1M | grep -q .; then
+          # Bar the live words' small Whisper (models/live-whisper-*.bin, Intel only), which comes with the app.
+          if find "$mnt" \( -iname 'ggml-*.bin' -o -name '*.bin' -size +1M \) ! -name 'live-whisper-*.bin' | grep -q .; then
             hdiutil detach -quiet "$mnt"
             echo "a model file is bundled in Study-Stash.dmg" >&2
             exit 1
@@ -509,17 +511,18 @@ jobs:
               if (-not (Test-Path "dist\windows\$rid\web\$f")) { throw "no web\$f in the $rid tree" }
             }
           }
-      - name: Both trees carry Cactus Whistle (the live words) - its model, its licence, and its engine built for their own processor
+      - name: Each tree carries its own live words - Cactus Whistle (model, licence, its arm64 engine) on ARM, the small Whisper (model, licence) on x64 - and not the other's
         shell: pwsh
         run: |
-          foreach ($tree in @(@("win-x64", 0x8664), @("win-arm64", 0xAA64))) {
-            $rid = $tree[0]; $machine = $tree[1]
-            foreach ($f in "models\whistle.cact", "needle\LICENSE.txt", "needle\$rid\libneedle3.dll") {
-              if (-not (Test-Path "dist\windows\$rid\$f")) { throw "$rid has no $f" }
-            }
-            $bytes = [IO.File]::ReadAllBytes("dist\windows\$rid\needle\$rid\libneedle3.dll")
-            $built = [BitConverter]::ToUInt16($bytes, [BitConverter]::ToInt32($bytes, 0x3C) + 4)
-            if ($built -ne $machine) { throw "$rid's libneedle3.dll is built for machine 0x$('{0:X}' -f $built), not 0x$('{0:X}' -f $machine)" }
+          foreach ($f in "win-arm64\models\whistle.cact", "win-arm64\needle\LICENSE.txt", "win-arm64\needle\win-arm64\libneedle3.dll",
+                         "win-x64\models\live-whisper-tiny-q8_0.bin", "win-x64\models\live-whisper-LICENSE.txt") {
+            if (-not (Test-Path "dist\windows\$f")) { throw "no $f" }
+          }
+          $bytes = [IO.File]::ReadAllBytes("dist\windows\win-arm64\needle\win-arm64\libneedle3.dll")
+          $built = [BitConverter]::ToUInt16($bytes, [BitConverter]::ToInt32($bytes, 0x3C) + 4)
+          if ($built -ne 0xAA64) { throw "win-arm64's libneedle3.dll is built for machine 0x$('{0:X}' -f $built), not 0xAA64" }
+          foreach ($f in "win-arm64\models\live-whisper-tiny-q8_0.bin", "win-x64\models\whistle.cact", "win-x64\needle") {
+            if (Test-Path "dist\windows\$f") { throw "${f}: a tree carries the other processor's live words" }
           }
       - name: Reports the version from Directory.Build.props, and no model is bundled (D6)
         shell: pwsh
@@ -529,7 +532,8 @@ jobs:
           $printed = (& "dist\windows\win-x64\StudyStash.exe" version | Out-String).Trim()
           if ($printed -ne $V) { throw "version printed '$printed', expected '$V'" }
           echo "V=$V" >> $env:GITHUB_ENV
-          $bad = Get-ChildItem dist\windows -Recurse -File -Filter "*.bin" -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1MB }
+          # Bar the live words' small Whisper (models\live-whisper-*.bin, x64 only), which comes with the app.
+          $bad = Get-ChildItem dist\windows -Recurse -File -Filter "*.bin" -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1MB -and $_.Name -notlike "live-whisper-*.bin" }
           if ($bad) { throw "a model file is bundled: $($bad.FullName -join ', ')" }
       - name: Both trees carry the notes' formula and diagram code, its native parts built for their own processor, and no debug symbols
         shell: pwsh

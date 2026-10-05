@@ -64,8 +64,10 @@ public sealed class WhistleTranscriber : ITranscriber, IWordHearer
     /// <summary>The model the app carries (models/whistle.cact beside it).</summary>
     public static string BundledModel => Path.Combine(AppContext.BaseDirectory, "models", File);
 
-    /// <summary>The engine is here for this computer and the model beside the app: Whistle can run.</summary>
-    public static bool Available => Needle.LibraryPath() is not null && System.IO.File.Exists(BundledModel);
+    /// <summary>Whistle runs well here: an ARM processor (needle's hand-tuned code is ARM's; on x64 it took 1.2-1.5×
+    /// the sound it heard on CI's runners, so x64 builds don't carry it), its engine for it, and the model beside the app.</summary>
+    public static bool Available => RuntimeInformation.ProcessArchitecture == Architecture.Arm64
+        && Needle.LibraryPath() is not null && System.IO.File.Exists(BundledModel);
 
     static void Load(string modelPath)
     {

@@ -39,14 +39,20 @@
     <InternalsVisibleTo Include="StudyStash.App.Tests" />
   </ItemGroup>
 
-  <!-- StudyStash.Audio carries Cactus Whistle's engine for every processor (needle/<rid>/); a publish for one processor
-       (the installers) keeps only its own, beside the model and the licence. -->
-  <Target Name="KeepThisProcessorsWhistleEngine" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(RuntimeIdentifier)' != ''">
+  <!-- StudyStash.Audio carries both live words' models (see Needle.targets): Cactus Whistle with its engine for ARM
+       (needle/<rid>/), and the small Whisper for x64. A publish for one processor (the installers) keeps its own: on
+       ARM (osx-arm64, win-arm64) Whistle, its own engine and its licence; on x64 (osx-x64, win-x64) the small Whisper
+       and its licence. -->
+  <PropertyGroup>
+    <LiveWordsArm>$([System.String]::Copy('$(RuntimeIdentifier)').EndsWith('-arm64'))</LiveWordsArm>
+  </PropertyGroup>
+  <Target Name="KeepThisProcessorsLiveWords" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(RuntimeIdentifier)' != ''">
     <ItemGroup>
-      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-                             Condition="$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\','/').StartsWith('needle/'))
-                                        and $([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\','/').Contains('/libneedle'))
-                                        and !$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\','/').StartsWith('needle/$(RuntimeIdentifier)/'))" />
+      <_LiveWordsFile Include="@(ResolvedFileToPublish)" Path="$([System.String]::Copy('%(ResolvedFileToPublish.RelativePath)').Replace('\','/'))" />
+      <_LiveWordsDrop Include="@(_LiveWordsFile)" Condition="'$(LiveWordsArm)' == 'true' and $([System.String]::Copy('%(Path)').StartsWith('models/live-whisper'))" />
+      <_LiveWordsDrop Include="@(_LiveWordsFile)" Condition="'$(LiveWordsArm)' == 'true' and $([System.String]::Copy('%(Path)').Contains('/libneedle')) and !$([System.String]::Copy('%(Path)').StartsWith('needle/$(RuntimeIdentifier)/'))" />
+      <_LiveWordsDrop Include="@(_LiveWordsFile)" Condition="'$(LiveWordsArm)' != 'true' and ($([System.String]::Copy('%(Path)').StartsWith('needle/')) or '%(Path)' == 'models/whistle.cact')" />
+      <ResolvedFileToPublish Remove="@(_LiveWordsDrop)" />
     </ItemGroup>
   </Target>
 

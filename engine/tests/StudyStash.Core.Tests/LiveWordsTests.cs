@@ -32,8 +32,8 @@ public class LiveWordsTests
             if (end == 1) Assert.Equal(["w0", "w1"], s.Words.Select(w => w.Text));
             var due = Said.Where(w => w.End <= end - 0.1).ToList();
             if (due.Count > 0) Assert.Contains(s.Words, w => w.Text == due[^1].Text);
-            // A pass only hears what isn't settled: a few seconds, not the whole lecture.
-            Assert.True(end - from <= 4.5, $"the pass at {end} s heard from {from} s");
+            // A pass only hears what isn't settled, and a few seconds before it for context: not the whole lecture.
+            Assert.True(end - from <= 4.5 + s.Context, $"the pass at {end} s heard from {from} s");
         }
         Assert.Equal(Said.Select(w => w.Text), s.Words.Select(w => w.Text));
         Assert.Equal(Said.Select(w => Math.Round(w.Start, 2)), s.Words.Select(w => Math.Round(w.Start, 2)));
@@ -151,8 +151,10 @@ public class LiveWordsTests
 
     /// <summary>A hearer that takes <paramref name="ratio"/> seconds (on a pretend clock) for each second it hears, and
     /// hears a word a second.</summary>
-    sealed class TimedHearer(double ratio) : IWordHearer
+    sealed class TimedHearer(Func<double> ratio) : IWordHearer
     {
+        public TimedHearer(double ratio) : this(() => ratio) { }
+
         public double Now;
         public int Calls;
         public double Longest;
@@ -162,7 +164,7 @@ public class LiveWordsTests
             Calls++;
             double seconds = samples.Length / (double)Sound.Rate;
             Longest = Math.Max(Longest, seconds);
-            Now += ratio * seconds;
+            Now += ratio() * seconds;
             return new([.. Enumerable.Range(0, (int)seconds).Select(i => new TimedWord(i + 0.1, i + 0.5, $"w{i}"))], "en");
         }
     }
@@ -218,6 +220,66 @@ public class LiveWordsTests
             Assert.Null(slow);
             Assert.Contains(captions.Words(l.Id), w => w.Start > 9);
         }
+    }
+
+    /// <summary>The live words' engine by processor: Whistle where needle has ARM's hand-tuned code, a small Whisper on
+    /// x64 (Whisper.net's AVX code), none elsewhere.</summary>
+    [Fact]
+    public void The_live_words_engine_is_chosen_by_processor()
+    {
+        Assert.Equal(LiveEngine.Whistle, LiveEngines.EngineFor(System.Runtime.InteropServices.Architecture.Arm64));
+        Assert.Equal(LiveEngine.SmallWhisper, LiveEngines.EngineFor(System.Runtime.InteropServices.Architecture.X64));
+        Assert.Equal(LiveEngine.None, LiveEngines.EngineFor(System.Runtime.InteropServices.Architecture.X86));
+        // Whistle reads seven languages; the small Whisper all of Whisper's.
+        Assert.False(LiveEngines.Reads(LiveEngine.Whistle, "pt"));
+        Assert.True(LiveEngines.Reads(LiveEngine.SmallWhisper, "pt"));
+    }
+
+    /// <summary>A lecture too slow for the live words (a busy moment) doesn't switch the next one's off: each lecture
+    /// gets its own short, hidden first pass.</summary>
+    [Fact]
+    public void A_slow_lecture_does_not_switch_the_next_ones_live_words_off()
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        FakeMic? mic = null;
+        using var rec = new Recorder(store, () => mic = new FakeMic());
+        double ratio = 1.5;
+        var hearer = new TimedHearer(() => ratio);
+        var captions = new LiveCaptioner(() => rec.Current, rec.Recent, _ => (hearer, "en")) { Clock = () => hearer.Now };
+        var first = rec.Start("Data Mining");
+        mic!.Play(3);
+        WaitFor(() => rec.Elapsed >= 2.95);
+        Assert.True(captions.Step());
+        Assert.True(captions.TooSlow);
+        Assert.False(captions.Step());
+        rec.Stop();
+
+        ratio = 0.01; // the computer is quiet again
+        var next = rec.Start("Data Mining");
+        mic.Play(3);
+        WaitFor(() => rec.Elapsed >= 2.95);
+        Assert.True(captions.Step());
+        Assert.False(captions.TooSlow);
+        Assert.NotEmpty(captions.Words(next.Id));
+        Assert.Equal(2, hearer.Calls);
+    }
+
+    /// <summary>The x64 computers' live words, the small Whisper the app carries, on the recording of speech: words with
+    /// times, the language, and nothing over silence. Runs wherever Whisper.net runs (CI's x64 runners too).</summary>
+    [Fact]
+    public void The_small_Whisper_hears_the_live_words()
+    {
+        if (!LiveWhisperHearer.Available) return;
+        using var whisper = new LiveWhisperHearer(LiveWhisperHearer.BundledModel);
+        var speech = Sound.ReadWav(Path.Combine(AppContext.BaseDirectory, "Fixtures", "speech.wav"));
+        var heard = whisper.Hear(speech, "", "");
+        string said = string.Join(" ", heard.Words.Select(w => w.Text)).ToLowerInvariant();
+        Assert.Contains("midterm", said);
+        Assert.Equal("en", heard.Language);
+        Assert.True(heard.Words.Count >= 8, said);
+        for (int i = 1; i < heard.Words.Count; i++) Assert.True(heard.Words[i].Start >= heard.Words[i - 1].Start && heard.Words[i].End >= heard.Words[i].Start, said);
+        Assert.InRange(heard.Words[^1].End, 3, speech.Length / (double)Sound.Rate + 0.1);
     }
 
     /// <summary>Real Cactus Whistle on the recording of speech (Fixtures/speech.wav), where the app carries its engine for

@@ -58,7 +58,8 @@ public sealed partial class RecorderModel : ObservableObject
     /// <summary>This lecture is written down after class (Settings → Recording): it only records, so there's no
     /// transcript to show and no chat about it until it stops.</summary>
     [ObservableProperty] public partial bool AfterClass { get; set; }
-    /// <summary>The live words are on (Cactus Whistle runs here): what's said shows a second or two after it's said.
+    /// <summary>The live words are on (Cactus Whistle on ARM, a small Whisper on x64, keeping up in this lecture): what's
+    /// said shows a second or two after it's said.
     /// Off, the transcript's own lines show, about half a minute after.</summary>
     [ObservableProperty] public partial bool QuickWords { get; set; } = true;
 

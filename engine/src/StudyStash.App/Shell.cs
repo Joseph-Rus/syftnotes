@@ -709,8 +709,8 @@ public static partial class Shell
     /// </summary>
     static void ShowLive()
     {
-        // The live words turned off for being too slow here: the waiting line says when the transcript's lines come.
-        recorder.QuickWords = host.LiveWordsOn;
+        // The live words turned off for being too slow in this lecture: the waiting line says when the transcript's lines come.
+        recorder.QuickWords = host.LiveWordsNow;
         var lines = host.LiveLines();
         if (lines.Count > 200) lines = lines[^200..];
         while (recorder.Lines.Count > 0 && lines.Count > 0 && recorder.Lines[0].Start < lines[0].Start) recorder.Lines.RemoveAt(0);

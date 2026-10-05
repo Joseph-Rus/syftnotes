@@ -16,9 +16,10 @@ if (-not $Version) { throw "engine\Directory.Build.props has no StudyStashVersio
 New-Item -ItemType Directory -Force -Path $Out | Out-Null
 $Out = (Resolve-Path $Out).Path
 
-# D6: the Whisper model is never bundled.
+# D6: the transcription model is never bundled. The one model file that is: the live words' small Whisper in the
+# x64 tree (models\live-whisper-*.bin, 43.5 MB), so a PC shows the first words with no download.
 function Test-NoModel([string]$Dir) {
-  $Bad = Get-ChildItem $Dir -Recurse -File -Filter "*.bin" -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1MB }
+  $Bad = Get-ChildItem $Dir -Recurse -File -Filter "*.bin" -ErrorAction SilentlyContinue | Where-Object { $_.Length -gt 1MB -and $_.Name -notlike "live-whisper-*.bin" }
   if ($Bad) { throw "the published app has a bundled model: $($Bad.FullName -join ', ')" }
 }
 

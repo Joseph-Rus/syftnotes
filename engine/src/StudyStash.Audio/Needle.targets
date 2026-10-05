@@ -1,28 +1,33 @@
 <Project>
 
-  <!-- Cactus Whistle: the speech model and the engine that runs it ("needle", Cactus Compute's C++ runtime), both
-       Apache-2.0, carried inside the app so it works with no download. Nothing is kept in git: the build fetches each
+  <!-- The live words' models, carried inside the app so they work with no download: on ARM (Apple silicon, Windows on
+       ARM) Cactus Whistle, the speech model and the engine that runs it ("needle", Cactus Compute's C++ runtime, whose
+       hand-tuned code is ARM's: on x64 it took 1.2-1.5x the sound it heard on CI's runners), both Apache-2.0; on x64
+       (Intel Macs, most PCs) Whisper tiny, multilingual, 8-bit (whisper.cpp's ggml-tiny-q8_0.bin, MIT, 43.5 MB), run
+       by Whisper.net like the transcript's own model. Nothing is kept in git: the build fetches each
        file once, at the exact Hugging Face revision below, checks its SHA-256 and keeps it in obj/needle.
          whistle.cact:   Cactus-Compute/whistle at WhistleRevision (16.9 MB)
          libneedle3.*:   Cactus-Compute/needle3 at NeedleRevision, from its engine wheels (python/cactus_needle-<v>-…whl;
                          the wheels are zip files whose needle/libneedle3.* is the shared library), one per processor.
        The engine is binary only (its source isn't published); it reaches no network (it imports no sockets or HTTP),
        and the telemetry the README speaks of is the Python package's, which Study Stash doesn't use.
-       Output: models/whistle.cact, needle/LICENSE.txt and needle/<rid>/libneedle3.(dylib|dll) for every processor; the
-       app's publish for one processor (the installers) keeps only its own (StudyStash.App.csproj). -->
+         live-whisper-tiny-q8_0.bin: ggerganov/whisper.cpp at LiveWhisperRevision.
+       Output: models/whistle.cact, needle/LICENSE.txt and needle/<rid>/libneedle3.(dylib|dll) for ARM, and
+       models/live-whisper-tiny-q8_0.bin with its licence; the app's publish for one processor (the installers) keeps
+       only its own processor's (StudyStash.App.csproj). -->
   <PropertyGroup>
     <NeedleVersion>3.1.0</NeedleVersion>
     <NeedleRevision>c7c415a3d1b3d929014bc6e866d51ebb971f7089</NeedleRevision>
     <WhistleRevision>b358ddadd89b7a713b5aa131f23032d3cca1b251</WhistleRevision>
     <WhistleSha256>b6e02f048568ac5d01a2042556c658061e699acbc0aa2a1439f52f3d461dffeb</WhistleSha256>
+    <LiveWhisperRevision>5359861c739e955e79d9a303bcbc70fb988958b1</LiveWhisperRevision>
+    <LiveWhisperSha256>c2085835d3f50733e2ff6e4b41ae8a2b8d8110461e18821b09a15c40c42d1cca</LiveWhisperSha256>
     <NeedleCache>$(MSBuildThisFileDirectory)obj/needle/</NeedleCache>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- Tag: the wheel's platform tag. Sha256: the shared library's, once out of the wheel. -->
     <NeedleEngine Include="osx-arm64" Rid="osx-arm64" Tag="macosx_11_0_arm64" Library="libneedle3.dylib" Sha256="6c3d79e04c48656b275feb9b4157b43fc20a6efbb5993d0aff9e6414eaef21be" />
-    <NeedleEngine Include="osx-x64" Rid="osx-x64" Tag="macosx_11_0_x86_64" Library="libneedle3.dylib" Sha256="e5077b70576281ca39c08acd07e30e819ec61d74df4d3193b9a92c225e4f7cab" />
-    <NeedleEngine Include="win-x64" Rid="win-x64" Tag="win_amd64" Library="libneedle3.dll" Sha256="de2e2c39cd311fbd9971fad4736abc329ed970653674c203e149c4ef27fd1c62" />
     <NeedleEngine Include="win-arm64" Rid="win-arm64" Tag="win_arm64" Library="libneedle3.dll" Sha256="a4b13bfde65a188982c309b52133ab4ad7d0e63a9b46ba55c3b76a1d32927f7a" />
   </ItemGroup>
 
@@ -32,6 +37,8 @@
     <None Include="@(NeedleWanted->'$(NeedleCache)%(Rid)/needle/%(Library)')" Link="needle/%(Rid)/%(Library)"
           CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
     <None Include="$(MSBuildThisFileDirectory)Whistle-LICENSE.txt" Link="needle/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(NeedleCache)live-whisper-tiny-q8_0.bin" Link="models/live-whisper-tiny-q8_0.bin" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)LiveWhisper-LICENSE.txt" Link="models/live-whisper-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" Visible="false" />
   </ItemGroup>
 
   <!-- Before anything is copied anywhere: fetch what isn't here yet, and check all of it. -->
@@ -39,6 +46,9 @@
     <DownloadFile Condition="!Exists('$(NeedleCache)whistle.cact')" SourceUrl="https://huggingface.co/Cactus-Compute/whistle/resolve/$(WhistleRevision)/whistle.cact"
                   DestinationFolder="$(NeedleCache)" DestinationFileName="whistle.cact" Retries="3" />
     <VerifyFileHash File="$(NeedleCache)whistle.cact" Hash="$(WhistleSha256)" Algorithm="SHA256" />
+    <DownloadFile Condition="!Exists('$(NeedleCache)live-whisper-tiny-q8_0.bin')" SourceUrl="https://huggingface.co/ggerganov/whisper.cpp/resolve/$(LiveWhisperRevision)/ggml-tiny-q8_0.bin"
+                  DestinationFolder="$(NeedleCache)" DestinationFileName="live-whisper-tiny-q8_0.bin" Retries="3" />
+    <VerifyFileHash File="$(NeedleCache)live-whisper-tiny-q8_0.bin" Hash="$(LiveWhisperSha256)" Algorithm="SHA256" />
 
     <DownloadFile Condition="!Exists('$(NeedleCache)%(NeedleWanted.Identity)/needle/%(NeedleWanted.Library)')"
                   SourceUrl="https://huggingface.co/Cactus-Compute/needle3/resolve/$(NeedleRevision)/python/cactus_needle-$(NeedleVersion)-py3-none-%(NeedleWanted.Tag).whl"
