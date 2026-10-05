@@ -101,20 +101,42 @@ public sealed class AiSettings
     {
         string path = PathIn(home);
         if (!File.Exists(path)) return new AiSettings();
-        try
+        for (int attempt = 1; ; attempt++)
         {
-            return JsonSerializer.Deserialize<AiSettings>(File.ReadAllText(path), Options) ?? new AiSettings();
-        }
-        catch (JsonException)
-        {
-            return new AiSettings();
+            try
+            {
+                return JsonSerializer.Deserialize<AiSettings>(File.ReadAllText(path), Options) ?? new AiSettings();
+            }
+            catch (JsonException)
+            {
+                return new AiSettings();
+            }
+            catch (IOException) when (attempt < 5)
+            {
+                // Windows refuses a read while the file is being written (an engine's run is recorded in it after every
+                // call): a moment later it reads.
+                Thread.Sleep(25 * attempt);
+            }
         }
     }
 
     public void Save(string home)
     {
         Directory.CreateDirectory(home);
-        Py.WriteText(PathIn(home), JsonSerializer.Serialize(this, Options) + "\n");
+        string text = JsonSerializer.Serialize(this, Options) + "\n";
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Py.WriteText(PathIn(home), text);
+                return;
+            }
+            catch (IOException) when (attempt < 5)
+            {
+                // Windows refuses a write while the file is being read (the diagram pass checks the switches): try again.
+                Thread.Sleep(25 * attempt);
+            }
+        }
     }
 
     /// <summary>As the API shows it: the choice, each job's, and every provider with whether it's here.</summary>

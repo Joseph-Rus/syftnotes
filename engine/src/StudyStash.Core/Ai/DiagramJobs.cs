@@ -409,7 +409,16 @@ public sealed class DiagramJobs
     /// or before a restart put them in, doesn't get them anyway.</summary>
     bool Land(Job job)
     {
-        var kinds = ai.KindsNow();
+        RichKinds kinds;
+        try
+        {
+            kinds = ai.KindsNow();
+        }
+        catch (IOException)
+        {
+            // The switches can't be read right now: keep what was designed (it was designed under the switches as they were).
+            kinds = RichKinds.All;
+        }
         var wanted = job.Diagrams.Where(d => KindOf(d) == RichKinds.None || kinds.HasFlag(KindOf(d))).ToList();
         if (wanted.Count == 0)
         {
