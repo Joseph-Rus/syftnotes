@@ -70,7 +70,7 @@ const RoundButton: React.FC<{glyph: 'shrink' | 'pause' | 'stop'; tint?: boolean;
 
 /** The recorder, open: the class and time, make it small, pause and stop; what's been said, newest at the bottom,
  * fading out toward the top; and asking about the lecture so far. */
-const Recorder: React.FC<{f: number; elapsed: string; lines: {time: string; text: string}[]; waiting: boolean; stopPress: number}> = ({f, elapsed, lines, waiting, stopPress}) => (
+export const Recorder: React.FC<{f: number; elapsed: string; lines: {time: string; text: string}[]; waiting: boolean; stopPress: number}> = ({f, elapsed, lines, waiting, stopPress}) => (
   <div style={{width: 360, height: 520, borderRadius: 28, background: glass, border: edge, boxShadow: '0 30px 70px -18px rgba(0,0,20,0.75)', boxSizing: 'border-box', position: 'relative', overflow: 'hidden', fontFamily: fonts.ui, color: colors.text}}>
     <div style={{position: 'absolute', left: 20, right: 12, top: 0, height: 60, display: 'flex', alignItems: 'center', gap: 10}}>
       <div style={{width: 8, height: 8, borderRadius: 4, background: REC}} />
@@ -237,13 +237,13 @@ export const Record: React.FC = () => {
           {recording ? <div style={{position: 'absolute', left: iconX + 7, top: 8, width: 7, height: 7, borderRadius: 4, background: REC, boxShadow: '0 0 0 1.5px rgba(8,10,40,0.6)'}} /> : null}
 
           {f >= MENU && f < RECORD + 9 ? (
-            <div style={{position: 'absolute', left: dropLeft, top: MENU_H + 8, transformOrigin: '70% 0', transform: `translateY(${px((1 - open) * -6 - shut * 4)}px) scale(${K})`, opacity: open * (1 - shut)}}>
+            <div style={{position: 'absolute', left: dropLeft, top: MENU_H + 8, transformOrigin: '0 0', transform: `translateY(${px((1 - open) * -6 - shut * 4)}px) scale(${K})`, opacity: open * (1 - shut)}}>
               <Dropdown press={Math.max(0, 1 - Math.abs(f - RECORD - 1) / 3)} />
             </div>
           ) : null}
 
           {f >= START && f < PILL + 6 ? (
-            <div style={{position: 'absolute', left: right - pillW * K, top, transformOrigin: '100% 0', transform: `scale(${K})`, opacity: pillIn * (1 - prog(f, PILL + 1, PILL + 5))}}>
+            <div style={{position: 'absolute', left: right - pillW, top, transformOrigin: '100% 0', transform: `scale(${K})`, opacity: pillIn * (1 - prog(f, PILL + 1, PILL + 5))}}>
               <div style={{width: pillW, display: 'flex', justifyContent: 'flex-end'}}>
                 <Pill f={f} elapsed={elapsed} hovered={f >= PILL - 14} />
               </div>
@@ -254,7 +254,7 @@ export const Record: React.FC = () => {
             <div
               style={{
                 position: 'absolute',
-                left: right - 360 * K,
+                left: right - 360,
                 top,
                 transformOrigin: '100% 0',
                 transform: `scale(${K})`,

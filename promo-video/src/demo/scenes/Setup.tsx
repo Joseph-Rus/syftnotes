@@ -343,9 +343,9 @@ export const Setup: React.FC = () => {
   const CHAT = PICK + 18; // Claude is installed and signed in: the chat begins
   const FINISH = MAC + 45; // the rest of the steps go by
 
-  const z = vertical ? 1.12 : 1.25;
+  const z = vertical ? 1.18 : 1.25;
   const left = vertical ? Math.round((width - W * z) / 2) : COLUMN;
-  const top = vertical ? 600 : 200;
+  const top = vertical ? 560 : 200;
   const enter = prog(f, 0, 14);
   const close = prog(f, OPEN + 4, OPEN + 14, inOut);
   const at = (p: {x: number; y: number}): [number, number] => [left + p.x * z, top + p.y * z];

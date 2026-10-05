@@ -9,7 +9,7 @@ import {G, Glyph} from './chrome';
 // The Settings window as the app draws it on a Mac set up as "Just this Mac" ("mac-settings-one-computer",
 // "mac-13-ai-engines-app", "mac-settings-recording-after", "mac-14-ai-tool-access-app", dark): the sections of This Mac
 // and Your library down the side, a page on the right with its title, its lede and grouped rows. Drawn at a Mac's own
-// sizes and shown a quarter larger (landscape) or 1.15 times (on a phone-shaped frame, where it's taller and nothing
+// sizes and shown a quarter larger (landscape) or 1.18 times (on a phone-shaped frame, where it's taller and nothing
 // needs to scroll).
 
 export const SW = 900;
@@ -87,7 +87,7 @@ export const SettingsWindow: React.FC<{on: Section; h: number; scroll?: number; 
 export const useSettingsStage = () => {
   const {width} = useVideoConfig();
   const vertical = useVertical();
-  const z = vertical ? 1.15 : 1.25;
+  const z = vertical ? 1.18 : 1.25;
   const h = vertical ? 1100 : 690;
   const left = vertical ? Math.round((width - SW * z) / 2) : COLUMN;
   const top = vertical ? 420 : 200;
