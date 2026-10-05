@@ -16,7 +16,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     public Func<string, AiProvider>? Providers { get; init; }
 
     /// <summary>How the library checks whether each engine is ready, without ever contacting an account.</summary>
-    public EngineChecks Checks { get; init; } = EngineChecks.Machine;
+    public EngineChecks Checks { get; init; } = EngineChecks.Machine with { HasKey = id => ApiKeys.Has(home, id) };
 
     /// <summary>How long <see cref="AskAsync"/> waits for the picked engine before falling back to Ollama: for the
     /// whole answer, or, when it's shown as it's written, for the engine to start writing it.</summary>
@@ -25,7 +25,13 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     /// <summary>A model Ollama is pulling right now, for <see cref="AiOverview.Pulling"/>. Null once it's done.</summary>
     public PullInfo? Pulling { get; private set; }
 
-    AiProvider Provider(string id) => Providers?.Invoke(id) ?? AiProviders.Get(id, ollamaHost);
+    AiProvider Provider(string id)
+    {
+        if (Providers?.Invoke(id) is { } fake) return fake;
+        var p = AiProviders.Get(id, ollamaHost);
+        p.ApiKey = ApiKeys.Get(home, p.Id);
+        return p;
+    }
 
     /// <summary>An empty folder for answers that need no files: nothing there to read or change.</summary>
     string Scratch()

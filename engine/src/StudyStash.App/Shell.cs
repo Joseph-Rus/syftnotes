@@ -119,6 +119,8 @@ public static partial class Shell
         host.Start();
         _ = SuggestLighterModelAsync();
         AppUpdates.Start(host, stop.Token, SayUpdate);
+        if (AppUpdates.Current is { } updater)
+            updater.FoundChanged += () => Dispatcher.UIThread.Post(() => panel.UpdateVersion = updater.Found is { } r ? string.Join('.', r.Version) : null);
         MakeTray();
         // A Mac's app menu (About, Settings… ⌘,, and the system's Hide and Quit ⌘Q) while a window is in front.
         Keybindings.Saved = () => host.Settings.Keys;
@@ -441,6 +443,11 @@ public static partial class Shell
             ShowLibrary();
         };
         panel.OnSettings = SettingsFromAnywhere;
+        panel.OnUpdate = () =>
+        {
+            panel.UpdateVersion = null;
+            _ = UpdateNowAsync();
+        };
         panel.OnSwitchClass = PickClass;
         panel.OnFixProblem = FixProblem;
         panel.OnOpenLecture = OpenRecentLecture;

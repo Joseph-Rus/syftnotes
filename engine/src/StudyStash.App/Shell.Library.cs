@@ -196,7 +196,8 @@ public static partial class Shell
             library.Groups.Add(group);
         }
         // A class linked to Canvas gets its own page: its lectures, what's to hand in, modules, files, announcements.
-        if (CanvasClassRow(name) is { } row && !allLectures)
+        // Its Lectures tab is the full list above, by week; the other tabs are Canvas's own lists.
+        if (CanvasClassRow(name) is { } row)
         {
             bool fresh = !(library.CanvasClass is { } open && openCanvasClass == name);
             var page = fresh ? NewCanvasClass() : library.CanvasClass!;
@@ -212,7 +213,8 @@ public static partial class Shell
                 });
             })], lectures.Count);
             // Nothing recorded for it yet: its page opens on what's to hand in, not an empty Lectures tab.
-            if (fresh && lectures.Count == 0) page.Tab = ClassTab.Assignments;
+            if (allLectures) page.Tab = ClassTab.Lectures;
+            else if (fresh && lectures.Count == 0) page.Tab = ClassTab.Assignments;
             library.CanvasClass = page;
             library.List = LibraryList.CanvasClass;
             try
@@ -233,7 +235,7 @@ public static partial class Shell
         else ShowLectureList();
         library.NoNoteText = lectures.Count > 0 ? "Choose a lecture to read its notes."
             : name == Configs.Unsorted ? "Every lecture is in a class."
-            : library.List == LibraryList.CanvasClass ? $"No lectures in {name} yet. Pick an assignment to see it here."
+            : library.List == LibraryList.CanvasClass ? $"No lectures in {name} yet. Its assignments are on the Assignments tab."
             : $"No lectures in {name} yet.";
         string? pick = openLecture is not null && lectures.Any(l => S(l["id"]) == openLecture) ? openLecture : lectures.Select(l => S(l["id"])).FirstOrDefault();
         if (pick is not null) await ShowLectureAsync(pick);
@@ -272,7 +274,7 @@ public static partial class Shell
         {
             Remember();
             allLectures = true;
-            ShowLectureList();
+            if (library.CanvasClass is { } page) page.Tab = ClassTab.Lectures;
         },
     };
 

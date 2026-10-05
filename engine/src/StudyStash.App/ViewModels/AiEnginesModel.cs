@@ -65,6 +65,37 @@ public sealed partial class AiEngineRow : ObservableObject
     public IRelayCommand AddCommand { get; internal set; } = null!;
 }
 
+/// <summary>The API key box's placeholder: "Paste a key", or "Paste a new key" over one that's saved.</summary>
+public static class KeyWords
+{
+    public static readonly Avalonia.Data.Converters.IValueConverter Placeholder =
+        new Avalonia.Data.Converters.FuncValueConverter<bool, string>(has => has ? "Paste a new key" : "Paste a key");
+}
+
+/// <summary>One engine's API key in Settings → AI engines: where to get one, the last four characters of the one saved,
+/// and a box to paste a new one. The key itself is never read back from the library.</summary>
+public sealed partial class ApiKeyRow : ObservableObject
+{
+    public string Id { get; init; } = "";
+    public string Name { get; init; } = "";
+    /// <summary>Where the student makes a key: Anthropic's Console, OpenAI's platform, Google AI Studio.</summary>
+    public string Where { get; init; } = "";
+    public string WhereUrl { get; init; } = "";
+    public bool First { get; init; }
+    [ObservableProperty] public partial string Hint { get; set; } = "";
+    [ObservableProperty] public partial string Draft { get; set; } = "";
+    public bool HasKey => Hint.Length > 0;
+    public string Sub => HasKey ? $"Key {Hint} saved. Used for notes and answers; tools still need the app." : $"Paste a key from {Where}.";
+    partial void OnHintChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasKey));
+        OnPropertyChanged(nameof(Sub));
+    }
+    public IAsyncRelayCommand SaveCommand { get; internal set; } = null!;
+    public IAsyncRelayCommand RemoveCommand { get; internal set; } = null!;
+    public IRelayCommand GetKeyCommand { get; internal set; } = null!;
+}
+
 /// <summary>
 /// Settings → AI engines (design 13): who writes the notes and who answers questions, the rich notes switches (diagrams,
 /// formula plots and drawings, and who designs them), Claude Code's speed, every engine's state and what to do about it,
@@ -81,6 +112,9 @@ public sealed partial class AiEnginesModel : ObservableObject
     public string Lede { get; init; } = "Notes are written after each lecture. Answers come while you ask. Engines run on your library, and you can set them up there or from this laptop.";
 
     public ObservableCollection<AiEngineRow> Engines { get; } = [];
+    /// <summary>API keys for Claude, ChatGPT and Gemini (shown once the library says it takes them).</summary>
+    public ObservableCollection<ApiKeyRow> Keys { get; } = [];
+    public bool HasKeys => Keys.Count > 0;
     /// <summary>Not-installed engines: the "Add an engine" menu.</summary>
     public ObservableCollection<AiEngineRow> AddChoices { get; } = [];
     public List<EngineChoice> NotesChoices { get; private set; } = [];
@@ -277,10 +311,53 @@ public sealed partial class AiEnginesModel : ObservableObject
                 else AddChoices.Add(row);
             }
             OnPropertyChanged(nameof(HasAddChoices));
+
+            Keys.Clear();
+            foreach (var (id, name, where, url) in KeyPlaces)
+                if (overview.Engines.FirstOrDefault(e => e.Id == id) is { } e)
+                {
+                    var k = new ApiKeyRow { Id = id, Name = name, Where = where, WhereUrl = url, Hint = e.KeyHint, First = Keys.Count == 0 };
+                    k.SaveCommand = new AsyncRelayCommand(() => SetKeyAsync(k, k.Draft));
+                    k.RemoveCommand = new AsyncRelayCommand(() => SetKeyAsync(k, ""));
+                    k.GetKeyCommand = new RelayCommand(() => OpenUrl?.Invoke(k.WhereUrl));
+                    Keys.Add(k);
+                }
+            OnPropertyChanged(nameof(HasKeys));
         }
         finally
         {
             loading = false;
+        }
+    }
+
+    static readonly (string Id, string Name, string Where, string Url)[] KeyPlaces =
+    [
+        ("claude", "Claude", "the Anthropic Console", "https://console.anthropic.com/settings/keys"),
+        ("codex", "ChatGPT", "OpenAI's platform", "https://platform.openai.com/api-keys"),
+        ("gemini", "Gemini", "Google AI Studio", "https://aistudio.google.com/apikey"),
+    ];
+
+    async Task SetKeyAsync(ApiKeyRow row, string key)
+    {
+        if (key.Trim().Length == 0 && !row.HasKey) return;
+        Busy = true;
+        Say = key.Trim().Length > 0 ? $"Trying {row.Name} with your key…" : null;
+        try
+        {
+            row.Draft = "";
+            await AfterAction(await library.KeyAsync(row.Id, key.Trim()));
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            Busy = false;
         }
     }
 

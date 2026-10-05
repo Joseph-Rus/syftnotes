@@ -126,7 +126,7 @@ public static partial class Shell
         else if (library.List == LibraryList.CanvasClass && library.CanvasClass is { } cls && CanvasClassRow(openClass) is { } row)
             await cls.LoadAsync(row);
         // The open class was just linked (or dropped): it becomes its own Canvas page (or plain lectures again).
-        else if (openClass is { } name && !allLectures && (CanvasClassRow(name) is not null) != (library.List == LibraryList.CanvasClass) && library.List != LibraryList.Due)
+        else if (openClass is { } name && (CanvasClassRow(name) is not null) != (library.List == LibraryList.CanvasClass) && library.List != LibraryList.Due)
             await ShowClassAsync(name);
     }
 

@@ -1,5 +1,5 @@
 <!-- A notification that looks like the system's own: one plain panel, the app's icon, a title, a few lines, and at
-     most two quiet buttons. On a Mac, a banner (the × shows when the pointer is over it); on Windows, a Windows 11
+     most two quiet buttons. On a Mac, a banner (the × shows on its top-left corner when the pointer is over it); on Windows, a Windows 11
      toast (the app's name and × along the top). Every toast the app shows, Canvas's included, is one of these. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -53,7 +53,7 @@
       <Setter Property="FontSize" Value="13" />
       <Setter Property="LineHeight" Value="18" />
     </Style>
-    <!-- Windows' × is in its header. A Mac banner shows its × only under the pointer, where the time was. -->
+    <!-- Windows' × is in its header. A Mac banner shows its × under the pointer, on its top-left corner, as the system's do. -->
     <Style Selector="v|ToastView.win Button#MacClose">
       <Setter Property="IsVisible" Value="False" />
     </Style>
@@ -63,10 +63,8 @@
     <Style Selector="v|ToastView.mac:pointerover Button#MacClose">
       <Setter Property="IsVisible" Value="True" />
     </Style>
-    <Style Selector="v|ToastView.mac:pointerover TextBlock#WhenText">
-      <Setter Property="IsVisible" Value="False" />
-    </Style>
   </UserControl.Styles>
+  <Panel>
   <Border Name="Card" ClipToBounds="False">
     <StackPanel>
       <!-- Windows: the app's name along the top, with the × -->
@@ -87,14 +85,8 @@
           <Grid ColumnDefinitions="*,Auto" MinHeight="18">
             <TextBlock Name="TitleText" Text="{Binding #Root.Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />
-            <Panel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
-              <TextBlock Name="WhenText" Text="{Binding #Root.When}" IsVisible="{Binding #Root.When, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                         FontSize="12" Foreground="{DynamicResource Fg3}" HorizontalAlignment="Right" VerticalAlignment="Center" />
-              <Button Name="MacClose" Theme="{StaticResource Surface}" Width="18" Height="18" CornerRadius="9" Margin="0,0,-4,0"
-                      HorizontalAlignment="Right" HorizontalContentAlignment="Center" Background="{DynamicResource Fill2}" ToolTip.Tip="Dismiss">
-                <c:Icon Glyph="close" Size="12" Foreground="{DynamicResource Fg2}" />
-              </Button>
-            </Panel>
+            <TextBlock Name="WhenText" Grid.Column="1" Margin="8,0,0,0" Text="{Binding #Root.When}" IsVisible="{Binding #Root.When, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       FontSize="12" Foreground="{DynamicResource Fg3}" HorizontalAlignment="Right" VerticalAlignment="Center" />
           </Grid>
           <TextBlock Name="BodyText" Text="{Binding #Root.Text}" IsVisible="{Binding #Root.Text, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                      Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis" />
@@ -110,4 +102,12 @@
       </Grid>
     </StackPanel>
   </Border>
+  <!-- A Mac banner's ×: over the top-left corner, as macOS's own notifications have it -->
+  <Button Name="MacClose" Theme="{StaticResource Surface}" Width="20" Height="20" CornerRadius="10" Margin="-7,-7,0,0" Padding="0"
+          HorizontalAlignment="Left" VerticalAlignment="Top" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+          Background="{DynamicResource PopupBg}" BorderBrush="{DynamicResource PopupStroke}" BorderThickness="1"
+          ToolTip.Tip="Dismiss" AutomationProperties.Name="Dismiss">
+    <c:Icon Glyph="close" Size="12" Foreground="{DynamicResource Fg2}" />
+  </Button>
+  </Panel>
 </UserControl>

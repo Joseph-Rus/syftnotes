@@ -80,6 +80,11 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
         OnPropertyChanged(nameof(IsSectionsLayout));
     }
 
+    /// <summary>Inside the library window, which draws the class's name, count and switcher over its own lecture list:
+    /// this page then shows only the open tab's list (and nothing on Lectures).</summary>
+    [ObservableProperty] public partial bool Embedded { get; set; }
+    public bool ShowOwnHeader => !Embedded;
+    partial void OnEmbeddedChanged(bool value) => OnPropertyChanged(nameof(ShowOwnHeader));
     [ObservableProperty] public partial ClassTab Tab { get; set; } = ClassTab.Lectures;
     public bool IsLecturesTab => Tab == ClassTab.Lectures;
     public bool IsAssignmentsTab => Tab == ClassTab.Assignments;

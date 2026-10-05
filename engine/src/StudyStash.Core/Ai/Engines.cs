@@ -27,6 +27,8 @@ public sealed record EngineChecks
     /// throws saying why not.</summary>
     public required Func<string, string, string, string> OpenSignIn { get; init; }
     public required Func<DateTime> Now { get; init; }
+    /// <summary>Whether the student gave an engine an API key (<see cref="ApiKeys"/>): it's usable then, CLI or not.</summary>
+    public Func<string, bool> HasKey { get; init; } = _ => false;
 
     /// <summary>The real probes: this computer, its files, its environment, its Ollama, its terminals.</summary>
     public static readonly EngineChecks Machine = new()
@@ -175,12 +177,12 @@ public static class Engines
 
     static (string State, string Until) CliState(string id, AiSettings settings, EngineChecks checks)
     {
-        if (checks.Which(AiProviders.Get(id).Binary) is null) return ("not_installed", "");
+        if (checks.Which(AiProviders.Get(id).Binary) is null && !checks.HasKey(id)) return ("not_installed", "");
         if (LimitedNow(id, settings, checks)) return ("limited", settings.Limits[id]);
         string test = settings.Tests.GetValueOrDefault(id, "");
         if (test == "works") return ("ready", "");
         if (test.Length > 0) return (LooksLikeAuth(test) ? "not_signed_in" : "failed", "");
-        return (Hinted(id, checks) == false ? "not_signed_in" : "unchecked", "");
+        return (Hinted(id, checks) == false && !checks.HasKey(id) ? "not_signed_in" : "unchecked", "");
     }
 
     static async Task<EngineInfo> OllamaRowAsync(AiSettings settings, Config cfg, EngineChecks checks)
@@ -205,7 +207,8 @@ public static class Engines
         string test = settings.Tests.GetValueOrDefault(id, "");
         return new EngineInfo(id, Name(id), state)
         {
-            Installed = checks.Which(provider.Binary) is not null,
+            Installed = checks.Which(provider.Binary) is not null || checks.HasKey(id),
+            HasKey = checks.HasKey(id),
             Model = settings.Models.GetValueOrDefault(id, ""),
             Models = provider.Models.Select(m => new ModelOption(m.Id, m.Label)).ToList(),
             Site = provider.Site,
@@ -218,7 +221,11 @@ public static class Engines
     public static async Task<AiOverview> StatusAsync(AiSettings settings, Config cfg, EngineChecks checks)
     {
         var engines = new List<EngineInfo> { await OllamaRowAsync(settings, cfg, checks) };
-        foreach (string id in Order.Skip(1)) engines.Add(CliRow(id, settings, checks));
+        foreach (string id in Order.Skip(1))
+        {
+            var row = CliRow(id, settings, checks);
+            engines.Add(row.HasKey ? row with { KeyHint = ApiKeys.Hint(cfg.Home, id) } : row);
+        }
 
         var problems = new List<AiProblemInfo>();
         bool Dismissed(string id) => settings.Dismissed.Contains(id);

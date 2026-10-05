@@ -195,9 +195,15 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Narrow, and showing what was opened in the list's place.</summary>
     [ObservableProperty] public partial bool NarrowDetail { get; set; }
 
-    public bool ShowLectures => List == LibraryList.Lectures;
+    /// <summary>A class's column (its header, and the Canvas tabs when it's linked): every class but Due.</summary>
+    public bool ShowLectures => List is LibraryList.Lectures or LibraryList.CanvasClass;
     public bool ShowDueList => List == LibraryList.Due;
-    public bool ShowCanvasClass => List == LibraryList.CanvasClass;
+    /// <summary>A Canvas-linked class: the Lectures / Assignments / Modules / Announcements switcher over its list.</summary>
+    public bool HasClassTabs => List == LibraryList.CanvasClass && CanvasClass is not null;
+    /// <summary>The lectures by week: a plain class, or a Canvas class on its Lectures tab.</summary>
+    public bool ShowLectureGroups => !HasClassTabs || CanvasClass!.IsLecturesTab;
+    /// <summary>One of a Canvas class's own lists, under the switcher.</summary>
+    public bool ShowClassTabBody => HasClassTabs && !CanvasClass!.IsLecturesTab;
 
     public bool ShowAssignment => Assignment is not null;
     public bool ShowReader => Assignment is null && Reader is not null;
@@ -217,7 +223,8 @@ public sealed partial class LibraryModel : ObservableObject
     public double ListWidth => Narrow ? double.NaN : List switch
     {
         LibraryList.Lectures => Skin.Current == SkinKind.Mac ? 312 : 320,
-        LibraryList.CanvasClass when Skin.Current == SkinKind.Win => 360,
+        LibraryList.CanvasClass when Skin.Current == SkinKind.Win => 380,
+        LibraryList.CanvasClass => 360,
         _ => 340,
     };
     public bool ShowListColumn => Overview is null && (!Narrow || !NarrowDetail);
@@ -248,7 +255,7 @@ public sealed partial class LibraryModel : ObservableObject
     {
         OnPropertyChanged(nameof(ShowLectures));
         OnPropertyChanged(nameof(ShowDueList));
-        OnPropertyChanged(nameof(ShowCanvasClass));
+        ClassTabsChanged();
         OnPropertyChanged(nameof(ListWidth));
     }
 
@@ -295,7 +302,6 @@ public sealed partial class LibraryModel : ObservableObject
     {
         if (Overview is { } o) o.Narrow = value;
         if (!value) NarrowDetail = false;
-        if (CanvasClass is { } c) c.Layout = value ? ClassLayout.Sections : ClassLayout.Tabs;
         OnPropertyChanged(nameof(ListWidth));
         OnPropertyChanged(nameof(DetailColumn));
         OnPropertyChanged(nameof(ColumnSpan));
@@ -309,9 +315,29 @@ public sealed partial class LibraryModel : ObservableObject
         OnPropertyChanged(nameof(ShowDetailColumn));
     }
 
-    partial void OnCanvasClassChanged(CanvasClassModel? value)
+    partial void OnCanvasClassChanged(CanvasClassModel? oldValue, CanvasClassModel? newValue)
     {
-        if (value is not null) value.Layout = Narrow ? ClassLayout.Sections : ClassLayout.Tabs;
+        if (oldValue is not null) oldValue.PropertyChanged -= CanvasClassPropertyChanged;
+        if (newValue is not null)
+        {
+            // The library window draws the class's header and switcher itself, over its own lecture list.
+            newValue.Layout = ClassLayout.Tabs;
+            newValue.Embedded = true;
+            newValue.PropertyChanged += CanvasClassPropertyChanged;
+        }
+        ClassTabsChanged();
+    }
+
+    void CanvasClassPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(CanvasClassModel.Tab)) ClassTabsChanged();
+    }
+
+    void ClassTabsChanged()
+    {
+        OnPropertyChanged(nameof(HasClassTabs));
+        OnPropertyChanged(nameof(ShowLectureGroups));
+        OnPropertyChanged(nameof(ShowClassTabBody));
     }
 
     /// <summary>Shows what the student opened (a lecture, an assignment, a page): in a narrow window it takes the

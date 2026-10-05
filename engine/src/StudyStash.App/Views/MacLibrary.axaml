@@ -10,6 +10,7 @@
              x:Class="StudyStash.App.Views.MacLibrary"
              x:DataType="vm:LibraryModel">
   <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
     <!-- A transcript line a diagram pointed to: marked, a little room round it, the words where they were. -->
     <Style Selector="Border.heard">
       <Setter Property="Margin" Value="-8,-4" />
@@ -294,7 +295,8 @@
                 <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold"
                            TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
                 <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" />
+                  <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" IsVisible="{Binding !HasClassTabs}" />
+                  <TextBlock Text="{Binding CanvasClass.HeaderLine, FallbackValue=''}" FontSize="11" Foreground="{DynamicResource Fg2}" IsVisible="{Binding HasClassTabs}" />
                   <!-- A class's lectures: back to the class's home -->
                   <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding CanShowClassPage}" Command="{Binding ShowClassPageCommand}">
                     <TextBlock Text="· Class home" FontSize="11" Foreground="{DynamicResource AccentText}" />
@@ -309,6 +311,16 @@
               </Button>
             </Grid>
           </Border>
+          <!-- A Canvas class: switch between its lectures (the list below) and Canvas's own lists -->
+          <Border DockPanel.Dock="Top" Classes="cv-seg" Margin="14,2,14,8" HorizontalAlignment="Left" IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasClassTabs}"
+                  DataContext="{Binding CanvasClass}" x:DataType="vm:CanvasClassModel">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto">
+              <Button Grid.Column="0" Classes="cv-seg-item" Classes.cv-on="{Binding IsLecturesTab}" Content="Lectures" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Lectures}" />
+              <Button Grid.Column="1" Classes="cv-seg-item" Classes.cv-on="{Binding IsAssignmentsTab}" Content="Assignments" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Assignments}" />
+              <Button Grid.Column="2" Classes="cv-seg-item" Classes.cv-on="{Binding IsModulesTab}" Content="Modules" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Modules}" />
+              <Button Grid.Column="3" Classes="cv-seg-item" Classes.cv-on="{Binding IsAnnouncementsTab}" Content="Announcements" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Announcements}" />
+            </Grid>
+          </Border>
           <!-- The one gentle ask for a tip, when it's due: in the list's flow, lined up with the lectures, covering nothing -->
           <Panel DockPanel.Dock="Top" IsVisible="{Binding HasSupport}" Margin="10,2,10,6">
             <v:MacSupportAsk Name="SupportAsk" DataContext="{Binding Support}" />
@@ -317,7 +329,11 @@
           <ScrollViewer DockPanel.Dock="Top" MaxHeight="200" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasClassFiles}" Margin="20,0,20,8">
             <v:MacAttachments Name="ClassAttachments" DataContext="{Binding ClassFiles}" />
           </ScrollViewer>
-          <DockPanel>
+          <!-- A Canvas class on one of Canvas's tabs: that list, in the lectures' place -->
+          <Panel IsVisible="{Binding ShowClassTabBody}">
+            <v:MacCanvasClass DataContext="{Binding CanvasClass}" />
+          </Panel>
+          <DockPanel IsVisible="{Binding ShowLectureGroups}">
             <TextBlock DockPanel.Dock="Top" IsVisible="{Binding HasEmpty}" Text="{Binding Empty}" FontSize="13" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="20,10" />
             <ScrollViewer VerticalScrollBarVisibility="Auto">
               <ItemsControl ItemsSource="{Binding Groups}">
@@ -359,9 +375,6 @@
           </Panel>
           <v:MacCanvasDue DataContext="{Binding DueList}" />
         </DockPanel>
-        <Panel IsVisible="{Binding ShowCanvasClass}">
-          <v:MacCanvasClass DataContext="{Binding CanvasClass}" />
-        </Panel>
           <!-- "Deleted · Undo", for a few seconds after a lecture goes -->
           <Border Name="UndoToast" Classes="undo" IsVisible="{Binding HasDeleted}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="16,0,16,28">
             <Grid ColumnDefinitions="*,10,Auto" VerticalAlignment="Center">

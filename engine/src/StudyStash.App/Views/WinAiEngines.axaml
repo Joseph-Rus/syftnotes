@@ -227,6 +227,46 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
+      <!-- API keys: an engine can run on a key instead of (or as well as) its app -->
+      <StackPanel IsVisible="{Binding HasKeys}">
+        <TextBlock Classes="ai-section" Text="API keys" Margin="0,18,0,8" />
+        <ItemsControl ItemsSource="{Binding Keys}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ApiKeyRow">
+              <Border Classes="ai-card" Margin="0,0,0,2">
+                <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
+                  <c:Icon Glyph="key" Size="20" />
+                  <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
+                    <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
+                    <TextBlock Classes="ai-row-sub" Text="{Binding Sub}" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Border Classes="field" Width="200">
+                      <TextBox Classes="bare" Text="{Binding Draft}" PasswordChar="•" FontSize="14"
+                               PlaceholderText="{Binding HasKey, Converter={x:Static vm:KeyWords.Placeholder}}"
+                               AutomationProperties.Name="{Binding Name, StringFormat='{}{0} API key'}">
+                        <TextBox.KeyBindings>
+                          <KeyBinding Gesture="Enter" Command="{Binding SaveCommand}" />
+                        </TextBox.KeyBindings>
+                      </TextBox>
+                    </Border>
+                    <Button Classes="ai-pillbtn" Command="{Binding SaveCommand}">
+                      <Border Classes="ai-pill primary"><TextBlock Text="Save" /></Border>
+                    </Button>
+                    <Button Classes="ai-pillbtn" Command="{Binding RemoveCommand}" IsVisible="{Binding HasKey}">
+                      <Border Classes="ai-pill"><TextBlock Text="Remove" /></Border>
+                    </Button>
+                    <Button Classes="ai-textbtn" Command="{Binding GetKeyCommand}" IsVisible="{Binding !HasKey}">
+                      <TextBlock Classes="ai-link" Text="Get a key" />
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
       <!-- If an engine isn’t available -->
       <TextBlock Classes="ai-section" Text="If an engine isn’t available" Margin="0,18,0,8" />
       <Border Classes="ai-card">

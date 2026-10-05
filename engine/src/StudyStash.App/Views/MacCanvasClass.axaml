@@ -81,6 +81,7 @@
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel>
+      <StackPanel IsVisible="{Binding ShowOwnHeader}">
       <StackPanel Margin="22,18,22,2" Spacing="0">
         <TextBlock Classes="cv-due-title" Text="{Binding Title}" />
         <TextBlock Classes="cv-due-sub" Text="{Binding HeaderLine}" />
@@ -90,7 +91,10 @@
         <TextBlock Classes="cv-due-sub" Text="{Binding ScoutLine}" />
       </StackPanel>
 
+      </StackPanel>
+
       <!-- Tabs layout -->
+      <Panel IsVisible="{Binding ShowOwnHeader}">
       <Border Classes="cv-seg" Margin="12,14,12,4" HorizontalAlignment="Left" IsVisible="{Binding IsTabsLayout}">
         <Grid ColumnDefinitions="Auto,Auto,Auto,Auto">
           <Button Classes="cv-seg-item" Classes.cv-on="{Binding IsLecturesTab}" Content="Lectures" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Lectures}" />
@@ -99,10 +103,13 @@
           <Button Grid.Column="3" Classes="cv-seg-item" Classes.cv-on="{Binding IsAnnouncementsTab}" Content="Announcements" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Announcements}" />
         </Grid>
       </Border>
+      </Panel>
 
       <StackPanel IsVisible="{Binding IsTabsLayout}">
         <StackPanel IsVisible="{Binding IsLecturesTab}">
+          <StackPanel IsVisible="{Binding ShowOwnHeader}">
           <ContentControl Content="{Binding}" ContentTemplate="{StaticResource LecturesBlock}" Margin="0,0,0,0" />
+          </StackPanel>
         </StackPanel>
         <StackPanel IsVisible="{Binding IsAssignmentsTab}">
           <TextBlock Classes="cv-group-label" Text="To hand in" IsVisible="{Binding HasToHandIn}" />

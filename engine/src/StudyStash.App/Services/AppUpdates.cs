@@ -101,6 +101,19 @@ public sealed class AppUpdates
     /// <summary>Downloading and installing right now.</summary>
     public bool Installing { get; private set; }
 
+    /// <summary>A newer release this copy could install, as the last round or Check now found it (null when up to
+    /// date): the menu bar's and Settings' Update now show while there is one.</summary>
+    public Release? Found { get; private set; }
+    /// <summary>Said (from the updater's thread) whenever <see cref="Found"/> changes.</summary>
+    public event Action? FoundChanged;
+
+    void Saw(Release? release)
+    {
+        if (release?.Tag == Found?.Tag) return;
+        Found = release;
+        FoundChanged?.Invoke();
+    }
+
     readonly SemaphoreSlim oneAtATime = new(1, 1);
     readonly HashSet<string> told = [];
     volatile bool asked;
@@ -149,12 +162,17 @@ public sealed class AppUpdates
             Log($"[update] check failed: {e.Message}");
             return CheckFailed;
         }
-        if (release is null || !Updates.IsNewer(release)) return UpToDate;
+        if (release is null || !Updates.IsNewer(release))
+        {
+            Saw(null);
+            return UpToDate;
+        }
         if (CantInstall() is { } why)
         {
             Once(new(UpdateNewsKind.CantInstall, release, why));
             return CantHere;
         }
+        Saw(release);
         if (!asked && !Automatic())
         {
             Once(new(UpdateNewsKind.Ready, release));
@@ -232,8 +250,14 @@ public sealed class AppUpdates
             Log($"[update] check failed: {e.Message}");
             return new(CheckFailed);
         }
-        if (release is null || !Updates.IsNewer(release)) return new(UpToDate);
-        return CantInstall() is { } why ? new(CantHere, release, why) : new(Available, release);
+        if (release is null || !Updates.IsNewer(release))
+        {
+            Saw(null);
+            return new(UpToDate);
+        }
+        if (CantInstall() is { } why) return new(CantHere, release, why);
+        Saw(release);
+        return new(Available, release);
     }
 
     /// <summary>Update now (Settings, or the notification's Update): the newest release installs now, auto_update or
