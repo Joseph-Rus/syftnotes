@@ -35,6 +35,16 @@
 #   (the old workflow took 12 to 16 for every merge and every release alike), and a release that publishes the
 #   installers a rehearsal already proved under a minute.
 #
+#   Signing is switched on by secrets and costs nothing without them. Only a run that builds installers (a release, or
+#   a rehearsal of one) can sign, and then only if the repository has the secrets in docs/signing.md: the Mac app is
+#   signed with an Apple Developer ID, notarized and stapled, and Windows' exe, dlls, Setup.exe and uninstaller are
+#   signed (Azure Artifact Signing). With none of them, the installers are the ad hoc signed Mac app and the unsigned
+#   Setup.exe, exactly as before. Some of a group's secrets but not all of them stops the run at the start. Signing is a
+#   step of its own, after the build (macos/sign-release.sh, windows/sign-release.ps1), so nothing the build runs ever
+#   sees a key. A rehearsal by hand with "test_signing" ticked signs with throwaway self-signed identities that it makes
+#   on the runners: that proves every signing step but Apple's and Microsoft's, and its installers are never published
+#   (nor reusable by a release). The plan is .github/scripts/signing-plan.sh.
+#
 #   Runs are never cancelled by a later push: each push to main has a group of its own, so a release run isn't
 #   cancelled by the push after it, nor skipped while waiting for the one before. (Runs by hand on one branch
 #   replace each other.) The plan (what is tested, what is built, what is reused) is decided in the first job, by
@@ -48,6 +58,10 @@ on:
     inputs:
       installers:
         description: "Build and prove the installers too, as a release does (always on for code whose version has no tag yet). Nothing is published from a run by hand."
+        type: boolean
+        default: false
+      test_signing:
+        description: "Rehearse the signing steps with throwaway self-signed identities (the Mac app and Setup.exe made as for a release, signed by certificates made on the runners): proves the steps, not Apple's notarization or Microsoft's signing. Those installers can never be published."
         type: boolean
         default: false
       reuse_run:
@@ -83,6 +97,9 @@ jobs:
       installers: ${{ steps.plan.outputs.installers }}
       tested: ${{ steps.plan.outputs.tested }}
       reuse_run: ${{ steps.plan.outputs.reuse_run }}
+      mac_signing: ${{ steps.signing.outputs.mac_signing }}
+      mac_notarize: ${{ steps.signing.outputs.mac_notarize }}
+      win_signing: ${{ steps.signing.outputs.win_signing }}
     steps:
       - uses: actions/checkout@v4
       # A run by hand keeps the exact tree it tests, so that merging that branch into main with the very same code
@@ -106,6 +123,27 @@ jobs:
           WANT_INSTALLERS: ${{ inputs.installers }}
           REUSE_RUN: ${{ inputs.reuse_run }}
         run: bash .github/scripts/plan.sh
+      # Which secrets exist (only that: no value comes here) decides whether the installers are signed.
+      - id: signing
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INSTALLERS: ${{ steps.plan.outputs.installers }}
+          TEST_SIGNING: ${{ inputs.test_signing }}
+          MACOS_CERT_P12_BASE64_SET: ${{ secrets.MACOS_CERT_P12_BASE64 != '' }}
+          MACOS_CERT_PASSWORD_SET: ${{ secrets.MACOS_CERT_PASSWORD != '' }}
+          APPLE_TEAM_ID_SET: ${{ secrets.APPLE_TEAM_ID != '' }}
+          APPLE_NOTARY_KEY_P8_BASE64_SET: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 != '' }}
+          APPLE_NOTARY_KEY_ID_SET: ${{ secrets.APPLE_NOTARY_KEY_ID != '' }}
+          APPLE_NOTARY_ISSUER_ID_SET: ${{ secrets.APPLE_NOTARY_ISSUER_ID != '' }}
+          AZURE_TENANT_ID_SET: ${{ secrets.AZURE_TENANT_ID != '' }}
+          AZURE_CLIENT_ID_SET: ${{ secrets.AZURE_CLIENT_ID != '' }}
+          AZURE_CLIENT_SECRET_SET: ${{ secrets.AZURE_CLIENT_SECRET != '' }}
+          WINDOWS_SIGNING_ENDPOINT_SET: ${{ secrets.WINDOWS_SIGNING_ENDPOINT != '' }}
+          WINDOWS_SIGNING_ACCOUNT_SET: ${{ secrets.WINDOWS_SIGNING_ACCOUNT != '' }}
+          WINDOWS_SIGNING_PROFILE_SET: ${{ secrets.WINDOWS_SIGNING_PROFILE != '' }}
+          WINDOWS_CERT_PFX_BASE64_SET: ${{ secrets.WINDOWS_CERT_PFX_BASE64 != '' }}
+          WINDOWS_CERT_PASSWORD_SET: ${{ secrets.WINDOWS_CERT_PASSWORD != '' }}
+        run: bash .github/scripts/signing-plan.sh plan
 
   # The C# engine (engine/): every test on each system. Golden/ holds fixed expectations the tests compare byte for
   # byte. The two test projects are two jobs per system: they used to run one after the other in one job, and the
@@ -174,11 +212,14 @@ jobs:
   # The Mac app: one universal bundle for Apple silicon and Intel, started by its own launcher (D1); ad hoc signed with
   # the microphone entitlement; the DMG (D2). Proved with the real self-test (D5): real windows open, the pretend
   # microphone records, Whisper (Metal) hears the speech from inside the bundle. Only a release uploads the DMG.
+  # With the signing secrets (docs/signing.md) the app is signed with a Developer ID, notarized and stapled right after
+  # the build, and the DMG made again around it; the self-test then runs the signed app, with library validation on.
   mac-app:
     name: Mac app (self-test, DMG)
     needs: [version]
     if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
-    timeout-minutes: 25
+    # Notarization usually answers within minutes, but Apple's first answers for a new account can take much longer.
+    timeout-minutes: ${{ needs.version.outputs.mac_signing == 'real' && 120 || (needs.version.outputs.mac_signing == 'rehearsal' && 40 || 25) }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -196,6 +237,37 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Build Study Stash.app and its one DMG
         run: sh macos/build-app.sh dist/mac
+      # Signing, only when the version job planned it. Each step that needs a secret has just its own.
+      - name: Signing - the Developer ID certificate, in a keychain made for this run
+        if: needs.version.outputs.mac_signing == 'real'
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: sh macos/signing-setup.sh import
+      - name: Signing - the notary key
+        if: needs.version.outputs.mac_notarize == 'true'
+        env:
+          APPLE_NOTARY_KEY_P8_BASE64: ${{ secrets.APPLE_NOTARY_KEY_P8_BASE64 }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        run: sh macos/signing-setup.sh notary
+      - name: Signing - a throwaway self-signed identity, for the rehearsal
+        if: needs.version.outputs.mac_signing == 'rehearsal'
+        run: sh macos/signing-setup.sh selfsigned
+      - name: Sign the app, notarize it if there is a key, and make the DMG again around it
+        if: needs.version.outputs.mac_signing != 'off'
+        env:
+          # Set the repository variable STUDYSTASH_LIBRARY_VALIDATION to "off" to keep disable-library-validation (docs/signing.md).
+          STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
+        run: sh macos/sign-release.sh dist/mac
+      - name: The signature is the one this run was told to make
+        if: needs.version.outputs.mac_signing != 'off'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
+          HOW: ${{ needs.version.outputs.mac_signing == 'rehearsal' && 'rehearsal' || (needs.version.outputs.mac_notarize == 'true' && 'notarized' || 'signed') }}
+        run: sh macos/verify-signing.sh "dist/mac/Study Stash.app" dist/mac/Study-Stash.dmg "$HOW"
       - name: The app carries the phone app, which the library serves at /app/
         run: |
           for arch in arm64 x64; do
@@ -244,6 +316,19 @@ jobs:
         with:
           name: mac-selftest
           path: ${{ runner.temp }}/selftest
+      # How this run signed the installer, as the name of an artifact: a rehearsal's is never published or reused.
+      - name: How the Mac installer was signed
+        if: needs.version.outputs.installers == 'true'
+        run: echo "${{ needs.version.outputs.mac_signing }}" > "$RUNNER_TEMP/mac-signing.txt"
+      - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.installers == 'true'
+        with:
+          name: signing-mac-${{ needs.version.outputs.mac_signing }}
+          path: ${{ runner.temp }}/mac-signing.txt
+          retention-days: 30
+      - name: Signing - the keychain and keys are removed
+        if: always() && needs.version.outputs.mac_signing != 'off'
+        run: sh macos/signing-setup.sh cleanup
 
   # The Mac app's second self-test, on a computer of its own so it runs beside the first: Just this computer, where
   # setup makes the app's own library and the notes are written here.
@@ -298,6 +383,13 @@ jobs:
           ditto "$RUNNER_TEMP/mnt/Study Stash.app" "$RUNNER_TEMP/Study Stash.app"
           hdiutil detach -quiet "$RUNNER_TEMP/mnt"
           codesign --verify --deep --strict "$RUNNER_TEMP/Study Stash.app"
+      - name: Signed as planned, and Gatekeeper accepts it, offline, on the Intel Mac that will run it
+        if: needs.version.outputs.mac_signing != 'off'
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          STUDYSTASH_LIBRARY_VALIDATION: ${{ vars.STUDYSTASH_LIBRARY_VALIDATION }}
+          HOW: ${{ needs.version.outputs.mac_signing == 'rehearsal' && 'rehearsal' || (needs.version.outputs.mac_notarize == 'true' && 'notarized' || 'signed') }}
+        run: sh macos/verify-signing.sh "$RUNNER_TEMP/Study Stash.app" dist/mac/Study-Stash.dmg "$HOW"
       - name: Self-test, natively on Intel
         run: sh macos/selftest.sh "$RUNNER_TEMP/Study Stash.app" "$RUNNER_TEMP/selftest"
       - uses: actions/upload-artifact@v4
@@ -310,12 +402,14 @@ jobs:
   # self-tested (D5) as just this computer and as a laptop. A merge stops there (the build leaves Setup.exe out). A
   # release also builds Setup.exe, installs it, self-tests as a laptop from the installed copy (so what Setup.exe put
   # there, native code and all, is what runs), updates it in place with a silent Setup.exe, and uninstalls it without
-  # touching lectures or settings outside the install folder.
+  # touching lectures or settings outside the install folder. With the signing secrets (docs/signing.md) the build leaves
+  # Setup.exe out, and a step after it signs the app's exe and dlls and makes Setup.exe again, signed with its uninstaller;
+  # everything after that, self-tests included, runs the signed files.
   windows-app:
     name: Windows app (self-test, Setup.exe)
     needs: [version]
     if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
-    timeout-minutes: 25
+    timeout-minutes: ${{ needs.version.outputs.win_signing != 'off' && 40 || 25 }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -344,6 +438,14 @@ jobs:
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile("install.ps1", [ref]$null, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { throw "install.ps1 doesn't parse: $errors" }
+      - name: The signing scripts parse
+        shell: pwsh
+        run: |
+          foreach ($script in "sign", "sign-release", "signing-setup", "verify-signing") {
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile("windows\$script.ps1", [ref]$null, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { throw "windows\$script.ps1 doesn't parse: $errors" }
+          }
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -351,7 +453,43 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Build win-x64 and win-arm64, and Study-Stash-Setup.exe
         shell: pwsh
-        run: .\windows\build.ps1 -Out dist\windows
+        run: .\windows\build.ps1 -Out dist\windows ${{ needs.version.outputs.win_signing != 'off' && '-NoInstaller' || '' }}
+      # Signing, only when the version job planned it. The secrets reach just the one step that signs.
+      - name: Signing - a throwaway self-signed certificate, for the rehearsal
+        if: needs.version.outputs.win_signing == 'rehearsal'
+        shell: pwsh
+        run: .\windows\signing-setup.ps1 -SelfSigned
+      - name: Signing - .NET 8, which Azure Artifact Signing's signtool plugin runs on
+        if: needs.version.outputs.win_signing == 'real'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Sign the app's files, then make Setup.exe again, signed with its uninstaller
+        if: needs.version.outputs.win_signing == 'real'
+        shell: pwsh
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          WINDOWS_SIGNING_ENDPOINT: ${{ secrets.WINDOWS_SIGNING_ENDPOINT }}
+          WINDOWS_SIGNING_ACCOUNT: ${{ secrets.WINDOWS_SIGNING_ACCOUNT }}
+          WINDOWS_SIGNING_PROFILE: ${{ secrets.WINDOWS_SIGNING_PROFILE }}
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: .\windows\sign-release.ps1 -Out dist\windows
+      - name: Sign the app's files, then make Setup.exe again, signed with its uninstaller (the rehearsal's certificate)
+        if: needs.version.outputs.win_signing == 'rehearsal'
+        shell: pwsh
+        run: .\windows\sign-release.ps1 -Out dist\windows
+      - name: The signature is the one this run was told to make
+        if: needs.version.outputs.win_signing != 'off'
+        shell: pwsh
+        env:
+          HOW: ${{ needs.version.outputs.win_signing }}
+        run: |
+          $check = @{}
+          if ($env:HOW -eq "rehearsal") { $check.Rehearsal = $true }
+          .\windows\verify-signing.ps1 @check dist\windows\Study-Stash-Setup.exe dist\windows\win-x64\StudyStash.exe dist\windows\win-arm64\StudyStash.exe dist\windows\win-x64\StudyStash.Core.dll dist\windows\win-x64\libSkiaSharp.dll
       - name: Both trees carry the phone app, which the library serves at /app/
         shell: pwsh
         run: |
@@ -429,6 +567,16 @@ jobs:
           if (Select-String -Path "$app\study-stash.ini" -Pattern "^\s*role\s*=" -Quiet) { throw "the one download wrote a role" }
           $printed = (& "$app\StudyStash.exe" version | Out-String).Trim()
           if ($printed -ne $env:V) { throw "installed version '$printed', expected '$env:V'" }
+      - name: What the installer put there is signed too, and so is the uninstaller it wrote
+        if: needs.version.outputs.win_signing != 'off'
+        shell: pwsh
+        env:
+          HOW: ${{ needs.version.outputs.win_signing }}
+        run: |
+          $app = "$env:LOCALAPPDATA\Programs\Study Stash"
+          $check = @{}
+          if ($env:HOW -eq "rehearsal") { $check.Rehearsal = $true }
+          .\windows\verify-signing.ps1 @check "$app\StudyStash.exe" "$app\unins000.exe" "$app\libSkiaSharp.dll"
       # A release runs this from the copy the installer put there; a merge, which has no installer, from the build.
       - name: Self-test (D5), as a laptop - its native code came with the installer, and a lecture's formulas and flowchart draw
         if: needs.version.outputs.tested != 'true' || needs.version.outputs.installers == 'true'
@@ -514,6 +662,22 @@ jobs:
         with:
           name: windows-selftest
           path: ${{ runner.temp }}\selftest
+      # How this run signed the installer, as the name of an artifact: a rehearsal's is never published or reused.
+      - name: How Setup.exe was signed
+        if: needs.version.outputs.installers == 'true'
+        shell: pwsh
+        run: |
+          "${{ needs.version.outputs.win_signing }}" | Set-Content "$env:RUNNER_TEMP\windows-signing.txt"
+      - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.installers == 'true'
+        with:
+          name: signing-windows-${{ needs.version.outputs.win_signing }}
+          path: ${{ runner.temp }}\windows-signing.txt
+          retention-days: 30
+      - name: Signing - the rehearsal's certificate is removed
+        if: always() && needs.version.outputs.win_signing == 'rehearsal'
+        shell: pwsh
+        run: .\windows\signing-setup.ps1 -Cleanup
 
   # Publish v<version> the first time it passes everything above, with the one download per system, the four old role
   # names as byte-for-byte copies of them (0.8.x and older copies update themselves by those names, and old libraries'
@@ -531,6 +695,18 @@ jobs:
       actions: read  # to download the installers a run by hand built
     steps:
       - uses: actions/checkout@v4
+      # The installers about to be published are signed as this run was told to sign them (a run by hand's, reused, may not
+      # have been), and are never a rehearsal's.
+      - name: The installers are signed as planned
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ needs.version.outputs.reuse_run || github.run_id }}
+          PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          REUSE: ${{ needs.version.outputs.reuse_run != '' }}
+          EXPECT_MAC: ${{ needs.version.outputs.mac_signing }}
+          EXPECT_WIN: ${{ needs.version.outputs.win_signing }}
+        run: bash .github/scripts/signing-plan.sh release
       - uses: actions/download-artifact@v4
         with:
           name: mac-installers

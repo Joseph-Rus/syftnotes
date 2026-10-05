@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- The entitlements of a release signed with a Developer ID (macos/sign-release.sh). Every Mach-O in the bundle
+         carries the app's own Team ID, so the hardened runtime's library validation can stay on: there is no
+         disable-library-validation here, unlike StudyStash.entitlements, which an ad hoc build needs because its
+         dylibs have no Team ID to match. allow-jit lets the CLR's JIT map executable pages; audio-input is the
+         microphone. -->
+    <key>com.apple.security.cs.allow-jit</key><true/>
+    <key>com.apple.security.device.audio-input</key><true/>
+</dict>
+</plist>

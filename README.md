@@ -98,8 +98,9 @@ you download it. The Mac app needs macOS 15 (Sequoia) or later, on Apple silicon
 Windows one, Windows 10 or 11.
 
 - **Mac:** open the DMG and drag **Study Stash** into Applications. Study Stash isn't signed with a
-  paid Apple Developer ID yet, so the first time macOS asks: click **Done**, then **System Settings
-  → Privacy & Security → Open Anyway**. Allow the microphone when it asks.
+  paid Apple Developer ID yet, so if macOS says it can't check it for malicious software, click
+  **Done**, then **System Settings → Privacy & Security → Open Anyway**. Allow the microphone when
+  it asks.
 - **Windows:** run the Setup.exe. It installs for your account only, no admin rights needed. If
   Windows says "Windows protected your PC", click **More info**, then **Run anyway**.
 

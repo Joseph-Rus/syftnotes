@@ -133,9 +133,12 @@ runs on a computer.
   from (`LSUIElement`, the microphone usage strings), so it can't be a per-architecture `exec`.
   The launcher `dlopen`s the matching architecture's `libhostfxr.dylib` under
   `Contents/MacOS/{arm64,x64}` and starts .NET in-process; a per-arch self-contained publish can't
-  be `lipo`-merged, so this is the trick that makes both look like one program. It's signed ad hoc
+  be `lipo`-merged, so this is the trick that makes both look like one program. By default it's signed ad hoc
   (no paid Developer ID) with the hardened runtime, `disable-library-validation` (so it can still
-  load its own unsigned dylibs), and a microphone entitlement.
+  load its own unsigned dylibs), and a microphone entitlement. A release whose repository has the
+  signing secrets re-signs it after the build with a Developer ID, without `disable-library-validation`,
+  notarizes and staples the app and the DMG, and signs Windows' exe, dlls, Setup.exe and uninstaller
+  (`macos/sign-release.sh`, `windows/sign-release.ps1`, [signing.md](signing.md)).
 - The Info.plist carries `NSMicrophoneUsageDescription` and `NSAudioCaptureUsageDescription`
   (without them macOS kills the app on first mic use), `StudyStashRole` for the role preset, and
   `CFBundleShortVersionString`/`CFBundleVersion` set to `StudyStashVersion` so an installed copy
