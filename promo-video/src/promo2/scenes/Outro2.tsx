@@ -116,11 +116,12 @@ const Chip: React.FC<{children: React.ReactNode; size: number}> = ({children, si
   </div>
 );
 
-export const Cta2: React.FC = () => {
+/** The end card. `duration` is its length in frames (the second video's own, unless another video reuses it). */
+export const Cta2: React.FC<{duration?: number}> = ({duration}) => {
   const f = useCurrentFrame();
   const vertical = useVertical();
   const {width} = useVideoConfig();
-  const D = durations2.cta;
+  const D = duration ?? durations2.cta;
   // The words come in once the promise has cleared (the first 12 frames are the cross-fade).
   const icon = prog(f, 4, 26);
   const sheen = prog(f, 30, 56, inOut);

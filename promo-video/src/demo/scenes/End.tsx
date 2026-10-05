@@ -1,9 +1,7 @@
 import React from 'react';
-import {AbsoluteFill} from 'remotion';
-import {Desktop} from '../../components/Layout';
+import {Cta2} from '../../promo2/scenes/Outro2';
+import {length} from '../config';
 
-export const End: React.FC = () => (
-  <AbsoluteFill>
-    <Desktop />
-  </AbsoluteFill>
-);
+// The end card, as the second video's (Cta2): the icon, Study Stash, "Free for Mac and Windows.", the link, the marks
+// for Mac and Windows and the film's glimpses beside it, holding to the last frame.
+export const End: React.FC = () => <Cta2 duration={length('end')} />;
