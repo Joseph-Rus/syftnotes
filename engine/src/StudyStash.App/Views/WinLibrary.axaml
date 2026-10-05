@@ -241,8 +241,22 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:ClassItem">
-                <Button Classes="nav" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
+                <StackPanel>
+                  <TextBlock Classes="classes" Text="{Binding Section}" FontSize="14" FontWeight="SemiBold" IsVisible="{Binding HasSection}" />
+                  <Button Classes="nav" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
                         Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
+                  <Button.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Move to folder" ItemsSource="{Binding MoveChoices}">
+                        <MenuItem.ItemContainerTheme>
+                          <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:FolderChoice">
+                            <Setter Property="Header" Value="{Binding Label}" />
+                            <Setter Property="Command" Value="{Binding Pick}" />
+                          </ControlTheme>
+                        </MenuItem.ItemContainerTheme>
+                      </MenuItem>
+                    </ContextMenu>
+                  </Button.ContextMenu>
                   <Panel>
                     <Border Classes="pill" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
                     <!-- dot | name, cut short with "…" (the whole name on hover) | the count, in its own column -->
@@ -255,6 +269,7 @@
                     </Grid>
                   </Panel>
                 </Button>
+                </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -535,6 +550,10 @@
     </DockPanel>
 
     <!-- "Delete this lecture?", over the window: a click outside it is Cancel -->
+    <!-- "Put CS 101 in a new folder": its name, over the window -->
+    <Panel Name="FolderAsk" IsVisible="{Binding AskingFolder}" Background="Transparent">
+      <v:WinNewFolder HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Panel>
     <Panel Name="DeleteAsk" IsVisible="{Binding AskingDelete}" Background="Transparent" PointerPressed="OnDeleteAskPressed">
       <v:WinDeleteLecture HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Panel>

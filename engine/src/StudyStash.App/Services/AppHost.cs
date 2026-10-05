@@ -825,6 +825,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         (Overview?["classes"] as JsonArray ?? []).OfType<JsonObject>()
             .Select(c => (c["name"]?.GetValue<string>() ?? "", c["color"]?.GetValue<int>() ?? 0, c["lectures"]?.GetValue<int>() ?? 0)).ToList();
 
+    /// <summary>The sidebar folder a class is in ("" for Classes), as the library's overview says.</summary>
+    public string GroupOf(string className) =>
+        (Overview?["classes"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(c => c["name"]?.GetValue<string>() == className)?["group"]?.GetValue<string>() ?? "";
+
     public int ColorOf(string className) => Classes().FirstOrDefault(c => c.Name == className) is { Name.Length: > 0 } c ? c.Color : -1;
 
     /// <summary>"Library connected · Model ready", or what needs doing: pure, so a test needn't drive a real library

@@ -21,6 +21,28 @@ public sealed partial class ClassItem : ObservableObject
     [ObservableProperty] public partial int Count { get; set; }
     [ObservableProperty] public partial bool Selected { get; set; }
     public bool HasDot => !IsUnsorted;
+    /// <summary>The sidebar folder it's in ("" for Classes).</summary>
+    public string Group { get; init; } = "";
+    /// <summary>The first of its folder: the folder's name heads it in the sidebar.</summary>
+    public string Section { get; set; } = "";
+    public bool HasSection => Section.Length > 0;
+    /// <summary>Its context menu's Move to folder: Classes, every folder it isn't in, and New folder….</summary>
+    public List<FolderChoice> MoveChoices { get; set; } = [];
+}
+
+/// <summary>One place a class can move to in the sidebar, as its context menu lists it.</summary>
+public sealed class FolderChoice(string label, IRelayCommand pick)
+{
+    public string Label { get; } = label;
+    public IRelayCommand Pick { get; } = pick;
+}
+
+/// <summary>"Move CS 101 to a new folder": the name being typed, over the library window.</summary>
+public sealed partial class NewFolderAsk(string className) : ObservableObject
+{
+    public string ClassName { get; } = className;
+    public string Title => $"Put {ClassName} in a new folder";
+    [ObservableProperty] public partial string Name { get; set; } = "";
 }
 
 /// <summary>A lecture in the middle column: title, "Tue 23 Sep · 1 h 12 min", and the lecture in a sentence.</summary>
@@ -393,6 +415,21 @@ public sealed partial class LibraryModel : ObservableObject
     // --- deleting a lecture ---------------------------------------------------------------------------------------
 
     /// <summary>The lecture being deleted, while the window asks "Delete this lecture?"; null when it isn't asking.</summary>
+    /// <summary>A new sidebar folder being named for a class; null when nobody's asking.</summary>
+    [ObservableProperty] public partial NewFolderAsk? NamingFolder { get; set; }
+    public bool AskingFolder => NamingFolder is not null;
+    partial void OnNamingFolderChanged(NewFolderAsk? value) => OnPropertyChanged(nameof(AskingFolder));
+    /// <summary>Moves a class into a sidebar folder ("" for Classes).</summary>
+    public Func<string, string, Task>? OnMoveToFolder { get; set; }
+    [RelayCommand] void CancelFolder() => NamingFolder = null;
+    [RelayCommand]
+    async Task ConfirmFolder()
+    {
+        if (NamingFolder is not { } ask || ask.Name.Trim().Length == 0) return;
+        NamingFolder = null;
+        if (OnMoveToFolder is { } move) await move(ask.ClassName, ask.Name.Trim());
+    }
+
     [ObservableProperty] public partial LectureDeletion? Deleting { get; set; }
     /// <summary>The lecture just deleted, while the "Deleted · Undo" toast shows.</summary>
     [ObservableProperty] public partial LectureDeletion? Deleted { get; set; }

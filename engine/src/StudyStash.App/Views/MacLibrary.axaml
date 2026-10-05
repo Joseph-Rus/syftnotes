@@ -259,8 +259,22 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:ClassItem">
-                    <Button Classes="cls" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
+                    <StackPanel>
+                      <TextBlock Classes="classes" Text="{Binding Section}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" IsVisible="{Binding HasSection}" />
+                      <Button Classes="cls" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
                             Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
+                      <Button.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Move to folder" ItemsSource="{Binding MoveChoices}">
+                            <MenuItem.ItemContainerTheme>
+                              <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:FolderChoice">
+                                <Setter Property="Header" Value="{Binding Label}" />
+                                <Setter Property="Command" Value="{Binding Pick}" />
+                              </ControlTheme>
+                            </MenuItem.ItemContainerTheme>
+                          </MenuItem>
+                        </ContextMenu>
+                      </Button.ContextMenu>
                       <!-- dot | name, cut short with "…" (the whole name on hover) | the count, in its own column -->
                       <Grid ColumnDefinitions="Auto,8,*,10,Auto">
                         <Panel Classes="slot">
@@ -270,6 +284,7 @@
                         <TextBlock Grid.Column="4" Classes="count" Text="{Binding Count}" FontSize="13" VerticalAlignment="Center" />
                       </Grid>
                     </Button>
+                    </StackPanel>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
@@ -512,6 +527,10 @@
     </DockPanel>
 
     <!-- "Delete this lecture?", over the window: a click outside it is Cancel -->
+    <!-- "Put CS 101 in a new folder": its name, over the window -->
+    <Panel Name="FolderAsk" IsVisible="{Binding AskingFolder}" Background="Transparent">
+      <v:MacNewFolder HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Panel>
     <Panel Name="DeleteAsk" IsVisible="{Binding AskingDelete}" Background="Transparent" PointerPressed="OnDeleteAskPressed">
       <v:MacDeleteLecture HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Panel>

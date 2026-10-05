@@ -1,0 +1,44 @@
+<!-- "Put CS 101 in a new folder": a sidebar folder of the student's own (Projects, Clubs, Research), named over the
+     library window. Cancel and Create sit right, one height, on one line; Escape cancels, Enter creates. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.MacNewFolder"
+             x:DataType="vm:LibraryModel"
+             ClipToBounds="False">
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Escape" Command="{Binding CancelFolderCommand}" />
+  </UserControl.KeyBindings>
+  <UserControl.Styles>
+    <Style Selector="Button.dialog">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="MinWidth" Value="84" />
+      <Setter Property="CornerRadius" Value="15" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Width="360" Padding="20,18,20,16" CornerRadius="20" Background="{DynamicResource PopupBg}" BorderBrush="{DynamicResource PopupStroke}"
+          BorderThickness="1" BoxShadow="{DynamicResource PopupShadow}">
+    <StackPanel Spacing="8">
+      <TextBlock Text="{Binding NamingFolder.Title, FallbackValue=''}" FontFamily="{DynamicResource DisplayFont}" FontSize="15" FontWeight="SemiBold" />
+      <TextBlock Text="A folder in the sidebar, beside Classes: for projects, clubs or research." FontSize="13" LineHeight="18"
+                 Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+      <TextBox Name="FolderName" Text="{Binding NamingFolder.Name, FallbackValue=''}" PlaceholderText="Projects" FontSize="13" MaxLength="40">
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Enter" Command="{Binding ConfirmFolderCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,10,0,0">
+        <Button Classes="dialog fill2" Command="{Binding CancelFolderCommand}">
+          <TextBlock Text="Cancel" FontSize="13" FontWeight="Medium" />
+        </Button>
+        <Button Classes="dialog fill2" Command="{Binding ConfirmFolderCommand}">
+          <TextBlock Text="Create" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentText}" />
+        </Button>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

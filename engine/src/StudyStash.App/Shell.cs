@@ -486,6 +486,7 @@ public static partial class Shell
             allLectures = false;
             _ = ShowClassAsync(c.Name);
         };
+        library.OnMoveToFolder = MoveToFolderAsync;
         library.OnLecture = l =>
         {
             Remember();

@@ -300,9 +300,9 @@
         </Grid>
         <TextBlock Classes="ov-sub" IsVisible="{Binding !HasFolders}" TextWrapping="Wrap"
                    Text="A project's repo, a shared drive, anything that goes with this class but isn't notes. It stays where it is." />
-        <ItemsControl ItemsSource="{Binding Folders}">
+        <ItemsControl ItemsSource="{Binding Folders}" Margin="0,0,-10,-10">
           <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+            <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:LinkedFolder">

@@ -1,0 +1,48 @@
+<!-- "Put CS 101 in a new folder": a sidebar folder of the student's own, as a Windows 11 content dialog over the page.
+     Create and Cancel share the footer; Escape cancels, Enter creates. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.WinNewFolder"
+             x:DataType="vm:LibraryModel"
+             ClipToBounds="False">
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Escape" Command="{Binding CancelFolderCommand}" />
+  </UserControl.KeyBindings>
+  <UserControl.Styles>
+    <Style Selector="Button.dialog">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+  </UserControl.Styles>
+
+  <Border Width="420" CornerRadius="8" Background="{DynamicResource PopupBg}" BorderBrush="{DynamicResource PopupStroke}" BorderThickness="1"
+          BoxShadow="{DynamicResource ShadowLg}" ClipToBounds="True">
+    <DockPanel>
+      <Border DockPanel.Dock="Bottom" Background="{DynamicResource Footer}" Padding="24">
+        <Grid ColumnDefinitions="*,8,*">
+          <Button Classes="dialog" Command="{Binding ConfirmFolderCommand}">
+            <TextBlock Text="Create" FontSize="14" FontWeight="SemiBold" />
+          </Button>
+          <Button Grid.Column="2" Classes="dialog" Command="{Binding CancelFolderCommand}">
+            <TextBlock Text="Cancel" FontSize="14" />
+          </Button>
+        </Grid>
+      </Border>
+      <StackPanel Spacing="12" Margin="24">
+        <TextBlock Text="{Binding NamingFolder.Title, FallbackValue=''}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Text="A folder in the sidebar, beside Classes: for projects, clubs or research." FontSize="14" LineHeight="20" TextWrapping="Wrap" />
+        <TextBox Name="FolderName" Text="{Binding NamingFolder.Name, FallbackValue=''}" PlaceholderText="Projects" FontSize="14" MaxLength="40">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding ConfirmFolderCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+      </StackPanel>
+    </DockPanel>
+  </Border>
+</UserControl>
