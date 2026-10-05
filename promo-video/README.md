@@ -17,6 +17,12 @@ and a lighter app (see [The second video](#the-second-video-whats-new) below).
 - `out/promo2.mp4`: 1920×1080, 30 fps
 - `out/promo2-vertical.mp4`: 1080×1920
 
+A third, about 2 minutes 12 seconds, is a full demo of the app, from the first launch to the end card, narrated by Adam
+(see [The third video](#the-third-video-a-full-demo) below).
+
+- `out/demo.mp4`: 1920×1080, 30 fps
+- `out/demo-vertical.mp4`: 1080×1920
+
 ## Preview and render
 
 You need Node.js 18 or later.
@@ -132,4 +138,56 @@ library plus ENGR 120 and CS 340.
   in `src/promo2/sound.ts`, and no bells or ticks. SFX2.md lists them, with ElevenLabs prompts for making your own and
   where to drop the files. The first video's effects and music are byte for byte what they were. After rendering,
   `scripts/master.py` sets the sound to −14 LUFS with its true peak under −1 dBTP (the picture is copied as it is).
+
+## The third video: a full demo
+
+`Demo` and `DemoVertical`, in `src/demo/`, on the same night desktop, in the same dark app, with the same titles,
+pointer and steadiness rules as the second video, whose diagram, drawings, plots, intro, promise and end card it reuses.
+It is built to a fixed timeline that the narration and the sound effects were written for: `src/demo/plan.json` says
+when each scene starts, when its line starts and when every effect plays. VOICEOVER3.md has the script, Adam's
+settings, the ElevenLabs prompts for the nine effects and their times, and how to drop the files in.
+
+```sh
+npm run demo-audio           # the narration, effects and music from elevenlabs3/ (or made here), fitted to the plan
+npm run render3              # → out/demo.mp4
+npm run render3:vertical     # → out/demo-vertical.mp4
+npm run render3:all          # both
+npm run card3                # → out/ko-fi-preview-3.png, a 1200×630 picture for a shared link
+```
+
+| Time | Scene | What happens |
+|---|---|---|
+| 0–6 s | Opener | The black intro: the icon drawn in light, **Study Stash** rising as it's said, "Your lectures, written up and filed by class." |
+| 6–15 s | Setup | The guided first launch: Claude picked; Claude's chat, Just this Mac (Set up), the microphone check, "You're set up" (Open Study Stash); the notification pointing at the S. in the menu bar |
+| 15–28 s | Record | The S. opens its dropdown; Record · BIO 110; the recorder's pill (red dot, time, level meter); a click opens the recorder, the live words come in a second apart; "50 minutes later"; Stop; "Recording saved" |
+| 28–40 s | Notes first | "Writing the notes…" as the clock moves on; "Filed in BIO 110" (the list, the count, the notification); the notes, "Adding diagrams…"; "A minute later"; the diagram drops in; "Diagrams added" |
+| 40–54 s | Explore | A box lit with its neighbours; pinned (Explain this, Quiz me, Where was this said?, Zoom in); Step through, Next; Test yourself, a hidden box checked, Knew it, "1 of 8 recalled" |
+| 54–64 s | Plots | The sigmoid's steepness dragged from 1 to 5; gradient descent's learning rate dragged down to 0.05 and up to 0.21 |
+| 64–72 s | Drawings | The drone: the battery passed, the flight controller lit and pinned; then the hand, its deep flexor tendon lit |
+| 72–83 s | Ask | Under CS 101's notes: "What's on the midterm?" typed and sent, the answer written in from what was said |
+| 83–92 s | Canvas | Due: soonest first, the late one marked Missing; Lab 3 opened: due date, points, instructions, rubric |
+| 92–100 s | Phone | The phone app: Library, a tap into The cardiac cycle's notes (its diagram too), Due, Ask |
+| 100–111 s | Settings | AI engines: Rich notes off; Claude Code speed → Fast mode; Recording: When it's written down → After class |
+| 111–118 s | AI apps | AI tool access: Connect for Claude Desktop, "Added. Quit and reopen…", then "Connected · started 13:41" |
+| 118–125 s | Promise | The second video's drawn laptop that locks; "Free and open source, for Mac and Windows." |
+| 125–132 s | End card | The second video's product-page card, held to the end |
+
+The times are the plan's; a line that runs long stretches its scene and moves what follows (`src/demo/timeline.json`,
+printed by `npm run demo-audio`).
+
+**What's real, what's drawn.** Everything is drawn in code to match the app's own screenshot tests
+(`engine/tests/StudyStash.App.Tests`: `mac-05-setup-guided-*`, `mac-01-dropdown`, `mac-02-recorder`, `mac-12-toast`,
+`mac-04-full-app-answer`, `mac-09-canvas-due-app`, `mac-13-ai-engines-app`, `mac-settings-recording-after`,
+`mac-14-ai-tool-access-*`), its views (`MacRecorder.axaml`, `MacAiEngines.axaml`) and its words (`AiWords`,
+`AiAccessModel`, `RecorderModel`, `IconWords`, `GuidedSetupModel`). The phone is the phone web app's own screens and
+dark Lagoon colours (`web/src`). The notes, lectures and assignments are invented demo content.
+
+**What to edit.**
+- **The timeline:** `src/demo/plan.json` (scene starts, lines, effects); then `npm run demo-audio`. The scenes read
+  their moments from it, so a click stays on its sound.
+- **The headlines:** `src/demo/config.ts` (`titles`). **How loud each sound is:** `src/demo/sound.ts`.
+- **A scene:** `src/demo/scenes/`, one file each. The library window and notifications are in `src/demo/chrome.tsx`,
+  the Settings window in `src/demo/settings.tsx`.
+- **The sound:** `scripts/demo_audio.py`, with `scripts/wordtimes` (a small Whisper.net tool that finds each word's
+  time in a take).
 
