@@ -40,8 +40,9 @@ for arch in arm64 x64; do
 done
 rm -f "$MACOS/x64/ggml-metal.metal"   # no Metal on Intel
 
-# D6: the Whisper model is never bundled.
-big=$(find "$OUT" -name '*.bin' -size +1M -o -iname 'ggml-*.bin')
+# D6: the transcription model is never bundled. The one model file that is: the live words' small Whisper in the
+# Intel tree (models/live-whisper-*.bin, 43.5 MB), so an Intel Mac shows the first words with no download.
+big=$(find "$OUT" \( -name '*.bin' -size +1M -o -iname 'ggml-*.bin' \) ! -name 'live-whisper-*.bin')
 if [ -n "$big" ]; then
   echo "build-app.sh: a model file ended up in the bundle:" >&2
   echo "$big" >&2
