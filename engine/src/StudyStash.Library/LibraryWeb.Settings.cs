@@ -192,6 +192,9 @@ public sealed partial class LibraryWeb
         string? name = Text(body["name"]);
         if (name is not null && (name.Length == 0 || name.Length > 80)) return Http.Detail(400, "Give the library a name (up to 80 characters).");
         List<ClassDef>? classes = null;
+        // A class sent with the name it had ("was") under a new one is a rename: its lectures, folder and Canvas course
+        // go with it (as "Use Canvas course names" does), rather than staying behind under the old name.
+        var renames = new List<ClassRenameStep>();
         if (body["classes"] is JsonArray list)
         {
             classes = [];
@@ -205,7 +208,9 @@ public sealed partial class LibraryWeb
                 if (!seen.Add(cls)) return Http.Detail(400, $"There are two classes called {cls}.");
                 var aliases = (item["aliases"] as JsonArray)?.Select(Text).OfType<string>().Where(a => a.Length > 0).Distinct().ToList() ?? [];
                 classes.Add(new ClassDef(cls, aliases, Text(item["description"]) ?? ""));
+                if (Text(item["was"]) is { Length: > 0 } was && was != cls && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, cls, 0, ""));
             }
+            if (renames.Count > 0 && ClassRename.Blocked(Canvas.Crawl) is { } busy) return Http.Detail(409, busy);
         }
         double? confidence = body["notes"]?["min_confidence"] is JsonValue cv && cv.TryGetValue(out double d) && !double.IsNaN(d) ? Math.Clamp(d, 0, 1) : null;
         string? sortEngine = Text(body["sort_engine"]);
@@ -244,6 +249,20 @@ public sealed partial class LibraryWeb
             }
         }
         if (name is not null) cfg.PoolName = name;
+        if (renames.Count > 0)
+        {
+            var outcome = ClassRename.Apply(cfg, store, renames, Canvas.Crawl);
+            if (outcome.Renamed.Count > 0)
+            {
+                Console.WriteLine($"[classes] renamed in Settings: {string.Join(", ", outcome.Renamed.Select(st => $"{st.From} → {st.To}"))} ({outcome.Lectures} lectures moved)");
+                pipeline.Wake();
+            }
+            // The rename keeps the old name as another name, so a lecture a laptop recorded under it still files here.
+            foreach (var st in outcome.Renamed)
+                if (classes!.FirstOrDefault(c => c.Name == st.To) is { } sent && cfg.Classes.FirstOrDefault(c => c.Name == st.To) is { } kept)
+                    sent.Aliases = [.. sent.Aliases.Concat(kept.Aliases).Distinct(StringComparer.OrdinalIgnoreCase)];
+            if (outcome.Problem is { } problem) return Http.Detail(409, problem);
+        }
         if (classes is not null) cfg.Classes = classes;
         if (body["notes"] is JsonObject notes)
         {

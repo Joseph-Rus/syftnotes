@@ -15,6 +15,9 @@ public sealed partial class LibraryClassRow : ObservableObject
     [ObservableProperty] public partial string Name { get; set; } = "";
     [ObservableProperty] public partial string Aliases { get; set; } = "";
     [ObservableProperty] public partial string Description { get; set; } = "";
+    /// <summary>The name the library knows it by ("" for a class just added here): a different <see cref="Name"/> is a
+    /// rename, which takes its lectures, folder and Canvas course with it.</summary>
+    public string Was { get; set; } = "";
     public string Folder { get; init; } = "";
     public int Lectures { get; init; }
     public IBrush Dot { get; init; } = Brushes.Gray;
@@ -382,7 +385,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             int i = 0;
             var classes = (s["classes"] as JsonArray ?? []).OfType<JsonObject>().Select(c => new LibraryClassRow
             {
-                Name = Str(c["name"]), Description = Str(c["description"]), Folder = Str(c["folder"]),
+                Name = Str(c["name"]), Was = Str(c["name"]), Description = Str(c["description"]), Folder = Str(c["folder"]),
                 Aliases = string.Join(", ", (c["aliases"] as JsonArray ?? []).Select(Str).Where(a => a.Length > 0)),
                 Lectures = c["lectures"] is JsonValue cl && cl.TryGetValue(out int k) ? k : 0, Dot = Skin.ClassDot(i++),
             }).ToList();
@@ -634,15 +637,29 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         ["classes"] = new JsonArray(Classes.Select(c => (JsonNode?)new JsonObject
         {
             ["name"] = c.Name.Trim(),
+            // What it was called, so the library moves its lectures with a rename instead of leaving them under the old name.
+            ["was"] = c.Was,
             ["aliases"] = new JsonArray(c.Aliases.Split(',').Select(a => a.Trim()).Where(a => a.Length > 0).Select(a => (JsonNode?)a).ToArray()),
             ["description"] = c.Description.Trim(),
         }).ToArray()),
     };
 
+    /// <summary>Sends the classes; once the library has them, a class whose name was changed here is known by its new
+    /// one, and this computer's waiting lectures follow it.</summary>
+    async Task<bool> SendClassesAsync(string what)
+    {
+        var renamed = Classes.Where(c => c.Was.Length > 0 && c.Name.Trim().Length > 0 && c.Was != c.Name.Trim()).Select(c => (c.Was, c.Name.Trim())).ToList();
+        if (!await SendAsync(ClassesChange(), what)) return false;
+        foreach (var c in Classes.Where(c => c.Was.Length > 0)) c.Was = c.Name.Trim();
+        if (renamed.Count > 0) ClassesRenamed?.Invoke(renamed);
+        ClassesChanged?.Invoke();
+        return true;
+    }
+
     [RelayCommand]
     async Task SaveClasses()
     {
-        if (!filling && State == LibrarySettingsState.Ready && await SendAsync(ClassesChange(), "The classes")) ClassesChanged?.Invoke();
+        if (!filling && State == LibrarySettingsState.Ready) await SendClassesAsync("The classes");
     }
 
     [RelayCommand]
@@ -651,16 +668,14 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         string name = NewClass.Trim();
         if (name.Length == 0) return;
         Classes.Add(new LibraryClassRow { Name = name, Dot = Skin.ClassDot(Classes.Count) });
-        if (!await SendAsync(ClassesChange(), $"{name}")) return;
-        NewClass = "";
-        ClassesChanged?.Invoke();
+        if (await SendClassesAsync($"{name}")) NewClass = "";
     }
 
     [RelayCommand]
     async Task RemoveClass(LibraryClassRow row)
     {
         Classes.Remove(row);
-        if (await SendAsync(ClassesChange(), $"{row.Name}")) ClassesChanged?.Invoke();
+        await SendClassesAsync($"{row.Name}");
     }
 
     // Use Canvas course names: the preview, then the renames.
