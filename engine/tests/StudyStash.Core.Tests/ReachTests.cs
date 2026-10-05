@@ -350,6 +350,7 @@ public class ReachTests
         Assert.False(before.On);
         Assert.Null(before.McpUrl);
         Assert.Equal("Study Stash", before.Name);
+        Assert.Null(before.Needs); // Tailscale is ready: nothing to do first
 
         var on = (await remote.SetWebAsync(true))!.Web!;
         Assert.Equal($"funnel --bg --https=443 http://127.0.0.1:{ClaudeWeb.PortFor(cfg)}", ran[^1]);
@@ -401,6 +402,26 @@ public class ReachTests
         Assert.StartsWith("Your tailnet doesn't allow Funnel yet.", web["problem"]!.GetValue<string>());
         Assert.Equal(FunnelLink, web["fix_url"]!.GetValue<string>());
         Assert.Equal("", new ClaudeAccess(cfg.Home).PublicUrl);
+    }
+
+    /// <summary>A computer on its own, with no Tailscale: before the switch is ever tried, the library says what the
+    /// web needs and where to get it, rather than an address that goes nowhere.</summary>
+    [Fact]
+    public async Task Without_tailscale_the_library_says_what_the_web_needs_before_the_switch_is_tried()
+    {
+        var reach = new ClaudeReach { Tailscale = () => new TailscaleInfo() };
+        var (site, dir, store, _) = await LibraryAsync(reach, Answers);
+        await using var _site = site;
+        using var _dir = dir;
+        using var _store = store;
+
+        var web = (await new AiRemote("http://localhost", "pw", site.Client).AccessAsync())!.Web!;
+
+        Assert.False(web.On);
+        Assert.Null(web.McpUrl);
+        Assert.Null(web.Problem);
+        Assert.StartsWith("Tailscale isn't on the library's computer.", web.Needs);
+        Assert.Equal(ClaudeReach.DownloadPage, web.NeedsUrl);
     }
 
     [Fact]

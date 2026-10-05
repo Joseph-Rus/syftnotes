@@ -422,20 +422,18 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Refresh();
     }
 
-    /// <summary>AI tool access, with this computer's own Claude Code, Claude Desktop and Codex setup, and the
-    /// library's Claude routes for turning on the web address and removing a connection.</summary>
+    /// <summary>AI tool access, with the AI apps on this computer (Claude Desktop, Claude Code, Codex, Gemini CLI: each
+    /// connected to the library with one click), and the library's Claude routes for turning on the web address and
+    /// removing a connection.</summary>
     static AiAccessModel MakeAccess(IAiLibrary ai, AppHost host)
     {
         var setup = ClaudeSetup.ThisComputer(host.Home);
         return new AiAccessModel(ai)
         {
-            ClaudeCodeCommand = setup.ClaudeCodeCommand,
-            CodexSetup = setup.CodexSetup,
             McpJson = setup.McpJson,
-            CheckInClaudeCode = setup.InClaudeCode,
-            CheckInClaudeDesktop = setup.InClaudeDesktop,
-            AddToClaudeDesktop = () => Task.FromResult(setup.AddToClaudeDesktop()),
-            RemoveFromClaudeDesktopHook = () => Task.FromResult(setup.RemoveFromClaudeDesktop()),
+            ReadApps = setup.States,
+            ConnectApp = setup.Connect,
+            DisconnectApp = setup.Disconnect,
             OpenUrl = url => Dialogs.OpenUrl(url),
             RevokeConnection = async id =>
             {

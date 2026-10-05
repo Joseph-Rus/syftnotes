@@ -656,6 +656,25 @@ public class AiShots
                 m.WebNoteFixUrl = "https://login.tailscale.com/f/funnel?node=abc123";
                 break;
         }
+        // The AI apps on this computer, one in each state: connected, added but not loaded yet, not connected, not here.
+        var now = new DateTime(2026, 10, 4, 14, 0, 0);
+        foreach (var (id, name, installed, added, addedAt, started) in new (string, string, bool, bool, DateTime?, DateTime?)[]
+        {
+            ("claude-desktop", "Claude Desktop", true, true, now.AddHours(-2), now.AddMinutes(-20)),
+            ("claude-code", "Claude Code", true, true, now.AddMinutes(-1), null),
+            ("codex", "Codex", true, false, null, null),
+            ("gemini", "Gemini CLI", false, false, null, null),
+        })
+        {
+            var row = new AiAppRow { Id = id, Name = name, First = m.Apps.Count == 0 };
+            row.Show(new Services.AiAppState(id, name, installed, added, false, addedAt, started, ""), now);
+            m.Apps.Add(row);
+        }
+        if (web == "off")
+        {
+            m.WebNeeds = "Tailscale isn't on the library's computer. Install it from tailscale.com/download and sign in.";
+            m.WebNeedsUrl = StudyStash.Core.ClaudeReach.DownloadPage;
+        }
         m.Connected.Add(new AiConnectionRow { Id = "1", Name = "Claude Code", Detail = "Signed in from the web", UsedWords = "Used 10:40", CanRemove = true, First = true });
         m.Connected.Add(new AiConnectionRow { Id = "2", Name = "Codex", Detail = "Token", UsedWords = "Used Tue", CanRemove = true });
         return m;
@@ -675,7 +694,7 @@ public class AiShots
             Shot.Take("win-14-ai-tool-access", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel() }));
     }
 
-    // --- 14: the "Claude (desktop and web)" card (connectors task 5): off, on and answering, and a Funnel problem.
+    // --- 14: the "Claude on the web and phone" card (connectors task 5): off, on and answering, and a Funnel problem.
 
     [AvaloniaFact]
     public void Mac_ai_tool_access_claude_off()

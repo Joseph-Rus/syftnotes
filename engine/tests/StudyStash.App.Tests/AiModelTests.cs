@@ -1,4 +1,5 @@
 using Avalonia.Headless.XUnit;
+using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
@@ -1217,63 +1218,30 @@ public class AiAccessModelTests
     }
 
     [AvaloniaFact]
-    public async Task Copying_claude_code_or_codex_puts_the_right_text_on_the_clipboard()
+    public async Task Connecting_an_app_from_its_row_shows_what_was_written_and_where_it_stands()
     {
         var (model, _) = Loaded();
+        bool added = false;
+        model.ReadApps = () => [new AiAppState("claude-desktop", "Claude Desktop", true, added, false, added ? Now : null, null, "/c.json")];
+        model.ConnectApp = id =>
+        {
+            added = id == "claude-desktop";
+            return new AiAppChange(true, "Added Study Stash to Claude Desktop.", "/c.json", "/c.json.study-stash-backup", "{\"mcpServers\":{}}");
+        };
         await model.Load();
-        model.ClaudeCodeCommand = "claude mcp add ...";
-        model.CodexSetup = "[mcp_servers.study-stash]";
-        var copied = new List<string>();
-        model.Copy = s => { copied.Add(s); return Task.CompletedTask; };
+        var row = Assert.Single(model.Apps);
+        Assert.Equal("Not connected", row.Status);
+        Assert.DoesNotContain(model.Connected, c => c.Name == "Claude Desktop"); // the apps here aren't library connections
 
-        await model.CopyClaudeCodeCommand.ExecuteAsync(null);
-        Assert.Equal("claude mcp add ...", copied[^1]);
-        Assert.Contains("terminal", model.Say);
+        await row.Connect!.ExecuteAsync(null);
 
-        await model.CopyCodexCommand.ExecuteAsync(null);
-        Assert.Equal("[mcp_servers.study-stash]", copied[^1]);
-        Assert.Contains("config.toml", model.Say);
-    }
-
-    [AvaloniaFact]
-    public async Task Adding_claude_desktop_shows_up_as_a_connected_row()
-    {
-        var (model, _) = Loaded();
-        await model.Load();
-        model.AddToClaudeDesktop = () => Task.FromResult("Added to Claude Desktop.");
-        model.CheckInClaudeDesktop = () => true;
-
-        await model.AddClaudeDesktopCommand.ExecuteAsync(null);
-
-        Assert.Equal("Added to Claude Desktop.", model.Say);
-        Assert.Contains(model.Connected, c => c.Id == "claude-desktop");
-    }
-
-    [AvaloniaFact]
-    public async Task Removing_claude_desktop_takes_its_row_away()
-    {
-        var (model, _) = Loaded();
-        model.CheckInClaudeDesktop = () => true;
-        await model.Load();
-        var row = model.Connected.Single(c => c.Id == "claude-desktop");
-        model.RemoveFromClaudeDesktopHook = () => Task.FromResult("Removed from Claude Desktop.");
-        model.CheckInClaudeDesktop = () => false;
-
-        await row.Remove!.ExecuteAsync(null);
-
-        Assert.DoesNotContain(model.Connected, c => c.Id == "claude-desktop");
-    }
-
-    [AvaloniaFact]
-    public async Task Claude_code_on_this_computer_has_no_remove()
-    {
-        var (model, _) = Loaded();
-        model.CheckInClaudeCode = () => true;
-
-        await model.Load();
-
-        var row = model.Connected.Single(c => c.Id == "claude-code");
-        Assert.Null(row.Remove);
+        Assert.Same(row, Assert.Single(model.Apps));
+        Assert.Equal("Added. Quit and reopen Claude Desktop to load it.", row.Status);
+        Assert.True(row.CanDisconnect);
+        Assert.Equal("Added Study Stash to Claude Desktop.", model.Say);
+        Assert.True(model.ShowWritten);
+        Assert.Equal("/c.json", model.WrittenFile);
+        Assert.Contains("/c.json.study-stash-backup", model.WrittenBackupWords);
     }
 
     [AvaloniaFact]
@@ -1296,7 +1264,7 @@ public class AiAccessModelTests
         Assert.Empty(model.Connected);
     }
 
-    // Claude (desktop and web): the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
+    // Claude on the web and phone: the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
     // (task 4). FakeAiLibrary's unscripted SetWebAsync turns Funnel on at "https://mini.tail1234.ts.net" and answers
     // reachable straight away; OnSetWeb/OnCheckWeb script something else (a problem, a slow check, an older library).
 

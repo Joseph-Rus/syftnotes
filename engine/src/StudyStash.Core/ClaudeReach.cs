@@ -52,17 +52,7 @@ public sealed partial class ClaudeReach
     public (string? Url, ReachProblem? Problem) Set(int port, bool internet, bool on, int httpsPort = 443)
     {
         var ts = Tailscale();
-        if (!ts.Installed || ts.Exe.Length == 0)
-            return (null, new(ReachKind.NotInstalled, "Tailscale isn't on the library's computer. Install it from tailscale.com/download and sign in.", DownloadPage));
-        if (!ts.Running)
-            return (null, new(ReachKind.NotRunning, ts.State switch
-            {
-                "NeedsLogin" => "Tailscale is signed out on the library's computer. Open it and sign in.",
-                "Starting" => "Tailscale is still connecting on the library's computer. Try again in a moment.",
-                _ => "Tailscale isn't running on the library's computer. Open it and sign in.",
-            }));
-        if (ts.Dns.Length == 0)
-            return (null, new(ReachKind.NoName, "Tailscale hasn't given this computer a name yet. Turn on MagicDNS in the Tailscale admin console.", DnsPage));
+        if (Missing(ts) is { } missing) return (null, missing);
         string verb = internet ? "funnel" : "serve";
         string https = $"--https={httpsPort}";
         string[] args = on ? [verb, "--bg", https, $"http://127.0.0.1:{port}"] : [verb, https, "off"];
@@ -77,6 +67,26 @@ public sealed partial class ClaudeReach
             return (null, new(ReachKind.Other, words.Length > 0 ? $"Tailscale said: {Py.Head(words, 300)}" : $"Tailscale stopped (code {said.ExitCode}) without saying why."));
         }
         return (on ? $"https://{ts.Dns.TrimEnd('.')}{(httpsPort == 443 ? "" : $":{httpsPort}")}" : null, null);
+    }
+
+    /// <summary>What Tailscale still needs on this computer before anything can go on it (installed, signed in, a
+    /// name), or null when it's ready to try. Asks Tailscale's status; changes nothing.</summary>
+    public ReachProblem? Missing() => Missing(Tailscale());
+
+    static ReachProblem? Missing(TailscaleInfo ts)
+    {
+        if (!ts.Installed || ts.Exe.Length == 0)
+            return new(ReachKind.NotInstalled, "Tailscale isn't on the library's computer. Install it from tailscale.com/download and sign in.", DownloadPage);
+        if (!ts.Running)
+            return new(ReachKind.NotRunning, ts.State switch
+            {
+                "NeedsLogin" => "Tailscale is signed out on the library's computer. Open it and sign in.",
+                "Starting" => "Tailscale is still connecting on the library's computer. Try again in a moment.",
+                _ => "Tailscale isn't running on the library's computer. Open it and sign in.",
+            });
+        if (ts.Dns.Length == 0)
+            return new(ReachKind.NoName, "Tailscale hasn't given this computer a name yet. Turn on MagicDNS in the Tailscale admin console.", DnsPage);
+        return null;
     }
 
     /// <summary>A tailnet admin has to allow Funnel (or HTTPS certificates) once: which one Tailscale is asking for.</summary>

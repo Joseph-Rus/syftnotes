@@ -106,7 +106,14 @@ public sealed record ToolConnection(string Id, string Name, string Kind)
 /// and the last check from the internet (<see cref="Reachable"/>, in <see cref="Words"/>, at
 /// <see cref="CheckedAt"/>, Unix seconds).</summary>
 public sealed record WebReach(bool On, string Name, string? McpUrl, string? Problem, string? FixUrl,
-    bool? Reachable, string? Words, double? CheckedAt, bool HasPassword);
+    bool? Reachable, string? Words, double? CheckedAt, bool HasPassword)
+{
+    /// <summary>While it's off: what the library's computer needs first (Tailscale, installed and signed in, with a
+    /// name), in words, and the page that gets it (<see cref="NeedsUrl"/>). Null when it's ready to turn on, or from
+    /// a library that doesn't say.</summary>
+    public string? Needs { get; init; }
+    public string? NeedsUrl { get; init; }
+}
 
 public sealed record ToolAccessInfo(bool On, ReadingScopes Reading, List<ToolConnection> Connections)
 {

@@ -1,17 +1,94 @@
-# Study Stash as a Claude connector
+# Study Stash and AI apps (MCP)
 
-Claude on the web (claude.ai), the Claude desktop app and Claude on your phone can read your lecture library
-through a **custom connector**. You add Study Stash's address in Claude once. Claude asks you to sign in with your
-library password, and from then on it can search your lectures, notes and Canvas work while you chat.
+Study Stash's library speaks MCP, so AI apps can search and read your lectures, notes and Canvas work. Every tool
+only reads. There are two ways in, and which you need depends on where the AI app runs:
 
-Claude Code and Claude Desktop on the library's own computer don't need any of this. They can use
-`studystash mcp` over stdio (Settings → AI tool access → Connect a tool).
+| The AI app | Where it runs | How it reaches your library | Needs Tailscale? |
+|---|---|---|---|
+| Claude Desktop, Claude Code, Codex (app, CLI, IDE extension), Gemini CLI | On your computer | It starts Study Stash's MCP server itself (stdio) | No |
+| claude.ai in a browser, the Claude phone app | Anthropic's servers | A custom connector at an internet address | Yes (Funnel) |
+| ChatGPT's connectors, in a browser or the ChatGPT app | OpenAI's servers | The same internet address | Yes (Funnel). Not tested |
+
+## On this computer: no Tailscale
+
+This is all a computer on its own needs ("Use just this computer", or a library and a laptop in one).
+
+1. Open Study Stash → Settings → **AI tool access**. Under **AI apps on this computer**, each app shows where it
+   stands: *Not on this computer*, *Not connected*, *Added. Quit and reopen … to load it*, or *Connected · started
+   14:05*.
+2. Choose **Connect** next to the app. Study Stash adds itself to that app's own settings file and shows what it
+   wrote, and where.
+3. Quit and reopen the app (or start a new Claude Code, Codex or Gemini session). When the app starts Study Stash,
+   its row turns to **Connected**.
+
+**Disconnect** takes Study Stash out again. If the app has another copy of Study Stash set up (an old download, say),
+the row says so and offers **Fix**.
+
+### What it writes, and where
+
+Each app gets one entry, `study-stash`, that starts the Study Stash app as an MCP server over stdio:
+`StudyStash mcp --client <app>` (with `--home <folder>` if your settings aren't in the usual place). No password,
+token or address goes into the app's settings: the server reads your library through this computer with the
+password Study Stash already keeps in its own settings (`~/.study-stash`), and `--client` only lets Settings show
+which app started it.
+
+| App | File | Where Study Stash goes |
+|---|---|---|
+| Claude Desktop | Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`. Windows: `%APPDATA%\Claude\claude_desktop_config.json`, or, for the Microsoft Store build, `%LOCALAPPDATA%\Packages\Claude_…\LocalCache\Roaming\Claude\claude_desktop_config.json` | `mcpServers.study-stash` |
+| Claude Code | `~/.claude.json` (or `$CLAUDE_CONFIG_DIR/.claude.json`), the servers for every project, as `claude mcp add --scope user` keeps them | `mcpServers.study-stash` |
+| Codex | `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`). The Codex app, its CLI and its IDE extension all read it | a `[mcp_servers.study-stash]` table |
+| Gemini CLI | `~/.gemini/settings.json` | `mcpServers.study-stash` |
+
+On Windows, `~` is your user folder (`C:\Users\<you>`).
+
+How each change is made:
+
+- **A merge, never a replace.** Everything else in the file (the app's other MCP servers, its settings) stays. In
+  `config.toml` every other line stays exactly as it was, comments included.
+- **The file as it was is kept** next to it, as `<file>.study-stash-backup`, before each change.
+- **A file Study Stash can't rewrite safely is left alone**: JSON that isn't valid, JSON with comments (a rewrite
+  would drop them), TOML that isn't valid, or Study Stash set up by hand in a form it won't rewrite. Settings says
+  why and shows the setup to add by hand.
+- A settings file that's a link (a dotfiles setup) is followed: the file it points to changes, and the link stays.
+- **Copy setup** (for any other MCP app) copies the same `mcpServers` JSON, to paste into that app's settings.
+
+Doing it by hand: Claude Code's own command is
+`claude mcp add --scope user study-stash -- "/Applications/Study Stash.app/Contents/MacOS/StudyStash" mcp`
+(on Windows, the path to `StudyStash.exe`). The others take the JSON from **Copy setup**, or for Codex:
+
+```toml
+[mcp_servers.study-stash]
+command = "/Applications/Study Stash.app/Contents/MacOS/StudyStash"
+args = ["mcp"]
+```
+
+### Over HTTP on this computer
+
+The library also answers MCP over Streamable HTTP at `http://127.0.0.1:<library port + 1>/mcp` (8788 with the usual
+port), on this computer only: it never listens on the network. It always asks for a sign-in. An app that supports
+MCP sign-in (OAuth) finds it by itself, and you allow it with your library password; the sign-in page warns you when
+it returns to a program on this computer. Most apps don't need this: the stdio setup above is simpler.
+
+### What the AI apps on this computer can't do
+
+ChatGPT's desktop app has no local MCP servers: its connectors run on OpenAI's servers, like claude.ai. Use Codex for
+ChatGPT on this computer, or the internet address below. The Gemini app on the web has no custom MCP servers.
+
+## On the web: claude.ai and the Claude phone app
+
+claude.ai and the Claude phone app reach your library from Anthropic's servers, so the library needs an address on
+the internet. Study Stash makes one with Tailscale Funnel. A computer with no Tailscale doesn't have one, so the card
+says what it needs (Tailscale, free, installed and signed in) and links to it, instead of showing an address that
+goes nowhere. Nothing goes on the internet until you turn the switch on, and turning it on needs a library password.
+
+Study Stash doesn't set up other tunnels. Funnel is the one it can turn on and off for you, check from the internet,
+and keep to the Claude port alone.
 
 ## For students
 
 ### What the switch does
 
-The **Claude (desktop and web)** card is in Study Stash → Settings → AI tool access. Its switch is **Let Claude reach
+The **Claude on the web and phone** card is in Study Stash → Settings → AI tool access. Its switch is **Let Claude reach
 your library from the internet**. When you turn it on:
 
 - Study Stash asks Tailscale to turn on **Funnel** for the library's Claude port. That gives it one HTTPS address on
@@ -56,7 +133,7 @@ Any of these ends the connection:
 
 - **In Claude:** Settings → Connectors → Study Stash → Disconnect (or Remove). Claude tells the library to forget its
   sign-in.
-- **In Study Stash:** under Connected tools, choose **Remove** next to Claude. Its token stops working at once, and Claude asks you to
+- **In Study Stash:** on the Claude on the web and phone card, choose **Remove** next to Claude. Its token stops working at once, and Claude asks you to
   sign in again next time.
 - **Everything at once:** turn the Claude switch off. The address stops answering on the internet.
 
