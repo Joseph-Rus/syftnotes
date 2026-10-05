@@ -86,8 +86,9 @@
     </Style>
   </UserControl.Styles>
 
+  <Panel>
   <ScrollViewer Name="Page" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel MaxWidth="1040" HorizontalAlignment="Stretch" Margin="36,18,36,36" Spacing="24">
+    <StackPanel MaxWidth="1040" HorizontalAlignment="Stretch" Margin="36,18,36,130" Spacing="24">
 
       <!-- The greeting and the day, or the class, what it is on Canvas, and what it covers -->
       <Grid ColumnDefinitions="*,Auto">
@@ -101,7 +102,14 @@
           <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" FontSize="13" LineHeight="19" Foreground="{DynamicResource Fg2}"
                      TextWrapping="Wrap" MaxWidth="620" HorizontalAlignment="Left" Margin="0,4,0,0" MaxLines="3" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top" Margin="12,4,0,0" IsVisible="{Binding IsClass}">
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top" Margin="12,4,0,0">
+          <!-- Record from here: into this class on its home, sorted by the library on Home -->
+          <Button Name="Record" Classes="ov-pill" Command="{Binding RecordCommand}" IsVisible="{Binding CanRecord}" AutomationProperties.Name="{Binding RecordWords}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <Ellipse Width="9" Height="9" Fill="{DynamicResource Rec}" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding RecordWords}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
           <Button Classes="ov-pill" Command="{Binding Files.AttachCommand, FallbackValue={x:Null}}" IsVisible="{Binding HasFiles}"
                   ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the page)" AutomationProperties.Name="Attach to class">
             <StackPanel Orientation="Horizontal" Spacing="6">
@@ -328,4 +336,10 @@
       </StackPanel>
     </StackPanel>
   </ScrollViewer>
+  <!-- Ask about everything (Home) or this class, at the foot of the page; its latest answer just above -->
+  <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24" Spacing="8" IsVisible="{Binding HasAsk}">
+    <v:MacAiAnswer DataContext="{Binding Ask}" IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).HasAnswer}" MaxHeight="420" />
+    <v:MacAiAskBar DataContext="{Binding Ask}" />
+  </StackPanel>
+  </Panel>
 </UserControl>

@@ -54,7 +54,9 @@ public static partial class Shell
         if (host.Remote() is not { } lib) return;
         var lectures = await OverviewLecturesAsync(lib, null, 60);
         if (turn != libraryTurn) return;
-        library.Overview = OverviewModel.Home(OverviewSources(lectures, events: library.ComingUp.HasCalendars ? [.. library.ComingUp.Rows] : null));
+        var home = OverviewModel.Home(OverviewSources(lectures, events: library.ComingUp.HasCalendars ? [.. library.ComingUp.Rows] : null));
+        Equip(home, null);
+        library.Overview = home;
     }
 
     static async Task ShowClassHomeAsync(string name)
@@ -91,10 +93,38 @@ public static partial class Shell
             _ = ShowClassTabAsync(name, tab);
         });
         page.SetFolders(LinkedFolders(lib, name, info), host.Settings.LibraryHere ? () => _ = LinkFolderAsync(lib, name) : null);
+        Equip(page, name);
         var files = new AttachmentsModel(lib, name, null);
         page.Files = files;
         _ = files.LoadAsync();
         library.Overview = page;
+    }
+
+    /// <summary>Home's and a class's home's Record and ask bar: everything (Home) or that class.</summary>
+    static void Equip(OverviewModel page, string? cls)
+    {
+        if (host.Settings.Role != AppRole.Library)
+        {
+            page.Recording = host.Recorder.Current is not null;
+            page.OnRecord = () =>
+            {
+                if (host.Recorder.Current is not null)
+                {
+                    ShowRecorder(expanded: true);
+                    return;
+                }
+                chosenClass = cls ?? "";
+                ToggleRecording();
+                page.Recording = true;
+            };
+        }
+        var ask = new AiAskModel(Ai()) { ClassName = cls, OpenSettings = () => ShowSettings("AI") };
+        if (cls is null) ask.OnlyScopes("all");
+        else ask.OnlyScopes("class", "all");
+        library.Ask?.Stop();
+        library.Ask = null;
+        page.Ask = ask;
+        _ = ask.Load();
     }
 
     /// <summary>The folders linked to a class, as the library's overview lists them.</summary>

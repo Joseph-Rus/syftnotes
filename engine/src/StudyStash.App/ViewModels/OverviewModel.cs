@@ -101,6 +101,31 @@ public sealed partial class OverviewModel : ObservableObject
     public bool CanSeeAllDue => OnAllDue is not null && Due.Count > 0;
     public bool CanSeeAllLectures => OnAllLectures is not null && Lectures.Count > 0;
 
+    /// <summary>Record from here: Home lets the library sort the lecture, a class's home records into that class.
+    /// While a lecture records it opens the recorder instead (never stops it by surprise).</summary>
+    public Action? OnRecord { get; set; }
+    public bool CanRecord => OnRecord is not null;
+    [ObservableProperty] public partial bool Recording { get; set; }
+    public string RecordWords => Recording ? "Recording…" : IsHome ? "Record" : $"Record {ClassName}";
+    partial void OnRecordingChanged(bool value) => OnPropertyChanged(nameof(RecordWords));
+    [RelayCommand] void Record() => OnRecord?.Invoke();
+
+    /// <summary>Ask about every class (Home) or this one (its home), floating at the foot of the page as under a lecture.</summary>
+    [ObservableProperty] public partial AiAskModel? Ask { get; set; }
+    public bool HasAsk => Ask is not null;
+    public bool HasAnswer => Ask?.HasLatest == true;
+    partial void OnAskChanged(AiAskModel? oldValue, AiAskModel? newValue)
+    {
+        if (oldValue is not null) oldValue.PropertyChanged -= AskChanged;
+        if (newValue is not null) newValue.PropertyChanged += AskChanged;
+        OnPropertyChanged(nameof(HasAsk));
+        OnPropertyChanged(nameof(HasAnswer));
+    }
+    void AskChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AiAskModel.HasLatest)) OnPropertyChanged(nameof(HasAnswer));
+    }
+
     /// <summary>Folders on the computer that go with the class (a project's repo, say), linked rather than copied in.</summary>
     public ObservableCollection<LinkedFolder> Folders { get; } = [];
     public bool HasFolders => Folders.Count > 0;

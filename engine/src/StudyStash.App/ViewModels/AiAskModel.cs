@@ -76,6 +76,14 @@ public sealed partial class AiAskModel : ObservableObject
         EngineChoice.Mark(ScopeChoices, Scope);
     }
 
+    /// <summary>An ask bar with no lecture under it (Home, a class's home): only the scopes that make sense there.</summary>
+    public void OnlyScopes(params string[] ids)
+    {
+        ScopeChoices.RemoveAll(c => !ids.Contains(c.Id));
+        Scope = ids[0];
+        EngineChoice.Mark(ScopeChoices, Scope);
+    }
+
     /// <summary>Set by the host: the lecture or class this ask bar is under (whichever the current scope needs).</summary>
     public string? LectureId { get; set; }
     public string? ClassName { get; set; }
