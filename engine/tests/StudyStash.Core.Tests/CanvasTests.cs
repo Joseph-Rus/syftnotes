@@ -202,11 +202,11 @@ public class CanvasTests
 
     [Theory]
     [InlineData("Add your school's Canvas address first.", "", "", FindOutcome.NoAddress)] // the library didn't ask Chrome
-    [InlineData("Chrome didn't answer. Is Chrome open, with the Study Stash extension on?", "", "", FindOutcome.NoAddress)] // no address, whatever Chrome did
-    [InlineData("Chrome isn't signed in to Canvas.", "https://canvas.test", "now", FindOutcome.SignedOut)]
-    [InlineData("Chrome didn't answer. Is Chrome open, with the Study Stash extension on?", "https://canvas.test", "", FindOutcome.NoExtension)]
+    [InlineData(AgentQueue.NoAnswer, "", "", FindOutcome.NoAddress)] // no address, whatever Chrome did
+    [InlineData(CanvasSync.SignedOutAnswer, "https://canvas.test", "now", FindOutcome.SignedOut)]
+    [InlineData(AgentQueue.NoAnswer, "https://canvas.test", "", FindOutcome.NoExtension)]
     [InlineData("TypeError: Failed to fetch", "https://canvas.test", "", FindOutcome.NoExtension)]
-    [InlineData("Chrome didn't answer. Is Chrome open, with the Study Stash extension on?", "https://canvas.test", "now", FindOutcome.Away)]
+    [InlineData(AgentQueue.NoAnswer, "https://canvas.test", "now", FindOutcome.Away)]
     [InlineData("TypeError: Failed to fetch", "https://canvas.test", "an hour ago", FindOutcome.Away)]
     [InlineData("TypeError: Failed to fetch", "https://canvas.test", "now", FindOutcome.Other)]
     [InlineData("refused: not a Canvas URL", "https://canvas.test", "now", FindOutcome.Other)]
@@ -245,7 +245,7 @@ public class CanvasTests
         }
 
         var r = await Read(j => new CanvasResult(j.Id, 401, "", """{"status":"unauthenticated","errors":[{"message":"user authorization required"}]}""", "", "", j.Url));
-        Assert.Equal("Chrome isn't signed in to Canvas.", r["error"]!.GetValue<string>());
+        Assert.Equal(CanvasSync.SignedOutAnswer, r["error"]!.GetValue<string>());
         var st = CanvasSettings.Load(dir.Path);
         Assert.True(st.NeedsLogin);
         Assert.Equal(CanvasSync.SignInError, st.Error);
@@ -258,6 +258,36 @@ public class CanvasTests
         Assert.False(st.NeedsLogin);
         Assert.Equal("", st.Error);
         Assert.Equal("connected", CanvasView.State(sync, Now)["state"]!.GetValue<string>());
+    }
+
+    /// <summary>The extension says which browser it runs in (1.6 on), so the app can say "Is Firefox open?": kept per
+    /// copy, written down at once when it changes, and never anything but a plain name.</summary>
+    [Fact]
+    public void The_library_knows_which_browser_checked_in()
+    {
+        using var dir = new TempDir();
+        var now = Now;
+        var sync = FakeCanvas.Library(dir, () => now);
+        CanvasSettings.Update(dir.Path, s => s.Courses.Clear());
+        Assert.Equal(("your browser", "Your browser"), (CanvasSettings.Load(dir.Path).BrowserName(), CanvasSettings.Load(dir.Path).BrowserName(start: true)));
+
+        sync.Work(false, "1.6", 3, "http://127.0.0.1:8787", browser: "Chrome");
+        Assert.Equal("Chrome", CanvasSettings.Load(dir.Path).ExtensionBrowser);
+
+        // The laptop's Firefox, a moment later: said at once, and each copy keeps its own.
+        now = Now.AddSeconds(2);
+        sync.Work(false, "1.6", 3, "http://100.64.0.7:8787", browser: "Firefox");
+        var s = CanvasSettings.Load(dir.Path);
+        Assert.Equal(("Firefox", "Firefox", "Chrome"), (s.BrowserName(), s.ExtensionCopies["another_computer"].Browser, s.ExtensionCopies["this_computer"].Browser));
+        Assert.Equal("Firefox", CanvasView.State(sync, now)["extension"]!["browser"]!.GetValue<string>());
+
+        // The same Firefox switched to Zen (it says so at once); one that says nothing, or nothing fit to show, stays what it was.
+        sync.Work(false, "1.6", 3, "http://100.64.0.7:8787", browser: "Zen");
+        Assert.Equal("Zen", CanvasSettings.Load(dir.Path).ExtensionBrowser);
+        now = now.AddSeconds(20);
+        sync.Work(false, "1.5", 3, "http://100.64.0.7:8787");
+        Assert.Equal("Zen", CanvasSettings.Load(dir.Path).ExtensionBrowser);
+        Assert.Equal(["", "", "Opera GX"], new[] { "<b>Chrome</b>", new string('a', 25), " Opera GX " }.Select(CanvasSettings.CleanBrowser));
     }
 
     [Fact]

@@ -45,6 +45,9 @@ public sealed class CanvasSettings
     /// <summary>Which Chrome last checked in, from the library address the extension says it uses:
     /// "this_computer" (a loopback address), "another_computer", or "" when it didn't say.</summary>
     public string ExtensionWhere { get; set; } = "";
+    /// <summary>Which browser the extension that last checked in runs in, as it names itself ("Chrome", "Edge",
+    /// "Firefox"); "" for an extension from before 1.6, which didn't say.</summary>
+    public string ExtensionBrowser { get; set; } = "";
     /// <summary>Every Chrome that checks in, by where it is ("this_computer", "another_computer", or "" for one from
     /// before 1.4 that doesn't say): when it last asked, and its version and protocol. The library's Chrome and the
     /// laptop's can both run the extension; the fields above are the one that asked last.</summary>
@@ -87,6 +90,22 @@ public sealed class CanvasSettings
     /// <summary>The extension Chrome runs is older than this library's: its folder wasn't brought up to date (one the
     /// laptop app made, say), so it can't reload into the new version by itself.</summary>
     [JsonIgnore] public bool ExtensionOutdated => Extension.IsOlder(ExtensionVersion, Extension.Version());
+
+    /// <summary>The browser the extension runs in, for a sentence: its name once an extension has said it
+    /// (<see cref="ExtensionBrowser"/>), "your browser" until then ("Your browser" to <paramref name="start"/> one).</summary>
+    public string BrowserName(bool start = false) => BrowserName(ExtensionBrowser, start);
+
+    /// <summary><see cref="BrowserName(bool)"/> for any browser's name ("" when it isn't known).</summary>
+    public static string BrowserName(string? browser, bool start = false) =>
+        browser is { Length: > 0 } ? browser : start ? "Your browser" : "your browser";
+
+    /// <summary>A browser's name as an extension gave it (its <c>b</c>), safe to show and to keep: letters, digits and
+    /// spaces, 24 characters at most; "" for anything else.</summary>
+    public static string CleanBrowser(string? name)
+    {
+        string trimmed = (name ?? "").Trim();
+        return trimmed.Length is > 0 and <= 24 && trimmed.All(c => char.IsAsciiLetterOrDigit(c) || c == ' ') ? trimmed : "";
+    }
 
     /// <summary>How often a check-in that changes nothing else is written down.</summary>
     public static readonly TimeSpan SeenEvery = TimeSpan.FromSeconds(15);
@@ -236,6 +255,7 @@ public sealed record CourseInfo(string Code, string Name, string Term, string Te
 /// student has seen it.</summary>
 public sealed record ExtensionUpdate(string From, string To, string At, bool Dismissed);
 
-/// <summary>One Chrome's extension as it last checked in: when (ISO), its version, its protocol, and which key it came
-/// with (<see cref="CanvasSettings.KeyId"/>; "" from before keys were written down).</summary>
-public sealed record ExtensionCopy(string Seen, string Version, int Protocol, string Key = "");
+/// <summary>One browser's extension as it last checked in: when (ISO), its version, its protocol, which key it came
+/// with (<see cref="CanvasSettings.KeyId"/>; "" from before keys were written down), and which browser it is ("Chrome",
+/// "Firefox"; "" from before 1.6).</summary>
+public sealed record ExtensionCopy(string Seen, string Version, int Protocol, string Key = "", string Browser = "");

@@ -10,8 +10,8 @@ public sealed class AgentQueue
     /// <summary>After an AI's last read, the extension keeps checking often for this long: it's likely to ask again.</summary>
     public static readonly TimeSpan HotFor = TimeSpan.FromMinutes(2);
 
-    /// <summary>What a read gets back when Chrome didn't answer in time.</summary>
-    public const string NoAnswer = "Chrome didn't answer. Is Chrome open, with the Study Stash extension on?";
+    /// <summary>What a read gets back when the browser with the extension didn't answer in time.</summary>
+    public const string NoAnswer = "Your browser didn't answer. Is it open, with the Study Stash extension on?";
 
     readonly Lock gate = new();
     readonly List<CanvasJob> jobs = [];

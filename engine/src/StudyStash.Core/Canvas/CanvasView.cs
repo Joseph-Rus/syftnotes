@@ -42,7 +42,8 @@ public static class CanvasView
         return courses.Keys.Where(cls => !Done(cls)).ToList();
     }
 
-    /// <summary>The state, for the app's Canvas screens. <c>extension.connected</c> is a Chrome checking in now with
+    /// <summary>The state, for the app's Canvas screens. <c>extension.browser</c> is the browser that checked in last
+    /// ("Chrome", "Firefox"; "" before 1.6); <c>extension.connected</c> is a Chrome checking in now with
     /// this library's current key; <c>seen</c> is when one last did (null: never); <c>key_matches</c> says whether the
     /// Chrome that checked in last used that key (false: it has an old one, so it needs connecting again); and
     /// <c>refused_at</c> is when a Chrome with another key last knocked (<paramref name="refusedAt"/>).</summary>
@@ -53,7 +54,7 @@ public static class CanvasView
         var left = active ? Left(s.Synced, sync.Crawl.Sections) : [];
         string? host = Uri.TryCreate(s.Url, UriKind.Absolute, out var u) ? u.Host : null;
         var warnings = new JsonArray();
-        if (s.ExtensionOutdated) warnings.Add("The Chrome extension is older than this library's; open chrome://extensions and reload it.");
+        if (s.ExtensionOutdated) warnings.Add($"The extension in {s.BrowserName()} is older than this library's; open its extensions page and reload it.");
         return new JsonObject
         {
             ["state"] = StateOf(s, active, now),
@@ -63,6 +64,7 @@ public static class CanvasView
             {
                 ["seen"] = When(s.SeenWithKey), ["version"] = s.ExtensionVersion, ["latest"] = Extension.Version(), ["outdated"] = s.ExtensionOutdated,
                 ["connected"] = s.ExtensionConnected(now), ["key_matches"] = s.LastKeyMatches, ["last_seen"] = When(s.ExtensionSeen),
+                ["browser"] = s.ExtensionBrowser,
                 ["refused_at"] = When(refusedAt),
                 ["updated"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = When(up.At) } : null,
             },

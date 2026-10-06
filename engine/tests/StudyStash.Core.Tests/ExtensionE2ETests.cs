@@ -121,7 +121,7 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
             var sw = Stopwatch.StartNew();
             var found = await rig.PostAsync("/api/v2/canvas/courses", "{}");
             Note($"Find courses signed out answered in {sw.Elapsed.TotalSeconds:0.0} s: {found["error"]?.ToJsonString()}");
-            Assert.Equal("Chrome isn't signed in to Canvas.", ExtensionRig.S(found["error"]));
+            Assert.Equal(CanvasSync.SignedOutAnswer, ExtensionRig.S(found["error"]));
             // And the library now knows: the app and Settings say "Sign in to Canvas".
             Assert.Equal("signed_out", ExtensionRig.S((await rig.GetAsync("/api/v2/canvas/state"))["state"]));
         }
