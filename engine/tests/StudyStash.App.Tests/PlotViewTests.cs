@@ -116,7 +116,11 @@ public class PlotViewTests
         using var output = new MemoryStream();
         int pages = await Services.NotesPdf.WriteAsync(output, lecture, false, Services.Paper.Letter, Avalonia.Media.Colors.Teal);
         var pdf = new PdfProbe(output.ToArray());
-        if (Environment.GetEnvironmentVariable("STUDYSTASH_SHOTS") is { Length: > 0 } dir) await File.WriteAllBytesAsync(Path.Combine(dir, "plot-paper.pdf"), output.ToArray());
+        if (Environment.GetEnvironmentVariable("STUDYSTASH_SHOTS") is { Length: > 0 } dir)
+        {
+            Directory.CreateDirectory(dir); // this test may be the first to keep a picture
+            await File.WriteAllBytesAsync(Path.Combine(dir, "plot-paper.pdf"), output.ToArray());
+        }
         Assert.True(pdf.IsPdf);
         Assert.True(pdf.Count("threshold 0.5") == 1);
         Assert.True(pdf.Count("Drawn at k = 1 (steepness k).") == 1);
