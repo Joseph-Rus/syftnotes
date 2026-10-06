@@ -1244,7 +1244,7 @@ public static partial class Shell
         return new GuidedSetupModel(model, services, () => host.Settings, host.Save);
     }
 
-    /// <summary>The Chrome helper card's Canvas connection, as the Canvas step makes it, started before the card shows.</summary>
+    /// <summary>The browser helper card's Canvas connection, as the Canvas step makes it, started before the card shows.</summary>
     static async Task<CanvasConnectModel?> SetupCanvasAsync(SetupModel model)
     {
         if (host.Remote() is null) return null;

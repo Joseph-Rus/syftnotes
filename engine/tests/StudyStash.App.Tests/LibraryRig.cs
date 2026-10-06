@@ -155,8 +155,9 @@ public sealed class LibraryRig : IAsyncDisposable
     public CanvasContext Context(CanvasClient? client = null)
     {
         var actions = new CanvasActions(
-            OpenUrl: _ => { }, OpenInChrome: _ => { }, OpenChrome: () => { }, OpenChromeExtensions: () => { }, RevealFolder: _ => { },
-            OpenFile: _ => { }, PrepareExtension: (_, _) => Path.Combine(Home, "laptop-extension"));
+            OpenUrl: _ => { }, OpenInBrowser: _ => { }, OpenBrowser: () => { }, Browsers: () => [Browsers.Chrome], RememberBrowser: _ => { },
+            OpenExtensions: _ => null, OpenAddOn: _ => null, RevealFolder: _ => { },
+            OpenFile: _ => { }, PrepareExtension: (_, _) => Path.Combine(Home, "laptop-extension"), Copy: _ => { });
         return new CanvasContext(client ?? Client(), new CanvasClock(() => DateTimeOffset.Now, FakeCanvas.Zone),
             _ => new SolidColorBrush(Colors.Gray), actions, Home);
     }

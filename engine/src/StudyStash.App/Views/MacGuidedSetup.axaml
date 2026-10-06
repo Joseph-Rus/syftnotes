@@ -727,13 +727,14 @@
                               </Grid>
                             </StackPanel>
 
-                            <!-- Canvas: the Chrome helper, with Canvas connect's own three pictures -->
+                            <!-- Canvas: the browser helper, with Canvas connect's own three pictures (Chrome's family) or its three steps and code (Firefox's) -->
                             <StackPanel Spacing="10" IsVisible="{Binding IsChrome}">
                               <ContentControl Content="{Binding Canvas}">
                                 <ContentControl.ContentTemplate>
                                   <DataTemplate x:DataType="vm:CanvasConnectModel">
                               <StackPanel Spacing="10">
-                                <TextBlock Classes="note" Text="{Binding ChromeHelp}" />
+                                <TextBlock Classes="note" Text="{Binding BrowserHelp}" />
+                                <StackPanel Spacing="10" IsVisible="{Binding IsChromium}">
                                 <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
                                   <Border Classes="cv-illus" Height="76">
                                     <StackPanel Spacing="10">
@@ -764,18 +765,39 @@
                                   <Grid Grid.Column="1" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="2" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Click Load unpacked" TextWrapping="Wrap" /></Grid>
                                   <Grid Grid.Column="2" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding PickCaption}" TextWrapping="Wrap" /></Grid>
                                 </Grid>
-                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding WaitingForChrome}">
-                                  <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-                                  <TextBlock Classes="note" Text="Waiting for Chrome…" VerticalAlignment="Center" />
                                 </StackPanel>
-                                <TextBlock Classes="note" Foreground="{DynamicResource Warn}" Text="{Binding ChromeError}" IsVisible="{Binding ChromeError, Converter={x:Static c:Converters.NotEmpty}}" />
+                                <StackPanel Spacing="8" IsVisible="{Binding IsFirefox}">
+                                  <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="1" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding FirefoxStep1}" TextWrapping="Wrap" /></Grid>
+                                  <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="2" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding FirefoxStep2}" TextWrapping="Wrap" /></Grid>
+                                  <Border Classes="cv-code" Margin="14,0,0,0" IsVisible="{Binding ShowCode}">
+                                    <Grid ColumnDefinitions="*,10,Auto">
+                                      <SelectableTextBlock AutomationProperties.Name="Connection code" Text="{Binding ConnectionCode}" />
+                                      <Button Grid.Column="2" Classes="cv-pill cv-mini" VerticalAlignment="Top" Command="{Binding CopyCodeCommand}"><TextBlock Text="{Binding CopyLabel}" /></Button>
+                                    </Grid>
+                                  </Border>
+                                  <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding FirefoxStep3}" TextWrapping="Wrap" /></Grid>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding WaitingForBrowser}">
+                                  <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                                  <TextBlock Classes="note" Text="{Binding WaitingLabel}" VerticalAlignment="Center" />
+                                </StackPanel>
+                                <TextBlock Classes="note" Foreground="{DynamicResource Warn}" Text="{Binding BrowserError}" IsVisible="{Binding BrowserError, Converter={x:Static c:Converters.NotEmpty}}" />
                               </StackPanel>
                                   </DataTemplate>
                                 </ContentControl.ContentTemplate>
                               </ContentControl>
-                              <Button Classes="push tint" HorizontalAlignment="Right" Command="{Binding PressCommand}" CommandParameter="add" IsVisible="{Binding Canvas.ShowAddToChrome, FallbackValue=True}" IsEnabled="{Binding !Busy}">
-                                <TextBlock Text="Add to Chrome" FontSize="13" FontWeight="Medium" />
-                              </Button>
+                              <!-- Another browser (when there is one), quietly on the left; the card's one button on the right -->
+                              <Grid ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding Canvas.ShowAddRow, FallbackValue=True}">
+                                <Button Classes="link" IsVisible="{Binding Canvas.CanSwitchBrowser, FallbackValue=False}">
+                                  <TextBlock Text="Use another browser" />
+                                  <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding Canvas.BrowserChoices}" ItemContainerTheme="{StaticResource CvBrowserItem}" />
+                                  </Button.Flyout>
+                                </Button>
+                                <Button Grid.Column="2" Classes="push tint" Command="{Binding PressCommand}" CommandParameter="add" IsVisible="{Binding Canvas.ShowAddToBrowser, FallbackValue=True}" IsEnabled="{Binding !Busy}">
+                                  <TextBlock Text="{Binding Canvas.AddLabel, FallbackValue='Add to your browser'}" FontSize="13" FontWeight="Medium" />
+                                </Button>
+                              </Grid>
                             </StackPanel>
 
                             <!-- The courses Canvas found -->

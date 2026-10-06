@@ -55,10 +55,10 @@
           </Grid>
           <Border Classes="cv-sep" />
           <Grid Classes="cv-row" ColumnDefinitions="*,Auto,Auto">
-            <TextBlock Text="Chrome extension" VerticalAlignment="Center" FontSize="13" />
+            <TextBlock Text="{Binding ExtensionLabel}" VerticalAlignment="Center" FontSize="13" />
             <TextBlock Grid.Column="1" Classes="cv-value" Text="{Binding ExtensionLine}" VerticalAlignment="Center" />
             <Button Grid.Column="2" Classes="cv-pill cv-plain" Margin="12,0,0,0" VerticalAlignment="Center" Command="{Binding SetUpExtensionCommand}"
-                    ToolTip.Tip="The steps to add it to Chrome again: its folder, and Load unpacked"><TextBlock Text="Set up" /></Button>
+                    ToolTip.Tip="The steps to add it to your browser again"><TextBlock Text="Set up" /></Button>
           </Grid>
           <Border Classes="cv-sep" />
           <Grid Classes="cv-row" ColumnDefinitions="*,Auto">

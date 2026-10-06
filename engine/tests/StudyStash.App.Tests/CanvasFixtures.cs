@@ -22,23 +22,35 @@ public static class CanvasFixtures
     /// <summary>A context wired to a fake library (or none, for a view model with nothing to load from), the
     /// design's clock, class dots CS 101 = dot 0, BIO 110 = 1, CALC II = 2, HIST 210 = 3, and actions that only
     /// record what they were asked (never launch anything). <paramref name="log"/>, when given, collects each
-    /// action's name and argument in order.</summary>
-    public static CanvasContext Context(FakeLibrary? handler = null, string? home = null, List<(string What, string Arg)>? log = null)
+    /// action's name and argument in order. <paramref name="browsers"/> is what this pretend computer can add the
+    /// extension to, the one to use first (just Chrome unless said); <paramref name="notInstalled"/> is the sentence
+    /// opening one answers with, for a computer where it isn't there.</summary>
+    public static CanvasContext Context(FakeLibrary? handler = null, string? home = null, List<(string What, string Arg)>? log = null,
+        IReadOnlyList<Browser>? browsers = null, string? notInstalled = null)
     {
         var client = handler is null ? null : new CanvasClient("https://library.test", "test-key", handler.Client());
         void Log(string what, string arg = "") => log?.Add((what, arg));
+        string? Opened(string what, Browser browser)
+        {
+            Log(what, browser.Name);
+            return notInstalled;
+        }
         var actions = new CanvasActions(
             OpenUrl: url => Log("OpenUrl", url),
-            OpenInChrome: url => Log("OpenInChrome", url),
-            OpenChrome: () => Log("OpenChrome"),
-            OpenChromeExtensions: () => Log("OpenChromeExtensions"),
+            OpenInBrowser: url => Log("OpenInBrowser", url),
+            OpenBrowser: () => Log("OpenBrowser"),
+            Browsers: () => browsers ?? [Browsers.Chrome],
+            RememberBrowser: browser => Log("RememberBrowser", browser.Name),
+            OpenExtensions: browser => Opened("OpenExtensions", browser),
+            OpenAddOn: browser => Opened("OpenAddOn", browser),
             RevealFolder: dir => Log("RevealFolder", dir),
             OpenFile: path => Log("OpenFile", path),
             PrepareExtension: (key, canvasUrl) =>
             {
                 Log("PrepareExtension", $"{key} {canvasUrl}");
                 return home is null ? "" : Path.Combine(home, "chrome-extension");
-            });
+            },
+            Copy: text => Log("Copy", text));
         // A fresh brush from the same palette Skin.ClassDot draws from, not that shared cache itself: plain (non-UI-
         // thread) tests run alongside Avalonia ones in this project, and an AvaloniaObject born on the wrong thread
         // makes every later render of it throw "a different thread owns it" — however far away that render is.

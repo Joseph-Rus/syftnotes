@@ -98,7 +98,9 @@ public static partial class Shell
     /// <see cref="CanvasFeed"/>, which reads again whenever the library says Canvas changed.</summary>
     static void OnCanvasChanged() => Dispatcher.UIThread.Post(() =>
     {
-        if (quitting || canvasWatch?.State is null) return;
+        if (quitting || canvasWatch?.State is not { } state) return;
+        // Which browser the extension checked in from: the one "Open in the browser" opens, anywhere in the app.
+        Browsers.Heard = Browsers.HeardFrom(state.Extension);
         library.Status = LibraryStatus();
         UpdateDueStatus();
     });

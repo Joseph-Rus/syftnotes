@@ -204,12 +204,12 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
             System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(dest)!);
             if (context.Client is { } client && await client.DownloadAsync(cls, chip.Path, dest))
                 context.Actions.OpenFile(dest);
-            else if (chip.Url is { Length: > 0 } fileUrl) context.Actions.OpenInChrome(fileUrl);
-            else if (url is { Length: > 0 }) context.Actions.OpenInChrome(url);
+            else if (chip.Url is { Length: > 0 } fileUrl) context.Actions.OpenInBrowser(fileUrl);
+            else if (url is { Length: > 0 }) context.Actions.OpenInBrowser(url);
         }
         catch (Exception e) when (e is HttpRequestException or CanvasLibraryException or System.IO.IOException or TaskCanceledException)
         {
-            if (url is { Length: > 0 }) context.Actions.OpenInChrome(url);
+            if (url is { Length: > 0 }) context.Actions.OpenInBrowser(url);
         }
         finally
         {
@@ -217,7 +217,7 @@ public sealed partial class AssignmentModel(CanvasContext context) : ObservableO
         }
     }
 
-    /// <summary>A link in the instructions: a web address opens in the browser (Canvas's in Chrome); one into the
+    /// <summary>A link in the instructions: a web address opens in the browser (Canvas's in the one the student reads Canvas in); one into the
     /// assignment's own saved files ("files/slides.pdf", "../Lab 1/files/policy.pdf") opens the library's copy, or
     /// the assignment on Canvas when the library hasn't got it.</summary>
     public Action<string> LinkHandler => OpenLink;

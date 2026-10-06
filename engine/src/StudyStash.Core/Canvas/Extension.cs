@@ -215,6 +215,16 @@ public static class Extension
     /// so it never changes once the add-on is published.</summary>
     public const string FirefoxId = "canvas@study-stash-app.web.app";
 
+    /// <summary>The Firefox copy's page on addons.mozilla.org once it's published there; "" until then, and the app
+    /// offers Firefox only when there's somewhere to get it (docs/firefox-add-on.md).</summary>
+    public const string FirefoxPublishedAt = "";
+
+    /// <summary>Where a student gets the Firefox copy: <see cref="FirefoxPublishedAt"/>, or what
+    /// STUDYSTASH_FIREFOX_ADDON says instead (a web address, or the path of a packed add-on), for trying it before
+    /// it's published. "" when there's nowhere.</summary>
+    public static string FirefoxAddOn =>
+        Environment.GetEnvironmentVariable("STUDYSTASH_FIREFOX_ADDON") is { Length: > 0 } tried ? tried : FirefoxPublishedAt;
+
     /// <summary>The oldest Firefox the add-on installs in: 140 (June 2025, also an extended-support release) has
     /// everything the extension uses, and shows what it sends where before the student adds it.</summary>
     public const string FirefoxMinVersion = "140.0";

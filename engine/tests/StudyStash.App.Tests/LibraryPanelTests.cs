@@ -70,7 +70,7 @@ public class LibraryPanelTests
 
     [Theory]
     [InlineData("not_set_up", "Canvas isn't connected", true)]
-    [InlineData("no_extension", "Canvas is waiting for Chrome", false)]
+    [InlineData("no_extension", "Canvas is waiting for your browser", false)]
     [InlineData("syncing", "Canvas syncing…", true)]
     [InlineData("error", "Canvas couldn't sync", false)]
     public void Canvas_says_what_it_is_doing(string status, string words, bool good) =>

@@ -826,7 +826,7 @@ public static partial class Shell
         ShowLibrary();
     }
 
-    /// <summary>Canvas syncs on Chrome's next check, within a minute.</summary>
+    /// <summary>Canvas syncs on the browser's next check, within a minute.</summary>
     static void SyncCanvas()
     {
         quickWindow?.Hide();
@@ -841,7 +841,7 @@ public static partial class Shell
             {
             }
         });
-        Toast("Syncing Canvas", "On Chrome's next check, within a minute.", null, null);
+        Toast("Syncing Canvas", $"On {CanvasWords.Browser(canvasWatch?.State)}'s next check, within a minute.", null, null);
     }
 
     /// <summary>A passage cut down to the part round what was searched for.</summary>

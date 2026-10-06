@@ -11,8 +11,8 @@ public class CanvasStatusTests
         // fixture, Kind, Title, Text, Glyph, Tone, ActionLabel, IsPrimary, IsPlain, CanClose — design 08's table.
         yield return ["state-not-set-up", CanvasStateKind.NotSetUp, "Connect Canvas",
             "Bring in assignments, due dates and course files next to your lectures.", "link_off", CanvasTone.Info, "Connect", true, false, true];
-        yield return ["state-no-extension", CanvasStateKind.NoExtension, "Finish setting up the Chrome extension",
-            "It takes three clicks in Chrome.", "extension", CanvasTone.Warn, "Show me how", true, false, true];
+        yield return ["state-no-extension", CanvasStateKind.NoExtension, "Finish setting up the browser extension",
+            "It takes a few clicks in your browser.", "extension", CanvasTone.Warn, "Show me how", true, false, true];
         yield return ["state-chrome-away", CanvasStateKind.ChromeAway, "Is Chrome open?",
             "Chrome last checked in at 8:12. Canvas syncs only while Chrome is open.", "schedule", CanvasTone.Warn, "Open Chrome", false, false, true];
         yield return ["state-signed-out", CanvasStateKind.SignedOut, "Sign in to Canvas in Chrome",
@@ -21,7 +21,7 @@ public class CanvasStatusTests
             "BIO 110, CALC II and HIST 210.", "", CanvasTone.Info, null!, false, false, true];
         yield return ["state-connected", CanvasStateKind.Connected, "Connected",
             "Last sync 10:24. Next at 11:24.", "check_circle", CanvasTone.Ok, "Sync now", false, false, false];
-        yield return ["state-updated", CanvasStateKind.Updated, "The Chrome extension updated itself",
+        yield return ["state-updated", CanvasStateKind.Updated, "The extension in Chrome updated itself",
             "Now version 1.4. Nothing to do.", "new_releases", CanvasTone.Info, "Dismiss", false, true, false];
         yield return ["state-error", CanvasStateKind.Error, "Canvas didn’t answer",
             "school.instructure.com didn’t respond at 10:24. Study Stash will try again at 11:24.", "error", CanvasTone.Error, "Try now", false, false, true];
@@ -90,23 +90,29 @@ public class CanvasStatusTests
     }
 
     [Fact]
-    public void Act_on_chrome_away_opens_chrome()
+    public void Act_on_chrome_away_opens_the_browser()
     {
         List<(string What, string Arg)> log = [];
         var model = new CanvasStatusModel(CanvasFixtures.Context(log: log));
         model.Show(CanvasFixtures.Load<CanvasApi.State>("state-chrome-away"));
         model.ActCommand.Execute(null);
-        Assert.Contains(log, e => e.What == "OpenChrome");
+        Assert.Contains(log, e => e.What == "OpenBrowser");
+
+        // Its button names the browser the extension is in; one that didn't say is "your browser".
+        model.Show(new CanvasApi.State { Status = "chrome_away", Extension = new() { Browser = "Edge" } });
+        Assert.Equal("Open Edge", model.ActionLabel);
+        model.Show(new CanvasApi.State { Status = "chrome_away", Extension = new() });
+        Assert.Equal("Open your browser", model.ActionLabel);
     }
 
     [Fact]
-    public void Act_on_signed_out_opens_canvas_in_chrome()
+    public void Act_on_signed_out_opens_canvas_in_the_browser()
     {
         List<(string What, string Arg)> log = [];
         var model = new CanvasStatusModel(CanvasFixtures.Context(log: log));
         model.Show(CanvasFixtures.Load<CanvasApi.State>("state-signed-out"));
         model.ActCommand.Execute(null);
-        Assert.Contains(log, e => e.What == "OpenInChrome" && e.Arg == "https://school.instructure.com");
+        Assert.Contains(log, e => e.What == "OpenInBrowser" && e.Arg == "https://school.instructure.com");
     }
 
     [Fact]

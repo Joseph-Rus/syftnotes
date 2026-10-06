@@ -2,7 +2,25 @@
      settings page's own "group"/"row"/"pill" classes once our controls sit inside it. -->
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:StudyStash.App.ViewModels"
         xmlns:c="using:StudyStash.App.Controls">
+
+  <Styles.Resources>
+    <!-- A browser in the extension step's "Use another browser" menu: its name, a check on the one chosen now. The
+         menu's own item, bound to its choice (a MenuItem inside an item template would sit in the real item's header). -->
+    <ControlTheme x:Key="CvBrowserItem" TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:BrowserChoice">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="10,6" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Header" Value="{Binding Name}" />
+      <Setter Property="Command" Value="{Binding Pick}" />
+      <Setter Property="Icon">
+        <Template>
+          <c:Icon Glyph="check" Size="13" IsVisible="{Binding Current}" />
+        </Template>
+      </Setter>
+    </ControlTheme>
+  </Styles.Resources>
 
   <!-- design 08: one state's card -->
   <Style Selector="Border.cv-card">
@@ -639,6 +657,21 @@
     <Setter Property="FontSize" Value="11" />
     <Setter Property="FontWeight" Value="SemiBold" />
     <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+  </Style>
+  <!-- Firefox's connection code: a box to select from or copy, framed like the pictures it stands in for. -->
+  <Style Selector="Border.cv-code">
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Background" Value="{DynamicResource Raised}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,6,6,6" />
+  </Style>
+  <Style Selector="Border.cv-code SelectableTextBlock">
+    <Setter Property="FontFamily" Value="SF Mono, Menlo, Cascadia Mono, Consolas, monospace" />
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="LineHeight" Value="15" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
   <Style Selector="TextBlock.cv-waiting">
     <Setter Property="FontSize" Value="12" />

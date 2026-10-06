@@ -122,8 +122,10 @@ public sealed class GuidedSetupShots
         });
     }
 
-    /// <summary>A chat under way: the AI's greeting, the student's answer, what Study Stash noted, and a card.</summary>
-    internal static GuidedSetupModel Chat(SkinKind skin, string card, AppRole role = AppRole.Both, bool chosen = true, double? downloading = null)
+    /// <summary>A chat under way: the AI's greeting, the student's answer, what Study Stash noted, and a card.
+    /// <paramref name="browsers"/> is what the helper card's computer can add the extension to (just Chrome unless said).</summary>
+    internal static GuidedSetupModel Chat(SkinKind skin, string card, AppRole role = AppRole.Both, bool chosen = true, double? downloading = null,
+        IReadOnlyList<Browser>? browsers = null)
     {
         var services = new GuidedServices
         {
@@ -184,8 +186,11 @@ public sealed class GuidedSetupShots
                 s.MicHeard = true;
                 break;
             case "chrome_helper":
-                var ctx = CanvasFixtures.Context(new FakeLibrary());
-                s.Canvas = new CanvasConnectModel(ctx, new CanvasWatch(ctx), forSetup: true) { AddedToChrome = true, ExtensionFolder = "/Users/student/Study Stash/Chrome extension" };
+                var ctx = CanvasFixtures.Context(new FakeLibrary(), browsers: browsers);
+                s.Canvas = new CanvasConnectModel(ctx, new CanvasWatch(ctx), forSetup: true) { AddedToBrowser = true, ExtensionFolder = "/Users/student/Study Stash/Chrome extension" };
+                // Firefox's card shows the code its second step pastes (as long as a student's own).
+                if (s.Canvas.IsFirefox)
+                    s.Canvas.ConnectionCode = StudyStash.Core.Canvas.Extension.ConnectionCode("http://127.0.0.1:8787", "q1W2e3R4t5Y6u7I8o9P0a1S2d3F4g5H6", "https://school.instructure.com");
                 break;
             case "course_picker":
                 foreach (var (id, name, code) in new[] { ("1", "Intro to Biology", "BIO 110"), ("2", "Intro to Computer Science", "CS 101"), ("3", "Modern World History", "HIST 120") })
@@ -239,6 +244,7 @@ public sealed class GuidedSetupShots
                 ("microphone", () => Chat(skin, "microphone_check")),
                 ("model", () => Chat(skin, "model_download")),
                 ("chrome", () => Chat(skin, "chrome_helper", downloading: 0.42)),
+                ("firefox", () => Chat(skin, "chrome_helper", downloading: 0.42, browsers: [Browsers.Firefox, Browsers.Chrome])),
                 ("courses", () => Chat(skin, "course_picker", downloading: 0.42)),
                 ("start-at-login", () => Chat(skin, "start_at_login", downloading: 0.42)),
                 ("finish", () => Chat(skin, "finish")),

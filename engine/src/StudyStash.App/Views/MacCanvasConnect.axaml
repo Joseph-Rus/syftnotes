@@ -1,6 +1,6 @@
-<!-- Connecting Canvas (design 07): the school, Add to Chrome, finding your courses, and (Settings' window only)
-     matching classes and the first sync. Every step is one row of the same height: its marker, its title, and on the
-     right its summary or its one action; the open step's help, pictures and lists sit under its title.
+<!-- Connecting Canvas (design 07): the school, Add to Chrome (or whichever browser), finding your courses, and
+     (Settings' window only) matching classes and the first sync. Every step is one row of the same height: its marker,
+     its title, and on the right its summary or its one action; the open step's help, pictures and lists sit under its title.
      Draws no outer padding or window — the setup wizard or a small dialog gives the margins. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -51,7 +51,7 @@
         <TextBlock Classes="cv-help cv-body" Text="{Binding SchoolError}" IsVisible="{Binding SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <Border Classes="cv-sep" />
 
-        <!-- 2 Add to Chrome -->
+        <!-- 2 The browser extension: Add to Chrome, Edge, Firefox… -->
         <Grid Classes="cv-srow" ColumnDefinitions="20,12,*,Auto">
           <Panel Classes="cv-marker">
             <Border Classes="cv-num" Classes.cv-current="{Binding Step2.IsCurrent}" IsVisible="{Binding !Step2.IsDone}"><TextBlock Text="2" /></Border>
@@ -60,25 +60,27 @@
           <TextBlock Grid.Column="2" Classes="cv-step-title" Classes.cv-current="{Binding Step2.IsCurrent}" Classes.cv-todo="{Binding Step2.IsToDo}" Text="{Binding Step2.Title}" />
           <TextBlock Grid.Column="3" Classes="cv-value cv-good" Text="{Binding Step2.Summary}" VerticalAlignment="Center" IsVisible="{Binding Step2.IsDone}" />
           <Panel Grid.Column="3" IsVisible="{Binding Step2.IsCurrent}" VerticalAlignment="Center">
-            <Button Classes="cv-pill cv-mini cv-primary" IsVisible="{Binding ShowAddToChrome}" IsEnabled="{Binding !AddingToChrome}" Command="{Binding AddToChromeCommand}">
-              <TextBlock Text="Add to Chrome" />
+            <Button Classes="cv-pill cv-mini cv-primary" IsVisible="{Binding ShowAddToBrowser}" IsEnabled="{Binding !AddingToBrowser}" Command="{Binding AddToBrowserCommand}">
+              <TextBlock Text="{Binding AddLabel}" />
             </Button>
-            <StackPanel Classes="cv-action" IsVisible="{Binding WaitingForChrome}">
+            <StackPanel Classes="cv-action" IsVisible="{Binding WaitingForBrowser}">
               <c:Spinner Width="14" Height="14" Thickness="2" Foreground="{DynamicResource Fg2}" />
-              <TextBlock Classes="cv-value" Text="Waiting for Chrome…" />
+              <TextBlock Classes="cv-value" Text="{Binding WaitingLabel}" />
             </StackPanel>
-            <StackPanel Classes="cv-action" IsVisible="{Binding ChromeConnected}">
+            <StackPanel Classes="cv-action" IsVisible="{Binding BrowserConnected}">
               <c:Icon Glyph="check" Size="16" Foreground="{DynamicResource Ok}" />
               <TextBlock Classes="cv-value cv-good" Text="Connected" />
             </StackPanel>
           </Panel>
         </Grid>
         <StackPanel Classes="cv-body" Spacing="12" IsVisible="{Binding Step2.IsCurrent}">
-          <TextBlock Classes="cv-step-body" Text="{Binding ChromeHelp}" />
+          <TextBlock Classes="cv-step-body" Text="{Binding BrowserHelp}" />
+          <!-- Chrome's family: three pictures of its extensions page -->
+          <StackPanel Spacing="12" IsVisible="{Binding IsChromium}">
           <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
             <Border Classes="cv-illus" Height="84">
               <StackPanel Spacing="10">
-                <!-- Chrome's extensions page, its Developer mode switch at the top right -->
+                <!-- The extensions page, its Developer mode switch at the top right -->
                 <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Right">
                   <TextBlock Classes="cv-illus-row" Text="Developer mode" VerticalAlignment="Center" />
                   <Border Classes="cv-illus-toggle"><Ellipse Classes="cv-illus-knob" /></Border>
@@ -107,12 +109,36 @@
             <Grid Grid.Column="1" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="2" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="Click Load unpacked" TextWrapping="Wrap" /></Grid>
             <Grid Grid.Column="2" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding PickCaption}" TextWrapping="Wrap" /></Grid>
           </Grid>
-          <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding AddedToChrome}">
-            <Button Classes="cv-quiet" Command="{Binding ShowFolderCommand}"><TextBlock Classes="cv-link" Text="Show the folder again" /></Button>
-            <TextBlock Classes="cv-link-sep" Text="·" />
-            <Button Classes="cv-quiet" Command="{Binding OpenChromeExtensionsCommand}"><TextBlock Classes="cv-link" Text="Open Chrome extensions" /></Button>
           </StackPanel>
-          <TextBlock Classes="cv-help" Text="{Binding ChromeError}" IsVisible="{Binding ChromeError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <!-- Firefox's family: three steps, and the code its second step pastes -->
+          <StackPanel Spacing="8" IsVisible="{Binding IsFirefox}">
+            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="1" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding FirefoxStep1}" TextWrapping="Wrap" /></Grid>
+            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="2" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding FirefoxStep2}" TextWrapping="Wrap" /></Grid>
+            <Border Classes="cv-code" Margin="14,0,0,0" IsVisible="{Binding ShowCode}">
+              <Grid ColumnDefinitions="*,10,Auto">
+                <SelectableTextBlock AutomationProperties.Name="Connection code" Text="{Binding ConnectionCode}" />
+                <Button Grid.Column="2" Classes="cv-pill cv-mini" VerticalAlignment="Top" Command="{Binding CopyCodeCommand}"><TextBlock Text="{Binding CopyLabel}" /></Button>
+              </Grid>
+            </Border>
+            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding FirefoxStep3}" TextWrapping="Wrap" /></Grid>
+          </StackPanel>
+          <!-- Quiet links: the folder and the extensions page again (or the add-on again), and another browser when there is one -->
+          <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowLinks}">
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowFolderLinks}">
+              <Button Classes="cv-quiet" Command="{Binding ShowFolderCommand}"><TextBlock Classes="cv-link" Text="Show the folder again" /></Button>
+              <TextBlock Classes="cv-link-sep" Text="·" />
+              <Button Classes="cv-quiet" Command="{Binding OpenExtensionsCommand}"><TextBlock Classes="cv-link" Text="{Binding OpenExtensionsLabel}" /></Button>
+            </StackPanel>
+            <Button Classes="cv-quiet" IsVisible="{Binding ShowAddOnLink}" Command="{Binding OpenAddOnCommand}"><TextBlock Classes="cv-link" Text="Open the add-on again" /></Button>
+            <TextBlock Classes="cv-link-sep" Text="·" IsVisible="{Binding ShowSwitchAfterLinks}" />
+            <Button Name="OtherBrowser" Classes="cv-quiet" IsVisible="{Binding CanSwitchBrowser}">
+              <TextBlock Classes="cv-link" Text="Use another browser" />
+              <Button.Flyout>
+                <MenuFlyout Placement="BottomEdgeAlignedLeft" ItemsSource="{Binding BrowserChoices}" ItemContainerTheme="{StaticResource CvBrowserItem}" />
+              </Button.Flyout>
+            </Button>
+          </StackPanel>
+          <TextBlock Classes="cv-help" Text="{Binding BrowserError}" IsVisible="{Binding BrowserError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
         <Border Classes="cv-sep" />
 
@@ -137,7 +163,7 @@
                   Command="{Binding BringInCommand}"><TextBlock Text="{Binding BringInLabel}" /></Button>
         </Grid>
         <StackPanel Classes="cv-body" IsVisible="{Binding Step3.IsCurrent}">
-          <TextBlock Classes="cv-step-body" Text="Sign in to Canvas in Chrome. Study Stash looks again by itself once you have." IsVisible="{Binding SignedOut}" />
+          <TextBlock Classes="cv-step-body" Text="{Binding SignInHelp}" IsVisible="{Binding SignedOut}" />
           <TextBlock Classes="cv-step-body" Text="{Binding CoursesSay}" IsVisible="{Binding ShowCoursesSay}" />
         </StackPanel>
         <!-- Which courses to bring in: this term's ticked, the rest (past terms, sandboxes, chapel) not -->

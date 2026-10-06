@@ -120,9 +120,14 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool SavingSchool { get; set; }
 
     [ObservableProperty] public partial string ExtensionLine { get; set; } = "";
+    /// <summary>The extension row's name: "Edge extension" once the library has heard which browser it runs in,
+    /// "Browser extension" until then.</summary>
+    [ObservableProperty] public partial string ExtensionLabel { get; set; } = "Browser extension";
+    /// <summary>Windows' line under Sync: "Runs while Edge is open".</summary>
+    [ObservableProperty] public partial string SyncRuns { get; set; } = "Runs while your browser is open";
 
-    /// <summary>Connect Canvas's steps (the extension's folder, Chrome's Load unpacked): from the Chrome extension row,
-    /// to set it up again after it's gone from Chrome, or on a new Chrome.</summary>
+    /// <summary>Connect Canvas's steps (the extension's folder and the browser's Load unpacked, or Firefox's add-on and
+    /// code): from the extension row, to set it up again after it's gone from the browser, or in another one.</summary>
     public Action? OnSetUpExtension { get; set; }
 
     [RelayCommand]
@@ -194,6 +199,8 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
         Status.Show(state);
         School = state.School.Length > 0 ? state.School : overview.Url;
         ExtensionLine = state.Extension is { Seen: { } seen } ext ? CanvasWords.ExtensionCheckedInLine(seen, ext.Version, zone, now) : "Not set up yet";
+        ExtensionLabel = state.Extension?.Browser is { Length: > 0 } named ? $"{named} extension" : "Browser extension";
+        SyncRuns = $"Runs while {CanvasWords.Browser(state)} is open";
         PollMinutes = state.PollMinutes > 0 ? state.PollMinutes : overview.PollMinutes;
 
         // A change not saved yet stays as ticked; anything else shows what the library has now.

@@ -77,7 +77,7 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
         {
             Status = status,
             Url = o.Url,
-            Extension = new CanvasApi.ExtensionInfo { Seen = seen, Version = o.ExtensionVersion, Updated = o.ExtensionUpdate },
+            Extension = new CanvasApi.ExtensionInfo { Seen = seen, Version = o.ExtensionVersion, Updated = o.ExtensionUpdate, Browser = o.Extension?.SeenBrowser ?? "" },
             LastSync = o.LastSync,
             PollMinutes = o.PollMinutes,
             Syncing = o.Syncing ? new CanvasApi.SyncingInfo { Left = o.Left } : null,
@@ -111,8 +111,8 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
         Uri.TryCreate(ServerUrl, UriKind.Absolute, out var u) && (u.IsLoopback || u.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
-    /// "Add to Chrome"'s one question: is a Chrome with the extension talking to the library, and which folder does
-    /// Chrome load it from on this computer. A library that says (<c>"extension": {"connected", "folder", "version"}</c>
+    /// "Add to Chrome"'s one question: is a browser with the extension talking to the library, and which folder does
+    /// Chrome's family load it from on this computer. A library that says (<c>"extension": {"connected", "folder", "version"}</c>
     /// in GET canvas) is taken at its word, its folder used only when the library is on this computer. An older one
     /// is read the old way: connected once the extension has ever checked in, and the folder made here by
     /// <paramref name="prepare"/> (key, Canvas address) from GET canvas/extension, pointing at this library as this
