@@ -13,13 +13,20 @@ only reads. There are two ways in, and which you need depends on where the AI ap
 
 This is all a computer on its own needs ("Use just this computer", or a library and a laptop in one).
 
-1. Open Study Stash → Settings → **AI tool access**. Under **AI apps on this computer**, each app shows where it
-   stands: *Not on this computer*, *Not connected*, *Added. Quit and reopen … to load it*, or *Connected · started
-   14:05*.
-2. Choose **Connect** next to the app. Study Stash adds itself to that app's own settings file and shows what it
-   wrote, and where.
-3. Quit and reopen the app (or start a new Claude Code, Codex or Gemini session). When the app starts Study Stash,
-   its row turns to **Connected** by itself: Settings keeps looking for a few minutes after you choose Connect.
+1. Open Study Stash → Settings → **AI tool access**. **AI apps on this computer** is the first thing on the page,
+   with a row for each AI app Study Stash found here. The ones it didn't find are named in one line underneath; if it
+   found none, the page offers **Get ChatGPT** and **Get Claude** instead.
+2. Choose **Connect** next to the app. Study Stash adds itself to that app's own settings file. There's nothing to
+   type or paste. (**Show what changed** shows what it wrote, and where.)
+3. The row now says the one step left, since an app only reads its settings when it starts:
+   - **On a Mac**, choose **Reopen Claude** or **Reopen ChatGPT**. Study Stash quits the app the way its own Quit menu
+     does and opens it again. (Closing an app's window on a Mac doesn't quit it, which is why this is a button.) If
+     the app won't quit, because it's asking about unsaved work, say, nothing is forced and the page says so.
+   - **On Windows**, quit the app completely and open it again.
+   - **ChatGPT** starts Study Stash when a chat in Codex begins, so its row adds: then start a chat in Codex.
+   - Claude Code, Codex in a terminal and Gemini CLI: start a new session.
+4. The row turns to **Connected** by itself: Settings keeps looking for five minutes after Connect or Reopen. The
+   page then gives a first question to ask ("What did my last lecture cover?"), with **Copy**.
 
 **Disconnect** takes Study Stash out again. If the app has another copy of Study Stash set up (an old download, say),
 the row says so and offers **Fix**. If you pasted Study Stash into the app's settings by hand, it works, but the row
@@ -29,7 +36,7 @@ can't tell when it's connected: it says so and offers **Update**, which writes i
 
 The **ChatGPT** row is for the ChatGPT desktop app that has Codex built in (the one OpenAI released in July 2026, for
 Mac and Windows), and for Codex in the terminal or your editor. They share one settings file, Codex's, so one
-**Connect** covers all of them. After you reopen ChatGPT, Study Stash is under ChatGPT's own Settings → MCP servers,
+**Connect** covers all of them. After ChatGPT is reopened, Study Stash is under ChatGPT's own Settings → MCP servers,
 and ChatGPT can use it where it works on this computer: its **Codex** mode. Ask it something like "search my Study
 Stash lectures for recursion". ChatGPT's plain Chat mode runs on OpenAI's servers, which can't start an app on your
 computer: that's what the internet address below is for.
@@ -257,7 +264,11 @@ made-up lectures.
 - **Connect** on a copy of that ChatGPT's real `config.toml` (it already holds ChatGPT's own `node_repl` server and
   its plugins) added only Study Stash's table, `codex mcp list` then showed both servers, and **Disconnect** put the
   file back byte for byte.
-- Not done by hand: pressing Connect in the app and reopening ChatGPT's window.
+- Reopen (2026-10-06, on a Mac): tried on a real app, Calculator, both open and closed. It quit and a new copy
+  opened, with no system permission asked for. Not tried on ChatGPT or Claude themselves.
+- ChatGPT, left open and idle, wasn't running its own `node_repl` MCP server: it starts MCP servers when a chat in
+  Codex begins, which is why ChatGPT's row asks for one.
+- Not done by hand: pressing Connect in the app's own window, then Reopen, then starting a chat in ChatGPT.
 
 **MCP Inspector** (`@modelcontextprotocol/inspector` 2.8.0, `--cli`, run by hand). The library ran on 127.0.0.1
 with a throwaway `--home`, two ingested lectures (CS 101, BIO 110), and a fake `tailscale` on `PATH` (it was never

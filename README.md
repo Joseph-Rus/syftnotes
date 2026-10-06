@@ -380,8 +380,9 @@ and Canvas work (read-only). Set it up in **Settings → Your library → AI too
 
 - **AI apps on this computer** (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): choose **Connect**
   next to the app. Study Stash adds itself to that app's own settings file, keeping everything else
-  in it (and a copy of it as it was, `….study-stash-backup`), then shows you what it wrote. Quit and
-  reopen the app (or start a new session) and the row turns to **Connected** by itself.
+  in it (and a copy of it as it was, `….study-stash-backup`). The app has to be quit and opened
+  again to load it: on a Mac the row has a **Reopen** button that does that for you. The row then
+  turns to **Connected** by itself (ChatGPT's, once you start a chat in Codex).
   **Disconnect** takes only Study Stash back out. The **ChatGPT** row is the ChatGPT desktop app
   (the one with Codex built in) and Codex in the terminal or your editor: they share one settings file. The app starts Study Stash itself and reads your library through this
   computer, so this works on a computer on its own: no Tailscale, no internet address, and no

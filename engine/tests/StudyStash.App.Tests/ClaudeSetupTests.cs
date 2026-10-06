@@ -14,7 +14,7 @@ public class ClaudeSetupTests
 
     static ClaudeSetup Setup(TempHome home, string program = Program) => new()
     {
-        Program = program, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = _ => false,
+        Program = program, Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = _ => false, ReopenApp = null,
         DesktopConfig = home["user/Claude/claude_desktop_config.json"], ClaudeCodeConfig = home["user/.claude.json"],
         CodexConfig = home["user/.codex/config.toml"], GeminiConfig = home["user/.gemini/settings.json"],
     };
@@ -49,7 +49,7 @@ public class ClaudeSetupTests
         var added = setup.Connect(id);
 
         Assert.True(added.Ok, added.Say);
-        Assert.Contains("to load it", added.Say);
+        Assert.StartsWith("Added Study Stash to ", added.Say);
         if (!OperatingSystem.IsWindows()) Assert.NotNull(new FileInfo(path).LinkTarget); // still a link
         var config = JsonNode.Parse(File.ReadAllText(real))!;
         Assert.Equal("dark", config["theme"]!.GetValue<string>());
@@ -99,7 +99,7 @@ public class ClaudeSetupTests
         var added = setup.Connect("codex");
 
         Assert.True(added.Ok, added.Say);
-        Assert.Equal("Added Study Stash to ChatGPT. Quit and reopen ChatGPT to load it (or start a new Codex session).", added.Say);
+        Assert.Equal("Added Study Stash to ChatGPT.", added.Say);
         string text = File.ReadAllText(setup.CodexConfig);
         Assert.StartsWith(before.TrimEnd('\n'), text);
         Assert.Contains($"[mcp_servers.{ClaudeTools.ServerName}]\ncommand = \"{Program}\"\nargs = [\"--home\", \"{home["study-stash"].Replace("\\", "\\\\")}\", \"mcp\", \"--client\", \"codex\"]", text);
@@ -186,7 +186,7 @@ public class ClaudeSetupTests
         var none = Setup(home);
         Assert.Equal("ChatGPT", none.State("codex").Name);
         Assert.False(none.State("codex").Installed);
-        var withApp = new ClaudeSetup { Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = name => name == "ChatGPT", CodexConfig = home["user/.codex/config.toml"] };
+        var withApp = new ClaudeSetup { Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = name => name == "ChatGPT", ReopenApp = null, CodexConfig = home["user/.codex/config.toml"] };
         Assert.True(withApp.State("codex").Installed);
     }
 
@@ -220,8 +220,8 @@ public class ClaudeSetupTests
     public void An_app_is_connected_once_it_has_started_study_stash_since_it_was_added()
     {
         var now = new DateTime(2026, 10, 4, 15, 0, 0);
-        AiAppState State(bool added = true, DateTime? addedAt = null, DateTime? started = null, bool other = false, bool installed = true) =>
-            new("claude-desktop", "Claude Desktop", installed, added, other, addedAt, started, "");
+        AiAppState State(bool added = true, DateTime? addedAt = null, DateTime? started = null, bool other = false, bool installed = true, bool reopen = false) =>
+            new("claude-desktop", "Claude Desktop", installed, added, other, addedAt, started, "", CanReopen: reopen);
         var row = new AiAppRow { Id = "claude-desktop", Name = "Claude Desktop" };
 
         row.Show(State(added: false, installed: false), now);
@@ -229,23 +229,61 @@ public class ClaudeSetupTests
         Assert.False(row.CanConnect);
 
         row.Show(State(added: false), now);
-        Assert.Equal("Not connected", row.Status);
+        Assert.Equal("Not connected yet", row.Status);
         Assert.True(row.CanConnect);
         Assert.False(row.CanDisconnect);
 
+        // Added, but the app hasn't loaded it: the row says the one step left, and offers to do it where it can.
         row.Show(State(addedAt: now.AddMinutes(-1), started: now.AddMinutes(-30)), now);
-        Assert.Equal("Added. Quit and reopen Claude Desktop to load it.", row.Status);
+        Assert.Equal("Almost done. Quit Claude completely, then open it again.", row.Status);
         Assert.False(row.Ok);
+        Assert.False(row.CanReopen);
         Assert.True(row.CanDisconnect);
+        row.Show(State(addedAt: now.AddMinutes(-1), reopen: true), now);
+        Assert.Equal("Almost done. Reopen Claude so it loads Study Stash.", row.Status);
+        Assert.True(row.CanReopen);
+        Assert.Equal("Reopen Claude", row.ReopenWords);
+        // ChatGPT starts Study Stash only when a chat in Codex begins, so its row says that too.
+        var chatgpt = new AiAppRow { Id = "codex", Name = "ChatGPT" };
+        chatgpt.Show(new AiAppState("codex", "ChatGPT", true, true, false, now, null, "", CanReopen: true), now);
+        Assert.Equal("Almost done. Reopen ChatGPT, then start a chat in Codex.", chatgpt.Status);
 
-        row.Show(State(addedAt: now.AddMinutes(-30), started: now.AddMinutes(-1)), now);
+        row.Show(State(addedAt: now.AddMinutes(-30), started: now.AddMinutes(-1), reopen: true), now);
         Assert.Equal("Connected · started 14:59", row.Status);
         Assert.True(row.Ok);
         Assert.False(row.CanConnect);
+        Assert.False(row.CanReopen);
 
         row.Show(State(other: true), now);
         Assert.Equal("Fix", row.ConnectWords);
         Assert.True(row.CanConnect);
+    }
+
+    [Fact]
+    public async Task Reopen_quits_and_opens_the_rows_desktop_app_and_says_what_to_do_when_it_cant()
+    {
+        using var home = new TempHome();
+        var asked = new List<string>();
+        bool works = true;
+        var setup = new ClaudeSetup
+        {
+            Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = name => name is "ChatGPT" or "Claude",
+            CodexConfig = home["user/.codex/config.toml"], DesktopConfig = home["user/Claude/claude_desktop_config.json"],
+            ReopenApp = bundle => { asked.Add(bundle); return Task.FromResult(works); },
+        };
+        Assert.True(setup.State("codex").CanReopen);
+        Assert.False(setup.State("gemini").CanReopen); // it lives in a terminal: nothing to reopen
+
+        Assert.True((await setup.ReopenAsync("codex")).Ok);
+        Assert.True((await setup.ReopenAsync("claude-desktop")).Ok);
+        Assert.Equal(["com.openai.codex", "com.anthropic.claudefordesktop"], asked);
+
+        works = false; // it's asking about unsaved work, say: nothing is forced
+        var stuck = await setup.ReopenAsync("codex");
+        Assert.False(stuck.Ok);
+        Assert.Contains("Quit it yourself", stuck.Say);
+        // Where Study Stash can't reopen apps (Windows), no row offers to.
+        Assert.False(Setup(home).State("codex").CanReopen);
     }
 
     [Fact]

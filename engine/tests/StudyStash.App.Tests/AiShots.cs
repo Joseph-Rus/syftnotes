@@ -656,20 +656,21 @@ public class AiShots
                 m.WebNoteFixUrl = "https://login.tailscale.com/f/funnel?node=abc123";
                 break;
         }
-        // The AI apps on this computer, one in each state: connected, added but not loaded yet, not connected, not here.
+        // The AI apps on this computer, one in each state: connected, added but not loaded yet (with Reopen), not
+        // connected; the one that isn't here is named in the line under them.
         var now = new DateTime(2026, 10, 4, 14, 0, 0);
-        foreach (var (id, name, installed, added, addedAt, started) in new (string, string, bool, bool, DateTime?, DateTime?)[]
+        foreach (var (id, name, added, addedAt, started) in new (string, string, bool, DateTime?, DateTime?)[]
         {
-            ("claude-desktop", "Claude Desktop", true, true, now.AddHours(-2), now.AddMinutes(-20)),
-            ("claude-code", "Claude Code", true, true, now.AddMinutes(-1), null),
-            ("codex", "ChatGPT", true, false, null, null),
-            ("gemini", "Gemini CLI", false, false, null, null),
+            ("claude-desktop", "Claude Desktop", true, now.AddHours(-2), now.AddMinutes(-20)),
+            ("codex", "ChatGPT", true, now.AddMinutes(-1), null),
+            ("claude-code", "Claude Code", false, null, null),
         })
         {
             var row = new AiAppRow { Id = id, Name = name, First = m.Apps.Count == 0 };
-            row.Show(new Services.AiAppState(id, name, installed, added, false, addedAt, started, ""), now);
+            row.Show(new Services.AiAppState(id, name, true, added, false, addedAt, started, "", CanReopen: id != "claude-code"), now);
             m.Apps.Add(row);
         }
+        m.MissingApps = "Not found on this computer: Gemini CLI.";
         if (web == "off")
         {
             m.WebNeeds = "Tailscale isn't on the library's computer. Install it from tailscale.com/download and sign in.";

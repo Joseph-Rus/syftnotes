@@ -12,9 +12,10 @@ namespace StudyStash.App.Services;
 /// <summary>One AI app on this computer, as its own settings file has it: whether the app is here at all, whether
 /// Study Stash is in its settings (and for this copy of Study Stash), when Settings added it, and when the app last
 /// started it. <paramref name="Outdated"/>: this copy is in there, but not the way Connect writes it (pasted in by
-/// hand, say), so it never says which app started it and Settings can't tell when it's connected.</summary>
+/// hand, say), so it never says which app started it and Settings can't tell when it's connected.
+/// <paramref name="CanReopen"/>: it's a desktop app Study Stash can quit and open again for the student (a Mac).</summary>
 public sealed record AiAppState(string Id, string Name, bool Installed, bool Added, bool OtherCopy, DateTime? AddedAt, DateTime? Started, string ConfigPath,
-    bool Outdated = false);
+    bool Outdated = false, bool CanReopen = false);
 
 /// <summary>What connecting or disconnecting an app did: the words to show, and, for the "what was written" panel,
 /// the file, the copy of it kept from before, and the setup that went in (never anything secret: there's none in it).</summary>
@@ -42,6 +43,9 @@ public sealed class ClaudeSetup
     public Func<string, bool> AppInstalled { get; init; } = DesktopAppInstalled;
     /// <summary>False in a test or a self-test: nothing is written to an AI app's settings.</summary>
     public bool CanWrite { get; init; } = true;
+    /// <summary>Quits a desktop app (by its bundle id) and opens it again; whether it did. A Mac only: elsewhere the
+    /// student is told to do it.</summary>
+    public Func<string, Task<bool>>? ReopenApp { get; init; } = OperatingSystem.IsMacOS() ? id => Platform.MacApps.ReopenAsync(id) : null;
 
     string? desktop, claudeCode, codex, gemini;
 
@@ -69,7 +73,7 @@ public sealed class ClaudeSetup
         string user = Path.Combine(home, "ai-apps-home");
         return new()
         {
-            Home = home, UserHome = user, CanWrite = false, Find = _ => null, AppInstalled = _ => false,
+            Home = home, UserHome = user, CanWrite = false, Find = _ => null, AppInstalled = _ => false, ReopenApp = null,
             DesktopConfig = Path.Combine(user, "Claude", "claude_desktop_config.json"), ClaudeCodeConfig = Path.Combine(user, ".claude.json"),
             CodexConfig = Path.Combine(user, ".codex", "config.toml"), GeminiConfig = Path.Combine(user, ".gemini", "settings.json"),
         };
@@ -80,6 +84,24 @@ public sealed class ClaudeSetup
         [("claude-desktop", "Claude Desktop"), ("claude-code", "Claude Code"), ("codex", "ChatGPT"), ("gemini", "Gemini CLI")];
 
     static string NameOf(string id) => Apps.First(a => a.Id == id).Name;
+
+    /// <summary>The desktop app behind a row, as its own menu bar names it ("Claude", "ChatGPT"), and its bundle on a
+    /// Mac; null for the ones that live in a terminal.</summary>
+    public static (string Name, string Bundle)? DesktopApp(string id) => id switch
+    {
+        "claude-desktop" => ("Claude", "com.anthropic.claudefordesktop"),
+        "codex" => ("ChatGPT", "com.openai.codex"),
+        _ => null,
+    };
+
+    /// <summary>Quits the row's desktop app and opens it again, so it loads the settings Connect just wrote.</summary>
+    public async Task<AiAppChange> ReopenAsync(string id)
+    {
+        if (DesktopApp(id) is not { } desktop || ReopenApp is null || !AppInstalled(desktop.Name)) return new(false, $"Quit {NameOf(id)} completely, then open it again.");
+        return await ReopenApp(desktop.Bundle)
+            ? new(true, "")
+            : new(false, $"{desktop.Name} didn't quit and open again. Quit it yourself ({desktop.Name} menu → Quit {desktop.Name}), then open it again.");
+    }
 
     /// <summary>Claude Desktop's settings file. On Windows the Microsoft Store (MSIX) build keeps its AppData inside its
     /// package folder, and reads that copy first, so that's the one to change when it's there.</summary>
@@ -234,7 +256,8 @@ public sealed class ClaudeSetup
         bool ours = added && SameProgram(command);
         return new AiAppState(id, NameOf(id), IsInstalled(id) || added, added, added && !ours,
             ToLocal(McpClients.When(McpClients.AddedFile(Home, id))), ToLocal(McpClients.When(McpClients.StartedFile(Home, id))), path,
-            Outdated: ours && !args.SequenceEqual(ArgsFor(id)));
+            Outdated: ours && !args.SequenceEqual(ArgsFor(id)),
+            CanReopen: ReopenApp is not null && DesktopApp(id) is { } desktop && AppInstalled(desktop.Name));
     }
 
     static DateTime? ToLocal(DateTime? utc) => utc?.ToLocalTime();
@@ -274,17 +297,6 @@ public sealed class ClaudeSetup
         return result;
     }
 
-    static string Restart(string name) => name switch
-    {
-        "Claude Desktop" => "Quit and reopen Claude Desktop to load it.",
-        "Claude Code" => "Start a new Claude Code session to load it.",
-        "ChatGPT" => ChatGptRestart,
-        _ => $"Start {name} again to load it.",
-    };
-
-    /// <summary>The ChatGPT app reads its settings when it opens; Codex in a terminal or an editor, at each new session.</summary>
-    public const string ChatGptRestart = "Quit and reopen ChatGPT to load it (or start a new Codex session).";
-
     AiAppChange ChangeJson(string id, string name, string path, bool add, string written)
     {
         string? before = File.Exists(path) ? File.ReadAllText(path) : null;
@@ -315,7 +327,7 @@ public sealed class ClaudeSetup
         if (before is null || before.EndsWith('\n')) after += before?.Contains("\r\n", StringComparison.Ordinal) == true ? "\r\n" : "\n";
         string? backup = Save(path, before, after);
         return add
-            ? new(true, $"Added Study Stash to {name}. {Restart(name)}", path, backup, written)
+            ? new(true, $"Added Study Stash to {name}.", path, backup, written)
             : new(true, $"Took Study Stash out of {name}. Its other settings are as they were.", path, backup);
     }
 
@@ -343,7 +355,7 @@ public sealed class ClaudeSetup
             return new(false, Manual($"Couldn't make a change to {name}'s config.toml that it would read, so it's left alone."), path, null, add ? written : null);
         string? backup = Save(path, File.Exists(path) ? before : null, after);
         return add
-            ? new(true, $"Added Study Stash to {name}. {Restart(name)}", path, backup, written)
+            ? new(true, $"Added Study Stash to {name}.", path, backup, written)
             : new(true, $"Took Study Stash out of {name}. Its other settings are as they were.", path, backup);
     }
 

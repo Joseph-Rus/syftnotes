@@ -1,5 +1,5 @@
-<!-- Settings → AI tool access (design 14, Windows): the off switch, what AI apps may read, the AI apps on this
-     computer (one click each, no Tailscale), the "Claude and ChatGPT on the web and phone" card (Funnel on/off, the address, a
+<!-- Settings → AI tool access (design 14, Windows): the off switch, the AI apps on this computer (one click each,
+     no Tailscale), what AI apps may read, the "Claude and ChatGPT on the web and phone" card (Funnel on/off, the address, a
      live check, its problems, and what this computer needs first), and the other connections. The pane's own
      padding and scrolling; the settings window is the host's. -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -17,7 +17,7 @@
 
       <TextBlock Classes="ai-title" Text="AI tool access" />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left"
-                 Text="Claude, ChatGPT, Gemini and other apps that support MCP can read your library. They can't change or delete anything." />
+                 Text="ChatGPT, Claude and other AI apps can read your lectures and notes to answer your questions. They can't change or delete anything." />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left" Foreground="{DynamicResource Warn}" IsVisible="{Binding Offline}"
                  Text="Can't reach your library right now, so what's below may be out of date." />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left" IsVisible="{Binding OlderLibrary}"
@@ -36,6 +36,104 @@
             <ToggleButton AutomationProperties.Name="Let AI tools read your library" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" />
           </StackPanel>
         </Grid>
+      </Border>
+
+      <!-- The AI apps on this computer come first: connecting one is what a student opens this page to do. A row says
+           the one thing to do next; apps that aren't here are one quiet line, or, when none is, where to get one. -->
+      <TextBlock Classes="ai-section" Text="AI apps on this computer" Margin="0,18,0,8" />
+      <Border Classes="ai-card">
+        <StackPanel Spacing="4">
+          <Grid Classes="ai-row" ColumnDefinitions="20,16,*" Margin="0,4,0,8" IsVisible="{Binding NoApps}">
+            <c:Icon Glyph="download" Size="18" VerticalAlignment="Top" Margin="0,2,0,0" />
+            <StackPanel Grid.Column="2" Spacing="10">
+              <StackPanel Classes="ai-row-text">
+                <TextBlock Classes="ai-row-title" Text="No AI app found on this computer yet" />
+                <TextBlock Classes="ai-row-sub" TextWrapping="Wrap"
+                           Text="Get the ChatGPT app or the Claude app and open it once. It shows up here, ready to connect." />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Classes="ai-pillbtn" Command="{Binding GetChatGptCommand}">
+                  <Border Classes="ai-pill"><TextBlock Text="Get ChatGPT" /></Border>
+                </Button>
+                <Button Classes="ai-pillbtn" Command="{Binding GetClaudeCommand}">
+                  <Border Classes="ai-pill"><TextBlock Text="Get Claude" /></Border>
+                </Button>
+                <Button Classes="ai-textbtn" Command="{Binding RefreshCommand}" VerticalAlignment="Center" Margin="4,0,0,0">
+                  <TextBlock Text="Look again" FontSize="14" />
+                </Button>
+              </StackPanel>
+            </StackPanel>
+          </Grid>
+          <ItemsControl ItemsSource="{Binding Apps}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:AiAppRow">
+                <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="48" Margin="0,4">
+                  <c:Icon Glyph="{Binding Icon}" Size="18" />
+                  <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" ToolTip.Tip="{Binding About}">
+                    <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
+                    <Grid ColumnDefinitions="Auto,*">
+                      <Ellipse Classes="ai-dot good" IsVisible="{Binding Ok}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                      <TextBlock Grid.Column="1" Classes="ai-row-sub" Text="{Binding Status}" TextWrapping="Wrap" />
+                    </Grid>
+                  </StackPanel>
+                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <Button Classes="ai-textbtn" Command="{Binding Disconnect}" IsVisible="{Binding CanDisconnect}" VerticalAlignment="Center">
+                      <TextBlock Text="Disconnect" FontSize="14" />
+                    </Button>
+                    <Button Classes="ai-pillbtn" Command="{Binding Reopen}" IsVisible="{Binding CanReopen}">
+                      <Border Classes="ai-pill primary"><TextBlock Text="{Binding ReopenWords}" /></Border>
+                    </Button>
+                    <Button Classes="ai-pillbtn" Command="{Binding Connect}" IsVisible="{Binding CanConnect}">
+                      <Border Classes="ai-pill primary"><TextBlock Text="{Binding ConnectWords}" /></Border>
+                    </Button>
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <!-- Connected: a first question to ask, so it's seen working -->
+          <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="48" Margin="0,4" IsVisible="{Binding ShowTry}">
+            <c:Icon Glyph="chat" Size="18" />
+            <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
+              <TextBlock Classes="ai-row-sub" Text="{Binding TryLead}" TextWrapping="Wrap" />
+              <TextBlock Classes="ai-row-title" Text="{x:Static vm:AiAccessModel.TryQuestion}" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CopyTryCommand}" VerticalAlignment="Center" Margin="12,0,0,0"
+                    AutomationProperties.Name="Copy the question">
+              <Border Classes="ai-pill"><TextBlock Text="Copy" /></Border>
+            </Button>
+          </Grid>
+          <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="44">
+            <c:Icon Glyph="hub" Size="18" />
+            <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap" VerticalAlignment="Center"
+                       Text="Using another AI app? Copy the setup, then paste it into that app's MCP settings." />
+            <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CopyOtherCommand}" VerticalAlignment="Center" Margin="12,0,0,0">
+              <Border Classes="ai-pill"><TextBlock Text="Copy setup" /></Border>
+            </Button>
+          </Grid>
+        </StackPanel>
+      </Border>
+      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap"
+                 Text="Nothing to type or paste: the app reads your library through this computer." />
+      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0" HorizontalAlignment="Left" TextWrapping="Wrap"
+                 Foreground="{DynamicResource Fg3}" Text="{Binding MissingApps}" IsVisible="{Binding ShowMissingApps}" />
+      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
+      <Button Classes="ai-textbtn" Command="{Binding ToggleDetailsCommand}" IsVisible="{Binding HasWritten}" HorizontalAlignment="Left" Margin="0,4,0,0" Padding="0,2">
+        <TextBlock Classes="ai-link" Text="{Binding DetailsWords}" />
+      </Button>
+      <Border Classes="ai-card" Margin="0,8,0,0" IsVisible="{Binding ShowWritten}">
+        <StackPanel Spacing="6">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Classes="ai-row-title" Text="What was written" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ai-textbtn" Command="{Binding CopyWrittenCommand}" IsVisible="{Binding HasWrittenText}">
+              <TextBlock Text="Copy" FontSize="14" />
+            </Button>
+          </Grid>
+          <SelectableTextBlock Classes="ai-row-sub" Text="{Binding WrittenFile}" TextWrapping="Wrap" />
+          <TextBlock Classes="ai-row-sub" Text="{Binding WrittenBackupWords}" TextWrapping="Wrap" />
+          <SelectableTextBlock Text="{Binding WrittenText}" IsVisible="{Binding HasWrittenText}" TextWrapping="Wrap"
+                               FontFamily="Cascadia Mono, Consolas, SF Mono, Menlo, monospace" FontSize="12" Foreground="{DynamicResource Fg2}" />
+        </StackPanel>
       </Border>
 
       <TextBlock Classes="ai-section" Text="What they can read" Margin="0,18,0,8" />
@@ -80,61 +178,6 @@
         </StackPanel>
       </Border>
 
-      <TextBlock Classes="ai-section" Text="AI apps on this computer" Margin="0,18,0,8" />
-      <Border Classes="ai-card">
-        <StackPanel Spacing="4">
-          <ItemsControl ItemsSource="{Binding Apps}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:AiAppRow">
-                <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="48" Margin="0,4">
-                  <c:Icon Glyph="{Binding Icon}" Size="18" />
-                  <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" ToolTip.Tip="{Binding About}">
-                    <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
-                    <Grid ColumnDefinitions="Auto,*">
-                      <Ellipse Classes="ai-dot good" IsVisible="{Binding Ok}" VerticalAlignment="Center" Margin="0,0,6,0" />
-                      <TextBlock Grid.Column="1" Classes="ai-row-sub" Text="{Binding Status}" TextWrapping="Wrap" />
-                    </Grid>
-                  </StackPanel>
-                  <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="12,0,0,0">
-                    <Button Classes="ai-textbtn" Command="{Binding Disconnect}" IsVisible="{Binding CanDisconnect}" VerticalAlignment="Center">
-                      <TextBlock Text="Disconnect" FontSize="14" />
-                    </Button>
-                    <Button Classes="ai-pillbtn" Command="{Binding Connect}" IsVisible="{Binding CanConnect}">
-                      <Border Classes="ai-pill primary"><TextBlock Text="{Binding ConnectWords}" /></Border>
-                    </Button>
-                  </StackPanel>
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-          <Grid Classes="ai-row" ColumnDefinitions="20,16,*,Auto" MinHeight="44">
-            <c:Icon Glyph="hub" Size="18" />
-            <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap" VerticalAlignment="Center"
-                       Text="Another app that supports MCP: copy the setup, then paste it into the app's settings." />
-            <Button Grid.Column="3" Classes="ai-pillbtn" Command="{Binding CopyOtherCommand}" VerticalAlignment="Center" Margin="12,0,0,0">
-              <Border Classes="ai-pill"><TextBlock Text="Copy setup" /></Border>
-            </Button>
-          </Grid>
-        </StackPanel>
-      </Border>
-      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap"
-                 Text="Each app starts Study Stash itself and reads your library through this computer. No Tailscale, no internet address, and no password goes into the app's settings." />
-      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
-      <Border Classes="ai-card" Margin="0,8,0,0" IsVisible="{Binding ShowWritten}">
-        <StackPanel Spacing="6">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Classes="ai-row-title" Text="What was written" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Classes="ai-textbtn" Command="{Binding CopyWrittenCommand}" IsVisible="{Binding HasWrittenText}">
-              <TextBlock Text="Copy" FontSize="14" />
-            </Button>
-          </Grid>
-          <SelectableTextBlock Classes="ai-row-sub" Text="{Binding WrittenFile}" TextWrapping="Wrap" />
-          <TextBlock Classes="ai-row-sub" Text="{Binding WrittenBackupWords}" TextWrapping="Wrap" />
-          <SelectableTextBlock Text="{Binding WrittenText}" IsVisible="{Binding HasWrittenText}" TextWrapping="Wrap"
-                               FontFamily="Cascadia Mono, Consolas, SF Mono, Menlo, monospace" FontSize="12" Foreground="{DynamicResource Fg2}" />
-        </StackPanel>
-      </Border>
-
       <TextBlock Classes="ai-section" Text="Claude and ChatGPT on the web and phone" Margin="0,18,0,8" />
       <Border Classes="ai-card">
         <StackPanel>
@@ -143,7 +186,7 @@
             <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
               <TextBlock Classes="ai-row-title" Text="Let Claude and ChatGPT reach your library from the internet" TextWrapping="Wrap" />
               <TextBlock Classes="ai-row-sub" TextWrapping="Wrap"
-                         Text="claude.ai, the Claude phone app and chatgpt.com run on Anthropic's and OpenAI's servers, so they need an internet address. Study Stash makes one with Tailscale Funnel, and only someone with your library password can let them in. The apps above don't need this." />
+                         Text="claude.ai, the Claude phone app and chatgpt.com need an address on the internet to reach your library. Study Stash makes one with Tailscale (free), and only your library password lets anyone in. The apps above don't need this." />
             </StackPanel>
             <Panel Grid.Column="3" VerticalAlignment="Center" Margin="12,0,0,0">
               <c:Spinner IsVisible="{Binding WebBusy}" Width="16" Height="16" Foreground="{DynamicResource Fg2}" />
