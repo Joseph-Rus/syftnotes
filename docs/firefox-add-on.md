@@ -7,7 +7,9 @@ The Canvas extension is one set of files (`extension/`) that runs in two familie
   ([chrome-web-store.md](chrome-web-store.md)).
 - **Firefox and the browsers built on it** (Zen, LibreWolf, Waterfox). This page.
 
-Nothing here has been published. This page is what's built, how to try it today, and what publishing takes.
+Version 1.6 was submitted to addons.mozilla.org on 2026-10-06 (listed, add-on URL `study-stash-for-canvas`) and is
+awaiting review. Until it's approved and `Extension.FirefoxPublishedAt` is set, the app doesn't offer Firefox. This
+page is what's built, how to try it today, and what publishing took.
 
 ## Why Firefox can't use the folder
 
@@ -80,7 +82,7 @@ Use an account that will keep working after graduation: the add-on belongs to it
 ### 2. The ID never changes
 
 Mozilla signs the add-on under `canvas@study-stash-app.web.app`, and every update must carry the same ID. It doesn't
-have to be a real address. If another ID is wanted, change `Extension.FirefoxId` **before** the first upload.
+have to be a real address. The first upload was made under it, so `Extension.FirefoxId` stays as it is.
 
 ### 3. The first upload
 
@@ -89,11 +91,13 @@ StudyStash extension-zip --firefox ~/Desktop/study-stash-for-canvas-1.6.zip
 ```
 
 **Submit a New Add-on**, **On this site** (listed: Firefox then updates installed copies by itself), and upload the
-zip. The validator runs at once. Nothing in the zip is minified or built, so answer **No** to "do you need to submit
-source code".
+zip. The validator runs at once (no errors; one warning, that Firefox for Android 140 doesn't know
+`data_collection_permissions`, which doesn't matter while Android stays unticked). Tick **Firefox** only. Answer **No**
+to "do you need to submit source code": the scripts and the popup are hand-written and go in as they are. Only
+`manifest.json` is written by the packing command, and it's plain JSON; the notes to the reviewer say so.
 
-- **Name, summary** come from the manifest. **Categories**: Other, or Feeds, News & Blogging has nothing closer;
-  pick what the form offers for education.
+- **Name, summary** come from the manifest. **Categories**: there's none for education, so **My add-on doesn't fit
+  into any of the categories**.
 - **Add-on URL (slug)**: `study-stash-for-canvas`, so the page is
   `https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/`.
 - **Description**: what it does (copies your Canvas courses into your own Study Stash library), that it only reads and
@@ -118,7 +122,9 @@ It reads no passwords and no cookies: Firefox sends the student's own Canvas ses
 Listed add-ons are usually reviewed within a few days. Optional access to every site gets a closer look, like in
 Chrome's store, and the reviewer notes above answer the usual question.
 
-When the page is live, set `Extension.FirefoxPublishedAt` to its address. Until then it's empty and the app doesn't
+`https://addons.mozilla.org/api/v5/addons/addon/study-stash-for-canvas/` answers 401 while it's awaiting review and
+200 once it's public. When the page is live, set `Extension.FirefoxPublishedAt` to its address
+(`https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/`). Until then it's empty and the app doesn't
 offer Firefox, so nothing a student sees depends on an add-on that isn't there.
 
 ### Signing it without listing it
