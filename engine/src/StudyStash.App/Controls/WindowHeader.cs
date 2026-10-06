@@ -20,8 +20,6 @@ public sealed class WindowHeader : Panel
     /// <summary>Where the Mac's first light starts, and the room the three take (with a gap after them).</summary>
     public const double LightsInset = 20, LightsRoom = 88;
 
-    /// <summary>Where a toolbar beside a Mac's window buttons starts.</summary>
-    public static readonly Avalonia.Thickness AfterLights = new(LightsInset + LightsRoom, 0, 0, 0);
     /// <summary>Windows' caption buttons are 46 px each.</summary>
     public const double CaptionWidth = 46;
 

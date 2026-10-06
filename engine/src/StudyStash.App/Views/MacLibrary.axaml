@@ -168,8 +168,11 @@
     <DockPanel>
       <!-- The title bar: drag the window by it; the system's traffic lights sit in it, and the toolbar on its right. -->
       <c:WindowHeader Name="Header" DockPanel.Dock="Top" DrawChrome="{Binding DrawChrome}">
-        <!-- Beside the window buttons: fold the sidebar away, and back and forward through the places picked -->
-        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="{x:Static c:WindowHeader.AfterLights}">
+        <!-- Fold the sidebar away, and back and forward through the places picked: in the window's top left corner.
+             The header keeps the lights' room clear, so they start right after the lights; full screen has no lights
+             at rest, and there they take the corner itself (the code-behind moves them), level with search and
+             Settings on the other side. -->
+        <StackPanel Name="Nav" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left" VerticalAlignment="Center">
           <c:Glass Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}">
             <Button Name="ToggleSidebar" Classes="round" Command="{Binding ToggleSidebarCommand}" ToolTip.Tip="Show or hide the sidebar (⌃⌘S)" AutomationProperties.Name="Toggle sidebar">
               <c:Icon Glyph="dock_to_right" Size="19" Foreground="{DynamicResource Fg}" RenderTransform="scale(-1,1)" />

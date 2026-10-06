@@ -78,6 +78,35 @@ public class ChromeTests
         }
     }
 
+    /// <summary>The sidebar's button and Back/Forward sit in the Mac window's top left corner: right after the lights,
+    /// and in full screen (no lights at rest) in the corner itself. They once sat a second lights' width further in,
+    /// half over the sidebar's edge.</summary>
+    [AvaloniaFact]
+    public void The_mac_sidebar_button_starts_after_the_lights_and_in_the_corner_in_full_screen()
+    {
+        try
+        {
+            var (window, _) = Open(SkinKind.Mac, () => new MacLibrary { DataContext = Demo.Library(), Width = 1280, Height = 800 });
+            var view = (MacLibrary)window.Content!;
+            var nav = view.FindControl<StackPanel>("Nav")!;
+            double Left()
+            {
+                window.UpdateLayout();
+                return nav.TranslatePoint(new Point(0, 0), view)!.Value.X;
+            }
+            Assert.Equal(WindowHeader.LightsRoom, Left(), 1);
+            window.WindowState = WindowState.FullScreen;
+            Assert.Equal(MacLibrary.FullScreenInset, Left(), 1);
+            window.WindowState = WindowState.Normal;
+            Assert.Equal(WindowHeader.LightsRoom, Left(), 1);
+            window.Close();
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
     [AvaloniaFact]
     public void The_mac_title_bar_keeps_the_lights_room_on_the_left_and_windows_keeps_the_caption_buttons_room_on_the_right()
     {

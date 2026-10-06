@@ -1,6 +1,8 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using StudyStash.App.Controls;
 using StudyStash.App.ViewModels;
 
 namespace StudyStash.App.Views;
@@ -22,7 +24,34 @@ public partial class MacLibrary : UserControl
         };
         Fades.Over(TopFade, "Win", 0.3);
         Fades.Under(Fade, "Win", 0.7);
+        AttachedToVisualTree += (_, _) =>
+        {
+            window = TopLevel.GetTopLevel(this) as Window;
+            if (window is not null) window.PropertyChanged += OnWindowChanged;
+            PlaceNav();
+        };
+        DetachedFromVisualTree += (_, _) =>
+        {
+            if (window is not null) window.PropertyChanged -= OnWindowChanged;
+            window = null;
+        };
     }
+
+    /// <summary>How far in from the window's edge the title bar's buttons sit in full screen: as search and Settings do
+    /// on the other side.</summary>
+    public const double FullScreenInset = 12;
+
+    Window? window;
+
+    void OnWindowChanged(object? sender, AvaloniaPropertyChangedEventArgs e)
+    {
+        if (e.Property == Window.WindowStateProperty) PlaceNav();
+    }
+
+    /// <summary>The sidebar's button and Back/Forward start right after the lights; full screen shows no lights at
+    /// rest, so there they move into the corner the lights leave (out of the room the header keeps for them).</summary>
+    void PlaceNav() =>
+        Nav.Margin = new Thickness(window?.WindowState == WindowState.FullScreen ? FullScreenInset - WindowHeader.LightsRoom : 0, 0, 0, 0);
 
     /// <summary>A lecture row's "Delete lecture…": asks first.</summary>
     void OnDeleteRow(object? sender, RoutedEventArgs e)
