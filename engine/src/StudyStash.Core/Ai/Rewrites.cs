@@ -276,4 +276,31 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             return Build(id, store.Get(id) ?? row, null);
         }
     }
+
+    /// <summary>Save the lecture's notes as the student edited them by hand (<see cref="Store.EditNotes"/>): shown at
+    /// once, whoever wrote them still named as their writer, and a rewrite running or waiting to be chosen left as it
+    /// is. Refuses empty notes (400); while the pipeline is writing this lecture's notes (409); and, with
+    /// <paramref name="basedOn"/> given, when the notes are no longer the ones the edit started from (412: their
+    /// diagrams arrived, or another device changed them), so the student chooses rather than undoing that unseen.</summary>
+    public RewriteInfo Edit(string id, string markdown, string? basedOn = null)
+    {
+        var row = Require(id);
+        markdown = Py.Strip(markdown.ReplaceLineEndings("\n"));
+        if (markdown.Length == 0) throw new RewriteRefusedException(400, "the notes are empty.");
+        lock (gate)
+        {
+            switch (store.EditNotes(id, markdown, basedOn))
+            {
+                case NotesEdited.Gone:
+                    throw new RewriteRefusedException(404, "there's no lecture with that id.");
+                case NotesEdited.Busy:
+                    throw new RewriteRefusedException(409, "the library is writing this lecture's notes right now.");
+                case NotesEdited.Changed:
+                    throw new RewriteRefusedException(412, "these notes changed while you were editing them.");
+                case NotesEdited.Unwritten:
+                    throw new RewriteRefusedException(503, "the note's file couldn't be saved (another app may have it open).");
+            }
+            return Build(id, store.Get(id) ?? row, jobs.GetValueOrDefault(id));
+        }
+    }
 }

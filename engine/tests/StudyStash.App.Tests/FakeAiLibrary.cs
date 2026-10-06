@@ -30,6 +30,10 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string, RewriteInfo?>? OnRewriteCancel { get; set; }
     public Func<string, RewriteInfo?>? OnRewriteKeep { get; set; }
     public Func<string, RewriteInfo?>? OnRewriteUse { get; set; }
+    /// <summary>(lecture, the notes sent, the fingerprint of the notes they were based on).</summary>
+    public Func<string, string, string?, RewriteInfo?>? OnEditNotes { get; set; }
+    /// <summary>Each edit sent: the notes, and the fingerprint of the notes they were based on.</summary>
+    public List<(string Markdown, string? BasedOn)> Edits { get; } = [];
     public Func<ToolAccessInfo?>? OnAccess { get; set; }
     public Func<bool?, ReadingScopes?, ToolAccessInfo?>? OnSetAccess { get; set; }
     public Func<bool, ToolAccessInfo?>? OnSetWeb { get; set; }
@@ -176,6 +180,14 @@ public sealed class FakeAiLibrary : IAiLibrary
     {
         Calls.Add($"rewrite-use:{lecture}");
         return Task.FromResult(OnRewriteUse is not null ? OnRewriteUse(lecture) : new RewriteInfo(lecture, "none"));
+    }
+
+    public Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn)
+    {
+        Calls.Add($"edit:{lecture}");
+        Edits.Add((markdown, basedOn));
+        return Task.FromResult(OnEditNotes is not null ? OnEditNotes(lecture, markdown, basedOn)
+            : new RewriteInfo(lecture, "none") { Current = new NotesVersion(markdown, "Ollama", DateTime.Now.ToString("o")) });
     }
 
     public Task<ToolAccessInfo?> AccessAsync()

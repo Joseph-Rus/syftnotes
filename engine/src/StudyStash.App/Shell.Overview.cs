@@ -65,7 +65,7 @@ public static partial class Shell
         dueSelection = null;
         library.NarrowDetail = false;
         ClearDetail();
-        library.Notes?.Dispose();
+        LeaveNotes(library.Notes);
         library.Notes = null;
         library.Note = null;
     }

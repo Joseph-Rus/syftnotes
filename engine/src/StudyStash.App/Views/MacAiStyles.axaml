@@ -429,6 +429,29 @@
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
 
+  <!-- The notes as text while they're edited: a field the width of the notes, as tall as what's in it. -->
+  <Style Selector="Border.ai-editor">
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="16,14" />
+    <Setter Property="Background" Value="{DynamicResource Group}" />
+  </Style>
+  <Style Selector="TextBox.ai-editor">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="LineHeight" Value="22" />
+    <Setter Property="MinHeight" Value="160" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+  </Style>
+  <Style Selector="TextBlock.ai-editor-hint">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.ai-editor-problem">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
   <!-- While the "Rewrite notes with" menu is open, the notes dim to .5 (17). -->
   <Style Selector="Border.ai-dim">
     <Setter Property="Opacity" Value="1" />
