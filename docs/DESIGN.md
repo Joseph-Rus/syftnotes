@@ -126,7 +126,17 @@ place, `Shell.Notify`, as a `Notice`.
 - **Where macOS won't have them, the app's own cards say it** (`ToastShelf`, a plain panel with no picture): macOS
   refuses a copy that isn't a signed app in a normal place (opened from its disk image, run from a build or
   temporary folder), and a self-test never has macOS ask anything.
-- **Windows still shows the app's own cards**, for now: its own notifications haven't been built.
+- **On Windows they're Windows' own too**, for the installed app in its usual settings folder. `WinNotifications`
+  speaks to Windows' notification interfaces (Windows.UI.Notifications) from C#, their ids and method order checked
+  against Windows' own metadata. An app that isn't a Store package gets notifications by saying who it is in the
+  registry, which the app does for this account the first time it has something to say (its name and icon under
+  `HKCU\Software\Classes\AppUserModelId\StudyStash.App`); Windows shows that name and icon along the top, as it
+  does for any app, and nothing else of Study Stash's (no picture in it, no sound). A click on one, or on its button,
+  opens a `studystash:` link (`NoticeLinks`): Windows starts a second copy with `--open LINK`, which hands the running
+  app a word and goes, the way `--show` does. Only that one exact link shape means anything. Windows asks nobody's
+  leave first; notifications turned off for Study Stash (or altogether) in Windows' settings means none are shown.
+  Setup.exe's uninstaller takes the registry keys out. A build run from its folder, or a second profile, keeps the
+  app's own cards: the link has to open the installed program.
 - One that says something is still so (the lecture is paused) is taken down when it no longer is.
 
 ## Installers and updates

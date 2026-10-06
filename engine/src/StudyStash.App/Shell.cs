@@ -195,6 +195,12 @@ public static partial class Shell
     {
         if (quitting) return;
         Program.Log($"[app] another copy said \"{message}\"");
+        // A click on one of Windows' notifications: what it does is that notice's to say (it may open nothing at all).
+        if (NoticeLinks.IsWord(message))
+        {
+            if (OperatingSystem.IsWindows()) WinNotifications.Opened(message);
+            return;
+        }
         if (!host.Settings.SetupDone) ShowSetup();
         else if (message == "record") ToggleRecording();
         // "--show panel" / "--show quick": open the dropdown or the quick panel without the menu bar or the shortcut

@@ -9,9 +9,8 @@ using StudyStash.Core;
 namespace StudyStash.App;
 
 /// <summary>The shell's notifications: what the app says, and when. They're the computer's own (a Mac's Notification
-/// Center, through <see cref="SystemNotices"/>) wherever it will have them; Study Stash's own cards
-/// (<see cref="ToastShelf"/>) where it won't (a build run from its folder, a copy opened from its disk image, Windows
-/// for now).</summary>
+/// Center, Windows' notifications, through <see cref="SystemNotices"/>) wherever it will have them; Study Stash's own
+/// cards (<see cref="ToastShelf"/>) where it won't (a build run from its folder, a copy opened from its disk image).</summary>
 public static partial class Shell
 {
     static ToastShelf? shelf;
@@ -25,9 +24,34 @@ public static partial class Shell
     {
         if (systemNoticesTried) return systemNotices;
         systemNoticesTried = true;
-        if (Desktop.SystemChangesOff || !OperatingSystem.IsMacOS()) return null;
-        if (MacNotifications.Make() is not { } center) return null;
+        if (Desktop.SystemChangesOff) return null;
+        ISystemNotifications? center = OperatingSystem.IsMacOS() ? MacNotifications.Make() : OperatingSystem.IsWindows() ? WindowsNotifications() : null;
+        if (center is null) return null;
         return systemNotices = new SystemNotices(center, a => Dispatcher.UIThread.Post(a), notice => Shelf().Show(notice), log: Program.Log);
+    }
+
+    /// <summary>Windows' notifications, for the installed app in its usual settings folder: a click on one comes back
+    /// through a link that opens the installed program, which a build run from its folder, or a second profile,
+    /// mustn't take over. The app's icon is written out for Windows to show beside its name, as it does for any app.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    static WinNotifications? WindowsNotifications()
+    {
+        if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "study-stash.ini")) || !Desktop.SameFolder(host.Home, Configs.DefaultHome)) return null;
+        string? icon = null;
+        try
+        {
+            icon = Path.Combine(host.Home, "notification-icon.png");
+            using var from = Avalonia.Platform.AssetLoader.Open(new Uri("avares://StudyStash/Assets/icon.png"));
+            using var to = File.Create(icon);
+            from.CopyTo(to);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FileNotFoundException)
+        {
+            icon = null;
+        }
+        var made = WinNotifications.Make(icon: icon, program: Desktop.Program);
+        if (made is null) Program.Log($"[notifications] Windows won't have them here ({WinNotifications.LastError ?? "no reason given"}): Study Stash shows its own");
+        return made;
     }
 
     /// <summary>The notifications' shelf, made the first time one is said: they go on the display whose menu bar has
