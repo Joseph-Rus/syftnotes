@@ -94,6 +94,11 @@ public sealed class ClaudeSetup
         _ => null,
     };
 
+    /// <summary>The ChatGPT and Claude desktop apps that are on this computer, as their settings stand: the ones
+    /// guided setup offers to connect.</summary>
+    public IReadOnlyList<AiAppState> DesktopStates() =>
+        [.. Apps.Where(a => DesktopApp(a.Id) is { } desktop && AppInstalled(desktop.Name)).Select(a => State(a.Id))];
+
     /// <summary>Quits the row's desktop app and opens it again, so it loads the settings Connect just wrote.</summary>
     public async Task<AiAppChange> ReopenAsync(string id)
     {

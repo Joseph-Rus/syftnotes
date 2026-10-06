@@ -798,6 +798,15 @@
                               </StackPanel>
                             </StackPanel>
 
+                            <!-- Let the ChatGPT or Claude app read the library -->
+                            <StackPanel Spacing="10" IsVisible="{Binding IsAiApp}">
+                              <TextBlock Classes="note" Text="{Binding AiAppBody}" />
+                              <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <Button Classes="push fill" Command="{Binding PressCommand}" CommandParameter="notnow"><TextBlock Text="Not now" FontSize="13" /></Button>
+                                <Button Classes="push tint" Command="{Binding PressCommand}" CommandParameter="connect"><TextBlock Text="Connect" FontSize="13" FontWeight="Medium" /></Button>
+                              </StackPanel>
+                            </StackPanel>
+
                             <!-- Start at login -->
                             <StackPanel Spacing="10" IsVisible="{Binding IsStartAtLogin}">
                               <TextBlock Classes="note" Text="{Binding StartAtLoginBody}" />

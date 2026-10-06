@@ -30,6 +30,11 @@ public sealed record ChecklistFacts
     public bool ChromeConnected { get; init; }
     /// <summary>How many courses Canvas found.</summary>
     public int CoursesFound { get; init; }
+    /// <summary>The ChatGPT and Claude desktop apps on this computer, by name ("ChatGPT", "Claude"): each can be let
+    /// read the library with one press.</summary>
+    public IReadOnlyList<string> AiApps { get; init; } = [];
+    /// <summary>Every one of them has Study Stash in its settings.</summary>
+    public bool AiAppsConnected { get; init; }
 }
 
 /// <summary>
@@ -108,6 +113,11 @@ public static class SetupChecklist
             : canvas == ChecklistState.Now && !f.ChromeConnected ? "Waiting for Chrome…" : "";
         items.Add(new("canvas", "Canvas", canvas, canvasDetail, Optional: true));
 
+        if (chosen && f.AiApps.Count > 0)
+            items.Add(new("ai_app", "AI app", f.AiAppsConnected ? ChecklistState.Done
+                : Left(f, "ai_app") ?? (Now(f, "ai_app") ? ChecklistState.Now : ChecklistState.Todo),
+                !f.AiAppsConnected ? AiAppNames(f.AiApps) : f.AiApps.Count == 1 ? $"{f.AiApps[0]} connected" : "Both connected", Optional: true));
+
         if (m.IsOneComputer || m.IsLibrary)
             items.Add(new("start_at_login", "Start at login", f.StartsAtLogin ? ChecklistState.Done
                 : Left(f, "start_at_login") ?? (Now(f, "start_at_login") ? ChecklistState.Now : ChecklistState.Todo), Recommended: true));
@@ -117,6 +127,9 @@ public static class SetupChecklist
                 Optional: true));
         return items;
     }
+
+    /// <summary>"ChatGPT", "ChatGPT and Claude".</summary>
+    public static string AiAppNames(IReadOnlyList<string> names) => string.Join(" and ", names);
 
     static bool Now(ChecklistFacts f, params string[] cards) => cards.Contains(f.OpenCard);
 

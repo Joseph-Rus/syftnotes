@@ -126,13 +126,19 @@ The first time Study Stash opens, it asks which AI will set it up with you:
 - **Claude** (through Claude Code, from Anthropic): needs a paid Claude plan, Pro or Max.
 - **ChatGPT** (through Codex, from OpenAI): needs a paid ChatGPT plan, Plus or higher.
 
-Pick one, press **Install** (Study Stash runs its maker's own installer, for your account only, no
-admin password; nothing is downloaded until you press it, and it's skipped when it's already
-there), then **Open sign-in page** to sign in on Claude's or ChatGPT's own page. Study Stash never
-sees your password or your sign-in. A tiny test message then checks your plan includes it.
+**If you already have the ChatGPT app or the Claude app on a Mac, there's nothing to install.** The
+ChatGPT app carries Codex inside it, signed in with the app, and the Claude app keeps its own Claude
+Code once its Code tab has been opened. Study Stash finds those copies: the one you have starts
+picked, and **Continue** goes straight to the chat.
+
+Otherwise: pick one, press **Install** (Study Stash runs its maker's own installer, for your
+account only, no admin password; nothing is downloaded until you press it), then **Open sign-in
+page** to sign in on Claude's or ChatGPT's own page. Study Stash never sees your password or your
+sign-in. A tiny test message then checks your plan includes it.
 
 After that your AI walks you through the rest in a chat, with a checklist beside it: one computer or
-two, the microphone, the transcription model, your classes, Canvas, and starting at login. It can
+two, the microphone, the transcription model, your classes, Canvas, letting your ChatGPT or Claude
+app read your lectures (one **Connect**, if you have the app), and starting at login. It can
 only use Study Stash's own setup tools (no commands, files or web), and anything that changes your
 computer happens only when you press the button in its card. Close the window part-way and the chat
 picks up where it left off. The chat uses a little of your plan, and your AI then writes your
@@ -197,6 +203,9 @@ npm install -g @openai/codex                        # Mac or Windows (or on a Ma
 ```
 
 **Gemini** — the Gemini CLI, signed in with your Google account.
+
+On a Mac, Study Stash also uses the Codex inside the ChatGPT app and the Claude Code the Claude app
+keeps, when there's no copy installed on its own: nothing to install.
 
 Setup's notes step shows these commands with a Copy button, opens Terminal for you, and has
 **Check again** to pick the engine up once it's installed and signed in.

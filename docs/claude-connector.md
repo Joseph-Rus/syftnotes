@@ -13,6 +13,10 @@ only reads. There are two ways in, and which you need depends on where the AI ap
 
 This is all a computer on its own needs ("Use just this computer", or a library and a laptop in one).
 
+**In setup:** when the ChatGPT or Claude app is on the computer, guided setup's chat offers it as a step of its own,
+"Let ChatGPT read your lectures?", with **Connect** and **Not now**. Connect does what step 2 below does. The app
+loads Study Stash the next time it opens. Afterwards it's all in Settings:
+
 1. Open Study Stash → Settings → **AI tool access**. **AI apps on this computer** is the first thing on the page,
    with a row for each AI app Study Stash found here. The ones it didn't find are named in one line underneath; if it
    found none, the page offers **Get ChatGPT** and **Get Claude** instead.
