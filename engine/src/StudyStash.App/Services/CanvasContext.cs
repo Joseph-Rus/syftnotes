@@ -15,7 +15,8 @@ public sealed record CanvasClock(Func<DateTimeOffset> Now, TimeZoneInfo Zone);
 /// reads Canvas in. <see cref="Browsers"/> is the browsers the extension can be added to here, the one to use first;
 /// <see cref="RememberBrowser"/> keeps the one the student added it to. <see cref="OpenExtensions"/> (a browser of
 /// Chrome's family at its extensions page) and <see cref="OpenAddOn"/> (the Firefox copy's page, in a browser of
-/// Firefox's family) hand back a sentence when the browser couldn't be started, null when it could.</summary>
+/// Firefox's family) hand back a sentence when the browser couldn't be started, null when it could. <see cref="Advise"/> says when the
+/// student's usual browser can't take the extension, or nothing here can (null when there's nothing to say).</summary>
 public sealed record CanvasActions(
     Action<string> OpenUrl,
     Action<string> OpenInBrowser,
@@ -27,7 +28,8 @@ public sealed record CanvasActions(
     Action<string> RevealFolder,
     Action<string> OpenFile,
     Func<string, string, string> PrepareExtension,
-    Action<string> Copy);
+    Action<string> Copy,
+    Func<BrowserAdvice?>? Advise = null);
 
 /// <summary>What every Canvas view model reads: the library's Canvas client (null before the laptop is paired with
 /// one), the clock, a class's dot colour, and the actions above. Tests build one whole so nothing a view model does
@@ -57,7 +59,8 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
             RevealFolder: Reveal,
             OpenFile: path => Machine.Open(path),
             PrepareExtension: (key, canvasUrl) => Core.Canvas.Extension.EnsureFor(host.Home, cc.ServerUrl, key, canvasUrl).Path,
-            Copy: Copy);
+            Copy: Copy,
+            Advise: () => Browsers.Advise());
         return new CanvasContext(client, new CanvasClock(() => DateTimeOffset.Now, TimeZoneInfo.Local), cls => Skin.ClassDot(host.ColorOf(cls)), actions, host.Home);
     }
 

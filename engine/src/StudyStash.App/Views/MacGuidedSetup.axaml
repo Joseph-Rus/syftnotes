@@ -733,6 +733,10 @@
                                 <ContentControl.ContentTemplate>
                                   <DataTemplate x:DataType="vm:CanvasConnectModel">
                               <StackPanel Spacing="10">
+                                <StackPanel Spacing="4" IsVisible="{Binding ShowAdvice}">
+                                  <TextBlock Classes="note" Foreground="{DynamicResource Fg}" Text="{Binding AdviceText}" TextWrapping="Wrap" />
+                                  <Button Classes="link" HorizontalAlignment="Left" Command="{Binding GetBrowserCommand}" IsVisible="{Binding ShowGetBrowser}"><TextBlock Text="Get Chrome" /></Button>
+                                </StackPanel>
                                 <TextBlock Classes="note" Text="{Binding BrowserHelp}" />
                                 <StackPanel Spacing="10" IsVisible="{Binding IsChromium}">
                                 <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">

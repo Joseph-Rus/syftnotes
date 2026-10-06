@@ -592,6 +592,9 @@
     <Setter Property="LineHeight" Value="17.4" />
     <Setter Property="TextWrapping" Value="Wrap" />
   </Style>
+  <Style Selector="TextBlock.cv-step-body.cv-advice">
+    <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+  </Style>
   <Style Selector="Border.cv-illus">
     <Setter Property="Background" Value="{DynamicResource Raised}" />
     <Setter Property="CornerRadius" Value="10" />

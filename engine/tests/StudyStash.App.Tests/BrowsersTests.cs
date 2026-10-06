@@ -84,6 +84,30 @@ public class BrowsersTests
         Assert.Equal([Browsers.Chrome], Browsers.Offer(Browsers.Safari, [Browsers.Safari], firefoxAddOn: ""));
     }
 
+    /// <summary>The default browser is looked at first; when the extension can't go in it the student is told why and
+    /// which one is used instead, and when nothing here will do, to get Chrome.</summary>
+    [Fact]
+    public void A_default_browser_the_extension_cant_go_in_gets_advice_and_one_it_can_go_in_gets_none()
+    {
+        var safari = Browsers.Advise(Browsers.Safari, [Browsers.Chrome, Browsers.Safari], "")!;
+        Assert.Equal("Your usual browser, Safari, can’t run the Study Stash extension. Study Stash will use Chrome instead.", safari.Say(Browsers.Chrome));
+
+        // Firefox, while its add-on has nowhere to be fetched from; once it has, Firefox is simply used.
+        var firefox = Browsers.Advise(Browsers.Firefox, [Browsers.Edge, Browsers.Firefox], "")!;
+        Assert.Equal("Your usual browser, Firefox, can’t run the Study Stash extension yet. Study Stash will use Edge instead.", firefox.Say(Browsers.Edge));
+        Assert.Null(Browsers.Advise(Browsers.Firefox, [Browsers.Edge, Browsers.Firefox], "https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/"));
+
+        Assert.Null(Browsers.Advise(Browsers.Edge, [Browsers.Chrome, Browsers.Edge], ""));
+        Assert.Null(Browsers.Advise(null, [Browsers.Brave], "")); // the system didn't say, and Brave will do
+
+        // A Mac with only Safari.
+        var only = Browsers.Advise(Browsers.Safari, [Browsers.Safari], "")!;
+        Assert.True(only.NoneHere);
+        Assert.Equal("Your usual browser, Safari, can’t run the Study Stash extension. It runs in Chrome, Edge, Brave, Arc, Opera and Vivaldi, "
+            + "and none of them is on this computer. Get Chrome, then press Add to Chrome.", only.Say(Browsers.Chrome));
+        Assert.StartsWith("It runs in Chrome", Browsers.Advise(null, [], "")!.Say(Browsers.Chrome));
+    }
+
     [Fact]
     public void Canvas_opens_in_the_browser_the_extension_checked_in_from()
     {

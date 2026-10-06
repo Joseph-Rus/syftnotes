@@ -363,7 +363,9 @@ yet: [docs/firefox-add-on.md](docs/firefox-add-on.md). On your library's compute
 
 1. **Settings → Your library → Canvas** (or the Canvas step in setup): type your school's Canvas
    address.
-2. Click **Add to Chrome** (the button names your own browser: Add to Edge, Add to Brave). It opens
+2. Click **Add to Chrome** (the button names your own browser: Add to Edge, Add to Brave; if the
+   browser you usually use can't run the extension, like Safari, Study Stash says so and uses
+   another one on your computer, or points you to Chrome when there's none). It opens
    that browser's extensions page and shows the extension's folder. Turn on **Developer mode**,
    click **Load unpacked**, and pick that folder — or drag the folder onto the Extensions page. On
    a Mac the folder is **Study Stash → Chrome extension** in your home folder

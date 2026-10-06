@@ -74,6 +74,11 @@
           </Panel>
         </Grid>
         <StackPanel Classes="cv-body" Spacing="12" IsVisible="{Binding Step2.IsCurrent}">
+          <!-- The student's usual browser can't take the extension: said first, with the one that will be used -->
+          <StackPanel Spacing="4" IsVisible="{Binding ShowAdvice}">
+            <TextBlock Classes="cv-step-body cv-advice" Text="{Binding AdviceText}" />
+            <Button Classes="cv-quiet" HorizontalAlignment="Left" Command="{Binding GetBrowserCommand}" IsVisible="{Binding ShowGetBrowser}"><TextBlock Classes="cv-link" Text="Get Chrome" /></Button>
+          </StackPanel>
           <TextBlock Classes="cv-step-body" Text="{Binding BrowserHelp}" />
           <!-- Chrome's family: three pictures of its extensions page -->
           <StackPanel Spacing="12" IsVisible="{Binding IsChromium}">

@@ -29,6 +29,29 @@ public sealed record Browser(string Name, BrowserFamily Family, IReadOnlyList<st
 }
 
 /// <summary>
+/// What the extension step tells a student it can't offer their usual browser to: that browser (<see cref="Usual"/>:
+/// Safari, or Firefox before its add-on is out; null when the system didn't say which they use), and whether nothing
+/// on this computer can take the extension (<see cref="NoneHere"/>: then there's one to get).
+/// </summary>
+public sealed record BrowserAdvice(Browser? Usual, bool NoneHere)
+{
+    /// <summary>The sentences: why not their usual browser, then the one Study Stash will use instead
+    /// (<paramref name="use"/>, the step's browser), or to get Chrome when none here will do.</summary>
+    public string Say(Browser use)
+    {
+        string why = Usual switch
+        {
+            null => "",
+            { Family: BrowserFamily.Firefox } => $"Your usual browser, {Usual.Name}, can’t run the Study Stash extension yet. ",
+            _ => $"Your usual browser, {Usual.Name}, can’t run the Study Stash extension. ",
+        };
+        return NoneHere
+            ? $"{why}It runs in {Browsers.Family()}, and none of them is on this computer. Get Chrome, then press Add to Chrome."
+            : $"{why}Study Stash will use {use.Name} instead.";
+    }
+}
+
+/// <summary>
 /// The browsers the student may read Canvas in: which are on this computer, which one the system opens links with,
 /// which one to add the extension to, and opening one, a URL inside it, or its extensions page — each through one
 /// <see cref="Machine.Run"/> call, so a computer without it reads back as one plain sentence instead of a swallowed
@@ -68,9 +91,16 @@ public static class Browsers
         [Chrome, Edge, Brave, Arc, Opera, Vivaldi, Chromium, Firefox, FirefoxDeveloper, Zen, LibreWolf, Waterfox, Safari];
 
     /// <summary>What the student reads when no browser could be started: the ones the extension goes in.</summary>
-    public static string NotInstalled => Extension.FirefoxAddOn.Length > 0
-        ? "Study Stash reads Canvas through Chrome, Edge, Brave, Arc, Opera, Vivaldi or Firefox. Install one, then try again."
-        : "Study Stash reads Canvas through Chrome, Edge, Brave, Arc, Opera or Vivaldi. Install one, then try again.";
+    public static string NotInstalled => $"Study Stash reads Canvas through {Family("or")}. Install one, then try again.";
+
+    /// <summary>The browsers the extension goes in, for a sentence: "Chrome, Edge, Brave, Arc, Opera and Vivaldi",
+    /// with Firefox once its add-on has somewhere to be fetched from.</summary>
+    public static string Family(string joined = "and") => Extension.FirefoxAddOn.Length > 0
+        ? $"Chrome, Edge, Brave, Arc, Opera, Vivaldi {joined} Firefox"
+        : $"Chrome, Edge, Brave, Arc, Opera {joined} Vivaldi";
+
+    /// <summary>Where a student without any of them gets one: Chrome's own download page.</summary>
+    public const string GetChrome = "https://www.google.com/chrome/";
 
     /// <summary>The browser of that name ("Edge"), or null for one Study Stash doesn't know (and for "").</summary>
     public static Browser? Named(string? name) =>
@@ -220,6 +250,23 @@ public static class Browsers
         if (said.Count == 0) return ToUse(usual, installed, firefoxAddOn, picked);
         var mine = Named(picked);
         return said.FirstOrDefault(b => b == mine) ?? said.FirstOrDefault(b => b == usual) ?? said[0];
+    }
+
+    /// <summary>What to tell the student when the extension can't go in the browser they usually use
+    /// (<paramref name="usual"/>), or in nothing on this computer; null when it goes in their usual browser, or the
+    /// system didn't say which that is and another here will do.</summary>
+    public static BrowserAdvice? Advise(Browser? usual, IReadOnlyList<Browser> installed, string? firefoxAddOn = null)
+    {
+        bool none = !installed.Any(b => CanAdd(b, firefoxAddOn));
+        bool fine = usual is null || CanAdd(usual, firefoxAddOn);
+        return fine && !none ? null : new BrowserAdvice(fine ? null : usual, none);
+    }
+
+    /// <summary>This computer's <see cref="Advise(Browser?, IReadOnlyList{Browser}, string?)"/>.</summary>
+    public static BrowserAdvice? Advise()
+    {
+        var usual = Default();
+        return Advise(usual, Installed(usual));
     }
 
     /// <summary>The browsers to offer the extension to (<see cref="Choices"/>), the one to use (<see cref="ToUse"/>)

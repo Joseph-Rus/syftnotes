@@ -8,9 +8,9 @@ namespace StudyStash.App.Tests;
 public class CanvasConnectTests
 {
     static CanvasConnectModel Model(FakeLibrary handler, string? home = null, List<(string What, string Arg)>? log = null, bool forSetup = false,
-        IReadOnlyList<Browser>? browsers = null, string? notInstalled = null)
+        IReadOnlyList<Browser>? browsers = null, string? notInstalled = null, BrowserAdvice? advice = null)
     {
-        var context = CanvasFixtures.Context(handler, home, log, browsers, notInstalled);
+        var context = CanvasFixtures.Context(handler, home, log, browsers, notInstalled, advice);
         return new CanvasConnectModel(context, new CanvasWatch(context), forSetup);
     }
 
@@ -211,6 +211,44 @@ public class CanvasConnectTests
         Assert.True(m.ShowAddToBrowser); // "Install one, then try again."
         Assert.False(m.WaitingForBrowser);
         m.Dispose();
+    }
+
+    /// <summary>A student who uses Safari is told the extension can't go in it and which browser Study Stash will use
+    /// (the one the step offers, also after they pick another); one with nothing that will do gets a way to Chrome.</summary>
+    [Fact]
+    public async Task A_usual_browser_that_cant_take_the_extension_is_said_with_the_one_to_use_or_where_to_get_one()
+    {
+        var log = new List<(string What, string Arg)>();
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas", NoExtensionYet)
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var m = Model(handler, home: "the-home", log: log, browsers: [Browsers.Chrome, Browsers.Edge], advice: new BrowserAdvice(Browsers.Safari, NoneHere: false));
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Assert.True(m.ShowAdvice);
+        Assert.Equal("Your usual browser, Safari, can’t run the Study Stash extension. Study Stash will use Chrome instead.", m.AdviceText);
+        Assert.False(m.ShowGetBrowser);
+        m.BrowserChoices[1].Pick.Execute(null);
+        Assert.EndsWith("Study Stash will use Edge instead.", m.AdviceText);
+        await m.AddToBrowserCommand.ExecuteAsync(null);
+        Assert.False(m.ShowAdvice); // added: the step is about Edge's own page now
+        m.Dispose();
+
+        // Nothing here will do: Chrome's download page is one click away, in whatever this computer opens links with.
+        log.Clear();
+        var bare = Model(handler, home: "the-home", log: log, notInstalled: Browsers.NotInstalled, advice: new BrowserAdvice(Browsers.Safari, NoneHere: true));
+        await bare.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Assert.True(bare.ShowGetBrowser);
+        Assert.EndsWith("Get Chrome, then press Add to Chrome.", bare.AdviceText);
+        bare.GetBrowserCommand.Execute(null);
+        Assert.Contains(("OpenUrl", Browsers.GetChrome), log);
+        await bare.AddToBrowserCommand.ExecuteAsync(null);
+        Assert.True(bare.ShowGetBrowser); // still not there: the way to it stays
+        bare.Dispose();
+
+        // The usual browser takes it: nothing to say.
+        var fine = Model(handler, home: "the-home");
+        Assert.False(fine.ShowAdvice);
+        fine.Dispose();
     }
 
     [Fact]

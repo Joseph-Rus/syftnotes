@@ -388,7 +388,8 @@ public class CanvasShots
     /// Chrome are open; on a <paramref name="mac"/>, the folder Chrome's picker shows there), or "found" (Chrome
     /// connected and five courses found). On a computer with other browsers: "edge" (Edge is the one to use, with a
     /// quiet way to another), "firefox" (Firefox's three steps and its code) and "firefox-waiting" (Add to Firefox
-    /// pressed).</summary>
+    /// pressed). For a student who uses Safari: "safari" (Chrome is here, and is used instead) and "no-browser"
+    /// (nothing here will do: get Chrome).</summary>
     internal static async Task<CanvasConnectModel> SetupStepAsync(string at, bool mac = false)
     {
         var handler = new FakeLibrary()
@@ -401,9 +402,11 @@ public class CanvasShots
         {
             "edge" => [Browsers.Edge, Browsers.Chrome, Browsers.Firefox],
             "firefox" or "firefox-waiting" => [Browsers.Firefox, Browsers.Chrome],
+            "safari" => [Browsers.Chrome, Browsers.Edge],
             _ => null,
         };
-        var context = CanvasFixtures.Context(handler, "the-home", browsers: browsers);
+        var advice = at is "safari" or "no-browser" ? new BrowserAdvice(Browsers.Safari, NoneHere: at == "no-browser") : null;
+        var context = CanvasFixtures.Context(handler, "the-home", browsers: browsers, advice: advice);
         var m = new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>(at == "found" ? "state-connected" : "state-no-extension"), []);
         if (at is "waiting" or "firefox-waiting") await m.AddToBrowserCommand.ExecuteAsync(null);
@@ -485,7 +488,7 @@ public class CanvasShots
     [AvaloniaFact]
     public async Task Mac_connect_setup()
     {
-        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting" })
+        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser" })
         {
             var m = await SetupStepAsync(at, mac: true);
             foreach (var t in Themes)
@@ -500,7 +503,7 @@ public class CanvasShots
     [AvaloniaFact]
     public async Task Win_connect_setup()
     {
-        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting" })
+        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser" })
         {
             var m = await SetupStepAsync(at);
             foreach (var t in Themes)

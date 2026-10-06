@@ -604,6 +604,9 @@
     <Setter Property="Size" Value="16" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
+  <Style Selector="TextBlock.cv-step-body.cv-advice">
+    <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+  </Style>
   <Style Selector="Border.cv-illus">
     <Setter Property="Background" Value="{DynamicResource Ground}" />
     <Setter Property="CornerRadius" Value="4" />

@@ -24,9 +24,10 @@ public static class CanvasFixtures
     /// record what they were asked (never launch anything). <paramref name="log"/>, when given, collects each
     /// action's name and argument in order. <paramref name="browsers"/> is what this pretend computer can add the
     /// extension to, the one to use first (just Chrome unless said); <paramref name="notInstalled"/> is the sentence
-    /// opening one answers with, for a computer where it isn't there.</summary>
+    /// opening one answers with, for a computer where it isn't there; <paramref name="advice"/> is what this computer
+    /// says about the student's usual browser, when the extension can't go in it.</summary>
     public static CanvasContext Context(FakeLibrary? handler = null, string? home = null, List<(string What, string Arg)>? log = null,
-        IReadOnlyList<Browser>? browsers = null, string? notInstalled = null)
+        IReadOnlyList<Browser>? browsers = null, string? notInstalled = null, BrowserAdvice? advice = null)
     {
         var client = handler is null ? null : new CanvasClient("https://library.test", "test-key", handler.Client());
         void Log(string what, string arg = "") => log?.Add((what, arg));
@@ -50,7 +51,8 @@ public static class CanvasFixtures
                 Log("PrepareExtension", $"{key} {canvasUrl}");
                 return home is null ? "" : Path.Combine(home, "chrome-extension");
             },
-            Copy: text => Log("Copy", text));
+            Copy: text => Log("Copy", text),
+            Advise: () => advice);
         // A fresh brush from the same palette Skin.ClassDot draws from, not that shared cache itself: plain (non-UI-
         // thread) tests run alongside Avalonia ones in this project, and an AvaloniaObject born on the wrong thread
         // makes every later render of it throw "a different thread owns it" — however far away that render is.

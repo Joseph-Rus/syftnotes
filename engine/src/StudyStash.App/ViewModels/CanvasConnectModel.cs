@@ -68,6 +68,8 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     bool checkingBrowser;
     /// <summary>The student chose the browser here ("Use another browser"): it stays chosen when the step opens again.</summary>
     bool pickedHere;
+    /// <summary>What to say about the student's usual browser, when the extension can't go in it; null when it can.</summary>
+    BrowserAdvice? advice;
     static readonly ConnectStep Hidden = new() { Number = 0, Title = "" };
 
     public CanvasConnectModel(CanvasContext context, CanvasWatch watch, bool forSetup = false)
@@ -171,7 +173,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public ObservableCollection<BrowserChoice> BrowserChoices { get; } = [];
     /// <summary>The browser this step adds the extension to: the one to use, until the student picks another.</summary>
     [NotifyPropertyChangedFor(nameof(BrowserName), nameof(IsFirefox), nameof(IsChromium), nameof(AddLabel), nameof(WaitingLabel), nameof(OpenExtensionsLabel),
-        nameof(BrowserHelp), nameof(FirefoxStep1), nameof(FirefoxStep3), nameof(ShowCode), nameof(ShowFolderLinks), nameof(ShowAddOnLink))]
+        nameof(BrowserHelp), nameof(FirefoxStep1), nameof(FirefoxStep3), nameof(ShowCode), nameof(ShowFolderLinks), nameof(ShowAddOnLink), nameof(AdviceText))]
     [ObservableProperty]
     public partial Browser Browser { get; set; } = Browsers.Chrome;
     /// <summary>Its name, for every sentence in the step ("Add to Edge", "Waiting for Edge…").</summary>
@@ -198,7 +200,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public string PickCaption => $"Pick the {FolderName} folder, or drag it onto the page";
     /// <summary>Add to Chrome has been pressed: the button gives way to quiet links and the "Waiting for Chrome…" row.</summary>
     [NotifyPropertyChangedFor(nameof(WaitingForBrowser), nameof(ShowBrowserStatus), nameof(ShowAddToBrowser), nameof(ShowAddRow), nameof(BrowserHelp),
-        nameof(ShowFolderLinks), nameof(ShowAddOnLink), nameof(ShowLinks), nameof(ShowSwitchAfterLinks))]
+        nameof(ShowFolderLinks), nameof(ShowAddOnLink), nameof(ShowLinks), nameof(ShowSwitchAfterLinks), nameof(ShowAdvice), nameof(ShowGetBrowser))]
     [ObservableProperty]
     public partial bool AddedToBrowser { get; set; }
     [NotifyPropertyChangedFor(nameof(CanFinish))]
@@ -206,7 +208,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public partial bool AddingToBrowser { get; set; }
     /// <summary>A browser with the extension is talking to the library.</summary>
     [NotifyPropertyChangedFor(nameof(WaitingForBrowser), nameof(ShowBrowserStatus), nameof(ShowAddToBrowser), nameof(ShowAddRow), nameof(CanSwitchBrowser),
-        nameof(ShowLinks), nameof(ShowSwitchAfterLinks))]
+        nameof(ShowLinks), nameof(ShowSwitchAfterLinks), nameof(ShowAdvice), nameof(ShowGetBrowser))]
     [ObservableProperty]
     public partial bool BrowserConnected { get; set; }
     [ObservableProperty] public partial string? BrowserError { get; set; }
@@ -223,6 +225,13 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         (true, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens the Study Stash add-on there. Then:",
         (true, true) => $"The Study Stash add-on is open in {BrowserName}. There:",
     };
+    /// <summary>The student's usual browser can't take the extension (Safari; Firefox before its add-on is out), or
+    /// nothing on this computer can: said above the step's help, with the browser Study Stash will use instead, until
+    /// the extension has been added to one.</summary>
+    public bool ShowAdvice => advice is not null && !AddedToBrowser && !BrowserConnected;
+    public string AdviceText => advice?.Say(Browser) ?? "";
+    /// <summary>Nothing here can take the extension: the step links to where Chrome is got.</summary>
+    public bool ShowGetBrowser => ShowAdvice && advice!.NoneHere;
     public bool WaitingForBrowser => AddedToBrowser && !BrowserConnected;
     public bool ShowBrowserStatus => AddedToBrowser || BrowserConnected;
     /// <summary>The browser that's connected, for a sentence: the one that checked in, by its own name; else the one
@@ -392,6 +401,10 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// choice in this step, while it's still among them).</summary>
     void OfferBrowsers()
     {
+        advice = context.Actions.Advise?.Invoke();
+        OnPropertyChanged(nameof(ShowAdvice));
+        OnPropertyChanged(nameof(AdviceText));
+        OnPropertyChanged(nameof(ShowGetBrowser));
         var offer = context.Actions.Browsers();
         if (offer.Count == 0) offer = [Browsers.Chrome];
         var chosen = pickedHere && offer.Contains(Browser) ? Browser : offer[0];
@@ -601,6 +614,11 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
             AddingToBrowser = false;
         }
     }
+
+    /// <summary>"Get Chrome", when no browser here can take the extension: its download page, in whatever this
+    /// computer opens links with.</summary>
+    [RelayCommand]
+    void GetBrowser() => context.Actions.OpenUrl(Browsers.GetChrome);
 
     /// <summary>"Show the folder again", after Add to Chrome.</summary>
     [RelayCommand]
