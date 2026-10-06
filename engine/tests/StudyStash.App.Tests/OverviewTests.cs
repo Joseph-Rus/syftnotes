@@ -284,6 +284,33 @@ public class OverviewTests
         }
     }
 
+    /// <summary>A catalogue's name for a class is long: the title wraps beside the page's buttons, never under them
+    /// (Record once repeated the name, and covered it).</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void A_long_class_name_wraps_beside_the_buttons_not_under_them(SkinKind skin)
+    {
+        var m = Demo.Overview("Theory of Computation and Compilers(CSCI4150.A)");
+        m.Overview!.OnRecord = () => { };
+        Control view = skin == SkinKind.Mac ? new MacLibrary { DataContext = m } : new WinLibrary { DataContext = m };
+        var w = Host(view, skin, 1000, 800);
+        try
+        {
+            var page = view.GetVisualDescendants().OfType<UserControl>().First(u => u is MacOverview or WinOverview);
+            var title = page.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "Title");
+            var record = page.GetVisualDescendants().OfType<Button>().First(b => b.Name == "Record");
+            Assert.True(record.IsEffectivelyVisible);
+            Assert.True(In(title, view).Right <= In(record, view).Left, $"{skin}: the title runs under Record");
+            Assert.True(In(record, view).Right <= In(page, view).Right, $"{skin}: Record runs off the page");
+        }
+        finally
+        {
+            w.Close();
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
     /// <summary>The window 64 px in on the design's ground, as every shot of it is.</summary>
     static readonly Size Wide = new(1408, 928);
 
