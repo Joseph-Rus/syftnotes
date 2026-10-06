@@ -16,6 +16,7 @@ public sealed class Seen : IDisposable
     readonly Visual target;
     readonly Action<bool> changed;
     readonly List<IDisposable> listening = [];
+    bool attached;
     bool seen;
 
     /// <summary>Starts listening: <paramref name="changed"/> is called with true when <paramref name="target"/> comes into
@@ -26,16 +27,28 @@ public sealed class Seen : IDisposable
         this.changed = changed;
         target.AttachedToVisualTree += Attached;
         target.DetachedFromVisualTree += Detached;
-        if (TopLevel.GetTopLevel(target) is not null) Listen();
+        if (target.IsAttachedToVisualTree())
+        {
+            attached = true;
+            Listen();
+        }
     }
 
     /// <summary>Whether it's in view now.</summary>
     public bool InView => seen;
 
-    void Attached(object? sender, VisualTreeAttachmentEventArgs e) => Listen();
+    void Attached(object? sender, VisualTreeAttachmentEventArgs e)
+    {
+        attached = true;
+        Listen();
+    }
 
+    /// <summary>Taken out of its window, or its window closed: not seen, whatever the control says of itself. A window
+    /// that has closed is still its top level, and a control taken apart counts as visible again, so asking it would
+    /// say it had come into view, for good, with nothing left listening to say otherwise.</summary>
     void Detached(object? sender, VisualTreeAttachmentEventArgs e)
     {
+        attached = false;
         Forget();
         Update();
     }
@@ -56,7 +69,7 @@ public sealed class Seen : IDisposable
 
     void Update()
     {
-        bool now = TopLevel.GetTopLevel(target) is not null && target.IsEffectivelyVisible;
+        bool now = attached && TopLevel.GetTopLevel(target) is not null && target.IsEffectivelyVisible;
         if (now == seen) return;
         seen = now;
         changed(now);
