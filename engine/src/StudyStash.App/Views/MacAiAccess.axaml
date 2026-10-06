@@ -1,5 +1,5 @@
 <!-- Settings → AI tool access (design 14): the off switch, what AI apps may read, the AI apps on this computer (one
-     click each, no Tailscale), the "Claude on the web and phone" card (Funnel on/off, the address, a live check, its
+     click each, no Tailscale), the "Claude and ChatGPT on the web and phone" card (Funnel on/off, the address, a live check, its
      problems, and what this computer needs first), and the other connections. The pane's own padding and scrolling;
      the settings window is the host's. -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -21,7 +21,7 @@
           <ToggleButton AutomationProperties.Name="AI tool access" Grid.Column="1" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" VerticalAlignment="Center" />
         </Grid>
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left"
-                   Text="Claude, Codex, Gemini and other apps that support MCP can read your library. They can't change or delete anything." />
+                   Text="Claude, ChatGPT, Gemini and other apps that support MCP can read your library. They can't change or delete anything." />
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left" Foreground="{DynamicResource Warn}" IsVisible="{Binding Offline}"
                    Text="Can't reach your library right now, so what's below may be out of date." />
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left" IsVisible="{Binding OlderLibrary}"
@@ -91,7 +91,7 @@
                       <Panel Classes="ai-lead">
                         <Border Classes="ai-tile"><c:Icon Glyph="{Binding Icon}" Size="15" Foreground="{DynamicResource Fg}" /></Border>
                       </Panel>
-                      <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
+                      <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" ToolTip.Tip="{Binding About}">
                         <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
                         <Grid ColumnDefinitions="Auto,*">
                           <Ellipse Classes="ai-dot good" IsVisible="{Binding Ok}" VerticalAlignment="Center" Margin="0,0,6,0" />
@@ -141,10 +141,10 @@
         </Border>
       </StackPanel>
 
-      <!-- Claude on the web and phone: Funnel on/off, the address to paste into Claude, steps, a live check, its
+      <!-- Claude and ChatGPT on the web and phone: Funnel on/off, the address to paste into them, steps, a live check, its
            problems in plain words, what this computer needs first (Tailscale), and the sign-ins it has made. -->
       <StackPanel Spacing="8">
-        <TextBlock Classes="ai-section" Text="Claude on the web and phone" Margin="4,0" />
+        <TextBlock Classes="ai-section" Text="Claude and ChatGPT on the web and phone" Margin="4,0" />
         <Border Classes="ai-group">
           <StackPanel>
             <Grid Classes="ai-row" ColumnDefinitions="28,12,*,Auto" MinHeight="56" Margin="16,10">
@@ -152,13 +152,13 @@
                 <Border Classes="ai-tile"><c:Icon Glyph="public" Size="16" Foreground="{DynamicResource Fg}" /></Border>
               </Panel>
               <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
-                <TextBlock Classes="ai-row-title" Text="Let Claude reach your library from the internet" TextWrapping="Wrap" />
+                <TextBlock Classes="ai-row-title" Text="Let Claude and ChatGPT reach your library from the internet" TextWrapping="Wrap" />
                 <TextBlock Classes="ai-row-sub" TextWrapping="Wrap"
-                           Text="claude.ai in a browser and the Claude phone app run on Anthropic's servers, so they need an internet address. Study Stash makes one with Tailscale Funnel, and only someone with your library password can let them in. The apps above don't need this." />
+                           Text="claude.ai, the Claude phone app and chatgpt.com run on Anthropic's and OpenAI's servers, so they need an internet address. Study Stash makes one with Tailscale Funnel, and only someone with your library password can let them in. The apps above don't need this." />
               </StackPanel>
-              <Panel Grid.Column="3" VerticalAlignment="Center">
+              <Panel Grid.Column="3" VerticalAlignment="Center" Margin="12,0,0,0">
                 <c:Spinner IsVisible="{Binding WebBusy}" Width="16" Height="16" Foreground="{DynamicResource Fg2}" />
-                <ToggleButton AutomationProperties.Name="Let Claude reach your library from the internet" IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
+                <ToggleButton AutomationProperties.Name="Let Claude and ChatGPT reach your library from the internet" IsVisible="{Binding !WebBusy}" Theme="{StaticResource AiToggle}"
                               IsChecked="{Binding WebOn}" IsEnabled="{Binding WebToggleEnabled}" />
               </Panel>
             </Grid>
@@ -189,12 +189,12 @@
                 <Grid ColumnDefinitions="28,12,*">
                   <Panel Classes="ai-lead"><Border Classes="ai-num"><TextBlock Text="1" /></Border></Panel>
                   <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap"
-                             Text="In Claude, open Settings → Connectors and choose Add custom connector." />
+                             Text="Claude: open Settings → Connectors and choose Add custom connector.&#x0a;ChatGPT: in a browser, open chatgpt.com/plugins, choose + and Add custom MCP server." />
                 </Grid>
                 <Grid ColumnDefinitions="28,12,*">
                   <Panel Classes="ai-lead"><Border Classes="ai-num"><TextBlock Text="2" /></Border></Panel>
                   <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap"
-                             Text="Paste the name and URL, then choose Continue." />
+                             Text="Paste the name and URL, then choose Continue (in ChatGPT, Create as a plugin)." />
                 </Grid>
                 <Grid ColumnDefinitions="28,12,*">
                   <Panel Classes="ai-lead"><Border Classes="ai-num"><TextBlock Text="3" /></Border></Panel>
@@ -248,7 +248,7 @@
               <Grid ColumnDefinitions="28,12,*" MinHeight="36" Margin="16,8">
                 <Panel Classes="ai-lead"><c:Icon Glyph="info" Size="16" Foreground="{DynamicResource Fg3}" /></Panel>
                 <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap"
-                           Text="AI tool access is off, so Claude can't read anything even when connected." />
+                           Text="AI tool access is off, so they can't read anything even when connected." />
               </Grid>
             </StackPanel>
 

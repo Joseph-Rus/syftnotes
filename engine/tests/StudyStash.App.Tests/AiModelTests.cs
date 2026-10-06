@@ -1222,7 +1222,10 @@ public class AiAccessModelTests
     {
         var (model, _) = Loaded();
         bool added = false;
-        model.ReadApps = () => [new AiAppState("claude-desktop", "Claude Desktop", true, added, false, added ? Now : null, null, "/c.json")];
+        DateTime? started = null;
+        var reopened = new TaskCompletionSource();
+        model.Delay = _ => reopened.Task;
+        model.ReadApps = () => [new AiAppState("claude-desktop", "Claude Desktop", true, added, false, added ? Now : null, started, "/c.json")];
         model.ConnectApp = id =>
         {
             added = id == "claude-desktop";
@@ -1242,6 +1245,13 @@ public class AiAccessModelTests
         Assert.True(model.ShowWritten);
         Assert.Equal("/c.json", model.WrittenFile);
         Assert.Contains("/c.json.study-stash-backup", model.WrittenBackupWords);
+
+        // The student reopens the app, which starts Study Stash: the row says so by itself, with Settings still open.
+        started = Now.AddMinutes(1);
+        reopened.SetResult();
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!row.Ok && DateTime.UtcNow < deadline) await Task.Delay(5, TestContext.Current.CancellationToken);
+        Assert.StartsWith("Connected", row.Status);
     }
 
     [AvaloniaFact]
@@ -1264,7 +1274,7 @@ public class AiAccessModelTests
         Assert.Empty(model.Connected);
     }
 
-    // Claude on the web and phone: the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
+    // Claude and ChatGPT on the web and phone: the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
     // (task 4). FakeAiLibrary's unscripted SetWebAsync turns Funnel on at "https://mini.tail1234.ts.net" and answers
     // reachable straight away; OnSetWeb/OnCheckWeb script something else (a problem, a slow check, an older library).
 
@@ -1359,13 +1369,13 @@ public class AiAccessModelTests
     {
         var (model, lib) = Loaded();
         await model.Load();
-        lib.OnSetWeb = on => throw new LibraryRefusedException(400, "Set a library password first, so only you can let Claude in.");
+        lib.OnSetWeb = on => throw new LibraryRefusedException(400, "Set a library password first, so only you can let an AI app in.");
 
         model.WebOn = true;
 
         Assert.False(model.WebOn);
         Assert.False(model.HasPassword);
-        Assert.Equal("Set a library password first, so only you can let Claude in.", model.WebNote);
+        Assert.Equal("Set a library password first, so only you can let an AI app in.", model.WebNote);
     }
 
     [AvaloniaFact]

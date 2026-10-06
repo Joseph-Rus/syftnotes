@@ -21,19 +21,20 @@ public sealed class AiConnectionRow
     public string WinDetail => HasUsedWords ? $"{Detail} · {UsedWords}" : Detail;
     public bool CanRemove { get; init; }
     public IAsyncRelayCommand? Remove { get; internal set; }
-    /// <summary>terminal for Claude, code for Codex, hub for anything else — the row's icon tile.</summary>
-    public string Icon => Name switch { "Claude Code" or "Claude" or "Claude Desktop" => "terminal", "Codex" => "code", _ => "hub" };
+    /// <summary>terminal for Claude, code for ChatGPT and Codex, hub for anything else — the row's icon tile.</summary>
+    public string Icon => Name switch { "Claude Code" or "Claude" or "Claude Desktop" => "terminal", "Codex" or "ChatGPT" => "code", _ => "hub" };
     /// <summary>The first row in the list shows no separator above it.</summary>
     public bool First { get; set; }
 }
 
-/// <summary>One AI app on this computer (Claude Desktop, Claude Code, Codex, Gemini CLI): what it's called, where it
+/// <summary>One AI app on this computer (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): what it's called, where it
 /// stands, and its own Connect and Disconnect, closed over its id.</summary>
 public sealed partial class AiAppRow : ObservableObject
 {
     public string Id { get; init; } = "";
     public string Name { get; init; } = "";
-    /// <summary>What the app is, under its name ("The app, the CLI and the IDE extension").</summary>
+    /// <summary>What the app is, in a few words ("The ChatGPT app, and Codex in the terminal or your editor"): the
+    /// row's tooltip.</summary>
     public string About { get; init; } = "";
     public string Icon => Id switch { "codex" => "code", "gemini" => "auto_awesome", "claude-code" => "terminal", _ => "desktop_windows" };
     [ObservableProperty] public partial string Status { get; set; } = "";
@@ -41,7 +42,8 @@ public sealed partial class AiAppRow : ObservableObject
     [ObservableProperty] public partial bool Ok { get; set; }
     [ObservableProperty] public partial bool CanConnect { get; set; }
     [ObservableProperty] public partial bool CanDisconnect { get; set; }
-    /// <summary>"Connect", or "Fix" when the app has another copy of Study Stash set up.</summary>
+    /// <summary>"Connect", "Fix" when the app has another copy of Study Stash set up, or "Update" when it has this
+    /// one the way it was pasted in by hand.</summary>
     [ObservableProperty] public partial string ConnectWords { get; set; } = "Connect";
     public bool First { get; set; }
     public IAsyncRelayCommand? Connect { get; internal set; }
@@ -51,16 +53,17 @@ public sealed partial class AiAppRow : ObservableObject
     partial void OnStatusChanged(string value) => OnPropertyChanged(nameof(WinDetail));
 
     /// <summary>Where an app stands, in words: not here, not connected, added but not loaded yet, connected (and when
-    /// it last started Study Stash), or set up for another copy of Study Stash.</summary>
+    /// it last started Study Stash), set up for another copy of Study Stash, or set up by hand.</summary>
     public void Show(AiAppState s, DateTime now)
     {
         Ok = false;
-        CanConnect = s.Installed && (!s.Added || s.OtherCopy);
+        CanConnect = s.Installed && (!s.Added || s.OtherCopy || s.Outdated);
         CanDisconnect = s.Added;
-        ConnectWords = s.OtherCopy ? "Fix" : "Connect";
+        ConnectWords = s.OtherCopy ? "Fix" : s.Outdated ? "Update" : "Connect";
         if (!s.Installed) Status = "Not on this computer";
         else if (!s.Added) Status = "Not connected";
         else if (s.OtherCopy) Status = "Set up for another copy of Study Stash. Choose Fix to use this one.";
+        else if (s.Outdated) Status = "Set up by hand, so Study Stash can't tell when it's connected. Choose Update.";
         else if (s.Started is { } started && (s.AddedAt is null || started >= s.AddedAt))
         {
             Ok = true;
@@ -70,7 +73,7 @@ public sealed partial class AiAppRow : ObservableObject
         {
             "Claude Desktop" => "Added. Quit and reopen Claude Desktop to load it.",
             "Claude Code" => "Added. Start a new Claude Code session to load it.",
-            "Codex" => "Added. Restart Codex to load it.",
+            "ChatGPT" => "Added. " + ClaudeSetup.ChatGptRestart,
             _ => $"Added. Start {s.Name} again to load it.",
         };
     }
@@ -78,7 +81,8 @@ public sealed partial class AiAppRow : ObservableObject
 
 /// <summary>
 /// Settings → AI tool access (design 14): the off switch, what AI apps may read, the AI apps on this computer (each
-/// connected with one click, no Tailscale needed), Claude on the web (Tailscale Funnel), and the other connections.
+/// connected with one click, no Tailscale needed), Claude and ChatGPT on the web (Tailscale Funnel), and the other
+/// connections.
 /// Reads and drives one library's AI (<see cref="IAiLibrary"/>); what it can't do through that (reading and changing
 /// the AI apps' own settings on this computer) goes through hooks the host sets, so this model never touches a file
 /// or a process itself.
@@ -111,9 +115,9 @@ public sealed partial class AiAccessModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(WebToggleEnabled))]
     public partial bool HasPassword { get; set; }
 
-    // Claude on the web and phone: whether Claude can reach this library over the internet, through Tailscale Funnel
-    // (task 4's ClaudeReach/ReachCheck, read through ToolAccessInfo.Web). WebOn is the switch Settings shows; the
-    // library is the truth, so every change round-trips through it before the switch visibly moves.
+    // Claude and ChatGPT on the web and phone: whether they can reach this library over the internet, through Tailscale
+    // Funnel (task 4's ClaudeReach/ReachCheck, read through ToolAccessInfo.Web). WebOn is the switch Settings shows;
+    // the library is the truth, so every change round-trips through it before the switch visibly moves.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowWebReady), nameof(ShowWebNeeds), nameof(ShowWebNeedsAction))]
     public partial bool WebOn { get; set; }
@@ -162,13 +166,13 @@ public sealed partial class AiAccessModel : ObservableObject
     public string? WebStatusWords => WebChecking ? "Checking…" : WebWords;
     public bool WebStatusOk => WebReachable == true;
     public bool WebStatusWarn => WebReachable == false;
-    /// <summary>The master AI-tool-access switch (<see cref="On"/>) is off: Claude can be signed in and the address
+    /// <summary>The master AI-tool-access switch (<see cref="On"/>) is off: an app can be signed in and the address
     /// can answer, but every tool call is refused. Shown as a quiet note under the card, not another problem.</summary>
     public bool ShowToolsOffNote => !On;
     public bool WebToggleEnabled => WebSupported && HasPassword;
 
-    /// <summary>Claude sign-ins (<c>kind == "signin"</c>): the ones this card lists and can remove. A token made in
-    /// Settings, or this computer's own Claude Code/Desktop, stay in <see cref="Connected"/> below instead.</summary>
+    /// <summary>Sign-ins from the web (Claude, ChatGPT: <c>kind == "signin"</c>): the ones this card lists and can
+    /// remove. A token made in Settings stays in <see cref="Connected"/> below instead.</summary>
     public ObservableCollection<AiConnectionRow> ClaudeConnections { get; } = [];
     public bool HasClaudeConnections => ClaudeConnections.Count > 0;
 
@@ -369,7 +373,8 @@ public sealed partial class AiAccessModel : ObservableObject
         {
             return;
         }
-        foreach (var s in states)
+        // The apps this computer has come first (the order only settles when the rows are first made).
+        foreach (var s in states.OrderByDescending(s => s.Installed))
         {
             var row = Apps.FirstOrDefault(a => a.Id == s.Id);
             if (row is null)
@@ -388,7 +393,7 @@ public sealed partial class AiAccessModel : ObservableObject
     {
         "claude-desktop" => "The Claude app on this computer",
         "claude-code" => "In the terminal, the Claude app's Code tab, or your editor",
-        "codex" => "The Codex app, CLI and IDE extension share one setup",
+        "codex" => "The ChatGPT app, and Codex in the terminal or your editor",
         "gemini" => "Google's Gemini in the terminal",
         _ => "",
     };
@@ -405,10 +410,46 @@ public sealed partial class AiAccessModel : ObservableObject
             WrittenBackup = done.Backup;
             WrittenText = done.Written;
             await LoadApps();
+            StopWatchingApps();
+            if (add && done.Ok) WatchApp(id);
         }
         finally
         {
             Busy = false;
+        }
+    }
+
+    CancellationTokenSource? appWatch;
+
+    void StopWatchingApps()
+    {
+        appWatch?.Cancel();
+        appWatch = null;
+    }
+
+    /// <summary>After Connect, the app still has to be reopened to load Study Stash. Looks again every few seconds for
+    /// a few minutes, so the row turns to Connected by itself the moment it does, with Settings still open.</summary>
+    void WatchApp(string id)
+    {
+        var cts = new CancellationTokenSource();
+        appWatch = cts;
+        _ = WatchAsync();
+
+        async Task WatchAsync()
+        {
+            try
+            {
+                for (var i = 0; i < 60 && !cts.IsCancellationRequested; i++)
+                {
+                    await (Delay?.Invoke(TimeSpan.FromSeconds(3)) ?? Task.Delay(TimeSpan.FromSeconds(3), cts.Token));
+                    if (cts.IsCancellationRequested) return;
+                    await LoadApps();
+                    if (Apps.FirstOrDefault(a => a.Id == id) is not { Ok: false, CanDisconnect: true }) return;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
     }
 

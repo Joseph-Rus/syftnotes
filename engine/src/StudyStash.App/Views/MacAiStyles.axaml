@@ -502,7 +502,7 @@
     <Setter Property="CornerRadius" Value="9" />
   </Style>
 
-  <!-- The "Claude on the web and phone" card's own bits (14, connectors): a fixed-width leading column so the switch's
+  <!-- The "Claude and ChatGPT on the web and phone" card's own bits (14, connectors): a fixed-width leading column so the switch's
        icon, the field rows' labels and the steps' numbers all start at the same left edge, a numbered step marker
        the same size as ai-check, and the field rows' own label/value split. -->
   <Style Selector="Panel.ai-lead">

@@ -11,8 +11,10 @@ namespace StudyStash.App.Services;
 
 /// <summary>One AI app on this computer, as its own settings file has it: whether the app is here at all, whether
 /// Study Stash is in its settings (and for this copy of Study Stash), when Settings added it, and when the app last
-/// started it.</summary>
-public sealed record AiAppState(string Id, string Name, bool Installed, bool Added, bool OtherCopy, DateTime? AddedAt, DateTime? Started, string ConfigPath);
+/// started it. <paramref name="Outdated"/>: this copy is in there, but not the way Connect writes it (pasted in by
+/// hand, say), so it never says which app started it and Settings can't tell when it's connected.</summary>
+public sealed record AiAppState(string Id, string Name, bool Installed, bool Added, bool OtherCopy, DateTime? AddedAt, DateTime? Started, string ConfigPath,
+    bool Outdated = false);
 
 /// <summary>What connecting or disconnecting an app did: the words to show, and, for the "what was written" panel,
 /// the file, the copy of it kept from before, and the setup that went in (never anything secret: there's none in it).</summary>
@@ -20,13 +22,13 @@ public sealed record AiAppChange(bool Ok, string Say, string? File = null, strin
 
 /// <summary>
 /// Connecting AI apps on this computer to your lectures (Settings → AI tool access). Claude Desktop, Claude Code,
-/// Codex (its app, CLI and IDE extension share one settings file) and Gemini CLI each start Study Stash's MCP server
-/// themselves (<c>StudyStash mcp --client ID</c>), which reads the library with the password this computer already
-/// keeps in Study Stash's own settings. So their settings get no password and no address: nothing on the network,
-/// no Tailscale. Every change is a merge into the app's own file (its other servers and settings stay as they were),
-/// with the file as it was kept next to it, and a file that can't be read safely (not valid, or with comments a
-/// rewrite would drop) is left alone. Claude on the web needs an internet address instead: that's the library's
-/// Tailscale Funnel switch, not this.
+/// ChatGPT (the ChatGPT app, the Codex CLI and its IDE extension share one settings file, Codex's) and Gemini CLI
+/// each start Study Stash's MCP server themselves (<c>StudyStash mcp --client ID</c>), which reads the library with
+/// the password this computer already keeps in Study Stash's own settings. So their settings get no password and no
+/// address: nothing on the network, no Tailscale. Every change is a merge into the app's own file (its other servers
+/// and settings stay as they were), with the file as it was kept next to it, and a file that can't be read safely
+/// (not valid, or with comments a rewrite would drop) is left alone. Claude and ChatGPT on the web need an internet
+/// address instead: that's the library's Tailscale Funnel switch, not this.
 /// </summary>
 public sealed class ClaudeSetup
 {
@@ -36,7 +38,7 @@ public sealed class ClaudeSetup
     public string UserHome { get; init; } = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
     /// <summary>A command on the PATH (or where installers put it), or null.</summary>
     public Func<string, string?> Find { get; init; } = StudyStash.Core.Ai.AiProvider.Which;
-    /// <summary>Whether an app by this name ("Claude", "Codex") is installed as a desktop app.</summary>
+    /// <summary>Whether an app by this name ("Claude", "ChatGPT") is installed as a desktop app.</summary>
     public Func<string, bool> AppInstalled { get; init; } = DesktopAppInstalled;
     /// <summary>False in a test or a self-test: nothing is written to an AI app's settings.</summary>
     public bool CanWrite { get; init; } = true;
@@ -51,7 +53,7 @@ public sealed class ClaudeSetup
         get => claudeCode ??= Path.Combine(Environment.GetEnvironmentVariable("CLAUDE_CONFIG_DIR") is { Length: > 0 } d ? d : UserHome, ".claude.json");
         init => claudeCode = value;
     }
-    /// <summary>Codex's settings (~/.codex/config.toml), shared by the Codex app, its CLI and its IDE extension.</summary>
+    /// <summary>Codex's settings (~/.codex/config.toml), which the ChatGPT app, the Codex CLI and its IDE extension all read.</summary>
     public string CodexConfig
     {
         get => codex ??= Path.Combine(Environment.GetEnvironmentVariable("CODEX_HOME") is { Length: > 0 } d ? d : Path.Combine(UserHome, ".codex"), "config.toml");
@@ -75,7 +77,7 @@ public sealed class ClaudeSetup
 
     /// <summary>The apps, in the order Settings lists them.</summary>
     public static readonly IReadOnlyList<(string Id, string Name)> Apps =
-        [("claude-desktop", "Claude Desktop"), ("claude-code", "Claude Code"), ("codex", "Codex"), ("gemini", "Gemini CLI")];
+        [("claude-desktop", "Claude Desktop"), ("claude-code", "Claude Code"), ("codex", "ChatGPT"), ("gemini", "Gemini CLI")];
 
     static string NameOf(string id) => Apps.First(a => a.Id == id).Name;
 
@@ -106,13 +108,42 @@ public sealed class ClaudeSetup
 
     static bool DesktopAppInstalled(string name)
     {
-        if (OperatingSystem.IsMacOS())
-            return Directory.Exists($"/Applications/{name}.app")
-                || Directory.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Applications", name + ".app"));
+        if (name == "ChatGPT") return ChatGptAppInstalled();
+        if (OperatingSystem.IsMacOS()) return MacApps(name).Any(Directory.Exists);
         if (OperatingSystem.IsWindows() && name == "Claude")
             return Directory.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AnthropicClaude"));
         return false;
     }
+
+    static string[] MacApps(string name) =>
+        [$"/Applications/{name}.app", Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Applications", name + ".app")];
+
+    /// <summary>The ChatGPT app that reads Codex's settings: the one OpenAI merged with Codex in July 2026 (it's
+    /// Codex's own app underneath, whichever of the two names it has). ChatGPT Classic, the app from before, has no
+    /// MCP servers on this computer, so it doesn't count.</summary>
+    static bool ChatGptAppInstalled()
+    {
+        try
+        {
+            if (OperatingSystem.IsMacOS())
+                return new[] { "ChatGPT", "Codex" }.SelectMany(MacApps).Any(app => IsCodexBundle(Path.Combine(app, "Contents", "Info.plist")));
+            if (OperatingSystem.IsWindows())
+            {
+                // The Microsoft Store's "ChatGPT" is the OpenAI.Codex package.
+                string packages = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Packages");
+                return Directory.Exists(packages) && Directory.EnumerateDirectories(packages, "OpenAI.Codex_*").Any();
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+        return false;
+    }
+
+    /// <summary>Whether an app's Info.plist names Codex's bundle (com.openai.codex): true of the merged ChatGPT app,
+    /// not of ChatGPT Classic (com.openai.chat). The name is in the file as plain text whether the plist is XML or binary.</summary>
+    public static bool IsCodexBundle(string infoPlist) =>
+        File.Exists(infoPlist) && File.ReadAllBytes(infoPlist).AsSpan().IndexOf("com.openai.codex"u8) >= 0;
 
     /// <summary>The MCP server's command: the app, told to be the server (and where its settings are, if not the usual).</summary>
     public List<string> McpArgs => Home == Configs.DefaultHome ? ["mcp"] : ["--home", Home, "mcp"];
@@ -158,7 +189,7 @@ public sealed class ClaudeSetup
     {
         "claude-desktop" => AppInstalled("Claude") || Directory.Exists(Path.GetDirectoryName(DesktopConfig)),
         "claude-code" => Find("claude") is not null || File.Exists(ClaudeCodeConfig),
-        "codex" => Find("codex") is not null || AppInstalled("Codex") || Directory.Exists(Path.GetDirectoryName(CodexConfig)),
+        "codex" => Find("codex") is not null || AppInstalled("ChatGPT") || Directory.Exists(Path.GetDirectoryName(CodexConfig)),
         "gemini" => Find("gemini") is not null || Directory.Exists(Path.GetDirectoryName(GeminiConfig)),
         _ => false,
     };
@@ -173,6 +204,7 @@ public sealed class ClaudeSetup
     {
         string path = ConfigOf(id);
         string? command = null;
+        List<string?> args = [];
         bool added = false;
         try
         {
@@ -181,24 +213,28 @@ public sealed class ClaudeSetup
                 string text = File.ReadAllText(path);
                 if (id == "codex")
                 {
-                    if (TomlOf(text)?["mcp_servers"] is TomlTable servers && servers.TryGetValue(ClaudeTools.ServerName, out var s))
+                    if (ServersOf(TomlOf(text)) is { } servers && servers.TryGetValue(ClaudeTools.ServerName, out var s))
                     {
                         added = true;
                         command = (s as TomlTable)?.TryGetValue("command", out var c) == true ? c as string : null;
+                        if ((s as TomlTable)?.TryGetValue("args", out var a) == true && a is TomlArray list) args = [.. list.Select(x => x as string)];
                     }
                 }
                 else if (JsonOf(text, lenient: true)?["mcpServers"]?[ClaudeTools.ServerName] is JsonObject entry)
                 {
                     added = true;
                     command = entry["command"] is JsonValue v && v.TryGetValue(out string? c) ? c : null;
+                    if (entry["args"] is JsonArray list) args = [.. list.Select(x => x is JsonValue av && av.TryGetValue(out string? arg) ? arg : null)];
                 }
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
         }
-        return new AiAppState(id, NameOf(id), IsInstalled(id) || added, added, added && !SameProgram(command),
-            ToLocal(McpClients.When(McpClients.AddedFile(Home, id))), ToLocal(McpClients.When(McpClients.StartedFile(Home, id))), path);
+        bool ours = added && SameProgram(command);
+        return new AiAppState(id, NameOf(id), IsInstalled(id) || added, added, added && !ours,
+            ToLocal(McpClients.When(McpClients.AddedFile(Home, id))), ToLocal(McpClients.When(McpClients.StartedFile(Home, id))), path,
+            Outdated: ours && !args.SequenceEqual(ArgsFor(id)));
     }
 
     static DateTime? ToLocal(DateTime? utc) => utc?.ToLocalTime();
@@ -242,9 +278,12 @@ public sealed class ClaudeSetup
     {
         "Claude Desktop" => "Quit and reopen Claude Desktop to load it.",
         "Claude Code" => "Start a new Claude Code session to load it.",
-        "Codex" => "Restart Codex to load it.",
+        "ChatGPT" => ChatGptRestart,
         _ => $"Start {name} again to load it.",
     };
+
+    /// <summary>The ChatGPT app reads its settings when it opens; Codex in a terminal or an editor, at each new session.</summary>
+    public const string ChatGptRestart = "Quit and reopen ChatGPT to load it (or start a new Codex session).";
 
     AiAppChange ChangeJson(string id, string name, string path, bool add, string written)
     {
@@ -293,15 +332,15 @@ public sealed class ClaudeSetup
         string nl = before.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
         var (rest, had) = WithoutOurTables(before, nl);
         var left = TomlOf(rest);
-        if (left is null || left["mcp_servers"] is TomlTable s && s.ContainsKey(ClaudeTools.ServerName))
+        if (left is null || ServersOf(left)?.ContainsKey(ClaudeTools.ServerName) == true)
             return new(false, Manual($"{name}'s config.toml has Study Stash set up by hand in a way Study Stash won't rewrite, so it's left alone."), path, null, add ? written : null);
         string after;
         if (add) after = (rest.Trim().Length > 0 ? rest.TrimEnd('\r', '\n') + nl + nl : "") + written.ReplaceLineEndings(nl) + nl;
         else if (!had) return new(true, $"{name} doesn't have Study Stash.", path);
         else after = rest;
-        // What Codex will read has Study Stash exactly when it should, or nothing is written.
-        if (TomlOf(after) is not { } check || (check["mcp_servers"] is TomlTable c && c.ContainsKey(ClaudeTools.ServerName)) != add)
-            return new(false, Manual($"Couldn't make a change to {name}'s config.toml that Codex would read, so it's left alone."), path, null, add ? written : null);
+        // What ChatGPT and Codex will read has Study Stash exactly when it should, or nothing is written.
+        if (TomlOf(after) is not { } check || (ServersOf(check)?.ContainsKey(ClaudeTools.ServerName) == true) != add)
+            return new(false, Manual($"Couldn't make a change to {name}'s config.toml that it would read, so it's left alone."), path, null, add ? written : null);
         string? backup = Save(path, File.Exists(path) ? before : null, after);
         return add
             ? new(true, $"Added Study Stash to {name}. {Restart(name)}", path, backup, written)
@@ -342,6 +381,9 @@ public sealed class ClaudeSetup
         string rest = string.Join(nl, kept);
         return (rest.Length > 0 ? rest + nl : "", true);
     }
+
+    /// <summary>config.toml's MCP servers, or null when it has none (asking a table for a key it doesn't have throws).</summary>
+    static TomlTable? ServersOf(TomlTable? config) => config is not null && config.TryGetValue("mcp_servers", out var servers) ? servers as TomlTable : null;
 
     static TomlTable? TomlOf(string text)
     {

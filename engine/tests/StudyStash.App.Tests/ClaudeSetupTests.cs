@@ -5,7 +5,7 @@ using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>Connecting the AI apps on this computer (Claude Desktop, Claude Code, Codex, Gemini CLI) to the library:
+/// <summary>Connecting the AI apps on this computer (Claude Desktop, Claude Code, ChatGPT, Gemini CLI) to the library:
 /// what goes into each app's own settings file, and that nothing else in it is ever lost. Every file is in a test's
 /// own folder: never a real app's settings.</summary>
 public class ClaudeSetupTests
@@ -78,7 +78,7 @@ public class ClaudeSetupTests
     }
 
     [Fact]
-    public void Codex_gets_its_own_table_and_every_other_line_of_config_toml_stays_as_it_was()
+    public void ChatGPT_gets_its_own_table_and_every_other_line_of_config_toml_stays_as_it_was()
     {
         using var home = new TempHome();
         var setup = Setup(home);
@@ -99,6 +99,7 @@ public class ClaudeSetupTests
         var added = setup.Connect("codex");
 
         Assert.True(added.Ok, added.Say);
+        Assert.Equal("Added Study Stash to ChatGPT. Quit and reopen ChatGPT to load it (or start a new Codex session).", added.Say);
         string text = File.ReadAllText(setup.CodexConfig);
         Assert.StartsWith(before.TrimEnd('\n'), text);
         Assert.Contains($"[mcp_servers.{ClaudeTools.ServerName}]\ncommand = \"{Program}\"\nargs = [\"--home\", \"{home["study-stash"].Replace("\\", "\\\\")}\", \"mcp\", \"--client\", \"codex\"]", text);
@@ -152,6 +153,67 @@ public class ClaudeSetupTests
         Assert.True(setup.Connect("gemini").Ok);
         Assert.True(setup.Disconnect("gemini").Ok);
         Assert.Equal("{\n  \"theme\": \"Default\"\n}\n", File.ReadAllText(setup.GeminiConfig).ReplaceLineEndings("\n"));
+    }
+
+    [Fact]
+    public void ChatGPT_connects_when_its_settings_have_no_mcp_servers_yet_and_goes_back_to_how_it_was()
+    {
+        using var home = new TempHome();
+        var setup = Setup(home);
+        // A Codex CLI that has only ever had a model picked: no [mcp_servers] anywhere in the file.
+        const string before = "model = \"gpt-5\"\n";
+        Write(setup.CodexConfig, before);
+        Assert.False(setup.State("codex").Added);
+
+        Assert.True(setup.Connect("codex").Ok);
+        Assert.True(setup.State("codex") is { Added: true, Outdated: false });
+        Assert.True(setup.Disconnect("codex").Ok);
+
+        Assert.Equal(before, File.ReadAllText(setup.CodexConfig));
+    }
+
+    [Fact]
+    public void The_chatgpt_row_is_for_the_app_that_reads_codexs_settings_not_chatgpt_classic()
+    {
+        using var home = new TempHome();
+        // The merged ChatGPT app is Codex's own bundle; ChatGPT Classic isn't, and has no MCP servers on this computer.
+        Write(home["ChatGPT.app/Contents/Info.plist"], "<plist><dict><key>CFBundleIdentifier</key><string>com.openai.codex</string></dict></plist>");
+        Write(home["ChatGPT Classic.app/Contents/Info.plist"], "<plist><dict><key>CFBundleIdentifier</key><string>com.openai.chat</string></dict></plist>");
+        Assert.True(ClaudeSetup.IsCodexBundle(home["ChatGPT.app/Contents/Info.plist"]));
+        Assert.False(ClaudeSetup.IsCodexBundle(home["ChatGPT Classic.app/Contents/Info.plist"]));
+        Assert.False(ClaudeSetup.IsCodexBundle(home["Nothing.app/Contents/Info.plist"]));
+
+        var none = Setup(home);
+        Assert.Equal("ChatGPT", none.State("codex").Name);
+        Assert.False(none.State("codex").Installed);
+        var withApp = new ClaudeSetup { Home = home["study-stash"], UserHome = home["user"], Find = _ => null, AppInstalled = name => name == "ChatGPT", CodexConfig = home["user/.codex/config.toml"] };
+        Assert.True(withApp.State("codex").Installed);
+    }
+
+    [Theory]
+    [InlineData("claude-desktop")]
+    [InlineData("codex")]
+    public void Study_stash_pasted_in_by_hand_is_offered_an_update_so_its_row_can_say_connected(string id)
+    {
+        using var home = new TempHome();
+        var setup = Setup(home);
+        // What "Copy setup" and the docs give: the command, with nothing saying which app started it.
+        Write(setup.State(id).ConfigPath, id == "codex"
+            ? $"[mcp_servers.study-stash]\ncommand = \"{Program}\"\nargs = [\"mcp\"]\n"
+            : new JsonObject { ["mcpServers"] = new JsonObject { ["study-stash"] = new JsonObject { ["command"] = Program, ["args"] = new JsonArray("mcp") } } }.ToJsonString());
+
+        var state = setup.State(id);
+        Assert.True(state is { Added: true, OtherCopy: false, Outdated: true });
+        var row = new AiAppRow { Id = id, Name = state.Name };
+        row.Show(state, DateTime.Now);
+        Assert.Equal("Update", row.ConnectWords);
+        Assert.True(row.CanConnect);
+        Assert.Contains("Set up by hand", row.Status);
+
+        Assert.True(setup.Connect(id).Ok);
+
+        Assert.True(setup.State(id) is { Added: true, Outdated: false });
+        Assert.Contains("--client", File.ReadAllText(setup.State(id).ConfigPath));
     }
 
     [Fact]

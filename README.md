@@ -64,8 +64,9 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
 - **Comes with you on your phone.** Your library serves a phone app over Tailscale: read your
   notes, see what's coming up, search, and add photos and PDFs to a lecture from your iPhone or
   iPad. Settings → Your library → Phone shows a code to pair it ([docs/phone.md](docs/phone.md)).
-- **Lets AI apps read your library** over MCP: Claude Desktop, Claude Code, Codex and Gemini CLI on
-  your computer with one click (no Tailscale needed), and claude.ai through a Tailscale Funnel.
+- **Lets AI apps read your library** over MCP: Claude Desktop, Claude Code, the ChatGPT app (with
+  Codex) and Gemini CLI on your computer with one click (no Tailscale needed), and claude.ai and
+  chatgpt.com through a Tailscale Funnel.
 - **Looks at home on your computer.** A native Mac look (Liquid Glass) and Windows 11's, light and
   dark, with ten colour themes in Settings → Appearance.
 - **Keeps itself up to date**, quietly, when nothing is recording.
@@ -377,23 +378,26 @@ filed into each class's folder.
 Your library speaks [MCP](https://modelcontextprotocol.io), so AI apps can read your lectures, notes
 and Canvas work (read-only). Set it up in **Settings → Your library → AI tool access**.
 
-- **AI apps on this computer** (Claude Desktop, Claude Code, Codex, Gemini CLI): choose **Connect**
+- **AI apps on this computer** (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): choose **Connect**
   next to the app. Study Stash adds itself to that app's own settings file, keeping everything else
   in it (and a copy of it as it was, `….study-stash-backup`), then shows you what it wrote. Quit and
-  reopen the app (or start a new session) and the row turns to **Connected**. **Disconnect** takes
-  only Study Stash back out. The app starts Study Stash itself and reads your library through this
+  reopen the app (or start a new session) and the row turns to **Connected** by itself.
+  **Disconnect** takes only Study Stash back out. The **ChatGPT** row is the ChatGPT desktop app
+  (the one with Codex built in) and Codex in the terminal or your editor: they share one settings file. The app starts Study Stash itself and reads your library through this
   computer, so this works on a computer on its own: no Tailscale, no internet address, and no
   password goes into the app's settings. Another MCP app: **Copy setup** and paste it into its settings.
-- **claude.ai in a browser, and the Claude phone app**: these run on Anthropic's servers, so they
-  need an internet address. Turn on **Let Claude reach your library from the internet** (it uses a
+- **claude.ai and chatgpt.com in a browser, and the Claude phone app**: these run on Anthropic's
+  and OpenAI's servers, so they need an internet address. Turn on **Let Claude and ChatGPT reach
+  your library from the internet** (it uses a
   [Tailscale Funnel](https://tailscale.com/kb/1223/funnel), protected by signing in with your
-  library password), then in Claude add a custom connector named **Study Stash** with the address
-  `https://<your library's name>.<your tailnet>.ts.net/mcp`. On a computer without Tailscale the
+  library password), then add a custom connector named **Study Stash** with the address
+  `https://<your library's name>.<your tailnet>.ts.net/mcp`: in Claude under Settings → Connectors,
+  in ChatGPT at chatgpt.com/plugins (**+** → **Add custom MCP server**). On a computer without Tailscale the
   card says so, and links to Tailscale (free); nothing is put on the internet until you turn it on.
 
 [docs/claude-connector.md](docs/claude-connector.md) has the details: each app's settings file,
-what each can read, the web connector, troubleshooting, and how Claude's connector requirements are
-met and tested.
+what each can read, the web connector, troubleshooting, and how Claude's and ChatGPT's connector
+requirements are met and tested.
 
 ## Updates
 

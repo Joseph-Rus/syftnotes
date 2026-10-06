@@ -662,7 +662,7 @@ public class AiShots
         {
             ("claude-desktop", "Claude Desktop", true, true, now.AddHours(-2), now.AddMinutes(-20)),
             ("claude-code", "Claude Code", true, true, now.AddMinutes(-1), null),
-            ("codex", "Codex", true, false, null, null),
+            ("codex", "ChatGPT", true, false, null, null),
             ("gemini", "Gemini CLI", false, false, null, null),
         })
         {
@@ -694,7 +694,7 @@ public class AiShots
             Shot.Take("win-14-ai-tool-access", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel() }));
     }
 
-    // --- 14: the "Claude on the web and phone" card (connectors task 5): off, on and answering, and a Funnel problem.
+    // --- 14: the "Claude and ChatGPT on the web and phone" card (connectors task 5): off, on and answering, and a Funnel problem.
 
     [AvaloniaFact]
     public void Mac_ai_tool_access_claude_off()
