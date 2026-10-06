@@ -1,5 +1,5 @@
-<!-- A notification that looks like the system's own: one plain panel, the app's icon, a title, a few lines, and at
-     most two quiet buttons. On a Mac, a banner (the × shows on its top-left corner when the pointer is over it); on Windows, a Windows 11
+<!-- A notification of the app's own, for where the system's can't be had: one plain panel, a title, a few lines, and
+     at most two quiet buttons, with no picture on it. On a Mac, a banner (the × shows on its top-left corner when the pointer is over it); on Windows, a Windows 11
      toast (the app's name and × along the top). Every toast the app shows, Canvas's included, is one of these. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -68,20 +68,15 @@
   <Border Name="Card" ClipToBounds="False">
     <StackPanel>
       <!-- Windows: the app's name along the top, with the × -->
-      <Grid Name="WinHeader" ColumnDefinitions="Auto,8,*,Auto" Margin="0,0,0,10" IsVisible="False">
-        <Image Source="avares://StudyStash/Assets/icon.png" Width="16" Height="16" RenderOptions.BitmapInterpolationMode="HighQuality"
-               VerticalAlignment="Center" />
-        <TextBlock Grid.Column="2" Text="Study Stash" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-        <Button Name="WinClose" Grid.Column="3" Theme="{StaticResource Surface}" Width="24" Height="24" CornerRadius="4" Margin="0,-4,-6,-4"
+      <Grid Name="WinHeader" ColumnDefinitions="*,Auto" Margin="0,0,0,10" IsVisible="False">
+        <TextBlock Text="Study Stash" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+        <Button Name="WinClose" Grid.Column="1" Theme="{StaticResource Surface}" Width="24" Height="24" CornerRadius="4" Margin="0,-4,-6,-4"
                 HorizontalContentAlignment="Center" ToolTip.Tip="Dismiss">
           <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
         </Button>
       </Grid>
-      <Grid ColumnDefinitions="Auto,*">
-        <Border Name="MacIcon" Width="32" Height="32" CornerRadius="7" ClipToBounds="True" Margin="0,1,10,0" VerticalAlignment="Top">
-          <Image Source="avares://StudyStash/Assets/icon.png" RenderOptions.BitmapInterpolationMode="HighQuality" />
-        </Border>
-        <StackPanel Name="Words" Grid.Column="1" Spacing="1">
+      <Grid>
+        <StackPanel Name="Words" Spacing="1">
           <Grid ColumnDefinitions="*,Auto" MinHeight="18">
             <TextBlock Name="TitleText" Text="{Binding #Root.Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Center" />

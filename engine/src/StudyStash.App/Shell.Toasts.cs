@@ -8,10 +8,27 @@ using StudyStash.Core;
 
 namespace StudyStash.App;
 
-/// <summary>The shell's notifications (<see cref="ToastShelf"/>): what the app says, and when.</summary>
+/// <summary>The shell's notifications: what the app says, and when. They're the computer's own (a Mac's Notification
+/// Center, through <see cref="SystemNotices"/>) wherever it will have them; Study Stash's own cards
+/// (<see cref="ToastShelf"/>) where it won't (a build run from its folder, a copy opened from its disk image, Windows
+/// for now).</summary>
 public static partial class Shell
 {
     static ToastShelf? shelf;
+    static SystemNotices? systemNotices;
+    static bool systemNoticesTried;
+
+    /// <summary>The computer's own notifications, made the first time something is said; null where there are none
+    /// to be had. A self-test keeps to the app's own cards: it measures where those land, and must never have macOS
+    /// ask anyone anything.</summary>
+    static SystemNotices? SystemNotifications()
+    {
+        if (systemNoticesTried) return systemNotices;
+        systemNoticesTried = true;
+        if (Desktop.SystemChangesOff || !OperatingSystem.IsMacOS()) return null;
+        if (MacNotifications.Make() is not { } center) return null;
+        return systemNotices = new SystemNotices(center, a => Dispatcher.UIThread.Post(a), notice => Shelf().Show(notice), log: Program.Log);
+    }
 
     /// <summary>The notifications' shelf, made the first time one is said: they go on the display whose menu bar has
     /// the S. (a Mac) or the main one (Windows), clear of the dropdown or tray flyout, the recorder and the quick panel.</summary>
@@ -27,8 +44,7 @@ public static partial class Shell
         return shelf;
     }
 
-    /// <summary>A notification like the system's own (see <see cref="Notify"/>). Error codes in the words go to the log,
-    /// not on screen.</summary>
+    /// <summary>A notification (see <see cref="Notify"/>). Error codes in the words go to the log, not on screen.</summary>
     public static void Toast(string title, string text, string? action, Action? run, TimeSpan? stay = null)
     {
         if (ToastWords.HadCodes(title) || ToastWords.HadCodes(text)) Program.Log($"[toast] {title}: {text}");
@@ -39,12 +55,14 @@ public static partial class Shell
         });
     }
 
-    /// <summary>Shows <paramref name="notice"/> on top of the stack, unless the same one is showing already (that one
-    /// starts its time again instead). Its words are the app's own, already plain.</summary>
+    /// <summary>Says <paramref name="notice"/>: as one of the computer's own notifications where it has them, else as
+    /// a card of the app's own, on top of the stack (the same one showing already starts its time again instead). Its
+    /// words are the app's own, already plain.</summary>
     static void Notify(Notice notice)
     {
         if (quitting) return;
-        Shelf().Show(notice);
+        if (SystemNotifications() is { } system) system.Show(notice);
+        else Shelf().Show(notice);
     }
 
     /// <summary>The S. in a Mac's menu bar, as a point on screen: the notifications go on that display. Null on
@@ -98,6 +116,7 @@ public static partial class Shell
     /// until it's over or closed.</summary>
     static void SaySettledProblems()
     {
+        systemNotices?.Tick();
         foreach (var p in problemNotices.Due(DateTime.UtcNow, quiet: !host.Settings.SetupDone || setupWindow?.IsVisible == true))
         {
             var kind = p.Kind;
@@ -189,6 +208,10 @@ public static partial class Shell
         return NoticeWords.UpdateNowLine(await Task.Run(updates.NowAsync));
     }
 
-    /// <summary>Quitting: every notification goes.</summary>
-    static void CloseAllToasts() => shelf?.CloseAll();
+    /// <summary>Quitting: every card goes, and so does any of the system's that said something was still so.</summary>
+    static void CloseAllToasts()
+    {
+        shelf?.CloseAll();
+        systemNotices?.Quit();
+    }
 }
