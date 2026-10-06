@@ -159,6 +159,11 @@ public interface IAiLibrary
     Task<RewriteInfo?> RewriteCancelAsync(string lecture);
     Task<RewriteInfo?> RewriteKeepAsync(string lecture);
     Task<RewriteInfo?> RewriteUseAsync(string lecture);
+    /// <summary>Saves the lecture's notes as the student edited them by hand. <paramref name="basedOn"/> is the
+    /// <see cref="Notes.Fingerprint"/> of the notes the edit started from: when the library has other notes by now it
+    /// refuses (412) rather than save over them; null saves over whatever is there. Null from a library too old to
+    /// take edits.</summary>
+    Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn) => Task.FromResult<RewriteInfo?>(null);
     Task<ToolAccessInfo?> AccessAsync();
     Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null);
     /// <summary>Turns Funnel on or off on the library's computer, then checks it from the internet.</summary>
@@ -317,6 +322,9 @@ public sealed class AiRemote(string serverUrl, string key, HttpClient? http = nu
 
     public async Task<RewriteInfo?> RewriteUseAsync(string lecture) =>
         As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/use"));
+
+    public async Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn) => As<RewriteInfo>(await SendAsync(
+        HttpMethod.Post, $"/rewrite/{Seg(lecture)}/edit", new JsonObject { ["markdown"] = markdown, ["based_on"] = basedOn }));
 
     public async Task<ToolAccessInfo?> AccessAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Get, "/access"));
 

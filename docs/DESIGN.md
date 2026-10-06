@@ -82,7 +82,14 @@ laptop                                          library (a Mac mini, say — any
    `NoteView`, which keeps every unchanged block (a diagram's pins and folds) and the reader's place
    (`NoteView.HoldPlace`). The laptop sees them the same way, over the library's API; the phone and
    Ask read the notes afresh. **Rewrite notes with** (`Rewrites`) writes the draft without diagrams
-   (`AiJobs.WriteNotesPlannedAsync`) and queues them when it's used.
+   (`AiJobs.WriteNotesPlannedAsync`) and queues them when it's used. **Edit** turns the notes on the
+   page into their Markdown, each diagram, plot and drawing folded to one line (`NoteEdit`: move the
+   line and it moves, delete it and it goes). Save posts them to
+   `POST /api/v2/ai/rewrite/{id}/edit` with the fingerprint of the notes the edit started from
+   (`based_on`); `Store.EditNotes` saves them (the note file written afresh, search and Ask at once,
+   their writer still named) unless other notes are there by now (412: their diagrams arrived, or
+   another device changed them), when the editor says so and Save again replaces them. Unsaved
+   typing stays through a reload of the page and a look at another lecture, until the app quits.
 6. **Read it.** `studystash mcp` (stdio, for Claude Code or Claude Desktop on the library's own
    computer) and the HTTP + OAuth 2.1 door for claude.ai both read the same library through
    `ClaudeTools`, so Claude can search lectures, read one, and read Canvas.

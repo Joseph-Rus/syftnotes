@@ -340,6 +340,13 @@ public static partial class Shell
             foreach (var c in g.Items) c.Selected = c.Id == id;
         if (host.Remote() is not { } lib) return;
         ClearDetail();
+        // Its notes are being edited: the page stays as it is under the student's typing, however it came to be shown
+        // again (a new lecture was filed, a file was attached, a click on its own row).
+        if (library.Notes is { Editing: true } edited && edited.LectureId == id && library.Note is { } shown && shown.Id == id)
+        {
+            if (transcript) shown.ShowTranscript = true;
+            return;
+        }
         JsonObject? l;
         try
         {
@@ -412,17 +419,29 @@ public static partial class Shell
         // built every diagram and plot in the lecture a second time just to hide it again.
         var before = library.Notes;
         AiNotesModel? notes = null;
+        bool fresh = false;
         if (!note.HasPending)
         {
-            notes = new AiNotesModel(ai);
-            notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            // Notes with an edit in them come back as they were left: the ones on screen (Edit pressed while this
+            // lecture was loading), or ones kept from before another lecture was opened.
+            if (before is { Editing: true } && before.LectureId == note.Id) notes = before;
+            else if (!unsavedNotes.Remove(note.Id, out notes))
             {
-                if (openLecture == note.Id) _ = ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true);
-            });
+                fresh = true;
+                notes = new AiNotesModel(ai);
+                notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (openLecture == note.Id) _ = ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true);
+                });
+            }
         }
-        library.Notes = notes;
-        before?.Dispose();
-        if (notes is not null) _ = notes.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]));
+        if (!ReferenceEquals(before, notes))
+        {
+            library.Notes = notes;
+            LeaveNotes(before);
+        }
+        if (fresh) _ = notes!.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]));
+        else if (notes is not null && !ReferenceEquals(before, notes)) _ = notes.Refresh(); // kept: the library says where they stand now
         var ask = new AiAskModel(ai)
         {
             LectureId = note.Id, ClassName = note.ClassName,
@@ -432,6 +451,19 @@ public static partial class Shell
         library.Ask?.Stop(); // an answer about the lecture being left isn't wanted any more
         library.Ask = ask;
         _ = ask.Load();
+    }
+
+    /// <summary>Notes a student had typed in and not saved when they opened something else, by lecture: back in their
+    /// editor, as they were, when that lecture is opened again (until the app quits).</summary>
+    static readonly Dictionary<string, AiNotesModel> unsavedNotes = [];
+
+    /// <summary>Notes that leave the page stop following the library; ones with unsaved typing are kept for their
+    /// lecture's next opening.</summary>
+    static void LeaveNotes(AiNotesModel? notes)
+    {
+        if (notes is null) return;
+        notes.Dispose();
+        if (notes.EditDirty) unsavedNotes[notes.LectureId] = notes;
     }
 
     /// <summary>The connected library's AI: engines, asking, rewriting notes.</summary>
@@ -469,7 +501,7 @@ public static partial class Shell
         library.CanvasClass = null;
         openCanvasClass = null;
         // No lecture behind the Due page: its notes stop following a rewrite, and the ask bar goes with it.
-        library.Notes?.Dispose();
+        LeaveNotes(library.Notes);
         library.Notes = null;
         library.Note = null;
         var list = library.DueList is { } open && dueListFor == canvasFor ? open : NewDueList();

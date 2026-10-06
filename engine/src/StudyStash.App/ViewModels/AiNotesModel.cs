@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.Core;
 using StudyStash.Core.Ai;
+using StudyStash.Core.Rich;
 
 namespace StudyStash.App.ViewModels;
 
@@ -16,8 +17,9 @@ public enum RewriteState { Idle, Rewriting, Ready, Comparing, Failed }
 /// pressed, however long a rewrite takes or however it ends. Polls the library while a rewrite is running so a job
 /// started elsewhere (another device, or before the app was last opened) still shows up here. The notes arrive before
 /// their diagrams: while the library adds those, the byline says so quietly and the library is asked now and then, and
-/// the diagrams appear in the notes on screen where they go, the rest of the page as it was. Reads and drives one
-/// library's AI (<see cref="IAiLibrary"/>); the view is just this.
+/// the diagrams appear in the notes on screen where they go, the rest of the page as it was. "Edit" turns the current
+/// notes into a text editor (<see cref="NoteEdit"/>: their Markdown, a line for each diagram) until Save or Cancel.
+/// Reads and drives one library's AI (<see cref="IAiLibrary"/>); the view is just this.
 /// </summary>
 public sealed partial class AiNotesModel : ObservableObject, IDisposable
 {
@@ -69,7 +71,12 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     /// view's two columns show side by side.</summary>
     public string CurrentBody => AiWords.DropLeadingSummary(CurrentMarkdown);
     public string DraftBody => AiWords.DropLeadingSummary(DraftMarkdown);
-    public bool ShowRewriteButton => State == RewriteState.Idle;
+    public bool ShowRewriteButton => State == RewriteState.Idle && !Editing;
+    /// <summary>"Edit" sits beside "Rewrite notes", and goes when it does: the notes are edited while nothing else is
+    /// happening to them.</summary>
+    public bool ShowEditButton => State == RewriteState.Idle && !Editing;
+    /// <summary>The notes as they read: not while the two are compared side by side, or the editor has their place.</summary>
+    public bool ShowNotes => !IsComparing && !Editing;
     public bool ShowBar => State is RewriteState.Rewriting or RewriteState.Ready or RewriteState.Failed;
     public bool Dimmed => MenuOpen;
     public bool IsRewriting => State == RewriteState.Rewriting;
@@ -101,6 +108,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShownMarkdown));
         OnPropertyChanged(nameof(ShownByline));
         OnPropertyChanged(nameof(ShowRewriteButton));
+        OnPropertyChanged(nameof(ShowEditButton));
+        OnPropertyChanged(nameof(ShowNotes));
         OnPropertyChanged(nameof(ShowBar));
         OnPropertyChanged(nameof(IsRewriting));
         OnPropertyChanged(nameof(IsReady));
@@ -138,12 +147,16 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     void SetCurrent(string markdown, string engineName, string updatedAt)
     {
+        bool changed = markdown != CurrentMarkdown;
         CurrentMarkdown = markdown;
         CurrentByline = AiWords.WrittenByline(engineName, updatedAt);
         WriterId = FindEngineId(engineName);
         OnPropertyChanged(nameof(CurrentBody));
         OnPropertyChanged(nameof(ShownMarkdown));
         OnPropertyChanged(nameof(ShownByline));
+        // Notes that changed under an editor nobody has typed in yet: it starts again from them. Typed in, it keeps
+        // the student's words, and Save hears from the library that the notes changed.
+        if (changed && Editing && !EditDirty) BeginEdit();
     }
 
     [RelayCommand]
@@ -388,6 +401,135 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     [RelayCommand]
     Task TryAgain() => Rewrite(lastEngine.Length > 0 ? lastEngine : WriterId);
+
+    // --- Editing the notes by hand --------------------------------------------------------------------------------
+
+    NoteEdit? edit;
+    /// <summary>The notes the edit started from, whole: the library is told, so it never saves over other ones unseen.</summary>
+    string editFrom = "";
+
+    /// <summary>The student is editing the current notes: the notes area is a text editor until Save or Cancel.</summary>
+    [ObservableProperty] public partial bool Editing { get; set; }
+    /// <summary>The editor's text: the notes' Markdown without the leading "Summary" heading (the header row says it),
+    /// each diagram one line (<see cref="NoteEdit"/>).</summary>
+    [ObservableProperty] public partial string EditText { get; set; } = "";
+    /// <summary>Why the last Save didn't save, said in the editor (what was typed is still there); "" otherwise.</summary>
+    [ObservableProperty] public partial string EditProblem { get; set; } = "";
+    public bool HasEditProblem => EditProblem.Length > 0;
+    /// <summary>The notes have diagrams, each a "[Diagram 1]" line in the editor: it says what those lines are.</summary>
+    public bool EditHasDiagrams => edit?.HasDiagrams == true;
+    /// <summary>Something's been typed that isn't saved: the host keeps these notes when their lecture is left.</summary>
+    public bool EditDirty => Editing && edit is not null && EditText.ReplaceLineEndings("\n") != edit.Text;
+    public bool CanSaveEdit => !Busy && EditText.Trim().Length > 0;
+
+    partial void OnEditingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowRewriteButton));
+        OnPropertyChanged(nameof(ShowEditButton));
+        OnPropertyChanged(nameof(ShowNotes));
+        OnPropertyChanged(nameof(EditDirty));
+    }
+
+    partial void OnEditTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(EditDirty));
+        OnPropertyChanged(nameof(CanSaveEdit));
+    }
+
+    partial void OnEditProblemChanged(string value) => OnPropertyChanged(nameof(HasEditProblem));
+
+    partial void OnBusyChanged(bool value) => OnPropertyChanged(nameof(CanSaveEdit));
+
+    void BeginEdit()
+    {
+        editFrom = CurrentMarkdown;
+        edit = NoteEdit.Begin(CurrentBody);
+        EditText = edit.Text;
+        OnPropertyChanged(nameof(EditHasDiagrams));
+        OnPropertyChanged(nameof(EditDirty));
+    }
+
+    [RelayCommand]
+    void Edit()
+    {
+        if (Editing || State != RewriteState.Idle) return;
+        EditProblem = "";
+        BeginEdit();
+        Editing = true;
+    }
+
+    [RelayCommand]
+    void CancelEdit()
+    {
+        Editing = false;
+        EditProblem = "";
+        edit = null;
+        EditText = "";
+    }
+
+    /// <summary>Saves what's in the editor as the lecture's notes. With nothing typed, it just closes. When the library
+    /// has other notes by now (their diagrams arrived, or another device changed them) nothing is saved: the editor
+    /// says so and stays, and Save again is the student's choice to put theirs over them.</summary>
+    [RelayCommand]
+    async Task SaveEdit()
+    {
+        if (!Editing || edit is null || Busy || !CanSaveEdit) return;
+        if (!EditDirty)
+        {
+            CancelEdit();
+            return;
+        }
+        Busy = true;
+        try
+        {
+            // The leading "Summary" heading the editor leaves out goes back as it was.
+            string head = editFrom[..(editFrom.Length - AiWords.DropLeadingSummary(editFrom).Length)];
+            var info = await library.EditNotesAsync(LectureId, head + edit.End(EditText), Notes.Fingerprint(editFrom));
+            if (info is null)
+            {
+                OlderLibrary = true;
+                EditProblem = AiWords.EditNeedsNewerLibrary;
+                return;
+            }
+            CancelEdit();
+            Apply(info);
+            NotesChanged?.Invoke();
+        }
+        catch (LibraryRefusedException ex) when (ex.Status == 412)
+        {
+            EditProblem = await SeeWhatChanged() ? AiWords.EditNotesChanged : AiWords.EditOffline;
+        }
+        catch (LibraryRefusedException ex)
+        {
+            EditProblem = AiWords.EditRefused(ex.Status, ex.Message);
+        }
+        catch
+        {
+            Offline = true;
+            EditProblem = AiWords.EditOffline;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    /// <summary>The notes as the library has them now become what the edit is based on, the typing untouched: so the
+    /// next Save says so truthfully. False when the library couldn't be asked.</summary>
+    async Task<bool> SeeWhatChanged()
+    {
+        try
+        {
+            if (await library.RewriteAsync(LectureId) is not { } info) return false;
+            Apply(info);
+            editFrom = CurrentMarkdown;
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     [RelayCommand]
     void Dismiss()

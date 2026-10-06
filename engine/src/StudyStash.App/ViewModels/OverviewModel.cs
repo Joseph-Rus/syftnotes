@@ -115,8 +115,16 @@ public sealed partial class OverviewModel : ObservableObject
     public Action? OnRecord { get; set; }
     public bool CanRecord => OnRecord is not null;
     [ObservableProperty] public partial bool Recording { get; set; }
-    public string RecordWords => Recording ? "Recording…" : IsHome ? "Record" : $"Record {ClassName}";
-    partial void OnRecordingChanged(bool value) => OnPropertyChanged(nameof(RecordWords));
+    /// <summary>The button's words: short, since the page's title already names the class (a catalogue's name for
+    /// one, "Theory of Computation and Compilers(CSCI4150.A)", made a button that covered the title).</summary>
+    public string RecordWords => Recording ? "Recording…" : "Record";
+    /// <summary>Where the lecture goes, for the button's tip and for a screen reader.</summary>
+    public string RecordTip => Recording ? "Recording: open the recorder" : IsHome ? "Start recording a lecture" : $"Record a lecture into {ClassName}";
+    partial void OnRecordingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(RecordWords));
+        OnPropertyChanged(nameof(RecordTip));
+    }
     [RelayCommand] void Record() => OnRecord?.Invoke();
 
     /// <summary>Ask about every class (Home) or this one (its home), floating at the foot of the page as under a lecture.</summary>
@@ -141,6 +149,8 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>Link a folder: set on a class's home when the library is on this computer (its folders are this one's).</summary>
     public Action? OnLinkFolder { get; set; }
     public bool CanLinkFolders => OnLinkFolder is not null;
+    /// <summary>With folders already linked the button sits over them; with none it's in the card that says what one is for.</summary>
+    public bool CanLinkAnother => CanLinkFolders && HasFolders;
     /// <summary>The Linked folders section: when there are some, or one can be linked.</summary>
     public bool ShowFolders => IsClass && (HasFolders || CanLinkFolders);
     [RelayCommand] void LinkFolder() => OnLinkFolder?.Invoke();
@@ -155,6 +165,7 @@ public sealed partial class OverviewModel : ObservableObject
         OnLinkFolder = link;
         OnPropertyChanged(nameof(HasFolders));
         OnPropertyChanged(nameof(CanLinkFolders));
+        OnPropertyChanged(nameof(CanLinkAnother));
         OnPropertyChanged(nameof(ShowFolders));
     }
 
@@ -175,8 +186,16 @@ public sealed partial class OverviewModel : ObservableObject
     public int SideRow => Narrow ? 1 : 0;
     /// <summary>The lectures take the whole width when nothing sits beside them.</summary>
     public int LecturesSpan => Narrow || !HasSide ? 3 : 1;
+    /// <summary>The page's buttons (Record, Attach) sit beside the title (wide) or under it (narrow), never over it.</summary>
+    public int ActionsColumn => Narrow ? 0 : 1;
+    public int ActionsRow => Narrow ? 1 : 0;
+    /// <summary>They fill from the page's edge, so Record is the outermost: the right one beside the title, the left under it.</summary>
+    public Avalonia.Controls.Dock ActionsDock => Narrow ? Avalonia.Controls.Dock.Left : Avalonia.Controls.Dock.Right;
     partial void OnNarrowChanged(bool value)
     {
+        OnPropertyChanged(nameof(ActionsColumn));
+        OnPropertyChanged(nameof(ActionsRow));
+        OnPropertyChanged(nameof(ActionsDock));
         OnPropertyChanged(nameof(CardColumns));
         OnPropertyChanged(nameof(SideColumn));
         OnPropertyChanged(nameof(SideSpan));

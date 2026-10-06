@@ -952,6 +952,66 @@ public class AiNotesModelTests
     }
 
     [AvaloniaFact]
+    public async Task An_edit_saves_what_was_typed_with_each_diagram_back_where_its_line_is()
+    {
+        string notes = "## Summary\n\nBody text.\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\nMore.";
+        var (model, lib) = Loaded(new RewriteInfo("lec-1", "none") { Current = new NotesVersion(notes, "Ollama", Current.At) });
+        await model.Load("lec-1", notes, "Ollama", Current.At);
+        bool changed = false;
+        model.NotesChanged += () => changed = true;
+
+        model.EditCommand.Execute(null);
+
+        Assert.True(model.Editing);
+        Assert.False(model.ShowNotes);
+        Assert.False(model.ShowRewriteButton);
+        // No "Summary" heading (the header row says it), and the diagram is a line, not its source.
+        Assert.Equal("Body text.\n\n[Diagram 1]\n\nMore.", model.EditText);
+
+        model.EditText = "[Diagram 1]\r\n\r\nBody text, fixed.\n\nMore."; // the diagram moved to the top; a Windows return
+        await model.SaveEditCommand.ExecuteAsync(null);
+
+        var sent = Assert.Single(lib.Edits);
+        Assert.Equal("## Summary\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\nBody text, fixed.\n\nMore.", sent.Markdown);
+        Assert.Equal(Notes.Fingerprint(notes), sent.BasedOn);
+        Assert.False(model.Editing);
+        Assert.True(changed);
+        Assert.StartsWith("```mermaid", model.ShownMarkdown);
+    }
+
+    [AvaloniaFact]
+    public async Task Notes_that_changed_under_an_edit_are_only_saved_over_when_Save_is_pressed_again()
+    {
+        var (model, lib) = Loaded();
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        model.EditCommand.Execute(null);
+
+        // Nothing typed yet when the notes' diagrams arrive: the editor starts again from them.
+        lib.OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = Current with { Markdown = "# Summary\n\nBody text.\n\nWith more." } };
+        await model.Refresh();
+        Assert.Equal("Body text.\n\nWith more.", model.EditText);
+
+        // Typed in, then they change again (on another device): the library won't save over what the edit never saw.
+        model.EditText = "My own words.";
+        var theirs = Current with { Markdown = "# Summary\n\nTheir words." };
+        lib.OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = theirs };
+        lib.OnEditNotes = (_, markdown, basedOn) => basedOn == Notes.Fingerprint(theirs.Markdown)
+            ? new RewriteInfo("lec-1", "none") { Current = theirs with { Markdown = markdown } }
+            : throw new LibraryRefusedException(412, "these notes changed while you were editing them.");
+
+        await model.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.True(model.Editing);
+        Assert.Equal("My own words.", model.EditText);
+        Assert.Equal(AiWords.EditNotesChanged, model.EditProblem);
+
+        await model.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.False(model.Editing);
+        Assert.Equal("My own words.", model.ShownMarkdown);
+    }
+
+    [AvaloniaFact]
     public async Task Compare_shows_both_and_the_current_notes_never_change_until_use()
     {
         var draft = new NotesVersion("# Summary\n\nNew body.", "Claude Code", DateTime.Now.ToString("o"));
