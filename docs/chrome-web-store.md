@@ -5,7 +5,9 @@ in `chrome://extensions`, see [canvas.md](canvas.md#the-extension)). That needs 
 unpacked extension off if Developer mode is switched off later. A copy from the Chrome Web Store has neither problem:
 the student clicks **Add to Chrome**, and Chrome keeps it up to date.
 
-Nothing here has been published. This page is what it takes, and what is already built for it.
+Nothing here has been published. This page is what it takes, and what is already built for it. Edge, Brave, Arc,
+Opera and Vivaldi install from the Chrome Web Store too, and run the same copy. Firefox has its own:
+[firefox-add-on.md](firefox-add-on.md).
 
 ## What's built
 
@@ -34,9 +36,11 @@ Nothing here has been published. This page is what it takes, and what is already
     moves or its key changes.
   - An unpacked folder's copy never shows any of this: its `config.json` comes first.
 
-**What still needs doing in the app.** Nothing in the app shows the code yet. The Canvas setup screen should offer
-"Add to Chrome" (the store link), then show the code with a Copy button (the laptop app from
-`ExtensionKeeper.ConnectionCode`, the library page from `connection_code`). Keep "Load unpacked" as the fallback.
+**What still needs doing in the app.** The app shows the code only for Firefox (its Canvas connect step, when the
+student's browser is one of Firefox's family), and the library's Settings page shows it under Canvas, **Set up the
+extension on this computer**. For Chrome's family the connect step still loads the folder. Once this is published,
+that step should offer "Add to Chrome" (the store link) first, with the same code and Copy button, and keep "Load
+unpacked" as the fallback.
 
 **Tested.** `ExtensionStoreTests` checks the zip and its manifest against the store's rules, that packing twice gives
 the same bytes, the code going both ways and the `extension-zip` command. `ExtensionScriptTests` runs the real
@@ -58,7 +62,7 @@ the item belongs to it. Verify the contact email the dashboard asks for.
 ### 2. The first upload and the extension's ID
 
 ```sh
-StudyStash extension-zip ~/Desktop/study-stash-for-canvas-1.5.zip
+StudyStash extension-zip ~/Desktop/study-stash-for-canvas-1.6.zip
 ```
 
 In the dashboard choose **New item** and upload the zip. The item gets its ID now (32 letters, a to p), and it never
@@ -121,7 +125,7 @@ Fix it, bump the version and resubmit.
 
 ## Updates
 
-1. Change the files in `extension/` and raise `"version"` in `extension/manifest.json` (1.5 → 1.6; `1.10` comes after
+1. Change the files in `extension/` and raise `"version"` in `extension/manifest.json` (1.6 → 1.7; `1.10` comes after
    `1.9`). **Every change to a shipped file needs a new version**: the store refuses an upload that isn't higher than
    the published one, and unpacked copies only reload themselves when the version (or their sites) changes
    ([canvas.md](canvas.md#versions-updates-and-reload)). The extension's version is its own and never follows the

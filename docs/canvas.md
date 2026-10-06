@@ -190,8 +190,11 @@ error "Chrome isn't signed in to Canvas.", and a file read that Canvas refused s
 
 ## The extension
 
-`extension/` is a Manifest V3 extension (version **1.5**, Chrome 120 or later; it has its own version, separate from
-the app's). The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
+`extension/` is a Manifest V3 extension (version **1.6**; it has its own version, separate from the app's). The same
+files run in Chrome 120 or later and the browsers built on it (Edge, Brave, Arc, Opera, Vivaldi), which load the folder
+described here, and in Firefox 140 or later and the browsers built on it (Zen, LibreWolf, Waterfox), which take a
+packed, signed copy connected by a pasted code instead: [firefox-add-on.md](firefox-add-on.md). Wherever this page
+says Chrome, any browser of its family does the same. The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
 `Extension.Ensure(dir, library, key, canvasUrl)` writes it out as a folder for Chrome's "Load unpacked": the scripts
 (`background.js`, `connection.js`, the popup, the "S." icons that `macos/make_icon.swift out.chrome` draws), a manifest,
 and `config.json` + `config.js`. The library keeps its own folder (`Extension.Folder(home)`) ready by itself: on start, and whenever the Canvas address changes.
@@ -238,7 +241,7 @@ the Study Stash that wrote the folder speaks; the extension sends its own.
 
 | Who | What |
 |---|---|
-| extension → library | `GET /api/v2/canvas/work?v=<its version>&p=<its protocol>&wait=20&a=<the library address it uses>[&force=1]`, header `X-Study-Stash-Key` (or the library password). 1.2 and earlier send no `p`, read as 1; 1.3 sends no `wait` or `a`. The first ask each time the pump starts (installed, reloaded, the alarm after a failure) sends `wait=0` and is answered at once, so the status and badge are right straight away. `force=1` comes from a fresh start (installed, reloaded, the popup's "Sync Canvas now"). |
+| extension → library | `GET /api/v2/canvas/work?v=<its version>&p=<its protocol>&wait=20&a=<the library address it uses>[&b=<its browser>][&force=1]`, header `X-Study-Stash-Key` (or the library password). 1.2 and earlier send no `p`, read as 1; 1.3 sends no `wait` or `a`; 1.5 and earlier send no `b` ("Chrome", "Edge", "Brave", "Firefox": the library keeps it with each copy, cleaned to letters, digits and spaces, and names that browser in what it says). The first ask each time the pump starts (installed, reloaded, the alarm after a failure) sends `wait=0` and is answered at once, so the status and badge are right straight away. `force=1` comes from a fresh start (installed, reloaded, the popup's "Sync Canvas now"). |
 | library → extension | `{"jobs":[{"id","url","kind":"json\|text\|bytes"}], "hot": bool, "ext": "<the library's extension version>", "p": 3}`. With `p ≥ 3` and `wait`, the library **holds the request** until there is work (an AI's read or Find my courses is queued, someone asks for a sync, a sync falls due, Canvas's pause runs out: it looks again every 5 s) or `min(wait, 25)` seconds pass (Chrome drops a fetch with no answer after 30), or the request goes away, or the library is stopping. Older protocols are answered at once, and `hot` (ask again in 1.5 s: an AI is reading) is for them. |
 | extension → library | `POST /api/v2/canvas/results {"results":[result]}`; result = `{"id","status","link","type","final","text" or "b64","error","signed_out","rate","retry_after"}`. The last three are new in protocol 2; the library reads their absence as an old extension. |
 
@@ -418,7 +421,7 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
 
 - `GET /api/v2/canvas/state` (also embedded as `state` in `GET /api/v2/canvas`): `{"state", "school", "url",
   "extension":{"seen","version","latest","outdated","updated":{"from","to","at"}|null,"connected","key_matches",
-  "last_seen","refused_at"}, "last_sync" (when the last
+  "last_seen","browser" (the browser that checked in last, "" from an extension before 1.6),"refused_at"}, "last_sync" (when the last
   sync finished), "next_sync", "poll_minutes", "syncing":{"left","total","classes":[…]}|null, "paused_until"|null,
   "error":{"text","at"}|null, "warnings":[…], "revision"}`. `state` is decided by `CanvasView.StateOf` in this order: `not_set_up`
   (no Canvas address) > `no_extension` (no Chrome has ever checked in with this library's **current** extension key)

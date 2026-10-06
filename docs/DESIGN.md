@@ -206,8 +206,9 @@ project or its author.
   and changes all of it over `/api/v2/ai/engines` and `/api/v2/ai/defaults` (`rich`, `rich_diagrams`,
   `rich_plots`, `rich_drawings`, `speed`; `AiOverview.Rich` and `.Speed`, absent from an older library, whose
   rows the pane then hides), and the library's own web settings page has the same switches.
-- **Canvas** (`Core/Canvas`): a small Chrome extension (`extension/`, embedded in the engine and
-  written out for Chrome to load) is a read-only fetch proxy. It asks the library for work
+- **Canvas** (`Core/Canvas`): a small browser extension (`extension/`, embedded in the engine and
+  written out for Chrome or a browser built on it to load; packed for Firefox, `docs/firefox-add-on.md`)
+  is a read-only fetch proxy. It asks the library for work
   (`/api/v2/canvas/work`) with its own key, fetches Canvas URLs with the browser's own session, and
   posts the answers back — never a Canvas API token, which many schools disable. The sync is a
   persisted job queue; a read an AI asks for (the MCP Canvas tools) jumps the queue.
