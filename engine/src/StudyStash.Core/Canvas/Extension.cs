@@ -4,12 +4,15 @@ using System.Text.Json.Nodes;
 namespace StudyStash.Core.Canvas;
 
 /// <summary>
-/// The Chrome extension that reads Canvas with the person's own sign-in and hands it to the library. Its files are
-/// inside the engine; <see cref="Ensure"/> writes them out as a folder Chrome loads ("Load unpacked"), with a
-/// config.json (and config.js, for a copy from before 1.4) that says where the library is and holds the extension's
-/// key. The library keeps its own folder ready by itself: on start, and whenever the Canvas address changes. When
-/// Study Stash updates, the folder is brought up to date, and the extension reloads itself from it the next time it
-/// checks in.
+/// The browser extension that reads Canvas with the person's own sign-in and hands it to the library. Its files are
+/// inside the engine; <see cref="Ensure"/> writes them out as a folder Chrome, or any browser built on it (Edge,
+/// Brave, Arc, Opera, Vivaldi), loads ("Load unpacked"), with a config.json (and config.js, for a copy from before
+/// 1.4) that says where the library is and holds the extension's key. The library keeps its own folder ready by
+/// itself: on start, and whenever the Canvas address changes. When Study Stash updates, the folder is brought up to
+/// date, and the extension reloads itself from it the next time it checks in. Firefox, and the browsers built on it
+/// (Zen, LibreWolf, Waterfox), keep only an add-on Mozilla has signed, so theirs is packed instead
+/// (<see cref="PackForFirefox"/>) and connected by pasting a code (<see cref="ConnectionCode"/>), like a copy from the
+/// Chrome Web Store (<see cref="PackForStore"/>).
 /// </summary>
 public static class Extension
 {
@@ -122,7 +125,9 @@ public static class Extension
         string.Equals(Path.GetFullPath(a).TrimEnd(Path.DirectorySeparatorChar), Path.GetFullPath(b).TrimEnd(Path.DirectorySeparatorChar),
             OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
 
-    static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+    /// <summary>How a manifest is written: indented, and with its quotes left as they are (Firefox's content policy
+    /// has 'self' in it).</summary>
+    static readonly JsonSerializerOptions Indented = new() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     const UnixFileMode OwnerOnlyFolder = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
 
@@ -160,7 +165,7 @@ public static class Extension
     }.ToJsonString();
 
     /// <summary>
-    /// The code a copy from the Chrome Web Store is connected with (it has no folder for Study Stash to write): the
+    /// The code a copy from a browser's store is connected with (it has no folder for Study Stash to write): the
     /// config.json <see cref="Ensure"/> would write for this library address, key and Canvas, in base64url so it
     /// survives being copied and pasted. The popup decodes it (connection.js <c>decodeCode</c>). Empty while there's
     /// no Canvas address: the extension couldn't ask Chrome for Canvas yet.
@@ -186,9 +191,9 @@ public static class Extension
         }
     }
 
-    /// <summary>What the Chrome Web Store copy may reach once the student allows it: any https or http site, asked
-    /// for one by one when they paste a code (their school's Canvas and their library aren't known when it's
-    /// published). Nothing is granted at install.</summary>
+    /// <summary>What a store copy (the Chrome Web Store's, Firefox's) may reach once the student allows it: any https
+    /// or http site, asked for one by one when they paste a code (their school's Canvas and their library aren't known
+    /// when it's published). Nothing is granted at install.</summary>
     public static readonly IReadOnlyList<string> StoreOptionalHosts = ["https://*/*", "http://*/*"];
 
     /// <summary>The manifest of the Chrome Web Store copy: this engine's, with no host permissions (it asks for its
@@ -201,17 +206,64 @@ public static class Extension
         return manifest;
     }
 
-    /// <summary>The files the Chrome Web Store copy is made of: this engine's scripts, pages and icons (never a
-    /// config: a store copy is connected by code), in name order.</summary>
+    /// <summary>The files a store copy is made of: this engine's scripts, pages and icons (never a config: a store
+    /// copy is connected by code), in name order.</summary>
     public static IReadOnlyList<string> StoreFiles() =>
         [.. Files().Where(f => f is not ("config.js" or "config.json")).Order(StringComparer.Ordinal)];
+
+    /// <summary>The add-on's ID in Firefox: Mozilla signs the add-on under it, and an update must carry the same one,
+    /// so it never changes once the add-on is published.</summary>
+    public const string FirefoxId = "canvas@study-stash-app.web.app";
+
+    /// <summary>The oldest Firefox the add-on installs in: 140 (June 2025, also an extended-support release) has
+    /// everything the extension uses, and shows what it sends where before the student adds it.</summary>
+    public const string FirefoxMinVersion = "140.0";
+
+    /// <summary>What the Firefox copy tells the student it sends out of the browser before they add it (Firefox's
+    /// own list of kinds): Canvas's pages and files, and the announcements and feedback among them. They go only to
+    /// the student's own library.</summary>
+    public static readonly IReadOnlyList<string> FirefoxDataSent = ["websiteContent", "personalCommunications"];
+
+    /// <summary>
+    /// The manifest of the Firefox copy: the store copy's (<see cref="StoreManifest"/>: no site until it's connected
+    /// by code), run as a background page rather than a service worker (Firefox has none for extensions; the page's
+    /// scripts are connection.js then background.js, which a service worker brings in itself), with Firefox's own
+    /// settings (<see cref="FirefoxId"/>, <see cref="FirefoxMinVersion"/>, <see cref="FirefoxDataSent"/>) in place of
+    /// Chrome's oldest version, and a content policy that leaves http alone: Firefox would otherwise turn every
+    /// request into https, and a library on the student's own network is reached over http.
+    /// </summary>
+    public static JsonObject FirefoxManifest()
+    {
+        var manifest = StoreManifest();
+        manifest.Remove("minimum_chrome_version");
+        manifest["background"] = new JsonObject { ["scripts"] = new JsonArray("connection.js", "background.js") };
+        manifest["content_security_policy"] = new JsonObject { ["extension_pages"] = "script-src 'self'" };
+        manifest["browser_specific_settings"] = new JsonObject
+        {
+            ["gecko"] = new JsonObject
+            {
+                ["id"] = FirefoxId, ["strict_min_version"] = FirefoxMinVersion,
+                ["data_collection_permissions"] = new JsonObject { ["required"] = new JsonArray(FirefoxDataSent.Select(k => (JsonNode)k).ToArray()) },
+            },
+        };
+        return manifest;
+    }
 
     /// <summary>
     /// Write the zip to upload to the Chrome Web Store: <see cref="StoreFiles"/> at its top level with
     /// <see cref="StoreManifest"/>. The same engine always makes the same bytes (fixed order, times and compression),
-    /// so a new zip differs only when the extension did. Returns the names in it.
+    /// so a new zip differs only when the extension did. Returns the names in it. Edge's and Opera's stores take the
+    /// same zip.
     /// </summary>
-    public static IReadOnlyList<string> PackForStore(string zipPath)
+    public static IReadOnlyList<string> PackForStore(string zipPath) => Pack(zipPath, StoreManifest());
+
+    /// <summary>
+    /// Write the zip Mozilla signs (addons.mozilla.org): the same files with <see cref="FirefoxManifest"/>, and the
+    /// same bytes from the same engine. Firefox's developer and nightly builds install it unsigned.
+    /// </summary>
+    public static IReadOnlyList<string> PackForFirefox(string zipPath) => Pack(zipPath, FirefoxManifest());
+
+    static IReadOnlyList<string> Pack(string zipPath, JsonObject manifest)
     {
         var names = StoreFiles();
         var stamp = new DateTimeOffset(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -221,7 +273,7 @@ public static class Extension
             foreach (string name in names)
             {
                 byte[] bytes = name == "manifest.json"
-                    ? System.Text.Encoding.UTF8.GetBytes(StoreManifest().ToJsonString(Indented) + "\n") : Read(name);
+                    ? System.Text.Encoding.UTF8.GetBytes(manifest.ToJsonString(Indented) + "\n") : Read(name);
                 var entry = zip.CreateEntry(name, System.IO.Compression.CompressionLevel.Optimal);
                 entry.LastWriteTime = stamp;
                 using var into = entry.Open();

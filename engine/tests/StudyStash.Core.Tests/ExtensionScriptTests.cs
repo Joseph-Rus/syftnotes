@@ -8,9 +8,9 @@ using StudyStash.Core.Canvas;
 namespace StudyStash.Core.Tests;
 
 /// <summary>
-/// The Chrome extension's service worker (extension/background.js, the copy the engine carries), run in Jint with
-/// Chrome and the network stood in for: what it hands the library for each kind of Canvas answer, and how it talks to
-/// the library.
+/// The extension's background script (extension/background.js, the copy the engine carries), run in Jint with
+/// the browser (Chrome by default, or Firefox) and the network stood in for: what it hands the library for each kind
+/// of Canvas answer, and how it talks to the library.
 /// </summary>
 public class ExtensionScriptTests
 {
@@ -63,15 +63,18 @@ public class ExtensionScriptTests
         /// <param name="legacy">A folder from before 1.4: config.js's STUDY_STASH, as JSON; null when there's no config.js.</param>
         /// <param name="runningHosts">The host permissions Chrome is running with; <paramref name="diskHosts"/>, the folder's.</param>
         /// <param name="granted">What chrome.permissions.contains answers: whether the student allowed a store copy's sites.</param>
+        /// <param name="firefox">Firefox rather than Chrome: a background page (no importScripts) at moz-extension://,
+        /// which says its own name.</param>
         public Worker(string running = "1.4", string? onDisk = null, string? config = DefaultConfig, string? stored = null, string? legacy = null,
-            string[]? runningHosts = null, string[]? diskHosts = null, bool granted = true)
+            string[]? runningHosts = null, string[]? diskHosts = null, bool granted = true, bool firefox = false)
         {
             runningHosts ??= Hosts;
-            Route("chrome-extension://study-stash/manifest.json", _ => new FakeResponse
+            string at = firefox ? "moz-extension://study-stash/" : "chrome-extension://study-stash/";
+            Route(at + "manifest.json", _ => new FakeResponse
             {
                 Body = new JsonObject { ["version"] = onDisk ?? running, ["host_permissions"] = new JsonArray((diskHosts ?? runningHosts).Select(h => (JsonNode)h).ToArray()) }.ToJsonString(),
             });
-            if (config is not null) Route("chrome-extension://study-stash/config.json", Json(config));
+            if (config is not null) Route(at + "config.json", Json(config));
             // Only a guard against a script that never ends: a busy machine (the app tests render beside these) can take far
             // longer than the few seconds this normally needs.
             js = new Jint.Engine(o => o.TimeoutInterval(TimeSpan.FromMinutes(2)));
@@ -99,7 +102,7 @@ public class ExtensionScriptTests
                 var chrome = {
                   runtime: {
                     getManifest: () => ({version: '{{{running}}}', host_permissions: {{{JsonSerializer.Serialize(runningHosts)}}}}),
-                    getURL: p => 'chrome-extension://study-stash/' + p,
+                    getURL: p => '{{{at}}}' + p,
                     reload: () => { __reloads++; },
                     onInstalled: listeners, onStartup: listeners, onMessage: listeners,
                   },
@@ -132,10 +135,14 @@ public class ExtensionScriptTests
                   };
                 }
                 """);
+            js.Execute(firefox
+                ? "importScripts = undefined; var browser = {runtime: {getBrowserInfo: async () => ({name: 'Firefox'})}};"
+                : "var navigator = {userAgentData: {brands: [{brand: 'Not?A_Brand'}, {brand: 'Chromium'}, {brand: 'Google Chrome'}]}};");
             js.Execute(Source("connection.js"));
             js.Execute(Source("background.js"));
-            // What a round of the pump does first: read the connection. Tests of run() start from there.
-            Eval("(async () => { conn = await loadConnection(); })()");
+            // What a round of the pump does first: ask which browser this is, and read the connection. Tests of run()
+            // start from there.
+            Eval("(async () => { await whichBrowser(); conn = await loadConnection(); })()");
             Fetched.Clear();
         }
 
@@ -371,9 +378,9 @@ public class ExtensionScriptTests
 
     static JsonObject Job(string id, string path, string kind) => new() { ["id"] = id, ["url"] = Canvas + path, ["kind"] = kind };
 
-    const string Ask = Library + "/api/v2/canvas/work?v=1.4&p=3&wait=20&a=http%3A%2F%2F127.0.0.1%3A8787";
+    const string Ask = Library + "/api/v2/canvas/work?v=1.4&p=3&wait=20&a=http%3A%2F%2F127.0.0.1%3A8787&b=Chrome";
     /// <summary>A pump's first ask: answered at once, so its status is up to date straight away.</summary>
-    const string AskNow = Library + "/api/v2/canvas/work?v=1.4&p=3&wait=0&a=http%3A%2F%2F127.0.0.1%3A8787";
+    const string AskNow = Library + "/api/v2/canvas/work?v=1.4&p=3&wait=0&a=http%3A%2F%2F127.0.0.1%3A8787&b=Chrome";
 
     [Fact]
     public void It_waits_for_work_with_the_library_and_posts_each_file_on_its_own()
@@ -626,6 +633,28 @@ public class ExtensionScriptTests
         folder.Eval("pump(false)");
         Assert.Empty(folder.Checked);
         Assert.NotEmpty(folder.Asks);
+    }
+
+    /// <summary>Firefox runs the same scripts as a background page: no importScripts, its site patterns take no port
+    /// (it never says a pattern with one is allowed), and the library and the student are told it's Firefox.</summary>
+    [Fact]
+    public void In_firefox_it_runs_as_a_background_page_asks_for_sites_without_ports_and_says_which_browser_it_is()
+    {
+        string stored = $$"""{"app":"http://mini.test:8787","key":"k3y","canvas":"{{Canvas}}","files":["*.inscloudgate.net"],"protocol":3}""";
+        var w = new Worker(running: Extension.Version(), config: null, stored: stored, firefox: true);
+        w.Route("http://mini.test:8787/api/v2/canvas/work", new FakeResponse { Throws = true });
+        w.Eval("pump(true)");
+        Assert.Equal([[Canvas + "/*", "https://*.inscloudgate.net/*", "http://mini.test/*"]], w.Checked);
+        Assert.Contains("&b=Firefox", w.Fetched.Last().Url);
+        Assert.StartsWith("http://mini.test:8787/api/v2/canvas/work?", w.Fetched.Last().Url); // the library itself is still reached on its port
+        Assert.Equal("Sign in to Canvas in Firefox.", w.Eval("statusWords({state: 'signed_out'})").AsString());
+        Assert.StartsWith("Firefox hasn't allowed", w.Eval("statusWords({state: 'no_access'})").AsString());
+
+        // Chrome says so too, and a browser that doesn't say is "this browser".
+        var chrome = WithLibrary(new Worker(), [], rounds: 1);
+        chrome.Eval("pump(false)");
+        Assert.Contains("&b=Chrome", chrome.Asks[0]);
+        Assert.Equal("Sign in to Canvas in this browser.", chrome.Eval("(browserIs = '', statusWords({state: 'signed_out'}))").AsString());
     }
 
     [Fact]

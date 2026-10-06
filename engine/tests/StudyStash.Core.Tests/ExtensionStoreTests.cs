@@ -74,6 +74,41 @@ public partial class ExtensionStoreTests
             Assert.Contains(r.Groups[1].Value, entries);
     }
 
+    /// <summary>What Firefox needs that Chrome doesn't: a background page whose scripts are in the zip in the order
+    /// they run, its own ID and oldest version, http left alone (a library on the student's network), and still no
+    /// site until it's connected.</summary>
+    [Fact]
+    public async Task The_firefox_zip_is_the_same_extension_with_firefox_s_manifest()
+    {
+        using var dir = new TempDir();
+        Assert.Equal(0, await Cli.RunAsync(["--home", dir["home"], "extension-zip", "--firefox", dir["out/fx.zip"]]));
+        Assert.False(Directory.Exists(dir["home"]));
+        Extension.PackForStore(dir["out/store.zip"]);
+        using var zip = ZipFile.OpenRead(dir["out/fx.zip"]);
+        using var store = ZipFile.OpenRead(dir["out/store.zip"]);
+        var entries = zip.Entries.Select(e => e.FullName).ToList();
+        Assert.Equal(Extension.StoreFiles(), entries);
+        foreach (string same in entries.Where(e => e != "manifest.json")) Assert.Equal(Text(store, same), Text(zip, same));
+
+        var m = ManifestIn(zip);
+        Assert.Equal(3, m["manifest_version"]!.GetValue<int>());
+        Assert.Equal(Extension.Version(), m["version"]!.GetValue<string>());
+        Assert.Null(m["background"]!["service_worker"]);
+        Assert.Equal(["connection.js", "background.js"], m["background"]!["scripts"]!.AsArray().Select(f => f!.GetValue<string>()));
+        Assert.Null(m["minimum_chrome_version"]);
+        Assert.Null(m["host_permissions"]);
+        Assert.Equal(["https://*/*", "http://*/*"], m["optional_host_permissions"]!.AsArray().Select(h => h!.GetValue<string>()));
+        Assert.Equal("script-src 'self'", m["content_security_policy"]!["extension_pages"]!.GetValue<string>());
+        Assert.Contains("'self'", Text(zip, "manifest.json")); // written plainly, not as \u0027
+        var gecko = m["browser_specific_settings"]!["gecko"]!;
+        Assert.Equal(Extension.FirefoxId, gecko["id"]!.GetValue<string>());
+        Assert.Matches(@"^\d+\.\d+$", gecko["strict_min_version"]!.GetValue<string>());
+        Assert.NotEmpty(gecko["data_collection_permissions"]!["required"]!.AsArray());
+        // The Chrome Web Store's copy has none of Firefox's settings, and keeps its service worker.
+        Assert.Null(ManifestIn(store)["browser_specific_settings"]);
+        Assert.Equal("background.js", ManifestIn(store)["background"]!["service_worker"]!.GetValue<string>());
+    }
+
     [Fact]
     public void The_same_engine_packs_the_same_bytes()
     {
