@@ -131,9 +131,9 @@ public class BrowsersTests
     [Fact]
     public void A_browser_that_cant_be_started_is_said_with_the_browsers_to_choose_from()
     {
-        Assert.Equal(Browsers.NotInstalled, Browsers.Open(Browsers.Chrome, null, (_, _, _) => null, _ => @"C:\Chrome\chrome.exe"));
+        Assert.Equal(Browsers.NotInstalled, Browsers.Open(Browsers.Chrome, null, (_, _, _) => null, _ => @"C:\Chrome\chrome.exe", (_, _) => false));
         // Started, but it said it couldn't (a Mac without it: `open -b` exits 1).
-        Assert.Equal(Browsers.NotInstalled, Browsers.Open(Browsers.Chrome, null, (_, _, _) => new ProcResult(1, ""), _ => @"C:\Chrome\chrome.exe"));
+        Assert.Equal(Browsers.NotInstalled, Browsers.Open(Browsers.Chrome, null, (_, _, _) => new ProcResult(1, ""), _ => @"C:\Chrome\chrome.exe", (_, _) => false));
         Assert.Contains("Chrome, Edge, Brave", Browsers.NotInstalled);
     }
 
@@ -146,7 +146,7 @@ public class BrowsersTests
         {
             ran = true;
             return new ProcResult(0, "");
-        }, _ => null));
+        }, _ => null, (_, _) => ran = true));
         Assert.False(ran);
     }
 
@@ -154,25 +154,87 @@ public class BrowsersTests
     public void Edge_opens_its_own_extensions_page_and_a_url_opens_in_the_browser_asked_for()
     {
         if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsWindows()) return; // the app opens a browser on a Mac or Windows
+        // What was started, and with what: `open` and its arguments on a Mac; the browser's own exe and its on Windows.
         IReadOnlyList<string> args = [];
         ProcResult Run(string exe, IReadOnlyList<string> given, TimeSpan timeout)
         {
-            args = given;
+            args = [exe, .. given];
             return new ProcResult(0, "");
+        }
+        bool Start(string exe, IReadOnlyList<string> given)
+        {
+            args = [exe, .. given];
+            return true;
         }
         static string Exe(Browser browser) => @"C:\Program Files\" + browser.WindowsExe[0];
 
-        Assert.Null(Browsers.OpenExtensions(Browsers.Edge, Run, Exe));
+        Assert.Null(Browsers.OpenExtensions(Browsers.Edge, Run, Exe, Start));
         // Edge itself, never Chrome: by its bundle id on a Mac, by its own exe on Windows. chrome://extensions is its page too.
         string[] edge = OperatingSystem.IsMacOS()
-            ? ["-b", "com.microsoft.edgemac", "chrome://extensions"]
-            : ["/c", "start", "", @"C:\Program Files\Microsoft\Edge\Application\msedge.exe", "chrome://extensions"];
+            ? ["open", "-b", "com.microsoft.edgemac", "chrome://extensions"]
+            : [@"C:\Program Files\Microsoft\Edge\Application\msedge.exe", "chrome://extensions"];
         Assert.Equal(edge, args);
 
-        Assert.Null(Browsers.Open(Browsers.Firefox, "https://school.instructure.com", Run, Exe));
+        Assert.Null(Browsers.Open(Browsers.Firefox, "https://school.instructure.com", Run, Exe, Start));
         string[] firefox = OperatingSystem.IsMacOS()
-            ? ["-b", "org.mozilla.firefox", "https://school.instructure.com"]
-            : ["/c", "start", "", @"C:\Program Files\Mozilla Firefox\firefox.exe", "https://school.instructure.com"];
+            ? ["open", "-b", "org.mozilla.firefox", "https://school.instructure.com"]
+            : [@"C:\Program Files\Mozilla Firefox\firefox.exe", "https://school.instructure.com"];
         Assert.Equal(firefox, args);
+
+        // A Canvas file's address has "&" in it. It reaches the browser whole, as one argument, and nothing reads it
+        // as a command on the way: Windows used to go through cmd, which cut the address at the "&" and ran what
+        // followed it, so a link written for the purpose started a program.
+        const string file = "https://school.instructure.com/courses/7/files/42/download?verifier=aB3&wrap=1&calc.exe";
+        Assert.Null(Browsers.Open(Browsers.Chrome, file, Run, Exe, Start));
+        Assert.Equal(file, args[^1]);
+        Assert.DoesNotContain("cmd", args);
+        Assert.Equal(OperatingSystem.IsMacOS() ? 4 : 2, args.Count);
+    }
+
+    [Theory]
+    [InlineData("--gpu-launcher=calc.exe")] // a browser reads a word that starts with a dash as an order to itself
+    [InlineData("-new-window https://school.instructure.com")]
+    [InlineData("/Applications/Calculator.app")]
+    [InlineData(@"C:\Windows\System32\calc.exe")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("javascript:alert(1)")]
+    [InlineData("ms-msdt:/id PCWDiagnostic")]
+    [InlineData("")]
+    public void Only_an_address_is_handed_to_a_browser_and_only_a_web_page_to_the_system(string link)
+    {
+        bool started = false;
+        Assert.Equal(Browsers.NotAnAddress, Browsers.Open(Browsers.Chrome, link, (_, _, _) =>
+        {
+            started = true;
+            return new ProcResult(0, "");
+        }, _ => @"C:\Chrome\chrome.exe", (_, _) => started = true));
+        Assert.False(started);
+
+        // The same link clicked in a note, or on a Canvas page, is never handed to the system either.
+        Assert.False(Dialogs.IsWebLink(link));
+        foreach (string system in new[] { "Darwin", "Windows", "Linux" })
+            Dialogs.OpenWebLink(link, (_, _, _) =>
+            {
+                started = true;
+                return new ProcResult(0, "");
+            }, system);
+        Assert.False(started);
+    }
+
+    [Fact]
+    public void A_web_page_and_an_email_address_still_open()
+    {
+        Assert.True(Dialogs.IsWebLink("https://school.instructure.com/courses/7?a=1&b=2"));
+        Assert.True(Dialogs.IsWebLink("http://example.com"));
+        Assert.True(Dialogs.IsWebLink("mailto:prof@school.edu"));
+        Assert.True(Browsers.IsAddress("chrome://extensions"));
+        Assert.False(Browsers.IsAddress("mailto:prof@school.edu")); // the system's mail app, not a browser's page
+        IReadOnlyList<string> opened = [];
+        Dialogs.OpenWebLink("https://example.com/a?b=1&c=2", (exe, args, _) =>
+        {
+            opened = [exe, .. args];
+            return new ProcResult(0, "");
+        }, "Darwin");
+        Assert.Equal(["open", "https://example.com/a?b=1&c=2"], opened);
     }
 }

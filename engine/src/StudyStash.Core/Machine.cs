@@ -47,6 +47,24 @@ public static partial class Machine
         }
     }
 
+    /// <summary>Starts a program and leaves it running: not waited for, and what it prints isn't read (a browser, which
+    /// outlives this call and Study Stash). Each argument reaches it whole, whatever is in it: no shell reads them.
+    /// False when it couldn't be started.</summary>
+    public static bool Start(string exe, IReadOnlyList<string> args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
+            foreach (string a in args) psi.ArgumentList.Add(a);
+            using var p = Process.Start(psi);
+            return p is not null;
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or IOException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>A command that talks to the person in this terminal (an installer asking for a password): its exit
     /// code, or null when it didn't start.</summary>
     public static int? RunAttached(string exe, IReadOnlyList<string> args)

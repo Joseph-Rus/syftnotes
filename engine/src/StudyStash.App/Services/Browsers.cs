@@ -295,25 +295,39 @@ public static class Browsers
 
     // ---- opening one ----
 
-    /// <summary>Opens the browser, or a URL (or a file) inside it when one is given. Null on success;
-    /// <see cref="NotInstalled"/> when nothing could be started. A Mac opens it by its bundle id;
-    /// <paramref name="windowsExe"/> finds its exe on Windows (tests give their own).</summary>
-    public static string? Open(Browser browser, string? target = null, Runner? run = null, Func<Browser, string?>? windowsExe = null)
+    /// <summary>What <see cref="Open"/> says of a target that isn't a page a browser shows.</summary>
+    public const string NotAnAddress = "That link isn't a web address.";
+
+    /// <summary>Whether <paramref name="target"/> is something to hand a browser: a web page, or one of its own pages
+    /// (chrome://extensions). The addresses come from Canvas and from notes, and a browser takes anything else as
+    /// an order to itself (a word starting with a dash is a switch, and some switches start programs).</summary>
+    public static bool IsAddress(string target) =>
+        Uri.TryCreate(target, UriKind.Absolute, out var u) && u.Scheme is "http" or "https" or "chrome";
+
+    /// <summary>Opens the browser, or an address inside it when one is given. Null on success;
+    /// <see cref="NotInstalled"/> when nothing could be started, <see cref="NotAnAddress"/> (and nothing started) for
+    /// a target that isn't one. A Mac opens it by its bundle id; <paramref name="windowsExe"/> finds its exe on Windows
+    /// and <paramref name="start"/> starts it there (tests give their own).</summary>
+    public static string? Open(Browser browser, string? target = null, Runner? run = null, Func<Browser, string?>? windowsExe = null,
+        Func<string, IReadOnlyList<string>, bool>? start = null)
     {
-        var runner = run ?? Machine.Run;
-        ProcResult? started = null;
+        if (target is not null && !IsAddress(target)) return NotAnAddress;
         if (OperatingSystem.IsMacOS())
-            started = runner("open", target is null ? ["-b", browser.MacBundle] : ["-b", browser.MacBundle, target], TimeSpan.FromSeconds(10));
-        else if (OperatingSystem.IsWindows() && (windowsExe ?? WindowsExe)(browser) is { } exe)
-            // Through `start`, so this doesn't wait for (or end with) a browser it started; by its path, so a missing
-            // one is said here rather than in Windows' own "cannot find" box.
-            started = runner("cmd", target is null ? ["/c", "start", "", exe] : ["/c", "start", "", exe, target], TimeSpan.FromSeconds(10));
-        return started is { ExitCode: 0 } ? null : NotInstalled;
+            return (run ?? Machine.Run)("open", target is null ? ["-b", browser.MacBundle] : ["-b", browser.MacBundle, target], TimeSpan.FromSeconds(10))
+                is { ExitCode: 0 } ? null : NotInstalled;
+        // Windows: the browser's own program, with the address as one argument of its own. Never through cmd, which
+        // reads an "&" in an address as the end of the command: the link was cut there, and what followed it was run
+        // as a command of its own. Not waited for (with no browser open yet, what starts is the browser itself), and
+        // by its path, so a missing one is said here rather than in Windows' own "cannot find" box.
+        if (OperatingSystem.IsWindows() && (windowsExe ?? WindowsExe)(browser) is { } exe)
+            return (start ?? Machine.Start)(exe, target is null ? [] : [target]) ? null : NotInstalled;
+        return NotInstalled;
     }
 
     /// <summary>Opens a browser of Chrome's family at its own extensions page, where "Load unpacked" picks up the
     /// folder <see cref="Extension"/> wrote: <c>chrome://extensions</c> is that page in every one of them (Edge shows
     /// it as edge://extensions, Brave as brave://extensions).</summary>
-    public static string? OpenExtensions(Browser browser, Runner? run = null, Func<Browser, string?>? windowsExe = null) =>
-        Open(browser, "chrome://extensions", run, windowsExe);
+    public static string? OpenExtensions(Browser browser, Runner? run = null, Func<Browser, string?>? windowsExe = null,
+        Func<string, IReadOnlyList<string>, bool>? start = null) =>
+        Open(browser, "chrome://extensions", run, windowsExe, start);
 }

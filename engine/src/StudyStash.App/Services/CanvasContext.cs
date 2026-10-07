@@ -45,7 +45,8 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
         var client = cc.ServerUrl.Length > 0 ? new CanvasClient(cc.ServerUrl, cc.PoolKey) : null;
         Browsers.Picked = host.Settings.CanvasBrowser;
         var actions = new CanvasActions(
-            OpenUrl: url => Dialogs.OpenUrl(url),
+            // What Canvas calls a link is whatever someone typed there: only a web page is opened.
+            OpenUrl: url => Dialogs.OpenWebLink(url),
             OpenInBrowser: OpenInBrowser,
             OpenBrowser: () => OpenInBrowser(null),
             Browsers: () => Browsers.Offer(),
@@ -91,7 +92,7 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
     /// is given. A link still opens when that browser can't be started: in whatever the system opens links with.</summary>
     static void OpenInBrowser(string? url)
     {
-        if (Browsers.Open(Browsers.ForCanvas(), url) is not null && url is not null) Dialogs.OpenUrl(url);
+        if (Browsers.Open(Browsers.ForCanvas(), url) is not null && url is not null) Dialogs.OpenWebLink(url);
     }
 
     /// <summary>Puts text on the clipboard, through the window the student is in.</summary>
