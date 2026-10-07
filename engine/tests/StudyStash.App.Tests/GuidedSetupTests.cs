@@ -265,11 +265,26 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
-    public async Task No_subscription_opens_setup_by_hand_with_the_free_model_for_notes()
+    public async Task No_paid_plan_is_one_of_the_three_answers_and_opens_setup_by_hand_with_the_free_AI_for_notes()
     {
         await using var rig = await new Rig().OpenAsync();
         var g = rig.Guided;
-        g.UseOllamaCommand.Execute(null);
+        // The first screen asks what the student has, in their terms. The tools underneath aren't named on it.
+        Assert.DoesNotContain("Claude Code", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
+        Assert.DoesNotContain("Codex", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
+        Assert.DoesNotContain("Ollama", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
+        g.Picked = "";
+        Assert.False(g.CanContinue);
+        g.PickCommand.Execute("claude");
+        Assert.Equal(["Pick your AI", "Get Claude ready", "Sign in to Claude", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+
+        // "I don't have a paid plan" is an answer like the other two, not a small link under them: nothing to install
+        // or sign in to, and Continue goes on.
+        g.PickCommand.Execute("free");
+        Assert.True(g.PickedFree);
+        Assert.True(g.CanContinue);
+        Assert.Equal(["Pick your AI", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        await g.ContinueCommand.ExecuteAsync(null);
         Assert.Equal(GuidedScreen.Manual, g.Screen);
         Assert.True(g.PreferOllama);
         Assert.Equal("ollama", AppSettings.Load(rig.Home.Path).SetupAi);
@@ -300,8 +315,8 @@ public sealed class GuidedSetupTests
             ["""{"type":"thread.started","thread_id":"t-1"}""", """{"type":"turn.failed","error":{"message":"To use Codex with your ChatGPT plan, upgrade to Plus."}}"""], 1);
         await g.OpenSignInCommand.ExecuteAsync(null);
         Assert.Equal(ChatProblem.Plan, g.PlanProblem);
-        Assert.Equal("Your ChatGPT plan doesn't include Codex in the app", g.PlanProblemTitle);
-        Assert.Equal("It needs Plus or higher.", g.PlanProblemText);
+        Assert.Equal("This ChatGPT account is on a plan that other apps can't use", g.PlanProblemTitle);
+        Assert.Equal("Study Stash needs ChatGPT Plus or higher. Without one, a free AI can write your notes instead.", g.PlanProblemText);
         Assert.False(g.AiReady);
         g.OpenPlansCommand.Execute("");
         Assert.Equal(["https://chatgpt.com/pricing"], rig.Opened);
