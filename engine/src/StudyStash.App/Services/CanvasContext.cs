@@ -90,10 +90,12 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
 
     /// <summary>Opens the browser the student reads Canvas in (<see cref="Browsers.ForCanvas()"/>), at a URL when one
     /// is given. A link still opens when that browser can't be started: in whatever the system opens links with.</summary>
-    static void OpenInBrowser(string? url)
-    {
-        if (Browsers.Open(Browsers.ForCanvas(), url) is not null && url is not null) Dialogs.OpenWebLink(url);
-    }
+    static void OpenInBrowser(string? url) =>
+        // Not on the window's own thread: finding the browser asks the system, and starting one takes a moment.
+        Task.Run(() =>
+        {
+            if (Browsers.Open(Browsers.ForCanvas(), url) is not null && url is not null) Dialogs.OpenWebLink(url);
+        });
 
     /// <summary>Puts text on the clipboard, through the window the student is in.</summary>
     static void Copy(string text)

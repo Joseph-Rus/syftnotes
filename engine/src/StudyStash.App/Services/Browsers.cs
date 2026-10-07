@@ -158,15 +158,36 @@ public static class Browsers
             .SelectMany(d => browser.WindowsExe.Select(exe => Path.Combine(d, exe)))
             .FirstOrDefault(File.Exists);
 
+    /// <summary>How long the system's answer to "which browser opens links?" is used before it's asked again. It's
+    /// wanted for every Canvas link clicked, and a Mac answers by running a program.</summary>
+    public static readonly TimeSpan DefaultKept = TimeSpan.FromMinutes(1);
+
+    static readonly Lock defaultGate = new();
+    static (Browser? Browser, DateTime At)? defaultFound;
+
     /// <summary>The browser this computer opens links with, when it's one Study Stash knows; null when it isn't, or
     /// the system didn't say. A Mac is asked for LaunchServices' handlers, Windows for the https association the
-    /// student chose.</summary>
+    /// student chose. The answer is kept for <see cref="DefaultKept"/> (a test's own <paramref name="run"/> always asks).</summary>
     public static Browser? Default(Runner? run = null)
+    {
+        if (run is not null) return AskDefault(run);
+        lock (defaultGate)
+        {
+            if (defaultFound is { } found && DateTime.UtcNow - found.At < DefaultKept && DateTime.UtcNow >= found.At) return found.Browser;
+            var browser = AskDefault(Machine.Run);
+            defaultFound = (browser, DateTime.UtcNow);
+            return browser;
+        }
+    }
+
+    static Browser? AskDefault(Runner run)
     {
         if (OperatingSystem.IsMacOS())
         {
-            var asked = (run ?? Machine.Run)("defaults", ["read", "com.apple.LaunchServices/com.apple.launchservices.secure", "LSHandlers"], TimeSpan.FromSeconds(5));
-            return MacDefault(asked is { ExitCode: 0 } ? asked.Stdout : "");
+            var asked = run("defaults", ["read", "com.apple.LaunchServices/com.apple.launchservices.secure", "LSHandlers"], TimeSpan.FromSeconds(5));
+            // No answer at all (it couldn't be run, or took too long) is not knowing, which isn't Safari. An answer
+            // that there are no handlers is a Mac never told otherwise, which is.
+            return asked is null ? null : MacDefault(asked.ExitCode == 0 ? asked.Stdout : "");
         }
         if (OperatingSystem.IsWindows())
         {

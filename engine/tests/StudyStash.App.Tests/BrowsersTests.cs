@@ -53,6 +53,18 @@ public class BrowsersTests
         Assert.Null(Browsers.MacDefault(Handlers("com.duckduckgo.macos.browser")));
     }
 
+    [Fact]
+    public void A_mac_that_couldnt_be_asked_isnt_taken_for_one_that_uses_safari()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        // No answer (the question couldn't be run, or took too long): not known. It used to be read as Safari, and
+        // the student was told their usual browser can't run the extension.
+        Assert.Null(Browsers.Default((_, _, _) => null));
+        // An answer that there are no handlers: a Mac never told otherwise, which opens links in Safari.
+        Assert.Equal(Browsers.Safari, Browsers.Default((_, _, _) => new ProcResult(1, "")));
+        Assert.Equal(Browsers.Edge, Browsers.Default((_, _, _) => new ProcResult(0, Handlers("com.microsoft.edgemac"))));
+    }
+
     [Theory]
     [InlineData("ChromeHTML", "Chrome")]
     [InlineData("MSEdgeHTM", "Edge")]

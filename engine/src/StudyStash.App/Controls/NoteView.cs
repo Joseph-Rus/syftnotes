@@ -73,9 +73,13 @@ public sealed partial class NoteView : StackPanel
     public static Action<string> OpenLink { get; set; } = url =>
     {
         if (!Dialogs.IsWebLink(url)) return;
-        if (Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Host.EndsWith(".instructure.com", StringComparison.OrdinalIgnoreCase)
-            && Browsers.Open(Browsers.ForCanvas(), url) is null) return;
-        Dialogs.OpenUrl(url);
+        // Not on the page's own thread: finding the browser asks the system, and starting one takes a moment.
+        Task.Run(() =>
+        {
+            if (Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Host.EndsWith(".instructure.com", StringComparison.OrdinalIgnoreCase)
+                && Browsers.Open(Browsers.ForCanvas(), url) is null) return;
+            Dialogs.OpenUrl(url);
+        });
     };
 
     /// <summary>The class a section heading carries, and the one a table's header row carries: a page never ends
