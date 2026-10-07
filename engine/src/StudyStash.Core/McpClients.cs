@@ -1,7 +1,8 @@
 namespace StudyStash.Core;
 
 /// <summary>
-/// The AI apps on this computer that Settings connects to the library (Claude Desktop, Claude Code, Codex, Gemini CLI).
+/// The AI apps on this computer that Settings connects to the library (Claude Desktop, Claude Code, ChatGPT with
+/// Codex, Gemini CLI).
 /// Each starts Study Stash's own MCP server over stdio (<c>mcp --client ID</c>), which reads the library on this
 /// computer with the password the app already keeps, so nothing secret goes into the AI app's settings and no
 /// network address is involved. The server leaves a note when an app starts it: that's how Settings tells

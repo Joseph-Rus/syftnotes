@@ -97,7 +97,13 @@ public static class AppMenu
     public static void Attach(Window window, Action library, Action settings)
     {
         AddSettingsKey(window, settings);
-        if (OperatingSystem.IsMacOS()) NativeMenu.SetMenu(window, ForWindow(window, library, settings));
+        if (!OperatingSystem.IsMacOS()) return;
+        var bar = ForWindow(window, library, settings);
+        NativeMenu.SetMenu(window, bar);
+        // The system's menu bar keeps a window's menus after the window has closed, for as long as the app runs (about
+        // 24 KB a window: each item, what watches it, and its hold on the system's own item). Emptied, the items are
+        // let go one by one and next to nothing is left to keep.
+        window.Closed += (_, _) => bar.Items.Clear();
     }
 
     /// <summary>⌘, (Ctrl+,, or the student's own) opens Settings from <paramref name="window"/> (the dropdown, the quick

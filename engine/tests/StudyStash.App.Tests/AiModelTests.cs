@@ -952,6 +952,109 @@ public class AiNotesModelTests
     }
 
     [AvaloniaFact]
+    public async Task An_edit_saves_what_was_typed_with_each_diagram_back_where_its_line_is()
+    {
+        string notes = "## Summary\n\nBody text.\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\nMore.";
+        var (model, lib) = Loaded(new RewriteInfo("lec-1", "none") { Current = new NotesVersion(notes, "Ollama", Current.At) });
+        await model.Load("lec-1", notes, "Ollama", Current.At);
+        bool changed = false;
+        model.NotesChanged += () => changed = true;
+
+        model.EditCommand.Execute(null);
+
+        Assert.True(model.Editing);
+        Assert.False(model.ShowNotes);
+        Assert.False(model.ShowRewriteButton);
+        // No "Summary" heading (the header row says it), and the diagram is a line, not its source.
+        Assert.Equal("Body text.\n\n[Diagram 1]\n\nMore.", model.EditText);
+
+        model.EditText = "[Diagram 1]\r\n\r\nBody text, fixed.\n\nMore."; // the diagram moved to the top; a Windows return
+        await model.SaveEditCommand.ExecuteAsync(null);
+
+        var sent = Assert.Single(lib.Edits);
+        Assert.Equal("## Summary\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\nBody text, fixed.\n\nMore.", sent.Markdown);
+        Assert.Equal(Notes.Fingerprint(notes), sent.BasedOn);
+        Assert.False(model.Editing);
+        Assert.True(changed);
+        Assert.StartsWith("```mermaid", model.ShownMarkdown);
+    }
+
+    [AvaloniaFact]
+    public async Task Notes_that_changed_under_an_edit_are_only_saved_over_when_Save_is_pressed_again()
+    {
+        var (model, lib) = Loaded();
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        model.EditCommand.Execute(null);
+
+        // Nothing typed yet when the notes' diagrams arrive: the editor starts again from them.
+        lib.OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = Current with { Markdown = "# Summary\n\nBody text.\n\nWith more." } };
+        await model.Refresh();
+        Assert.Equal("Body text.\n\nWith more.", model.EditText);
+
+        // Typed in, then they change again (on another device): the library won't save over what the edit never saw.
+        model.EditText = "My own words.";
+        var theirs = Current with { Markdown = "# Summary\n\nTheir words." };
+        lib.OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = theirs };
+        lib.OnEditNotes = (_, markdown, basedOn) => basedOn == Notes.Fingerprint(theirs.Markdown)
+            ? new RewriteInfo("lec-1", "none") { Current = theirs with { Markdown = markdown } }
+            : throw new LibraryRefusedException(412, "these notes changed while you were editing them.");
+
+        await model.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.True(model.Editing);
+        Assert.Equal("My own words.", model.EditText);
+        Assert.Equal(AiWords.EditNotesChanged, model.EditProblem);
+
+        await model.SaveEditCommand.ExecuteAsync(null);
+
+        Assert.False(model.Editing);
+        Assert.Equal("My own words.", model.ShownMarkdown);
+    }
+
+    [AvaloniaFact]
+    public async Task Unsaved_typing_is_written_down_and_is_back_in_its_editor_after_the_app_restarts()
+    {
+        using var home = new StudyStash.Core.Tests.TempDir();
+        var (model, lib) = Loaded();
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        Assert.Null(model.Unsaved);
+        model.EditCommand.Execute(null);
+        Assert.Null(model.Unsaved); // Edit pressed, nothing typed: nothing to keep
+        model.EditText = "Half a sentence I was";
+
+        // What the app writes down as it quits (or updates itself, or a moment after the last key).
+        var typed = model.Unsaved!.Value;
+        Assert.True(NoteDrafts.Save(home.Path, new Dictionary<string, NoteDraft> { ["lec-1"] = new(typed.From, typed.Text, "2026-10-06T12:00:00Z") }));
+
+        // The app again, later: the same lecture opens with the typing in its editor, and it saves as that edit.
+        var kept = NoteDrafts.Load(home.Path, DateTimeOffset.Parse("2026-10-07T12:00:00Z"));
+        var (again, lib2) = Loaded();
+        await again.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        again.RestoreEdit(kept["lec-1"].From, kept["lec-1"].Text);
+        Assert.True(again.Editing);
+        Assert.Equal("Half a sentence I was", again.EditText);
+        Assert.True(again.EditDirty);
+        (string Markdown, string? BasedOn) sent = default;
+        lib2.OnEditNotes = (_, markdown, basedOn) =>
+        {
+            sent = (markdown, basedOn);
+            return new RewriteInfo("lec-1", "none") { Current = Current with { Markdown = markdown } };
+        };
+        await again.SaveEditCommand.ExecuteAsync(null);
+        Assert.Equal(("# Summary\n\nHalf a sentence I was", Notes.Fingerprint(Current.Markdown)), sent);
+        Assert.False(again.Editing);
+        Assert.Null(again.Unsaved);
+
+        // Saved, there's nothing left to keep, and the file goes. One never opened again is dropped after a month.
+        Assert.True(NoteDrafts.Save(home.Path, new Dictionary<string, NoteDraft>()));
+        Assert.False(File.Exists(NoteDrafts.PathIn(home.Path)));
+        Assert.True(NoteDrafts.Save(home.Path, new Dictionary<string, NoteDraft> { ["lec-9"] = new("a", "b", "2026-08-01T00:00:00Z") }));
+        Assert.Empty(NoteDrafts.Load(home.Path, DateTimeOffset.Parse("2026-10-06T12:00:00Z")));
+        File.WriteAllText(NoteDrafts.PathIn(home.Path), "not json");
+        Assert.Empty(NoteDrafts.Load(home.Path));
+    }
+
+    [AvaloniaFact]
     public async Task Compare_shows_both_and_the_current_notes_never_change_until_use()
     {
         var draft = new NotesVersion("# Summary\n\nNew body.", "Claude Code", DateTime.Now.ToString("o"));
@@ -1218,30 +1321,87 @@ public class AiAccessModelTests
     }
 
     [AvaloniaFact]
-    public async Task Connecting_an_app_from_its_row_shows_what_was_written_and_where_it_stands()
+    public async Task Connecting_an_app_takes_one_click_then_reopen_and_the_row_turns_connected_by_itself()
     {
         var (model, _) = Loaded();
         bool added = false;
-        model.ReadApps = () => [new AiAppState("claude-desktop", "Claude Desktop", true, added, false, added ? Now : null, null, "/c.json")];
+        DateTime? started = null;
+        var loaded = new TaskCompletionSource();
+        var reopened = new List<string>();
+        model.Delay = _ => loaded.Task;
+        // This computer has Claude and nothing else: one row, and the rest named in a line.
+        model.ReadApps = () =>
+        [
+            new AiAppState("claude-desktop", "Claude Desktop", true, added, false, added ? Now : null, started, "/c.json", CanReopen: true),
+            new AiAppState("codex", "ChatGPT", false, false, false, null, null, ""),
+            new AiAppState("gemini", "Gemini CLI", false, false, false, null, null, ""),
+        ];
         model.ConnectApp = id =>
         {
             added = id == "claude-desktop";
             return new AiAppChange(true, "Added Study Stash to Claude Desktop.", "/c.json", "/c.json.study-stash-backup", "{\"mcpServers\":{}}");
         };
+        model.ReopenApp = id =>
+        {
+            reopened.Add(id);
+            return Task.FromResult(new AiAppChange(true, ""));
+        };
         await model.Load();
         var row = Assert.Single(model.Apps);
-        Assert.Equal("Not connected", row.Status);
+        Assert.Equal("Not connected yet", row.Status);
+        Assert.Equal("Not found on this computer: ChatGPT, Gemini CLI.", model.MissingApps);
+        Assert.True(model.ShowMissingApps);
+        Assert.False(model.NoApps);
+        Assert.False(model.ShowTry);
         Assert.DoesNotContain(model.Connected, c => c.Name == "Claude Desktop"); // the apps here aren't library connections
 
         await row.Connect!.ExecuteAsync(null);
 
         Assert.Same(row, Assert.Single(model.Apps));
-        Assert.Equal("Added. Quit and reopen Claude Desktop to load it.", row.Status);
+        Assert.Equal("Almost done. Reopen Claude so it loads Study Stash.", row.Status);
+        Assert.True(row.CanReopen);
         Assert.True(row.CanDisconnect);
         Assert.Equal("Added Study Stash to Claude Desktop.", model.Say);
+        // What was written is there for whoever wants it, folded away.
+        Assert.True(model.HasWritten);
+        Assert.False(model.ShowWritten);
+        model.ToggleDetails();
         Assert.True(model.ShowWritten);
         Assert.Equal("/c.json", model.WrittenFile);
         Assert.Contains("/c.json.study-stash-backup", model.WrittenBackupWords);
+
+        await row.Reopen!.ExecuteAsync(null);
+
+        Assert.Equal(["claude-desktop"], reopened);
+        Assert.Equal("Claude is opening. This turns to Connected in a moment.", row.Status);
+
+        // The app starts Study Stash: the row says so by itself, with Settings still open, and there's a question to try.
+        started = Now.AddMinutes(1);
+        loaded.SetResult();
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!row.Ok && DateTime.UtcNow < deadline) await Task.Delay(5, TestContext.Current.CancellationToken);
+        Assert.StartsWith("Connected", row.Status);
+        Assert.False(row.CanReopen);
+        Assert.True(model.ShowTry);
+        Assert.Equal("Try it. In Claude, ask:", model.TryLead);
+    }
+
+    [AvaloniaFact]
+    public async Task With_no_ai_app_on_this_computer_the_page_says_where_to_get_one()
+    {
+        var (model, _) = Loaded();
+        var opened = new List<string>();
+        model.OpenUrl = opened.Add;
+        model.ReadApps = () => [new AiAppState("claude-desktop", "Claude Desktop", false, false, false, null, null, ""), new AiAppState("codex", "ChatGPT", false, false, false, null, null, "")];
+
+        await model.Load();
+
+        Assert.Empty(model.Apps);
+        Assert.True(model.NoApps);
+        Assert.False(model.ShowMissingApps); // the empty state says it; no list of absences under it
+        model.GetChatGpt();
+        model.GetClaude();
+        Assert.Equal([AiAccessModel.ChatGptDownload, AiAccessModel.ClaudeDownload], opened);
     }
 
     [AvaloniaFact]
@@ -1264,7 +1424,7 @@ public class AiAccessModelTests
         Assert.Empty(model.Connected);
     }
 
-    // Claude on the web and phone: the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
+    // Claude and ChatGPT on the web and phone: the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
     // (task 4). FakeAiLibrary's unscripted SetWebAsync turns Funnel on at "https://mini.tail1234.ts.net" and answers
     // reachable straight away; OnSetWeb/OnCheckWeb script something else (a problem, a slow check, an older library).
 
@@ -1359,13 +1519,13 @@ public class AiAccessModelTests
     {
         var (model, lib) = Loaded();
         await model.Load();
-        lib.OnSetWeb = on => throw new LibraryRefusedException(400, "Set a library password first, so only you can let Claude in.");
+        lib.OnSetWeb = on => throw new LibraryRefusedException(400, "Set a library password first, so only you can let an AI app in.");
 
         model.WebOn = true;
 
         Assert.False(model.WebOn);
         Assert.False(model.HasPassword);
-        Assert.Equal("Set a library password first, so only you can let Claude in.", model.WebNote);
+        Assert.Equal("Set a library password first, so only you can let an AI app in.", model.WebNote);
     }
 
     [AvaloniaFact]

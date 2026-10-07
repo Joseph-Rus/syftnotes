@@ -137,7 +137,8 @@ public abstract class AiProvider
     /// <summary>Where these commands usually live: a background service starts with a short PATH. On Windows also
     /// the PATH as Windows has it now: an engine (or Node.js, which npm's claude.cmd and codex.cmd run on) installed
     /// while Study Stash was running isn't on the PATH it started with, and "Check again" in setup should find it.
-    /// Codex's own Windows installer puts it in %LOCALAPPDATA%\Programs\OpenAI\Codex\bin.</summary>
+    /// Codex's own Windows installer puts it in %LOCALAPPDATA%\Programs\OpenAI\Codex\bin. Last of all, the copies the
+    /// ChatGPT and Claude desktop apps carry (<see cref="DesktopAppDirs"/>): one installed on its own comes first.</summary>
     public static string SearchPath()
     {
         string home = Py.UserHome();
@@ -146,11 +147,47 @@ public abstract class AiProvider
                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "OpenAI", "Codex", "bin"),
                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "nodejs")]
             : ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", Path.Combine(home, ".local", "bin"),
-               Path.Combine(home, ".npm-global", "bin"), Path.Combine(home, ".bun", "bin"), Path.Combine(home, ".claude", "local")];
+               Path.Combine(home, ".npm-global", "bin"), Path.Combine(home, ".bun", "bin"), Path.Combine(home, ".claude", "local"),
+               .. OperatingSystem.IsMacOS() ? DesktopAppDirs(home) : []];
         var dirs = new[] { Environment.GetEnvironmentVariable("PATH") ?? "" }.Concat(extra)
             .SelectMany(p => p.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             .Distinct(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
         return string.Join(Path.PathSeparator, dirs);
+    }
+
+    /// <summary>
+    /// A Mac: where the ChatGPT app keeps its Codex and Claude Desktop keeps its Claude Code, so a student who already
+    /// has the app needs no second install, and usually no second sign-in (ChatGPT's Codex is signed in with the app).
+    /// The ChatGPT app carries Codex inside its bundle; Claude Desktop downloads Claude Code beside its own settings,
+    /// a folder per version, once its Code tab has been opened: the newest one counts. Only folders that are there.
+    /// </summary>
+    public static List<string> DesktopAppDirs(string home, string applications = "/Applications")
+    {
+        var dirs = new List<string>();
+        try
+        {
+            foreach (string apps in new[] { applications, Path.Combine(home, "Applications") })
+                foreach (string app in new[] { "ChatGPT.app", "Codex.app" })
+                {
+                    string dir = Path.Combine(apps, app, "Contents", "Resources", "codex-cli", "CodexCLI.app", "Contents", "MacOS");
+                    if (File.Exists(Path.Combine(dir, "codex")) && !dirs.Contains(dir)) dirs.Add(dir);
+                }
+            string kept = Path.Combine(home, "Library", "Application Support", "Claude", "claude-code");
+            if (Directory.Exists(kept))
+            {
+                var newest = Directory.EnumerateDirectories(kept)
+                    .Select(d => (Dir: d, Version: Version.TryParse(Path.GetFileName(d), out var v) ? v : null))
+                    .Where(d => d.Version is not null).OrderByDescending(d => d.Version)
+                    .SelectMany(d => Directory.EnumerateDirectories(d.Dir).OrderByDescending(Directory.GetLastWriteTimeUtc))
+                    .Select(d => Path.Combine(d, "claude.app", "Contents", "MacOS"))
+                    .FirstOrDefault(d => File.Exists(Path.Combine(d, "claude")));
+                if (newest is not null) dirs.Add(newest);
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
+        return dirs;
     }
 
     /// <summary>Windows: the folders on this account's PATH and the computer's, as the registry has them now (an

@@ -74,6 +74,9 @@ public sealed class GuidedSetupTests
         public List<string> Terminals { get; } = [];
         public List<string> Writers { get; } = [];
         public string InstallMode { get; set; } = "ok";
+        /// <summary>The ChatGPT and Claude desktop apps this computer has, and the ones a card connected.</summary>
+        public List<AiAppState> AiApps { get; } = [];
+        public List<string> Connected { get; } = [];
 
         public Rig(string cli = "claude", bool installed = false, bool signedIn = false, AppRole? role = null, bool again = false, Action<AppSettings>? saved = null,
             Func<IAudioSource>? mic = null, TempHome? home = null)
@@ -107,6 +110,14 @@ public sealed class GuidedSetupTests
                 OpenUrl = Opened.Add,
                 OpenTerminal = (exe, args) => Terminals.Add(string.Join(' ', [Path.GetFileNameWithoutExtension(exe), .. args])),
                 Downloading = () => Host.Downloading?.Fraction,
+                AiApps = () => [.. AiApps],
+                ConnectAiApp = id =>
+                {
+                    Connected.Add(id);
+                    int at = AiApps.FindIndex(a => a.Id == id);
+                    AiApps[at] = AiApps[at] with { Added = true };
+                    return new AiAppChange(true, "");
+                },
             };
             Guided = new GuidedSetupModel(Setup, services, () => Host.Settings, Host.Save);
             Driver = new GuidedSetup(Guided, Host)
@@ -154,6 +165,49 @@ public sealed class GuidedSetupTests
             Host.Dispose();
             Home.Dispose();
         }
+    }
+
+    [AvaloniaFact]
+    public async Task An_ai_thats_here_and_signed_in_starts_picked_and_one_continue_reaches_the_chat()
+    {
+        // The ChatGPT app is on this computer (its own Codex, signed in with it): no install step, no sign-in step.
+        await using var rig = await new Rig(cli: "codex", installed: true, signedIn: true).OpenAsync();
+        var g = rig.Guided;
+        Assert.Equal(GuidedScreen.PickAi, g.Screen);
+        Assert.Equal("codex", g.Picked); // the only one here, so it's picked already
+
+        await g.ContinueCommand.ExecuteAsync(null);
+
+        await Until(() => g.Screen == GuidedScreen.Chat, "the chat, with no stop at the sign-in screen");
+        Assert.True(g.AiReady);
+        Assert.Empty(rig.Opened); // no sign-in page was opened
+    }
+
+    [AvaloniaFact]
+    public async Task Setup_offers_to_let_the_chatgpt_app_read_the_library_and_one_press_connects_it()
+    {
+        var rig0 = new Rig(installed: true, signedIn: true, role: AppRole.Both, saved: s => s.SetupAi = "claude");
+        rig0.AiApps.Add(new AiAppState("codex", "ChatGPT", true, false, false, null, null, ""));
+        await using var rig = await rig0.OpenAsync();
+        var g = rig.Guided;
+        await Until(() => g.Screen == GuidedScreen.Chat && !g.Busy, "the chat");
+        g.RoleChosen = true;
+        Assert.Equal(("AI app", "ChatGPT"), (rig.Item("ai_app").Title, rig.Item("ai_app").Detail));
+        Assert.Equal(ChecklistState.Todo, rig.Item("ai_app").State);
+
+        Assert.False((await rig.CallAsync("offer_ai_app")).Error);
+        var card = g.Thread.OfType<CardEntry>().Last();
+        Assert.Equal("Let ChatGPT read your lectures?", card.Title);
+        Assert.Empty(rig.Connected); // showing the card changed nothing
+
+        await card.PressCommand.ExecuteAsync("connect");
+
+        Assert.Equal(["codex"], rig.Connected);
+        Assert.Equal(ChecklistState.Done, rig.Item("ai_app").State);
+        Assert.Equal("ChatGPT connected", rig.Item("ai_app").Detail);
+        Assert.False(card.Open);
+        Assert.Contains(g.Thread.OfType<NoteEntry>(), n => n.Text == "ChatGPT can read your lectures");
+        Assert.Contains("already connected", (await rig.CallAsync("offer_ai_app")).Text);
     }
 
     [AvaloniaFact]

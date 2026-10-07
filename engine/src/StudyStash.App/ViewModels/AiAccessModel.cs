@@ -21,19 +21,20 @@ public sealed class AiConnectionRow
     public string WinDetail => HasUsedWords ? $"{Detail} · {UsedWords}" : Detail;
     public bool CanRemove { get; init; }
     public IAsyncRelayCommand? Remove { get; internal set; }
-    /// <summary>terminal for Claude, code for Codex, hub for anything else — the row's icon tile.</summary>
-    public string Icon => Name switch { "Claude Code" or "Claude" or "Claude Desktop" => "terminal", "Codex" => "code", _ => "hub" };
+    /// <summary>terminal for Claude, code for ChatGPT and Codex, hub for anything else — the row's icon tile.</summary>
+    public string Icon => Name switch { "Claude Code" or "Claude" or "Claude Desktop" => "terminal", "Codex" or "ChatGPT" => "code", _ => "hub" };
     /// <summary>The first row in the list shows no separator above it.</summary>
     public bool First { get; set; }
 }
 
-/// <summary>One AI app on this computer (Claude Desktop, Claude Code, Codex, Gemini CLI): what it's called, where it
+/// <summary>One AI app on this computer (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): what it's called, where it
 /// stands, and its own Connect and Disconnect, closed over its id.</summary>
 public sealed partial class AiAppRow : ObservableObject
 {
     public string Id { get; init; } = "";
     public string Name { get; init; } = "";
-    /// <summary>What the app is, under its name ("The app, the CLI and the IDE extension").</summary>
+    /// <summary>What the app is, in a few words ("The ChatGPT app, and Codex in the terminal or your editor"): the
+    /// row's tooltip.</summary>
     public string About { get; init; } = "";
     public string Icon => Id switch { "codex" => "code", "gemini" => "auto_awesome", "claude-code" => "terminal", _ => "desktop_windows" };
     [ObservableProperty] public partial string Status { get; set; } = "";
@@ -41,44 +42,73 @@ public sealed partial class AiAppRow : ObservableObject
     [ObservableProperty] public partial bool Ok { get; set; }
     [ObservableProperty] public partial bool CanConnect { get; set; }
     [ObservableProperty] public partial bool CanDisconnect { get; set; }
-    /// <summary>"Connect", or "Fix" when the app has another copy of Study Stash set up.</summary>
+    /// <summary>"Connect", "Fix" when the app has another copy of Study Stash set up, or "Update" when it has this
+    /// one the way it was pasted in by hand.</summary>
     [ObservableProperty] public partial string ConnectWords { get; set; } = "Connect";
-    public bool First { get; set; }
+    /// <summary>Added, but the app hasn't loaded it yet, and it's a desktop app Study Stash can quit and open again
+    /// (a Mac): the row offers to, since closing a Mac app's window doesn't quit it.</summary>
+    [ObservableProperty] public partial bool CanReopen { get; set; }
+    /// <summary>The app as its own menu bar names it ("Claude", "ChatGPT"): what the words about it say.</summary>
+    public string AppName => ClaudeSetup.DesktopApp(Id)?.Name ?? Name;
+    public string ReopenWords => $"Reopen {AppName}";
+    /// <summary>While Reopen is quitting and opening the app.</summary>
+    public bool Reopening { get; set; }
+    /// <summary>Reopen opened the app since it was added: the row says what's left, if anything.</summary>
+    public bool Reopened { get; set; }
+    [ObservableProperty] public partial bool First { get; set; }
     public IAsyncRelayCommand? Connect { get; internal set; }
     public IAsyncRelayCommand? Disconnect { get; internal set; }
+    public IAsyncRelayCommand? Reopen { get; internal set; }
     /// <summary>Windows shows the status in the one subtitle line.</summary>
     public string WinDetail => Status;
     partial void OnStatusChanged(string value) => OnPropertyChanged(nameof(WinDetail));
 
     /// <summary>Where an app stands, in words: not here, not connected, added but not loaded yet, connected (and when
-    /// it last started Study Stash), or set up for another copy of Study Stash.</summary>
+    /// it last started Study Stash), set up for another copy of Study Stash, or set up by hand.</summary>
     public void Show(AiAppState s, DateTime now)
     {
         Ok = false;
-        CanConnect = s.Installed && (!s.Added || s.OtherCopy);
+        CanConnect = s.Installed && (!s.Added || s.OtherCopy || s.Outdated);
         CanDisconnect = s.Added;
-        ConnectWords = s.OtherCopy ? "Fix" : "Connect";
+        ConnectWords = s.OtherCopy ? "Fix" : s.Outdated ? "Update" : "Connect";
+        bool waiting = false;
         if (!s.Installed) Status = "Not on this computer";
-        else if (!s.Added) Status = "Not connected";
+        else if (!s.Added) Status = "Not connected yet";
         else if (s.OtherCopy) Status = "Set up for another copy of Study Stash. Choose Fix to use this one.";
+        else if (s.Outdated) Status = "Set up by hand, so Study Stash can't tell when it's connected. Choose Update.";
         else if (s.Started is { } started && (s.AddedAt is null || started >= s.AddedAt))
         {
             Ok = true;
+            Reopened = false;
             Status = "Connected · " + (started.Date == now.Date ? $"started {started:H:mm}" : now - started < TimeSpan.FromDays(7) ? $"started {started:ddd}" : $"started {started:d MMM}");
         }
-        else Status = s.Name switch
+        else
         {
-            "Claude Desktop" => "Added. Quit and reopen Claude Desktop to load it.",
-            "Claude Code" => "Added. Start a new Claude Code session to load it.",
-            "Codex" => "Added. Restart Codex to load it.",
-            _ => $"Added. Start {s.Name} again to load it.",
-        };
+            waiting = true;
+            Status = Reopening ? $"Reopening {AppName}…" : Reopened ? OpenedWords : WaitingWords(s.CanReopen);
+        }
+        CanReopen = waiting && s.CanReopen && !Reopening;
     }
+
+    /// <summary>The one step left after Connect: the app reads its settings when it starts. ChatGPT starts Study
+    /// Stash only once a chat in Codex begins, so its row says that too.</summary>
+    string WaitingWords(bool canReopen) => Id switch
+    {
+        "claude-desktop" => canReopen ? "Almost done. Reopen Claude so it loads Study Stash." : "Almost done. Quit Claude completely, then open it again.",
+        "codex" => canReopen ? "Almost done. Reopen ChatGPT, then start a chat in Codex." : "Almost done. Quit ChatGPT and open it again, then start a chat in Codex.",
+        "claude-code" => "Almost done. Start a new Claude Code session.",
+        _ => $"Almost done. Start {Name} again.",
+    };
+
+    string OpenedWords => Id == "codex"
+        ? "ChatGPT is open. Start a chat in Codex and this turns to Connected."
+        : $"{AppName} is opening. This turns to Connected in a moment.";
 }
 
 /// <summary>
 /// Settings → AI tool access (design 14): the off switch, what AI apps may read, the AI apps on this computer (each
-/// connected with one click, no Tailscale needed), Claude on the web (Tailscale Funnel), and the other connections.
+/// connected with one click, no Tailscale needed), Claude and ChatGPT on the web (Tailscale Funnel), and the other
+/// connections.
 /// Reads and drives one library's AI (<see cref="IAiLibrary"/>); what it can't do through that (reading and changing
 /// the AI apps' own settings on this computer) goes through hooks the host sets, so this model never touches a file
 /// or a process itself.
@@ -111,9 +141,9 @@ public sealed partial class AiAccessModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(WebToggleEnabled))]
     public partial bool HasPassword { get; set; }
 
-    // Claude on the web and phone: whether Claude can reach this library over the internet, through Tailscale Funnel
-    // (task 4's ClaudeReach/ReachCheck, read through ToolAccessInfo.Web). WebOn is the switch Settings shows; the
-    // library is the truth, so every change round-trips through it before the switch visibly moves.
+    // Claude and ChatGPT on the web and phone: whether they can reach this library over the internet, through Tailscale
+    // Funnel (task 4's ClaudeReach/ReachCheck, read through ToolAccessInfo.Web). WebOn is the switch Settings shows;
+    // the library is the truth, so every change round-trips through it before the switch visibly moves.
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowWebReady), nameof(ShowWebNeeds), nameof(ShowWebNeedsAction))]
     public partial bool WebOn { get; set; }
@@ -162,13 +192,13 @@ public sealed partial class AiAccessModel : ObservableObject
     public string? WebStatusWords => WebChecking ? "Checking…" : WebWords;
     public bool WebStatusOk => WebReachable == true;
     public bool WebStatusWarn => WebReachable == false;
-    /// <summary>The master AI-tool-access switch (<see cref="On"/>) is off: Claude can be signed in and the address
+    /// <summary>The master AI-tool-access switch (<see cref="On"/>) is off: an app can be signed in and the address
     /// can answer, but every tool call is refused. Shown as a quiet note under the card, not another problem.</summary>
     public bool ShowToolsOffNote => !On;
     public bool WebToggleEnabled => WebSupported && HasPassword;
 
-    /// <summary>Claude sign-ins (<c>kind == "signin"</c>): the ones this card lists and can remove. A token made in
-    /// Settings, or this computer's own Claude Code/Desktop, stay in <see cref="Connected"/> below instead.</summary>
+    /// <summary>Sign-ins from the web (Claude, ChatGPT: <c>kind == "signin"</c>): the ones this card lists and can
+    /// remove. A token made in Settings stays in <see cref="Connected"/> below instead.</summary>
     public ObservableCollection<AiConnectionRow> ClaudeConnections { get; } = [];
     public bool HasClaudeConnections => ClaudeConnections.Count > 0;
 
@@ -188,19 +218,63 @@ public sealed partial class AiAccessModel : ObservableObject
     /// <summary>Adds Study Stash to one app's settings, or takes it out; answers what happened.</summary>
     public Func<string, AiAppChange>? ConnectApp { get; set; }
     public Func<string, AiAppChange>? DisconnectApp { get; set; }
+    /// <summary>Quits one app and opens it again (a Mac); answers whether it did, with the words to show if not.</summary>
+    public Func<string, Task<AiAppChange>>? ReopenApp { get; set; }
+
+    /// <summary>The apps Study Stash looked for and didn't find, in one quiet line under the ones it did.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMissingApps))]
+    public partial string? MissingApps { get; set; }
+    /// <summary>None of them is on this computer: the group says where to get one instead of a list of absences.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowMissingApps))]
+    public partial bool NoApps { get; set; }
+    public bool ShowMissingApps => !NoApps && MissingApps is { Length: > 0 };
+
+    public const string ChatGptDownload = "https://openai.com/chatgpt/download/";
+    public const string ClaudeDownload = "https://claude.com/download";
+
+    [RelayCommand] public void GetChatGpt() => OpenUrl?.Invoke(ChatGptDownload);
+    [RelayCommand] public void GetClaude() => OpenUrl?.Invoke(ClaudeDownload);
+
+    /// <summary>Once an app is connected: a first question to ask it, so the student sees it work.</summary>
+    public const string TryQuestion = "What did my last lecture cover?";
+    public bool ShowTry => Apps.Any(a => a.Ok);
+    public string TryLead => Apps.FirstOrDefault(a => a.Ok) switch
+    {
+        { Id: "codex" } => "Try it. In ChatGPT, start a chat in Codex and ask:",
+        { } row => $"Try it. In {row.AppName}, ask:",
+        null => "",
+    };
+
+    [RelayCommand]
+    public async Task CopyTry()
+    {
+        if (Copy is null) return;
+        await Copy(TryQuestion);
+        Say = "Copied. Paste it into the app.";
+    }
 
     /// <summary>The "what was written" panel after a change: the app's settings file, the copy of it from before, and
     /// the setup that went in (no secrets: the apps start Study Stash, which reads its own settings).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowWritten))]
+    [NotifyPropertyChangedFor(nameof(ShowWritten), nameof(HasWritten))]
     public partial string? WrittenFile { get; set; }
+    /// <summary>The panel is folded away behind "Show what changed": it's there for whoever wants to see it, and
+    /// opens by itself only when a change couldn't be made and the setup has to be pasted in by hand.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowWritten), nameof(DetailsWords))]
+    public partial bool DetailsOpen { get; set; }
+    public bool HasWritten => WrittenFile is { Length: > 0 };
+    public string DetailsWords => DetailsOpen ? "Hide what changed" : "Show what changed";
+    [RelayCommand] public void ToggleDetails() => DetailsOpen = !DetailsOpen;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(WrittenBackupWords))]
     public partial string? WrittenBackup { get; set; }
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasWrittenText))]
     public partial string? WrittenText { get; set; }
-    public bool ShowWritten => WrittenFile is { Length: > 0 };
+    public bool ShowWritten => HasWritten && DetailsOpen;
     public bool HasWrittenText => WrittenText is { Length: > 0 };
     public string WrittenBackupWords => WrittenBackup is { Length: > 0 } b ? "As it was before: " + b : "It's a new file: there was nothing to keep.";
     public bool HasSay => Say is { Length: > 0 };
@@ -369,26 +443,63 @@ public sealed partial class AiAccessModel : ObservableObject
         {
             return;
         }
+        // A row for each app this computer has, in the order Settings lists them; the rest are named in one line.
+        int at = 0;
         foreach (var s in states)
         {
             var row = Apps.FirstOrDefault(a => a.Id == s.Id);
+            if (!s.Installed)
+            {
+                if (row is not null) Apps.Remove(row);
+                continue;
+            }
             if (row is null)
             {
-                row = new AiAppRow { Id = s.Id, Name = s.Name, About = AppAbout(s.Id), First = Apps.Count == 0 };
+                row = new AiAppRow { Id = s.Id, Name = s.Name, About = AppAbout(s.Id) };
                 string id = s.Id;
                 row.Connect = new AsyncRelayCommand(() => ChangeAppAsync(id, add: true));
                 row.Disconnect = new AsyncRelayCommand(() => ChangeAppAsync(id, add: false));
-                Apps.Add(row);
+                row.Reopen = new AsyncRelayCommand(() => ReopenAppAsync(id));
+                Apps.Insert(Math.Min(at, Apps.Count), row);
             }
             row.Show(s, now());
+            at = Apps.IndexOf(row) + 1;
         }
+        for (int i = 0; i < Apps.Count; i++) Apps[i].First = i == 0;
+        NoApps = Apps.Count == 0;
+        var missing = states.Where(s => !s.Installed).Select(s => s.Name).ToList();
+        MissingApps = missing.Count > 0 ? $"Not found on this computer: {string.Join(", ", missing)}." : null;
+        OnPropertyChanged(nameof(ShowTry));
+        OnPropertyChanged(nameof(TryLead));
+    }
+
+    /// <summary>The row's Reopen: quits the app and opens it again, then keeps looking for it to load Study Stash.</summary>
+    async Task ReopenAppAsync(string id)
+    {
+        if (ReopenApp is null || Apps.FirstOrDefault(a => a.Id == id) is not { } row) return;
+        row.Reopening = true;
+        await LoadApps();
+        AiAppChange done;
+        try
+        {
+            done = await ReopenApp(id);
+        }
+        finally
+        {
+            row.Reopening = false;
+        }
+        row.Reopened = done.Ok;
+        Say = done.Ok ? null : done.Say;
+        await LoadApps();
+        StopWatchingApps();
+        if (done.Ok) WatchApp(id);
     }
 
     static string AppAbout(string id) => id switch
     {
         "claude-desktop" => "The Claude app on this computer",
         "claude-code" => "In the terminal, the Claude app's Code tab, or your editor",
-        "codex" => "The Codex app, CLI and IDE extension share one setup",
+        "codex" => "The ChatGPT app, and Codex in the terminal or your editor",
         "gemini" => "Google's Gemini in the terminal",
         _ => "",
     };
@@ -404,11 +515,53 @@ public sealed partial class AiAccessModel : ObservableObject
             WrittenFile = done.File;
             WrittenBackup = done.Backup;
             WrittenText = done.Written;
+            // Folded away unless the setup has to be pasted in by hand, which is what the words then point at.
+            DetailsOpen = !done.Ok && done.Written is { Length: > 0 };
+            if (Apps.FirstOrDefault(a => a.Id == id) is { } changed) changed.Reopened = false;
             await LoadApps();
+            StopWatchingApps();
+            if (add && done.Ok) WatchApp(id);
         }
         finally
         {
             Busy = false;
+        }
+    }
+
+    CancellationTokenSource? appWatch;
+
+    /// <summary>Stops looking again after a Connect (<see cref="WatchApp"/>): another change took its place, or
+    /// Settings closed, and looking went on for its five minutes with nobody to see it.</summary>
+    public void StopWatchingApps()
+    {
+        appWatch?.Cancel();
+        appWatch = null;
+    }
+
+    /// <summary>After Connect or Reopen, the app still has to load Study Stash (ChatGPT, once a chat in Codex starts).
+    /// Looks again every few seconds for five minutes, so the row turns to Connected by itself the moment it does,
+    /// with Settings still open.</summary>
+    void WatchApp(string id)
+    {
+        var cts = new CancellationTokenSource();
+        appWatch = cts;
+        _ = WatchAsync();
+
+        async Task WatchAsync()
+        {
+            try
+            {
+                for (var i = 0; i < 100 && !cts.IsCancellationRequested; i++)
+                {
+                    await (Delay?.Invoke(TimeSpan.FromSeconds(3)) ?? Task.Delay(TimeSpan.FromSeconds(3), cts.Token));
+                    if (cts.IsCancellationRequested) return;
+                    await LoadApps();
+                    if (Apps.FirstOrDefault(a => a.Id == id) is not { Ok: false, CanDisconnect: true }) return;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
     }
 

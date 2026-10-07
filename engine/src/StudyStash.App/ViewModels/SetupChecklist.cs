@@ -26,10 +26,17 @@ public sealed record ChecklistFacts
     public double? Downloading { get; init; }
     /// <summary>The card showing now ("microphone_check"…), or "".</summary>
     public string OpenCard { get; init; } = "";
-    /// <summary>Chrome is connected to the library (the Canvas helper checked in).</summary>
-    public bool ChromeConnected { get; init; }
+    /// <summary>The student's browser is connected to the library (the Canvas helper checked in).</summary>
+    public bool BrowserConnected { get; init; }
+    /// <summary>The browser the helper is being added to ("Edge"); "" before the helper's card has been offered.</summary>
+    public string Browser { get; init; } = "";
     /// <summary>How many courses Canvas found.</summary>
     public int CoursesFound { get; init; }
+    /// <summary>The ChatGPT and Claude desktop apps on this computer, by name ("ChatGPT", "Claude"): each can be let
+    /// read the library with one press.</summary>
+    public IReadOnlyList<string> AiApps { get; init; } = [];
+    /// <summary>Every one of them has Study Stash in its settings.</summary>
+    public bool AiAppsConnected { get; init; }
 }
 
 /// <summary>
@@ -102,11 +109,16 @@ public static class SetupChecklist
         items.Add(new("classes", "Classes", classes > 0 ? ChecklistState.Done : Left(f, "classes") ?? ChecklistState.Todo,
             classes > 0 ? $"{classes} class{(classes == 1 ? "" : "es")}" : "", Optional: true));
 
-        var canvas = f.ChromeConnected && f.CoursesFound > 0 ? ChecklistState.Done
+        var canvas = f.BrowserConnected && f.CoursesFound > 0 ? ChecklistState.Done
             : Left(f, "canvas") ?? (Now(f, "chrome_helper", "course_picker") ? ChecklistState.Now : ChecklistState.Todo);
         string canvasDetail = canvas == ChecklistState.Done ? $"{f.CoursesFound} course{(f.CoursesFound == 1 ? "" : "s")} found"
-            : canvas == ChecklistState.Now && !f.ChromeConnected ? "Waiting for Chrome…" : "";
+            : canvas == ChecklistState.Now && !f.BrowserConnected ? $"Waiting for {Core.Canvas.CanvasSettings.BrowserName(f.Browser)}…" : "";
         items.Add(new("canvas", "Canvas", canvas, canvasDetail, Optional: true));
+
+        if (chosen && f.AiApps.Count > 0)
+            items.Add(new("ai_app", "AI app", f.AiAppsConnected ? ChecklistState.Done
+                : Left(f, "ai_app") ?? (Now(f, "ai_app") ? ChecklistState.Now : ChecklistState.Todo),
+                !f.AiAppsConnected ? AiAppNames(f.AiApps) : f.AiApps.Count == 1 ? $"{f.AiApps[0]} connected" : "Both connected", Optional: true));
 
         if (m.IsOneComputer || m.IsLibrary)
             items.Add(new("start_at_login", "Start at login", f.StartsAtLogin ? ChecklistState.Done
@@ -117,6 +129,9 @@ public static class SetupChecklist
                 Optional: true));
         return items;
     }
+
+    /// <summary>"ChatGPT", "ChatGPT and Claude".</summary>
+    public static string AiAppNames(IReadOnlyList<string> names) => string.Join(" and ", names);
 
     static bool Now(ChecklistFacts f, params string[] cards) => cards.Contains(f.OpenCard);
 

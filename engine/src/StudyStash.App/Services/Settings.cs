@@ -393,7 +393,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         };
         AiProblems = new AiProblemsModel(ai);
         Access = MakeAccess(ai, host);
-        Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch) { OnSetUpExtension = () => Shell.ShowCanvasConnect() };
+        Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch) { OnSetUpExtension = () => Shell.ShowCanvasConnect(), OnChooseBrowser = Shell.ChooseBrowser };
         Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
         Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
         Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, records);
@@ -426,7 +426,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Refresh();
     }
 
-    /// <summary>AI tool access, with the AI apps on this computer (Claude Desktop, Claude Code, Codex, Gemini CLI: each
+    /// <summary>AI tool access, with the AI apps on this computer (Claude Desktop, Claude Code, ChatGPT, Gemini CLI: each
     /// connected to the library with one click), and the library's Claude routes for turning on the web address and
     /// removing a connection.</summary>
     static AiAccessModel MakeAccess(IAiLibrary ai, AppHost host)
@@ -438,6 +438,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             ReadApps = setup.States,
             ConnectApp = setup.Connect,
             DisconnectApp = setup.Disconnect,
+            ReopenApp = setup.ReopenAsync,
             OpenUrl = url => Dialogs.OpenUrl(url),
             RevokeConnection = async id =>
             {
@@ -1031,5 +1032,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     {
         host.Changed -= OnHostChanged;
         Canvas.Dispose();
+        // Settings has closed: nobody is waiting to see an AI app's row turn to Connected.
+        Access.StopWatchingApps();
     }
 }

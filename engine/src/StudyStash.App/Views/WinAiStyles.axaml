@@ -381,6 +381,31 @@
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
   </Style>
 
+  <!-- The notes as text while they're edited: a field the width of the notes, as tall as what's in it. -->
+  <Style Selector="Border.ai-editor">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Padding" Value="12,10" />
+    <Setter Property="Background" Value="{DynamicResource Card}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="TextBox.ai-editor">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="LineHeight" Value="22" />
+    <Setter Property="MinHeight" Value="160" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+  </Style>
+  <Style Selector="TextBlock.ai-editor-hint">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.ai-editor-problem">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
   <!-- While the "Rewrite notes with" menu is open, the notes dim to .5 (17). -->
   <Style Selector="Border.ai-dim">
     <Setter Property="Opacity" Value="1" />
@@ -511,7 +536,7 @@
     <Setter Property="CornerRadius" Value="8" />
   </Style>
 
-  <!-- The "Claude on the web and phone" card's own bits (14, connectors): a numbered step marker the same size as
+  <!-- The "Claude and ChatGPT on the web and phone" card's own bits (14, connectors): a numbered step marker the same size as
        ai-check, and the field rows' own label/value split. -->
   <Style Selector="Border.ai-num">
     <Setter Property="Width" Value="20" />

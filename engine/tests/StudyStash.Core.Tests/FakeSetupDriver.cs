@@ -28,7 +28,7 @@ public sealed class FakeSetupDriver : ISetupDriver
         new("large-v3", "Whisper large-v3", "3 GB", false, false),
     ];
 
-    public SetupCourses Courses { get; set; } = new(false, [], "Chrome isn't connected yet.");
+    public SetupCourses Courses { get; set; } = new(false, [], "The student's browser isn't connected yet.");
     public List<SetupCard> Cards { get; } = [];
     public List<(string Question, IReadOnlyList<string> Choices)> Questions { get; } = [];
     public List<(string Name, string About)> Classes { get; } = [];

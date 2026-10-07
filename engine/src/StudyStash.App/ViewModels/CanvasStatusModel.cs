@@ -107,7 +107,7 @@ public sealed partial class CanvasStatusModel(CanvasContext context) : Observabl
         {
             CanvasStateKind.NotSetUp => ("link_off", CanvasTone.Info, "Connect", true, false, true),
             CanvasStateKind.NoExtension => ("extension", CanvasTone.Warn, "Show me how", true, false, true),
-            CanvasStateKind.ChromeAway => ("schedule", CanvasTone.Warn, "Open Chrome", false, false, true),
+            CanvasStateKind.ChromeAway => ("schedule", CanvasTone.Warn, $"Open {CanvasWords.Browser(s)}", false, false, true),
             CanvasStateKind.SignedOut => ("lock", CanvasTone.Warn, "Open Canvas", false, false, true),
             CanvasStateKind.Syncing => ("", CanvasTone.Info, null, false, false, true),
             CanvasStateKind.Connected => ("check_circle", CanvasTone.Ok, "Sync now", false, false, false),
@@ -120,7 +120,7 @@ public sealed partial class CanvasStatusModel(CanvasContext context) : Observabl
         IsVisible = true;
     }
 
-    /// <summary>Connect opens Settings' Connection flow; Show me how opens the same flow at its Chrome step (both
+    /// <summary>Connect opens Settings' Connection flow; Show me how opens the same flow at its extension step (both
     /// T5's connect control — this task only calls back to whichever host holds it).</summary>
     public Action? OnConnect { get; set; }
     public Action? OnShowMeHow { get; set; }
@@ -137,10 +137,10 @@ public sealed partial class CanvasStatusModel(CanvasContext context) : Observabl
                 OnShowMeHow?.Invoke();
                 break;
             case CanvasStateKind.ChromeAway:
-                context.Actions.OpenChrome();
+                context.Actions.OpenBrowser();
                 break;
             case CanvasStateKind.SignedOut:
-                context.Actions.OpenInChrome(state.Url);
+                context.Actions.OpenInBrowser(state.Url);
                 break;
             case CanvasStateKind.Connected:
             case CanvasStateKind.Error:

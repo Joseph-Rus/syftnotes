@@ -4,16 +4,22 @@
 // signed into and hands the answers back. It never writes to Canvas, and it refuses any URL outside Canvas
 // and its file store. It waits for work with the library (which answers as soon as there is some), and says on its
 // toolbar button when it can't reach the library or Canvas.
-importScripts('connection.js');
-try { importScripts('config.js'); } catch (e) { /* only a folder from before 1.4 needs it: config.json replaced it */ }
+// Chrome and its family run this as a service worker, which brings in connection.js itself; Firefox and its family run
+// it as a background page whose manifest lists connection.js first.
+if (typeof importScripts === 'function') {
+  importScripts('connection.js');
+  try { importScripts('config.js'); } catch (e) { /* only a folder from before 1.4 needs it: config.json replaced it */ }
+}
 
 const MAX_BYTES = 40 * 1024 * 1024;
 // What this copy of the extension does, told to the library on every visit (docs/canvas.md, "The extension"):
-// 2 = says when Chrome is signed out, passes on Canvas's rate limit, never hands over an error page or an
+// 2 = says when the browser is signed out, passes on Canvas's rate limit, never hands over an error page or an
 // oversized file as a file, reloads itself before taking work when its folder is newer, posts files one at a time.
 // 3 = waits for work (wait=), says which library address it uses (a=), reloads itself when its host permissions change.
+// From 1.6 it also says which browser it runs in (b=), whatever the protocol.
 const PROTOCOL = 3;
-// How long the library may hold a request for work, in seconds: under the 30 s Chrome allows a fetch without an answer.
+// How long the library may hold a request for work, in seconds: under the 30 s a browser allows a fetch without an
+// answer, and under the 30 s of quiet after which it puts this script to sleep.
 const WAIT = 20;
 // Canvas sent us to its sign-in page, or answered as if nobody were signed in. Canvas's other 401,
 // {"status":"unauthorized"}, only means this student can't see that part of the course.
@@ -57,8 +63,8 @@ function b64(buf) {
   return btoa(s);
 }
 
-// Some files (often your own submissions) don't download through Canvas's /files/<id>/download redirect from a
-// service worker. Canvas's API hands out a signed link to the same file, which does.
+// Some files (often your own submissions) don't download through Canvas's /files/<id>/download redirect from an
+// extension. Canvas's API hands out a signed link to the same file, which does.
 async function viaPublicUrl(url) {
   const m = url.match(/\/files\/(\d+)\/download/);
   if (!m) throw new Error('not a Canvas file');
@@ -109,7 +115,8 @@ async function run(job) {
 // manifest there isn't the one running (another version, or other hosts it may reach), reload to pick up the new
 // files and permissions. Checked before asking for work, so a reload never drops work already taken. Reloading for
 // the same folder again (Chrome came back still running something else) waits a minute, so a folder Chrome reads
-// differently can't reload it over and over; a folder that changed again reloads at once.
+// differently can't reload it over and over; a folder that changed again reloads at once. A copy from a browser's
+// store always reads the manifest it's running, so it never reloads this way: the store updates it.
 const RELOAD_EVERY = 60 * 1000;
 async function needsReload() {
   let onDisk;
@@ -147,13 +154,14 @@ async function setStatus(state) {
   } catch (e) { /* no toolbar button to update */ }
 }
 
-// Canvas's answers say whether Chrome is signed in: an answer that bounced to sign-in says no, a good one says yes.
+// Canvas's answers say whether the browser is signed in: an answer that bounced to sign-in says no, a good one says yes.
 function noteCanvas(results) {
   if (results.some(r => r.signed_out)) signedOut = true;
   else if (results.some(r => !r.error && r.status >= 200 && r.status < 300)) signedOut = false;
 }
 
-// Asking the library again at once keeps Chrome from putting this worker to sleep: any extension call resets its timer.
+// Asking the library again at once keeps the browser from putting this script to sleep: any extension call resets its
+// timer (Chrome's for a service worker, Firefox's for a background page).
 async function stayAwake() {
   try { await chrome.storage.session.set({lastPoll: Date.now()}); } catch (e) { /* no session storage */ }
 }
@@ -174,6 +182,7 @@ async function pump(force) {
     let idle = 0;
     for (let round = 0; round < 5000; round++) {
       if (await needsReload()) { chrome.runtime.reload(); return; }
+      const where = await whichBrowser();
       conn = await loadConnection();
       if (!conn) { await setStatus('no_config'); return; }
       if (!(await hasAccess(conn))) { await setStatus('no_access'); return; } // a store copy the student hasn't allowed yet
@@ -186,7 +195,8 @@ async function pump(force) {
         // The first ask is answered at once, so the toolbar button says how things stand now (a key put right, a
         // library back) rather than after a held request.
         work = await app('/api/v2/canvas/work?v=' + chrome.runtime.getManifest().version + '&p=' + PROTOCOL + '&wait=' + (round === 0 ? 0 : WAIT)
-                         + '&a=' + encodeURIComponent(conn.app) + (forced ? '&force=1' : ''), undefined, waiting && waiting.signal);
+                         + '&a=' + encodeURIComponent(conn.app) + (where ? '&b=' + encodeURIComponent(where) : '') + (forced ? '&force=1' : ''),
+                         undefined, waiting && waiting.signal);
       } catch (e) {
         if (e && e.name === 'AbortError') continue; // asked to sync: ask again at once, with force
         await setStatus(e && e.refused ? 'library_refused' : 'library_unreachable');
@@ -233,11 +243,17 @@ async function pump(force) {
   }
 }
 
-// Every 30 seconds (Chrome 120 and later): starts the pump again when the worker slept or the library went away.
+// Every 30 seconds (Chrome 120 and later, Firefox): starts the pump again when this script slept or the library went
+// away.
 function schedule() { chrome.alarms.create('sync', {periodInMinutes: 0.5}); }
 chrome.runtime.onInstalled.addListener(() => { schedule(); pump(true); });
 chrome.runtime.onStartup.addListener(() => { schedule(); pump(false); });
 chrome.alarms.onAlarm.addListener(a => { if (a.name === 'sync') pump(false); });
+// A browser that lost the alarm (Firefox keeps none from one run to the next; an extension switched off and on again
+// starts with none) gets it back whenever this script starts.
+try {
+  chrome.alarms.get('sync').then(a => { if (!a) { schedule(); pump(false); } }, () => { /* no alarm to ask about */ });
+} catch (e) { /* no alarms to ask */ }
 // a store copy was just allowed to reach Canvas and the library: start at once rather than at the next alarm
 if (chrome.permissions && chrome.permissions.onAdded) chrome.permissions.onAdded.addListener(() => pump(true));
 // the toolbar popup asks for a sync

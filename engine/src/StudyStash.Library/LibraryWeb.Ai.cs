@@ -277,6 +277,16 @@ public sealed partial class LibraryWeb
         app.MapPost("/api/v2/ai/rewrite/{lecture}/use", Http.Handle(ctx => ApiAsync(ctx, () =>
             Task.FromResult(RewriteResult(() => Rewrites.Use((string)ctx.Request.RouteValues["lecture"]!))))));
 
+        // The student's own edit of the notes: based_on is the fingerprint of the notes it started from (none: save
+        // over whatever is there).
+        app.MapPost("/api/v2/ai/rewrite/{lecture}/edit", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string? markdown = body?["markdown"] is JsonValue mv && mv.TryGetValue(out string? text) ? text : null;
+            if (markdown is null) return Http.Detail(400, "what are the notes?");
+            return RewriteResult(() => Rewrites.Edit((string)ctx.Request.RouteValues["lecture"]!, markdown, Str(body, "based_on")));
+        })));
+
         app.MapGet("/api/v2/ai/access", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             await NoticeFunnelOffAsync(force: false);
@@ -296,13 +306,13 @@ public sealed partial class LibraryWeb
             return AiJson(ToolAccessJson());
         })));
 
-        // Claude on the web: Funnel on or off through the library, so the laptop and the library both can, and a
-        // Tailscale problem is part of the answer (shown where the switch is), not a refusal.
+        // Claude and ChatGPT on the web: Funnel on or off through the library, so the laptop and the library both can,
+        // and a Tailscale problem is part of the answer (shown where the switch is), not a refusal.
         app.MapPost("/api/v2/ai/access/web", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             var body = await Http.JsonBodyAsync(ctx.Request);
             if (body?["on"] is not JsonValue ov || !ov.TryGetValue(out bool on)) return Http.Detail(400, "on or off?");
-            if (on && cfg.PoolPassword.Length == 0) return Http.Detail(400, "Set a library password first, so only you can let Claude in.");
+            if (on && cfg.PoolPassword.Length == 0) return Http.Detail(400, "Set a library password first, so only you can let an AI app in.");
             var (url, problem) = await Task.Run(() => options.Reach.Set(ClaudeWeb.PortFor(cfg), internet: true, on));
             // Off with no Tailscale at all: nothing is on the internet, so there's nothing left to turn off.
             if (!on && problem?.Kind == ReachKind.NotInstalled) problem = null;

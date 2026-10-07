@@ -66,13 +66,20 @@ public sealed partial class NoteView : StackPanel
         set => SetValue(LinkHandlerProperty, value);
     }
 
-    /// <summary>What clicking a link does: a Canvas address opens in Chrome, where the student is signed in to
-    /// Canvas; anything else in the default browser. Tests swap it for one that records the address.</summary>
+    /// <summary>What clicking a link does: a Canvas address opens in the browser the student reads Canvas in, where
+    /// they're signed in to it; any other web page in the default browser. A link that isn't a web page or an email
+    /// address (a file, a program, another app's own kind of link) does nothing: a note's links were written by an
+    /// AI, a teacher or whoever wrote the page it came from. Tests swap it for one that records the address.</summary>
     public static Action<string> OpenLink { get; set; } = url =>
     {
-        if (Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Host.EndsWith(".instructure.com", StringComparison.OrdinalIgnoreCase)
-            && Chrome.Open(url) is null) return;
-        Dialogs.OpenUrl(url);
+        if (!Dialogs.IsWebLink(url)) return;
+        // Not on the page's own thread: finding the browser asks the system, and starting one takes a moment.
+        Task.Run(() =>
+        {
+            if (Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Host.EndsWith(".instructure.com", StringComparison.OrdinalIgnoreCase)
+                && Browsers.Open(Browsers.ForCanvas(), url) is null) return;
+            Dialogs.OpenUrl(url);
+        });
     };
 
     /// <summary>The class a section heading carries, and the one a table's header row carries: a page never ends

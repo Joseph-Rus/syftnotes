@@ -228,6 +228,26 @@ public static partial class AiWords
     [System.Text.RegularExpressions.GeneratedRegex(@"^#{1,6}\s*Summary\s*$", System.Text.RegularExpressions.RegexOptions.IgnoreCase)]
     private static partial System.Text.RegularExpressions.Regex HeadingSummary();
 
+    /// <summary>Save found other notes on the library than the ones the edit started from: nothing was saved, and Save
+    /// again is the student's choice.</summary>
+    public const string EditNotesChanged = "These notes changed while you were editing: their diagrams arrived, or they were changed on another device or in another app. "
+        + "Save again to replace them with yours, or Cancel to see them.";
+
+    /// <summary>Save couldn't reach the library.</summary>
+    public const string EditOffline = "Your library isn't answering, so nothing was saved. What you typed is still here.";
+
+    /// <summary>The library is too old to take an edit.</summary>
+    public const string EditNeedsNewerLibrary = "Your library runs an older Study Stash. Update it to edit notes here.";
+
+    /// <summary>Why the library wouldn't save an edit, as the editor says it (what was typed stays).</summary>
+    public static string EditRefused(int status, string message) => status switch
+    {
+        409 => "Your library is writing this lecture's notes right now. Save again when they're done.",
+        503 => "Your library couldn't save this note's file: another app may have it open. Close it there, then save again.",
+        _ when message.Length > 0 => char.ToUpperInvariant(message[0]) + message[1..],
+        _ => "Your library couldn't save these notes.",
+    };
+
     /// <summary>The "Rewrite notes with" menu's row subtitle: the writer says so; a signed-out row says so; every
     /// other usable row says nothing extra (unlike "Answer with", nobody here is "the default").</summary>
     public static string RewriteEngineSubtitle(string id, string state, bool isWriter) =>

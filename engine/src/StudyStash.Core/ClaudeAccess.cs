@@ -7,8 +7,8 @@ using StudyStash.Core.Ai;
 
 namespace StudyStash.Core;
 
-/// <summary>An app that may sign in to the library (claude.ai, or Claude Code): one that registered (OAuth dynamic
-/// client registration), or one whose client_id is the https address of a document describing it (CIMD).</summary>
+/// <summary>An app that may sign in to the library (claude.ai, ChatGPT, or Claude Code): one that registered (OAuth
+/// dynamic client registration), or one whose client_id is the https address of a document describing it (CIMD).</summary>
 public sealed class ClaudeClient
 {
     public required string ClientId { get; init; }
@@ -73,10 +73,11 @@ public sealed class ClaudeAccess
 
     /// <summary>Shown for a client_id nobody knows, or a redirect_uri that doesn't match one on file: it never says
     /// which, so a guess at a client_id can't be confirmed by the wording.</summary>
-    public const string UnknownLinkMessage = "This sign-in link has expired or didn't come from Claude. Go back to Claude and choose Connect again.";
+    public const string UnknownLinkMessage = "This sign-in link has expired or didn't come from Claude or ChatGPT. Go back to the app and connect again.";
 
     /// <summary>Shown when a client's published identity (CIMD) couldn't be read or doesn't check out: the document
-    /// didn't fetch, wasn't JSON, claimed a different client_id, listed no good redirect_uris, or asked for a secret.</summary>
+    /// didn't fetch, wasn't JSON, claimed a different client_id, listed no good redirect_uris, or can only sign in
+    /// with a secret or a signature (this library takes public clients: PKCE, nothing else).</summary>
     public const string CimdInvalidMessage = "Study Stash couldn't confirm which app this is. Go back and try again.";
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
 
@@ -312,7 +313,11 @@ public sealed class ClaudeAccess
         if (doc is null || Str("client_id") != clientId) return (null, CimdInvalidMessage);
         var uris = (doc["redirect_uris"] as System.Text.Json.Nodes.JsonArray ?? []).Select(n => n is System.Text.Json.Nodes.JsonValue v && v.TryGetValue(out string? x) ? x : "").ToList();
         if (uris.Count == 0 || !uris.All(GoodRedirect)) return (null, CimdInvalidMessage);
-        if (doc["token_endpoint_auth_method"] is not null && Str("token_endpoint_auth_method") != "none") return (null, CimdInvalidMessage);
+        // A public client: it says "none", says nothing, or (ChatGPT's document) prefers a signature but lists "none"
+        // among the ways it can sign in, which is the one this library advertises, so that's the one it uses.
+        bool canBePublic = doc["token_endpoint_auth_methods_supported"] is System.Text.Json.Nodes.JsonArray ways
+            && ways.Any(n => n is System.Text.Json.Nodes.JsonValue v && v.TryGetValue(out string? x) && x == "none");
+        if (doc["token_endpoint_auth_method"] is not null && Str("token_endpoint_auth_method") != "none" && !canBePublic) return (null, CimdInvalidMessage);
         string name = (Str("client_name") ?? "").Trim();
         return (new ClaudeClient { ClientId = clientId, Name = name.Length > 0 ? Py.Head(name, 80) : host, RedirectUris = uris, Created = Now, Host = host }, null);
     }

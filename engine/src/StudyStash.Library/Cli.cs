@@ -21,7 +21,7 @@ public static class Cli
         + "       | doctor [--role server|client] | update [--check] [--force]\n"
         + "       | autostart install|uninstall|status --role server | version\n"
         + "       | mcp [--client claude-desktop|claude-code|codex|gemini]   (the MCP server for AI apps, over stdin and stdout)\n"
-        + "       | extension-zip OUT.zip   (the Canvas extension, packed for the Chrome Web Store)\n"
+        + "       | extension-zip [--firefox] OUT.zip   (the Canvas extension, packed for the Chrome Web Store, or for Firefox)\n"
         + "       | ai [use PROVIDER [--job notes|sort|ask|agent] [--model M] | test [PROVIDER] | ask QUESTION]   (each takes --home DIR)";
 
     /// <summary>The app's login item for a settings folder, handed in by the app's own Main: the library it runs then
@@ -119,7 +119,7 @@ public static class Cli
             "update" => await Update(),
             "autostart" => AutostartCommand(),
             "version" => Print(Engine.Version),
-            "extension-zip" => ExtensionZip(words.ElementAtOrDefault(1)),
+            "extension-zip" => ExtensionZip(words.ElementAtOrDefault(1), Flag("--firefox")),
             _ => Print(Usage, 2),
         };
 
@@ -132,14 +132,15 @@ public static class Cli
             return File.Exists(cfg.ConfigPath) ? ($"http://127.0.0.1:{cfg.WebPort}", cfg.PoolPassword) : (null, "");
         }
 
-        // The zip to upload to the Chrome Web Store (docs/chrome-web-store.md): the extension without a connection, which
-        // a student's copy gets by pasting a code from Study Stash.
-        static int ExtensionZip(string? output)
+        // The zip to upload to the Chrome Web Store (docs/chrome-web-store.md), or with --firefox the one Mozilla signs
+        // (docs/firefox-add-on.md): the extension without a connection, which a student's copy gets by pasting a code
+        // from Study Stash.
+        static int ExtensionZip(string? output, bool firefox)
         {
-            if (output is null) return Print("usage: studystash extension-zip OUT.zip", 2);
+            if (output is null) return Print("usage: studystash extension-zip [--firefox] OUT.zip", 2);
             string path = Path.GetFullPath(Py.ExpandUser(output));
-            var names = StudyStash.Core.Canvas.Extension.PackForStore(path);
-            return Print($"Packed Study Stash for Canvas {StudyStash.Core.Canvas.Extension.Version()} for the Chrome Web Store: {path}\n  {string.Join(", ", names)}");
+            var names = firefox ? StudyStash.Core.Canvas.Extension.PackForFirefox(path) : StudyStash.Core.Canvas.Extension.PackForStore(path);
+            return Print($"Packed Study Stash for Canvas {StudyStash.Core.Canvas.Extension.Version()} for {(firefox ? "Firefox" : "the Chrome Web Store")}: {path}\n  {string.Join(", ", names)}");
         }
 
         static int Print(string text, int code = 0)

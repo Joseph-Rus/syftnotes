@@ -295,10 +295,10 @@ public sealed partial class CanvasClassModel(CanvasContext context) : Observable
                 if (item.ExternalUrl is { Length: > 0 } externalUrl) context.Actions.OpenUrl(externalUrl);
                 break;
             case "file":
-                // The library's copy when the sync saved one; otherwise the file itself on Canvas, in the Chrome
+                // The library's copy when the sync saved one; otherwise the file itself on Canvas, in the browser
                 // that's signed in to it (a slide deck too big to save, or one not synced yet).
                 if (item.Local is not null && await OpenSavedFileAsync(item.Local.Length > 0 ? item.Local : item.Title)) break;
-                if (item.Url is { Length: > 0 } fileUrl) context.Actions.OpenInChrome(fileUrl);
+                if (item.Url is { Length: > 0 } fileUrl) context.Actions.OpenInBrowser(fileUrl);
                 break;
             default:
                 if (item.Url is { Length: > 0 } url) context.Actions.OpenUrl(url);

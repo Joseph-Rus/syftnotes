@@ -118,7 +118,7 @@ public static partial class Shell
         Wire();
         host.Start();
         _ = SuggestLighterModelAsync();
-        AppUpdates.Start(host, stop.Token, SayUpdate);
+        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() => panel.UpdateVersion = updater.Found is { } r ? string.Join('.', r.Version) : null);
         MakeTray();
@@ -195,6 +195,18 @@ public static partial class Shell
     {
         if (quitting) return;
         Program.Log($"[app] another copy said \"{message}\"");
+        // A click on one of Windows' notifications. One this run of the app said: what the click does is that notice's
+        // to say (it may open nothing at all). One from before (it sat in Windows' list while the app restarted): the
+        // library opens, as it does for any second copy.
+        if (NoticeLinks.IsWord(message))
+        {
+            if (OperatingSystem.IsWindows() && NoticeLinks.Parse(message) is { } click && systemNotices?.Knows(click.Id) == true)
+            {
+                WinNotifications.Opened(message);
+                return;
+            }
+            message = "show";
+        }
         if (!host.Settings.SetupDone) ShowSetup();
         else if (message == "record") ToggleRecording();
         // "--show panel" / "--show quick": open the dropdown or the quick panel without the menu bar or the shortcut
@@ -301,6 +313,8 @@ public static partial class Shell
         if (quitting) return;
         quitting = true;
         ticker?.Stop();
+        // What's typed in a lecture's notes and not saved is written down: it's back in its editor next time.
+        KeepDrafts();
         CloseAllToasts();
         StopCanvas();
         stop.Cancel();
@@ -1223,10 +1237,15 @@ public static partial class Shell
     /// The self-test finds no AI's CLI at all, so it never installs one or reaches an account.</summary>
     static GuidedSetupModel MakeGuided(SetupModel model)
     {
+        // The ChatGPT and Claude apps on this computer, for the card that lets one read the library (in a self-test this
+        // reads and writes nothing real: ClaudeSetup.ThisComputer sees to that).
+        var aiApps = ClaudeSetup.ThisComputer(host.Home);
         var services = new GuidedServices
         {
             Home = host.Home,
             Find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli),
+            AiApps = aiApps.DesktopStates,
+            ConnectAiApp = aiApps.Connect,
             OpenTerminal = (exe, args) =>
             {
                 try
@@ -1244,7 +1263,7 @@ public static partial class Shell
         return new GuidedSetupModel(model, services, () => host.Settings, host.Save);
     }
 
-    /// <summary>The Chrome helper card's Canvas connection, as the Canvas step makes it, started before the card shows.</summary>
+    /// <summary>The browser helper card's Canvas connection, as the Canvas step makes it, started before the card shows.</summary>
     static async Task<CanvasConnectModel?> SetupCanvasAsync(SetupModel model)
     {
         if (host.Remote() is null) return null;
@@ -1427,7 +1446,7 @@ public static partial class Shell
     /// to the menu bar otherwise.</summary>
     static void UpdateDock() =>
         Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
-            || canvasConnectWindow?.IsVisible == true));
+            || canvasConnectWindow?.IsVisible == true || browserChoiceWindow?.IsVisible == true));
 
     // --- keeping it all up to date ------------------------------------------------------------------------------------
 

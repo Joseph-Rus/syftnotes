@@ -93,6 +93,9 @@ public sealed class AppSettings
     public bool SupportAskDone { get; set; }
     /// <summary>The notes' diagrams have shown, once, how to explore one ("Click a box to follow its arrows").</summary>
     public bool DiagramHintSeen { get; set; }
+    /// <summary>The browser the student added the Canvas extension to on this computer ("Chrome", "Firefox"…): the
+    /// one Study Stash opens Canvas in, and offers first next time. "" until they've added it.</summary>
+    public string CanvasBrowser { get; set; } = "";
 
     public static string PathIn(string home) => System.IO.Path.Combine(home, "app.json");
 

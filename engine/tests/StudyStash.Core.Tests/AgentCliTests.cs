@@ -7,6 +7,31 @@ namespace StudyStash.Core.Tests;
 public class AgentCliTests
 {
     [Fact]
+    public void The_chatgpt_and_claude_apps_own_copies_are_found_so_a_student_with_the_app_installs_nothing()
+    {
+        using var dir = new TempDir();
+        string home = dir["home"], apps = dir["Applications"];
+        static void Program(string path)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, "");
+        }
+        Assert.Empty(AiProvider.DesktopAppDirs(home, apps)); // neither app: nothing to add
+
+        // ChatGPT carries Codex inside the app. Claude Desktop keeps Claude Code beside its settings, a folder per
+        // version: the newest is the one to run (2.1.288 over 2.1.99, which sorts after it as text).
+        string codex = Path.Combine(apps, "ChatGPT.app", "Contents", "Resources", "codex-cli", "CodexCLI.app", "Contents", "MacOS");
+        Program(Path.Combine(codex, "codex"));
+        string kept = Path.Combine(home, "Library", "Application Support", "Claude", "claude-code");
+        Program(Path.Combine(kept, "2.1.99", "aaaa", "claude.app", "Contents", "MacOS", "claude"));
+        string newest = Path.Combine(kept, "2.1.288", "bbbb", "claude.app", "Contents", "MacOS");
+        Program(Path.Combine(newest, "claude"));
+        Directory.CreateDirectory(Path.Combine(kept, "2.2.0", "cccc")); // a download that never finished: no program in it
+
+        Assert.Equal([codex, newest], AiProvider.DesktopAppDirs(home, apps));
+    }
+
+    [Fact]
     public void Each_installer_is_its_makers_documented_one_liner_over_https_for_this_account_alone()
     {
         Assert.Equal("curl -fsSL https://claude.ai/install.sh | bash", AgentCli.Claude.MacInstaller.Line);

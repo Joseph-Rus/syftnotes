@@ -54,6 +54,16 @@ public sealed partial class CardEntry : ChatEntry
         Kind = card.Kind;
         Arg = card.Arg;
         ModelId = card.Kind == "model_download" ? card.Arg : "";
+        // The helper card's heading names the browser, and the student can pick another in the card.
+        if (card.Kind == "chrome_helper" && owner.Setup.Canvas is { } canvas)
+        {
+            canvas.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(CanvasConnectModel.BrowserName)) return;
+                OnPropertyChanged(nameof(Title));
+                OnPropertyChanged(nameof(FoldedLine));
+            };
+        }
         Choice = card.Kind == "computer_setup" ? card.Arg switch
         {
             "laptop" => "laptop",
@@ -90,8 +100,9 @@ public sealed partial class CardEntry : ChatEntry
         "library_connection" => "Connect to your library",
         "microphone_check" => "Let Study Stash hear your lectures",
         "model_download" => ModelTitle,
-        "chrome_helper" => "Add Study Stash's helper to Chrome",
+        "chrome_helper" => $"Add Study Stash's helper to {Canvas?.BrowserName ?? "your browser"}",
         "course_picker" => "Pick your courses",
+        "ai_app" => $"Let {Arg} read your lectures?",
         "start_at_login" => "Start Study Stash when you log in?",
         "taskbar_tip" => "Keep Study Stash on the taskbar",
         _ => "You're set up",
@@ -102,8 +113,10 @@ public sealed partial class CardEntry : ChatEntry
     public string StartAtLoginBody => Setup.IsLibrary
         ? "Your library then starts by itself, so your laptop can always reach it and notes get written."
         : "Recommended: Study Stash then starts by itself, so your notes get written and Record is always one click away.";
+    /// <summary>The AI app card: <see cref="Arg"/> is the app, or both ("ChatGPT and Claude").</summary>
+    public string AiAppBody => $"Then you can ask {Arg} about your classes, and it answers from your own lectures and notes. It can only read them: nothing is changed or deleted.";
     public string TaskbarBody => "Windows tucks new icons away under ^. Select ^ in the taskbar corner, then drag the Study Stash icon down beside the clock.";
-    /// <summary>The Chrome helper card's Canvas connection (made when the AI offered it).</summary>
+    /// <summary>The browser helper card's Canvas connection (made when the AI offered it).</summary>
     public CanvasConnectModel? Canvas => Setup.Canvas;
     public bool HasOutcome => Outcome.Length > 0;
     public bool HasProblem => !string.IsNullOrEmpty(Problem);
@@ -114,6 +127,7 @@ public sealed partial class CardEntry : ChatEntry
     public bool IsModel => Kind == "model_download";
     public bool IsChrome => Kind == "chrome_helper";
     public bool IsCourses => Kind == "course_picker";
+    public bool IsAiApp => Kind == "ai_app";
     public bool IsStartAtLogin => Kind == "start_at_login";
     public bool IsTaskbar => Kind == "taskbar_tip";
     public bool IsFinish => Kind == "finish";

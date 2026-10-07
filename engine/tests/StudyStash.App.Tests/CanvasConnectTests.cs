@@ -2,15 +2,15 @@ using System.Net;
 using System.Text.Json;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
-using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
 
 public class CanvasConnectTests
 {
-    static CanvasConnectModel Model(FakeLibrary handler, string? home = null, List<(string What, string Arg)>? log = null, bool forSetup = false)
+    static CanvasConnectModel Model(FakeLibrary handler, string? home = null, List<(string What, string Arg)>? log = null, bool forSetup = false,
+        IReadOnlyList<Browser>? browsers = null, string? notInstalled = null, BrowserAdvice? advice = null)
     {
-        var context = CanvasFixtures.Context(handler, home, log);
+        var context = CanvasFixtures.Context(handler, home, log, browsers, notInstalled, advice);
         return new CanvasConnectModel(context, new CanvasWatch(context), forSetup);
     }
 
@@ -33,7 +33,7 @@ public class CanvasConnectTests
     [InlineData("""{"state": "chrome_away", "url": "https://canvas.test", "extension": {"seen": "2025-09-20T10:00:00Z", "connected": false, "key_matches": true}}""")]
     [InlineData("""{"state": "no_extension", "url": "https://canvas.test", "extension": {"seen": null, "connected": false, "key_matches": false, "last_seen": "2025-09-25T17:23:00Z"}}""")]
     [InlineData("""{"state": "connected", "url": "https://canvas.test", "extension": {"seen": "2025-09-25T17:23:00Z", "connected": false}}""")]
-    public async Task A_chrome_that_is_not_checking_in_now_with_the_current_key_opens_at_the_extension_step(string json)
+    public async Task A_browser_that_is_not_checking_in_now_with_the_current_key_opens_at_the_extension_step(string json)
     {
         var handler = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
         var m = Model(handler);
@@ -107,7 +107,7 @@ public class CanvasConnectTests
         Assert.Equal(2, m.Current);
         var sent = Assert.Single(handler.Requests, r => r.Method == "POST" && r.Path == "/api/v2/canvas");
         Assert.Equal("{\"url\":\"school.instructure.com\"}", sent.Body);
-        Assert.Empty(log); // Chrome opens only when Add to Chrome is pressed
+        Assert.Empty(log); // the browser opens only when Add to Chrome is pressed
         m.Dispose();
     }
 
@@ -137,9 +137,11 @@ public class CanvasConnectTests
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
 
         Assert.Equal(2, m.Current);
-        Assert.Equal("Chrome extension", m.Step2.Title);
-        Assert.True(m.ShowAddToChrome);
-        Assert.False(m.ShowChromeStatus);
+        Assert.Equal("Browser extension", m.Step2.Title);
+        Assert.Equal("Add to Chrome", m.AddLabel);
+        Assert.True(m.ShowAddToBrowser);
+        Assert.False(m.ShowBrowserStatus);
+        Assert.False(m.CanSwitchBrowser); // one browser here: nothing to switch to
         Assert.Empty(log);
         Assert.Equal(TimeSpan.FromSeconds(3), watch.NextDelay);
 
@@ -159,14 +161,16 @@ public class CanvasConnectTests
         var m = Model(handler, home: "the-home", log: log);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
 
-        await m.AddToChromeCommand.ExecuteAsync(null);
+        await m.AddToBrowserCommand.ExecuteAsync(null);
 
         string folder = Path.Combine("the-home", "chrome-extension");
         Assert.Equal(folder, m.ExtensionFolder);
-        Assert.Equal([("PrepareExtension", "test-key-abc123 https://school.instructure.com"), ("RevealFolder", folder), ("OpenChromeExtensions", "")], log);
-        Assert.True(m.AddedToChrome);
-        Assert.False(m.ShowAddToChrome); // the button gives way to the quiet links
-        Assert.True(m.WaitingForChrome);
+        Assert.Equal([("PrepareExtension", "test-key-abc123 https://school.instructure.com"), ("RevealFolder", folder), ("OpenExtensions", "Chrome"),
+            ("RememberBrowser", "Chrome")], log);
+        Assert.True(m.AddedToBrowser);
+        Assert.False(m.ShowAddToBrowser); // the button gives way to the quiet links
+        Assert.True(m.WaitingForBrowser);
+        Assert.Equal("Waiting for Chrome…", m.WaitingLabel);
         Assert.Equal(2, m.Current);
 
         log.Clear();
@@ -183,11 +187,131 @@ public class CanvasConnectTests
         var m = Model(handler, home: "the-home", log: log);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
 
-        await m.AddToChromeCommand.ExecuteAsync(null);
+        await m.AddToBrowserCommand.ExecuteAsync(null);
 
-        Assert.NotNull(m.ChromeError);
-        Assert.False(m.AddedToChrome);
+        Assert.NotNull(m.BrowserError);
+        Assert.False(m.AddedToBrowser);
         Assert.Empty(log);
+        m.Dispose();
+    }
+
+    [Fact]
+    public async Task A_browser_that_isnt_on_this_computer_is_said_and_the_button_stays()
+    {
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas", NoExtensionYet)
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var m = Model(handler, home: "the-home", notInstalled: Browsers.NotInstalled);
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+
+        await m.AddToBrowserCommand.ExecuteAsync(null);
+
+        Assert.Equal(Browsers.NotInstalled, m.BrowserError);
+        Assert.Contains("Chrome, Edge, Brave", m.BrowserError); // the browsers to choose from, not only Chrome
+        Assert.True(m.ShowAddToBrowser); // "Install one, then try again."
+        Assert.False(m.WaitingForBrowser);
+        m.Dispose();
+    }
+
+    /// <summary>A student who uses Safari is told the extension can't go in it and which browser Study Stash will use
+    /// (the one the step offers, also after they pick another); one with nothing that will do gets a way to Chrome.</summary>
+    [Fact]
+    public async Task A_usual_browser_that_cant_take_the_extension_is_said_with_the_one_to_use_or_where_to_get_one()
+    {
+        var log = new List<(string What, string Arg)>();
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas", NoExtensionYet)
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var m = Model(handler, home: "the-home", log: log, browsers: [Browsers.Chrome, Browsers.Edge], advice: new BrowserAdvice(Browsers.Safari, NoneHere: false));
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Assert.True(m.ShowAdvice);
+        Assert.Equal("Your usual browser, Safari, can’t run the Study Stash extension. Study Stash will use Chrome instead.", m.AdviceText);
+        Assert.False(m.ShowGetBrowser);
+        m.BrowserChoices[1].Pick.Execute(null);
+        Assert.EndsWith("Study Stash will use Edge instead.", m.AdviceText);
+        await m.AddToBrowserCommand.ExecuteAsync(null);
+        Assert.False(m.ShowAdvice); // added: the step is about Edge's own page now
+        m.Dispose();
+
+        // Nothing here will do: Chrome's download page is one click away, in whatever this computer opens links with.
+        log.Clear();
+        var bare = Model(handler, home: "the-home", log: log, notInstalled: Browsers.NotInstalled, advice: new BrowserAdvice(Browsers.Safari, NoneHere: true));
+        await bare.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Assert.True(bare.ShowGetBrowser);
+        Assert.EndsWith("Get Chrome, then press Add to Chrome.", bare.AdviceText);
+        bare.GetBrowserCommand.Execute(null);
+        Assert.Contains(("OpenUrl", Browsers.GetChrome), log);
+        await bare.AddToBrowserCommand.ExecuteAsync(null);
+        Assert.True(bare.ShowGetBrowser); // still not there: the way to it stays
+        bare.Dispose();
+
+        // The usual browser takes it: nothing to say.
+        var fine = Model(handler, home: "the-home");
+        Assert.False(fine.ShowAdvice);
+        fine.Dispose();
+    }
+
+    [Fact]
+    public async Task With_two_browsers_here_the_student_can_use_the_other_and_the_step_follows()
+    {
+        var log = new List<(string What, string Arg)>();
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas", NoExtensionYet)
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var m = Model(handler, home: "the-home", log: log, browsers: [Browsers.Chrome, Browsers.Edge]);
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Assert.Equal("Add to Chrome", m.AddLabel); // the one to use comes first
+        Assert.True(m.CanSwitchBrowser);
+        Assert.Equal(["Chrome", "Edge"], m.BrowserChoices.Select(c => c.Name));
+        Assert.Empty(log);
+
+        m.BrowserChoices[1].Pick.Execute(null);
+
+        Assert.Equal("Add to Edge", m.AddLabel);
+        Assert.Contains("opens Edge’s extensions page", m.BrowserHelp);
+        Assert.True(m.IsChromium); // Edge loads the folder like Chrome: the same three pictures
+        Assert.Equal([false, true], m.BrowserChoices.Select(c => c.Current));
+        Assert.Equal([("RememberBrowser", "Edge")], log); // the one Study Stash opens Canvas in from now on
+
+        log.Clear();
+        await m.AddToBrowserCommand.ExecuteAsync(null);
+        Assert.Contains(("OpenExtensions", "Edge"), log);
+        Assert.Equal("Waiting for Edge…", m.WaitingLabel);
+        Assert.Equal("Open Edge extensions", m.OpenExtensionsLabel);
+        m.Dispose();
+    }
+
+    [Fact]
+    public async Task Firefox_shows_the_code_and_opens_the_add_on_and_never_a_folder()
+    {
+        var log = new List<(string What, string Arg)>();
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas", NoExtensionYet)
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var m = Model(handler, home: "the-home", log: log, browsers: [Browsers.Firefox]);
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Assert.True(m.IsFirefox);
+        Assert.Equal("Add to Firefox", m.AddLabel);
+        Assert.Equal("In Firefox, click Add when it asks to add Study Stash for Canvas.", m.FirefoxStep1);
+
+        await m.AddToBrowserCommand.ExecuteAsync(null);
+
+        // The add-on, in Firefox; nothing written or shown on this computer.
+        Assert.Equal([("OpenAddOn", "Firefox"), ("RememberBrowser", "Firefox")], log);
+        Assert.Null(m.ExtensionFolder);
+        Assert.False(m.ShowFolderLinks);
+        Assert.True(m.ShowAddOnLink);
+        // The code to paste connects to the library as this computer reaches it, with the extension's key and the school.
+        Assert.True(m.ShowCode);
+        Assert.Equal(new StudyStash.Core.Canvas.ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"),
+            StudyStash.Core.Canvas.Extension.ReadConnectionCode(m.ConnectionCode));
+        Assert.True(m.WaitingForBrowser);
+        Assert.Equal("Waiting for Firefox…", m.WaitingLabel);
+
+        log.Clear();
+        m.CopyCodeCommand.Execute(null);
+        Assert.Equal([("Copy", m.ConnectionCode)], log);
+        Assert.Equal("Copied", m.CopyLabel);
         m.Dispose();
     }
 
@@ -204,16 +328,16 @@ public class CanvasConnectTests
         var watch = new CanvasWatch(context);
         var m = new CanvasConnectModel(context, watch);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
-        await m.AddToChromeCommand.ExecuteAsync(null);
+        await m.AddToBrowserCommand.ExecuteAsync(null);
         await Task.Delay(40, TestContext.Current.CancellationToken); // the hurried watch asks at once: still waiting
-        Assert.True(m.WaitingForChrome);
+        Assert.True(m.WaitingForBrowser);
 
         handler.Json(HttpMethod.Get, "/api/v2/canvas/state", "state-connected"); // Chrome loads the extension
         await watch.RefreshAsync(TestContext.Current.CancellationToken); // the library now says "connected"
         await Task.Delay(40, TestContext.Current.CancellationToken); // Changed fires the advance without awaiting it
 
-        Assert.True(m.ChromeConnected);
-        Assert.False(m.WaitingForChrome);
+        Assert.True(m.BrowserConnected);
+        Assert.False(m.WaitingForBrowser);
         Assert.Equal("Connected", m.Step2.Summary);
         Assert.Equal("Found 4 courses. Tick the ones to bring in.", m.CoursesSay); // straight on to finding courses
         Assert.Equal(3, m.Current);
@@ -222,7 +346,7 @@ public class CanvasConnectTests
     }
 
     [Fact]
-    public async Task A_library_that_says_a_chrome_is_connected_is_believed_before_its_state_catches_up()
+    public async Task A_library_that_says_a_browser_is_connected_is_believed_before_its_state_catches_up()
     {
         var handler = new FakeLibrary()
             .Json(HttpMethod.Get, "/api/v2/canvas/state", "state-no-extension")
@@ -235,7 +359,7 @@ public class CanvasConnectTests
         await watch.RefreshAsync(TestContext.Current.CancellationToken);
         await Task.Delay(40, TestContext.Current.CancellationToken);
 
-        Assert.True(m.ChromeConnected);
+        Assert.True(m.BrowserConnected);
         Assert.Equal(3, m.Current);
         m.Dispose();
     }
@@ -253,7 +377,7 @@ public class CanvasConnectTests
 
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-connected"), [], TestContext.Current.CancellationToken);
 
-        Assert.Equal(["School address", "Chrome extension", "Your courses"], m.Steps.Select(s => s.Title));
+        Assert.Equal(["School address", "Browser extension", "Your courses"], m.Steps.Select(s => s.Title));
         Assert.False(m.ShowMatchAndSync);
         Assert.True(m.AllDone);
         Assert.All(m.Steps, s => Assert.True(s.IsDone));
@@ -264,16 +388,17 @@ public class CanvasConnectTests
     }
 
     [Fact]
-    public async Task Signed_out_shows_the_sign_in_line_and_opens_canvas_in_chrome()
+    public async Task Signed_out_shows_the_sign_in_line_and_opens_canvas_in_the_browser()
     {
         var log = new List<(string What, string Arg)>();
         var m = Model(new FakeLibrary(), log: log);
 
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-signed-out"), [], TestContext.Current.CancellationToken);
         Assert.True(m.SignedOut);
+        Assert.Equal("Sign in to Canvas in Chrome. Study Stash looks again by itself once you have.", m.SignInHelp); // the browser that checked in
 
         m.OpenCanvasCommand.Execute(null);
-        Assert.Contains(log, l => l.What == "OpenInChrome" && l.Arg == "https://school.instructure.com");
+        Assert.Contains(log, l => l.What == "OpenInBrowser" && l.Arg == "https://school.instructure.com");
     }
 
     [Fact]
@@ -409,60 +534,5 @@ public class CanvasConnectTests
         Assert.True(skipped);
         Assert.True(back);
         Assert.True(finished);
-    }
-
-    // ---- Chrome.cs: never launches anything real in a test ----
-
-    [Fact]
-    public void Chrome_reports_when_nothing_could_be_started()
-    {
-        Assert.Equal(Chrome.NotInstalled, Chrome.Open(null, (_, _, _) => null, () => @"C:\Chrome\chrome.exe"));
-        // Started, but it said it couldn't (a Mac with no Chrome: `open -a` exits 1).
-        Assert.Equal(Chrome.NotInstalled, Chrome.Open(null, (_, _, _) => new ProcResult(1, ""), () => @"C:\Chrome\chrome.exe"));
-    }
-
-    [Fact]
-    public void Chrome_that_windows_cant_find_is_said_without_starting_anything()
-    {
-        if (!OperatingSystem.IsWindows()) return; // Windows looks for chrome.exe first; a Mac asks `open -a`
-        bool ran = false;
-        Assert.Equal(Chrome.NotInstalled, Chrome.Open("chrome://extensions", (_, _, _) =>
-        {
-            ran = true;
-            return new ProcResult(0, "");
-        }, () => null));
-        Assert.False(ran);
-    }
-
-    [Fact]
-    public void Chrome_asks_for_the_url_it_was_given()
-    {
-        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsWindows()) return; // the app opens Chrome on a Mac or Windows
-        string? exe = null;
-        IReadOnlyList<string>? args = null;
-        string? result = Chrome.Open("https://school.instructure.com", (e, a, _) =>
-        {
-            exe = e;
-            args = a;
-            return new ProcResult(0, "");
-        }, () => @"C:\Program Files\Google\Chrome\Application\chrome.exe");
-
-        Assert.Null(result);
-        Assert.NotNull(exe);
-        Assert.Contains("https://school.instructure.com", args!);
-    }
-
-    [Fact]
-    public void Chrome_extensions_opens_the_extensions_page()
-    {
-        if (!OperatingSystem.IsMacOS() && !OperatingSystem.IsWindows()) return; // the app opens Chrome on a Mac or Windows
-        IReadOnlyList<string>? args = null;
-        Chrome.OpenExtensions((_, a, _) =>
-        {
-            args = a;
-            return new ProcResult(0, "");
-        }, () => @"C:\Program Files\Google\Chrome\Application\chrome.exe");
-
-        Assert.Contains("chrome://extensions", args!);
     }
 }

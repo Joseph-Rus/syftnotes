@@ -143,6 +143,12 @@ public class SettingsAccessTests
             Assert.Equal("Window", window.Header);
             Assert.Equal(["Minimize", "Zoom", "Close", "Study Stash library", "Settings…"], window.Menu!.Items.OfType<NativeMenuItem>().Where(i => i is not NativeMenuItemSeparator).Select(i => i.Header));
             Assert.Equal(new KeyGesture(Key.M, KeyModifiers.Meta), window.Menu.Items.OfType<NativeMenuItem>().First().Gesture);
+            // A Mac's menu bar keeps a closed window's menus for as long as the app runs: closed, the window's are
+            // emptied, so their items (and each one's hold on the system's own) are let go.
+            w.Show();
+            Assert.Single(bar.Items);
+            w.Close();
+            Assert.Empty(bar.Items);
         }
 
         var floating = new Window();

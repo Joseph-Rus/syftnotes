@@ -57,6 +57,42 @@ public class IdleCostTests
     }
 
     [AvaloniaFact]
+    public void A_spinner_in_a_window_that_closes_stops_for_good()
+    {
+        // A window that closes is hidden first and taken apart after, and a spinner taken apart counted as seen again:
+        // its timer started with nothing left listening to stop it, whether it was showing or hidden when the window
+        // closed. The running timer kept the spinner, and the spinner the whole closed window, for as long as the app
+        // ran: setup's window after a first run (about 20 MB), and Connect Canvas's every time it was opened (about 6).
+        string? still = Environment.GetEnvironmentVariable("STUDYSTASH_STILL");
+        Environment.SetEnvironmentVariable("STUDYSTASH_STILL", null); // other tests' pictures set it for the whole run
+        try
+        {
+            foreach (bool showing in new[] { true, false })
+            {
+                var spinner = new StudyStash.App.Controls.Spinner { Width = 12, Height = 12 };
+                var dot = new PulseDot { Width = 8, Height = 8 };
+                var row = new StackPanel { Children = { spinner, dot }, IsVisible = showing };
+                var w = Show(row);
+                Assert.Equal(showing, spinner.Turning);
+                Assert.Equal(showing, dot.Breathing);
+                w.Close();
+                Dispatcher.UIThread.RunJobs();
+                Assert.False(spinner.Turning);
+                Assert.False(dot.Breathing);
+                // What the window showed goes on changing after it has gone (a check that finishes, a step that moves on).
+                row.IsVisible = !showing;
+                row.IsVisible = showing;
+                Assert.False(spinner.Turning);
+                Assert.False(dot.Breathing);
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("STUDYSTASH_STILL", still);
+        }
+    }
+
+    [AvaloniaFact]
     public void The_recording_dot_breathes_only_while_it_can_be_seen_and_in_the_same_slow_breath()
     {
         var dot = new PulseDot { Width = 8, Height = 8 };

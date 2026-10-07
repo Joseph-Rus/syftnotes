@@ -82,7 +82,14 @@ laptop                                          library (a Mac mini, say — any
    `NoteView`, which keeps every unchanged block (a diagram's pins and folds) and the reader's place
    (`NoteView.HoldPlace`). The laptop sees them the same way, over the library's API; the phone and
    Ask read the notes afresh. **Rewrite notes with** (`Rewrites`) writes the draft without diagrams
-   (`AiJobs.WriteNotesPlannedAsync`) and queues them when it's used.
+   (`AiJobs.WriteNotesPlannedAsync`) and queues them when it's used. **Edit** turns the notes on the
+   page into their Markdown, each diagram, plot and drawing folded to one line (`NoteEdit`: move the
+   line and it moves, delete it and it goes). Save posts them to
+   `POST /api/v2/ai/rewrite/{id}/edit` with the fingerprint of the notes the edit started from
+   (`based_on`); `Store.EditNotes` saves them (the note file written afresh, search and Ask at once,
+   their writer still named) unless other notes are there by now (412: their diagrams arrived, or
+   another device changed them), when the editor says so and Save again replaces them. Unsaved
+   typing stays through a reload of the page and a look at another lecture, until the app quits.
 6. **Read it.** `studystash mcp` (stdio, for Claude Code or Claude Desktop on the library's own
    computer) and the HTTP + OAuth 2.1 door for claude.ai both read the same library through
    `ClaudeTools`, so Claude can search lectures, read one, and read Canvas.
@@ -107,6 +114,39 @@ The library installs itself as this computer's own background service — `com.s
 on a Mac (launchd), the Windows Startup folder, or systemd `--user` on Linux — so it comes back
 after a restart. Setting it up again stops the copy already running first, so only one library ever
 runs on a computer.
+
+## Notifications
+
+What the app says (a lecture filed, a recording that paused by itself, Canvas's news, an update) goes through one
+place, `Shell.Notify`, as a `Notice`.
+
+- **On a Mac they're the system's own.** `MacNotifications` hands each one to Notification Center
+  (`UNUserNotificationCenter`, spoken to from C#), and macOS shows it its way: its look, its corner, how long it
+  stays, the list of earlier ones, Do Not Disturb and Focus. Study Stash adds only the words and, where a notice has
+  one, its button; a click on the notification does what the button does. Nothing of Study Stash's is drawn on one
+  (no picture, no sound). The icon macOS puts beside it is the app's own, which is macOS's doing and can't be left
+  off.
+- **macOS asks once** whether to allow them, the first time something is said. Until that's answered a notice waits
+  a few seconds, then shows as one of the app's own cards so it isn't lost (`SystemNotices`), and the ones after it
+  don't wait at all. "Don't Allow" (or turning them off in System Settings → Notifications) means the ones that only
+  tell (a lecture filed) aren't shown: it's the student's choice. One that needs them (a recording that paused by
+  itself, a problem with its fix) still shows, as the app's own card.
+- **Where macOS won't have them, the app's own cards say it** (`ToastShelf`, a plain panel with no picture): macOS
+  refuses a copy that isn't a signed app in a normal place (opened from its disk image, run from a build or
+  temporary folder), and a self-test never has macOS ask anything.
+- **On Windows they're Windows' own too**, for the installed app in its usual settings folder. `WinNotifications`
+  speaks to Windows' notification interfaces (Windows.UI.Notifications) from C#, their ids and method order checked
+  against Windows' own metadata. An app that isn't a Store package gets notifications by saying who it is in the
+  registry, which the app does for this account the first time it has something to say (its name and icon under
+  `HKCU\Software\Classes\AppUserModelId\StudyStash.App`); Windows shows that name and icon along the top, as it
+  does for any app, and nothing else of Study Stash's (no picture in it, no sound). A click on one, or on its button,
+  opens a `studystash:` link (`NoticeLinks`): Windows starts a second copy with `--open LINK`, which hands the running
+  app a word and goes, the way `--show` does. Only that one exact link shape means anything. Windows asks nobody's
+  leave first; notifications turned off for Study Stash (or altogether) in Windows' settings is treated as on a Mac,
+  and one Windows won't take is shown as the app's own card and noted in the log.
+  Setup.exe's uninstaller takes the registry keys out. A build run from its folder, or a second profile, keeps the
+  app's own cards: the link has to open the installed program.
+- One that says something is still so (the lecture is paused) is taken down when it no longer is.
 
 ## Installers and updates
 
@@ -206,8 +246,9 @@ project or its author.
   and changes all of it over `/api/v2/ai/engines` and `/api/v2/ai/defaults` (`rich`, `rich_diagrams`,
   `rich_plots`, `rich_drawings`, `speed`; `AiOverview.Rich` and `.Speed`, absent from an older library, whose
   rows the pane then hides), and the library's own web settings page has the same switches.
-- **Canvas** (`Core/Canvas`): a small Chrome extension (`extension/`, embedded in the engine and
-  written out for Chrome to load) is a read-only fetch proxy. It asks the library for work
+- **Canvas** (`Core/Canvas`): a small browser extension (`extension/`, embedded in the engine and
+  written out for Chrome or a browser built on it to load; packed for Firefox, `docs/firefox-add-on.md`)
+  is a read-only fetch proxy. It asks the library for work
   (`/api/v2/canvas/work`) with its own key, fetches Canvas URLs with the browser's own session, and
   posts the answers back — never a Canvas API token, which many schools disable. The sync is a
   persisted job queue; a read an AI asks for (the MCP Canvas tools) jumps the queue.

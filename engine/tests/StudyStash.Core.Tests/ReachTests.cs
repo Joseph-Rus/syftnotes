@@ -437,7 +437,7 @@ public class ReachTests
 
         var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.SetWebAsync(true));
         Assert.Equal(400, refused.Status);
-        Assert.Equal("Set a library password first, so only you can let Claude in.", refused.Message);
+        Assert.Equal("Set a library password first, so only you can let an AI app in.", refused.Message);
         Assert.Equal(0, ran);
         Assert.False((await remote.AccessAsync())!.Web!.HasPassword);
     }

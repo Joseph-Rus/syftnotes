@@ -11,7 +11,7 @@ namespace StudyStash.App.Tests;
 /// The laptop's whole Canvas setup in a real Chrome, against a library that has never synced: the app's own connect
 /// steps (its <see cref="CanvasClient"/> over HTTP with the library password), the extension folder the laptop app
 /// makes pointing at the library as another computer, Chrome for Testing signed in to a pretend Canvas, then Find my
-/// courses, matching and a sync, and every Canvas screen's read afterwards. Skipped unless STUDYSTASH_E2E_CHROME is set
+/// courses, bringing them in and a sync, and every Canvas screen's read afterwards. Skipped unless STUDYSTASH_E2E_CHROME is set
 /// (engine/tests/extension-e2e.sh runs it).
 /// </summary>
 [Collection("LaptopChromeE2E")]
@@ -44,9 +44,11 @@ public sealed class LaptopChromeE2ETests
         // The laptop app: its client reads the library over HTTP; its extension folder is made the way
         // CanvasContext.For makes it, pointing Chrome at the library by the laptop's address for it.
         var actions = new CanvasActions(
-            OpenUrl: _ => { }, OpenInChrome: _ => { }, OpenChrome: () => { }, OpenChromeExtensions: () => { }, RevealFolder: _ => { },
+            OpenUrl: _ => { }, OpenInBrowser: _ => { }, OpenBrowser: () => { }, Browsers: () => [Browsers.Chrome], RememberBrowser: _ => { },
+            OpenExtensions: _ => null, OpenAddOn: _ => null, RevealFolder: _ => { },
             OpenFile: _ => { },
-            PrepareExtension: (key, canvasUrl) => Extension.Ensure(Extension.Folder(laptopHome), libraryAsTheLaptopSeesIt, key, canvasUrl).Path);
+            PrepareExtension: (key, canvasUrl) => Extension.Ensure(Extension.Folder(laptopHome), libraryAsTheLaptopSeesIt, key, canvasUrl).Path,
+            Copy: _ => { });
         var context = rig.Context() with { Actions = actions, Home = laptopHome };
         var client = context.Client!;
         var watch = new CanvasWatch(context);
@@ -61,28 +63,36 @@ public sealed class LaptopChromeE2ETests
         await m.ContinueCommand.ExecuteAsync(null);
         Assert.Null(m.SchoolError);
         Assert.Equal(2, m.Current);
-        Assert.True(Extension.Ready(m.ExtensionFolder!), "the laptop app didn't make the extension's folder");
+        // The laptop's own folder, made the way Add to Chrome makes it for a library on another computer. (The rig's
+        // library answers on 127.0.0.1, so the button itself would take the library's own folder, which points at a
+        // library on this computer's usual port, not at the rig.)
+        var made = (await client.ExtensionAsync(stop))!;
+        string folder = actions.PrepareExtension(made.Key, made.Canvas);
+        Assert.True(Extension.Ready(folder), "the laptop app didn't make the extension's folder");
+        Assert.Equal(libraryAsTheLaptopSeesIt, Extension.Connection(folder)?.App);
 
-        using var chrome = ChromeRunner.Start(m.ExtensionFolder!, rig.Scratch("chrome-profile"), canvas.Url + "/login/e2e",
+        using var chrome = ChromeRunner.Start(folder, rig.Scratch("chrome-profile"), canvas.Url + "/login/e2e",
             CanvasServer.Host, CanvasServer.OtherHost, LibraryHost);
 
-        // Chrome checks in with the library's key: the extension step moves on by itself, Find my courses runs, and the
-        // steps land on matching each class to a course.
+        // Chrome checks in with the library's key: the extension step moves on by itself and Find my courses runs,
+        // offering both courses (this term's, so both ticked).
         await Until(async () =>
         {
             await watch.RefreshAsync(stop);
-            return m.Current == 4;
-        }, "the connect steps to reach matching", 90, chrome);
-        Assert.Equal("Found 2 courses.", m.CoursesSay);
-        Assert.Equal(["4201", "4202"], m.Courses.Select(r => r.Selected?.Id));
+            return m.Current == 3 && m.Picker.HasCourses;
+        }, "the connect steps to find the courses", 90, chrome);
+        Assert.Equal("Found 2 courses. Tick the ones to bring in.", m.CoursesSay);
+        Assert.Equal(["4201", "4202"], m.Picker.Courses.Where(c => c.Ticked).Select(c => c.Id).Order());
         var extension = (await client.ExtensionAsync(stop))!;
         Assert.True(extension.Connected);
         Assert.True(extension.KeyMatches);
         Assert.Equal("another_computer", extension.SeenWhere);
-        TestContext.Current.SendDiagnosticMessage($"[e2e] matching {sw.Elapsed.TotalSeconds:0.0} s after the school's address");
+        // The extension says which browser it's in, and the app reads it from the library (Chrome for Testing calls itself Chromium).
+        Assert.Equal("Chromium", (await client.StateAsync(stop))!.Extension?.Browser);
+        TestContext.Current.SendDiagnosticMessage($"[e2e] courses found {sw.Elapsed.TotalSeconds:0.0} s after the school's address");
 
-        await m.LinkTheseCommand.ExecuteAsync(null);
-        Assert.Null(m.LinkError);
+        // Bringing them in links each to the class this library already has for it, so it's straight on to the sync.
+        await m.BringInCommand.ExecuteAsync(null);
         Assert.Equal(5, m.Current);
         await m.SyncNowCommand.ExecuteAsync(null);
         await Until(() => Task.FromResult(CanvasSettings.Load(rig.Home).LastDone.Length > 0), "the sync to finish", 120, chrome);

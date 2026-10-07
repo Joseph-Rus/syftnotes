@@ -281,4 +281,74 @@ public class AiRewriteTests
         Assert.Equal("failed", info.State);
         Assert.Contains("restarted", info.Error);
     }
+
+    [Fact]
+    public async Task An_edit_by_hand_becomes_the_notes_everywhere_and_never_saves_over_ones_it_hasnt_seen()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        Seed(store);
+        var ai = new AiJobs(cfg.Home) { Providers = _ => new ScriptedAi("claude", "Claude"), Checks = new FakeChecks().Build() };
+        await using var site = await Site(cfg, store, ai);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+        string was = Notes.Fingerprint("Old notes about cells.");
+
+        var saved = await remote.EditNotesAsync("lec-1", "Old notes about cells, and the mitochondria.\r\n", was);
+
+        Assert.Equal("Old notes about cells, and the mitochondria.", saved!.Current!.Markdown);
+        Assert.Equal("none", saved.State);
+        var row = store.Get("lec-1")!;
+        Assert.Equal("qwen3:8b", row.SummaryModel); // still its writer's
+        Assert.Equal(Store.Done, row.Status);
+        Assert.Contains("and the mitochondria.", File.ReadAllText(row.MdPath!));
+        Assert.Contains(store.SearchPassages("mitochondria"), hit => hit.Note.Id == "lec-1");
+
+        // Another edit that started from the notes as they were before that one: refused, and nothing changes.
+        var stale = await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.EditNotesAsync("lec-1", "Something else.", was));
+        Assert.Equal(412, stale.Status);
+        Assert.Equal("Old notes about cells, and the mitochondria.", store.Get("lec-1")!.SummaryMd);
+        await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.EditNotesAsync("lec-1", "  \n", null)); // empty notes aren't notes
+    }
+
+    [Fact]
+    public void An_edit_by_hand_keeps_what_was_written_in_the_note_file_in_another_app()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        Seed(store);
+        string path = store.Get("lec-1")!.MdPath!;
+        string Read() => File.ReadAllText(path).Replace("\r\n", "\n");
+        string Seen() => Notes.Fingerprint(store.Get("lec-1")!.SummaryMd!);
+
+        // Lines of the student's own in the file, outside its summary (written in Obsidian, say). An edit in Study
+        // Stash used to write the whole file afresh, and they were gone; now only the summary is replaced.
+        File.WriteAllText(path, Read().Replace("## Transcript", "## My questions\n\nAsk about the Krebs cycle.\n\n## Transcript"));
+        Assert.Equal(NotesEdited.Saved, store.EditNotes("lec-1", "## Cells\n\nOld notes about cells, and the mitochondria.", Seen()));
+        Assert.Contains("\n## Summary\n\n### Cells\n\nOld notes about cells, and the mitochondria.\n\n_Written by qwen3:8b", Read());
+        Assert.Contains("\n## My questions\n\nAsk about the Krebs cycle.\n\n## Transcript\n", Read());
+        // The file's summary is the library's notes, a heading level down: that's no edit of its own.
+        Assert.Equal(NotesEdited.Saved, store.EditNotes("lec-1", "## Cells\n\nNotes about cells, and the mitochondria.", Seen()));
+
+        // The summary itself changed in the file. The app never showed that (it shows the library's notes), so an edit
+        // that started from the ones before isn't saved over it: it becomes the library's notes, to be seen first.
+        File.WriteAllText(path, Read().Replace("and the mitochondria.", "and the mitochondria (the powerhouse)."));
+        Assert.Equal(NotesEdited.Changed, store.EditNotes("lec-1", "Something typed in the app.", Seen()));
+        Assert.Equal("## Cells\n\nNotes about cells, and the mitochondria (the powerhouse).", store.Get("lec-1")!.SummaryMd);
+        Assert.Contains("the powerhouse", Read());
+        Assert.Contains(store.SearchPassages("powerhouse"), hit => hit.Note.Id == "lec-1");
+
+        // Seen, then saved again: the student's choice. The file's own lines are still there.
+        Assert.Equal(NotesEdited.Saved, store.EditNotes("lec-1", "Something typed in the app.", Seen()));
+        Assert.Contains("\n## Summary\n\nSomething typed in the app.\n\n_Written by qwen3:8b", Read());
+        Assert.DoesNotContain("powerhouse", Read());
+        Assert.Contains("Ask about the Krebs cycle.", Read());
+
+        // A file with no summary left in it is kept exactly as it is; the app, search and Ask still get the edit.
+        File.WriteAllText(path, "Just my own page now.\n");
+        Assert.Equal(NotesEdited.Saved, store.EditNotes("lec-1", "Typed in the app again.", Seen()));
+        Assert.Equal("Just my own page now.\n", Read());
+        Assert.Equal("Typed in the app again.", store.Get("lec-1")!.SummaryMd);
+    }
 }

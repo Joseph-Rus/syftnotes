@@ -45,17 +45,25 @@ public static partial class Notes
     public static string? PlaceInFile(string text, IReadOnlyList<DesignedDiagram> diagrams)
     {
         var lines = text.Split('\n').ToList();
+        if (SummaryLines(lines) is not { } at) return null;
+        string section = string.Join("\n", lines.Skip(at.First).Take(at.End - at.First));
+        var (placed, which, _) = DiagramDesign.Place(section, diagrams);
+        if (which.Count == 0) return null;
+        lines.RemoveRange(at.First, at.End - at.First);
+        lines.InsertRange(at.First, placed.Split('\n'));
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>Where a note file's summary is: the lines after "## Summary", up to the one that says who wrote it (or
+    /// the next part of the file). Null for a file with no summary.</summary>
+    static (int First, int End)? SummaryLines(List<string> lines)
+    {
         int head = lines.FindIndex(l => l.TrimEnd() == "## Summary");
         if (head < 0) return null;
         int end = head + 1;
         while (end < lines.Count && !lines[end].StartsWith("_Written by ", StringComparison.Ordinal)
                && lines[end].TrimEnd() is not ("## Private notes" or "## Transcript")) end++;
-        string section = string.Join("\n", lines.Skip(head + 1).Take(end - head - 1));
-        var (placed, which, _) = DiagramDesign.Place(section, diagrams);
-        if (which.Count == 0) return null;
-        lines.RemoveRange(head + 1, end - head - 1);
-        lines.InsertRange(head + 1, placed.Split('\n'));
-        return string.Join("\n", lines);
+        return (head + 1, end);
     }
 }
 
