@@ -178,10 +178,10 @@ public sealed class SetupToolsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Courses_wait_for_chrome()
+    public async Task Courses_wait_for_the_browser()
     {
         await using var mcp = await Connect();
-        Assert.Contains("Chrome isn't connected yet", (await Call(mcp, "get_canvas_courses")).Text);
+        Assert.Contains("browser isn't connected yet", (await Call(mcp, "get_canvas_courses")).Text);
         Assert.True((await Call(mcp, "offer_course_picker")).Error);
         driver.Courses = new SetupCourses(true, [("Intro to Biology", "BIO 110")]);
         Assert.Contains("- Intro to Biology (BIO 110)", (await Call(mcp, "get_canvas_courses")).Text);

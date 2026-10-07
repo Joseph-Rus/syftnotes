@@ -190,8 +190,11 @@ error "Chrome isn't signed in to Canvas.", and a file read that Canvas refused s
 
 ## The extension
 
-`extension/` is a Manifest V3 extension (version **1.5**, Chrome 120 or later; it has its own version, separate from
-the app's). The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
+`extension/` is a Manifest V3 extension (version **1.6**; it has its own version, separate from the app's). The same
+files run in Chrome 120 or later and the browsers built on it (Edge, Brave, Arc, Opera, Vivaldi), which load the folder
+described here, and in Firefox 140 or later and the browsers built on it (Zen, LibreWolf, Waterfox), which take a
+packed, signed copy connected by a pasted code instead: [firefox-add-on.md](firefox-add-on.md). Wherever this page
+says Chrome, any browser of its family does the same. The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
 `Extension.Ensure(dir, library, key, canvasUrl)` writes it out as a folder for Chrome's "Load unpacked": the scripts
 (`background.js`, `connection.js`, the popup, the "S." icons that `macos/make_icon.swift out.chrome` draws), a manifest,
 and `config.json` + `config.js`. The library keeps its own folder (`Extension.Folder(home)`) ready by itself: on start, and whenever the Canvas address changes.
@@ -238,7 +241,7 @@ the Study Stash that wrote the folder speaks; the extension sends its own.
 
 | Who | What |
 |---|---|
-| extension → library | `GET /api/v2/canvas/work?v=<its version>&p=<its protocol>&wait=20&a=<the library address it uses>[&force=1]`, header `X-Study-Stash-Key` (or the library password). 1.2 and earlier send no `p`, read as 1; 1.3 sends no `wait` or `a`. The first ask each time the pump starts (installed, reloaded, the alarm after a failure) sends `wait=0` and is answered at once, so the status and badge are right straight away. `force=1` comes from a fresh start (installed, reloaded, the popup's "Sync Canvas now"). |
+| extension → library | `GET /api/v2/canvas/work?v=<its version>&p=<its protocol>&wait=20&a=<the library address it uses>[&b=<its browser>][&force=1]`, header `X-Study-Stash-Key` (or the library password). 1.2 and earlier send no `p`, read as 1; 1.3 sends no `wait` or `a`; 1.5 and earlier send no `b` ("Chrome", "Edge", "Brave", "Firefox": the library keeps it with each copy, cleaned to letters, digits and spaces, and names that browser in what it says). The first ask each time the pump starts (installed, reloaded, the alarm after a failure) sends `wait=0` and is answered at once, so the status and badge are right straight away. `force=1` comes from a fresh start (installed, reloaded, the popup's "Sync Canvas now"). |
 | library → extension | `{"jobs":[{"id","url","kind":"json\|text\|bytes"}], "hot": bool, "ext": "<the library's extension version>", "p": 3}`. With `p ≥ 3` and `wait`, the library **holds the request** until there is work (an AI's read or Find my courses is queued, someone asks for a sync, a sync falls due, Canvas's pause runs out: it looks again every 5 s) or `min(wait, 25)` seconds pass (Chrome drops a fetch with no answer after 30), or the request goes away, or the library is stopping. Older protocols are answered at once, and `hot` (ask again in 1.5 s: an AI is reading) is for them. |
 | extension → library | `POST /api/v2/canvas/results {"results":[result]}`; result = `{"id","status","link","type","final","text" or "b64","error","signed_out","rate","retry_after"}`. The last three are new in protocol 2; the library reads their absence as an old extension. |
 
@@ -274,6 +277,22 @@ What protocol 3 (1.4) adds:
   own version goes up (two Chromes on different versions taking turns aren't an update); a 1.3 copy (no `a`) that
   reloads into 1.4 is the same Chrome. Measured end to end: with both waiting, `canvas.json` is written about four
   times in 30 s and Find is answered at once.
+- **Two browsers in one place.** Chrome and Edge on the same computer (or any two that name themselves, 1.6 on) are
+  one copy to the library, since a copy is kept by where it is. Left to themselves they'd take turns on every
+  check-in, each renaming the extension to itself, and one not signed in to Canvas would keep saying so over the one
+  that is. So one reads Canvas and the other is left alone (`CanvasSync.InCharge`): the browser the student picked
+  while it's running, else the one that was reading already while it's running. "Running" is a check-in within
+  five minutes (`CanvasSettings.BrowserHere`), so a browser that's closed hands over to the other rather than to
+  nobody. The one left alone is answered like an idle one (its request is held, it gets no jobs) and isn't written
+  down as the copy. Each named browser's last check-in is kept in `canvas.json` `browsers_seen` (`where` → name →
+  when; at most every 15 s, dropped after 30 days) and the pick in `browser_choice` (`where` → name). While two are
+  running, `state.extension.browsers` is `{"where","browsers":[names]}`, and `choose_browser` is the same while the
+  pick isn't one of them: the app asks "Which browser do you use for Canvas?" by itself once (a small window that
+  doesn't take the keyboard), and Settings → Canvas offers "Change browser" for as long as there are two.
+  `POST /api/v2/canvas/browser {"where","browser"}` is the pick (400 with the reason for a browser the library never
+  heard from); it answers with the state. An extension before 1.6 names no browser and is never held back, and two
+  browsers that give the same name (Arc calls itself Chrome) can't be told apart: they take turns as two Chromes do.
+  The one left alone does nothing with its own "Sync Canvas now" either.
 - **A wrong key.** The library answers 401 before anything else, so a Chrome with a key it didn't make is never
   written down, takes no work and reads nothing on Canvas; the extension says `library_refused`. Once the right key is
   in its folder, the next alarm (within 30 s) connects it, with no reload: the key is read every round.
@@ -418,7 +437,8 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
 
 - `GET /api/v2/canvas/state` (also embedded as `state` in `GET /api/v2/canvas`): `{"state", "school", "url",
   "extension":{"seen","version","latest","outdated","updated":{"from","to","at"}|null,"connected","key_matches",
-  "last_seen","refused_at"}, "last_sync" (when the last
+  "last_seen","browser" (the browser that checked in last, "" from an extension before 1.6),
+  "browsers" and "choose_browser" ({"where","browsers":[…]}|null: two browsers in one place, above),"refused_at"}, "last_sync" (when the last
   sync finished), "next_sync", "poll_minutes", "syncing":{"left","total","classes":[…]}|null, "paused_until"|null,
   "error":{"text","at"}|null, "warnings":[…], "revision"}`. `state` is decided by `CanvasView.StateOf` in this order: `not_set_up`
   (no Canvas address) > `no_extension` (no Chrome has ever checked in with this library's **current** extension key)

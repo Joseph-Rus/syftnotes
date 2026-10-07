@@ -66,12 +66,12 @@ public sealed partial class NoteView : StackPanel
         set => SetValue(LinkHandlerProperty, value);
     }
 
-    /// <summary>What clicking a link does: a Canvas address opens in Chrome, where the student is signed in to
-    /// Canvas; anything else in the default browser. Tests swap it for one that records the address.</summary>
+    /// <summary>What clicking a link does: a Canvas address opens in the browser the student reads Canvas in, where
+    /// they're signed in to it; anything else in the default browser. Tests swap it for one that records the address.</summary>
     public static Action<string> OpenLink { get; set; } = url =>
     {
         if (Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Host.EndsWith(".instructure.com", StringComparison.OrdinalIgnoreCase)
-            && Chrome.Open(url) is null) return;
+            && Browsers.Open(Browsers.ForCanvas(), url) is null) return;
         Dialogs.OpenUrl(url);
     };
 

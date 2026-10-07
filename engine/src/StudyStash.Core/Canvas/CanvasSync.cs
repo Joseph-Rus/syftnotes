@@ -40,15 +40,47 @@ public sealed partial class CanvasSync
 
     public CanvasSettings Settings => CanvasSettings.Load(home);
 
+    /// <summary>The browser that reads Canvas in one place right now, when more than one could: the student's pick
+    /// while it's running, else the one whose check-ins are the place's copy while that's running. "" when neither
+    /// is: whoever asks next takes over.</summary>
+    static string InCharge(CanvasSettings s, string where, ExtensionCopy? copy, string keyId, DateTimeOffset now)
+    {
+        if (s.BrowserChoice.GetValueOrDefault(where) is { Length: > 0 } picked
+            && CanvasSettings.Here(s.BrowsersSeen.GetValueOrDefault(where)?.GetValueOrDefault(picked), now)) return picked;
+        return copy is { Browser.Length: > 0 } && copy.Key == keyId && CanvasSettings.Here(copy.Seen, now) ? copy.Browser : "";
+    }
+
+    /// <summary>The student's answer to "which browser?" (<see cref="CanvasSettings.BrowserQuestion"/>): that one reads
+    /// Canvas in that place from now on, and its name is the one the app uses. Null when it's taken; else why not.</summary>
+    public string? ChooseBrowser(string where, string browser)
+    {
+        string named = CanvasSettings.CleanBrowser(browser);
+        if (named.Length == 0 || Settings.BrowsersSeen.GetValueOrDefault(where)?.ContainsKey(named) != true)
+            return "Study Stash hasn't heard from the extension in that browser.";
+        CanvasSettings.Update(home, st =>
+        {
+            st.BrowserChoice[where] = named;
+            if (st.ExtensionWhere == where) st.ExtensionBrowser = named;
+        });
+        return null;
+    }
+
     /// <summary>How long a find waits for Chrome while no extension has ever checked in: a freshly added one checks
     /// in at once, so longer only keeps the student waiting (tests shorten it).</summary>
     public TimeSpan FirstContactWait { get; set; } = TimeSpan.FromSeconds(20);
 
-    /// <summary>What Settings says while Chrome isn't signed in to Canvas.</summary>
-    public const string SignInError = "Chrome isn't signed in to Canvas. Open Canvas in Chrome and sign in; it syncs again within the hour.";
+    /// <summary>What Settings says while the browser with the extension isn't signed in to Canvas.</summary>
+    public const string SignInError = "Your browser isn't signed in to Canvas. Open Canvas there and sign in; it syncs again within the hour.";
 
-    /// <summary>What an AI's read (or Find my courses) gets back when Chrome answered as if nobody were signed in.</summary>
-    public const string SignedOutAnswer = "Chrome isn't signed in to Canvas.";
+    /// <summary>The same as a Study Stash that only knew Chrome said it: a canvas.json may still hold it, and signing
+    /// in clears it too.</summary>
+    const string ChromeSignInError = "Chrome isn't signed in to Canvas. Open Canvas in Chrome and sign in; it syncs again within the hour.";
+
+    /// <summary>The error is the one for a browser that isn't signed in (<see cref="SignInError"/>, in either wording).</summary>
+    public static bool IsSignInError(string error) => error is SignInError or ChromeSignInError;
+
+    /// <summary>What an AI's read (or Find my courses) gets back when the browser answered as if nobody were signed in.</summary>
+    public const string SignedOutAnswer = "Your browser isn't signed in to Canvas.";
 
     /// <summary>What an AI's read gets back while there's no Canvas address, or the address isn't Canvas's.</summary>
     public const string NotCanvas = "Only Canvas addresses (or /api/v1/... paths) can be read.";
@@ -59,8 +91,9 @@ public sealed partial class CanvasSync
     /// before protocol 2 sends none), and <paramref name="address"/> the library address it uses (its <c>a</c>; before
     /// 1.4, none); every extension so far can do every job, whatever its version. <paramref name="withKey"/> is false
     /// when it came with the library password rather than the extension's current key: it gets its work, but never
-    /// counts as the extension being connected.</summary>
-    public CanvasWork Work(bool force, string? extVersion = null, int protocol = 1, string? address = null, bool withKey = true)
+    /// counts as the extension being connected. <paramref name="browser"/> is the browser it says it runs in (its
+    /// <c>b</c>, from 1.6: "Chrome", "Firefox"; cleaned by <see cref="CanvasSettings.CleanBrowser"/>).</summary>
+    public CanvasWork Work(bool force, string? extVersion = null, int protocol = 1, string? address = null, bool withKey = true, string? browser = null)
     {
         var now = Clock();
         string at = now.ToString("o", CultureInfo.InvariantCulture);
@@ -71,7 +104,28 @@ public sealed partial class CanvasSync
         // that asks all the time (or two, the library's Chrome and the laptop's) would otherwise rewrite canvas.json on
         // every visit.
         var copy = s.ExtensionCopies.GetValueOrDefault(where);
-        bool news = copy is null || extVersion is { Length: > 0 } && extVersion != copy.Version || protocol != copy.Protocol || keyId != copy.Key;
+        string named = CanvasSettings.CleanBrowser(browser);
+        // Each browser that says its name is noted where it is, as often as a check-in is (two in one place is a
+        // question for the student: CanvasSettings.BrowserQuestion).
+        if (named.Length > 0 && withKey && !(s.BrowsersSeen.GetValueOrDefault(where)?.GetValueOrDefault(named) is { } noted
+                && DateTimeOffset.TryParse(noted, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var notedAt)
+                && now - notedAt < CanvasSettings.SeenEvery && now >= notedAt))
+            s = CanvasSettings.Update(home, st =>
+            {
+                if (!st.BrowsersSeen.TryGetValue(where, out var names)) st.BrowsersSeen[where] = names = [];
+                names[named] = at;
+                // One long gone isn't kept for ever.
+                foreach (string gone in names.Where(b => !DateTimeOffset.TryParse(b.Value, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var last) || now - last > TimeSpan.FromDays(30)).Select(b => b.Key).ToList())
+                    names.Remove(gone);
+            });
+        // Two browsers in one place: one reads Canvas and the other is left alone while that one is running. It's the
+        // one the student picked, or, until they have, the one that was reading already. Otherwise the two would take
+        // turns on every check-in, each renaming the extension to itself, and one that isn't signed in to Canvas
+        // would keep saying so over the one that is.
+        if (named.Length > 0 && withKey && InCharge(s, where, copy, keyId, now) is { Length: > 0 } inCharge && inCharge != named)
+            return new CanvasWork([], false, Extension.Version());
+        bool news = copy is null || extVersion is { Length: > 0 } && extVersion != copy.Version || protocol != copy.Protocol || keyId != copy.Key
+            || named.Length > 0 && named != copy.Browser;
         bool stale = copy is null || !DateTimeOffset.TryParse(copy.Seen, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var seen)
             || now - seen >= CanvasSettings.SeenEvery || now < seen;
         if (news || stale)
@@ -85,15 +139,18 @@ public sealed partial class CanvasSync
                     ?? (st.ExtensionCopies.Count == 0 ? st.ExtensionVersion : "");
                 if (had is null && where.Length > 0) st.ExtensionCopies.Remove(""); // it says where it is now
                 string version = extVersion is { Length: > 0 } ? extVersion : had?.Version ?? "";
-                st.ExtensionCopies[where] = new ExtensionCopy(at, version, protocol, keyId);
+                // One that doesn't say which browser it is (before 1.6) is the browser it was.
+                st.ExtensionCopies[where] = new ExtensionCopy(at, version, protocol, keyId, named.Length > 0 ? named : had?.Browser ?? "");
+                st.ExtensionBrowser = st.ExtensionCopies[where].Browser;
                 st.ExtensionSeen = at;
                 st.ExtensionKeyId = keyId;
                 st.ExtensionProtocol = protocol;
                 st.ExtensionWhere = where;
                 if (extVersion is not { Length: > 0 }) return;
                 // Chrome reloaded a newer copy from the folder Study Stash keeps up to date: worth a word, once. Two
-                // Chromes on different versions taking turns aren't an update.
-                if (before.Length > 0 && Extension.IsOlder(before, extVersion)) st.ExtensionUpdate = new ExtensionUpdate(before, extVersion, at, false);
+                // Chromes on different versions taking turns aren't an update, and nor is another browser taking over.
+                bool sameBrowser = had is null || had.Browser.Length == 0 || named.Length == 0 || had.Browser == named;
+                if (sameBrowser && before.Length > 0 && Extension.IsOlder(before, extVersion)) st.ExtensionUpdate = new ExtensionUpdate(before, extVersion, at, false);
                 st.ExtensionVersion = extVersion;
             });
         if (protocol < 1) return new CanvasWork([], false, Extension.Version()); // nothing this library knows how to hand it
@@ -149,10 +206,11 @@ public sealed partial class CanvasSync
     /// or when <paramref name="ct"/> ends (the request went away, the library is stopping). Older extensions ask on a
     /// timer and are answered at once.
     /// </summary>
-    public async Task<CanvasWork> WorkAsync(bool force, string? extVersion, int protocol, string? address, TimeSpan wait, CancellationToken ct = default, bool withKey = true)
+    public async Task<CanvasWork> WorkAsync(bool force, string? extVersion, int protocol, string? address, TimeSpan wait, CancellationToken ct = default, bool withKey = true,
+        string? browser = null)
     {
         Task woken = Task.WhenAny(Agents.Queued.Next, nudged.Next);
-        var work = Work(force, extVersion, protocol, address, withKey);
+        var work = Work(force, extVersion, protocol, address, withKey, browser);
         if (work.Jobs.Count > 0 || protocol < 3 || wait <= TimeSpan.Zero) return work;
         var until = DateTime.UtcNow + (wait < LongestWait ? wait : LongestWait);
         while (!ct.IsCancellationRequested)
@@ -172,7 +230,7 @@ public sealed partial class CanvasSync
             }
             if (ct.IsCancellationRequested) break; // nobody left to hand work to
             woken = Task.WhenAny(Agents.Queued.Next, nudged.Next);
-            work = Work(false, extVersion, protocol, address, withKey);
+            work = Work(false, extVersion, protocol, address, withKey, browser);
             if (work.Jobs.Count > 0) return work;
         }
         return work;
@@ -323,7 +381,7 @@ public sealed partial class CanvasSync
             CanvasSettings.Update(home, st =>
             {
                 st.NeedsLogin = false;
-                if (st.Error == SignInError) st.Error = "";
+                if (IsSignInError(st.Error)) st.Error = "";
             });
         if (kind == "bytes" && r.Status >= 400) return new JsonObject { ["error"] = $"Canvas answered {r.Status}, so nothing was saved.", ["status"] = r.Status };
         var result = new JsonObject { ["status"] = r.Status, ["url"] = r.Final.Length > 0 ? r.Final : url };

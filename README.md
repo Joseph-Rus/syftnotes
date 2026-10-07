@@ -366,19 +366,25 @@ the notes, in a quick answer and in the Ask chat:
 
 ## Canvas
 
-Study Stash reads Canvas through Chrome with your own sign-in — no Canvas password or token — and
-only reads; nothing on Canvas changes. On your library's computer:
+Study Stash reads Canvas through your browser with your own sign-in — no Canvas password or token —
+and only reads; nothing on Canvas changes. It works in Chrome and the browsers built on it (Edge,
+Brave, Arc, Opera, Vivaldi). The extension runs in Firefox too, but its add-on isn't published
+yet: [docs/firefox-add-on.md](docs/firefox-add-on.md). On your library's computer:
 
 1. **Settings → Your library → Canvas** (or the Canvas step in setup): type your school's Canvas
    address.
-2. Click **Add to Chrome**. It opens Chrome's extensions page and shows the extension's folder.
-   Turn on **Developer mode**, click **Load unpacked**, and pick that folder — or drag the folder
-   onto the Extensions page. On a Mac the folder is **Study Stash → Chrome extension** in your home
-   folder (`~/Study Stash/Chrome extension`), where Chrome's window can see it; on Windows it's
+2. Click **Add to Chrome** (the button names your own browser: Add to Edge, Add to Brave; if the
+   browser you usually use can't run the extension, like Safari, Study Stash says so and uses
+   another one on your computer, or points you to Chrome when there's none). It opens
+   that browser's extensions page and shows the extension's folder. Turn on **Developer mode**,
+   click **Load unpacked**, and pick that folder — or drag the folder onto the Extensions page. On
+   a Mac the folder is **Study Stash → Chrome extension** in your home folder
+   (`~/Study Stash/Chrome extension`), where the browser's window can see it; on Windows it's
    `chrome-extension` in `%USERPROFILE%\.study-stash`.
-3. Sign in to Canvas in Chrome, then click **Find my courses** and match each class to its course.
+3. Sign in to Canvas in that browser, then click **Find my courses** and match each class to its
+   course.
 
-Canvas then syncs about once an hour while Chrome is open (it can stay minimized): what's due,
+Canvas then syncs about once an hour while that browser is open (it can stay minimized): what's due,
 assignments with rubrics, your submissions and feedback, modules, files, pages and announcements,
 filed into each class's folder.
 
@@ -434,8 +440,8 @@ Your settings, the lecture database and the recordings are under `~/.study-stash
 the `STUDYSTASH_HOME` environment variable). The notes themselves are plain Markdown files in a
 folder per class, by default in **Documents/Study Stash** on the library's computer (Settings → Your library →
 Library → Notes folder shows where), which you can open, back up or sync however you like. On a Mac
-the Chrome extension's folder is `~/Study Stash/Chrome extension`, because Chrome's Load unpacked
-window doesn't show folders whose names start with a dot.
+the browser extension's folder is `~/Study Stash/Chrome extension`, because a browser's Load
+unpacked window doesn't show folders whose names start with a dot.
 
 ## Build from source
 

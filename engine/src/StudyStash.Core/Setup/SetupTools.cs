@@ -55,7 +55,7 @@ public sealed record SetupStatus
 /// it's the one marked for this computer (and why).</summary>
 public sealed record SetupModelOption(string Id, string Name, string Size, bool Downloaded, bool Marked, string Why = "");
 
-/// <summary>The courses Chrome found on Canvas, or why there are none yet.</summary>
+/// <summary>The courses the student's browser found on Canvas, or why there are none yet.</summary>
 public sealed record SetupCourses(bool Connected, IReadOnlyList<(string Name, string Code)> Found, string Why = "");
 
 /// <summary>A card the AI asks the setup window to show: the student acts in it. <see cref="Arg"/> is the one thing
@@ -153,7 +153,7 @@ public sealed class SetupTools(ISetupDriver driver)
             "The models that turn speech into text on this computer: id, name, size, whether it's downloaded, and the one marked for this "
             + "computer and why. offer_model_download takes the id.")),
         McpServerTool.Create(CoursesAsync, Named("get_canvas_courses", "List Canvas courses",
-            "The courses Chrome found on Canvas (name and code), or why there are none yet.")),
+            "The courses the student's browser found on Canvas (name and code), or why there are none yet.")),
         McpServerTool.Create(
             ([Description("The question, in one or two short sentences (up to 300 characters).")] string question,
              [Description("2 to 4 short answers to tap (each up to 40 characters).")] string[] choices) => AskAsync(question, choices),
@@ -185,11 +185,11 @@ public sealed class SetupTools(ISetupDriver driver)
         McpServerTool.Create(
             ([Description("The address the student opens Canvas at, like school.instructure.com.")] string school_address) =>
                 OfferCanvasAsync(school_address),
-            Named("offer_chrome_helper", "Offer: connect Canvas through Chrome",
-                "Checks the school's Canvas address, then shows the card that adds Study Stash's helper to Chrome, with pictures of each step. "
-                + "Study Stash says when Chrome is connected.")),
+            Named("offer_chrome_helper", "Offer: connect Canvas through the browser",
+                "Checks the school's Canvas address, then shows the card that adds Study Stash's helper to the student's browser (the card names "
+                + "the browser and shows each step). Study Stash says when the browser is connected.")),
         McpServerTool.Create(() => OfferCoursesAsync(), Named("offer_course_picker", "Offer: pick your courses",
-            "Once Chrome is connected: shows the ticked list of courses Canvas found; \"Add these classes\" makes them classes.")),
+            "Once the student's browser is connected: shows the ticked list of courses Canvas found; \"Add these classes\" makes them classes.")),
         McpServerTool.Create(() => OfferAsync("ai_app"), Named("offer_ai_app", "Offer: let their AI app read their lectures",
             "When the checklist has ai_app (the ChatGPT or Claude app is on this computer): shows the card that lets that app read the "
             + "student's lectures and notes, so they can ask it about their classes. It only reads. The student presses Connect.")),
@@ -279,7 +279,7 @@ public sealed class SetupTools(ISetupDriver driver)
     async Task<CallToolResult> CoursesAsync()
     {
         var c = await driver.CoursesAsync();
-        if (c.Found.Count == 0) return Say(c.Why.Length > 0 ? c.Why : c.Connected ? "Chrome is connected, but Canvas hasn't shown any courses yet." : "Chrome isn't connected yet.");
+        if (c.Found.Count == 0) return Say(c.Why.Length > 0 ? c.Why : c.Connected ? "The student's browser is connected, but Canvas hasn't shown any courses yet." : "The student's browser isn't connected yet.");
         return Say($"Canvas found {c.Found.Count} course{(c.Found.Count == 1 ? "" : "s")}:\n"
             + string.Join('\n', c.Found.Select(f => "- " + f.Name + (f.Code.Length > 0 && !f.Name.Contains(f.Code, StringComparison.OrdinalIgnoreCase) ? $" ({f.Code})" : ""))));
     }
@@ -330,7 +330,7 @@ public sealed class SetupTools(ISetupDriver driver)
         "library_connection" => "connect-to-your-library",
         "microphone_check" => "microphone",
         "model_download" => "model download",
-        "chrome_helper" => "Chrome helper",
+        "chrome_helper" => "browser helper",
         "course_picker" => "course picker",
         "ai_app" => "AI app",
         "start_at_login" => "start at login",
@@ -378,7 +378,7 @@ public sealed class SetupTools(ISetupDriver driver)
     async Task<CallToolResult> OfferCoursesAsync()
     {
         var c = await driver.CoursesAsync();
-        if (c.Found.Count == 0) return No(c.Why.Length > 0 ? c.Why : "Chrome isn't connected yet: offer_chrome_helper first, then wait for Study Stash to say it's connected.");
+        if (c.Found.Count == 0) return No(c.Why.Length > 0 ? c.Why : "The student's browser isn't connected yet: offer_chrome_helper first, then wait for Study Stash to say it's connected.");
         return await OfferAsync("course_picker");
     }
 

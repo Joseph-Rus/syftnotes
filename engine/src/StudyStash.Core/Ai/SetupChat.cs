@@ -141,7 +141,7 @@ public static partial class SetupChat
                Cactus Whistle (Apple silicon and ARM PCs), it's already here: as the transcript it's the fastest but the
                least accurate, so suggest it only to a student who asks for the fastest or has no room for a download.
             5. Classes. Ask whether their school uses Canvas. If yes, ask for the address they open Canvas at (like
-               school.instructure.com), then offer_chrome_helper; when Chrome is connected, offer_course_picker. If not (or later),
+               school.instructure.com), then offer_chrome_helper; when their browser is connected, offer_course_picker. If not (or later),
                ask what classes they're taking this term and add_class each, with a few words on what it covers in their words:
                that helps Study Stash file each lecture.
             6. If the checklist has ai_app (the student has the ChatGPT or Claude app on this {device}): say in one line that

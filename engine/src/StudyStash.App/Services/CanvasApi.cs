@@ -201,21 +201,35 @@ public static class CanvasApi
         public IReadOnlyList<string> Warnings { get; init; } = [];
     }
 
-    /// <summary>The Chrome extension as the library sees it. <see cref="Seen"/> is when a Chrome last checked in with
-    /// the library's current key; <see cref="Connected"/> is one checking in now with it (null from a library older
-    /// than this field: go by the state); <see cref="KeyMatches"/> false means the Chrome that asked last has an old
-    /// key and needs connecting again; <see cref="RefusedAt"/> is when a Chrome with another key was turned away.</summary>
+    /// <summary>The browser extension as the library sees it. <see cref="Seen"/> is when a browser last checked in
+    /// with the library's current key; <see cref="Connected"/> is one checking in now with it (null from a library
+    /// older than this field: go by the state); <see cref="KeyMatches"/> false means the browser that asked last has
+    /// an old key and needs connecting again; <see cref="RefusedAt"/> is when one with another key was turned away.
+    /// <see cref="Browser"/> is the browser that checked in last, as it names itself ("Chrome", "Edge", "Firefox"); ""
+    /// from an extension before 1.6, or a library that doesn't say. <see cref="Browsers"/> is there while two browsers
+    /// in one place run the extension, and <see cref="ChooseBrowser"/> too while the student hasn't picked one.</summary>
     public sealed record ExtensionInfo
     {
+        public BrowserQuestion? Browsers { get; init; }
+        public BrowserQuestion? ChooseBrowser { get; init; }
         public DateTimeOffset? Seen { get; init; }
         public bool? Connected { get; init; }
         public bool? KeyMatches { get; init; }
         public DateTimeOffset? LastSeen { get; init; }
         public DateTimeOffset? RefusedAt { get; init; }
+        public string Browser { get; init; } = "";
         public string Version { get; init; } = "";
         public string? Latest { get; init; }
         public bool Outdated { get; init; }
         public ExtensionUpdate? Updated { get; init; }
+    }
+
+    /// <summary>Two browsers (or more) run the extension in one place (<see cref="Where"/>: "this_computer" beside
+    /// the library, "another_computer"), by the names they give themselves: the student is asked which to use.</summary>
+    public sealed record BrowserQuestion
+    {
+        public string Where { get; init; } = "";
+        public IReadOnlyList<string> Browsers { get; init; } = [];
     }
 
     public sealed record ExtensionUpdate
@@ -279,8 +293,8 @@ public static class CanvasApi
     // ---- GET canvas/extension ----
 
     /// <summary>The library's extension: its key, the Canvas it points at, this library's version and protocol, the
-    /// folder the library keeps ready, and the Chrome that last checked in (which computer, whether it's connected
-    /// now). A library from before these fields leaves them empty.</summary>
+    /// folder the library keeps ready, and the browser that last checked in (which computer, which browser, whether
+    /// it's connected now). A library from before these fields leaves them empty.</summary>
     public sealed record ExtensionKey
     {
         public string Key { get; init; } = "";
@@ -294,13 +308,15 @@ public static class CanvasApi
         public int SeenProtocol { get; init; }
         /// <summary>"this_computer", "another_computer", or "" (the extension didn't say).</summary>
         public string SeenWhere { get; init; } = "";
-        /// <summary>A Chrome is checking in now with the library's current key.</summary>
+        /// <summary>"Chrome", "Edge", "Firefox"…, or "" (an extension from before 1.6 didn't say).</summary>
+        public string SeenBrowser { get; init; } = "";
+        /// <summary>A browser is checking in now with the library's current key.</summary>
         public bool Connected { get; init; }
-        /// <summary>The Chrome that checked in last used the library's current key (false: an old registration).</summary>
+        /// <summary>The browser that checked in last used the library's current key (false: an old registration).</summary>
         public bool KeyMatches { get; init; }
-        /// <summary>When a Chrome last checked in with the current key.</summary>
+        /// <summary>When a browser last checked in with the current key.</summary>
         public DateTimeOffset? SeenWithKey { get; init; }
-        /// <summary>When a Chrome with another key was last turned away.</summary>
+        /// <summary>When a browser with another key was last turned away.</summary>
         public DateTimeOffset? RefusedAt { get; init; }
     }
 
@@ -656,10 +672,10 @@ public static class CanvasApi
         public string Text { get; init; } = "";
     }
 
-    // ---- the Chrome extension, for setup's and Settings' "Add to Chrome" ----
+    // ---- the browser extension, for setup's and Settings' "Add to Chrome" ----
 
-    /// <summary>Whether a Chrome with the extension is talking to the library now, the folder to load it from on this
-    /// computer (null until one is ready), and the extension's version. Read by
+    /// <summary>Whether a browser with the extension is talking to the library now, the folder Chrome's family loads
+    /// it from on this computer (null until one is ready), and the extension's version. Read by
     /// <see cref="CanvasClient.ExtensionStatusAsync"/> from whichever shape the library sends.</summary>
     public sealed record ExtensionStatus
     {

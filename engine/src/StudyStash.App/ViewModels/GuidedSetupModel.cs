@@ -919,7 +919,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         Ai = Cli.Id, AiReady = AiReady, Windows = services.Windows, RoleChosen = RoleChosen, NotesWriter = NotesWriter, Skipped = skipped,
         TaskbarDone = TaskbarDone, StartsAtLogin = StartsAtLogin, Downloading = Setup.ModelReady ? null : services.Downloading(),
-        OpenCard = OpenCard is { Open: true } c ? c.Kind : "", ChromeConnected = Setup.Canvas?.ChromeConnected == true,
+        OpenCard = OpenCard is { Open: true } c ? c.Kind : "", BrowserConnected = Setup.Canvas?.BrowserConnected == true, Browser = Setup.Canvas?.BrowserName ?? "",
         CoursesFound = Setup.Canvas?.Found.Count ?? Setup.Courses.Count,
         AiApps = AiAppNames, AiAppsConnected = AiAppsConnected,
     };

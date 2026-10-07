@@ -98,10 +98,85 @@ public static partial class Shell
     /// <see cref="CanvasFeed"/>, which reads again whenever the library says Canvas changed.</summary>
     static void OnCanvasChanged() => Dispatcher.UIThread.Post(() =>
     {
-        if (quitting || canvasWatch?.State is null) return;
+        if (quitting || canvasWatch?.State is not { } state) return;
+        // Which browser the extension checked in from: the one "Open in the browser" opens, anywhere in the app.
+        Browsers.Heard = Browsers.HeardFrom(state.Extension);
+        // The extension is in two browsers: ask which one to use, once. The question gone (answered somewhere else,
+        // or one of the browsers closed) takes its window with it; one the student opened from Settings stays for as
+        // long as there are two to choose between.
+        if (state.Extension?.ChooseBrowser is { Browsers.Count: > 1 } ask) AskWhichBrowser(ask);
+        else if (!browserChoiceByHand || state.Extension?.Browsers is not { Browsers.Count: > 1 }) browserChoiceWindow?.Close();
         library.Status = LibraryStatus();
         UpdateDueStatus();
     });
+
+    static Window? browserChoiceWindow;
+    /// <summary>The question already asked since the app started: Not now isn't asked again until the next start.</summary>
+    static string browserAsked = "";
+    /// <summary>The open one was asked for from Settings, not come up by itself.</summary>
+    static bool browserChoiceByHand;
+
+    /// <summary>Settings' "Change browser": the same question, whether or not it's been answered.</summary>
+    public static void ChooseBrowser(CanvasApi.BrowserQuestion ask) => AskWhichBrowser(ask, byHand: true);
+
+    /// <summary>"Which browser do you use for Canvas?", in a small window of its own. By itself, once for each pair of
+    /// browsers: not while setup or Connect Canvas is busy with the same thing, and not before setup is done.</summary>
+    static void AskWhichBrowser(CanvasApi.BrowserQuestion ask, bool byHand = false)
+    {
+        if (browserChoiceWindow is { } open)
+        {
+            if (byHand) open.Activate();
+            return;
+        }
+        string asked = ask.Where + "\n" + string.Join("\n", ask.Browsers);
+        if (!byHand)
+        {
+            if (asked == browserAsked) return;
+            if (!host.Settings.SetupDone || setupWindow?.IsVisible == true || canvasConnectWindow?.IsVisible == true) return;
+        }
+        browserAsked = asked;
+        browserChoiceByHand = byHand;
+        string where = ask.Where;
+        var model = new BrowserChoiceModel(ask.Browsers, browser => ChooseBrowserAsync(where, browser));
+        var w = BrowserChoiceWindow.Make(model);
+        browserChoiceWindow = w;
+        w.Closed += (_, _) =>
+        {
+            if (browserChoiceWindow == w) browserChoiceWindow = null;
+            UpdateDock();
+        };
+        // In the middle of the pointer's display. It sets its own height (as tall as what it says).
+        w.WindowStartupLocation = WindowStartupLocation.Manual;
+        w.Position = Placement.Centred(ScreenFor(w), BrowserChoiceWindow.Wanted).Position;
+        Look.Apply(w);
+        WinChrome.Apply(w);
+        AppMenu.Attach(w, ShowLibrary, SettingsFromAnywhere);
+        if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
+        w.Show();
+        UpdateDock();
+        // Asked for, it takes the keyboard like any window the student opens. Come up by itself, it doesn't.
+        if (byHand) w.Activate();
+    }
+
+    /// <summary>The student's pick: the library is told, the app opens Canvas in that browser from now on, and the
+    /// status follows at once. Null when the library took it; else why not, for the window.</summary>
+    static async Task<string?> ChooseBrowserAsync(string where, string browser)
+    {
+        if (Canvas().Client is not { } client) return "Your library isn't reachable right now. Try again in a moment.";
+        await client.ChooseBrowserAsync(where, browser);
+        // The app opens Canvas there too, at once: in the browser on this computer that goes by that name (Arc calls
+        // itself Chrome; the two browsers may be on the library's computer, not this one). That's also the browser
+        // Connect Canvas starts from next time.
+        Browsers.Heard = browser;
+        var mine = await Task.Run(() => Browsers.ForCanvas());
+        if (mine.Says.Equals(browser, StringComparison.OrdinalIgnoreCase) && host.Settings.CanvasBrowser != mine.Name)
+        {
+            Browsers.Picked = mine.Name;
+            host.Save(s => s.CanvasBrowser = mine.Name);
+        }
+        if (canvasWatch is { } watch) await watch.RefreshAsync();
+        return null;
+    }
 
     /// <summary>Reads Canvas again now (Canvas's connect window finished), then shows it.</summary>
     static async Task CanvasSyncedAsync()

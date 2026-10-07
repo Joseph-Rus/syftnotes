@@ -43,8 +43,8 @@ public static class LibraryPanelWords
     {
         null or "" => (null, true),
         "not_set_up" => ("Canvas isn't connected", true),
-        "no_extension" => ("Canvas is waiting for Chrome", false),
-        "chrome_away" => ("Canvas is waiting for Chrome to open", false),
+        "no_extension" => ($"Canvas is waiting for {CanvasWords.Browser(state)}", false),
+        "chrome_away" => ($"Canvas is waiting for {CanvasWords.Browser(state)} to open", false),
         "signed_out" => ("Canvas needs you to sign in", false),
         "syncing" => ("Canvas syncing…", true),
         "error" => ("Canvas couldn't sync", false),

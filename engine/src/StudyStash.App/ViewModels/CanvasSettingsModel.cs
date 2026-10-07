@@ -120,13 +120,34 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool SavingSchool { get; set; }
 
     [ObservableProperty] public partial string ExtensionLine { get; set; } = "";
+    /// <summary>The extension row's name: "Edge extension" once the library has heard which browser it runs in,
+    /// "Browser extension" until then.</summary>
+    [ObservableProperty] public partial string ExtensionLabel { get; set; } = "Browser extension";
+    /// <summary>Windows' line under Sync: "Runs while Edge is open".</summary>
+    [ObservableProperty] public partial string SyncRuns { get; set; } = "Runs while your browser is open";
 
-    /// <summary>Connect Canvas's steps (the extension's folder, Chrome's Load unpacked): from the Chrome extension row,
-    /// to set it up again after it's gone from Chrome, or on a new Chrome.</summary>
+    /// <summary>Connect Canvas's steps (the extension's folder and the browser's Load unpacked, or Firefox's add-on and
+    /// code): from the extension row, to set it up again after it's gone from the browser, or in another one.</summary>
     public Action? OnSetUpExtension { get; set; }
 
     [RelayCommand]
     void SetUpExtension() => OnSetUpExtension?.Invoke();
+
+    /// <summary>The extension runs in two browsers here (Chrome and Edge, say): the row offers the choice between
+    /// them, whether or not it's been made.</summary>
+    [ObservableProperty] public partial bool CanChooseBrowser { get; set; }
+    /// <summary>"The extension is in Chrome and Edge: pick the one Study Stash reads Canvas through".</summary>
+    [ObservableProperty] public partial string ChooseBrowserTip { get; set; } = "";
+    CanvasApi.BrowserQuestion? browsers;
+
+    /// <summary>Opens "Which browser do you use for Canvas?" for those browsers.</summary>
+    public Action<CanvasApi.BrowserQuestion>? OnChooseBrowser { get; set; }
+
+    [RelayCommand]
+    void ChooseBrowser()
+    {
+        if (browsers is { } ask) OnChooseBrowser?.Invoke(ask);
+    }
 
     public IReadOnlyList<PollChoice> PollChoices { get; } =
         [.. new[] { 15, 30, 60, 180, 1440 }.Select(m => new PollChoice(m, CanvasWords.PollIntervalText(m)))];
@@ -194,6 +215,11 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
         Status.Show(state);
         School = state.School.Length > 0 ? state.School : overview.Url;
         ExtensionLine = state.Extension is { Seen: { } seen } ext ? CanvasWords.ExtensionCheckedInLine(seen, ext.Version, zone, now) : "Not set up yet";
+        ExtensionLabel = state.Extension?.Browser is { Length: > 0 } named ? $"{named} extension" : "Browser extension";
+        browsers = state.Extension?.Browsers is { Browsers.Count: > 1 } two ? two : null;
+        CanChooseBrowser = browsers is not null;
+        ChooseBrowserTip = browsers is null ? "" : $"The extension is in {BrowserChoiceModel.Join(browsers.Browsers)}: pick the one Study Stash reads Canvas through";
+        SyncRuns = $"Runs while {CanvasWords.Browser(state)} is open";
         PollMinutes = state.PollMinutes > 0 ? state.PollMinutes : overview.PollMinutes;
 
         // A change not saved yet stays as ticked; anything else shows what the library has now.

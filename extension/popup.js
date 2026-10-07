@@ -1,6 +1,7 @@
 // The toolbar popup: when Canvas last synced, or what's wrong (the library refused this extension's key, can't be
-// reached, Chrome isn't signed in to Canvas); sync now, or open the library. A copy from the Chrome Web Store that
-// isn't connected yet asks for the code from Study Stash, then for Chrome's permission to reach Canvas and the library.
+// reached, the browser isn't signed in to Canvas); sync now, or open the library. A copy from a browser's store that
+// isn't connected yet asks for the code from Study Stash, then for the browser's permission to reach Canvas and the
+// library.
 const $ = id => document.getElementById(id);
 const s = $('s'), connect = $('connect'), allowRow = $('allow-row'), main = $('main'), code = $('code'), go = $('go');
 let conn = null;
@@ -16,7 +17,7 @@ function only(part) {
   for (const p of [connect, allowRow, main]) p.hidden = p !== part;
 }
 
-// Tell the service worker to start now rather than at its next alarm.
+// Tell the background script to start now rather than at its next alarm.
 function wake() {
   try {
     const p = chrome.runtime.sendMessage({sync: true});
@@ -25,10 +26,11 @@ function wake() {
 }
 
 async function show() {
+  const where = await whichBrowser();
   conn = await loadConnection();
   if (!conn) {
     only(connect);
-    s.textContent = 'Connect this extension to your library: Study Stash shows the code when you add the extension to Chrome.';
+    s.textContent = 'Connect this extension to your library: Study Stash shows the code when you add the extension to ' + (where || 'your browser') + '.';
     return;
   }
   if (!(await hasAccess(conn))) {
@@ -59,7 +61,7 @@ async function show() {
 }
 show();
 
-// Connect and Allow ask Chrome straight away, inside the click: Chrome only shows its permission prompt for one.
+// Connect and Allow ask the browser straight away, inside the click: it only shows its permission prompt for one.
 go.onclick = () => {
   go.disabled = true;
   return connectWithCode(code.value).then(granted => {

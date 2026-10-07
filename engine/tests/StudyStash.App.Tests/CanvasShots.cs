@@ -164,6 +164,12 @@ public class CanvasShots
         var signedOut = await Settings("state-signed-out");
         foreach (var t in Themes)
             Shot.Take("mac-06-canvas-settings-signed-out", SkinKind.Mac, t, () => CanvasFrames.MacSettings(new MacCanvasSettings { DataContext = signedOut }));
+        // The extension in two browsers: the row offers the choice between them.
+        var two = await Settings();
+        two.ExtensionLabel = "Chrome extension";
+        two.CanChooseBrowser = true;
+        foreach (var t in Themes)
+            Shot.Take("mac-06-canvas-settings-two-browsers", SkinKind.Mac, t, () => CanvasFrames.MacSettings(new MacCanvasSettings { DataContext = two }));
     }
 
     [AvaloniaFact]
@@ -179,6 +185,12 @@ public class CanvasShots
         var signedOut = await Settings("state-signed-out");
         foreach (var t in Themes)
             Shot.Take("win-06-canvas-settings-signed-out", SkinKind.Win, t, () => CanvasFrames.WinSettings(new WinCanvasSettings { DataContext = signedOut }));
+        // The extension in two browsers: the row offers the choice between them.
+        var two = await Settings();
+        two.ExtensionLabel = "Chrome extension";
+        two.CanChooseBrowser = true;
+        foreach (var t in Themes)
+            Shot.Take("win-06-canvas-settings-two-browsers", SkinKind.Win, t, () => CanvasFrames.WinSettings(new WinCanvasSettings { DataContext = two }));
     }
 
     // ---- design 09: the Due list and an assignment ----
@@ -386,19 +398,32 @@ public class CanvasShots
 
     /// <summary>Setup's Canvas step: "chrome" (Add to Chrome, not pressed yet), "waiting" (pressed: the folder and
     /// Chrome are open; on a <paramref name="mac"/>, the folder Chrome's picker shows there), or "found" (Chrome
-    /// connected and five courses found).</summary>
+    /// connected and five courses found). On a computer with other browsers: "edge" (Edge is the one to use, with a
+    /// quiet way to another), "firefox" (Firefox's three steps and its code) and "firefox-waiting" (Add to Firefox
+    /// pressed). For a student who uses Safari: "safari" (Chrome is here, and is used instead) and "no-browser"
+    /// (nothing here will do: get Chrome).</summary>
     internal static async Task<CanvasConnectModel> SetupStepAsync(string at, bool mac = false)
     {
         var handler = new FakeLibrary()
             .Json(HttpMethod.Get, "/api/v2/canvas/state", at == "found" ? "state-connected" : "state-no-extension")
             .Json(HttpMethod.Get, "/api/v2/canvas", """{"url": "https://school.instructure.com", "extension_seen": ""}""")
-            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension")
+            // A key as long as a real one, so the code Firefox pastes is as long as a student's.
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", """{"key": "q1W2e3R4t5Y6u7I8o9P0a1S2d3F4g5H6", "canvas": "https://school.instructure.com", "version": "1.6"}""")
             .Json(HttpMethod.Post, "/api/v2/canvas/courses", FoundCourses);
-        var context = CanvasFixtures.Context(handler, "the-home");
+        IReadOnlyList<Browser>? browsers = at switch
+        {
+            "edge" => [Browsers.Edge, Browsers.Chrome, Browsers.Firefox],
+            "firefox" or "firefox-waiting" => [Browsers.Firefox, Browsers.Chrome],
+            "safari" => [Browsers.Chrome, Browsers.Edge],
+            _ => null,
+        };
+        var advice = at is "safari" or "no-browser" ? new BrowserAdvice(Browsers.Safari, NoneHere: at == "no-browser") : null;
+        var context = CanvasFixtures.Context(handler, "the-home", browsers: browsers, advice: advice);
         var m = new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>(at == "found" ? "state-connected" : "state-no-extension"), []);
-        if (at == "waiting") await m.AddToChromeCommand.ExecuteAsync(null);
+        if (at is "waiting" or "firefox-waiting") await m.AddToBrowserCommand.ExecuteAsync(null);
         if (at == "waiting" && mac) m.ExtensionFolder = Path.Combine("~", "Study Stash", "Chrome extension");
+        for (int i = 0; i < 100 && m.IsFirefox && m.ConnectionCode.Length == 0; i++) await Task.Delay(10); // the code is asked for as the step opens
         m.Dispose(); // a still picture: the watch needn't keep asking
         return m;
     }
@@ -475,7 +500,7 @@ public class CanvasShots
     [AvaloniaFact]
     public async Task Mac_connect_setup()
     {
-        foreach (var at in new[] { "chrome", "waiting", "found" })
+        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser" })
         {
             var m = await SetupStepAsync(at, mac: true);
             foreach (var t in Themes)
@@ -490,7 +515,7 @@ public class CanvasShots
     [AvaloniaFact]
     public async Task Win_connect_setup()
     {
-        foreach (var at in new[] { "chrome", "waiting", "found" })
+        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser" })
         {
             var m = await SetupStepAsync(at);
             foreach (var t in Themes)

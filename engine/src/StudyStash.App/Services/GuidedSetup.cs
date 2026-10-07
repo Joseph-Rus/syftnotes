@@ -21,7 +21,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
     readonly GuidedSetupModel g;
     readonly SetupModel m;
     readonly AppHost host;
-    bool micSaid, deniedSaid, modelStarted, modelSaid, chromeSaid;
+    bool micSaid, deniedSaid, modelStarted, modelSaid, browserSaid;
 
     public GuidedSetup(GuidedSetupModel guided, AppHost host)
     {
@@ -37,7 +37,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
         };
     }
 
-    /// <summary>Makes the Chrome helper's model (the app's, over the library's Canvas; tests their own).</summary>
+    /// <summary>Makes the browser helper's model (the app's, over the library's Canvas; tests their own).</summary>
     public Func<Task<CanvasConnectModel?>> MakeCanvas { get; init; } = () => Task.FromResult<CanvasConnectModel?>(null);
     /// <summary>Sets who writes the notes and answers questions on the library: null when it took it, else why not.</summary>
     public Func<string, Task<string?>>? WriteNotes { get; init; }
@@ -82,8 +82,8 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
 
     public Task<SetupCourses> CoursesAsync() => OnUi(() =>
     {
-        if (m.Canvas is not { } c) return Task.FromResult(new SetupCourses(false, [], "Chrome isn't connected yet: offer_chrome_helper first."));
-        if (!c.ChromeConnected) return Task.FromResult(new SetupCourses(false, [], "Chrome isn't connected yet. The Chrome helper card is waiting for it."));
+        if (m.Canvas is not { } c) return Task.FromResult(new SetupCourses(false, [], "The student's browser isn't connected yet: offer_chrome_helper first."));
+        if (!c.BrowserConnected) return Task.FromResult(new SetupCourses(false, [], $"{c.BrowserName} isn't connected yet. The browser helper card is waiting for it."));
         return Task.FromResult(new SetupCourses(true, [.. c.Found.Select(f => (f.ClassName, f.Code))],
             c.FindingCourses ? "Canvas is still looking for courses." : c.CoursesSay ?? ""));
     });
@@ -104,14 +104,14 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
                 if (m.Canvas is null && await MakeCanvas() is { } made) m.Canvas = made;
                 if (m.Canvas is not { } c) return "Canvas can't be connected from setup here. The student can do it later in Settings → Canvas.";
                 // The school's address is checked and saved (the library's own setting, as the Canvas step does);
-                // the helper itself is only added when the student presses Add to Chrome.
-                if (!c.ChromeConnected)
+                // the helper itself is only added when the student presses Add to Chrome (or whichever browser).
+                if (!c.BrowserConnected)
                 {
                     c.SchoolField = card.Arg;
                     await c.ContinueCommand.ExecuteAsync(null);
                     if (c.SchoolError is { Length: > 0 } bad) return $"That Canvas address didn't work: {bad.TrimEnd('.')}. Ask the student to check it.";
                 }
-                chromeSaid = false;
+                browserSaid = false;
                 break;
             case "course_picker" when m.Canvas is { Found.Count: > 0 } canvas:
                 m.TakeCourses(canvas.Found);
@@ -250,11 +250,11 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
                 break;
             case ("chrome_helper", "add"):
                 if (m.Canvas is not { } c) break;
-                await Busy(card, () => c.AddToChromeCommand.ExecuteAsync(null));
-                card.Problem = c.ChromeError;
+                await Busy(card, () => c.AddToBrowserCommand.ExecuteAsync(null));
+                card.Problem = c.BrowserError;
                 break;
             case ("chrome_helper", "extensions"):
-                m.Canvas?.OpenChromeExtensionsCommand.Execute(null);
+                m.Canvas?.OpenExtensionsCommand.Execute(null);
                 break;
             case ("chrome_helper", "folder"):
                 m.Canvas?.ShowFolderCommand.Execute(null);
@@ -436,14 +436,17 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
 
     void OnCanvasChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (sender is not CanvasConnectModel c || chromeSaid) return;
+        // The student picked another browser in the card: the checklist's "Waiting for …" follows.
+        if (e.PropertyName == nameof(CanvasConnectModel.BrowserName)) g.Refresh();
+        if (sender is not CanvasConnectModel c || browserSaid) return;
         if (e.PropertyName is not (nameof(CanvasConnectModel.Found) or nameof(CanvasConnectModel.FindingCourses) or nameof(CanvasConnectModel.CoursesSay))) return;
-        if (!c.ChromeConnected || c.FindingCourses) return;
-        chromeSaid = true;
-        if (g.OpenCard is { IsChrome: true } card) Fold(card, "Chrome is connected");
+        if (!c.BrowserConnected || c.FindingCourses) return;
+        browserSaid = true;
+        string browser = c.ConnectedIn(start: true);
+        if (g.OpenCard is { IsChrome: true } card) Fold(card, $"{browser} is connected");
         int n = c.Found.Count;
-        if (n > 0) g.Note($"Chrome is connected · Canvas found {n} course{(n == 1 ? "" : "s")}", $"Chrome is connected. Canvas found {n} course{(n == 1 ? "" : "s")}.");
-        else g.Note("Chrome is connected", $"Chrome is connected, but Canvas found no courses{(c.CoursesSay is { Length: > 0 } say ? ": " + say.TrimEnd('.') : "")}.", good: false);
+        if (n > 0) g.Note($"{browser} is connected · Canvas found {n} course{(n == 1 ? "" : "s")}", $"{browser} is connected. Canvas found {n} course{(n == 1 ? "" : "s")}.");
+        else g.Note($"{browser} is connected", $"{browser} is connected, but Canvas found no courses{(c.CoursesSay is { Length: > 0 } say ? ": " + say.TrimEnd('.') : "")}.", good: false);
         g.Refresh();
     }
 }

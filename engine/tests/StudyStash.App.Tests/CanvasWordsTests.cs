@@ -406,12 +406,12 @@ public class CanvasWordsTests
 
     [Theory]
     [InlineData("state-not-set-up", "Connect Canvas", "Bring in assignments, due dates and course files next to your lectures.")]
-    [InlineData("state-no-extension", "Finish setting up the Chrome extension", "It takes three clicks in Chrome.")]
+    [InlineData("state-no-extension", "Finish setting up the browser extension", "It takes a few clicks in your browser.")]
     [InlineData("state-chrome-away", "Is Chrome open?", "Chrome last checked in at 8:12. Canvas syncs only while Chrome is open.")]
     [InlineData("state-signed-out", "Sign in to Canvas in Chrome", "Syncing waits until you do.")]
     [InlineData("state-syncing", "Syncing… 3 left", "BIO 110, CALC II and HIST 210.")]
     [InlineData("state-connected", "Connected", "Last sync 10:24. Next at 11:24.")]
-    [InlineData("state-updated", "The Chrome extension updated itself", "Now version 1.4. Nothing to do.")]
+    [InlineData("state-updated", "The extension in Chrome updated itself", "Now version 1.4. Nothing to do.")]
     [InlineData("state-error", "Canvas didn’t answer", "school.instructure.com didn’t respond at 10:24. Study Stash will try again at 11:24.")]
     public void Describe_matches_the_design_s_words_for_every_state(string fixture, string title, string text)
     {
@@ -424,11 +424,28 @@ public class CanvasWordsTests
     [Theory]
     [InlineData("""{"state": "no_extension", "extension": {"connected": false, "key_matches": false, "last_seen": "2025-09-25T17:20:00Z"}}""")]
     [InlineData("""{"state": "no_extension", "extension": {"connected": false, "refused_at": "2025-09-25T17:20:00Z"}}""")]
-    public void A_chrome_with_an_old_key_is_asked_to_connect_again(string json)
+    public void A_browser_with_an_old_key_is_asked_to_connect_again(string json)
     {
         var s = System.Text.Json.JsonSerializer.Deserialize<CanvasApi.State>(json, CanvasApi.Json)!;
         var copy = CanvasWords.Describe(s, Zone);
-        Assert.Equal("Connect Chrome again", copy.Title);
+        Assert.Equal("Connect your browser again", copy.Title);
         Assert.Contains("earlier setup", copy.Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>The words name the browser the library heard the extension from, whichever it is; an extension from
+    /// before 1.6 (or an older library) doesn't say, and then it's "your browser", never a guess.</summary>
+    [Fact]
+    public void The_states_name_the_browser_the_extension_is_in_or_say_your_browser()
+    {
+        var firefox = System.Text.Json.JsonSerializer.Deserialize<CanvasApi.State>(
+            """{"state": "chrome_away", "extension": {"seen": "2025-09-25T15:12:00Z", "version": "1.6", "browser": "Firefox"}}""", CanvasApi.Json)!;
+        Assert.Equal(new CanvasWords.StateCopy("Is Firefox open?", "Firefox last checked in at 8:12. Canvas syncs only while Firefox is open."),
+            CanvasWords.Describe(firefox, Zone));
+
+        var unsaid = System.Text.Json.JsonSerializer.Deserialize<CanvasApi.State>(
+            """{"state": "chrome_away", "extension": {"seen": "2025-09-25T15:12:00Z", "version": "1.4"}}""", CanvasApi.Json)!;
+        Assert.Equal(new CanvasWords.StateCopy("Is your browser open?", "Your browser last checked in at 8:12. Canvas syncs only while your browser is open."),
+            CanvasWords.Describe(unsaid, Zone));
+        Assert.Equal("Sign in to Canvas in your browser", CanvasWords.Describe(unsaid with { Status = "signed_out" }, Zone).Title);
     }
 }

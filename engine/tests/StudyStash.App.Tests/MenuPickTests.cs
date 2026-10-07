@@ -99,6 +99,41 @@ public class MenuPickTests
         }
     }
 
+    /// <summary>Connecting Canvas on a computer with two browsers: "Use another browser" picks the one clicked, and the
+    /// step's button follows it.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public async Task Use_another_browser_picks_the_browser_you_click_and_closes(SkinKind skin)
+    {
+        var context = CanvasFixtures.Context(new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/state", "state-no-extension"),
+            browsers: [Services.Browsers.Chrome, Services.Browsers.Edge]);
+        using var m = new CanvasConnectModel(context, new Services.CanvasWatch(context));
+        await m.StartAsync(CanvasFixtures.Load<Services.CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Control view = skin == SkinKind.Mac ? new MacCanvasConnect { DataContext = m } : new WinCanvasConnect { DataContext = m };
+        var w = Host(view, skin);
+        try
+        {
+            var link = view.FindControl<Button>("OtherBrowser")!;
+            Assert.True(link.IsEffectivelyVisible);
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Add to Chrome" && t.IsEffectivelyVisible);
+            var menu = OpenFlyout(link);
+            Assert.True(Checked(Item(menu, "Chrome")));
+            Click(Item(menu, "Edge"));
+            Assert.Equal("Edge", m.BrowserName);
+            Assert.False(link.Flyout!.IsOpen);
+            Assert.Contains(view.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Add to Edge" && t.IsEffectivelyVisible);
+
+            menu = OpenFlyout(link);
+            Assert.True(Checked(Item(menu, "Edge")));
+            Assert.False(Checked(Item(menu, "Chrome")));
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]

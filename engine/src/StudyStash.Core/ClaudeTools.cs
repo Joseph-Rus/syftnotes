@@ -973,7 +973,7 @@ public static class ClaudeTools
                 ([Description("A Canvas REST API path, like /api/v1/courses/123/modules?include[]=items&per_page=100. Course ids come from canvas_courses.")] string path) =>
                     CanvasText(lib, "fetch", new JsonObject { ["url"] = path, ["kind"] = "json" }),
                 Named("canvas_api", "Read Canvas's API", "GETs a Canvas REST API path live, through the student's own Canvas sign-in in "
-                    + "Chrome, and returns the JSON text; when there's more, next_page is the address to read next. Use it only when "
+                    + "their browser, and returns the JSON text; when there's more, next_page is the address to read next. Use it only when "
                     + "the mirrored tools (due_assignments, get_assignment, class_modules, class_files, class_announcements) don't "
                     + "have it. Useful paths: /api/v1/courses/<id>/pages, /api/v1/courses/<id>/front_page, "
                     + "/api/v1/courses/<id>?include[]=syllabus_body, /api/v1/courses/<id>/files, /api/v1/courses/<id>/discussion_topics. "
@@ -982,7 +982,7 @@ public static class ClaudeTools
                 ([Description("A Canvas web page, like /courses/123 or /courses/123/pages/syllabus. Course ids come from canvas_courses.")] string url) =>
                     CanvasText(lib, "fetch", new JsonObject { ["url"] = url, ["kind"] = "text" }),
                 Named("canvas_page", "Read a Canvas page", "A Canvas web page read live, as Markdown text, through the student's own "
-                    + "Canvas sign-in in Chrome. Use it for a page the mirrored tools don't have, like a syllabus or a wiki page.", live: true)),
+                    + "Canvas sign-in in their browser. Use it for a page the mirrored tools don't have, like a syllabus or a wiki page.", live: true)),
         ]);
         if (!web)
             tools.Add(McpServerTool.Create(
