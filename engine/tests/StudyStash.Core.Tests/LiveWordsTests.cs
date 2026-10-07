@@ -87,9 +87,12 @@ public class LiveWordsTests
         }
     }
 
+    /// <summary>Waits for the recorder to have taken in what the pretend microphone played. It's over as soon as it
+    /// has; the limit is only there so a recorder that never does fails, and is long enough for a busy CI machine
+    /// (35 s of sound once took a Linux runner more than the 5 s this allowed).</summary>
     static void WaitFor(Func<bool> done)
     {
-        var until = DateTime.UtcNow.AddSeconds(5);
+        var until = DateTime.UtcNow.AddSeconds(60);
         while (!done() && DateTime.UtcNow < until) Thread.Sleep(10);
         Assert.True(done());
     }

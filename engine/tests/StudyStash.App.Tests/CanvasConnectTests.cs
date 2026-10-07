@@ -316,6 +316,58 @@ public class CanvasConnectTests
     }
 
     [Fact]
+    public async Task A_student_who_already_has_the_add_on_in_firefox_gets_its_code_though_theres_nowhere_to_send_them_for_it()
+    {
+        // Firefox is their usual browser and its add-on isn't published where this Study Stash knows of: the step
+        // offers Chrome. But they have the add-on (Mozilla published it since, or they added it from a file), and its
+        // own button asks for a code from Study Stash. The step said only that Firefox can't run the extension yet.
+        var log = new List<(string What, string Arg)>();
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas", NoExtensionYet)
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var m = Model(handler, home: "the-home", log: log, browsers: [Browsers.Chrome, Browsers.Edge], advice: new BrowserAdvice(Browsers.FirefoxDeveloper, NoneHere: false));
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Assert.Equal("Your usual browser, Firefox Developer Edition, can’t run the Study Stash extension yet. Study Stash will use Chrome instead.", m.AdviceText);
+        Assert.True(m.ShowHaveIt);
+        Assert.Equal("I already have it in Firefox Developer Edition", m.HaveItLabel);
+        Assert.False(m.ShowCode);
+
+        await m.HaveItCommand.ExecuteAsync(null);
+
+        // The step is Firefox's now: the code, the two things to do with it, and nothing opened or added.
+        Assert.Equal([("RememberBrowser", "Firefox Developer Edition")], log);
+        Assert.True(m.IsFirefox);
+        Assert.Equal("Firefox Developer Edition", m.BrowserName);
+        Assert.True(m.ShowCode);
+        Assert.Equal(new StudyStash.Core.Canvas.ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"),
+            StudyStash.Core.Canvas.Extension.ReadConnectionCode(m.ConnectionCode));
+        Assert.Equal("Study Stash reads Canvas through your own sign-in in Firefox Developer Edition. To connect the add-on you have there:", m.BrowserHelp);
+        Assert.Equal("In Firefox Developer Edition, click the Study Stash button (it may be under the puzzle-piece Extensions button).", m.FirefoxStep1);
+        Assert.Equal("Paste this code and click Connect.", m.FirefoxStep2);
+        Assert.True(m.WaitingForBrowser);
+        Assert.Equal("Waiting for Firefox Developer Edition…", m.WaitingLabel);
+        Assert.False(m.ShowAdvice);
+        Assert.False(m.ShowHaveIt);
+        Assert.False(m.ShowAddOnLink); // there's no add-on page to open again
+        Assert.False(m.ShowFolderLinks);
+
+        // Chrome after all: the step is Chrome's again, as it was.
+        Assert.True(m.CanSwitchBrowser);
+        m.BrowserChoices[0].Pick.Execute(null);
+        Assert.True(m.IsChromium);
+        Assert.False(m.ShowCode);
+        Assert.True(m.ShowHaveIt);
+        Assert.Equal("Click the Study Stash button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.", m.FirefoxStep2);
+
+        // Safari can't run it at all: there's nothing to already have.
+        var safari = Model(handler, advice: new BrowserAdvice(Browsers.Safari, NoneHere: false));
+        await safari.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Assert.False(safari.ShowHaveIt);
+        m.Dispose();
+        safari.Dispose();
+    }
+
+    [Fact]
     public async Task The_extension_turning_up_says_connected_and_moves_on_to_finding_courses()
     {
         var handler = new FakeLibrary()

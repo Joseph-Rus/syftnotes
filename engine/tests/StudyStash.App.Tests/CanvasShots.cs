@@ -401,7 +401,9 @@ public class CanvasShots
     /// connected and five courses found). On a computer with other browsers: "edge" (Edge is the one to use, with a
     /// quiet way to another), "firefox" (Firefox's three steps and its code) and "firefox-waiting" (Add to Firefox
     /// pressed). For a student who uses Safari: "safari" (Chrome is here, and is used instead) and "no-browser"
-    /// (nothing here will do: get Chrome).</summary>
+    /// (nothing here will do: get Chrome). For one who uses Firefox before Study Stash knows where its add-on is:
+    /// "firefox-not-yet" (Chrome is used instead, or they say they have the add-on already) and "firefox-have-it"
+    /// (they said so: its code, and nothing to add).</summary>
     internal static async Task<CanvasConnectModel> SetupStepAsync(string at, bool mac = false)
     {
         var handler = new FakeLibrary()
@@ -414,14 +416,16 @@ public class CanvasShots
         {
             "edge" => [Browsers.Edge, Browsers.Chrome, Browsers.Firefox],
             "firefox" or "firefox-waiting" => [Browsers.Firefox, Browsers.Chrome],
-            "safari" => [Browsers.Chrome, Browsers.Edge],
+            "safari" or "firefox-not-yet" or "firefox-have-it" => [Browsers.Chrome, Browsers.Edge],
             _ => null,
         };
-        var advice = at is "safari" or "no-browser" ? new BrowserAdvice(Browsers.Safari, NoneHere: at == "no-browser") : null;
+        var advice = at is "safari" or "no-browser" ? new BrowserAdvice(Browsers.Safari, NoneHere: at == "no-browser")
+            : at is "firefox-not-yet" or "firefox-have-it" ? new BrowserAdvice(Browsers.FirefoxDeveloper, NoneHere: false) : null;
         var context = CanvasFixtures.Context(handler, "the-home", browsers: browsers, advice: advice);
         var m = new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>(at == "found" ? "state-connected" : "state-no-extension"), []);
         if (at is "waiting" or "firefox-waiting") await m.AddToBrowserCommand.ExecuteAsync(null);
+        if (at == "firefox-have-it") await m.HaveItCommand.ExecuteAsync(null);
         if (at == "waiting" && mac) m.ExtensionFolder = Path.Combine("~", "Study Stash", "Chrome extension");
         for (int i = 0; i < 100 && m.IsFirefox && m.ConnectionCode.Length == 0; i++) await Task.Delay(10); // the code is asked for as the step opens
         m.Dispose(); // a still picture: the watch needn't keep asking
@@ -500,7 +504,7 @@ public class CanvasShots
     [AvaloniaFact]
     public async Task Mac_connect_setup()
     {
-        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser" })
+        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser", "firefox-not-yet", "firefox-have-it" })
         {
             var m = await SetupStepAsync(at, mac: true);
             foreach (var t in Themes)
@@ -515,7 +519,7 @@ public class CanvasShots
     [AvaloniaFact]
     public async Task Win_connect_setup()
     {
-        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser" })
+        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser", "firefox-not-yet", "firefox-have-it" })
         {
             var m = await SetupStepAsync(at);
             foreach (var t in Themes)
