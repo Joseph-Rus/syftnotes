@@ -133,6 +133,22 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
     [RelayCommand]
     void SetUpExtension() => OnSetUpExtension?.Invoke();
 
+    /// <summary>The extension runs in two browsers here (Chrome and Edge, say): the row offers the choice between
+    /// them, whether or not it's been made.</summary>
+    [ObservableProperty] public partial bool CanChooseBrowser { get; set; }
+    /// <summary>"The extension is in Chrome and Edge: pick the one Study Stash reads Canvas through".</summary>
+    [ObservableProperty] public partial string ChooseBrowserTip { get; set; } = "";
+    CanvasApi.BrowserQuestion? browsers;
+
+    /// <summary>Opens "Which browser do you use for Canvas?" for those browsers.</summary>
+    public Action<CanvasApi.BrowserQuestion>? OnChooseBrowser { get; set; }
+
+    [RelayCommand]
+    void ChooseBrowser()
+    {
+        if (browsers is { } ask) OnChooseBrowser?.Invoke(ask);
+    }
+
     public IReadOnlyList<PollChoice> PollChoices { get; } =
         [.. new[] { 15, 30, 60, 180, 1440 }.Select(m => new PollChoice(m, CanvasWords.PollIntervalText(m)))];
     [NotifyPropertyChangedFor(nameof(PollLabel))]
@@ -200,6 +216,9 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
         School = state.School.Length > 0 ? state.School : overview.Url;
         ExtensionLine = state.Extension is { Seen: { } seen } ext ? CanvasWords.ExtensionCheckedInLine(seen, ext.Version, zone, now) : "Not set up yet";
         ExtensionLabel = state.Extension?.Browser is { Length: > 0 } named ? $"{named} extension" : "Browser extension";
+        browsers = state.Extension?.Browsers is { Browsers.Count: > 1 } two ? two : null;
+        CanChooseBrowser = browsers is not null;
+        ChooseBrowserTip = browsers is null ? "" : $"The extension is in {BrowserChoiceModel.Join(browsers.Browsers)}: pick the one Study Stash reads Canvas through";
         SyncRuns = $"Runs while {CanvasWords.Browser(state)} is open";
         PollMinutes = state.PollMinutes > 0 ? state.PollMinutes : overview.PollMinutes;
 

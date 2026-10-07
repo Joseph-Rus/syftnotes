@@ -1427,7 +1427,7 @@ public static partial class Shell
     /// to the menu bar otherwise.</summary>
     static void UpdateDock() =>
         Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
-            || canvasConnectWindow?.IsVisible == true));
+            || canvasConnectWindow?.IsVisible == true || browserChoiceWindow?.IsVisible == true));
 
     // --- keeping it all up to date ------------------------------------------------------------------------------------
 

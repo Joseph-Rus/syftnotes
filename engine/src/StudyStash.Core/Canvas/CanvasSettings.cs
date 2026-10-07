@@ -52,6 +52,12 @@ public sealed class CanvasSettings
     /// before 1.4 that doesn't say): when it last asked, and its version and protocol. The library's Chrome and the
     /// laptop's can both run the extension; the fields above are the one that asked last.</summary>
     public Dictionary<string, ExtensionCopy> ExtensionCopies { get; set; } = [];
+    /// <summary>Every browser that has said its name while checking in, by where it is and then by name, and when it
+    /// last did (ISO): how the library knows that two browsers in one place both run the extension.</summary>
+    public Dictionary<string, Dictionary<string, string>> BrowsersSeen { get; set; } = [];
+    /// <summary>The browser the student picked for a place where two run the extension: that one reads Canvas while
+    /// it's running, and the other is left alone.</summary>
+    public Dictionary<string, string> BrowserChoice { get; set; } = [];
     /// <summary>Chrome's extension updated itself (it reloads from a folder Study Stash keeps up to date): Settings
     /// says so ("The Chrome extension updated itself. Now version 1.3.") until it's dismissed.</summary>
     public ExtensionUpdate? ExtensionUpdate { get; set; }
@@ -109,6 +115,33 @@ public sealed class CanvasSettings
 
     /// <summary>How often a check-in that changes nothing else is written down.</summary>
     public static readonly TimeSpan SeenEvery = TimeSpan.FromSeconds(15);
+
+    /// <summary>How long after a browser's last check-in it still counts as running the extension now. An idle
+    /// extension asks about once a minute, so five minutes of quiet means its browser is closed.</summary>
+    public static readonly TimeSpan BrowserHere = TimeSpan.FromMinutes(5);
+
+    /// <summary>Whether something that last checked in at <paramref name="seen"/> (ISO) is still here now.</summary>
+    public static bool Here(string? seen, DateTimeOffset now) =>
+        DateTimeOffset.TryParse(seen, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var at)
+        && now - at <= BrowserHere && now >= at - BrowserHere;
+
+    /// <summary>The browsers running the extension in one place right now, by name, in the order of the alphabet.</summary>
+    public IReadOnlyList<string> BrowsersHere(string where, DateTimeOffset now) =>
+        [.. BrowsersSeen.GetValueOrDefault(where, []).Where(b => Here(b.Value, now)).Select(b => b.Key).Order(StringComparer.Ordinal)];
+
+    /// <summary>A place where two browsers (or more) run the extension now: there's a choice between them, made or
+    /// not (Settings offers to change it). Null when there's only one, or none.</summary>
+    public (string Where, IReadOnlyList<string> Browsers)? BrowsersToChoose(DateTimeOffset now)
+    {
+        foreach (string where in BrowsersSeen.Keys.Order(StringComparer.Ordinal))
+            if (BrowsersHere(where, now) is { Count: > 1 } here) return (where, here);
+        return null;
+    }
+
+    /// <summary>That choice while the student hasn't made it (their pick isn't one of the browsers here): the
+    /// question the app asks by itself. Null when there's nothing to ask.</summary>
+    public (string Where, IReadOnlyList<string> Browsers)? BrowserQuestion(DateTimeOffset now) =>
+        BrowsersToChoose(now) is { } choice && !choice.Browsers.Contains(BrowserChoice.GetValueOrDefault(choice.Where, "")) ? choice : null;
 
     /// <summary>An extension with the current key is checking in: lately enough that it's running now. One that
     /// long-polls (protocol 3 and later) asks all the time, so 90 seconds of quiet means it's gone; an older one only

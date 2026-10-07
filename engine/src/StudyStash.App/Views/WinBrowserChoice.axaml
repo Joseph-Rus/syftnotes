@@ -1,0 +1,31 @@
+<!-- "Which browser do you use for Canvas?" (Windows): the question, a button for each browser the extension is
+     checking in from, and Not now. Draws no window: Windows/BrowserChoiceWindow gives it one. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.WinBrowserChoice"
+             x:DataType="vm:BrowserChoiceModel">
+  <UserControl.Styles>
+    <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
+  </UserControl.Styles>
+  <StackPanel Spacing="12">
+    <TextBlock Name="Question" Text="{x:Static vm:BrowserChoiceModel.Title}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+    <TextBlock Classes="ai-sub" Text="{Binding Lede}" TextWrapping="Wrap" />
+    <ItemsControl Name="Options" ItemsSource="{Binding Options}" Margin="0,6,0,0">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:BrowserOption">
+          <Button Classes="ai-pillbtn" Command="{Binding Pick}" AutomationProperties.Name="{Binding Name}">
+            <Border Classes="ai-pill" MinWidth="96"><TextBlock Text="{Binding Name}" HorizontalAlignment="Center" /></Border>
+          </Button>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <TextBlock Classes="ai-sub" Foreground="{DynamicResource Warn}" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" TextWrapping="Wrap" />
+    <Button Name="Later" Classes="ai-textbtn" Command="{Binding LaterCommand}" HorizontalAlignment="Left">
+      <TextBlock Text="Not now" FontSize="14" />
+    </Button>
+  </StackPanel>
+</UserControl>

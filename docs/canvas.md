@@ -277,6 +277,22 @@ What protocol 3 (1.4) adds:
   own version goes up (two Chromes on different versions taking turns aren't an update); a 1.3 copy (no `a`) that
   reloads into 1.4 is the same Chrome. Measured end to end: with both waiting, `canvas.json` is written about four
   times in 30 s and Find is answered at once.
+- **Two browsers in one place.** Chrome and Edge on the same computer (or any two that name themselves, 1.6 on) are
+  one copy to the library, since a copy is kept by where it is. Left to themselves they'd take turns on every
+  check-in, each renaming the extension to itself, and one not signed in to Canvas would keep saying so over the one
+  that is. So one reads Canvas and the other is left alone (`CanvasSync.InCharge`): the browser the student picked
+  while it's running, else the one that was reading already while it's running. "Running" is a check-in within
+  five minutes (`CanvasSettings.BrowserHere`), so a browser that's closed hands over to the other rather than to
+  nobody. The one left alone is answered like an idle one (its request is held, it gets no jobs) and isn't written
+  down as the copy. Each named browser's last check-in is kept in `canvas.json` `browsers_seen` (`where` → name →
+  when; at most every 15 s, dropped after 30 days) and the pick in `browser_choice` (`where` → name). While two are
+  running, `state.extension.browsers` is `{"where","browsers":[names]}`, and `choose_browser` is the same while the
+  pick isn't one of them: the app asks "Which browser do you use for Canvas?" by itself once (a small window that
+  doesn't take the keyboard), and Settings → Canvas offers "Change browser" for as long as there are two.
+  `POST /api/v2/canvas/browser {"where","browser"}` is the pick (400 with the reason for a browser the library never
+  heard from); it answers with the state. An extension before 1.6 names no browser and is never held back, and two
+  browsers that give the same name (Arc calls itself Chrome) can't be told apart: they take turns as two Chromes do.
+  The one left alone does nothing with its own "Sync Canvas now" either.
 - **A wrong key.** The library answers 401 before anything else, so a Chrome with a key it didn't make is never
   written down, takes no work and reads nothing on Canvas; the extension says `library_refused`. Once the right key is
   in its folder, the next alarm (within 30 s) connects it, with no reload: the key is read every round.
@@ -421,7 +437,8 @@ land: they fill `CourseIndex`, and every builder here reads straight from it.
 
 - `GET /api/v2/canvas/state` (also embedded as `state` in `GET /api/v2/canvas`): `{"state", "school", "url",
   "extension":{"seen","version","latest","outdated","updated":{"from","to","at"}|null,"connected","key_matches",
-  "last_seen","browser" (the browser that checked in last, "" from an extension before 1.6),"refused_at"}, "last_sync" (when the last
+  "last_seen","browser" (the browser that checked in last, "" from an extension before 1.6),
+  "browsers" and "choose_browser" ({"where","browsers":[…]}|null: two browsers in one place, above),"refused_at"}, "last_sync" (when the last
   sync finished), "next_sync", "poll_minutes", "syncing":{"left","total","classes":[…]}|null, "paused_until"|null,
   "error":{"text","at"}|null, "warnings":[…], "revision"}`. `state` is decided by `CanvasView.StateOf` in this order: `not_set_up`
   (no Canvas address) > `no_extension` (no Chrome has ever checked in with this library's **current** extension key)

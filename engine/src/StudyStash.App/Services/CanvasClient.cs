@@ -183,6 +183,11 @@ public sealed class CanvasClient(string serverUrl, string key, HttpClient? http 
         SendAsync<CanvasApi.NotificationsResponse>(HttpMethod.Get,
             canvasRoot + "/notifications" + (after is null ? "" : $"?after={after.Value.ToString(CultureInfo.InvariantCulture)}"), null, stop);
 
+    /// <summary>The student's pick of the browser that reads Canvas, where two run the extension. The library's
+    /// state after it; a library that won't take the pick says why (<see cref="CanvasLibraryException"/>).</summary>
+    public Task<CanvasApi.State?> ChooseBrowserAsync(string where, string browser, CancellationToken stop = default) =>
+        SendAsync<CanvasApi.State>(HttpMethod.Post, canvasRoot + "/browser", new JsonObject { ["where"] = where, ["browser"] = browser }, stop);
+
     public Task MarkNotificationsSeenAsync(long upTo, CancellationToken stop = default) =>
         SendAsync<JsonObject>(HttpMethod.Post, canvasRoot + "/notifications/seen", new JsonObject { ["up_to"] = upTo }, stop);
 

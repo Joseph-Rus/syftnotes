@@ -102,11 +102,12 @@ public sealed class LibraryRig : IAsyncDisposable
 
     /// <summary>One visit from Chrome's extension: ask for work (with <paramref name="key"/>, the library's own by
     /// default, from the library address <paramref name="address"/>), answer it from the pretend Canvas, and hand the
-    /// answers back. The number of jobs answered, or -1 when the library turned the key away.</summary>
-    public async Task<int> VisitAsync(string? key = null, string address = "http://127.0.0.1:1", CancellationToken stop = default)
+    /// answers back; <paramref name="browser"/> is the browser it says it runs in (1.6 on). The number of jobs
+    /// answered, or -1 when the library turned the key away.</summary>
+    public async Task<int> VisitAsync(string? key = null, string address = "http://127.0.0.1:1", CancellationToken stop = default, string browser = "")
     {
         string query = string.Create(CultureInfo.InvariantCulture,
-            $"?v={Extension.Version()}&p={Extension.Protocol}&a={Uri.EscapeDataString(address)}&wait=0");
+            $"?v={Extension.Version()}&p={Extension.Protocol}&a={Uri.EscapeDataString(address)}&wait=0{(browser.Length > 0 ? "&b=" + Uri.EscapeDataString(browser) : "")}");
         using var ask = new HttpRequestMessage(HttpMethod.Get, Url + "/api/v2/canvas/work" + query);
         ask.Headers.Add("X-Study-Stash-Key", key ?? ExtensionKey);
         using var r = await http.SendAsync(ask, stop);

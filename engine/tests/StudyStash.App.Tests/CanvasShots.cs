@@ -164,6 +164,12 @@ public class CanvasShots
         var signedOut = await Settings("state-signed-out");
         foreach (var t in Themes)
             Shot.Take("mac-06-canvas-settings-signed-out", SkinKind.Mac, t, () => CanvasFrames.MacSettings(new MacCanvasSettings { DataContext = signedOut }));
+        // The extension in two browsers: the row offers the choice between them.
+        var two = await Settings();
+        two.ExtensionLabel = "Chrome extension";
+        two.CanChooseBrowser = true;
+        foreach (var t in Themes)
+            Shot.Take("mac-06-canvas-settings-two-browsers", SkinKind.Mac, t, () => CanvasFrames.MacSettings(new MacCanvasSettings { DataContext = two }));
     }
 
     [AvaloniaFact]
@@ -179,6 +185,12 @@ public class CanvasShots
         var signedOut = await Settings("state-signed-out");
         foreach (var t in Themes)
             Shot.Take("win-06-canvas-settings-signed-out", SkinKind.Win, t, () => CanvasFrames.WinSettings(new WinCanvasSettings { DataContext = signedOut }));
+        // The extension in two browsers: the row offers the choice between them.
+        var two = await Settings();
+        two.ExtensionLabel = "Chrome extension";
+        two.CanChooseBrowser = true;
+        foreach (var t in Themes)
+            Shot.Take("win-06-canvas-settings-two-browsers", SkinKind.Win, t, () => CanvasFrames.WinSettings(new WinCanvasSettings { DataContext = two }));
     }
 
     // ---- design 09: the Due list and an assignment ----

@@ -281,13 +281,84 @@ public class CanvasTests
         Assert.Equal(("Firefox", "Firefox", "Chrome"), (s.BrowserName(), s.ExtensionCopies["another_computer"].Browser, s.ExtensionCopies["this_computer"].Browser));
         Assert.Equal("Firefox", CanvasView.State(sync, now)["extension"]!["browser"]!.GetValue<string>());
 
-        // The same Firefox switched to Zen (it says so at once); one that says nothing, or nothing fit to show, stays what it was.
-        sync.Work(false, "1.6", 3, "http://100.64.0.7:8787", browser: "Zen");
-        Assert.Equal("Zen", CanvasSettings.Load(dir.Path).ExtensionBrowser);
+        // One that says nothing (before 1.6), or nothing fit to show, stays what it was.
         now = now.AddSeconds(20);
         sync.Work(false, "1.5", 3, "http://100.64.0.7:8787");
-        Assert.Equal("Zen", CanvasSettings.Load(dir.Path).ExtensionBrowser);
+        Assert.Equal("Firefox", CanvasSettings.Load(dir.Path).ExtensionBrowser);
         Assert.Equal(["", "", "Opera GX"], new[] { "<b>Chrome</b>", new string('a', 25), " Opera GX " }.Select(CanvasSettings.CleanBrowser));
+    }
+
+    /// <summary>The extension in two browsers on one computer (Chrome and Edge, say). They used to take turns on every
+    /// check-in, each renaming the extension to itself and rewriting canvas.json. Now one reads Canvas and the other is
+    /// left alone: the one that was reading, until the student says which, and then the one they picked while it's
+    /// running.</summary>
+    [Fact]
+    public void Two_browsers_in_one_place_dont_take_turns_and_the_students_pick_decides()
+    {
+        using var dir = new TempDir();
+        var now = Now;
+        var sync = FakeCanvas.Library(dir, () => now);
+        CanvasSettings.Update(dir.Path, s => s.Courses.Clear());
+        const string here = "http://127.0.0.1:8787", place = "this_computer";
+        string InCharge() => CanvasSettings.Load(dir.Path).ExtensionCopies[place].Browser;
+        JsonNode? Question() => CanvasView.State(sync, now)["extension"]!["choose_browser"];
+
+        sync.Work(false, "1.5", 3, here, browser: "Chrome");
+        Assert.Null(Question());
+
+        // Edge too, on a newer version: Chrome goes on reading Canvas, and there's a question for the student.
+        now = now.AddSeconds(20);
+        sync.Work(false, "1.6", 3, here, browser: "Edge");
+        var s = CanvasSettings.Load(dir.Path);
+        Assert.Equal(("Chrome", "Chrome", "1.5"), (InCharge(), s.ExtensionBrowser, s.ExtensionVersion));
+        Assert.Null(s.ExtensionUpdate); // another browser's newer copy isn't "the extension updated itself"
+        Assert.Equal((place, "Chrome,Edge"), (Question()!["where"]!.GetValue<string>(), string.Join(",", Question()!["browsers"]!.AsArray().Select(b => b!.GetValue<string>()))));
+
+        // Turn and turn about changes nothing.
+        for (int i = 0; i < 3; i++)
+        {
+            now = now.AddSeconds(20);
+            sync.Work(false, "1.5", 3, here, browser: "Chrome");
+            now = now.AddSeconds(20);
+            sync.Work(false, "1.6", 3, here, browser: "Edge");
+        }
+        Assert.Equal("Chrome", InCharge());
+        Assert.Null(CanvasSettings.Load(dir.Path).ExtensionUpdate);
+
+        // A browser the library never heard from can't be picked. The student picks Edge: its name at once, no more
+        // question, and Chrome is the one left alone from its next check-in.
+        Assert.NotNull(sync.ChooseBrowser(place, "Safari"));
+        Assert.NotNull(sync.ChooseBrowser(place, "<b>Edge</b>"));
+        Assert.Null(sync.ChooseBrowser(place, "Edge"));
+        Assert.Equal("Edge", CanvasSettings.Load(dir.Path).ExtensionBrowser);
+        Assert.Null(Question());
+        // The choice is still there to change (Settings offers it), while both browsers are.
+        Assert.Equal(2, CanvasView.State(sync, now)["extension"]!["browsers"]!["browsers"]!.AsArray().Count);
+        now = now.AddSeconds(20);
+        string chromeSeen = CanvasSettings.Load(dir.Path).ExtensionCopies[place].Seen;
+        sync.Work(false, "1.5", 3, here, browser: "Chrome");
+        Assert.Equal(("Chrome", chromeSeen), (InCharge(), CanvasSettings.Load(dir.Path).ExtensionCopies[place].Seen)); // left alone: not even noted as the copy
+        now = now.AddSeconds(5);
+        sync.Work(false, "1.6", 3, here, browser: "Edge");
+        Assert.Equal(("Edge", "Edge"), (InCharge(), CanvasSettings.Load(dir.Path).ExtensionBrowser));
+        now = now.AddSeconds(20);
+        sync.Work(false, "1.5", 3, here, browser: "Chrome");
+        Assert.Equal("Edge", InCharge());
+
+        // Edge is closed. Five quiet minutes later Chrome reads Canvas again, rather than nobody; and Edge, opened
+        // again, is the one the student picked.
+        now = now.Add(CanvasSettings.BrowserHere).AddMinutes(1);
+        sync.Work(false, "1.5", 3, here, browser: "Chrome");
+        Assert.Equal("Chrome", InCharge());
+        now = now.AddSeconds(20);
+        sync.Work(false, "1.6", 3, here, browser: "Edge");
+        Assert.Equal("Edge", InCharge());
+        Assert.Null(Question());
+
+        // Chrome is closed for good: after five minutes there's no choice to offer any more.
+        now = now.Add(CanvasSettings.BrowserHere).AddMinutes(1);
+        sync.Work(false, "1.6", 3, here, browser: "Edge");
+        Assert.Null(CanvasView.State(sync, now)["extension"]!["browsers"]);
     }
 
     [Fact]

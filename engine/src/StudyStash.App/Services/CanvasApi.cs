@@ -206,9 +206,12 @@ public static class CanvasApi
     /// older than this field: go by the state); <see cref="KeyMatches"/> false means the browser that asked last has
     /// an old key and needs connecting again; <see cref="RefusedAt"/> is when one with another key was turned away.
     /// <see cref="Browser"/> is the browser that checked in last, as it names itself ("Chrome", "Edge", "Firefox"); ""
-    /// from an extension before 1.6, or a library that doesn't say.</summary>
+    /// from an extension before 1.6, or a library that doesn't say. <see cref="Browsers"/> is there while two browsers
+    /// in one place run the extension, and <see cref="ChooseBrowser"/> too while the student hasn't picked one.</summary>
     public sealed record ExtensionInfo
     {
+        public BrowserQuestion? Browsers { get; init; }
+        public BrowserQuestion? ChooseBrowser { get; init; }
         public DateTimeOffset? Seen { get; init; }
         public bool? Connected { get; init; }
         public bool? KeyMatches { get; init; }
@@ -219,6 +222,14 @@ public static class CanvasApi
         public string? Latest { get; init; }
         public bool Outdated { get; init; }
         public ExtensionUpdate? Updated { get; init; }
+    }
+
+    /// <summary>Two browsers (or more) run the extension in one place (<see cref="Where"/>: "this_computer" beside
+    /// the library, "another_computer"), by the names they give themselves: the student is asked which to use.</summary>
+    public sealed record BrowserQuestion
+    {
+        public string Where { get; init; } = "";
+        public IReadOnlyList<string> Browsers { get; init; } = [];
     }
 
     public sealed record ExtensionUpdate

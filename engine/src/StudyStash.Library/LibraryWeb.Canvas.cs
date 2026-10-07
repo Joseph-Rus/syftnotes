@@ -183,6 +183,13 @@ public sealed partial class LibraryWeb
             CanvasSeen.Mark(cfg.Home, cls, ids);
             return Http.Json(new JsonObject { ["ok"] = true });
         })));
+        // Two browsers in one place run the extension: the student's pick of the one that reads Canvas.
+        app.MapPost("/api/v2/canvas/browser", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            if (Canvas.ChooseBrowser(S(body?["where"]), S(body?["browser"])) is { } refused) return Http.Detail(400, refused);
+            return Http.Json(CanvasView.State(Canvas, Canvas.Clock(), refusedAt));
+        })));
         app.MapGet("/api/v2/canvas/notifications", (HttpContext ctx, long? after) => Api(ctx, () =>
         {
             var soonNow = Canvas.Clock();

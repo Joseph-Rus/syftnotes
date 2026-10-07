@@ -42,6 +42,9 @@ public static class CanvasView
         return courses.Keys.Where(cls => !Done(cls)).ToList();
     }
 
+    static JsonObject? Choice((string Where, IReadOnlyList<string> Browsers)? choice) => choice is { } c
+        ? new JsonObject { ["where"] = c.Where, ["browsers"] = new JsonArray(c.Browsers.Select(b => (JsonNode)b).ToArray()) } : null;
+
     /// <summary>The state, for the app's Canvas screens. <c>extension.browser</c> is the browser that checked in last
     /// ("Chrome", "Firefox"; "" before 1.6); <c>extension.connected</c> is a Chrome checking in now with
     /// this library's current key; <c>seen</c> is when one last did (null: never); <c>key_matches</c> says whether the
@@ -65,6 +68,10 @@ public static class CanvasView
                 ["seen"] = When(s.SeenWithKey), ["version"] = s.ExtensionVersion, ["latest"] = Extension.Version(), ["outdated"] = s.ExtensionOutdated,
                 ["connected"] = s.ExtensionConnected(now), ["key_matches"] = s.LastKeyMatches, ["last_seen"] = When(s.ExtensionSeen),
                 ["browser"] = s.ExtensionBrowser,
+                // Two browsers in one place run the extension: which they are (Settings offers the choice), and the
+                // same again while the student hasn't said which to use (the app asks).
+                ["browsers"] = Choice(s.BrowsersToChoose(now)),
+                ["choose_browser"] = Choice(s.BrowserQuestion(now)),
                 ["refused_at"] = When(refusedAt),
                 ["updated"] = s.ExtensionUpdate is { Dismissed: false } up ? new JsonObject { ["from"] = up.From, ["to"] = up.To, ["at"] = When(up.At) } : null,
             },
