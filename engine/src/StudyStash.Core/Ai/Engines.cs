@@ -32,6 +32,10 @@ public sealed record EngineChecks
     /// <summary>Install the Ollama app on this computer from its maker's own download, reporting bytes done and total
     /// as it comes down. True when it's installed afterwards.</summary>
     public Func<Action<long, long>?, Task<bool>> InstallOllama { get; init; } = _ => Task.FromResult(false);
+    /// <summary>This computer's memory in GB, or null when it can't be told: which free model it can run.</summary>
+    public Func<double?> RamGb { get; init; } = () => null;
+    /// <summary>Free room on the disk models are kept on, in GB, or null when it can't be told.</summary>
+    public Func<double?> DiskFreeGb { get; init; } = () => null;
 
     /// <summary>The real probes: this computer, its files, its environment, its Ollama, its terminals.</summary>
     public static readonly EngineChecks Machine = new()
@@ -44,6 +48,8 @@ public sealed record EngineChecks
         StartOllama = host => Ollama.StartAsync(host),
         PullModel = (model, host, progress, ct) => Ollama.PullAsync(model, host, progress, ct: ct),
         InstallOllama = progress => Ready.InstallOllamaAsync(_ => { }, progress, StudyStash.Core.Machine.Platform, StudyStash.Core.Machine.Run, Ready.Download),
+        RamGb = StudyStash.Core.Machine.TotalRamGb,
+        DiskFreeGb = () => StudyStash.Core.Machine.DiskFreeGb(),
         OpenSignIn = (home, terminal, id) =>
         {
             var (exe, args) = Engines.SignInCommand(id);
@@ -198,11 +204,23 @@ public static class Engines
             : !Ollama.HasModel(installedModels.Select(m => m.Name).ToList(), cfg.EffectiveSummaryModel) ? "model_missing"
             : "ready";
         var models = (installedModels ?? []).Select(m => new ModelOption(m.Name, $"{m.Name} ({Ollama.SizeLabel(m.SizeGb)})")).ToList();
+        string wanted = FreeModel(cfg, checks);
         return new EngineInfo("ollama", Name("ollama"), state)
         {
             Installed = installed, Model = cfg.EffectiveSummaryModel, Models = models, Site = AiProviders.Get("ollama").Site,
+            SetUpGb = state == "ready" ? 0 : Ollama.DownloadGb(wanted),
+            Small = wanted == Ollama.SmallModel,
         };
     }
+
+    /// <summary>
+    /// The model the free AI writes notes with on this library's computer: the one the library was told to use, or,
+    /// for a library nobody has chosen one for, the one this computer's memory can run. (A new library starts on
+    /// <see cref="Config.DefaultOllamaModel"/>, 24 GB to download and for a computer with 40 GB of memory: a student's
+    /// laptop set up from the app was left to download that.)
+    /// </summary>
+    public static string FreeModel(Config cfg, EngineChecks checks) =>
+        cfg.SummaryModel.Length > 0 || cfg.OllamaModel != Config.DefaultOllamaModel ? cfg.EffectiveSummaryModel : Ollama.RecommendedModel(checks.RamGb());
 
     static EngineInfo CliRow(string id, AiSettings settings, EngineChecks checks)
     {

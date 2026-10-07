@@ -558,6 +558,13 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     public Task SetUpOllamaAsync(string model, string host, CancellationToken ct = default)
     {
         if (Pulling is { Why.Length: 0 }) return Task.CompletedTask;
+        // No room for it: said before anything is downloaded, not by a download that stops near its end.
+        double need = Ollama.DownloadGb(model);
+        if (need > 0 && Checks.DiskFreeGb() is { } free && free < need + 2)
+        {
+            Pulling = new PullInfo(model, 0, $"This computer doesn't have room for the free AI: it needs about {Math.Ceiling(need + 2):0} GB free, and has {Math.Floor(free):0}.");
+            return Task.CompletedTask;
+        }
         bool installed = Checks.OllamaInstalled();
         Pulling = new PullInfo(model, 0, "") { Step = installed ? "start" : "app" };
         return Task.Run(async () =>

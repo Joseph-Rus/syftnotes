@@ -224,6 +224,79 @@ public class AiApiTests
         Assert.Null((await remote.EnginesAsync())!.Pulling);
     }
 
+    /// <summary>The free AI a library sets up is one its computer can run. A library made by the app for "Just this
+    /// computer" was never given a model, so it stood on the built-in one: 24 GB to download, for a computer with 40 GB
+    /// of memory, on a student's laptop.</summary>
+    [Theory]
+    [InlineData(8.0, 100.0, "", "qwen3:1.7b", 1.4, true)]   // a small laptop: the small one, said to be simpler
+    [InlineData(16.0, 100.0, "", "gemma4:e4b", 10.0, false)]
+    [InlineData(64.0, 100.0, "", "qwen3.6:35b-a3b", 24.0, false)]
+    [InlineData(8.0, 100.0, "llama3.2", "llama3.2", 0.0, false)] // one the student chose stays, whatever the memory
+    public async Task The_free_AI_set_up_on_a_computer_is_one_its_memory_can_run(double ram, double disk, string chosen, string model, double gb, bool small)
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { PoolPassword = "pw", OllamaEnabled = true, SummaryModel = chosen };
+        Configs.Save(cfg);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var models = new List<(string Name, double SizeGb)>();
+        var pulled = new List<string>();
+        var checks = new FakeChecks().Build() with
+        {
+            OllamaInstalled = () => true,
+            OllamaModels = _ => Task.FromResult<List<(string Name, double SizeGb)>?>(models.ToList()),
+            RamGb = () => ram,
+            DiskFreeGb = () => disk,
+            PullModel = (name, _, _, _) =>
+            {
+                pulled.Add(name);
+                models.Add((name, gb));
+                return Task.FromResult((true, ""));
+            },
+        };
+        var jobs = new AiJobs(cfg.Home) { Checks = checks };
+        await using var site = await Site(cfg, store, jobs);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+
+        // Before anything is downloaded, the row can say how much there is to get, and that it's the small one.
+        var free = (await remote.EnginesAsync())!.Engines.Single(e => e.Id == "ollama");
+        Assert.Equal(("model_missing", gb, small), (free.State, free.SetUpGb, free.Small));
+
+        await remote.SetUpAsync("ollama");
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline && (await remote.EnginesAsync())!.Pulling is { Why.Length: 0 }) await Task.Delay(20);
+
+        Assert.Equal([model], pulled);
+        Assert.Equal("ready", (await remote.EnginesAsync())!.Engines.Single(e => e.Id == "ollama").State);
+        Assert.Equal(model, Configs.Load(cfg.Home).EffectiveSummaryModel); // kept: the library writes notes with it from now on
+    }
+
+    [Fact]
+    public async Task A_computer_without_room_for_the_free_AI_is_told_before_anything_is_downloaded()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { PoolPassword = "pw", OllamaEnabled = true };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var did = new List<string>();
+        var checks = new FakeChecks().Build() with
+        {
+            OllamaInstalled = () => false,
+            RamGb = () => 16,
+            DiskFreeGb = () => 5.7,
+            InstallOllama = _ =>
+            {
+                did.Add("app");
+                return Task.FromResult(true);
+            },
+        };
+        await using var site = await Site(cfg, store, new AiJobs(cfg.Home) { Checks = checks });
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+
+        var said = await remote.SetUpAsync("ollama");
+
+        Assert.Equal("This computer doesn't have room for the free AI: it needs about 12 GB free, and has 5.", said!.Overview!.Pulling!.Why);
+        Assert.Empty(did);
+    }
+
     /// <summary>A student with no paid plan presses one button, and the library gets the free AI ready whatever it
     /// still needs: its app from its maker, starting it, the model it writes notes with. Nothing here is a real
     /// download or a real Ollama.</summary>

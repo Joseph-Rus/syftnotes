@@ -112,6 +112,8 @@ public static partial class AiWords
 
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup
     /// the library is this computer.</summary>
+    static string Simpler(bool small, string device) => small ? $" A small one fits this {device}'s memory, so its notes are simpler than Claude's or ChatGPT's." : "";
+
     /// <summary>An engine's name in setup's "who writes your notes" list, in a student's terms: what they'd say they
     /// have (Claude, ChatGPT), or what it is (a free AI on this computer). The tools' own names (Claude Code, Codex,
     /// Ollama) are in the line under it, so they're recognised in Settings later.</summary>
@@ -128,15 +130,21 @@ public static partial class AiWords
     {
         "app" => $"Downloading the free AI… {Math.Round(Math.Clamp(at.Fraction, 0, 1) * 100):0}%",
         "start" => "Starting it…",
-        _ => $"Downloading what it writes notes with (a few gigabytes, once)… {Math.Round(Math.Clamp(at.Fraction, 0, 1) * 100):0}%",
+        _ => $"Downloading what it writes notes with ({HowBig(Core.Ollama.DownloadGb(at.Model))}, once)… {Math.Round(Math.Clamp(at.Fraction, 0, 1) * 100):0}%",
     };
 
-    public static string SetupAbout(string id, string state, string device = "computer") => id == "ollama"
+    /// <summary>"about 10 GB", "about 1.4 GB", or "a few gigabytes" for a size that isn't known.</summary>
+    public static string HowBig(double gb) => gb <= 0 ? "a few gigabytes" : $"about {gb.ToString(gb < 10 ? "0.#" : "0", System.Globalization.CultureInfo.InvariantCulture)} GB";
+
+    /// <summary>A row's line in setup's "who writes your notes" list. For the free AI that still needs setting up:
+    /// how much there is to download for this computer (<paramref name="gb"/>), and, where only the small one fits
+    /// (<paramref name="small"/>), that its notes are simpler: said before the download, not found out after.</summary>
+    public static string SetupAbout(string id, string state, string device = "computer", double gb = 0, bool small = false) => id == "ollama"
         ? state switch
         {
-            "not_installed" => $"Free and private (Ollama). Study Stash downloads it for you: a few gigabytes, once.",
+            "not_installed" => $"Free and private (Ollama). Study Stash downloads it for you: {HowBig(gb)}, once.{Simpler(small, device)}",
             "not_running" => "Free and private (Ollama). It's here, and needs starting.",
-            "model_missing" => "Free and private (Ollama). It's here, and still needs what it writes notes with.",
+            "model_missing" => $"Free and private (Ollama). It's here, and still needs what it writes notes with: {HowBig(gb)}, once.{Simpler(small, device)}",
             _ => $"Free and private (Ollama). It runs on this {device}: nothing you record leaves it.",
         }
         : id is "claude" or "codex" ? (id == "claude" ? "With your paid Claude plan, through Claude Code. " : "With your paid ChatGPT plan, through Codex. ") + state switch

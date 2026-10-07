@@ -158,7 +158,14 @@ public sealed partial class LibraryWeb
         {
             string id = (string)ctx.Request.RouteValues["id"]!;
             if (id != "ollama") return Http.Detail(400, $"{Engines.Name(id)} isn't set up from here.");
-            _ = Jobs.SetUpOllamaAsync(cfg.EffectiveSummaryModel, cfg.OllamaHost); // in the background; AiOverview.Pulling shows it
+            // A library nobody chose a model for gets the one this computer can run, and keeps it.
+            string model = Engines.FreeModel(cfg, Jobs.Checks);
+            if (model != cfg.EffectiveSummaryModel)
+            {
+                cfg.OllamaModel = model;
+                Configs.Save(cfg);
+            }
+            _ = Jobs.SetUpOllamaAsync(model, cfg.OllamaHost); // in the background; AiOverview.Pulling shows it
             return AiJson(new AiSaid("Getting the free AI ready…", await AiOverviewAsync()));
         })));
 

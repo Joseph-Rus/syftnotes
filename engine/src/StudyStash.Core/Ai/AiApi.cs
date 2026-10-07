@@ -13,6 +13,11 @@ public sealed record ModelOption(string Id, string Label);
 /// <summary>state: ready | unchecked | not_installed | not_signed_in | not_running | model_missing | limited | failed</summary>
 public sealed record EngineInfo(string Id, string Name, string State)
 {
+    /// <summary>The free AI, while it still needs setting up: about how much there is to download for this computer,
+    /// in GB (0 when that isn't known).</summary>
+    public double SetUpGb { get; init; }
+    /// <summary>The free AI on a computer with little memory: only the small model fits, and its notes are simpler.</summary>
+    public bool Small { get; init; }
     public bool Installed { get; init; }
     public string Model { get; init; } = "";
     public List<ModelOption> Models { get; init; } = [];
