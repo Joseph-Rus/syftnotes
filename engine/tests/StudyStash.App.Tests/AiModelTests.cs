@@ -591,6 +591,39 @@ public class AiSetupModelTests
     }
 
     [AvaloniaFact]
+    public async Task Where_setup_can_get_claude_and_chatgpt_ready_with_buttons_their_rows_have_one_and_no_commands()
+    {
+        var lib = new FakeAiLibrary { Overview = With(("claude", "not_installed"), ("codex", "not_signed_in")) };
+        var asked = new List<string>();
+        var model = new AiSetupModel(lib)
+        {
+            Windows = false,
+            SetUpPaid = id =>
+            {
+                asked.Add(id);
+                return Task.CompletedTask;
+            },
+        };
+        await model.Load();
+
+        var claude = model.Engines.Single(r => r.Id == "claude");
+        var chatgpt = model.Engines.Single(r => r.Id == "codex");
+        Assert.Equal(("Claude", "Set it up", true, false), (claude.Name, claude.OpenLabel, claude.ShowOneButton, claude.HasHelp));
+        Assert.Equal(("ChatGPT", "Sign in", true, false), (chatgpt.Name, chatgpt.OpenLabel, chatgpt.ShowOneButton, chatgpt.HasHelp));
+        Assert.False(chatgpt.ShowSignIn); // not the sign-in that opens a terminal
+        Assert.Empty(claude.Help);
+
+        await claude.OpenCommand.ExecuteAsync(null);
+        await chatgpt.OpenCommand.ExecuteAsync(null);
+        Assert.Equal(["claude", "codex"], asked);
+        Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
+
+        // Clicking the row itself (it can't write notes yet) doesn't open a list of steps: there aren't any.
+        claude.SelectCommand.Execute(null);
+        Assert.False(claude.ShowHelp);
+    }
+
+    [AvaloniaFact]
     public async Task A_free_AI_that_couldnt_be_got_says_why_and_offers_to_try_again()
     {
         var lib = new FakeAiLibrary { Overview = Nothing("not_installed") };

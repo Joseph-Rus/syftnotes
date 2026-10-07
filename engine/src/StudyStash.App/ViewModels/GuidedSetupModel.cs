@@ -182,6 +182,16 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public bool PickedCodex => Picked == "codex";
     /// <summary>No paid plan: Continue goes to setup by hand, with the free AI on this computer picked for the notes.</summary>
     public bool PickedFree => Picked == "free";
+
+    /// <summary>Setup by hand's notes step asked for Claude or ChatGPT to be got ready on this computer: the two
+    /// screens guided setup has for that (download and set up, sign in) show, and then it's back to that step with the
+    /// AI picked, not on to the chat. "" otherwise.</summary>
+    string forNotes = "";
+    public bool ForNotes => forNotes.Length > 0;
+    /// <summary>It's ready (its id): the by-hand notes step looks at it again and picks it.</summary>
+    public Action<string>? ReadyForNotes { get; set; }
+    /// <summary>The quiet link at the foot of those screens: back to the step they came from.</summary>
+    public string ByHandLabel => ForNotes ? "Back" : "Set up by hand";
     public bool CanContinue => Screen switch
     {
         GuidedScreen.PickAi => Picked.Length > 0,
@@ -414,6 +424,13 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void UseOllama()
     {
+        if (ForNotes)
+        {
+            // Asked for from the notes step, which has the free AI's own button: back there.
+            StopWork();
+            BackToNotes(ready: false);
+            return;
+        }
         save(s => s.SetupAi = "ollama");
         PreferOllama = true;
         StopWork();
@@ -426,8 +443,47 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void ByHand() => ByHandAt("");
 
+    /// <summary>From setup by hand's notes step, "Set it up" on Claude or ChatGPT: what guided setup does for them,
+    /// with buttons (the maker's installer, then its own sign-in page), where that step used to give commands to paste
+    /// into Terminal. Already here and signed in, it's straight back with it picked.</summary>
+    public async Task GetReadyForNotesAsync(string id)
+    {
+        if (id is not ("claude" or "codex")) return;
+        StopWork();
+        forNotes = id;
+        Picked = id;
+        Notify(nameof(ForNotes), nameof(ByHandLabel));
+        var found = await Task.Run(() => services.Find(AgentCli.Get(id)));
+        if (id == "codex") CodexFound = found;
+        else ClaudeFound = found;
+        if (!found.Works)
+        {
+            ToInstall();
+            return;
+        }
+        await ToSignInAsync();
+        if (AiReady && Screen == GuidedScreen.SignIn) BackToNotes();
+    }
+
+    /// <summary>Back to the by-hand step that asked, the AI ready (or the student gave up on it: <paramref name="ready"/>
+    /// false, and nothing is picked).</summary>
+    void BackToNotes(bool ready = true)
+    {
+        string id = forNotes;
+        forNotes = "";
+        Notify(nameof(ForNotes), nameof(ByHandLabel));
+        Screen = GuidedScreen.Manual;
+        if (ready) ReadyForNotes?.Invoke(id);
+    }
+
     void ByHandAt(string item)
     {
+        if (ForNotes)
+        {
+            StopWork();
+            BackToNotes(ready: false);
+            return;
+        }
         if (!AiReady && settings().SetupAi is not ("claude" or "codex" or "ollama")) save(s => s.SetupAi = "manual");
         if (!AiReady) StopWork();
         var items = SetupChecklist.From(Setup, Facts());
@@ -475,6 +531,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             case GuidedScreen.Install when Installed:
                 await ToSignInOrChatAsync();
                 break;
+            case GuidedScreen.SignIn when AiReady && ForNotes:
+                BackToNotes();
+                break;
             case GuidedScreen.SignIn when AiReady:
                 StartChat("[Study Stash] Setup was opened.");
                 break;
@@ -487,7 +546,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         StopWork();
         Picked = Other.Id;
-        save(s => s.SetupAi = Picked);
+        if (ForNotes) forNotes = Picked; // the notes step asked: it's the other one that goes back to it
+        else save(s => s.SetupAi = Picked);
         session = ""; // the other AI can't carry on this one's conversation
         ResetSignIn();
         if (Found.Works) await ToSignInAsync();
@@ -576,7 +636,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     async Task ToSignInOrChatAsync()
     {
         await ToSignInAsync();
-        if (AiReady && Screen == GuidedScreen.SignIn) StartChat("[Study Stash] Setup was opened.");
+        if (!AiReady || Screen != GuidedScreen.SignIn) return;
+        if (ForNotes) BackToNotes();
+        else StartChat("[Study Stash] Setup was opened.");
     }
 
     /// <summary>The sign-in screen: already signed in goes straight to the plan check.</summary>

@@ -140,6 +140,8 @@ public static class AiDemo
             Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings.",
             WriteNotes = _ => Task.FromResult(true),
             Wait = () => new TaskCompletionSource().Task,
+            // As in setup's own window: Claude and ChatGPT are got ready with buttons, not commands.
+            SetUpPaid = _ => Task.CompletedTask,
         };
         m.Load().GetAwaiter().GetResult();
         return m;

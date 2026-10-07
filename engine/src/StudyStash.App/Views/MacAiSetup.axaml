@@ -96,7 +96,7 @@
                         <TextBlock Classes="ai-row-sub" Text="Recommended" IsVisible="{Binding Recommended}" VerticalAlignment="Center" />
                         <!-- The free AI, not ready yet: one button gets it ready, and nothing is left to do by hand -->
                         <Button AutomationProperties.Name="{Binding OpenLabel}" Name="SetUpFree" Classes="ai-pillbtn" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOneButton}">
-                          <Border Classes="ai-pill primary">
+                          <Border Classes="ai-pill" Classes.primary="{Binding Primary}">
                             <TextBlock Text="{Binding OpenLabel}" />
                           </Border>
                         </Button>

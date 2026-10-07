@@ -374,7 +374,7 @@
           <DockPanel IsVisible="{Binding !OnChat}">
             <Border DockPanel.Dock="Bottom" Height="64" Background="{DynamicResource Footer}" BorderBrush="{DynamicResource Sep}" BorderThickness="0,1,0,0" Padding="24,0">
               <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                <Button Name="ByHand" Classes="quiet" Command="{Binding ByHandCommand}"><TextBlock Text="Set up by hand" /></Button>
+                <Button Name="ByHand" Classes="quiet" Command="{Binding ByHandCommand}"><TextBlock Text="{Binding ByHandLabel}" /></Button>
                 <Button Name="Continue" Grid.Column="2" Classes="push default" Command="{Binding ContinueCommand}" IsEnabled="{Binding CanContinue}"><TextBlock Text="Continue" FontSize="14" /></Button>
               </Grid>
             </Border>

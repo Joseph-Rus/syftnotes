@@ -1313,7 +1313,16 @@ public static partial class Shell
                         OpenTerminal = TerminalApp.Open,
                         OpenUrl = url => Dialogs.OpenUrl(url),
                         WriteNotes = WriteNotesAsync,
+                        // Claude and ChatGPT are got ready by guided setup's own two screens, with buttons, where
+                        // setup's window has them.
+                        SetUpPaid = guidedSetup is { } withButtons ? withButtons.GetReadyForNotesAsync : null,
                     };
+                    if (guidedSetup is { } guided)
+                        guided.ReadyForNotes = id =>
+                        {
+                            // Back on this step: the library looks at it afresh, and it's the pick when it works.
+                            if (model.Ai?.Engines.FirstOrDefault(r => r.Id == id) is { } row) _ = row.CheckAgainCommand.ExecuteAsync(null);
+                        };
                 }
                 _ = LoadAiStepAsync(model.Ai);
                 break;

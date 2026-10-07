@@ -356,7 +356,7 @@
           <!-- Pick your AI, Install, Sign in -->
           <DockPanel Margin="0,12,0,20" IsVisible="{Binding !OnChat}">
             <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="40,0">
-              <Button Name="ByHand" Classes="quiet" Command="{Binding ByHandCommand}"><TextBlock Text="Set up by hand" /></Button>
+              <Button Name="ByHand" Classes="quiet" Command="{Binding ByHandCommand}"><TextBlock Text="{Binding ByHandLabel}" /></Button>
               <Button Name="Continue" Grid.Column="2" Classes="push tint" Command="{Binding ContinueCommand}" IsEnabled="{Binding CanContinue}">
                 <TextBlock Text="Continue" FontSize="13" FontWeight="Medium" />
               </Button>

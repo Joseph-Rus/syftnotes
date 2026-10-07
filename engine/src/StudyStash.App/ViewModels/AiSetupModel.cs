@@ -53,6 +53,8 @@ public sealed partial class AiSetupRow : ObservableObject
     public double Fraction { get; init; }
     public bool Steady { get; init; }
     public bool ShowOneButton => OneButton && !Working;
+    /// <summary>The filled button: the free AI's, which costs nothing to say yes to. Claude's and ChatGPT's are plain.</summary>
+    public bool Primary => Id == "ollama";
     internal Action? HelpChanged { get; set; }
 
     partial void OnShowHelpChanged(bool value)
@@ -98,6 +100,10 @@ public sealed partial class AiSetupModel : ObservableObject
     /// <summary>Opens Terminal (PowerShell on Windows) for a command to be pasted into.</summary>
     public Action? OpenTerminal { get; init; }
     public Action<string>? OpenUrl { get; init; }
+    /// <summary>Gets Claude or ChatGPT ready on this computer with buttons (its maker's installer, then its own
+    /// sign-in page), for a host that can: setup's window, which has guided setup's screens for it. Their rows then
+    /// have one button each, and no commands to paste into a terminal. Null: the steps and commands, as before.</summary>
+    public Func<string, Task>? SetUpPaid { get; init; }
     /// <summary>Turns the library's note writing (and sorting with AI) on or off; true when it did. Null in a host
     /// that can't, which then doesn't offer "No AI for now".</summary>
     public Func<bool, Task<bool>>? WriteNotes { get; init; }
@@ -186,25 +192,27 @@ public sealed partial class AiSetupModel : ObservableObject
         var working = overview.Pulling is { Why.Length: 0 } at ? at : null;
         var failed = overview.Pulling is { Why.Length: > 0 } stopped ? stopped : null;
         bool freeNeedsWork = overview.Engines.FirstOrDefault(e => e.Id == "ollama") is { State: "not_installed" or "not_running" or "model_missing" };
+        // Claude or ChatGPT, not on this computer or not signed in, where the host gets them ready with buttons.
+        bool Buttons(EngineInfo e) => SetUpPaid is not null && e is { Id: "claude" or "codex", State: "not_installed" or "not_signed_in" };
         Engines.Clear();
         // Claude Code and Codex always show, with the steps to get them going; Gemini only once it's here.
         foreach (var e in overview.Engines.Where(e => e.Id is "ollama" or "claude" or "codex" || e.Installed))
         {
-            var steps = EngineSetupWords.Steps(e.Id, e.State, Windows);
+            var steps = Buttons(e) ? [] : EngineSetupWords.Steps(e.Id, e.State, Windows);
             string terminal = EngineSetupWords.TerminalName(Windows);
             var row = new AiSetupRow
             {
                 Id = e.Id,
                 Name = AiWords.SetupName(e.Id, e.Name, Windows ? "PC" : "Mac"),
-                About = AiWords.SetupAbout(e.Id, e.State, Windows ? "PC" : "Mac"),
+                About = AiWords.SetupAbout(e.Id, e.State, Windows ? "PC" : "Mac", e.SetUpGb, e.Small),
                 State = e.State,
                 Recommended = e.Id == "ollama" && !freeNeedsWork,
-                OneButton = e.Id == "ollama" && freeNeedsWork,
+                OneButton = e.Id == "ollama" && freeNeedsWork || Buttons(e),
                 Working = e.Id == "ollama" && working is not null,
                 Progress = e.Id == "ollama" && working is not null ? AiWords.FreeAiProgress(working) : "",
                 Fraction = working?.Fraction ?? 0,
                 Steady = working is { Step: "start" },
-                ShowSignIn = e.State == "not_signed_in" && steps.Count == 0,
+                ShowSignIn = e.State == "not_signed_in" && steps.Count == 0 && !Buttons(e),
                 CanWrite = CanWrite(e),
                 Selected = e.Id == SelectedNotes,
                 First = Engines.Count == 0,
@@ -216,6 +224,8 @@ public sealed partial class AiSetupModel : ObservableObject
                 OpenLabel = (e.Id, e.State) switch
                 {
                     ("ollama", _) => failed is null ? "Set it up" : "Try again",
+                    (_, "not_signed_in") when Buttons(e) => "Sign in",
+                    _ when Buttons(e) => "Set it up",
                     (_, "not_signed_in") => $"Sign in in {terminal}",
                     _ => $"Open {terminal}",
                 },
@@ -332,6 +342,12 @@ public sealed partial class AiSetupModel : ObservableObject
         if (row.Id == "ollama")
         {
             await SetUpFreeAsync();
+            return;
+        }
+        if (row.OneButton && SetUpPaid is { } withButtons)
+        {
+            Say = null;
+            await withButtons(row.Id);
             return;
         }
         if (row.State == "not_signed_in")

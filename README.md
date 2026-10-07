@@ -150,7 +150,7 @@ notes and answers your questions (you can switch to a free local model in Settin
 
 **No paid plan?** That's the first screen's third answer, **I don't have a paid plan**. It goes to
 setup by hand, a few plain steps. On its notes step, **Free AI on this Mac** has one button, **Set it
-up**: Study Stash downloads a free AI (Ollama, a few gigabytes, once), installs and starts it, and
+up**: Study Stash downloads a free AI (Ollama, with a model sized for your computer), installs and starts it, and
 shows how far along it is, with nothing to do in a browser or a terminal. You can carry on with setup
 while it downloads. Or leave **No AI for now** picked: lectures are recorded and transcribed, and
 notes can be switched on later in Settings. **Set up by hand** is on every screen too, and
@@ -191,6 +191,13 @@ engine, lectures are still filed and keep their transcripts. With Claude Code, C
 lecture's transcript (and, for its diagrams, its notes) goes to that AI under your own account;
 with Ollama nothing leaves your computer.
 
+**In setup, each one is a button.** Setup's notes step lists them as **Free AI on this Mac**,
+**Claude** and **ChatGPT**, each with **Set it up**. The free one downloads Ollama and a model that
+fits your computer's memory (about 1.4 GB on a small laptop, 10 GB on one with 14 GB of memory or
+more, 24 GB on a big machine), installs and starts it, and says first if the disk has no room.
+Claude and ChatGPT get their maker's own installer and their own sign-in page. Nothing is typed into
+a terminal. The commands below are for doing it yourself, or on a library you set up another way.
+
 **Ollama** — free, and nothing leaves your computer. Install it from [ollama.com](https://ollama.com),
 and Study Stash offers to download a model.
 
@@ -215,8 +222,9 @@ npm install -g @openai/codex                        # Mac or Windows (or on a Ma
 On a Mac, Study Stash also uses the Codex inside the ChatGPT app and the Claude Code the Claude app
 keeps, when there's no copy installed on its own: nothing to install.
 
-Setup's notes step shows these commands with a Copy button, opens Terminal for you, and has
-**Check again** to pick the engine up once it's installed and signed in.
+Where setup can't do it with buttons (a library you reach from another computer), its notes step
+shows these commands with a Copy button, opens Terminal for you, and has **Check again** to pick the
+engine up once it's installed and signed in.
 
 **Rich notes** are the diagrams, formula plots and drawings a lecture's notes get after they're written.
 They're on, as they always were; **Settings → AI engines → Rich notes** switches them off (plain

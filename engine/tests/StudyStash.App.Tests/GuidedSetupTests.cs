@@ -294,6 +294,50 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
+    public async Task Setup_by_hand_gets_claude_ready_with_buttons_and_comes_back_to_the_step_that_asked()
+    {
+        // Setup by hand's notes step used to give Claude's two commands to paste into Terminal. It borrows guided
+        // setup's two screens instead (download and set up, sign in), and then it's back on the step with Claude ready.
+        await using var rig = await new Rig(cli: "claude").OpenAsync();
+        var g = rig.Guided;
+        g.ByHandCommand.Execute(null);
+        rig.Setup.Go(rig.Setup.Steps[2].Step); // a few steps in
+        var step = rig.Setup.Step;
+        string? ready = null;
+        g.ReadyForNotes = id => ready = id;
+
+        await g.GetReadyForNotesAsync("claude");
+        Assert.Equal(GuidedScreen.Install, g.Screen); // not on this computer yet
+        Assert.True(g.ForNotes);
+        Assert.Equal("Back", g.ByHandLabel);
+
+        // Back, having done nothing: the step they left, and nothing picked.
+        g.ByHandCommand.Execute(null);
+        Assert.Equal((GuidedScreen.Manual, step, (string?)null), (g.Screen, rig.Setup.Step, ready));
+        Assert.Equal("Set up by hand", g.ByHandLabel);
+
+        // This time through: one button installs it, its own page signs in, and Continue is back on the step.
+        await g.GetReadyForNotesAsync("claude");
+        await g.InstallCommand.ExecuteAsync(null);
+        Assert.True(g.Installed);
+        await g.ContinueCommand.ExecuteAsync(null);
+        Assert.Equal(GuidedScreen.SignIn, g.Screen);
+        File.WriteAllText(Path.Combine(rig.Bin, "signed-in"), "");
+        await g.OpenSignInCommand.ExecuteAsync(null);
+        await Until(() => g.AiReady, "Claude signed in and its plan checked");
+        await g.ContinueCommand.ExecuteAsync(null);
+        Assert.Equal((GuidedScreen.Manual, step, "claude"), (g.Screen, rig.Setup.Step, ready));
+        Assert.False(g.ForNotes);
+        Assert.Empty(rig.Terminals); // nothing was opened to paste a command into
+        Assert.Empty(g.Thread); // and no chat was started: this is setup by hand
+
+        // Already here and signed in (the Claude app's own, say): straight back, with nothing to press.
+        ready = null;
+        await g.GetReadyForNotesAsync("claude");
+        Assert.Equal((GuidedScreen.Manual, "claude"), (g.Screen, ready));
+    }
+
+    [AvaloniaFact]
     public async Task An_install_offline_or_a_plan_without_the_cli_says_so_with_a_way_on()
     {
         await using var rig = await new Rig(cli: "codex").OpenAsync();
