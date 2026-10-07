@@ -470,7 +470,7 @@ public class ConnectorTests
         Assert.Contains("Study notes", html);
         Assert.Contains("Canvas assignments and files", html);
         Assert.Contains("It can't change or delete anything.", html);
-        Assert.DoesNotContain("AI tool access is off", html);
+        Assert.DoesNotContain("Reading is switched off for AI apps", html);
 
         // The list follows the toggles, not a fixed script.
         door.Access.Reading = new ReadingScopes(Lectures: false, Notes: true, Canvas: false);
@@ -482,7 +482,7 @@ public class ConnectorTests
         // Tools off: Claude is told up front, before it tries a call and gets refused.
         door.Access.ToolsOn = false;
         html = await (await c.GetAsync("/authorize?" + Query(fields))).Content.ReadAsStringAsync();
-        Assert.Contains("AI tool access is off in Study Stash, so Claude Code won't see anything until you turn it on.", html);
+        Assert.Contains("Reading is switched off for AI apps in Study Stash (Settings → AI apps), so Claude Code won't see anything until you turn it on.", html);
     }
 
     [Fact]
@@ -1024,7 +1024,7 @@ public class ConnectorTests
         {
             var r = await mcp.CallToolAsync(t.Name, new Dictionary<string, object?>());
             Assert.True(r.IsError);
-            Assert.Equal("AI tool access is off in Study Stash. The student can turn it on in Study Stash → Settings → AI tool access.", Text(r));
+            Assert.Equal("Reading is switched off for AI apps in Study Stash. The student can turn it on in Study Stash → Settings → AI apps.", Text(r));
         }
 
         door.Access.ToolsOn = true; // no reconnect needed
@@ -1049,7 +1049,7 @@ public class ConnectorTests
         {
             var r = await mcp.CallToolAsync(name, new Dictionary<string, object?>());
             Assert.True(r.IsError, name);
-            Assert.Equal("Study Stash's settings don't let AI tools read Canvas right now (Settings → AI tool access → Canvas assignments and files).", Text(r));
+            Assert.Equal("Study Stash's settings don't let AI tools read Canvas right now (Settings → AI apps → Canvas assignments and files).", Text(r));
         }
         Assert.True((await mcp.CallToolAsync("list_classes", new Dictionary<string, object?>())).IsError is null or false);
     }

@@ -159,9 +159,9 @@ public class AiEnginesModelTests
         await model.Load();
 
         Assert.True(model.ShowDrawnBy);
-        Assert.Equal(["Automatic", "Same as notes", "Ollama", "Claude Code", "Codex", "Gemini"], model.DiagramsChoices.Select(c => c.Name)); // off is the Rich notes switch's
+        Assert.Equal(["Automatic", "Same as notes", "Ollama", "Claude", "ChatGPT", "Gemini"], model.DiagramsChoices.Select(c => c.Name)); // off is the Rich notes switch's
         Assert.Equal("Automatic", model.SelectedDiagramsName);
-        Assert.Equal("Claude Code reads each transcript", model.DiagramsAbout);
+        Assert.Equal("Claude reads each transcript", model.DiagramsAbout);
         Assert.Empty(lib.DefaultsCalls);
 
         model.SelectedDiagrams = "codex";

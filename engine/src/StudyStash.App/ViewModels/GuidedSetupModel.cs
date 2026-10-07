@@ -400,7 +400,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// does it, keeping everything else in the file). Null when they're all connected; else why not, for the card.</summary>
     public string? ConnectAiApps()
     {
-        const string later = "You can connect it later in Settings → AI tool access.";
+        const string later = "You can connect it later in Settings → AI apps.";
         if (services.ConnectAiApp is not { } connect) return "Study Stash can't change that app's settings here. " + later;
         foreach (var app in aiApps.Where(a => !a.Added || a.OtherCopy || a.Outdated))
             if (!connect(app.Id).Ok) services.Log($"[setup] connecting {app.Name} didn't work");

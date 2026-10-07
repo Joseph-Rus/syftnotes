@@ -10,8 +10,8 @@ public static class AiDemo
     static readonly List<EngineInfo> Engines_ =
     [
         new EngineInfo("ollama", "Ollama", "ready") { Installed = true, Model = "qwen3:30b", Models = [new ModelOption("qwen3:30b", "qwen3:30b (19 GB)")] },
-        new EngineInfo("claude", "Claude Code", "ready") { Installed = true },
-        new EngineInfo("codex", "Codex", "not_signed_in") { Installed = true },
+        new EngineInfo("claude", "Claude", "ready") { Installed = true },
+        new EngineInfo("codex", "ChatGPT", "not_signed_in") { Installed = true },
         new EngineInfo("gemini", "Gemini", "not_installed") { Site = "https://ai.google.dev/gemini-api" },
     ];
 
@@ -185,7 +185,7 @@ public static class AiDemo
 
     static readonly NotesVersion DraftNotes = new(
         "# Summary\n\nA recursive function calls itself on a smaller input until it reaches a base case it can answer directly. Every call gets a frame on the call stack holding its own arguments and locals.",
-        "Claude Code", Now);
+        "Claude", Now);
 
     static AiNotesModel LoadedNotes(RewriteInfo info)
     {
@@ -206,11 +206,11 @@ public static class AiDemo
 
     /// <summary>Rewriting with Claude Code: the current notes are exactly as before.</summary>
     public static AiNotesModel NotesRewriting() =>
-        LoadedNotes(new RewriteInfo(LectureId, "working") { Engine = "claude", EngineName = "Claude Code", Current = CurrentNotes });
+        LoadedNotes(new RewriteInfo(LectureId, "working") { Engine = "claude", EngineName = "Claude", Current = CurrentNotes });
 
     /// <summary>Claude Code's draft is ready to keep, compare or use.</summary>
     public static AiNotesModel NotesReady() =>
-        LoadedNotes(new RewriteInfo(LectureId, "ready") { Engine = "claude", EngineName = "Claude Code", Current = CurrentNotes, Draft = DraftNotes });
+        LoadedNotes(new RewriteInfo(LectureId, "ready") { Engine = "claude", EngineName = "Claude", Current = CurrentNotes, Draft = DraftNotes });
 
     /// <summary>The ready draft, "Compare" already pressed.</summary>
     public static AiNotesModel NotesComparing()
@@ -223,7 +223,7 @@ public static class AiDemo
     /// <summary>Claude Code's rewrite failed: the current notes are unchanged.</summary>
     public static AiNotesModel NotesFailed() => LoadedNotes(new RewriteInfo(LectureId, "failed")
     {
-        Engine = "claude", EngineName = "Claude Code", Error = "Claude Code hit its usage limit.", Current = CurrentNotes,
+        Engine = "claude", EngineName = "Claude", Error = "Claude hit its usage limit.", Current = CurrentNotes,
     });
 
     // -----------------------------------------------------------------------------------------------------------
@@ -238,14 +238,14 @@ public static class AiDemo
             Problems =
             [
                 new AiProblemInfo("engine-offline", "engine_offline", "ollama", "Ollama"),
-                new AiProblemInfo("not-signed-in", "not_signed_in", "codex", "Codex") { FallbackTo = "claude" },
+                new AiProblemInfo("not-signed-in", "not_signed_in", "codex", "ChatGPT") { FallbackTo = "claude" },
                 new AiProblemInfo("model-missing", "model_missing", "ollama", "Ollama") { SizeGb = 40 },
-                new AiProblemInfo("usage-limit", "usage_limit", "claude", "Claude Code") { Until = DateTime.Today.AddHours(15).ToString("o"), FallbackTo = "ollama" },
+                new AiProblemInfo("usage-limit", "usage_limit", "claude", "Claude") { Until = DateTime.Today.AddHours(15).ToString("o"), FallbackTo = "ollama" },
             ],
         };
         var m = new AiProblemsModel(new Library(overview));
         m.Load().GetAwaiter().GetResult();
-        m.AddFellBack("fell-back", "Ollama", "Claude Code didn't respond in time.");
+        m.AddFellBack("fell-back", "Ollama", "Claude didn't respond in time.");
         m.AddAccessRequest("access-1", "Codex", "Eli's MacBook", () => Task.CompletedTask, () => Task.CompletedTask);
         return m;
     }
@@ -257,7 +257,7 @@ public static class AiDemo
         var m = new AiProblemsModel(new Library(Overview()));
         m.Load().GetAwaiter().GetResult();
         m.AddLibraryOffline(() => Task.CompletedTask);
-        m.AddRewriteFailed("rewrite-1", "Claude Code", "Claude Code hit its usage limit.", () => Task.CompletedTask);
+        m.AddRewriteFailed("rewrite-1", "Claude", "Claude hit its usage limit.", () => Task.CompletedTask);
         return m;
     }
 }

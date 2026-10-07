@@ -86,7 +86,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         new() { Id = "Classes", Glyph = "book_2", Label = "Classes" },
         new() { Id = "Notes", Glyph = "edit_note", Label = "Notes and sorting" },
         new() { Id = "AI", Glyph = "auto_awesome", Label = "Your AI" },
-        new() { Id = "Access", Glyph = "hub", Label = "AI tool access" },
+        new() { Id = "Access", Glyph = "hub", Label = "AI apps" },
         new() { Id = "Canvas", Glyph = "school", Label = "Canvas" },
         new() { Id = "Folders", Glyph = "folder", Label = "Folders" },
         new() { Id = "Phone", Glyph = "smartphone", Label = "Phone" },

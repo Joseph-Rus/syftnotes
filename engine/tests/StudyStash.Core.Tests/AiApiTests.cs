@@ -53,7 +53,7 @@ public class AiApiTests
         Assert.Equal(400, unknown.Status);
         var notInstalled = await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.DefaultsAsync(notes: "codex"));
         Assert.Equal(409, notInstalled.Status);
-        Assert.Contains("Codex", notInstalled.Message);
+        Assert.Contains("ChatGPT isn't set up on your library's computer.", notInstalled.Message);
 
         // Who draws the diagrams: automatic comes to the notes engine here; off, and an engine that isn't here, refused.
         Assert.Equal(("auto", "claude"), (overview.Diagrams, overview.DiagramsBy));
@@ -108,7 +108,7 @@ public class AiApiTests
             Engine = "claude", Live = "Today we studied the cell membrane and osmosis in class.",
         });
         Assert.NotNull(reply);
-        Assert.Equal(("Cells have membranes.", "claude", "Claude Code", false), (reply!.Answer, reply.Engine, reply.EngineName, reply.FellBack));
+        Assert.Equal(("Cells have membranes.", "claude", "Claude", false), (reply!.Answer, reply.Engine, reply.EngineName, reply.FellBack));
     }
 
     [Fact]

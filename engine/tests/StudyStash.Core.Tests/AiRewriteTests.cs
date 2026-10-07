@@ -68,17 +68,17 @@ public class AiRewriteTests
         var ready = await UntilAsync(remote, "lec-1", i => i.State != "working");
         Assert.Equal("ready", ready.State);
         Assert.Equal("New, better notes.", ready.Draft!.Markdown);
-        Assert.Equal("Claude Code", ready.Draft.By);
+        Assert.Equal("Claude", ready.Draft.By); // the AI's own name, not the tool it's reached through
         Assert.Equal("Old notes about cells.", ready.Current!.Markdown); // still the old notes: nobody chose yet
 
         var used = await remote.RewriteUseAsync("lec-1");
         Assert.NotNull(used);
         Assert.Equal("none", used!.State); // decided: nothing left pending
         Assert.Equal("New, better notes.", used.Current!.Markdown);
-        Assert.Equal("Claude Code", used.Current.By); // notes_model, read back through WhoWrote
+        Assert.Equal("Claude", used.Current.By); // notes_model, read back through WhoWrote
 
         var row = store.Get("lec-1")!;
-        Assert.Equal("Claude Code", Engines.WhoWrote(row.SummaryModel ?? ""));
+        Assert.Equal("Claude", Engines.WhoWrote(row.SummaryModel ?? ""));
         Assert.Contains("New, better notes.", File.ReadAllText(row.MdPath!)); // the .md file itself was rewritten
     }
 
@@ -227,7 +227,7 @@ public class AiRewriteTests
 
         var notInstalled = await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.RewriteStartAsync("lec-1", "codex"));
         Assert.Equal(409, notInstalled.Status);
-        Assert.Contains("Codex", notInstalled.Message);
+        Assert.Equal("ChatGPT isn't set up on your library's computer.", notInstalled.Message);
     }
 
     [Fact]

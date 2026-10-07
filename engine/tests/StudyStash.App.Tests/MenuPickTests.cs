@@ -229,7 +229,7 @@ public class MenuPickTests
         try
         {
             var select = view.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is MenuFlyout);
-            Click(Item(OpenFlyout(select), "Claude Code"));
+            Click(Item(OpenFlyout(select), "Claude"));
             Assert.Equal("claude", m.SelectedAsk);
             Assert.True(m.AskChoices.Single(c => c.Id == "claude").Current);
         }

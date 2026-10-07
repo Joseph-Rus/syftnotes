@@ -41,7 +41,7 @@ public class AiShots
     static readonly (string Icon, string Title)[] MacSections =
     [
         ("tune", "General"), ("mic", "Recording"), ("dns", "Library"), ("auto_awesome", "Your AI"),
-        ("hub", "AI tool access"), ("school", "Canvas"), ("keyboard", "Shortcuts"),
+        ("hub", "AI apps"), ("school", "Canvas"), ("keyboard", "Shortcuts"),
     ];
 
     /// <summary>The Mac settings window, its sidebar selected on <paramref name="selected"/>, the pane on the right.</summary>
@@ -146,7 +146,7 @@ public class AiShots
 
     // ---------------------------------------------------------------------------------------------------------
     // The library setup wizard's AI step (design 15): "This is the library" and "Transcription model" done,
-    // "Your AI" current, "AI tool access" still to come. Fixed to this one step: the wizard itself is WS6's.
+    // "Your AI" current, "AI apps" still to come. Fixed to this one step: the wizard itself is WS6's.
     // ---------------------------------------------------------------------------------------------------------
 
     static Control SetupSidebarRow(string title, bool done, bool current, int number, bool optional)
@@ -199,7 +199,7 @@ public class AiShots
         rows.Children.Add(SetupSidebarRow("This is the library", done: true, current: false, number: 1, optional: false));
         rows.Children.Add(SetupSidebarRow("Transcription model", done: true, current: false, number: 2, optional: false));
         rows.Children.Add(SetupSidebarRow("Your AI", done: false, current: true, number: 3, optional: false));
-        rows.Children.Add(SetupSidebarRow("AI tool access", done: false, current: false, number: 4, optional: true));
+        rows.Children.Add(SetupSidebarRow("AI apps", done: false, current: false, number: 4, optional: true));
 
         var sidebarInner = new Border { CornerRadius = new CornerRadius(18), Padding = new Thickness(10, 0, 10, 14), Child = rows };
         Res(sidebarInner, Border.BackgroundProperty, sidebarInner, "Glass");
@@ -271,7 +271,7 @@ public class AiShots
         nav.Children.Add(WinSetupSidebarRow("This is the library", done: true, current: false, number: 1, optional: false));
         nav.Children.Add(WinSetupSidebarRow("Transcription model", done: true, current: false, number: 2, optional: false));
         nav.Children.Add(WinSetupSidebarRow("Your AI", done: false, current: true, number: 3, optional: false));
-        nav.Children.Add(WinSetupSidebarRow("AI tool access", done: false, current: false, number: 4, optional: true));
+        nav.Children.Add(WinSetupSidebarRow("AI apps", done: false, current: false, number: 4, optional: true));
 
         var caption = new TextBlock { Text = "Library setup · step 3 of 4", FontSize = 12, Margin = new Thickness(32, 28, 0, 0) };
         Res(caption, TextBlock.ForegroundProperty, caption, "Fg2");
@@ -685,14 +685,14 @@ public class AiShots
     public void Mac_ai_tool_access()
     {
         foreach (var t in Themes)
-            Shot.Take("mac-14-ai-tool-access", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI tool access", new MacAiAccess { DataContext = AccessModel() }));
+            Shot.Take("mac-14-ai-tool-access", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI apps", new MacAiAccess { DataContext = AccessModel() }));
     }
 
     [AvaloniaFact]
     public void Win_ai_tool_access()
     {
         foreach (var t in Themes)
-            Shot.Take("win-14-ai-tool-access", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel() }));
+            Shot.Take("win-14-ai-tool-access", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI apps", new WinAiAccess { DataContext = AccessModel() }));
     }
 
     // --- 14: the "Claude and ChatGPT on the web and phone" card (connectors task 5): off, on and answering, and a Funnel problem.
@@ -701,42 +701,42 @@ public class AiShots
     public void Mac_ai_tool_access_claude_off()
     {
         foreach (var t in Themes)
-            Shot.Take("mac-14-ai-tool-access-claude-off", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI tool access", new MacAiAccess { DataContext = AccessModel("off") }));
+            Shot.Take("mac-14-ai-tool-access-claude-off", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI apps", new MacAiAccess { DataContext = AccessModel("off") }));
     }
 
     [AvaloniaFact]
     public void Mac_ai_tool_access_claude_ready()
     {
         foreach (var t in Themes)
-            Shot.Take("mac-14-ai-tool-access-claude-ready", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI tool access", new MacAiAccess { DataContext = AccessModel("ready") }));
+            Shot.Take("mac-14-ai-tool-access-claude-ready", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI apps", new MacAiAccess { DataContext = AccessModel("ready") }));
     }
 
     [AvaloniaFact]
     public void Mac_ai_tool_access_claude_problem()
     {
         foreach (var t in Themes)
-            Shot.Take("mac-14-ai-tool-access-claude-problem", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI tool access", new MacAiAccess { DataContext = AccessModel("problem") }));
+            Shot.Take("mac-14-ai-tool-access-claude-problem", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI apps", new MacAiAccess { DataContext = AccessModel("problem") }));
     }
 
     [AvaloniaFact]
     public void Win_ai_tool_access_claude_off()
     {
         foreach (var t in Themes)
-            Shot.Take("win-14-ai-tool-access-claude-off", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel("off") }));
+            Shot.Take("win-14-ai-tool-access-claude-off", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI apps", new WinAiAccess { DataContext = AccessModel("off") }));
     }
 
     [AvaloniaFact]
     public void Win_ai_tool_access_claude_ready()
     {
         foreach (var t in Themes)
-            Shot.Take("win-14-ai-tool-access-claude-ready", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel("ready") }));
+            Shot.Take("win-14-ai-tool-access-claude-ready", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI apps", new WinAiAccess { DataContext = AccessModel("ready") }));
     }
 
     [AvaloniaFact]
     public void Win_ai_tool_access_claude_problem()
     {
         foreach (var t in Themes)
-            Shot.Take("win-14-ai-tool-access-claude-problem", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI tool access", new WinAiAccess { DataContext = AccessModel("problem") }));
+            Shot.Take("win-14-ai-tool-access-claude-problem", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI apps", new WinAiAccess { DataContext = AccessModel("problem") }));
     }
 }
 

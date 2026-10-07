@@ -153,7 +153,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             if (row.Status is Store.Queued or Store.Working)
                 throw new RewriteRefusedException(409, "the library is still writing this lecture's notes.");
             if (!Installed(engine))
-                throw new RewriteRefusedException(409, $"{Engines.Name(engine)} isn't installed on your library's computer.");
+                throw new RewriteRefusedException(409, $"{Engines.Name(engine)} isn't set up on your library's computer.");
 
             var cts = new CancellationTokenSource();
             var job = new Job { Engine = engine, Started = ai.Checks.Now().ToString("o"), Cts = cts, AttachmentIds = [.. m.Attached.Select(a => a.Id)] };

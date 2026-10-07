@@ -434,7 +434,7 @@ public static class ClaudeWeb
         if (reading.Notes) items.Add("Study notes");
         if (reading.Canvas) items.Add("Canvas assignments and files");
         string list = items.Count > 0 ? $"<ul class=\"reading\">{string.Concat(items.Select(i => $"<li>{Ui.Esc(i)}</li>"))}</ul>" : "";
-        string toolsOff = access.ToolsOn ? "" : $"<p class=\"note\">AI tool access is off in Study Stash, so {Ui.Esc(name)} won't see anything until you turn it on.</p>";
+        string toolsOff = access.ToolsOn ? "" : $"<p class=\"note\">Reading is switched off for AI apps in Study Stash (Settings → AI apps), so {Ui.Esc(name)} won't see anything until you turn it on.</p>";
         string body = $"""
             <main><form method="post" action="/authorize">
             <img src="/icon.png" alt="" width="56" height="56">

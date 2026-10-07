@@ -181,7 +181,7 @@ public sealed partial class AiSetupModel : ObservableObject
             SelectedAsk = overview.Ask == overview.Notes || overview.Engines.FirstOrDefault(e => e.Id == overview.Ask) is not { Installed: true } ? SameAsNotes : overview.Ask;
             picked = true;
         }
-        AskChoices = [new EngineChoice(SameAsNotes, "Same as notes"), .. overview.Engines.Where(e => e.Installed).Select(e => new EngineChoice(e.Id, e.Name))];
+        AskChoices = [new EngineChoice(SameAsNotes, "Same as notes"), .. overview.Engines.Where(e => e.Installed).Select(e => new EngineChoice(e.Id, AiWords.PlainName(e.Id, e.Name)))];
         foreach (var c in AskChoices) c.Pick = new RelayCommand(() => SelectedAsk = c.Id);
         EngineChoice.Mark(AskChoices, SelectedAsk);
         OnPropertyChanged(nameof(AskChoices));

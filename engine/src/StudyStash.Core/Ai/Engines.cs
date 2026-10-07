@@ -68,7 +68,7 @@ public sealed record EngineChecks
         OllamaModels = _ => Task.FromResult<List<(string, double)>?>(null),
         StartOllama = _ => Task.FromResult(false),
         PullModel = (_, _, _, _) => Task.FromResult((false, "nothing here downloads a model")),
-        OpenSignIn = (_, _, id) => throw new InvalidOperationException($"{Engines.Name(id)} isn't installed on this computer."),
+        OpenSignIn = (_, _, id) => throw new InvalidOperationException($"{Engines.Tool(id)} isn't installed on this computer."),
         Now = () => DateTime.Now,
     };
 }
@@ -81,21 +81,33 @@ public static class Engines
 {
     public static readonly string[] Order = ["ollama", "claude", "codex", "gemini"];
 
+    /// <summary>An AI's name, as the person using Study Stash knows it: who wrote a lecture's notes, who answered, who
+    /// is at its limit. Claude and ChatGPT, not the tools Study Stash reaches them through (<see cref="Tool"/>).</summary>
     public static string Name(string id) => id switch
     {
         "ollama" => "Ollama",
-        "claude" => "Claude Code",
-        "codex" => "Codex",
+        "claude" => "Claude",
+        "codex" => "ChatGPT",
         "gemini" => "Gemini",
         _ => id,
+    };
+
+    /// <summary>The tool Study Stash reaches an AI through, for the few places that are about the tool itself (what
+    /// is installed, what a terminal runs): Claude Code for Claude, Codex for ChatGPT.</summary>
+    public static string Tool(string id) => id switch
+    {
+        "claude" => "Claude Code",
+        "codex" => "Codex",
+        "gemini" => "Gemini CLI",
+        _ => Name(id),
     };
 
     /// <summary>Which engine wrote a lecture's notes, from the model name the pipeline recorded
     /// (<see cref="AiJobs.Describe"/>: an Ollama model like "qwen3:30b", or "Claude sonnet", "ChatGPT", "Gemini …").</summary>
     public static string WhoWrote(string notesModel) => notesModel switch
     {
-        _ when notesModel.StartsWith("Claude", StringComparison.Ordinal) => "Claude Code",
-        _ when notesModel.StartsWith("ChatGPT", StringComparison.Ordinal) || notesModel.StartsWith("Codex", StringComparison.Ordinal) => "Codex",
+        _ when notesModel.StartsWith("Claude", StringComparison.Ordinal) => "Claude",
+        _ when notesModel.StartsWith("ChatGPT", StringComparison.Ordinal) || notesModel.StartsWith("Codex", StringComparison.Ordinal) => "ChatGPT",
         _ when notesModel.StartsWith("Gemini", StringComparison.Ordinal) => "Gemini",
         { Length: > 0 } => "Ollama",
         _ => "",
@@ -178,7 +190,7 @@ public static class Engines
         var (state, _) = CliState(id, settings, checks);
         return state switch
         {
-            "not_installed" => $"{Name(id)} isn't installed on your library's computer.",
+            "not_installed" => $"{Name(id)} isn't set up on your library's computer.",
             "not_signed_in" => $"{Name(id)} isn't signed in on your library.",
             "limited" => $"{Name(id)} hit its usage limit.",
             _ => null,

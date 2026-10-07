@@ -34,7 +34,7 @@ public class LibrarySettingsModelTests
 
         Assert.Equal("This laptop", model.ComputerNavTitle);
         Assert.Equal(["General", "Appearance", "Shortcuts", "Recording", "Calendars", "Connection"], model.ComputerNav.Select(n => n.Label));
-        Assert.Equal(["Library", "Classes", "Notes and sorting", "Your AI", "AI tool access", "Canvas", "Folders", "Phone"], model.LibraryNav.Select(n => n.Label));
+        Assert.Equal(["Library", "Classes", "Notes and sorting", "Your AI", "AI apps", "Canvas", "Folders", "Phone"], model.LibraryNav.Select(n => n.Label));
         Assert.Empty(fake.Calls); // nothing asked before a library page opens
     }
 

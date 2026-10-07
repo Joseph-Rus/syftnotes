@@ -165,7 +165,7 @@ public class AskStreamTests
 
         Assert.Equal("Cells have membranes", soFar); // not thrown away for Ollama's answer from scratch
         Assert.Equal(503, stopped.Status);
-        Assert.Equal("Claude Code stopped partway through: rate limit exceeded", stopped.Message);
+        Assert.Equal("Claude stopped partway through: rate limit exceeded", stopped.Message);
         Assert.False(ollama.Finished);
     }
 

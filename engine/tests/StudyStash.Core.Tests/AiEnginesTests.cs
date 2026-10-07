@@ -14,12 +14,15 @@ public class AiEnginesTests
     public void Engines_come_in_the_designs_order_with_their_own_names()
     {
         Assert.Equal(["ollama", "claude", "codex", "gemini"], Engines.Order);
-        Assert.Equal(["Ollama", "Claude Code", "Codex", "Gemini"], Engines.Order.Select(Engines.Name));
+        // Each AI by the name the person using Study Stash knows; the tool it's reached through is a separate thing.
+        Assert.Equal(["Ollama", "Claude", "ChatGPT", "Gemini"], Engines.Order.Select(Engines.Name));
+        Assert.Equal(["Ollama", "Claude Code", "Codex", "Gemini CLI"], Engines.Order.Select(Engines.Tool));
     }
 
     [Theory]
-    [InlineData("Claude sonnet", "Claude Code")]
-    [InlineData("ChatGPT", "Codex")]
+    [InlineData("Claude sonnet", "Claude")]
+    [InlineData("ChatGPT", "ChatGPT")]
+    [InlineData("Codex", "ChatGPT")] // notes written before 0.14 may say the tool
     [InlineData("Gemini 3.1 Pro", "Gemini")]
     [InlineData("qwen3:30b", "Ollama")]
     [InlineData("", "")]

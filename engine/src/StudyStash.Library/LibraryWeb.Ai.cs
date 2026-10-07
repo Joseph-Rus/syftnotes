@@ -120,7 +120,7 @@ public sealed partial class LibraryWeb
             var overview = await AiOverviewAsync();
             foreach (string? id in new[] { notes, ask, diagrams })
                 if (id is not null && overview.Engines.FirstOrDefault(e => e.Id == id) is { Installed: false } row)
-                    return Http.Detail(409, $"{row.Name} isn't installed on your library's computer.");
+                    return Http.Detail(409, $"{row.Name} isn't set up on your library's computer.");
             var settings = AiSettings.Load(cfg.Home);
             if (notes is not null) settings.ByJob["notes"] = new AiChoice(notes);
             if (ask is not null)

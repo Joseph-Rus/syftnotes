@@ -112,9 +112,9 @@ public static partial class AiWords
     public static string SpeedAbout(string id) => id switch
     {
         AiSpeed.Fast => "The same Opus, up to 2.5 times faster for notes and diagrams, but billed at a higher rate. "
-            + "It needs usage credits on your Claude account, and without them Claude Code runs at its normal speed",
+            + "It needs usage credits on your Claude account, and without them Claude runs at its normal speed",
         AiSpeed.Quick => "Sonnet at low effort for the notes and diagrams: quicker and lighter on your plan, with shallower notes and diagrams",
-        _ => "Claude Code as it's set up, at its usual pace",
+        _ => "Claude as it's set up, at its usual pace",
     };
 
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup
@@ -125,6 +125,7 @@ public static partial class AiWords
     public static string PlainName(string id, string name) => id switch
     {
         "ollama" => "Ollama (free, advanced)",
+        // By its id too: a library on an older Study Stash still sends the tools' names.
         "claude" => "Claude",
         "codex" => "ChatGPT",
         _ => name,

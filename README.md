@@ -39,8 +39,9 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
   than the lecturer's seems to speak; it is careful rather than complete, and can be wrong. While it
   records, a tiny pill shows the time and the level; pause or stop from the menu bar.
 - **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
-  to review, written by Ollama (free and private) or by Claude Code, Codex or Gemini with the plan
-  you already have. Rewrite a lecture's notes with another engine and keep whichever you like.
+  to review, written by Claude, ChatGPT or Gemini with the plan
+  you already have, or by a free model on your own computer (Ollama, the advanced way). Rewrite a
+  lecture's notes with another AI and keep whichever you like.
 - **Files every lecture under its class**, working out which from what was said, or using the class
   you picked. Anything it can't place waits in **Unsorted**, and a lecture you don't need can be
   deleted (with Undo).
@@ -407,7 +408,7 @@ filed into each class's folder.
 ## Claude, Codex, Gemini and MCP
 
 Your library speaks [MCP](https://modelcontextprotocol.io), so AI apps can read your lectures, notes
-and Canvas work (read-only). Set it up in **Settings → Your library → AI tool access**.
+and Canvas work (read-only). Set it up in **Settings → Your library → AI apps**.
 
 - **AI apps on this computer** (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): choose **Connect**
   next to the app. Study Stash adds itself to that app's own settings file, keeping everything else

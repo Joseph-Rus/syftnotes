@@ -753,7 +753,7 @@ public sealed partial class LibraryWeb
                 _ => "Standard",
             };
             string opts = string.Concat(AiSpeed.Choices.Select(c => $"<option value=\"{c}\"{(c == AiSpeed.Normal(picked.Speed) ? " selected" : "")}>{Ui.Esc(Label(c))}</option>"));
-            return $"<div class=\"row\"><label class=\"grow\" for=\"ai_speed\">Claude Code speed</label><select id=\"ai_speed\" name=\"ai_speed\">{opts}</select></div>";
+            return $"<div class=\"row\"><label class=\"grow\" for=\"ai_speed\">How fast Claude works</label><select id=\"ai_speed\" name=\"ai_speed\">{opts}</select></div>";
         }
         var main = providers.First(p => p.Id == picked.Provider);
         string modelOpts = string.Concat(main.Models.Select(m =>
