@@ -460,6 +460,24 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         Editing = true;
     }
 
+    /// <summary>What's typed and not saved, to keep for later (the host writes it down, so it outlives the app): the
+    /// notes the edit started from, and the editor's text. Null when nothing is.</summary>
+    public (string From, string Text)? Unsaved => EditDirty ? (editFrom, EditText) : null;
+
+    /// <summary>Puts back typing kept from before (<see cref="Unsaved"/>): the editor opens with it, as an edit of the
+    /// notes it started from. If the lecture's notes are other ones by now, Save says so, as it does for any edit.</summary>
+    public void RestoreEdit(string from, string text)
+    {
+        if (Editing || State != RewriteState.Idle) return;
+        editFrom = from;
+        edit = NoteEdit.Begin(AiWords.DropLeadingSummary(from));
+        EditProblem = "";
+        EditText = text;
+        Editing = true;
+        OnPropertyChanged(nameof(EditHasDiagrams));
+        OnPropertyChanged(nameof(EditDirty));
+    }
+
     [RelayCommand]
     void CancelEdit()
     {

@@ -372,13 +372,16 @@ public sealed class AppUpdates
     /// the UI thread (a Mac install copies and checks a whole app, which would otherwise freeze the menu bar for a
     /// minute). Off for a build folder and the self-test; auto_update is read fresh every round, so turning it off in
     /// Settings (or client.toml) takes effect on the next check.</summary>
-    public static void Start(AppHost host, CancellationToken stop, Action<UpdateNews> tell)
+    /// <param name="busy">Something the student is in the middle of that a restart would take from under their
+    /// hands (typing in a lecture's notes): an update waits for it, as it waits for a lecture.</param>
+    public static void Start(AppHost host, CancellationToken stop, Action<UpdateNews> tell, Func<bool>? busy = null)
     {
         var updateHost = UpdateHost.ThisComputer();
         List<string> relaunchArgs = ["--background"];
         if (!string.Equals(host.Home, Configs.DefaultHome, StringComparison.Ordinal)) relaunchArgs.AddRange(["--home", host.Home]);
         bool Idle() => host.Recorder.Current is null
-                       && !host.Lectures.All().Any(l => l.State is LectureState.Recording or LectureState.Paused or LectureState.Transcribing);
+                       && !host.Lectures.All().Any(l => l.State is LectureState.Recording or LectureState.Paused or LectureState.Transcribing)
+                       && busy?.Invoke() != true;
         var updates = new AppUpdates
         {
             Latest = () => Updates.CachedLatestAsync(),

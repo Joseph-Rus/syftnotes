@@ -118,7 +118,7 @@ public static partial class Shell
         Wire();
         host.Start();
         _ = SuggestLighterModelAsync();
-        AppUpdates.Start(host, stop.Token, SayUpdate);
+        AppUpdates.Start(host, stop.Token, SayUpdate, () => TypingNotes);
         if (AppUpdates.Current is { } updater)
             updater.FoundChanged += () => Dispatcher.UIThread.Post(() => panel.UpdateVersion = updater.Found is { } r ? string.Join('.', r.Version) : null);
         MakeTray();
@@ -313,6 +313,8 @@ public static partial class Shell
         if (quitting) return;
         quitting = true;
         ticker?.Stop();
+        // What's typed in a lecture's notes and not saved is written down: it's back in its editor next time.
+        KeepDrafts();
         CloseAllToasts();
         StopCanvas();
         stop.Cancel();

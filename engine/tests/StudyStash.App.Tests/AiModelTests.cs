@@ -1012,6 +1012,49 @@ public class AiNotesModelTests
     }
 
     [AvaloniaFact]
+    public async Task Unsaved_typing_is_written_down_and_is_back_in_its_editor_after_the_app_restarts()
+    {
+        using var home = new StudyStash.Core.Tests.TempDir();
+        var (model, lib) = Loaded();
+        await model.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        Assert.Null(model.Unsaved);
+        model.EditCommand.Execute(null);
+        Assert.Null(model.Unsaved); // Edit pressed, nothing typed: nothing to keep
+        model.EditText = "Half a sentence I was";
+
+        // What the app writes down as it quits (or updates itself, or a moment after the last key).
+        var typed = model.Unsaved!.Value;
+        Assert.True(NoteDrafts.Save(home.Path, new Dictionary<string, NoteDraft> { ["lec-1"] = new(typed.From, typed.Text, "2026-10-06T12:00:00Z") }));
+
+        // The app again, later: the same lecture opens with the typing in its editor, and it saves as that edit.
+        var kept = NoteDrafts.Load(home.Path, DateTimeOffset.Parse("2026-10-07T12:00:00Z"));
+        var (again, lib2) = Loaded();
+        await again.Load("lec-1", Current.Markdown, "Ollama", Current.At);
+        again.RestoreEdit(kept["lec-1"].From, kept["lec-1"].Text);
+        Assert.True(again.Editing);
+        Assert.Equal("Half a sentence I was", again.EditText);
+        Assert.True(again.EditDirty);
+        (string Markdown, string? BasedOn) sent = default;
+        lib2.OnEditNotes = (_, markdown, basedOn) =>
+        {
+            sent = (markdown, basedOn);
+            return new RewriteInfo("lec-1", "none") { Current = Current with { Markdown = markdown } };
+        };
+        await again.SaveEditCommand.ExecuteAsync(null);
+        Assert.Equal(("# Summary\n\nHalf a sentence I was", Notes.Fingerprint(Current.Markdown)), sent);
+        Assert.False(again.Editing);
+        Assert.Null(again.Unsaved);
+
+        // Saved, there's nothing left to keep, and the file goes. One never opened again is dropped after a month.
+        Assert.True(NoteDrafts.Save(home.Path, new Dictionary<string, NoteDraft>()));
+        Assert.False(File.Exists(NoteDrafts.PathIn(home.Path)));
+        Assert.True(NoteDrafts.Save(home.Path, new Dictionary<string, NoteDraft> { ["lec-9"] = new("a", "b", "2026-08-01T00:00:00Z") }));
+        Assert.Empty(NoteDrafts.Load(home.Path, DateTimeOffset.Parse("2026-10-06T12:00:00Z")));
+        File.WriteAllText(NoteDrafts.PathIn(home.Path), "not json");
+        Assert.Empty(NoteDrafts.Load(home.Path));
+    }
+
+    [AvaloniaFact]
     public async Task Compare_shows_both_and_the_current_notes_never_change_until_use()
     {
         var draft = new NotesVersion("# Summary\n\nNew body.", "Claude Code", DateTime.Now.ToString("o"));

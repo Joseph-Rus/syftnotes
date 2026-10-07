@@ -429,6 +429,7 @@ public static partial class Shell
             {
                 fresh = true;
                 notes = new AiNotesModel(ai);
+                FollowEdits(notes);
                 notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     if (openLecture == note.Id) _ = ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true);
@@ -441,6 +442,8 @@ public static partial class Shell
             LeaveNotes(before);
         }
         if (fresh) _ = notes!.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]));
+        // Typing that was in this lecture's editor when the app last quit goes back into it.
+        if (fresh && EarlierDrafts().Remove(note.Id, out var draft)) notes!.RestoreEdit(draft.From, draft.Text);
         else if (notes is not null && !ReferenceEquals(before, notes)) _ = notes.Refresh(); // kept: the library says where they stand now
         var ask = new AiAskModel(ai)
         {
@@ -454,8 +457,56 @@ public static partial class Shell
     }
 
     /// <summary>Notes a student had typed in and not saved when they opened something else, by lecture: back in their
-    /// editor, as they were, when that lecture is opened again (until the app quits).</summary>
+    /// editor, as they were, when that lecture is opened again. They're written down too (<see cref="NoteDrafts"/>),
+    /// so they're still there after the app quits, updates itself or is restarted.</summary>
     static readonly Dictionary<string, AiNotesModel> unsavedNotes = [];
+    /// <summary>Unsaved typing from before the app last quit, whose lecture hasn't been opened since.</summary>
+    static Dictionary<string, NoteDraft>? earlierDrafts;
+    static Avalonia.Threading.DispatcherTimer? draftsTimer;
+    static long lastNoteTyping;
+
+    static Dictionary<string, NoteDraft> EarlierDrafts() => earlierDrafts ??= NoteDrafts.Load(host.Home);
+
+    /// <summary>The student typed in a lecture's notes in the last few minutes: the app doesn't restart itself for an
+    /// update under their hands. (What they typed is kept either way; a forgotten edit doesn't hold an update up.)</summary>
+    public static bool TypingNotes => DateTime.UtcNow.Ticks - Interlocked.Read(ref lastNoteTyping) < TimeSpan.FromMinutes(5).Ticks;
+
+    /// <summary>Follows a lecture's editor: what's typed is written down a moment after the last key, and taken back
+    /// out once it's saved or cancelled.</summary>
+    static void FollowEdits(AiNotesModel notes) => notes.PropertyChanged += (_, e) =>
+    {
+        if (e.PropertyName == nameof(AiNotesModel.EditText) && notes.EditDirty) Interlocked.Exchange(ref lastNoteTyping, DateTime.UtcNow.Ticks);
+        if (e.PropertyName is not (nameof(AiNotesModel.EditText) or nameof(AiNotesModel.Editing)) || quitting) return;
+        if (draftsTimer is null)
+        {
+            draftsTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            draftsTimer.Tick += (_, _) =>
+            {
+                draftsTimer.Stop();
+                KeepDrafts();
+            };
+        }
+        draftsTimer.Stop();
+        draftsTimer.Start();
+    };
+
+    /// <summary>Writes down every lecture's unsaved typing as it stands now: the one on the page, the ones left for
+    /// another lecture, and the ones from before the app last quit that haven't been opened since.</summary>
+    static void KeepDrafts()
+    {
+        try
+        {
+            string at = DateTimeOffset.UtcNow.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+            var drafts = new Dictionary<string, NoteDraft>(EarlierDrafts());
+            foreach (var notes in unsavedNotes.Values.Append(library?.Notes))
+                if (notes?.Unsaved is { } typed) drafts[notes.LectureId] = new NoteDraft(typed.From, typed.Text, at);
+            if (!NoteDrafts.Save(host.Home, drafts)) Program.Log("[notes] unsaved typing couldn't be written down (the disk may be full)");
+        }
+        catch (Exception e)
+        {
+            Program.Log($"[error] keeping unsaved notes: {e.Message}");
+        }
+    }
 
     /// <summary>Notes that leave the page stop following the library; ones with unsaved typing are kept for their
     /// lecture's next opening.</summary>
@@ -463,7 +514,11 @@ public static partial class Shell
     {
         if (notes is null) return;
         notes.Dispose();
-        if (notes.EditDirty) unsavedNotes[notes.LectureId] = notes;
+        if (notes.EditDirty)
+        {
+            unsavedNotes[notes.LectureId] = notes;
+            KeepDrafts();
+        }
     }
 
     /// <summary>The connected library's AI: engines, asking, rewriting notes.</summary>
