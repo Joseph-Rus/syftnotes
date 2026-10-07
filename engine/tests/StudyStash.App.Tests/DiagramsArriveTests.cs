@@ -43,6 +43,11 @@ public class DiagramsArriveTests
         var model = new AiNotesModel(lib) { Delay = (_, ct) => poll.WaitAsync(ct) };
         await model.Load("lec-1", Notes, "Claude Code", at);
         Assert.Equal("Written by Claude Code · Tue 9:40 · Adding diagrams…", model.ShownByline);
+        // No Edit until they're in: an edit begun now would have no line for them, and saving it would put notes
+        // without the diagrams over the ones that have them.
+        Assert.False(model.ShowEditButton);
+        model.EditCommand.Execute(null);
+        Assert.False(model.Editing);
 
         Skin.UseTheme(ColourThemes.Default);
         ((App)Application.Current!).UseSkin(SkinKind.Mac);
@@ -66,6 +71,7 @@ public class DiagramsArriveTests
         DiagramsReady.Wait(window);
 
         Assert.Equal("Written by Claude Code · Tue 9:40 · Diagrams added", model.ShownByline);
+        Assert.True(model.ShowEditButton);
         Assert.Same(view, page.GetVisualDescendants().OfType<NoteView>().First(v => v.IsEffectivelyVisible)); // the same page, not a new one
         Assert.Single(view.GetVisualDescendants().OfType<DiagramView>());
         Assert.All(kept, c => Assert.Contains(c, view.Children)); // every piece already on screen is the same control

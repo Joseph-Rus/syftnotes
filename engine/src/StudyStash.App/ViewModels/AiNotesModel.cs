@@ -73,8 +73,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     public string DraftBody => AiWords.DropLeadingSummary(DraftMarkdown);
     public bool ShowRewriteButton => State == RewriteState.Idle && !Editing;
     /// <summary>"Edit" sits beside "Rewrite notes", and goes when it does: the notes are edited while nothing else is
-    /// happening to them.</summary>
-    public bool ShowEditButton => State == RewriteState.Idle && !Editing;
+    /// changing them. That includes their diagrams, which follow the notes by a few minutes: an edit begun before they
+    /// arrive has no line for them, so saving it would put notes without them over the ones that have them.</summary>
+    public bool ShowEditButton => State == RewriteState.Idle && !Editing && !AddingDiagrams;
     /// <summary>The notes as they read: not while the two are compared side by side, or the editor has their place.</summary>
     public bool ShowNotes => !IsComparing && !Editing;
     public bool ShowBar => State is RewriteState.Rewriting or RewriteState.Ready or RewriteState.Failed;
@@ -229,6 +230,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         };
         bool was = AddingDiagrams;
         AddingDiagrams = info.Diagrams == "adding";
+        if (AddingDiagrams != was) OnPropertyChanged(nameof(ShowEditButton));
         if (AddingDiagrams && !was) beforeDiagrams = CurrentMarkdown;
         if (AddingDiagrams) DiagramsLine = "Adding diagrams…";
         else if (was) DiagramsLine = CurrentMarkdown != beforeDiagrams ? "Diagrams added" : "";
@@ -452,7 +454,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     [RelayCommand]
     void Edit()
     {
-        if (Editing || State != RewriteState.Idle) return;
+        if (Editing || State != RewriteState.Idle || AddingDiagrams) return;
         EditProblem = "";
         BeginEdit();
         Editing = true;
