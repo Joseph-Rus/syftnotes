@@ -334,6 +334,48 @@ public class ConnectorTests
         Assert.Equal(("Claude", "clients.example", Ts + "/mcp"), (grant.Name, grant.ClientHost, grant.Resource));
     }
 
+    /// <summary>ChatGPT's own document, as https://chatgpt.com/oauth/client.json answered on 2026-10-06: it prefers a
+    /// signature (private_key_jwt) but lists "none" among the ways it can sign in.</summary>
+    const string ChatGptDoc = "https://chatgpt.com/oauth/client.json";
+    const string ChatGptCallback = "https://chatgpt.com/connector_platform_oauth_redirect";
+    const string ChatGptDocText = """
+        {"client_id":"https://chatgpt.com/oauth/client.json","client_uri":"https://chatgpt.com/","redirect_uris":["https://chatgpt.com/connector_platform_oauth_redirect"],"token_endpoint_auth_method":"private_key_jwt","token_endpoint_auth_methods_supported":["none","private_key_jwt"],"grant_types":["authorization_code","refresh_token"],"response_types":["code"],"client_name":"ChatGPT","logo_uri":"https://persistent.oaistatic.com/sonic/misc/openai-logo.png","token_endpoint_auth_signing_alg":"RS256","jwks_uri":"https://chatgpt.com/oauth/jwks.json"}
+        """;
+
+    [Fact]
+    public async Task ChatGPT_signs_in_with_its_published_identity()
+    {
+        await using var door = await Door.OpenAsync();
+        var c = door.As("http://mini.tail1234.ts.net");
+        door.Docs[ChatGptDoc] = ChatGptDocText;
+        string verifier = Verifier();
+        var fields = Ask(ChatGptDoc, ChatGptCallback, verifier);
+        string html = await (await c.GetAsync("/authorize?" + Query(fields))).Content.ReadAsStringAsync();
+        Assert.Contains("ChatGPT wants to read your lectures", html);
+        Assert.Contains("will return to chatgpt.com", html);
+        Assert.Contains("Identified by chatgpt.com", html);
+
+        var back = await Allow(c, fields);
+        Assert.StartsWith(ChatGptCallback + "?code=", back.ToString());
+        Assert.Equal(Ts, Params(back)["iss"]);
+        // As a public client: client_id in the form, PKCE, no secret and no signature.
+        var tokens = await Json(await Swap(c, Params(back)["code"]!, verifier, ChatGptDoc, ChatGptCallback, Ts + "/mcp"));
+        var listed = await c.SendAsync(Rpc(tokens["access_token"]!.GetValue<string>(), new { jsonrpc = "2.0", id = 1, method = "tools/list" }));
+        Assert.Equal(HttpStatusCode.OK, listed.StatusCode);
+        var grant = door.Access.Grants().Single();
+        Assert.Equal(("ChatGPT", "chatgpt.com", Ts + "/mcp"), (grant.Name, grant.ClientHost, grant.Resource));
+        Assert.Equal(HttpStatusCode.OK, (await Renew(c, tokens["refresh_token"]!.GetValue<string>(), ChatGptDoc)).StatusCode);
+
+        // If it signs who it is instead (a client_assertion, and no client_id in the form), the code still exchanges.
+        verifier = Verifier();
+        back = await Allow(c, Ask(ChatGptDoc, ChatGptCallback, verifier));
+        static string Part(string json) => Convert.ToBase64String(Encoding.UTF8.GetBytes(json)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        string assertion = Part("""{"alg":"RS256"}""") + "." + Part($$"""{"iss":"{{ChatGptDoc}}","sub":"{{ChatGptDoc}}","aud":"{{Ts}}"}""") + ".c2ln";
+        var signed = await c.PostAsync("/token", Form(("grant_type", "authorization_code"), ("code", Params(back)["code"]!), ("code_verifier", verifier),
+            ("redirect_uri", ChatGptCallback), ("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"), ("client_assertion", assertion)));
+        Assert.Equal(HttpStatusCode.OK, signed.StatusCode);
+    }
+
     [Fact]
     public async Task A_document_that_doesnt_match_gets_a_problem_page_and_no_redirect()
     {
@@ -440,7 +482,7 @@ public class ConnectorTests
         // Tools off: Claude is told up front, before it tries a call and gets refused.
         door.Access.ToolsOn = false;
         html = await (await c.GetAsync("/authorize?" + Query(fields))).Content.ReadAsStringAsync();
-        Assert.Contains("AI tool access is off in Study Stash, so Claude won't see anything until you turn it on.", html);
+        Assert.Contains("AI tool access is off in Study Stash, so Claude Code won't see anything until you turn it on.", html);
     }
 
     [Fact]
@@ -489,7 +531,7 @@ public class ConnectorTests
         for (int i = 0; i < 8; i++) door.Access.Failed();
         var locked = await c.PostAsync("/authorize", Form([.. fields, ("password", "pw"), ("decision", "allow")]));
         Assert.Equal((HttpStatusCode)429, locked.StatusCode);
-        Assert.Contains("Too many wrong tries. Wait 15 minutes, then choose Connect in Claude again.", await locked.Content.ReadAsStringAsync());
+        Assert.Contains("Too many wrong tries. Wait 15 minutes, then connect from Claude again.", await locked.Content.ReadAsStringAsync());
 
         door.Cfg.PoolPassword = "";
         var noPassword = await c.GetAsync("/authorize?" + Query(fields));
@@ -930,6 +972,7 @@ public class ConnectorTests
     [InlineData(null, true)]
     [InlineData("https://claude.ai", true)]
     [InlineData("https://claude.com", true)]
+    [InlineData("https://chatgpt.com", true)]
     [InlineData("https://mini.tail1234.ts.net", true)]
     [InlineData("http://localhost:6274", true)]
     [InlineData("http://127.0.0.1:6274", true)]
@@ -937,7 +980,7 @@ public class ConnectorTests
     [InlineData("https://claude.ai.evil.example", false)]
     [InlineData("http://mini.tail1234.ts.net", false)]
     [InlineData("null", false)]
-    public async Task Only_claude_this_library_or_this_computer_may_call_from_a_page(string? origin, bool allowed)
+    public async Task Only_claude_chatgpt_this_library_or_this_computer_may_call_from_a_page(string? origin, bool allowed)
     {
         await using var door = await Door.OpenAsync();
         var c = door.As("http://mini.tail1234.ts.net");

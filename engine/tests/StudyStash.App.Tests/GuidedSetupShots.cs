@@ -128,8 +128,11 @@ public sealed class GuidedSetupShots
         var services = new GuidedServices
         {
             Home = Home, Windows = skin == SkinKind.Win, Find = _ => AgentFound.None, OpenUrl = _ => { }, Post = a => a(), Downloading = () => downloading,
+            // The AI app card's computer has the ChatGPT app, not yet connected.
+            AiApps = () => card == "ai_app" ? [new AiAppState("codex", "ChatGPT", true, false, false, null, null, "")] : [],
         };
         var g = new GuidedSetupModel(SetupModel.For(skin, role), services, () => new AppSettings(), _ => { });
+        g.LoadAiApps();
         g.ClaudeFound = ClaudeHere;
         g.Picked = "claude";
         g.AiReady = true;
@@ -161,6 +164,7 @@ public sealed class GuidedSetupShots
                 "model_download" => "Next, the model that turns speech into text.",
                 "chrome_helper" => "Great, your school uses Canvas. Let's connect it through Chrome.",
                 "course_picker" => "Chrome is connected! Here are the courses Canvas found.",
+                "ai_app" => $"You have the ChatGPT app on this {device}. Want it to be able to answer questions from your own lectures?",
                 "start_at_login" => "Last thing: Study Stash can start when you log in, so notes get written.",
                 "taskbar_tip" => "One more tip for Windows: keep Study Stash on the taskbar.",
                 "finish" => "You're all set. Your library is ready, and Claude writes your notes.",
@@ -204,7 +208,7 @@ public sealed class GuidedSetupShots
         }
         if (card.Length > 0)
         {
-            string arg = card == "model_download" ? "large-v3-turbo-q5" : card == "chrome_helper" ? "school.instructure.com" : "";
+            string arg = card == "model_download" ? "large-v3-turbo-q5" : card == "chrome_helper" ? "school.instructure.com" : card == "ai_app" ? "ChatGPT" : "";
             g.ShowCard(new Core.Setup.SetupCard(card, arg));
         }
         g.Refresh();
@@ -240,6 +244,7 @@ public sealed class GuidedSetupShots
                 ("model", () => Chat(skin, "model_download")),
                 ("chrome", () => Chat(skin, "chrome_helper", downloading: 0.42)),
                 ("courses", () => Chat(skin, "course_picker", downloading: 0.42)),
+                ("ai-app", () => Chat(skin, "ai_app", downloading: 0.42)),
                 ("start-at-login", () => Chat(skin, "start_at_login", downloading: 0.42)),
                 ("finish", () => Chat(skin, "finish")),
                 ("password", () => Chat(skin, "library_password", AppRole.Library)),

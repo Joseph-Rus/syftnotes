@@ -144,9 +144,11 @@ public static partial class SetupChat
                school.instructure.com), then offer_chrome_helper; when Chrome is connected, offer_course_picker. If not (or later),
                ask what classes they're taking this term and add_class each, with a few words on what it covers in their words:
                that helps Study Stash file each lecture.
-            6. Just this {device} or a library: offer_start_at_login, saying it's recommended so notes get written.
-            7. Windows, a computer that records: offer_taskbar_tip.
-            8. When get_setup_status says ready_to_finish, recap in two or three short lines and call offer_finish.
+            6. If the checklist has ai_app (the student has the ChatGPT or Claude app on this {device}): say in one line that
+               the app can then answer questions from their own lectures, and offer_ai_app. It's optional.
+            7. Just this {device} or a library: offer_start_at_login, saying it's recommended so notes get written.
+            8. Windows, a computer that records: offer_taskbar_tip.
+            9. When get_setup_status says ready_to_finish, recap in two or three short lines and call offer_finish.
 
             Your first message: greet them in one line, say this takes about 5 minutes, and start step 1.
             """;
@@ -479,6 +481,7 @@ public static partial class SetupChat
             {
                 "canvas" => "Left Canvas for later",
                 "classes" => "Left classes for later",
+                "ai_app" => "Left your AI app for later",
                 "start_at_login" => "Left start at login off",
                 "taskbar" => "Skipped the taskbar tip",
                 _ => "Skipped a step",

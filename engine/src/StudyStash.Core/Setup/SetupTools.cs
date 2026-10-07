@@ -107,15 +107,15 @@ public sealed class SetupTools(ISetupDriver driver)
     {
         "get_setup_status" or "list_transcription_models" or "get_canvas_courses" => "read",
         "ask_student" or "offer_computer_setup" or "offer_library_password" or "offer_library_connection" or "offer_microphone_check"
-            or "offer_model_download" or "offer_chrome_helper" or "offer_course_picker" or "offer_start_at_login" or "offer_taskbar_tip"
-            or "offer_finish" => "card",
+            or "offer_model_download" or "offer_chrome_helper" or "offer_course_picker" or "offer_ai_app" or "offer_start_at_login"
+            or "offer_taskbar_tip" or "offer_finish" => "card",
         "add_class" or "set_notes_writer" or "skip_step" or "open_manual_setup" => "direct",
         _ => null,
     };
 
     public static readonly string[] Roles = ["one_computer", "laptop", "library"];
     public static readonly string[] Writers = ["claude", "codex", "ollama", "none"];
-    public static readonly string[] Skippable = ["canvas", "classes", "start_at_login", "taskbar"];
+    public static readonly string[] Skippable = ["canvas", "classes", "ai_app", "start_at_login", "taskbar"];
 
     static CallToolResult Say(string text) => new() { Content = [new TextContentBlock { Text = text }] };
     static CallToolResult No(string text) => new() { IsError = true, Content = [new TextContentBlock { Text = text }] };
@@ -190,6 +190,9 @@ public sealed class SetupTools(ISetupDriver driver)
                 + "Study Stash says when Chrome is connected.")),
         McpServerTool.Create(() => OfferCoursesAsync(), Named("offer_course_picker", "Offer: pick your courses",
             "Once Chrome is connected: shows the ticked list of courses Canvas found; \"Add these classes\" makes them classes.")),
+        McpServerTool.Create(() => OfferAsync("ai_app"), Named("offer_ai_app", "Offer: let their AI app read their lectures",
+            "When the checklist has ai_app (the ChatGPT or Claude app is on this computer): shows the card that lets that app read the "
+            + "student's lectures and notes, so they can ask it about their classes. It only reads. The student presses Connect.")),
         McpServerTool.Create(() => OfferAsync("start_at_login"), Named("offer_start_at_login", "Offer: start at login",
             "Just this computer or a library: asks whether Study Stash starts when the student logs in (recommended, so notes get written).")),
         McpServerTool.Create(() => OfferAsync("taskbar_tip"), Named("offer_taskbar_tip", "Offer: taskbar tip",
@@ -207,7 +210,7 @@ public sealed class SetupTools(ISetupDriver driver)
             Named("set_notes_writer", "Choose who writes the notes",
                 "Who writes the study notes and answers questions: claude, codex, ollama, or none. Refused for one that isn't ready here.")),
         McpServerTool.Create(
-            ([Description("canvas, classes, start_at_login or taskbar.")] string step) => SkipAsync(step),
+            ([Description("canvas, classes, ai_app, start_at_login or taskbar.")] string step) => SkipAsync(step),
             Named("skip_step", "Leave a step for later", "Marks an optional step as left for later, when the student says so.")),
         McpServerTool.Create(
             ([Description("The checklist item to start at (from get_setup_status). Leave out for the first one not done.")] string? step = null) =>
@@ -306,6 +309,9 @@ public sealed class SetupTools(ISetupDriver driver)
                 s.Role.Length == 0 ? FirstRole : "A library doesn't record, so it doesn't need that.",
             "start_at_login" when s.Role is not ("one" or "library") =>
                 s.Role.Length == 0 ? FirstRole : "A laptop doesn't need to start at login.",
+            "ai_app" when s.Items.All(i => i.Id != "ai_app") =>
+                s.Role.Length == 0 ? FirstRole : "There's no ChatGPT or Claude app on this computer to connect, so there's nothing to offer.",
+            "ai_app" when s.Items.First(i => i.Id == "ai_app").Done => "It's already connected.",
             "taskbar_tip" when !s.Windows || !s.Records => "The taskbar tip is only for a Windows PC that records.",
             "finish" when !s.ReadyToFinish => "Not yet. Still to do: " + string.Join(", ", s.Left.Select(i => i.Title)) + ".",
             _ => null,
@@ -326,6 +332,7 @@ public sealed class SetupTools(ISetupDriver driver)
         "model_download" => "model download",
         "chrome_helper" => "Chrome helper",
         "course_picker" => "course picker",
+        "ai_app" => "AI app",
         "start_at_login" => "start at login",
         "taskbar_tip" => "taskbar",
         _ => "finish",
@@ -401,7 +408,7 @@ public sealed class SetupTools(ISetupDriver driver)
     async Task<CallToolResult> SkipAsync(string step)
     {
         step = (step ?? "").Trim();
-        if (!Skippable.Contains(step)) return No("step is canvas, classes, start_at_login or taskbar: only optional steps can be left for later.");
+        if (!Skippable.Contains(step)) return No("step is canvas, classes, ai_app, start_at_login or taskbar: only optional steps can be left for later.");
         if (await driver.SkipAsync(step) is { } refused) return No(refused);
         return Say("Left for later. The student can do it any time in Settings.");
     }

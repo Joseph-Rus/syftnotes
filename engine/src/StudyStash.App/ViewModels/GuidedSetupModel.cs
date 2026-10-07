@@ -45,6 +45,10 @@ public sealed class GuidedServices
     public Action<string> Log { get; init; } = _ => { };
     /// <summary>Runs something on the window's thread (a CLI's events come from its own).</summary>
     public Action<Action> Post { get; init; } = a => Dispatcher.UIThread.Post(a);
+    /// <summary>The ChatGPT and Claude desktop apps on this computer, as their own settings stand (read only).</summary>
+    public Func<IReadOnlyList<AiAppState>> AiApps { get; init; } = () => [];
+    /// <summary>Adds Study Stash to one of those apps' settings, as Settings → AI tool access's Connect does.</summary>
+    public Func<string, AiAppChange>? ConnectAiApp { get; init; }
 
     public AgentInstall MakeInstaller(AgentCliInfo cli) =>
         Installer?.Invoke(cli) ?? new AgentInstall(cli, Windows, Path.Combine(Home, "logs", "setup-install.log"));
@@ -80,6 +84,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     string lastPrompt = "";
     string? question;
     bool chatStarted, opened;
+    /// <summary>The ChatGPT and Claude apps on this computer: asked when the window opens and after a Connect.</summary>
+    IReadOnlyList<AiAppState> aiApps = [];
     /// <summary>Codex's plan check worked only with the student's own config.toml read (its sign-in is kept there): the
     /// chat's turns read it too, or each would say the sign-in didn't work.</summary>
     bool keepUserConfig;
@@ -195,8 +201,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public bool InstallOther => InstallFailure is InstallFailure.Other or InstallFailure.WontStart;
     public string UseOtherLabel => $"Use {Other.Brand} instead";
 
-    public string SignInTitle => $"Sign in to {Brand}";
-    public string SignInLede => Cli.Id == "codex"
+    public string SignInTitle => SignedIn ? $"You're signed in to {Brand}" : $"Sign in to {Brand}";
+    public string SignInLede => SignedIn ? $"{Brand} is signed in on this {Device}. There's nothing more to do here."
+        : Cli.Id == "codex"
         ? "Your browser will open ChatGPT's sign-in page. Sign in with the account that has your Plus plan (or higher), then come back here."
         : "Your browser will open Claude's sign-in page. Sign in with the account that has your Pro or Max plan, then come back here.";
     public string Privacy => $"Study Stash never sees your password. {Cli.Name} keeps your sign-in on this {Device}.";
@@ -280,7 +287,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     partial void OnInstallProblemChanged(string? value) => Notify(nameof(ShowInstallButton), nameof(HasInstallProblem));
     partial void OnInstallFailureChanged(InstallFailure value) => Notify(nameof(InstallRegion), nameof(InstallOther));
     partial void OnWaitingSignInChanged(bool value) => Notify(nameof(ShowOpenSignIn));
-    partial void OnSignedInChanged(bool value) => Notify(nameof(ShowOpenSignIn));
+    partial void OnSignedInChanged(bool value) => Notify(nameof(ShowOpenSignIn), nameof(SignInTitle), nameof(SignInLede));
     partial void OnCheckingPlanChanged(bool value) => Notify(nameof(ShowCheckingPlan));
 
     partial void OnAiReadyChanged(bool value)
@@ -313,9 +320,11 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public async Task OpenAsync()
     {
         opened = true;
-        var (claude, codex) = await Task.Run(() => (services.Find(AgentCli.Claude), services.Find(AgentCli.Codex)));
+        var (claude, codex, apps) = await Task.Run(() => (services.Find(AgentCli.Claude), services.Find(AgentCli.Codex), ReadAiApps()));
         ClaudeFound = claude;
         CodexFound = codex;
+        aiApps = apps;
+        Refresh();
         var s = settings();
         if (s.SetupAi is "claude" or "codex" && (s.SetupAi == "codex" ? codex : claude).Works)
         {
@@ -334,8 +343,45 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             return;
         }
         RoleChosen = Again;
+        // One of them is on this computer already and the other isn't: it starts picked, so it's just Continue.
+        if (Picked.Length == 0 && claude.Works != codex.Works) Picked = claude.Works ? "claude" : "codex";
         Screen = GuidedScreen.PickAi;
         Refresh();
+    }
+
+    /// <summary>Looks again at which of the ChatGPT and Claude apps are here, and whether each has Study Stash.</summary>
+    public void LoadAiApps()
+    {
+        aiApps = ReadAiApps();
+        Refresh();
+    }
+
+    IReadOnlyList<AiAppState> ReadAiApps()
+    {
+        try
+        {
+            return services.AiApps();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>The ChatGPT and Claude apps on this computer, by name, for the checklist and the card.</summary>
+    public IReadOnlyList<string> AiAppNames => [.. aiApps.Select(a => ClaudeSetup.DesktopApp(a.Id)?.Name ?? a.Name)];
+    public bool AiAppsConnected => aiApps.Count > 0 && aiApps.All(a => a.Added && !a.OtherCopy);
+
+    /// <summary>The AI app card's Connect: Study Stash goes into each app's own settings (as Settings → AI tool access
+    /// does it, keeping everything else in the file). Null when they're all connected; else why not, for the card.</summary>
+    public string? ConnectAiApps()
+    {
+        const string later = "You can connect it later in Settings → AI tool access.";
+        if (services.ConnectAiApp is not { } connect) return "Study Stash can't change that app's settings here. " + later;
+        foreach (var app in aiApps.Where(a => !a.Added || a.OtherCopy || a.Outdated))
+            if (!connect(app.Id).Ok) services.Log($"[setup] connecting {app.Name} didn't work");
+        LoadAiApps();
+        return AiAppsConnected ? null : "Study Stash couldn't change that app's settings. " + later;
     }
 
     [RelayCommand]
@@ -406,11 +452,11 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         {
             case GuidedScreen.PickAi when Picked.Length > 0:
                 save(s => s.SetupAi = Picked);
-                if (Found.Works) await ToSignInAsync();
+                if (Found.Works) await ToSignInOrChatAsync();
                 else ToInstall();
                 break;
             case GuidedScreen.Install when Installed:
-                await ToSignInAsync();
+                await ToSignInOrChatAsync();
                 break;
             case GuidedScreen.SignIn when AiReady:
                 StartChat("[Study Stash] Setup was opened.");
@@ -505,6 +551,15 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         signIn ??= services.SignIn(Cli, exe);
         var s = signIn;
         return await Task.Run(s.Check);
+    }
+
+    /// <summary>On from picking (or installing): the sign-in screen, unless the AI turns out to be signed in already
+    /// and its plan checks out (the copy inside the ChatGPT or Claude app usually is). Then there's nothing for the
+    /// student to do there, so the chat starts.</summary>
+    async Task ToSignInOrChatAsync()
+    {
+        await ToSignInAsync();
+        if (AiReady && Screen == GuidedScreen.SignIn) StartChat("[Study Stash] Setup was opened.");
     }
 
     /// <summary>The sign-in screen: already signed in goes straight to the plan check.</summary>
@@ -866,6 +921,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         TaskbarDone = TaskbarDone, StartsAtLogin = StartsAtLogin, Downloading = Setup.ModelReady ? null : services.Downloading(),
         OpenCard = OpenCard is { Open: true } c ? c.Kind : "", ChromeConnected = Setup.Canvas?.ChromeConnected == true,
         CoursesFound = Setup.Canvas?.Found.Count ?? Setup.Courses.Count,
+        AiApps = AiAppNames, AiAppsConnected = AiAppsConnected,
     };
 
     public IReadOnlyList<ChecklistItem> Items() => SetupChecklist.From(Setup, Facts());

@@ -426,7 +426,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Refresh();
     }
 
-    /// <summary>AI tool access, with the AI apps on this computer (Claude Desktop, Claude Code, Codex, Gemini CLI: each
+    /// <summary>AI tool access, with the AI apps on this computer (Claude Desktop, Claude Code, ChatGPT, Gemini CLI: each
     /// connected to the library with one click), and the library's Claude routes for turning on the web address and
     /// removing a connection.</summary>
     static AiAccessModel MakeAccess(IAiLibrary ai, AppHost host)
@@ -438,6 +438,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             ReadApps = setup.States,
             ConnectApp = setup.Connect,
             DisconnectApp = setup.Disconnect,
+            ReopenApp = setup.ReopenAsync,
             OpenUrl = url => Dialogs.OpenUrl(url),
             RevokeConnection = async id =>
             {

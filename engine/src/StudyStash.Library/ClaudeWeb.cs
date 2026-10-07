@@ -10,10 +10,11 @@ using StudyStash.Core;
 namespace StudyStash.Library;
 
 /// <summary>
-/// The library's door for Claude, on a port of its own (the library's port + 1, on this computer only): the MCP
-/// server, and the OAuth sign-in Claude uses to reach it. Tailscale Serve or Funnel puts this port, and nothing
-/// else of the library, on https://&lt;library&gt;.ts.net. Claude signs in the way any app does: it registers, sends
-/// you to the sign-in page, where the library's password allows it, and gets tokens that only read.
+/// The library's door for Claude and ChatGPT, on a port of its own (the library's port + 1, on this computer only):
+/// the MCP server, and the OAuth sign-in they use to reach it. Tailscale Serve or Funnel puts this port, and nothing
+/// else of the library, on https://&lt;library&gt;.ts.net. Each signs in the way any app does: it says who it is (its
+/// published identity, or by registering), sends you to the sign-in page, where the library's password allows it,
+/// and gets tokens that only read.
 /// </summary>
 public static class ClaudeWeb
 {
@@ -42,10 +43,10 @@ public static class ClaudeWeb
         var app = builder.Build();
 
         // In this order: a browser's preflight is answered (no sign-in needed to ask); a page from a site that isn't
-        // Claude or this library is turned away (a browser always says where a page came from; Claude's own servers
-        // send no Origin); only a signed-in Claude (or a token from Settings) gets to the MCP server; anyone else is told
-        // where to sign in (RFC 9728), which is how Claude finds the sign-in on its own. AI tool access being off is
-        // the tools' to say, in words, not a refused connection.
+        // Claude, ChatGPT or this library is turned away (a browser always says where a page came from; their own
+        // servers send no Origin); only a signed-in app (or a token from Settings) gets to the MCP server; anyone else
+        // is told where to sign in (RFC 9728), which is how Claude and ChatGPT find the sign-in on their own. AI tool
+        // access being off is the tools' to say, in words, not a refused connection.
         app.Use(async (ctx, next) =>
         {
             ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
@@ -205,9 +206,11 @@ public static class ClaudeWeb
             ctx.Response.Headers.CacheControl = "no-store";
             ctx.Response.Headers.Pragma = "no-cache";
             // A public client sends client_id in the form; one that sends it as Basic auth is read the same way, and a
-            // secret it sends along is ignored (none was ever issued).
+            // secret it sends along is ignored (none was ever issued). One that signs who it is instead (ChatGPT can:
+            // private_key_jwt) is taken at its word like the others: the code and its PKCE verifier are the proof.
             string clientId = form.Get("client_id");
             if (clientId.Length == 0 && BasicUser(ctx.Request) is { Length: > 0 } basic) clientId = basic;
+            if (clientId.Length == 0 && AssertedClient(form.Get("client_assertion")) is { Length: > 0 } asserted) clientId = asserted;
             string grantType = form.Get("grant_type");
             if (grantType is "authorization_code" or "refresh_token" && (grantType == "authorization_code" || clientId.Length > 0) && !access.KnownClient(clientId))
                 return Http.Json(new JsonObject { ["error"] = "invalid_client", ["error_description"] = "Study Stash doesn't know this app. Register again." }, 401);
@@ -239,7 +242,7 @@ public static class ClaudeWeb
 
         app.MapMcp(McpPath);
         app.MapGet("/", () => Results.Text(
-            "Study Stash: the MCP server for your lecture library.\nAdd " + McpPath + " on this address to Claude as a connector.\n",
+            "Study Stash: the MCP server for your lecture library.\nAdd " + McpPath + " on this address to Claude or ChatGPT as a connector.\n",
             "text/plain; charset=utf-8"));
         app.MapGet("/healthz", () => Http.Json(new JsonObject { ["ok"] = true, ["app"] = "study-stash-claude", ["version"] = Engine.Version }));
         Icons.Map(app);
@@ -255,14 +258,14 @@ public static class ClaudeWeb
     const string McpHeaders = "Authorization, Content-Type, Accept, MCP-Protocol-Version, Mcp-Session-Id, Mcp-Method, Mcp-Name, Last-Event-ID";
 
     /// <summary>Whether a page from <paramref name="origin"/> may call the MCP server: this library by any of its
-    /// names, Claude on the web, or a program on this computer.</summary>
+    /// names, Claude or ChatGPT on the web, or a program on this computer.</summary>
     public static bool AllowedOrigin(HttpContext ctx, ClaudeAccess access, string origin)
     {
         if (OriginOf(origin) is not { } o) return false;
         if (o.StartsWith("http://localhost:", StringComparison.Ordinal) || o == "http://localhost"
             || o.StartsWith("http://127.0.0.1:", StringComparison.Ordinal) || o == "http://127.0.0.1")
             return true;
-        return new[] { Base(ctx, access), access.PublicUrl, access.TailnetUrl ?? "", "https://claude.ai", "https://claude.com" }
+        return new[] { Base(ctx, access), access.PublicUrl, access.TailnetUrl ?? "", "https://claude.ai", "https://claude.com", "https://chatgpt.com" }
             .Any(known => known.Length > 0 && OriginOf(known) == o);
     }
 
@@ -325,6 +328,24 @@ public static class ClaudeWeb
         return false;
     }
 
+    /// <summary>Who a signed client assertion (RFC 7523) says it's from: its <c>sub</c>, read without checking the
+    /// signature, which is all a client_id in the form would be worth too. Null when there's none to read.</summary>
+    static string? AssertedClient(string jwt)
+    {
+        string[] parts = jwt.Split('.');
+        if (parts.Length != 3) return null;
+        try
+        {
+            string payload = parts[1].Replace('-', '+').Replace('_', '/');
+            payload = payload.PadRight(payload.Length + (4 - payload.Length % 4) % 4, '=');
+            return JsonNode.Parse(Convert.FromBase64String(payload)) is JsonObject claims && claims["sub"] is JsonValue v && v.TryGetValue(out string? sub) ? sub : null;
+        }
+        catch (Exception e) when (e is FormatException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>The client_id of a Basic Authorization header, if one was sent.</summary>
     static string? BasicUser(HttpRequest request)
     {
@@ -345,7 +366,7 @@ public static class ClaudeWeb
         post is not null ? post.Get(key) : ctx.Request.Query[key].ToString();
 
     /// <summary>The sign-in page: what's asking, and the library's password to allow it. Allowed, it goes back to
-    /// Claude with a code; turned down, with access_denied. Every answer that goes back names this server (iss).</summary>
+    /// the app with a code; turned down, with access_denied. Every answer that goes back names this server (iss).</summary>
     static async Task<IResult> Authorize(HttpContext ctx, Config cfg, ClaudeAccess access, IFormCollection? post)
     {
         // The page is only ever fetched fresh, never framed, and never sent to another site as a referrer.
@@ -378,7 +399,7 @@ public static class ClaudeWeb
         if (post.Get("decision") == "deny") return Results.Redirect(Back("error=access_denied"));
         // The same page either way, so the wording alone can't say whether the lockout or the password check found
         // the problem first.
-        if (access.LockedOut()) return Form(cfg, access, client, redirectUri, fields, csp, "Too many wrong tries. Wait 15 minutes, then choose Connect in Claude again.", 429);
+        if (access.LockedOut()) return Form(cfg, access, client, redirectUri, fields, csp, $"Too many wrong tries. Wait 15 minutes, then connect from {NameOf(client)} again.", 429);
         string password = post.Get("password");
         bool right = CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(password), Encoding.UTF8.GetBytes(cfg.PoolPassword));
         if (!right)
@@ -388,6 +409,9 @@ public static class ClaudeWeb
         }
         return Results.Redirect(Back("code=" + Uri.EscapeDataString(access.NewCode(client, redirect, challenge, bound))));
     }
+
+    /// <summary>What the app asking is called on the sign-in page: its own name, or "Claude" when it gave none.</summary>
+    static string NameOf(ClaudeClient client) => client.Name.Length > 0 ? client.Name : "Claude";
 
     /// <summary>A redirect back to a program on this computer (Claude Code's loopback callback), not a browser
     /// somewhere else: the page warns, since anyone could have started that program.</summary>
@@ -400,7 +424,7 @@ public static class ClaudeWeb
         string hidden = string.Concat(fields.Select(f => $"<input type=\"hidden\" name=\"{f.Item1}\" value=\"{Ui.Esc(f.Item2)}\">"));
         string err = error is null ? "" : $"<p class=\"bad\" role=\"alert\">{Ui.Esc(error)}</p>";
         // Anyone can claim any name at registration; a published identity (CIMD) is named by where it's published too.
-        string name = client.Name.Length > 0 ? client.Name : "Claude";
+        string name = NameOf(client);
         string identifiedBy = client.Host is not null ? $"<p class=\"who\">Identified by {Ui.Esc(client.Host)}</p>" : "";
         string warn = IsLoopback(redirect)
             ? "<p class=\"warn\">This goes back to a program on this computer (localhost). Allow it only if you just started it yourself.</p>" : "";
@@ -410,7 +434,7 @@ public static class ClaudeWeb
         if (reading.Notes) items.Add("Study notes");
         if (reading.Canvas) items.Add("Canvas assignments and files");
         string list = items.Count > 0 ? $"<ul class=\"reading\">{string.Concat(items.Select(i => $"<li>{Ui.Esc(i)}</li>"))}</ul>" : "";
-        string toolsOff = access.ToolsOn ? "" : "<p class=\"note\">AI tool access is off in Study Stash, so Claude won't see anything until you turn it on.</p>";
+        string toolsOff = access.ToolsOn ? "" : $"<p class=\"note\">AI tool access is off in Study Stash, so {Ui.Esc(name)} won't see anything until you turn it on.</p>";
         string body = $"""
             <main><form method="post" action="/authorize">
             <img src="/icon.png" alt="" width="56" height="56">

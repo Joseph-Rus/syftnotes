@@ -1223,10 +1223,15 @@ public static partial class Shell
     /// The self-test finds no AI's CLI at all, so it never installs one or reaches an account.</summary>
     static GuidedSetupModel MakeGuided(SetupModel model)
     {
+        // The ChatGPT and Claude apps on this computer, for the card that lets one read the library (in a self-test this
+        // reads and writes nothing real: ClaudeSetup.ThisComputer sees to that).
+        var aiApps = ClaudeSetup.ThisComputer(host.Home);
         var services = new GuidedServices
         {
             Home = host.Home,
             Find = SelfTest.Dir is not null ? _ => AgentFound.None : cli => AgentInstall.Find(cli),
+            AiApps = aiApps.DesktopStates,
+            ConnectAiApp = aiApps.Connect,
             OpenTerminal = (exe, args) =>
             {
                 try

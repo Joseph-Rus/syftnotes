@@ -54,12 +54,31 @@ public sealed class SetupToolsTests : IAsyncLifetime
         await using var mcp = await Connect();
         Assert.Equal("study_stash_setup", mcp.ServerInfo.Name);
         var names = (await mcp.ListToolsAsync()).Select(t => t.Name).ToList();
-        Assert.Equal(18, names.Count);
+        Assert.Equal(19, names.Count);
         foreach (string n in names) Assert.True(SetupTools.KindOf(n) is "read" or "card" or "direct", $"{n} isn't classified as read, card or direct");
         Assert.All(names, n => Assert.Matches("^[a-z_]+$", n));
         Assert.Contains("get_setup_status", names);
         Assert.Contains("offer_finish", names);
-        Assert.Equal(10, names.Count(n => n.StartsWith("offer_", StringComparison.Ordinal)));
+        Assert.Equal(11, names.Count(n => n.StartsWith("offer_", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task The_ai_app_card_is_offered_only_when_theres_an_app_to_connect()
+    {
+        await using var mcp = await Connect();
+        // No ChatGPT or Claude app on this computer: the checklist has no such item, and the tool says so.
+        var none = await Call(mcp, "offer_ai_app");
+        Assert.True(none.Error);
+        Assert.Contains("no ChatGPT or Claude app", none.Text);
+        Assert.Empty(driver.Cards);
+
+        driver.Status = driver.Status with { Items = [.. driver.Status.Items, new ChecklistItem("ai_app", "AI app", ChecklistState.Todo, "ChatGPT", Optional: true)] };
+        Assert.False((await Call(mcp, "offer_ai_app")).Error);
+        Assert.Equal("ai_app", driver.Cards.Last().Kind);
+        Assert.False((await Call(mcp, "skip_step", new() { ["step"] = "ai_app" })).Error);
+
+        driver.Status = driver.Status with { Items = [.. driver.Status.Items.Where(i => i.Id != "ai_app"), new ChecklistItem("ai_app", "AI app", ChecklistState.Done, "ChatGPT connected", Optional: true)] };
+        Assert.Contains("already connected", (await Call(mcp, "offer_ai_app")).Text);
     }
 
     [Fact]

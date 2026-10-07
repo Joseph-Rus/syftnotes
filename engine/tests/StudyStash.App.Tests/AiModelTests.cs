@@ -1278,30 +1278,87 @@ public class AiAccessModelTests
     }
 
     [AvaloniaFact]
-    public async Task Connecting_an_app_from_its_row_shows_what_was_written_and_where_it_stands()
+    public async Task Connecting_an_app_takes_one_click_then_reopen_and_the_row_turns_connected_by_itself()
     {
         var (model, _) = Loaded();
         bool added = false;
-        model.ReadApps = () => [new AiAppState("claude-desktop", "Claude Desktop", true, added, false, added ? Now : null, null, "/c.json")];
+        DateTime? started = null;
+        var loaded = new TaskCompletionSource();
+        var reopened = new List<string>();
+        model.Delay = _ => loaded.Task;
+        // This computer has Claude and nothing else: one row, and the rest named in a line.
+        model.ReadApps = () =>
+        [
+            new AiAppState("claude-desktop", "Claude Desktop", true, added, false, added ? Now : null, started, "/c.json", CanReopen: true),
+            new AiAppState("codex", "ChatGPT", false, false, false, null, null, ""),
+            new AiAppState("gemini", "Gemini CLI", false, false, false, null, null, ""),
+        ];
         model.ConnectApp = id =>
         {
             added = id == "claude-desktop";
             return new AiAppChange(true, "Added Study Stash to Claude Desktop.", "/c.json", "/c.json.study-stash-backup", "{\"mcpServers\":{}}");
         };
+        model.ReopenApp = id =>
+        {
+            reopened.Add(id);
+            return Task.FromResult(new AiAppChange(true, ""));
+        };
         await model.Load();
         var row = Assert.Single(model.Apps);
-        Assert.Equal("Not connected", row.Status);
+        Assert.Equal("Not connected yet", row.Status);
+        Assert.Equal("Not found on this computer: ChatGPT, Gemini CLI.", model.MissingApps);
+        Assert.True(model.ShowMissingApps);
+        Assert.False(model.NoApps);
+        Assert.False(model.ShowTry);
         Assert.DoesNotContain(model.Connected, c => c.Name == "Claude Desktop"); // the apps here aren't library connections
 
         await row.Connect!.ExecuteAsync(null);
 
         Assert.Same(row, Assert.Single(model.Apps));
-        Assert.Equal("Added. Quit and reopen Claude Desktop to load it.", row.Status);
+        Assert.Equal("Almost done. Reopen Claude so it loads Study Stash.", row.Status);
+        Assert.True(row.CanReopen);
         Assert.True(row.CanDisconnect);
         Assert.Equal("Added Study Stash to Claude Desktop.", model.Say);
+        // What was written is there for whoever wants it, folded away.
+        Assert.True(model.HasWritten);
+        Assert.False(model.ShowWritten);
+        model.ToggleDetails();
         Assert.True(model.ShowWritten);
         Assert.Equal("/c.json", model.WrittenFile);
         Assert.Contains("/c.json.study-stash-backup", model.WrittenBackupWords);
+
+        await row.Reopen!.ExecuteAsync(null);
+
+        Assert.Equal(["claude-desktop"], reopened);
+        Assert.Equal("Claude is opening. This turns to Connected in a moment.", row.Status);
+
+        // The app starts Study Stash: the row says so by itself, with Settings still open, and there's a question to try.
+        started = Now.AddMinutes(1);
+        loaded.SetResult();
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (!row.Ok && DateTime.UtcNow < deadline) await Task.Delay(5, TestContext.Current.CancellationToken);
+        Assert.StartsWith("Connected", row.Status);
+        Assert.False(row.CanReopen);
+        Assert.True(model.ShowTry);
+        Assert.Equal("Try it. In Claude, ask:", model.TryLead);
+    }
+
+    [AvaloniaFact]
+    public async Task With_no_ai_app_on_this_computer_the_page_says_where_to_get_one()
+    {
+        var (model, _) = Loaded();
+        var opened = new List<string>();
+        model.OpenUrl = opened.Add;
+        model.ReadApps = () => [new AiAppState("claude-desktop", "Claude Desktop", false, false, false, null, null, ""), new AiAppState("codex", "ChatGPT", false, false, false, null, null, "")];
+
+        await model.Load();
+
+        Assert.Empty(model.Apps);
+        Assert.True(model.NoApps);
+        Assert.False(model.ShowMissingApps); // the empty state says it; no list of absences under it
+        model.GetChatGpt();
+        model.GetClaude();
+        Assert.Equal([AiAccessModel.ChatGptDownload, AiAccessModel.ClaudeDownload], opened);
     }
 
     [AvaloniaFact]
@@ -1324,7 +1381,7 @@ public class AiAccessModelTests
         Assert.Empty(model.Connected);
     }
 
-    // Claude on the web and phone: the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
+    // Claude and ChatGPT on the web and phone: the card's own state (connectors task 5), driven by IAiLibrary.SetWebAsync/CheckWebAsync
     // (task 4). FakeAiLibrary's unscripted SetWebAsync turns Funnel on at "https://mini.tail1234.ts.net" and answers
     // reachable straight away; OnSetWeb/OnCheckWeb script something else (a problem, a slow check, an older library).
 
@@ -1419,13 +1476,13 @@ public class AiAccessModelTests
     {
         var (model, lib) = Loaded();
         await model.Load();
-        lib.OnSetWeb = on => throw new LibraryRefusedException(400, "Set a library password first, so only you can let Claude in.");
+        lib.OnSetWeb = on => throw new LibraryRefusedException(400, "Set a library password first, so only you can let an AI app in.");
 
         model.WebOn = true;
 
         Assert.False(model.WebOn);
         Assert.False(model.HasPassword);
-        Assert.Equal("Set a library password first, so only you can let Claude in.", model.WebNote);
+        Assert.Equal("Set a library password first, so only you can let an AI app in.", model.WebNote);
     }
 
     [AvaloniaFact]

@@ -119,6 +119,10 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
             case "microphone_check":
                 micSaid = deniedSaid = false;
                 break;
+            case "ai_app":
+                // The card names the apps it's about ("ChatGPT", "ChatGPT and Claude").
+                card = card with { Arg = SetupChecklist.AiAppNames(g.AiAppNames) };
+                break;
         }
         g.ShowCard(card);
         return null;
@@ -257,6 +261,22 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
                 break;
             case ("course_picker", "add"):
                 await CoursesAsync(card);
+                break;
+            case ("ai_app", "connect"):
+                if (g.ConnectAiApps() is { } stuck)
+                {
+                    card.Problem = stuck;
+                    break;
+                }
+                Fold(card, $"{card.Arg} can read your lectures");
+                g.Note($"{card.Arg} can read your lectures",
+                    $"The student connected {card.Arg}: it can read their lectures and notes the next time it's opened"
+                    + (card.Arg.Contains("ChatGPT", StringComparison.Ordinal) ? " (in ChatGPT, from a chat in Codex)." : "."));
+                break;
+            case ("ai_app", "notnow"):
+                g.Skip("ai_app");
+                Fold(card, "Not now");
+                g.Note("Left your AI app for later", "The student said \"Not now\" to letting their AI app read their lectures. It's in Settings → AI tool access.", good: false);
                 break;
             case ("start_at_login", "on"):
                 try
