@@ -78,6 +78,8 @@
           <StackPanel Spacing="4" IsVisible="{Binding ShowAdvice}">
             <TextBlock Classes="cv-step-body cv-advice" Text="{Binding AdviceText}" />
             <Button Classes="cv-quiet" HorizontalAlignment="Left" Command="{Binding GetBrowserCommand}" IsVisible="{Binding ShowGetBrowser}"><TextBlock Classes="cv-link" Text="Get Chrome" /></Button>
+            <!-- Firefox, with the add-on in it already (Study Stash has nowhere to send them for it yet): its code -->
+            <Button Name="HaveIt" Classes="cv-quiet" HorizontalAlignment="Left" Command="{Binding HaveItCommand}" IsVisible="{Binding ShowHaveIt}"><TextBlock Classes="cv-link" Text="{Binding HaveItLabel}" /></Button>
           </StackPanel>
           <TextBlock Classes="cv-step-body" Text="{Binding BrowserHelp}" />
           <!-- Chrome's family: three pictures of its extensions page -->
