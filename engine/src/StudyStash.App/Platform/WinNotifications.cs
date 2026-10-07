@@ -48,6 +48,9 @@ public sealed unsafe class WinNotifications : ISystemNotifications
     /// <summary>What went wrong last, and where ("showing: 0x803E0105"); null when nothing has.</summary>
     public static string? LastError { get; private set; }
 
+    /// <summary>Where a refusal from Windows is written down (the app's log), so one that isn't shown leaves a trace.</summary>
+    public static Action<string>? Log { get; set; }
+
     public event Action<string, string>? Responded;
 #pragma warning disable CS0067 // Windows asks nobody's leave: what it shows is read fresh each time, never announced
     public event Action? StateChanged;
@@ -93,6 +96,7 @@ public sealed unsafe class WinNotifications : ISystemNotifications
     {
         if (result >= 0) return false;
         LastError = $"{doing}: 0x{result:X8}";
+        Log?.Invoke("[notifications] Windows said no while " + LastError);
         return true;
     }
 
@@ -177,7 +181,7 @@ public sealed unsafe class WinNotifications : ISystemNotifications
         }
     }
 
-    public void Show(string id, string title, string body, IReadOnlyList<NotificationButton> buttons) => ShowXml(id, NoticeLinks.WindowsXml(id, title, body, buttons));
+    public bool Show(string id, string title, string body, IReadOnlyList<NotificationButton> buttons) => ShowXml(id, NoticeLinks.WindowsXml(id, title, body, buttons));
 
     /// <summary>Hands Windows one notification. False when it wouldn't take it (<see cref="LastError"/> says where).</summary>
     public bool ShowXml(string id, string xml)

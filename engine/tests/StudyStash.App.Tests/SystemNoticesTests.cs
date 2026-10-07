@@ -17,8 +17,14 @@ public class SystemNoticesTests
         public event Action<string, string>? Responded;
         public List<(string Id, string Title, string Body, IReadOnlyList<NotificationButton> Buttons)> Shown { get; } = [];
         public List<string> Removed { get; } = [];
+        /// <summary>False: it won't take the next ones (Windows refusing a notification it can't read).</summary>
+        public bool Takes { get; set; } = true;
 
-        public void Show(string id, string title, string body, IReadOnlyList<NotificationButton> buttons) => Shown.Add((id, title, body, buttons));
+        public bool Show(string id, string title, string body, IReadOnlyList<NotificationButton> buttons)
+        {
+            if (Takes) Shown.Add((id, title, body, buttons));
+            return Takes;
+        }
         public void Remove(string id) => Removed.Add(id);
 
         public void Say(NotificationState state)
@@ -127,9 +133,10 @@ public class SystemNoticesTests
     }
 
     [Fact]
-    public void Where_the_system_wont_have_them_the_apps_own_card_says_it_and_where_the_student_said_no_nothing_does()
+    public void Nothing_that_needs_the_student_is_lost_for_want_of_the_system()
     {
         var notice = new Notice { Title = "Recording saved" };
+        var paused = new Notice { Title = "Recording paused", Text = "The microphone stopped.", ActionLabel = "Resume", UntilClosed = true, StillTrue = () => true };
 
         // A copy the system refuses (run from its disk image, or a build folder): the app's own card, as before.
         var refused = new Rig(NotificationState.Unavailable);
@@ -137,11 +144,21 @@ public class SystemNoticesTests
         Assert.Empty(refused.System.Shown);
         Assert.Equal([notice], refused.Own);
 
-        // Turned off for Study Stash in the system's settings: the student's choice, so no card either.
+        // Turned off for Study Stash in the system's settings: what only tells isn't shown, as the student asked. A
+        // lecture that stopped recording still is, as the app's own card: that can't wait for them to look.
         var declined = new Rig(NotificationState.Denied);
         declined.Notices.Show(notice);
+        declined.Notices.Show(paused);
         Assert.Empty(declined.System.Shown);
-        Assert.Empty(declined.Own);
+        Assert.Equal([paused], declined.Own);
+
+        // Allowed, but the system won't take this one (Windows can't read it, or has nowhere to show it): it's said
+        // all the same, and a click that can't come isn't waited for.
+        var choosy = new Rig();
+        choosy.System.Takes = false;
+        choosy.Notices.Show(notice);
+        Assert.Equal([notice], choosy.Own);
+        Assert.False(choosy.Notices.Knows(SystemNotices.IdOf(notice)));
     }
 
     [Fact]
@@ -159,15 +176,26 @@ public class SystemNoticesTests
         Assert.Equal([saved], rig.Own);
 
         // Left unanswered: after a few seconds the notice is shown as the app's own card and taken back from the
-        // system, so it isn't said twice when the answer comes.
+        // system, so it isn't said twice when the answer comes. Saying it again meanwhile doesn't start its wait over.
         var ignored = new Rig(NotificationState.Unknown);
         ignored.Notices.Show(saved);
         ignored.Notices.Tick();
         Assert.Empty(ignored.Own);
-        ignored.Now += SystemNotices.AnswerWait;
+        ignored.Now += SystemNotices.AnswerWait - TimeSpan.FromSeconds(1);
+        ignored.Notices.Show(new Notice { Title = "Recording saved" });
+        ignored.Now += TimeSpan.FromSeconds(1);
         ignored.Notices.Tick();
-        Assert.Equal([saved], ignored.Own);
+        Assert.Equal("Recording saved", Assert.Single(ignored.Own).Title);
         Assert.Equal([SystemNotices.IdOf(saved)], ignored.System.Removed);
+        // The question is still unanswered: the next one doesn't wait at all.
+        var next = new Notice { Title = "Filed in CS 101" };
+        ignored.Notices.Show(next);
+        Assert.Equal(next, ignored.Own[^1]);
+        // Answered Allow at last: from then on they're the system's.
+        ignored.System.Say(NotificationState.Allowed);
+        ignored.Notices.Show(new Notice { Title = "Filed in BIO 110" });
+        Assert.Equal("Filed in BIO 110", ignored.System.Shown[^1].Title);
+        Assert.Equal(2, ignored.Own.Count);
 
         // Answered "Don't Allow": what was waiting is let go.
         var declined = new Rig(NotificationState.Unknown);

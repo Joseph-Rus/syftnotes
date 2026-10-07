@@ -26,7 +26,8 @@ public static partial class NoticeLinks
     /// <paramref name="buttons"/>, and the link a click on it, or on a button, opens. No picture and no sound.</summary>
     public static string WindowsXml(string id, string title, string body, IReadOnlyList<NotificationButton> buttons)
     {
-        static string X(string s) => System.Security.SecurityElement.Escape(s) ?? "";
+        // Escaped, and without the control characters XML can't hold (a Canvas title is whatever the school typed).
+        static string X(string s) => System.Security.SecurityElement.Escape(string.Concat(s.Where(c => !char.IsControl(c) || c is '\n' or '\t'))) ?? "";
         var xml = new System.Text.StringBuilder();
         xml.Append($"<toast launch=\"{X(For(id))}\" activationType=\"protocol\"><visual><binding template=\"ToastGeneric\">");
         xml.Append($"<text>{X(title)}</text>");

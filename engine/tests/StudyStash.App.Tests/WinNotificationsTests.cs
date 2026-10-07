@@ -24,6 +24,9 @@ public class WinNotificationsTests(ITestOutputHelper output)
         Assert.Empty(toast.Descendants("image"));
         Assert.Equal("true", toast.Element("audio")!.Attribute("silent")!.Value);
 
+        // A control character in the words (a Canvas title is whatever the school typed) can't stop Windows reading it.
+        Assert.Equal("Quiz 1 due", XElement.Parse(NoticeLinks.WindowsXml(Id, "Quiz\u0001 1\u0008 due", "", [])).Descendants("text").Single().Value);
+
         // One with nothing but a title has one line and no row of buttons.
         var bare = XElement.Parse(NoticeLinks.WindowsXml(Id, "Recording saved", "", []));
         Assert.Single(bare.Descendants("text"));

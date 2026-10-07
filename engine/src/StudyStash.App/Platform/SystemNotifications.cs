@@ -18,8 +18,9 @@ public interface ISystemNotifications
     /// <summary><see cref="State"/> is known now, or changed. May come on any thread.</summary>
     event Action? StateChanged;
 
-    /// <summary>Shows a notification, in place of the one with the same <paramref name="id"/> if it's still there.</summary>
-    void Show(string id, string title, string body, IReadOnlyList<NotificationButton> buttons);
+    /// <summary>Shows a notification, in place of the one with the same <paramref name="id"/> if it's still there.
+    /// False when the system wouldn't take it: whoever asked shows it some other way.</summary>
+    bool Show(string id, string title, string body, IReadOnlyList<NotificationButton> buttons);
 
     /// <summary>Takes one down, wherever it is (on screen, or in the list of earlier ones).</summary>
     void Remove(string id);

@@ -49,6 +49,7 @@ public static partial class Shell
         {
             icon = null;
         }
+        WinNotifications.Log = Program.Log;
         var made = WinNotifications.Make(icon: icon, program: Desktop.Program);
         if (made is null) Program.Log($"[notifications] Windows won't have them here ({WinNotifications.LastError ?? "no reason given"}): Study Stash shows its own");
         return made;

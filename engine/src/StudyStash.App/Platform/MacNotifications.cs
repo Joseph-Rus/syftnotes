@@ -252,10 +252,11 @@ public sealed unsafe class MacNotifications : ISystemNotifications
         post();
     }
 
-    public void Show(string id, string title, string body, IReadOnlyList<NotificationButton> buttons)
+    public bool Show(string id, string title, string body, IReadOnlyList<NotificationButton> buttons)
     {
         lock (gate) withdrawn.Remove(id);
         WhenAnswered(() => Post(id, title, body, buttons));
+        return true;
     }
 
     void Post(string id, string title, string body, IReadOnlyList<NotificationButton> buttons)
