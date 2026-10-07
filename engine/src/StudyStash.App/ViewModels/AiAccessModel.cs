@@ -530,7 +530,9 @@ public sealed partial class AiAccessModel : ObservableObject
 
     CancellationTokenSource? appWatch;
 
-    void StopWatchingApps()
+    /// <summary>Stops looking again after a Connect (<see cref="WatchApp"/>): another change took its place, or
+    /// Settings closed, and looking went on for its five minutes with nobody to see it.</summary>
+    public void StopWatchingApps()
     {
         appWatch?.Cancel();
         appWatch = null;

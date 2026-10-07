@@ -1032,5 +1032,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     {
         host.Changed -= OnHostChanged;
         Canvas.Dispose();
+        // Settings has closed: nobody is waiting to see an AI app's row turn to Connected.
+        Access.StopWatchingApps();
     }
 }
