@@ -174,7 +174,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public static string ClaudeLine => "I have a paid Claude plan (Pro or Max).";
     public static string CodexLine => "I have a paid ChatGPT plan (Plus or higher).";
     public static string FreeTitle => "I don't have a paid plan";
-    public string FreeLine => $"That's fine. A free AI that runs on this {Device} can write your notes, or Study Stash can just record and transcribe.";
+    public string FreeLine => $"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {Device} (Ollama).";
     public string AlreadyHere => $"Already on this {Device}";
     public bool ClaudeHere => ClaudeFound.Works;
     public bool CodexHere => CodexFound.Works;
@@ -229,8 +229,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>Signed in, but on a plan other apps can't use (the free one): said as that, with what would work.</summary>
     public string PlanTooSmallTitle => $"This {Brand} account is on a plan that other apps can't use";
     public string PlanTooSmallText => Cli.Id == "codex"
-        ? "Study Stash needs ChatGPT Plus or higher. Without one, a free AI can write your notes instead."
-        : "Study Stash needs Claude Pro or Max. Without one, a free AI can write your notes instead.";
+        ? "Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures."
+        : "Study Stash needs Claude Pro or Max. Without one, it still records and transcribes your lectures.";
     public bool ShowOpenSignIn => !WaitingSignIn && !SignedIn && PlanProblem == ChatProblem.None;
     public bool HasSignInProblem => !string.IsNullOrEmpty(SignInProblem);
     public bool HasPlanProblem => PlanProblem != ChatProblem.None;

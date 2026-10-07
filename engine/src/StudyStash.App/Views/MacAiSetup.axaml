@@ -87,16 +87,19 @@
                           </Border>
                           <Border Classes="focusring ai-radioring" />
                           <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Classes="ai-row-title" Text="{Binding Name}" />
-                            <TextBlock Classes="ai-row-sub" Text="{Binding About}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <TextBlock Classes="ai-row-title" Text="{Binding Name}" VerticalAlignment="Center" />
+                              <!-- The free AI that runs on the computer itself: not the easy way, and said so -->
+                              <TextBlock Classes="ai-row-sub" Text="Advanced" IsVisible="{Binding Advanced}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <TextBlock Classes="ai-row-sub" Text="{Binding About}" TextWrapping="Wrap" />
                           </StackPanel>
                         </Grid>
                       </Button>
                       <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                        <TextBlock Classes="ai-row-sub" Text="Recommended" IsVisible="{Binding Recommended}" VerticalAlignment="Center" />
-                        <!-- The free AI, not ready yet: one button gets it ready, and nothing is left to do by hand -->
+                        <!-- Not ready yet: one button gets it ready (the free AI, Claude or ChatGPT), and nothing is left to do by hand -->
                         <Button AutomationProperties.Name="{Binding OpenLabel}" Name="SetUpFree" Classes="ai-pillbtn" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOneButton}">
-                          <Border Classes="ai-pill" Classes.primary="{Binding Primary}">
+                          <Border Classes="ai-pill">
                             <TextBlock Text="{Binding OpenLabel}" />
                           </Border>
                         </Button>

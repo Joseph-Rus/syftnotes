@@ -203,7 +203,7 @@ public class MenuPickTests
         {
             var notes = view.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is MenuFlyout { ItemsSource: var s } && ReferenceEquals(s, m.NotesChoices));
             var menu = OpenFlyout(notes);
-            Assert.True(Checked(Item(menu, "Free AI (Ollama)")));
+            Assert.True(Checked(Item(menu, "Ollama (free, advanced)")));
             Click(Item(menu, "Claude"));
             Assert.Equal("claude", m.SelectedNotes);
             Assert.Equal("Claude", m.SelectedNotesName);

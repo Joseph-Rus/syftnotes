@@ -272,7 +272,10 @@ public sealed class GuidedSetupTests
         // The first screen asks what the student has, in their terms. The tools underneath aren't named on it.
         Assert.DoesNotContain("Claude Code", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
         Assert.DoesNotContain("Codex", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
-        Assert.DoesNotContain("Ollama", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
+        // The free AI that runs on the computer is named once, as what it is: Ollama, and advanced. Without a plan the
+        // plain way is no AI at all, and Study Stash still records and transcribes.
+        Assert.DoesNotContain("Ollama", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine);
+        Assert.Equal($"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {g.Device} (Ollama).", g.FreeLine);
         g.Picked = "";
         Assert.False(g.CanContinue);
         g.PickCommand.Execute("claude");
@@ -360,7 +363,7 @@ public sealed class GuidedSetupTests
         await g.OpenSignInCommand.ExecuteAsync(null);
         Assert.Equal(ChatProblem.Plan, g.PlanProblem);
         Assert.Equal("This ChatGPT account is on a plan that other apps can't use", g.PlanProblemTitle);
-        Assert.Equal("Study Stash needs ChatGPT Plus or higher. Without one, a free AI can write your notes instead.", g.PlanProblemText);
+        Assert.Equal("Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures.", g.PlanProblemText);
         Assert.False(g.AiReady);
         g.OpenPlansCommand.Execute("");
         Assert.Equal(["https://chatgpt.com/pricing"], rig.Opened);

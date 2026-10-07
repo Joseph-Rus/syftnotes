@@ -19,7 +19,7 @@ public sealed class AiSetupStep
     public IRelayCommand CopyCommand { get; internal set; } = null!;
 }
 
-/// <summary>One engine in setup's "Choose who writes your notes" list: a radio row, Ollama marked Recommended. An
+/// <summary>One engine in setup's "Choose who writes your notes" list: a radio row, the free AI (Ollama) marked Advanced. An
 /// engine that can't write notes yet (not installed, not signed in) offers "Set up": the steps to get it going, with
 /// the commands to copy, a button to open Terminal (or sign in there), and Check again.</summary>
 public sealed partial class AiSetupRow : ObservableObject
@@ -28,7 +28,9 @@ public sealed partial class AiSetupRow : ObservableObject
     public string Name { get; init; } = "";
     public string About { get; init; } = "";
     public string State { get; init; } = "";
-    public bool Recommended { get; init; }
+    /// <summary>The free AI that runs on the computer itself (Ollama): for someone comfortable with a big download, a
+    /// slower computer while it works and simpler notes. Marked, so a student who isn't doesn't take it for the easy way.</summary>
+    public bool Advanced { get; init; }
     public bool ShowSignIn { get; init; }
     /// <summary>It can write notes now (as far as anyone can tell without asking it): picking it is allowed.</summary>
     public bool CanWrite { get; init; }
@@ -53,8 +55,6 @@ public sealed partial class AiSetupRow : ObservableObject
     public double Fraction { get; init; }
     public bool Steady { get; init; }
     public bool ShowOneButton => OneButton && !Working;
-    /// <summary>The filled button: the free AI's, which costs nothing to say yes to. Claude's and ChatGPT's are plain.</summary>
-    public bool Primary => Id == "ollama";
     internal Action? HelpChanged { get; set; }
 
     partial void OnShowHelpChanged(bool value)
@@ -206,7 +206,7 @@ public sealed partial class AiSetupModel : ObservableObject
                 Name = AiWords.SetupName(e.Id, e.Name, Windows ? "PC" : "Mac"),
                 About = AiWords.SetupAbout(e.Id, e.State, Windows ? "PC" : "Mac", e.SetUpGb, e.Small),
                 State = e.State,
-                Recommended = e.Id == "ollama" && !freeNeedsWork,
+                Advanced = e.Id == "ollama",
                 OneButton = e.Id == "ollama" && freeNeedsWork || Buttons(e),
                 Working = e.Id == "ollama" && working is not null,
                 Progress = e.Id == "ollama" && working is not null ? AiWords.FreeAiProgress(working) : "",

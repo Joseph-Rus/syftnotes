@@ -455,7 +455,7 @@
                       <StackPanel Orientation="Horizontal" Spacing="8" Margin="28,0,0,0">
                         <Button Classes="push fill" Command="{Binding TryAgainCommand}" Height="28"><TextBlock Text="Try again" FontSize="12" /></Button>
                         <Button Classes="push fill" Command="{Binding UseOtherCommand}" IsVisible="{Binding InstallRegion}" Height="28"><TextBlock Text="{Binding UseOtherLabel}" FontSize="12" /></Button>
-                        <Button Classes="push fill" Command="{Binding UseOllamaCommand}" IsVisible="{Binding InstallRegion}" Height="28"><TextBlock Text="Use a free AI instead" FontSize="12" /></Button>
+                        <Button Classes="push fill" Command="{Binding UseOllamaCommand}" IsVisible="{Binding InstallRegion}" Height="28"><TextBlock Text="Carry on without it" FontSize="12" /></Button>
                         <Button Classes="link" Command="{Binding OpenDocsCommand}" IsVisible="{Binding InstallOther}">
                           <StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="Install it yourself" /><c:Icon Glyph="arrow_outward" Size="12" /></StackPanel>
                         </Button>
@@ -525,7 +525,7 @@
                       <StackPanel Orientation="Horizontal" Spacing="4" Margin="28,0,0,0">
                         <Button Classes="link" Command="{Binding UseOtherCommand}"><TextBlock Text="{Binding UseOtherLabel}" /></Button>
                         <TextBlock Text="·" FontSize="12" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
-                        <Button Classes="link" Command="{Binding UseOllamaCommand}"><TextBlock Text="Use a free AI instead" /></Button>
+                        <Button Classes="link" Command="{Binding UseOllamaCommand}"><TextBlock Text="Carry on without it" /></Button>
                       </StackPanel>
                     </StackPanel>
                   </Border>

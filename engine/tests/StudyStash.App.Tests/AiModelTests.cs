@@ -48,7 +48,7 @@ public class AiWordsTests
         Assert.Equal("Through Claude Code. Runs on your library. Signed in.", AiWords.EngineAbout("claude", "ready"));
         Assert.Equal("Through Codex. Runs on your library.", AiWords.EngineAbout("codex", "not_signed_in"));
         // Where a student chooses one, each AI goes by what they'd call it; the tool is in the line under it.
-        Assert.Equal(("Free AI (Ollama)", "Claude", "ChatGPT", "Gemini"),
+        Assert.Equal(("Ollama (free, advanced)", "Claude", "ChatGPT", "Gemini"),
             (AiWords.PlainName("ollama", "Ollama"), AiWords.PlainName("claude", "Claude Code"), AiWords.PlainName("codex", "Codex"), AiWords.PlainName("gemini", "Gemini")));
     }
 
@@ -122,7 +122,7 @@ public class AiEnginesModelTests
 
         await model.Load();
 
-        Assert.Equal(["Free AI (Ollama)", "Claude", "ChatGPT"], model.Engines.Select(r => r.Name));
+        Assert.Equal(["Ollama (free, advanced)", "Claude", "ChatGPT"], model.Engines.Select(r => r.Name));
         Assert.Single(model.AddChoices);
         Assert.Equal("Gemini", model.AddChoices[0].Name);
         Assert.Equal("ollama", model.SelectedNotes);
@@ -319,7 +319,7 @@ public class AiSetupModelTests
 
         Assert.Equal(["ollama", "claude", "codex"], model.Engines.Select(r => r.Id));
         var ollama = model.Engines.Single(r => r.Id == "ollama");
-        Assert.True(ollama.Recommended);
+        Assert.True(ollama.Advanced);
         Assert.True(ollama.Selected);
         var codex = model.Engines.Single(r => r.Id == "codex");
         Assert.True(codex.HasHelp); // how to sign in, under the row
@@ -589,7 +589,7 @@ public class AiSetupModelTests
         Assert.Equal("ollama", model.SelectedNotes);
         Assert.False(free.Working);
         Assert.False(free.ShowOneButton);
-        Assert.True(free.Recommended);
+        Assert.True(free.Advanced);
         Assert.Equal("Free AI on this Mac is ready. It writes your notes.", model.Say);
     }
 

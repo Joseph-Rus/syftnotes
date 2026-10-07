@@ -99,7 +99,7 @@
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
                 <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
                   <TextBlock Classes="ai-row-title" Text="Drawings" />
-                  <TextBlock Classes="ai-row-sub" Text="Labelled figures of what a lecture describes (not with the free AI)" TextWrapping="Wrap" />
+                  <TextBlock Classes="ai-row-sub" Text="Labelled figures of what a lecture describes (not on Ollama)" TextWrapping="Wrap" />
                 </StackPanel>
                 <ToggleButton AutomationProperties.Name="Drawings" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDrawings}" VerticalAlignment="Center" />
               </Grid>
@@ -264,10 +264,10 @@
         <Border Classes="ai-group">
           <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
             <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
-              <TextBlock Classes="ai-row-title" Text="Use the free AI (Ollama) instead" />
+              <TextBlock Classes="ai-row-title" Text="Use Ollama instead" />
               <TextBlock Classes="ai-row-sub" Text="So notes and answers never stall" />
             </StackPanel>
-            <ToggleButton AutomationProperties.Name="Use the free AI (Ollama) instead" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" VerticalAlignment="Center" />
+            <ToggleButton AutomationProperties.Name="Use Ollama instead" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" VerticalAlignment="Center" />
           </Grid>
         </Border>
       </StackPanel>

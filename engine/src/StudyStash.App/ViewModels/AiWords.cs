@@ -124,7 +124,7 @@ public static partial class AiWords
     /// the tool, and the tool's name is in the row's own line.</summary>
     public static string PlainName(string id, string name) => id switch
     {
-        "ollama" => "Free AI (Ollama)",
+        "ollama" => "Ollama (free, advanced)",
         "claude" => "Claude",
         "codex" => "ChatGPT",
         _ => name,

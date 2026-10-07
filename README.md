@@ -127,8 +127,8 @@ writes your notes and answers your questions:
 - **Claude**: you have a paid Claude plan, Pro or Max. (Study Stash talks to it through Claude Code,
   Anthropic's own helper for apps.)
 - **ChatGPT**: you have a paid ChatGPT plan, Plus or higher. (Through Codex, OpenAI's.)
-- **I don't have a paid plan**: a free AI that runs on your computer can write your notes, or Study
-  Stash can just record and transcribe.
+- **I don't have a paid plan**: Study Stash still records and transcribes your lectures. A free AI
+  can also run on your own computer (Ollama), which is the advanced way.
 
 **If you already have the ChatGPT app or the Claude app on a Mac, there's nothing to install.** The
 ChatGPT app carries Codex inside it, signed in with the app, and the Claude app keeps its own Claude
@@ -149,11 +149,11 @@ picks up where it left off. The chat uses a little of your plan, and your AI the
 notes and answers your questions (you can switch to a free local model in Settings any time).
 
 **No paid plan?** That's the first screen's third answer, **I don't have a paid plan**. It goes to
-setup by hand, a few plain steps. On its notes step, **Free AI on this Mac** has one button, **Set it
-up**: Study Stash downloads a free AI (Ollama, with a model sized for your computer), installs and starts it, and
+setup by hand, a few plain steps. Its notes step starts on **No AI for now**: lectures are recorded
+and transcribed, and notes can be switched on later in Settings. **Free AI on this Mac** is there
+too, marked **Advanced**, with one button, **Set it up**: Study Stash downloads a free AI (Ollama, with a model sized for your computer), installs and starts it, and
 shows how far along it is, with nothing to do in a browser or a terminal. You can carry on with setup
-while it downloads. Or leave **No AI for now** picked: lectures are recorded and transcribed, and
-notes can be switched on later in Settings. **Set up by hand** is on every screen too, and
+while it downloads. **Set up by hand** is on every screen too, and
 **Settings → General → Run setup** runs either again.
 
 Setup by hand asks how you'll use it:
