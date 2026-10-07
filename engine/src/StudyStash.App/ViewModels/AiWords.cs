@@ -230,7 +230,7 @@ public static partial class AiWords
 
     /// <summary>Save found other notes on the library than the ones the edit started from: nothing was saved, and Save
     /// again is the student's choice.</summary>
-    public const string EditNotesChanged = "These notes changed while you were editing: their diagrams arrived, or they were changed on another device. "
+    public const string EditNotesChanged = "These notes changed while you were editing: their diagrams arrived, or they were changed on another device or in another app. "
         + "Save again to replace them with yours, or Cancel to see them.";
 
     /// <summary>Save couldn't reach the library.</summary>

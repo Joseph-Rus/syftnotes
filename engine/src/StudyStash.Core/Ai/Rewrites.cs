@@ -281,7 +281,8 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
     /// once, whoever wrote them still named as their writer, and a rewrite running or waiting to be chosen left as it
     /// is. Refuses empty notes (400); while the pipeline is writing this lecture's notes (409); and, with
     /// <paramref name="basedOn"/> given, when the notes are no longer the ones the edit started from (412: their
-    /// diagrams arrived, or another device changed them), so the student chooses rather than undoing that unseen.</summary>
+    /// diagrams arrived, another device changed them, or their summary was edited in the note file itself, which
+    /// makes those the notes), so the student chooses rather than undoing that unseen.</summary>
     public RewriteInfo Edit(string id, string markdown, string? basedOn = null)
     {
         var row = Require(id);
