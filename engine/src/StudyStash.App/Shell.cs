@@ -195,6 +195,18 @@ public static partial class Shell
     {
         if (quitting) return;
         Program.Log($"[app] another copy said \"{message}\"");
+        // A click on one of Windows' notifications. One this run of the app said: what the click does is that notice's
+        // to say (it may open nothing at all). One from before (it sat in Windows' list while the app restarted): the
+        // library opens, as it does for any second copy.
+        if (NoticeLinks.IsWord(message))
+        {
+            if (OperatingSystem.IsWindows() && NoticeLinks.Parse(message) is { } click && systemNotices?.Knows(click.Id) == true)
+            {
+                WinNotifications.Opened(message);
+                return;
+            }
+            message = "show";
+        }
         if (!host.Settings.SetupDone) ShowSetup();
         else if (message == "record") ToggleRecording();
         // "--show panel" / "--show quick": open the dropdown or the quick panel without the menu bar or the shortcut

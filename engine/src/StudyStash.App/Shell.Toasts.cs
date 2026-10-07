@@ -8,10 +8,52 @@ using StudyStash.Core;
 
 namespace StudyStash.App;
 
-/// <summary>The shell's notifications (<see cref="ToastShelf"/>): what the app says, and when.</summary>
+/// <summary>The shell's notifications: what the app says, and when. They're the computer's own (a Mac's Notification
+/// Center, Windows' notifications, through <see cref="SystemNotices"/>) wherever it will have them; Study Stash's own
+/// cards (<see cref="ToastShelf"/>) where it won't (a build run from its folder, a copy opened from its disk image).</summary>
 public static partial class Shell
 {
     static ToastShelf? shelf;
+    static SystemNotices? systemNotices;
+    static bool systemNoticesTried;
+
+    /// <summary>The computer's own notifications, made the first time something is said; null where there are none
+    /// to be had. A self-test keeps to the app's own cards: it measures where those land, and must never have macOS
+    /// ask anyone anything.</summary>
+    static SystemNotices? SystemNotifications()
+    {
+        if (systemNoticesTried) return systemNotices;
+        systemNoticesTried = true;
+        if (Desktop.SystemChangesOff) return null;
+        ISystemNotifications? center = OperatingSystem.IsMacOS() ? MacNotifications.Make() : OperatingSystem.IsWindows() ? WindowsNotifications() : null;
+        if (center is null) return null;
+        return systemNotices = new SystemNotices(center, a => Dispatcher.UIThread.Post(a), notice => Shelf().Show(notice), log: Program.Log);
+    }
+
+    /// <summary>Windows' notifications, for the installed app in its usual settings folder: a click on one comes back
+    /// through a link that opens the installed program, which a build run from its folder, or a second profile,
+    /// mustn't take over. The app's icon is written out for Windows to show beside its name, as it does for any app.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    static WinNotifications? WindowsNotifications()
+    {
+        if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "study-stash.ini")) || !Desktop.SameFolder(host.Home, Configs.DefaultHome)) return null;
+        string? icon = null;
+        try
+        {
+            icon = Path.Combine(host.Home, "notification-icon.png");
+            using var from = Avalonia.Platform.AssetLoader.Open(new Uri("avares://StudyStash/Assets/icon.png"));
+            using var to = File.Create(icon);
+            from.CopyTo(to);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FileNotFoundException)
+        {
+            icon = null;
+        }
+        WinNotifications.Log = Program.Log;
+        var made = WinNotifications.Make(icon: icon, program: Desktop.Program);
+        if (made is null) Program.Log($"[notifications] Windows won't have them here ({WinNotifications.LastError ?? "no reason given"}): Study Stash shows its own");
+        return made;
+    }
 
     /// <summary>The notifications' shelf, made the first time one is said: they go on the display whose menu bar has
     /// the S. (a Mac) or the main one (Windows), clear of the dropdown or tray flyout, the recorder and the quick panel.</summary>
@@ -27,8 +69,7 @@ public static partial class Shell
         return shelf;
     }
 
-    /// <summary>A notification like the system's own (see <see cref="Notify"/>). Error codes in the words go to the log,
-    /// not on screen.</summary>
+    /// <summary>A notification (see <see cref="Notify"/>). Error codes in the words go to the log, not on screen.</summary>
     public static void Toast(string title, string text, string? action, Action? run, TimeSpan? stay = null)
     {
         if (ToastWords.HadCodes(title) || ToastWords.HadCodes(text)) Program.Log($"[toast] {title}: {text}");
@@ -39,12 +80,14 @@ public static partial class Shell
         });
     }
 
-    /// <summary>Shows <paramref name="notice"/> on top of the stack, unless the same one is showing already (that one
-    /// starts its time again instead). Its words are the app's own, already plain.</summary>
+    /// <summary>Says <paramref name="notice"/>: as one of the computer's own notifications where it has them, else as
+    /// a card of the app's own, on top of the stack (the same one showing already starts its time again instead). Its
+    /// words are the app's own, already plain.</summary>
     static void Notify(Notice notice)
     {
         if (quitting) return;
-        Shelf().Show(notice);
+        if (SystemNotifications() is { } system) system.Show(notice);
+        else Shelf().Show(notice);
     }
 
     /// <summary>The S. in a Mac's menu bar, as a point on screen: the notifications go on that display. Null on
@@ -98,6 +141,7 @@ public static partial class Shell
     /// until it's over or closed.</summary>
     static void SaySettledProblems()
     {
+        systemNotices?.Tick();
         foreach (var p in problemNotices.Due(DateTime.UtcNow, quiet: !host.Settings.SetupDone || setupWindow?.IsVisible == true))
         {
             var kind = p.Kind;
@@ -189,6 +233,10 @@ public static partial class Shell
         return NoticeWords.UpdateNowLine(await Task.Run(updates.NowAsync));
     }
 
-    /// <summary>Quitting: every notification goes.</summary>
-    static void CloseAllToasts() => shelf?.CloseAll();
+    /// <summary>Quitting: every card goes, and so does any of the system's that said something was still so.</summary>
+    static void CloseAllToasts()
+    {
+        shelf?.CloseAll();
+        systemNotices?.Quit();
+    }
 }

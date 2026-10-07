@@ -52,7 +52,7 @@ public class ToastTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac, 16)]
     [InlineData(SkinKind.Win, 8)]
-    public void A_toast_is_one_plain_panel_with_the_app_icon(SkinKind skin, double radius)
+    public void A_toast_is_one_plain_panel_with_no_picture_on_it(SkinKind skin, double radius)
     {
         ((App)Application.Current!).UseSkin(skin);
         var view = new ToastView { Title = "Recording saved", Text = "Study Stash is writing it down." };
@@ -67,10 +67,9 @@ public class ToastTests
             Assert.True(bg.R == bg.G && bg.G == bg.B, $"the panel is {bg}, not a grey");
             foreach (var s in card.BoxShadow)
                 Assert.True(s.Color.R == s.Color.G && s.Color.G == s.Color.B, $"shadow {s.Color} is coloured");
-            // The app's own icon, not an accent square.
-            var icons = view.GetVisualDescendants().OfType<Image>().Where(i => i.IsEffectivelyVisible).ToList();
-            Assert.Single(icons);
-            Assert.NotNull(icons[0].Source);
+            // No picture on it, the app's icon included (the system puts its own on its notifications; these are the
+            // app's cards for where the system's can't be had), and no accent square either.
+            Assert.Empty(view.GetVisualDescendants().OfType<Image>());
             Assert.True(view.TryFindResource("Accent", view.ActualThemeVariant, out var accent));
             Assert.DoesNotContain(view.GetVisualDescendants().OfType<Border>(), b => b.Background is ISolidColorBrush { Color: var c }
                 && c == ((ISolidColorBrush)accent!).Color);

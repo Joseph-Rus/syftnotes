@@ -86,7 +86,7 @@ public static class Desktop
         return ($"com.study-stash.app.{hash}", $"Study Stash ({hash})");
     }
 
-    static bool SameFolder(string a, string b) =>
+    internal static bool SameFolder(string a, string b) =>
         string.Equals(Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)), Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
@@ -276,7 +276,8 @@ public static class Desktop
     }
 
     /// <summary>The words a later copy can hand off: show the library, record, open the dropdown, the quick panel or
-    /// Settings ("settings", or "settings:Library" for one of its pages).</summary>
+    /// Settings ("settings", or "settings:Library" for one of its pages). A click on one of Windows' notifications
+    /// comes the same way, as a word of its own (<see cref="NoticeLinks"/>).</summary>
     static readonly HashSet<string> Words = ["show", "record", "panel", "quick", "settings"];
 
     /// <summary>Settings' pages a later copy can open it at.</summary>
@@ -285,7 +286,8 @@ public static class Desktop
     /// <summary>Whether a later copy's word is one the app acts on; anything else is ignored. ("snap:&lt;name&gt;" only
     /// while pictures are on: see <see cref="MacSnap"/>.)</summary>
     public static bool IsWord(string word) =>
-        Words.Contains(word) || (word.StartsWith("settings:", StringComparison.Ordinal) && SettingsPages.Contains(word["settings:".Length..]))
+        Words.Contains(word) || NoticeLinks.IsWord(word)
+        || (word.StartsWith("settings:", StringComparison.Ordinal) && SettingsPages.Contains(word["settings:".Length..]))
         || (word.StartsWith("snap:", StringComparison.Ordinal) && MacSnap.Folder is not null && MacSnap.IsName(word["snap:".Length..]));
 
     /// <summary>Listen for later copies handing off (they say "show", or "record"); what they say is passed to

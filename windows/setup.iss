@@ -60,6 +60,12 @@ Filename: "{app}\study-stash.ini"; Section: "app"; Key: "version"; String: "{#Ap
 Name: "{userprograms}\Study Stash"; Filename: "{app}\StudyStash.exe"; Comment: "Open Study Stash"
 Name: "{userdesktop}\Study Stash"; Filename: "{app}\StudyStash.exe"; Tasks: desktopicon
 
+[Registry]
+; What the app tells Windows about itself the first time it has something to say, so its notifications are Windows'
+; own (its name and icon for them, and the link a click on one opens). Nothing is written here; they go with the app.
+Root: HKCU; Subkey: "Software\Classes\AppUserModelId\StudyStash.App"; Flags: dontcreatekey uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\studystash"; Flags: dontcreatekey uninsdeletekey
+
 [Run]
 Filename: "{app}\StudyStash.exe"; Description: "Open Study Stash"; Flags: nowait postinstall skipifsilent
 ; a silent update (/relaunch=1) reopens the app once the new files are in place

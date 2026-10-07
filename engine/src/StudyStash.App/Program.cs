@@ -49,8 +49,10 @@ static class Program
         // has nothing to show, so it just goes.
         if (!Desktop.Claim(Home))
         {
-            int show = Array.IndexOf(args, "--show");
-            string? word = args.Contains("--record") ? "record"
+            int show = Array.IndexOf(args, "--show"), open = Array.IndexOf(args, "--open");
+            // "--open LINK": Windows opened a studystash: link, for a click on one of the app's notifications.
+            string? word = open >= 0 && open + 1 < args.Length && NoticeLinks.WordFor(args[open + 1]) is { } click ? click
+                : args.Contains("--record") ? "record"
                 : show >= 0 && show + 1 < args.Length ? args[show + 1]
                 : Background ? null : "show";
             Log(word is null ? "[app] Study Stash is already running for this folder; this copy, started at login, goes"
