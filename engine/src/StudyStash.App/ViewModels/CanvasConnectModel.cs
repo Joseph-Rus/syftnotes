@@ -200,7 +200,8 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public string PickCaption => $"Pick the {FolderName} folder, or drag it onto the page";
     /// <summary>Add to Chrome has been pressed: the button gives way to quiet links and the "Waiting for Chrome…" row.</summary>
     [NotifyPropertyChangedFor(nameof(WaitingForBrowser), nameof(ShowBrowserStatus), nameof(ShowAddToBrowser), nameof(ShowAddRow), nameof(BrowserHelp),
-        nameof(ShowFolderLinks), nameof(ShowAddOnLink), nameof(ShowLinks), nameof(ShowSwitchAfterLinks), nameof(ShowAdvice), nameof(ShowGetBrowser))]
+        nameof(ShowFolderLinks), nameof(ShowAddOnLink), nameof(ShowLinks), nameof(ShowSwitchAfterLinks), nameof(ShowAdvice), nameof(ShowGetBrowser),
+        nameof(ShowHaveIt))]
     [ObservableProperty]
     public partial bool AddedToBrowser { get; set; }
     [NotifyPropertyChangedFor(nameof(CanFinish))]
@@ -208,7 +209,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public partial bool AddingToBrowser { get; set; }
     /// <summary>A browser with the extension is talking to the library.</summary>
     [NotifyPropertyChangedFor(nameof(WaitingForBrowser), nameof(ShowBrowserStatus), nameof(ShowAddToBrowser), nameof(ShowAddRow), nameof(CanSwitchBrowser),
-        nameof(ShowLinks), nameof(ShowSwitchAfterLinks), nameof(ShowAdvice), nameof(ShowGetBrowser))]
+        nameof(ShowLinks), nameof(ShowSwitchAfterLinks), nameof(ShowAdvice), nameof(ShowGetBrowser), nameof(ShowHaveIt))]
     [ObservableProperty]
     public partial bool BrowserConnected { get; set; }
     [ObservableProperty] public partial string? BrowserError { get; set; }
@@ -223,6 +224,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         (false, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} shows you the extension’s folder and opens {BrowserName}’s extensions page. There:",
         (false, true) => $"{BrowserName}’s extensions page is open, and the folder is showing. In {BrowserName}:",
         (true, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens the Study Stash add-on there. Then:",
+        (true, true) when haveItAlready => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. To connect the add-on you have there:",
         (true, true) => $"The Study Stash add-on is open in {BrowserName}. There:",
     };
     /// <summary>The student's usual browser can't take the extension (Safari; Firefox before its add-on is out), or
@@ -230,6 +232,14 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// the extension has been added to one.</summary>
     public bool ShowAdvice => advice is not null && !AddedToBrowser && !BrowserConnected;
     public string AdviceText => advice?.Say(Browser) ?? "";
+    /// <summary>Their usual browser is Firefox (or one built on it) and Study Stash has nowhere to send them for its
+    /// add-on yet. A student who has the add-on there already (Mozilla published it after this Study Stash was made,
+    /// or they added it from a file) says so, and the step is that browser's: the code to paste, and nothing to add.</summary>
+    public bool ShowHaveIt => ShowAdvice && advice!.Usual is { Family: BrowserFamily.Firefox };
+    public string HaveItLabel => advice?.Usual is { } usual ? $"I already have it in {usual.Name}" : "";
+    /// <summary>The student said the add-on is in their Firefox already: there's no add-on page to open, in the
+    /// step's words or its links.</summary>
+    bool haveItAlready;
     /// <summary>Nothing here can take the extension: the step links to where Chrome is got.</summary>
     public bool ShowGetBrowser => ShowAdvice && advice!.NoneHere;
     public bool WaitingForBrowser => AddedToBrowser && !BrowserConnected;
@@ -240,8 +250,12 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         CanvasSettings.BrowserName(state.Extension?.Browser is { Length: > 0 } named ? named : AddedToBrowser ? BrowserName : "", start);
 
     /// <summary>Firefox's three steps, where Chrome's family has its three pictures.</summary>
-    public string FirefoxStep1 => $"In {BrowserName}, click Add when it asks to add Study Stash for Canvas.";
-    public string FirefoxStep2 => "Click the Study Stash button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.";
+    public string FirefoxStep1 => haveItAlready
+        ? $"In {BrowserName}, click the Study Stash button (it may be under the puzzle-piece Extensions button)."
+        : $"In {BrowserName}, click Add when it asks to add Study Stash for Canvas.";
+    public string FirefoxStep2 => haveItAlready
+        ? "Paste this code and click Connect."
+        : "Click the Study Stash button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.";
     public string FirefoxStep3 => $"Click Allow when {BrowserName} asks.";
     /// <summary>The code a Firefox copy is connected with (<see cref="Extension.ConnectionCode"/>: the library as this
     /// computer reaches it, the extension's key and the Canvas address); "" until the library has said.</summary>
@@ -258,9 +272,10 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     // The quiet links under the step, once the button's been pressed: the folder and the extensions page again
     // (Chrome's family) or the add-on again (Firefox's), and the way to another browser when there is one.
     public bool ShowFolderLinks => AddedToBrowser && IsChromium;
-    public bool ShowAddOnLink => AddedToBrowser && IsFirefox;
+    public bool ShowAddOnLink => AddedToBrowser && IsFirefox && !haveItAlready;
     public bool ShowLinks => AddedToBrowser || CanSwitchBrowser;
-    public bool ShowSwitchAfterLinks => AddedToBrowser && CanSwitchBrowser;
+    /// <summary>The dot between those links and "Use another browser": only when there's a link before it.</summary>
+    public bool ShowSwitchAfterLinks => (ShowFolderLinks || ShowAddOnLink) && CanSwitchBrowser;
 
     // ---- step 3: find my courses ----
     [ObservableProperty] public partial bool SignedOut { get; set; }
@@ -405,9 +420,12 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ShowAdvice));
         OnPropertyChanged(nameof(AdviceText));
         OnPropertyChanged(nameof(ShowGetBrowser));
+        OnPropertyChanged(nameof(ShowHaveIt));
+        OnPropertyChanged(nameof(HaveItLabel));
         var offer = context.Actions.Browsers();
         if (offer.Count == 0) offer = [Browsers.Chrome];
-        var chosen = pickedHere && offer.Contains(Browser) ? Browser : offer[0];
+        // A Firefox the student said has the add-on already isn't among the ones offered, and stays the step's browser.
+        var chosen = pickedHere && (offer.Contains(Browser) || haveItAlready) ? Browser : offer[0];
         if (!offer.SequenceEqual(BrowserChoices.Select(c => c.Browser)))
         {
             BrowserChoices.Clear();
@@ -426,10 +444,49 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     {
         if (browser == Browser) return;
         pickedHere = true;
+        haveItAlready = false;
         AddedToBrowser = false;
         BrowserError = null;
         Use(browser);
+        OnPropertyChanged(nameof(FirefoxStep2));
         context.Actions.RememberBrowser(browser);
+    }
+
+    /// <summary>"I already have it in Firefox": the step becomes that browser's, as it is once Add to Firefox has
+    /// been pressed, but with nothing to add: the code to paste into the add-on's own button, and the wait for it to
+    /// connect. It's the browser Study Stash opens Canvas in from here.</summary>
+    [RelayCommand]
+    async Task HaveIt()
+    {
+        if (advice?.Usual is not { Family: BrowserFamily.Firefox } usual || context.Client is not { } client) return;
+        AddingToBrowser = true;
+        BrowserError = null;
+        try
+        {
+            var info = await ReadCodeAsync(client);
+            if (ConnectionCode.Length == 0)
+            {
+                BrowserError = info is null
+                    ? "Your library runs an older Study Stash: update it to add Canvas."
+                    : "The code to connect it isn't ready yet. Try again in a moment.";
+                return;
+            }
+            pickedHere = true;
+            haveItAlready = true;
+            Use(usual);
+            OnPropertyChanged(nameof(FirefoxStep2));
+            context.Actions.RememberBrowser(usual);
+            AddedToBrowser = true;
+            if (Current == 2) hurry ??= watch.Hurry();
+        }
+        catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            BrowserError = e is CanvasLibraryException { Message.Length: > 0 } ? e.Message : "Your library didn't answer. Try again in a moment.";
+        }
+        finally
+        {
+            AddingToBrowser = false;
+        }
     }
 
     void Use(Browser browser)

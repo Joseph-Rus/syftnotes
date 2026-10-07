@@ -46,6 +46,11 @@ pastes a code from Study Stash.
 - **Where the code is shown.** The library's Settings page, under Canvas, **Set up the extension on this computer**
   (the code for a browser on the library's computer). In the app, the Canvas connect step shows it when the student's
   browser is Firefox.
+- **A Firefox that has the add-on before Study Stash knows where it is.** While `Extension.FirefoxPublishedAt` is
+  empty the step says Firefox can't run the extension yet and uses another browser. A student whose usual browser is
+  Firefox (or one built on it) also gets **I already have it in Firefox**: the step becomes that browser's, with the
+  code to paste and nothing to add. That covers the days between Mozilla publishing the add-on and the Study Stash
+  release that names its page, and an add-on installed from a file.
 
 **Tested.** `ExtensionStoreTests` checks the Firefox zip and its manifest. `ExtensionScriptTests` runs the real scripts
 in Jint as Firefox runs them (no `importScripts`, `moz-extension://`): patterns without a port, `b=Firefox`, and the

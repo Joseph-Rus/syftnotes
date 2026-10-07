@@ -736,6 +736,7 @@
                                 <StackPanel Spacing="4" IsVisible="{Binding ShowAdvice}">
                                   <TextBlock Classes="note" Foreground="{DynamicResource Fg}" Text="{Binding AdviceText}" TextWrapping="Wrap" />
                                   <Button Classes="link" HorizontalAlignment="Left" Command="{Binding GetBrowserCommand}" IsVisible="{Binding ShowGetBrowser}"><TextBlock Text="Get Chrome" /></Button>
+                                  <Button Classes="link" HorizontalAlignment="Left" Command="{Binding HaveItCommand}" IsVisible="{Binding ShowHaveIt}"><TextBlock Text="{Binding HaveItLabel}" /></Button>
                                 </StackPanel>
                                 <TextBlock Classes="note" Text="{Binding BrowserHelp}" />
                                 <StackPanel Spacing="10" IsVisible="{Binding IsChromium}">
