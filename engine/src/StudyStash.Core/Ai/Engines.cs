@@ -29,6 +29,9 @@ public sealed record EngineChecks
     public required Func<DateTime> Now { get; init; }
     /// <summary>Whether the student gave an engine an API key (<see cref="ApiKeys"/>): it's usable then, CLI or not.</summary>
     public Func<string, bool> HasKey { get; init; } = _ => false;
+    /// <summary>Install the Ollama app on this computer from its maker's own download, reporting bytes done and total
+    /// as it comes down. True when it's installed afterwards.</summary>
+    public Func<Action<long, long>?, Task<bool>> InstallOllama { get; init; } = _ => Task.FromResult(false);
 
     /// <summary>The real probes: this computer, its files, its environment, its Ollama, its terminals.</summary>
     public static readonly EngineChecks Machine = new()
@@ -40,6 +43,7 @@ public sealed record EngineChecks
         OllamaModels = host => Ollama.ListModelsAsync(host),
         StartOllama = host => Ollama.StartAsync(host),
         PullModel = (model, host, progress, ct) => Ollama.PullAsync(model, host, progress, ct: ct),
+        InstallOllama = progress => Ready.InstallOllamaAsync(_ => { }, progress, StudyStash.Core.Machine.Platform, StudyStash.Core.Machine.Run, Ready.Download),
         OpenSignIn = (home, terminal, id) =>
         {
             var (exe, args) = Engines.SignInCommand(id);

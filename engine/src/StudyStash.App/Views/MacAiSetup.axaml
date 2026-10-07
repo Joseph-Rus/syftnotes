@@ -15,6 +15,14 @@
     <Style Selector="Border.ai-radio.dim">
       <Setter Property="Opacity" Value="0.45" />
     </Style>
+    <Style Selector="ProgressBar.ai-work">
+      <Setter Property="Height" Value="6" />
+      <Setter Property="MinHeight" Value="6" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="{DynamicResource Fill2}" />
+      <Setter Property="Foreground" Value="{DynamicResource Accent}" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
     <Style Selector="Border.stepnum">
       <Setter Property="Width" Value="18" />
       <Setter Property="Height" Value="18" />
@@ -86,6 +94,12 @@
                       </Button>
                       <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                         <TextBlock Classes="ai-row-sub" Text="Recommended" IsVisible="{Binding Recommended}" VerticalAlignment="Center" />
+                        <!-- The free AI, not ready yet: one button gets it ready, and nothing is left to do by hand -->
+                        <Button AutomationProperties.Name="{Binding OpenLabel}" Name="SetUpFree" Classes="ai-pillbtn" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOneButton}">
+                          <Border Classes="ai-pill primary">
+                            <TextBlock Text="{Binding OpenLabel}" />
+                          </Border>
+                        </Button>
                         <Button AutomationProperties.Name="Sign in" Classes="ai-pillbtn" Command="{Binding SignInCommand}" IsVisible="{Binding ShowSignIn}">
                           <Border Classes="ai-pill">
                             <TextBlock Text="Sign in" />
@@ -98,6 +112,11 @@
                         </Button>
                       </StackPanel>
                     </Grid>
+                    <!-- The free AI being got ready: how far along -->
+                    <StackPanel IsVisible="{Binding Working}" Margin="44,0,16,12" Spacing="6">
+                      <ProgressBar Classes="ai-work" Minimum="0" Maximum="1" Value="{Binding Fraction}" IsIndeterminate="{Binding Steady}" />
+                      <TextBlock Classes="ai-row-sub" Text="{Binding Progress}" TextWrapping="Wrap" />
+                    </StackPanel>
                     <!-- How to get it going: numbered steps under the name, then Open Terminal | Check again -->
                     <StackPanel IsVisible="{Binding ShowHelp}" Margin="44,0,16,14" Spacing="12">
                       <ItemsControl ItemsSource="{Binding Help}">

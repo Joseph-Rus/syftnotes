@@ -549,6 +549,56 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         }, ct);
     }
 
+    /// <summary>
+    /// Gets the free AI ready on this computer in one go, in the background, whatever it still needs: the Ollama app
+    /// (downloaded from its maker and installed), starting it, and the model it writes notes with. <see cref="Pulling"/>
+    /// says which step it's at and how far along, until it's done (then null) or a step fails (then
+    /// <see cref="PullInfo.Why"/> says why, in words for the student). Asked again while it runs, it carries on.
+    /// </summary>
+    public Task SetUpOllamaAsync(string model, string host, CancellationToken ct = default)
+    {
+        if (Pulling is { Why.Length: 0 }) return Task.CompletedTask;
+        bool installed = Checks.OllamaInstalled();
+        Pulling = new PullInfo(model, 0, "") { Step = installed ? "start" : "app" };
+        return Task.Run(async () =>
+        {
+            try
+            {
+                if (!installed)
+                {
+                    bool got = await Checks.InstallOllama((done, total) => Pulling = new PullInfo(model, total > 0 ? (double)done / total : 0, "") { Step = "app" });
+                    if (!got)
+                    {
+                        Pulling = new PullInfo(model, 0, "The free AI's app couldn't be downloaded and installed. Check the internet connection and try again.") { Step = "app" };
+                        return;
+                    }
+                }
+                var models = await Checks.OllamaModels(host);
+                if (models is null)
+                {
+                    Pulling = new PullInfo(model, 0, "") { Step = "start" };
+                    if (!await Checks.StartOllama(host))
+                    {
+                        Pulling = new PullInfo(model, 0, "The free AI is installed but didn't start. Open the Ollama app, then try again.") { Step = "start" };
+                        return;
+                    }
+                    models = await Checks.OllamaModels(host);
+                }
+                if (models is not null && Ollama.HasModel(models.Select(m => m.Name).ToList(), model))
+                {
+                    Pulling = null;
+                    return;
+                }
+                Pulling = null; // the download says where it is itself
+                await DownloadAsync(model, host, ct);
+            }
+            catch (Exception e) when (e is HttpRequestException or OperationCanceledException or IOException)
+            {
+                Pulling = new PullInfo(model, 0, e.Message);
+            }
+        }, ct);
+    }
+
     DateTime warmedAt = DateTime.MinValue;
     readonly Lock warming = new();
 

@@ -1328,12 +1328,14 @@ public static partial class Shell
         }
     }
 
-    /// <summary>The AI step reads the library; "No subscription? Use a free model" on guided setup's first screen
-    /// comes here with the free model on this computer picked for the notes.</summary>
+    /// <summary>The AI step reads the library; "I don't have a paid plan" on guided setup's first screen comes here
+    /// with the free AI on this computer picked for the notes when it's here already. When it isn't, its row has the
+    /// one button that gets it, and "No AI for now" stays picked until it's pressed: nothing is left chosen that
+    /// can't write notes.</summary>
     static async Task LoadAiStepAsync(AiSetupModel ai)
     {
         await ai.Load();
-        if (host.Settings.SetupAi == "ollama" && ai.Engines.Any(e => e.Id == "ollama")) ai.SelectedNotes = "ollama";
+        if (host.Settings.SetupAi == "ollama" && ai.Engines.Any(e => e is { Id: "ollama", CanWrite: true })) ai.SelectedNotes = "ollama";
     }
 
     /// <summary>Which flow, and which library password, setup's AI step was made for.</summary>

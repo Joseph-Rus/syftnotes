@@ -46,6 +46,7 @@ public static class AiDemo
         public Task<AiOverview?> RichAsync(bool? on = null, bool? diagrams = null, bool? plots = null, bool? drawings = null, string? speed = null) => Task.FromResult<AiOverview?>(overview);
         public Task<AiSaid?> StartAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> DownloadAsync(string engine) => Task.FromResult<AiSaid?>(null);
+        public Task<AiSaid?> SetUpAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> SignInAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> CheckAsync(string engine, string model = "") => Task.FromResult<AiSaid?>(null);
         public Task<AiOverview?> ModelAsync(string engine, string model) => Task.FromResult<AiOverview?>(overview);
@@ -118,6 +119,27 @@ public static class AiDemo
             Windows = windows,
             Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings.",
             WriteNotes = _ => Task.FromResult(true),
+        };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
+    /// <summary>Setup's notes step on a computer with no paid AI on it: the free one in <paramref name="state"/>, and,
+    /// with <paramref name="pulling"/>, being got ready right now (a still: nothing asks the library again).</summary>
+    public static AiSetupModel SetupFree(bool windows, string state, PullInfo? pulling = null)
+    {
+        var o = SetupOverview();
+        o = o with
+        {
+            Engines = [.. o.Engines.Select(e => e.Id == "ollama" ? e with { State = state, Installed = state != "not_installed" } : e with { State = "not_installed", Installed = false })],
+            Pulling = pulling,
+        };
+        var m = new AiSetupModel(new Library(o))
+        {
+            Windows = windows,
+            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings.",
+            WriteNotes = _ => Task.FromResult(true),
+            Wait = () => new TaskCompletionSource().Task,
         };
         m.Load().GetAwaiter().GetResult();
         return m;

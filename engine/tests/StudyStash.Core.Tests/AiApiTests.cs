@@ -224,6 +224,82 @@ public class AiApiTests
         Assert.Null((await remote.EnginesAsync())!.Pulling);
     }
 
+    /// <summary>A student with no paid plan presses one button, and the library gets the free AI ready whatever it
+    /// still needs: its app from its maker, starting it, the model it writes notes with. Nothing here is a real
+    /// download or a real Ollama.</summary>
+    [Fact]
+    public async Task The_free_AI_is_got_ready_in_one_go_its_app_then_starting_it_then_its_model()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        bool installed = false, running = false, appComes = false;
+        var models = new List<(string Name, double SizeGb)>();
+        var did = new List<string>();
+        var seen = new List<string>();
+        AiJobs? jobs = null;
+        var checks = new FakeChecks().Build() with
+        {
+            OllamaInstalled = () => installed,
+            InstallOllama = progress =>
+            {
+                did.Add("app");
+                progress?.Invoke(50, 100);
+                seen.Add($"{jobs!.Pulling?.Step} {jobs.Pulling?.Fraction}");
+                installed = appComes;
+                return Task.FromResult(appComes);
+            },
+            OllamaModels = _ => Task.FromResult(running ? models.ToList() : null),
+            StartOllama = _ =>
+            {
+                did.Add("start");
+                seen.Add($"{jobs!.Pulling?.Step}");
+                running = true;
+                return Task.FromResult(true);
+            },
+            PullModel = (model, _, progress, _) =>
+            {
+                did.Add("model " + model);
+                progress?.Invoke(1, 4);
+                seen.Add($"{jobs!.Pulling?.Step} {jobs.Pulling?.Fraction}");
+                models.Add((model, 5.2));
+                return Task.FromResult((true, ""));
+            },
+        };
+        jobs = new AiJobs(cfg.Home) { Checks = checks };
+        await using var site = await Site(cfg, store, jobs);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+        async Task<PullInfo?> Settled()
+        {
+            var deadline = DateTime.UtcNow.AddSeconds(5);
+            while (DateTime.UtcNow < deadline && (await remote.EnginesAsync())!.Pulling is { Why.Length: 0 }) await Task.Delay(20);
+            return (await remote.EnginesAsync())!.Pulling;
+        }
+
+        // The app can't be had (no internet): said in words for the student, and nothing more is tried.
+        Assert.NotNull(await remote.SetUpAsync("ollama"));
+        var stopped = await Settled();
+        Assert.Equal(("app", "The free AI's app couldn't be downloaded and installed. Check the internet connection and try again."), (stopped!.Step, stopped.Why));
+        Assert.Equal(["app"], did);
+
+        // Tried again with the internet back: its app, then starting it, then its model, each saying where it is.
+        did.Clear();
+        seen.Clear();
+        appComes = true;
+        await remote.SetUpAsync("ollama");
+        Assert.Null(await Settled());
+        Assert.Equal(["app", "start", "model " + cfg.EffectiveSummaryModel], did);
+        Assert.Equal(["app 0.5", "start", "model 0.25"], seen);
+        Assert.Equal("ready", (await remote.EnginesAsync())!.Engines.Single(e => e.Id == "ollama").State);
+
+        // All there: pressed again, there's nothing to do. And only the free AI is set up this way.
+        did.Clear();
+        await remote.SetUpAsync("ollama");
+        Assert.Null(await Settled());
+        Assert.Empty(did);
+        await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.SetUpAsync("claude"));
+    }
+
     [Fact]
     public async Task Checking_an_engine_records_whether_it_answered()
     {

@@ -82,6 +82,15 @@ public sealed class FakeAiLibrary : IAiLibrary
         return Task.FromResult<AiSaid?>(new AiSaid($"Started {Row(Overview, engine).Name}.", Overview));
     }
 
+    /// <summary>What "Set it up" answers (the free AI got ready in one go); null plays a library too old to.</summary>
+    public Func<string, AiSaid?>? OnSetUp { get; set; }
+
+    public Task<AiSaid?> SetUpAsync(string engine)
+    {
+        Calls.Add($"set-up:{engine}");
+        return Task.FromResult(OnSetUp?.Invoke(engine));
+    }
+
     public Task<AiSaid?> DownloadAsync(string engine)
     {
         Calls.Add($"download:{engine}");

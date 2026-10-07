@@ -112,13 +112,41 @@ public static partial class AiWords
 
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup
     /// the library is this computer.</summary>
+    /// <summary>An engine's name in setup's "who writes your notes" list, in a student's terms: what they'd say they
+    /// have (Claude, ChatGPT), or what it is (a free AI on this computer). The tools' own names (Claude Code, Codex,
+    /// Ollama) are in the line under it, so they're recognised in Settings later.</summary>
+    public static string SetupName(string id, string name, string device = "computer") => id switch
+    {
+        "ollama" => $"Free AI on this {device}",
+        "claude" => "Claude",
+        "codex" => "ChatGPT",
+        _ => name,
+    };
+
+    /// <summary>What "Set it up" on the free AI's row is doing right now, under the row.</summary>
+    public static string FreeAiProgress(PullInfo at) => at.Step switch
+    {
+        "app" => $"Downloading the free AI… {Math.Round(Math.Clamp(at.Fraction, 0, 1) * 100):0}%",
+        "start" => "Starting it…",
+        _ => $"Downloading what it writes notes with (a few gigabytes, once)… {Math.Round(Math.Clamp(at.Fraction, 0, 1) * 100):0}%",
+    };
+
     public static string SetupAbout(string id, string state, string device = "computer") => id == "ollama"
         ? state switch
         {
-            "not_installed" => $"Free and private, but not on this {device} yet.",
-            "not_running" => "Installed. Start it to write notes.",
-            "model_missing" => "Installed. It needs the model it writes notes with.",
-            _ => "Private. Runs here, nothing leaves this computer.",
+            "not_installed" => $"Free and private (Ollama). Study Stash downloads it for you: a few gigabytes, once.",
+            "not_running" => "Free and private (Ollama). It's here, and needs starting.",
+            "model_missing" => "Free and private (Ollama). It's here, and still needs what it writes notes with.",
+            _ => $"Free and private (Ollama). It runs on this {device}: nothing you record leaves it.",
+        }
+        : id is "claude" or "codex" ? (id == "claude" ? "With your paid Claude plan, through Claude Code. " : "With your paid ChatGPT plan, through Codex. ") + state switch
+        {
+            "ready" => "Signed in on this computer.",
+            "not_signed_in" => "Installed. Sign in to use it.",
+            "unchecked" => "Installed on this computer.",
+            "not_installed" => $"Not on this {device} yet.",
+            "limited" => "Hit its usage limit for now.",
+            _ => "",
         }
         : state switch
         {

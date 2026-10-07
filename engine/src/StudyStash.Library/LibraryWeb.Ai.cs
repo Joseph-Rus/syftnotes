@@ -153,6 +153,15 @@ public sealed partial class LibraryWeb
             return AiJson(new AiSaid($"Downloading {model}…", await AiOverviewAsync()));
         })));
 
+        // The free AI in one go: whatever it still needs on this computer (its app, starting it, its model).
+        app.MapPost("/api/v2/ai/engines/{id}/set-up", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            string id = (string)ctx.Request.RouteValues["id"]!;
+            if (id != "ollama") return Http.Detail(400, $"{Engines.Name(id)} isn't set up from here.");
+            _ = Jobs.SetUpOllamaAsync(cfg.EffectiveSummaryModel, cfg.OllamaHost); // in the background; AiOverview.Pulling shows it
+            return AiJson(new AiSaid("Getting the free AI ready…", await AiOverviewAsync()));
+        })));
+
         app.MapPost("/api/v2/ai/engines/{id}/sign-in", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             string id = (string)ctx.Request.RouteValues["id"]!;

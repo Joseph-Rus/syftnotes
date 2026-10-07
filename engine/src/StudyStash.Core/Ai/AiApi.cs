@@ -35,7 +35,13 @@ public sealed record AiProblemInfo(string Id, string Kind, string Engine, string
     public string FallbackTo { get; init; } = "";
 }
 
-public sealed record PullInfo(string Model, double Fraction, string Why);
+/// <summary>Something the library is downloading for the free AI on its computer: how far along, or why it stopped.
+/// <see cref="Step"/> says which part: "app" (the Ollama app itself), "start" (starting it) or "model" (what it writes
+/// notes with, the only step a library from before 0.14 has).</summary>
+public sealed record PullInfo(string Model, double Fraction, string Why)
+{
+    public string Step { get; init; } = "model";
+}
 
 /// <summary>Rich notes as Settings shows them: <see cref="On"/> (diagrams, formula plots and drawings are added after the
 /// notes; off, the notes are plain and nothing more is asked of the AI) and each kind that's switched on while it is.</summary>
@@ -140,6 +146,10 @@ public interface IAiLibrary
         Task.FromResult<AiOverview?>(null);
     Task<AiSaid?> StartAsync(string engine);
     Task<AiSaid?> DownloadAsync(string engine);
+    /// <summary>Gets an engine ready on the library's computer in one go, whatever it still needs (the free AI: its
+    /// app installed, started, its model downloaded), in the background: <see cref="AiOverview.Pulling"/> says how far
+    /// along. Null from a library too old to.</summary>
+    Task<AiSaid?> SetUpAsync(string engine);
     Task<AiSaid?> SignInAsync(string engine);
     Task<AiSaid?> CheckAsync(string engine, string model = "");
     Task<AiOverview?> ModelAsync(string engine, string model);
@@ -244,6 +254,8 @@ public sealed class AiRemote(string serverUrl, string key, HttpClient? http = nu
     public async Task<AiSaid?> StartAsync(string engine) => As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/start"));
 
     public async Task<AiSaid?> DownloadAsync(string engine) => As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/download"));
+
+    public async Task<AiSaid?> SetUpAsync(string engine) => As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/set-up"));
 
     public async Task<AiSaid?> SignInAsync(string engine) => As<AiSaid>(await SendAsync(HttpMethod.Post, $"/engines/{Seg(engine)}/sign-in"));
 

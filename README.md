@@ -121,19 +121,23 @@ Then open **Study Stash**. See [Setting up](#setting-up).
 
 ## Setting up
 
-The first time Study Stash opens, it asks which AI will set it up with you:
+The first time Study Stash opens, it asks which AI you have. An AI sets Study Stash up with you,
+writes your notes and answers your questions:
 
-- **Claude** (through Claude Code, from Anthropic): needs a paid Claude plan, Pro or Max.
-- **ChatGPT** (through Codex, from OpenAI): needs a paid ChatGPT plan, Plus or higher.
+- **Claude**: you have a paid Claude plan, Pro or Max. (Study Stash talks to it through Claude Code,
+  Anthropic's own helper for apps.)
+- **ChatGPT**: you have a paid ChatGPT plan, Plus or higher. (Through Codex, OpenAI's.)
+- **I don't have a paid plan**: a free AI that runs on your computer can write your notes, or Study
+  Stash can just record and transcribe.
 
 **If you already have the ChatGPT app or the Claude app on a Mac, there's nothing to install.** The
 ChatGPT app carries Codex inside it, signed in with the app, and the Claude app keeps its own Claude
 Code once its Code tab has been opened. Study Stash finds those copies: the one you have starts
 picked, and **Continue** goes straight to the chat.
 
-Otherwise: pick one, press **Install** (Study Stash runs its maker's own installer, for your
-account only, no admin password; nothing is downloaded until you press it), then **Open sign-in
-page** to sign in on Claude's or ChatGPT's own page. Study Stash never sees your password or your
+Otherwise: pick the one you pay for, press **Download and set up** (Study Stash runs its maker's own
+installer, for your account only, no admin password; nothing is downloaded until you press it), then
+**Open sign-in page** to sign in on Claude's or ChatGPT's own page. Study Stash never sees your password or your
 sign-in. A tiny test message then checks your plan includes it.
 
 After that your AI walks you through the rest in a chat, with a checklist beside it: one computer or
@@ -144,8 +148,12 @@ computer happens only when you press the button in its card. Close the window pa
 picks up where it left off. The chat uses a little of your plan, and your AI then writes your
 notes and answers your questions (you can switch to a free local model in Settings any time).
 
-**No subscription?** "Use a free model on this Mac (Ollama)" on the first screen goes to setup by
-hand, with Ollama picked for your notes. **Set up by hand** is on every screen too, and
+**No paid plan?** That's the first screen's third answer, **I don't have a paid plan**. It goes to
+setup by hand, a few plain steps. On its notes step, **Free AI on this Mac** has one button, **Set it
+up**: Study Stash downloads a free AI (Ollama, a few gigabytes, once), installs and starts it, and
+shows how far along it is, with nothing to do in a browser or a terminal. You can carry on with setup
+while it downloads. Or leave **No AI for now** picked: lectures are recorded and transcribed, and
+notes can be switched on later in Settings. **Set up by hand** is on every screen too, and
 **Settings → General → Run setup** runs either again.
 
 Setup by hand asks how you'll use it:
