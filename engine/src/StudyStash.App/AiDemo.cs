@@ -56,6 +56,8 @@ public static class AiDemo
         public Task<RewriteInfo?> RewriteCancelAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
         public Task<RewriteInfo?> RewriteKeepAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
         public Task<RewriteInfo?> RewriteUseAsync(string lecture) => Task.FromResult(rewrite?.Invoke(lecture));
+        public Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn) =>
+            Task.FromResult<RewriteInfo?>(new RewriteInfo(lecture, "none") { Current = new NotesVersion(markdown, "Ollama", Now) });
         public Task<ToolAccessInfo?> AccessAsync() => Task.FromResult<ToolAccessInfo?>(Access());
         public Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null) => Task.FromResult<ToolAccessInfo?>(Access());
         public Task<ToolAccessInfo?> SetWebAsync(bool on) => Task.FromResult<ToolAccessInfo?>(Access());

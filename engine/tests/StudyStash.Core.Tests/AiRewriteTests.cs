@@ -281,4 +281,33 @@ public class AiRewriteTests
         Assert.Equal("failed", info.State);
         Assert.Contains("restarted", info.Error);
     }
+
+    [Fact]
+    public async Task An_edit_by_hand_becomes_the_notes_everywhere_and_never_saves_over_ones_it_hasnt_seen()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        Seed(store);
+        var ai = new AiJobs(cfg.Home) { Providers = _ => new ScriptedAi("claude", "Claude"), Checks = new FakeChecks().Build() };
+        await using var site = await Site(cfg, store, ai);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+        string was = Notes.Fingerprint("Old notes about cells.");
+
+        var saved = await remote.EditNotesAsync("lec-1", "Old notes about cells, and the mitochondria.\r\n", was);
+
+        Assert.Equal("Old notes about cells, and the mitochondria.", saved!.Current!.Markdown);
+        Assert.Equal("none", saved.State);
+        var row = store.Get("lec-1")!;
+        Assert.Equal("qwen3:8b", row.SummaryModel); // still its writer's
+        Assert.Equal(Store.Done, row.Status);
+        Assert.Contains("and the mitochondria.", File.ReadAllText(row.MdPath!));
+        Assert.Contains(store.SearchPassages("mitochondria"), hit => hit.Note.Id == "lec-1");
+
+        // Another edit that started from the notes as they were before that one: refused, and nothing changes.
+        var stale = await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.EditNotesAsync("lec-1", "Something else.", was));
+        Assert.Equal(412, stale.Status);
+        Assert.Equal("Old notes about cells, and the mitochondria.", store.Get("lec-1")!.SummaryMd);
+        await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.EditNotesAsync("lec-1", "  \n", null)); // empty notes aren't notes
+    }
 }

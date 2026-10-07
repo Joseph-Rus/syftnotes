@@ -277,6 +277,16 @@ public sealed partial class LibraryWeb
         app.MapPost("/api/v2/ai/rewrite/{lecture}/use", Http.Handle(ctx => ApiAsync(ctx, () =>
             Task.FromResult(RewriteResult(() => Rewrites.Use((string)ctx.Request.RouteValues["lecture"]!))))));
 
+        // The student's own edit of the notes: based_on is the fingerprint of the notes it started from (none: save
+        // over whatever is there).
+        app.MapPost("/api/v2/ai/rewrite/{lecture}/edit", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string? markdown = body?["markdown"] is JsonValue mv && mv.TryGetValue(out string? text) ? text : null;
+            if (markdown is null) return Http.Detail(400, "what are the notes?");
+            return RewriteResult(() => Rewrites.Edit((string)ctx.Request.RouteValues["lecture"]!, markdown, Str(body, "based_on")));
+        })));
+
         app.MapGet("/api/v2/ai/access", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             await NoticeFunnelOffAsync(force: false);

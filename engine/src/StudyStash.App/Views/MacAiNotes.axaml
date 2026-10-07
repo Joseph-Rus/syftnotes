@@ -1,6 +1,6 @@
 <!-- A lecture's notes with "Rewrite notes" (design 17): the current notes never change on screen until "Use new" is
-     pressed, however a rewrite ends. Only the notes block — the lecture's own title/meta row above it is the host
-     page's (MacLibrary). -->
+     pressed, however a rewrite ends. "Edit" turns them into a text editor until Save or Cancel. Only the notes
+     block — the lecture's own title/meta row above it is the host page's (MacLibrary). -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -64,11 +64,28 @@
       </Grid>
     </Border>
 
-    <!-- Summary header + Rewrite notes -->
-    <Grid ColumnDefinitions="Auto,Auto,*,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
+    <!-- Summary header + Edit and Rewrite notes (while editing: Cancel and Save) -->
+    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
       <TextBlock Classes="ai-notes-title" Text="Summary" />
       <TextBlock Grid.Column="1" Classes="ai-notes-byline" Margin="10,0,0,0" Text="{Binding ShownByline}" />
-      <Button Name="RewriteButton" Grid.Column="3" Classes="ai-pillbtn" IsVisible="{Binding ShowRewriteButton}">
+      <Button Grid.Column="3" Classes="ai-pillbtn" Margin="0,0,8,0" IsVisible="{Binding ShowEditButton}" Command="{Binding EditCommand}"
+              ToolTip.Tip="Fix or add to these notes yourself" AutomationProperties.Name="Edit notes">
+        <Border Classes="ai-pill">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Glyph="edit" Size="15" />
+            <TextBlock Text="Edit" />
+          </StackPanel>
+        </Border>
+      </Button>
+      <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Editing}">
+        <Button Classes="ai-textbtn" Command="{Binding CancelEditCommand}">
+          <Border Classes="ai-pill-plain"><TextBlock Text="Cancel" /></Border>
+        </Button>
+        <Button Classes="ai-pillbtn" Command="{Binding SaveEditCommand}" IsEnabled="{Binding CanSaveEdit}">
+          <Border Classes="ai-pill" Classes.primary="True"><TextBlock Text="Save" /></Border>
+        </Button>
+      </StackPanel>
+      <Button Name="RewriteButton" Grid.Column="4" Classes="ai-pillbtn" IsVisible="{Binding ShowRewriteButton}">
         <Border Classes="ai-pill">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Glyph="refresh" Size="15" />
@@ -91,9 +108,28 @@
     </Grid>
 
     <!-- The notes, dimmed while the menu is open -->
-    <Border Classes="ai-dim" Classes.dimmed="{Binding Dimmed}" IsVisible="{Binding !IsComparing}">
+    <Border Classes="ai-dim" Classes.dimmed="{Binding Dimmed}" IsVisible="{Binding ShowNotes}">
       <c:NoteView Markdown="{Binding ShownMarkdown}" />
     </Border>
+
+    <!-- Editing: the notes as text, each diagram one line; Save and Cancel again under long notes -->
+    <StackPanel Spacing="10" IsVisible="{Binding Editing}">
+      <TextBlock Classes="ai-editor-hint" IsVisible="{Binding EditHasDiagrams}"
+                 Text="A line like [Diagram 1] is a diagram. Move the line to move it, or delete the line to take it out." />
+      <Border Classes="ai-editor">
+        <TextBox Name="Editor" Classes="bare ai-editor" Text="{Binding EditText}" AcceptsReturn="True" TextWrapping="Wrap"
+                 AutomationProperties.Name="Notes" />
+      </Border>
+      <TextBlock Classes="ai-editor-problem" IsVisible="{Binding HasEditProblem}" Text="{Binding EditProblem}" />
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Classes="ai-textbtn" Command="{Binding CancelEditCommand}">
+          <Border Classes="ai-pill-plain"><TextBlock Text="Cancel" /></Border>
+        </Button>
+        <Button Classes="ai-pillbtn" Command="{Binding SaveEditCommand}" IsEnabled="{Binding CanSaveEdit}">
+          <Border Classes="ai-pill" Classes.primary="True"><TextBlock Text="Save" /></Border>
+        </Button>
+      </StackPanel>
+    </StackPanel>
 
     <!-- Compare: the current notes beside the new ones -->
     <Grid ColumnDefinitions="*,28,*" IsVisible="{Binding IsComparing}">

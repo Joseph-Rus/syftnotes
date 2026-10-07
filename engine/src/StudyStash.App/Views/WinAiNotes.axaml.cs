@@ -8,6 +8,7 @@ public partial class WinAiNotes : UserControl
     public WinAiNotes()
     {
         InitializeComponent();
+        AiNotesEditor.Attach(this, Editor);
         DataContextChanged += (_, _) =>
         {
             if (DataContext is AiNotesModel m) m.CloseMenu = () => RewriteButton.Flyout?.Hide();
