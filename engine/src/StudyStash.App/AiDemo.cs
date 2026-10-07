@@ -100,8 +100,8 @@ public static class AiDemo
         var m = new AiSetupModel(new Library(SetupOverview()))
         {
             Windows = windows,
-            Lede = oneComputer ? $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings."
-                : "This computer is your library, so the engines run here. You can change this later from any of your computers.",
+            Lede = oneComputer ? $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings → Your AI."
+                : "This computer is your library, so the AI runs here. You can change this later from any of your computers, in Settings → Your AI.",
             WriteNotes = oneComputer ? _ => Task.FromResult(true) : null,
         };
         m.Load().GetAwaiter().GetResult();
@@ -117,7 +117,7 @@ public static class AiDemo
         var m = new AiSetupModel(new Library(o))
         {
             Windows = windows,
-            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings.",
+            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings → Your AI.",
             WriteNotes = _ => Task.FromResult(true),
         };
         m.Load().GetAwaiter().GetResult();
@@ -137,7 +137,7 @@ public static class AiDemo
         var m = new AiSetupModel(new Library(o))
         {
             Windows = windows,
-            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings.",
+            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings → Your AI.",
             WriteNotes = _ => Task.FromResult(true),
             Wait = () => new TaskCompletionSource().Task,
             // As in setup's own window: Claude and ChatGPT are got ready with buttons, not commands.

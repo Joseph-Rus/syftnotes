@@ -92,7 +92,7 @@ public sealed partial class AiSetupModel : ObservableObject
     public List<EngineChoice> AskChoices { get; private set; } = [new(SameAsNotes, "Same as notes")];
 
     /// <summary>The line under the title: where the engines run.</summary>
-    public string Lede { get; init; } = "This computer is your library, so the engines run here. You can change this later from any of your computers.";
+    public string Lede { get; init; } = "This computer is your library, so the AI runs here. You can change this later from any of your computers, in Settings → Your AI.";
     /// <summary>Windows words (PowerShell, not Terminal) and commands.</summary>
     public bool Windows { get; init; } = OperatingSystem.IsWindows();
     /// <summary>Puts a command on the clipboard.</summary>

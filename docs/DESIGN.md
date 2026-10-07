@@ -222,7 +222,7 @@ project or its author.
   never holds a key — Claude Code (`claude -p`, edits allowed only inside the working folder),
   Codex (`codex exec`, read-only or workspace-write), Antigravity for Gemini (`agy -p`). Ollama
   answers plain questions directly; as an agent it runs through Codex (`--oss`).
-- **Speed** (`Core/Ai/AiSpeed.cs`, `ai.json`'s `speed`, Settings → AI engines → Claude Code speed): how
+- **Speed** (`Core/Ai/AiSpeed.cs`, `ai.json`'s `speed`, Settings → Your AI → How fast Claude works): how
   Claude Code writes the notes (`AiJobs` for the `notes` job and a rewrite) and designs the rich notes
   (`DiagramEngines.PickAsync`, carried by `DiagramPick`, so the illustrator and the revise round get it too);
   sorting and answers never change, and neither does any other engine. *Standard* is as it was (the notes with

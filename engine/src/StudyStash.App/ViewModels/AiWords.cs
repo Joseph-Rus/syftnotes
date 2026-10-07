@@ -65,8 +65,15 @@ public static partial class AiWords
     /// signed in; every other CLI just says where it runs.</summary>
     public static string EngineAbout(string id, string state) =>
         id == "ollama" ? "Runs on your library. Nothing leaves it."
-        : state == "ready" ? "Runs on your library. Signed in."
-        : "Runs on your library.";
+        : Through(id) + (state == "ready" ? "Runs on your library. Signed in." : "Runs on your library.");
+
+    /// <summary>The tool Study Stash reaches an AI through, said once on its row: "Through Claude Code. ".</summary>
+    static string Through(string id) => id switch
+    {
+        "claude" => "Through Claude Code. ",
+        "codex" => "Through Codex. ",
+        _ => "",
+    };
 
     /// <summary>A diagrams pick as its menu says it: Automatic · Same as notes · an engine · Off.</summary>
     public static string DiagramsChoiceName(string id) => id switch
@@ -82,7 +89,7 @@ public static partial class AiWords
     public static string DiagramsAbout(string choice, string by) => choice switch
     {
         DiagramEngines.Off => "New notes have no diagrams",
-        DiagramEngines.SameAsNotes => "The notes engine draws them as it writes",
+        DiagramEngines.SameAsNotes => "The AI that writes your notes draws them too",
         _ when by == "ollama" => "Ollama reads each transcript, on your library",
         _ when by.Length > 0 => $"{Engines.Name(by)} reads each transcript",
         _ => "From each transcript, after the notes",
@@ -112,6 +119,17 @@ public static partial class AiWords
 
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup
     /// the library is this computer.</summary>
+    /// <summary>An AI's name where a student chooses one in Settings ("Your AI"): what they'd call it. Claude Code and
+    /// Codex are how Study Stash reaches Claude and ChatGPT, and the free one is Ollama; a student picks the AI, not
+    /// the tool, and the tool's name is in the row's own line.</summary>
+    public static string PlainName(string id, string name) => id switch
+    {
+        "ollama" => "Free AI (Ollama)",
+        "claude" => "Claude",
+        "codex" => "ChatGPT",
+        _ => name,
+    };
+
     static string Simpler(bool small, string device) => small ? $" A small one fits this {device}'s memory, so its notes are simpler than Claude's or ChatGPT's." : "";
 
     /// <summary>An engine's name in setup's "who writes your notes" list, in a student's terms: what they'd say they
@@ -185,7 +203,7 @@ public static partial class AiWords
     public static DateTime? ParseUntil(string iso) =>
         DateTime.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t) ? t : null;
 
-    public const string OlderLibraryWords = "Your library runs an older Study Stash: update it to pick engines here.";
+    public const string OlderLibraryWords = "Your library runs an older Study Stash: update it to choose your AI here.";
 
     /// <summary>Whether an engine is worth offering to ask or write with: ready, or installed but never checked. A
     /// down/limited/unsignedin/missing-model engine is skipped (not_installed already never reaches the ask menu).</summary>
@@ -364,7 +382,7 @@ public static partial class AiWords
         "usage_limit" => ParseUntil(until) is { } t ? $"Questions go to {fallbackName} until {UntilClock(t)}." : $"Questions go to {fallbackName}.",
         "fell_back" => detail,
         "access_request" => $"From {detail}. It can read, not change.",
-        "library_offline" => "Engines run on your library. Check it's on and connected.",
+        "library_offline" => "Your AI runs on your library. Check it's on and connected.",
         "rewrite_failed" => $"{detail} Your current notes are unchanged.",
         _ => detail,
     };

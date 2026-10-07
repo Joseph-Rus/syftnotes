@@ -51,7 +51,7 @@ public sealed class SetupTests
         Assert.Equal(["Welcome", "Your library", "Microphone", "Transcription model", "Canvas", "Classes", "Done"], Titles(laptop));
 
         var library = SetupModel.For(SkinKind.Mac, AppRole.Library);
-        Assert.Equal(["Welcome", "Password", "AI engines", "Canvas", "Classes", "Start at login", "Connect your laptop"], Titles(library));
+        Assert.Equal(["Welcome", "Password", "Your AI", "Canvas", "Classes", "Start at login", "Connect your laptop"], Titles(library));
     }
 
     [Fact]

@@ -664,7 +664,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
             why = preflight;
         }
         if (engine == "ollama" && !cfg.OllamaEnabled && Providers is null)
-            throw new InvalidOperationException("Asking needs an engine: turn one on in AI engines.");
+            throw new InvalidOperationException("Asking needs an AI: choose one in Settings → Your AI.");
 
         string shown = "";
         async Task<JsonObject> RunAsync(string who, CancellationTokenSource timer)

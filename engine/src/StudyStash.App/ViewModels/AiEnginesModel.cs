@@ -109,7 +109,7 @@ public sealed partial class AiEnginesModel : ObservableObject
     public AiEnginesModel(IAiLibrary library) => this.library = library;
 
     /// <summary>The line under the pane's title: where the engines run (the library elsewhere, or this computer).</summary>
-    public string Lede { get; init; } = "Notes are written after each lecture. Answers come while you ask. Engines run on your library, and you can set them up there or from this laptop.";
+    public string Lede { get; init; } = "Choose which AI writes your notes and answers your questions. You can change it here any time. It runs on your library, and you can set it up there or from this laptop.";
 
     public ObservableCollection<AiEngineRow> Engines { get; } = [];
     /// <summary>API keys for Claude, ChatGPT and Gemini (shown once the library says it takes them).</summary>
@@ -271,9 +271,9 @@ public sealed partial class AiEnginesModel : ObservableObject
             }
             OlderLibrary = false;
             Offline = false;
-            NotesChoices = [.. overview.Engines.Select(e => new EngineChoice(e.Id, e.Name))];
+            NotesChoices = [.. overview.Engines.Select(e => new EngineChoice(e.Id, AiWords.PlainName(e.Id, e.Name)))];
             foreach (var c in NotesChoices) c.Pick = new RelayCommand(() => SelectedNotes = c.Id);
-            AskChoices = [.. overview.Engines.Select(e => new EngineChoice(e.Id, e.Name))];
+            AskChoices = [.. overview.Engines.Select(e => new EngineChoice(e.Id, AiWords.PlainName(e.Id, e.Name)))];
             foreach (var c in AskChoices) c.Pick = new RelayCommand(() => SelectedAsk = c.Id);
             DiagramsChoices = [.. DiagramEngines.Picks.Select(id => new EngineChoice(id, AiWords.DiagramsChoiceName(id)))];
             foreach (var c in DiagramsChoices) c.Pick = new RelayCommand(() => SelectedDiagrams = c.Id);
@@ -366,7 +366,7 @@ public sealed partial class AiEnginesModel : ObservableObject
         var row = new AiEngineRow
         {
             Id = e.Id,
-            Name = e.Name,
+            Name = AiWords.PlainName(e.Id, e.Name),
             Icon = AiWords.EngineIcon(e.Id),
             About = e.Installed || e.Id == "ollama" ? AiWords.EngineAbout(e.Id, e.State) : "Install it on your library's computer.",
             State = e.State,

@@ -40,7 +40,7 @@ public class AiShots
 
     static readonly (string Icon, string Title)[] MacSections =
     [
-        ("tune", "General"), ("mic", "Recording"), ("dns", "Library"), ("auto_awesome", "AI engines"),
+        ("tune", "General"), ("mic", "Recording"), ("dns", "Library"), ("auto_awesome", "Your AI"),
         ("hub", "AI tool access"), ("school", "Canvas"), ("keyboard", "Shortcuts"),
     ];
 
@@ -146,7 +146,7 @@ public class AiShots
 
     // ---------------------------------------------------------------------------------------------------------
     // The library setup wizard's AI step (design 15): "This is the library" and "Transcription model" done,
-    // "AI engines" current, "AI tool access" still to come. Fixed to this one step: the wizard itself is WS6's.
+    // "Your AI" current, "AI tool access" still to come. Fixed to this one step: the wizard itself is WS6's.
     // ---------------------------------------------------------------------------------------------------------
 
     static Control SetupSidebarRow(string title, bool done, bool current, int number, bool optional)
@@ -198,7 +198,7 @@ public class AiShots
         rows.Children.Add(lights);
         rows.Children.Add(SetupSidebarRow("This is the library", done: true, current: false, number: 1, optional: false));
         rows.Children.Add(SetupSidebarRow("Transcription model", done: true, current: false, number: 2, optional: false));
-        rows.Children.Add(SetupSidebarRow("AI engines", done: false, current: true, number: 3, optional: false));
+        rows.Children.Add(SetupSidebarRow("Your AI", done: false, current: true, number: 3, optional: false));
         rows.Children.Add(SetupSidebarRow("AI tool access", done: false, current: false, number: 4, optional: true));
 
         var sidebarInner = new Border { CornerRadius = new CornerRadius(18), Padding = new Thickness(10, 0, 10, 14), Child = rows };
@@ -270,7 +270,7 @@ public class AiShots
         var nav = new StackPanel { Width = 220, Spacing = 4, Margin = new Thickness(4, 4, 4, 8) };
         nav.Children.Add(WinSetupSidebarRow("This is the library", done: true, current: false, number: 1, optional: false));
         nav.Children.Add(WinSetupSidebarRow("Transcription model", done: true, current: false, number: 2, optional: false));
-        nav.Children.Add(WinSetupSidebarRow("AI engines", done: false, current: true, number: 3, optional: false));
+        nav.Children.Add(WinSetupSidebarRow("Your AI", done: false, current: true, number: 3, optional: false));
         nav.Children.Add(WinSetupSidebarRow("AI tool access", done: false, current: false, number: 4, optional: true));
 
         var caption = new TextBlock { Text = "Library setup · step 3 of 4", FontSize = 12, Margin = new Thickness(32, 28, 0, 0) };
@@ -605,14 +605,14 @@ public class AiShots
     public void Mac_ai_engines()
     {
         foreach (var t in Themes)
-            Shot.Take("mac-13-ai-engines", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "AI engines", new MacAiEngines { DataContext = AiDemo.Engines() }));
+            Shot.Take("mac-13-ai-engines", SkinKind.Mac, t, () => SettingsFrame(SkinKind.Mac, "Your AI", new MacAiEngines { DataContext = AiDemo.Engines() }));
     }
 
     [AvaloniaFact]
     public void Win_ai_engines()
     {
         foreach (var t in Themes)
-            Shot.Take("win-13-ai-engines", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "AI engines", new WinAiEngines { DataContext = AiDemo.Engines() }));
+            Shot.Take("win-13-ai-engines", SkinKind.Win, t, () => SettingsFrame(SkinKind.Win, "Your AI", new WinAiEngines { DataContext = AiDemo.Engines() }));
     }
 
     [AvaloniaFact]

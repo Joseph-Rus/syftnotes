@@ -1306,8 +1306,8 @@ public static partial class Shell
                     model.Ai = new AiSetupModel(Ai())
                     {
                         Lede = model.IsOneComputer
-                            ? $"They run on this {model.DeviceWord}, as part of your library. You can change this later in Settings."
-                            : "This computer is your library, so the engines run here. You can change this later from any of your computers.",
+                            ? $"They run on this {model.DeviceWord}, as part of your library. You can change this later in Settings → Your AI."
+                            : "This computer is your library, so the AI runs here. You can change this later from any of your computers, in Settings → Your AI.",
                         Windows = Skin.Current == SkinKind.Win,
                         Copy = text => model.OnCopy?.Invoke(text),
                         OpenTerminal = TerminalApp.Open,

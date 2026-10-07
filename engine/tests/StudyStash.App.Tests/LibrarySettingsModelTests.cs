@@ -34,7 +34,7 @@ public class LibrarySettingsModelTests
 
         Assert.Equal("This laptop", model.ComputerNavTitle);
         Assert.Equal(["General", "Appearance", "Shortcuts", "Recording", "Calendars", "Connection"], model.ComputerNav.Select(n => n.Label));
-        Assert.Equal(["Library", "Classes", "Notes and sorting", "AI engines", "AI tool access", "Canvas", "Folders", "Phone"], model.LibraryNav.Select(n => n.Label));
+        Assert.Equal(["Library", "Classes", "Notes and sorting", "Your AI", "AI tool access", "Canvas", "Folders", "Phone"], model.LibraryNav.Select(n => n.Label));
         Assert.Empty(fake.Calls); // nothing asked before a library page opens
     }
 
@@ -148,7 +148,7 @@ public class LibrarySettingsModelTests
             using var _m = model;
             Assert.Equal(can, model.Lib.CanChangeLaptops);
             if (role == AppRole.Laptop) Assert.Contains("from this laptop", model.Engines.Lede, StringComparison.Ordinal);
-            else Assert.Contains($"Engines run on this {(OperatingSystem.IsWindows() ? "PC" : "Mac")}", model.Engines.Lede, StringComparison.Ordinal);
+            else Assert.Contains($"It runs on this {(OperatingSystem.IsWindows() ? "PC" : "Mac")}", model.Engines.Lede, StringComparison.Ordinal);
         }
     }
 

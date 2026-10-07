@@ -84,7 +84,7 @@ public class AppWiringTests
         var ai = new FakeAiLibrary { Overview = AiDemo.Overview(), Access = AiDemo.Access() };
         using var model = SettingsModel.Make(host, ai: ai, canvas: CanvasFixtures.Context());
 
-        Assert.Equal(["General", "Appearance", "Shortcuts", "Recording", "Calendars", "Connection", "Library", "Classes", "Notes and sorting", "AI engines", "AI tool access", "Canvas", "Folders", "Phone"],
+        Assert.Equal(["General", "Appearance", "Shortcuts", "Recording", "Calendars", "Connection", "Library", "Classes", "Notes and sorting", "Your AI", "AI tool access", "Canvas", "Folders", "Phone"],
             model.NavItems.Select(n => n.Label));
         Assert.Empty(ai.Calls); // nothing asked before a section opens
 

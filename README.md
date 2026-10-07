@@ -182,10 +182,10 @@ curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install
 irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
 ```
 
-## AI engines
+## Your AI
 
 Pick who writes your notes and who answers your questions in setup or in
-**Settings → Your library → AI engines** — one engine for everything, or a different one for each
+**Settings → Your library → Your AI** — one engine for everything, or a different one for each
 job. The same page switches the rich notes (below) and sets how fast Claude Code works. The engines run on your library's computer (with one computer, that's your laptop). Without an
 engine, lectures are still filed and keep their transcripts. With Claude Code, Codex or Gemini, a
 lecture's transcript (and, for its diagrams, its notes) goes to that AI under your own account;
@@ -227,7 +227,7 @@ shows these commands with a Copy button, opens Terminal for you, and has **Check
 engine up once it's installed and signed in.
 
 **Rich notes** are the diagrams, formula plots and drawings a lecture's notes get after they're written.
-They're on, as they always were; **Settings → AI engines → Rich notes** switches them off (plain
+They're on, as they always were; **Settings → Your AI → Rich notes** switches them off (plain
 notes only, and no second call to your AI at all) or one kind at a time: **Diagrams** (flowcharts, state
 and sequence diagrams, timelines, mind maps), **Formula plots** and **Drawings** (labelled figures of
 what a lecture describes). A kind that's switched off is never asked of the AI — its part of the
@@ -336,7 +336,7 @@ the notes, in a quick answer and in the Ask chat:
   columns of its groups with square arrows between them; Mermaid state diagrams (automata too),
   sequence diagrams, timelines and mind maps are drawn natively as well; something spatial (a
   structure, a physics setup, a circuit) comes back as a sanitised SVG. They're designed after the notes by the
-  engine that draws them (**Rich notes → Drawn by**, see [AI engines](#ai-engines)), each under a bold title with a
+  engine that draws them (**Rich notes → Drawn by**, see [Your AI](#your-ai)), each under a bold title with a
   caption and the moment of the lecture it comes from; rewriting a lecture's notes designs them
   again rather than adding more. Either kind opens larger on a click, and a diagram Study Stash
   can't draw shows its source with a plain reason instead of failing.

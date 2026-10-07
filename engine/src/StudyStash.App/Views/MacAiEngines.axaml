@@ -14,7 +14,7 @@
     <StackPanel Margin="40,12,40,32" Spacing="24" MaxWidth="640">
 
       <StackPanel Spacing="6">
-        <TextBlock Classes="ai-title" Text="AI engines" c:Typography.Extra="-0.39" />
+        <TextBlock Classes="ai-title" Text="Your AI" c:Typography.Extra="-0.39" />
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left"
                    Text="{Binding Lede}" />
       </StackPanel>
@@ -99,7 +99,7 @@
               <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
                 <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
                   <TextBlock Classes="ai-row-title" Text="Drawings" />
-                  <TextBlock Classes="ai-row-sub" Text="Labelled figures of what a lecture describes (not on Ollama)" TextWrapping="Wrap" />
+                  <TextBlock Classes="ai-row-sub" Text="Labelled figures of what a lecture describes (not with the free AI)" TextWrapping="Wrap" />
                 </StackPanel>
                 <ToggleButton AutomationProperties.Name="Drawings" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding RichDrawings}" VerticalAlignment="Center" />
               </Grid>
@@ -130,7 +130,7 @@
 
       <!-- How fast Claude Code writes the notes and designs the rich notes -->
       <StackPanel Spacing="8" IsVisible="{Binding HasSpeed}">
-        <TextBlock Classes="ai-section" Text="Claude Code speed" Margin="4,0" />
+        <TextBlock Classes="ai-section" Text="How fast Claude works" Margin="4,0" />
         <Border Classes="ai-group">
           <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" Margin="16,8">
             <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center" Margin="0,0,12,0">
@@ -155,9 +155,9 @@
       <!-- Engines -->
       <StackPanel Spacing="8">
         <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Classes="ai-section" Text="Engines" Margin="4,0" />
+          <TextBlock Classes="ai-section" Text="AIs on your library" Margin="4,0" />
           <Button Grid.Column="1" Classes="ai-textbtn" IsVisible="{Binding HasAddChoices}">
-            <TextBlock Classes="ai-link" Text="Add an engine" />
+            <TextBlock Classes="ai-link" Text="Add another AI" />
             <Button.Flyout>
               <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AddChoices}" ItemContainerTheme="{StaticResource AiAddItem}">
                 <MenuFlyout.ItemTemplate>
@@ -260,14 +260,14 @@
 
       <!-- If an engine isn’t available -->
       <StackPanel Spacing="8">
-        <TextBlock Classes="ai-section" Text="If an engine isn’t available" Margin="4,0" />
+        <TextBlock Classes="ai-section" Text="If your AI isn’t available" Margin="4,0" />
         <Border Classes="ai-group">
           <Grid Classes="ai-row" ColumnDefinitions="Auto,12,*,Auto" MinHeight="44" Margin="16,8">
             <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
-              <TextBlock Classes="ai-row-title" Text="Use Ollama instead" />
+              <TextBlock Classes="ai-row-title" Text="Use the free AI (Ollama) instead" />
               <TextBlock Classes="ai-row-sub" Text="So notes and answers never stall" />
             </StackPanel>
-            <ToggleButton AutomationProperties.Name="Use Ollama instead" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" VerticalAlignment="Center" />
+            <ToggleButton AutomationProperties.Name="Use the free AI (Ollama) instead" Grid.Column="3" Theme="{StaticResource AiToggle}" IsChecked="{Binding Fallback}" VerticalAlignment="Center" />
           </Grid>
         </Border>
       </StackPanel>

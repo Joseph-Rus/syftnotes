@@ -45,8 +45,11 @@ public class AiWordsTests
     public void Ollama_never_leaves_this_computer_a_signed_in_cli_says_so()
     {
         Assert.Equal("Runs on your library. Nothing leaves it.", AiWords.EngineAbout("ollama", "ready"));
-        Assert.Equal("Runs on your library. Signed in.", AiWords.EngineAbout("claude", "ready"));
-        Assert.Equal("Runs on your library.", AiWords.EngineAbout("codex", "not_signed_in"));
+        Assert.Equal("Through Claude Code. Runs on your library. Signed in.", AiWords.EngineAbout("claude", "ready"));
+        Assert.Equal("Through Codex. Runs on your library.", AiWords.EngineAbout("codex", "not_signed_in"));
+        // Where a student chooses one, each AI goes by what they'd call it; the tool is in the line under it.
+        Assert.Equal(("Free AI (Ollama)", "Claude", "ChatGPT", "Gemini"),
+            (AiWords.PlainName("ollama", "Ollama"), AiWords.PlainName("claude", "Claude Code"), AiWords.PlainName("codex", "Codex"), AiWords.PlainName("gemini", "Gemini")));
     }
 
     [Fact]
@@ -119,7 +122,7 @@ public class AiEnginesModelTests
 
         await model.Load();
 
-        Assert.Equal(["Ollama", "Claude Code", "Codex"], model.Engines.Select(r => r.Name));
+        Assert.Equal(["Free AI (Ollama)", "Claude", "ChatGPT"], model.Engines.Select(r => r.Name));
         Assert.Single(model.AddChoices);
         Assert.Equal("Gemini", model.AddChoices[0].Name);
         Assert.Equal("ollama", model.SelectedNotes);
@@ -796,12 +799,12 @@ public class AiAskModelTests
     {
         var (model, lib) = Loaded();
         await model.Load();
-        lib.OnAsk = _ => throw new LibraryRefusedException(503, "Asking needs an engine: turn one on in AI engines.");
+        lib.OnAsk = _ => throw new LibraryRefusedException(503, "Asking needs an AI: choose one in Settings → Your AI.");
         model.Question = "q";
 
         await model.AskCommand.ExecuteAsync(null);
 
-        Assert.Equal("Asking needs an engine: turn one on in AI engines.", model.Turns[0].Failed);
+        Assert.Equal("Asking needs an AI: choose one in Settings → Your AI.", model.Turns[0].Failed);
         Assert.True(model.Turns[0].IsThinking == false);
     }
 
@@ -917,7 +920,7 @@ public class AiWordsRewriteAndProblemTests
         Assert.Equal("From Eli's MacBook. It can read, not change.", AiWords.ProblemMessage("access_request", "Codex", "", "", 0, "Eli's MacBook"));
 
         Assert.Equal("Your library isn't answering", AiWords.ProblemTitle("library_offline", "", ""));
-        Assert.Equal("Engines run on your library. Check it's on and connected.", AiWords.ProblemMessage("library_offline", "", "", "", 0, ""));
+        Assert.Equal("Your AI runs on your library. Check it's on and connected.", AiWords.ProblemMessage("library_offline", "", "", "", 0, ""));
 
         Assert.Equal("Claude Code couldn't rewrite the notes", AiWords.ProblemTitle("rewrite_failed", "Claude Code", ""));
         Assert.Equal("Claude Code hit its usage limit. Your current notes are unchanged.", AiWords.ProblemMessage("rewrite_failed", "Claude Code", "", "", 0, "Claude Code hit its usage limit."));
