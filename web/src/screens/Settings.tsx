@@ -9,7 +9,7 @@ import { look } from '../theme/useTheme';
 import { Check } from '../ui/icons';
 import { Button, Row, Screen, Section, Segmented } from '../ui/kit';
 
-/** This phone and the library it reads: which library, this phone's name, the look (the Mac's ten themes, light or
+/** This phone and the library it reads: which library, this phone's name, the look (the Mac's twenty themes, light or
  * dark), and removing this phone, which locks it out at once as Remove does on the computer. */
 export function SettingsScreen({ api, onRemoved }: { api: Api; onRemoved: () => void }) {
   const me = useResource('me', (signal) => api.me(signal));

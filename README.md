@@ -68,7 +68,7 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
   Codex) and Gemini CLI on your computer with one click (no Tailscale needed), and claude.ai and
   chatgpt.com through a Tailscale Funnel.
 - **Looks at home on your computer.** A native Mac look (Liquid Glass) and Windows 11's, light and
-  dark, with ten colour themes in Settings → Appearance.
+  dark, with twenty colour themes in Settings → Appearance.
 - **Keeps itself up to date**, quietly, when nothing is recording.
 
 ![The library window: a class's lectures, a lecture's notes, and the Ask bar](docs/images/library-window.png)

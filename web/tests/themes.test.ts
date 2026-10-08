@@ -1,9 +1,10 @@
 import { classColor, darkTokens, findTheme, isLight, lightTokens, themeCss, themes } from '../src/theme/themes';
 
-test('there are the app’s ten themes, Lagoon first', () => {
-  expect(themes).toHaveLength(10);
+test('there are the app’s twenty themes, Lagoon first', () => {
+  expect(themes).toHaveLength(20);
   expect(themes[0]!.name).toBe('Lagoon');
   expect(themes.map((t) => t.name)).toContain('Original red');
+  expect(themes[19]!.name).toBe('Mint');
 });
 
 test('a theme is found by name in any case, and an unknown one is Lagoon', () => {
@@ -13,7 +14,8 @@ test('a theme is found by name in any case, and an unknown one is Lagoon', () =>
   expect(findTheme(null).name).toBe('Lagoon');
 });
 
-test('Chalkboard and Highlighter are light accents with dark ink on them', () => {
+test('Chalkboard, Highlighter, Lilac, Peach and Mint are light accents with dark ink on them', () => {
+  expect(themes.filter(isLight).map((t) => t.name)).toEqual(['Chalkboard', 'Highlighter', 'Lilac', 'Peach', 'Mint']);
   expect(isLight(findTheme('Chalkboard'))).toBe(true);
   expect(isLight(findTheme('Lagoon'))).toBe(false);
   expect(lightTokens(findTheme('Highlighter'))['--on-accent']).toBe('#171717');

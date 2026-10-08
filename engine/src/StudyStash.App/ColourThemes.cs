@@ -41,7 +41,7 @@ public static class Oklch
 /// </summary>
 public sealed record ColourTheme(string Name, double H, double C, double L, double Nh, double Nc, double[] Wall, double Hl)
 {
-    /// <summary>A light accent (Chalkboard, Highlighter): text on it is dark ink, and dark mode keeps it as it is.</summary>
+    /// <summary>A light accent (Chalkboard, Highlighter, Lilac, Peach, Mint): text on it is dark ink, and dark mode keeps it as it is.</summary>
     public bool IsLight => L >= 0.75;
 
     /// <summary>The design's <c>o(l, c, a)</c>: the accent's hue at another lightness and chroma.</summary>
@@ -51,7 +51,8 @@ public sealed record ColourTheme(string Name, double H, double C, double L, doub
     public Color Neutral(double l, double chroma, double alpha = 1) => Oklch.ToColor(l, Nc * chroma, Nh, alpha);
 }
 
-/// <summary>The ten colour themes the student can pick from, in the picker's order. Lagoon (teal) is the default.</summary>
+/// <summary>The twenty colour themes the student can pick from, in the picker's order (five to a row: the first ten,
+/// then ten more round the colour wheel from blue to green). Lagoon (teal) is the default.</summary>
 public static class ColourThemes
 {
     public static readonly IReadOnlyList<ColourTheme> All =
@@ -66,6 +67,16 @@ public static class ColourThemes
         new("Terracotta", 35, 0.13, 0.58, 60, 0.016, [35, 80, 300], 85),
         new("Graphite", 260, 0.01, 0.42, 260, 0.004, [250, 260, 240], 95),
         new("Original red", 22, 0.19, 0.6, 30, 0.003, [250, 25, 160], 22),
+        new("Sky", 235, 0.13, 0.62, 235, 0.012, [235, 200, 270], 95),
+        new("Midnight", 275, 0.13, 0.42, 270, 0.016, [275, 245, 305], 85),
+        new("Violet", 295, 0.17, 0.55, 290, 0.012, [295, 260, 330], 95),
+        new("Lilac", 300, 0.10, 0.82, 300, 0.012, [300, 270, 340], 320),
+        new("Bubblegum", 355, 0.17, 0.64, 350, 0.012, [355, 320, 30], 350),
+        new("Peach", 55, 0.10, 0.84, 55, 0.016, [55, 25, 85], 85),
+        new("Mocha", 55, 0.07, 0.47, 65, 0.02, [55, 35, 85], 85),
+        new("Moss", 115, 0.11, 0.56, 110, 0.014, [115, 85, 150], 95),
+        new("Clover", 148, 0.16, 0.60, 150, 0.012, [148, 120, 180], 95),
+        new("Mint", 165, 0.11, 0.87, 165, 0.012, [165, 135, 200], 165),
     ];
 
     public static ColourTheme Default => All[0];
