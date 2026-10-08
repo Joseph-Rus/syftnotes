@@ -518,7 +518,7 @@ public class AiSetupModelTests
     {
         var lib = new FakeAiLibrary { Overview = With(("ollama", "not_installed"), ("claude", "not_installed"), ("codex", "not_installed")) };
         var writes = new List<bool>();
-        var model = new AiSetupModel(lib) { WriteNotes = on => { writes.Add(on); return Task.FromResult(true); } };
+        var model = new AiSetupModel(lib) { Windows = false, WriteNotes = on => { writes.Add(on); return Task.FromResult(true); } };
         await model.Load();
 
         Assert.True(model.OffersNoAi);
