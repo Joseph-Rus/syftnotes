@@ -120,7 +120,7 @@ public sealed partial class LibraryWeb
             var overview = await AiOverviewAsync();
             foreach (string? id in new[] { notes, ask, diagrams })
                 if (id is not null && overview.Engines.FirstOrDefault(e => e.Id == id) is { Installed: false } row)
-                    return Http.Detail(409, $"{row.Name} isn't installed on your library's computer.");
+                    return Http.Detail(409, $"{row.Name} isn't set up on your library's computer.");
             var settings = AiSettings.Load(cfg.Home);
             if (notes is not null) settings.ByJob["notes"] = new AiChoice(notes);
             if (ask is not null)
@@ -151,6 +151,22 @@ public sealed partial class LibraryWeb
             string model = cfg.EffectiveSummaryModel;
             _ = Jobs.DownloadAsync(model, cfg.OllamaHost); // runs in the background; AiOverview.Pulling shows it
             return AiJson(new AiSaid($"Downloading {model}…", await AiOverviewAsync()));
+        })));
+
+        // The free AI in one go: whatever it still needs on this computer (its app, starting it, its model).
+        app.MapPost("/api/v2/ai/engines/{id}/set-up", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            string id = (string)ctx.Request.RouteValues["id"]!;
+            if (id != "ollama") return Http.Detail(400, $"{Engines.Name(id)} isn't set up from here.");
+            // A library nobody chose a model for gets the one this computer can run, and keeps it.
+            string model = Engines.FreeModel(cfg, Jobs.Checks);
+            if (model != cfg.EffectiveSummaryModel)
+            {
+                cfg.OllamaModel = model;
+                Configs.Save(cfg);
+            }
+            _ = Jobs.SetUpOllamaAsync(model, cfg.OllamaHost); // in the background; AiOverview.Pulling shows it
+            return AiJson(new AiSaid("Getting the free AI ready…", await AiOverviewAsync()));
         })));
 
         app.MapPost("/api/v2/ai/engines/{id}/sign-in", Http.Handle(ctx => ApiAsync(ctx, async () =>

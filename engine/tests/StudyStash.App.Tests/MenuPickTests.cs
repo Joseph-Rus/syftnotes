@@ -203,10 +203,10 @@ public class MenuPickTests
         {
             var notes = view.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is MenuFlyout { ItemsSource: var s } && ReferenceEquals(s, m.NotesChoices));
             var menu = OpenFlyout(notes);
-            Assert.True(Checked(Item(menu, "Ollama")));
-            Click(Item(menu, "Claude Code"));
+            Assert.True(Checked(Item(menu, "Ollama (free, advanced)")));
+            Click(Item(menu, "Claude"));
             Assert.Equal("claude", m.SelectedNotes);
-            Assert.Equal("Claude Code", m.SelectedNotesName);
+            Assert.Equal("Claude", m.SelectedNotesName);
             Assert.Contains(lib.DefaultsCalls, c => c.Notes == "claude");
             Assert.True(m.NotesChoices.Single(c => c.Id == "claude").Current);
             Assert.False(m.NotesChoices.Single(c => c.Id == "ollama").Current);
@@ -229,7 +229,7 @@ public class MenuPickTests
         try
         {
             var select = view.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is MenuFlyout);
-            Click(Item(OpenFlyout(select), "Claude Code"));
+            Click(Item(OpenFlyout(select), "Claude"));
             Assert.Equal("claude", m.SelectedAsk);
             Assert.True(m.AskChoices.Single(c => c.Id == "claude").Current);
         }

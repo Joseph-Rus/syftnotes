@@ -30,6 +30,13 @@ public sealed class GuidedSetupShots
     internal static IEnumerable<(string Name, Func<SkinKind, GuidedSetupModel> Make)> States()
     {
         yield return ("pick", skin => Guided(skin));
+        // No paid plan: the third answer, picked. Continue goes to setup by hand.
+        yield return ("pick-free", skin =>
+        {
+            var g = Guided(skin);
+            g.PickCommand.Execute("free");
+            return g;
+        });
         yield return ("pick-installed", skin =>
         {
             var g = Guided(skin);
@@ -115,8 +122,8 @@ public sealed class GuidedSetupShots
             g.Picked = "codex";
             g.Screen = GuidedScreen.SignIn;
             g.SignedIn = true;
-            g.PlanProblemTitle = "Your ChatGPT plan doesn't include Codex in the app";
-            g.PlanProblemText = "It needs Plus or higher.";
+            g.PlanProblemTitle = g.PlanTooSmallTitle;
+            g.PlanProblemText = g.PlanTooSmallText;
             g.PlanProblem = ChatProblem.Plan;
             return g;
         });

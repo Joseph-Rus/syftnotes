@@ -199,7 +199,20 @@ public static class Ollama
     {
         null or >= 40 => "qwen3.6:35b-a3b", // ~24 GB
         >= 14 => "gemma4:e4b", // ~10 GB
-        _ => "qwen3:1.7b", // ~1.4 GB
+        _ => SmallModel, // ~1.4 GB
+    };
+
+    /// <summary>The model for a computer with little memory (under 14 GB): it fits, and its notes are simpler.</summary>
+    public const string SmallModel = "qwen3:1.7b";
+
+    /// <summary>How big one of the recommended models is to download, in GB; 0 for a model Study Stash doesn't know
+    /// the size of.</summary>
+    public static double DownloadGb(string model) => model switch
+    {
+        "qwen3.6:35b-a3b" => 24,
+        "gemma4:e4b" => 10,
+        SmallModel => 1.4,
+        _ => 0,
     };
 
     /// <summary>

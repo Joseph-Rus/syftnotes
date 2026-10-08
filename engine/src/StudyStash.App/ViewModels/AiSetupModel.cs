@@ -19,7 +19,7 @@ public sealed class AiSetupStep
     public IRelayCommand CopyCommand { get; internal set; } = null!;
 }
 
-/// <summary>One engine in setup's "Choose who writes your notes" list: a radio row, Ollama marked Recommended. An
+/// <summary>One engine in setup's "Choose who writes your notes" list: a radio row, the free AI (Ollama) marked Advanced. An
 /// engine that can't write notes yet (not installed, not signed in) offers "Set up": the steps to get it going, with
 /// the commands to copy, a button to open Terminal (or sign in there), and Check again.</summary>
 public sealed partial class AiSetupRow : ObservableObject
@@ -28,7 +28,9 @@ public sealed partial class AiSetupRow : ObservableObject
     public string Name { get; init; } = "";
     public string About { get; init; } = "";
     public string State { get; init; } = "";
-    public bool Recommended { get; init; }
+    /// <summary>The free AI that runs on the computer itself (Ollama): for someone comfortable with a big download, a
+    /// slower computer while it works and simpler notes. Marked, so a student who isn't doesn't take it for the easy way.</summary>
+    public bool Advanced { get; init; }
     public bool ShowSignIn { get; init; }
     /// <summary>It can write notes now (as far as anyone can tell without asking it): picking it is allowed.</summary>
     public bool CanWrite { get; init; }
@@ -40,8 +42,19 @@ public sealed partial class AiSetupRow : ObservableObject
     public IReadOnlyList<AiSetupStep> Help { get; init; } = [];
     public bool HasHelp => Help.Count > 0;
     public string HelpLabel => ShowHelp ? "Hide" : "Set up";
-    /// <summary>The help's first button: "Get Ollama", "Open Terminal" (to install) or "Sign in in Terminal".</summary>
+    /// <summary>The help's first button ("Open Terminal" to install, or "Sign in in Terminal"); for the free AI, the
+    /// row's own one button ("Set it up").</summary>
     public string OpenLabel { get; init; } = "";
+    /// <summary>The free AI, not ready yet: one button on the row gets it ready (its app, starting it, its model), and
+    /// nothing is left for the student to do in a browser or a terminal.</summary>
+    public bool OneButton { get; init; }
+    /// <summary>That's happening now: the row shows how far along instead of the button.</summary>
+    public bool Working { get; init; }
+    public string Progress { get; init; } = "";
+    /// <summary>How far along, from 0 to 1; no figure while it's only starting.</summary>
+    public double Fraction { get; init; }
+    public bool Steady { get; init; }
+    public bool ShowOneButton => OneButton && !Working;
     internal Action? HelpChanged { get; set; }
 
     partial void OnShowHelpChanged(bool value)
@@ -79,7 +92,7 @@ public sealed partial class AiSetupModel : ObservableObject
     public List<EngineChoice> AskChoices { get; private set; } = [new(SameAsNotes, "Same as notes")];
 
     /// <summary>The line under the title: where the engines run.</summary>
-    public string Lede { get; init; } = "This computer is your library, so the engines run here. You can change this later from any of your computers.";
+    public string Lede { get; init; } = "This computer is your library, so the AI runs here. You can change this later from any of your computers, in Settings → Your AI.";
     /// <summary>Windows words (PowerShell, not Terminal) and commands.</summary>
     public bool Windows { get; init; } = OperatingSystem.IsWindows();
     /// <summary>Puts a command on the clipboard.</summary>
@@ -87,6 +100,10 @@ public sealed partial class AiSetupModel : ObservableObject
     /// <summary>Opens Terminal (PowerShell on Windows) for a command to be pasted into.</summary>
     public Action? OpenTerminal { get; init; }
     public Action<string>? OpenUrl { get; init; }
+    /// <summary>Gets Claude or ChatGPT ready on this computer with buttons (its maker's installer, then its own
+    /// sign-in page), for a host that can: setup's window, which has guided setup's screens for it. Their rows then
+    /// have one button each, and no commands to paste into a terminal. Null: the steps and commands, as before.</summary>
+    public Func<string, Task>? SetUpPaid { get; init; }
     /// <summary>Turns the library's note writing (and sorting with AI) on or off; true when it did. Null in a host
     /// that can't, which then doesn't offer "No AI for now".</summary>
     public Func<bool, Task<bool>>? WriteNotes { get; init; }
@@ -130,6 +147,8 @@ public sealed partial class AiSetupModel : ObservableObject
             return;
         }
         Apply(overview);
+        // Come back to while the free AI is still coming down: the row carries on showing it.
+        if (overview?.Pulling is { Why.Length: 0 }) _ = FollowAsync();
     }
 
     /// <summary>It can write notes now: Ollama once installed (it may still need starting, or its model), a CLI
@@ -162,27 +181,38 @@ public sealed partial class AiSetupModel : ObservableObject
             SelectedAsk = overview.Ask == overview.Notes || overview.Engines.FirstOrDefault(e => e.Id == overview.Ask) is not { Installed: true } ? SameAsNotes : overview.Ask;
             picked = true;
         }
-        AskChoices = [new EngineChoice(SameAsNotes, "Same as notes"), .. overview.Engines.Where(e => e.Installed).Select(e => new EngineChoice(e.Id, e.Name))];
+        AskChoices = [new EngineChoice(SameAsNotes, "Same as notes"), .. overview.Engines.Where(e => e.Installed).Select(e => new EngineChoice(e.Id, AiWords.PlainName(e.Id, e.Name)))];
         foreach (var c in AskChoices) c.Pick = new RelayCommand(() => SelectedAsk = c.Id);
         EngineChoice.Mark(AskChoices, SelectedAsk);
         OnPropertyChanged(nameof(AskChoices));
         OnPropertyChanged(nameof(SelectedAskName));
 
         var open = Engines.Where(r => r.ShowHelp).Select(r => r.Id).ToHashSet();
+        // The free AI being got ready (its app, starting it, its model), and whether there's still something to get.
+        var working = overview.Pulling is { Why.Length: 0 } at ? at : null;
+        var failed = overview.Pulling is { Why.Length: > 0 } stopped ? stopped : null;
+        bool freeNeedsWork = overview.Engines.FirstOrDefault(e => e.Id == "ollama") is { State: "not_installed" or "not_running" or "model_missing" };
+        // Claude or ChatGPT, not on this computer or not signed in, where the host gets them ready with buttons.
+        bool Buttons(EngineInfo e) => SetUpPaid is not null && e is { Id: "claude" or "codex", State: "not_installed" or "not_signed_in" };
         Engines.Clear();
         // Claude Code and Codex always show, with the steps to get them going; Gemini only once it's here.
         foreach (var e in overview.Engines.Where(e => e.Id is "ollama" or "claude" or "codex" || e.Installed))
         {
-            var steps = EngineSetupWords.Steps(e.Id, e.State, Windows);
+            var steps = Buttons(e) ? [] : EngineSetupWords.Steps(e.Id, e.State, Windows);
             string terminal = EngineSetupWords.TerminalName(Windows);
             var row = new AiSetupRow
             {
                 Id = e.Id,
-                Name = e.Name,
-                About = AiWords.SetupAbout(e.Id, e.State, Windows ? "PC" : "Mac"),
+                Name = AiWords.SetupName(e.Id, e.Name, Windows ? "PC" : "Mac"),
+                About = AiWords.SetupAbout(e.Id, e.State, Windows ? "PC" : "Mac", e.SetUpGb, e.Small),
                 State = e.State,
-                Recommended = e.Id == "ollama",
-                ShowSignIn = e.State == "not_signed_in" && steps.Count == 0,
+                Advanced = e.Id == "ollama",
+                OneButton = e.Id == "ollama" && freeNeedsWork || Buttons(e),
+                Working = e.Id == "ollama" && working is not null,
+                Progress = e.Id == "ollama" && working is not null ? AiWords.FreeAiProgress(working) : "",
+                Fraction = working?.Fraction ?? 0,
+                Steady = working is { Step: "start" },
+                ShowSignIn = e.State == "not_signed_in" && steps.Count == 0 && !Buttons(e),
                 CanWrite = CanWrite(e),
                 Selected = e.Id == SelectedNotes,
                 First = Engines.Count == 0,
@@ -193,9 +223,9 @@ public sealed partial class AiSetupModel : ObservableObject
                 })],
                 OpenLabel = (e.Id, e.State) switch
                 {
-                    ("ollama", "not_running") => "Start Ollama",
-                    ("ollama", "model_missing") => "Download the model",
-                    ("ollama", _) => "Get Ollama",
+                    ("ollama", _) => failed is null ? "Set it up" : "Try again",
+                    (_, "not_signed_in") when Buttons(e) => "Sign in",
+                    _ when Buttons(e) => "Set it up",
                     (_, "not_signed_in") => $"Sign in in {terminal}",
                     _ => $"Open {terminal}",
                 },
@@ -237,16 +267,87 @@ public sealed partial class AiSetupModel : ObservableObject
         OnPropertyChanged(nameof(ChoiceWords));
     }
 
+    /// <summary>How often the library is asked how far the free AI's download has got.</summary>
+    public Func<Task> Wait { get; init; } = () => Task.Delay(TimeSpan.FromSeconds(1.5));
+    bool following;
+
+    /// <summary>"Set it up" on the free AI's row: the library gets it ready in one go (downloads and installs its app,
+    /// starts it, downloads what it writes notes with), and the row shows how far along. As soon as its app is in, it's
+    /// the pick for the notes, and setup can go on while the rest comes down.</summary>
+    async Task SetUpFreeAsync()
+    {
+        Say = null;
+        try
+        {
+            var said = await library.SetUpAsync("ollama");
+            if (said is null)
+            {
+                // A library from before it could: the old way, one piece at a time.
+                OlderLibrary = true;
+                return;
+            }
+            if (said.Overview is not null) Apply(said.Overview);
+            await FollowAsync();
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = ex.Message;
+        }
+        catch
+        {
+            Offline = true;
+        }
+    }
+
+    /// <summary>Follows the free AI being got ready until it's done or has stopped, the rows showing each answer.</summary>
+    async Task FollowAsync()
+    {
+        if (following) return;
+        following = true;
+        try
+        {
+            while (true)
+            {
+                await Wait();
+                var overview = await library.EnginesAsync();
+                if (overview is null) return;
+                Apply(overview);
+                var free = Engines.FirstOrDefault(r => r.Id == "ollama");
+                // Its app is here: it's the pick (the student pressed its button), while its model comes down.
+                if (free is { CanWrite: true } && SelectedNotes != "ollama") SelectedNotes = "ollama";
+                if (overview.Pulling is { Why.Length: > 0 } stopped)
+                {
+                    Say = stopped.Why;
+                    return;
+                }
+                if (overview.Pulling is null)
+                {
+                    if (free is { State: "ready" }) Say = $"{free.Name} is ready. It writes your notes.";
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            following = false;
+        }
+    }
+
     async Task OpenAsync(AiSetupRow row)
     {
-        if (row.Id == "ollama" && row.State is "not_running" or "model_missing")
-        {
-            await ActAsync(() => row.State == "not_running" ? library.StartAsync("ollama") : library.DownloadAsync("ollama"));
-            return;
-        }
         if (row.Id == "ollama")
         {
-            OpenUrl?.Invoke("https://ollama.com/download");
+            await SetUpFreeAsync();
+            return;
+        }
+        if (row.OneButton && SetUpPaid is { } withButtons)
+        {
+            Say = null;
+            await withButtons(row.Id);
             return;
         }
         if (row.State == "not_signed_in")

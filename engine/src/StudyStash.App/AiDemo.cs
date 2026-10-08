@@ -10,8 +10,8 @@ public static class AiDemo
     static readonly List<EngineInfo> Engines_ =
     [
         new EngineInfo("ollama", "Ollama", "ready") { Installed = true, Model = "qwen3:30b", Models = [new ModelOption("qwen3:30b", "qwen3:30b (19 GB)")] },
-        new EngineInfo("claude", "Claude Code", "ready") { Installed = true },
-        new EngineInfo("codex", "Codex", "not_signed_in") { Installed = true },
+        new EngineInfo("claude", "Claude", "ready") { Installed = true },
+        new EngineInfo("codex", "ChatGPT", "not_signed_in") { Installed = true },
         new EngineInfo("gemini", "Gemini", "not_installed") { Site = "https://ai.google.dev/gemini-api" },
     ];
 
@@ -46,6 +46,7 @@ public static class AiDemo
         public Task<AiOverview?> RichAsync(bool? on = null, bool? diagrams = null, bool? plots = null, bool? drawings = null, string? speed = null) => Task.FromResult<AiOverview?>(overview);
         public Task<AiSaid?> StartAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> DownloadAsync(string engine) => Task.FromResult<AiSaid?>(null);
+        public Task<AiSaid?> SetUpAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> SignInAsync(string engine) => Task.FromResult<AiSaid?>(null);
         public Task<AiSaid?> CheckAsync(string engine, string model = "") => Task.FromResult<AiSaid?>(null);
         public Task<AiOverview?> ModelAsync(string engine, string model) => Task.FromResult<AiOverview?>(overview);
@@ -99,8 +100,8 @@ public static class AiDemo
         var m = new AiSetupModel(new Library(SetupOverview()))
         {
             Windows = windows,
-            Lede = oneComputer ? $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings."
-                : "This computer is your library, so the engines run here. You can change this later from any of your computers.",
+            Lede = oneComputer ? $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings → Your AI."
+                : "This computer is your library, so the AI runs here. You can change this later from any of your computers, in Settings → Your AI.",
             WriteNotes = oneComputer ? _ => Task.FromResult(true) : null,
         };
         m.Load().GetAwaiter().GetResult();
@@ -116,8 +117,31 @@ public static class AiDemo
         var m = new AiSetupModel(new Library(o))
         {
             Windows = windows,
-            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings.",
+            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings → Your AI.",
             WriteNotes = _ => Task.FromResult(true),
+        };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
+    /// <summary>Setup's notes step on a computer with no paid AI on it: the free one in <paramref name="state"/>, and,
+    /// with <paramref name="pulling"/>, being got ready right now (a still: nothing asks the library again).</summary>
+    public static AiSetupModel SetupFree(bool windows, string state, PullInfo? pulling = null)
+    {
+        var o = SetupOverview();
+        o = o with
+        {
+            Engines = [.. o.Engines.Select(e => e.Id == "ollama" ? e with { State = state, Installed = state != "not_installed" } : e with { State = "not_installed", Installed = false })],
+            Pulling = pulling,
+        };
+        var m = new AiSetupModel(new Library(o))
+        {
+            Windows = windows,
+            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings → Your AI.",
+            WriteNotes = _ => Task.FromResult(true),
+            Wait = () => new TaskCompletionSource().Task,
+            // As in setup's own window: Claude and ChatGPT are got ready with buttons, not commands.
+            SetUpPaid = _ => Task.CompletedTask,
         };
         m.Load().GetAwaiter().GetResult();
         return m;
@@ -161,7 +185,7 @@ public static class AiDemo
 
     static readonly NotesVersion DraftNotes = new(
         "# Summary\n\nA recursive function calls itself on a smaller input until it reaches a base case it can answer directly. Every call gets a frame on the call stack holding its own arguments and locals.",
-        "Claude Code", Now);
+        "Claude", Now);
 
     static AiNotesModel LoadedNotes(RewriteInfo info)
     {
@@ -182,11 +206,11 @@ public static class AiDemo
 
     /// <summary>Rewriting with Claude Code: the current notes are exactly as before.</summary>
     public static AiNotesModel NotesRewriting() =>
-        LoadedNotes(new RewriteInfo(LectureId, "working") { Engine = "claude", EngineName = "Claude Code", Current = CurrentNotes });
+        LoadedNotes(new RewriteInfo(LectureId, "working") { Engine = "claude", EngineName = "Claude", Current = CurrentNotes });
 
     /// <summary>Claude Code's draft is ready to keep, compare or use.</summary>
     public static AiNotesModel NotesReady() =>
-        LoadedNotes(new RewriteInfo(LectureId, "ready") { Engine = "claude", EngineName = "Claude Code", Current = CurrentNotes, Draft = DraftNotes });
+        LoadedNotes(new RewriteInfo(LectureId, "ready") { Engine = "claude", EngineName = "Claude", Current = CurrentNotes, Draft = DraftNotes });
 
     /// <summary>The ready draft, "Compare" already pressed.</summary>
     public static AiNotesModel NotesComparing()
@@ -199,7 +223,7 @@ public static class AiDemo
     /// <summary>Claude Code's rewrite failed: the current notes are unchanged.</summary>
     public static AiNotesModel NotesFailed() => LoadedNotes(new RewriteInfo(LectureId, "failed")
     {
-        Engine = "claude", EngineName = "Claude Code", Error = "Claude Code hit its usage limit.", Current = CurrentNotes,
+        Engine = "claude", EngineName = "Claude", Error = "Claude hit its usage limit.", Current = CurrentNotes,
     });
 
     // -----------------------------------------------------------------------------------------------------------
@@ -214,14 +238,14 @@ public static class AiDemo
             Problems =
             [
                 new AiProblemInfo("engine-offline", "engine_offline", "ollama", "Ollama"),
-                new AiProblemInfo("not-signed-in", "not_signed_in", "codex", "Codex") { FallbackTo = "claude" },
+                new AiProblemInfo("not-signed-in", "not_signed_in", "codex", "ChatGPT") { FallbackTo = "claude" },
                 new AiProblemInfo("model-missing", "model_missing", "ollama", "Ollama") { SizeGb = 40 },
-                new AiProblemInfo("usage-limit", "usage_limit", "claude", "Claude Code") { Until = DateTime.Today.AddHours(15).ToString("o"), FallbackTo = "ollama" },
+                new AiProblemInfo("usage-limit", "usage_limit", "claude", "Claude") { Until = DateTime.Today.AddHours(15).ToString("o"), FallbackTo = "ollama" },
             ],
         };
         var m = new AiProblemsModel(new Library(overview));
         m.Load().GetAwaiter().GetResult();
-        m.AddFellBack("fell-back", "Ollama", "Claude Code didn't respond in time.");
+        m.AddFellBack("fell-back", "Ollama", "Claude didn't respond in time.");
         m.AddAccessRequest("access-1", "Codex", "Eli's MacBook", () => Task.CompletedTask, () => Task.CompletedTask);
         return m;
     }
@@ -233,7 +257,7 @@ public static class AiDemo
         var m = new AiProblemsModel(new Library(Overview()));
         m.Load().GetAwaiter().GetResult();
         m.AddLibraryOffline(() => Task.CompletedTask);
-        m.AddRewriteFailed("rewrite-1", "Claude Code", "Claude Code hit its usage limit.", () => Task.CompletedTask);
+        m.AddRewriteFailed("rewrite-1", "Claude", "Claude hit its usage limit.", () => Task.CompletedTask);
         return m;
     }
 }

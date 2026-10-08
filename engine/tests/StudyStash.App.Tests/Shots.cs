@@ -560,6 +560,16 @@ public class SurfaceShots
                     Shot.Take($"{look}-05-setup-one-computer-ai-{engine}-help", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = help, DrawChrome = true } : new WinSetup { DataContext = help, DrawChrome = true },
                         size: new Size(1100, skin == SkinKind.Mac ? 968 : 1028));
             }
+            // The same step for a student with no paid plan: the free AI with its one button, and while it's being got.
+            foreach (var (what, state, pulling) in new (string, string, StudyStash.Core.Ai.PullInfo?)[]
+                     { ("free", "not_installed", null), ("free-working", "model_missing", new StudyStash.Core.Ai.PullInfo("qwen3:8b", 0.42, "")) })
+            {
+                var free = await SetupPage(skin, AppRole.Both, SetupStep.Ai);
+                free.Ai = AiDemo.SetupFree(skin == SkinKind.Win, state, pulling);
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-one-computer-ai-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = free, DrawChrome = true } : new WinSetup { DataContext = free, DrawChrome = true },
+                        size: new Size(1100, skin == SkinKind.Mac ? 808 : 868));
+            }
             // Just this computer's welcome while its library is being made, and when it couldn't be.
             var making = SetupModel.For(skin);
             making.Connecting = true;

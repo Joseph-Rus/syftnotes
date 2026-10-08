@@ -1306,14 +1306,23 @@ public static partial class Shell
                     model.Ai = new AiSetupModel(Ai())
                     {
                         Lede = model.IsOneComputer
-                            ? $"They run on this {model.DeviceWord}, as part of your library. You can change this later in Settings."
-                            : "This computer is your library, so the engines run here. You can change this later from any of your computers.",
+                            ? $"They run on this {model.DeviceWord}, as part of your library. You can change this later in Settings → Your AI."
+                            : "This computer is your library, so the AI runs here. You can change this later from any of your computers, in Settings → Your AI.",
                         Windows = Skin.Current == SkinKind.Win,
                         Copy = text => model.OnCopy?.Invoke(text),
                         OpenTerminal = TerminalApp.Open,
                         OpenUrl = url => Dialogs.OpenUrl(url),
                         WriteNotes = WriteNotesAsync,
+                        // Claude and ChatGPT are got ready by guided setup's own two screens, with buttons, where
+                        // setup's window has them.
+                        SetUpPaid = guidedSetup is { } withButtons ? withButtons.GetReadyForNotesAsync : null,
                     };
+                    if (guidedSetup is { } guided)
+                        guided.ReadyForNotes = id =>
+                        {
+                            // Back on this step: the library looks at it afresh, and it's the pick when it works.
+                            if (model.Ai?.Engines.FirstOrDefault(r => r.Id == id) is { } row) _ = row.CheckAgainCommand.ExecuteAsync(null);
+                        };
                 }
                 _ = LoadAiStepAsync(model.Ai);
                 break;
@@ -1328,12 +1337,14 @@ public static partial class Shell
         }
     }
 
-    /// <summary>The AI step reads the library; "No subscription? Use a free model" on guided setup's first screen
-    /// comes here with the free model on this computer picked for the notes.</summary>
+    /// <summary>The AI step reads the library; "I don't have a paid plan" on guided setup's first screen comes here
+    /// with the free AI on this computer picked for the notes when it's here already. When it isn't, its row has the
+    /// one button that gets it, and "No AI for now" stays picked until it's pressed: nothing is left chosen that
+    /// can't write notes.</summary>
     static async Task LoadAiStepAsync(AiSetupModel ai)
     {
         await ai.Load();
-        if (host.Settings.SetupAi == "ollama" && ai.Engines.Any(e => e.Id == "ollama")) ai.SelectedNotes = "ollama";
+        if (host.Settings.SetupAi == "ollama" && ai.Engines.Any(e => e is { Id: "ollama", CanWrite: true })) ai.SelectedNotes = "ollama";
     }
 
     /// <summary>Which flow, and which library password, setup's AI step was made for.</summary>

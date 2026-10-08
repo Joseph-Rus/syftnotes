@@ -491,7 +491,7 @@ public static class ClaudeTools
         + "or a long hex string; pass them to get_lecture and get_transcript. When Canvas is linked, due_assignments, "
         + "get_assignment, class_modules, class_files and class_announcements read what Study Stash already mirrors from "
         + "Canvas; canvas_api, canvas_page and canvas_download read Canvas directly and never other students' data. "
-        + "If a tool says AI tool access is off, tell the user what it says: the student turns it on in Study Stash.";
+        + "If a tool says reading is switched off for AI apps, tell the user what it says: the student turns it on in Study Stash.";
 
     /// <summary>What the internet door tells Claude on the web and in the desktop app: nothing here writes, and
     /// nothing points at files on a computer Claude can't open.</summary>
@@ -503,8 +503,8 @@ public static class ClaudeTools
         + "list_lectures and search_notes give them, get_lecture and get_transcript take them. When Canvas is linked, "
         + "due_assignments, get_assignment, class_modules, class_files and class_announcements read what Study Stash "
         + "already mirrors from Canvas; search_files and read_file find and read course files; canvas_api and canvas_page "
-        + "read Canvas live, and never other students' data. Every tool only reads. If a tool says AI tool access is "
-        + "off, or that a setting doesn't allow something, tell the student what it says: they change it in Study Stash.";
+        + "read Canvas live, and never other students' data. Every tool only reads. If a tool says reading is switched "
+        + "off for AI apps, or that a setting doesn't allow something, tell the student what it says: they change it in Study Stash.";
 
     /// <summary>The most characters one call hands back, of a transcript or a file.</summary>
     public const int PageChars = 40000;

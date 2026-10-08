@@ -265,17 +265,79 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
-    public async Task No_subscription_opens_setup_by_hand_with_the_free_model_for_notes()
+    public async Task No_paid_plan_is_one_of_the_three_answers_and_opens_setup_by_hand_with_the_free_AI_for_notes()
     {
         await using var rig = await new Rig().OpenAsync();
         var g = rig.Guided;
-        g.UseOllamaCommand.Execute(null);
+        // The first screen asks what the student has, in their terms. The tools underneath aren't named on it.
+        Assert.DoesNotContain("Claude Code", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
+        Assert.DoesNotContain("Codex", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
+        // The free AI that runs on the computer is named once, as what it is: Ollama, and advanced. Without a plan the
+        // plain way is no AI at all, and Study Stash still records and transcribes.
+        Assert.DoesNotContain("Ollama", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine);
+        Assert.Equal($"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {g.Device} (Ollama).", g.FreeLine);
+        g.Picked = "";
+        Assert.False(g.CanContinue);
+        g.PickCommand.Execute("claude");
+        Assert.Equal(["Pick your AI", "Get Claude ready", "Sign in to Claude", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+
+        // "I don't have a paid plan" is an answer like the other two, not a small link under them: nothing to install
+        // or sign in to, and Continue goes on.
+        g.PickCommand.Execute("free");
+        Assert.True(g.PickedFree);
+        Assert.True(g.CanContinue);
+        Assert.Equal(["Pick your AI", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        await g.ContinueCommand.ExecuteAsync(null);
         Assert.Equal(GuidedScreen.Manual, g.Screen);
         Assert.True(g.PreferOllama);
         Assert.Equal("ollama", AppSettings.Load(rig.Home.Path).SetupAi);
         Assert.Equal(SetupStep.Welcome, rig.Setup.Step);
         Assert.Equal(0, FakeAgents.Turns(rig.Bin));
         Assert.False(File.Exists(FakeAgents.ExePath(rig.Bin, "claude")));
+    }
+
+    [AvaloniaFact]
+    public async Task Setup_by_hand_gets_claude_ready_with_buttons_and_comes_back_to_the_step_that_asked()
+    {
+        // Setup by hand's notes step used to give Claude's two commands to paste into Terminal. It borrows guided
+        // setup's two screens instead (download and set up, sign in), and then it's back on the step with Claude ready.
+        await using var rig = await new Rig(cli: "claude").OpenAsync();
+        var g = rig.Guided;
+        g.ByHandCommand.Execute(null);
+        rig.Setup.Go(rig.Setup.Steps[2].Step); // a few steps in
+        var step = rig.Setup.Step;
+        string? ready = null;
+        g.ReadyForNotes = id => ready = id;
+
+        await g.GetReadyForNotesAsync("claude");
+        Assert.Equal(GuidedScreen.Install, g.Screen); // not on this computer yet
+        Assert.True(g.ForNotes);
+        Assert.Equal("Back", g.ByHandLabel);
+
+        // Back, having done nothing: the step they left, and nothing picked.
+        g.ByHandCommand.Execute(null);
+        Assert.Equal((GuidedScreen.Manual, step, (string?)null), (g.Screen, rig.Setup.Step, ready));
+        Assert.Equal("Set up by hand", g.ByHandLabel);
+
+        // This time through: one button installs it, its own page signs in, and Continue is back on the step.
+        await g.GetReadyForNotesAsync("claude");
+        await g.InstallCommand.ExecuteAsync(null);
+        Assert.True(g.Installed);
+        await g.ContinueCommand.ExecuteAsync(null);
+        Assert.Equal(GuidedScreen.SignIn, g.Screen);
+        File.WriteAllText(Path.Combine(rig.Bin, "signed-in"), "");
+        await g.OpenSignInCommand.ExecuteAsync(null);
+        await Until(() => g.AiReady, "Claude signed in and its plan checked");
+        await g.ContinueCommand.ExecuteAsync(null);
+        Assert.Equal((GuidedScreen.Manual, step, "claude"), (g.Screen, rig.Setup.Step, ready));
+        Assert.False(g.ForNotes);
+        Assert.Empty(rig.Terminals); // nothing was opened to paste a command into
+        Assert.Empty(g.Thread); // and no chat was started: this is setup by hand
+
+        // Already here and signed in (the Claude app's own, say): straight back, with nothing to press.
+        ready = null;
+        await g.GetReadyForNotesAsync("claude");
+        Assert.Equal((GuidedScreen.Manual, "claude"), (g.Screen, ready));
     }
 
     [AvaloniaFact]
@@ -300,8 +362,8 @@ public sealed class GuidedSetupTests
             ["""{"type":"thread.started","thread_id":"t-1"}""", """{"type":"turn.failed","error":{"message":"To use Codex with your ChatGPT plan, upgrade to Plus."}}"""], 1);
         await g.OpenSignInCommand.ExecuteAsync(null);
         Assert.Equal(ChatProblem.Plan, g.PlanProblem);
-        Assert.Equal("Your ChatGPT plan doesn't include Codex in the app", g.PlanProblemTitle);
-        Assert.Equal("It needs Plus or higher.", g.PlanProblemText);
+        Assert.Equal("This ChatGPT account is on a plan that other apps can't use", g.PlanProblemTitle);
+        Assert.Equal("Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures.", g.PlanProblemText);
         Assert.False(g.AiReady);
         g.OpenPlansCommand.Execute("");
         Assert.Equal(["https://chatgpt.com/pricing"], rig.Opened);

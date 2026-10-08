@@ -56,15 +56,7 @@ public static class EngineSetupWords
             : new HowToStep("Sign in: run this and choose Sign in with ChatGPT", SignInCommand(id), Plan(id));
         return (id, state) switch
         {
-            ("ollama", "not_installed") =>
-            [
-                new HowToStep("Download Ollama from ollama.com and open it", Note: $"It's free and runs on this {(windows ? "PC" : "Mac")}: nothing you record leaves it."),
-            ],
-            ("ollama", "not_running") => [new HowToStep("Open the Ollama app, or start it from here")],
-            ("ollama", "model_missing") =>
-            [
-                new HowToStep("Download the model it writes notes with", Note: $"A few gigabytes, once. It runs on this {(windows ? "PC" : "Mac")}: nothing you record leaves it."),
-            ],
+            // The free AI has no steps to follow: its row's one button gets it ready (AiSetupModel).
             ("claude" or "codex", "not_installed") =>
             [
                 new HowToStep($"Install it: paste this into {where}", InstallCommand(id, windows), $"Or with npm: {NpmCommand(id)}"),

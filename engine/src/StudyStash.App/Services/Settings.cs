@@ -85,8 +85,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         new() { Id = "Library", Glyph = "dns", Label = "Library" },
         new() { Id = "Classes", Glyph = "book_2", Label = "Classes" },
         new() { Id = "Notes", Glyph = "edit_note", Label = "Notes and sorting" },
-        new() { Id = "AI", Glyph = "auto_awesome", Label = "AI engines" },
-        new() { Id = "Access", Glyph = "hub", Label = "AI tool access" },
+        new() { Id = "AI", Glyph = "auto_awesome", Label = "Your AI" },
+        new() { Id = "Access", Glyph = "hub", Label = "AI apps" },
         new() { Id = "Canvas", Glyph = "school", Label = "Canvas" },
         new() { Id = "Folders", Glyph = "folder", Label = "Folders" },
         new() { Id = "Phone", Glyph = "smartphone", Label = "Phone" },
@@ -387,9 +387,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Engines = new AiEnginesModel(ai)
         {
             OpenUrl = url => Dialogs.OpenUrl(url),
-            Lede = "Notes are written after each lecture. Answers come while you ask. " + (host.Settings.Role == AppRole.Laptop
-                ? "Engines run on your library, and you can set them up there or from this laptop."
-                : $"Engines run on this {device}, as part of your library."),
+            Lede = "Choose which AI writes your notes and answers your questions. You can change it here any time. " + (host.Settings.Role == AppRole.Laptop
+                ? "It runs on your library, and you can set it up there or from this laptop."
+                : $"It runs on this {device}, as part of your library."),
         };
         AiProblems = new AiProblemsModel(ai);
         Access = MakeAccess(ai, host);

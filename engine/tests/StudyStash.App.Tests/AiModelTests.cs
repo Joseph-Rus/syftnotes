@@ -45,19 +45,25 @@ public class AiWordsTests
     public void Ollama_never_leaves_this_computer_a_signed_in_cli_says_so()
     {
         Assert.Equal("Runs on your library. Nothing leaves it.", AiWords.EngineAbout("ollama", "ready"));
-        Assert.Equal("Runs on your library. Signed in.", AiWords.EngineAbout("claude", "ready"));
-        Assert.Equal("Runs on your library.", AiWords.EngineAbout("codex", "not_signed_in"));
+        Assert.Equal("Through Claude Code. Runs on your library. Signed in.", AiWords.EngineAbout("claude", "ready"));
+        Assert.Equal("Through Codex. Runs on your library.", AiWords.EngineAbout("codex", "not_signed_in"));
+        // Where a student chooses one, each AI goes by what they'd call it; the tool is in the line under it.
+        Assert.Equal(("Ollama (free, advanced)", "Claude", "ChatGPT", "Gemini"),
+            (AiWords.PlainName("ollama", "Ollama"), AiWords.PlainName("claude", "Claude Code"), AiWords.PlainName("codex", "Codex"), AiWords.PlainName("gemini", "Gemini")));
     }
 
     [Fact]
     public void Setup_words_are_phrased_for_this_computer()
     {
-        Assert.Equal("Private. Runs here, nothing leaves this computer.", AiWords.SetupAbout("ollama", "ready"));
-        Assert.Equal("Signed in on this computer.", AiWords.SetupAbout("claude", "ready"));
-        Assert.Equal("Installed. Sign in to use it.", AiWords.SetupAbout("codex", "not_signed_in"));
+        Assert.Equal("Free and private (Ollama). It runs on this computer: nothing you record leaves it.", AiWords.SetupAbout("ollama", "ready"));
+        Assert.Equal("With your paid Claude plan, through Claude Code. Signed in on this computer.", AiWords.SetupAbout("claude", "ready"));
+        Assert.Equal("With your paid ChatGPT plan, through Codex. Installed. Sign in to use it.", AiWords.SetupAbout("codex", "not_signed_in"));
+        // The list names each one as a student would: what they have, or what it is. The tools' names are in the line under.
+        Assert.Equal(("Free AI on this Mac", "Claude", "ChatGPT", "Gemini"),
+            (AiWords.SetupName("ollama", "Ollama", "Mac"), AiWords.SetupName("claude", "Claude Code"), AiWords.SetupName("codex", "Codex"), AiWords.SetupName("gemini", "Gemini")));
         Assert.Equal("Installed on this computer.", AiWords.SetupAbout("gemini", "unchecked"));
-        Assert.Equal("Not on this Mac yet.", AiWords.SetupAbout("claude", "not_installed", "Mac"));
-        Assert.Equal("Free and private, but not on this PC yet.", AiWords.SetupAbout("ollama", "not_installed", "PC"));
+        Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", AiWords.SetupAbout("claude", "not_installed", "Mac"));
+        Assert.Equal("Free and private (Ollama). Study Stash downloads it for you: a few gigabytes, once.", AiWords.SetupAbout("ollama", "not_installed", "PC"));
     }
 
     [Fact]
@@ -116,7 +122,7 @@ public class AiEnginesModelTests
 
         await model.Load();
 
-        Assert.Equal(["Ollama", "Claude Code", "Codex"], model.Engines.Select(r => r.Name));
+        Assert.Equal(["Ollama (free, advanced)", "Claude", "ChatGPT"], model.Engines.Select(r => r.Name));
         Assert.Single(model.AddChoices);
         Assert.Equal("Gemini", model.AddChoices[0].Name);
         Assert.Equal("ollama", model.SelectedNotes);
@@ -153,9 +159,9 @@ public class AiEnginesModelTests
         await model.Load();
 
         Assert.True(model.ShowDrawnBy);
-        Assert.Equal(["Automatic", "Same as notes", "Ollama", "Claude Code", "Codex", "Gemini"], model.DiagramsChoices.Select(c => c.Name)); // off is the Rich notes switch's
+        Assert.Equal(["Automatic", "Same as notes", "Ollama", "Claude", "ChatGPT", "Gemini"], model.DiagramsChoices.Select(c => c.Name)); // off is the Rich notes switch's
         Assert.Equal("Automatic", model.SelectedDiagramsName);
-        Assert.Equal("Claude Code reads each transcript", model.DiagramsAbout);
+        Assert.Equal("Claude reads each transcript", model.DiagramsAbout);
         Assert.Empty(lib.DefaultsCalls);
 
         model.SelectedDiagrams = "codex";
@@ -313,12 +319,12 @@ public class AiSetupModelTests
 
         Assert.Equal(["ollama", "claude", "codex"], model.Engines.Select(r => r.Id));
         var ollama = model.Engines.Single(r => r.Id == "ollama");
-        Assert.True(ollama.Recommended);
+        Assert.True(ollama.Advanced);
         Assert.True(ollama.Selected);
         var codex = model.Engines.Single(r => r.Id == "codex");
         Assert.True(codex.HasHelp); // how to sign in, under the row
         Assert.False(codex.CanWrite);
-        Assert.Equal("Installed. Sign in to use it.", codex.About);
+        Assert.Equal("With your paid ChatGPT plan, through Codex. Installed. Sign in to use it.", codex.About);
         // ask == notes on the library: the select starts on "Same as notes".
         Assert.Equal(AiSetupModel.SameAsNotes, model.SelectedAsk);
         Assert.Equal("Same as notes", model.SelectedAskName);
@@ -375,6 +381,9 @@ public class AiSetupModelTests
         Assert.Equal("codex", lib.DefaultsCalls[0].Ask);
     }
 
+    /// <summary>A computer with no paid AI on it, and the free one in <paramref name="free"/>.</summary>
+    static AiOverview Nothing(string free) => With(("ollama", free), ("claude", "not_installed"), ("codex", "not_installed"));
+
     static AiOverview With(params (string Id, string State)[] states)
     {
         var o = AiTestData.MixedOverview();
@@ -396,7 +405,7 @@ public class AiSetupModelTests
         Assert.Equal(["ollama", "claude", "codex"], mac.Engines.Select(r => r.Id));
         var claude = mac.Engines.Single(r => r.Id == "claude");
         Assert.False(claude.CanWrite);
-        Assert.Equal("Not on this Mac yet.", claude.About);
+        Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", claude.About);
         Assert.Equal(["curl -fsSL https://claude.ai/install.sh | bash", "claude"], claude.Help.Select(h => h.Command));
         Assert.Equal([1, 2], claude.Help.Select(h => h.Number));
         Assert.Contains("paste this into Terminal", claude.Help[0].Title, StringComparison.Ordinal);
@@ -487,7 +496,7 @@ public class AiSetupModelTests
         Assert.True(ready.Selected);
         Assert.False(ready.ShowHelp);
         Assert.Equal("claude", model.SelectedNotes);
-        Assert.Equal("Claude Code is ready. It writes your notes.", model.Say);
+        Assert.Equal("Claude is ready. It writes your notes.", model.Say);
     }
 
     [AvaloniaFact]
@@ -509,7 +518,7 @@ public class AiSetupModelTests
     {
         var lib = new FakeAiLibrary { Overview = With(("ollama", "not_installed"), ("claude", "not_installed"), ("codex", "not_installed")) };
         var writes = new List<bool>();
-        var model = new AiSetupModel(lib) { WriteNotes = on => { writes.Add(on); return Task.FromResult(true); } };
+        var model = new AiSetupModel(lib) { Windows = false, WriteNotes = on => { writes.Add(on); return Task.FromResult(true); } };
         await model.Load();
 
         Assert.True(model.OffersNoAi);
@@ -523,42 +532,123 @@ public class AiSetupModelTests
         lib.Overview = With(("claude", "not_installed"), ("codex", "not_installed"));
         await model.Engines.Single(r => r.Id == "ollama").CheckAgainCommand.ExecuteAsync(null);
         Assert.Equal("ollama", model.SelectedNotes);
-        Assert.Equal("Ollama", model.ChoiceWords);
+        Assert.Equal("Free AI on this Mac", model.ChoiceWords);
         Assert.True(await model.SaveAsync());
         Assert.Equal([false, true], writes);
         Assert.Equal("ollama", lib.DefaultsCalls[^1].Notes);
     }
 
     [AvaloniaFact]
-    public async Task Ollama_once_installed_offers_to_start_or_fetch_its_model_from_setup()
+    public async Task The_free_AI_is_got_ready_with_one_button_and_nothing_to_do_in_a_browser_or_a_terminal()
     {
-        var lib = new FakeAiLibrary { Overview = With(("ollama", "not_installed")) };
+        // No paid plan, and nothing on this Mac yet. The row used to send the student to ollama.com to install an app,
+        // then to "Start Ollama", then to "Download the model", each with Check again.
+        var lib = new FakeAiLibrary { Overview = Nothing("not_installed") };
         var opened = new List<string>();
-        var model = new AiSetupModel(lib) { Windows = false, OpenUrl = opened.Add };
+        int asked = 0;
+        var answers = new Queue<AiOverview>();
+        var model = new AiSetupModel(lib) { Windows = false, OpenUrl = opened.Add, WriteNotes = _ => Task.FromResult(true), Wait = () => Task.CompletedTask };
         await model.Load();
-        var ollama = model.Engines.Single(r => r.Id == "ollama");
-        Assert.Equal("Get Ollama", ollama.OpenLabel);
-        await ollama.OpenCommand.ExecuteAsync(null);
-        Assert.Equal(["https://ollama.com/download"], opened);
+        Assert.True(model.NoAi); // nothing can write notes yet
+        var free = model.Engines.Single(r => r.Id == "ollama");
+        Assert.Equal(("Free AI on this Mac", "Set it up"), (free.Name, free.OpenLabel));
+        Assert.True(free.ShowOneButton);
+        Assert.False(free.HasHelp); // no steps to follow
 
-        // Installed now, but without the model it writes notes with.
-        lib.Overview = With(("ollama", "model_missing"));
-        await model.Engines.Single(r => r.Id == "ollama").CheckAgainCommand.ExecuteAsync(null);
-        ollama = model.Engines.Single(r => r.Id == "ollama");
+        // The library does it in one go, and says where it is each time it's asked.
+        AiOverview At(string state, PullInfo? pulling) => Nothing(state) with { Pulling = pulling };
+        lib.OnSetUp = _ => new AiSaid("Getting the free AI ready…", At("not_installed", new PullInfo("qwen3:8b", 0, "") { Step = "app" }));
+        var seen = new List<(string Progress, bool Working, string Picked)>();
+        answers.Enqueue(At("not_installed", new PullInfo("qwen3:8b", 0.4, "") { Step = "app" }));
+        answers.Enqueue(At("not_running", new PullInfo("qwen3:8b", 0, "") { Step = "start" }));
+        answers.Enqueue(At("model_missing", new PullInfo("qwen3:8b", 0.12, "")));
+        answers.Enqueue(At("ready", null));
+        lib.OnEngines = () =>
+        {
+            asked++;
+            var next = answers.Dequeue();
+            lib.Overview = next;
+            return next;
+        };
+        model.Engines.CollectionChanged += (_, _) =>
+        {
+            if (model.Engines.FirstOrDefault(r => r.Id == "ollama") is { } row) seen.Add((row.Progress, row.Working, model.SelectedNotes));
+        };
+
+        await free.OpenCommand.ExecuteAsync(null);
+
+        Assert.Empty(opened); // no website
+        Assert.Contains("set-up:ollama", lib.Calls);
+        Assert.DoesNotContain("download:ollama", lib.Calls);
+        Assert.Equal(4, asked);
+        Assert.Contains(seen, s => s.Progress == "Downloading the free AI… 40%" && s.Working);
+        Assert.Contains(seen, s => s.Progress == "Starting it…");
+        Assert.Contains(seen, s => s.Progress == "Downloading what it writes notes with (a few gigabytes, once)… 12%");
+        // Its app in, it's the pick at once (setup can go on while the rest comes down); at the end it says so.
+        free = model.Engines.Single(r => r.Id == "ollama");
         Assert.Equal("ollama", model.SelectedNotes);
-        Assert.Equal("Installed. It needs the model it writes notes with.", ollama.About);
-        Assert.Equal("Ollama is here. Installed. It needs the model it writes notes with.", model.Say);
-        Assert.Equal("Download the model", ollama.OpenLabel);
+        Assert.False(free.Working);
+        Assert.False(free.ShowOneButton);
+        Assert.True(free.Advanced);
+        Assert.Equal("Free AI on this Mac is ready. It writes your notes.", model.Say);
+    }
 
-        await ollama.OpenCommand.ExecuteAsync(null);
-        Assert.Contains("download:ollama", lib.Calls);
-        Assert.Equal("Private. Runs here, nothing leaves this computer.", model.Engines.Single(r => r.Id == "ollama").About);
-
-        lib.Overview = With(("ollama", "not_running"));
+    [AvaloniaFact]
+    public async Task Where_setup_can_get_claude_and_chatgpt_ready_with_buttons_their_rows_have_one_and_no_commands()
+    {
+        var lib = new FakeAiLibrary { Overview = With(("claude", "not_installed"), ("codex", "not_signed_in")) };
+        var asked = new List<string>();
+        var model = new AiSetupModel(lib)
+        {
+            Windows = false,
+            SetUpPaid = id =>
+            {
+                asked.Add(id);
+                return Task.CompletedTask;
+            },
+        };
         await model.Load();
-        Assert.Equal("Start Ollama", model.Engines.Single(r => r.Id == "ollama").OpenLabel);
+
+        var claude = model.Engines.Single(r => r.Id == "claude");
+        var chatgpt = model.Engines.Single(r => r.Id == "codex");
+        Assert.Equal(("Claude", "Set it up", true, false), (claude.Name, claude.OpenLabel, claude.ShowOneButton, claude.HasHelp));
+        Assert.Equal(("ChatGPT", "Sign in", true, false), (chatgpt.Name, chatgpt.OpenLabel, chatgpt.ShowOneButton, chatgpt.HasHelp));
+        Assert.False(chatgpt.ShowSignIn); // not the sign-in that opens a terminal
+        Assert.Empty(claude.Help);
+
+        await claude.OpenCommand.ExecuteAsync(null);
+        await chatgpt.OpenCommand.ExecuteAsync(null);
+        Assert.Equal(["claude", "codex"], asked);
+        Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
+
+        // Clicking the row itself (it can't write notes yet) doesn't open a list of steps: there aren't any.
+        claude.SelectCommand.Execute(null);
+        Assert.False(claude.ShowHelp);
+    }
+
+    [AvaloniaFact]
+    public async Task A_free_AI_that_couldnt_be_got_says_why_and_offers_to_try_again()
+    {
+        var lib = new FakeAiLibrary { Overview = Nothing("not_installed") };
+        const string why = "The free AI's app couldn't be downloaded and installed. Check the internet connection and try again.";
+        lib.OnSetUp = _ => new AiSaid("Getting the free AI ready…", Nothing("not_installed") with { Pulling = new PullInfo("qwen3:8b", 0, "") { Step = "app" } });
+        lib.OnEngines = () => lib.Overview = Nothing("not_installed") with { Pulling = new PullInfo("qwen3:8b", 0, why) { Step = "app" } };
+        var model = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true), Wait = () => Task.CompletedTask };
+        await model.Load();
+
         await model.Engines.Single(r => r.Id == "ollama").OpenCommand.ExecuteAsync(null);
-        Assert.Contains("start:ollama", lib.Calls);
+
+        var free = model.Engines.Single(r => r.Id == "ollama");
+        Assert.Equal(why, model.Say);
+        Assert.Equal("Try again", free.OpenLabel);
+        Assert.True(free.ShowOneButton);
+        Assert.True(model.NoAi); // "No AI for now" is still the pick: setup can go on with just transcripts
+
+        // A library from before 0.14 can't do it in one go: said, not left spinning.
+        var old = new AiSetupModel(new FakeAiLibrary { Overview = With(("ollama", "not_installed")) }) { Wait = () => Task.CompletedTask };
+        await old.Load();
+        await old.Engines.Single(r => r.Id == "ollama").OpenCommand.ExecuteAsync(null);
+        Assert.True(old.OlderLibrary);
     }
 
     [AvaloniaFact]
@@ -709,12 +799,12 @@ public class AiAskModelTests
     {
         var (model, lib) = Loaded();
         await model.Load();
-        lib.OnAsk = _ => throw new LibraryRefusedException(503, "Asking needs an engine: turn one on in AI engines.");
+        lib.OnAsk = _ => throw new LibraryRefusedException(503, "Asking needs an AI: choose one in Settings → Your AI.");
         model.Question = "q";
 
         await model.AskCommand.ExecuteAsync(null);
 
-        Assert.Equal("Asking needs an engine: turn one on in AI engines.", model.Turns[0].Failed);
+        Assert.Equal("Asking needs an AI: choose one in Settings → Your AI.", model.Turns[0].Failed);
         Assert.True(model.Turns[0].IsThinking == false);
     }
 
@@ -830,7 +920,7 @@ public class AiWordsRewriteAndProblemTests
         Assert.Equal("From Eli's MacBook. It can read, not change.", AiWords.ProblemMessage("access_request", "Codex", "", "", 0, "Eli's MacBook"));
 
         Assert.Equal("Your library isn't answering", AiWords.ProblemTitle("library_offline", "", ""));
-        Assert.Equal("Engines run on your library. Check it's on and connected.", AiWords.ProblemMessage("library_offline", "", "", "", 0, ""));
+        Assert.Equal("Your AI runs on your library. Check it's on and connected.", AiWords.ProblemMessage("library_offline", "", "", "", 0, ""));
 
         Assert.Equal("Claude Code couldn't rewrite the notes", AiWords.ProblemTitle("rewrite_failed", "Claude Code", ""));
         Assert.Equal("Claude Code hit its usage limit. Your current notes are unchanged.", AiWords.ProblemMessage("rewrite_failed", "Claude Code", "", "", 0, "Claude Code hit its usage limit."));

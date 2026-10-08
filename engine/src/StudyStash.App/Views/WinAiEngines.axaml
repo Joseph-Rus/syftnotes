@@ -14,7 +14,7 @@
   <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="36,28,36,20" Spacing="4" MaxWidth="680">
 
-      <TextBlock Classes="ai-title" Text="AI engines" />
+      <TextBlock Classes="ai-title" Text="Your AI" />
       <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,4,0,0"
                  Text="{Binding Lede}" />
 
@@ -147,7 +147,7 @@
 
       <!-- How fast Claude Code writes the notes and designs the rich notes -->
       <StackPanel IsVisible="{Binding HasSpeed}">
-        <TextBlock Classes="ai-section" Text="Claude Code speed" Margin="0,18,0,8" />
+        <TextBlock Classes="ai-section" Text="How fast Claude works" Margin="0,18,0,8" />
         <Border Classes="ai-card" Margin="0">
           <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
             <c:Icon Glyph="schedule" Size="20" />
@@ -172,9 +172,9 @@
 
       <!-- Engines -->
       <Grid ColumnDefinitions="*,Auto" Margin="0,18,0,8">
-        <TextBlock Classes="ai-section" Text="Engines" />
+        <TextBlock Classes="ai-section" Text="AIs on your library" />
         <Button Grid.Column="1" Classes="ai-textbtn" IsVisible="{Binding HasAddChoices}">
-          <TextBlock Classes="ai-link" Text="Add an engine" />
+          <TextBlock Classes="ai-link" Text="Add another AI" />
           <Button.Flyout>
             <MenuFlyout Placement="BottomEdgeAlignedRight" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AddChoices}" ItemContainerTheme="{StaticResource AiAddItem}">
               <MenuFlyout.ItemTemplate>
@@ -268,7 +268,7 @@
       </StackPanel>
 
       <!-- If an engine isn’t available -->
-      <TextBlock Classes="ai-section" Text="If an engine isn’t available" Margin="0,18,0,8" />
+      <TextBlock Classes="ai-section" Text="If your AI isn’t available" Margin="0,18,0,8" />
       <Border Classes="ai-card">
         <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
           <c:Icon Glyph="swap_horiz" Size="20" />

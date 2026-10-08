@@ -139,7 +139,8 @@ public class AccessibleNamesTests
             window.Show();
             Dispatcher.UIThread.RunJobs();
             window.UpdateLayout();
-            Assert.Equal(("Claude", "ChatGPT"), (Said(view.FindControl<Button>("PickClaude")!), Said(view.FindControl<Button>("PickCodex")!)));
+            Assert.Equal(("Claude", "ChatGPT", "I don't have a paid plan"),
+                (Said(view.FindControl<Button>("PickClaude")!), Said(view.FindControl<Button>("PickCodex")!), Said(view.FindControl<Button>("PickFree")!)));
             // In the chat, the checklist beside it.
             foreach (string title in new[] { "Sign in", "Pick a model", "Add your classes" }) g.Checklist.Add(new ChecklistRow(title) { Title = title });
             g.Screen = GuidedScreen.Chat;

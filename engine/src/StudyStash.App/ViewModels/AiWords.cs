@@ -65,8 +65,15 @@ public static partial class AiWords
     /// signed in; every other CLI just says where it runs.</summary>
     public static string EngineAbout(string id, string state) =>
         id == "ollama" ? "Runs on your library. Nothing leaves it."
-        : state == "ready" ? "Runs on your library. Signed in."
-        : "Runs on your library.";
+        : Through(id) + (state == "ready" ? "Runs on your library. Signed in." : "Runs on your library.");
+
+    /// <summary>The tool Study Stash reaches an AI through, said once on its row: "Through Claude Code. ".</summary>
+    static string Through(string id) => id switch
+    {
+        "claude" => "Through Claude Code. ",
+        "codex" => "Through Codex. ",
+        _ => "",
+    };
 
     /// <summary>A diagrams pick as its menu says it: Automatic · Same as notes · an engine · Off.</summary>
     public static string DiagramsChoiceName(string id) => id switch
@@ -82,7 +89,7 @@ public static partial class AiWords
     public static string DiagramsAbout(string choice, string by) => choice switch
     {
         DiagramEngines.Off => "New notes have no diagrams",
-        DiagramEngines.SameAsNotes => "The notes engine draws them as it writes",
+        DiagramEngines.SameAsNotes => "The AI that writes your notes draws them too",
         _ when by == "ollama" => "Ollama reads each transcript, on your library",
         _ when by.Length > 0 => $"{Engines.Name(by)} reads each transcript",
         _ => "From each transcript, after the notes",
@@ -105,20 +112,68 @@ public static partial class AiWords
     public static string SpeedAbout(string id) => id switch
     {
         AiSpeed.Fast => "The same Opus, up to 2.5 times faster for notes and diagrams, but billed at a higher rate. "
-            + "It needs usage credits on your Claude account, and without them Claude Code runs at its normal speed",
+            + "It needs usage credits on your Claude account, and without them Claude runs at its normal speed",
         AiSpeed.Quick => "Sonnet at low effort for the notes and diagrams: quicker and lighter on your plan, with shallower notes and diagrams",
-        _ => "Claude Code as it's set up, at its usual pace",
+        _ => "Claude as it's set up, at its usual pace",
     };
 
     /// <summary>The library setup step's row subtitle: phrased for the computer you're sitting at, since in setup
     /// the library is this computer.</summary>
-    public static string SetupAbout(string id, string state, string device = "computer") => id == "ollama"
+    /// <summary>An AI's name where a student chooses one in Settings ("Your AI"): what they'd call it. Claude Code and
+    /// Codex are how Study Stash reaches Claude and ChatGPT, and the free one is Ollama; a student picks the AI, not
+    /// the tool, and the tool's name is in the row's own line.</summary>
+    public static string PlainName(string id, string name) => id switch
+    {
+        "ollama" => "Ollama (free, advanced)",
+        // By its id too: a library on an older Study Stash still sends the tools' names.
+        "claude" => "Claude",
+        "codex" => "ChatGPT",
+        _ => name,
+    };
+
+    static string Simpler(bool small, string device) => small ? $" A small one fits this {device}'s memory, so its notes are simpler than Claude's or ChatGPT's." : "";
+
+    /// <summary>An engine's name in setup's "who writes your notes" list, in a student's terms: what they'd say they
+    /// have (Claude, ChatGPT), or what it is (a free AI on this computer). The tools' own names (Claude Code, Codex,
+    /// Ollama) are in the line under it, so they're recognised in Settings later.</summary>
+    public static string SetupName(string id, string name, string device = "computer") => id switch
+    {
+        "ollama" => $"Free AI on this {device}",
+        "claude" => "Claude",
+        "codex" => "ChatGPT",
+        _ => name,
+    };
+
+    /// <summary>What "Set it up" on the free AI's row is doing right now, under the row.</summary>
+    public static string FreeAiProgress(PullInfo at) => at.Step switch
+    {
+        "app" => $"Downloading the free AI… {Math.Round(Math.Clamp(at.Fraction, 0, 1) * 100):0}%",
+        "start" => "Starting it…",
+        _ => $"Downloading what it writes notes with ({HowBig(Core.Ollama.DownloadGb(at.Model))}, once)… {Math.Round(Math.Clamp(at.Fraction, 0, 1) * 100):0}%",
+    };
+
+    /// <summary>"about 10 GB", "about 1.4 GB", or "a few gigabytes" for a size that isn't known.</summary>
+    public static string HowBig(double gb) => gb <= 0 ? "a few gigabytes" : $"about {gb.ToString(gb < 10 ? "0.#" : "0", System.Globalization.CultureInfo.InvariantCulture)} GB";
+
+    /// <summary>A row's line in setup's "who writes your notes" list. For the free AI that still needs setting up:
+    /// how much there is to download for this computer (<paramref name="gb"/>), and, where only the small one fits
+    /// (<paramref name="small"/>), that its notes are simpler: said before the download, not found out after.</summary>
+    public static string SetupAbout(string id, string state, string device = "computer", double gb = 0, bool small = false) => id == "ollama"
         ? state switch
         {
-            "not_installed" => $"Free and private, but not on this {device} yet.",
-            "not_running" => "Installed. Start it to write notes.",
-            "model_missing" => "Installed. It needs the model it writes notes with.",
-            _ => "Private. Runs here, nothing leaves this computer.",
+            "not_installed" => $"Free and private (Ollama). Study Stash downloads it for you: {HowBig(gb)}, once.{Simpler(small, device)}",
+            "not_running" => "Free and private (Ollama). It's here, and needs starting.",
+            "model_missing" => $"Free and private (Ollama). It's here, and still needs what it writes notes with: {HowBig(gb)}, once.{Simpler(small, device)}",
+            _ => $"Free and private (Ollama). It runs on this {device}: nothing you record leaves it.",
+        }
+        : id is "claude" or "codex" ? (id == "claude" ? "With your paid Claude plan, through Claude Code. " : "With your paid ChatGPT plan, through Codex. ") + state switch
+        {
+            "ready" => "Signed in on this computer.",
+            "not_signed_in" => "Installed. Sign in to use it.",
+            "unchecked" => "Installed on this computer.",
+            "not_installed" => $"Not on this {device} yet.",
+            "limited" => "Hit its usage limit for now.",
+            _ => "",
         }
         : state switch
         {
@@ -149,7 +204,7 @@ public static partial class AiWords
     public static DateTime? ParseUntil(string iso) =>
         DateTime.TryParse(iso, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t) ? t : null;
 
-    public const string OlderLibraryWords = "Your library runs an older Study Stash: update it to pick engines here.";
+    public const string OlderLibraryWords = "Your library runs an older Study Stash: update it to choose your AI here.";
 
     /// <summary>Whether an engine is worth offering to ask or write with: ready, or installed but never checked. A
     /// down/limited/unsignedin/missing-model engine is skipped (not_installed already never reaches the ask menu).</summary>
@@ -328,7 +383,7 @@ public static partial class AiWords
         "usage_limit" => ParseUntil(until) is { } t ? $"Questions go to {fallbackName} until {UntilClock(t)}." : $"Questions go to {fallbackName}.",
         "fell_back" => detail,
         "access_request" => $"From {detail}. It can read, not change.",
-        "library_offline" => "Engines run on your library. Check it's on and connected.",
+        "library_offline" => "Your AI runs on your library. Check it's on and connected.",
         "rewrite_failed" => $"{detail} Your current notes are unchanged.",
         _ => detail,
     };

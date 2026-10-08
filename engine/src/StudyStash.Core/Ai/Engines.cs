@@ -29,6 +29,13 @@ public sealed record EngineChecks
     public required Func<DateTime> Now { get; init; }
     /// <summary>Whether the student gave an engine an API key (<see cref="ApiKeys"/>): it's usable then, CLI or not.</summary>
     public Func<string, bool> HasKey { get; init; } = _ => false;
+    /// <summary>Install the Ollama app on this computer from its maker's own download, reporting bytes done and total
+    /// as it comes down. True when it's installed afterwards.</summary>
+    public Func<Action<long, long>?, Task<bool>> InstallOllama { get; init; } = _ => Task.FromResult(false);
+    /// <summary>This computer's memory in GB, or null when it can't be told: which free model it can run.</summary>
+    public Func<double?> RamGb { get; init; } = () => null;
+    /// <summary>Free room on the disk models are kept on, in GB, or null when it can't be told.</summary>
+    public Func<double?> DiskFreeGb { get; init; } = () => null;
 
     /// <summary>The real probes: this computer, its files, its environment, its Ollama, its terminals.</summary>
     public static readonly EngineChecks Machine = new()
@@ -40,6 +47,9 @@ public sealed record EngineChecks
         OllamaModels = host => Ollama.ListModelsAsync(host),
         StartOllama = host => Ollama.StartAsync(host),
         PullModel = (model, host, progress, ct) => Ollama.PullAsync(model, host, progress, ct: ct),
+        InstallOllama = progress => Ready.InstallOllamaAsync(_ => { }, progress, StudyStash.Core.Machine.Platform, StudyStash.Core.Machine.Run, Ready.Download),
+        RamGb = StudyStash.Core.Machine.TotalRamGb,
+        DiskFreeGb = () => StudyStash.Core.Machine.DiskFreeGb(),
         OpenSignIn = (home, terminal, id) =>
         {
             var (exe, args) = Engines.SignInCommand(id);
@@ -58,7 +68,7 @@ public sealed record EngineChecks
         OllamaModels = _ => Task.FromResult<List<(string, double)>?>(null),
         StartOllama = _ => Task.FromResult(false),
         PullModel = (_, _, _, _) => Task.FromResult((false, "nothing here downloads a model")),
-        OpenSignIn = (_, _, id) => throw new InvalidOperationException($"{Engines.Name(id)} isn't installed on this computer."),
+        OpenSignIn = (_, _, id) => throw new InvalidOperationException($"{Engines.Tool(id)} isn't installed on this computer."),
         Now = () => DateTime.Now,
     };
 }
@@ -71,21 +81,33 @@ public static class Engines
 {
     public static readonly string[] Order = ["ollama", "claude", "codex", "gemini"];
 
+    /// <summary>An AI's name, as the person using Study Stash knows it: who wrote a lecture's notes, who answered, who
+    /// is at its limit. Claude and ChatGPT, not the tools Study Stash reaches them through (<see cref="Tool"/>).</summary>
     public static string Name(string id) => id switch
     {
         "ollama" => "Ollama",
-        "claude" => "Claude Code",
-        "codex" => "Codex",
+        "claude" => "Claude",
+        "codex" => "ChatGPT",
         "gemini" => "Gemini",
         _ => id,
+    };
+
+    /// <summary>The tool Study Stash reaches an AI through, for the few places that are about the tool itself (what
+    /// is installed, what a terminal runs): Claude Code for Claude, Codex for ChatGPT.</summary>
+    public static string Tool(string id) => id switch
+    {
+        "claude" => "Claude Code",
+        "codex" => "Codex",
+        "gemini" => "Gemini CLI",
+        _ => Name(id),
     };
 
     /// <summary>Which engine wrote a lecture's notes, from the model name the pipeline recorded
     /// (<see cref="AiJobs.Describe"/>: an Ollama model like "qwen3:30b", or "Claude sonnet", "ChatGPT", "Gemini …").</summary>
     public static string WhoWrote(string notesModel) => notesModel switch
     {
-        _ when notesModel.StartsWith("Claude", StringComparison.Ordinal) => "Claude Code",
-        _ when notesModel.StartsWith("ChatGPT", StringComparison.Ordinal) || notesModel.StartsWith("Codex", StringComparison.Ordinal) => "Codex",
+        _ when notesModel.StartsWith("Claude", StringComparison.Ordinal) => "Claude",
+        _ when notesModel.StartsWith("ChatGPT", StringComparison.Ordinal) || notesModel.StartsWith("Codex", StringComparison.Ordinal) => "ChatGPT",
         _ when notesModel.StartsWith("Gemini", StringComparison.Ordinal) => "Gemini",
         { Length: > 0 } => "Ollama",
         _ => "",
@@ -168,7 +190,7 @@ public static class Engines
         var (state, _) = CliState(id, settings, checks);
         return state switch
         {
-            "not_installed" => $"{Name(id)} isn't installed on your library's computer.",
+            "not_installed" => $"{Name(id)} isn't set up on your library's computer.",
             "not_signed_in" => $"{Name(id)} isn't signed in on your library.",
             "limited" => $"{Name(id)} hit its usage limit.",
             _ => null,
@@ -194,11 +216,23 @@ public static class Engines
             : !Ollama.HasModel(installedModels.Select(m => m.Name).ToList(), cfg.EffectiveSummaryModel) ? "model_missing"
             : "ready";
         var models = (installedModels ?? []).Select(m => new ModelOption(m.Name, $"{m.Name} ({Ollama.SizeLabel(m.SizeGb)})")).ToList();
+        string wanted = FreeModel(cfg, checks);
         return new EngineInfo("ollama", Name("ollama"), state)
         {
             Installed = installed, Model = cfg.EffectiveSummaryModel, Models = models, Site = AiProviders.Get("ollama").Site,
+            SetUpGb = state == "ready" ? 0 : Ollama.DownloadGb(wanted),
+            Small = wanted == Ollama.SmallModel,
         };
     }
+
+    /// <summary>
+    /// The model the free AI writes notes with on this library's computer: the one the library was told to use, or,
+    /// for a library nobody has chosen one for, the one this computer's memory can run. (A new library starts on
+    /// <see cref="Config.DefaultOllamaModel"/>, 24 GB to download and for a computer with 40 GB of memory: a student's
+    /// laptop set up from the app was left to download that.)
+    /// </summary>
+    public static string FreeModel(Config cfg, EngineChecks checks) =>
+        cfg.SummaryModel.Length > 0 || cfg.OllamaModel != Config.DefaultOllamaModel ? cfg.EffectiveSummaryModel : Ollama.RecommendedModel(checks.RamGb());
 
     static EngineInfo CliRow(string id, AiSettings settings, EngineChecks checks)
     {

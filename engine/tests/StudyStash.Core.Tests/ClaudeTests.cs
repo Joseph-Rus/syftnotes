@@ -592,7 +592,7 @@ public class ClaudeTests
         await using var mcp = await Connect(site, token);
         var refused = await mcp.CallToolAsync("get_lecture", new Dictionary<string, object?> { ["lecture_id"] = "rec-1" });
         Assert.Equal(true, refused.IsError);
-        Assert.Equal("Study Stash's settings don't let AI tools read study notes right now (Settings → AI tool access → Study notes).", ((TextContentBlock)refused.Content[0]).Text);
+        Assert.Equal("Study Stash's settings don't let AI tools read study notes right now (Settings → AI apps → Study notes).", ((TextContentBlock)refused.Content[0]).Text);
 
         var ok = await mcp.CallToolAsync("search_notes", new Dictionary<string, object?> { ["query"] = "osmosis" });
         Assert.True(ok.IsError is null or false);

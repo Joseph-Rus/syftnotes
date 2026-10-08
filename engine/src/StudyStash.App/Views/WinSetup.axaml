@@ -123,6 +123,15 @@
       <Setter Property="TextWrapping" Value="Wrap" />
       <Setter Property="MaxLines" Value="2" />
     </Style>
+    <!-- The model step's card: as tall as its reason, which is a sentence or two (two lines cut it off mid-sentence). -->
+    <Style Selector="Button.choice.tall">
+      <Setter Property="Height" Value="NaN" />
+      <Setter Property="MinHeight" Value="66" />
+      <Setter Property="Padding" Value="14,10,14,10" />
+    </Style>
+    <Style Selector="Button.choice.tall TextBlock.about">
+      <Setter Property="MaxLines" Value="5" />
+    </Style>
     <!-- The model step's list (Change opens it): the welcome's choices, one line high. -->
     <Style Selector="Button.choice.row">
       <Setter Property="Height" Value="34" />
@@ -455,7 +464,7 @@
             <TextBlock Classes="lede" Text="{Binding ModelBody}" />
             <!-- The model for this computer (Recommended, with why) or the one picked instead, its size, and Change, which
                  opens every model as a one-line list in place of the card and the download. -->
-            <Button AutomationProperties.Name="{Binding ChosenModel.Name}" AutomationProperties.HelpText="{Binding ChosenModel.Line}" Classes="choice" IsVisible="{Binding ShowModelCard}" Command="{Binding ChangeModelCommand}" Margin="0,20,0,0"
+            <Button AutomationProperties.Name="{Binding ChosenModel.Name}" AutomationProperties.HelpText="{Binding ChosenModel.Line}" Classes="choice tall" IsVisible="{Binding ShowModelCard}" Command="{Binding ChangeModelCommand}" Margin="0,20,0,0"
                     MaxWidth="440" HorizontalAlignment="Stretch">
               <Grid ColumnDefinitions="*,16,Auto">
                 <StackPanel Spacing="2" VerticalAlignment="Center">

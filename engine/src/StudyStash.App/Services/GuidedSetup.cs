@@ -152,7 +152,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
         if (m.IsLaptop) return "The library writes the notes, on its own computer: that's set there.";
         if (!m.LibraryOk) return "Set up the library first (offer_computer_setup).";
         if (engine is "claude" or "codex" && engine != g.Picked)
-            return $"Only {g.Brand} is set up on this {Device}. The student can add {AgentCli.Get(engine).Brand} later in Settings → AI engines.";
+            return $"Only {g.Brand} is set up on this {Device}. The student can add {AgentCli.Get(engine).Brand} later in Settings → Your AI.";
         if (engine is "claude" or "codex" && !g.AiReady) return $"{g.Brand} isn't ready yet.";
         string? refused = await (WriteNotes ?? WriteOnLibraryAsync)(engine);
         if (refused is not null) return refused;
@@ -276,7 +276,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
             case ("ai_app", "notnow"):
                 g.Skip("ai_app");
                 Fold(card, "Not now");
-                g.Note("Left your AI app for later", "The student said \"Not now\" to letting their AI app read their lectures. It's in Settings → AI tool access.", good: false);
+                g.Note("Left your AI app for later", "The student said \"Not now\" to letting their AI app read their lectures. It's in Settings → AI apps.", good: false);
                 break;
             case ("start_at_login", "on"):
                 try

@@ -12,10 +12,10 @@ namespace StudyStash.Core.Ai;
 /// </summary>
 public static class ToolAccess
 {
-    /// <summary>What every tool says while AI tool access is off.</summary>
-    public const string Off = "AI tool access is off in Study Stash. The student can turn it on in Study Stash → Settings → AI tool access.";
+    /// <summary>What every tool says while Settings → AI apps has reading switched off.</summary>
+    public const string Off = "Reading is switched off for AI apps in Study Stash. The student can turn it on in Study Stash → Settings → AI apps.";
 
-    /// <summary>Each scope as its toggle is named in Settings → AI tool access, and what it lets tools read.</summary>
+    /// <summary>Each scope as its toggle is named in Settings → AI apps, and what it lets tools read.</summary>
     static readonly Dictionary<string, (string Toggle, string What)> Toggles = new()
     {
         ["lectures"] = ("Lectures and transcripts", "lectures and transcripts"),
@@ -25,8 +25,8 @@ public static class ToolAccess
 
     /// <summary>What a tool says when the toggle its scope needs is off, naming that toggle.</summary>
     public static string Refused(string scope) => Toggles.TryGetValue(scope, out var t)
-        ? $"Study Stash's settings don't let AI tools read {t.What} right now (Settings → AI tool access → {t.Toggle})."
-        : "Study Stash's settings don't let AI tools read that right now (Settings → AI tool access).";
+        ? $"Study Stash's settings don't let AI tools read {t.What} right now (Settings → AI apps → {t.Toggle})."
+        : "Study Stash's settings don't let AI tools read that right now (Settings → AI apps).";
 
     /// <summary>The scope a tool needs, or null only for list_classes (just the class names and counts). Every other
     /// tool is named here on purpose: a test fails when a new tool isn't.</summary>

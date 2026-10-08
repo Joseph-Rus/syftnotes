@@ -376,7 +376,7 @@ public sealed partial class SetupModel : ObservableObject
         SetupStep.Welcome => "Welcome",
         SetupStep.Password => "Password",
         SetupStep.Library => "Your library",
-        SetupStep.Ai => IsLibrary ? "AI engines" : "Notes",
+        SetupStep.Ai => IsLibrary ? "Your AI" : "Notes",
         SetupStep.Microphone => "Microphone",
         SetupStep.Model => "Transcription model",
         SetupStep.Canvas => "Canvas",

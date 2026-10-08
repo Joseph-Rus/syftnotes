@@ -159,7 +159,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     public bool Again => Setup.Again;
     public string Device => Setup.DeviceWord;
-    public AgentCliInfo Cli => AgentCli.Get(Picked.Length > 0 ? Picked : "claude");
+    public AgentCliInfo Cli => AgentCli.Get(Picked == "codex" ? "codex" : "claude");
     public AgentCliInfo Other => Cli.Id == "codex" ? AgentCli.Claude : AgentCli.Codex;
     public string Brand => Cli.Brand;
     public AgentFound Found => Cli.Id == "codex" ? CodexFound : ClaudeFound;
@@ -168,13 +168,30 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     // --- the words each screen shows (the design's) ------------------------------------------------------------------
 
     public string PickTitle => Again ? "Set up Study Stash again" : "Welcome to Study Stash";
-    public static string PickLede => "Pick the AI that will set up Study Stash with you, write your notes and answer your questions. You'll use your own account.";
+    public static string PickLede => "An AI sets up Study Stash with you, writes your notes and answers your questions. Which do you have?";
+    // The three answers, in the student's own terms: what they pay for, never the tools underneath (Claude Code, Codex,
+    // Ollama), which the next screens name once, where they're installed.
+    public static string ClaudeLine => "I have a paid Claude plan (Pro or Max).";
+    public static string CodexLine => "I have a paid ChatGPT plan (Plus or higher).";
+    public static string FreeTitle => "I don't have a paid plan";
+    public string FreeLine => $"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {Device} (Ollama).";
     public string AlreadyHere => $"Already on this {Device}";
     public bool ClaudeHere => ClaudeFound.Works;
     public bool CodexHere => CodexFound.Works;
     public bool PickedClaude => Picked == "claude";
     public bool PickedCodex => Picked == "codex";
-    public string OllamaLine => $"No subscription? Use a free model on this {Device} (Ollama)";
+    /// <summary>No paid plan: Continue goes to setup by hand, with the free AI on this computer picked for the notes.</summary>
+    public bool PickedFree => Picked == "free";
+
+    /// <summary>Setup by hand's notes step asked for Claude or ChatGPT to be got ready on this computer: the two
+    /// screens guided setup has for that (download and set up, sign in) show, and then it's back to that step with the
+    /// AI picked, not on to the chat. "" otherwise.</summary>
+    string forNotes = "";
+    public bool ForNotes => forNotes.Length > 0;
+    /// <summary>It's ready (its id): the by-hand notes step looks at it again and picks it.</summary>
+    public Action<string>? ReadyForNotes { get; set; }
+    /// <summary>The quiet link at the foot of those screens: back to the step they came from.</summary>
+    public string ByHandLabel => ForNotes ? "Back" : "Set up by hand";
     public bool CanContinue => Screen switch
     {
         GuidedScreen.PickAi => Picked.Length > 0,
@@ -190,9 +207,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         _ => "Step 3 of 3",
     };
 
-    public string InstallTitle => $"Install {Cli.Name}";
-    public string InstallLede => $"Study Stash will download {Cli.Name} from {Cli.Maker} and set it up in your account. You won't need an administrator password.";
-    public string InstallButton => $"Install {Cli.Name}";
+    public string InstallTitle => $"Get {Brand} ready";
+    public string InstallLede => $"Study Stash talks to {Brand} through {Cli.Name}, {Cli.Maker}'s own helper for apps. Study Stash will download it and set it up in your account. You won't need an administrator password.";
+    public string InstallButton => "Download and set up";
     public string InstallSource => $"Installs with {Cli.Maker}'s own installer from {Cli.Site}";
     public string InstallLine => (Windows ? Cli.WindowsInstaller : Cli.MacInstaller).Line;
     public bool ShowInstallButton => !Installing && !Installed && InstallProblem is null;
@@ -206,9 +223,14 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         : Cli.Id == "codex"
         ? "Your browser will open ChatGPT's sign-in page. Sign in with the account that has your Plus plan (or higher), then come back here."
         : "Your browser will open Claude's sign-in page. Sign in with the account that has your Pro or Max plan, then come back here.";
-    public string Privacy => $"Study Stash never sees your password. {Cli.Name} keeps your sign-in on this {Device}.";
+    public string Privacy => $"Study Stash never sees your password. The sign-in is {Brand}'s own, and stays on this {Device}.";
     public string PlanNote => $"Your chat with {Brand} uses your {Brand} plan.";
     public string ReadyWords => $"{Brand} is ready.";
+    /// <summary>Signed in, but on a plan other apps can't use (the free one): said as that, with what would work.</summary>
+    public string PlanTooSmallTitle => $"This {Brand} account is on a plan that other apps can't use";
+    public string PlanTooSmallText => Cli.Id == "codex"
+        ? "Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures."
+        : "Study Stash needs Claude Pro or Max. Without one, it still records and transcribes your lectures.";
     public bool ShowOpenSignIn => !WaitingSignIn && !SignedIn && PlanProblem == ChatProblem.None;
     public bool HasSignInProblem => !string.IsNullOrEmpty(SignInProblem);
     public bool HasPlanProblem => PlanProblem != ChatProblem.None;
@@ -242,7 +264,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     void BuildSteps()
     {
         int at = Screen switch { GuidedScreen.PickAi => 0, GuidedScreen.Install => 1, GuidedScreen.SignIn => 2, _ => 3 };
-        string[] titles = ["Pick your AI", $"Install {Cli.Name}", $"Sign in to {Brand}", "Set up Study Stash"];
+        // Without a paid plan there's nothing to install or sign in to: setup by hand comes next.
+        string[] titles = PickedFree ? ["Pick your AI", "Set up Study Stash"] : ["Pick your AI", $"Get {Brand} ready", $"Sign in to {Brand}", "Set up Study Stash"];
+        if (PickedFree) at = Math.Min(at, 1);
         if (Steps.Count != titles.Length)
         {
             Steps.Clear();
@@ -252,7 +276,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         {
             if (Steps[i].Title != titles[i]) Steps[i] = new StepItem { Number = i + 1, Title = titles[i] };
             Steps[i].Current = i == at;
-            Steps[i].Done = i < at || i == 1 && at > 0 && Found.Works && !OnInstall;
+            Steps[i].Done = i < at || i == 1 && !PickedFree && at > 0 && Found.Works && !OnInstall;
         }
     }
 
@@ -266,7 +290,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     partial void OnPickedChanged(string value)
     {
         BuildSteps();
-        Notify(nameof(Cli), nameof(Other), nameof(Brand), nameof(Found), nameof(PickedClaude), nameof(PickedCodex), nameof(CanContinue), nameof(StepLabel),
+        Notify(nameof(Cli), nameof(Other), nameof(Brand), nameof(Found), nameof(PickedClaude), nameof(PickedCodex), nameof(PickedFree), nameof(CanContinue), nameof(StepLabel),
             nameof(InstallTitle), nameof(InstallLede), nameof(InstallButton), nameof(InstallSource), nameof(InstallLine), nameof(UseOtherLabel), nameof(SignInTitle),
             nameof(SignInLede), nameof(Privacy), nameof(PlanNote), nameof(ReadyWords), nameof(SidebarTitle), nameof(FieldHint), nameof(Thinking));
     }
@@ -376,7 +400,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// does it, keeping everything else in the file). Null when they're all connected; else why not, for the card.</summary>
     public string? ConnectAiApps()
     {
-        const string later = "You can connect it later in Settings → AI tool access.";
+        const string later = "You can connect it later in Settings → AI apps.";
         if (services.ConnectAiApp is not { } connect) return "Study Stash can't change that app's settings here. " + later;
         foreach (var app in aiApps.Where(a => !a.Added || a.OtherCopy || a.Outdated))
             if (!connect(app.Id).Ok) services.Log($"[setup] connecting {app.Name} didn't work");
@@ -387,7 +411,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void Pick(string id)
     {
-        if (id is "claude" or "codex") Picked = id;
+        if (id is "claude" or "codex" or "free") Picked = id;
     }
 
     [RelayCommand]
@@ -400,6 +424,13 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void UseOllama()
     {
+        if (ForNotes)
+        {
+            // Asked for from the notes step, which has the free AI's own button: back there.
+            StopWork();
+            BackToNotes(ready: false);
+            return;
+        }
         save(s => s.SetupAi = "ollama");
         PreferOllama = true;
         StopWork();
@@ -412,8 +443,47 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void ByHand() => ByHandAt("");
 
+    /// <summary>From setup by hand's notes step, "Set it up" on Claude or ChatGPT: what guided setup does for them,
+    /// with buttons (the maker's installer, then its own sign-in page), where that step used to give commands to paste
+    /// into Terminal. Already here and signed in, it's straight back with it picked.</summary>
+    public async Task GetReadyForNotesAsync(string id)
+    {
+        if (id is not ("claude" or "codex")) return;
+        StopWork();
+        forNotes = id;
+        Picked = id;
+        Notify(nameof(ForNotes), nameof(ByHandLabel));
+        var found = await Task.Run(() => services.Find(AgentCli.Get(id)));
+        if (id == "codex") CodexFound = found;
+        else ClaudeFound = found;
+        if (!found.Works)
+        {
+            ToInstall();
+            return;
+        }
+        await ToSignInAsync();
+        if (AiReady && Screen == GuidedScreen.SignIn) BackToNotes();
+    }
+
+    /// <summary>Back to the by-hand step that asked, the AI ready (or the student gave up on it: <paramref name="ready"/>
+    /// false, and nothing is picked).</summary>
+    void BackToNotes(bool ready = true)
+    {
+        string id = forNotes;
+        forNotes = "";
+        Notify(nameof(ForNotes), nameof(ByHandLabel));
+        Screen = GuidedScreen.Manual;
+        if (ready) ReadyForNotes?.Invoke(id);
+    }
+
     void ByHandAt(string item)
     {
+        if (ForNotes)
+        {
+            StopWork();
+            BackToNotes(ready: false);
+            return;
+        }
         if (!AiReady && settings().SetupAi is not ("claude" or "codex" or "ollama")) save(s => s.SetupAi = "manual");
         if (!AiReady) StopWork();
         var items = SetupChecklist.From(Setup, Facts());
@@ -450,6 +520,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         switch (Screen)
         {
+            case GuidedScreen.PickAi when PickedFree:
+                UseOllama();
+                break;
             case GuidedScreen.PickAi when Picked.Length > 0:
                 save(s => s.SetupAi = Picked);
                 if (Found.Works) await ToSignInOrChatAsync();
@@ -457,6 +530,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 break;
             case GuidedScreen.Install when Installed:
                 await ToSignInOrChatAsync();
+                break;
+            case GuidedScreen.SignIn when AiReady && ForNotes:
+                BackToNotes();
                 break;
             case GuidedScreen.SignIn when AiReady:
                 StartChat("[Study Stash] Setup was opened.");
@@ -470,7 +546,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     {
         StopWork();
         Picked = Other.Id;
-        save(s => s.SetupAi = Picked);
+        if (ForNotes) forNotes = Picked; // the notes step asked: it's the other one that goes back to it
+        else save(s => s.SetupAi = Picked);
         session = ""; // the other AI can't carry on this one's conversation
         ResetSignIn();
         if (Found.Works) await ToSignInAsync();
@@ -559,7 +636,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     async Task ToSignInOrChatAsync()
     {
         await ToSignInAsync();
-        if (AiReady && Screen == GuidedScreen.SignIn) StartChat("[Study Stash] Setup was opened.");
+        if (!AiReady || Screen != GuidedScreen.SignIn) return;
+        if (ForNotes) BackToNotes();
+        else StartChat("[Study Stash] Setup was opened.");
     }
 
     /// <summary>The sign-in screen: already signed in goes straight to the plan check.</summary>
@@ -641,8 +720,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 SignInProblem = "That sign-in didn't work. Try again.";
                 break;
             case ChatProblem.Plan:
-                PlanProblemTitle = Cli.Id == "codex" ? "Your ChatGPT plan doesn't include Codex in the app" : "Your Claude account doesn't include Claude Code";
-                PlanProblemText = Cli.Id == "codex" ? "It needs Plus or higher." : "Claude Code needs a Pro or Max plan.";
+                PlanProblemTitle = PlanTooSmallTitle;
+                PlanProblemText = PlanTooSmallText;
                 PlanProblem = ChatProblem.Plan;
                 break;
             case ChatProblem.Limit:
@@ -845,8 +924,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             case ChatProblem.Plan:
                 AiReady = false;
                 Screen = GuidedScreen.SignIn;
-                PlanProblemTitle = Cli.Id == "codex" ? "Your ChatGPT plan doesn't include Codex in the app" : "Your Claude account doesn't include Claude Code";
-                PlanProblemText = Cli.Id == "codex" ? "It needs Plus or higher." : "Claude Code needs a Pro or Max plan.";
+                PlanProblemTitle = PlanTooSmallTitle;
+                PlanProblemText = PlanTooSmallText;
                 PlanProblem = ChatProblem.Plan;
                 return;
         }

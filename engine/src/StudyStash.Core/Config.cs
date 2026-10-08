@@ -29,7 +29,12 @@ public sealed class Config(string home, string poolDir)
     public bool AutoUpdate { get; set; } = true;
     public bool OllamaEnabled { get; set; } = true;
     public string OllamaHost { get; set; } = "http://localhost:11434";
-    public string OllamaModel { get; set; } = "qwen3.6:35b-a3b"; // sorts lectures into classes
+    /// <summary>The model a library starts with until one is chosen for it: one for a computer with 40 GB of memory or
+    /// more. A library whose computer has less gets one that fits when its free AI is set up
+    /// (<see cref="Ai.Engines.FreeModel"/>).</summary>
+    public const string DefaultOllamaModel = "qwen3.6:35b-a3b";
+
+    public string OllamaModel { get; set; } = DefaultOllamaModel; // sorts lectures into classes
     public double MinConfidence { get; set; } = 0.6;
     public bool SummaryEnabled { get; set; } = true; // write study notes from each lecture's transcript
     public string SummaryModel { get; set; } = ""; // blank = the sorting model
@@ -238,7 +243,7 @@ public static class Configs
             AutoUpdate = Bool(Get(data, "auto_update", true)),
             OllamaEnabled = Bool(Get(ollama, "enabled", true)),
             OllamaHost = Str(Get(ollama, "host", "http://localhost:11434")),
-            OllamaModel = Str(Get(ollama, "model", "qwen3.6:35b-a3b")),
+            OllamaModel = Str(Get(ollama, "model", Config.DefaultOllamaModel)),
             MinConfidence = Float(Get(ollama, "min_confidence", 0.6)),
             SummaryEnabled = Bool(Get(summary, "enabled", true)),
             SummaryModel = Str(Get(summary, "model", "")),

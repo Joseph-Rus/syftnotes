@@ -159,6 +159,13 @@
     <Style Selector="Button.card /template/ Border#PART_Bg">
       <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
     </Style>
+    <!-- A choice as a row: as tall as what it says -->
+    <Style Selector="Button.card.row">
+      <Setter Property="Height" Value="NaN" />
+      <Setter Property="MinHeight" Value="58" />
+      <Setter Property="Padding" Value="16,10,16,10" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
     <Style Selector="Button.card.on">
       <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
     </Style>
@@ -349,7 +356,7 @@
           <!-- Pick your AI, Install, Sign in -->
           <DockPanel Margin="0,12,0,20" IsVisible="{Binding !OnChat}">
             <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto" Margin="40,0">
-              <Button Name="ByHand" Classes="quiet" Command="{Binding ByHandCommand}"><TextBlock Text="Set up by hand" /></Button>
+              <Button Name="ByHand" Classes="quiet" Command="{Binding ByHandCommand}"><TextBlock Text="{Binding ByHandLabel}" /></Button>
               <Button Name="Continue" Grid.Column="2" Classes="push tint" Command="{Binding ContinueCommand}" IsEnabled="{Binding CanContinue}">
                 <TextBlock Text="Continue" FontSize="13" FontWeight="Medium" />
               </Button>
@@ -362,66 +369,63 @@
                 <StackPanel IsVisible="{Binding OnPick}">
                   <TextBlock Classes="h1" Text="{Binding PickTitle}" Margin="0,18,0,0" />
                   <TextBlock Classes="lede" Text="{x:Static vm:GuidedSetupModel.PickLede}" />
-                  <Grid ColumnDefinitions="*,12,*" Margin="0,18,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
-                    <Panel>
-                      <Button AutomationProperties.Name="Claude" Name="PickClaude" Classes="card" Classes.on="{Binding PickedClaude}" Command="{Binding PickCommand}" CommandParameter="claude">
-                        <StackPanel Spacing="6">
-                          <Grid ColumnDefinitions="*,Auto">
+                  <!-- Three answers in the student's own terms: what they pay for, or nothing. The tools underneath (Claude Code,
+                       Codex, Ollama) aren't named here. -->
+                  <StackPanel Spacing="8" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
+                    <Button AutomationProperties.Name="Claude" Name="PickClaude" Classes="card row" Classes.on="{Binding PickedClaude}" Command="{Binding PickCommand}" CommandParameter="claude">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="2">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="Claude" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <Border Grid.Column="1" Classes="radio" Classes.on="{Binding PickedClaude}"><Ellipse /></Border>
-                          </Grid>
-                          <TextBlock Classes="about" Text="Uses Claude Code, from Anthropic." />
-                          <TextBlock Classes="plan" Text="Needs a paid Claude plan: Pro or Max." />
-                          <Border Classes="badge" IsVisible="{Binding ClaudeHere}" HorizontalAlignment="Left" Margin="0,2,0,0">
-                            <StackPanel Orientation="Horizontal" Spacing="3">
-                              <c:Icon Glyph="check" Size="11" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
-                              <TextBlock Text="{Binding AlreadyHere}" />
-                            </StackPanel>
-                          </Border>
-                        </StackPanel>
-                      </Button>
-                      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom" Margin="16,0,16,14">
-                        <Button Classes="link" Command="{Binding OpenPlansCommand}" CommandParameter="claude">
-                          <StackPanel Orientation="Horizontal" Spacing="3">
-                            <TextBlock Text="What's Claude Pro?" />
-                            <c:Icon Glyph="arrow_outward" Size="12" />
+                            <Border Classes="badge" IsVisible="{Binding ClaudeHere}">
+                              <StackPanel Orientation="Horizontal" Spacing="3">
+                                <c:Icon Glyph="check" Size="11" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding AlreadyHere}" />
+                              </StackPanel>
+                            </Border>
                           </StackPanel>
-                        </Button>
-                      </StackPanel>
-                    </Panel>
-                    <Panel Grid.Column="2">
-                      <Button AutomationProperties.Name="ChatGPT" Name="PickCodex" Classes="card" Classes.on="{Binding PickedCodex}" Command="{Binding PickCommand}" CommandParameter="codex">
-                        <StackPanel Spacing="6">
-                          <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Classes="about" Text="{x:Static vm:GuidedSetupModel.ClaudeLine}" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="radio" Classes.on="{Binding PickedClaude}" Margin="12,0,0,0"><Ellipse /></Border>
+                      </Grid>
+                    </Button>
+                    <Button AutomationProperties.Name="ChatGPT" Name="PickCodex" Classes="card row" Classes.on="{Binding PickedCodex}" Command="{Binding PickCommand}" CommandParameter="codex">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="2">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="ChatGPT" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <Border Grid.Column="1" Classes="radio" Classes.on="{Binding PickedCodex}"><Ellipse /></Border>
-                          </Grid>
-                          <TextBlock Classes="about" Text="Uses Codex, from OpenAI." />
-                          <TextBlock Classes="plan" Text="Needs a paid ChatGPT plan: Plus or higher." />
-                          <Border Classes="badge" IsVisible="{Binding CodexHere}" HorizontalAlignment="Left" Margin="0,2,0,0">
-                            <StackPanel Orientation="Horizontal" Spacing="3">
-                              <c:Icon Glyph="check" Size="11" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
-                              <TextBlock Text="{Binding AlreadyHere}" />
-                            </StackPanel>
-                          </Border>
-                        </StackPanel>
-                      </Button>
-                      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom" Margin="16,0,16,14">
-                        <Button Classes="link" Command="{Binding OpenPlansCommand}" CommandParameter="codex">
-                          <StackPanel Orientation="Horizontal" Spacing="3">
-                            <TextBlock Text="What's ChatGPT Plus?" />
-                            <c:Icon Glyph="arrow_outward" Size="12" />
+                            <Border Classes="badge" IsVisible="{Binding CodexHere}">
+                              <StackPanel Orientation="Horizontal" Spacing="3">
+                                <c:Icon Glyph="check" Size="11" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding AlreadyHere}" />
+                              </StackPanel>
+                            </Border>
                           </StackPanel>
-                        </Button>
-                      </StackPanel>
-                    </Panel>
-                  </Grid>
-                  <Button Name="Ollama" Classes="quiet" Margin="0,16,0,0" HorizontalAlignment="Left" Command="{Binding UseOllamaCommand}">
-                    <StackPanel Orientation="Horizontal" Spacing="2">
-                      <TextBlock Text="{Binding OllamaLine}" FontSize="12" />
-                      <c:Icon Glyph="chevron_right" Size="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-                    </StackPanel>
-                  </Button>
+                          <TextBlock Classes="about" Text="{x:Static vm:GuidedSetupModel.CodexLine}" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="radio" Classes.on="{Binding PickedCodex}" Margin="12,0,0,0"><Ellipse /></Border>
+                      </Grid>
+                    </Button>
+                    <Button AutomationProperties.Name="I don't have a paid plan" Name="PickFree" Classes="card row" Classes.on="{Binding PickedFree}" Command="{Binding PickCommand}" CommandParameter="free">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="2">
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{x:Static vm:GuidedSetupModel.FreeTitle}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+                          </StackPanel>
+                          <TextBlock Classes="about" Text="{Binding FreeLine}" />
+                        </StackPanel>
+                        <Border Grid.Column="1" Classes="radio" Classes.on="{Binding PickedFree}" Margin="12,0,0,0"><Ellipse /></Border>
+                      </Grid>
+                    </Button>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="16" Margin="2,12,0,0">
+                    <Button Classes="link" Command="{Binding OpenPlansCommand}" CommandParameter="claude">
+                      <StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="What's Claude Pro?" FontSize="12" /><c:Icon Glyph="arrow_outward" Size="12" /></StackPanel>
+                    </Button>
+                    <Button Classes="link" Command="{Binding OpenPlansCommand}" CommandParameter="codex">
+                      <StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="What's ChatGPT Plus?" FontSize="12" /><c:Icon Glyph="arrow_outward" Size="12" /></StackPanel>
+                    </Button>
+                  </StackPanel>
                 </StackPanel>
 
                 <!-- Screen 2 · Install -->
@@ -451,7 +455,7 @@
                       <StackPanel Orientation="Horizontal" Spacing="8" Margin="28,0,0,0">
                         <Button Classes="push fill" Command="{Binding TryAgainCommand}" Height="28"><TextBlock Text="Try again" FontSize="12" /></Button>
                         <Button Classes="push fill" Command="{Binding UseOtherCommand}" IsVisible="{Binding InstallRegion}" Height="28"><TextBlock Text="{Binding UseOtherLabel}" FontSize="12" /></Button>
-                        <Button Classes="push fill" Command="{Binding UseOllamaCommand}" IsVisible="{Binding InstallRegion}" Height="28"><TextBlock Text="Use a free model instead" FontSize="12" /></Button>
+                        <Button Classes="push fill" Command="{Binding UseOllamaCommand}" IsVisible="{Binding InstallRegion}" Height="28"><TextBlock Text="Carry on without it" FontSize="12" /></Button>
                         <Button Classes="link" Command="{Binding OpenDocsCommand}" IsVisible="{Binding InstallOther}">
                           <StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="Install it yourself" /><c:Icon Glyph="arrow_outward" Size="12" /></StackPanel>
                         </Button>
@@ -521,7 +525,7 @@
                       <StackPanel Orientation="Horizontal" Spacing="4" Margin="28,0,0,0">
                         <Button Classes="link" Command="{Binding UseOtherCommand}"><TextBlock Text="{Binding UseOtherLabel}" /></Button>
                         <TextBlock Text="·" FontSize="12" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
-                        <Button Classes="link" Command="{Binding UseOllamaCommand}"><TextBlock Text="Use a free model instead" /></Button>
+                        <Button Classes="link" Command="{Binding UseOllamaCommand}"><TextBlock Text="Carry on without it" /></Button>
                       </StackPanel>
                     </StackPanel>
                   </Border>

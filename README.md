@@ -39,8 +39,9 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
   than the lecturer's seems to speak; it is careful rather than complete, and can be wrong. While it
   records, a tiny pill shows the time and the level; pause or stop from the menu bar.
 - **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
-  to review, written by Ollama (free and private) or by Claude Code, Codex or Gemini with the plan
-  you already have. Rewrite a lecture's notes with another engine and keep whichever you like.
+  to review, written by Claude, ChatGPT or Gemini with the plan
+  you already have, or by a free model on your own computer (Ollama, the advanced way). Rewrite a
+  lecture's notes with another AI and keep whichever you like.
 - **Files every lecture under its class**, working out which from what was said, or using the class
   you picked. Anything it can't place waits in **Unsorted**, and a lecture you don't need can be
   deleted (with Undo).
@@ -121,19 +122,23 @@ Then open **Study Stash**. See [Setting up](#setting-up).
 
 ## Setting up
 
-The first time Study Stash opens, it asks which AI will set it up with you:
+The first time Study Stash opens, it asks which AI you have. An AI sets Study Stash up with you,
+writes your notes and answers your questions:
 
-- **Claude** (through Claude Code, from Anthropic): needs a paid Claude plan, Pro or Max.
-- **ChatGPT** (through Codex, from OpenAI): needs a paid ChatGPT plan, Plus or higher.
+- **Claude**: you have a paid Claude plan, Pro or Max. (Study Stash talks to it through Claude Code,
+  Anthropic's own helper for apps.)
+- **ChatGPT**: you have a paid ChatGPT plan, Plus or higher. (Through Codex, OpenAI's.)
+- **I don't have a paid plan**: Study Stash still records and transcribes your lectures. A free AI
+  can also run on your own computer (Ollama), which is the advanced way.
 
 **If you already have the ChatGPT app or the Claude app on a Mac, there's nothing to install.** The
 ChatGPT app carries Codex inside it, signed in with the app, and the Claude app keeps its own Claude
 Code once its Code tab has been opened. Study Stash finds those copies: the one you have starts
 picked, and **Continue** goes straight to the chat.
 
-Otherwise: pick one, press **Install** (Study Stash runs its maker's own installer, for your
-account only, no admin password; nothing is downloaded until you press it), then **Open sign-in
-page** to sign in on Claude's or ChatGPT's own page. Study Stash never sees your password or your
+Otherwise: pick the one you pay for, press **Download and set up** (Study Stash runs its maker's own
+installer, for your account only, no admin password; nothing is downloaded until you press it), then
+**Open sign-in page** to sign in on Claude's or ChatGPT's own page. Study Stash never sees your password or your
 sign-in. A tiny test message then checks your plan includes it.
 
 After that your AI walks you through the rest in a chat, with a checklist beside it: one computer or
@@ -144,8 +149,12 @@ computer happens only when you press the button in its card. Close the window pa
 picks up where it left off. The chat uses a little of your plan, and your AI then writes your
 notes and answers your questions (you can switch to a free local model in Settings any time).
 
-**No subscription?** "Use a free model on this Mac (Ollama)" on the first screen goes to setup by
-hand, with Ollama picked for your notes. **Set up by hand** is on every screen too, and
+**No paid plan?** That's the first screen's third answer, **I don't have a paid plan**. It goes to
+setup by hand, a few plain steps. Its notes step starts on **No AI for now**: lectures are recorded
+and transcribed, and notes can be switched on later in Settings. **Free AI on this Mac** is there
+too, marked **Advanced**, with one button, **Set it up**: Study Stash downloads a free AI (Ollama, with a model sized for your computer), installs and starts it, and
+shows how far along it is, with nothing to do in a browser or a terminal. You can carry on with setup
+while it downloads. **Set up by hand** is on every screen too, and
 **Settings → General → Run setup** runs either again.
 
 Setup by hand asks how you'll use it:
@@ -174,14 +183,21 @@ curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install
 irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
 ```
 
-## AI engines
+## Your AI
 
 Pick who writes your notes and who answers your questions in setup or in
-**Settings → Your library → AI engines** — one engine for everything, or a different one for each
+**Settings → Your library → Your AI** — one engine for everything, or a different one for each
 job. The same page switches the rich notes (below) and sets how fast Claude Code works. The engines run on your library's computer (with one computer, that's your laptop). Without an
 engine, lectures are still filed and keep their transcripts. With Claude Code, Codex or Gemini, a
 lecture's transcript (and, for its diagrams, its notes) goes to that AI under your own account;
 with Ollama nothing leaves your computer.
+
+**In setup, each one is a button.** Setup's notes step lists them as **Free AI on this Mac**,
+**Claude** and **ChatGPT**, each with **Set it up**. The free one downloads Ollama and a model that
+fits your computer's memory (about 1.4 GB on a small laptop, 10 GB on one with 14 GB of memory or
+more, 24 GB on a big machine), installs and starts it, and says first if the disk has no room.
+Claude and ChatGPT get their maker's own installer and their own sign-in page. Nothing is typed into
+a terminal. The commands below are for doing it yourself, or on a library you set up another way.
 
 **Ollama** — free, and nothing leaves your computer. Install it from [ollama.com](https://ollama.com),
 and Study Stash offers to download a model.
@@ -207,11 +223,12 @@ npm install -g @openai/codex                        # Mac or Windows (or on a Ma
 On a Mac, Study Stash also uses the Codex inside the ChatGPT app and the Claude Code the Claude app
 keeps, when there's no copy installed on its own: nothing to install.
 
-Setup's notes step shows these commands with a Copy button, opens Terminal for you, and has
-**Check again** to pick the engine up once it's installed and signed in.
+Where setup can't do it with buttons (a library you reach from another computer), its notes step
+shows these commands with a Copy button, opens Terminal for you, and has **Check again** to pick the
+engine up once it's installed and signed in.
 
 **Rich notes** are the diagrams, formula plots and drawings a lecture's notes get after they're written.
-They're on, as they always were; **Settings → AI engines → Rich notes** switches them off (plain
+They're on, as they always were; **Settings → Your AI → Rich notes** switches them off (plain
 notes only, and no second call to your AI at all) or one kind at a time: **Diagrams** (flowcharts, state
 and sequence diagrams, timelines, mind maps), **Formula plots** and **Drawings** (labelled figures of
 what a lecture describes). A kind that's switched off is never asked of the AI — its part of the
@@ -320,7 +337,7 @@ the notes, in a quick answer and in the Ask chat:
   columns of its groups with square arrows between them; Mermaid state diagrams (automata too),
   sequence diagrams, timelines and mind maps are drawn natively as well; something spatial (a
   structure, a physics setup, a circuit) comes back as a sanitised SVG. They're designed after the notes by the
-  engine that draws them (**Rich notes → Drawn by**, see [AI engines](#ai-engines)), each under a bold title with a
+  engine that draws them (**Rich notes → Drawn by**, see [Your AI](#your-ai)), each under a bold title with a
   caption and the moment of the lecture it comes from; rewriting a lecture's notes designs them
   again rather than adding more. Either kind opens larger on a click, and a diagram Study Stash
   can't draw shows its source with a plain reason instead of failing.
@@ -391,7 +408,7 @@ filed into each class's folder.
 ## Claude, Codex, Gemini and MCP
 
 Your library speaks [MCP](https://modelcontextprotocol.io), so AI apps can read your lectures, notes
-and Canvas work (read-only). Set it up in **Settings → Your library → AI tool access**.
+and Canvas work (read-only). Set it up in **Settings → Your library → AI apps**.
 
 - **AI apps on this computer** (Claude Desktop, Claude Code, ChatGPT, Gemini CLI): choose **Connect**
   next to the app. Study Stash adds itself to that app's own settings file, keeping everything else

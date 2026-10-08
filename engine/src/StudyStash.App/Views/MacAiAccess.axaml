@@ -17,8 +17,8 @@
 
       <StackPanel Spacing="6">
         <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Classes="ai-title" Text="AI tool access" c:Typography.Extra="-0.39" />
-          <ToggleButton AutomationProperties.Name="AI tool access" Grid.Column="1" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" VerticalAlignment="Center" />
+          <TextBlock Classes="ai-title" Text="AI apps" c:Typography.Extra="-0.39" />
+          <ToggleButton AutomationProperties.Name="Let AI apps read your library" Grid.Column="1" Theme="{StaticResource AiToggle}" IsChecked="{Binding On}" VerticalAlignment="Center" />
         </Grid>
         <TextBlock Classes="ai-sub" MaxWidth="540" HorizontalAlignment="Left"
                    Text="ChatGPT, Claude and other AI apps can read your lectures and notes to answer your questions. They can't change or delete anything." />
@@ -298,7 +298,7 @@
               <Grid ColumnDefinitions="28,12,*" MinHeight="36" Margin="16,8">
                 <Panel Classes="ai-lead"><c:Icon Glyph="info" Size="16" Foreground="{DynamicResource Fg3}" /></Panel>
                 <TextBlock Grid.Column="2" Classes="ai-row-sub" TextWrapping="Wrap"
-                           Text="AI tool access is off, so they can't read anything even when connected." />
+                           Text="Reading is switched off at the top of this page, so they can't read anything even when connected." />
               </Grid>
             </StackPanel>
 
