@@ -2,7 +2,7 @@ import { useEffect } from 'preact/hooks';
 import { persistedStore, useStore } from '../data/store';
 import { chromeColour, findTheme, themeCss, type Appearance } from './themes';
 
-/** The look chosen in this phone's Settings: one of the Mac's ten colour themes, and light, dark or the phone's own. */
+/** The look chosen in this phone's Settings: one of the Mac's twenty colour themes, and light, dark or the phone's own. */
 export const look = persistedStore<{ theme: string; appearance: Appearance }>('ss.look', { theme: 'Lagoon', appearance: 'system' });
 
 let style: HTMLStyleElement | null = null;

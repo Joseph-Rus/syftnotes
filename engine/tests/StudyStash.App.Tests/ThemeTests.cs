@@ -121,7 +121,7 @@ public partial class ThemeTests
         Assert.Empty(coloured);
     }
 
-    /// <summary>A light accent (Chalkboard, Highlighter) takes dark ink; so does every accent on dark Windows.</summary>
+    /// <summary>A light accent (Chalkboard, Highlighter, Lilac, Peach, Mint) takes dark ink; so does every accent on dark Windows.</summary>
     [AvaloniaFact]
     public void Text_on_the_accent_reads()
     {
@@ -136,7 +136,7 @@ public partial class ThemeTests
             Assert.Equal(light, OnAccent(SkinKind.Win, ThemeVariant.Light));
             Assert.Equal(ink, OnAccent(SkinKind.Win, ThemeVariant.Dark));
         }
-        Assert.Equal(new[] { "Chalkboard", "Highlighter" }, ColourThemes.All.Where(t => t.IsLight).Select(t => t.Name));
+        Assert.Equal(new[] { "Chalkboard", "Highlighter", "Lilac", "Peach", "Mint" }, ColourThemes.All.Where(t => t.IsLight).Select(t => t.Name));
     }
 
     static string Source([CallerFilePath] string here = "") =>
@@ -205,7 +205,8 @@ public partial class ThemeTests
         Assert.Same(ColourThemes.Default, ColourThemes.Find(""));
         Assert.Same(ColourThemes.Default, ColourThemes.Find(null));
         Assert.Equal("Original red", ColourThemes.Find("original red").Name);
-        Assert.Equal(new[] { "Lagoon", "Library", "Blueprint", "Marmalade", "Plum", "Chalkboard", "Highlighter", "Terracotta", "Graphite", "Original red" },
+        Assert.Equal(new[] { "Lagoon", "Library", "Blueprint", "Marmalade", "Plum", "Chalkboard", "Highlighter", "Terracotta", "Graphite", "Original red",
+                "Sky", "Midnight", "Violet", "Lilac", "Bubblegum", "Peach", "Mocha", "Moss", "Clover", "Mint" },
             ColourThemes.All.Select(t => t.Name));
     }
 

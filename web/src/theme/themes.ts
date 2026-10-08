@@ -1,4 +1,4 @@
-// The Study Stash look on a phone: the app's ten colour themes (ColourThemes.cs) and the Mac's Liquid Glass tokens
+// The Study Stash look on a phone: the app's twenty colour themes (ColourThemes.cs) and the Mac's Liquid Glass tokens
 // worked out from them the way Skin.cs does, as CSS oklch() colours.
 
 /** A colour theme: the accent's hue, chroma and lightness, and the faint hue the neutral surfaces lean to. */
@@ -23,7 +23,7 @@ const t = (name: string, h: number, c: number, l: number, nh: number, nc: number
   hl,
 });
 
-/** The ten themes, in the picker's order. Lagoon (teal) is the default. */
+/** The twenty themes, in the picker's order. Lagoon (teal) is the default. */
 export const themes: readonly ColourTheme[] = [
   t('Lagoon', 195, 0.12, 0.58, 210, 0.012, 95),
   t('Library', 160, 0.1, 0.5, 80, 0.014, 95),
@@ -35,6 +35,16 @@ export const themes: readonly ColourTheme[] = [
   t('Terracotta', 35, 0.13, 0.58, 60, 0.016, 85),
   t('Graphite', 260, 0.01, 0.42, 260, 0.004, 95),
   t('Original red', 22, 0.19, 0.6, 30, 0.003, 22),
+  t('Sky', 235, 0.13, 0.62, 235, 0.012, 95),
+  t('Midnight', 275, 0.13, 0.42, 270, 0.016, 85),
+  t('Violet', 295, 0.17, 0.55, 290, 0.012, 95),
+  t('Lilac', 300, 0.1, 0.82, 300, 0.012, 320),
+  t('Bubblegum', 355, 0.17, 0.64, 350, 0.012, 350),
+  t('Peach', 55, 0.1, 0.84, 55, 0.016, 85),
+  t('Mocha', 55, 0.07, 0.47, 65, 0.02, 85),
+  t('Moss', 115, 0.11, 0.56, 110, 0.014, 95),
+  t('Clover', 148, 0.16, 0.6, 150, 0.012, 95),
+  t('Mint', 165, 0.11, 0.87, 165, 0.012, 165),
 ];
 
 export const defaultTheme = themes[0]!;
@@ -45,7 +55,7 @@ export function findTheme(name: string | null | undefined): ColourTheme {
   return themes.find((x) => x.name.toLowerCase() === n) ?? defaultTheme;
 }
 
-/** A light accent (Chalkboard, Highlighter): text on it is dark ink. */
+/** A light accent (Chalkboard, Highlighter, Lilac, Peach, Mint): text on it is dark ink. */
 export const isLight = (theme: ColourTheme) => theme.l >= 0.75;
 
 const r = (n: number) => Math.round(n * 1000) / 1000;

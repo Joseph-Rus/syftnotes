@@ -12,7 +12,7 @@ web/src/
   router.ts   every screen's address under /app/, Back, tab and depth (push/pop/swap transitions)
   format.ts   dates, durations, sizes, "This week" / "Tomorrow", the way the Mac says them
   data/       resource.ts (what's cached and re-asked), store.ts (a tiny shared-value store)
-  theme/      themes.ts (the Mac's ten colour themes as CSS custom properties), useTheme.ts (puts them on the page)
+  theme/      themes.ts (the Mac's twenty colour themes as CSS custom properties), useTheme.ts (puts them on the page)
   ui/         kit.tsx (the pieces every screen is built from), icons.tsx, pull.ts (pull-to-refresh), math.ts (KaTeX)
   screens/    Install, Pair, Unreachable, Home, ClassScreen, LectureScreen, Upload, ComingUp, Search, Settings
   App.tsx     the boot gate, then routes between screens; main.tsx wires it to the page and registers the service worker
@@ -106,14 +106,14 @@ overdue. Adding files and voice memos live behind the Library's **+** (a sheet),
   OCR finishes — no manual refresh needed.
 - **Search** (`Search.tsx`): searches as the typing pauses; classes, lectures, then passages (a transcript
   passage says when it was said).
-- **Settings** (`Settings.tsx`): the library, the look (Automatic, Light or Dark, and the Mac's ten colour themes,
+- **Settings** (`Settings.tsx`): the library, the look (Automatic, Light or Dark, and the Mac's twenty colour themes,
   kept on the phone as `ss.look`), and this phone (`/api/v2/me`'s `device`) with **Remove this phone**, which locks
   it out at once, as Remove does on the computer.
 
 ## Look and feel
 
 `theme/themes.ts` works out the Mac's Liquid Glass tokens (`Skin.MacTokens`'s formulas, in `oklch()`) for light and
-dark from one of its ten colour themes; `useTheme.ts` writes them as a `<style>` on the page and matches the
+dark from one of its twenty colour themes; `useTheme.ts` writes them as a `<style>` on the page and matches the
 browser's own chrome (the status bar, Safari's tab bar) to it. Which theme, and light or dark, is chosen in the
 phone's own Settings (`look` in `useTheme.ts`); it starts on Lagoon, following the phone's light or dark. `ui/kit.tsx` is every shared piece (navigation bar with a title that shrinks into it on scroll,
 inset grouped lists, buttons, empty states, skeletons) and `ui/pull.ts` is pull-to-refresh, damped like iOS's rubber
