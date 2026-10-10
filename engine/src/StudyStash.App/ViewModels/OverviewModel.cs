@@ -296,7 +296,7 @@ public sealed partial class OverviewModel : ObservableObject
             HasCanvas = canvas,
             HasCalendars = s.Events is not null,
             OnAllDue = canvas ? s.OpenDueHome ?? s.OpenDueList : null,
-            LecturesEmpty = "No lectures yet. Record one from the menu bar and its notes land here.",
+            LecturesEmpty = $"No lectures yet. Record one from the {(OperatingSystem.IsMacOS() ? "menu bar" : "tray")} and its notes land here.",
         };
         var toHandIn = StillToHandIn(s.Due).ToList();
         m.Stats.Add(new OverviewStat(lectures.ToString(CultureInfo.InvariantCulture), lectures == 1 ? "Lecture" : "Lectures"));

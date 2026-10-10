@@ -435,11 +435,13 @@
                       </Grid>
                     </Button>
                   </StackPanel>
-                  <StackPanel Orientation="Horizontal" Spacing="16" Margin="2,12,0,0">
-                    <Button Classes="link" Command="{Binding OpenPlansCommand}" CommandParameter="claude">
+                  <!-- 8 above, not 12: with the third answer on two lines the page was 3 px taller than the window, and the
+                       first screen a student sees came with a scroll bar. -->
+                  <StackPanel Orientation="Horizontal" Spacing="16" Margin="2,8,0,0">
+                    <Button AutomationProperties.Name="What's Claude Pro?" Classes="link" Command="{Binding OpenPlansCommand}" CommandParameter="claude">
                       <StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="What's Claude Pro?" FontSize="12" /><c:Icon Glyph="open_in_new" Size="12" /></StackPanel>
                     </Button>
-                    <Button Classes="link" Command="{Binding OpenPlansCommand}" CommandParameter="codex">
+                    <Button AutomationProperties.Name="What's ChatGPT Plus?" Classes="link" Command="{Binding OpenPlansCommand}" CommandParameter="codex">
                       <StackPanel Orientation="Horizontal" Spacing="3"><TextBlock Text="What's ChatGPT Plus?" FontSize="12" /><c:Icon Glyph="open_in_new" Size="12" /></StackPanel>
                     </Button>
                   </StackPanel>

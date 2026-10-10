@@ -213,6 +213,34 @@ public class AiTests
     }
 
     [Fact]
+    public async Task An_ollama_that_isnt_running_is_known_soon()
+    {
+        // Nothing listens here. Windows takes two seconds to refuse each of localhost's two addresses (and some PCs
+        // never refuse): the library's settings and setup's notes step waited four or five for an Ollama most
+        // students don't have.
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Null(await Ollama.ListModelsAsync($"http://localhost:{port}"));
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(3.5), $"took {watch.Elapsed}");
+    }
+
+    [Fact]
+    public void Only_this_computers_own_addresses_are_given_the_short_wait()
+    {
+        Assert.Equal([System.Net.IPAddress.Loopback, System.Net.IPAddress.IPv6Loopback], Ollama.LocalAddresses("localhost"));
+        Assert.Equal([System.Net.IPAddress.Loopback, System.Net.IPAddress.IPv6Loopback], Ollama.LocalAddresses("LocalHost"));
+        Assert.Equal([System.Net.IPAddress.Loopback], Ollama.LocalAddresses("127.0.0.1"));
+        Assert.Equal([System.Net.IPAddress.IPv6Loopback], Ollama.LocalAddresses("::1"));
+        // Another computer (an Ollama on the Mac mini, over Tailscale) keeps the usual wait.
+        Assert.Null(Ollama.LocalAddresses("mac-mini"));
+        Assert.Null(Ollama.LocalAddresses("100.64.0.7"));
+        Assert.Null(Ollama.LocalAddresses("192.168.1.20"));
+    }
+
+    [Fact]
     public void Gemini_reads_its_step_updates()
     {
         var g = new GeminiProvider();

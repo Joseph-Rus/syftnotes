@@ -350,7 +350,7 @@ public static partial class Shell
     {
         if (canvasConnectWindow is { IsVisible: true })
         {
-            canvasConnectWindow.Activate();
+            Raise(canvasConnectWindow);
             return;
         }
         var watch = CanvasPoll();

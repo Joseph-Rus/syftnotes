@@ -142,6 +142,7 @@ public sealed partial class LibraryWeb
         var ts = options.Tailscale();
         var rel = await options.Latest(3600);
         var picked = AiSettings.Load(cfg.Home);
+        var terminals = Terminal.Available();
         // What sorting follows: the main AI, or the notes engine while Ollama has no model to sort with (AiJobs.SortAsync).
         string sortsWith = await AiJobs.SortFollowsNotesAsync(picked, cfg, Jobs.Checks) ?? picked.Provider;
         var counts = store.ClassesSummary().ToDictionary(c => c.ClassName, c => c.Count);
@@ -191,8 +192,8 @@ public sealed partial class LibraryWeb
             },
             ["terminal"] = new JsonObject
             {
-                ["current"] = picked.Terminal,
-                ["choices"] = new JsonArray(Terminal.Available().Select(t => (JsonNode?)new JsonObject { ["id"] = t.Id, ["name"] = t.Name }).ToArray()),
+                ["current"] = Terminal.Used(picked.Terminal, terminals),
+                ["choices"] = new JsonArray(terminals.Select(t => (JsonNode?)new JsonObject { ["id"] = t.Id, ["name"] = t.Name }).ToArray()),
             },
             ["folders"] = new JsonArray(Folders.Load(cfg.Home).Select(f => (JsonNode?)new JsonObject
             {

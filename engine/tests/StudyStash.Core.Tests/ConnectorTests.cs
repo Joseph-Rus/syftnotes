@@ -1127,7 +1127,18 @@ public class ConnectorTests
         File.WriteAllText(taxes, "private words");
         string away = Path.Combine(outside, "diary.md");
         File.WriteAllText(away, "not shared");
-        File.CreateSymbolicLink(Path.Combine(week, "diary.md"), away);
+        // A link out of the folder. Windows lets an ordinary account (no Developer Mode, not an administrator: most
+        // students' PCs) link only a folder, a junction, so there the file is reached through one.
+        string linked = Path.Combine(week, "diary.md");
+        if (OperatingSystem.IsWindows())
+        {
+            using var mklink = Process.Start(new ProcessStartInfo("cmd") { ArgumentList = { "/c", "mklink", "/J", Path.Combine(week, "away"), outside }, CreateNoWindow = true })!;
+            mklink.WaitForExit();
+            Assert.Equal(0, mklink.ExitCode);
+            linked = Path.Combine(week, "away", "diary.md");
+            Assert.Equal("not shared", File.ReadAllText(linked)); // Windows itself follows it
+        }
+        else File.CreateSymbolicLink(linked, away);
         string home = dir["home"];
         Directory.CreateDirectory(home);
         var index = new StudyStash.Core.Ai.FileIndex(home, () => [("Library", lib, false), ("Secret", secret, true)], () => []);
@@ -1148,7 +1159,7 @@ public class ConnectorTests
 
         Assert.Contains("private folder", await source.ReadFileAsync(taxes, 0));
         const string NotHere = "That isn't a file Study Stash shares with AI tools.";
-        Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(week, "diary.md"), 0)); // a link out of the folder
+        Assert.StartsWith(NotHere, await source.ReadFileAsync(linked, 0)); // a link out of the folder
         Assert.StartsWith(NotHere, await source.ReadFileAsync(away, 0));
         Assert.StartsWith(NotHere, await source.ReadFileAsync(Path.Combine(week, "..", "..", "..", "..", "..", "outside", "diary.md"), 0));
         Assert.StartsWith(NotHere, await source.ReadFileAsync("Week 1/recursion.md", 0));

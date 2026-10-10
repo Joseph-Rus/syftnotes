@@ -369,7 +369,7 @@ sealed class PartsChrome
         else
         {
             stripTitle.Text = "";
-            stripWords.Text = windowed ? "Point at a part to see what it is, click it to pin it; drag or scroll to move about; pinch or ⌘/Ctrl + scroll to zoom." : "";
+            stripWords.Text = windowed ? $"Point at a part to see what it is, click it to pin it; drag or scroll to move about; pinch or {(Mac ? "⌘/Ctrl" : "Ctrl")} + scroll to zoom." : "";
         }
         stripTitle.IsVisible = stripTitle.Text?.Length > 0;
         stripTitle.Margin = new Thickness(touring ? 6 : windowed ? 4 : 8, 0, 8, 0);

@@ -293,8 +293,9 @@ public static partial class Shell
         if (!hotkeysOn) return null;
         string quick = Keybindings.Show(KeyAction.Quick);
         string record = Keybindings.Show(KeyAction.Record);
-        if (!hotkeys.Quick) return $"{quick} is taken by another app, so search from the menu bar.";
-        if (!hotkeys.Record) return $"{record} is taken by another app, so record from the menu bar.";
+        string icon = OperatingSystem.IsMacOS() ? "menu bar" : "tray";
+        if (!hotkeys.Quick) return $"{quick} is taken by another app, so search from the {icon}.";
+        if (!hotkeys.Record) return $"{record} is taken by another app, so record from the {icon}.";
         return null;
     }
 
@@ -470,6 +471,7 @@ public static partial class Shell
         recorder.OnStop = () => StopRecording();
         recorder.OnExpand = expanded =>
         {
+            RecorderTakesKeyboard(expanded);
             recorderWindow?.Refit(PlaceRecorder);
             host.WatchLiveWords(WatchingWords());
         };
@@ -830,9 +832,18 @@ public static partial class Shell
     /// <summary>The live words can be seen: the recorder is open on screen, or the menu's panel (its last line) is.</summary>
     static bool WatchingWords() => (recorder.Expanded && recorderWindow?.IsVisible == true) || panelWindow?.IsVisible == true;
 
+    /// <summary>Windows: the small pill never takes the keyboard from the app you're typing in. The shortcut starts a
+    /// recording from Word or a browser, the pill came up as the window in front, and what was typed next went to it.
+    /// Opened up, it's a window you asked for, with a box to ask in. (A Mac never brings the app forward for it.)</summary>
+    static void RecorderTakesKeyboard(bool expanded)
+    {
+        if (OperatingSystem.IsWindows() && recorderWindow is { } w) w.ShowActivated = expanded;
+    }
+
     static void ShowRecorder(bool expanded)
     {
         recorderWindow ??= MakeRecorderWindow();
+        RecorderTakesKeyboard(expanded);
         bool changed = recorder.Expanded != expanded;
         recorder.Expanded = expanded;
         if (recorderWindow.IsVisible)
@@ -1092,9 +1103,18 @@ public static partial class Shell
         library.DrawChrome = false;
         w.Show();
         UpdateDock();
-        w.Activate();
+        Raise(w);
         Desktop.Activate();
         _ = LoadLibraryAsync();
+    }
+
+    /// <summary>Brings a window the student asked for to the front. On Windows, activating a minimized window leaves it
+    /// in the taskbar: Open Study Stash, opening the app again and a click on a lecture seemed to do nothing. So it
+    /// comes back up first, as large as it was.</summary>
+    static void Raise(Window w)
+    {
+        if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal;
+        w.Activate();
     }
 
     /// <summary>Settings → General's Run setup again: Settings makes way, and setup opens (guided, straight to the chat
@@ -1118,7 +1138,7 @@ public static partial class Shell
     {
         if (setupWindow is { IsVisible: true })
         {
-            setupWindow.Activate();
+            Raise(setupWindow);
             return;
         }
         library.Support = null; // the ask for a tip never shows during setup
@@ -1415,7 +1435,7 @@ public static partial class Shell
         if (settingsWindow is { IsVisible: true })
         {
             if (section is not null && settingsWindow.Content is Control { DataContext: SettingsModel open }) open.Section = section;
-            settingsWindow.Activate();
+            Raise(settingsWindow);
             return;
         }
         var model = SettingsModel.Make(host, canvas: Canvas(), watch: CanvasPoll());
