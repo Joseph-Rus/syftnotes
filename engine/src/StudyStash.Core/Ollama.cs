@@ -19,28 +19,60 @@ public static class Ollama
         Timeout = Timeout.InfiniteTimeSpan,
     };
 
+    /// <summary>How long a connection to this computer itself is given. An Ollama that's running takes it at once. One
+    /// that isn't should be refused at once too, but Windows takes two seconds to say so, for each of localhost's two
+    /// addresses, and a PC whose firewall drops the refusal never says: every look at an Ollama that isn't there (the
+    /// library's settings, setup's notes step) waited four or five seconds for nothing.</summary>
+    internal static readonly TimeSpan LocalConnect = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>The addresses <paramref name="host"/> is on this computer ("localhost", 127.0.0.1, ::1); null for
+    /// another computer's.</summary>
+    internal static IPAddress[]? LocalAddresses(string host) =>
+        string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ? [IPAddress.Loopback, IPAddress.IPv6Loopback]
+        : IPAddress.TryParse(host, out var ip) && IPAddress.IsLoopback(ip) ? [ip]
+        : null;
+
     /// <summary>
-    /// Connects as usual, except that "localhost" tries 127.0.0.1 before ::1. Ollama listens on 127.0.0.1 only, and
-    /// Windows gives localhost's IPv6 address first: a refused connection there takes Windows a couple of seconds
-    /// before the one that works is tried, on every new connection (and a status check only waits five).
+    /// Connects as usual, except to this computer itself. "localhost" tries 127.0.0.1 before ::1: Ollama listens on
+    /// 127.0.0.1 only, and Windows gives localhost's IPv6 address first. And each of this computer's addresses gets
+    /// <see cref="LocalConnect"/> to answer, no longer: nothing answering in that time is nothing listening.
     /// </summary>
     static async ValueTask<Stream> ConnectAsync(SocketsHttpConnectionContext context, CancellationToken ct)
     {
         var at = context.DnsEndPoint;
-        var socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp) { NoDelay = true };
-        try
+        if (LocalAddresses(at.Host) is not { } here)
         {
-            if (string.Equals(at.Host, "localhost", StringComparison.OrdinalIgnoreCase))
-                await socket.ConnectAsync([IPAddress.Loopback, IPAddress.IPv6Loopback], at.Port, ct);
-            else
-                await socket.ConnectAsync(at, ct);
-            return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+            var far = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp) { NoDelay = true };
+            try
+            {
+                await far.ConnectAsync(at, ct);
+                return new System.Net.Sockets.NetworkStream(far, ownsSocket: true);
+            }
+            catch
+            {
+                far.Dispose();
+                throw;
+            }
         }
-        catch
+        Exception? nobody = null;
+        foreach (var address in here)
         {
-            socket.Dispose();
-            throw;
+            var socket = new System.Net.Sockets.Socket(System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp) { NoDelay = true };
+            using var soon = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            soon.CancelAfter(LocalConnect);
+            try
+            {
+                await socket.ConnectAsync(new IPEndPoint(address, at.Port), soon.Token);
+                return new System.Net.Sockets.NetworkStream(socket, ownsSocket: true);
+            }
+            catch (Exception e)
+            {
+                socket.Dispose();
+                if (ct.IsCancellationRequested) throw;
+                nobody ??= e is OperationCanceledException ? new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused) : e;
+            }
         }
+        throw nobody!;
     }
 
     static string Url(string host, string path) => host.TrimEnd('/') + path;
