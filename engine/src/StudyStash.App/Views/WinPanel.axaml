@@ -47,8 +47,10 @@
         <Grid ColumnDefinitions="Auto,8,*,Auto,2,Auto">
           <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Center" IsVisible="{Binding ShowStatus}" />
           <TextBlock Grid.Column="2" Text="{Binding Status}" ToolTip.Tip="{Binding Status}" c:Tips.WhenCut="True" IsVisible="{Binding ShowStatus}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-          <Button Name="OpenApp" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0" Command="{Binding OpenAppCommand}">
-            <TextBlock Text="Open Study Stash" FontSize="13" VerticalAlignment="Center" />
+          <!-- "Open", not "Open Study Stash": the words beside it ("Library running on this PC · Model ready") are shown whole -->
+          <Button Name="OpenApp" AutomationProperties.Name="Open Study Stash" Grid.Column="3" Theme="{StaticResource Surface}" Height="32" CornerRadius="4" Padding="8,0"
+                  Command="{Binding OpenAppCommand}">
+            <TextBlock Text="Open" FontSize="13" VerticalAlignment="Center" />
           </Button>
           <!-- Quick Settings' own gear, at the footer's right -->
           <Button Name="Settings" AutomationProperties.Name="Settings" Grid.Column="5" Theme="{StaticResource Surface}" Width="32" Height="32" CornerRadius="4" Padding="0"
@@ -93,10 +95,9 @@
             <Grid ColumnDefinitions="*,1,36">
               <Button Name="Record" AutomationProperties.Name="Record" Theme="{StaticResource Surface}" Foreground="{DynamicResource OnAccent}" Padding="12,0" Command="{Binding RecordCommand}"
                       IsEnabled="{Binding CanRecord}">
-                <Grid ColumnDefinitions="Auto,8,*,Auto">
+                <Grid ColumnDefinitions="Auto,8,*">
                   <c:Icon Glyph="fiber_manual_record" Filled="True" Size="14" Foreground="{DynamicResource OnAccent}" />
                   <TextBlock Grid.Column="2" Text="{Binding RecordLabel}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Grid.Column="3" Text="{Binding RecordShortcut}" FontSize="12" Opacity="0.7" Margin="8,0,0,0" VerticalAlignment="Center" />
                 </Grid>
               </Button>
               <Border Grid.Column="1" Background="{DynamicResource OnAccent}" Opacity="0.25" />
@@ -184,10 +185,9 @@
 
         <!-- Search: a Fluent text box look -->
         <Button Name="Search" AutomationProperties.Name="Search notes and lectures" Classes="control" Height="32" Padding="11,0,8,0" HorizontalContentAlignment="Stretch" Command="{Binding SearchCommand}">
-          <Grid ColumnDefinitions="*,Auto,Auto">
+          <Grid ColumnDefinitions="*,Auto">
             <TextBlock Text="Search notes and lectures" FontSize="14" Foreground="{DynamicResource Fg3}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="1" Text="{Binding SearchShortcut}" FontSize="11" Foreground="{DynamicResource Fg3}" Margin="8,0,0,0" VerticalAlignment="Center" />
-            <c:Icon Grid.Column="2" Glyph="search" Size="14" Foreground="{DynamicResource Fg2}" Margin="8,0,0,0" />
+            <c:Icon Grid.Column="1" Glyph="search" Size="14" Foreground="{DynamicResource Fg2}" Margin="8,0,0,0" />
           </Grid>
         </Button>
       </StackPanel>
