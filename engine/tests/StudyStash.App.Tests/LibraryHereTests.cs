@@ -27,7 +27,8 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe] };
+        // Its notes in this test's own folder: with none given a new library keeps them in the real Documents\Study Stash.
+        var here = new LibraryHere { Command = [exe], Folder = home["Study Stash"] };
         try
         {
             string said = await here.CreateAsync(host, "Ada's library", "at-least-4", "Ada");
@@ -51,7 +52,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe] };
+        var here = new LibraryHere { Command = [exe], Folder = home["Study Stash"] };
         using var squatter = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
         squatter.Bind(new IPEndPoint(IPAddress.Loopback, 8787));
         squatter.Listen();
@@ -73,7 +74,7 @@ public sealed class LibraryHereTests
         Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
         using var home = new TempHome();
         using var host = Host(home.Path);
-        var here = new LibraryHere { Command = [exe] };
+        var here = new LibraryHere { Command = [exe], Folder = home["Study Stash"] };
         try
         {
             await here.CreateAsync(host, "Ada's library", "at-least-4", "Ada");

@@ -293,12 +293,17 @@ public static partial class SelfTest
 
         if (m.OnTaskbar)
         {
+            await Wait(1); // the window lays out the step first
             Shot(Shell.Windows.Setup, "setup-taskbar");
             m.NextCommand.Execute(null);
         }
 
         // Done: how to record, then Open Study Stash. The role stays Laptop; no login item is touched.
-        if (m.OnDone) Shot(Shell.Windows.Setup, "setup-done");
+        if (m.OnDone)
+        {
+            await Wait(1);
+            Shot(Shell.Windows.Setup, "setup-done");
+        }
         if (Shell.Windows.Setup is not null && m.IsLast) m.NextCommand.Execute(null);
         bool closed = await Until(() => Shell.Windows.Setup is null, 10);
         Say(closed ? $"setup finished: role {host.Settings.Role}, setup done {host.Settings.SetupDone}" : "setup: the window never closed");
@@ -395,16 +400,22 @@ public static partial class SelfTest
         // Start at login: shown, and left off (the self-test never adds a login item).
         if (!m.OnStartAtLogin) throw new InvalidOperationException($"expected Start at login, got {m.Step}");
         m.StartAtLogin = false;
+        await Wait(1); // the window lays out the step first
         Shot(Shell.Windows.Setup, "setup-start-at-login");
         m.NextCommand.Execute(null);
 
         if (m.OnTaskbar)
         {
+            await Wait(1);
             Shot(Shell.Windows.Setup, "setup-taskbar");
             m.NextCommand.Execute(null);
         }
 
-        if (m.OnDone) Shot(Shell.Windows.Setup, "setup-done");
+        if (m.OnDone)
+        {
+            await Wait(1);
+            Shot(Shell.Windows.Setup, "setup-done");
+        }
         if (Shell.Windows.Setup is not null && m.IsLast) m.NextCommand.Execute(null);
         bool closed = await Until(() => Shell.Windows.Setup is null, 10);
         Say(closed ? $"setup finished: role {host.Settings.Role}, setup done {host.Settings.SetupDone}" : "setup: the window never closed");

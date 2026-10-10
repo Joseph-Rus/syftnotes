@@ -296,6 +296,8 @@ public sealed class SetupToolsTests : IAsyncLifetime
         string url = own.Url;
         await own.DisposeAsync();
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
-        await Assert.ThrowsAnyAsync<HttpRequestException>(() => http.PostAsync(url, new StringContent("{}")));
+        // Refused, or, on a PC whose firewall drops the refusal, never answered: either way nobody is there.
+        var e = await Assert.ThrowsAnyAsync<Exception>(() => http.PostAsync(url, new StringContent("{}")));
+        Assert.True(e is HttpRequestException or TaskCanceledException, e.ToString());
     }
 }
