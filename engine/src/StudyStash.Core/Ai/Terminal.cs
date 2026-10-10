@@ -21,6 +21,12 @@ public static class Terminal
         OperatingSystem.IsMacOS() ? Mac.Where(t => Directory.Exists(t.App)).Select(t => (t.Id, t.Name)).ToList()
         : OperatingSystem.IsWindows() ? [("wt", "Windows Terminal")] : [];
 
+    /// <summary>The terminal <see cref="Open"/> uses on a computer that has <paramref name="here"/>: the one picked
+    /// when it's there, else the first that is ("" with none). The setting starts as a Mac's Ghostty, so a PC, or a Mac
+    /// without Ghostty, said "ghostty" in Settings while opening Windows Terminal, or Terminal.</summary>
+    public static string Used(string picked, IReadOnlyList<(string Id, string Name)> here) =>
+        here.Any(t => t.Id == picked) ? picked : here.Count > 0 ? here[0].Id : "";
+
     /// <summary>What the AI is told when it opens.</summary>
     public static string Briefing(string library, string folder, string? className) =>
         $"You were opened from Study Stash, the user's lecture library ({library}: one folder per class, lectures as Markdown, "

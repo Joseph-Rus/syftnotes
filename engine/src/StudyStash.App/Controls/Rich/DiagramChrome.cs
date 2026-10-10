@@ -392,7 +392,7 @@ sealed class DiagramChrome
         else
         {
             stripTitle.Text = "";
-            stripWords.Text = windowed ? (x.HasGroups && x.AnyFolded ? "Click a group to open it. " : "") + "Click a box to follow its arrows; drag or scroll to move about; pinch or ⌘/Ctrl + scroll to zoom." : "";
+            stripWords.Text = windowed ? (x.HasGroups && x.AnyFolded ? "Click a group to open it. " : "") + $"Click a box to follow its arrows; drag or scroll to move about; pinch or {(Mac ? "⌘/Ctrl" : "Ctrl")} + scroll to zoom." : "";
         }
         stripTitle.IsVisible = stripTitle.Text?.Length > 0;
         stripTitle.Margin = new Thickness(stepping ? 6 : windowed ? 4 : 8, 0, 8, 0);

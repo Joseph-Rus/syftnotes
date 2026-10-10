@@ -568,7 +568,7 @@
                   <TextBlock Text="Start Study Stash when I sign in" FontSize="14" />
                   <TextBlock Text="{Binding StartAtLoginHint}" FontSize="12" Foreground="{DynamicResource Fg2}" />
                 </StackPanel>
-                <ToggleButton AutomationProperties.Name="Start Study Stash when I log in" Grid.Column="2" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
+                <ToggleButton AutomationProperties.Name="Start Study Stash when I sign in" Grid.Column="2" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
               </Grid>
             </Border>
           </StackPanel>

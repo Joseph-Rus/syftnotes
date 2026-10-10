@@ -293,8 +293,9 @@ public static partial class Shell
         if (!hotkeysOn) return null;
         string quick = Keybindings.Show(KeyAction.Quick);
         string record = Keybindings.Show(KeyAction.Record);
-        if (!hotkeys.Quick) return $"{quick} is taken by another app, so search from the menu bar.";
-        if (!hotkeys.Record) return $"{record} is taken by another app, so record from the menu bar.";
+        string icon = OperatingSystem.IsMacOS() ? "menu bar" : "tray";
+        if (!hotkeys.Quick) return $"{quick} is taken by another app, so search from the {icon}.";
+        if (!hotkeys.Record) return $"{record} is taken by another app, so record from the {icon}.";
         return null;
     }
 

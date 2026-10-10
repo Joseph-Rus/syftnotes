@@ -179,6 +179,18 @@ public class WindowsCommandTests
         Assert.Equal(["-d", @"C:\Notes\CS 101\; Fall", @"C:\nodejs\node.exe", @"C:\npm\cli.js", "--append-system-prompt", "This is the class \"R&D\\; lab\"."], args);
     }
 
+    /// <summary>Settings names the terminal that opens. The setting starts as a Mac's Ghostty, which a PC doesn't
+    /// have: it opens Windows Terminal, and said "ghostty".</summary>
+    [Fact]
+    public void Settings_names_the_terminal_this_computer_opens()
+    {
+        (string Id, string Name)[] pc = [("wt", "Windows Terminal")], mac = [("terminal", "Terminal"), ("iterm", "iTerm")];
+        Assert.Equal("wt", Terminal.Used("ghostty", pc));
+        Assert.Equal("terminal", Terminal.Used("ghostty", mac)); // a Mac without Ghostty
+        Assert.Equal("iterm", Terminal.Used("iterm", mac));      // the one picked, when it's here
+        Assert.Equal("", Terminal.Used("ghostty", []));
+    }
+
     /// <summary>A stand-in CLI that answers with one line of JSON: the arguments it was given and what came in on its
     /// input.</summary>
     sealed class EchoCli(List<string> cmd) : AiProvider

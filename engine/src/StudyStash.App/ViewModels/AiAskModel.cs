@@ -110,7 +110,9 @@ public sealed partial class AiAskModel : ObservableObject
         new("lecture", "This lecture"), new("class", "This class"), new("all", "All classes"),
     ];
 
-    public string EngineName => Menu.Items.FirstOrDefault(i => i.Id == Engine)?.Name ?? Engine;
+    /// <summary>The engine's name on the chip. One that isn't in the menu (no AI set up yet, so the default is an
+    /// Ollama nobody installed) still goes by its name, "Ollama", not its id.</summary>
+    public string EngineName => Menu.Items.FirstOrDefault(i => i.Id == Engine)?.Name ?? Engines.Name(Engine);
     public string ScopeName => ScopeChoices.FirstOrDefault(c => c.Id == Scope)?.Name ?? Scope;
     public string Placeholder => AiWords.AskPlaceholder(Scope);
     public AiTurn? Latest => Turns.Count > 0 ? Turns[^1] : null;
