@@ -470,6 +470,7 @@ public static partial class Shell
         recorder.OnStop = () => StopRecording();
         recorder.OnExpand = expanded =>
         {
+            RecorderTakesKeyboard(expanded);
             recorderWindow?.Refit(PlaceRecorder);
             host.WatchLiveWords(WatchingWords());
         };
@@ -830,9 +831,18 @@ public static partial class Shell
     /// <summary>The live words can be seen: the recorder is open on screen, or the menu's panel (its last line) is.</summary>
     static bool WatchingWords() => (recorder.Expanded && recorderWindow?.IsVisible == true) || panelWindow?.IsVisible == true;
 
+    /// <summary>Windows: the small pill never takes the keyboard from the app you're typing in. The shortcut starts a
+    /// recording from Word or a browser, the pill came up as the window in front, and what was typed next went to it.
+    /// Opened up, it's a window you asked for, with a box to ask in. (A Mac never brings the app forward for it.)</summary>
+    static void RecorderTakesKeyboard(bool expanded)
+    {
+        if (OperatingSystem.IsWindows() && recorderWindow is { } w) w.ShowActivated = expanded;
+    }
+
     static void ShowRecorder(bool expanded)
     {
         recorderWindow ??= MakeRecorderWindow();
+        RecorderTakesKeyboard(expanded);
         bool changed = recorder.Expanded != expanded;
         recorder.Expanded = expanded;
         if (recorderWindow.IsVisible)
