@@ -1102,9 +1102,18 @@ public static partial class Shell
         library.DrawChrome = false;
         w.Show();
         UpdateDock();
-        w.Activate();
+        Raise(w);
         Desktop.Activate();
         _ = LoadLibraryAsync();
+    }
+
+    /// <summary>Brings a window the student asked for to the front. On Windows, activating a minimized window leaves it
+    /// in the taskbar: Open Study Stash, opening the app again and a click on a lecture seemed to do nothing. So it
+    /// comes back up first, as large as it was.</summary>
+    static void Raise(Window w)
+    {
+        if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal;
+        w.Activate();
     }
 
     /// <summary>Settings → General's Run setup again: Settings makes way, and setup opens (guided, straight to the chat
@@ -1128,7 +1137,7 @@ public static partial class Shell
     {
         if (setupWindow is { IsVisible: true })
         {
-            setupWindow.Activate();
+            Raise(setupWindow);
             return;
         }
         library.Support = null; // the ask for a tip never shows during setup
@@ -1425,7 +1434,7 @@ public static partial class Shell
         if (settingsWindow is { IsVisible: true })
         {
             if (section is not null && settingsWindow.Content is Control { DataContext: SettingsModel open }) open.Section = section;
-            settingsWindow.Activate();
+            Raise(settingsWindow);
             return;
         }
         var model = SettingsModel.Make(host, canvas: Canvas(), watch: CanvasPoll());
