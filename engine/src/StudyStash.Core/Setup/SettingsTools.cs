@@ -28,8 +28,12 @@ public interface ISettingsDriver
     /// <summary>Changes it to <paramref name="value"/> (shown in the window as it changes). Null when it's changed;
     /// else why not, in words.</summary>
     Task<string?> ChangeAsync(SettingEntry entry, string value);
-    /// <summary>Adds a class to the library. Null when it's in; else why not.</summary>
-    Task<string?> AddClassAsync(string name, string about);
+    /// <summary>Adds a class to the library, in the sidebar folder <paramref name="folder"/> ("" for Classes). Null when
+    /// it's in; else why not.</summary>
+    Task<string?> AddClassAsync(string name, string about, string folder);
+    /// <summary>Moves a class to the sidebar folder <paramref name="folder"/> (Clubs, Work, one of the student's own;
+    /// "" back to Classes). Null when it's moved; else why not.</summary>
+    Task<string?> MoveToFolderAsync(string name, string folder);
 }
 
 /// <summary>
@@ -52,7 +56,7 @@ public sealed class SettingsTools(ISettingsDriver driver)
     {
         "get_settings" or "find_setting" => "read",
         "open_settings" => "show",
-        "change_setting" or "add_class" => "direct",
+        "change_setting" or "add_class" or "move_to_folder" => "direct",
         _ => null,
     };
 
@@ -106,10 +110,19 @@ public sealed class SettingsTools(ISettingsDriver driver)
                 + "for or agreed to.")),
         McpServerTool.Create(
             ([Description("The class's name, like BIO 110 (up to 80 characters).")] string name,
-             [Description("What it covers, in the student's words (up to 300 characters). It helps file each lecture.")] string? about = null) =>
-                AddClassAsync(name, about ?? ""),
-            Named("add_class", "Add a class",
-                "Adds a class to the student's library, with what it covers. The student sees it in Settings → Classes, where they can change it.")),
+             [Description("What it covers, in the student's words (up to 300 characters). It helps file each lecture.")] string? about = null,
+             [Description("Its sidebar folder: Classes (the default) for a course, Clubs for a club, Work for a job, or a folder name of the student's own.")] string? folder = null) =>
+                AddClassAsync(name, about ?? "", folder ?? ""),
+            Named("add_class", "Add a class, club or job",
+                "Adds a class to the student's library, with what it covers, in its sidebar folder: a club goes in Clubs, a job in Work. The "
+                + "student sees it in the sidebar and in Settings → Classes, where they can change it.")),
+        McpServerTool.Create(
+            ([Description("The class's name, as it is in the library.")] string name,
+             [Description("The sidebar folder: Clubs, Work, a folder name of the student's own, or Classes to put it back with the courses.")] string folder) =>
+                MoveToFolderAsync(name, folder),
+            Named("move_to_folder", "Move to a sidebar folder",
+                "Moves one of the library's classes to another sidebar folder (Classes, Clubs, Work or one of the student's own). Its lectures "
+                + "go with it. Only for what the student asked for or agreed to.")),
     ];
 
     // --- reading ------------------------------------------------------------------------------------------------------
@@ -200,7 +213,7 @@ public sealed class SettingsTools(ISettingsDriver driver)
         return Say($"Done: {SettingsIndex.SectionName(entry.Section)} → {entry.Title} is now {value}. The student sees it in Settings, and can change it back there.");
     }
 
-    async Task<CallToolResult> AddClassAsync(string name, string about)
+    async Task<CallToolResult> AddClassAsync(string name, string about, string folder)
     {
         name = (name ?? "").Trim();
         about = about.Trim();
@@ -208,8 +221,27 @@ public sealed class SettingsTools(ISettingsDriver driver)
         if (name.Length > 80) return No("That class name is too long: keep it under 80 characters.");
         if (about.Length > 300) return No("Keep what it covers under 300 characters.");
         if (Volatile.Read(ref classes) >= MaxClasses) return No($"That's {MaxClasses} classes in this chat: the student can add more in Settings → Classes.");
-        if (await driver.AddClassAsync(name, about) is { } refused) return No(refused);
+        if (Folder(folder) is not { } where) return No("Keep a folder's name under 40 characters.");
+        if (await driver.AddClassAsync(name, about, where) is { } refused) return No(refused);
         Interlocked.Increment(ref classes);
-        return Say($"Added {name}. The student sees it in Settings → Classes.");
+        return Say(where.Length == 0 ? $"Added {name}. The student sees it under Classes, and in Settings → Classes."
+            : $"Added {name} in {where}. The student sees it there in the sidebar, and in Settings → Classes.");
+    }
+
+    async Task<CallToolResult> MoveToFolderAsync(string name, string folder)
+    {
+        name = (name ?? "").Trim();
+        if (name.Length == 0) return No("Give the class's name.");
+        if (Folder(folder) is not { } where) return No("Keep a folder's name under 40 characters.");
+        if (await driver.MoveToFolderAsync(name, where) is { } refused) return No(refused);
+        return Say($"Moved {name} to {(where.Length == 0 ? "Classes" : where)}.");
+    }
+
+    /// <summary>A sidebar folder as the library keeps it: "" for Classes; null when it's too long.</summary>
+    static string? Folder(string? folder)
+    {
+        string f = (folder ?? "").Trim();
+        if (f.Equals("Classes", StringComparison.OrdinalIgnoreCase)) return "";
+        return f.Length > 40 ? null : f;
     }
 }
