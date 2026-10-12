@@ -33,12 +33,12 @@ public sealed record SettingEntry
 /// </summary>
 public static class SettingsIndex
 {
-    /// <summary>The sidebar's sections: id and name, in its order (Recording and Calendars only on a computer that
-    /// records).</summary>
+    /// <summary>The sidebar's sections: id and name, in its order (Recording, Calendars and Granola only on a computer
+    /// that records).</summary>
     public static readonly IReadOnlyList<(string Id, string Name)> Sections =
     [
         ("General", "General"), ("Appearance", "Appearance"), ("Shortcuts", "Shortcuts"), ("Recording", "Recording"),
-        ("Calendars", "Calendars"), ("Connection", "Connection"), ("Library", "Library"), ("Classes", "Classes"),
+        ("Calendars", "Calendars"), ("Granola", "Granola"), ("Connection", "Connection"), ("Library", "Library"), ("Classes", "Classes"),
         ("Notes", "Notes and sorting"), ("AI", "Your AI"), ("Access", "AI apps"), ("Canvas", "Canvas"), ("Folders", "Folders"),
         ("Phone", "Phone"),
     ];
@@ -105,6 +105,9 @@ public static class SettingsIndex
             "calendar schedule timetable events", "records"),
         new() { Section = "Calendars", Title = "Add a calendar feed", Detail = "Paste a calendar's address (ics).",
             Words = "ics ical google outlook icloud schedule timetable feed", Only = "records" },
+
+        Page("Granola", "Bring lectures you recorded in Granola over to Study Stash, which files them and writes their notes.",
+            "granola import transfer bring move lectures other app recorder", "records"),
 
         Page("Connection", "Which library this computer uses, and what this computer is for.", "library server network"),
         new() { Section = "Connection", Title = "Connect to a library", Detail = "The library's address and password.",
