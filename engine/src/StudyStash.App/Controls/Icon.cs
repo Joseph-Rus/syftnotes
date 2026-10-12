@@ -80,8 +80,12 @@ public sealed class Icon : Control
         double left = (Bounds.Width - Size) / 2, top = (Bounds.Height - Size) / 2;
         if (Brands.Is(Glyph))
         {
+            // (The drawing itself runs on the renderer's own thread, which can't read this control: everything it
+            // needs is worked out here and handed to it. Reading Size from in there threw, and the whole window was
+            // drawn magenta for that frame.)
+            var box = new Rect(left, top, Size, Size);
             if (Brands.Find(Glyph, ActualThemeVariant == ThemeVariant.Dark) is { } mark)
-                context.Custom(new SkiaOp(new Rect(left, top, Size, Size), canvas => Brands.Draw(canvas, mark, new Rect(left, top, Size, Size))));
+                context.Custom(new SkiaOp(box, canvas => Brands.Draw(canvas, mark, box)));
             return;
         }
         if (Find(Glyph) is not { } g) return;
