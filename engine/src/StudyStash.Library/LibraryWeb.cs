@@ -557,7 +557,7 @@ public sealed partial class LibraryWeb
             + "<button class=\"js-hide\">Move</button></form>";
         var about = new List<(string, string)> { ("Class", picker), ("Date", Ui.Esc(Ui.LongDate(r.Date))) };
         bool cameWithNotes = Py.Strip(m.NotesMarkdown).Length > 0;
-        about.Add(("Summary", !string.IsNullOrEmpty(r.SummaryMd) ? $"Notes by {Ui.Esc(r.SummaryModel)}, from the transcript"
+        about.Add(("Summary", !string.IsNullOrEmpty(r.SummaryMd) ? $"Notes by {Ui.Esc(r.SummaryModel)}, from {(Summarize.FromNotes(m) ? "the notes it came with" : "the transcript")}"
             : cameWithNotes ? "The notes it came with"
             : r.HasTranscript is > 0 ? "No study notes yet" : "No transcript, so no study notes"));
         if (!string.IsNullOrEmpty(r.ClassifiedBy))
@@ -591,7 +591,7 @@ public sealed partial class LibraryWeb
         var docs = new List<(string Id, string Label, string Html)>();
         if (!string.IsNullOrEmpty(r.SummaryMd))
             docs.Add(("summary", "Summary", $"<div class=\"prose\">{Ui.RenderMd(r.SummaryMd)}</div>"
-                + $"<p class=\"byline\">Written by {Ui.Esc(r.SummaryModel)} from the transcript.</p>"));
+                + $"<p class=\"byline\">Written by {Ui.Esc(r.SummaryModel)} from {(Summarize.FromNotes(m) ? "the notes it came with" : "the transcript")}.</p>"));
         else if (cameWithNotes) docs.Add(("notes", "Notes", $"<div class=\"prose\">{Ui.RenderMd(m.NotesMarkdown)}</div>"));
         if (Py.Strip(m.PrivateNotes).Length > 0) docs.Add(("typed", "Typed notes", $"<div class=\"prose\">{Ui.RenderMd(m.PrivateNotes)}</div>"));
         if (Py.Strip(m.Transcript).Length > 0) docs.Add(("transcript", "Transcript", $"<div class=\"transcript\">{Ui.Esc(Py.Strip(m.Transcript))}</div>"));
