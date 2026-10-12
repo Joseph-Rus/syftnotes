@@ -3,7 +3,7 @@
 Lucide outline icons (ISC license), stroke width **1.5**, drawn in `currentColor`.
 If the app can install a package, use Lucide directly (`lucide-react`, `lucide-vue-next`, `lucide` or the SF Symbols equivalents) with `strokeWidth={1.5}` instead of copying these files.
 
-Use icons only where they help you find something: sidebar nav, toolbar buttons, and inside the Ask bar. **No icons on lecture rows, week cells, section headings or counts.** No sparkle icon for AI.
+Use icons only where they help you find something: sidebar nav, toolbar buttons, the Attach button, menus, the unsorted marker and the Ask bar. **No icons on lecture rows, week cells, section headings or counts.** No sparkle icon for AI.
 
 | File | Lucide name |
 | --- | --- |
@@ -29,5 +29,12 @@ Use icons only where they help you find something: sidebar nav, toolbar buttons,
 | `filter.svg` | `list-filter` |
 | `calendar.svg` | `calendar` |
 | `bookmark.svg` | `bookmark` |
+
+| `paperclip.svg` | `paperclip` |
+| `move.svg` | `folder-input` |
+| `share.svg` | `share` |
+| `trash.svg` | `trash-2` |
+| `check.svg` | `check` |
+| `chevron-left.svg` | `chevron-left` |
 
 The record button and mini recorder draw their dot and stop square in CSS, not with an icon.

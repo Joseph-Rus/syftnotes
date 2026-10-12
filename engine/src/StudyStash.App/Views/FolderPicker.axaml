@@ -1,0 +1,47 @@
+<!-- The folder picker (both looks): where a note goes. A search field that narrows the list as it's typed in,
+     Unsorted, every folder under its group's name with its swatch and how many notes it holds (a check on the one the
+     note is in), and New folder. Arrows move, Return picks, Esc closes. It opens under a Home row's folder label, a
+     note page's breadcrumb and its toolbar's Move. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.FolderPicker"
+             x:DataType="vm:FolderPickerModel">
+  <Border Classes="menu" Width="280" MaxHeight="400">
+    <DockPanel>
+      <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Margin="-2,-2,-2,6" Padding="12,4,8,8">
+        <Grid ColumnDefinitions="Auto,8,*">
+          <c:Icon Glyph="{Binding SearchGlyph}" Size="16" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
+          <TextBox Name="Search" Grid.Column="2" Classes="bare" Height="30" Text="{Binding Query}" PlaceholderText="{Binding Placeholder}"
+                   PlaceholderForeground="{DynamicResource InkSubtle}" FontSize="14" VerticalContentAlignment="Center" AutomationProperties.Name="Search folders" />
+        </Grid>
+      </Border>
+      <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <ItemsControl Name="Rows" ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FolderPick">
+              <Panel>
+                <TextBlock Classes="menu-label" Text="{Binding Shown}" IsVisible="{Binding IsLabel}" />
+                <Border Classes="menu-sep" IsVisible="{Binding IsRule}" />
+                <Button Classes="menu-item" Classes.active="{Binding Active}" Classes.action="{Binding IsNew}" IsVisible="{Binding IsRow}"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="{Binding Said}"
+                        Command="{Binding $parent[UserControl].((vm:FolderPickerModel)DataContext).PickCommand}" CommandParameter="{Binding}">
+                  <Grid ColumnDefinitions="Auto,10,*,10,Auto">
+                    <c:Icon Glyph="inbox" Size="16" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding IsUnsorted}" VerticalAlignment="Center" />
+                    <c:Icon Glyph="add" Size="16" IsVisible="{Binding IsNew}" VerticalAlignment="Center" />
+                    <c:Swatch Fill="{Binding Dot}" IsVisible="{Binding IsFolder}" VerticalAlignment="Center" Margin="3,0" />
+                    <TextBlock Grid.Column="2" Text="{Binding Shown}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="4" Text="{Binding Count}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding ShowCount}"
+                               VerticalAlignment="Center" />
+                    <c:Icon Grid.Column="4" Glyph="check" Size="16" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding Current}" VerticalAlignment="Center" />
+                  </Grid>
+                </Button>
+              </Panel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </DockPanel>
+  </Border>
+</UserControl>

@@ -1,0 +1,108 @@
+<!-- What fills the library window's pane (both looks). One page at a time: Home, Due or a folder's page; a note's page;
+     an assignment; or a class's lists on Canvas, the one place with a list on the left and what's picked from it
+     beside it. With the library away, a plain line says so. A toast at the foot says what was just moved or deleted,
+     with Undo. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.LibraryPages"
+             x:DataType="vm:LibraryModel">
+  <UserControl.Styles>
+    <Style Selector="Border.undo">
+      <Setter Property="Height" Value="44" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+      <Setter Property="Padding" Value="18,0,8,0" />
+      <Setter Property="Background" Value="{DynamicResource Ink}" />
+      <Setter Property="BoxShadow" Value="{DynamicResource ShadowFloat}" />
+    </Style>
+    <Style Selector="Border.undo TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Surface}" />
+    </Style>
+    <Style Selector="Button.undo">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Height" Value="30" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Padding" Value="10,0" />
+    </Style>
+    <!-- The line over a class's Canvas lists: its name, a link back to its page. -->
+    <Style Selector="Button.crumb-link">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    </Style>
+    <Style Selector="Button.crumb-link /template/ Border#PART_Wash">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="Button.crumb-link:pointerover TextBlock">
+      <Setter Property="TextDecorations" Value="Underline" />
+    </Style>
+  </UserControl.Styles>
+
+  <Panel>
+    <Grid ColumnDefinitions="Auto,Auto,*">
+      <!-- A class's lists on Canvas: whose they are (a link back to the class's page), which list, and the list -->
+      <DockPanel Name="CanvasLists" Grid.Column="1" Grid.ColumnSpan="{Binding ColumnSpan}" Width="{Binding ListWidth}" IsVisible="{Binding ShowListColumn}">
+        <StackPanel DockPanel.Dock="Top" Margin="22,6,16,10" Spacing="12">
+          <WrapPanel>
+            <Button Name="CanvasOf" Classes="crumb-link" Margin="0,0,10,0" VerticalAlignment="Center" Command="{Binding OpenFolderCommand}" CommandParameter="{Binding CanvasOf}"
+                    AutomationProperties.Name="{Binding CanvasOfShown}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <c:Swatch Fill="{Binding CanvasDot}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding CanvasOfShown}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="220" />
+              </StackPanel>
+            </Button>
+            <TextBlock Classes="crumb" Text="On Canvas" />
+          </WrapPanel>
+          <Border Classes="seg-group" HorizontalAlignment="Left" DataContext="{Binding CanvasClass}" x:DataType="vm:CanvasClassModel">
+            <StackPanel Orientation="Horizontal">
+              <Button Classes="seg-item" Classes.on="{Binding IsAssignmentsTab}" Content="Assignments" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Assignments}" />
+              <Button Classes="seg-item" Classes.on="{Binding IsModulesTab}" Content="Modules" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Modules}" />
+              <Button Classes="seg-item" Classes.on="{Binding IsAnnouncementsTab}" Content="Announcements" Command="{Binding SelectTabCommand}" CommandParameter="{x:Static vm:ClassTab.Announcements}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+        <c:BySkin Mac="{x:Type v:MacCanvasClass}" Win="{x:Type v:WinCanvasClass}" DataContext="{Binding CanvasClass}" />
+      </DockPanel>
+
+      <!-- Home, Due, or a folder's page: the whole pane -->
+      <Panel Grid.Column="1" Grid.ColumnSpan="2" IsVisible="{Binding ShowOverview}">
+        <v:Overview Name="Overview" DataContext="{Binding Overview}" />
+      </Panel>
+
+      <!-- What's open: a note, an assignment, or a Canvas page (beside Canvas's lists, or the whole pane) -->
+      <Panel Name="Detail" Grid.Column="{Binding DetailColumn}" Grid.ColumnSpan="{Binding ColumnSpan}" IsVisible="{Binding ShowDetailColumn}">
+        <Border Width="1" Background="{DynamicResource Line}" HorizontalAlignment="Left" IsVisible="{Binding ShowListColumn}" />
+        <Panel IsVisible="{Binding ShowAssignment}" Margin="1,0,0,0">
+          <c:BySkin Name="Assignment" Mac="{x:Type v:MacAssignment}" Win="{x:Type v:WinAssignment}" ViewClasses="inwindow" DataContext="{Binding Assignment}" />
+        </Panel>
+        <Panel IsVisible="{Binding ShowReader}" Margin="1,0,0,0">
+          <c:BySkin Name="Reader" Mac="{x:Type v:MacCanvasReader}" Win="{x:Type v:WinCanvasReader}" DataContext="{Binding Reader}" />
+        </Panel>
+        <v:NotePage Name="NotePage" IsVisible="{Binding ShowNotePage}" />
+        <TextBlock Name="CanvasHint" IsVisible="{Binding ShowCanvasHint}" Text="Choose something from the list to read it here." FontSize="14.5" Foreground="{DynamicResource InkSubtle}"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+        <!-- The library can't be read: why, in a sentence -->
+        <TextBlock Name="Empty" Classes="empty" IsVisible="{Binding ShowEmpty}" Text="{Binding Empty}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" />
+        <!-- Narrow: back to the list -->
+        <Button Classes="icon-btn" IsVisible="{Binding NarrowDetail}" Command="{Binding BackCommand}" ToolTip.Tip="Back to the list" AutomationProperties.Name="Back to the list"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,4,0,0">
+          <c:Icon Glyph="arrow_back" Size="18" />
+        </Button>
+      </Panel>
+    </Grid>
+
+    <!-- "Moved to Machine Learning. Undo", "Deleted … Undo": for a few seconds after -->
+    <Border Name="UndoToast" Classes="undo" IsVisible="{Binding HasToast}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="16,0,16,92">
+      <Grid ColumnDefinitions="*,10,Auto" VerticalAlignment="Center">
+        <TextBlock Name="ToastSaid" Text="{Binding ToastSaid}" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="420" />
+        <Button Grid.Column="2" Name="Undo" Classes="undo" Command="{Binding UndoToastCommand}" VerticalAlignment="Center">
+          <TextBlock Text="Undo" FontSize="14" FontWeight="Bold" />
+        </Button>
+      </Grid>
+    </Border>
+  </Panel>
+</UserControl>

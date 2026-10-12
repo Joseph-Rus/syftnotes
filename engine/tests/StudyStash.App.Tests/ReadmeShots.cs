@@ -100,8 +100,8 @@ public class ReadmeShots
 
     static void Heart(ThemeVariant t)
     {
-        var model = Bio110("The heart, chamber by chamber", "Tue 30 Sep · 58 min", "Blood passes through the heart twice on every lap of the body.");
-        model.Note = new NoteModel { ClassName = "BIO 110", Dot = Skin.ClassDot(1), Meta = "BIO 110 · Tuesday 30 September · 58 min", Title = "The heart, chamber by chamber", Markdown = HeartLecture() };
+        var model = RichShots.CardiacLibrary();
+        model.Note = new NoteModel { ClassName = "BIO 110", Dot = Skin.ClassDot(1), When = "Tuesday 30 September at 11:00 AM, 58 min", Title = "The heart, chamber by chamber", Markdown = HeartLecture() }.Titled();
         model.Diagrams = new Lecture();
         var window = Stage(new MacLibrary { DataContext = model }, t);
         var figure = window.GetVisualDescendants().OfType<SvgView>().Single();
@@ -121,16 +121,9 @@ public class ReadmeShots
     static void Plot(ThemeVariant t)
     {
         var model = RichShots.CardiacLibrary();
-        model.ClassTitle = "CSCI 4220";
-        model.ClassCount = "14 lectures";
         foreach (var c in model.Classes) c.Selected = false;
         model.Classes.Insert(0, new ClassItem { Name = "CSCI 4220", Dot = Skin.ClassDot(4), Count = 14, Selected = true });
-        model.Groups.Clear();
-        var week = new LectureGroup { Label = "This week", First = true };
-        week.Items.Add(new LectureCard { Title = "Logistic regression", Meta = "Mon 28 Sep · 52 min", Summary = "A linear score squashed into a probability, fitted by gradient descent.", Selected = true });
-        week.Items.Add(new LectureCard { Title = "Linear regression", Meta = "Wed 23 Sep · 50 min", Summary = "Fitting a line by least squares, and what the residuals say.", Last = true });
-        model.Groups.Add(week);
-        model.Note = new NoteModel { ClassName = "CSCI 4220", Dot = Skin.ClassDot(4), Meta = "CSCI 4220 · Monday 28 September · 52 min", Title = "Logistic regression", Markdown = PlotShots.MlLecture };
+        model.Note = new NoteModel { ClassName = "CSCI 4220", Dot = Skin.ClassDot(4), When = "Monday 28 September at 9:30 AM, 52 min", Title = "Logistic regression", Markdown = PlotShots.MlLecture }.Titled();
         model.Diagrams = new Lecture();
         var window = Stage(new MacLibrary { DataContext = model }, t);
         var plot = window.GetVisualDescendants().OfType<PlotView>().First();
@@ -153,19 +146,6 @@ public class ReadmeShots
     static void Home(ThemeVariant t) => Save("home", t, Stage(new MacLibrary { DataContext = Demo.Overview() }, t));
 
     // --- the stage ---------------------------------------------------------------------------------------------------
-
-    /// <summary>BIO 110's sidebar and lecture list, the lecture named first open.</summary>
-    static LibraryModel Bio110(string title, string meta, string summary)
-    {
-        var m = RichShots.CardiacLibrary();
-        m.Groups.Clear();
-        var week = new LectureGroup { Label = "This week", First = true };
-        week.Items.Add(new LectureCard { Title = title, Meta = meta, Summary = summary, Selected = true });
-        week.Items.Add(new LectureCard { Title = RichDemo.LectureTitle, Meta = "Tue 23 Sep · 1 h 12 min", Summary = "The heart moves blood in one continuous cycle, once a beat." });
-        week.Items.Add(new LectureCard { Title = "Blood pressure and perfusion", Meta = "Thu 18 Sep · 1 h 05 min", Summary = "How the body keeps blood moving when pressure drops.", Last = true });
-        m.Groups.Add(week);
-        return m;
-    }
 
     /// <summary>A lecture that can be asked about and has a transcript, so a figure's own buttons all show.</summary>
     sealed class Lecture : IDiagramHost

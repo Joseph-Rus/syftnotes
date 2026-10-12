@@ -57,6 +57,26 @@ public static partial class Summarize
         Three to five numbered questions a student should be able to answer after this lecture.
         """.ReplaceLineEndings("\n");
 
+    /// <summary>The notes' shape when the student typed notes of their own while the lecture recorded: their lines
+    /// are the outline, kept word for word and marked as theirs (==like this==, which reads as a highlighter's mark
+    /// in any Markdown app), with what the lecture said added round them.</summary>
+    public static readonly string AroundTyped = """
+        The student typed their own notes during the lecture. Write the study notes around them, in this shape:
+
+        ## Summary
+        Two to four sentences: what the lecture covered and how it fits the course.
+
+        Then the student's notes, as the outline of everything after the summary:
+        - Keep every line the student typed, word for word and in the order they typed it. A line they typed as a heading stays a heading (##); every other line of theirs starts a bullet of its own.
+        - Wrap each thing the student typed in double equals signs, ==exactly as they typed it==, and wrap nothing else in them: those marks are how the student's words are told from yours.
+        - After a line of the student's, on the same bullet, add what the lecture said about it, in a sentence or two.
+        - Where the lecture covered something that matters and the student wrote nothing, add bullets of your own, and sections under headings of your own, in the order it was taught.
+        - If the lecture has enough for them, end with "## Questions to review": three to five numbered questions.
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>The marks round what the student typed, in the notes: Markdown's own "highlight".</summary>
+    public const string Mark = "==";
+
     public static readonly string Rules = """
         Rules:
         - Use only what is in the transcript. Never invent facts, dates, or examples.
@@ -332,7 +352,20 @@ public static partial class Summarize
 
     public static string WholePrompt(Meeting m, string transcript, Drawings drawings = Drawings.Flowcharts, string attached = "") =>
         "You are an expert note-taker for university lectures. Write study notes for this lecture "
-        + $"from its transcript.\n\n{Structure}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{AttachedPart(attached)}\n\nTranscript:\n{transcript}";
+        + $"from its transcript.\n\n{Shape(m)}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}\n\nTranscript:\n{transcript}";
+
+    /// <summary>What the student typed during the lecture, as they typed it (never more than a few pages of it).</summary>
+    public static string Typed(Meeting m) => Py.Head(Py.Strip(m.PrivateNotes), MaxTypedChars);
+
+    /// <summary>How much of what the student typed the notes are written round: well past a lecture's worth of typing.</summary>
+    public const int MaxTypedChars = 8000;
+
+    /// <summary>The notes' sections: the usual ones, or the student's own outline when they typed one.</summary>
+    static string Shape(Meeting m) => Typed(m).Length > 0 ? AroundTyped : Structure;
+
+    /// <summary>What the student typed, under its own heading, for the notes to be written round; nothing when they typed nothing.</summary>
+    static string TypedPart(Meeting m) => Typed(m).Length == 0 ? ""
+        : "\n\nThe student's own notes, typed during the lecture (keep every line, marked with ==, as told above):\n\n" + Typed(m);
 
     /// <summary>What the student attached, under its own heading, for the notes to draw on; nothing when there's none.</summary>
     static string AttachedPart(string attached) => attached.Length == 0 ? ""
@@ -360,7 +393,51 @@ public static partial class Summarize
         string joined = string.Join("\n\n", notes.Select((n, i) => $"### Part {i + 1}\n{n}"));
         return "You are an expert note-taker for university lectures. Below are notes on consecutive parts of one "
             + "lecture. Merge them into one set of study notes, removing repetition and keeping every distinct "
-            + $"fact.\n\n{Structure}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{AttachedPart(attached)}\n\n{joined}";
+            + $"fact.\n\n{Shape(m)}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}\n\n{joined}";
+    }
+
+    [GeneratedRegex(@"^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s+)*")]
+    private static partial Regex LineLead();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex Blanks();
+
+    /// <summary>A typed line down to its words: no heading or bullet marker in front, no marks, one space between words.</summary>
+    static string Words(string line) => Blanks().Replace(LineLead().Replace(line, "").Replace(Mark, ""), " ").Trim();
+
+    /// <summary>
+    /// The notes with every line the student typed in them, marked as theirs, whatever the model did: a line of theirs
+    /// it wrote without the marks gets them, and one it left out altogether is added at the end under "Also in your
+    /// notes". The student's own words are never lost to a model that didn't follow its instructions.
+    /// </summary>
+    public static string KeepTyped(string notes, string typed)
+    {
+        var lines = Py.Strip(typed).Split('\n').Select(Words).Where(l => l.Length > 0).Distinct().ToList();
+        if (lines.Count == 0 || Py.Strip(notes).Length == 0) return notes;
+        var missing = new List<string>();
+        foreach (string line in lines)
+        {
+            if (notes.Contains(Mark + line + Mark, StringComparison.Ordinal)) continue;
+            // There, but unmarked (and not inside a longer mark, or a code or maths span): mark its first appearance.
+            int at = notes.IndexOf(line, StringComparison.Ordinal);
+            if (at >= 0 && !InsideMark(notes, at))
+            {
+                notes = notes[..at] + Mark + line + Mark + notes[(at + line.Length)..];
+                continue;
+            }
+            if (at < 0) missing.Add(line);
+        }
+        if (missing.Count == 0) return notes;
+        return notes.TrimEnd() + "\n\n## Also in your notes\n" + string.Join("\n", missing.Select(l => $"- {Mark}{l}{Mark}")) + "\n";
+    }
+
+    /// <summary>Whether a place in the notes is already between a pair of marks on its line.</summary>
+    static bool InsideMark(string notes, int at)
+    {
+        int lineStart = notes.LastIndexOf('\n', Math.Max(0, at - 1)) + 1;
+        int marks = 0;
+        for (int i = notes.IndexOf(Mark, lineStart, StringComparison.Ordinal); i >= 0 && i < at; i = notes.IndexOf(Mark, i + Mark.Length, StringComparison.Ordinal)) marks++;
+        return marks % 2 == 1;
     }
 
     /// <summary>Our own study notes for a lecture, written from its transcript, drawing what <paramref name="drawings"/>
@@ -374,12 +451,14 @@ public static partial class Summarize
         int budget = TranscriptBudget(ctx);
         // What the student attached takes part of the room (never more than a third), and the transcript the rest.
         string attached = Attachments.Context(m.Attached, Math.Min(Attachments.MaxContextChars, budget / AttachedShare));
-        budget -= attached.Length;
+        budget -= attached.Length + Typed(m).Length;
         string text = Py.Strip(TimedText.Plain(m.Transcript)); // a recording's times would only distract the model
         // A transcript that says who's speaking says what that means, once, before the words (and in each part of a long one).
         string hint = Speakers.HasLabels(text) ? Speakers.NotesHint + "\n\n" : "";
         text = hint + text;
-        Task<string> Repaired(string notes) => RepairDiagramsAsync(notes, prompt => chat(cfg, model, prompt, ctx));
+        // What the student typed is in the notes that come back, marked as theirs, whatever the model made of the asking.
+        string typed = Typed(m);
+        async Task<string> Repaired(string notes) => KeepTyped(await RepairDiagramsAsync(notes, prompt => chat(cfg, model, prompt, ctx)), typed);
         if (text.Length <= budget) return await Repaired(CleanOutput(await chat(cfg, model, WholePrompt(m, text, drawings, attached), ctx)));
         var parts = SplitTranscript(text[hint.Length..], budget).Select(part => hint + part).ToList();
         var notes = new List<string>();

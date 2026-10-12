@@ -84,13 +84,13 @@ public class MenuPickTests
             var chip = bar.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is MenuFlyout);
             var menu = OpenFlyout(chip);
             Assert.True(Checked(Item(menu, "This lecture")));
-            Click(Item(menu, "This class"));
+            Click(Item(menu, "This folder"));
             Assert.Equal("class", m.Scope);
-            Assert.Contains(chip.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "This class");
+            Assert.Contains(chip.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "This folder");
             Assert.False(chip.Flyout!.IsOpen);
 
             menu = OpenFlyout(chip);
-            Assert.True(Checked(Item(menu, "This class")));
+            Assert.True(Checked(Item(menu, "This folder")));
             Assert.False(Checked(Item(menu, "This lecture")));
         }
         finally

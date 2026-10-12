@@ -738,6 +738,33 @@ public sealed partial class Store : IDisposable
         }
     }
 
+    /// <summary>What became of renaming a lecture.</summary>
+    public enum Renamed { Done, Gone, Busy }
+
+    /// <summary>
+    /// The student gives a lecture a title of their own: it's the lecture's from now on (its note file is written
+    /// again under the new name), and writing the notes again never changes it back. Not while the library is still
+    /// writing that lecture's notes: it would write its own title over this one as it finished.
+    /// </summary>
+    public Renamed SetTitle(string noteId, string title)
+    {
+        lock (gate)
+        {
+            var row = Get(noteId);
+            if (row is null) return Renamed.Gone;
+            if (row.Status is Queued or Working) return Renamed.Busy;
+            string? old = string.IsNullOrEmpty(row.MdPath) ? null : row.MdPath;
+            var m = Meeting(row);
+            m.Title = title;
+            m.Raw[Core.Meeting.TitleBy] = Core.Meeting.ByHand;
+            var c = new Classification(string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName, row.Confidence ?? 0,
+                row.ClassifiedBy ?? "", title, JsonList(row.Topics));
+            string path = Save(m, c, row.SummaryMd ?? "", row.SummaryModel ?? "", row.Error ?? "");
+            DropEmptyDir(old, path);
+            return Renamed.Done;
+        }
+    }
+
     /// <summary>The folder a class's lectures (and its Canvas files) live in, without making it.</summary>
     public string ClassFolder(string className) => Path.Combine(PoolDir, Notes.Slugify(className, 60));
 

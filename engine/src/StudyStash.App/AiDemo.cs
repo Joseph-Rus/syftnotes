@@ -70,10 +70,10 @@ public static class AiDemo
     public static IAiLibrary DemoLibrary() => new Library(Overview(), id => new RewriteInfo(id, "none"));
 
     /// <summary>A lecture's notes as the full app shows them before any rewrite: written by Ollama.</summary>
-    public static AiNotesModel LectureNotes(string markdown)
+    public static AiNotesModel LectureNotes(string markdown, string writer = "Ollama")
     {
         var m = new AiNotesModel(DemoLibrary());
-        m.Load(LectureId, markdown, "Ollama", Now).GetAwaiter().GetResult();
+        m.Load(LectureId, markdown, writer, Now).GetAwaiter().GetResult();
         return m;
     }
 

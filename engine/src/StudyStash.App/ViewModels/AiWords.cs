@@ -219,13 +219,17 @@ public static partial class AiWords
         : state == "not_signed_in" ? "Not signed in"
         : "";
 
-    /// <summary>The ask field's placeholder for a scope: This lecture/class/all your classes.</summary>
-    public static string AskPlaceholder(string scope) => scope switch
+    /// <summary>The ask field's placeholder for a scope: this lecture (or meeting, or recording), its folder by name,
+    /// or everything.</summary>
+    public static string AskPlaceholder(string scope, string noun = Nouns.Lecture, string? folder = null) => scope switch
     {
-        "class" => "Ask anything about this class",
-        "all" => "Ask anything about your lectures",
-        _ => "Ask anything about this lecture",
+        "class" => $"Ask about {folder ?? "this folder"}",
+        "all" => "Ask anything about your notes",
+        _ => $"Ask about this {noun}",
     };
+
+    /// <summary>The ask field while a lecture records: there's no lecture yet, only what's been heard.</summary>
+    public const string AskLive = "Ask about what's been said so far";
 
     /// <summary>While waiting: "Asking Claude Code…".</summary>
     public static string Thinking(string engineName) => $"Asking {engineName}…";

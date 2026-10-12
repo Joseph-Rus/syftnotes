@@ -55,9 +55,25 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     /// <summary>What the notes area shows: the draft once it's ready (or while comparing), the current notes
     /// otherwise — either way with a leading "Summary" heading dropped, since the header row already says it.</summary>
-    public string ShownMarkdown => State is RewriteState.Ready or RewriteState.Comparing ? DraftBody : CurrentBody;
+    public string ShownMarkdown => State is RewriteState.Ready or RewriteState.Comparing ? DraftBody
+        : OnlyMine && HasMine ? TypedNotes.Only(CurrentBody) : CurrentBody;
+
+    /// <summary>"Only my notes": what the student typed, and nothing that was added from the recording.</summary>
+    [ObservableProperty] public partial bool OnlyMine { get; set; }
+    partial void OnOnlyMineChanged(bool value) => OnPropertyChanged(nameof(ShownMarkdown));
+    /// <summary>Some of the notes are the student's own words (typed while recording, or changed by hand since).</summary>
+    public bool HasMine => TypedNotes.HasMarks(CurrentMarkdown);
+    /// <summary>Who wrote the rest, as the line over the notes names them ("Claude"); "" for an older lecture that doesn't say.</summary>
+    public string Writer { get; private set; } = "";
+    /// <summary>The line over the notes saying whose words are whose: with some of the student's, "What you wrote" in
+    /// ink beside "Added by Claude from the recording" in grey; with none, just who wrote them.</summary>
+    public string LegendAi => (HasMine ? "Added" : "Written") + (Writer.Length > 0 ? $" by {Writer}" : "") + " from the recording";
+    [RelayCommand] void ToggleOnlyMine() => OnlyMine = !OnlyMine;
     public string ShownByline => State is RewriteState.Ready or RewriteState.Comparing ? DraftByline
         : DiagramsLine.Length == 0 ? CurrentByline : CurrentByline.Length == 0 ? DiagramsLine : $"{CurrentByline} · {DiagramsLine}";
+
+    /// <summary>Who wrote the notes and when, on hover over the line that says whose words are whose.</summary>
+    public string? BylineTip => ShownByline.Length > 0 ? ShownByline : null;
 
     /// <summary>"Adding diagrams…" while the library adds the current notes' diagrams (they follow the notes by a few
     /// minutes), "Diagrams added" once they've appeared, until the lecture is left; "" otherwise. On the byline.</summary>
@@ -66,7 +82,11 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     /// <summary>The notes when the diagrams were first seen on their way: different once they're in.</summary>
     string beforeDiagrams = "";
 
-    partial void OnDiagramsLineChanged(string value) => OnPropertyChanged(nameof(ShownByline));
+    partial void OnDiagramsLineChanged(string value)
+    {
+        OnPropertyChanged(nameof(ShownByline));
+        OnPropertyChanged(nameof(BylineTip));
+    }
     /// <summary>The current and draft notes, each with a leading "Summary" heading dropped: what the compare
     /// view's two columns show side by side.</summary>
     public string CurrentBody => AiWords.DropLeadingSummary(CurrentMarkdown);
@@ -108,6 +128,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(ShownMarkdown));
         OnPropertyChanged(nameof(ShownByline));
+        OnPropertyChanged(nameof(BylineTip));
         OnPropertyChanged(nameof(ShowRewriteButton));
         OnPropertyChanged(nameof(ShowEditButton));
         OnPropertyChanged(nameof(ShowNotes));
@@ -152,9 +173,13 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         CurrentMarkdown = markdown;
         CurrentByline = AiWords.WrittenByline(engineName, updatedAt);
         WriterId = FindEngineId(engineName);
+        Writer = engineName;
         OnPropertyChanged(nameof(CurrentBody));
+        OnPropertyChanged(nameof(HasMine));
+        OnPropertyChanged(nameof(LegendAi));
         OnPropertyChanged(nameof(ShownMarkdown));
         OnPropertyChanged(nameof(ShownByline));
+        OnPropertyChanged(nameof(BylineTip));
         // Notes that changed under an editor nobody has typed in yet: it starts again from them. Typed in, it keeps
         // the student's words, and Save hears from the library that the notes changed.
         if (changed && Editing && !EditDirty) BeginEdit();
@@ -421,7 +446,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     /// <summary>The notes have diagrams, each a "[Diagram 1]" line in the editor: it says what those lines are.</summary>
     public bool EditHasDiagrams => edit?.HasDiagrams == true;
     /// <summary>Something's been typed that isn't saved: the host keeps these notes when their lecture is left.</summary>
-    public bool EditDirty => Editing && edit is not null && EditText.ReplaceLineEndings("\n") != edit.Text;
+    public bool EditDirty => Editing && edit is not null && EditText.ReplaceLineEndings("\n") != editStart;
     public bool CanSaveEdit => !Busy && EditText.Trim().Length > 0;
 
     partial void OnEditingChanged(bool value)
@@ -442,11 +467,16 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     partial void OnBusyChanged(bool value) => OnPropertyChanged(nameof(CanSaveEdit));
 
+    /// <summary>The editor's text as the edit began: the notes without the marks round the student's own words (they
+    /// read as they do on the page; <see cref="TypedNotes.Remark"/> puts the marks back when it's saved).</summary>
+    string editStart = "";
+
     void BeginEdit()
     {
         editFrom = CurrentMarkdown;
         edit = NoteEdit.Begin(CurrentBody);
-        EditText = edit.Text;
+        editStart = TypedNotes.Unmarked(edit.Text);
+        EditText = editStart;
         OnPropertyChanged(nameof(EditHasDiagrams));
         OnPropertyChanged(nameof(EditDirty));
     }
@@ -471,6 +501,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         if (Editing || State != RewriteState.Idle) return;
         editFrom = from;
         edit = NoteEdit.Begin(AiWords.DropLeadingSummary(from));
+        editStart = TypedNotes.Unmarked(edit.Text);
         EditProblem = "";
         EditText = text;
         Editing = true;
@@ -504,7 +535,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         {
             // The leading "Summary" heading the editor leaves out goes back as it was.
             string head = editFrom[..(editFrom.Length - AiWords.DropLeadingSummary(editFrom).Length)];
-            var info = await library.EditNotesAsync(LectureId, head + edit.End(EditText), Notes.Fingerprint(editFrom));
+            // A line left as it was keeps whose it was; one the student changed or added is theirs.
+            var info = await library.EditNotesAsync(LectureId, head + edit.End(TypedNotes.Remark(EditText, edit.Text)), Notes.Fingerprint(editFrom));
             if (info is null)
             {
                 OlderLibrary = true;

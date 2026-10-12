@@ -1,189 +1,244 @@
-# Semester UI redesign: handoff for Claude Code
+# Semester UI redesign: handoff for Claude Code (v2)
 
-This folder is the complete spec for restyling the app's interface. It changes how things **look and are laid out**, not what the app does: keep all data loading, recording, Canvas sync and AI logic exactly as it is.
+This folder is the complete spec for restyling and restructuring the app's interface. It covers **how things look, where they live, and a few new interactions**: taking notes while recording, starting a recording from Coming up, and a calendar for deadlines. Keep the existing recording, transcription, Canvas sync and AI pipelines; extend them only where section 6 says so.
 
 ```
 semester-ui-handoff/
 ├── README.md              ← this spec (read all of it first)
+├── PROMPT.md              ← what to paste into Claude Code
 ├── tokens/
 │   ├── tokens.css         ← every color, type style, space and radius, light + dark
-│   └── tokens.json        ← same values for non-CSS code (Swift, etc.)
-├── reference/
-│   ├── home.html          ← the Home screen, built and working; open it in a browser
+│   └── tokens.json        ← same values for non-CSS code
+├── reference/             ← working HTML for every screen; open in a browser, add ?theme=dark
+│   ├── home.html          ← Home: Up next + one notes list
+│   ├── home-filter.html   ← Home with the notes filter open
+│   ├── home-move.html     ← Home with the folder picker open on a note
+│   ├── due.html           ← Due: month calendar
+│   ├── folder-class.html  ← a class folder (Machine Learning)
+│   ├── folder-club.html   ← a non-class folder (ACM), showing "meetings"
+│   ├── note.html          ← a lecture after recording: your notes merged with Claude's write-up
+│   ├── recording.html     ← the same page while recording and taking notes
 │   ├── components.html    ← every component in every state
 │   └── semester.css       ← the reference implementation of each component
-├── screenshots/           ← home + components, light + dark (2x)
-├── icons/                 ← the 22 icons used, Lucide 1.5 stroke, currentColor
+├── screenshots/           ← every reference page, light + dark (2x)
+├── icons/                 ← Lucide icons used, 1.5 stroke, currentColor
 └── fonts/                 ← Atkinson Hyperlegible Next (variable woff2) + OFL license
 ```
 
-`reference/home.html` and `screenshots/home-light.png` are the source of truth for the look. When this README and the reference disagree, the reference wins. Open `reference/*.html?theme=dark` for dark mode.
+**The reference pages and screenshots are the source of truth for the look.** When this README and a reference page disagree, the reference wins. Use the light and dark themes, following the system setting, with an override in Settings.
 
 ---
 
 ## 1. How to do the work
 
-1. **Read the codebase first.** Find the UI framework, where styles live (CSS files, Tailwind config, CSS-in-JS theme, SwiftUI modifiers), and the components that render: the sidebar, the Home screen (greeting, stat tiles, Recent lectures, Due soon, class cards), the record button, the floating recorder, and the Ask bar.
-2. **Install the foundations.** Copy `fonts/` into the app's assets and load `tokens/tokens.css` once at the root (or port `tokens.json` into the existing theme object or Tailwind `theme.extend`). Keep the token names, so the reference CSS can be ported directly.
-3. **Delete the old look.** Remove the old colors, shadows, font stacks and one-off styles as you replace each component. Don't leave two systems running side by side.
-4. **Rebuild components one at a time** against `reference/semester.css` and `reference/components.html`, in this order: sidebar → page header and record button → week planner → lecture list → Ask bar → mini recorder → other screens.
-5. **Check each step visually.** Run the app (or a Storybook/preview) in light and dark, screenshot it, and compare against `screenshots/`. Fix the differences before moving on.
-6. **Finish with the acceptance checklist** in section 9.
+1. **Read the codebase first.** Find the UI framework, where styles and theme values live, and the screens: sidebar, Home, Due, class page (including its hidden "class home" second layout), lecture detail (currently a three-column layout with a lecture list), the record button, the floating recorder, and the Ask bar.
+2. **Install the foundations.** Copy `fonts/` into the app's assets and load `tokens/tokens.css` once at the root (or port `tokens.json` into the existing theme). Keep the token names.
+3. **Restructure navigation** (section 3) before restyling, so you don't style screens that are about to be deleted.
+4. **Rebuild screens one at a time** against `reference/`, in this order: sidebar → Home → folder page → note page → recording → Due calendar → mini recorder.
+5. **Delete the old look as you go.** No leftover colors, shadows, font stacks or unused components.
+6. **Check each step visually.** Run the app in light and dark, screenshot it, and compare against `screenshots/`. Fix the differences before moving on.
+7. **Finish with the acceptance checklist** in section 10.
 
-If the app isn't web-based (e.g. SwiftUI), use `tokens.json` for values, and treat the HTML/CSS as a precise visual spec: same sizes, spacing, weights and colors.
+If the app isn't web-based, use `tokens.json` for values and treat the HTML/CSS as a precise visual spec.
 
 ---
 
 ## 2. What to remove
 
-The current Home screen reads like a generic dashboard template. All of these go:
-
-- **Stat tiles** (12 Lectures / 8 Classes / 10 To hand in / 1 Overdue / 1 Unsorted). Counts live in the sidebar and in one sentence under the date.
-- **The "Good morning" greeting.** The page title is the date.
-- **Colored dots** for classes. Classes are shown with highlighter swipes (section 4).
-- **Icon boxes** on list rows, and icons in tiles, headings or counts.
-- **Pill badges** like "Missing" or "In 2 days". Status is shown by where an item sits in the week, plus plain red text for late items.
-- **Rounded panels inside rounded panels** (the grey "Recent lectures" and "Due soon" boxes).
-- **The full-red "Recording…" button.** Red only fills the record dot.
-- **The sparkle icon and the "Claude" model pill** in the Ask bar. (Model choice can move to settings, or sit in the scope menu.)
-- **Raw LaTeX in summaries** (`$b = Ax + s$`). See section 6.
-- **Registrar suffixes in class names** ("Theory of Computation and Compiler(CSCI4150.A)" → "Theory of Computation and Compilers").
-- **Class cards** at the bottom of Home. The sidebar already lists classes.
+- **All metric tiles,** everywhere: Home, Due, and class pages (e.g. "14 Lectures / 3 To hand in / Mon 12 Oct Last lecture").
+- **The class card grid** at the bottom of pages ("all the classes at the bottom").
+- **The class page's second layout** ("Class home" with Record/Attach, metrics, Recent lectures, To hand in, Coming up, On Canvas) **and the Lectures / Assignments / Modules / Announcements tabs.** These merge into one folder page (section 5.3).
+- **The lecture list column** that appears beside the lecture detail. There is **one sidebar only**. A note page fills the main pane, and Back returns to where you came from.
+- **"Unsorted" in the sidebar.** Unsorted notes live in the Home notes list (section 5.1).
+- **The green filled "selected lecture" card,** the colored dots, the pill badges ("In 6 days", "Missing"), the full-red Record button, the sparkle icon and the "Claude" model pill in the Ask bar.
+- **Raw LaTeX** in summaries, and registrar suffixes in class names.
 
 ---
 
-## 3. Foundations
+## 3. Information architecture
 
-All values are in `tokens/tokens.css`. Rules for using them:
+```
+Sidebar (the only one)
+├── Home              ← Up next + every note, filterable by folder or Unsorted
+├── Due               ← month calendar of deadlines (week view as an option)
+├── Classes           ← folders of kind "class": recordings are called lectures
+├── Clubs             ← folders of kind "club":  recordings are called meetings
+├── Work              ← folders of kind "work":  recordings are called meetings
+└── Coming up         ← next two calendar events; click one to start recording it
+    Library and Canvas sync status
+```
 
-**Surfaces.** The window background is `--color-canvas`. The **sidebar sits directly on the canvas, with no panel behind it**. The main pane is one `--color-surface` sheet with `--radius-pane` and a 1px `--color-line` outline, and no drop shadow. The week grid is `--color-surface-sunken`. Today's column is `--color-surface-today`, lifted with `--shadow-today`. Only the Ask bar and the mini recorder float (`--shadow-float`).
+- **Folder kinds.** Every folder has a `kind`: `class`, `club` or `work` (these are the sidebar groups; users can add folders to any group). A class folder can be linked to a Canvas course.
+- **What a recording is called** depends on its folder:
+  - in a `class` folder → **lecture** ("Lecture, Monday 12 October at 9:30 AM"; section title "Lectures")
+  - in a `club` or `work` folder → **meeting** (section title "Meetings")
+  - not in any folder (unsorted) → **recording** ("Recording, Sat 10 Oct at 4:12 PM")
+  - generic surfaces that mix kinds (Home list, search, the Ask bar on Home) → **notes** ("Notes", "Ask anything about your notes")
 
-**Text.** `--color-ink` for titles, names and anything you act on. `--color-ink-muted` for summaries, dates, inactive nav and class meetings. `--color-ink-subtle` for counts, times, placeholders and the sidebar footer. Every pairing used holds 4.5:1 contrast in both themes.
-
-**Red means recording or late, nothing else.** `--color-record` is the record dot, the live level meter and the "Recorded" dot on a class meeting. `--color-late` is text for late items and the "Late" column heading. Never use red for decoration, links, or errors that aren't about deadlines.
-
-**No accent color.** Links are `--color-ink-muted` with a 2px `--color-line` underline that turns `currentColor` on hover. Focus is a 2px solid `--color-focus` outline, offset 2px.
-
-**Type.** One family, Atkinson Hyperlegible Next (made for legibility, OFL licensed). Weight carries the hierarchy, not size jumps or extra fonts. Use the `--text-*` shorthands: `--text-date` for the page title only, `--text-h2` for section titles, `--text-title` for lecture titles, `--text-due` for assignment names in the week, `--text-meta` / `--text-micro` for supporting text. Use tabular figures everywhere (`font-variant-numeric: tabular-nums`). Sentence case everywhere; **never uppercase labels**.
-
-**Spacing.** 4px base (`--space-*`). Main pane side padding is `--space-14` (56px); sections are 36px apart; the lecture grid uses a 20px gap.
-
-**Radius is nested, not uniform:** controls 8px → today column 10px → week grid and Ask bar 12px → main pane 14px → record button pill. Highlights use their own irregular radius (in `.hl`).
-
-**Motion.** Hover changes color only (120ms). The only looping animation is the live level meter while recording. No entrance animations. Respect `prefers-reduced-motion`.
+  Put this in one helper (e.g. `nounFor(folder)`) and use it everywhere: labels, empty states, aria-labels and toasts.
+- **Routes:** `/home`, `/due`, `/folder/:id`, `/note/:id`. A note page always shows its folder in the breadcrumb; moving a note to another folder updates the noun immediately.
 
 ---
 
-## 4. Class colors (the signature)
+## 4. Foundations
 
-Each class gets one **highlighter color**: yellow, green, pink, blue, orange, violet, teal or lime. It's the one bold element in the UI. Everything else stays black, grey and white.
+All values are in `tokens/tokens.css`.
 
-- **Data:** store a `color` key per class (one of the eight names). Assign in this order as classes are added: yellow, green, orange, pink, blue, teal, violet, lime. Let the user change it in class settings. Persist it.
-- **Highlight** (`<mark class="hl">` inside an element with `data-hl="<color>"`): a marker swipe behind ink text, with irregular rounded corners that continue across line breaks. Use it for assignment names in the week grid and the class name under each lecture title. In dark mode the highlighter colors are deep and the text stays light. That's handled by the tokens, so don't override it.
-- **Swatch** (`.swatch`): a small, slightly rotated mark. Use it next to class names in the sidebar and in class meetings. Swatches use the `--swatch-*` tokens (brighter in dark mode, because no text sits on them).
-- Never use class colors for status, and never fill large areas with them.
+**Surfaces.** Window background `--color-canvas`. The sidebar sits **directly on the canvas** with no panel. The main pane is one `--color-surface` sheet with `--radius-pane` and a 1px `--color-line` outline. The calendar grid is `--color-surface-sunken`; today's cell or column is `--color-surface-today` with `--shadow-today`. Only the Ask bar, menus and the mini recorder float (`--shadow-float`).
 
-Current mapping for the sample data: Chapel blue, Web App Dev green, Theory of Computation yellow, Machine and Deep Learning orange, Data Mining pink, Capstone teal, Internship violet, Personal Projects lime.
+**Text.** `--color-ink` for titles and anything you act on; `--color-ink-muted` for summaries, dates and Claude-written note text; `--color-ink-subtle` for counts, times and placeholders.
+
+**Red means recording or late, nothing else.** `--color-record` is the record dot, the live meter and the recording bar outline. `--color-late` is for "Missing" and "Was due…" text.
+
+**No accent color.** Links are muted text with a 2px `--color-line` underline. Focus is a 2px solid `--color-focus` outline, offset 2px.
+
+**Type.** One family, Atkinson Hyperlegible Next; weight carries the hierarchy. Use the `--text-*` shorthands. Use tabular figures everywhere. Sentence case everywhere, and never uppercase labels.
+
+**Radius is nested:** controls 8 → today cell 10 → panels and Ask bar 12 → main pane 14 → Record and Attach pills.
+
+**Motion.** Hover changes color only (120ms). Looping animation is limited to the recording dot pulse, the level meter and the note caret. Respect `prefers-reduced-motion`.
 
 ---
 
 ## 5. Screens
 
-### App frame
-Window padding 8px, 8px gap between sidebar and pane. Sidebar 244px wide.
+### 5.0 Sidebar (`.sidebar`), see any reference page
+- **Toolbar row:** hide sidebar, back, forward.
+- **Nav:** Home, Due (count of open assignments). The selected item is a white chip with `aria-current="page"`.
+- **Groups:** Classes (with a + Add folder button), Clubs, Work. Each folder shows a swatch in its highlighter color, its name and a count, and opens its folder page.
+- **Coming up** (`.coming`), pinned above the footer: the next two calendar events. Each item shows a swatch, the event title, and when it starts ("Tomorrow 8:45 AM"). **Clicking an item starts recording that event** (section 6.1). There is **no Record button** on these items: the whole item is the button, with a hover fill and a "Click to record" tooltip. An event starting within 15 minutes reads "In 11 minutes" in bold ink (`.is-soon`).
+- **Footer:** "Library on this Mac" and "Canvas synced at 12:58". If sync fails, the second line reads "Canvas sync failed. Retry" in `--color-late`.
 
-### Sidebar (`.sidebar`)
-- **Toolbar row:** hide-sidebar button on the left; back and forward on the right (forward disabled at 40% opacity when there's nowhere to go). Icon buttons are 32px, icons 18px at 1.5 stroke.
-- **Nav:** Home, Due, Unsorted, each with an icon. Counts are right-aligned in `--color-ink-subtle`, with no badge background. The selected item is a white `--color-surface` chip with a 1px line outline, bold text and `aria-current="page"`.
-- **"Classes" heading** in `--text-meta` bold, subtle, sentence case, with a 24px "+" Add class button.
-- **Class items:** swatch, class name (single line with ellipsis; the full name goes in the tooltip) and an optional count of new lectures. **Hide zero counts.**
-- **Footer** at the bottom, two plain lines in `--text-micro`, subtle: "Library on this Mac" and "Canvas synced at 10:18". If sync fails, the second line becomes "Canvas sync failed. Retry" in `--color-late`, with Retry as a link.
+### 5.1 Home (`home.html`, `home-filter.html`)
+- **Header:** today's date as the title; a one-sentence lede with the most urgent things ("Capstone team sync starts in 11 minutes. Reading quiz 6 is due tonight."); the Record button on the right (records into Unsorted unless an event is happening now, in which case it records into that event's folder).
+- **Up next** (`.event` rows): the rest of today's and tomorrow's calendar events, up to 4. Each row shows the time and day, the event title, and its folder as a highlight. If the event title is just the class name, show the class name once, as the highlight. **The whole row is a button: clicking it starts recording** (no separate Record button). Hover fills the row; an event starting within 15 minutes shows "In 11 minutes" under the time, in ink. With no events, show "Nothing on your calendar for the rest of today or tomorrow."
+- **Notes:** every note from every folder, newest first (this replaces "Recent lectures" and the Unsorted page). Rows use `.note`: date | title, folder label, two-line summary | length.
+  - **Change a note's folder right from the list** (like Granola). The folder label under each title is a button (`.folder-pick`): it looks like the plain highlight until you hover the row, when a chevron and a hover fill appear. Clicking it opens the **folder picker** (`.menu--left`, see `home-move.html` and the Folder picker card in `components.html`):
+    - a search field at the top ("Move to folder"), filtering as you type
+    - **Unsorted**, then the folders grouped under Classes, Clubs and Work, each with its swatch and note count, and a check on the current folder
+    - a divider, then **New folder** (creates the folder and moves the note into it)
+    - Picking a folder moves the note immediately, updates the label (and the noun, section 3), and shows a toast: "Moved to Machine Learning. Undo". Keyboard: arrows move, Enter picks, Esc closes. The menu flips upward when there's no room below.
+  - **Unsorted notes** show an inbox icon and "Unsorted" as their folder label (`.unsorted` inside `.folder-pick`); the same picker files them.
+  - **Filter** (`.picker` + `.menu`, top right of the section): "All notes" (default, checked), "Unsorted" with its count, then the folders grouped under Classes, Clubs and Work, each with a chevron. **Picking a folder navigates to that folder's page.** Picking Unsorted filters the list in place, and the button label changes to "Unsorted".
+  - Load more on scroll, 20 at a time.
+- **Ask bar:** "Ask anything about your notes", scope "All notes".
 
-### Main pane toolbar
-Search and Settings icon buttons, top right. Nothing else.
+### 5.2 Due (`due.html`): a calendar, not a list
+- **Header:** title "Due"; the lede names what's most urgent ("Reading quiz 6 is due tonight, and Asynchronous Lecture 5 is still missing."). **No metrics.**
+- **Calendar bar:** previous/next month, the month name, a "Today" button; on the right a class filter ("All classes ⌄") and a Month | Week toggle (`.seg`).
+- **Month grid** (`.cal`): Mon–Sun columns, 5 or 6 rows. Days outside the month show their number in subtle grey; the 1st of a month reads "1 Oct". Today's cell is lifted (`.is-today`) and labeled "Today".
+  - Each assignment is a highlight in its class color (`.cal-item`), one line, truncated with the full title in the tooltip. Show the time only when it isn't 11:59 PM; today's items say "Tonight 11:59 PM".
+  - **Missing** (past due, not submitted): red "Missing" under the title. **Handed in:** struck through in the class swatch color, ink-subtle text.
+  - More than 2 items in a day → show 2, then a "N more" link that opens a small popover listing the rest.
+  - Clicking an item opens the assignment detail (the existing Canvas assignment sheet).
+- **Week view:** the 7-day planner from v1 (deadlines highlighted under each day, class meetings above). Its styles are already in `reference/semester.css` (`.week`, `.day`, `.meeting`, `.deadline`). Build it if there is time; otherwise leave the toggle out.
+- No Ask bar on this page.
 
-### Home: page header
-- Title: today's date in `--text-date`, e.g. "Monday, October 12".
-- **Lede sentence** under it in `--text-lede`, muted: one plain sentence built from the data, covering the most urgent thing first. Examples:
-  - "Two assignments due Wednesday, and one asynchronous lecture still to watch."
-  - "CCHW2 is due tonight at 11:59 PM."
-  - "Nothing due this week."
-  
-  Don't color or bold part of the sentence.
-- **Record button** (`.record`) aligned to the bottom-right of the header (see Recording, section 7).
+### 5.3 Folder page (`folder-class.html`, `folder-club.html`): one page per folder
+This replaces both the class tabs and the "Class home" layout.
+- **Header:** the folder name as the page title, with a highlighter underline in the folder's color (`.folder-title`). The lede for a class reads "CSCI 4220 on Canvas. Meets Monday, Wednesday and Friday at 9:30 AM."; for other folders, "Club meetings, Thursdays at 6:00 PM." On the right: **Attach** (upload audio or a file into this folder) and **Record** (records into this folder).
+- **Main column:** "Lectures" (class) or "Meetings" (club/work), grouped under This week, Last week, then month names. Same `.note` rows as Home, without the folder highlight.
+- **Right rail** (272px, class folders only where data exists):
+  - **Due:** the next 3 assignments for this class (title, then "Sun 18 Oct, in 6 days"; anything due within 7 days in bold ink), and a "See these on the calendar" link that opens Due filtered to this class.
+  - **On Canvas:** links to Assignments, Modules and Announcements. These open Canvas (or the existing in-app Canvas viewer); they are no longer tabs.
+  - **Next class / Next meeting:** "Wednesday at 9:30 AM".
+- **Empty folder:** "No lectures yet. Record one here, or attach a recording." (Use "meetings" for club and work folders.)
+- **Ask bar:** "Ask about Machine Learning", scope set to this folder.
 
-### Home: "This week" planner (`.week`)
-This replaces both the stat tiles and the "Due soon" list. It's the main thing on Home.
-- **Columns:** an optional **Late** column first (only when something is overdue and not handed in), then Mon–Fri, then Sat and Sun at 0.8 width. Grid: `1.15fr repeat(5, 1fr) .8fr .8fr` (`.week--no-late` drops the first column).
-- **Day header:** day name (`Today` for the current day) on the left, date number on the right in `--text-daynum`. The Late column has no number, and its heading is in `--color-late`.
-- **Today** is lifted out of the grid: `--color-surface-today`, `--radius-day`, `--shadow-today`, extending 4px above and below.
-- **Class meetings** (`.meetings`) at the top of each day: time in `--text-micro` subtle, then swatch and short class name. A meeting that was recorded shows a 6px red dot and "Recorded" after the time. **If the app has no class schedule data, leave out meetings entirely**; don't invent them.
-- **Deadlines** (`.deadlines`) below a hairline: assignment name in a highlight with the class color, and the due time below in `--text-micro` ("11:59 PM"). In the Late column the line under the name reads "Was due Mon 5" in `--color-late`. A handed-in item stays on its day, struck through in its swatch color, with "Handed in" below.
-- Clicking a deadline opens it (same behavior as the current Due soon rows). On hover, an ink outline appears around the highlight.
-- When there are more than 4 deadlines on one day, show 3 and a "+2 more" text link.
+### 5.4 Note page (`note.html`): a lecture, meeting or recording
+- **No second list column.** The page fills the main pane. The toolbar adds a group of page actions: Move to folder, Share, Delete.
+- **Breadcrumb:** the folder swatch and name (a link to the folder), a small chevron button that opens the same folder picker, then "Lecture, Monday 12 October at 9:30 AM, 52 min" (noun from section 3).
+- **Title:** editable in place (`contenteditable` or an input styled as `.doc-title`).
+- **Tabs:** Notes | Transcript. On the right: an "Only my notes" switch and Attach.
+- **Notes** (`.notes`): one document that merges what the user typed with what Claude wrote from the recording (section 6.2).
+  - User-typed text: `.mine`, ink, weight 600. Claude's text: `.ai`, `--color-ink-muted`, weight 400.
+  - A legend line at the top: "What you wrote" / "Added by Claude from the recording".
+  - "Only my notes" hides `.ai`.
+  - The whole document stays editable. Text the user edits or types becomes `.mine`.
+  - Render math with KaTeX. Readable width: 68ch, 16px, line height 1.65.
+- **Transcript tab:** speaker-labeled paragraphs with timestamps; clicking a timestamp plays from there (keep the existing player).
+- **Ask bar:** "Ask about this lecture" (noun per folder), scope "This lecture".
 
-### Home: "Recent lectures" (`.lecture`)
-- **Section head:** "Recent lectures" on the left; on the right a text link that names the total, e.g. "All 12 lectures".
-- **Row grid:** `108px | 1fr | 64px`. The date sits on the left in `--text-meta` bold muted ("Today", "Yesterday", "Wed 7 Oct", "Wed 30 Sep"). The middle holds the title (`--text-title`, wraps), then the class name as a highlight, then a two-line summary clamped at 64ch. Length is right-aligned ("13 min", "1 h 12 min").
-- Rows are separated by 1px `--color-line` hairlines. **No boxes, no icons, no backgrounds.** On hover, the title is underlined.
-- While a summary is being generated, show "Writing summary…" in italic subtle text instead of a badge.
-- Show the 4 most recent.
-
-### Ask bar (`.ask`)
-Docked at the bottom of the main pane, inset 56px from each side and 20px from the bottom, 52px tall, `--radius-panel`, `--shadow-float`. A 120px fade to `--color-surface` sits behind it, so content scrolling underneath doesn't collide with it.
-- **Contents:** text input ("Ask anything about your lectures"), a scope menu button ("All classes ⌄"; on a class page it defaults to that class), and a `⌘J` key hint. When there's text, the key hint swaps for a round ink send button (`.ask-send`) with an up-arrow icon.
-- Focus draws a 1.5px ink ring. ⌘J focuses it from anywhere.
-
-### Other screens
-Apply the same rules to Due, Unsorted and the class pages:
-- **Due:** group by day, with Late first. Each item shows its title in a highlight, the due time, and the class name in muted text. Use the same `.deadline` styling as the week grid, at list width.
-- **Class page:** the title is the class name in `--text-date`, with the code ("CSCI 4150") and meeting times in the lede. Below it: Upcoming deadlines (same as Due, filtered), then Lectures (same rows as Recent lectures, without the class highlight, since you're already on that class).
-- **Unsorted:** lecture rows, with a "Move to class" menu button on each row.
+### 5.5 Recording (`recording.html`)
+When recording starts (from Record, Coming up, Up next or the mini recorder), **open the note page for the new note right away** with:
+- **Recording bar** (`.recbar`) at the top of the page: pulsing red dot, "Recording", level meter, elapsed time, then **Pause** and **Stop** (ink button).
+- **Breadcrumb and title** prefilled from the calendar event ("Machine Learning, Mon 12 Oct"), or "Recording, Mon 12 Oct at 1:45 PM" when there's no event.
+- **Tabs:** Notes | Live transcript.
+- **Notes:** an empty editable document with the cursor in it, and a hint below: "Write as much or as little as you like. When you stop recording, Claude writes up the lecture around your notes." Everything typed here is stored as the user's notes.
+- **Ask bar:** "Ask about what's been said so far".
+- The **mini recorder** (`.mini`) appears when the app window isn't focused, and the main Record button shows its recording state on other pages.
 
 ---
 
-## 6. Content rules
+## 6. New behavior
 
-- **Dates:** "Today", "Yesterday", then "Wed 7 Oct" within the year, then "7 Oct 2025". Due times are "11:59 PM". Never "10/5/2026".
+### 6.1 Start recording from Coming up and Up next
+- Read events from the calendar source the app already uses for "Coming up".
+- **Match each event to a folder:** use an explicit mapping if one exists; otherwise match the event title to a folder name or course code; otherwise Unsorted.
+- **Clicking an event:** create a note in that folder, titled from the event, linked to the event ID; start recording; navigate to its note page (5.5). If a recording is already running, ask first: "Stop recording Data Mining and start Capstone team sync?" (Stop and start / Cancel).
+- Starting from an event more than 15 minutes early is allowed; the button just isn't shown until hover.
+
+### 6.2 Notes merged into the summary (Granola-style)
+- **Store the user's notes separately** from the generated write-up: `note.userNotes` (rich text, as typed, with timestamps per block if available) and `note.enhanced` (the merged document).
+- **When recording stops,** send the transcript plus `userNotes` to the existing summary step, with an instruction like this:
+
+  > Rewrite these notes into a structured write-up of the lecture. Keep every line the user wrote, verbatim and in their order, as headings or bullet starts. Under or after each user line, add the relevant details from the transcript. Add sections for important material the user didn't note. Mark each span as `user` or `ai`.
+
+- **Output format:** a block list, e.g. `[{type: "heading"|"bullet"|"paragraph", spans: [{text, source: "user"|"ai"}]}]`. Render `source: "user"` with `.mine` and `source: "ai"` with `.ai`.
+- **If the user wrote nothing,** generate the write-up as today; it's all `.ai`, and the legend reads only "Written by Claude from the recording".
+- **The note's one-line summary** (used in list rows) comes from the same step.
+- Edits after generation update `enhanced`; edited spans become `user`. "Regenerate" (in a ⋯ menu) rebuilds from `userNotes` + transcript and asks before overwriting edits.
+
+### 6.3 Unsorted and moving notes
+- **Unsorted** = a note with no folder. It shows in the Home list with the inbox marker.
+- **Moving notes:** the folder label on a Home row, the breadcrumb chevron on a note page, and the toolbar Move action all open the same folder picker; dragging a row onto a sidebar folder also works. After a move, show a toast: "Moved to Machine Learning. Undo".
+
+---
+
+## 7. Class colors
+
+Each folder has one **highlighter color**: yellow, green, pink, blue, orange, violet, teal or lime. Store `folder.color`, assign the next unused color on creation, and let the user change it in folder settings. It appears as:
+- the **swatch** in the sidebar, Coming up and the filter menu (`--swatch-*`)
+- the **highlight** behind the folder name in note rows and Up next, and behind assignment names in the calendar (`--hl-*`)
+- the **underline highlight** on the folder page title
+
+Never use folder colors for status, and never fill large areas with them. Sample mapping: Machine Learning blue, Capstone green, Computer Architecture violet, Data Mining orange, Theory of Computation pink, ACM teal, Intellievent yellow, NSWC lime.
+
+---
+
+## 8. Content rules
+
+- **Dates:** "Today", "Yesterday", then "Wed 7 Oct" within the year, then "7 Oct 2025". Times: "9:30 AM", "11:59 PM".
 - **Durations:** "13 min", "1 h 12 min".
-- **Class names:** strip the registrar suffix in parentheses. Keep the code (e.g. "CSCI4150.A" → "CSCI 4150") for class pages and tooltips only. In tight spots (class meetings), use the class's short name: Theory, Web Dev, Deep Learning, Data Mining, Chapel, Capstone. Add an editable `shortName` field per class, defaulting to the first 1–2 words.
-- **Math in summaries:** render `$…$` with KaTeX (or MathJax) inline. If that's not possible, strip the dollar signs and convert simple `^T`, `^2` and `_i` to Unicode (cᵀx, x², xᵢ). Never show raw LaTeX.
-- **Voice:** plain, second person, sentence case, no exclamation marks, no emoji.
+- **Class names:** strip registrar suffixes. Keep the course code for the folder lede and tooltips.
+- **Nouns:** lecture / meeting / recording / notes, per section 3.
+- **Voice:** plain, second person, sentence case, no exclamation marks, no emoji. Ledes are one or two sentences, with the most urgent thing first; never bold or color part of a sentence.
 
 ---
 
-## 7. Recording
+## 9. Accessibility
 
-- **Idle:** `.record`, a white pill with a 1px line outline. Inside: a 40px red dot with a white inner dot, the word "Record", and a `⌘R` hint.
-- **Recording:** add `.is-recording`. The pill outline turns 1.5px `--color-record`; the inner dot morphs into a rounded stop square (200ms); the label becomes the class being recorded (its short name); a five-bar red level meter follows, then the elapsed time ("12:04") in muted text. Clicking stops recording. Use `aria-pressed="true"`, and include the elapsed time in the aria-label.
-- **Paused:** `.is-paused`. The dot becomes a red ring with a red inner dot, and the label reads "Paused" plus the time.
-- **Mini recorder** (the floating "S" widget today): replace it with `.mini`, a white floating pill, 44px tall. Idle, it's just the 32px record dot. Recording, it shows dot (stop) + short class name + meter + time. It keeps its current docking behavior.
-- After a recording stops, the class meeting it belongs to shows "● Recorded" in the week grid, and the lecture appears at the top of Recent lectures with "Writing summary…".
-
----
-
-## 8. Accessibility
-
-- Every icon-only button has an `aria-label` and a matching `title` tooltip (include its shortcut).
-- The week grid is a list (`role="list"` / `listitem`), and each deadline is a link whose accessible name includes its class and due time.
-- Focus is visible everywhere (2px outline). Tab order runs sidebar → toolbar → page → Ask bar.
-- Status never relies on color alone: late items say "Was due…", recorded meetings say "Recorded", handed-in items say "Handed in".
-- Light and dark both follow the system setting, with an override in settings.
+- Icon-only buttons have an `aria-label` and a matching `title` (include the shortcut).
+- Coming up and Up next items are buttons whose label says what happens: "Record Capstone team sync, starts in 11 minutes".
+- The calendar is a grid; each item's accessible name includes its class, due date and state ("Missing", "Handed in").
+- The recording bar is `role="status"`. Pause and Stop are reachable by keyboard; ⌘R toggles recording.
+- Note rows are a single link (the title link stretches over the row), with the folder picker as a separate button inside (`aria-haspopup="menu"`, labeled "In Machine Learning. Change folder").
+- Status never relies on color alone.
 
 ---
 
-## 9. Acceptance checklist
+## 10. Acceptance checklist
 
-- [ ] Home matches `screenshots/home-light.png` and `home-dark.png` in layout, spacing, type and color.
-- [ ] No stat tiles, no greeting, no colored dots, no pill badges, no icon boxes on rows, no sparkle icon, no nested grey panels.
-- [ ] The only fonts loaded are Atkinson Hyperlegible Next and the system fallback.
-- [ ] Every color comes from a token; no hard-coded hex values left in components.
-- [ ] Red appears only for recording and late items.
-- [ ] Each class has a persisted highlighter color, used consistently in the sidebar, week grid, lecture rows and class page.
-- [ ] Class names show without registrar suffixes.
+- [ ] There is one sidebar. No list column beside a note page.
+- [ ] No metric tiles anywhere; no class card grid; no Unsorted item in the sidebar.
+- [ ] A class has exactly one page (no tabs, no "Class home").
+- [ ] Due is a month calendar with Missing and Handed in states, a class filter and month navigation.
+- [ ] Clicking a Coming up or Up next item starts recording into the right folder and opens the note page. Neither shows a separate Record button.
+- [ ] You can type notes while recording; after Stop, the write-up keeps your lines in ink and adds Claude's text in grey; "Only my notes" works.
+- [ ] Nouns follow the folder kind: lecture in classes, meeting in clubs and work, recording when unsorted.
+- [ ] The Home notes filter shows All or Unsorted in place, and navigates when a folder is picked; unsorted rows show the inbox marker.
+- [ ] Clicking the folder label on any Home row opens the folder picker (search, Unsorted, grouped folders with counts, New folder) and moves the note in place, with Undo.
+- [ ] Every screen matches its screenshot in light and dark.
+- [ ] Only Atkinson Hyperlegible Next is loaded; every color comes from a token; red appears only for recording and late items.
 - [ ] Summaries render math, with no `$` visible.
-- [ ] Record button and mini recorder work in idle, recording and paused states, as in `components.html`.
-- [ ] The Ask bar never covers the last lecture row (bottom padding plus fade).
-- [ ] Dark mode is checked on every screen; text contrast holds.
-- [ ] Keyboard: ⌘R toggles recording, ⌘J focuses Ask, ⌘K opens search; focus rings are visible.
-- [ ] Reduced motion stops the level meter animation.
+- [ ] Keyboard: ⌘R record, ⌘J Ask, ⌘K search; focus rings are visible; reduced motion stops looping animation.

@@ -237,8 +237,8 @@ public class WinChromeTests
             var window = new Window { Width = 1280, Height = 800, RequestedThemeVariant = ThemeVariant.Light, Content = view };
             window.Show();
             window.UpdateLayout();
-            var fade = view.FindControl<Border>("Fade")!;
-            var notes = view.FindControl<ScrollViewer>("NoteScroll")!;
+            var fade = view.Part<Border>("Fade");
+            var notes = view.Part<ScrollViewer>("NoteScroll");
             Assert.Null(notes.OpacityMask);
             var gradient = Assert.IsType<LinearGradientBrush>(fade.Background);
             Assert.Equal(0, gradient.GradientStops[0].Color.A);

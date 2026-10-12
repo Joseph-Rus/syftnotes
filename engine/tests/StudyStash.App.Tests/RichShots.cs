@@ -274,19 +274,14 @@ public class RichShots
 
     static IBrush BioDot => Skin.ClassDot(1);
 
-    /// <summary>The sidebar and lecture list around the cardiac-cycle lecture, open on the right.</summary>
+    /// <summary>The sidebar and the cardiac-cycle lecture's page.</summary>
     internal static LibraryModel CardiacLibrary()
     {
-        var m = new LibraryModel { ClassTitle = RichDemo.LectureClassName, ClassCount = "9 lectures", Status = "Library connected", DrawChrome = true };
+        var m = new LibraryModel { Status = "Library connected", DrawChrome = true, UnsortedCount = 1 };
         m.Classes.Add(new ClassItem { Name = "CS 101", Dot = Skin.ClassDot(0), Count = 12 });
         m.Classes.Add(new ClassItem { Name = RichDemo.LectureClassName, Dot = BioDot, Count = 9, Selected = true });
         m.Classes.Add(new ClassItem { Name = "CALC II", Dot = Skin.ClassDot(2), Count = 11 });
-        m.Unsorted = new ClassItem { Name = "Unsorted", IsUnsorted = true, Count = 1 };
-        var week = new LectureGroup { Label = "This week", First = true };
-        week.Items.Add(new LectureCard { Title = RichDemo.LectureTitle, Meta = "Tue 23 Sep · 1 h 12 min", Summary = "The heart moves blood in one continuous cycle, once a beat.", Selected = true });
-        week.Items.Add(new LectureCard { Title = "Blood pressure and perfusion", Meta = "Thu 18 Sep · 1 h 05 min", Summary = "How the body keeps blood moving when pressure drops.", Last = true });
-        m.Groups.Add(week);
-        m.Note = new NoteModel { ClassName = RichDemo.LectureClassName, Dot = BioDot, Meta = RichDemo.LectureMeta, Title = RichDemo.LectureTitle, Markdown = RichDemo.CardiacLecture };
+        m.Note = new NoteModel { ClassName = RichDemo.LectureClassName, Dot = BioDot, When = RichDemo.LectureWhen, Title = RichDemo.LectureTitle, Markdown = RichDemo.CardiacLecture }.Titled();
         var ask = AiDemo.AskIdle();
         ask.ClassName = RichDemo.LectureClassName;
         m.Ask = ask;

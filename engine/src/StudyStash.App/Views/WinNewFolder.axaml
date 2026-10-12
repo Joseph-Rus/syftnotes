@@ -36,7 +36,7 @@
       </Border>
       <StackPanel Spacing="12" Margin="24">
         <TextBlock Text="{Binding NamingFolder.Title, FallbackValue=''}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
-        <TextBlock Text="A folder in the sidebar, beside Classes: for projects, clubs or research." FontSize="14" LineHeight="20" TextWrapping="Wrap" />
+        <TextBlock Text="A group in the sidebar, beside Classes, Clubs and Work: for projects or research. What's recorded in its folders are meetings." FontSize="14" LineHeight="20" TextWrapping="Wrap" />
         <TextBox Name="FolderName" Text="{Binding NamingFolder.Name, FallbackValue=''}" PlaceholderText="Projects" FontSize="14" MaxLength="40">
           <TextBox.KeyBindings>
             <KeyBinding Gesture="Enter" Command="{Binding ConfirmFolderCommand}" />

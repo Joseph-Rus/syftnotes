@@ -71,6 +71,7 @@ public sealed class Highlight : TextBlock
     public static readonly StyledProperty<IBrush?> FillProperty = AvaloniaProperty.Register<Highlight, IBrush?>(nameof(Fill));
     public static readonly StyledProperty<bool> StruckProperty = AvaloniaProperty.Register<Highlight, bool>(nameof(Struck));
     public static readonly StyledProperty<bool> OutlinedProperty = AvaloniaProperty.Register<Highlight, bool>(nameof(Outlined));
+    public static readonly StyledProperty<bool> UnderProperty = AvaloniaProperty.Register<Highlight, bool>(nameof(Under));
 
     /// <summary>How far the swipe runs past the words on each side, and how much of that the words are moved in by:
     /// the rest hangs outside, so a marked line starts level with a plain one beside it. In ems.</summary>
@@ -78,7 +79,7 @@ public sealed class Highlight : TextBlock
 
     readonly ClassShade marker, strike;
 
-    static Highlight() => AffectsRender<Highlight>(FillProperty, StruckProperty, OutlinedProperty);
+    static Highlight() => AffectsRender<Highlight>(FillProperty, StruckProperty, OutlinedProperty, UnderProperty);
 
     public Highlight()
     {
@@ -107,6 +108,14 @@ public sealed class Highlight : TextBlock
         set => SetValue(OutlinedProperty, value);
     }
 
+    /// <summary>A folder's name as its page's title: the marker runs under the words (the lower half of the line),
+    /// square-ended, rather than behind the whole of them.</summary>
+    public bool Under
+    {
+        get => GetValue(UnderProperty);
+        set => SetValue(UnderProperty, value);
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
@@ -115,7 +124,7 @@ public sealed class Highlight : TextBlock
             marker.Follow(Fill);
             strike.Follow(Fill);
         }
-        else if (change.Property == FontSizeProperty) Padding = new Thickness(Inset * FontSize, 0);
+        else if (change.Property == FontSizeProperty || change.Property == UnderProperty) Padding = new Thickness(Under ? 0 : Inset * FontSize, 0);
         else if (change.Property == StruckProperty) Strike();
     }
 
@@ -137,7 +146,12 @@ public sealed class Highlight : TextBlock
             double y = origin.Y;
             foreach (var line in TextLayout.TextLines)
             {
-                if (line.Width > 0)
+                if (line.Width > 0 && Under)
+                {
+                    // From the middle of the type's own box to just above its foot, a little past the words on each side.
+                    context.DrawRectangle(brush, null, new Rect(origin.X + line.Start - 0.04 * em, y + (line.Height - body) / 2 + body * 0.5, line.Width + 0.08 * em, body * 0.4));
+                }
+                else if (line.Width > 0)
                 {
                     double top = y + (line.Height - body) / 2 - 0.04 * em;
                     var rect = new Rect(origin.X + line.Start - Reach * em, top, line.Width + 2 * Reach * em, body + 0.06 * em);

@@ -111,6 +111,12 @@ public class StoreClassifyTests
         var m = GoldenMeeting();
         var classes = GoldenClasses();
         var bare = new Meeting("n") { Title = "T", Date = "2026-09-01" };
+        // (The saved notes prompts are the usual ones, for a lecture the student typed nothing in. This one has typed
+        // notes, which change the notes' shape: TypedNotesTests has those words.)
+        Assert.NotEqual("", m.PrivateNotes);
+        Assert.Contains(m.PrivateNotes.Trim(), Summarize.WholePrompt(m, "TRANSCRIPT"));
+        Assert.Contains(m.PrivateNotes.Trim(), Summarize.MergePrompt(m, ["a", "b", "c"]));
+        m.PrivateNotes = "";
         Assert.Equal(prompts["sort"].S(), Classify.BuildPrompt(m, classes));
         Assert.Equal(prompts["sort_bare"].S(), Classify.BuildPrompt(bare, classes[..1]));
         Assert.Equal(prompts["whole"].S(), Summarize.WholePrompt(m, "TRANSCRIPT"));

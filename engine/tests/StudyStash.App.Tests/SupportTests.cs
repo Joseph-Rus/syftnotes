@@ -165,11 +165,11 @@ public class SupportTests
             Assert.Contains("Maybe later", texts);
             Assert.Contains("Don't ask again", texts);
 
-            // In the list's flow: it ends above the first lecture, so it covers none of them.
-            var firstLecture = view.GetVisualDescendants().OfType<Button>().First(b => b.Classes.Contains("card") && b.DataContext is LectureCard);
+            // In the page's flow on Home: it ends above the first note, so it covers none of them.
+            var firstNote = view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "Row" && b.DataContext is NoteItem);
             double cardBottom = card.TranslatePoint(new Point(0, card.Bounds.Height), view)!.Value.Y;
-            double lectureTop = firstLecture.TranslatePoint(new Point(0, 0), view)!.Value.Y;
-            Assert.True(cardBottom <= lectureTop, $"the card ends at {cardBottom}, below the first lecture's top at {lectureTop}");
+            double noteTop = firstNote.TranslatePoint(new Point(0, 0), view)!.Value.Y;
+            Assert.True(cardBottom <= noteTop, $"the card ends at {cardBottom}, below the first note's top at {noteTop}");
 
             var tip = card.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "Tip");
             tip.Command!.Execute(null);
@@ -207,7 +207,7 @@ public class SupportTests
     [AvaloniaFact]
     public void The_last_ask_offers_no_later()
     {
-        var library = Demo.Library();
+        var library = Demo.Overview(); // the ask shows on Home
         library.AskForSupport(last: true);
         var view = new MacLibrary { DataContext = library };
         var window = new Window { Width = 1280, Height = 800, Content = view };
@@ -256,8 +256,8 @@ public class SupportTests
             var coffee = view.GetVisualDescendants().OfType<Button>().SingleOrDefault(b => b.Name == "Support" && b.IsVisible);
             Assert.NotNull(coffee);
             Assert.Equal("Buy us a coffee", coffee.Content);
-            var recent = view.GetVisualDescendants().OfType<StackPanel>().First(p => p.Name == "Recent");
-            Assert.True(In(coffee, view).Top >= In(recent, view).Bottom, $"{skin}: the link isn't under the lectures");
+            var notes = view.GetVisualDescendants().OfType<StackPanel>().First(p => p.Name == "Notes");
+            Assert.True(In(coffee, view).Top >= In(notes, view).Bottom, $"{skin}: the link isn't under the notes");
             coffee.Command!.Execute(null);
             Assert.Equal(1, pressed);
 

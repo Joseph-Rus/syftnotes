@@ -38,8 +38,8 @@ public class SidebarTests
             window.Show();
             window.UpdateLayout();
 
-            var list = view.FindControl<ScrollViewer>("ClassList")!;
-            var status = view.FindControl<ItemsControl>("StatusRow")!;
+            var list = view.Part<ScrollViewer>("ClassList");
+            var status = view.Part<ItemsControl>("StatusRow");
             // Whatever doesn't fit scrolls, inside the list: nothing of it reaches the status lines.
             var last = list.GetVisualDescendants().OfType<TextBlock>().Last(t => t.Classes.Contains("name"));
             bool fits = In(last, view).Bottom <= In(list, view).Bottom + 0.5;
@@ -68,15 +68,11 @@ public class SidebarTests
             Assert.NotEmpty(counts);
             Assert.True(counts.Max() - counts.Min() < 0.5, $"{skin}: the counts end {counts.Min():0.#}–{counts.Max():0.#}");
 
-            var title = view.FindControl<TextBlock>("ListTitle")!;
-            var column = title.GetVisualParent()!;
-            Assert.True(title.Bounds.Right <= column.Bounds.Width + 0.5, $"{skin}: the list's header runs past its column");
-            var lines = title.TextLayout.TextLines;
-            Assert.True(lines.Count <= 2, $"{skin}: the header takes {lines.Count} lines");
-            Assert.True(lines.All(l => l.WidthIncludingTrailingWhitespace <= title.Bounds.Width + 0.5) || lines[^1].HasCollapsed, $"{skin}: the header is clipped, not wrapped or cut short");
-            // The heading is the name alone; the tooltip of one cut short is the class as the library has it.
+            // The open folder's page: its long name wraps in its own column, without the registrar's code.
+            var title = view.Part<StudyStash.App.Controls.Highlight>("FolderTitle");
             Assert.Equal("Probability and Statistics for Engineers", title.Text);
-            Assert.Equal("Probability and Statistics for Engineers(STAT3110.A)", ToolTip.GetTip(title));
+            Assert.True(In(title, view).Right <= width - 8, $"{skin}: the folder's name runs past the page");
+            Assert.True(title.TextLayout.TextLines.Count <= 3, $"{skin}: the name takes {title.TextLayout.TextLines.Count} lines");
             window.Close();
         }
         finally

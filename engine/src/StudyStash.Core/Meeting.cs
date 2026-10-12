@@ -13,12 +13,21 @@ public sealed class Meeting(string id)
     public List<string> Attendees { get; set; } = [];
     public string Folder { get; set; } = "";
     public string NotesMarkdown { get; set; } = "";
+    /// <summary>What the student typed themselves during the lecture (or brought with it from another app), as they
+    /// typed it. The notes are written around it, each of its lines kept and marked as theirs.</summary>
     public string PrivateNotes { get; set; } = "";
     public string Transcript { get; set; } = "";
     public JsonObject Raw { get; set; } = new();
     /// <summary>What the student attached to the lecture (their own notes, slides, handouts), with the words read from
     /// each: it helps write the notes. Kept by the library, never sent over the wire.</summary>
     public IReadOnlyList<AttachedText> Attached { get; set; } = [];
+
+    /// <summary>In <see cref="Raw"/>: who named the lecture. <see cref="ByHand"/> when the student typed its title (on
+    /// the recording, or renaming it later): then no AI names it from what was said.</summary>
+    public const string TitleBy = "title_by", ByHand = "human";
+
+    /// <summary>The student gave the lecture its title themselves.</summary>
+    public bool TitledByHand => Raw[TitleBy] is JsonValue v && v.TryGetValue(out string? by) && by == ByHand;
 
     /// <summary>dataclasses.replace(m, notes_markdown=...): a copy with other notes.</summary>
     public Meeting WithNotes(string notesMarkdown) => new(Id)

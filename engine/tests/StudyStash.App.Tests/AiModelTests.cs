@@ -87,9 +87,11 @@ public class AiWordsTests
     [Fact]
     public void The_ask_fields_placeholder_follows_the_scope()
     {
-        Assert.Equal("Ask anything about this lecture", AiWords.AskPlaceholder("lecture"));
-        Assert.Equal("Ask anything about this class", AiWords.AskPlaceholder("class"));
-        Assert.Equal("Ask anything about your lectures", AiWords.AskPlaceholder("all"));
+        Assert.Equal("Ask about this lecture", AiWords.AskPlaceholder("lecture"));
+        Assert.Equal("Ask about this meeting", AiWords.AskPlaceholder("lecture", Nouns.Meeting));
+        Assert.Equal("Ask about this folder", AiWords.AskPlaceholder("class"));
+        Assert.Equal("Ask about Machine Learning", AiWords.AskPlaceholder("class", Nouns.Lecture, "Machine Learning"));
+        Assert.Equal("Ask anything about your notes", AiWords.AskPlaceholder("all"));
     }
 
     [Fact]
@@ -1062,7 +1064,8 @@ public class AiNotesModelTests
         await model.SaveEditCommand.ExecuteAsync(null);
 
         var sent = Assert.Single(lib.Edits);
-        Assert.Equal("## Summary\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\nBody text, fixed.\n\nMore.", sent.Markdown);
+        // (The line that was changed is the student's own from now on: it's saved marked as theirs.)
+        Assert.Equal("## Summary\n\n```mermaid\nflowchart LR\n  A --> B\n```\n\n==Body text, fixed.==\n\nMore.", sent.Markdown);
         Assert.Equal(Notes.Fingerprint(notes), sent.BasedOn);
         Assert.False(model.Editing);
         Assert.True(changed);
@@ -1098,7 +1101,7 @@ public class AiNotesModelTests
         await model.SaveEditCommand.ExecuteAsync(null);
 
         Assert.False(model.Editing);
-        Assert.Equal("My own words.", model.ShownMarkdown);
+        Assert.Equal("==My own words.==", model.ShownMarkdown); // saved as the student's own
     }
 
     [AvaloniaFact]
@@ -1131,7 +1134,7 @@ public class AiNotesModelTests
             return new RewriteInfo("lec-1", "none") { Current = Current with { Markdown = markdown } };
         };
         await again.SaveEditCommand.ExecuteAsync(null);
-        Assert.Equal(("# Summary\n\nHalf a sentence I was", Notes.Fingerprint(Current.Markdown)), sent);
+        Assert.Equal(("# Summary\n\n==Half a sentence I was==", Notes.Fingerprint(Current.Markdown)), sent);
         Assert.False(again.Editing);
         Assert.Null(again.Unsaved);
 

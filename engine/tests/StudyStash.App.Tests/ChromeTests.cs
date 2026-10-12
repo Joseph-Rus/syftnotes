@@ -61,8 +61,8 @@ public class ChromeTests
                     if (name == "Mac library")
                     {
                         // The Mac library's bar lies behind the window: the sidebar's toolbar and the page's own are in
-                        // its strip, and the first thing under them (Home's row, the list's title) starts below it.
-                        foreach (string under in new[] { "HomeRow", "ListTitle" })
+                        // its strip, and the first thing under them (Home's row, the line over a note's title) starts below it.
+                        foreach (string under in new[] { "HomeRow", "Crumb" })
                         {
                             var first = root.GetVisualDescendants().OfType<Control>().First(c => c.Name == under);
                             double y = first.TranslatePoint(new Point(0, 0), root)!.Value.Y;
