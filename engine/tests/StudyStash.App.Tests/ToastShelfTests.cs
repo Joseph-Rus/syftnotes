@@ -100,6 +100,46 @@ public class ToastShelfTests
         Assert.True(w.Position.X + w.ClientSize.Width <= Pc.WorkingArea.Right, $"window right {w.Position.X + w.ClientSize.Width}");
     }
 
+    /// <summary>The recorder's window is one size wherever it's dragged: by the menu bar, along an edge, in the corner
+    /// it lives in. A see-through window resized at every step of a drag lagged behind the pointer, and on a Mac left
+    /// the blur off its glass. Its panel still goes right up to every edge, and its window never past one.</summary>
+    [AvaloniaFact]
+    public void A_dragged_panel_keeps_its_window_one_size_right_up_to_every_edge()
+    {
+        ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        var w = new Floating { Content = new Border { Width = 360, Height = 520 }, SteadySize = true };
+        try
+        {
+            var area = MacBook.WorkingArea;
+            int room = (int)Floating.ShadowRoom;
+            w.MoveTo(new PixelPoint(500, 200), area, 1);
+            w.Show();
+            Dispatcher.UIThread.RunJobs();
+            var size = w.ClientSize;
+            Assert.Equal(new Size(360 + 2 * room, 520 + 2 * room), size);
+
+            int right = area.Right - 360, bottom = area.Bottom - 520;
+            // The panel's top left: up to the menu bar a few points at a time, then each edge and corner.
+            var spots = new List<PixelPoint>();
+            for (int y = area.Y + 70; y >= area.Y; y -= 7) spots.Add(new PixelPoint(500, y));
+            for (int x = right - 70; x <= right; x += 7) spots.Add(new PixelPoint(x, area.Y + 10));
+            spots.AddRange([new(area.X, area.Y), new(area.X, 200), new(area.X, bottom), new(500, bottom), new(right, bottom), new(right - 12, area.Y + 10)]);
+            foreach (var spot in spots)
+            {
+                w.MoveTo(new PixelPoint(spot.X - room, spot.Y - room), area, 1);
+                Dispatcher.UIThread.RunJobs();
+                Assert.Equal(new PixelRect(spot.X, spot.Y, 360, 520), w.Panel());
+                Assert.True(size == w.ClientSize, $"panel at {spot}: the window is {w.ClientSize}, not {size}");
+                var window = new PixelRect(w.Position, PixelSize.FromSize(w.ClientSize, 1));
+                Assert.True(area.Contains(window.TopLeft) && window.Right <= area.Right && window.Bottom <= area.Bottom, $"panel at {spot}: the window, {window}, reaches past {area}");
+            }
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
     [AvaloniaFact]
     public void A_floating_panel_meant_just_under_the_menu_bar_lands_there_and_its_room_comes_back_lower_down()
     {
