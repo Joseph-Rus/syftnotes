@@ -1443,6 +1443,106 @@
                 <v:WinPhones DataContext="{Binding Phones}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
               </Panel>
 
+              <!-- Granola: sign in to it (on its own page, in the browser), then the lectures there that Study Stash doesn't
+                   have, each with Transfer, and whether a new one is announced. -->
+              <Panel IsVisible="{Binding OnGranola}">
+                <StackPanel Name="GranolaPage" DataContext="{Binding Granola}" x:DataType="vm:GranolaSettingsModel" Spacing="8">
+                  <TextBlock Classes="h" Text="Granola" />
+                  <TextBlock Classes="body" Text="{x:Static vm:GranolaSettingsModel.About}" TextWrapping="Wrap" />
+                  <Border Classes="group">
+                    <StackPanel>
+                      <!-- Not signed in: Connect, or Cancel while the browser is open on Granola's page -->
+                      <Border Classes="row" IsVisible="{Binding SignedOut}">
+                        <Grid ColumnDefinitions="*,16,Auto">
+                          <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="row-title" Text="Connect Granola" />
+                            <TextBlock Classes="row-sub" Text="{x:Static vm:GranolaSettingsModel.SignInNote}" TextWrapping="Wrap" IsVisible="{Binding !Connecting}" />
+                            <TextBlock Classes="row-sub" Text="Waiting for you to sign in in your browser…" TextWrapping="Wrap" IsVisible="{Binding Connecting}" />
+                          </StackPanel>
+                          <Button Name="GranolaConnect" Grid.Column="2" Classes="pill primary" Command="{Binding ConnectCommand}" IsVisible="{Binding CanConnect}" VerticalAlignment="Center">
+                            <TextBlock Text="Connect" FontWeight="Medium" />
+                          </Button>
+                          <Button Name="GranolaCancel" Grid.Column="2" Classes="pill" Command="{Binding CancelConnectCommand}" IsVisible="{Binding Connecting}" VerticalAlignment="Center">
+                            <TextBlock Text="Cancel" />
+                          </Button>
+                        </Grid>
+                      </Border>
+                      <!-- Signed in: who as, and Disconnect -->
+                      <Border Classes="row" IsVisible="{Binding SignedIn}">
+                        <Grid ColumnDefinitions="*,16,Auto">
+                          <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="row-title" Text="{Binding ConnectedLine}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="row-sub" Text="Study Stash looks for new lectures every few minutes." TextWrapping="Wrap" />
+                          </StackPanel>
+                          <Button Name="GranolaDisconnect" Grid.Column="2" Classes="pill" Command="{Binding DisconnectCommand}" VerticalAlignment="Center">
+                            <TextBlock Text="Disconnect" />
+                          </Button>
+                        </Grid>
+                      </Border>
+                      <Border Classes="rowsep" IsVisible="{Binding SignedIn}" />
+                      <Border Classes="row" IsVisible="{Binding SignedIn}">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Classes="row-title" Text="Tell me when Granola has a new lecture" />
+                            <TextBlock Classes="row-sub" Text="A notification with a Transfer button" />
+                          </StackPanel>
+                          <ToggleButton AutomationProperties.Name="Tell me when Granola has a new lecture" Grid.Column="1" Classes="switch" IsChecked="{Binding Notify}" VerticalAlignment="Center" Margin="12,0,0,0" />
+                        </Grid>
+                      </Border>
+                    </StackPanel>
+                  </Border>
+                  <TextBlock Name="GranolaProblem" Classes="row-sub" Text="{Binding Problem}" IsVisible="{Binding HasProblem}" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" Margin="4,0" />
+
+                  <!-- What's waiting in Granola -->
+                  <StackPanel Spacing="8" IsVisible="{Binding SignedIn}">
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,8,0,0">
+                      <TextBlock Classes="section" Text="In Granola, not in Study Stash" Margin="0" VerticalAlignment="Center" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Name="GranolaLook" Classes="pill" Command="{Binding LookNowCommand}" IsEnabled="{Binding !Looking}">
+                          <TextBlock Text="Look now" FontSize="13" />
+                        </Button>
+                        <Button Name="GranolaTransferAll" Classes="pill primary" Command="{Binding TransferAllCommand}" IsVisible="{Binding HasSeveral}">
+                          <TextBlock Text="Transfer all" FontSize="13" FontWeight="Medium" />
+                        </Button>
+                      </StackPanel>
+                    </Grid>
+                    <Border Classes="group" IsVisible="{Binding NothingWaiting}">
+                      <Border Classes="row">
+                        <TextBlock Classes="row-sub" Text="{x:Static vm:GranolaSettingsModel.NothingWaitingWords}" TextWrapping="Wrap" />
+                      </Border>
+                    </Border>
+                    <ItemsControl Name="GranolaLectures" ItemsSource="{Binding Lectures}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:GranolaLecture">
+                          <Border Classes="group" Margin="0,0,0,6">
+                            <Border Classes="row">
+                              <Grid ColumnDefinitions="*,16,Auto">
+                                <StackPanel Spacing="2" VerticalAlignment="Center">
+                                  <TextBlock Classes="row-title" Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                  <TextBlock Classes="row-sub" Text="{Binding When}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                                  <Button Theme="{StaticResource Surface}" Padding="0" VerticalAlignment="Center" IsEnabled="{Binding !Busy}"
+                                          Command="{Binding $parent[ItemsControl].((vm:GranolaSettingsModel)DataContext).LeaveCommand}" CommandParameter="{Binding}"
+                                          ToolTip.Tip="Leave it in Granola and don't offer it again">
+                                    <TextBlock Text="Leave it" FontSize="12" Foreground="{DynamicResource AccentText}" />
+                                  </Button>
+                                  <Button Classes="pill primary" IsEnabled="{Binding !Busy}"
+                                          Command="{Binding $parent[ItemsControl].((vm:GranolaSettingsModel)DataContext).TransferCommand}" CommandParameter="{Binding}">
+                                    <TextBlock Text="Transfer" FontSize="13" FontWeight="Medium" />
+                                  </Button>
+                                </StackPanel>
+                              </Grid>
+                            </Border>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                  <TextBlock Classes="row-sub" Text="{x:Static vm:GranolaSettingsModel.PlanNote}" TextWrapping="Wrap" Margin="4,6,4,0" />
+                </StackPanel>
+              </Panel>
+
               <!-- Calendars: pasting a feed, Connect buttons for kinds that offer one, and the sources already added -->
               <Panel IsVisible="{Binding OnCalendars}">
                 <v:MacCalendarSettings DataContext="{Binding Calendars}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />

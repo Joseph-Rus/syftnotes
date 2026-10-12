@@ -223,6 +223,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public CanvasSettingsModel Canvas { get; }
     /// <summary>The calendar feeds and sources connected on this computer, and which of their calendars are shown.</summary>
     public CalendarSettingsModel Calendars { get; }
+    /// <summary>Settings → Granola: sign in, and the lectures there that Study Stash could bring over.</summary>
+    public ViewModels.GranolaSettingsModel Granola { get; }
     /// <summary>The library's own settings (Library, Classes, Notes and sorting, Folders).</summary>
     public LibrarySettingsModel Lib { get; }
     /// <summary>Adding a phone to the library, and the phones already added.</summary>
@@ -307,6 +309,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public bool OnAi => Section == "AI";
     public bool OnCanvas => Section == "Canvas";
     public bool OnCalendars => Section == "Calendars";
+    public bool OnGranola => Section == "Granola";
     public bool OnAccess => Section == "Access";
     /// <summary>The AI panes scroll and pad themselves; every other section sits in the page's own scroller.</summary>
     public bool OnPlainPage => !OnAi && !OnAccess;
@@ -344,6 +347,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             new() { Id = "Shortcuts", Glyph = "keyboard", Label = "Shortcuts" },
             .. records ? new NavItem[] { new() { Id = "Recording", Glyph = "mic", Label = "Recording" } } : [],
             .. records ? new NavItem[] { new() { Id = "Calendars", Glyph = "event", Label = "Calendars" } } : [],
+            .. records ? new NavItem[] { new() { Id = "Granola", Glyph = "drive_file_move", Label = "Granola" } } : [],
             new() { Id = "Connection", Glyph = "link", Label = "Connection" },
         ];
         string device = OperatingSystem.IsWindows() ? "PC" : "Mac";
@@ -395,6 +399,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Access = MakeAccess(ai, host);
         Canvas = new CanvasSettingsModel(canvas ?? CanvasContext.For(host), watch) { OnSetUpExtension = () => Shell.ShowCanvasConnect(), OnChooseBrowser = Shell.ChooseBrowser };
         Calendars = new CalendarSettingsModel(host.Home, wake: () => host.Calendars.Wake());
+        Granola = new ViewModels.GranolaSettingsModel(host.Granola, () => host.Settings.GranolaNotify, on => host.Save(x => x.GranolaNotify = on));
         Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
         Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, records);
         Phones.Ticking = Phones.UiTicking();
@@ -564,10 +569,12 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                  {
                      nameof(OnConnection), nameof(OnRecording), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
                      nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage),
-                     nameof(OnGeneral), nameof(OnAppearance), nameof(OnShortcuts), nameof(OnPhone), nameof(OnCalendars),
+                     nameof(OnGeneral), nameof(OnAppearance), nameof(OnShortcuts), nameof(OnPhone), nameof(OnCalendars), nameof(OnGranola),
                  })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;
+        // Opened, the Granola page looks at Granola then, not at the next five minutes.
+        if (value == "Granola") Granola.LookNowCommand.Execute(null);
         // A library on this computer starts at login through the same login item as the app (Your library → Start the
         // library when this Mac starts): General shows it as it is now, not as it was when Settings opened.
         if (value == "General" && !loading)
@@ -1028,6 +1035,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     {
         host.Changed -= OnHostChanged;
         Canvas.Dispose();
+        Granola.Dispose();
         // Settings has closed: nobody is waiting to see an AI app's row turn to Connected.
         Access.StopWatchingApps();
     }
