@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -62,6 +63,32 @@ public class RecorderPillTests
         Assert.Equal(width, pill.Bounds.Width); // the pill doesn't grow under the pointer
         stop.Command!.Execute(null);
         Assert.True(stopped);
+    }
+
+    /// <summary>The pill is in the colour theme the student picked (Settings → Appearance), and changes with it while
+    /// it's on screen: its fill is the theme's accent, not a colour of its own.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void The_pill_takes_the_colour_theme(SkinKind skin)
+    {
+        var (view, pill) = Show(skin, Demo.Recorder());
+        Color Fill() => ((ISolidColorBrush)((Border)pill).Background!).Color;
+        Color Accent() => view.TryFindResource("Accent", view.ActualThemeVariant, out var a) ? ((ISolidColorBrush)a!).Color : default;
+
+        var lagoon = Fill();
+        Assert.Equal(Accent(), lagoon);
+        try
+        {
+            Skin.UseTheme(ColourThemes.Find("Plum"));
+            Dispatcher.UIThread.RunJobs();
+            Assert.NotEqual(lagoon, Fill());
+            Assert.Equal(Accent(), Fill());
+        }
+        finally
+        {
+            Skin.UseTheme(ColourThemes.Default);
+        }
     }
 
     [Fact]
