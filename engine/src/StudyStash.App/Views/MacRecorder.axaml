@@ -35,22 +35,25 @@
     </Style>
   </UserControl.Styles>
   <Panel>
-    <!-- The pill (after Granola's): a small dark capsule standing upright, Study Stash's mark on top and three green bars
+    <!-- The pill (after Granola's): a small capsule standing upright, in the colour theme's accent (Settings →
+         Appearance: it changes with the theme, and with light and dark), Study Stash's mark on top and three bars
          under it that move with what the microphone hears. Paused, a pause mark takes the bars' place; with the pointer
          over it, Stop does; the time is its tooltip, and a click opens the recorder. -->
-    <Border Name="Pill" IsVisible="{Binding !Expanded}" Width="44" Height="84" CornerRadius="22" Background="#F2161618"
-            BorderBrush="#33FFFFFF" BorderThickness="1" BoxShadow="0 6 18 0 #59000000" HorizontalAlignment="Left"
+    <Border Name="Pill" IsVisible="{Binding !Expanded}" Width="40" Height="76" CornerRadius="20" Background="{DynamicResource Accent}"
+            BoxShadow="{DynamicResource PillShadow}" HorizontalAlignment="Left"
             ToolTip.Tip="{Binding Elapsed}" ToolTip.Placement="Left">
-      <Grid RowDefinitions="*,Auto,*" Margin="0,12">
-        <c:AppMarkGlyph Grid.Row="0" Width="22" Height="22" Foreground="#FFFFFFFF" HorizontalAlignment="Center" VerticalAlignment="Top" />
-        <Panel Grid.Row="2" Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Bottom">
-          <c:Waveform Bars="3" Height="14" MinBar="4" Levels="{Binding Levels}" Foreground="{DynamicResource Good}"
+      <Grid RowDefinitions="*,Auto,*" Margin="0,11">
+        <c:AppMarkGlyph Grid.Row="0" Width="20" Height="20" Foreground="{DynamicResource OnAccent}" HorizontalAlignment="Center" VerticalAlignment="Top" />
+        <Panel Grid.Row="2" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Bottom">
+          <c:Waveform Bars="3" Height="13" MinBar="4" Levels="{Binding Levels}" Foreground="{DynamicResource OnAccent}"
                       HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowMeter}" />
-          <c:Icon Glyph="pause" Filled="True" Size="13" Foreground="#99FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"
-                  IsVisible="{Binding ShowPausedMark}" />
+          <c:Icon Glyph="pause" Filled="True" Size="12" Foreground="{DynamicResource OnAccent}" Opacity="0.75" HorizontalAlignment="Center"
+                  VerticalAlignment="Center" IsVisible="{Binding ShowPausedMark}" />
+          <!-- Stop's disc: the ink on the accent, faint -->
+          <Border Width="20" Height="20" CornerRadius="10" Background="{DynamicResource OnAccent}" Opacity="0.2" IsVisible="{Binding Hovered}" />
           <Button AutomationProperties.Name="Stop" Classes="stop" Command="{Binding StopCommand}" ToolTip.Tip="Stop" IsVisible="{Binding Hovered}"
-                  Width="22" Height="22" CornerRadius="11" Background="#33FFFFFF">
-            <c:Icon Glyph="stop" Filled="True" Size="12" Foreground="#FFFFFFFF" />
+                  Width="20" Height="20" CornerRadius="10">
+            <c:Icon Glyph="stop" Filled="True" Size="11" Foreground="{DynamicResource OnAccent}" />
           </Button>
         </Panel>
       </Grid>

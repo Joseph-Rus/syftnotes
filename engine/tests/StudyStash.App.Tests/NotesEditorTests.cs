@@ -57,4 +57,37 @@ public class NotesEditorTests
         Assert.StartsWith("## Summary\n\nMine. Paragraph 1", Assert.Single(lib.Edits).Markdown);
         Assert.False(model.Editing);
     }
+
+    /// <summary>The notes' header reads as one line: "Written by Claude · Mon 8:36" sits on the same baseline as
+    /// "Summary" (smaller type beside bigger, not hung from its top), and Summary is level with Edit and Rewrite
+    /// notes at the other end of the row.</summary>
+    [AvaloniaFact]
+    public async Task The_macs_byline_sits_on_summarys_line_level_with_the_buttons()
+    {
+        var skin = SkinKind.Mac;
+        string at = new DateTime(2026, 9, 29, 9, 40, 0).ToString("o");
+        string notes = "## Summary\n\nWhat the lecture was about.";
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview(), OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = new NotesVersion(notes, "Claude Code", at) } };
+        var model = new AiNotesModel(lib) { Delay = (_, ct) => Task.Delay(Timeout.InfiniteTimeSpan, ct) };
+        await model.Load("lec-1", notes, "Claude Code", at);
+
+        Skin.UseTheme(ColourThemes.Default);
+        ((App)Application.Current!).UseSkin(skin);
+        var page = new MacAiNotes { DataContext = model, Width = 620 };
+        var window = new Window { Width = 660, Height = 400, RequestedThemeVariant = ThemeVariant.Light, Content = page };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        var texts = page.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).ToList();
+        var title = texts.Single(t => t.Classes.Contains("ai-notes-title"));
+        var byline = texts.Single(t => t.Classes.Contains("ai-notes-byline"));
+        var edit = texts.Single(t => t.Text == "Edit");
+        // Where each one's letters stand, down the page.
+        double Baseline(TextBlock t) => t.TranslatePoint(new Point(0, t.Padding.Top + t.TextLayout.TextLines[0].Baseline), page)!.Value.Y;
+        double Middle(Visual v) => v.TranslatePoint(new Point(0, v.Bounds.Height / 2), page)!.Value.Y;
+
+        Assert.StartsWith("Written by", byline.Text);
+        Assert.True(Math.Abs(Baseline(byline) - Baseline(title)) <= 0.75, $"the byline's letters stand at {Baseline(byline):0.00}, Summary's at {Baseline(title):0.00}");
+        Assert.True(Math.Abs(Middle(title) - Middle(edit)) <= 1.5, $"Summary's middle is at {Middle(title):0.00}, Edit's at {Middle(edit):0.00}");
+    }
 }

@@ -125,7 +125,8 @@ public static partial class Shell
         library.Overview = page;
     }
 
-    /// <summary>Home's and a class's home's Record and ask bar: everything (Home) or that class.</summary>
+    /// <summary>Home's and a class's home's Record and ask bar: everything (Home) or that class. And Home's "Buy us a
+    /// coffee".</summary>
     static void Equip(OverviewModel page, string? cls)
     {
         if (host.Settings.Role != AppRole.Library)
@@ -143,6 +144,14 @@ public static partial class Shell
                 page.Recording = true;
             };
         }
+        // Home's "Buy us a coffee": the Ko-fi page, and the library window's own ask for a tip goes for good (as it
+        // does from the ask itself, which answers here if it's showing).
+        if (page.IsHome)
+            page.OnSupport = () =>
+            {
+                if (library.Support is { } asking) asking.TipCommand.Execute(null);
+                else SupportAsk.Answer(host, SupportAnswer.Tip, url => Dialogs.OpenUrl(url), DateTimeOffset.Now);
+            };
         var ask = new AiAskModel(Ai()) { ClassName = cls, OpenSettings = () => ShowSettings("AI") };
         if (cls is null) ask.OnlyScopes("all");
         else ask.OnlyScopes("class", "all");

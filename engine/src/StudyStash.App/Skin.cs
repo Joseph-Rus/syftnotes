@@ -210,6 +210,9 @@ public static class Skin
         r["RaisedShadow"] = Shadows([.. edge, Outer(0, 0, 0, 0.5, sep), Outer(0, 1, 2, 0, Black(0.08))]);
         r["SegShadow"] = Shadows([.. edge, Outer(0, 1, 3, 0, Black(0.12))]);
         r["WindowShadow"] = Shadows([.. gshadow, Outer(0, 0, 0, 0.5, sep)]);
+        // Not in the design: the small recorder's capsule, an accent fill with the tinted buttons' edge, and the shadow
+        // it floats on over whatever else is on screen.
+        r["PillShadow"] = Shadows([.. edgeTint, PillDrop]);
         // The dot's ring on a highlighted row: white on a dark accent, near-black ink on a light one — never a tint.
         r["OnAccentRing"] = Shadows([Outer(0, 0, 0, 1.5, lt ? Rgba(0x17, 0x17, 0x17, 1) : Colors.White)]);
         B("Ground", dark ? Hex("#161616") : Hex("#E4E2DF"));
@@ -320,6 +323,9 @@ public static class Skin
         }
         B("IcInfo", accentText);
         B("Good", Good);
+        // Not in the design: the small recorder's capsule, an accent fill with a hairline just inside it (dark on a
+        // light accent, light on a dark one), and the shadow it floats on over whatever else is on screen.
+        r["PillShadow"] = Shadows([Inset(0, 0, 0, 1, dark || lt ? Black(0.14) : White(0.2)), PillDrop]);
         // The caption buttons Avalonia draws in a Windows window's title bar (Fluent's keys): our ink, hover and press.
         r["CaptionButtonForeground"] = r["Fg"];
         r["CaptionButtonBackground"] = r["Hover"];
@@ -350,7 +356,7 @@ public static class Skin
     static readonly string[] MacShadows =
     [
         "Edge", "EdgeSoft", "EdgeTint", "GShadow", "SideShadow", "CtlShadow", "GlassShadow", "SideGlassShadow", "CtlGlassShadow",
-        "RaisedShadow", "SegShadow", "WindowShadow", "OnAccentRing", "PopupShadow",
+        "RaisedShadow", "SegShadow", "WindowShadow", "OnAccentRing", "PopupShadow", "PillShadow",
     ];
     static readonly string[] WinBrushes =
     [
@@ -358,7 +364,7 @@ public static class Skin
         "Subtle", "Subtle2", "Ctrl", "CtrlStroke", "CtrlBottom", "CtrlBorder", "Accent", "AccentText", "OnAccent", "Hl", "Taskbar",
         "Mini", "Ok", "Warn", "Rec", "PopupBg", "PopupStroke", "IbInfo", "IbOk", "IbWarn", "IbErr", "IcInfo", "IcOk", "IcWarn", "IcErr", "IbGlyph", "Good", "Hover", "Press",
     ];
-    static readonly string[] WinShadows = ["Shadow", "ShadowLg", "PopupShadow"];
+    static readonly string[] WinShadows = ["Shadow", "ShadowLg", "PopupShadow", "PillShadow"];
 
     /// <summary>Every token the design gives a look, and what it is (a brush, shadows, the glass's filter, a font, a
     /// radius): what <see cref="Build(SkinKind, ColourTheme)"/> must make, light and dark.</summary>
@@ -377,6 +383,9 @@ public static class Skin
     static readonly Color Good = Oklch.ToColor(0.7, 0.15, 150);
     /// <summary>The dark ink text takes on a light accent (Chalkboard, Highlighter).</summary>
     static readonly Color Ink = Color.FromRgb(0x16, 0x17, 0x1A);
+
+    /// <summary>The shadow under the small recorder's capsule, the same in both looks, light and dark.</summary>
+    static readonly BoxShadow PillDrop = new() { OffsetY = 6, Blur = 18, Color = Color.FromArgb(0x59, 0, 0, 0) };
 
     static Color Hex(string hex) => Color.Parse(hex);
     static Color White(double a) => Rgba(255, 255, 255, a);
