@@ -146,6 +146,25 @@ public class GranolaSettingsTests
                         () => new SettingsView { DataContext = model, DrawChrome = true }, size: new Size(1700, skin == SkinKind.Mac ? 908 : 988));
                     Assert.True(shot.PixelSize.Width > 0);
                 }
+                // The notification that offers a lecture, and the one for several.
+                if (signedIn)
+                    foreach (var t in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+                        Shot.Take($"{look}-toast-granola", skin, t, () =>
+                        {
+                            var one = NoticeWords.GranolaHas(["Cell membranes and transport"]);
+                            var two = NoticeWords.GranolaHas(["Osmosis and tonicity", "Cell membranes and transport"]);
+                            var brought = NoticeWords.GranolaBrought("Cell membranes and transport", null);
+                            return new StackPanel
+                            {
+                                Spacing = 10,
+                                Children =
+                                {
+                                    new ToastView { Title = one.Title, Text = one.Text, ActionLabel = one.Action },
+                                    new ToastView { Title = two.Title, Text = two.Text, ActionLabel = two.Action },
+                                    new ToastView { Title = brought.Title, Text = brought.Text },
+                                },
+                            };
+                        }, size: new Size(560, 420));
                 // The page says what it is and what a free Granola plan gives, whichever state it's in.
                 var view = new SettingsView { DataContext = model };
                 var window = new Window { Width = 1100, Height = 800, Content = view };

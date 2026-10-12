@@ -90,19 +90,35 @@ public static class GranolaTransfer
     /// <summary>A lecture in Granola that Study Stash could bring over.</summary>
     public sealed record Waiting(string GranolaId, string Title, string Date);
 
+    /// <summary>A lecture this old is over, whether or not Granola's notes for it can be seen.</summary>
+    public static readonly TimeSpan SurelyOver = TimeSpan.FromHours(3);
+
     /// <summary>
     /// The lectures in Granola (the last 30 days: all a free plan lists) that Study Stash hasn't brought over and
     /// wasn't told to leave, newest first. One the library has already (brought over from another computer) is
     /// remembered as brought over and not offered. A library that can't be asked right now counts as not having it.
+    /// A lecture seen for the first time is only offered once Granola has written its notes (it writes them when the
+    /// lecture ends), or it started more than <see cref="SurelyOver"/> ago: one still being recorded waits.
     /// </summary>
     public static async Task<List<Waiting>> WaitingAsync(ILectureSource granola, GranolaLedger ledger, Func<string, Task<bool>> inLibrary,
-        CancellationToken ct = default)
+        DateTimeOffset? now = null, CancellationToken ct = default)
     {
         await using var session = await granola.SessionAsync(ct);
+        var listed = await granola.ListMeetingsAsync(session, ct: ct);
+        // The ones not seen before, asked after in tens (all Granola answers for at once): which have notes yet.
+        var unseen = listed.Where(m => ledger.Of(m.Id) is null).Select(m => m.Id).ToList();
+        var written = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < unseen.Count; i += 10)
+            foreach (var whole in await granola.GetMeetingsAsync(session, [.. unseen.Skip(i).Take(10)], ct))
+                if (Py.Strip(whole.NotesMarkdown).Length > 0 || Py.Strip(whole.Transcript).Length > 0) written.Add(whole.Id);
+        var at = now ?? DateTimeOffset.Now;
+        bool Over(Meeting m) => !DateTimeOffset.TryParse(m.Date, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeLocal, out var started) || at - started >= SurelyOver;
         var waiting = new List<Waiting>();
-        foreach (var m in await granola.ListMeetingsAsync(session, ct: ct))
+        foreach (var m in listed)
         {
             if (ledger.Of(m.Id) is GranolaLedger.Transferred or GranolaLedger.Left) continue;
+            if (ledger.Of(m.Id) is null && !written.Contains(m.Id) && !Over(m)) continue;
             bool have;
             try
             {
@@ -123,13 +139,19 @@ public static class GranolaTransfer
     /// plan gives it. Null while Granola has nothing written for it yet (it may still be recording): it's offered
     /// again later.
     /// </summary>
-    public static async Task<Meeting?> FetchAsync(ILectureSource granola, string granolaId, CancellationToken ct = default)
+    public static async Task<Meeting?> FetchAsync(ILectureSource granola, string granolaId, CancellationToken ct = default, Action<string>? log = null)
     {
         await using var session = await granola.SessionAsync(ct);
         var m = (await granola.GetMeetingsAsync(session, [granolaId], ct)).FirstOrDefault(x => x.Id == granolaId);
         if (m is null) return null;
         if (m.Transcript.Length == 0) m.Transcript = await granola.GetTranscriptAsync(session, granolaId, ct);
-        if (Py.Strip(m.NotesMarkdown).Length == 0 && Py.Strip(m.PrivateNotes).Length == 0 && Py.Strip(m.Transcript).Length == 0) return null;
+        if (Py.Strip(m.NotesMarkdown).Length == 0 && Py.Strip(m.PrivateNotes).Length == 0 && Py.Strip(m.Transcript).Length == 0)
+        {
+            // The names of what Granola did send (never its words): if its notes are there under a name Study Stash
+            // doesn't know, this is how that's found.
+            log?.Invoke($"[granola] {granolaId} came with no notes; Granola sent: {string.Join(", ", m.Raw.Select(kv => kv.Key))}");
+            return null;
+        }
         return new Meeting(LectureId(granolaId))
         {
             Title = m.Title, Date = m.Date, Owner = m.Owner, Attendees = m.Attendees,
@@ -216,7 +238,7 @@ public sealed class GranolaImport(string tokensPath, string clientPath, GranolaL
         try
         {
             var cc = config();
-            var waiting = await GranolaTransfer.WaitingAsync(Granola(), ledger, id => InLibraryAsync(cc, id), ct);
+            var waiting = await GranolaTransfer.WaitingAsync(Granola(), ledger, id => InLibraryAsync(cc, id), ct: ct);
             var fresh = waiting.Where(w => ledger.Of(w.GranolaId) is null).ToList();
             foreach (var w in fresh) ledger.Mark(w.GranolaId, GranolaLedger.Offered);
             bool changed = Problem is not null || !waiting.SequenceEqual(Waiting);
@@ -266,7 +288,7 @@ public sealed class GranolaImport(string tokensPath, string clientPath, GranolaL
                 Problem = "Study Stash isn't connected to a library yet, so there's nowhere to bring it.";
                 return false;
             }
-            var m = await GranolaTransfer.FetchAsync(Granola(), granolaId, ct);
+            var m = await GranolaTransfer.FetchAsync(Granola(), granolaId, ct, say);
             if (m is null)
             {
                 Problem = "Granola hasn't written anything for that lecture yet. Try again once it has finished it.";
@@ -301,15 +323,15 @@ public sealed class GranolaImport(string tokensPath, string clientPath, GranolaL
         Changed?.Invoke();
     }
 
-    /// <summary>What went wrong, for the student; null for something that isn't Granola's or the library's doing.</summary>
+    /// <summary>What went wrong, for the student. Null only for a cancel: anything else Granola or the library does
+    /// (an answer in a shape Study Stash doesn't know included) is said, and tried again at the next look.</summary>
     static string? Words(Exception e) => e switch
     {
-        OAuthException => "Granola wants you to sign in again.",
-        GranolaToolException => "Granola didn't answer the way Study Stash expected. It will try again.",
+        OperationCanceledException and not TaskCanceledException => null,
+        OAuthException => "Granola wants you to sign in again. Disconnect, then Connect.",
         LibraryRefusedException => "Your library didn't take it. Check Study Stash is connected to your library.",
         HttpRequestException or TaskCanceledException or IOException or TimeoutException => "Couldn't reach Granola or your library. It will try again.",
-        ModelContextProtocol.McpException => "Granola didn't answer the way Study Stash expected. It will try again.",
-        _ => null,
+        _ => "Granola didn't answer the way Study Stash expected. It will try again.",
     };
 
     /// <summary>Looks at Granola now and every <see cref="Every"/> until stopped.</summary>

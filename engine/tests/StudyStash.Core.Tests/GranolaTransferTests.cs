@@ -34,6 +34,9 @@ public class GranolaTransferTests
 
     static readonly string Summary = string.Join("\n", Enumerable.Repeat("- The cell membrane is a lipid bilayer that lets small nonpolar molecules through.", 8));
 
+    /// <summary>Long after every lecture here: none could still be recording.</summary>
+    static readonly DateTimeOffset Later = new(2026, 11, 1, 12, 0, 0, TimeSpan.Zero);
+
     static Meeting Lecture(string id, string title, string date, string notes = "") =>
         new(id) { Title = title, Date = date, NotesMarkdown = notes, Folder = "School" };
 
@@ -48,7 +51,7 @@ public class GranolaTransferTests
         ledger.Mark("c", GranolaLedger.Left);
         ledger.Mark("e", GranolaLedger.Transferred);
 
-        var waiting = await GranolaTransfer.WaitingAsync(granola, ledger, id => Task.FromResult(id == "granola-d"));
+        var waiting = await GranolaTransfer.WaitingAsync(granola, ledger, id => Task.FromResult(id == "granola-d"), Later);
 
         Assert.Equal(["b", "a"], waiting.Select(w => w.GranolaId));
         Assert.Equal("Osmosis", waiting[0].Title);
@@ -56,8 +59,29 @@ public class GranolaTransferTests
         Assert.Equal(GranolaLedger.Transferred, new GranolaLedger(dir["granola.json"]).Of("d"));
 
         // A library that can't be asked right now: its lectures are still offered, and nothing is marked.
-        var offline = await GranolaTransfer.WaitingAsync(granola, new GranolaLedger(dir["other.json"]), _ => throw new HttpRequestException("no route"));
+        var offline = await GranolaTransfer.WaitingAsync(granola, new GranolaLedger(dir["other.json"]), _ => throw new HttpRequestException("no route"), Later);
         Assert.Equal(5, offline.Count);
+    }
+
+    [Fact]
+    public async Task A_lecture_still_being_recorded_waits_until_granola_has_written_its_notes()
+    {
+        using var dir = new TempDir();
+        var now = new DateTimeOffset(2026, 10, 12, 10, 30, 0, TimeZoneInfo.Local.GetUtcOffset(new DateTime(2026, 10, 12, 10, 30, 0)));
+        var recording = Lecture("live", "Enzymes", "2026-10-12T10:00:00"); // started half an hour ago, nothing written
+        var done = Lecture("done", "Membranes", "2026-10-12T09:00:00", Summary); // an hour and a half ago, written up
+        var old = Lecture("old", "No notes, long over", "2026-10-11T09:00:00");
+        var ledger = new GranolaLedger(dir["granola.json"]);
+        Task<bool> No(string _) => Task.FromResult(false);
+
+        var waiting = await GranolaTransfer.WaitingAsync(new FakeGranola(recording, done, old), ledger, No, now);
+        Assert.Equal(["done", "old"], waiting.Select(w => w.GranolaId));
+
+        // Its notes written, it's offered; and once offered, a lecture stays in the list whatever Granola says of it.
+        recording.NotesMarkdown = Summary;
+        ledger.Mark("old", GranolaLedger.Offered);
+        waiting = await GranolaTransfer.WaitingAsync(new FakeGranola(recording, done, old), ledger, No, now);
+        Assert.Equal(["live", "done", "old"], waiting.Select(w => w.GranolaId));
     }
 
     [Fact]

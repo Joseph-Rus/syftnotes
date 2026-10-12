@@ -96,6 +96,8 @@ this**, **Quiz me** and **Where was this said?**, which opens the transcript at 
   and go into the lecture's notes, Ask and Claude.
 - **Brings in Canvas.** What's due across your classes, each assignment's instructions, rubric,
   your submission and feedback, module files and pages, announcements, quizzes and discussions.
+- **Brings lectures over from Granola.** If you record in Granola too, sign in once and Study Stash
+  offers each lecture it doesn't have, with a **Transfer** button. See [Granola](#granola).
 - **Comes with you on your phone.** Your library serves a phone app over Tailscale: read your
   notes, see what's coming up, search, and add photos and PDFs to a lecture from your iPhone or
   iPad. Settings → Your library → Phone shows a code to pair it ([docs/phone.md](docs/phone.md)).
@@ -477,6 +479,27 @@ Canvas then syncs about once an hour while that browser is open (it can stay min
 assignments with rubrics, your submissions and feedback, modules, files, pages and announcements,
 filed into each class's folder.
 
+## Granola
+
+If you also record lectures in [Granola](https://granola.ai), Study Stash can bring them over. In
+**Settings → Granola**, press **Connect** and sign in on Granola's own page in your browser. Study
+Stash never sees your password. From then on it looks at your Granola every few minutes. When there's
+a lecture it doesn't have, a notification offers it with a **Transfer** button, and the Granola page
+lists every one that's waiting, each with **Transfer** and **Leave it**.
+
+A transferred lecture goes to your library the way a recording does: it's filed under its class and
+gets study notes. What the notes are written from depends on your Granola plan, because Study Stash
+only gets what Granola's own connection for apps shares:
+
+- **Free Granola plan:** each lecture's notes (Granola's summary, and anything you typed) from the
+  last 30 days, and no transcript. The study notes are written from Granola's summary, so they can
+  only be as full as it is, and the lecture has no transcript to read or search.
+- **Paid Granola plan:** the transcript too, and the notes are written from that.
+
+Study Stash only reads from Granola and changes nothing there. **Disconnect** forgets the sign-in on
+this computer, and the lectures already brought over stay. The page is on the computer you record
+on. Study Stash isn't affiliated with Granola.
+
 ## Claude, Codex, Gemini and MCP
 
 Your library speaks [MCP](https://modelcontextprotocol.io), so AI apps can read your lectures, notes
@@ -526,7 +549,8 @@ they are; only the app goes. To remove them too, delete the folders under
 ## Where your data lives
 
 Your settings, the lecture database and the recordings are under `~/.study-stash` (or `--home`, or
-the `STUDYSTASH_HOME` environment variable). The notes themselves are plain Markdown files in a
+the `STUDYSTASH_HOME` environment variable). If you connect Granola, its sign-in is kept there too, in
+`granola-tokens.json`. The notes themselves are plain Markdown files in a
 folder per class, by default in **Documents/Study Stash** on the library's computer (Settings → Your library →
 Library → Notes folder shows where), which you can open, back up or sync however you like. On a Mac
 the browser extension's folder is `~/Study Stash/Chrome extension`, because a browser's Load
