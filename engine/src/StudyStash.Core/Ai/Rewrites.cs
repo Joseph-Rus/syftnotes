@@ -148,7 +148,7 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
                 throw new RewriteRefusedException(409, "a rewrite is already running for this lecture.");
             var m = store.Meeting(row);
             m.Attached = store.AttachedTo(id); // the new notes use what the student attached, too
-            if (Py.Strip(m.Transcript).Length < Summarize.MinTranscriptChars)
+            if (Py.Strip(m.Transcript).Length < Summarize.MinTranscriptChars && !Summarize.FromNotes(m))
                 throw new RewriteRefusedException(409, "this lecture doesn't have enough of a transcript to rewrite from.");
             if (row.Status is Store.Queued or Store.Working)
                 throw new RewriteRefusedException(409, "the library is still writing this lecture's notes.");
