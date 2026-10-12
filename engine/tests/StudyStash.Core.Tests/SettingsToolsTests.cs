@@ -12,7 +12,7 @@ namespace StudyStash.Core.Tests;
 sealed class FakeSettingsDriver : ISettingsDriver
 {
     public readonly Dictionary<string, string> Values = new() { ["appearance"] = "system", ["keep_recordings_days"] = "30", ["write_notes"] = "on" };
-    public readonly List<string> Opened = [], Changed = [], Classes = [];
+    public readonly List<string> Opened = [], Changed = [], Classes = [], Moved = [];
     public bool Laptop { get; set; } = true;
     public string? LibraryProblem { get; set; }
 
@@ -35,9 +35,16 @@ sealed class FakeSettingsDriver : ISettingsDriver
         return Task.FromResult<string?>(null);
     }
 
-    public Task<string?> AddClassAsync(string name, string about)
+    public Task<string?> AddClassAsync(string name, string about, string folder)
     {
-        Classes.Add(name);
+        Classes.Add(folder.Length > 0 ? $"{name} in {folder}" : name);
+        return Task.FromResult<string?>(null);
+    }
+
+    public Task<string?> MoveToFolderAsync(string name, string folder)
+    {
+        if (!Classes.Any(c => c == name || c.StartsWith(name + " in ", StringComparison.Ordinal))) return Task.FromResult<string?>($"There's no class called {name}.");
+        Moved.Add($"{name} → {(folder.Length > 0 ? folder : "Classes")}");
         return Task.FromResult<string?>(null);
     }
 }
@@ -115,7 +122,7 @@ public sealed class SettingsToolsTests : IAsyncLifetime
     {
         await using var mcp = await Connect();
         var names = (await mcp.ListToolsAsync()).Select(t => t.Name).ToList();
-        Assert.Equal(["add_class", "change_setting", "find_setting", "get_settings", "open_settings"], names.Order());
+        Assert.Equal(["add_class", "change_setting", "find_setting", "get_settings", "move_to_folder", "open_settings"], names.Order());
         foreach (string n in names) Assert.NotNull(SettingsTools.KindOf(n));
     }
 
@@ -142,6 +149,32 @@ public sealed class SettingsToolsTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task It_adds_a_club_to_Clubs_and_moves_a_class_between_folders()
+    {
+        await using var mcp = await Connect();
+        var (e1, t1) = await Call(mcp, "add_class", new() { ["name"] = "SAE Club", ["about"] = "Formula SAE build meetings", ["folder"] = "Clubs" });
+        Assert.False(e1);
+        Assert.Contains("in Clubs", t1);
+        var (e2, _) = await Call(mcp, "add_class", new() { ["name"] = "BIO 110", ["folder"] = "Classes" });
+        Assert.False(e2);
+        Assert.Equal(["SAE Club in Clubs", "BIO 110"], driver.Classes);
+
+        var (e3, t3) = await Call(mcp, "move_to_folder", new() { ["name"] = "BIO 110", ["folder"] = "Work" });
+        Assert.False(e3);
+        Assert.Contains("Moved BIO 110 to Work", t3);
+        var (e4, _) = await Call(mcp, "move_to_folder", new() { ["name"] = "SAE Club", ["folder"] = "classes" });
+        Assert.False(e4);
+        Assert.Equal(["BIO 110 → Work", "SAE Club → Classes"], driver.Moved);
+
+        var (e5, t5) = await Call(mcp, "move_to_folder", new() { ["name"] = "Chess Club", ["folder"] = "Clubs" });
+        Assert.True(e5);
+        Assert.Contains("no class called Chess Club", t5);
+        var (e6, t6) = await Call(mcp, "move_to_folder", new() { ["name"] = "BIO 110", ["folder"] = new string('x', 41) });
+        Assert.True(e6);
+        Assert.Contains("40 characters", t6);
+    }
+
+    [Fact]
     public async Task It_says_no_in_words_to_what_it_cant_change()
     {
         await using var mcp = await Connect();
@@ -165,6 +198,8 @@ public sealed class SettingsToolsTests : IAsyncLifetime
     public void Its_chips_name_what_it_did()
     {
         Assert.Equal("Mode: dark", SetupChat.Chip("change_setting", new JsonObject { ["key"] = "appearance", ["value"] = "dark" }));
+        Assert.Equal("Added SAE Club to Clubs", SetupChat.Chip("add_class", new JsonObject { ["name"] = "SAE Club", ["folder"] = "Clubs" }));
+        Assert.Equal("Moved BIO 110 to Work", SetupChat.Chip("move_to_folder", new JsonObject { ["name"] = "BIO 110", ["folder"] = "Work" }));
         Assert.Equal("Changed Recording the computer's sound", SetupChat.Chip("change_setting", new JsonObject { ["key"] = "computer_audio", ["value"] = "a very long value indeed here" }));
         Assert.Equal("Showed Notes and sorting", SetupChat.Chip("open_settings", new JsonObject { ["section"] = "notes" }));
         Assert.Equal("Searched Settings", SetupChat.Chip("find_setting", null));

@@ -469,7 +469,8 @@ public static partial class SetupChat
             "get_setup_status" => "Checked your setup",
             "list_transcription_models" => "Looked at the models",
             "get_canvas_courses" => "Looked at your Canvas courses",
-            "add_class" => Arg("name") is { Length: > 0 } n ? $"Added {n}" : "Added a class",
+            "add_class" => Arg("name") is { Length: > 0 } n ? Arg("folder") is { Length: > 0 } f && !f.Equals("Classes", StringComparison.OrdinalIgnoreCase) ? $"Added {n} to {f}" : $"Added {n}" : "Added a class",
+            "move_to_folder" => Arg("name") is { Length: > 0 } m ? $"Moved {m} to {(Arg("folder") is { Length: > 0 } to ? to : "Classes")}" : "Moved a class",
             "set_notes_writer" => Arg("engine") switch
             {
                 "none" => "Turned notes off for now",

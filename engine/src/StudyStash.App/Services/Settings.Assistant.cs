@@ -184,7 +184,37 @@ public sealed partial class SettingsModel
             return $"{e.Title} can't be changed from here.";
         }
 
-        public Task<string?> AddClassAsync(string name, string about) => Ui(async () =>
+        public Task<string?> AddClassAsync(string name, string about, string folder) => Ui(async () =>
+        {
+            if (await AddAsync(name, about) is { } refused) return refused;
+            return folder.Length == 0 ? null : await GroupAsync(name, folder);
+        });
+
+        public Task<string?> MoveToFolderAsync(string name, string folder) => Ui(async () =>
+        {
+            if (await LibraryAsync() is { } why) return $"Classes can't be moved now: {why}";
+            if (m.Lib.Classes.FirstOrDefault(c => c.Name.Trim().Equals(name, StringComparison.OrdinalIgnoreCase)) is not { } row)
+                return $"There's no class called {name}.";
+            return await GroupAsync(row.Name.Trim(), folder);
+        });
+
+        /// <summary>Puts a class in a sidebar folder ("" for Classes), and shows the sidebar again. Null when done.</summary>
+        async Task<string?> GroupAsync(string name, string folder)
+        {
+            if (m.host.Remote() is not { } lib) return "The library isn't connected.";
+            try
+            {
+                await lib.ClassGroupAsync(name, folder);
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+            {
+                return e.Message.Length > 0 ? e.Message : "The library didn't move it.";
+            }
+            m.Lib.ClassesChanged?.Invoke();
+            return null;
+        }
+
+        Task<string?> AddAsync(string name, string about) => Ui(async () =>
         {
             if (await LibraryAsync() is { } why) return $"Classes can't be added now: {why}";
             if (m.Lib.Classes.Any(c => c.Name.Trim().Equals(name, StringComparison.OrdinalIgnoreCase))) return $"There's already a class called {name}.";
