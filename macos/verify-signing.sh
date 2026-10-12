@@ -21,6 +21,15 @@ for arg; do
   esac
 done
 fail() { echo "verify-signing.sh: $*" >&2; exit 1; }
+# stapler validate asks Apple's ticket service (CloudKit) online, and a CI runner's connection to it sometimes drops
+# ("The network connection was lost", error 68): tried three times, 20 seconds apart, before it counts as a failure.
+staple_ok() {
+  for try in 1 2 3; do
+    if xcrun stapler validate "$1"; then return 0; fi
+    [ "$try" = 3 ] || { echo "verify-signing.sh: stapler validate didn't answer for $1; trying again in 20 seconds" >&2; sleep 20; }
+  done
+  fail "the notarization ticket isn't stapled to $1 (or Apple couldn't be reached to check it)"
+}
 
 codesign --verify --deep --strict --verbose=2 "$APP"
 info=$(codesign -dvv "$APP" 2>&1)
@@ -48,12 +57,12 @@ if [ "${STUDYSTASH_LIBRARY_VALIDATION:-on}" != off ] && printf '%s\n' "$ents" | 
 fi
 
 if [ "$MODE" = notarized ]; then
-  xcrun stapler validate "$APP"
+  staple_ok "$APP"
   spctl --assess --type execute --verbose=4 "$APP" 2>&1 | sed 's/^/  /'
   spctl --assess --type execute "$APP" || fail "Gatekeeper refuses the app"
   if [ -n "$DMG" ]; then
     codesign --verify --verbose=2 "$DMG"
-    xcrun stapler validate "$DMG"
+    staple_ok "$DMG"
     spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG" 2>&1 | sed 's/^/  /'
     spctl --assess --type open --context context:primary-signature "$DMG" || fail "Gatekeeper refuses the DMG"
   fi
