@@ -9,7 +9,7 @@ using StudyStash.App.Views;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>"Buy us more Claude usage": Settings → About's line and button, and the library window's one gentle ask
+/// <summary>"Buy us a coffee": Home's button, and the library window's one gentle ask
 /// for a tip — when it asks, what each answer does, and that the Ko-fi page is only ever caught here, never handed to
 /// a real browser.</summary>
 public class SupportTests
@@ -160,8 +160,8 @@ public class SupportTests
             Assert.True(card.IsEffectivelyVisible);
             var texts = Texts(card);
             Assert.Contains("Enjoying Study Stash?", texts);
-            Assert.Contains("It's free, and two students build it with Claude.\nA tip buys more Claude usage.", texts);
-            Assert.Contains("Buy us more Claude usage", texts);
+            Assert.Contains("It's free, and two students build it with Claude.\nA coffee keeps us going.", texts);
+            Assert.Contains("Buy us a coffee", texts);
             Assert.Contains("Maybe later", texts);
             Assert.Contains("Don't ask again", texts);
 
@@ -221,31 +221,57 @@ public class SupportTests
         window.Close();
     }
 
-    // --- Settings → About ------------------------------------------------------------------------------------------
+    // --- Home ------------------------------------------------------------------------------------------------------
 
-    [AvaloniaFact]
-    public void About_says_Study_Stash_is_free_and_its_button_opens_the_Ko_fi_page()
+    /// <summary>"Buy us a coffee" is on Home, beside Record and clear of the greeting, in both looks, and a class's
+    /// home has none. (What pressing it does, the Ko-fi page and no more asking, is <see cref="SupportAsk.Answer"/>'s,
+    /// above.)</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void Home_has_buy_us_a_coffee_beside_record_and_a_classs_home_has_none(SkinKind skin)
     {
-        using var home = new TempHome();
-        using var host = new AppHost(home.Path, log: _ => { });
-        using var model = SettingsModel.Make(host);
-        var opened = new List<string>();
-        model.OpenUrl = opened.Add;
-        model.Section = "General";
-        var view = new SettingsView { DataContext = model };
-        var window = new Window { Width = 900, Height = 900, Content = view };
-        window.Show();
-        Dispatcher.UIThread.RunJobs();
+        ((App)Application.Current!).UseSkin(skin);
+        Window? window = null;
+        try
+        {
+            Control Show(LibraryModel library)
+            {
+                window?.Close();
+                Control view = skin == SkinKind.Mac ? new MacLibrary { DataContext = library } : new WinLibrary { DataContext = library };
+                window = new Window { Width = 1280, Height = 800, Content = view };
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                window.UpdateLayout();
+                return view;
+            }
+            static Button? Named(Control view, string name) =>
+                view.GetVisualDescendants().OfType<Button>().SingleOrDefault(b => b.Name == name && b.IsEffectivelyVisible);
+            static Rect In(Control c, Control view) => new(c.TranslatePoint(default, view)!.Value, c.Bounds.Size);
 
-        var texts = Texts(view);
-        Assert.Contains("Study Stash is free and open source, built with Claude.", texts);
-        Assert.Contains("Buy us more Claude usage", texts);
-        var button = view.GetVisualDescendants().OfType<Button>().Single(b => b.Name == "BuyClaudeUsage");
-        Assert.True(button.IsEffectivelyVisible);
-        button.Command!.Execute(null);
-        Assert.Equal([KoFi], opened);
-        // Having bought Claude usage from here, the library window never asks for a tip.
-        Assert.True(AppSettings.Load(home.Path).SupportAskDone);
-        window.Close();
+            var home = Demo.Overview();
+            int pressed = 0;
+            home.Overview!.OnSupport = () => pressed++;
+            var view = Show(home);
+            var coffee = Named(view, "Support");
+            Assert.NotNull(coffee);
+            Assert.Contains("Buy us a coffee", Texts(coffee));
+            var record = Named(view, "Record")!;
+            var title = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "Title");
+            Assert.True(In(title, view).Right <= In(coffee, view).Left, $"{skin}: the greeting runs under the button");
+            Assert.True(In(coffee, view).Right <= In(record, view).Left, $"{skin}: the button runs under Record");
+            Assert.Equal(In(record, view).Height, In(coffee, view).Height);
+            coffee.Command!.Execute(null);
+            Assert.Equal(1, pressed);
+
+            var cls = Demo.Overview("CS 101");
+            cls.Overview!.OnSupport = () => { };
+            Assert.Null(Named(Show(cls), "Support"));
+        }
+        finally
+        {
+            window?.Close();
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
     }
 }

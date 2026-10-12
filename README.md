@@ -494,7 +494,7 @@ installers, with no rebuild, within a minute. Add `-f installers=true` to rehear
 ## Support Study Stash
 
 Study Stash is free and open source, and two students build it with Claude. If it saves you time,
-you can [buy us more Claude usage](https://ko-fi.com/studystashteam) on Ko-fi, and it goes into
+you can [buy us a coffee](https://ko-fi.com/studystashteam) on Ko-fi, and it goes into
 building the next version.
 
 ## License

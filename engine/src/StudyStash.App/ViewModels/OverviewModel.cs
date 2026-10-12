@@ -127,6 +127,12 @@ public sealed partial class OverviewModel : ObservableObject
     }
     [RelayCommand] void Record() => OnRecord?.Invoke();
 
+    /// <summary>Home's "Buy us a coffee": Study Stash is free, and a tip for the two students who build it goes to
+    /// their Ko-fi page (<see cref="Services.SupportAsk"/>). Only on Home, beside Record.</summary>
+    public Action? OnSupport { get; set; }
+    public bool CanSupport => IsHome && OnSupport is not null;
+    [RelayCommand] void Support() => OnSupport?.Invoke();
+
     /// <summary>Ask about every class (Home) or this one (its home), floating at the foot of the page as under a lecture.</summary>
     [ObservableProperty] public partial AiAskModel? Ask { get; set; }
     public bool HasAsk => Ask is not null;

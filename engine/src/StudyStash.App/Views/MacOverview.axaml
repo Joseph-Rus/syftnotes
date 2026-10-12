@@ -5,6 +5,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
              xmlns:c="using:StudyStash.App.Controls"
+             xmlns:s="using:StudyStash.App.Services"
              xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.MacOverview"
              x:DataType="vm:OverviewModel">
@@ -126,6 +127,14 @@
             <StackPanel Orientation="Horizontal" Spacing="8">
               <c:Icon Glyph="mic" Size="20" Foreground="#FFFFFFFF" VerticalAlignment="Center" />
               <TextBlock Text="{Binding RecordWords}" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFFFF" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <!-- Home only: Study Stash is free, and a tip for the two students who build it goes to their Ko-fi page -->
+          <Button Name="Support" DockPanel.Dock="{Binding ActionsDock}" Classes="ov-pill big" Command="{Binding SupportCommand}" IsVisible="{Binding CanSupport}"
+                  ToolTip.Tip="{x:Static s:SupportAsk.HomeTip}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <c:Icon Glyph="local_cafe" Size="18" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+              <TextBlock Text="{x:Static s:SupportAsk.Button}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <!-- Due's home: the two-column list, each assignment beside its detail -->

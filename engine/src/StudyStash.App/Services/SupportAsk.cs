@@ -3,7 +3,7 @@ namespace StudyStash.App.Services;
 /// <summary>How the student answered the library window's ask for a tip.</summary>
 public enum SupportAnswer
 {
-    /// <summary>"Buy us more Claude usage": the Ko-fi page opens, and it never asks again.</summary>
+    /// <summary>"Buy us a coffee": the Ko-fi page opens, and it never asks again.</summary>
     Tip,
     /// <summary>"Maybe later": it asks once more, a month on at the soonest.</summary>
     Later,
@@ -14,22 +14,22 @@ public enum SupportAnswer
 /// <summary>
 /// Where a tip for Study Stash goes, the words that ask for one, and when the library window asks: once the library
 /// holds a few lectures, never while recording or during setup, and at most twice ("Maybe later" asks once more a
-/// month on, then never again). Buying Claude usage, from the ask or from Settings → About, ends it for good.
+/// month on, then never again). "Buy us a coffee", in the ask or on Home, ends it for good.
 /// </summary>
 public static class SupportAsk
 {
-    /// <summary>The team's Ko-fi page, which "Buy us more Claude usage" opens in the browser.</summary>
+    /// <summary>The team's Ko-fi page, which "Buy us a coffee" opens in the browser.</summary>
     public const string Page = "https://ko-fi.com/studystashteam";
 
-    /// <summary>The button's words, in Settings → About and in the library window's ask alike.</summary>
-    public const string Button = "Buy us more Claude usage";
+    /// <summary>The button's words, on Home and in the library window's ask alike.</summary>
+    public const string Button = "Buy us a coffee";
 
-    /// <summary>Settings → About's line beside the button.</summary>
-    public const string AboutLine = "Study Stash is free and open source, built with Claude.";
+    /// <summary>What Home's button is for, under the pointer.</summary>
+    public const string HomeTip = "Study Stash is free. A tip on Ko-fi goes to the two students who build it.";
 
     /// <summary>The ask's title, and its two sentences, a line each.</summary>
     public const string Title = "Enjoying Study Stash?";
-    public const string Text = "It's free, and two students build it with Claude.\nA tip buys more Claude usage.";
+    public const string Text = "It's free, and two students build it with Claude.\nA coffee keeps us going.";
     public const string LaterButton = "Maybe later";
     public const string NeverButton = "Don't ask again";
 
