@@ -36,3 +36,6 @@ How a few things in the spec are done here:
 To lay pictures of the app over the spec's: `STUDYSTASH_SHOTS=<folder> dotnet test
 engine/tests/StudyStash.App.Tests --filter Design_shots` draws every screen with the spec's own
 sample, the size of its `screenshots/` at 1x, light and dark.
+
+`semester-ui-pictures/` has the app's own pictures of the new screens (drawn off screen with the spec's
+sample) and three short films of them in use, for the pull request that brought the design in.
