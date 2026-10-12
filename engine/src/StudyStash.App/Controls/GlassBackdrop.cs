@@ -35,7 +35,10 @@ public static class GlassBackdrop
     {
         public readonly List<IntPtr> Views = [];
         public List<(Rect Rect, CornerRadius Radius)>? Shapes;
+        /// <summary>The glass each of <see cref="Views"/> lies under, as last matched.</summary>
+        public List<Glass> Glasses = [];
         public bool Dark;
+        public bool Flipped;
         public double Height;
         public bool Failed;
         public int Logged = -1;
@@ -57,6 +60,7 @@ public static class GlassBackdrop
         window.LayoutUpdated += (_, _) =>
         {
             var state = States.GetOrCreateValue(window);
+            Follow(window, state);
             state.Debounce ??= new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Background, (_, _) =>
             {
                 state.Debounce!.Stop();
@@ -69,6 +73,43 @@ public static class GlassBackdrop
         {
             if (States.TryGetValue(window, out var state)) RemoveAll(state);
         };
+    }
+
+    /// <summary>
+    /// The glass only moved inside its window, the same size and shape (the recorder dragged along a display's edge:
+    /// its clear room goes from one side to the other, and the panel with it): its blur goes with it in the same
+    /// layout, not once things have been still for a moment, or the blur would trail up to a shadow's room behind the
+    /// glass for as long as the drag lasts. Anything more than a move (another size, a glass come or gone, the window
+    /// another height) is left to <see cref="Sync"/>.
+    /// </summary>
+    static void Follow(Window window, State state)
+    {
+        if (!OperatingSystem.IsMacOS() || state.Failed || !window.IsVisible) return;
+        if (state.Shapes is not { } shapes || shapes.Count != state.Views.Count || shapes.Count != state.Glasses.Count) return;
+        if (state.Height != window.ClientSize.Height) return;
+        var moved = new (Rect Rect, CornerRadius Radius)[shapes.Count];
+        bool any = false;
+        for (int i = 0; i < shapes.Count; i++)
+        {
+            var glass = state.Glasses[i];
+            if (!glass.IsEffectivelyVisible || glass.Bounds.Size != shapes[i].Rect.Size || glass.CornerRadius != shapes[i].Radius) return;
+            if (glass.TranslatePoint(new Point(0, 0), window) is not { } topLeft) return;
+            moved[i] = (new Rect(topLeft, glass.Bounds.Size), glass.CornerRadius);
+            any |= topLeft != shapes[i].Rect.Position;
+        }
+        if (!any) return;
+        try
+        {
+            for (int i = 0; i < moved.Length; i++)
+            {
+                if (moved[i].Rect == shapes[i].Rect) continue;
+                ObjC.SendRect(state.Views[i], ObjC.Sel("setFrame:"), new CGRect(FrameFor(moved[i].Rect, state.Height, state.Flipped)));
+                shapes[i] = moved[i];
+            }
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException or MarshalDirectiveException)
+        {
+        }
     }
 
     /// <summary>Where a glass's blur goes in AppKit's terms, in points: Avalonia's DIPs are AppKit's points, and a view
@@ -137,10 +178,15 @@ public static class GlassBackdrop
         // Until the window has taken its content's size, the glass isn't where it will be: the next layout brings it.
         if (Math.Abs(window.Bounds.Width - window.ClientSize.Width) > 0.5 || Math.Abs(window.Bounds.Height - window.ClientSize.Height) > 0.5)
             return null;
-        var shapes = CollectGlass(window);
+        var glasses = CollectGlass(window);
+        List<(Rect Rect, CornerRadius Radius)> shapes = [.. glasses.Select(g => (g.Rect, g.Radius))];
         double height = window.ClientSize.Height;
         if (state.Shapes is { } last && SameShapes(last, shapes) && state.Dark == dark && state.Height == height &&
-            state.Views.Count == shapes.Count) return null;
+            state.Views.Count == shapes.Count)
+        {
+            state.Glasses = [.. glasses.Select(g => g.Glass)];
+            return null;
+        }
 
         while (state.Views.Count > shapes.Count)
         {
@@ -179,7 +225,9 @@ public static class GlassBackdrop
             SetMask(view, frame.Size, r, window.RenderScaling);
         }
         state.Shapes = shapes;
+        state.Glasses = [.. glasses.Select(g => g.Glass)];
         state.Dark = dark;
+        state.Flipped = flipped;
         state.Height = height;
         if (shapes.Count > 0) window.Classes.Remove("solidglass");
         Describe(window, state, container, flipped);
@@ -216,6 +264,7 @@ public static class GlassBackdrop
     {
         foreach (var view in state.Views) Remove(view);
         state.Views.Clear();
+        state.Glasses = [];
         state.Shapes = null;
     }
 
@@ -273,15 +322,15 @@ public static class GlassBackdrop
     }
 
     /// <summary>Every visible Glass in the window, in window coordinates: where the blur goes.</summary>
-    static List<(Rect Rect, CornerRadius Radius)> CollectGlass(Window window)
+    static List<(Glass Glass, Rect Rect, CornerRadius Radius)> CollectGlass(Window window)
     {
-        var list = new List<(Rect, CornerRadius)>();
+        var list = new List<(Glass, Rect, CornerRadius)>();
         foreach (var v in window.GetVisualDescendants())
         {
             if (v is not Glass glass || !glass.IsEffectivelyVisible) continue;
             if (glass.Bounds.Width <= 0 || glass.Bounds.Height <= 0) continue;
             if (glass.TranslatePoint(new Point(0, 0), window) is not { } topLeft) continue;
-            list.Add((new Rect(topLeft, glass.Bounds.Size), glass.CornerRadius));
+            list.Add((glass, new Rect(topLeft, glass.Bounds.Size), glass.CornerRadius));
         }
         return list;
     }

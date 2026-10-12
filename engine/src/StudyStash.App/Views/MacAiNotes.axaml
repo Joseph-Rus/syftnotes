@@ -64,11 +64,15 @@
       </Grid>
     </Border>
 
-    <!-- Summary header + Edit and Rewrite notes (while editing: Cancel and Save) -->
-    <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
-      <TextBlock Classes="ai-notes-title" Text="Summary" />
-      <TextBlock Grid.Column="1" Classes="ai-notes-byline" Margin="10,0,0,0" Text="{Binding ShownByline}" />
-      <Button Grid.Column="3" Classes="ai-pillbtn" Margin="0,0,8,0" IsVisible="{Binding ShowEditButton}" Command="{Binding EditCommand}"
+    <!-- Summary header + Edit and Rewrite notes (while editing: Cancel and Save), all on one line: Summary is level
+         with the buttons, and its byline stands on Summary's baseline. The two hang from one top, the byline's smaller
+         type set down by how much lower 17 pt letters stand than 12 pt ones (4.4). -->
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+        <TextBlock Classes="ai-notes-title" Text="Summary" VerticalAlignment="Top" />
+        <TextBlock Classes="ai-notes-byline" Margin="10,4.4,0,0" VerticalAlignment="Top" Text="{Binding ShownByline}" />
+      </StackPanel>
+      <Button Grid.Column="2" Classes="ai-pillbtn" Margin="0,0,8,0" IsVisible="{Binding ShowEditButton}" Command="{Binding EditCommand}"
               ToolTip.Tip="Fix or add to these notes yourself" AutomationProperties.Name="Edit notes">
         <Border Classes="ai-pill">
           <StackPanel Orientation="Horizontal" Spacing="6">
@@ -77,7 +81,7 @@
           </StackPanel>
         </Border>
       </Button>
-      <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Editing}">
+      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Editing}">
         <Button Classes="ai-textbtn" Command="{Binding CancelEditCommand}">
           <Border Classes="ai-pill-plain"><TextBlock Text="Cancel" /></Border>
         </Button>
@@ -85,7 +89,7 @@
           <Border Classes="ai-pill" Classes.primary="True"><TextBlock Text="Save" /></Border>
         </Button>
       </StackPanel>
-      <Button Name="RewriteButton" Grid.Column="4" Classes="ai-pillbtn" IsVisible="{Binding ShowRewriteButton}">
+      <Button Name="RewriteButton" Grid.Column="3" Classes="ai-pillbtn" IsVisible="{Binding ShowRewriteButton}">
         <Border Classes="ai-pill">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Glyph="refresh" Size="15" />

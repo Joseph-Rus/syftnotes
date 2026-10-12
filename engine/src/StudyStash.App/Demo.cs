@@ -184,7 +184,14 @@ public static class Demo
             m.Home.Selected = false;
             m.Overview = OverviewModel.ForDue(sources);
         }
-        else if (cls is null) m.Overview = OverviewModel.Home(sources);
+        else if (cls is null)
+        {
+            // As on a computer that records: Record at the edge, "Buy us a coffee" beside it.
+            var home = OverviewModel.Home(sources);
+            home.OnRecord = () => { };
+            home.OnSupport = () => { };
+            m.Overview = home;
+        }
         else
         {
             var facts = new ClassHomeFacts(cls, Cs, 12, canvas ? "CS 101" : null, canvas ? "Introduction to Computer Science" : null,

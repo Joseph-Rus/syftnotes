@@ -86,12 +86,32 @@ public class Floating : Window
         int full = (int)(ShadowRoom * scale);
         var panel = PanelSize(scale);
         var p = new PixelRect(at.X + full, at.Y + full, panel.Width, panel.Height);
-        int left = Math.Clamp(p.X - area.X, 0, full), top = Math.Clamp(p.Y - area.Y, 0, full);
-        int right = Math.Clamp(area.Right - p.Right, 0, full), bottom = Math.Clamp(area.Bottom - p.Bottom, 0, full);
+        var (left, right) = Room(p.X - area.X, area.Right - p.Right, full, SteadySize);
+        var (top, bottom) = Room(p.Y - area.Y, area.Bottom - p.Bottom, full, SteadySize);
         var padding = new Thickness(left / scale, top / scale, right / scale, bottom / scale);
         if (holder.Padding != padding) holder.Padding = padding;
         var position = new PixelPoint(p.X - left, p.Y - top);
         if (Position != position) Position = position;
+    }
+
+    /// <summary>A window that's dragged about (the recorder) is one size wherever it is: by a display's edge, the clear
+    /// room that side can't have goes to the other side, where a window that only sits where it's put gives it up.
+    /// Giving it up changes the window's size, and a drag along an edge (or out of the corner the recorder lives in)
+    /// did that at every step: a see-through window resized under the pointer over and over, which lagged behind it,
+    /// and on a Mac left the system's blur up to 60 points off the glass it belongs under until the drag paused.</summary>
+    public bool SteadySize { get; init; }
+
+    /// <summary>The clear room each side of the panel along one line (left and right, or top and bottom), in pixels,
+    /// given how far the panel is from each edge of the usable area: the <paramref name="full"/> room where there's
+    /// that much, less where there isn't. <paramref name="steady"/>: what one side is short of, the other takes, so the
+    /// two always come to twice the full room (on a display with too little space for that, as much as there is).</summary>
+    public static (int Near, int Far) Room(int nearSpace, int farSpace, int full, bool steady)
+    {
+        int near = Math.Clamp(nearSpace, 0, full), far = Math.Clamp(farSpace, 0, full);
+        if (!steady) return (near, far);
+        int missing = 2 * full - near - far;
+        int more = Math.Min(missing, Math.Max(0, nearSpace - near));
+        return (near + more, far + Math.Min(missing - more, Math.Max(0, farSpace - far)));
     }
 
     /// <summary><see cref="MoveTo"/> on whichever display the panel lands on.</summary>

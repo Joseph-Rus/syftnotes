@@ -863,7 +863,7 @@ public static partial class Shell
     static Floating MakeRecorderWindow()
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
-        var w = new Floating { Content = view, KeepClear = true, Title = "Study Stash recorder" };
+        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, Title = "Study Stash recorder" };
         AppMenu.AddSettingsKey(w, SettingsFromAnywhere);
         // Drag it anywhere by its background; where it lands is saved once the drag ends, not on every pixel moved.
         // It moves by hand, not by the system's own window drag, so it can go right up to a Mac's menu bar (see
@@ -874,8 +874,8 @@ public static partial class Shell
         view.PointerPressed += (_, e) =>
         {
             if (e.Source is TextBox || w.Refitting || !e.GetCurrentPoint(view).Properties.IsLeftButtonPressed || w.Panel() is not { } panel) return;
-            // All in screen pixels: the window's clear room shrinks and grows at the display's edges as it moves, which
-            // shifts the pill inside it, so a point on the pill itself wouldn't stay put.
+            // All in screen pixels: the window's clear room goes from one side to the other at the display's edges as
+            // it moves, which shifts the pill inside it, so a point on the pill itself wouldn't stay put.
             grabbed = view.PointToScreen(e.GetPosition(view));
             int room = (int)(Floating.ShadowRoom * w.DesktopScaling);
             grabbedAt = new PixelPoint(panel.X - room, panel.Y - room);
@@ -927,7 +927,7 @@ public static partial class Shell
     {
         if (recorderWindow is not { IsVisible: true } w || w.Panel() is not { } panel) return;
         var (_, scale) = w.WorkArea(w.Position);
-        // Where the window's top right would be with its whole shadow room, whatever of that room is trimmed now.
+        // Where the window's top right would be with its whole shadow room, however that room lies round it now.
         int room = (int)(Floating.ShadowRoom * scale);
         host.Save(s =>
         {

@@ -1,10 +1,65 @@
 <p align="center"><img src="docs/images/icon.png" width="96" alt="Study Stash"></p>
 
-# Study Stash
+<h1 align="center">Study Stash</h1>
 
-Your own lecture library. Record a lecture, and it's transcribed on your computer, filed under the
-right class, and turned into study notes — next to your Canvas assignments, and ready to ask about.
-Free and open source, for Mac and Windows, and your recordings never leave your own computers.
+<p align="center">
+  <b>Record a lecture. Get notes worth studying from, with the diagrams already drawn.</b><br>
+  Free and open source, for Mac and Windows. Your recordings never leave your own computers.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash.dmg"><b>Download for Mac</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Setup.exe"><b>Download for Windows</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://study-stash-app.web.app/assets/study-stash-demo.mp4">Watch the 50-second demo</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Joseph-Rus/study-stash/releases/latest"><img src="https://img.shields.io/github/v/release/Joseph-Rus/study-stash?label=release" alt="Latest release"></a>
+  <img src="https://img.shields.io/badge/macOS%2015%2B%20%C2%B7%20Windows%2010%2F11-555" alt="macOS 15 or later, Windows 10 or 11">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT licence"></a>
+</p>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/notes-heart-dark.png">
+  <img src="docs/images/notes-heart-light.png" alt="A lecture's notes in Study Stash, with a labelled drawing of the heart cut open: aorta, atria, ventricles and valves">
+</picture>
+
+Study Stash is your own lecture library. Record a lecture and it's transcribed on your computer,
+filed under the right class and turned into study notes, next to your Canvas assignments and ready
+to ask about. Two students build it, with Claude.
+
+## The notes come with the pictures
+
+Once a lecture's notes are written, a second pass reads the transcript and decides whether anything
+in it is clearer as a picture. If something is, it's drawn into the notes under the section it
+belongs to, with the moment of the lecture it came from.
+
+**Drawings you can point at.** A lecture that spends time on a physical thing (the heart cut open,
+the bones of the hand, a drone, a circuit board) gets a labelled drawing of it, like a figure in a
+textbook. That's the heart above. Most are put together in seconds from about 300 professionally
+drawn, openly licensed parts. Point at a part and it lights up. Click it for the line where the
+lecturer named it, or hide every label and test yourself.
+
+**Graphs worked out from the formula.** When the shape of a formula is the point (a sigmoid, a loss
+curve, a distribution), the notes plot it. The AI only writes down the formula the lecturer gave and
+the app does the maths, so a curve is never sketched freehand. Drag a slider and it redraws. Read any
+value under the pointer, or hide the curve with **Predict** and sketch it yourself first.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/notes-plot-dark.png">
+  <img src="docs/images/notes-plot-light.png" alt="A plot in a lecture's notes: the sigmoid with its tangent, a slider for its steepness, a value read under the pointer, and Explain this, Quiz me and Where was this said?">
+</picture>
+
+**Formulas and diagrams, typeset.** Formulas look the way you'd write them on paper. A process or a
+cycle comes back as a diagram you can walk through a box at a time, and every box has **Explain
+this**, **Quiz me** and **Where was this said?**, which opens the transcript at the line that says it.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/notes-formulas-dark.png">
+  <img src="docs/images/notes-formulas-light.png" alt="A lecture's notes with a diagram of the cardiac cycle and two typeset formulas, a dose calculation and mean arterial pressure">
+</picture>
 
 [![The 50-second demo: a lecture's notes, with a labelled diagram of the organs of the torso](docs/images/demo-poster.png)](https://study-stash-app.web.app/assets/study-stash-demo.mp4)
 
@@ -13,35 +68,14 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
 ## What it does
 
 - **Records and transcribes on your computer.** Click **Record** in the menu bar (Mac) or tray
-  (Windows), or press ⌥⇧R / Ctrl+Alt+R. It transcribes as you go, so the recorder shows what's
-  said and you can ask about it mid-lecture; or, to save battery, it only records during the lecture
-  and transcribes it after class (Settings → Recording). The audio never leaves your computer. A Mac with Apple silicon or a PC with a graphics card uses Whisper (Metal or Vulkan),
-  starting on the compact large-v3 turbo, which keeps up and leaves room for everything else. A
-  computer with no graphics card Whisper can use, and 4 fast cores and 8 GB of memory, starts on
-  NVIDIA's Parakeet instead (a 2.5 GB download): it's made for the processor, nearly as accurate as
-  the compact turbo, and never makes up words over silence; it reads 25 European languages, and a
-  lecture in another language uses Whisper. A computer too weak for either gets a lighter Whisper.
-  The bigger, more accurate models are a choice in setup and Settings → Recording, and so, on a Mac
-  with Apple silicon or a PC with an ARM processor, is Cactus Whistle, the fastest and smallest, which
-  comes with the app (about as accurate as Whisper base).
-  Whatever the model, while a lecture is transcribed as you go, the open recorder shows what's said
-  a second or two after it's said: a quick model hears the newest sound every second, and the chosen
-  model's more accurate lines take its place as they come (about half a minute behind). The quick
-  model comes with the app: Cactus Whistle on Apple silicon and Windows on ARM, where its engine is
-  fastest; a small Whisper (tiny, 44 MB) on Intel Macs and other PCs, where Whistle's engine is
-  slow. Every pass is timed, and each lecture's first is a short test: where this computer can't
-  keep up cheaply during a lecture (a pass taking more than 0.3× the sound it hears), the live words
-  switch themselves off for that lecture and the recorder shows the chosen model's lines only; the
-  next lecture tries again. Whistle reads English, German, French, Spanish, Italian, Dutch and
-  Polish; on a computer that hears the live words with it, a lecture in another language shows the
-  chosen model's lines only. In Settings → Recording, an
-  experimental **Tell speakers apart** also marks in a transcript ("Speaker 2:") where a voice other
-  than the lecturer's seems to speak; it is careful rather than complete, and can be wrong. While it
-  records, a tiny pill shows the time and the level; pause or stop from the menu bar.
+  (Windows), or press ⌥⇧R / Ctrl+Alt+R. The recorder shows what's said a second or two after it's
+  said, and you can ask about the lecture while it's still going. The audio never leaves your
+  computer. [Recording and transcription](#recording-and-transcription) has the models and the
+  details.
 - **Writes study notes with the AI you choose.** A summary, key points, definitions and questions
   to review, written by Claude, ChatGPT or Gemini with the plan
   you already have, or by a free model on your own computer (Ollama, the advanced way). Rewrite a
-  lecture's notes with another AI and keep whichever you like.
+  lecture's notes with another AI and keep whichever you like, or fix them yourself with **Edit**.
 - **Files every lecture under its class**, working out which from what was said, or using the class
   you picked. Anything it can't place waits in **Unsorted**, and a lecture you don't need can be
   deleted (with Undo).
@@ -72,7 +106,10 @@ Free and open source, for Mac and Windows, and your recordings never leave your 
   dark, with twenty colour themes in Settings → Appearance.
 - **Keeps itself up to date**, quietly, when nothing is recording.
 
-![The library window: a class's lectures, a lecture's notes, and the Ask bar](docs/images/library-window.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png">
+  <img src="docs/images/home-light.png" alt="Home in the library window: the day's numbers, recent lectures, what's due soon and coming up, and a card for every class">
+</picture>
 
 <p align="center">
   <img src="docs/images/menu-bar.png" width="49%" alt="The menu bar dropdown: Record, recent lectures and search; and while recording">
@@ -182,6 +219,41 @@ curl -fsSL https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install
 # Windows (PowerShell)
 irm https://raw.githubusercontent.com/Joseph-Rus/study-stash/main/install.ps1 | iex
 ```
+
+## Recording and transcription
+
+Study Stash transcribes as you go, so the recorder shows what's said and you can ask about it
+mid-lecture; or, to save battery, it only records during the lecture and transcribes it after class
+(Settings → Recording). The audio never leaves your computer.
+
+**The model.** A Mac with Apple silicon or a PC with a graphics card uses Whisper (Metal or Vulkan),
+starting on the compact large-v3 turbo, which keeps up and leaves room for everything else. A
+computer with no graphics card Whisper can use, and 4 fast cores and 8 GB of memory, starts on
+NVIDIA's Parakeet instead (a 2.5 GB download): it's made for the processor, nearly as accurate as
+the compact turbo, and never makes up words over silence; it reads 25 European languages, and a
+lecture in another language uses Whisper. A computer too weak for either gets a lighter Whisper.
+The bigger, more accurate models are a choice in setup and Settings → Recording, and so, on a Mac
+with Apple silicon or a PC with an ARM processor, is Cactus Whistle, the fastest and smallest, which
+comes with the app (about as accurate as Whisper base).
+
+**The live words.** Whatever the model, while a lecture is transcribed as you go, the open recorder
+shows what's said a second or two after it's said: a quick model hears the newest sound every
+second, and the chosen model's more accurate lines take its place as they come (about half a minute
+behind). The quick model comes with the app: Cactus Whistle on Apple silicon and Windows on ARM,
+where its engine is fastest; a small Whisper (tiny, 44 MB) on Intel Macs and other PCs, where
+Whistle's engine is slow. Every pass is timed, and each lecture's first is a short test: where this
+computer can't keep up cheaply during a lecture (a pass taking more than 0.3× the sound it hears),
+the live words switch themselves off for that lecture and the recorder shows the chosen model's
+lines only; the next lecture tries again. Whistle reads English, German, French, Spanish, Italian,
+Dutch and Polish; on a computer that hears the live words with it, a lecture in another language
+shows the chosen model's lines only.
+
+**Speakers.** In Settings → Recording, an experimental **Tell speakers apart** also marks in a
+transcript ("Speaker 2:") where a voice other than the lecturer's seems to speak; it is careful
+rather than complete, and can be wrong.
+
+**While it records**, a small pill in your theme's colour floats on screen with a level meter. Point
+at it for the time and Stop, click it to open the recorder, or pause and stop from the menu bar.
 
 ## Your AI
 
@@ -494,8 +566,8 @@ installers, with no rebuild, within a minute. Add `-f installers=true` to rehear
 ## Support Study Stash
 
 Study Stash is free and open source, and two students build it with Claude. If it saves you time,
-you can [buy us more Claude usage](https://ko-fi.com/studystashteam) on Ko-fi, and it goes into
-building the next version.
+you can [buy us a coffee](https://ko-fi.com/studystashteam) on Ko-fi, and it goes into
+building the next version. A star on GitHub helps other students find it.
 
 ## License
 

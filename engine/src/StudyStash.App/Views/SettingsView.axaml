@@ -676,19 +676,6 @@
                         <TextBlock Classes="row-sub" Text="{x:Static rich:PartsLibrary.AboutLine}" TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
-                    <Border Classes="rowsep" />
-                    <!-- Study Stash is free: a tip for the two students who build it goes to their Ko-fi page. -->
-                    <Border Classes="row">
-                      <Grid ColumnDefinitions="*,16,Auto">
-                        <StackPanel Spacing="2" VerticalAlignment="Center">
-                          <TextBlock Classes="row-title" Text="Support Study Stash" />
-                          <TextBlock Classes="row-sub" Text="{x:Static s:SupportAsk.AboutLine}" TextWrapping="Wrap" />
-                        </StackPanel>
-                        <Button Name="BuyClaudeUsage" Grid.Column="2" Classes="pill" Command="{Binding BuyClaudeUsageCommand}" VerticalAlignment="Center">
-                          <TextBlock Text="{x:Static s:SupportAsk.Button}" />
-                        </Button>
-                      </Grid>
-                    </Border>
                   </StackPanel>
                 </Border>
               </StackPanel>
