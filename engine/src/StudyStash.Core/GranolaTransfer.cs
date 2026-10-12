@@ -8,7 +8,8 @@ namespace StudyStash.Core;
 /// </summary>
 public sealed class GranolaLedger
 {
-    public const string Transferred = "transferred", Left = "left";
+    /// <summary>Brought over; told to stay in Granola; or offered once in a notification and still waiting.</summary>
+    public const string Transferred = "transferred", Left = "left", Offered = "offered";
 
     readonly string path;
     readonly Dictionary<string, string> lectures = new(StringComparer.Ordinal);
@@ -34,7 +35,8 @@ public sealed class GranolaLedger
     /// <summary>Who is signed in to Granola, as Granola names them (an email), for Settings to say.</summary>
     public string Account { get; private set; } = "";
 
-    /// <summary>What became of a lecture in Granola: <see cref="Transferred"/>, <see cref="Left"/>, or null (not seen).</summary>
+    /// <summary>What became of a lecture in Granola: <see cref="Transferred"/>, <see cref="Left"/>, <see cref="Offered"/>,
+    /// or null (not seen).</summary>
     public string? Of(string granolaId) => lectures.GetValueOrDefault(granolaId);
 
     public void Mark(string granolaId, string what)
@@ -100,7 +102,7 @@ public static class GranolaTransfer
         var waiting = new List<Waiting>();
         foreach (var m in await granola.ListMeetingsAsync(session, ct: ct))
         {
-            if (ledger.Of(m.Id) is not null) continue;
+            if (ledger.Of(m.Id) is GranolaLedger.Transferred or GranolaLedger.Left) continue;
             bool have;
             try
             {
@@ -136,5 +138,194 @@ public static class GranolaTransfer
             NotesMarkdown = m.NotesMarkdown, PrivateNotes = m.PrivateNotes, Transcript = m.Transcript,
             Raw = new JsonObject { ["source"] = "granola", ["granola_id"] = granolaId },
         };
+    }
+}
+
+/// <summary>
+/// The student's Granola, as the app keeps up with it: signed in to once (in the browser, on Granola's own page; Study
+/// Stash never sees the password), then looked at every few minutes for lectures Study Stash doesn't have. A new one
+/// is announced once (<see cref="Found"/>, the app's notification with Transfer), and every waiting one is listed for
+/// Settings. Transfer sends it to the library the way a recording goes (/api/ingest), where its notes are written.
+/// </summary>
+public sealed class GranolaImport(string tokensPath, string clientPath, GranolaLedger ledger, Func<ClientConfig> config, LaptopHost? net = null,
+    Func<GranolaOAuth, ILectureSource>? source = null, Action<string>? log = null)
+{
+    /// <summary>How often Granola is looked at while the app runs.</summary>
+    public static readonly TimeSpan Every = TimeSpan.FromMinutes(5);
+
+    readonly GranolaOAuth oauth = new(GranolaTransfer.McpUrl, GranolaTransfer.CallbackPort, "login", tokensPath, clientPath);
+    readonly LaptopHost net = net ?? new LaptopHost();
+    readonly Action<string> say = log ?? (_ => { });
+    readonly SemaphoreSlim one = new(1, 1);
+
+    ILectureSource Granola() => source?.Invoke(oauth) ?? GranolaClient.For(GranolaTransfer.McpUrl, oauth);
+
+    public bool SignedIn => oauth.IsLoggedIn();
+
+    /// <summary>Who is signed in, as Granola names them; empty when Granola didn't say.</summary>
+    public string Account => ledger.Account;
+
+    /// <summary>The lectures in Granola that Study Stash could bring over, newest first, as of the last look.</summary>
+    public IReadOnlyList<GranolaTransfer.Waiting> Waiting { get; private set; } = [];
+
+    /// <summary>Why the last look or transfer didn't work, in words for the student; null when it did.</summary>
+    public string? Problem { get; private set; }
+
+    /// <summary>Signed in or out, the list of waiting lectures, or <see cref="Problem"/> changed.</summary>
+    public event Action? Changed;
+
+    /// <summary>Lectures seen in Granola for the first time: said once, for the app's notification.</summary>
+    public event Action<IReadOnlyList<GranolaTransfer.Waiting>>? Found;
+
+    /// <summary>Opens Granola's sign-in page in the browser and waits (five minutes at most) for the student to allow
+    /// it. Throws <see cref="OAuthException"/> with why when it doesn't happen.</summary>
+    public async Task SignInAsync(Func<string, Task>? openUrl = null, CancellationToken ct = default)
+    {
+        await oauth.LoginAsync(log: _ => { }, openUrl: openUrl, ct: ct);
+        say("[granola] signed in");
+        try
+        {
+            var granola = Granola();
+            await using var session = await granola.SessionAsync(ct);
+            if (granola is GranolaClient client && await client.GetAccountInfoAsync(session, ct) is { Email.Length: > 0 } who) ledger.SignedInAs(who.Email);
+        }
+        catch (Exception e) when (e is HttpRequestException or OAuthException or GranolaToolException or IOException && !ct.IsCancellationRequested)
+        {
+            // Signed in all the same: who as is only for Settings to say.
+        }
+        Problem = null;
+        Changed?.Invoke();
+    }
+
+    /// <summary>Forgets the sign-in on this computer. What was brought over stays in Study Stash.</summary>
+    public void SignOut()
+    {
+        oauth.Logout();
+        ledger.SignedOut();
+        Waiting = [];
+        Problem = null;
+        say("[granola] signed out");
+        Changed?.Invoke();
+    }
+
+    /// <summary>Looks at Granola now. Never throws but for cancelling: what went wrong is <see cref="Problem"/>.</summary>
+    public async Task CheckAsync(CancellationToken ct = default)
+    {
+        if (!SignedIn) return;
+        await one.WaitAsync(ct);
+        try
+        {
+            var cc = config();
+            var waiting = await GranolaTransfer.WaitingAsync(Granola(), ledger, id => InLibraryAsync(cc, id), ct);
+            var fresh = waiting.Where(w => ledger.Of(w.GranolaId) is null).ToList();
+            foreach (var w in fresh) ledger.Mark(w.GranolaId, GranolaLedger.Offered);
+            bool changed = Problem is not null || !waiting.SequenceEqual(Waiting);
+            Waiting = waiting;
+            Problem = null;
+            if (changed) Changed?.Invoke();
+            if (fresh.Count > 0)
+            {
+                say($"[granola] {fresh.Count} new lecture(s) in Granola");
+                Found?.Invoke(fresh);
+            }
+        }
+        catch (Exception e) when (Words(e) is { } why && !ct.IsCancellationRequested)
+        {
+            say($"[granola] couldn't look: {e.Message.Split('\n')[0]}");
+            if (Problem != why)
+            {
+                Problem = why;
+                Changed?.Invoke();
+            }
+        }
+        finally
+        {
+            one.Release();
+        }
+    }
+
+    /// <summary>Whether the library has this lecture already (brought over from another computer).</summary>
+    async Task<bool> InLibraryAsync(ClientConfig cc, string lectureId)
+    {
+        if (cc.ServerUrl.Length == 0) return false;
+        return await net.Get($"{cc.ServerUrl.TrimEnd('/')}/api/v2/lectures/{Uri.EscapeDataString(lectureId)}", cc.PoolKey) is not null;
+    }
+
+    /// <summary>
+    /// Brings one lecture over: fetched whole from Granola and sent to the library, which writes its notes and files
+    /// it. True when it went; false, with <see cref="Problem"/> saying why, when it didn't (it stays in the list).
+    /// </summary>
+    public async Task<bool> TransferAsync(string granolaId, CancellationToken ct = default)
+    {
+        await one.WaitAsync(ct);
+        try
+        {
+            var cc = config();
+            if (cc.ServerUrl.Length == 0)
+            {
+                Problem = "Study Stash isn't connected to a library yet, so there's nowhere to bring it.";
+                return false;
+            }
+            var m = await GranolaTransfer.FetchAsync(Granola(), granolaId, ct);
+            if (m is null)
+            {
+                Problem = "Granola hasn't written anything for that lecture yet. Try again once it has finished it.";
+                return false;
+            }
+            if (m.Owner.Length == 0) m.Owner = cc.DisplayName;
+            await net.Post($"{cc.ServerUrl.TrimEnd('/')}/api/ingest", Wire.MeetingJson(m), cc.PoolKey);
+            ledger.Mark(granolaId, GranolaLedger.Transferred);
+            Waiting = [.. Waiting.Where(w => w.GranolaId != granolaId)];
+            Problem = null;
+            say($"[granola] brought over {m.Id} ({(Py.Strip(m.Transcript).Length > 0 ? "with its transcript" : "notes only")})");
+            return true;
+        }
+        catch (Exception e) when (Words(e) is { } why && !ct.IsCancellationRequested)
+        {
+            say($"[granola] couldn't bring {granolaId} over: {e.Message.Split('\n')[0]}");
+            Problem = why;
+            return false;
+        }
+        finally
+        {
+            one.Release();
+            Changed?.Invoke();
+        }
+    }
+
+    /// <summary>Leaves a lecture in Granola: it isn't offered again.</summary>
+    public void Leave(string granolaId)
+    {
+        ledger.Mark(granolaId, GranolaLedger.Left);
+        Waiting = [.. Waiting.Where(w => w.GranolaId != granolaId)];
+        Changed?.Invoke();
+    }
+
+    /// <summary>What went wrong, for the student; null for something that isn't Granola's or the library's doing.</summary>
+    static string? Words(Exception e) => e switch
+    {
+        OAuthException => "Granola wants you to sign in again.",
+        GranolaToolException => "Granola didn't answer the way Study Stash expected. It will try again.",
+        LibraryRefusedException => "Your library didn't take it. Check Study Stash is connected to your library.",
+        HttpRequestException or TaskCanceledException or IOException or TimeoutException => "Couldn't reach Granola or your library. It will try again.",
+        ModelContextProtocol.McpException => "Granola didn't answer the way Study Stash expected. It will try again.",
+        _ => null,
+    };
+
+    /// <summary>Looks at Granola now and every <see cref="Every"/> until stopped.</summary>
+    public async Task RunAsync(CancellationToken stop)
+    {
+        while (!stop.IsCancellationRequested)
+        {
+            try
+            {
+                await CheckAsync(stop);
+                await Task.Delay(Every, stop);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+        }
     }
 }

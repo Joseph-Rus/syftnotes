@@ -115,4 +115,53 @@ public class GranolaTransferTests
         Assert.False(Summarize.FromNotes(recorded));
         Assert.Contains("_Written by Claude from the transcript._", Notes.Render(recorded, new Classification("BIO 110", 1, "rules"), notes, "Claude"));
     }
+
+    [Fact]
+    public async Task A_new_lecture_is_announced_once_and_transfer_sends_it_to_the_library()
+    {
+        using var dir = new TempDir();
+        File.WriteAllText(dir["tokens.json"], "{\"access_token\": \"t\"}"); // signed in
+        var granola = new FakeGranola(Lecture("a", "Membranes", "2026-10-05T09:00:00", Summary), Lecture("b", "Osmosis", "2026-10-07T09:00:00", Summary));
+        var sent = new List<(string Url, JsonObject Body, string Key)>();
+        var net = new LaptopHost
+        {
+            Post = (url, body, key) =>
+            {
+                sent.Add((url, (JsonObject)JsonNode.Parse(body)!, key));
+                return Task.FromResult(new JsonObject { ["status"] = "queued" });
+            },
+            Get = (_, _) => Task.FromResult<JsonObject?>(null), // the library has neither
+        };
+        var cc = new ClientConfig(dir["home"]) { ServerUrl = "http://library:8787/", PoolKey = "secret", DisplayName = "Joey" };
+        GranolaImport Import() => new(dir["tokens.json"], dir["client.json"], new GranolaLedger(dir["granola.json"]), () => cc, net, _ => granola);
+        var import = Import();
+        var found = new List<string>();
+        import.Found += lectures => found.AddRange(lectures.Select(l => l.Title));
+
+        Assert.True(import.SignedIn);
+        await import.CheckAsync();
+        Assert.Equal(["Osmosis", "Membranes"], found);
+        Assert.Equal(["b", "a"], import.Waiting.Select(w => w.GranolaId));
+        // Looked at again, even after the app starts again: still waiting, not announced a second time.
+        await import.CheckAsync();
+        import = Import();
+        import.Found += lectures => found.AddRange(lectures.Select(l => l.Title));
+        await import.CheckAsync();
+        Assert.Equal(2, found.Count);
+        Assert.Equal(2, import.Waiting.Count);
+
+        Assert.True(await import.TransferAsync("a"));
+        var (url, body, key) = Assert.Single(sent);
+        Assert.Equal(("http://library:8787/api/ingest", "secret"), (url, key));
+        Assert.Equal(("granola-a", "Membranes", Summary, "Joey"), ((string?)body["id"], (string?)body["title"], (string?)body["notes_markdown"], (string?)body["owner"]));
+        Assert.Equal(["b"], import.Waiting.Select(w => w.GranolaId));
+
+        import.Leave("b");
+        Assert.Empty(import.Waiting);
+        await Import().CheckAsync();
+        Assert.Single(sent); // neither is offered or sent again
+        var after = Import();
+        await after.CheckAsync();
+        Assert.Empty(after.Waiting);
+    }
 }
