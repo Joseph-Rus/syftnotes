@@ -3,6 +3,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace StudyStash.Core;
 
@@ -385,5 +386,65 @@ public static class Py
     {
         var comparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), comparison);
+    }
+
+    static readonly Regex WhitespaceOnly = new("^[ \t]+$", RegexOptions.Multiline);
+    static readonly Regex LeadingWhitespace = new("(^[ \t]*)(?:[^ \t\n])", RegexOptions.Multiline);
+
+    /// <summary>textwrap.dedent: remove the indentation every line shares; blank lines become empty.</summary>
+    public static string Dedent(string text)
+    {
+        string? margin = null;
+        text = WhitespaceOnly.Replace(text, "");
+        foreach (Match m in LeadingWhitespace.Matches(text))
+        {
+            string indent = m.Groups[1].Value;
+            if (margin is null) margin = indent;
+            else if (indent.StartsWith(margin, StringComparison.Ordinal)) { }
+            else if (margin.StartsWith(indent, StringComparison.Ordinal)) margin = indent;
+            else
+            {
+                int i = 0;
+                while (i < margin.Length && i < indent.Length && margin[i] == indent[i]) i++;
+                margin = margin[..i];
+            }
+        }
+        return string.IsNullOrEmpty(margin) ? text : Regex.Replace(text, "(?m)^" + Regex.Escape(margin), "");
+    }
+
+    /// <summary>
+    /// urllib.parse.quote_plus: what Python's urlencode does to each key and value. Letters, digits and "_.-~"
+    /// stay, a space becomes "+", and everything else becomes %XX of its UTF-8 bytes.
+    /// </summary>
+    public static string QuotePlus(string s)
+    {
+        var sb = new StringBuilder();
+        foreach (byte b in Encoding.UTF8.GetBytes(s))
+        {
+            char c = (char)b;
+            if (char.IsAsciiLetterOrDigit(c) || c is '_' or '.' or '-' or '~') sb.Append(c);
+            else if (c == ' ') sb.Append('+');
+            else sb.Append('%').Append(b.ToString("X2", Inv));
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>urllib.parse.urlencode(dict).</summary>
+    public static string UrlEncode(IEnumerable<(string Key, string Value)> pairs) =>
+        string.Join("&", pairs.Select(p => QuotePlus(p.Key) + "=" + QuotePlus(p.Value)));
+
+    /// <summary>urllib.parse.parse_qs(q) with the first value of each key: blank values are dropped, as there.</summary>
+    public static Dictionary<string, string> ParseQs(string query)
+    {
+        var result = new Dictionary<string, string>();
+        foreach (string part in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            int eq = part.IndexOf('=');
+            if (eq < 0) continue;
+            string key = Unquote(part[..eq]), value = Unquote(part[(eq + 1)..]);
+            if (value.Length > 0) result.TryAdd(key, value);
+        }
+        return result;
+        static string Unquote(string s) => Uri.UnescapeDataString(s.Replace('+', ' '));
     }
 }
