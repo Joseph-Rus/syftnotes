@@ -59,6 +59,12 @@ public sealed class Lecture
     public int Tries { get; set; }
     /// <summary>The calendar event it was recorded during (its title named the lecture); null when there was none.</summary>
     public Calendar.RecordedEvent? Event { get; set; }
+    /// <summary>What the student typed while it recorded, as they typed it (Markdown: "# " starts a heading, "- " a
+    /// bullet). It goes to the library with the transcript, and the notes are written around it.</summary>
+    public string Notes { get; set; } = "";
+    /// <summary>The student typed the title themselves: the library keeps it, rather than naming the lecture from
+    /// what was said.</summary>
+    public bool TitleTyped { get; set; }
 
     [JsonIgnore]
     public double Progress => Seconds <= 0 ? 0 : Math.Clamp(TranscribedSeconds / Seconds, 0, 1);
@@ -75,15 +81,18 @@ public sealed class Lecture
     /// <summary>What the library's /api/ingest takes.</summary>
     public System.Text.Json.Nodes.JsonObject Payload()
     {
+        // Until the library names it from what was said: its folder and the day ("CS 101, Tue 22 Sep": a folder can be a
+        // class, a club or work, so it isn't called a lecture here), or in no folder "Recording, Sat 10 Oct at 4:12 PM".
         string title = Title.Length > 0 ? Title
-            : ClassName.Length > 0 ? $"{ClassName} lecture, {StartedAt.ToString("ddd d MMM", CultureInfo.InvariantCulture)}"
-            : $"Lecture, {StartedAt.ToString("ddd d MMM", CultureInfo.InvariantCulture)}";
+            : ClassName.Length > 0 ? $"{ClassName}, {StartedAt.ToString("ddd d MMM", CultureInfo.InvariantCulture)}"
+            : $"Recording, {StartedAt.ToString("ddd d MMM 'at' h:mm tt", CultureInfo.InvariantCulture)}";
         var raw = new System.Text.Json.Nodes.JsonObject
         {
             ["source"] = "recorder", ["seconds"] = Math.Round(Seconds, 1), ["language"] = Language,
         };
         if (Event is not null) raw["event"] = Event.Json();
-        return new System.Text.Json.Nodes.JsonObject
+        if (TitleTyped && Title.Length > 0) raw[Meeting.TitleBy] = Meeting.ByHand;
+        var payload = new System.Text.Json.Nodes.JsonObject
         {
             ["id"] = Id,
             ["title"] = title,
@@ -93,6 +102,10 @@ public sealed class Lecture
             ["transcript"] = Transcript(),
             ["raw"] = raw,
         };
+        // What the student typed is theirs alone until now: the library keeps it with the lecture, apart from the notes
+        // it writes, and writes those around it.
+        if (Notes.Trim().Length > 0) payload["private_notes"] = Notes.Trim();
+        return payload;
     }
 }
 

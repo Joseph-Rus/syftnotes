@@ -115,9 +115,14 @@ public static class NotesPdf
         footer.Children.Add(footerPage);
         // The look's tokens in the light look and the first colour theme: paper is white, whatever the screen shows.
         var host = new StackPanel { Children = { column, footer }, Resources = Skin.Build(Skin.Current, ColourThemes.Default) };
-        // A plain colon throughout, not the raised one SF Pro and Inter put between figures: that glyph stands for no
-        // letter, so "3:1" or a time like 10:30 would copy, and be found by a search, as "3 1".
-        host.SetValue(TextElement.FontFeaturesProperty, FontFeatureCollection.Parse("-calt"));
+        // Plain figures and a plain colon throughout: on screen the app's figures are all one width (a font feature
+        // that swaps each for another drawing of it), and a system font raises the colon between figures; either
+        // drawing stands for no letter in a PDF, so "3:1" or a time like 10:30 would copy, and be found by a search,
+        // as something else. The app's own style asks for the feature on every piece of text, so paper says otherwise
+        // the same way, nearer the text.
+        var plain = FontFeatureCollection.Parse("-calt, -tnum");
+        host.SetValue(TextElement.FontFeaturesProperty, plain);
+        host.Styles.Add(new Style(x => x.Is<TextBlock>()) { Setters = { new Setter(TextElement.FontFeaturesProperty, plain) } });
         // Never shown: it's what gives the pieces the app's styles, and the light look.
         var window = new Window { Content = host, RequestedThemeVariant = ThemeVariant.Light, ShowInTaskbar = false, ShowActivated = false };
         try

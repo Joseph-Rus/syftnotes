@@ -14,8 +14,8 @@ using StudyStash.App.Windows;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>The Mac's glass: in the screenshots it blurs, saturates and brightens what's behind it the way the design
-/// does; in the app it never blurs, and a floating window's glass is solid.</summary>
+/// <summary>The Mac's panes: plain white sheets in this look. The control behind them can still blur, saturate and
+/// brighten what's behind it when it's given a filter (the look before did); the look gives it none.</summary>
 public class GlassTests
 {
     static void Mac()
@@ -56,8 +56,9 @@ public class GlassTests
         HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top,
     };
 
-    /// <summary>Black and blue stripes under two panes: through the one that blurs they melt into one colour; through
-    /// the other they still show.</summary>
+    /// <summary>Black and blue stripes under two panes, each given the old look's filter: through the one that blurs
+    /// they melt into one colour; through the other they still show. (The look's own panes are plain white sheets
+    /// now, with no filter: <see cref="A_floating_window_on_the_Mac_has_a_plain_sheet"/>.)</summary>
     [AvaloniaFact]
     public void Glass_blurs_what_is_behind_it_in_shots()
     {
@@ -67,6 +68,11 @@ public class GlassTests
             stripes.Children.Add(new Border { Width = 10, Height = 320, Background = i % 2 == 0 ? Brushes.Black : new SolidColorBrush(Color.Parse("#6FA8F0")) });
         var blurred = Pane(40, 60, 180, 200);
         var clear = Pane(280, 60, 180, 200);
+        foreach (var pane in new[] { blurred, clear })
+        {
+            pane.Background = new SolidColorBrush(Color.FromArgb(0x6B, 255, 255, 255));
+            pane.Filter = new GlassFilter(22, 2.0, 1.04);
+        }
         Glass.SetBlurBackdrop(blurred, true);
         var frame = Draw(new Panel { Children = { stripes, blurred, clear } }, 500, 320);
 
@@ -110,10 +116,11 @@ public class GlassTests
     static Color Token(string key, ThemeVariant variant) =>
         Skin.Build(Skin.Current).TryGetResource(key, variant, out var v) ? ((ISolidColorBrush)v!).Color : default;
 
-    /// <summary>The app's floating windows (the dropdown, the recorder, the quick panel) are clear, so on the Mac their
-    /// glass is the solid kind, and nothing in the app blurs its backdrop; an ordinary window keeps the see-through glass.</summary>
+    /// <summary>The app's panes (the dropdown, the recorder, the quick panel, a toolbar) are plain sheets in the page's
+    /// white, floating or not: nothing see-through, nothing blurred behind them, a hairline round each and a shadow
+    /// under the floating ones.</summary>
     [AvaloniaFact]
-    public void A_floating_window_on_the_Mac_has_solid_glass()
+    public void A_floating_window_on_the_Mac_has_a_plain_sheet()
     {
         Mac();
         var floating = Pane(0, 0, 200, 100);
@@ -128,11 +135,11 @@ public class GlassTests
             Dispatcher.UIThread.RunJobs();
             Assert.Contains("solidglass", popup.Classes);
             Assert.DoesNotContain("solidglass", window.Classes);
-            Assert.Equal(Token("GlassSolid", ThemeVariant.Light), Fill(floating));
-            Assert.Equal(Token("Glass", ThemeVariant.Light), Fill(ordinary));
+            Assert.Equal(Skin.Light.Surface, Fill(floating));
+            Assert.Equal(Skin.Light.Surface, Fill(ordinary));
             Assert.False(Glass.GetBlurBackdrop(floating));
-            Assert.Equal(22, floating.Filter?.Blur);
-            Assert.True(floating.BoxShadow.Count > 0, "the glass has its edge highlights and shadow");
+            Assert.Equal(0, floating.Filter?.Blur);
+            Assert.True(floating.BoxShadow.Count > 0, "the sheet has its hairline and shadow");
         }
         finally
         {

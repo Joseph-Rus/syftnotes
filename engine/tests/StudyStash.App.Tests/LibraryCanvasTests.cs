@@ -193,7 +193,8 @@ public class LibraryCanvasTests
             Assert.Empty((await client.FindCoursesAsync(stop))!.Error);
             var watch = new CanvasWatch(context);
             using var feed = new CanvasFeed(context, watch);
-            var due = new CanvasDueModel(context);
+            // What Due's calendar would show: everything the feed last read as due.
+            List<CanvasApi.Item> due = [];
             int updates = 0;
             // The app shows updates on its UI thread; here a lock stands in for it.
             var ui = new Lock();
@@ -206,7 +207,7 @@ public class LibraryCanvasTests
                 lock (ui)
                 {
                     updates++;
-                    if (feed.Due is { } d) due.Show(d);
+                    if (feed.Due is { } d) due = [.. d.Groups.SelectMany(g => g.Items)];
                 }
             };
 
@@ -216,7 +217,7 @@ public class LibraryCanvasTests
                 await watch.RefreshAsync(stop);
                 return feed.Due is not null;
             }, "the first look", 60);
-            Assert.True(Shows(() => due.IsEmpty));
+            Assert.True(Shows(() => due.Count == 0));
             Assert.False(feed.Linked);
 
             // Linking the courses shows without a sync (the sidebar's Due appears), and the sync that follows fills the page.
@@ -231,9 +232,9 @@ public class LibraryCanvasTests
             await Until(async () =>
             {
                 await watch.RefreshAsync(stop);
-                return !Shows(() => due.IsEmpty);
+                return !Shows(() => due.Count == 0);
             }, "the Due page to fill in after the sync", 90);
-            Assert.True(Shows(() => due.Groups.SelectMany(g => g.Rows).Any(r => r.Class == "CS 101")));
+            Assert.True(Shows(() => due.Any(i => i.Class == "CS 101")));
             Assert.True(Shows(() => updates >= 2));
 
             // Once caught up, another look with nothing new reads nothing again. The sync can still be writing its last

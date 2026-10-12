@@ -1,4 +1,4 @@
-<!-- "Delete this lecture?": asked in the library window before a lecture goes, as a Windows 11 content dialog over the
+<!-- "Delete this lecture?" (or meeting, or recording): asked in the library window before a note goes, as a Windows 11 content dialog over the
      page. Cancel and Delete share the footer, one height; Escape cancels. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -38,7 +38,7 @@
         </Grid>
       </Border>
       <StackPanel Spacing="12" Margin="24,24,24,24">
-        <TextBlock Text="Delete this lecture?" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding Deleting.Ask, FallbackValue=''}" FontFamily="{DynamicResource DisplayFont}" FontSize="20" FontWeight="SemiBold" />
         <TextBlock Text="{Binding Deleting.Warning, FallbackValue=''}" FontSize="14" LineHeight="20" TextWrapping="Wrap" />
       </StackPanel>
     </DockPanel>

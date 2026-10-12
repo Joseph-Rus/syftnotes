@@ -13,15 +13,18 @@ using StudyStash.App.Platform;
 
 namespace StudyStash.App;
 
-/// <summary>The shell's library side: the full app's columns (a class's lectures, Canvas's Due and a linked class's
-/// own page, a lecture with its notes and ask bar, an assignment), search, and moving lectures.</summary>
+/// <summary>The shell's library side: the sidebar, a note's page (its notes, its transcript and its ask bar; while it
+/// records, the student's own notes and what's been heard), search, and deleting and exporting notes. The pages
+/// beside it (Home, Due, a folder's page, Canvas's lists) are in Shell.Overview.cs.</summary>
 public static partial class Shell
 {
+    /// <summary>The folder in mind: the one whose page showed last, or whose note is open.</summary>
     static string? openClass;
+    /// <summary>The note whose page is open; null when another page is.</summary>
     static string? openLecture;
     static int searchTurn;
-    /// <summary>Every load of the library window (the whole thing, or one class) takes the next turn: a load that's
-    /// no longer the latest by the time it's back stops instead of clobbering what a later one already drew.</summary>
+    /// <summary>Every whole load of the library window takes the next turn: one that's no longer the latest by the
+    /// time it's back stops instead of clobbering what a later one already drew.</summary>
     static int libraryTurn;
     static bool libraryReloadQueued;
 
@@ -40,8 +43,7 @@ public static partial class Shell
             if (quitting || mainWindow?.IsVisible != true) return;
             // Back after being away (the window opened before the library was up, say): its classes too, not just the
             // page showing, which may be "Can't reach your library" with no classes beside it.
-            _ = all ? LoadLibraryAsync() : dueOpen ? ShowDueAsync() : overviewOf is { } over ? ShowOverviewAsync(over)
-                : openClass is { } cls ? ShowClassAsync(cls) : Task.CompletedTask;
+            _ = all ? LoadLibraryAsync() : ReshowAsync();
             // The page showing has its new note; the sidebar's counts beside it follow (a whole load does its own).
             if (!all) _ = RefreshCountsAsync();
         }, TimeSpan.FromSeconds(1));
@@ -83,7 +85,8 @@ public static partial class Shell
         return l["seconds"] is JsonValue v && v.TryGetValue(out double s) ? $"{day} · {TimedText.Length(s)}" : day;
     }
 
-    /// <summary>Puts a class in a sidebar folder of the student's own ("" back to Classes), then shows the sidebar again.</summary>
+    /// <summary>Puts a folder in a sidebar group (Clubs, Work, or one of the student's own; "" back to Classes), then
+    /// shows the sidebar again. What its recordings are called follows: lectures in Classes, meetings anywhere else.</summary>
     static async Task MoveToFolderAsync(string cls, string group)
     {
         if (host.Remote() is not { } lib) return;
@@ -96,68 +99,90 @@ public static partial class Shell
             Toast("Couldn't move it", e.Message, null, null);
             return;
         }
-        bool wasSelected = library.Classes.Any(c => c.Name == cls && c.Selected);
         await LoadLibraryAsync();
-        if (wasSelected) foreach (var c in library.Classes) c.Selected = c.Name == cls;
+    }
+
+    /// <summary>The groups every sidebar offers a folder, whether or not anything is in them yet.</summary>
+    static readonly string[] StandardGroups = ["Clubs", "Work"];
+
+    /// <summary>The sidebar's folders, as the library has them now: Classes first, then each other group (Clubs, Work,
+    /// one of the student's own) under its name, in the order they were made.</summary>
+    static void ShowSidebar()
+    {
+        var due = library.Classes.FirstOrDefault(c => c.IsDue);
+        library.Classes.Clear();
+        if (due is not null) library.Classes.Add(due);
+        var all = host.Classes().Select(c => (c.Name, c.Color, c.Lectures, Group: host.GroupOf(c.Name))).ToList();
+        var groups = all.Select(c => c.Group).Where(g => g.Length > 0).Distinct().ToList();
+        var offered = StandardGroups.Concat(groups).Distinct().ToList();
+        foreach (var group in new[] { "" }.Concat(groups))
+        {
+            bool first = true;
+            foreach (var (name, color, count, _) in all.Where(c => c.Group == group))
+            {
+                var item = new ClassItem { Name = name, Dot = Skin.ClassDot(color), Count = count, Group = group, Section = first && group.Length > 0 ? group : "" };
+                item.MoveChoices = [.. new[] { "" }.Concat(offered).Where(g => g != group)
+                    .Select(g => new FolderChoice(g.Length == 0 ? "Classes" : g, new CommunityToolkit.Mvvm.Input.RelayCommand(() => _ = MoveToFolderAsync(name, g)))),
+                    new FolderChoice("New group…", new CommunityToolkit.Mvvm.Input.RelayCommand(() => library.NamingFolder = new NewFolderAsk(name)))];
+                library.Classes.Add(item);
+                first = false;
+            }
+        }
+        // A folder removed (in Settings, say) isn't left in mind.
+        if (openClass is not null && library.Classes.All(c => c.Name != openClass)) openClass = null;
+        if (overviewOf is { Length: > 0 } over && over != DueHome && library.Classes.All(c => c.Name != over)) overviewOf = "";
+        if (openCanvasClass is { } canvas && library.Classes.All(c => c.Name != canvas)) openCanvasClass = null;
     }
 
     static async Task LoadLibraryAsync()
     {
         int turn = ++libraryTurn;
         await host.CheckLibraryAsync();
-        if (turn != libraryTurn) return; // a later load (or an explicit class) has already taken over
-        library.Classes.Clear();
-        // Classes first, then each folder of the student's own ("Projects") under its name, in the order they were made.
-        var all = host.Classes().Select(c => (c.Name, c.Color, c.Lectures, Group: host.GroupOf(c.Name))).ToList();
-        var folders = all.Select(c => c.Group).Where(g => g.Length > 0).Distinct().ToList();
-        foreach (var group in new[] { "" }.Concat(folders))
-        {
-            bool first = true;
-            foreach (var (name, color, count, _) in all.Where(c => c.Group == group))
-            {
-                var item = new ClassItem { Name = name, Dot = Skin.ClassDot(color), Count = count, Group = group, Section = first && group.Length > 0 ? group : "" };
-                item.MoveChoices = [.. new[] { "" }.Concat(folders).Where(g => g != group)
-                    .Select(g => new FolderChoice(g.Length == 0 ? "Classes" : g, new CommunityToolkit.Mvvm.Input.RelayCommand(() => _ = MoveToFolderAsync(name, g)))),
-                    new FolderChoice("New folder…", new CommunityToolkit.Mvvm.Input.RelayCommand(() => library.NamingFolder = new NewFolderAsk(name)))];
-                library.Classes.Add(item);
-                first = false;
-            }
-        }
-        // A class removed (in Settings, say) isn't left open.
-        if (openClass is not null && openClass != Configs.Unsorted && library.Classes.All(c => c.Name != openClass)) openClass = null;
+        if (turn != libraryTurn) return; // a later load has already taken over
+        ShowSidebar();
         if (host.Library == LibraryState.Connected && !host.OlderLibrary && canvasDue is null) await LoadCanvasAsync();
         if (turn != libraryTurn) return;
         UpdateDueItem();
         UpdateNextDue();
         int unsorted = host.Overview?["unsorted"]?.GetValue<int>() ?? 0;
-        library.Unsorted.Count = unsorted;
+        library.UnsortedCount = unsorted;
         if (host.Library != LibraryState.Connected || host.OlderLibrary)
         {
-            LeaveOverview();
-            ShowLectureList();
-            library.Groups.Clear();
-            library.ClassTitle = "";
-            library.ClassCount = "";
-            library.Note = null;
+            // A recording can still be taken (and its notes typed) with the library away: its page stays.
+            if (library.Note is { Live: true }) return;
+            ++pageTurn;
+            ClearPane();
+            library.Overview = null;
+            SelectInSidebar(null, home: true);
             library.Empty = host.OlderLibrary ? "Your library runs an older Study Stash. It files your lectures, but update it to browse, search and ask here."
                 : host.Library switch
             {
-                LibraryState.NotSetUp => "Connect to your library in Settings to see your lectures here.",
+                LibraryState.NotSetUp => "Connect to your library in Settings to see your notes here.",
                 LibraryState.WrongPassword => "Your library's password changed. Sign in again in Settings.",
-                _ => "Can't reach your library. Lectures you record wait on this computer until it's back.",
+                _ => "Can't reach your library. What you record waits on this computer until it's back.",
             };
             return;
         }
+        library.Empty = null;
         AskForSupportIfDue(host.Classes().Sum(c => c.Lectures) + unsorted);
-        if ((dueOpen || dueSelection is not null) && library.Classes.FirstOrDefault(c => c.IsDue) is not null)
+        _ = HearNotesWriterAsync();
+        await ReshowAsync();
+    }
+
+    /// <summary>The page the window is on, read again: a note filed, a class linked, the library back. No step in
+    /// Back and Forward.</summary>
+    static async Task ReshowAsync()
+    {
+        bool was = restoring;
+        restoring = true;
+        try
         {
-            await ShowDueAsync();
-            return;
+            await GoToAsync(Here());
         }
-        // Home, unless the student was somewhere else: a class's home, or a class's lectures or Canvas page.
-        if (overviewOf is { } over) await ShowOverviewAsync(over);
-        else if (openClass is { } cls) await ShowClassAsync(cls);
-        else await ShowHomeAsync();
+        finally
+        {
+            restoring = was;
+        }
     }
 
     /// <summary>The library window asks for a tip atop the lecture list when <see cref="SupportAsk.Due"/> says it's
@@ -170,209 +195,73 @@ public static partial class Shell
         else library.Support = null;
     }
 
-    static async Task ShowClassAsync(string name)
-    {
-        int turn = ++libraryTurn;
-        LeaveOverview();
-        if (openClass != name) allLectures = false;
-        // Back to the class's home from its lectures (Unsorted has no home).
-        library.CanShowClassPage = name != Configs.Unsorted;
-        openClass = name;
-        dueOpen = false;
-        dueSelection = null;
-        foreach (var c in library.Classes) c.Selected = c.Name == name && !c.IsDue;
-        library.Unsorted.Selected = name == Configs.Unsorted;
-        library.ClassTitle = name;
-        ShowClassFiles(name);
-        if (host.Remote() is not { } lib) return;
-        JsonArray list;
-        try
-        {
-            list = await lib.LecturesAsync(name, 200, null);
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
-        {
-            if (turn == libraryTurn) library.Empty = "Can't reach your library right now.";
-            return;
-        }
-        if (turn != libraryTurn) return; // a later class (or a whole reload) has already taken over
-        library.ClassCount = $"{list.Count} lecture{(list.Count == 1 ? "" : "s")}";
-        library.Groups.Clear();
-        var lectures = list.OfType<JsonObject>().ToList();
-        library.Empty = lectures.Count > 0 ? null
-            : name == Configs.Unsorted ? "Nothing to sort. A lecture the library can't place in a class waits here for you to file."
-            : $"No lectures in {name} yet. Record one and it lands here.";
-        var today = DateTime.Today;
-        var weekStart = today.AddDays(-(((int)today.DayOfWeek + 6) % 7)); // Monday
-        string GroupOf(JsonObject l)
-        {
-            var d = Date(S(l["date"]))?.LocalDateTime.Date ?? today;
-            if (d >= weekStart) return "This week";
-            if (d >= weekStart.AddDays(-7)) return "Last week";
-            return d.ToString("MMMM yyyy", CultureInfo.InvariantCulture) is var m && d.Year == today.Year ? d.ToString("MMMM", CultureInfo.InvariantCulture) : m;
-        }
-        foreach (var g in lectures.GroupBy(GroupOf))
-        {
-            var group = new LectureGroup { Label = g.Key, First = library.Groups.Count == 0 };
-            var items = g.ToList();
-            for (int i = 0; i < items.Count; i++)
-            {
-                var l = items[i];
-                bool writing = S(l["status"]) is "queued" or "working";
-                group.Items.Add(new LectureCard
-                {
-                    Id = S(l["id"]), Title = S(l["title"]), Meta = CardMeta(l), Summary = writing ? "Writing notes…" : S(l["summary"]), ClassName = S(l["class"]),
-                    Last = i == items.Count - 1 && ReferenceEquals(g.Key, lectures.GroupBy(GroupOf).Last().Key),
-                });
-            }
-            library.Groups.Add(group);
-        }
-        // A class linked to Canvas gets its own page: its lectures, what's to hand in, modules, files, announcements.
-        // Its Lectures tab is the full list above, by week; the other tabs are Canvas's own lists.
-        if (CanvasClassRow(name) is { } row)
-        {
-            bool fresh = !(library.CanvasClass is { } open && openCanvasClass == name);
-            var page = fresh ? NewCanvasClass() : library.CanvasClass!;
-            openCanvasClass = name;
-            var ctx = Canvas();
-            page.SetLectures([.. lectures.Take(3).Select(l =>
-            {
-                string id = S(l["id"]);
-                return new LectureRow(S(l["title"]), Date(S(l["date"])) is { } d ? CanvasWords.ShortDay(d, ctx.Clock.Zone) : "", () =>
-                {
-                    Remember();
-                    OpenFromList(() => ShowLectureAsync(id));
-                });
-            })], lectures.Count);
-            // Nothing recorded for it yet: its page opens on what's to hand in, not an empty Lectures tab.
-            if (allLectures) page.Tab = ClassTab.Lectures;
-            else if (fresh && lectures.Count == 0) page.Tab = ClassTab.Assignments;
-            library.CanvasClass = page;
-            library.List = LibraryList.CanvasClass;
-            try
-            {
-                await page.LoadAsync(row);
-            }
-            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException)
-            {
-            }
-            if (turn != libraryTurn) return;
-            // A notification's announcement: its own reader, not a lecture.
-            if (announcementToOpen is { } announcement)
-            {
-                announcementToOpen = null;
-                if (page.OpenAnnouncement(announcement.ToString(CultureInfo.InvariantCulture))) return;
-            }
-        }
-        else ShowLectureList();
-        library.NoNoteText = lectures.Count > 0 ? "Choose a lecture to read its notes."
-            : name == Configs.Unsorted ? "Every lecture is in a class."
-            : library.List == LibraryList.CanvasClass ? $"No lectures in {name} yet. Its assignments are on the Assignments tab."
-            : $"No lectures in {name} yet.";
-        string? pick = openLecture is not null && lectures.Any(l => S(l["id"]) == openLecture) ? openLecture : lectures.Select(l => S(l["id"])).FirstOrDefault();
-        if (pick is not null) await ShowLectureAsync(pick);
-        else
-        {
-            ClearDetail();
-            library.Note = null;
-        }
-    }
-
-    /// <summary>The class page's "All 12 lectures": this class's lectures by week, until the class is picked again.</summary>
-    static bool allLectures;
-    static string? openCanvasClass;
-
-    static CanvasClassModel NewCanvasClass() => new(Canvas())
-    {
-        OnAssignment = (cls, id) =>
-        {
-            Remember();
-            OpenFromList(() => ShowAssignmentAsync(cls, id));
-        },
-        OnReader = reader => OpenFromList(() =>
-        {
-            Remember();
-            library.Assignment = null;
-            library.Reader = reader;
-            return Task.CompletedTask;
-        }),
-        OnLecturesTab = from =>
-        {
-            if (library.Assignment is null && library.Reader is null) return;
-            Remember(from);
-            ClearDetail();
-        },
-        OnAllLectures = () =>
-        {
-            Remember();
-            allLectures = true;
-            if (library.CanvasClass is { } page) page.Tab = ClassTab.Lectures;
-        },
-    };
-
-    /// <summary>The middle column goes back to plain lectures by week (no Canvas list over it).</summary>
-    static void ShowLectureList()
-    {
-        library.List = LibraryList.Lectures;
-        library.CanvasClass = null;
-        openCanvasClass = null;
-    }
-
-    /// <summary>The right column goes back to the lecture: no assignment or Canvas page over it.</summary>
-    static void ClearDetail()
-    {
-        library.Assignment = null;
-        library.Reader = null;
-    }
-
-    /// <summary>Something the student picked from a list (not the page's own first pick): in a narrow window it takes
-    /// the list's place.</summary>
-    static void OpenFromList(Func<Task> open)
-    {
-        library.Opened();
-        _ = open();
-    }
-
+    /// <summary>A note's page: a lecture, a meeting or a recording, filling the pane. One that's being recorded shows
+    /// as that (its bar, the student's own notes, what's been heard); one this computer hasn't sent to the library yet
+    /// shows what it has; any other is the library's.</summary>
     static async Task ShowLectureAsync(string id, bool transcript = false)
     {
+        if (host.Recorder.Current is { } live && live.Id == id)
+        {
+            ShowRecordingPage();
+            return;
+        }
+        int turn = ++pageTurn;
+        LeavePage();
         openLecture = id;
-        foreach (var g in library.Groups)
-            foreach (var c in g.Items) c.Selected = c.Id == id;
-        if (host.Remote() is not { } lib) return;
-        ClearDetail();
+        bool showing = library.Overview is null && library.Assignment is null && library.CanvasClass is null && library.Note is { Live: false } on && on.Id == id;
         // Its notes are being edited: the page stays as it is under the student's typing, however it came to be shown
-        // again (a new lecture was filed, a file was attached, a click on its own row).
-        if (library.Notes is { Editing: true } edited && edited.LectureId == id && library.Note is { } shown && shown.Id == id)
+        // again (a new note was filed, a file was attached).
+        if (showing && library.Notes is { Editing: true } edited && edited.LectureId == id)
         {
-            if (transcript) shown.ShowTranscript = true;
+            if (transcript) library.Note!.ShowTranscript = true;
             return;
         }
-        JsonObject? l;
-        try
+        JsonObject? l = null;
+        bool reached = false;
+        if (host.Remote() is { } lib)
         {
-            l = await lib.LectureAsync(id);
+            try
+            {
+                l = await lib.LectureAsync(id);
+                reached = true;
+            }
+            catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+            {
+            }
         }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        // Another page was asked for while this one loaded (a notification's Open note, a click): that one shows.
+        if (turn != pageTurn) return;
+        if (l is null)
         {
+            // Not in the library (yet): one recorded here that's still being written down or sent shows what it has.
+            if (host.Lectures.Get(id) is { } local) ShowLocalLecture(local, transcript);
+            else if (reached && !showing) await ShowHomeAsync(); // it's gone (deleted on another computer): nothing to open
             return;
         }
-        // Another lecture was asked for while this one loaded (a notification's Open note, a click): that one shows.
-        if (l is null || openLecture != id) return;
-        var date = Date(S(l["date"]))?.LocalDateTime;
-        string meta = string.Join(" · ", new[]
+        string cls = S(l["class"]) is { } c && c != Configs.Unsorted ? c : "";
+        openClass = cls.Length > 0 ? cls : null;
+        SelectInSidebar(openClass);
+        string status = S(l["status"]), notes = S(l["notes"]), typed = S(l["typed"]), noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
+        bool writing = status is "queued" or "working";
+        string stamp = string.Join("\u0001", S(l["title"]), cls, status, notes, typed, S(l["error"]), S(l["transcript"]).Length, S(l["updated"]));
+        // Read again and nothing changed: the page stays as it is (where it's scrolled to, what's typed in Ask).
+        if (showing && library.Note!.Stamp == stamp)
         {
-            S(l["class"]), date?.ToString("dddd d MMMM", CultureInfo.InvariantCulture) ?? "",
-            l["seconds"] is JsonValue v && v.TryGetValue(out double s) ? TimedText.Length(s) : "",
-        }.Where(x => x.Length > 0));
-        string status = S(l["status"]);
-        string notes = S(l["notes"]);
+            if (transcript) library.Note.ShowTranscript = true;
+            return;
+        }
+        // No notes written (yet): what the student typed while it recorded is all there is to read, and it's theirs.
+        bool mine = notes.Length == 0 && typed.Trim().Length > 0;
         var note = new NoteModel
         {
-            Id = id, ClassName = S(l["class"]), Dot = DotFor(S(l["class"])), Meta = meta, Title = S(l["title"]), Markdown = notes,
-            Pending = status is "queued" or "working" ? "The library is writing the notes for this lecture. They show here when they're done."
-                : notes.Length == 0 ? S(l["error"]) is { Length: > 0 } err ? err : "There are no notes for this lecture." : null,
-            ShowTranscript = transcript,
-        };
+            Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(Date(S(l["date"])), l["seconds"] is JsonValue v && v.TryGetValue(out double s) ? s : null),
+            Title = S(l["title"]), Markdown = mine ? TypedNotes.AllMine(typed) : notes, Mine = mine, Stamp = stamp,
+            Pending = writing ? $"Your library is writing the notes for this {noun}. They show here when they're done."
+                : notes.Length == 0 ? S(l["error"]) is { Length: > 0 } err ? err : mine ? null : $"There are no notes for this {noun}." : null,
+            ShowTranscript = transcript || (showing && library.Note!.ShowTranscript),
+            // The library doesn't take a new name while it's still writing the notes (it would write its own over it).
+            OnRename = host.Remote() is { } remote && !host.OlderLibrary ? title => RenameAsync(remote, id, title) : null,
+        }.Titled();
         // A transcript without times (one pasted from another app) reads a paragraph per line it came with (each
         // speaker's turn), not as one wall of text.
         bool timed = TimedText.HasTimes(S(l["transcript"]));
@@ -383,9 +272,94 @@ public static partial class Shell
             note.Transcript.Add(new HeardLine { Time = timed ? TimedText.Clock(line.Start) : "", Text = line.Text, Start = timed ? line.Start : null });
             if (timed) note.Spoken.Add(line);
         }
+        FlushTyped();
+        library.NarrowDetail = false;
+        library.Assignment = null;
+        library.Reader = null;
+        library.CanvasClass = null;
+        library.Overview = null;
         library.Note = note;
         ShowLectureAi(l, note);
         ShowLectureFiles(note);
+    }
+
+    /// <summary>When a note was, and how long: "Monday 12 October at 9:30 AM, 52 min" (with its year once that isn't
+    /// this one).</summary>
+    internal static string NoteWhen(DateTimeOffset? date, double? seconds)
+    {
+        string when = date?.LocalDateTime is { } d
+            ? d.ToString(d.Year == DateTime.Today.Year ? "dddd d MMMM 'at' h:mm tt" : "dddd d MMMM yyyy 'at' h:mm tt", CultureInfo.InvariantCulture) : "";
+        return string.Join(", ", new[] { when, seconds is { } s ? TimedText.Length(s) : "" }.Where(x => x.Length > 0));
+    }
+
+    /// <summary>The title a recording goes by until it has one of its own: its event's or its folder's name and the
+    /// day ("Machine Learning, Mon 12 Oct"), or with neither "Recording, Mon 12 Oct at 1:45 PM".</summary>
+    internal static string WorkingTitle(Lecture l)
+    {
+        var at = l.StartedAt.LocalDateTime;
+        string day = at.ToString("ddd d MMM", CultureInfo.InvariantCulture);
+        if (l.TitleTyped && l.Title.Length > 0) return l.Title;
+        if (l.Title.Length > 0) return $"{ClassNames.Display(l.Title)}, {day}";
+        return l.ClassName.Length > 0 ? $"{ClassNames.Display(l.ClassName)}, {day}" : $"Recording, {day} at {at.ToString("h:mm tt", CultureInfo.InvariantCulture)}";
+    }
+
+    static async Task<bool> RenameAsync(RemoteLibrary lib, string id, string title)
+    {
+        try
+        {
+            await lib.RenameAsync(id, title);
+            return true;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            Toast("Couldn't rename it", e is LibraryRefusedException ? e.Message : "Your library didn't answer. Try again in a moment.", null, null);
+            return false;
+        }
+    }
+
+    /// <summary>What a recording's page on this computer was drawn from: when it reads differently, the page is drawn again.</summary>
+    static string LocalStamp(Lecture l) => string.Join("\u0001", "local", l.State, l.Title, l.ClassName, l.Notes, l.Error, l.Segments.Count);
+    static DateTime lastLocalLook = DateTime.MinValue;
+
+    /// <summary>A recording this computer made that the library doesn't have yet (it's still being written down here,
+    /// or waiting to be sent): its page shows what there is (what was typed while it recorded, what's been written
+    /// down so far) and says where it is on its way.</summary>
+    static void ShowLocalLecture(Lecture l, bool transcript)
+    {
+        string cls = l.ClassName, noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
+        string stamp = LocalStamp(l);
+        bool showing = library.Overview is null && library.Assignment is null && library.CanvasClass is null && library.Note is { Live: false } on && on.Id == l.Id;
+        if (showing && library.Note!.Stamp == stamp) return;
+        openClass = cls.Length > 0 ? cls : null;
+        SelectInSidebar(openClass);
+        string id = l.Id;
+        var note = new NoteModel
+        {
+            Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(l.StartedAt, l.Seconds > 0 ? l.Seconds : null), Title = WorkingTitle(l),
+            Markdown = l.Notes.Trim().Length > 0 ? TypedNotes.AllMine(l.Notes.Trim()) : "", Mine = true, Stamp = stamp, Local = true,
+            Pending = l.State switch
+            {
+                LectureState.Failed => l.Error.Length > 0 ? l.Error : $"This {noun} couldn't be written down.",
+                LectureState.Transcribing => $"This {noun} is being written down on this computer. Its notes come once that's done and your library has it.",
+                _ => host.Library == LibraryState.Connected ? $"On its way to your library, which writes the notes for this {noun}. They show here when they're done."
+                    : $"Waiting for your library. The notes for this {noun} are written once it's back.",
+            },
+            ShowTranscript = transcript || (showing && library.Note!.ShowTranscript),
+            // Until it's sent, a name typed here goes with it; after that the library's copy is the one to rename.
+            OnRename = l.State is LectureState.Transcribing ? title =>
+            {
+                host.TitleLecture(id, title);
+                return Task.FromResult(true);
+            } : null,
+        }.Titled();
+        foreach (var line in l.Segments)
+        {
+            note.Transcript.Add(new HeardLine { Time = TimedText.Clock(line.Start), Text = line.Text, Start = line.Start });
+            note.Spoken.Add(line);
+        }
+        ClearPane();
+        library.Overview = null;
+        library.Note = note;
     }
 
     /// <summary>A long run of speech as paragraphs of a few sentences each (about <paramref name="size"/> characters),
@@ -445,13 +419,18 @@ public static partial class Shell
         // Typing that was in this lecture's editor when the app last quit goes back into it.
         if (fresh && EarlierDrafts().Remove(note.Id, out var draft)) notes!.RestoreEdit(draft.From, draft.Text);
         else if (notes is not null && !ReferenceEquals(before, notes)) _ = notes.Refresh(); // kept: the library says where they stand now
+        // The same note read again keeps its ask bar, with what's typed and answered in it.
+        if (library.Ask is { } kept && kept.LectureId == note.Id && kept.Live is null) return;
         var ask = new AiAskModel(ai)
         {
-            LectureId = note.Id, ClassName = note.ClassName,
+            LectureId = note.Id, ClassName = note.HasClass ? note.ClassName : null,
             OpenSettings = () => ShowSettings("AI"),
             OnSource = s => PlaySource(s.Id ?? note.Id, s.At),
         };
-        library.Ask?.Stop(); // an answer about the lecture being left isn't wanted any more
+        // A note in no folder has no folder to ask about.
+        if (!note.HasClass) ask.OnlyScopes("lecture", "all");
+        ask.NameScopes(note.Noun, note.HasClass ? note.ClassShown : null);
+        if (!ReferenceEquals(library.Ask, recorder.Ask)) library.Ask?.Stop(); // an answer about the note being left isn't wanted any more
         library.Ask = ask;
         _ = ask.Load();
     }
@@ -537,122 +516,16 @@ public static partial class Shell
         else if (library.Note is { } n && at is not null) n.ShowTranscript = true;
     }
 
-    // --- Canvas: the Due page, and an assignment's own page ---------------------------------------------------------
-
-    static bool dueOpen;
-    /// <summary>The Due row to show (the last one picked, or one a notification or the dropdown asked for).</summary>
-    static (string Class, string Id)? dueSelection;
-
-    static async Task ShowDueAsync()
-    {
-        int turn = ++libraryTurn;
-        LeaveOverview();
-        dueOpen = true;
-        foreach (var c in library.Classes) c.Selected = c.IsDue;
-        library.Unsorted.Selected = false;
-        library.ClassTitle = "Due";
-        library.Empty = null;
-        library.Groups.Clear();
-        library.CanvasClass = null;
-        openCanvasClass = null;
-        // No lecture behind the Due page: its notes stop following a rewrite, and the ask bar goes with it.
-        LeaveNotes(library.Notes);
-        library.Notes = null;
-        library.Note = null;
-        var list = library.DueList is { } open && dueListFor == canvasFor ? open : NewDueList();
-        library.DueList = list;
-        library.List = LibraryList.Due;
-        await LoadCanvasAsync();
-        if (turn != libraryTurn) return;
-        UpdateDueItem();
-        UpdateNextDue();
-        UpdateDueStatus();
-        if (canvasDue is { } due) list.Show(due);
-        var rows = list.Groups.SelectMany(g => g.Rows).ToList();
-        var pick = dueSelection is var (cls, id) ? rows.FirstOrDefault(r => r.Class == cls && r.Id == id) : null;
-        pick ??= rows.FirstOrDefault();
-        if (pick is null)
-        {
-            ClearDetail();
-            library.Note = null;
-            return;
-        }
-        bool opened = dueSelection is not null && pick.Class == dueSelection.Value.Class && pick.Id == dueSelection.Value.Id;
-        picking = !opened;
-        list.SelectItem(pick.Class, pick.Id);
-        picking = false;
-    }
-
-    static string dueListFor = "";
-    /// <summary>The page is picking its own first row, not the student: a narrow window stays on the list.</summary>
-    static bool picking;
-
-    static CanvasDueModel NewDueList()
-    {
-        dueListFor = canvasFor;
-        CanvasDueModel? due = null;
-        return due = new CanvasDueModel(Canvas())
-        {
-            OnSelect = (cls, id) =>
-            {
-                if (!picking) Remember();
-                dueSelection = (cls, id);
-                if (!picking) library.Opened();
-                _ = ShowAssignmentAsync(cls, id, due?.ItemOf(cls, id));
-            },
-        };
-    }
-
-    /// <summary>An assignment's own page on the right: what to do, the rubric, and what was handed in.</summary>
-    /// <summary>A planner to-do (<paramref name="row"/>, from the Due list) has no assignment behind it, so it gets a
-    /// page of its own; anything else the library no longer knows opens nothing rather than an empty page.</summary>
-    static async Task ShowAssignmentAsync(string cls, string id, CanvasApi.Item? row = null)
-    {
-        var page = new AssignmentModel(Canvas()) { OnSearch = ToggleQuick };
-        try
-        {
-            if (row is { Kind: "todo" or "to-do" }) page.ShowTodo(row);
-            else if (!await page.LoadAsync(cls, id))
-            {
-                if (row is null) return;
-                page.ShowTodo(row);
-            }
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or CanvasLibraryException or System.Text.Json.JsonException or InvalidOperationException)
-        {
-            return;
-        }
-        library.Reader = null;
-        openAssignment = (cls, id);
-        library.Assignment = page;
-    }
-
+    /// <summary>Opens the library at a note's page (search, a notification, an answer's source).</summary>
     static void OpenLecture(string id, bool transcript = false)
     {
         Remember();
-        // Whichever load of the window finishes last (its class, or this lecture's) shows this lecture.
+        LeavePage();
         openLecture = id;
-        overviewOf = null;
+        bool loaded = mainWindow?.IsVisible == true && host.Library == LibraryState.Connected && library.Classes.Count > 0;
         ShowLibrary();
-        _ = OpenLectureAsync(id, transcript);
-    }
-
-    static async Task OpenLectureAsync(string id, bool transcript)
-    {
-        if (host.Remote() is not { } lib) return;
-        try
-        {
-            if (await lib.LectureAsync(id) is { } l && S(l["class"]) is { Length: > 0 } cls && cls != openClass)
-            {
-                openLecture = id;
-                await ShowClassAsync(cls);
-            }
-        }
-        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
-        {
-            return;
-        }
-        await ShowLectureAsync(id, transcript);
+        // The window is already up and read: the note opens now, not after the whole window is read again.
+        if (loaded || transcript) _ = ShowLectureAsync(id, transcript);
     }
 
     /// <summary>The ••• menu: open the class in a terminal with the AI (when the library is on this computer), the
@@ -661,7 +534,7 @@ public static partial class Shell
     {
         if (mainWindow?.Content is not Control anchor) return;
         var menu = Menu();
-        string? cls = dueOpen ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
+        string? cls = overviewOf == DueHome || overviewOf == "" ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
         if (host.Remote() is { } lib && Uri.TryCreate(lib.ServerUrl, UriKind.Absolute, out var u) && (u.IsLoopback || host.Settings.LibraryHere))
         {
             var term = new MenuItem { Header = cls is null ? "Open the library in Claude Code" : $"Open {cls} in Claude Code" };
@@ -694,39 +567,11 @@ public static partial class Shell
         menu.Open(anchor);
     }
 
-    static void MoveLecture()
-    {
-        if (library.Note is not { } note || mainWindow?.Content is not Control anchor) return;
-        var menu = Menu();
-        foreach (var (name, color, _) in host.Classes().Where(c => c.Name != note.ClassName).Append((Configs.Unsorted, -1, 0)))
-        {
-            var item = new MenuItem { Header = name };
-            if (color >= 0) item.Icon = new Avalonia.Controls.Shapes.Ellipse { Width = 8, Height = 8, Fill = Skin.ClassDot(color) };
-            item.Click += async (_, _) =>
-            {
-                if (host.Remote() is not { } lib) return;
-                try
-                {
-                    await lib.MoveAsync(note.Id, name);
-                    openLecture = note.Id;
-                    await LoadLibraryAsync();
-                }
-                catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
-                {
-                    Toast("Couldn't move it", e.Message, null, null);
-                }
-            };
-            menu.Items.Add(item);
-        }
-        menu.Open(anchor);
-    }
-
     /// <summary>Deletes a lecture on the library, the same from a laptop as on the library itself: its notes,
     /// transcript and search passages go at once, and the library keeps it in its trash a few minutes for Undo. The
     /// window has already taken it out of the list; if the library refuses, the list is read again.</summary>
     static async Task<bool> DeleteLectureAsync(LectureDeletion d)
     {
-        if (openLecture == d.Id) openLecture = null;
         try
         {
             if (host.Remote() is not { } lib) throw new HttpRequestException("Can't reach your library right now.");
@@ -755,7 +600,6 @@ public static partial class Shell
                 return;
             }
             Program.Log($"[library] brought back {d.Id}");
-            openLecture = d.Id;
             await LoadLibraryAsync();
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
@@ -770,7 +614,7 @@ public static partial class Shell
     {
         await Task.Yield(); // opening the menu is itself synchronous; a pick below does the real, awaited work
         if (library.Note is not { } note || mainWindow?.Content is not Control anchor || mainWindow is null || host.Remote() is not { } lib) return;
-        string? cls = dueOpen ? null : openClass is { } o && o != Configs.Unsorted ? o : null;
+        string? cls = note.HasClass ? note.ClassName : null;
         DownloadMenu.Build(cls, host.Settings.DownloadTranscripts,
             download: () => _ = NotesDownload.LectureAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title), host.Settings.DownloadTranscripts, MermaidSvg()),
             downloadPdf: () => _ = NotesDownload.LecturePdfAsync(mainWindow, lib, note.Id, NoteExport.SaveName(note.Title, ".pdf"), host.Settings.DownloadTranscripts,
@@ -855,7 +699,7 @@ public static partial class Shell
                 var classes = (r["classes"] as JsonArray ?? []).OfType<JsonObject>().Take(3).ToList();
                 if (lectures.Count > 0)
                 {
-                    rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Lectures", First = rows.Count == 0 });
+                    rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Notes", First = rows.Count == 0 });
                     foreach (var l in lectures)
                         rows.Add(new QuickRow
                         {
@@ -878,11 +722,11 @@ public static partial class Shell
                 }
                 if (classes.Count > 0)
                 {
-                    rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Classes", First = rows.Count == 0 });
+                    rows.Add(new QuickRow { Kind = QuickKind.Header, Title = "Folders", First = rows.Count == 0 });
                     foreach (var c in classes)
                     {
                         int n = c["lectures"]?.GetValue<int>() ?? 0;
-                        rows.Add(new QuickRow { Kind = QuickKind.Class, Title = S(c["name"]), ClassName = S(c["name"]), Dot = Skin.ClassDot(c["color"]?.GetValue<int>() ?? 0), Meta = $"{n} lecture{(n == 1 ? "" : "s")}" });
+                        rows.Add(new QuickRow { Kind = QuickKind.Class, Title = S(c["name"]), ClassName = S(c["name"]), Dot = Skin.ClassDot(c["color"]?.GetValue<int>() ?? 0), Meta = $"{n} note{(n == 1 ? "" : "s")}" });
                     }
                 }
                 if (rows.Count == 0) quick.Note = $"Nothing matches “{query.Trim()}”. {(Skin.Current == SkinKind.Mac ? "⌘" + ViewModels.QuickModel.Return : "Ctrl+Enter")} asks your notes instead.";
@@ -909,7 +753,10 @@ public static partial class Shell
     static void OpenDue()
     {
         quickWindow?.Hide();
-        dueOpen = true;
+        Remember();
+        LeavePage();
+        overviewOf = DueHome;
+        dueOnly = null;
         ShowLibrary();
     }
 
@@ -996,9 +843,11 @@ public static partial class Shell
         switch (row.Kind)
         {
             case QuickKind.Class when row.ClassName is { } c:
-                openClass = c;
-                openLecture = null;
-                overviewOf = c == Configs.Unsorted ? null : c;
+                Remember();
+                LeavePage();
+                // Unsorted is no folder: its notes are Home's, filtered.
+                homeUnsorted = c == Configs.Unsorted;
+                overviewOf = c == Configs.Unsorted ? "" : c;
                 ShowLibrary();
                 break;
             case QuickKind.Source or QuickKind.Passage when row.LectureId is { } id && row.At is double at:

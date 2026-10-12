@@ -1,0 +1,140 @@
+<!-- Due as a calendar (both looks): back and forward a month, the month's name, Today; on the right the class it's for
+     and Month | Week. The month is a sunken grid, Monday first, today's cell lifted out of it; each thing due is one
+     line in its class's highlighter, "Missing" in red under one that's late, a handed-in one struck through, and past
+     two on a day the rest are behind "1 more". The week is the planner: each day's deadlines under its class meetings. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.DueCalendar"
+             x:DataType="vm:DueCalendarModel"
+             ClipToBounds="False">
+  <StackPanel Spacing="12">
+    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,8,Auto">
+      <Button Classes="icon-btn" Command="{Binding PreviousCommand}" ToolTip.Tip="{Binding PreviousTip}" AutomationProperties.Name="{Binding PreviousTip}">
+        <c:Icon Glyph="chevron_left" Size="18" />
+      </Button>
+      <Button Grid.Column="1" Classes="icon-btn" Command="{Binding NextCommand}" ToolTip.Tip="{Binding NextTip}" AutomationProperties.Name="{Binding NextTip}">
+        <c:Icon Glyph="chevron_right" Size="18" />
+      </Button>
+      <TextBlock Name="Heading" Grid.Column="2" Classes="h2" FontSize="20" Text="{Binding Heading}" MinWidth="140" Margin="10,0,14,0" VerticalAlignment="Center" />
+      <Button Name="Today" Grid.Column="3" Classes="btn sm" Content="Today" Command="{Binding GoTodayCommand}" VerticalAlignment="Center" />
+      <!-- Which class it's for -->
+      <Button Name="Filter" Grid.Column="5" Classes="picker" VerticalAlignment="Center" AutomationProperties.Name="{Binding FilterName}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="{Binding FilterName}" VerticalAlignment="Center" />
+          <c:Icon Glyph="expand_more" Size="14" VerticalAlignment="Center" />
+        </StackPanel>
+        <Button.Flyout>
+          <Flyout Placement="BottomEdgeAlignedRight" VerticalOffset="6" FlyoutPresenterClasses="bare">
+            <Border Classes="menu" Width="264">
+              <ItemsControl ItemsSource="{Binding Filters}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CalendarFilter">
+                    <Button Classes="menu-item" Classes.active="{Binding Checked}" Command="{Binding Pick}" Click="OnPicked">
+                      <Grid ColumnDefinitions="Auto,*,Auto">
+                        <c:Swatch Fill="{Binding Dot}" IsVisible="{Binding HasDot}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <c:Icon Grid.Column="2" Glyph="check" Size="16" Foreground="{DynamicResource InkSubtle}" IsVisible="{Binding Checked}" VerticalAlignment="Center" />
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Border>
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+      <Border Grid.Column="7" Classes="seg-group" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal">
+          <Button Classes="seg-item" Classes.on="{Binding MonthView}" Content="Month" Command="{Binding ShowMonthCommand}" />
+          <Button Classes="seg-item" Classes.on="{Binding WeekView}" Content="Week" Command="{Binding ShowWeekCommand}" />
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <!-- The month -->
+    <Border Name="Month" Classes="cal" IsVisible="{Binding MonthView}">
+      <StackPanel>
+        <ItemsControl ItemsSource="{Binding Days}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><UniformGrid Columns="7" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <TextBlock Classes="cal-dow" Text="{Binding}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Border Classes="rule" />
+        <ItemsControl Name="Cells" ItemsSource="{Binding Cells}" ClipToBounds="False" AutomationProperties.Name="{Binding Heading}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><UniformGrid Columns="7" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:CalendarCell">
+              <Panel>
+                <Border BorderBrush="{DynamicResource Line}" BorderThickness="{Binding Rules}" />
+                <Border Classes="cal-cell" Classes.today="{Binding IsToday}" Classes.out="{Binding IsOut}">
+                  <StackPanel Spacing="6">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Classes="cal-num" Text="{Binding Number}" />
+                      <TextBlock Grid.Column="1" Text="Today" FontSize="12" FontWeight="Bold" Foreground="{DynamicResource Ink}" IsVisible="{Binding IsToday}" VerticalAlignment="Center" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Shown}" ClipToBounds="False">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CalendarItem">
+                          <Button Classes="cal-item" Classes.missing="{Binding Missing}" Classes.done="{Binding Done}" ToolTip.Tip="{Binding Tip}"
+                                  AutomationProperties.Name="{Binding Said}"
+                                  Command="{Binding $parent[UserControl].((vm:DueCalendarModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
+                            <StackPanel>
+                              <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" />
+                              <TextBlock Classes="cal-sub" Text="{Binding Sub}" IsVisible="{Binding HasSub}" />
+                            </StackPanel>
+                          </Button>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <!-- The rest of a full day, in a small list of its own -->
+                    <Button Classes="text-link" FontSize="12" Content="{Binding MoreWords}" IsVisible="{Binding HasMore}">
+                      <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft" VerticalOffset="6" FlyoutPresenterClasses="bare">
+                          <Border Classes="menu" Width="240" Padding="10">
+                            <ItemsControl ItemsSource="{Binding More}" ClipToBounds="False">
+                              <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CalendarItem">
+                                  <Button Classes="cal-item" Classes.missing="{Binding Missing}" Classes.done="{Binding Done}" ToolTip.Tip="{Binding Tip}"
+                                          AutomationProperties.Name="{Binding Said}" Click="OnPicked"
+                                          Command="{Binding $parent[UserControl].((vm:DueCalendarModel)DataContext).OpenCommand}" CommandParameter="{Binding}">
+                                    <StackPanel>
+                                      <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" />
+                                      <TextBlock Classes="cal-sub" Text="{Binding Sub}" IsVisible="{Binding HasSub}" />
+                                    </StackPanel>
+                                  </Button>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </Border>
+                        </Flyout>
+                      </Button.Flyout>
+                    </Button>
+                  </StackPanel>
+                </Border>
+              </Panel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+
+    <!-- One week, as the planner: class meetings over what's due, today lifted out -->
+    <v:WeekPlanner Name="WeekGrid" IsVisible="{Binding WeekView}" Days="{Binding Week}" OpenDue="{Binding OpenDueCommand}" />
+  </StackPanel>
+</UserControl>

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semester — Transformers, Self-Attention, and LLM Fundamentals</title>
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="semester.css">
+<script>/* ?theme=dark or ?theme=light */ var t=new URLSearchParams(location.search).get('theme'); if(t) document.documentElement.dataset.theme=t;</script>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar" aria-label="Sidebar">
+  <div class="sidebar-toolbar">
+    <button class="icon-btn" aria-label="Hide sidebar" title="Hide sidebar"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/> <path d="M9 3v18"/></svg></button>
+    <span class="spacer"></span>
+    <button class="icon-btn" aria-label="Back" title="Back"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/> <path d="M19 12H5"/></svg></button>
+    <button class="icon-btn" aria-label="Forward" title="Forward" disabled><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/> <path d="m12 5 7 7-7 7"/></svg></button>
+  </div>
+  <nav>
+    <a class="nav-item" href="home.html"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/> <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Home</a>
+    <a class="nav-item" href="due.html"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/> <path d="M16 2v4"/> <path d="M8 2v4"/> <path d="M3 10h5"/> <path d="M17.5 17.5 16 16.3V14"/> <circle cx="16" cy="16" r="6"/></svg>Due<span class="nav-count">24</span></a>
+  </nav>
+  <div class="side-group">Classes<button class="icon-btn icon-btn--sm" aria-label="Add folder" title="Add folder"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/> <path d="M12 5v14"/></svg></button></div>
+  <a class="class-item is-selected" href="folder-class.html"><span class="swatch" data-hl="blue"></span><span class="class-name">Machine Learning</span><span class="nav-count">14</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="green"></span><span class="class-name">Capstone</span><span class="nav-count">4</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="violet"></span><span class="class-name">Computer Architecture</span><span class="nav-count">8</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="orange"></span><span class="class-name">Data Mining</span><span class="nav-count">9</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="pink"></span><span class="class-name">Theory of Computation</span><span class="nav-count">15</span></a>
+  <div class="side-group">Clubs</div>
+  <a class="class-item" href="folder-club.html"><span class="swatch" data-hl="teal"></span><span class="class-name">ACM</span><span class="nav-count">5</span></a>
+  <div class="side-group">Work</div>
+  <a class="class-item" href="#"><span class="swatch" data-hl="yellow"></span><span class="class-name">Intellievent</span><span class="nav-count">2</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="lime"></span><span class="class-name">NSWC</span><span class="nav-count">1</span></a>
+  <div class="coming">
+    <div class="side-group">Coming up</div>
+    <button class="coming-item is-soon" type="button" title="Click to record" aria-label="Record Capstone team sync, starts in 11 minutes"><span class="coming-title"><span class="swatch swatch--sm" data-hl="green"></span><span>Capstone team sync</span></span><span class="coming-when">In 11 minutes</span></button>
+    <button class="coming-item" type="button" title="Click to record" aria-label="Record Data Mining, tomorrow at 8:45 AM"><span class="coming-title"><span class="swatch swatch--sm" data-hl="orange"></span><span>Data Mining</span></span><span class="coming-when">Tomorrow 8:45 AM</span></button>
+  </div>
+  <div class="side-footer">Library on this Mac<br>Canvas synced at 12:58</div>
+</aside>
+<main class="pane">
+<div class="pane-toolbar"><div class="toolbar-group"><button class="icon-btn" aria-label="Move to folder" title="Move to folder"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-1"/> <path d="M2 13h10"/> <path d="m9 16 3-3-3-3"/></svg></button><button class="icon-btn" aria-label="Share" title="Share"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/> <polyline points="16 6 12 2 8 6"/> <line x1="12" x2="12" y1="2" y2="15"/></svg></button><button class="icon-btn" aria-label="Delete" title="Delete"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/> <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/> <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/> <line x1="10" x2="10" y1="11" y2="17"/> <line x1="14" x2="14" y1="11" y2="17"/></svg></button></div>
+    <button class="icon-btn" aria-label="Search" title="Search  ⌘K"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/> <path d="m21 21-4.3-4.3"/></svg></button>
+    <button class="icon-btn" aria-label="Settings" title="Settings"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/> <circle cx="12" cy="12" r="3"/></svg></button>
+  </div>
+  <div class="page">
+    <div class="crumb"><a href="folder-class.html"><span class="swatch" data-hl="blue"></span>Machine Learning</a><button class="icon-btn icon-btn--sm" aria-label="Change folder" title="Change folder"><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><span>Lecture, Monday 12 October at 9:30 AM, 52 min</span></div>
+    <h1 class="doc-title" contenteditable="true" spellcheck="false">Transformers, Self-Attention, and LLM Fundamentals</h1>
+    <div class="doc-bar">
+      <div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="true">Notes</button><button class="tab" role="tab" aria-selected="false">Transcript</button></div>
+      <div class="doc-tools"><button class="switch" role="switch" aria-checked="false"><i></i>Only my notes</button><button class="link-btn" type="button"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>Attach</button></div>
+    </div>
+    <div class="notes">
+<p class="notes-legend"><span class="k-mine">What you wrote</span><span class="k-ai">Added by Claude from the recording</span></p>
+<h3><span class="mine">History</span></h3>
+<ul>
+<li><span class="mine">Attention Is All You Need, 2017</span> <span class="ai">The Google paper that introduced the transformer, built on attention instead of recurrence.</span></li>
+<li><span class="mine">ChatGPT, Nov 2022</span> <span class="ai">The release that brought large language models to a general audience.</span></li>
+<li><span class="ai">The 2022 claim that Google’s LaMDA was sentient, and why the class treated it with skepticism.</span></li>
+</ul>
+<h3><span class="mine">Chatbots and people</span></h3>
+<ul>
+<li><span class="mine">news story about AI-driven delusion</span> <span class="ai">How a chatbot that keeps agreeing with its user can reinforce false beliefs.</span></li>
+</ul>
+<h3><span class="mine">Why not fully connected nets</span></h3>
+<ul>
+<li><span class="mine">fixed input size</span> <span class="ai">A fully connected network expects a fixed-length input, but sentences vary in length and word order carries meaning.</span></li>
+</ul>
+<h3><span class="mine">Self-attention</span></h3>
+<ul>
+<li><span class="mine">q · k → softmax → weights on v</span> <span class="ai">Each token scores every other token with a dot product of its query and their keys; softmax turns the scores into weights over the value vectors.</span></li>
+<li><span class="mine">position encodings, on the exam?</span> <span class="ai">Attention alone ignores order, so a position signal is added to each token’s embedding. The professor said to know both sinusoidal and learned versions.</span></li>
+</ul>
+<h3><span class="ai">Tokenizers and decoder-only models</span></h3>
+<ul>
+<li><span class="ai">Text is split into subword tokens before it is embedded.</span></li>
+<li><span class="mine">GPT = decoder only, predicts next token</span> <span class="ai">Generation is autoregressive: each predicted token is fed back in as input for the next one.</span></li>
+</ul>
+<h3><span class="mine">To do</span></h3>
+<ul>
+<li><span class="mine">read ch. 12 before Wed</span></li>
+</ul>
+    </div>
+  </div>
+  <div class="ask-fade"></div><form class="ask" role="search"><input class="ask-input" placeholder="Ask about this lecture" aria-label="Ask about this lecture"><button class="ask-scope" type="button" aria-haspopup="listbox">This lecture<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><kbd>⌘J</kbd></form>
+</main>
+</div>
+</body>
+</html>

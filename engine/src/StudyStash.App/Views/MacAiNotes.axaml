@@ -64,38 +64,36 @@
       </Grid>
     </Border>
 
-    <!-- Summary header + Edit and Rewrite notes (while editing: Cancel and Save), all on one line: Summary is level
-         with the buttons, and its byline stands on Summary's baseline. The two hang from one top, the byline's smaller
-         type set down by how much lower 17 pt letters stand than 12 pt ones (4.4). -->
-    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
-      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-        <TextBlock Classes="ai-notes-title" Text="Summary" VerticalAlignment="Top" />
-        <TextBlock Classes="ai-notes-byline" Margin="10,4.4,0,0" VerticalAlignment="Top" Text="{Binding ShownByline}" />
+    <!-- Whose words are whose: the student's in ink, what was added from the recording in grey (who wrote that, and
+         when, on hover). On the right, Edit (while editing: Cancel and Save) and, under the dots, writing the notes
+         again with another AI. -->
+    <Grid ColumnDefinitions="*,12,Auto,Auto" MinHeight="28">
+      <StackPanel Name="Legend" Orientation="Horizontal" Spacing="18" VerticalAlignment="Center" ToolTip.Tip="{Binding BylineTip}" Background="Transparent">
+        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasMine}">
+          <Border Width="14" Height="3" CornerRadius="2" Background="{DynamicResource Ink}" VerticalAlignment="Center" />
+          <TextBlock Classes="legend mine" Text="What you wrote" />
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Border Width="14" Height="3" CornerRadius="2" Background="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+          <TextBlock Name="LegendAi" Classes="legend" Text="{Binding LegendAi}" />
+        </StackPanel>
+        <TextBlock Name="Byline" Classes="legend" Foreground="{DynamicResource InkSubtle}" Text="{Binding DiagramsLine}"
+                   IsVisible="{Binding DiagramsLine, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
       </StackPanel>
-      <Button Grid.Column="2" Classes="ai-pillbtn" Margin="0,0,8,0" IsVisible="{Binding ShowEditButton}" Command="{Binding EditCommand}"
+      <Button Name="EditButton" Grid.Column="2" Classes="link-btn" Margin="0,0,6,0" VerticalAlignment="Center" IsVisible="{Binding ShowEditButton}" Command="{Binding EditCommand}"
               ToolTip.Tip="Fix or add to these notes yourself" AutomationProperties.Name="Edit notes">
-        <Border Classes="ai-pill">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <c:Icon Glyph="edit" Size="15" />
-            <TextBlock Text="Edit" />
-          </StackPanel>
-        </Border>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <c:Icon Glyph="edit" Size="15" VerticalAlignment="Center" />
+          <TextBlock Text="Edit" VerticalAlignment="Center" />
+        </StackPanel>
       </Button>
-      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" IsVisible="{Binding Editing}">
-        <Button Classes="ai-textbtn" Command="{Binding CancelEditCommand}">
-          <Border Classes="ai-pill-plain"><TextBlock Text="Cancel" /></Border>
-        </Button>
-        <Button Classes="ai-pillbtn" Command="{Binding SaveEditCommand}" IsEnabled="{Binding CanSaveEdit}">
-          <Border Classes="ai-pill" Classes.primary="True"><TextBlock Text="Save" /></Border>
-        </Button>
+      <StackPanel Grid.Column="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" IsVisible="{Binding Editing}">
+        <Button Classes="btn sm" Content="Cancel" Command="{Binding CancelEditCommand}" />
+        <Button Classes="btn sm ink" Content="Save" Command="{Binding SaveEditCommand}" IsEnabled="{Binding CanSaveEdit}" />
       </StackPanel>
-      <Button Name="RewriteButton" Grid.Column="3" Classes="ai-pillbtn" IsVisible="{Binding ShowRewriteButton}">
-        <Border Classes="ai-pill">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <c:Icon Glyph="refresh" Size="15" />
-            <TextBlock Text="Rewrite notes" />
-          </StackPanel>
-        </Border>
+      <Button Name="RewriteButton" Grid.Column="3" Classes="icon-btn sm" VerticalAlignment="Center" IsVisible="{Binding ShowRewriteButton}"
+              ToolTip.Tip="Write these notes again" AutomationProperties.Name="Rewrite notes">
+        <c:Icon Glyph="more_horiz" Size="16" />
         <Button.Flyout>
           <Flyout Placement="BottomEdgeAlignedRight" ShowMode="Standard" FlyoutPresenterClasses="bare"
                   Opened="OnMenuOpened" Closed="OnMenuClosed">
@@ -113,7 +111,7 @@
 
     <!-- The notes, dimmed while the menu is open -->
     <Border Classes="ai-dim" Classes.dimmed="{Binding Dimmed}" IsVisible="{Binding ShowNotes}">
-      <c:NoteView Markdown="{Binding ShownMarkdown}" />
+      <c:NoteView Markdown="{Binding ShownMarkdown}" Provenance="True" />
     </Border>
 
     <!-- Editing: the notes as text, each diagram one line; Save and Cancel again under long notes -->

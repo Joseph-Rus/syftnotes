@@ -230,6 +230,10 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
 
     public async Task RewriteAsync(string id) => await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/rewrite", new JsonObject());
 
+    /// <summary>Gives a lecture a title of the student's own; the library keeps it from then on.</summary>
+    public async Task RenameAsync(string id, string title) =>
+        await SendAsync(HttpMethod.Post, $"/lectures/{Q(id)}/title", new JsonObject { ["title"] = title });
+
     /// <summary>Deletes a lecture on the library: its notes, transcript and search passages. It waits in the
     /// library's trash for a few minutes, so <see cref="RestoreAsync"/> can undo it. False: there's no such lecture.</summary>
     public async Task<bool> DeleteAsync(string id) => await SendAsync(HttpMethod.Delete, $"/lectures/{Q(id)}") is not null;

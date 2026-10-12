@@ -24,7 +24,7 @@
           BorderThickness="1" BoxShadow="{DynamicResource PopupShadow}">
     <StackPanel Spacing="8">
       <TextBlock Text="{Binding NamingFolder.Title, FallbackValue=''}" FontFamily="{DynamicResource DisplayFont}" FontSize="15" FontWeight="SemiBold" />
-      <TextBlock Text="A folder in the sidebar, beside Classes: for projects, clubs or research." FontSize="13" LineHeight="18"
+      <TextBlock Text="A group in the sidebar, beside Classes, Clubs and Work: for projects or research. What's recorded in its folders are meetings." FontSize="13" LineHeight="18"
                  Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
       <TextBox Name="FolderName" Text="{Binding NamingFolder.Name, FallbackValue=''}" PlaceholderText="Projects" FontSize="13" MaxLength="40">
         <TextBox.KeyBindings>

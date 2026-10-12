@@ -9,19 +9,26 @@ namespace StudyStash.App.Tests;
 public class AppWiringTests
 {
     [Fact]
-    public void The_list_column_is_the_designs_width_for_what_it_lists()
+    public void Only_a_classs_canvas_lists_have_a_list_column()
     {
-        var m = new LibraryModel();
-        Assert.Equal(Skin.Current == SkinKind.Mac ? 312 : 320, m.ListWidth);
+        // A note, Home, a folder's page: one page fills the pane, with no second column beside it.
+        var m = new LibraryModel { Note = new NoteModel { Id = "l1", Title = "Recursion" } };
+        Assert.False(m.ShowListColumn);
+        Assert.True(m.ShowDetailColumn);
+        Assert.Equal(2, m.ColumnSpan);
 
-        m.List = LibraryList.Due;
-        Assert.Equal(340, m.ListWidth);
-        Assert.True(m.ShowDueList);
-        Assert.False(m.ShowLectures);
-
-        m.List = LibraryList.CanvasClass;
+        // A class's lists on Canvas: the list on the left, what's picked from it beside it.
+        m.Note = null;
+        m.CanvasClass = new CanvasClassModel(CanvasFixtures.Context());
+        Assert.True(m.ShowListColumn);
         Assert.Equal(Skin.Current == SkinKind.Mac ? 360 : 380, m.ListWidth);
-        Assert.True(m.ShowLectures); // a Canvas class is the lecture list with its switcher over it
+        Assert.Equal(2, m.DetailColumn);
+        Assert.True(m.ShowCanvasHint); // nothing picked yet
+
+        // An overview (Home, Due, a folder) over it takes the whole pane.
+        m.Overview = new OverviewModel { IsHome = true };
+        Assert.False(m.ShowListColumn);
+        Assert.False(m.ShowDetailColumn);
     }
 
     [Fact]
@@ -35,7 +42,7 @@ public class AppWiringTests
         Assert.Equal(ClassLayout.Tabs, m.CanvasClass.Layout);
 
         m.Narrow = true;
-        Assert.Equal(ClassLayout.Tabs, m.CanvasClass.Layout); // the switcher stays: one class page at every width
+        Assert.Equal(ClassLayout.Tabs, m.CanvasClass.Layout); // the switcher stays: one list at every width
         Assert.True(double.IsNaN(m.ListWidth));
         Assert.True(m.ShowListColumn);
         Assert.False(m.ShowDetailColumn);
@@ -55,25 +62,32 @@ public class AppWiringTests
     }
 
     [Fact]
-    public void An_assignment_or_a_canvas_page_takes_the_lectures_place_and_its_ask_bar_goes()
+    public void An_assignment_or_a_canvas_page_takes_the_notes_place_and_its_ask_bar_goes()
     {
         var m = new LibraryModel { Note = new NoteModel { Id = "l1", Title = "Recursion" }, Ask = AiDemo.AskIdle() };
-        Assert.True(m.ShowLecturePage);
+        Assert.True(m.ShowNotePage);
+        Assert.True(m.ShowLectureTools);
         Assert.True(m.HasAsk);
 
         m.Assignment = new AssignmentModel(CanvasFixtures.Context());
-        Assert.False(m.ShowLecturePage);
+        Assert.False(m.ShowNotePage);
+        Assert.False(m.ShowLectureTools);
         Assert.True(m.ShowAssignment);
+        Assert.True(m.ShowAssignmentTools);
         Assert.False(m.HasAsk);
 
         m.Assignment = null;
         m.Reader = new CanvasReaderModel(CanvasFixtures.Context());
         Assert.True(m.ShowReader);
-        Assert.False(m.ShowLecturePage);
+        Assert.False(m.ShowNotePage);
 
         m.Reader = null;
         m.Note = null;
         Assert.False(m.HasAsk); // nothing open to ask about
+
+        // With the library away and nothing to show, the pane says why.
+        m.Empty = "Can't reach your library.";
+        Assert.True(m.ShowEmpty);
     }
 
     [AvaloniaFact]

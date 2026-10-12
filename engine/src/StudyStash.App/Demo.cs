@@ -82,32 +82,24 @@ public static class Demo
         2. What happens if the base case is n == 1 and you call factorial(0)?
         """;
 
-    /// <summary>The sample library; with <paramref name="due"/> a "Due" item heads the sidebar (nothing selected), to
-    /// eyeball it against the Canvas Due screen; with <paramref name="answered"/> a long answer sits above the ask bar;
-    /// with <paramref name="deleting"/> the window asks before deleting the open lecture, and with
-    /// <paramref name="deleted"/> "Deleted · Undo" shows under the list.</summary>
+    /// <summary>The sample library with a lecture's page open (CS 101's "Recursion and the call stack"); with
+    /// <paramref name="due"/> a "Due" item is in the sidebar; with <paramref name="answered"/> a long answer sits above
+    /// the ask bar; with <paramref name="deleting"/> the window asks before deleting the open lecture, and with
+    /// <paramref name="deleted"/> "Deleted · Undo" shows at the page's foot; <paramref name="askingSupport"/> is Home
+    /// with the ask for a tip on it.</summary>
     public static LibraryModel Library(bool due = false, bool answered = false, bool deleting = false, bool deleted = false, bool askingSupport = false)
     {
-        var m = new LibraryModel { ClassTitle = "CS 101", ClassCount = "12 lectures", Status = "Library connected", DrawChrome = true };
+        var m = new LibraryModel { Status = "Library connected", DrawChrome = true, UnsortedCount = 2 };
         if (due) m.Classes.Add(new ClassItem { Name = "Due", IsDue = true, Count = 3 });
         m.Classes.Add(new ClassItem { Name = "CS 101", Dot = Cs, Count = 12, Selected = true });
         m.Classes.Add(new ClassItem { Name = "BIO 110", Dot = Bio, Count = 9 });
         m.Classes.Add(new ClassItem { Name = "CALC II", Dot = Calc, Count = 11 });
         m.Classes.Add(new ClassItem { Name = "HIST 210", Dot = Hist, Count = 7 });
-        m.Unsorted.Count = 2;
-        var week = new LectureGroup { Label = "This week", First = true };
-        week.Items.Add(new LectureCard { Title = "Recursion and the call stack", Meta = "Tue 23 Sep · 1 h 12 min", Summary = "A recursive function solves a problem by calling itself on a smaller version of it.", Selected = true });
-        week.Items.Add(new LectureCard { Title = "Stack frames and scope", Meta = "Thu 18 Sep · 1 h 14 min", Summary = "Where a variable lives decides who can see it, and for how long." });
-        week.Items.Add(new LectureCard { Title = "Functions as values", Meta = "Tue 16 Sep · 1 h 10 min", Summary = "Passing a function to another function, and why map and filter work." });
-        var last = new LectureGroup { Label = "Last week" };
-        last.Items.Add(new LectureCard { Title = "Loops and invariants", Meta = "Thu 11 Sep · 1 h 13 min", Summary = "An invariant is a statement that stays true on every pass through a loop." });
-        last.Items.Add(new LectureCard { Title = "Tracing small programs", Meta = "Tue 9 Sep · 1 h 08 min", Summary = "Reading code line by line and writing down every value as it changes.", Last = true });
-        m.Groups.Add(week);
-        m.Groups.Add(last);
         m.Note = new NoteModel
         {
-            ClassName = "CS 101", Dot = Cs, Meta = "CS 101 · Tuesday 23 September · 1 h 12 min", Title = "Recursion and the call stack", Markdown = Notes,
-        };
+            Id = "lec-recursion", ClassName = "CS 101", Dot = Cs, When = "Tuesday 23 September at 10:02 AM, 1 h 12 min", Title = "Recursion and the call stack", Markdown = Notes,
+            OnRename = _ => Task.FromResult(true),
+        }.Titled();
         m.Ask = AiDemo.AskIdle();
         if (answered)
             m.Ask.Turns.Add(new AiTurn("What should I practise before the midterm?", "Claude")
@@ -123,12 +115,17 @@ public static class Demo
             });
         if (deleting) m.Deleting = new LectureDeletion("lec-recursion", "Recursion and the call stack", "CS 101");
         if (deleted) m.Deleted = new LectureDeletion("lec-frames", "Stack frames and scope", "CS 101");
-        if (askingSupport) m.AskForSupport(last: false);
+        if (askingSupport)
+        {
+            m = Overview();
+            m.AskForSupport(last: false);
+        }
         return m;
     }
 
-    /// <summary>The sample library on Home (<paramref name="cls"/>: on that class's home instead), with a week of
-    /// lectures, three things to hand in (one late), and today's classes on the calendar.</summary>
+    /// <summary>The sample library on Home (<paramref name="cls"/>: on that folder's page instead, or "\u0001due" for
+    /// Due), with a week of lectures, four things to hand in (one missing), and the classes that meet today and
+    /// tomorrow on the calendar.</summary>
     public static LibraryModel Overview(string? cls = null, bool narrow = false, bool canvas = true, bool calendars = true)
     {
         var m = Library(due: canvas);
@@ -145,6 +142,7 @@ public static class Demo
             L("l1", "Recursion and the call stack", "CS 101", 1, 72, "A recursive function solves a problem by calling itself on a smaller version of it."),
             L("l2", "Cell membranes and transport", "BIO 110", 1, 50, "How the lipid bilayer lets some molecules through and keeps others out."),
             L("l3", "Integration by parts", "CALC II", 2, 55, "Turning the integral of a product into one that's easier, and choosing u well."),
+            L("l0", "Recording, Sun 27 Sep at 4:12 PM", "Unsorted", 3, 18, "A planning conversation about the study group's schedule before the midterm."),
             L("l4", "Stack frames and scope", "CS 101", 6, 74, "Where a variable lives decides who can see it, and for how long."),
             L("l5", "The Treaty of Versailles", "HIST 210", 7, 48, "What the treaty asked of Germany, and why so many thought it would not hold."),
             L("l6", "Functions as values", "CS 101", 8, 70, "Passing a function to another function, and why map and filter work."),
@@ -160,13 +158,16 @@ public static class Demo
             [
                 new CanvasApi.Group { Key = "overdue", Label = "Overdue", Items = [Item("BIO 110", "a1", "Lab 3 write-up", -1, "missing", missing: true)] },
                 new CanvasApi.Group { Key = "week", Label = "This week", Items = [Item("CS 101", "a2", "Problem set 4: recursion", 1), Item("CALC II", "a3", "Quiz 5", 2), Item("CS 101", "a4", "Reading: SICP 1.2", 5)] },
+                new CanvasApi.Group { Key = "handed_in", Label = "Handed in", Items = [Item("CS 101", "a0", "Problem set 3: loops", -6, "submitted")] },
             ],
         };
-        var events = new List<ComingUpRow>
+        var today = new DateTimeOffset(now.Date, now.Offset);
+        int n = 0;
+        OverviewModel.Event Meets(string c, int day, double hour, double hours = 1.25) => new($"e{n++}", c, today.AddDays(day).AddHours(hour), today.AddDays(day).AddHours(hour + hours), c);
+        var events = new List<OverviewModel.Event>
         {
-            new("e1", "Now, until 11:15 AM", "CS 101 Lecture", "Engineering Hall 204", "CS 101", Cs, true),
-            new("e2", "1:30 PM", "BIO 110 Lab", "Science Center B12", "BIO 110", Bio, false),
-            new("e3", "Tomorrow 9:00 AM", "CALC II", "Math 101", "CALC II", Calc, false),
+            Meets("CS 101", -2, 10), Meets("CS 101", 0, 10), Meets("BIO 110", 0, 13.5), Meets("CALC II", 1, 9), Meets("CS 101", 2, 10), Meets("HIST 210", 2, 14),
+            new("e-study", "Study group", today.AddHours(16), today.AddHours(17), null),
         };
         var sources = new OverviewModel.Sources
         {
@@ -186,7 +187,7 @@ public static class Demo
         }
         else if (cls is null)
         {
-            // As on a computer that records: Record at the edge, "Buy us a coffee" beside it.
+            // As on a computer that records: Record beside the date, "Buy us a coffee" at the page's foot.
             var home = OverviewModel.Home(sources);
             home.OnRecord = () => { };
             home.OnSupport = () => { };
@@ -198,16 +199,352 @@ public static class Demo
                 "Programming from the ground up: recursion, data structures and how programs run.",
                 canvas ? new CanvasApi.Counts { ToHandIn = 2, Done = 6, Modules = 6, Files = 9, Announcements = 4, AnnouncementsNew = 1 } : null);
             var page = OverviewModel.ForClass(facts, sources);
-            page.AddLinks(facts, () => { }, canvas ? _ => { } : null);
+            page.AddLinks(facts, canvas ? _ => { } : null);
+            page.OnRecord = () => { };
             m.Overview = page;
         }
         m.Narrow = narrow;
         return m;
     }
 
+    /// <summary>What a student typed in Machine Learning's lecture, as they typed it: the design's own sample.</summary>
+    public const string Typed = """
+        # History
+        - Attention Is All You Need, 2017
+        - ChatGPT, Nov 2022
+
+        # Chatbots and people
+        - news story about AI-driven delusion
+
+        # Why not fully connected nets
+        - fixed input size
+
+        # Self-attention
+        - q · k → softmax → weights on v
+        """;
+
+    /// <summary>That lecture's notes once they're written: the student's lines kept (marked), what the recording added
+    /// round them.</summary>
+    public const string Merged = """
+        ### ==History==
+        - ==Attention Is All You Need, 2017== The Google paper that introduced the transformer, built on attention instead of recurrence.
+        - ==ChatGPT, Nov 2022== The release that brought large language models to a general audience.
+        - The 2022 claim that Google’s LaMDA was sentient, and why the class treated it with skepticism.
+
+        ### ==Chatbots and people==
+        - ==news story about AI-driven delusion== How a chatbot that keeps agreeing with its user can reinforce false beliefs.
+
+        ### ==Why not fully connected nets==
+        - ==fixed input size== A fully connected network expects a fixed-length input, but sentences vary in length and word order carries meaning.
+
+        ### ==Self-attention==
+        - ==q · k → softmax → weights on v== Each token scores every other token with a dot product of its query and their keys; softmax turns the scores into weights over the value vectors.
+        - ==position encodings, on the exam?== Attention alone ignores order, so a position signal is added to each token’s embedding. The professor said to know both sinusoidal and learned versions.
+
+        ### Tokenizers and decoder-only models
+        - Text is split into subword tokens before it is embedded.
+        - ==GPT = decoder only, predicts next token== Generation is autoregressive: each predicted token is fed back in as input for the next one.
+
+        ### ==To do==
+        - ==read ch. 12 before Wed==
+        """;
+
+    /// <summary>The pages of the design's own sample (the handoff's reference pages and screenshots).</summary>
+    public enum Page { Home, HomeUnsorted, Due, DueWeek, FolderClass, FolderClub, Note, NoteOnlyMine, Recording, CanvasLists }
+
+    /// <summary>
+    /// The design's own sample (the handoff's screenshots): Monday 12 October, 1:34 PM. Five classes, a club and two
+    /// work folders, each with its highlighter; Capstone's team sync eleven minutes off; a quiz due tonight and one
+    /// thing missing. <paramref name="page"/> picks the screen. For laying a picture of the app over the design's.
+    /// </summary>
+    /// <param name="go">Makes the sample one to click through: where a click that leads somewhere (a folder, a note,
+    /// an event to record, Stop) asks to go. Null for a still picture, where nothing leads anywhere.</param>
+    public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false, Action<Page>? go = null)
+    {
+        (string Name, string Hue, int Notes, string Group)[] folders =
+        [
+            ("Machine Learning", "Blue", 14, ""), ("Capstone", "Green", 4, ""), ("Computer Architecture", "Violet", 8, ""), ("Data Mining", "Orange", 9, ""),
+            ("Theory of Computation", "Pink", 15, ""), ("ACM", "Teal", 5, "Clubs"), ("Intellievent", "Yellow", 2, "Work"), ("NSWC", "Lime", 1, "Work"),
+        ];
+        IBrush Dot(string hue) => Skin.ClassDot(Array.IndexOf(Skin.ClassHues, hue));
+        IBrush DotOf(string folder) => folders.FirstOrDefault(f => f.Name == folder) is { Name: not null } f ? Dot(f.Hue) : Brushes.Gray;
+        string GroupOf(string folder) => folders.FirstOrDefault(f => f.Name == folder).Group ?? "";
+        const string ml = "Machine Learning";
+        var m = new LibraryModel { Status = "Library on this Mac · Canvas synced at 12:58", DrawChrome = true, OnAddClass = () => { }, UnsortedCount = 1 };
+        m.Classes.Add(new ClassItem { Name = "Due", IsDue = true, Count = 24, Selected = page is Page.Due or Page.DueWeek });
+        string group = "";
+        foreach (var (name, hue, notes, g) in folders)
+        {
+            m.Classes.Add(new ClassItem { Name = name, Dot = Dot(hue), Count = notes, Group = g, Section = g != group ? g : "" });
+            group = g;
+        }
+        m.Home.Selected = page is Page.Home or Page.HomeUnsorted;
+
+        var zone = TimeZoneInfo.CreateCustomTimeZone("Demo", TimeSpan.FromHours(-4), "Demo", "Demo");
+        var monday = new DateTimeOffset(2026, 10, 12, 0, 0, 0, TimeSpan.FromHours(-4));
+        var now = monday.AddHours(13).AddMinutes(34);
+        int n = 0;
+        OverviewModel.Event At(string title, string? folder, int day, double hour, double hours = 0.85) =>
+            new($"ev{n++}", title, monday.AddDays(day).AddHours(hour), monday.AddDays(day).AddHours(hour + hours), folder);
+        var events = new List<OverviewModel.Event>
+        {
+            At(ml, ml, 0, 9.5), At("Capstone team sync", "Capstone", 0, 13.75), At("Officer meeting", "ACM", 0, 18), At("Data Mining", "Data Mining", 1, 8.75),
+            At("Computer Architecture", "Computer Architecture", 1, 10.5), At(ml, ml, 2, 9.5), At("Theory of Computation", "Theory of Computation", 2, 13),
+            At("Data Mining", "Data Mining", 3, 8.75), At("Computer Architecture", "Computer Architecture", 3, 10.5), At("ACM", "ACM", 3, 18), At(ml, ml, 4, 9.5),
+        };
+        m.ComingUp.Show(true, [.. events.Where(e => e.End > now).Take(2).Select(e =>
+        {
+            bool soon = e.Start - now <= OverviewModel.Soon;
+            var at = TimeZoneInfo.ConvertTime(e.Start, zone);
+            string brief = soon ? $"In {(int)Math.Ceiling((e.Start - now).TotalMinutes)} minutes" : $"{(at.Date == monday.Date ? "Today" : "Tomorrow")} {at:h:mm tt}";
+            return new ComingUpRow(e.Id, brief, e.Title, null, e.Class, DotOf(e.Class ?? ""), false, brief, soon);
+        })]);
+
+        CanvasApi.Item Item(string c, string id, string name, int day, string status = "open", bool missing = false) => new()
+        {
+            Class = c, Id = id, Name = name, Kind = "assignment", DueAt = new DateTimeOffset(2026, 10, 1, 23, 59, 0, TimeSpan.FromHours(-4)).AddDays(day - 1), Status = status, Missing = missing,
+        };
+        CanvasApi.Item Done(string c, string id, string name, int day) => Item(c, id, name, day, "submitted");
+        const string toc = "Theory of Computation", arch = "Computer Architecture", mining = "Data Mining", cap = "Capstone";
+        var due = new CanvasApi.DueResponse
+        {
+            ToHandIn = 24,
+            Groups =
+            [
+                new CanvasApi.Group { Key = "overdue", Label = "Overdue", Items = [Item(toc, "d1", "Asynchronous Lecture 5", 5, "missing", missing: true)] },
+                new CanvasApi.Group
+                {
+                    Key = "week", Label = "This week",
+                    Items = [Item(mining, "d2", "Reading quiz 6", 12), Item(toc, "d3", "CCHW2", 14), Item(arch, "d4", "HW3", 14), Item(mining, "d5", "Project proposal", 16), Item(ml, "d6", "CA.02: First Contact", 18)],
+                },
+                new CanvasApi.Group
+                {
+                    Key = "later", Label = "Later",
+                    Items =
+                    [
+                        Item(toc, "d7", "CCHW3", 19), Item(arch, "d8", "Lab 4: Pipelining", 21), Item(mining, "d9", "Quiz 4", 22), Item(cap, "d10", "Sprint 3 report", 23),
+                        Item(mining, "d11", "Reading quiz 7", 23), Item(toc, "d12", "Proof portfolio draft", 23), Item(ml, "d13", "Midterm Project: 3-Minute Demo Video", 25),
+                        Item(toc, "d14", "CCHW4", 26), Item(arch, "d15", "HW4", 28), Item(cap, "d16", "Design review", 30), Item(ml, "d17", "Research Paper Presentation", 72),
+                    ],
+                },
+                new CanvasApi.Group
+                {
+                    Key = "handed_in", Label = "Handed in",
+                    Items = [Done(ml, "h1", "Paper summary", 2), Done(toc, "h2", "CCHW1", 5), Done(arch, "h3", "HW2", 8), Done(cap, "h4", "Sprint 2 report", 9)],
+                },
+            ],
+        };
+        OverviewModel.LectureFacts L(string id, string title, string c, int day, double hour, double min, string summary) =>
+            new(id, title, c, monday.AddDays(day).AddHours(hour), min * 60, summary, false, monday.AddDays(day).AddHours(hour).ToString("o"));
+        var everything = new List<OverviewModel.LectureFacts>
+        {
+            L("n1", "Transformers, Self-Attention, and LLM Fundamentals", ml, 0, 9.5, 52,
+                "Opened the course's block on modern AI: the 2017 transformer paper, why fixed-size networks fall short for language, and dot-product self-attention."),
+            L("n2", "Recording, Sat 10 Oct at 4:12 PM", "Unsorted", -2, 16.2, 18, "A planning conversation about the hackathon sponsor list and booking a room for the kickoff."),
+            L("n3", "General meeting: Hackathon planning", "ACM", -4, 18, 41, "Officers split up sponsor outreach, picked a November date and set up a sign-up form for teams."),
+            L("n4", "CNNs: Pooling, Kernels, AlexNet, and Sketch Classification", ml, -5, 9.5, 50,
+                "Continued the unit on convolutional neural networks with pooling, kernel sizes, the AlexNet architecture and a sketch classification demo."),
+            L("n5", "Weekly check-in", "NSWC", -6, 14, 24, "Status on the signal-processing pipeline and what the test harness needs before the next review."),
+            L("n6", "Intro to CNNs: AlexNet History, Invariance, and 1D Convolution", ml, -7, 9.5, 47,
+                "Started the course's unit on convolutional neural networks, from AlexNet's history to translation invariance and 1D convolution."),
+        };
+        var mlNotes = new List<OverviewModel.LectureFacts>
+        {
+            L("n1", "Transformers, Self-Attention, and LLM Fundamentals", ml, 0, 9.5, 52, "Opened the course's block on modern AI, starting with transformers."),
+            L("n4", "CNNs: Pooling, Kernels, AlexNet, and Sketch Classification", ml, -5, 9.5, 50, "Continued the unit on convolutional neural networks (CNNs)."),
+            L("n6", "Intro to CNNs: AlexNet History, Invariance, and 1D Convolution", ml, -7, 9.5, 47, "Started the course's unit on convolutional neural networks (CNNs)."),
+            L("n7", "Project Stand-up and Paper Talks: RF-CNN, AI in Music Production, Multimodal Unlearning", ml, -10, 9.5, 49,
+                "A Friday stand-up in two parts: project updates, then student paper talks."),
+            L("n8", "Backpropagation and Training a Network to Reproduce a Cat Image", ml, -12, 9.5, 51, "Explained backpropagation, the algorithm neural networks use to learn."),
+            L("n9", "Deep Learning Fundamentals: Network Depth, Expressivity, and Hyperparameters", ml, -14, 9.5, 50,
+                "How adding more layers increases a network’s expressivity and complexity."),
+            L("n10", "Research Papers: Epistemic Honesty in LLMs and LoRA Fine-Tuning", ml, -17, 9.5, 46,
+                "Two paper talks: epistemic honesty in large language models, and LoRA fine-tuning."),
+        };
+        var acmNotes = new List<OverviewModel.LectureFacts>
+        {
+            L("n3", "General meeting: Hackathon planning", "ACM", -4, 18, 41, "Officers split up sponsor outreach, picked a November date and set up a sign-up form for teams."),
+            L("n11", "Officer meeting", "ACM", -11, 18, 33, "Budget for the semester, the speaker series shortlist and who runs the next general meeting."),
+            L("n12", "General meeting: Welcome back", "ACM", -18, 18, 52, "Introductions, this year’s events and a demo of last spring’s hackathon winner."),
+        };
+        OverviewModel.Sources Sources(IReadOnlyList<OverviewModel.LectureFacts> notes) => new()
+        {
+            Now = now, Zone = zone,
+            Classes = [.. folders.Select(f => (f.Name, Dot(f.Hue), f.Notes))],
+            GroupOf = GroupOf,
+            Unsorted = 1,
+            Lectures = notes,
+            Canvas = [.. new[] { ml, toc, arch, mining, cap }.Select(c => new CanvasApi.ClassRow { Class = c, Linked = true })],
+            Due = due,
+            Events = events,
+            OpenClass = name => go?.Invoke(GroupOf(name).Length > 0 ? Page.FolderClub : Page.FolderClass),
+            OpenLecture = (_, _) => go?.Invoke(Page.Note),
+            OpenDue = _ => go?.Invoke(Page.Due),
+            RecordEvent = _ => go?.Invoke(Page.Recording),
+        };
+        var recorder = new RecorderModel { ClassName = ml, ClassDot = Dot("Blue"), Elapsed = "12:04", Levels = PillWave };
+        if (go is not null)
+        {
+            m.OnClass = c => go(c.IsHome ? Page.Home : c.IsDue ? Page.Due : c.Group.Length > 0 ? Page.FolderClub : Page.FolderClass);
+            m.OnFolder = name => go(GroupOf(name).Length > 0 ? Page.FolderClub : Page.FolderClass);
+            m.OnOpenRecording = () => go(Page.Recording);
+            m.ComingUp.OnRecord = _ => go(Page.Recording);
+            m.OnDelete = _ => Task.FromResult(true);
+            m.OnLeaveNote = () => go(Page.FolderClass);
+            m.PickerForNote = () =>
+            {
+                var picker = SamplePicker(ml);
+                picker.OnPick = to => m.SayMoved(new NoteMove("n1", ml, to == "Unsorted" ? "" : to));
+                return picker;
+            };
+            recorder.OnStop = () => go(Page.Note);
+            recorder.OnPause = () => recorder.IsPaused = !recorder.IsPaused;
+        }
+        AiAskModel Ask(string noun, string? folder, params string[] scopes)
+        {
+            var ask = AiDemo.AskIdle();
+            ask.OnlyScopes(scopes);
+            ask.NameScopes(noun, folder);
+            return ask;
+        }
+        void Records(OverviewModel o)
+        {
+            o.OnRecord = () => go?.Invoke(recording ? Page.Note : Page.Recording);
+            if (!recording) return;
+            o.Recorder = recorder;
+            o.Recording = true;
+        }
+        if (recording) m.Recording = recorder;
+        switch (page)
+        {
+            case Page.Home or Page.HomeUnsorted:
+            {
+                bool unsorted = page == Page.HomeUnsorted;
+                var home = OverviewModel.Home(Sources(unsorted ? [.. everything.Where(l => l.Class == "Unsorted")] : everything), unsorted);
+                Records(home);
+                home.OnSupport = () => { };
+                // A pick in the folder picker moves the row where it is, and says so with Undo, as the app does.
+                home.PickerFor = row =>
+                {
+                    var picker = SamplePicker(row.Folder);
+                    picker.OnPick = to => Move(row, to == "Unsorted" ? "" : to, say: true);
+                    return picker;
+                };
+                home.OnFilter = only => go?.Invoke(only ? Page.HomeUnsorted : Page.Home);
+                m.OnUndoMove = move =>
+                {
+                    if (home.Notes.FirstOrDefault(n => n.Id == move.Id) is { } row) Move(row, move.From, say: false);
+                    return Task.CompletedTask;
+                };
+                home.Ask = Ask(Nouns.Lecture, null, "all");
+                m.Overview = home;
+                break;
+            }
+            case Page.Due or Page.DueWeek:
+            {
+                var page1 = OverviewModel.ForDue(Sources([]));
+                if (page == Page.DueWeek) page1.Calendar!.WeekView = true;
+                m.Overview = page1;
+                break;
+            }
+            case Page.FolderClass or Page.FolderClub:
+            {
+                bool club = page == Page.FolderClub;
+                string name = club ? "ACM" : ml;
+                foreach (var c in m.Classes) c.Selected = c.Name == name;
+                var facts = new ClassHomeFacts(name, DotOf(name), club ? 5 : 14, club ? null : "CSCI 4220", club ? null : "Machine and Deep Learning", null,
+                    club ? null : new CanvasApi.Counts { ToHandIn = 3, Done = 5, Modules = 8, Files = 12, Announcements = 6, AnnouncementsNew = 1 }, GroupOf(name));
+                var folder = OverviewModel.ForClass(facts, Sources(club ? acmNotes : mlNotes));
+                folder.AddLinks(facts, club ? null : _ => { });
+                Records(folder);
+                folder.Files = new AttachmentsModel(new NoFiles(), name, null);
+                folder.Ask = Ask(folder.Noun, name, "class", "all");
+                m.Overview = folder;
+                break;
+            }
+            case Page.Note or Page.NoteOnlyMine:
+            {
+                foreach (var c in m.Classes) c.Selected = c.Name == ml;
+                m.Note = new NoteModel
+                {
+                    Id = "n1", ClassName = ml, Dot = Dot("Blue"), Noun = Nouns.Lecture, When = "Monday 12 October at 9:30 AM, 52 min",
+                    Title = "Transformers, Self-Attention, and LLM Fundamentals", Markdown = Merged, OnRename = _ => Task.FromResult(true),
+                }.Titled();
+                m.Notes = AiDemo.LectureNotes(Merged, "Claude");
+                m.Notes.OnlyMine = page == Page.NoteOnlyMine;
+                m.LectureFiles = new AttachmentsModel(new NoFiles(), ml, "n1");
+                m.Ask = Ask(Nouns.Lecture, ml, "lecture", "class", "all");
+                break;
+            }
+            case Page.Recording:
+            {
+                foreach (var c in m.Classes) c.Selected = c.Name == ml;
+                m.Recording = recorder;
+                recorder.Lines.Add(new HeardLine { Time = "10:48", Text = "So the query for this token is compared against the key of every other token.", Start = 648 });
+                recorder.Lines.Add(new HeardLine { Time = "11:30", Text = "You take the dot product, and softmax turns those scores into weights.", Start = 690 });
+                recorder.Lines.Add(new HeardLine { Time = "12:01", Text = "And those weights are applied to the value vectors.", Start = 721, Latest = true });
+                m.Note = new NoteModel
+                {
+                    Id = "rec-live", ClassName = ml, Dot = Dot("Blue"), Noun = Nouns.Lecture, When = "Monday 12 October at 9:30 AM", Title = "Machine Learning, Mon 12 Oct",
+                    Live = true, Recorder = recorder, Typed = Typed.ReplaceLineEndings("\n"), OnRename = _ => Task.FromResult(true),
+                }.Titled().Following();
+                var ask = AiDemo.AskIdle();
+                ask.Live = () => "";
+                ask.OnlyScopes("lecture");
+                ask.NameScopes(Nouns.Lecture, null);
+                m.Ask = ask;
+                break;
+            }
+            case Page.CanvasLists:
+            {
+                foreach (var c in m.Classes) c.Selected = c.Name == ml;
+                m.CanvasOf = ml;
+                m.CanvasDot = Dot("Blue");
+                break;
+            }
+        }
+        m.Narrow = narrow;
+        return m;
+
+        FolderPickerModel SamplePicker(string current) =>
+            new(folders.Select(f => (f.Name, f.Group, Dot(f.Hue), f.Notes)), current);
+
+        void Move(NoteItem row, string to, bool say)
+        {
+            string from = row.Folder;
+            row.Folder = to;
+            row.Dot = DotOf(to);
+            row.Noun = Nouns.For(to, to.Length > 0 ? GroupOf(to) : "");
+            if (say) m.SayMoved(new NoteMove(row.Id, from, to));
+        }
+    }
+
+    /// <summary>The sample's folder picker, open on a note in <paramref name="current"/> ("" for Unsorted).</summary>
+    public static FolderPickerModel Picker(string current = "Machine Learning")
+    {
+        (string Name, string Hue, int Notes, string Group)[] folders =
+        [
+            ("Machine Learning", "Blue", 14, ""), ("Capstone", "Green", 4, ""), ("Computer Architecture", "Violet", 8, ""), ("Data Mining", "Orange", 9, ""),
+            ("Theory of Computation", "Pink", 15, ""), ("ACM", "Teal", 5, "Clubs"), ("Intellievent", "Yellow", 2, "Work"), ("NSWC", "Lime", 1, "Work"),
+        ];
+        return new FolderPickerModel(folders.Select(f => (f.Name, f.Group, (IBrush)Skin.ClassDot(Array.IndexOf(Skin.ClassHues, f.Hue)), f.Notes)), current);
+    }
+
+    /// <summary>A library that holds no files and takes none: what a sample page's Attach hangs off.</summary>
+    sealed class NoFiles : Core.IAttachmentLibrary
+    {
+        public Task<System.Text.Json.Nodes.JsonObject?> AttachmentListAsync(string? className, string? lectureId, CancellationToken stop = default) =>
+            Task.FromResult<System.Text.Json.Nodes.JsonObject?>(null);
+        public Task<System.Text.Json.Nodes.JsonArray> AttachAsync(IEnumerable<string> paths, string? className, string? lectureId, CancellationToken stop = default) =>
+            Task.FromResult(new System.Text.Json.Nodes.JsonArray());
+        public Task<bool> RemoveAttachmentAsync(string id) => Task.FromResult(false);
+        public Task DownloadAttachmentAsync(string id, string path, CancellationToken stop = default) => Task.CompletedTask;
+        public Task RewriteAsync(string id) => Task.CompletedTask;
+    }
+
     /// <summary>A term with many classes, their names as a school's catalogue writes them (long, with the section on
-    /// the end), none of them with a lecture yet: the sidebar scrolls, names end in "…", and the open class's name
-    /// is too long for the list's header.</summary>
+    /// the end), none of them with a lecture yet: the sidebar scrolls, names end in "…", and the open folder's name
+    /// is too long for one line of its page's title.</summary>
     public static LibraryModel Crowded()
     {
         string[] names =
@@ -219,9 +556,17 @@ public static class Demo
             "Music Theory II(MUS1220.A)", "Introduction to Psychology(PSY1010.E)", "Senior Project Seminar(ME4900.A)",
         ];
         const int open = 9;
-        var m = new LibraryModel { ClassTitle = names[open], ClassCount = "0 lectures", Status = "Library running on this PC", DrawChrome = true };
+        var m = new LibraryModel { Status = "Library running on this PC", DrawChrome = true };
         for (int i = 0; i < names.Length; i++) m.Classes.Add(new ClassItem { Name = names[i], Dot = Skin.ClassDot(i), Count = i == 6 ? 12 : 0, Selected = i == open });
-        m.Empty = $"No lectures in {names[open]} yet. Record one and it lands here.";
+        var now = new DateTimeOffset(2026, 9, 30, 10, 20, 0, TimeSpan.FromHours(-7));
+        var sources = new OverviewModel.Sources
+        {
+            Now = now, Zone = TimeZoneInfo.CreateCustomTimeZone("Demo", TimeSpan.FromHours(-7), "Demo", "Demo"),
+            Classes = [.. names.Select((name, i) => (name, (IBrush)Skin.ClassDot(i), i == 6 ? 12 : 0))],
+        };
+        var page = OverviewModel.ForClass(new ClassHomeFacts(names[open], Skin.ClassDot(open), 0, null, null, null, null), sources);
+        page.OnRecord = () => { };
+        m.Overview = page;
         return m;
     }
 

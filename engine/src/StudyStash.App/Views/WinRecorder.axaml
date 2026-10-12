@@ -1,5 +1,5 @@
-<!-- The floating recorder (Surfaces, Windows 11 02): a small bar, 32 tall, recording or paused; open, 360 × 520, the
-     transcript fading upward, and a chat on the footer band. -->
+<!-- The floating recorder (Windows): small, a white pill with a red dot (Stop), the class, a level meter and the time;
+     open, 360 × 520, the transcript fading upward, and a chat on the footer band. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -15,9 +15,9 @@
   <UserControl.Styles>
     <Style Selector="Button.stop">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="22" />
-      <Setter Property="Height" Value="22" />
-      <Setter Property="CornerRadius" Value="4" />
+      <Setter Property="Width" Value="32" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="16" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.control">
@@ -40,28 +40,28 @@
     </Style>
   </UserControl.Styles>
   <Panel>
-    <!-- The pill (after Granola's): a small capsule standing upright, in the colour theme's accent (Settings →
-         Appearance: it changes with the theme, and with light and dark), Study Stash's mark on top and three bars
-         under it that move with what the microphone hears. Paused, a pause mark takes the bars' place; with the pointer
-         over it, Stop does; the time is its tooltip, and a click opens the recorder. -->
-    <Border Name="Pill" IsVisible="{Binding !Expanded}" Width="40" Height="76" CornerRadius="20" Background="{DynamicResource Accent}"
-            BoxShadow="{DynamicResource PillShadow}" HorizontalAlignment="Left"
-            ToolTip.Tip="{Binding Elapsed}" ToolTip.Placement="Left">
-      <Grid RowDefinitions="*,Auto,*" Margin="0,11">
-        <c:AppMarkGlyph Grid.Row="0" Width="20" Height="20" Foreground="{DynamicResource OnAccent}" HorizontalAlignment="Center" VerticalAlignment="Top" />
-        <Panel Grid.Row="2" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Bottom">
-          <c:Waveform Bars="3" Height="13" MinBar="4" Levels="{Binding Levels}" Foreground="{DynamicResource OnAccent}"
-                      HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding ShowMeter}" />
-          <c:Icon Glyph="pause" Filled="True" Size="12" Foreground="{DynamicResource OnAccent}" Opacity="0.75" HorizontalAlignment="Center"
-                  VerticalAlignment="Center" IsVisible="{Binding ShowPausedMark}" />
-          <!-- Stop's disc: the ink on the accent, faint -->
-          <Border Width="20" Height="20" CornerRadius="10" Background="{DynamicResource OnAccent}" Opacity="0.2" IsVisible="{Binding Hovered}" />
-          <Button AutomationProperties.Name="Stop" Classes="stop" Command="{Binding StopCommand}" ToolTip.Tip="Stop" IsVisible="{Binding Hovered}"
-                  Width="20" Height="20" CornerRadius="10">
-            <c:Icon Glyph="stop" Filled="True" Size="11" Foreground="{DynamicResource OnAccent}" />
-          </Button>
+    <!-- The pill: a small white capsule floating over whatever else is on screen, and red only in its dot. The dot is
+         Stop (a stop square in it while it records; a red ring round a red centre while it's paused), then the class
+         by its short name, a level meter that moves with what the microphone hears, and the time. A click anywhere
+         else on it opens the recorder; a drag moves it. Paused, "Paused" takes the class's place and the meter rests,
+         each in the room the other had, so the pill never changes size under the pointer. -->
+    <Border Name="Pill" IsVisible="{Binding !Expanded}" Classes.recording="{Binding IsRunning}" Classes.paused="{Binding IsPaused}" Height="44" CornerRadius="22"
+            Padding="6,0" Background="{DynamicResource Surface}" BoxShadow="{DynamicResource ShadowFloat}" HorizontalAlignment="Left"
+            AutomationProperties.Name="{Binding PillSaid}">
+      <StackPanel Orientation="Horizontal" Spacing="10">
+        <Button AutomationProperties.Name="Stop" Classes="stop" Command="{Binding StopCommand}" ToolTip.Tip="Stop" VerticalAlignment="Center">
+          <Border Classes="record-dot mini"><Border /></Border>
+        </Button>
+        <Panel VerticalAlignment="Center">
+          <TextBlock Name="PillClass" Text="{Binding ShortClass}" FontSize="14" FontWeight="Bold" MaxWidth="150" TextTrimming="CharacterEllipsis"
+                     Opacity="{Binding IsRunning, Converter={x:Static c:Converters.Shown}}" />
+          <TextBlock Text="Paused" FontSize="14" FontWeight="Bold" Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Shown}}" />
         </Panel>
-      </Grid>
+        <c:Waveform Bars="5" Height="16" MinBar="5" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" VerticalAlignment="Center"
+                    Opacity="{Binding IsRunning, Converter={x:Static c:Converters.Shown}}" />
+        <TextBlock Name="PillTime" Text="{Binding Elapsed}" FontSize="14" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" MinWidth="40"
+                   VerticalAlignment="Center" Margin="0,0,6,0" />
+      </StackPanel>
     </Border>
 
     <!-- Expanded -->
@@ -80,8 +80,8 @@
             <Button AutomationProperties.Name="{Binding PauseTip}" Classes="square control" Command="{Binding PauseCommand}" ToolTip.Tip="{Binding PauseTip}">
               <c:Icon Glyph="{Binding PauseGlyph}" Filled="True" Size="16" Foreground="{DynamicResource Fg}" />
             </Button>
-            <Button AutomationProperties.Name="Stop" Classes="square" Background="{DynamicResource Accent}" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
-              <c:Icon Glyph="stop" Filled="True" Size="16" Foreground="{DynamicResource OnAccent}" />
+            <Button AutomationProperties.Name="Stop" Classes="square" Background="{DynamicResource Record}" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
+              <c:Icon Glyph="stop" Filled="True" Size="12" Foreground="{DynamicResource OnRecord}" />
             </Button>
           </StackPanel>
         </Grid>

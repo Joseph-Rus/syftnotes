@@ -226,12 +226,12 @@ public static class RichDemo
     // -----------------------------------------------------------------------------------------------------------
     // The demo lecture: BIO 110's "The cardiac cycle and cardiac output" — a made-up nursing lecture that shows off
     // formulas and diagrams together, the way a real lecture's notes would. Its class, title and meta match the
-    // library shots' own LectureCard/NoteModel wiring in RichShots.cs (Demo.cs stays CS 101's, untouched).
+    // library shots' own NoteModel wiring in RichShots.cs (Demo.cs stays CS 101's, untouched).
     // -----------------------------------------------------------------------------------------------------------
 
     public const string LectureClassName = "BIO 110";
     public const string LectureTitle = "The cardiac cycle and cardiac output";
-    public const string LectureMeta = "BIO 110 · Tuesday 23 September · 1 h 12 min";
+    public const string LectureWhen = "Tuesday 23 September at 10:02 AM, 1 h 12 min";
 
     /// <summary>Low blood pressure treated by the reading, then always rechecked: the lecture's third flowchart, a
     /// decision like <see cref="PainReassess"/> but its own (a lecture's notes draw more than one kind).</summary>

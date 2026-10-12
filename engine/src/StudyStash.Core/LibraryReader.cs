@@ -75,6 +75,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         var m = Store.Meeting(row);
         var result = Summary(row);
         result["notes"] = NotesOf(row, m);
+        // What the student typed themselves during the lecture, as they typed it: the notes are written round it
+        // (their lines marked ==like this==), and with no notes written it's all there is to read.
+        result["typed"] = m.PrivateNotes;
         result["transcript"] = m.Transcript;
         result["classified_by"] = row.ClassifiedBy;
         result["notes_model"] = row.SummaryModel;

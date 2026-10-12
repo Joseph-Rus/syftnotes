@@ -364,10 +364,6 @@ public class SurfaceShots
     {
         var pills = new StackPanel { Spacing = 32, VerticalAlignment = VerticalAlignment.Top };
         pills.Children.Add(view(Demo.Recorder()));
-        // The pointer over it: Stop in the level meter's place.
-        var hovered = Demo.Recorder();
-        hovered.Hovered = true;
-        pills.Children.Add(view(hovered));
         pills.Children.Add(view(Demo.Recorder(paused: true)));
         if (extra is not null) pills.Children.Add(extra);
         // Written down after class (Settings → Recording): no transcript or chat yet, and it says why.

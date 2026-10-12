@@ -118,7 +118,7 @@
                 <Grid ColumnDefinitions="*,Auto" MinHeight="40" Margin="16,8">
                   <StackPanel Spacing="3" VerticalAlignment="Center" MinWidth="0">
                     <StackPanel Orientation="Horizontal" Spacing="8">
-                      <Ellipse Classes="cv-dot" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                      <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
                       <TextBlock Classes="cv-dot-label" Text="{Binding Class}" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Spacing="6" Margin="16,0,0,0">

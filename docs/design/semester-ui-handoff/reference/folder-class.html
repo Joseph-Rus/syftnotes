@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Semester — Machine Learning</title>
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="semester.css">
+<script>/* ?theme=dark or ?theme=light */ var t=new URLSearchParams(location.search).get('theme'); if(t) document.documentElement.dataset.theme=t;</script>
+</head>
+<body>
+<div class="app">
+<aside class="sidebar" aria-label="Sidebar">
+  <div class="sidebar-toolbar">
+    <button class="icon-btn" aria-label="Hide sidebar" title="Hide sidebar"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/> <path d="M9 3v18"/></svg></button>
+    <span class="spacer"></span>
+    <button class="icon-btn" aria-label="Back" title="Back"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 19-7-7 7-7"/> <path d="M19 12H5"/></svg></button>
+    <button class="icon-btn" aria-label="Forward" title="Forward" disabled><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/> <path d="m12 5 7 7-7 7"/></svg></button>
+  </div>
+  <nav>
+    <a class="nav-item" href="home.html"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/> <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Home</a>
+    <a class="nav-item" href="due.html"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/> <path d="M16 2v4"/> <path d="M8 2v4"/> <path d="M3 10h5"/> <path d="M17.5 17.5 16 16.3V14"/> <circle cx="16" cy="16" r="6"/></svg>Due<span class="nav-count">24</span></a>
+  </nav>
+  <div class="side-group">Classes<button class="icon-btn icon-btn--sm" aria-label="Add folder" title="Add folder"><svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/> <path d="M12 5v14"/></svg></button></div>
+  <a class="class-item is-selected" href="folder-class.html"><span class="swatch" data-hl="blue"></span><span class="class-name">Machine Learning</span><span class="nav-count">14</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="green"></span><span class="class-name">Capstone</span><span class="nav-count">4</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="violet"></span><span class="class-name">Computer Architecture</span><span class="nav-count">8</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="orange"></span><span class="class-name">Data Mining</span><span class="nav-count">9</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="pink"></span><span class="class-name">Theory of Computation</span><span class="nav-count">15</span></a>
+  <div class="side-group">Clubs</div>
+  <a class="class-item" href="folder-club.html"><span class="swatch" data-hl="teal"></span><span class="class-name">ACM</span><span class="nav-count">5</span></a>
+  <div class="side-group">Work</div>
+  <a class="class-item" href="#"><span class="swatch" data-hl="yellow"></span><span class="class-name">Intellievent</span><span class="nav-count">2</span></a>
+  <a class="class-item" href="#"><span class="swatch" data-hl="lime"></span><span class="class-name">NSWC</span><span class="nav-count">1</span></a>
+  <div class="coming">
+    <div class="side-group">Coming up</div>
+    <button class="coming-item is-soon" type="button" title="Click to record" aria-label="Record Capstone team sync, starts in 11 minutes"><span class="coming-title"><span class="swatch swatch--sm" data-hl="green"></span><span>Capstone team sync</span></span><span class="coming-when">In 11 minutes</span></button>
+    <button class="coming-item" type="button" title="Click to record" aria-label="Record Data Mining, tomorrow at 8:45 AM"><span class="coming-title"><span class="swatch swatch--sm" data-hl="orange"></span><span>Data Mining</span></span><span class="coming-when">Tomorrow 8:45 AM</span></button>
+  </div>
+  <div class="side-footer">Library on this Mac<br>Canvas synced at 12:58</div>
+</aside>
+<main class="pane">
+<div class="pane-toolbar">
+    <button class="icon-btn" aria-label="Search" title="Search  ⌘K"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/> <path d="m21 21-4.3-4.3"/></svg></button>
+    <button class="icon-btn" aria-label="Settings" title="Settings"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/> <circle cx="12" cy="12" r="3"/></svg></button>
+  </div>
+  <div class="page">
+    <header class="page-head">
+      <div><h1 class="page-date folder-title" data-hl="blue"><mark class="hl">Machine Learning</mark></h1><p class="page-lede">CSCI 4220 on Canvas. Meets Monday, Wednesday and Friday at 9:30 AM.</p></div>
+      <div class="head-actions"><button class="btn" type="button"><svg class="icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>Attach</button><button class="record" type="button" aria-pressed="false"><span class="record-dot"></span>Record<kbd>⌘R</kbd></button></div>
+    </header>
+    <div class="folder-grid">
+      <section aria-labelledby="ls"><h2 class="section-title" id="ls" style="margin-bottom:14px">Lectures</h2>
+<div class="group-label">This week</div>
+<article class="note"><span class="note-date">Mon 12 Oct</span><span class="note-body"><a class="note-title" href="note.html">Transformers, Self-Attention, and LLM Fundamentals</a><span class="note-summary">Opened the course's block on modern AI, starting with transformers.</span></span><span class="note-length">52 min</span></article>
+<div class="group-label">Last week</div>
+<article class="note"><span class="note-date">Wed 7 Oct</span><span class="note-body"><a class="note-title" href="note.html">CNNs: Pooling, Kernels, AlexNet, and Sketch Classification</a><span class="note-summary">Continued the unit on convolutional neural networks (CNNs).</span></span><span class="note-length">50 min</span></article>
+<article class="note"><span class="note-date">Mon 5 Oct</span><span class="note-body"><a class="note-title" href="note.html">Intro to CNNs: AlexNet History, Invariance, and 1D Convolution</a><span class="note-summary">Started the course's unit on convolutional neural networks (CNNs).</span></span><span class="note-length">47 min</span></article>
+<div class="group-label">October</div>
+<article class="note"><span class="note-date">Fri 2 Oct</span><span class="note-body"><a class="note-title" href="note.html">Project Stand-up and Paper Talks: RF-CNN, AI in Music Production, Multimodal Unlearning</a><span class="note-summary">A Friday stand-up in two parts: project updates, then student paper talks.</span></span><span class="note-length">49 min</span></article>
+<div class="group-label">September</div>
+<article class="note"><span class="note-date">Wed 30 Sep</span><span class="note-body"><a class="note-title" href="note.html">Backpropagation and Training a Network to Reproduce a Cat Image</a><span class="note-summary">Explained backpropagation, the algorithm neural networks use to learn.</span></span><span class="note-length">51 min</span></article>
+<article class="note"><span class="note-date">Mon 28 Sep</span><span class="note-body"><a class="note-title" href="note.html">Deep Learning Fundamentals: Network Depth, Expressivity, and Hyperparameters</a><span class="note-summary">How adding more layers increases a network’s expressivity and complexity.</span></span><span class="note-length">50 min</span></article>
+<article class="note"><span class="note-date">Fri 25 Sep</span><span class="note-body"><a class="note-title" href="note.html">Research Papers: Epistemic Honesty in LLMs and LoRA Fine-Tuning</a><span class="note-summary">Two paper talks: epistemic honesty in large language models, and LoRA fine-tuning.</span></span><span class="note-length">46 min</span></article>
+      </section>
+      <div class="rail">
+        <section class="rail-section"><h2 class="rail-title">Due</h2>
+          <a class="rail-due" href="#"><span class="rail-due-title">CA.02: First Contact</span><span class="rail-due-when is-soon">Sun 18 Oct, in 6 days</span></a>
+          <a class="rail-due" href="#"><span class="rail-due-title">Midterm Project: 3-Minute Demo Video</span><span class="rail-due-when">Sun 25 Oct, in 13 days</span></a>
+          <a class="rail-due" href="#"><span class="rail-due-title">Research Paper Presentation</span><span class="rail-due-when">Fri 11 Dec</span></a>
+          <a class="text-link" href="due.html" style="margin-top:6px">See these on the calendar</a>
+        </section>
+        <section class="rail-section"><h2 class="rail-title">On Canvas</h2>
+          <div class="rail-links"><a class="text-link" href="#">Assignments</a><a class="text-link" href="#">Modules</a><a class="text-link" href="#">Announcements</a></div>
+        </section>
+        <section class="rail-section"><h2 class="rail-title">Next class</h2>
+          <p class="rail-text">Wednesday at 9:30 AM</p>
+        </section>
+      </div>
+    </div>
+  </div>
+  <div class="ask-fade"></div><form class="ask" role="search"><input class="ask-input" placeholder="Ask about Machine Learning" aria-label="Ask about Machine Learning"><button class="ask-scope" type="button" aria-haspopup="listbox">Machine Learning<svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><kbd>⌘J</kbd></form>
+</main>
+</div>
+</body>
+</html>

@@ -125,7 +125,10 @@ public class GranolaTransferTests
         string p = Assert.Single(prompts);
         Assert.Contains("There is no transcript of this lecture", p);
         Assert.Contains("The notes it came with:\n- The cell membrane is a lipid bilayer", p);
-        Assert.Contains("What the student typed during it:\nask about aquaporins", p);
+        // What was typed in Granola is the student's own, kept and marked as theirs, as a recording's typed notes are.
+        Assert.Contains("The student's own notes, typed during the lecture", p);
+        Assert.Contains("ask about aquaporins", p);
+        Assert.Contains("==ask about aquaporins==", notes);
         Assert.Contains("Use only what is in these notes", p);
         Assert.DoesNotContain("Transcript:", p);
 
@@ -133,8 +136,10 @@ public class GranolaTransferTests
         Assert.Contains("_Written by Claude from the notes it came with._", file);
         Assert.Contains("## Notes\n\n- The cell membrane is a lipid bilayer", file); // Granola's own, kept
 
-        // Too little to write from stays as it came; a lecture with its transcript is written from that, as ever.
+        // Too little to write from stays as it came; a lecture with its transcript is written from that, as ever; and
+        // a short recording the student typed a page into isn't one that came with notes.
         Assert.False(Summarize.WantsSummary(new Meeting("granola-b") { NotesMarkdown = "Short." }, cfg));
+        Assert.False(Summarize.FromNotes(new Meeting("rec-2") { PrivateNotes = Summary }));
         var recorded = new Meeting("rec-1") { Title = "Membranes", Transcript = string.Join("\n", Enumerable.Repeat("The membrane is a lipid bilayer and water crosses it by osmosis.", 40)) };
         Assert.False(Summarize.FromNotes(recorded));
         Assert.Contains("_Written by Claude from the transcript._", Notes.Render(recorded, new Classification("BIO 110", 1, "rules"), notes, "Claude"));
