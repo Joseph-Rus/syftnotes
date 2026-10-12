@@ -257,7 +257,9 @@ public static class Demo
     /// work folders, each with its highlighter; Capstone's team sync eleven minutes off; a quiz due tonight and one
     /// thing missing. <paramref name="page"/> picks the screen. For laying a picture of the app over the design's.
     /// </summary>
-    public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false)
+    /// <param name="go">Makes the sample one to click through: where a click that leads somewhere (a folder, a note,
+    /// an event to record, Stop) asks to go. Null for a still picture, where nothing leads anywhere.</param>
+    public static LibraryModel Semester(Page page = Page.Home, bool recording = false, bool narrow = false, Action<Page>? go = null)
     {
         (string Name, string Hue, int Notes, string Group)[] folders =
         [
@@ -375,8 +377,29 @@ public static class Demo
             Canvas = [.. new[] { ml, toc, arch, mining, cap }.Select(c => new CanvasApi.ClassRow { Class = c, Linked = true })],
             Due = due,
             Events = events,
+            OpenClass = name => go?.Invoke(GroupOf(name).Length > 0 ? Page.FolderClub : Page.FolderClass),
+            OpenLecture = (_, _) => go?.Invoke(Page.Note),
+            OpenDue = _ => go?.Invoke(Page.Due),
+            RecordEvent = _ => go?.Invoke(Page.Recording),
         };
         var recorder = new RecorderModel { ClassName = ml, ClassDot = Dot("Blue"), Elapsed = "12:04", Levels = PillWave };
+        if (go is not null)
+        {
+            m.OnClass = c => go(c.IsHome ? Page.Home : c.IsDue ? Page.Due : c.Group.Length > 0 ? Page.FolderClub : Page.FolderClass);
+            m.OnFolder = name => go(GroupOf(name).Length > 0 ? Page.FolderClub : Page.FolderClass);
+            m.OnOpenRecording = () => go(Page.Recording);
+            m.ComingUp.OnRecord = _ => go(Page.Recording);
+            m.OnDelete = _ => Task.FromResult(true);
+            m.OnLeaveNote = () => go(Page.FolderClass);
+            m.PickerForNote = () =>
+            {
+                var picker = SamplePicker(ml);
+                picker.OnPick = to => m.SayMoved(new NoteMove("n1", ml, to == "Unsorted" ? "" : to));
+                return picker;
+            };
+            recorder.OnStop = () => go(Page.Note);
+            recorder.OnPause = () => recorder.IsPaused = !recorder.IsPaused;
+        }
         AiAskModel Ask(string noun, string? folder, params string[] scopes)
         {
             var ask = AiDemo.AskIdle();
@@ -386,7 +409,7 @@ public static class Demo
         }
         void Records(OverviewModel o)
         {
-            o.OnRecord = () => { };
+            o.OnRecord = () => go?.Invoke(recording ? Page.Note : Page.Recording);
             if (!recording) return;
             o.Recorder = recorder;
             o.Recording = true;
@@ -400,7 +423,19 @@ public static class Demo
                 var home = OverviewModel.Home(Sources(unsorted ? [.. everything.Where(l => l.Class == "Unsorted")] : everything), unsorted);
                 Records(home);
                 home.OnSupport = () => { };
-                home.PickerFor = row => SamplePicker(row.Folder);
+                // A pick in the folder picker moves the row where it is, and says so with Undo, as the app does.
+                home.PickerFor = row =>
+                {
+                    var picker = SamplePicker(row.Folder);
+                    picker.OnPick = to => Move(row, to == "Unsorted" ? "" : to, say: true);
+                    return picker;
+                };
+                home.OnFilter = only => go?.Invoke(only ? Page.HomeUnsorted : Page.Home);
+                m.OnUndoMove = move =>
+                {
+                    if (home.Notes.FirstOrDefault(n => n.Id == move.Id) is { } row) Move(row, move.From, say: false);
+                    return Task.CompletedTask;
+                };
                 home.Ask = Ask(Nouns.Lecture, null, "all");
                 m.Overview = home;
                 break;
@@ -473,6 +508,15 @@ public static class Demo
 
         FolderPickerModel SamplePicker(string current) =>
             new(folders.Select(f => (f.Name, f.Group, Dot(f.Hue), f.Notes)), current);
+
+        void Move(NoteItem row, string to, bool say)
+        {
+            string from = row.Folder;
+            row.Folder = to;
+            row.Dot = DotOf(to);
+            row.Noun = Nouns.For(to, to.Length > 0 ? GroupOf(to) : "");
+            if (say) m.SayMoved(new NoteMove(row.Id, from, to));
+        }
     }
 
     /// <summary>The sample's folder picker, open on a note in <paramref name="current"/> ("" for Unsorted).</summary>
