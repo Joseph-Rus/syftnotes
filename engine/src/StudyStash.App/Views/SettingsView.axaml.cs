@@ -1,8 +1,12 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
 using StudyStash.App.Services;
+using StudyStash.Core.Setup;
 
 namespace StudyStash.App.Views;
 
@@ -30,6 +34,61 @@ public partial class SettingsView : UserControl
         OnReturn(NewPassword, m => m.Lib.SavePasswordCommand);
         OnReturn(NewLibraryClass, m => m.Lib.AddClassCommand);
         OnReturn(NewFolder, m => m.Lib.AddFolderCommand);
+        DataContextChanged += (_, _) =>
+        {
+            if (watched is not null) watched.Spotlit -= Spotlight;
+            watched = DataContext as SettingsModel;
+            if (watched is not null) watched.Spotlit += Spotlight;
+        };
+        // ⌘F / Ctrl+F: the search field.
+        KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.F || !e.KeyModifiers.HasFlag(mac ? KeyModifiers.Meta : KeyModifiers.Control)) return;
+            e.Handled = true;
+            Search.Focus();
+            Search.SelectAll();
+        };
+    }
+
+    SettingsModel? watched;
+
+    /// <summary>How long a found setting stays lit.</summary>
+    public static readonly TimeSpan SpotFor = TimeSpan.FromSeconds(1.6);
+
+    /// <summary>The setting search (or the helper) went to: once its page is showing (a library page may still be
+    /// asking its library), scrolls to the line that names it and lights its row up for a moment.</summary>
+    void Spotlight(SettingEntry entry)
+    {
+        int tries = 0;
+        void Look()
+        {
+            if (Find(entry.Title) is { } line)
+            {
+                line.BringIntoView();
+                Control row = Row(line);
+                row.Classes.Add("spot");
+                DispatcherTimer.RunOnce(() => row.Classes.Remove("spot"), SpotFor);
+            }
+            else if (++tries < 20) DispatcherTimer.RunOnce(Look, TimeSpan.FromMilliseconds(150));
+        }
+        Dispatcher.UIThread.Post(Look, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>The words on the page now showing (not the sidebar's) that are <paramref name="title"/>.</summary>
+    public TextBlock? Find(string title) =>
+        this.GetVisualDescendants().OfType<TextBlock>().FirstOrDefault(t => t.Text == title && t.IsEffectivelyVisible && t.Bounds.Height > 0
+            && !t.GetVisualAncestors().Contains(Side));
+
+    /// <summary>What lights up for a line: the row it's in (the nearest grid on the page), else the line itself (a
+    /// section's heading).</summary>
+    static Control Row(TextBlock line)
+    {
+        foreach (var a in line.GetVisualAncestors())
+        {
+            if (a is ScrollViewer or ScrollContentPresenter or UserControl || a is StackPanel { Classes: var c } && c.Contains("pagebody")) break;
+            if (a is Grid g) return g;
+        }
+        return line;
     }
 
     void Run(Func<SettingsModel, IAsyncRelayCommand> command)

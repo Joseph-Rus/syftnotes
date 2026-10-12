@@ -1460,8 +1460,33 @@ public static partial class Shell
         model.Canvas.OnClassesChanged = LibraryClassesChanged;
         if (Skin.Current == SkinKind.Mac) MacTitleBar.Attach(w);
         WinChrome.Apply(w);
+        // Ask your AI's door to the settings tools: opened when it's first asked something, closed with the window.
+        SetupMcpHost? door = null;
+        bool closed = false;
+        model.Assistant.Services.OpenDoor = async () =>
+        {
+            try
+            {
+                var tools = new SettingsTools(model.Driver());
+                var opened = await SetupMcpHost.StartAsync(tools);
+                if (closed)
+                {
+                    await opened.DisposeAsync();
+                    return null;
+                }
+                door = opened;
+                return new SetupDoor(opened.Url, opened.Token, tools.NewTurn);
+            }
+            catch (Exception e) when (e is IOException or InvalidOperationException or System.Net.Sockets.SocketException)
+            {
+                host.Log($"[settings] the helper's tools couldn't start: {e.Message}");
+                return null;
+            }
+        };
         w.Closed += (_, _) =>
         {
+            closed = true;
+            if (door is not null) _ = door.DisposeAsync().AsTask();
             settingsWindow = null;
             model.Dispose();
             UpdateDock();

@@ -93,7 +93,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     ];
 
     /// <summary>Every row of the sidebar, both groups.</summary>
-    public IEnumerable<NavItem> NavItems => ComputerNav.Concat(LibraryNav);
+    public IEnumerable<NavItem> NavItems => ComputerNav.Concat(LibraryNav).Prepend(AssistantNav);
 
     /// <summary>The first group's heading: "This laptop" on a laptop, this Mac or PC where the library runs.</summary>
     public string ComputerNavTitle { get; }
@@ -309,7 +309,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public bool OnCalendars => Section == "Calendars";
     public bool OnAccess => Section == "Access";
     /// <summary>The AI panes scroll and pad themselves; every other section sits in the page's own scroller.</summary>
-    public bool OnPlainPage => !OnAi && !OnAccess;
+    public bool OnPlainPage => !OnAi && !OnAccess && !OnAssistant;
     public bool IsMac => Skin.Current == SkinKind.Mac;
     public bool IsWin => !IsMac;
     public bool OnGeneral => Section == "General";
@@ -398,6 +398,14 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         Phones = new PhonesModel(() => host.Remote() is { } phonesLib ? (m, path, body) => phonesLib.DevicesAsync(m, path, body) : null);
         Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, records);
         Phones.Ticking = Phones.UiTicking();
+        Assistant = new SettingsChatModel(new SettingsChatServices
+        {
+            Home = host.Home,
+            Preferred = () => host.Settings.SetupAi,
+            Computer = () => RoleWords,
+            Log = host.Log,
+            RunSetup = () => Shell.RunSetupAgain(),
+        });
         Address = cc.ServerUrl;
         DisplayName = cc.DisplayName;
         LibraryHere = host.Settings.LibraryHere;
@@ -471,6 +479,9 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                 break;
             case "Phone":
                 _ = Phones.Load();
+                break;
+            case "Assistant":
+                _ = Assistant.OpenAsync();
                 break;
         }
     }
@@ -564,7 +575,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
                  {
                      nameof(OnConnection), nameof(OnRecording), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
                      nameof(OnLibraryPage), nameof(LibraryPageTitle), nameof(LibraryPageLine), nameof(OnAi), nameof(OnCanvas), nameof(OnAccess), nameof(OnPlainPage),
-                     nameof(OnGeneral), nameof(OnAppearance), nameof(OnShortcuts), nameof(OnPhone), nameof(OnCalendars),
+                     nameof(OnGeneral), nameof(OnAppearance), nameof(OnShortcuts), nameof(OnPhone), nameof(OnCalendars), nameof(OnAssistant),
                  })
             OnPropertyChanged(p);
         foreach (var n in NavItems) n.On = n.Id == value;
@@ -1027,6 +1038,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public void Dispose()
     {
         host.Changed -= OnHostChanged;
+        Assistant.Dispose();
         Canvas.Dispose();
         // Settings has closed: nobody is waiting to see an AI app's row turn to Connected.
         Access.StopWatchingApps();

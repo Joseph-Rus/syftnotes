@@ -486,6 +486,13 @@ public static partial class SetupChat
                 "taskbar" => "Skipped the taskbar tip",
                 _ => "Skipped a step",
             },
+            // The settings helper's tools.
+            "get_settings" => "Looked at your settings",
+            "find_setting" => "Searched Settings",
+            "open_settings" => Setup.SettingsIndex.SectionOf(Arg("section")) is { } section ? $"Showed {Setup.SettingsIndex.SectionName(section)}" : "Showed Settings",
+            "change_setting" => Setup.SettingsIndex.ByKey(Arg("key")) is { } setting
+                ? Arg("value") is { Length: > 0 and <= 24 } to ? $"{setting.Short}: {to}" : $"Changed {setting.Short}"
+                : "Changed a setting",
             _ => "",
         };
     }

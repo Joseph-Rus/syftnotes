@@ -16,7 +16,8 @@ using StudyStash.Core.Setup;
 namespace StudyStash.Library;
 
 /// <summary>
-/// The door guided setup's AI reaches its setup tools through, open only while the setup window is: an MCP server on
+/// The door guided setup's AI reaches its setup tools through (and Settings' helper its settings tools), open only while
+/// its window is: an MCP server on
 /// this computer alone (127.0.0.1, a port the system picks), stateless, answering only a request that carries this
 /// window's own token (32 random bytes, compared in constant time). A request from a web page (it has an Origin) or
 /// addressed to any other host name is turned away, so no page in a browser can reach it.
@@ -40,7 +41,16 @@ public sealed class SetupMcpHost : IAsyncDisposable
     public string Token { get; }
 
     /// <summary>Opens the door for <paramref name="tools"/>.</summary>
-    public static async Task<SetupMcpHost> StartAsync(SetupTools tools, CancellationToken ct = default)
+    public static Task<SetupMcpHost> StartAsync(SetupTools tools, CancellationToken ct = default) =>
+        StartAsync(tools.Tools(), "Study Stash setup",
+            "Study Stash's setup tools. get_setup_status is the truth; offer_… tools show the student a card and change nothing themselves.", ct);
+
+    /// <summary>Opens the door for Settings' helper's <paramref name="tools"/>.</summary>
+    public static Task<SetupMcpHost> StartAsync(SettingsTools tools, CancellationToken ct = default) =>
+        StartAsync(tools.Tools(), "Study Stash settings",
+            "Study Stash's settings tools. get_settings says what's set; change_setting changes only what the student asked for.", ct);
+
+    static async Task<SetupMcpHost> StartAsync(IEnumerable<ModelContextProtocol.Server.McpServerTool> tools, string title, string instructions, CancellationToken ct)
     {
         byte[] raw = RandomNumberGenerator.GetBytes(32);
         string token64 = Convert.ToBase64String(raw).TrimEnd('=').Replace('+', '-').Replace('/', '_');
@@ -49,11 +59,11 @@ public sealed class SetupMcpHost : IAsyncDisposable
         builder.WebHost.ConfigureKestrel(k => k.Listen(IPAddress.Loopback, 0));
         builder.Services.AddMcpServer(o =>
         {
-            o.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = SetupChat.Server, Title = "Study Stash setup", Version = Engine.Version };
-            o.ServerInstructions = "Study Stash's setup tools. get_setup_status is the truth; offer_… tools show the student a card and change nothing themselves.";
+            o.ServerInfo = new ModelContextProtocol.Protocol.Implementation { Name = SetupChat.Server, Title = title, Version = Engine.Version };
+            o.ServerInstructions = instructions;
         })
             .WithHttpTransport(o => o.SessionMode = HttpServerSessionMode.Stateless)
-            .WithTools(tools.Tools());
+            .WithTools(tools);
         var web = builder.Build();
         var host = new SetupMcpHost(web, Encoding.ASCII.GetBytes(token64), token64);
         web.Use(async (ctx, next) =>

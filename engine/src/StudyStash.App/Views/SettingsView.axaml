@@ -527,6 +527,89 @@
       <Setter Property="MaxWidth" Value="680" />
       <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
+    <!-- Search, above the sidebar: a field with a magnifier and a clear button; while it has words, the sidebar is
+         what matches (a setting and the section it's in), then a row that asks the helper instead. -->
+    <Style Selector="Border.search">
+      <Setter Property="Height" Value="30" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <Style Selector=".mac Border.search">
+      <Setter Property="Background" Value="{DynamicResource Fill}" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector=".win Border.search">
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+      <Setter Property="Margin" Value="8,0,8,8" />
+    </Style>
+    <Style Selector="Button.hit">
+      <Setter Property="Theme" Value="{StaticResource Surface}" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Padding" Value="10,6" />
+    </Style>
+    <Style Selector="TextBlock.hit-title">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.hit-where">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <!-- A setting search or the helper went to: it flashes once on its page. -->
+    <Style Selector="Panel.spot">
+      <Setter Property="Background" Value="{DynamicResource Hl}" />
+    </Style>
+    <Style Selector="TextBlock.spot">
+      <Setter Property="Background" Value="{DynamicResource Hl}" />
+    </Style>
+
+    <!-- Ask your AI: the student's words in a tinted bubble on the right, the AI's plain on the left with what it did
+         under them as small chips. -->
+    <Style Selector="Border.bubble">
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+      <Setter Property="MaxWidth" Value="420" />
+    </Style>
+    <Style Selector=".mac Border.bubble">
+      <Setter Property="Background" Value="{DynamicResource Fill2}" />
+    </Style>
+    <Style Selector=".win Border.bubble">
+      <Setter Property="Background" Value="{DynamicResource Subtle}" />
+    </Style>
+    <Style Selector="Border.chip">
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="7,3" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
+    </Style>
+    <Style Selector="Border.ask">
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="Padding" Value="12,4,6,4" />
+    </Style>
+    <Style Selector=".mac Border.ask">
+      <Setter Property="Background" Value="{DynamicResource Raised}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
+    </Style>
+    <Style Selector=".win Border.ask">
+      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
+    </Style>
+    <Style Selector=".mac DockPanel.assistant">
+      <Setter Property="Margin" Value="40,12,40,24" />
+    </Style>
+    <Style Selector=".win DockPanel.assistant">
+      <Setter Property="Margin" Value="36,28,36,24" />
+    </Style>
   </UserControl.Styles>
 
   <UserControl.Resources>
@@ -568,8 +651,54 @@
       <c:WindowHeader Name="Header" DockPanel.Dock="Top" CanResize="False" />
 
       <Grid Name="Cols" ColumnDefinitions="220,*">
-        <c:Glass Classes="side">
+        <c:Glass Name="Side" Classes="side">
           <StackPanel Spacing="2">
+            <Border Classes="search">
+              <Grid ColumnDefinitions="Auto,6,*,Auto" VerticalAlignment="Center">
+                <c:Icon Glyph="search" Size="15" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                <TextBox Name="Search" Grid.Column="2" Classes="bare" Text="{Binding SearchText}" PlaceholderText="Search settings" FontSize="13"
+                         VerticalAlignment="Center" AutomationProperties.Name="Search settings">
+                  <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding OpenFirstHitCommand}" />
+                    <KeyBinding Gesture="Escape" Command="{Binding ClearSearchCommand}" />
+                  </TextBox.KeyBindings>
+                </TextBox>
+                <Button Grid.Column="3" Theme="{StaticResource Surface}" Padding="2" Command="{Binding ClearSearchCommand}" IsVisible="{Binding Searching}"
+                        ToolTip.Tip="Clear" AutomationProperties.Name="Clear the search" VerticalAlignment="Center">
+                  <c:Icon Glyph="close" Size="14" Foreground="{DynamicResource Fg2}" />
+                </Button>
+              </Grid>
+            </Border>
+
+            <!-- What the search found -->
+            <StackPanel Spacing="2" IsVisible="{Binding Searching}">
+              <ItemsControl ItemsSource="{Binding SearchHits}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="s:SettingsHit">
+                    <Button Classes="hit" AutomationProperties.Name="{Binding Title}" Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).OpenHitCommand}" CommandParameter="{Binding}">
+                      <Grid ColumnDefinitions="Auto,10,*">
+                        <c:Icon Glyph="{Binding Glyph}" Size="16" Foreground="{DynamicResource Fg2}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                        <StackPanel Grid.Column="2" Spacing="1">
+                          <TextBlock Classes="hit-title" Text="{Binding Title}" />
+                          <TextBlock Classes="hit-where" Text="{Binding Where}" />
+                        </StackPanel>
+                      </Grid>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Classes="hit-where" Text="Nothing in Settings matches." Margin="10,4,0,4" IsVisible="{Binding NoHits}" />
+              <Button Name="AskSearch" Classes="hit" Command="{Binding AskAboutSearchCommand}" AutomationProperties.Name="Ask your AI instead" Margin="0,6,0,0">
+                <Grid ColumnDefinitions="Auto,10,*">
+                  <c:Icon Glyph="forum" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                  <TextBlock Grid.Column="2" Classes="hit-title" Text="{Binding AskLine}" Foreground="{DynamicResource AccentText}" />
+                </Grid>
+              </Button>
+            </StackPanel>
+
+            <StackPanel Spacing="2" IsVisible="{Binding !Searching}">
+            <ContentControl Content="{Binding AssistantNav}" ContentTemplate="{StaticResource NavRow}" Margin="0,0,0,6" />
             <TextBlock Classes="navgroup" Text="{Binding ComputerNavTitle}" />
             <ItemsControl ItemsSource="{Binding ComputerNav}" ItemTemplate="{StaticResource NavRow}">
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
@@ -578,6 +707,7 @@
             <ItemsControl ItemsSource="{Binding LibraryNav}" ItemTemplate="{StaticResource NavRow}">
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
             </ItemsControl>
+            </StackPanel>
           </StackPanel>
         </c:Glass>
 
@@ -1466,6 +1596,117 @@
           <Panel IsVisible="{Binding OnAccess}">
             <v:MacAiAccess DataContext="{Binding Access}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsMac}" />
             <v:WinAiAccess DataContext="{Binding Access}" IsVisible="{Binding $parent[UserControl].((s:SettingsModel)DataContext).IsWin}" />
+          </Panel>
+
+          <!-- Ask your AI: the student's own AI, finding and changing settings (it pads and scrolls itself, with the
+               field at the bottom) -->
+          <Panel IsVisible="{Binding OnAssistant}">
+          <DockPanel Classes="assistant" DataContext="{Binding Assistant}" x:DataType="vm:SettingsChatModel">
+            <StackPanel DockPanel.Dock="Top" Spacing="8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Classes="h" Text="{Binding Title}" HorizontalAlignment="Left" />
+                <Button Grid.Column="1" Classes="pill" Command="{Binding NewChatCommand}" IsVisible="{Binding Thread.Count, Converter={x:Static c:Converters.Some}}"
+                        VerticalAlignment="Center"><TextBlock Text="New chat" FontSize="13" /></Button>
+              </Grid>
+              <TextBlock Classes="body" Text="{Binding Lede}" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- The field, at the bottom while the AI is ready -->
+            <StackPanel DockPanel.Dock="Bottom" Spacing="8" IsVisible="{Binding IsReady}" Margin="0,12,0,0">
+              <StackPanel Spacing="6" IsVisible="{Binding HasProblem}">
+                <TextBlock Classes="say" Text="{Binding Problem}" Foreground="{DynamicResource Warn}" Margin="0" />
+                <Button Classes="pill" Command="{Binding SetUpCommand}" IsVisible="{Binding ProblemNeedsSetup}" HorizontalAlignment="Left"><TextBlock Text="Run setup" FontSize="13" /></Button>
+              </StackPanel>
+              <Border Classes="ask">
+                <Grid ColumnDefinitions="*,6,Auto">
+                  <TextBox Name="AskBox" Classes="bare" Text="{Binding Draft}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center"
+                           TextWrapping="Wrap" MaxHeight="96" AutomationProperties.Name="Ask your AI">
+                    <TextBox.KeyBindings>
+                      <KeyBinding Gesture="Enter" Command="{Binding SendCommand}" />
+                    </TextBox.KeyBindings>
+                  </TextBox>
+                  <Panel Grid.Column="2" VerticalAlignment="Bottom">
+                    <Button Classes="pill primary" Command="{Binding SendCommand}" IsVisible="{Binding !Busy}" ToolTip.Tip="Send" AutomationProperties.Name="Send">
+                      <c:Icon Glyph="arrow_upward" Size="16" Foreground="{DynamicResource OnAccent}" />
+                    </Button>
+                    <Button Classes="pill" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
+                      <c:Icon Glyph="stop" Filled="True" Size="16" Foreground="{DynamicResource Fg}" />
+                    </Button>
+                  </Panel>
+                </Grid>
+              </Border>
+            </StackPanel>
+
+            <Panel Margin="0,16,0,0">
+              <!-- Looking for the student's AI -->
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLooking}" VerticalAlignment="Top">
+                <c:Spinner Width="14" Height="14" Foreground="{DynamicResource Fg2}" />
+                <TextBlock Classes="say" Text="Looking for your AI…" Margin="0" />
+              </StackPanel>
+
+              <!-- No AI here yet: setup installs one and signs in -->
+              <StackPanel Spacing="10" IsVisible="{Binding IsNoAi}" VerticalAlignment="Top">
+                <TextBlock Classes="body" Text="{Binding NoAiText}" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="pill primary" Command="{Binding SetUpCommand}"><TextBlock Text="Set it up" FontSize="13" FontWeight="Medium" /></Button>
+                  <Button Classes="pill" Command="{Binding LookAgainCommand}"><TextBlock Text="Look again" FontSize="13" /></Button>
+                </StackPanel>
+              </StackPanel>
+
+              <!-- Before anything's asked: a few things to try -->
+              <StackPanel Spacing="10" IsVisible="{Binding ShowWelcome}" VerticalAlignment="Top">
+                <TextBlock Classes="say" Text="Try asking:" Margin="0" />
+                <ItemsControl ItemsSource="{Binding Suggestions}">
+                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <Button Classes="pill" Margin="0,0,8,8" Command="{Binding $parent[DockPanel].((vm:SettingsChatModel)DataContext).SuggestCommand}" CommandParameter="{Binding}">
+                        <TextBlock Text="{Binding}" FontSize="13" />
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+
+              <!-- The conversation, newest at the bottom -->
+              <ScrollViewer Name="AssistantThread" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True"
+                            IsVisible="{Binding Thread.Count, Converter={x:Static c:Converters.Some}}">
+                <ItemsControl ItemsSource="{Binding Thread}">
+                  <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="14" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                  <ItemsControl.DataTemplates>
+                    <DataTemplate DataType="vm:StudentEntry">
+                      <Border Classes="bubble">
+                        <TextBlock Text="{Binding Text}" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource Fg}" />
+                      </Border>
+                    </DataTemplate>
+                    <DataTemplate DataType="vm:AiEntry">
+                      <StackPanel Spacing="6" HorizontalAlignment="Left" MaxWidth="520">
+                        <TextBlock Text="{Binding Byline}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
+                        <SelectableTextBlock Text="{Binding Text}" FontSize="13" LineHeight="19" TextWrapping="Wrap" Foreground="{DynamicResource Fg}"
+                                             IsVisible="{Binding Text, Converter={x:Static c:Converters.NotEmpty}}" />
+                        <ItemsControl ItemsSource="{Binding Chips}" IsVisible="{Binding HasChips}">
+                          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                              <Border Classes="chip" Margin="0,0,6,6">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                  <c:Icon Glyph="check" Size="12" Foreground="{DynamicResource AccentText}" />
+                                  <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource Fg2}" />
+                                </StackPanel>
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.DataTemplates>
+                </ItemsControl>
+              </ScrollViewer>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Busy}" VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="0,0,0,-4">
+                <c:Spinner Width="12" Height="12" Foreground="{DynamicResource Fg2}" />
+              </StackPanel>
+            </Panel>
+          </DockPanel>
           </Panel>
           </Panel>
         </Border>
