@@ -400,6 +400,7 @@ public sealed partial class LibrarySettingsModel : ObservableObject
                 Aliases = string.Join(", ", (c["aliases"] as JsonArray ?? []).Select(Str).Where(a => a.Length > 0)),
                 Lectures = c["lectures"] is JsonValue cl && cl.TryGetValue(out int k) ? k : 0, Dot = Skin.ClassDot(i++),
             }).ToList();
+            knownClasses = [.. classes.Select(c => c.Name)];
             // What was just typed comes back as it was sent: keep those rows (and the field being typed in).
             if (!Same(Classes, classes, c => $"{c.Name.Trim()}\n{Tidy(c.Aliases)}\n{c.Description.Trim()}"))
             {
@@ -643,8 +644,13 @@ public sealed partial class LibrarySettingsModel : ObservableObject
 
     // Classes: sent whole, once a field is left, a class added or removed.
 
+    /// <summary>The classes the library had when this was last filled: sent as "known", so a class added somewhere else
+    /// since (by Claude, the AI or another computer) isn't taken for one removed here.</summary>
+    List<string> knownClasses = [];
+
     JsonObject ClassesChange() => new()
     {
+        ["known"] = new JsonArray(knownClasses.Select(n => (JsonNode?)n).ToArray()),
         ["classes"] = new JsonArray(Classes.Select(c => (JsonNode?)new JsonObject
         {
             ["name"] = c.Name.Trim(),
