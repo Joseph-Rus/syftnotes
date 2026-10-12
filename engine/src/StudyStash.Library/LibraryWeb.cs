@@ -875,15 +875,23 @@ public sealed partial class LibraryWeb
         var classes = new List<ClassDef>();
         var renames = new List<ClassRenameStep>();
         var seen = new HashSet<string>();
+        var shown = new List<string>();
         for (int i = 0; f.ContainsKey($"class_name_{i}"); i++)
         {
+            string was = Py.Strip(f.Get($"class_was_{i}"));
             string name = Py.Strip(f.Get($"class_name_{i}"));
+            // A row shows the class it was rendered for; a page from before renames says only its name.
+            if ((was.Length > 0 ? was : name) is { Length: > 0 } showed) shown.Add(showed);
             if (name.Length == 0 || name == Configs.Unsorted || seen.Contains(name) || f.Get($"class_remove_{i}") == "1") continue;
             var aliases = f.Get($"class_aliases_{i}").Split(',').Select(Py.Strip).Where(a => a.Length > 0).ToList();
-            classes.Add(new ClassDef(name, aliases, Py.Strip(f.Get($"class_desc_{i}"))));
+            // The page doesn't show a class's sidebar folder ("Clubs"), so it keeps the one it had.
+            string group = cfg.Classes.FirstOrDefault(c => c.Name == name || (was.Length > 0 && c.Name == was))?.Group ?? "";
+            classes.Add(new ClassDef(name, aliases, Py.Strip(f.Get($"class_desc_{i}")), group));
             seen.Add(name);
-            if (Py.Strip(f.Get($"class_was_{i}")) is { Length: > 0 } was && was != name && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, name, 0, ""));
+            if (was.Length > 0 && was != name && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, name, 0, ""));
         }
+        // A class added while the page was open isn't on it, so saving the page keeps it.
+        classes.AddRange(Unseen(classes, shown));
         string? refused = renames.Count == 0 ? null
             : ClassRename.Blocked(Canvas.Crawl)
               ?? (renames.FirstOrDefault(r => r.To.Length > StudyStash.Core.Canvas.CourseNames.MaxLength) is { } tooLong ? $"“{tooLong.To[..20]}…” is too long for a class name (up to {StudyStash.Core.Canvas.CourseNames.MaxLength} characters)." : null)

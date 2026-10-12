@@ -290,6 +290,57 @@ public class LibrarySettingsApiTests
     }
 
     [Fact]
+    public async Task A_class_added_while_the_apps_settings_were_open_survives_their_save()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        await using var site = await Site(cfg, store);
+
+        // The app's Settings opened on CS 101 and BIO 110; then Claude added ACM, in its own folder.
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/classes", new { name = "ACM", group = "Clubs" })));
+        // There, BIO 110 is removed: the app sends what it has, and what it had.
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new
+        {
+            classes = new object[] { new { name = "CS 101", was = "CS 101", aliases = new[] { "cs101" }, description = "Recursion and the call stack" } },
+            known = new[] { "CS 101", "BIO 110" },
+        })));
+
+        var saved = Configs.Load(cfg.Home);
+        Assert.Equal(["CS 101", "ACM"], saved.Classes.Select(c => c.Name));
+        Assert.Equal("Clubs", saved.Classes[1].Group);
+
+        // An app from before "known" still sends the whole list, and it's taken whole.
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings", new { classes = new object[] { new { name = "CS 101" } } })));
+        Assert.Equal(["CS 101"], Configs.Load(cfg.Home).Classes.Select(c => c.Name));
+    }
+
+    [Fact]
+    public async Task Saving_the_library_page_keeps_classes_it_never_showed_and_every_class_s_folder()
+    {
+        using var dir = new TempDir();
+        var (cfg, store) = Library(dir);
+        using var _s = store;
+        await using var site = await Site(cfg, store);
+        await site.PostForm("/login", ("password", "pw"), ("next", "/"));
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/classes", new { name = "ACM", group = "Clubs" })));
+        Assert.Contains("name=\"class_was_2\" value=\"ACM\"", await site.Text("/settings"), StringComparison.Ordinal);
+
+        // The page was opened when the library had ACM too; meanwhile Intellievent is added, under Work.
+        await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/classes", new { name = "Intellievent", group = "Work" })));
+        var r = await site.PostForm("/settings",
+            ("class_name_0", "CS 101"), ("class_was_0", "CS 101"), ("class_aliases_0", "cs101"), ("class_desc_0", "Recursion and the call stack"),
+            ("class_name_1", "BIO 110"), ("class_was_1", "BIO 110"), ("class_remove_1", "1"),
+            ("class_name_2", "ACM"), ("class_was_2", "ACM"),
+            ("class_name_3", ""));
+        Assert.Equal(HttpStatusCode.SeeOther, r.StatusCode);
+
+        var saved = Configs.Load(cfg.Home);
+        Assert.Equal(["CS 101", "ACM", "Intellievent"], saved.Classes.Select(c => c.Name));
+        Assert.Equal(["", "Clubs", "Work"], saved.Classes.Select(c => c.Group));
+    }
+
+    [Fact]
     public async Task A_refused_change_changes_nothing()
     {
         using var dir = new TempDir();

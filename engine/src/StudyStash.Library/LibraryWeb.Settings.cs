@@ -244,6 +244,15 @@ public sealed partial class LibraryWeb
         return outcome.Problem;
     }
 
+    /// <summary>The library's classes a Settings screen didn't have (<paramref name="known"/> is what it had) and didn't
+    /// send: added by Claude, the AI or another computer while it was open. Saving its list keeps them, so a save only
+    /// removes a class that screen showed and left out.</summary>
+    List<ClassDef> Unseen(List<ClassDef> sent, IEnumerable<string> known)
+    {
+        var had = new HashSet<string>(known, StringComparer.OrdinalIgnoreCase);
+        return [.. cfg.Classes.Where(c => !had.Contains(c.Name) && !sent.Any(s => s.Name.Equals(c.Name, StringComparison.OrdinalIgnoreCase)))];
+    }
+
     /// <summary>Changes what the body names and leaves the rest; null when done, or why not (nothing is changed then).</summary>
     IResult? ChangeSettings(JsonObject body)
     {
@@ -271,6 +280,9 @@ public sealed partial class LibraryWeb
                 classes.Add(new ClassDef(cls, aliases, Text(item["description"]) ?? "", group.Trim()));
                 if (Text(item["was"]) is { Length: > 0 } was && was != cls && cfg.Classes.Any(c => c.Name == was)) renames.Add(new ClassRenameStep(was, cls, 0, ""));
             }
+            // "known": the classes the app's Settings had when it opened. One it never had (added from somewhere else
+            // while it was open) isn't one it removed, so it stays. Without it the list is taken whole, as before.
+            if (body["known"] is JsonArray known) classes.AddRange(Unseen(classes, known.Select(Text).OfType<string>()));
             if (renames.Count > 0 && ClassRename.Blocked(Canvas.Crawl) is { } busy) return Http.Detail(409, busy);
         }
         double? confidence = body["notes"]?["min_confidence"] is JsonValue cv && cv.TryGetValue(out double d) && !double.IsNaN(d) ? Math.Clamp(d, 0, 1) : null;
