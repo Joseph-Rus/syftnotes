@@ -542,7 +542,7 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:SetupClass">
                   <Grid ColumnDefinitions="20,10,150,10,*" Height="32">
-                    <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                    <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <TextBlock Grid.Column="4" Text="{Binding About}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                   </Grid>

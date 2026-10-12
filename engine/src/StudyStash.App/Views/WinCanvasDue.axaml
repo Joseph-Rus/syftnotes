@@ -2,6 +2,7 @@
      padding or window — the library window's list column gives the width and margins. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:StudyStash.App.Controls"
              xmlns:vm="using:StudyStash.App.ViewModels"
              x:Class="StudyStash.App.Views.WinCanvasDue"
              x:DataType="vm:CanvasDueModel">
@@ -35,7 +36,7 @@
                                        Text="{Binding Right}" Margin="8,0,0,0" VerticalAlignment="Bottom" />
                           </Grid>
                           <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Ellipse Classes="cv-row-dot" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                            <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
                             <TextBlock Classes="cv-row-sub" Text="{Binding Sub}" TextTrimming="CharacterEllipsis" />
                           </StackPanel>
                         </StackPanel>

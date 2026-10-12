@@ -99,7 +99,8 @@ public static partial class Shell
     }
 
     /// <summary>The library window's own keys: the sidebar (⌃⌘S, Ctrl+Shift+S), Back and Forward (⌘[ ⌘], or Alt+Left
-    /// and Alt+Right, and a mouse's back and forward buttons).</summary>
+    /// and Alt+Right, and a mouse's back and forward buttons), search (⌘K, Ctrl+K) and the caret into the page's Ask
+    /// bar (⌘J, Ctrl+J).</summary>
     static void AddLibraryKeys(Avalonia.Controls.Window w)
     {
         bool mac = OperatingSystem.IsMacOS();
@@ -110,6 +111,8 @@ public static partial class Shell
             () => library.ListHidden = !library.ListHidden);
         Bind(mac ? new KeyGesture(Key.OemOpenBrackets, KeyModifiers.Meta) : new KeyGesture(Key.Left, KeyModifiers.Alt), GoBack);
         Bind(mac ? new KeyGesture(Key.OemCloseBrackets, KeyModifiers.Meta) : new KeyGesture(Key.Right, KeyModifiers.Alt), GoForward);
+        Bind(new KeyGesture(Key.K, mac ? KeyModifiers.Meta : KeyModifiers.Control), () => library.SearchCommand.Execute(null));
+        Bind(new KeyGesture(Key.J, mac ? KeyModifiers.Meta : KeyModifiers.Control), () => Views.AskKeys.Focus(w));
         w.AddHandler(Avalonia.Input.InputElement.PointerReleasedEvent, (_, e) =>
         {
             if (e.InitialPressMouseButton == MouseButton.XButton1) GoBack();

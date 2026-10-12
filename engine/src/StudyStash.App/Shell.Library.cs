@@ -221,7 +221,7 @@ public static partial class Shell
                 bool writing = S(l["status"]) is "queued" or "working";
                 group.Items.Add(new LectureCard
                 {
-                    Id = S(l["id"]), Title = S(l["title"]), Meta = CardMeta(l), Summary = writing ? "Writing notes…" : S(l["summary"]), ClassName = S(l["class"]),
+                    Id = S(l["id"]), Title = S(l["title"]), Meta = CardMeta(l), Summary = writing ? "Writing notes…" : PlainMath.Inline(S(l["summary"])), ClassName = S(l["class"]),
                     Last = i == items.Count - 1 && ReferenceEquals(g.Key, lectures.GroupBy(GroupOf).Last().Key),
                 });
             }

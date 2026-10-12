@@ -22,7 +22,7 @@
                          Text="{Binding Right}" Margin="8,0,0,0" VerticalAlignment="Bottom" />
             </Grid>
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <Ellipse Classes="cv-row-dot" Fill="{Binding Dot}" VerticalAlignment="Center" />
+              <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
               <TextBlock Classes="cv-row-sub" Text="{Binding Sub}" TextTrimming="CharacterEllipsis" />
             </StackPanel>
           </StackPanel>

@@ -601,6 +601,11 @@ recoloured to Study Stash's palette and simplified, and from Study Stash's own p
 and its licence is listed in [docs/parts-credits.md](docs/parts-credits.md); where they come from
 and why, in [docs/parts-sources.md](docs/parts-sources.md).
 
+The app is set in [Atkinson Hyperlegible Next](https://www.brailleinstitute.org/freefont/) (SIL Open
+Font License 1.1) and its icons are [Lucide](https://lucide.dev)'s (ISC). The marks of Claude,
+ChatGPT, Codex, Gemini and Ollama beside their names are their owners' trademarks, shown only to
+say which product is meant.
+
 Notes and diagrams are drawn with [CSharpMath](https://github.com/verybadcat/CSharpMath) (MIT,
 bundling the [Latin Modern Math](https://www.gust.org.pl/projects/e-foundry/lm-math) font under
 the GUST font licence), [Svg.Skia](https://github.com/wieslawsoltes/Svg.Skia) (MIT), and

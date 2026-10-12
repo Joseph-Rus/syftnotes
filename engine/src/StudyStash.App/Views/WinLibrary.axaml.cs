@@ -10,6 +10,8 @@ public partial class WinLibrary : UserControl
     public WinLibrary()
     {
         InitializeComponent();
+        // The library window has no accent colour: what's inside that asks for one gets ink.
+        Resources.MergedDictionaries.Add(Skin.NoAccent());
         // Files dropped on the lecture are attached to it; on the list of lectures, to the class.
         AttachFiles.AcceptDrops(NoteScroll, () => (DataContext as LibraryModel)?.LectureFiles);
         // The notes' diagrams ask about their boxes in this lecture's Ask bar, and find them in its transcript.
@@ -20,8 +22,9 @@ public partial class WinLibrary : UserControl
         {
             if (DataContext is LibraryModel m) m.Narrow = e.NewSize.Width < LibraryModel.NarrowBelow;
         };
-        // The notes fade out under the floating ask bar (shorter while an answer is open), gone for the last quarter.
-        Fades.MaskBottom(NoteScroll, Fade, 0.75);
+        // The notes fade in under the page's toolbar, and out under the floating ask bar.
+        Fades.Over(TopFade, "Surface", 0.3);
+        Fades.Under(Fade, "Surface", 0.55);
     }
 
     /// <summary>A lecture row's "Delete lecture…": asks first.</summary>

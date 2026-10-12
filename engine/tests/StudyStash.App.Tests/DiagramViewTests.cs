@@ -106,12 +106,12 @@ public class DiagramViewTests
         var window = Show(620, SkinKind.Mac, ThemeVariant.Light, view);
         var scene = view.Scene;
         var canvas = view.GetVisualDescendants().OfType<DiagramCanvas>().Single();
-        Assert.Equal(Color.Parse("#1D1D1F"), ((ISolidColorBrush)canvas.Ink!).Color);
+        Assert.Equal(Skin.Light.Ink, ((ISolidColorBrush)canvas.Ink!).Color);
         window.RequestedThemeVariant = ThemeVariant.Dark;
         Dispatcher.UIThread.RunJobs();
         Assert.NotNull(window.CaptureRenderedFrame());
         Assert.Same(scene, view.Scene);
-        Assert.Equal(Color.Parse("#F5F5F7"), ((ISolidColorBrush)canvas.Ink!).Color);
+        Assert.Equal(Skin.Dark.Ink, ((ISolidColorBrush)canvas.Ink!).Color);
         window.Close();
     }
 

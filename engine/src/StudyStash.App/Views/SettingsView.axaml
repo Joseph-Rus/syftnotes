@@ -1336,7 +1336,7 @@
                         <DataTemplate x:DataType="vm:LibraryClassRow">
                           <Border Classes="group" Margin="0" Padding="16,12">
                             <Grid ColumnDefinitions="Auto,12,3*,8,2*,8,Auto" RowDefinitions="Auto,6,Auto,6,Auto">
-                              <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                              <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
                               <Border Grid.Column="2" Classes="field"><TextBox Classes="bare" Text="{Binding Name}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
                               <Border Grid.Column="4" Classes="field"><TextBox Classes="bare" Text="{Binding Aliases}" PlaceholderText="Other names, like cs101" FontSize="13" VerticalAlignment="Center" LostFocus="OnClassLostFocus" /></Border>
                               <Button Grid.Column="6" Theme="{StaticResource Surface}" Width="30" Height="30" CornerRadius="{DynamicResource RadiusControl}" HorizontalContentAlignment="Center"

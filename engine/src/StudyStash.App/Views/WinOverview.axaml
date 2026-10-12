@@ -1,6 +1,8 @@
-<!-- Home and a class's home (Windows): across the library window beside the sidebar. A greeting (or the class's name), a
-     row of numbers, the newest lectures beside what's due and what's coming up, and on Home a card for every class;
-     a class's home ends with the ways further in (all its lectures, its Canvas lists) and what's attached to it. -->
+<!-- Home, Due's home and a class's home (Windows): the page beside the sidebar. A title (today's date, or the class's name)
+     over one sentence, Record at its side; on Home the week (class meetings and what's due, day by day) and the newest
+     lectures; a class's home lists its deadlines and lectures, then the ways further in (its lists on Canvas, linked
+     folders, files). Sections are parted by space and hairlines: no boxes inside boxes, no icons on rows. Ask floats at
+     the foot. The same page in both systems' looks: MacOverview.axaml is the one to edit; this is that file under its own name. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -10,324 +12,196 @@
              x:Class="StudyStash.App.Views.WinOverview"
              x:DataType="vm:OverviewModel">
   <UserControl.Styles>
-    <Style Selector="TextBlock.ov-h2">
-      <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-      <Setter Property="FontSize" Value="16" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="VerticalAlignment" Value="Center" />
+    <!-- The page's side margins: the design's 56, drawn in when the window is narrow. -->
+    <Style Selector="StackPanel.ov-page">
+      <Setter Property="Margin" Value="56,6,56,132" />
     </Style>
-    <Style Selector="Border.ov-group">
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Background" Value="{DynamicResource Card}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="4" />
-      <Setter Property="Margin" Value="0,8,0,0" />
+    <Style Selector="StackPanel.ov-page.narrow">
+      <Setter Property="Margin" Value="24,6,24,132" />
     </Style>
-    <Style Selector="Button.ov-row">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Padding" Value="12,9" />
+    <Style Selector="StackPanel.ov-ask">
+      <Setter Property="Margin" Value="56,0,56,20" />
     </Style>
-    <Style Selector="Border.ov-stat">
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Background" Value="{DynamicResource Card}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="Padding" Value="16,10,16,11" />
-      <Setter Property="MinWidth" Value="136" />
+    <Style Selector="StackPanel.ov-ask.narrow">
+      <Setter Property="Margin" Value="24,0,24,20" />
     </Style>
-    <Style Selector="TextBlock.ov-value">
-      <Setter Property="FontFamily" Value="{DynamicResource DisplayFont}" />
-      <Setter Property="FontSize" Value="24" />
-      <Setter Property="FontWeight" Value="SemiBold" />
+    <!-- The page's buttons: at the title's foot beside it, or a row of their own under it (narrow) -->
+    <Style Selector="StackPanel.ov-actions">
+      <Setter Property="Margin" Value="24,0,0,0" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
     </Style>
-    <Style Selector="TextBlock.ov-value.strong">
-      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
-    </Style>
-    <Style Selector="TextBlock.ov-sub">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-    </Style>
-    <Style Selector="TextBlock.ov-empty">
-      <Setter Property="FontSize" Value="14" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-      <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="Margin" Value="12,10" />
-    </Style>
-    <Style Selector="TextBlock.ov-right">
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-    </Style>
-    <Style Selector="TextBlock.ov-right.strong">
-      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
-    <Style Selector="Button.ov-link">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Button.ov-card">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Background" Value="{DynamicResource Card}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CardStroke}" />
-      <Setter Property="BorderThickness" Value="1" />
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Padding" Value="16,12" />
-      <Setter Property="Margin" Value="0,0,10,10" />
-      <Setter Property="VerticalContentAlignment" Value="Top" />
-    </Style>
-    <Style Selector="Button.ov-pill">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="CornerRadius" Value="4" />
-      <Setter Property="Padding" Value="11,0,12,0" />
-      <Setter Property="Background" Value="{DynamicResource Ctrl}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
-      <Setter Property="BorderThickness" Value="1" />
-    </Style>
-    <Style Selector="Grid.ov-body.narrow StackPanel.ov-side">
-      <Setter Property="Margin" Value="0,24,0,0" />
-    </Style>
-    <!-- The page's buttons: level with the title's first line beside it, or a row of their own under it (narrow) -->
-    <Style Selector="DockPanel.ov-actions">
-      <Setter Property="Margin" Value="20,-4,0,0" />
-    </Style>
-    <Style Selector="Grid.ov-head.narrow DockPanel.ov-actions">
-      <Setter Property="Margin" Value="0,14,0,0" />
-    </Style>
-    <Style Selector="Button.ov-pill.big">
-      <Setter Property="Height" Value="44" />
-      <Setter Property="Padding" Value="16,0,18,0" />
+    <Style Selector="Grid.ov-head.narrow StackPanel.ov-actions">
+      <Setter Property="Margin" Value="0,16,0,0" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
     </Style>
   </UserControl.Styles>
 
   <Panel>
   <ScrollViewer Name="Page" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <StackPanel MaxWidth="1040" HorizontalAlignment="Stretch" Margin="36,24,36,130" Spacing="24">
+    <StackPanel Classes="ov-page" Classes.narrow="{Binding Narrow}" Spacing="36">
 
-      <!-- The greeting and the day, or the class, what it is on Canvas, and what it covers. The title wraps in a column
-           of its own, so a long class name never runs under the page's buttons: beside it, or under it when narrow. -->
+      <!-- The date (or the class), the sentence under it, and Record at the header's foot. The title wraps in a column
+           of its own, so a long class name never runs under the buttons: beside it, or under it when narrow. -->
       <Grid Classes="ov-head" Classes.narrow="{Binding Narrow}" ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-        <StackPanel Spacing="3">
-          <Grid ColumnDefinitions="Auto,*">
-            <Ellipse Width="10" Height="10" Fill="{Binding Dot}" IsVisible="{Binding IsClass}" VerticalAlignment="Top" Margin="0,13,10,0" />
-            <TextBlock Name="Title" Grid.Column="1" Text="{Binding Title}" FontFamily="{DynamicResource DisplayFont}" FontSize="28" FontWeight="SemiBold" TextWrapping="Wrap" />
-          </Grid>
-          <TextBlock Text="{Binding Subtitle}" FontSize="14" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding Description}" IsVisible="{Binding HasDescription}" FontSize="14" LineHeight="19" Foreground="{DynamicResource Fg2}"
-                     TextWrapping="Wrap" MaxWidth="620" HorizontalAlignment="Left" Margin="0,4,0,0" MaxLines="3" TextTrimming="CharacterEllipsis" />
+        <StackPanel>
+          <TextBlock Name="Title" Classes="page-title" Text="{Binding Title}" />
+          <TextBlock Name="Lede" Classes="page-lede" Text="{Binding Lede}" Margin="0,8,0,0" />
+          <TextBlock Classes="page-lede" Text="{Binding Description}" IsVisible="{Binding HasDescription}" FontSize="15" LineHeight="22" Margin="0,6,0,0"
+                     MaxLines="3" TextTrimming="CharacterEllipsis" />
         </StackPanel>
-        <!-- The one the page is for (Record, or Due's Full list) at the edge: the right one beside the title, the left
-             one under it. All the same height, so they read as one row. -->
-        <DockPanel Name="Actions" Classes="ov-actions" Grid.Column="{Binding ActionsColumn}" Grid.Row="{Binding ActionsRow}" LastChildFill="False"
-                   HorizontalSpacing="8" VerticalAlignment="Top">
-          <!-- Record from here: into this class on its home, sorted by the library on Home -->
-          <Button Name="Record" DockPanel.Dock="{Binding ActionsDock}" Theme="{StaticResource Surface}" Height="44" CornerRadius="6" Padding="18,0,22,0"
-                  Background="{DynamicResource Rec}" Command="{Binding RecordCommand}" IsVisible="{Binding CanRecord}"
-                  AutomationProperties.Name="{Binding RecordTip}" ToolTip.Tip="{Binding RecordTip}">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <c:Icon Glyph="mic" Size="20" Foreground="#FFFFFFFF" VerticalAlignment="Center" />
-              <TextBlock Text="{Binding RecordWords}" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFFFF" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
-          <!-- Home only: Study Stash is free, and a tip for the two students who build it goes to their Ko-fi page -->
-          <Button Name="Support" DockPanel.Dock="{Binding ActionsDock}" Classes="ov-pill big" Command="{Binding SupportCommand}" IsVisible="{Binding CanSupport}"
-                  ToolTip.Tip="{x:Static s:SupportAsk.HomeTip}">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <c:Icon Glyph="local_cafe" Size="18" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
-              <TextBlock Text="{x:Static s:SupportAsk.Button}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
+        <StackPanel Name="Actions" Classes="ov-actions" Grid.Column="{Binding ActionsColumn}" Grid.Row="{Binding ActionsRow}" Orientation="Horizontal"
+                    Spacing="8" VerticalAlignment="Bottom">
           <!-- Due's home: the two-column list, each assignment beside its detail -->
-          <Button Name="FullList" DockPanel.Dock="{Binding ActionsDock}" Classes="ov-pill big" Command="{Binding AllDueCommand}" IsVisible="{Binding IsDuePage}">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <c:Icon Glyph="assignment" Size="18" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
-              <TextBlock Text="Full list" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button Name="FullList" Classes="plain" Height="48" Padding="18,0" Command="{Binding AllDueCommand}" IsVisible="{Binding IsDuePage}" Content="Full list" />
+          <Button Name="Attach" Classes="plain" Height="48" Padding="18,0" Command="{Binding Files.AttachCommand, FallbackValue={x:Null}}" IsVisible="{Binding HasFiles}"
+                  ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the page)" AutomationProperties.Name="Attach to class" Content="Attach" />
+          <!-- Record from here: into this class on its home, sorted by the library on Home. Red is only the dot; while
+               a lecture records the pill is ringed in red, its dot a stop square, with the class, the level and the time. -->
+          <Button Name="Record" Classes="record" Classes.recording="{Binding Running}" Classes.paused="{Binding Paused}" Command="{Binding RecordCommand}"
+                  IsVisible="{Binding CanRecord}" AutomationProperties.Name="{Binding RecordTip}" ToolTip.Tip="{Binding RecordTip}">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <Border Classes="record-dot"><Border /></Border>
+              <TextBlock Name="RecordWords" Text="{Binding RecordWords}" VerticalAlignment="Center" />
+              <c:Waveform Bars="5" Height="16" MinBar="5" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
+                          VerticalAlignment="Center" IsVisible="{Binding Running}" />
+              <TextBlock Text="{Binding Elapsed}" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" IsVisible="{Binding Recording}" />
+              <TextBlock Classes="kbd" Text="{Binding RecordKeys}" FontSize="12" VerticalAlignment="Center" Margin="2,0,0,0" IsVisible="{Binding Idle}" />
             </StackPanel>
           </Button>
-          <Button Name="Attach" DockPanel.Dock="{Binding ActionsDock}" Classes="ov-pill big" Command="{Binding Files.AttachCommand, FallbackValue={x:Null}}" IsVisible="{Binding HasFiles}"
-                  ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the page)" AutomationProperties.Name="Attach to class">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <c:Icon Glyph="attach_file" Size="18" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
-              <TextBlock Text="Attach" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
-        </DockPanel>
+        </StackPanel>
       </Grid>
 
-      <!-- The numbers: a number with somewhere to go (To hand in, Unsorted) opens it -->
-      <ItemsControl Name="Stats" ItemsSource="{Binding Stats}">
+      <!-- Home: this week. What's late first (when anything is), then Monday to Sunday, today lifted out. -->
+      <StackPanel Name="ThisWeek" IsVisible="{Binding ShowWeek}" Spacing="12">
+        <TextBlock Classes="h2" Text="This week" />
+        <!-- A narrow window scrolls the week sideways rather than squeezing its days. -->
+        <!-- (The room round the week is part of what scrolls, so today's column, standing proud of the grid, and the
+             week's own hairline aren't cut off at the scroller's edge.) -->
+        <ScrollViewer Name="WeekScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="-8,-8">
+          <Panel>
+          <Border Name="Week" Classes="week" HorizontalAlignment="Left" Margin="8">
+            <ItemsControl ItemsSource="{Binding Week}" AutomationProperties.Name="This week" ClipToBounds="False">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><c:WeekRow /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:WeekDay">
+                  <Panel>
+                    <Border Width="1" Background="{DynamicResource Line}" HorizontalAlignment="Left" IsVisible="{Binding Ruled}" />
+                    <Border Classes="day" Classes.today="{Binding IsToday}" Classes.late="{Binding IsLate}">
+                      <StackPanel Spacing="10">
+                        <Grid ColumnDefinitions="*,Auto" MinHeight="26">
+                          <TextBlock Classes="day-name" Text="{Binding Name}" />
+                          <TextBlock Grid.Column="1" Classes="day-num" Text="{Binding Number}" />
+                        </Grid>
+                        <!-- Class meetings: the time, then the class by its short name beside its swatch; one that was
+                             recorded says so, with a red dot -->
+                        <ItemsControl ItemsSource="{Binding Meetings}" IsVisible="{Binding HasMeetings}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:WeekMeeting">
+                              <StackPanel>
+                                <StackPanel Orientation="Horizontal">
+                                  <TextBlock Classes="micro" Text="{Binding Time}" />
+                                  <Ellipse Width="6" Height="6" Fill="{DynamicResource Record}" Margin="9,0,5,0" VerticalAlignment="Center" IsVisible="{Binding Recorded}" />
+                                  <TextBlock Classes="micro" Text="Recorded" IsVisible="{Binding Recorded}" />
+                                </StackPanel>
+                                <Grid ColumnDefinitions="Auto,6,*">
+                                  <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Top" Margin="0,6,0,0" />
+                                  <TextBlock Grid.Column="2" Classes="meeting-class" Classes.recorded="{Binding Recorded}" Text="{Binding Class}" />
+                                </Grid>
+                              </StackPanel>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Classes="rule" IsVisible="{Binding Divided}" />
+                        <!-- What's due: the name in its class's highlighter, and when under it -->
+                        <ItemsControl ItemsSource="{Binding Deadlines}" IsVisible="{Binding HasDeadlines}" ClipToBounds="False">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:OverviewDue">
+                              <Button Classes="deadline" Classes.late="{Binding Late}" Classes.done="{Binding Done}" AutomationProperties.Name="{Binding Said}"
+                                      Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenDueCommand}" CommandParameter="{Binding}">
+                                <StackPanel Spacing="2">
+                                  <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" />
+                                  <TextBlock Classes="deadline-when" Text="{Binding When}" />
+                                </StackPanel>
+                              </Button>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="text-link" FontSize="13" Content="{Binding More}" IsVisible="{Binding HasMore}"
+                                Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenMoreCommand}" CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </Border>
+                  </Panel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+          </Panel>
+        </ScrollViewer>
+        <!-- Nothing due this week: the week stays, and says so in plain words, with what's next -->
+        <TextBlock Name="WeekEmpty" Classes="empty" IsVisible="{Binding HasWeekEmpty}" MaxWidth="560">
+          <Run Text="{Binding WeekEmpty}" FontWeight="Bold" Foreground="{DynamicResource Ink}" /><Run Text=" " /><Run Text="{Binding WeekNext}" />
+        </TextBlock>
+      </StackPanel>
+
+      <!-- Due's home: what's to hand in, day by day, what's late first -->
+      <ItemsControl Name="DueGroups" ItemsSource="{Binding DueGroups}" IsVisible="{Binding IsDuePage}" ClipToBounds="False">
         <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate><WrapPanel ItemSpacing="10" LineSpacing="10" /></ItemsPanelTemplate>
+          <ItemsPanelTemplate><StackPanel Spacing="28" /></ItemsPanelTemplate>
         </ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:OverviewStat">
-            <Button Theme="{StaticResource Surface}" CornerRadius="8" IsHitTestVisible="{Binding CanOpen}"
-                    Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenStatCommand}" CommandParameter="{Binding}">
-              <Border Classes="ov-stat">
-                <StackPanel>
-                  <TextBlock Classes="ov-value" Classes.strong="{Binding Strong}" Text="{Binding Value}" />
-                  <StackPanel Orientation="Horizontal" Spacing="2">
-                    <TextBlock Classes="ov-sub" Text="{Binding Label}" />
-                    <c:Icon Glyph="chevron_right" Size="14" Foreground="{DynamicResource Fg3}" IsVisible="{Binding CanOpen}" VerticalAlignment="Center" />
-                  </StackPanel>
-                </StackPanel>
-              </Border>
-            </Button>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-
-      <!-- The newest lectures, beside what's due and what's coming up (under them in a narrow window) -->
-      <Grid Classes="ov-body" Classes.narrow="{Binding Narrow}" ColumnDefinitions="*,24,*" RowDefinitions="Auto,Auto" IsVisible="{Binding ShowMain}">
-        <StackPanel Name="Recent" Grid.ColumnSpan="{Binding LecturesSpan}">
-          <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Classes="ov-h2" Text="Recent lectures" />
-            <Button Grid.Column="1" Classes="ov-link" Command="{Binding AllLecturesCommand}" IsVisible="{Binding CanSeeAllLectures}">
-              <TextBlock Text="See all" FontSize="12" Foreground="{DynamicResource AccentText}" />
-            </Button>
-          </Grid>
-          <Border Classes="ov-group">
-            <StackPanel>
-              <TextBlock Classes="ov-empty" Text="{Binding LecturesEmpty}" IsVisible="{Binding NoLectures}" />
-              <ItemsControl ItemsSource="{Binding Lectures}">
+          <DataTemplate x:DataType="vm:OverviewDueGroup">
+            <Grid ColumnDefinitions="128,*">
+              <TextBlock Classes="lecture-date" Classes.late="{Binding Late}" Text="{Binding Heading}" />
+              <ItemsControl Grid.Column="1" ItemsSource="{Binding Items}" ClipToBounds="False">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel Spacing="14" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:OverviewLecture">
-                    <Button Classes="ov-row" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenLectureCommand}" CommandParameter="{Binding}">
+                  <DataTemplate x:DataType="vm:OverviewDue">
+                    <Button Classes="deadline" Classes.late="{Binding Late}" AutomationProperties.Name="{Binding Said}"
+                            Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenDueCommand}" CommandParameter="{Binding}">
                       <StackPanel Spacing="2">
-                        <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                        <StackPanel Orientation="Horizontal" Spacing="6">
-                          <Ellipse Width="7" Height="7" Fill="{Binding Dot}" VerticalAlignment="Center"
-                                   IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).IsHome}" />
-                          <TextBlock Classes="ov-sub" Text="{Binding ClassName}" TextTrimming="CharacterEllipsis" MaxWidth="220"
-                                     IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).IsHome}" />
-                          <TextBlock Classes="ov-sub" Text="·" IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).IsHome}" />
-                          <TextBlock Classes="ov-sub" Text="{Binding Meta}" />
+                        <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" FontSize="15" LineHeight="20" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Classes="deadline-when" Text="{Binding When}" />
+                          <TextBlock Classes="deadline-when" Text="{Binding ClassLabel}" Foreground="{DynamicResource InkMuted}" IsVisible="{Binding HasClassLabel}" />
                         </StackPanel>
-                        <TextBlock Classes="ov-sub" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" LineHeight="16.8" Margin="0,2,0,0"
-                                   TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
                       </StackPanel>
                     </Button>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
-            </StackPanel>
-          </Border>
-        </StackPanel>
-
-        <StackPanel Classes="ov-side" Grid.Column="{Binding SideColumn}" Grid.Row="{Binding SideRow}" Grid.ColumnSpan="{Binding SideSpan}" Spacing="24" IsVisible="{Binding HasSide}">
-          <StackPanel Name="DueSoon" IsVisible="{Binding ShowDue}">
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Classes="ov-h2" Text="{Binding DueHeading}" />
-              <Button Grid.Column="1" Classes="ov-link" Command="{Binding AllDueCommand}" IsVisible="{Binding CanSeeAllDue}">
-                <TextBlock Text="See all" FontSize="12" Foreground="{DynamicResource AccentText}" />
-              </Button>
             </Grid>
-            <Border Classes="ov-group">
-              <StackPanel>
-                <TextBlock Classes="ov-empty" Text="{Binding DueEmpty}" IsVisible="{Binding NoDue}" />
-                <ItemsControl ItemsSource="{Binding Due}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:OverviewDue">
-                      <Button Classes="ov-row" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenDueCommand}" CommandParameter="{Binding}">
-                        <StackPanel Spacing="3">
-                          <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="1" Classes="ov-right" Classes.strong="{Binding Strong}" Text="{Binding Right}" Margin="8,0,0,0" VerticalAlignment="Bottom" />
-                          </Grid>
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Ellipse Width="7" Height="7" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                            <TextBlock Classes="ov-sub" Text="{Binding Sub}" TextTrimming="CharacterEllipsis" />
-                          </StackPanel>
-                        </StackPanel>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </Border>
-          </StackPanel>
-
-          <StackPanel Name="Events" IsVisible="{Binding ShowEvents}">
-            <TextBlock Classes="ov-h2" Text="Coming up" />
-            <Border Classes="ov-group">
-              <StackPanel>
-                <TextBlock Classes="ov-empty" Text="{Binding EventsEmpty}" IsVisible="{Binding NoEvents}" />
-                <ItemsControl ItemsSource="{Binding Events}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:OverviewEvent">
-                      <Grid ColumnDefinitions="7,10,*,10,Auto" Margin="12,8">
-                        <Ellipse Width="7" Height="7" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="2">
-                          <TextBlock Text="{Binding Title}" FontSize="14" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Classes="ov-sub" Text="{Binding Detail}" IsVisible="{Binding HasDetail}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                        <TextBlock Grid.Column="4" Classes="num ov-right" Classes.strong="{Binding Now}" Text="{Binding When}" VerticalAlignment="Center" />
-                      </Grid>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </StackPanel>
-      </Grid>
-
-      <!-- Due's home: what's to hand in, by when -->
-      <ItemsControl Name="DueGroups" ItemsSource="{Binding DueGroups}" IsVisible="{Binding IsDuePage}">
-        <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate><StackPanel Spacing="24" /></ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:OverviewDueGroup">
-            <StackPanel>
-              <TextBlock Classes="ov-h2" Text="{Binding Heading}" Margin="0,0,0,8" />
-              <Border Classes="ov-group">
-                <ItemsControl ItemsSource="{Binding Items}">
-                  <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:OverviewDue">
-                      <Button Classes="ov-row" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenDueCommand}" CommandParameter="{Binding}">
-                        <StackPanel Spacing="3">
-                          <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="1" Classes="ov-right" Classes.strong="{Binding Strong}" Text="{Binding Right}" Margin="8,0,0,0" VerticalAlignment="Bottom" />
-                          </Grid>
-                          <StackPanel Orientation="Horizontal" Spacing="6">
-                            <Ellipse Width="7" Height="7" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                            <TextBlock Classes="ov-sub" Text="{Binding Sub}" TextTrimming="CharacterEllipsis" />
-                          </StackPanel>
-                        </StackPanel>
-                      </Button>
-                    </DataTemplate>
-                  </ItemsControl.ItemTemplate>
-                </ItemsControl>
-              </Border>
-            </StackPanel>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <!-- Home: a card for every class -->
-      <StackPanel Name="ClassCards" IsVisible="{Binding HasClasses}">
-        <TextBlock Classes="ov-h2" Text="{Binding ClassesHeading}" Margin="0,0,0,8" />
-        <ItemsControl ItemsSource="{Binding Classes}" Margin="0,0,-10,-10">
+      <!-- A class's home: what's coming up to hand in -->
+      <StackPanel Name="Deadlines" IsVisible="{Binding ShowDue}" Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="h2" Text="Upcoming deadlines" />
+          <Button Grid.Column="1" Classes="text-link" Content="Everything due" Command="{Binding AllDueCommand}" IsVisible="{Binding CanSeeAllDue}" VerticalAlignment="Bottom" />
+        </Grid>
+        <TextBlock Classes="empty" Text="{Binding DueEmpty}" IsVisible="{Binding NoDue}" />
+        <ItemsControl ItemsSource="{Binding Due}" ClipToBounds="False">
           <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><UniformGrid Columns="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).CardColumns}" /></ItemsPanelTemplate>
+            <ItemsPanelTemplate><StackPanel Spacing="14" /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="vm:OverviewClass">
-              <Button Classes="ov-card" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenClassCommand}" CommandParameter="{Binding}"
-                      ToolTip.Tip="{Binding Name}">
-                <StackPanel Spacing="4">
-                  <Grid ColumnDefinitions="Auto,8,*">
-                    <Ellipse Width="9" Height="9" Fill="{Binding Dot}" VerticalAlignment="Top" Margin="0,5,0,0" />
-                    <TextBlock Grid.Column="2" Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
-                  </Grid>
-                  <TextBlock Classes="ov-sub" Text="{Binding Lectures}" TextTrimming="CharacterEllipsis" Margin="17,0,0,0" />
-                  <TextBlock Classes="ov-right" Classes.strong="{Binding NextStrong}" Text="{Binding Next}" IsVisible="{Binding HasNext}"
-                             TextTrimming="CharacterEllipsis" Margin="17,0,0,0" />
+            <DataTemplate x:DataType="vm:OverviewDue">
+              <Button Classes="deadline" Classes.late="{Binding Late}" AutomationProperties.Name="{Binding Said}"
+                      Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenDueCommand}" CommandParameter="{Binding}">
+                <StackPanel Spacing="2">
+                  <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" FontSize="15" LineHeight="20" />
+                  <TextBlock Classes="deadline-when" Text="{Binding When}" />
                 </StackPanel>
               </Button>
             </DataTemplate>
@@ -335,95 +209,113 @@
         </ItemsControl>
       </StackPanel>
 
-      <!-- A class's home: the ways further in -->
-      <StackPanel Name="Links" IsVisible="{Binding HasLinks}">
-        <TextBlock Classes="ov-h2" Text="On Canvas" Margin="0,0,0,8" />
-        <ItemsControl ItemsSource="{Binding Links}" Margin="0,0,-10,-10">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><UniformGrid Columns="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).LinkColumns}" /></ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
+      <!-- The newest lectures: when, the title over its class and a sentence or two, how long -->
+      <StackPanel Name="Recent" IsVisible="{Binding ShowMain}" Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="h2" Text="{Binding LecturesHeading}" />
+          <Button Name="AllLectures" Grid.Column="1" Classes="text-link" Content="{Binding AllLecturesWords}" Command="{Binding AllLecturesCommand}"
+                  IsVisible="{Binding CanSeeAllLectures}" VerticalAlignment="Bottom" />
+          <TextBlock Grid.Column="1" Text="{Binding AllLecturesWords}" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource InkMuted}"
+                     IsVisible="{Binding ShowLectureCount}" VerticalAlignment="Bottom" />
+        </Grid>
+        <TextBlock Classes="empty" Text="{Binding LecturesEmpty}" IsVisible="{Binding NoLectures}" />
+        <ItemsControl Classes="rows" ItemsSource="{Binding Lectures}" Margin="0,-12,0,0" ClipToBounds="False">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:OverviewLecture">
+              <StackPanel>
+                <Border Classes="rule" />
+                <Button Classes="lecture" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenLectureCommand}" CommandParameter="{Binding}">
+                  <Grid ColumnDefinitions="108,20,*,20,Auto">
+                    <TextBlock Classes="lecture-date" Text="{Binding When}" />
+                    <StackPanel Grid.Column="2" Spacing="4">
+                      <TextBlock Classes="lecture-title" Text="{Binding Title}" />
+                      <c:Highlight Classes="lecture-class" Text="{Binding ClassName}" Fill="{Binding Dot}"
+                                   IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).IsHome}" />
+                      <TextBlock Classes="lecture-summary" Classes.pending="{Binding Pending}" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="4" Classes="lecture-length" Text="{Binding Length}" MinWidth="64" TextAlignment="Right" />
+                  </Grid>
+                </Button>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+
+      <!-- A class's home: the ways further in, on Canvas -->
+      <StackPanel Name="Links" IsVisible="{Binding HasLinks}" Spacing="12">
+        <TextBlock Classes="h2" Text="On Canvas" />
+        <ItemsControl Classes="rows" ItemsSource="{Binding Links}" Margin="0,-8,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:OverviewLink">
-              <Button Classes="ov-card" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenLinkCommand}" CommandParameter="{Binding}">
-                <Grid ColumnDefinitions="Auto,10,*,Auto">
-                  <c:Icon Glyph="{Binding Glyph}" Size="18" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
-                  <StackPanel Grid.Column="2">
-                    <TextBlock Text="{Binding Label}" FontSize="14" FontWeight="SemiBold" />
-                    <TextBlock Classes="ov-sub" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
-                  </StackPanel>
-                  <c:Icon Grid.Column="3" Glyph="chevron_right" Size="16" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
-                </Grid>
-              </Button>
+              <StackPanel>
+                <Border Classes="rule" />
+                <Button Classes="row-link" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenLinkCommand}" CommandParameter="{Binding}">
+                  <Grid ColumnDefinitions="128,*">
+                    <TextBlock Classes="row-title" Text="{Binding Label}" />
+                    <TextBlock Grid.Column="1" Classes="row-sub" Text="{Binding Detail}" VerticalAlignment="Center" />
+                  </Grid>
+                </Button>
+              </StackPanel>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
       </StackPanel>
 
       <!-- A class's home: folders on the computer that go with it (a project's repo), linked, not copied in -->
-      <StackPanel Name="LinkedFolders" IsVisible="{Binding ShowFolders}">
-        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8">
-          <TextBlock Classes="ov-h2" Text="Linked folders" VerticalAlignment="Center" />
-          <!-- Another one: over the folders' right edge, as See all is over the lectures' -->
-          <Button Name="LinkAnother" Grid.Column="1" Classes="ov-pill" Command="{Binding LinkFolderCommand}" IsVisible="{Binding CanLinkAnother}"
-                  ToolTip.Tip="Link a folder on this computer to the class: it stays where it is, and search and the AI can read it">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <c:Icon Glyph="add" Size="15" Foreground="{DynamicResource Fg}" />
-              <TextBlock Text="Link a folder" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" />
-            </StackPanel>
-          </Button>
+      <StackPanel Name="LinkedFolders" IsVisible="{Binding ShowFolders}" Spacing="12">
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Classes="h2" Text="Linked folders" VerticalAlignment="Center" />
+          <!-- Another one: over the folders' right edge, as the lectures' link is over theirs -->
+          <Button Name="LinkAnother" Grid.Column="1" Classes="text-link" Content="Link a folder" Command="{Binding LinkFolderCommand}" IsVisible="{Binding CanLinkAnother}"
+                  VerticalAlignment="Bottom" ToolTip.Tip="Link a folder on this computer to the class: it stays where it is, and search and the AI can read it" />
         </Grid>
         <!-- None yet: what one is for and the button that links one, together where the folders will be -->
-        <Border Name="NoFolders" Classes="ov-group" Margin="0" Padding="16,10,10,10" IsVisible="{Binding !HasFolders}">
-          <Grid ColumnDefinitions="Auto,10,*,16,Auto">
-            <c:Icon Glyph="folder" Size="18" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
-            <TextBlock Grid.Column="2" Classes="ov-sub" FontSize="14" TextWrapping="Wrap" VerticalAlignment="Center"
-                       Text="A project's repo, a shared drive, anything that goes with this class but isn't notes. It stays where it is." />
-            <Button Name="LinkFolder" Grid.Column="4" Classes="ov-pill" Command="{Binding LinkFolderCommand}" VerticalAlignment="Center"
-                    ToolTip.Tip="Link a folder on this computer to the class: it stays where it is, and search and the AI can read it">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <c:Icon Glyph="add" Size="15" Foreground="{DynamicResource Fg}" />
-                <TextBlock Text="Link a folder" FontSize="14" FontWeight="Medium" VerticalAlignment="Center" />
-              </StackPanel>
-            </Button>
-          </Grid>
-        </Border>
-        <ItemsControl ItemsSource="{Binding Folders}" Margin="0,0,-10,-10" IsVisible="{Binding HasFolders}">
-          <ItemsControl.ItemsPanel>
-            <ItemsPanelTemplate><StackPanel /></ItemsPanelTemplate>
-          </ItemsControl.ItemsPanel>
+        <Grid Name="NoFolders" ColumnDefinitions="*,24,Auto" IsVisible="{Binding !HasFolders}">
+          <TextBlock Classes="empty" FontSize="15" LineHeight="22" VerticalAlignment="Center"
+                     Text="A project's repo, a shared drive, anything that goes with this class but isn't notes. It stays where it is." />
+          <Button Name="LinkFolder" Grid.Column="2" Classes="plain" Content="Link a folder" Command="{Binding LinkFolderCommand}" VerticalAlignment="Center"
+                  ToolTip.Tip="Link a folder on this computer to the class: it stays where it is, and search and the AI can read it" />
+        </Grid>
+        <ItemsControl Classes="rows" ItemsSource="{Binding Folders}" IsVisible="{Binding HasFolders}" Margin="0,-8,0,0">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:LinkedFolder">
-              <Button Classes="ov-card" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenFolderCommand}" CommandParameter="{Binding}"
-                      ToolTip.Tip="Open the folder">
-                <Button.ContextMenu>
-                  <ContextMenu>
-                    <MenuItem Header="Unlink from this class" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).UnlinkFolderCommand}" CommandParameter="{Binding}" />
-                  </ContextMenu>
-                </Button.ContextMenu>
-                <Grid ColumnDefinitions="Auto,10,*,Auto">
-                  <c:Icon Glyph="folder" Size="18" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
-                  <StackPanel Grid.Column="2">
-                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Classes="ov-sub" Text="{Binding Detail}" TextTrimming="CharacterEllipsis" />
+              <StackPanel>
+                <Border Classes="rule" />
+                <Button Classes="row-link" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).OpenFolderCommand}" CommandParameter="{Binding}"
+                        ToolTip.Tip="Open the folder">
+                  <Button.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Unlink from this class" Command="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).UnlinkFolderCommand}" CommandParameter="{Binding}" />
+                    </ContextMenu>
+                  </Button.ContextMenu>
+                  <StackPanel Spacing="2">
+                    <TextBlock Classes="row-title" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Classes="row-sub" Text="{Binding Detail}" />
                   </StackPanel>
-                  <c:Icon Grid.Column="3" Glyph="open_in_new" Size="15" Foreground="{DynamicResource Fg3}" VerticalAlignment="Center" />
-                </Grid>
-              </Button>
+                </Button>
+              </StackPanel>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
       </StackPanel>
 
       <!-- A class's home: what's attached to it (drop files anywhere on the page) -->
-      <StackPanel Name="ClassFiles" IsVisible="{Binding HasFiles}">
-        <TextBlock Classes="ov-h2" Text="Files" Margin="0,0,0,8" IsVisible="{Binding Files.HasItems, FallbackValue=False}" />
+      <StackPanel Name="ClassFiles" IsVisible="{Binding HasFiles}" Spacing="12">
+        <TextBlock Classes="h2" Text="Files" IsVisible="{Binding Files.HasItems, FallbackValue=False}" />
         <v:WinAttachments DataContext="{Binding Files}" />
       </StackPanel>
+
+      <!-- Home: Study Stash is free, and a tip for the two students who build it goes to their Ko-fi page -->
+      <Button Name="Support" Classes="text-link" Content="{x:Static s:SupportAsk.Button}" Command="{Binding SupportCommand}" IsVisible="{Binding CanSupport}"
+              ToolTip.Tip="{x:Static s:SupportAsk.HomeTip}" />
     </StackPanel>
   </ScrollViewer>
-  <!-- Ask about everything (Home) or this class, at the foot of the page; its latest answer just above -->
-  <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24" Spacing="8" IsVisible="{Binding HasAsk}">
-    <v:WinAiAnswer DataContext="{Binding Ask}" IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).HasAnswer}" MaxHeight="420" />
+  <!-- The page fades out under Ask, so what scrolls beneath never collides with it -->
+  <Border Name="Fade" Height="120" VerticalAlignment="Bottom" IsHitTestVisible="False" IsVisible="{Binding HasAsk}" />
+  <!-- Ask about everything (Home) or this class, docked at the foot of the page; its latest answer just above -->
+  <StackPanel Classes="ov-ask" Classes.narrow="{Binding Narrow}" VerticalAlignment="Bottom" Spacing="8" IsVisible="{Binding HasAsk}">
+    <v:WinAiAnswer DataContext="{Binding Ask}" IsVisible="{Binding $parent[UserControl].((vm:OverviewModel)DataContext).HasAnswer}" MaxHeight="420" HorizontalAlignment="Center" />
     <v:WinAiAskBar DataContext="{Binding Ask}" />
   </StackPanel>
   </Panel>

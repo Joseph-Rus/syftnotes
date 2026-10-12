@@ -8,7 +8,7 @@ using StudyStash.Core;
 
 namespace StudyStash.App.ViewModels;
 
-/// <summary>A class in the sidebar: its dot, name and how many lectures (Unsorted has an inbox instead of a dot).</summary>
+/// <summary>A class in the sidebar: its swatch, name and how many lectures (Home, Due and Unsorted have an icon instead).</summary>
 public sealed partial class ClassItem : ObservableObject
 {
     public string Name { get; init; } = "";
@@ -21,6 +21,13 @@ public sealed partial class ClassItem : ObservableObject
     [ObservableProperty] public partial int Count { get; set; }
     [ObservableProperty] public partial bool Selected { get; set; }
     public bool HasDot => !IsUnsorted;
+    /// <summary>The name as the sidebar shows it: without the registrar's code on the end.</summary>
+    public string Display => IsDue || IsHome || IsUnsorted ? Name : ClassNames.Display(Name);
+    /// <summary>The whole name, and its code: the tooltip of a name cut short.</summary>
+    public string Tip => ClassNames.Code(Name) is { Length: > 0 } code ? $"{Display} · {code}" : Display;
+    /// <summary>A count of nothing isn't shown.</summary>
+    public bool ShowCount => Count > 0;
+    partial void OnCountChanged(int value) => OnPropertyChanged(nameof(ShowCount));
     /// <summary>The sidebar folder it's in ("" for Classes).</summary>
     public string Group { get; init; } = "";
     /// <summary>The first of its folder: the folder's name heads it in the sidebar.</summary>
@@ -75,6 +82,11 @@ public sealed partial class NoteModel : ObservableObject
     public IBrush Dot { get; init; } = Brushes.Gray;
     /// <summary>"CS 101 · Tuesday 23 September · 1 h 12 min".</summary>
     public string Meta { get; init; } = "";
+    /// <summary>The class as the page's top line names it (no registrar's code), marked with its highlighter.</summary>
+    public string ClassShown => ClassNames.Display(ClassName);
+    public bool HasClass => ClassName.Length > 0;
+    /// <summary>The rest of that line: "Tuesday 23 September · 1 h 12 min".</summary>
+    public string When => HasClass && Meta.StartsWith(ClassName + " · ", StringComparison.Ordinal) ? Meta[(ClassName.Length + 3)..] : Meta;
     public string Title { get; init; } = "";
     public string Markdown { get; init; } = "";
     /// <summary>The notes aren't written yet (the library is on it), or couldn't be.</summary>
@@ -163,9 +175,16 @@ public sealed partial class LibraryModel : ObservableObject
     public bool ShowOverview => Overview is not null;
     public ObservableCollection<LectureGroup> Groups { get; } = [];
     [ObservableProperty] public partial string ClassTitle { get; set; } = "";
+    /// <summary>The list's heading: the class's name without the registrar's code.</summary>
+    public string ClassTitleShown => ClassNames.Display(ClassTitle);
+    partial void OnClassTitleChanged(string value) => OnPropertyChanged(nameof(ClassTitleShown));
     [ObservableProperty] public partial string ClassCount { get; set; } = "";
     [ObservableProperty] public partial NoteModel? Note { get; set; }
     [ObservableProperty] public partial string Status { get; set; } = "";
+    /// <summary>The status as the sidebar's foot shows it: a plain line for each thing it says ("Library on this
+    /// Mac", "Canvas synced at 10:18").</summary>
+    public string[] StatusLines => Status.Split(" · ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+    partial void OnStatusChanged(string value) => OnPropertyChanged(nameof(StatusLines));
     [ObservableProperty] public partial bool StatusGood { get; set; } = true;
     [ObservableProperty] public partial string SearchText { get; set; } = "";
     /// <summary>Draw the window's own buttons (screenshots; a real window has the system's).</summary>
@@ -585,5 +604,10 @@ public sealed partial class LibraryModel : ObservableObject
     [RelayCommand] void Export() => OnExport?.Invoke();
     [RelayCommand] void Search() => OnSearch?.Invoke();
     [RelayCommand] void Settings() => OnSettings?.Invoke();
+
+    /// <summary>The "+" beside Classes in the sidebar: where a class is added (Settings' Classes).</summary>
+    public Action? OnAddClass { get; set; }
+    public bool CanAddClass => OnAddClass is not null;
+    [RelayCommand] void AddClass() => OnAddClass?.Invoke();
     [RelayCommand] void More() => OnMore?.Invoke();
 }

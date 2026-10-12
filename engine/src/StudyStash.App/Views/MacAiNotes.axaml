@@ -66,11 +66,11 @@
 
     <!-- Summary header + Edit and Rewrite notes (while editing: Cancel and Save), all on one line: Summary is level
          with the buttons, and its byline stands on Summary's baseline. The two hang from one top, the byline's smaller
-         type set down by how much lower 17 pt letters stand than 12 pt ones (4.4). -->
+         type set down by how much lower 17 pt letters stand than 12 pt ones (4.9, in this face). -->
     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,10,0,0" VerticalAlignment="Center">
       <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
         <TextBlock Classes="ai-notes-title" Text="Summary" VerticalAlignment="Top" />
-        <TextBlock Classes="ai-notes-byline" Margin="10,4.4,0,0" VerticalAlignment="Top" Text="{Binding ShownByline}" />
+        <TextBlock Classes="ai-notes-byline" Margin="10,4.9,0,0" VerticalAlignment="Top" Text="{Binding ShownByline}" />
       </StackPanel>
       <Button Grid.Column="2" Classes="ai-pillbtn" Margin="0,0,8,0" IsVisible="{Binding ShowEditButton}" Command="{Binding EditCommand}"
               ToolTip.Tip="Fix or add to these notes yourself" AutomationProperties.Name="Edit notes">

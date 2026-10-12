@@ -9,6 +9,8 @@ public partial class WinOverview : UserControl
     {
         InitializeComponent();
         AttachFiles.AcceptDrops(Page, () => (DataContext as OverviewModel)?.Files);
+        Fades.Under(Fade, "Surface", 0.55);
+        WeekFit.Keep(WeekScroll, Week);
         // Another overview opens at its top, not wherever the last one was scrolled to; the same one read again
         // (Canvas synced, a lecture came in) stays where the student was.
         string? showing = null;

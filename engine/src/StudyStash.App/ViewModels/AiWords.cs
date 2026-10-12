@@ -12,13 +12,14 @@ namespace StudyStash.App.ViewModels;
 /// </summary>
 public static partial class AiWords
 {
-    /// <summary>An engine's icon (memory/terminal/code/auto_awesome), by id.</summary>
+    /// <summary>An engine's icon, by id: the product's own mark, so a student sees the one they know (Claude's,
+    /// ChatGPT's for the engine the app calls ChatGPT, Gemini's, Ollama's). Anything else is a plain chip.</summary>
     public static string EngineIcon(string id) => id switch
     {
-        "ollama" => "memory",
-        "claude" => "terminal",
-        "codex" => "code",
-        "gemini" => "auto_awesome",
+        "ollama" => "brand:ollama",
+        "claude" => "brand:claude",
+        "codex" => "brand:chatgpt",
+        "gemini" => "brand:gemini",
         _ => "memory",
     };
 
@@ -221,9 +222,9 @@ public static partial class AiWords
     /// <summary>The ask field's placeholder for a scope: This lecture/class/all your classes.</summary>
     public static string AskPlaceholder(string scope) => scope switch
     {
-        "class" => "Ask about this class",
-        "all" => "Ask about all your classes",
-        _ => "Ask about this lecture",
+        "class" => "Ask anything about this class",
+        "all" => "Ask anything about your lectures",
+        _ => "Ask anything about this lecture",
     };
 
     /// <summary>While waiting: "Asking Claude Code…".</summary>

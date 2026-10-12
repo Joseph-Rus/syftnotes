@@ -1,7 +1,9 @@
-<!-- The full app (Surfaces, macOS 04): a glass sidebar (Due, Classes, Unsorted), lectures by week, then the note.
-     Headings in SF Pro Display, reading text in New York. A title bar across the top holds the window buttons and the toolbar; the ask bar floats over the page.
-     With Canvas (09-11) the middle column is the Due list or a class's own page, and the right an assignment or a
-     Canvas page; the lecture's notes can be rewritten by another engine (17), and the ask bar picks its engine (16). -->
+<!-- The full app (Mac): the sidebar straight on the window's canvas (its toolbar, Home, Due, Unsorted, the classes, and
+     two plain lines about the library at its foot), and beside it one white page with a hairline round it. The page
+     is Home or a class's home, or a list (a class's lectures by week, Canvas's Due list, a linked class's own lists)
+     with what's opened beside it: a lecture's notes with Ask floating at their foot, an assignment, a Canvas page.
+     Search, Settings and the open lecture's tools sit at the page's top right. The window's title bar lies behind it
+     all: any empty stretch along the top moves the window, and the system's traffic lights sit in its corner. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -22,122 +24,61 @@
     </Style>
     <!-- The real window has its own rounded corners and shadow; a screenshot draws both itself. -->
     <Style Selector="Border#Chrome.chrome">
-      <Setter Property="CornerRadius" Value="26" />
+      <Setter Property="CornerRadius" Value="18" />
       <Setter Property="BoxShadow" Value="{DynamicResource WindowShadow}" />
     </Style>
-    <Style Selector="Button.cls">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="CornerRadius" Value="10" />
-      <Setter Property="Padding" Value="10,0" />
-    </Style>
-    <Style Selector="Button.cls.selected">
-      <Setter Property="Background" Value="{DynamicResource Fill2}" />
-    </Style>
-    <Style Selector="Button.cls.selected /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource EdgeSoft}" />
-    </Style>
-    <Style Selector="Button.cls TextBlock.title">
-      <Setter Property="FontWeight" Value="Normal" />
-    </Style>
-    <Style Selector="Button.cls.selected TextBlock.title">
+    <!-- The library's two lines at the sidebar's foot; when something's wrong they say so in the late red. -->
+    <Style Selector="TextBlock.side-foot">
+      <Setter Property="FontSize" Value="12" />
       <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="LineHeight" Value="20" />
+      <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
-    <Style Selector="Button.cls TextBlock.count">
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+    <Style Selector="ItemsControl.bad TextBlock.side-foot">
+      <Setter Property="Foreground" Value="{DynamicResource Late}" />
     </Style>
-    <Style Selector="TextBlock.classes">
-      <Setter Property="Margin" Value="10,8,10,6" />
-    </Style>
-    <!-- Unsorted's icon sits a little further out than the dots, and its count ends where every class's count ends. -->
-    <Style Selector="Button.cls.unsorted">
-      <Setter Property="Padding" Value="7,0,10,0" />
-      <Setter Property="Margin" Value="0,8,0,0" />
-    </Style>
-    <Style Selector="c|Icon.unsorted">
-      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
-    </Style>
-    <Style Selector="StackPanel.side.canvas">
-      <Setter Property="Spacing" Value="2" />
-    </Style>
-    <Style Selector="StackPanel.side.canvas StackPanel.rows">
-      <Setter Property="Spacing" Value="2" />
-    </Style>
-    <Style Selector="StackPanel.side.canvas Panel.slot">
-      <Setter Property="Width" Value="16" />
-    </Style>
-    <Style Selector="StackPanel.side.canvas TextBlock.classes">
-      <Setter Property="Margin" Value="10,10,10,4" />
-    </Style>
-    <Style Selector="StackPanel.side.canvas Button.cls.unsorted">
-      <Setter Property="Padding" Value="10,0" />
-      <Setter Property="Margin" Value="0,8,0,0" />
-    </Style>
-    <Style Selector="StackPanel.side.canvas c|Icon.unsorted">
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-    </Style>
-    <Style Selector="StackPanel.side.canvas Button.cls.selected TextBlock.title">
-      <Setter Property="FontWeight" Value="SemiBold" />
-    </Style>
+    <!-- A lecture in a class's list: plain words, and the open one on a grey wash. -->
     <Style Selector="Button.card">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="CornerRadius" Value="14" />
-      <Setter Property="Margin" Value="10,2" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Margin" Value="10,1" />
       <Setter Property="Padding" Value="0" />
     </Style>
     <Style Selector="Button.card.selected">
-      <Setter Property="Background" Value="{DynamicResource Tint}" />
-      <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
-    </Style>
-    <Style Selector="Button.card.selected /template/ Border#PART_Bg">
-      <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
+      <Setter Property="Background" Value="{DynamicResource Hover}" />
     </Style>
     <Style Selector="Button.card TextBlock.sub">
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-    </Style>
-    <Style Selector="Button.card.selected TextBlock.sub">
-      <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
-      <Setter Property="Opacity" Value="0.88" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     </Style>
     <Style Selector="TextBlock.group">
-      <Setter Property="Margin" Value="20,14,20,6" />
+      <Setter Property="Margin" Value="22,16,20,6" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
     </Style>
     <Style Selector="TextBlock.group.first">
-      <Setter Property="Margin" Value="20,10,20,6" />
-    </Style>
-    <Style Selector="Button.tool">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="34" />
-      <Setter Property="Height" Value="30" />
-      <Setter Property="CornerRadius" Value="15" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Margin" Value="22,8,20,6" />
     </Style>
     <Style Selector="Button.pill">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Height" Value="36" />
-      <Setter Property="CornerRadius" Value="18" />
-      <Setter Property="Padding" Value="12,0,14,0" />
-    </Style>
-    <Style Selector="Button.round">
-      <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="36" />
-      <Setter Property="Height" Value="36" />
-      <Setter Property="CornerRadius" Value="18" />
-      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="Height" Value="32" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+      <Setter Property="Padding" Value="10,0,12,0" />
     </Style>
     <Style Selector="Border.seg">
-      <Setter Property="Padding" Value="18,5" />
-      <Setter Property="CornerRadius" Value="15" />
+      <Setter Property="Padding" Value="16,5" />
+      <Setter Property="CornerRadius" Value="6" />
     </Style>
     <Style Selector="Border.seg.on">
-      <Setter Property="Background" Value="{DynamicResource Raised}" />
-      <Setter Property="BoxShadow" Value="{DynamicResource SegShadow}" />
+      <Setter Property="Background" Value="{DynamicResource Surface}" />
+      <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
     </Style>
     <Style Selector="Border.seg TextBlock">
-      <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
+      <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
     </Style>
     <Style Selector="Border.seg.on TextBlock">
-      <Setter Property="Foreground" Value="{DynamicResource Fg}" />
+      <Setter Property="Foreground" Value="{DynamicResource Ink}" />
     </Style>
     <!-- The notes fade out under the floating ask bar; with an answer open they end above it, so a short fade will do. -->
     <Style Selector="Border.fade">
@@ -148,7 +89,7 @@
     </Style>
     <Style Selector="Border.undo">
       <Setter Property="Height" Value="40" />
-      <Setter Property="CornerRadius" Value="20" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
       <Setter Property="Padding" Value="16,0,6,0" />
       <Setter Property="Background" Value="{DynamicResource PopupBg}" />
       <Setter Property="BorderBrush" Value="{DynamicResource PopupStroke}" />
@@ -158,113 +99,80 @@
     <Style Selector="Button.undo">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
       <Setter Property="Height" Value="28" />
-      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
       <Setter Property="Padding" Value="10,0" />
     </Style>
   </UserControl.Styles>
 
-  <Border Name="Chrome" Background="{DynamicResource Win}" ClipToBounds="True" Classes.chrome="{Binding DrawChrome}">
+  <Border Name="Chrome" Background="{DynamicResource Canvas}" ClipToBounds="True" Classes.chrome="{Binding DrawChrome}">
     <Panel>
-    <DockPanel>
-      <!-- The title bar: drag the window by it; the system's traffic lights sit in it, and the toolbar on its right. -->
-      <c:WindowHeader Name="Header" DockPanel.Dock="Top" DrawChrome="{Binding DrawChrome}">
-        <!-- Fold the sidebar away, and back and forward through the places picked: in the window's top left corner.
-             The header keeps the lights' room clear, so they start right after the lights; full screen has no lights
-             at rest, and there they take the corner itself (the code-behind moves them), level with search and
-             Settings on the other side. -->
-        <StackPanel Name="Nav" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left" VerticalAlignment="Center">
-          <c:Glass Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}">
-            <Button Name="ToggleSidebar" Classes="round" Command="{Binding ToggleSidebarCommand}" ToolTip.Tip="Show or hide the sidebar (⌃⌘S)" AutomationProperties.Name="Toggle sidebar">
-              <c:Icon Glyph="dock_to_right" Size="19" Foreground="{DynamicResource Fg}" RenderTransform="scale(-1,1)" />
+    <!-- The title bar, behind everything: drag the window by any empty stretch along its top (the sidebar's toolbar
+         row, the strip over the page), and the system's traffic lights sit in its left corner. -->
+    <c:WindowHeader Name="Header" VerticalAlignment="Top" DrawChrome="{Binding DrawChrome}" />
+    <Grid ColumnDefinitions="Auto,*" Margin="8">
+      <!-- The sidebar: straight on the canvas, no panel behind it -->
+      <DockPanel Name="Sidebar" Width="244" Margin="0,0,8,0" IsVisible="{Binding ShowSidebar}" Background="Transparent" c:WindowHeader.MovesWindow="True">
+        <!-- Its toolbar: fold the sidebar away on the left (after the traffic lights; in full screen, which has none
+             at rest, in the corner itself), back and forward through the places picked on the right. -->
+        <Grid Name="SideTools" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,2,Auto" Height="32" Margin="80,2,6,22">
+          <Button Name="ToggleSidebar" Classes="icon-btn" Command="{Binding ToggleSidebarCommand}" ToolTip.Tip="Hide sidebar (⌃⌘S)" AutomationProperties.Name="Hide sidebar">
+            <c:Icon Glyph="sidebar" Size="18" />
+          </Button>
+          <Button Grid.Column="2" Classes="icon-btn" Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack}" ToolTip.Tip="Back (⌘[)" AutomationProperties.Name="Back">
+            <c:Icon Glyph="arrow_back" Size="18" />
+          </Button>
+          <Button Grid.Column="4" Classes="icon-btn" Command="{Binding GoForwardCommand}" IsEnabled="{Binding CanGoForward}" ToolTip.Tip="Forward (⌘])" AutomationProperties.Name="Forward">
+            <c:Icon Glyph="arrow_forward" Size="18" />
+          </Button>
+        </Grid>
+        <!-- Whether the library answers, and when Canvas last synced: two plain lines at the foot, never under the
+             classes (they scroll). -->
+        <ItemsControl Name="StatusRow" DockPanel.Dock="Bottom" Classes.bad="{Binding !StatusGood}" ItemsSource="{Binding StatusLines}" Margin="16,8,16,2">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <TextBlock Classes="side-foot" Text="{Binding}" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <ScrollViewer Name="ClassList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="6,0,6,0" c:WindowHeader.MovesWindow="True">
+          <StackPanel Classes="side">
+            <!-- Home: every class at once -->
+            <Button Name="HomeRow" Classes="nav-item" Classes.selected="{Binding Home.Selected}"
+                    Command="{Binding PickClassCommand}" CommandParameter="{Binding Home}">
+              <Grid ColumnDefinitions="Auto,10,*">
+                <c:Icon Glyph="home" Size="18" />
+                <TextBlock Grid.Column="2" Text="Home" VerticalAlignment="Center" />
+              </Grid>
             </Button>
-          </c:Glass>
-          <c:Glass Height="36" CornerRadius="18" Padding="1,0" BoxShadow="{DynamicResource CtlGlassShadow}">
-            <StackPanel Orientation="Horizontal">
-              <Button Classes="tool" Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack}" ToolTip.Tip="Back (⌘[)" AutomationProperties.Name="Back">
-                <c:Icon Glyph="arrow_back" Size="18" Foreground="{DynamicResource Fg}" />
-              </Button>
-              <Button Classes="tool" Command="{Binding GoForwardCommand}" IsEnabled="{Binding CanGoForward}" ToolTip.Tip="Forward (⌘])" AutomationProperties.Name="Forward">
-                <c:Icon Glyph="arrow_back" Size="18" Foreground="{DynamicResource Fg}" RenderTransform="scale(-1,1)" />
-              </Button>
-            </StackPanel>
-          </c:Glass>
-        </StackPanel>
-        <!-- The toolbar: move and export for a lecture, Open in Canvas for an assignment, search, and Settings -->
-        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0">
-          <c:Glass Height="36" CornerRadius="18" Padding="4,0" BoxShadow="{DynamicResource CtlGlassShadow}" IsVisible="{Binding ShowLectureTools}">
-            <StackPanel Orientation="Horizontal">
-              <Button Classes="tool" Command="{Binding MoveCommand}" ToolTip.Tip="Move to another class" IsEnabled="{Binding HasNote}">
-                <c:Icon Glyph="drive_file_move" Size="19" Foreground="{DynamicResource Fg}" />
-              </Button>
-              <Button Classes="tool" Command="{Binding ExportCommand}" ToolTip.Tip="Export" IsEnabled="{Binding HasNote}">
-                <c:Icon Glyph="ios_share" Size="19" Foreground="{DynamicResource Fg}" />
-              </Button>
-              <Button Name="DeleteLecture" Classes="tool" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete lecture" AutomationProperties.Name="Delete lecture"
-                      IsEnabled="{Binding HasNote}">
-                <c:Icon Glyph="delete" Size="19" Foreground="{DynamicResource Fg}" />
-              </Button>
-            </StackPanel>
-          </c:Glass>
-          <c:Glass Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}" IsVisible="{Binding ShowAssignmentTools}">
-            <Button Classes="pill" Command="{Binding Assignment.OpenInCanvasCommand, FallbackValue={x:Null}}">
-              <StackPanel Orientation="Horizontal" Spacing="6">
-                <c:Icon Glyph="open_in_new" Size="16" Foreground="{DynamicResource Fg}" />
-                <TextBlock Text="Open in Canvas" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
-              </StackPanel>
+            <Button Name="DueRow" Classes="nav-item" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
+                    Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
+              <Grid ColumnDefinitions="Auto,10,*,10,Auto">
+                <c:Icon Glyph="event_upcoming" Size="18" />
+                <TextBlock Grid.Column="2" Text="Due" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="4" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" IsVisible="{Binding Due.ShowCount, FallbackValue=False}" />
+              </Grid>
             </Button>
-          </c:Glass>
-          <c:Glass Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}">
-            <Button Classes="round" Command="{Binding SearchCommand}" ToolTip.Tip="Search">
-              <c:Icon Glyph="search" Size="19" Foreground="{DynamicResource Fg}" />
+            <Button Name="UnsortedRow" Classes="nav-item unsorted" Classes.selected="{Binding Unsorted.Selected}"
+                    Command="{Binding PickClassCommand}" CommandParameter="{Binding Unsorted}">
+              <Grid ColumnDefinitions="Auto,10,*,10,Auto">
+                <c:Icon Glyph="inbox" Size="18" />
+                <TextBlock Grid.Column="2" Text="Unsorted" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="4" Classes="count" Text="{Binding Unsorted.Count}" IsVisible="{Binding Unsorted.ShowCount}" />
+              </Grid>
             </Button>
-          </c:Glass>
-          <c:Glass Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}">
-            <Button Name="Settings" AutomationProperties.Name="Settings" Classes="round" Command="{Binding SettingsCommand}" ToolTip.Tip="Settings (⌘,)">
-              <c:Icon Glyph="settings" Size="19" Foreground="{DynamicResource Fg}" />
-            </Button>
-          </c:Glass>
-        </StackPanel>
-      </c:WindowHeader>
-      <Grid ColumnDefinitions="Auto,Auto,*">
-        <!-- Classes: a floating glass panel, below the title bar (folded away, the list starts at the window's edge) -->
-        <c:Glass Name="Sidebar" Width="240" IsVisible="{Binding ShowSidebar}" CornerRadius="18" BoxShadow="{DynamicResource SideGlassShadow}" Padding="10,6,10,14" Margin="8,0,0,8" c:WindowHeader.MovesWindow="True">
-          <DockPanel>
-            <!-- Whether the library answers: a row of its own at the bottom, never under the classes (they scroll). -->
-            <Grid Name="StatusRow" DockPanel.Dock="Bottom" ColumnDefinitions="Auto,8,*" Margin="10,8,10,4">
-              <Ellipse Width="6" Height="6" Classes="status" Classes.warn="{Binding !StatusGood}" VerticalAlignment="Top" Margin="0,5,0,0" />
-              <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="11" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="*,Auto" Margin="10,22,4,6">
+              <TextBlock Classes="side-group" Text="Classes" />
+              <Button Name="AddClass" Grid.Column="1" Classes="icon-btn sm" Command="{Binding AddClassCommand}" IsVisible="{Binding CanAddClass}"
+                      ToolTip.Tip="Add class" AutomationProperties.Name="Add class">
+                <c:Icon Glyph="add" Size="16" />
+              </Button>
             </Grid>
-            <!-- Coming up on the student's calendars, above the library's status -->
-            <v:MacComingUp DockPanel.Dock="Bottom" DataContext="{Binding ComingUp}" Margin="2,8,2,0" />
-            <ScrollViewer Name="ClassList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:WindowHeader.MovesWindow="True">
-            <!-- With Canvas (design 09) the rows sit 2 px apart, each led by a 16 px slot, and the chosen one is bolder. -->
-            <StackPanel Classes="side" Classes.canvas="{Binding HasDue}">
-              <!-- Home: every class at once -->
-              <Button Name="HomeRow" Classes="cls" Classes.selected="{Binding Home.Selected}"
-                      Command="{Binding PickClassCommand}" CommandParameter="{Binding Home}">
-                <Grid ColumnDefinitions="Auto,8,*">
-                  <c:Icon Glyph="home" Size="17" Width="16" Foreground="{DynamicResource AccentText}" />
-                  <TextBlock Grid.Column="2" Classes="title" Text="Home" FontSize="13" VerticalAlignment="Center" />
-                </Grid>
-              </Button>
-              <Button Classes="cls" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
-                      Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
-                <Grid ColumnDefinitions="Auto,8,*,10,Auto">
-                  <c:Icon Glyph="event_upcoming" Size="17" Width="16" Foreground="{DynamicResource AccentText}" />
-                  <TextBlock Grid.Column="2" Classes="title" Text="Due" FontSize="13" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="4" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" FontSize="13" VerticalAlignment="Center" />
-                </Grid>
-              </Button>
-              <TextBlock Classes="classes" Text="Classes" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
-              <ItemsControl ItemsSource="{Binding Classes}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate><StackPanel Classes="rows" /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:ClassItem">
-                    <StackPanel>
-                      <TextBlock Classes="classes" Text="{Binding Section}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" IsVisible="{Binding HasSection}" />
-                      <Button Classes="cls" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
+            <ItemsControl ItemsSource="{Binding Classes}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ClassItem">
+                  <StackPanel>
+                    <TextBlock Classes="side-group" Text="{Binding Section}" Margin="10,22,4,6" IsVisible="{Binding HasSection}" />
+                    <Button Classes="nav-item class" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
                             Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
                       <Button.ContextMenu>
                         <ContextMenu>
@@ -278,60 +186,93 @@
                           </MenuItem>
                         </ContextMenu>
                       </Button.ContextMenu>
-                      <!-- dot | name, cut short with "…" (the whole name on hover) | the count, in its own column -->
-                      <Grid ColumnDefinitions="Auto,8,*,10,Auto">
-                        <Panel Classes="slot">
-                          <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                        </Panel>
-                        <TextBlock Grid.Column="2" Classes="title name" Text="{Binding Name}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" c:Tips.WhenCut="True" />
-                        <TextBlock Grid.Column="4" Classes="count" Text="{Binding Count}" FontSize="13" VerticalAlignment="Center" />
+                      <!-- its swatch | the name, cut short with "…" (the whole name, and its code, on hover) | how many
+                           lectures, when there are some -->
+                      <Grid ColumnDefinitions="Auto,10,*,Auto">
+                        <c:Swatch Fill="{Binding Dot}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Classes="name" Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding Tip}" c:Tips.WhenCut="True" />
+                        <TextBlock Grid.Column="3" Classes="count" Text="{Binding Count}" Margin="10,0,0,0" IsVisible="{Binding ShowCount}" />
                       </Grid>
                     </Button>
-                    </StackPanel>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-              <Button Classes="cls unsorted" Classes.selected="{Binding Unsorted.Selected}"
-                      Command="{Binding PickClassCommand}" CommandParameter="{Binding Unsorted}">
-                <Grid ColumnDefinitions="Auto,8,*,10,Auto">
-                  <c:Icon Classes="unsorted" Glyph="inbox" Size="16" Width="16" />
-                  <TextBlock Grid.Column="2" Classes="title" Text="Unsorted" FontSize="13" VerticalAlignment="Center" />
-                  <TextBlock Grid.Column="4" Classes="count" Text="{Binding Unsorted.Count}" FontSize="13" VerticalAlignment="Center" />
-                </Grid>
-              </Button>
-            </StackPanel>
-            </ScrollViewer>
-          </DockPanel>
-        </c:Glass>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
 
+      <!-- The page: one white sheet, a hairline round it, no shadow. The sheet itself takes no clicks, so the strip
+           along its top (where nothing else is) still moves the window. -->
+      <Panel Grid.Column="1">
+      <Border Name="Pane" Background="{DynamicResource Surface}" CornerRadius="{DynamicResource RadiusPane}" BoxShadow="{DynamicResource LineRing}" IsHitTestVisible="False" />
+      <Border CornerRadius="{DynamicResource RadiusPane}" ClipToBounds="True">
+      <DockPanel>
+        <!-- The page's toolbar: the open lecture's tools, Open in Canvas for an assignment, search, and Settings on the
+             right; with the sidebar folded away, its button and back and forward on the left. -->
+        <Grid Name="PaneTools" DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Height="32" Margin="12,10,12,0">
+          <StackPanel Name="PaneNav" Orientation="Horizontal" Spacing="2" IsVisible="{Binding !ShowSidebar}">
+            <Button Name="ShowSidebar" Classes="icon-btn" Command="{Binding ToggleSidebarCommand}" ToolTip.Tip="Show sidebar (⌃⌘S)" AutomationProperties.Name="Show sidebar">
+              <c:Icon Glyph="sidebar" Size="18" />
+            </Button>
+            <Button Classes="icon-btn" Command="{Binding GoBackCommand}" IsEnabled="{Binding CanGoBack}" ToolTip.Tip="Back (⌘[)" AutomationProperties.Name="Back">
+              <c:Icon Glyph="arrow_back" Size="18" />
+            </Button>
+            <Button Classes="icon-btn" Command="{Binding GoForwardCommand}" IsEnabled="{Binding CanGoForward}" ToolTip.Tip="Forward (⌘])" AutomationProperties.Name="Forward">
+              <c:Icon Glyph="arrow_forward" Size="18" />
+            </Button>
+          </StackPanel>
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2">
+            <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding ShowLectureTools}">
+              <Button Classes="icon-btn" Command="{Binding MoveCommand}" ToolTip.Tip="Move to another class" AutomationProperties.Name="Move to another class" IsEnabled="{Binding HasNote}">
+                <c:Icon Glyph="drive_file_move" Size="18" />
+              </Button>
+              <Button Classes="icon-btn" Command="{Binding ExportCommand}" ToolTip.Tip="Export" AutomationProperties.Name="Export" IsEnabled="{Binding HasNote}">
+                <c:Icon Glyph="ios_share" Size="18" />
+              </Button>
+              <Button Name="DeleteLecture" Classes="icon-btn" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete lecture" AutomationProperties.Name="Delete lecture"
+                      IsEnabled="{Binding HasNote}">
+                <c:Icon Glyph="delete" Size="18" />
+              </Button>
+              <Border Width="1" Height="16" Background="{DynamicResource Line}" Margin="6,0" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button Classes="plain" Height="32" Margin="0,0,6,0" Command="{Binding Assignment.OpenInCanvasCommand, FallbackValue={x:Null}}" IsVisible="{Binding ShowAssignmentTools}"
+                    Content="Open in Canvas" />
+            <Button Classes="icon-btn" Command="{Binding SearchCommand}" ToolTip.Tip="Search (⌘K)" AutomationProperties.Name="Search">
+              <c:Icon Glyph="search" Size="18" />
+            </Button>
+            <Button Name="Settings" AutomationProperties.Name="Settings" Classes="icon-btn" Command="{Binding SettingsCommand}" ToolTip.Tip="Settings (⌘,)">
+              <c:Icon Glyph="settings" Size="18" />
+            </Button>
+          </StackPanel>
+        </Grid>
+      <Grid ColumnDefinitions="Auto,Auto,*">
         <!-- The list: lectures by week, Canvas's Due list, or a linked class's own page -->
         <Panel Grid.Column="1" Grid.ColumnSpan="{Binding ColumnSpan}" Width="{Binding ListWidth}" IsVisible="{Binding ShowListColumn}">
         <DockPanel Name="LectureList" IsVisible="{Binding ShowLectures}">
-          <Border DockPanel.Dock="Top" Height="44" Margin="20,12,14,4">
+          <Border DockPanel.Dock="Top" MinHeight="44" Margin="22,4,12,6">
             <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-              <StackPanel VerticalAlignment="Center">
-                <TextBlock Name="ListTitle" Text="{Binding ClassTitle}" FontFamily="{DynamicResource DisplayFont}" FontSize="17" FontWeight="Bold"
-                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock Text="{Binding ClassCount}" FontSize="11" Foreground="{DynamicResource Fg2}" IsVisible="{Binding !HasClassTabs}" />
-                  <TextBlock Text="{Binding CanvasClass.HeaderLine, FallbackValue=''}" FontSize="11" Foreground="{DynamicResource Fg2}" IsVisible="{Binding HasClassTabs}" />
+              <StackPanel VerticalAlignment="Center" Spacing="1">
+                <TextBlock Name="ListTitle" Classes="h2" Text="{Binding ClassTitleShown}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding ClassTitle}" c:Tips.WhenCut="True" />
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="{Binding ClassCount}" FontSize="13" Foreground="{DynamicResource InkMuted}" IsVisible="{Binding !HasClassTabs}" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding CanvasClass.HeaderLine, FallbackValue=''}" FontSize="13" Foreground="{DynamicResource InkMuted}" IsVisible="{Binding HasClassTabs}" VerticalAlignment="Center" />
                   <!-- A class's lectures: back to the class's home -->
-                  <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding CanShowClassPage}" Command="{Binding ShowClassPageCommand}">
-                    <TextBlock Text="· Class home" FontSize="11" Foreground="{DynamicResource AccentText}" />
-                  </Button>
+                  <Button Classes="text-link" FontSize="13" Content="Class home" IsVisible="{Binding CanShowClassPage}" Command="{Binding ShowClassPageCommand}" />
                 </StackPanel>
               </StackPanel>
-              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+              <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Spacing="2">
                 <!-- Attach to the class (drop files on the list, too): its files show under the name once there are some -->
-                <Button Classes="tool" VerticalAlignment="Center" Command="{Binding ClassFiles.AttachCommand, FallbackValue={x:Null}}"
+                <Button Classes="icon-btn" VerticalAlignment="Center" Command="{Binding ClassFiles.AttachCommand, FallbackValue={x:Null}}"
                         IsVisible="{Binding HasClassFiles}" ToolTip.Tip="Attach notes, slides or a handout to this class (or drop files on the list)"
                         AutomationProperties.Name="Attach to class">
-                  <c:Icon Glyph="attach_file" Size="17" Foreground="{DynamicResource Fg2}" />
+                  <c:Icon Glyph="attach_file" Size="17" />
                 </Button>
                 <!-- Fold the list away, giving the page its room -->
-                <Button Name="HideList" Classes="tool" VerticalAlignment="Center" Command="{Binding ToggleListCommand}" IsVisible="{Binding CanToggleList}"
+                <Button Name="HideList" Classes="icon-btn" VerticalAlignment="Center" Command="{Binding ToggleListCommand}" IsVisible="{Binding CanToggleList}"
                         ToolTip.Tip="Hide the list (⌃⌘L)" AutomationProperties.Name="Hide the list">
-                  <c:Icon Glyph="chevron_left" Size="18" Foreground="{DynamicResource Fg2}" />
+                  <c:Icon Glyph="chevron_left" Size="18" />
                 </Button>
               </StackPanel>
             </Grid>
@@ -359,13 +300,13 @@
             <v:MacCanvasClass DataContext="{Binding CanvasClass}" />
           </Panel>
           <DockPanel IsVisible="{Binding ShowLectureGroups}">
-            <TextBlock DockPanel.Dock="Top" IsVisible="{Binding HasEmpty}" Text="{Binding Empty}" FontSize="13" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" Margin="20,10" />
+            <TextBlock DockPanel.Dock="Top" IsVisible="{Binding HasEmpty}" Text="{Binding Empty}" FontSize="15" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" Margin="22,10" />
             <ScrollViewer VerticalScrollBarVisibility="Auto">
               <ItemsControl ItemsSource="{Binding Groups}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:LectureGroup">
                     <StackPanel>
-                      <TextBlock Classes="group" Classes.first="{Binding First}" Text="{Binding Label}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" />
+                      <TextBlock Classes="group" Classes.first="{Binding First}" Text="{Binding Label}" />
                       <ItemsControl ItemsSource="{Binding Items}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:LectureCard">
@@ -377,9 +318,9 @@
                                 </ContextMenu>
                               </Button.ContextMenu>
                               <StackPanel Margin="12,10">
-                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                <TextBlock Classes="sub" Text="{Binding Meta}" FontSize="12" Margin="0,2,0,0" />
-                                <TextBlock Classes="sub" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" FontSize="12" LineHeight="16.8" Margin="0,4,0,0"
+                                <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="Bold" LineHeight="20" TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Classes="sub" Text="{Binding Meta}" FontSize="13" FontWeight="Medium" Margin="0,2,0,0" />
+                                <TextBlock Classes="sub" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" FontSize="13.5" LineHeight="19" Margin="0,4,0,0"
                                            TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" />
                               </StackPanel>
                             </Button>
@@ -405,7 +346,7 @@
             <Grid ColumnDefinitions="*,10,Auto" VerticalAlignment="Center">
               <TextBlock Text="{Binding Deleted.Said, FallbackValue=''}" FontSize="13" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
               <Button Grid.Column="2" Name="Undo" Classes="undo" Command="{Binding UndoCommand}" VerticalAlignment="Center">
-                <TextBlock Text="Undo" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource AccentText}" />
+                <TextBlock Text="Undo" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource Ink}" />
               </Button>
             </Grid>
           </Border>
@@ -419,11 +360,11 @@
         <!-- The right: the lecture, an assignment, or a Canvas page -->
         <Panel Grid.Column="{Binding DetailColumn}" Grid.ColumnSpan="{Binding ColumnSpan}" IsVisible="{Binding ShowDetailColumn}">
           <!-- The list folded away: one arrow at the page's left edge brings it back -->
-          <Button Name="ShowList" Theme="{StaticResource Surface}" Height="32" CornerRadius="16" Padding="8,0,12,0" Background="{DynamicResource Fill}" ZIndex="5" IsVisible="{Binding ShowListOpener}" Command="{Binding ToggleListCommand}"
-                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,12,0,0" ToolTip.Tip="Show the list (⌃⌘L)" AutomationProperties.Name="Show the list">
+          <Button Name="ShowList" Classes="plain" Height="32" Padding="6,0,12,0" ZIndex="5" IsVisible="{Binding ShowListOpener}" Command="{Binding ToggleListCommand}"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,4,0,0" ToolTip.Tip="Show the list (⌃⌘L)" AutomationProperties.Name="Show the list">
             <StackPanel Orientation="Horizontal" Spacing="2">
-              <c:Icon Glyph="chevron_right" Size="18" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
-              <TextBlock Text="List" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
+              <c:Icon Glyph="chevron_right" Size="18" VerticalAlignment="Center" />
+              <TextBlock Text="List" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
           <Border Width="1" Background="{DynamicResource Sep}" HorizontalAlignment="Left" IsVisible="{Binding !Narrow}" />
@@ -438,38 +379,32 @@
         <Grid IsVisible="{Binding ShowLecturePage}" RowDefinitions="*,Auto" ClipToBounds="False">
           <Panel>
           <ScrollViewer Name="NoteScroll" Margin="1,0,0,0" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasNote}">
-            <StackPanel MaxWidth="680" HorizontalAlignment="Center" Margin="56,28,56,140" Spacing="14" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding Meta}" FontSize="12" Foreground="{DynamicResource Fg2}" />
+            <StackPanel MaxWidth="680" HorizontalAlignment="Center" Margin="56,14,56,140" Spacing="14" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <c:Highlight Text="{Binding ClassShown}" Fill="{Binding Dot}" FontSize="13.5" FontWeight="SemiBold" LineHeight="18" IsVisible="{Binding HasClass}" />
+                <TextBlock Text="{Binding When}" FontSize="13.5" FontWeight="Medium" LineHeight="18" Foreground="{DynamicResource InkMuted}" />
               </StackPanel>
-              <TextBlock Text="{Binding Title}" FontFamily="{DynamicResource DisplayFont}" FontSize="30" FontWeight="Bold" LineHeight="34.5"
-                         c:Typography.Extra="-0.6" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding Title}" FontSize="32" FontWeight="ExtraBold" LineHeight="38" LetterSpacing="-0.8" TextWrapping="Wrap" />
               <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,0">
-                <Border HorizontalAlignment="Left" Padding="3" CornerRadius="18" Background="{DynamicResource Fill}" BoxShadow="{DynamicResource EdgeSoft}">
+                <Border HorizontalAlignment="Left" Padding="3" CornerRadius="{DynamicResource RadiusControl}" Background="{DynamicResource SurfaceSunken}" BoxShadow="{DynamicResource LineRing}">
                   <StackPanel Orientation="Horizontal">
-                    <Button Theme="{StaticResource Surface}" Padding="0" CornerRadius="15" Command="{Binding NotesCommand}" AutomationProperties.Name="Notes">
+                    <Button Theme="{StaticResource Surface}" Padding="0" CornerRadius="6" Command="{Binding NotesCommand}" AutomationProperties.Name="Notes">
                       <Border Classes="seg" Classes.on="{Binding ShowNotes}">
-                        <TextBlock Text="Notes" FontSize="12" FontWeight="Medium" />
+                        <TextBlock Text="Notes" FontSize="13" FontWeight="Bold" />
                       </Border>
                     </Button>
-                    <Button Theme="{StaticResource Surface}" Padding="0" CornerRadius="15" Command="{Binding TranscriptsCommand}" AutomationProperties.Name="Transcript">
+                    <Button Theme="{StaticResource Surface}" Padding="0" CornerRadius="6" Command="{Binding TranscriptsCommand}" AutomationProperties.Name="Transcript">
                       <Border Classes="seg" Classes.on="{Binding ShowTranscript}">
-                        <TextBlock Text="Transcript" FontSize="12" FontWeight="Medium" />
+                        <TextBlock Text="Transcript" FontSize="13" FontWeight="Bold" />
                       </Border>
                     </Button>
                   </StackPanel>
                 </Border>
                 <!-- Nothing attached yet: Attach sits beside the tabs rather than heading an empty list of its own -->
-                <Button Grid.Column="2" Classes="pill" VerticalAlignment="Center" Height="32"
+                <Button Grid.Column="2" Classes="plain" VerticalAlignment="Center" Height="32" Content="Attach"
                         Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.AttachCommand, FallbackValue={x:Null}}"
                         IsVisible="{Binding !$parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.ShowHeader, FallbackValue=False}"
-                        ToolTip.Tip="Attach your notes, slides or a handout (or drop files on the page)" AutomationProperties.Name="Attach">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <c:Icon Glyph="attach_file" Size="15" Foreground="{DynamicResource Fg}" />
-                    <TextBlock Text="Attach" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" />
-                  </StackPanel>
-                </Button>
+                        ToolTip.Tip="Attach your notes, slides or a handout (or drop files on the page)" AutomationProperties.Name="Attach" />
               </Grid>
               <!-- What's attached to this lecture (drop files anywhere on the page) -->
               <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasLectureFiles}" Margin="0,2,0,0">
@@ -513,7 +448,7 @@
           <!-- A diagram showed where it was said: one click back to the notes, where the diagram is -->
           <Button Name="BackToNotes" Theme="{StaticResource Surface}" IsVisible="{Binding Note.CanGoBack, FallbackValue=False}"
                   Command="{Binding Note.BackToNotesCommand, FallbackValue={x:Null}}" HorizontalAlignment="Center" VerticalAlignment="Top"
-                  Margin="0,16,0,0" Height="32" Padding="12,0,14,0" CornerRadius="16" Background="{DynamicResource PopupBg}"
+                  Margin="0,16,0,0" Height="32" Padding="12,0,14,0" CornerRadius="{DynamicResource RadiusControl}" Background="{DynamicResource PopupBg}"
                   BorderBrush="{DynamicResource PopupStroke}" BorderThickness="1" AutomationProperties.Name="Back to the notes">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Glyph="arrow_back" Size="15" Foreground="{DynamicResource Fg}" VerticalAlignment="Center" />
@@ -528,21 +463,22 @@
           </Panel>
 
           <!-- Ask about this lecture, with any engine -->
-          <Panel Name="AskRoom" Grid.RowSpan="2" IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24">
+          <Panel Name="AskRoom" Grid.RowSpan="2" IsVisible="{Binding HasAsk}" VerticalAlignment="Bottom" MaxWidth="792" Margin="56,0,56,20">
             <v:MacAiAskBar DataContext="{Binding Ask}" />
           </Panel>
         </Grid>
 
           <!-- Narrow: back to the list -->
-          <c:Glass IsVisible="{Binding NarrowDetail}" Width="36" Height="36" CornerRadius="18" BoxShadow="{DynamicResource CtlGlassShadow}"
-                   HorizontalAlignment="Left" VerticalAlignment="Top" Margin="14,14,0,0">
-            <Button Classes="round" Command="{Binding BackCommand}" ToolTip.Tip="Back">
-              <c:Icon Glyph="arrow_back" Size="19" Foreground="{DynamicResource Fg}" />
-            </Button>
-          </c:Glass>
+          <Button Classes="icon-btn" IsVisible="{Binding NarrowDetail}" Command="{Binding BackCommand}" ToolTip.Tip="Back" AutomationProperties.Name="Back to the list"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,4,0,0">
+            <c:Icon Glyph="arrow_back" Size="18" />
+          </Button>
         </Panel>
       </Grid>
-    </DockPanel>
+      </DockPanel>
+      </Border>
+      </Panel>
+    </Grid>
 
     <!-- "Delete this lecture?", over the window: a click outside it is Cancel -->
     <!-- "Put CS 101 in a new folder": its name, over the window -->

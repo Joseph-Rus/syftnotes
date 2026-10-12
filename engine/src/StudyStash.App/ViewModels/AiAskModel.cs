@@ -14,6 +14,8 @@ public sealed partial class EngineMenuItem(string id, string name, string subtit
 {
     public string Id { get; } = id;
     public string Name { get; } = name;
+    /// <summary>The engine's own mark (Claude's, ChatGPT's), beside its name.</summary>
+    public string Icon => AiWords.EngineIcon(Id);
     public string Subtitle { get; } = subtitle;
     public bool Checked { get; } = @checked;
     public bool Enabled { get; } = enabled;
@@ -113,6 +115,12 @@ public sealed partial class AiAskModel : ObservableObject
     /// <summary>The engine's name on the chip. One that isn't in the menu (no AI set up yet, so the default is an
     /// Ollama nobody installed) still goes by its name, "Ollama", not its id.</summary>
     public string EngineName => Menu.Items.FirstOrDefault(i => i.Id == Engine)?.Name ?? Engines.Name(Engine);
+    /// <summary>The engine on the ask bar: its own mark (Claude's, ChatGPT's), and what the button under it says.</summary>
+    public string EngineIcon => AiWords.EngineIcon(Engine);
+    public string EngineTip => $"Answer with {EngineName}";
+    /// <summary>Send shows once there's a question; until then the keys that put the caret in the bar do.</summary>
+    public bool CanSend => !Busy && Question.Trim().Length > 0;
+    public bool ShowKeys => !Busy && Question.Trim().Length == 0;
     public string ScopeName => ScopeChoices.FirstOrDefault(c => c.Id == Scope)?.Name ?? Scope;
     public string Placeholder => AiWords.AskPlaceholder(Scope);
     public AiTurn? Latest => Turns.Count > 0 ? Turns[^1] : null;
@@ -160,6 +168,8 @@ public sealed partial class AiAskModel : ObservableObject
 
     partial void OnQuestionChanged(string value)
     {
+        OnPropertyChanged(nameof(CanSend));
+        OnPropertyChanged(nameof(ShowKeys));
         if (value.Trim().Length == 0 || DateTime.UtcNow - warmedAt < TimeSpan.FromMinutes(1)) return;
         warmedAt = DateTime.UtcNow;
         _ = library.WarmAsync(Engine.Length > 0 ? Engine : null);
@@ -169,7 +179,20 @@ public sealed partial class AiAskModel : ObservableObject
     {
         warmedAt = DateTime.MinValue; // another engine may have something of its own to get ready
         foreach (var i in Menu.Items) i.Selected = i.Id == value;
+        EngineNamed();
+    }
+
+    partial void OnBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanSend));
+        OnPropertyChanged(nameof(ShowKeys));
+    }
+
+    void EngineNamed()
+    {
         OnPropertyChanged(nameof(EngineName));
+        OnPropertyChanged(nameof(EngineIcon));
+        OnPropertyChanged(nameof(EngineTip));
     }
 
     partial void OnScopeChanged(string value)
@@ -228,7 +251,7 @@ public sealed partial class AiAskModel : ObservableObject
         }
         if (Engine.Length == 0 || Menu.Items.All(i => i.Id != Engine)) Engine = overview.Ask;
         foreach (var i in Menu.Items) i.Selected = i.Id == Engine;
-        OnPropertyChanged(nameof(EngineName));
+        EngineNamed();
     }
 
     /// <summary>The question being answered right now, to stop it.</summary>

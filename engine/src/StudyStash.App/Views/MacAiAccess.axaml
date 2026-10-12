@@ -49,10 +49,10 @@
                   </StackPanel>
                   <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Classes="ai-pillbtn" Command="{Binding GetChatGptCommand}">
-                      <Border Classes="ai-pill"><TextBlock Text="Get ChatGPT" /></Border>
+                      <Border Classes="ai-pill"><StackPanel Orientation="Horizontal" Spacing="6"><c:Icon Glyph="brand:chatgpt" Size="15" VerticalAlignment="Center" /><TextBlock Text="Get ChatGPT" VerticalAlignment="Center" /></StackPanel></Border>
                     </Button>
                     <Button Classes="ai-pillbtn" Command="{Binding GetClaudeCommand}">
-                      <Border Classes="ai-pill"><TextBlock Text="Get Claude" /></Border>
+                      <Border Classes="ai-pill"><StackPanel Orientation="Horizontal" Spacing="6"><c:Icon Glyph="brand:claude" Size="15" VerticalAlignment="Center" /><TextBlock Text="Get Claude" VerticalAlignment="Center" /></StackPanel></Border>
                     </Button>
                     <Button Classes="ai-pillbtn" Command="{Binding RefreshCommand}">
                       <Border Classes="ai-pill-plain"><TextBlock Text="Look again" /></Border>

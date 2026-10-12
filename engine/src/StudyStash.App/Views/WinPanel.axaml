@@ -162,7 +162,7 @@
                 <Button Classes="row" Classes.selected="{Binding Selected}"
                         Command="{Binding $parent[UserControl].((vm:PanelModel)DataContext).OpenLectureCommand}" CommandParameter="{Binding}">
                   <Grid ColumnDefinitions="8,10,*,10,Auto">
-                    <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                    <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                       <TextBlock Text="{Binding Title}" FontSize="14" TextTrimming="CharacterEllipsis" />
                       <StackPanel Orientation="Horizontal" Spacing="6">

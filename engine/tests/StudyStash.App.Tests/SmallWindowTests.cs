@@ -9,8 +9,8 @@ namespace StudyStash.App.Tests;
 
 /// <summary>
 /// The Windows library in a small window: a laptop at 150% has about 1250 × 640 points for it, a 1024 × 768 screen
-/// about 990 × 700. The notes' "Rewrite notes" and the ask bar stay whole and inside the page: the bar is 600 wide
-/// where there's room and narrower where there isn't (the engine chip down to its icon), never cut off at its sides.
+/// about 990 × 700. The notes' "Rewrite notes" and the ask bar stay whole and inside the page: the bar fills the
+/// width the page gives it, never cut off at its sides.
 /// </summary>
 public class SmallWindowTests
 {
@@ -42,8 +42,7 @@ public class SmallWindowTests
             var bar = view.GetVisualDescendants().OfType<WinAiAskBar>().Single();
             var barAt = In(bar, view);
             Assert.True(barAt.Left >= bounds.Left + 23.5 && barAt.Right <= bounds.Right - 23.5, $"{width}: the ask bar ({barAt}) runs past the page ({bounds})");
-            Assert.Equal(Math.Min(WinAiAskBar.Wide, bounds.Width - 48), barAt.Width, 0.5);
-            Assert.Equal(barAt.Width < 480, bar.Compact);
+            Assert.True(barAt.Width >= 280, $"{width}: the ask bar is squeezed to {barAt.Width}");
             // Every part of the bar is inside it: the send button isn't cut off.
             foreach (var b in bar.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible))
                 Assert.True(In(b, view).Right <= barAt.Right + 0.5, $"{width}: a button in the ask bar runs past it");

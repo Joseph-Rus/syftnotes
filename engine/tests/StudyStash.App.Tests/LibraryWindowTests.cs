@@ -32,7 +32,7 @@ public class LibraryWindowTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public void Unsorted_is_always_in_the_sidebar_under_the_classes_even_empty(SkinKind skin)
+    public void Unsorted_is_always_in_the_sidebar_with_Home_even_empty(SkinKind skin)
     {
         var m = new LibraryModel();
         m.Classes.Add(new ClassItem { Name = "CS 101", Count = 3 });
@@ -42,9 +42,12 @@ public class LibraryWindowTests
         {
             var unsorted = Text(view, "Unsorted");
             var cs = Text(view, "CS 101");
-            Assert.True(unsorted.TranslatePoint(default, view)!.Value.Y > cs.TranslatePoint(default, view)!.Value.Y, "Unsorted sits under the classes");
+            var home = Text(view, "Home");
+            double Top(Visual v) => v.TranslatePoint(default, view)!.Value.Y;
+            Assert.True(Top(unsorted) > Top(home) && Top(unsorted) < Top(cs), "Unsorted sits under Home, over the classes");
             var row = unsorted.FindAncestorOfType<Button>()!;
-            Assert.Contains(row.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "0");
+            // Nothing waiting: no count beside it (a count of nothing isn't shown).
+            Assert.DoesNotContain(row.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "0" && t.IsEffectivelyVisible);
 
             // Lectures the library couldn't place: their count shows, and one click opens them.
             m.Unsorted.Count = 2;

@@ -376,6 +376,7 @@
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="2">
                           <StackPanel Orientation="Horizontal" Spacing="8">
+                            <c:Icon Glyph="brand:claude" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="Claude" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <Border Classes="badge" IsVisible="{Binding ClaudeHere}">
                               <StackPanel Orientation="Horizontal" Spacing="3">
@@ -393,6 +394,7 @@
                       <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="2">
                           <StackPanel Orientation="Horizontal" Spacing="8">
+                            <c:Icon Glyph="brand:chatgpt" Size="18" VerticalAlignment="Center" />
                             <TextBlock Text="ChatGPT" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
                             <Border Classes="badge" IsVisible="{Binding CodexHere}">
                               <StackPanel Orientation="Horizontal" Spacing="3">

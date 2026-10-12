@@ -258,8 +258,9 @@ public class NotesPdfTests
         }
     }
 
-    /// <summary>Some fonts (SF Pro, Inter) raise a colon between figures with a glyph that stands for no letter; on
-    /// paper the plain colon is kept, so "3:1" and "10:30" copy and search as written, in either look.</summary>
+    /// <summary>On screen figures are all one width, and a system font raises a colon between figures: each by a glyph
+    /// that stands for no letter. On paper the plain ones are kept, so "3:1" and "10:30" copy and search as written,
+    /// in either look.</summary>
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]

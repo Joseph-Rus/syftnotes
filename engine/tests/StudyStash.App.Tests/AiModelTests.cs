@@ -87,9 +87,9 @@ public class AiWordsTests
     [Fact]
     public void The_ask_fields_placeholder_follows_the_scope()
     {
-        Assert.Equal("Ask about this lecture", AiWords.AskPlaceholder("lecture"));
-        Assert.Equal("Ask about this class", AiWords.AskPlaceholder("class"));
-        Assert.Equal("Ask about all your classes", AiWords.AskPlaceholder("all"));
+        Assert.Equal("Ask anything about this lecture", AiWords.AskPlaceholder("lecture"));
+        Assert.Equal("Ask anything about this class", AiWords.AskPlaceholder("class"));
+        Assert.Equal("Ask anything about your lectures", AiWords.AskPlaceholder("all"));
     }
 
     [Fact]

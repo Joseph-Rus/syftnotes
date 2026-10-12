@@ -118,7 +118,9 @@ public sealed class Upcoming
         {
             var settings = CalendarSettings.Load(home);
             var now = clock();
-            DateTimeOffset from = now.AddHours(-12), to = now + Ahead;
+            // Back to this week's Monday (or half a day, whichever is further): Home's week shows the days already gone.
+            var monday = new DateTimeOffset(now.Date.AddDays(-(((int)now.DayOfWeek + 6) % 7)), now.Offset);
+            DateTimeOffset from = monday < now.AddHours(-12) ? monday : now.AddHours(-12), to = now + Ahead;
             var listed = new Dictionary<string, IReadOnlyList<CalendarInfo>>();
             var problems = new Dictionary<string, string>();
             var events = new List<CalendarEvent>();

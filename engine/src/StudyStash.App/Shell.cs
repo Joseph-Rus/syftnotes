@@ -522,6 +522,7 @@ public static partial class Shell
         library.OnListToggled = hidden => host.Save(s => s.ListHidden = hidden);
         library.OnSearch = ToggleQuick;
         library.OnSettings = ShowSettings;
+        library.OnAddClass = () => ShowSettings("Classes");
         library.OnMove = MoveLecture;
         library.OnDelete = DeleteLectureAsync;
         library.OnUndo = UndoDeleteAsync;
@@ -984,7 +985,7 @@ public static partial class Shell
         var w = new Window
         {
             Title = "Study Stash", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 48,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
         if (Skin.Current == SkinKind.Mac)
@@ -1586,6 +1587,7 @@ public static partial class Shell
         if (recording) library.Support = null; // the ask for a tip never shows while recording
         panel.IsRecording = recording;
         panel.IsPaused = recorder.IsPaused = live?.State == LectureState.Paused;
+        if (library.Overview is { CanRecord: true } page) ShowRecording(page);
         string cls = recording ? live!.ClassName : RecordClass() is { Length: > 0 } picked ? picked : CalendarClass();
         panel.ClassName = recorder.ClassName = cls;
         int color = host.ColorOf(cls);

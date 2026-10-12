@@ -29,7 +29,7 @@ public class ChromeTests
     static IEnumerable<(string Name, SkinKind Skin, double Height, Func<Control> Build)> Windows(Services.AppHost host)
     {
         yield return ("Mac library", SkinKind.Mac, 52, () => new MacLibrary { DataContext = Demo.Library(), Width = 1280, Height = 800 });
-        yield return ("Win library", SkinKind.Win, 48, () => new WinLibrary { DataContext = Demo.Library(), Width = 1280, Height = 800 });
+        yield return ("Win library", SkinKind.Win, 32, () => new WinLibrary { DataContext = Demo.Library(), Width = 1280, Height = 800 });
         yield return ("Mac setup", SkinKind.Mac, 52, () => new MacSetup { DataContext = Demo.Setup(SkinKind.Mac) });
         yield return ("Win setup", SkinKind.Win, 32, () => new WinSetup { DataContext = Demo.Setup(SkinKind.Win) });
         yield return ("Mac settings", SkinKind.Mac, 52, () => new SettingsView { DataContext = Services.SettingsModel.Make(host) });
@@ -58,6 +58,20 @@ public class ChromeTests
                     foreach (var control in header.GetVisualDescendants().OfType<Control>().Where(c => c is Button or TextBox))
                         Assert.Equal(WindowDecorationsElementRole.None, WindowDecorationProperties.GetElementRole(control));
 
+                    if (name == "Mac library")
+                    {
+                        // The Mac library's bar lies behind the window: the sidebar's toolbar and the page's own are in
+                        // its strip, and the first thing under them (Home's row, the list's title) starts below it.
+                        foreach (string under in new[] { "HomeRow", "ListTitle" })
+                        {
+                            var first = root.GetVisualDescendants().OfType<Control>().First(c => c.Name == under);
+                            double y = first.TranslatePoint(new Point(0, 0), root)!.Value.Y;
+                            Assert.True(y >= top.Y + height - 0.5, $"{name}: {under} starts at {y}, inside the title bar");
+                        }
+                        // The page's sheet takes no clicks itself, so its empty top strip still moves the window.
+                        Assert.False(root.GetVisualDescendants().OfType<Border>().First(b => b.Name == "Pane").IsHitTestVisible);
+                        continue;
+                    }
                     // Everything else in the window starts below the bar (the sidebar isn't under the lights).
                     var dock = header.GetVisualParent()!;
                     foreach (var sibling in dock.GetVisualChildren().OfType<Control>().Where(c => c != header && c.IsVisible))
@@ -78,9 +92,9 @@ public class ChromeTests
         }
     }
 
-    /// <summary>The sidebar's button and Back/Forward sit in the Mac window's top left corner: right after the lights,
-    /// and in full screen (no lights at rest) in the corner itself. They once sat a second lights' width further in,
-    /// half over the sidebar's edge.</summary>
+    /// <summary>The sidebar's button sits in the Mac window's top left corner: right after the lights, and in full
+    /// screen (no lights at rest) in the corner itself. It once sat a second lights' width further in, half over the
+    /// sidebar's edge. With the sidebar folded away, the page's own copy of it takes the same place.</summary>
     [AvaloniaFact]
     public void The_mac_sidebar_button_starts_after_the_lights_and_in_the_corner_in_full_screen()
     {
@@ -88,17 +102,18 @@ public class ChromeTests
         {
             var (window, _) = Open(SkinKind.Mac, () => new MacLibrary { DataContext = Demo.Library(), Width = 1280, Height = 800 });
             var view = (MacLibrary)window.Content!;
-            var nav = view.FindControl<StackPanel>("Nav")!;
-            double Left()
+            double Left(string name = "ToggleSidebar")
             {
                 window.UpdateLayout();
-                return nav.TranslatePoint(new Point(0, 0), view)!.Value.X;
+                return view.FindControl<Button>(name)!.TranslatePoint(new Point(0, 0), view)!.Value.X;
             }
             Assert.Equal(WindowHeader.LightsRoom, Left(), 1);
             window.WindowState = WindowState.FullScreen;
             Assert.Equal(MacLibrary.FullScreenInset, Left(), 1);
             window.WindowState = WindowState.Normal;
             Assert.Equal(WindowHeader.LightsRoom, Left(), 1);
+            ((ViewModels.LibraryModel)view.DataContext!).SidebarHidden = true;
+            Assert.Equal(WindowHeader.LightsRoom, Left("ShowSidebar"), 1);
             window.Close();
         }
         finally

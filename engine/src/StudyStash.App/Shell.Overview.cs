@@ -33,7 +33,7 @@ public static partial class Shell
         if (host.Remote() is null) return;
         await Task.Yield();
         if (turn != libraryTurn) return;
-        var page = OverviewModel.ForDue(OverviewSources([], events: null));
+        var page = OverviewModel.ForDue(OverviewSources([], meetings: null));
         var ask = new AiAskModel(Ai()) { OpenSettings = () => ShowSettings("AI") };
         ask.OnlyScopes("all");
         library.Ask?.Stop();
@@ -79,7 +79,7 @@ public static partial class Shell
         if (host.Remote() is not { } lib) return;
         var lectures = await OverviewLecturesAsync(lib, null, 60);
         if (turn != libraryTurn) return;
-        var home = OverviewModel.Home(OverviewSources(lectures, events: library.ComingUp.HasCalendars ? [.. library.ComingUp.Rows] : null));
+        var home = OverviewModel.Home(OverviewSources(lectures, meetings: Meetings(null)));
         Equip(home, null);
         library.Overview = home;
     }
@@ -106,7 +106,7 @@ public static partial class Shell
         var known = host.Classes().FirstOrDefault(c => c.Name == name);
         var facts = new ClassHomeFacts(name, DotFor(name), known.Lectures, row?.Canvas?.ShortCode is { Length: > 0 } code ? code : null,
             row?.Canvas?.Title is { Length: > 0 } title ? title : null, info is null ? null : S(info["description"]), row?.Counts);
-        var page = OverviewModel.ForClass(facts, OverviewSources(lectures, events: ClassEvents(name)));
+        var page = OverviewModel.ForClass(facts, OverviewSources(lectures, meetings: Meetings(name)));
         page.AddLinks(facts, () =>
         {
             Remember();
@@ -131,17 +131,18 @@ public static partial class Shell
     {
         if (host.Settings.Role != AppRole.Library)
         {
-            page.Recording = host.Recorder.Current is not null;
+            ShowRecording(page);
+            // The button says what a click does: Record starts one, and while one runs (its dot a stop square, the
+            // class, the level and the time beside it) the click stops it.
             page.OnRecord = () =>
             {
                 if (host.Recorder.Current is not null)
                 {
-                    ShowRecorder(expanded: true);
+                    StopRecording();
                     return;
                 }
                 chosenClass = cls ?? "";
                 ToggleRecording();
-                page.Recording = true;
             };
         }
         // Home's "Buy us a coffee": the Ko-fi page, and the library window's own ask for a tip goes for good (as it
@@ -221,21 +222,31 @@ public static partial class Shell
             l["seconds"] is JsonValue v && v.TryGetValue(out double sec) ? sec : null, S(l["summary"]), S(l["status"]) is "queued" or "working"))];
     }
 
-    /// <summary>This class on the student's calendars in the coming week (not only today and tomorrow, as the
-    /// sidebar's Coming up is); null without calendars.</summary>
-    static List<ComingUpRow>? ClassEvents(string name)
+    /// <summary>The overview showing says whether a lecture is recording, and reads the class, the level and the time
+    /// from the recorder while one is.</summary>
+    static void ShowRecording(OverviewModel page)
     {
-        if (host.Settings.Role == AppRole.Library || !host.HasCalendars) return null;
-        var now = DateTimeOffset.Now;
-        var classes = host.CalendarClasses();
-        var dot = DotFor(name);
-        return [.. host.Calendars.Events
-            .Where(e => !e.AllDay && !e.Cancelled && e.End > e.Start && e.End > now && e.Start < now + Upcoming.Ahead && EventClass.For(e.Title, classes) == name)
-            .OrderBy(e => e.Start).Take(OverviewModel.Rows)
-            .Select(e => new ComingUpRow(e.Id, CalendarWords.When(e, now, TimeZoneInfo.Local), e.Title, e.Location, name, dot, e.Start <= now))];
+        bool recording = host.Recorder.Current is not null;
+        page.Recorder = recording ? recorder : null;
+        page.Recording = recording;
     }
 
-    static OverviewModel.Sources OverviewSources(IReadOnlyList<OverviewModel.LectureFacts> lectures, IReadOnlyList<ComingUpRow>? events)
+    /// <summary>Class meetings on the student's calendars, as far as the app keeps them (this week, and the week
+    /// ahead): each event that's clearly one class's (<paramref name="only"/>: that class's alone). Null without
+    /// calendars, and on a computer that only keeps the library.</summary>
+    static List<OverviewModel.Meeting>? Meetings(string? only)
+    {
+        if (host.Settings.Role == AppRole.Library || !host.HasCalendars) return null;
+        var classes = host.CalendarClasses();
+        return [.. host.Calendars.Events
+            .Where(e => !e.AllDay && !e.Cancelled && e.End > e.Start)
+            .Select(e => (Event: e, Class: EventClass.For(e.Title, classes)))
+            .Where(x => x.Class is not null && (only is null || x.Class == only))
+            .OrderBy(x => x.Event.Start)
+            .Select(x => new OverviewModel.Meeting(x.Event.Start, x.Event.End, x.Class!))];
+    }
+
+    static OverviewModel.Sources OverviewSources(IReadOnlyList<OverviewModel.LectureFacts> lectures, IReadOnlyList<OverviewModel.Meeting>? meetings)
     {
         var ctx = Canvas();
         return new OverviewModel.Sources
@@ -246,7 +257,7 @@ public static partial class Shell
             Lectures = lectures,
             Due = CanvasLinked ? canvasDue : null,
             Canvas = canvasClasses,
-            Events = events,
+            Meetings = meetings,
             Unsorted = host.Overview?["unsorted"] is JsonValue u && u.TryGetValue(out int unsorted) ? unsorted : 0,
             Writing = host.Overview?["writing"] is JsonValue w && w.TryGetValue(out int writing) ? writing : 0,
             OpenClass = cls =>

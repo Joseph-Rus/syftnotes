@@ -11,8 +11,8 @@ using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>While a lecture records, the floating pill is tiny and only says it's recording: the dot, the time and a
-/// small level meter. No class, no buttons, until the pointer is over it; then Stop, in the meter's place.</summary>
+/// <summary>While a lecture records, the floating recorder is a small white pill: its red dot is Stop, then the class
+/// in a word or two, a level meter and the time. Red is only in the dot and the meter; no colour theme reaches it.</summary>
 public class RecorderPillTests
 {
     static (Control View, Control Pill) Show(SkinKind skin, RecorderModel model)
@@ -33,68 +33,56 @@ public class RecorderPillTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public void The_pill_is_a_small_upright_capsule_with_no_words(SkinKind skin)
+    public void The_pill_is_a_small_white_capsule_with_stop_the_class_and_the_time(SkinKind skin)
     {
         var model = Demo.Recorder();
-        var (_, pill) = Show(skin, model);
-
-        Assert.True(pill.Bounds.Height <= 90, $"{skin}: the pill is {pill.Bounds.Height} tall");
-        Assert.True(pill.Bounds.Width <= 48, $"{skin}: the pill is {pill.Bounds.Width} wide");
-        // Its mark and the level meter only: the time is its tooltip, the class is the recorder's.
-        Assert.Empty(Showing<TextBlock>(pill));
-        Assert.Equal("24:18", ToolTip.GetTip(pill));
-        Assert.Empty(Showing<Button>(pill));
-    }
-
-    [AvaloniaTheory]
-    [InlineData(SkinKind.Mac)]
-    [InlineData(SkinKind.Win)]
-    public void The_pointer_over_the_pill_puts_stop_in_the_meters_place(SkinKind skin)
-    {
-        var model = Demo.Recorder();
+        model.ClassName = "Theory of Computation and Compilers(CSCI4150.A)";
         bool stopped = false;
         model.OnStop = () => stopped = true;
-        var (_, pill) = Show(skin, model);
-        double width = pill.Bounds.Width;
+        var (view, pill) = Show(skin, model);
 
-        model.Hovered = true;
-        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(44, pill.Bounds.Height);
+        Assert.True(pill.Bounds.Width <= 260, $"{skin}: the pill is {pill.Bounds.Width} wide");
+        // The class in a word, and the time; its one button is Stop (the red dot).
+        var words = Showing<TextBlock>(pill).Where(t => t.Opacity > 0).Select(t => t.Text).ToList();
+        Assert.Equal(["Theory", "24:18"], words);
         var stop = Assert.Single(Showing<Button>(pill));
-        Assert.Equal(width, pill.Bounds.Width); // the pill doesn't grow under the pointer
+        Assert.Equal("Stop", Avalonia.Automation.AutomationProperties.GetName(stop));
         stop.Command!.Execute(null);
         Assert.True(stopped);
+        // White, whatever the colour theme: only the dot is red.
+        Color Token(string key) => view.TryFindResource(key, view.ActualThemeVariant, out var b) ? ((ISolidColorBrush)b!).Color : default;
+        Assert.Equal(Token("Surface"), ((ISolidColorBrush)((Border)pill).Background!).Color);
+        var dot = pill.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("record-dot"));
+        Assert.Equal(Token("Record"), ((ISolidColorBrush)dot.Background!).Color);
     }
 
-    /// <summary>The pill is in the colour theme the student picked (Settings → Appearance), and changes with it while
-    /// it's on screen: its fill is the theme's accent, not a colour of its own.</summary>
+    /// <summary>Pausing swaps the class for "Paused" and rests the meter, each in the other's room: a see-through
+    /// window resized on screen under the pointer is what made the recorder lag once.</summary>
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public void The_pill_takes_the_colour_theme(SkinKind skin)
+    public void Pausing_never_changes_the_pills_size(SkinKind skin)
     {
-        var (view, pill) = Show(skin, Demo.Recorder());
-        Color Fill() => ((ISolidColorBrush)((Border)pill).Background!).Color;
-        Color Accent() => view.TryFindResource("Accent", view.ActualThemeVariant, out var a) ? ((ISolidColorBrush)a!).Color : default;
+        var model = Demo.Recorder();
+        var (_, pill) = Show(skin, model);
+        var size = pill.Bounds.Size;
 
-        var lagoon = Fill();
-        Assert.Equal(Accent(), lagoon);
-        try
-        {
-            Skin.UseTheme(ColourThemes.Find("Plum"));
-            Dispatcher.UIThread.RunJobs();
-            Assert.NotEqual(lagoon, Fill());
-            Assert.Equal(Accent(), Fill());
-        }
-        finally
-        {
-            Skin.UseTheme(ColourThemes.Default);
-        }
+        model.IsPaused = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(size, pill.Bounds.Size);
+        Assert.Equal(["Paused", "24:18"], Showing<TextBlock>(pill).Where(t => t.Opacity > 0).Select(t => t.Text));
+        Assert.Equal("Paused CS 101, 24:18", model.PillSaid);
+
+        model.IsPaused = false;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(size, pill.Bounds.Size);
     }
 
     [Fact]
-    public void Opening_the_recorder_from_the_pill_forgets_the_pointer()
+    public void A_click_on_the_pill_opens_the_recorder()
     {
-        var model = new RecorderModel { Hovered = true };
+        var model = new RecorderModel();
         bool? opened = null;
         model.OnExpand = e => opened = e;
 
@@ -102,8 +90,6 @@ public class RecorderPillTests
 
         Assert.True(model.Expanded);
         Assert.True(opened);
-        Assert.False(model.Hovered);
-        Assert.True(model.ShowMeter);
     }
 
     /// <summary>The open recorder shows its newest line, at the bottom, however many came before it: as the live words

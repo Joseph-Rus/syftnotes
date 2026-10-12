@@ -128,7 +128,7 @@ public static class Demo
     }
 
     /// <summary>The sample library on Home (<paramref name="cls"/>: on that class's home instead), with a week of
-    /// lectures, three things to hand in (one late), and today's classes on the calendar.</summary>
+    /// lectures, four things to hand in (one late), and the classes that meet today and tomorrow on the calendar.</summary>
     public static LibraryModel Overview(string? cls = null, bool narrow = false, bool canvas = true, bool calendars = true)
     {
         var m = Library(due: canvas);
@@ -162,11 +162,11 @@ public static class Demo
                 new CanvasApi.Group { Key = "week", Label = "This week", Items = [Item("CS 101", "a2", "Problem set 4: recursion", 1), Item("CALC II", "a3", "Quiz 5", 2), Item("CS 101", "a4", "Reading: SICP 1.2", 5)] },
             ],
         };
-        var events = new List<ComingUpRow>
+        var today = new DateTimeOffset(now.Date, now.Offset);
+        OverviewModel.Meeting Meets(string c, int day, double hour, double hours = 1.25) => new(today.AddDays(day).AddHours(hour), today.AddDays(day).AddHours(hour + hours), c);
+        var meetings = new List<OverviewModel.Meeting>
         {
-            new("e1", "Now, until 11:15 AM", "CS 101 Lecture", "Engineering Hall 204", "CS 101", Cs, true),
-            new("e2", "1:30 PM", "BIO 110 Lab", "Science Center B12", "BIO 110", Bio, false),
-            new("e3", "Tomorrow 9:00 AM", "CALC II", "Math 101", "CALC II", Calc, false),
+            Meets("CS 101", 0, 10), Meets("BIO 110", 0, 13.5), Meets("CALC II", 1, 9), Meets("CS 101", 2, 10), Meets("HIST 210", 2, 14),
         };
         var sources = new OverviewModel.Sources
         {
@@ -175,7 +175,7 @@ public static class Demo
             Lectures = lectures,
             Due = canvas ? due : null,
             Canvas = canvas ? [new CanvasApi.ClassRow { Class = "CS 101", Linked = true }] : [],
-            Events = calendars ? events : null,
+            Meetings = calendars ? meetings : null,
             Unsorted = 2,
         };
         if (cls == "\u0001due")
@@ -186,7 +186,7 @@ public static class Demo
         }
         else if (cls is null)
         {
-            // As on a computer that records: Record at the edge, "Buy us a coffee" beside it.
+            // As on a computer that records: Record beside the date, "Buy us a coffee" at the page's foot.
             var home = OverviewModel.Home(sources);
             home.OnRecord = () => { };
             home.OnSupport = () => { };
@@ -201,6 +201,88 @@ public static class Demo
             page.AddLinks(facts, () => { }, canvas ? _ => { } : null);
             m.Overview = page;
         }
+        m.Narrow = narrow;
+        return m;
+    }
+
+    /// <summary>
+    /// The design's own Home (the handoff's screenshots): Monday 12 October, eight classes each with its highlighter,
+    /// one thing late, three due this week, the week's class meetings (the first of them recorded), and the four
+    /// newest of twelve lectures. For laying a picture of the app over the design's.
+    /// </summary>
+    public static LibraryModel Semester(bool recording = false, bool narrow = false)
+    {
+        (string Name, string Hue, int Lectures)[] classes =
+        [
+            ("Chapel Convocation", "Blue", 0), ("Web Application Development", "Green", 0),
+            ("Theory of Computation and Compilers(CSCI4150.A)", "Yellow", 4), ("Machine and Deep Learning", "Orange", 2), ("Data Mining", "Pink", 1),
+            ("Capstone Design", "Teal", 2), ("Internship Report and Presentation", "Violet", 0), ("Personal Projects", "Lime", 2),
+        ];
+        IBrush Dot(string hue) => Skin.ClassDot(Array.IndexOf(Skin.ClassHues, hue));
+        const string theory = "Theory of Computation and Compilers(CSCI4150.A)";
+        var m = new LibraryModel { Status = "Library on this Mac · Canvas synced at 10:18", DrawChrome = true, OnAddClass = () => { } };
+        m.Classes.Add(new ClassItem { Name = "Due", IsDue = true, Count = 16 });
+        foreach (var (name, hue, lectures) in classes) m.Classes.Add(new ClassItem { Name = name, Dot = Dot(hue), Count = lectures });
+        m.Unsorted.Count = 1;
+        m.Home.Selected = true;
+
+        var zone = TimeZoneInfo.CreateCustomTimeZone("Demo", TimeSpan.FromHours(-4), "Demo", "Demo");
+        var monday = new DateTimeOffset(2026, 10, 12, 0, 0, 0, TimeSpan.FromHours(-4));
+        var now = monday.AddHours(10.3);
+        OverviewModel.Meeting Meets(string c, int day, double hour) => new(monday.AddDays(day).AddHours(hour), monday.AddDays(day).AddHours(hour + 1.25), c);
+        CanvasApi.Item Item(string c, string id, string name, int day, string status = "open", bool missing = false) => new()
+        {
+            Class = c, Id = id, Name = name, Kind = "assignment", DueAt = monday.AddDays(day).AddHours(23).AddMinutes(59), Status = status, Missing = missing,
+        };
+        OverviewModel.LectureFacts L(string id, string title, string c, DateTimeOffset at, double min, string summary) => new(id, title, c, at, min * 60, summary, false);
+        var sources = new OverviewModel.Sources
+        {
+            Now = now, Zone = zone,
+            Classes = [.. classes.Select(c => (c.Name, Dot(c.Hue), c.Lectures))],
+            Unsorted = 1,
+            Lectures =
+            [
+                L("s1", "Linear vs Integer Linear Programming and NP-Hardness", theory, monday.AddHours(9.2), 13,
+                    "Built up from independent linear equations to a coupled system $b = Ax + s$, with an objective $c^T x$ to maximize or minimize."),
+                L("s2", "DFA Design Problems and Product Construction", theory, monday.AddDays(-5).AddHours(9), 53,
+                    "Worked solutions to a DFA design problem (parts a–d), each built from accept and reject strings and then checked state by state."),
+                L("s3", "Convolutional Neural Networks: Kernels, Stride, Dilation", "Machine and Deep Learning", monday.AddDays(-7).AddHours(13.5), 28,
+                    "Why CNNs generalize beyond their training data instead of memorizing it, then kernels, stride and dilation on MNIST."),
+                L("s4", "Drone Interception: Vision Training and Target Dataset", "Capstone Design", monday.AddDays(-12).AddHours(13), 23,
+                    "A team working session on the drone-interception project, not a formal lecture."),
+            ],
+            Canvas = [new CanvasApi.ClassRow { Class = theory, Linked = true }],
+            Due = new CanvasApi.DueResponse
+            {
+                ToHandIn = 16,
+                Groups =
+                [
+                    new CanvasApi.Group { Key = "overdue", Label = "Overdue", Items = [Item(theory, "d1", "Asynchronous Lecture 5", -7, "missing", missing: true)] },
+                    new CanvasApi.Group
+                    {
+                        Key = "week", Label = "This week",
+                        Items = [Item(theory, "d2", "CCHW2", 2), Item("Web Application Development", "d3", "HW3", 2), Item("Machine and Deep Learning", "d4", "CA.02: First Contact", 6)],
+                    },
+                ],
+            },
+            Meetings =
+            [
+                Meets(theory, 0, 9), Meets("Machine and Deep Learning", 0, 13.5), Meets("Web Application Development", 1, 10.5), Meets("Data Mining", 1, 14),
+                Meets(theory, 2, 9), Meets("Chapel Convocation", 2, 11), Meets("Machine and Deep Learning", 2, 13.5),
+                Meets("Web Application Development", 3, 10.5), Meets("Data Mining", 3, 14), Meets("Capstone Design", 4, 13),
+            ],
+        };
+        var home = OverviewModel.Home(sources);
+        home.OnRecord = () => { };
+        home.OnSupport = () => { };
+        if (recording)
+        {
+            home.Recorder = new RecorderModel { ClassName = theory, Elapsed = "12:04", Levels = PillWave };
+            home.Recording = true;
+        }
+        home.Ask = AiDemo.AskIdle();
+        home.Ask.OnlyScopes("all");
+        m.Overview = home;
         m.Narrow = narrow;
         return m;
     }

@@ -223,13 +223,13 @@ public class SupportTests
 
     // --- Home ------------------------------------------------------------------------------------------------------
 
-    /// <summary>"Buy us a coffee" is on Home, beside Record and clear of the greeting, in both looks, and a class's
-    /// home has none. (What pressing it does, the Ko-fi page and no more asking, is <see cref="SupportAsk.Answer"/>'s,
+    /// <summary>"Buy us a coffee" is on Home, a quiet link at the page's foot under the lectures, in both looks, and a
+    /// class's home has none. (What pressing it does, the Ko-fi page and no more asking, is <see cref="SupportAsk.Answer"/>'s,
     /// above.)</summary>
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public void Home_has_buy_us_a_coffee_beside_record_and_a_classs_home_has_none(SkinKind skin)
+    public void Home_has_buy_us_a_coffee_at_its_foot_and_a_classs_home_has_none(SkinKind skin)
     {
         ((App)Application.Current!).UseSkin(skin);
         Window? window = null;
@@ -253,14 +253,11 @@ public class SupportTests
             int pressed = 0;
             home.Overview!.OnSupport = () => pressed++;
             var view = Show(home);
-            var coffee = Named(view, "Support");
+            var coffee = view.GetVisualDescendants().OfType<Button>().SingleOrDefault(b => b.Name == "Support" && b.IsVisible);
             Assert.NotNull(coffee);
-            Assert.Contains("Buy us a coffee", Texts(coffee));
-            var record = Named(view, "Record")!;
-            var title = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "Title");
-            Assert.True(In(title, view).Right <= In(coffee, view).Left, $"{skin}: the greeting runs under the button");
-            Assert.True(In(coffee, view).Right <= In(record, view).Left, $"{skin}: the button runs under Record");
-            Assert.Equal(In(record, view).Height, In(coffee, view).Height);
+            Assert.Equal("Buy us a coffee", coffee.Content);
+            var recent = view.GetVisualDescendants().OfType<StackPanel>().First(p => p.Name == "Recent");
+            Assert.True(In(coffee, view).Top >= In(recent, view).Bottom, $"{skin}: the link isn't under the lectures");
             coffee.Command!.Execute(null);
             Assert.Equal(1, pressed);
 

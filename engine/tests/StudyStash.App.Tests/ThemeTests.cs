@@ -12,8 +12,9 @@ using StudyStash.App.Views;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>The colour themes: worked out in OKLCH the way the design does, drawn the way Chrome draws them, every
-/// token there for every theme, look and variant, kept in app.json, and swapped while the app runs.</summary>
+/// <summary>The look's tokens, and the colour themes that give it its accent: the accent worked out in OKLCH and
+/// drawn the way Chrome draws it, every token there for every theme, look and variant, the theme kept in app.json and
+/// swapped while the app runs. The surfaces and inks are the design's own (tokens.css), the same whatever the theme.</summary>
 public partial class ThemeTests
 {
     static readonly SkinKind[] Looks = [SkinKind.Mac, SkinKind.Win];
@@ -42,12 +43,16 @@ public partial class ThemeTests
         Assert.Equal(0x80, Oklch.ToColor(0.5, 0, 0, 0.5).A);
     }
 
-    /// <summary>The theme's tokens in the skin are the design's: renderVals()'s formulas, as Chrome draws them.</summary>
+    /// <summary>What a colour theme still decides: the accent and the status colours. (ThemeExpected's other rows are
+    /// surfaces that leant to the theme in the look before; now they're the design's own greys.)</summary>
+    static readonly HashSet<string> FromTheme = ["Accent", "AccentText", "Tint", "AccentTint", "IcInfo", "Ok", "Warn", "Good"];
+
+    /// <summary>The theme's accent in the skin is worked out as before: its formulas, as Chrome draws them.</summary>
     [AvaloniaFact]
-    public void Every_theme_token_matches_the_design()
+    public void Every_theme_accent_matches_its_formula()
     {
         var built = new Dictionary<(string, SkinKind), ResourceDictionary>();
-        foreach (var row in ThemeExpected.Rows)
+        foreach (var row in ThemeExpected.Rows.Where(r => FromTheme.Contains(r.Token)))
         {
             var theme = ColourThemes.Find(row.Theme);
             Assert.Equal(row.Theme, theme.Name);
@@ -78,10 +83,50 @@ public partial class ThemeTests
             }
     }
 
-    static bool Neutral(Color c) => Math.Abs(c.R - c.G) <= 1 && Math.Abs(c.G - c.B) <= 1 && Math.Abs(c.R - c.B) <= 1;
+    /// <summary>Grey, or the design's own blue-grey of a hairline or an ink (their blue runs a few steps over their red).</summary>
+    static bool Neutral(Color c) => Math.Abs(c.R - c.G) <= 8 && Math.Abs(c.G - c.B) <= 10 && Math.Abs(c.R - c.B) <= 18;
+
+    /// <summary>The surfaces, inks and reds are the design's own values, the same in both looks and whatever the theme.</summary>
+    [AvaloniaFact]
+    public void The_designs_tokens_are_its_own_in_both_looks_whatever_the_theme()
+    {
+        (string Key, string Light, string Dark)[] design =
+        [
+            ("Canvas", "#E9EBEE", "#0E0F11"), ("Surface", "#FFFFFF", "#191A1D"), ("SurfaceSunken", "#F5F6F7", "#202226"), ("SurfaceToday", "#FFFFFF", "#2A2C31"),
+            ("Line", "#DDE0E4", "#2D3035"), ("Ink", "#1D1F23", "#ECEEF1"), ("InkMuted", "#565C66", "#A4A9B1"), ("InkSubtle", "#626973", "#8D939C"),
+            ("Record", "#D42A1A", "#FF5A47"), ("OnRecord", "#FFFFFF", "#1A0603"), ("Late", "#B3261E", "#FF8A80"),
+            ("HlYellow", "#FFE46B", "#5A4C00"), ("HlTeal", "#A6EBE1", "#134F48"), ("SwatchYellow", "#FFE46B", "#E9CF4A"), ("SwatchLime", "#E2F28C", "#C4DC55"),
+        ];
+        foreach (var theme in new[] { ColourThemes.Default, ColourThemes.Find("Plum") })
+            foreach (var kind in Looks)
+            {
+                var d = Skin.Build(kind, theme);
+                foreach (var (key, light, dark) in design)
+                {
+                    Assert.True(d.TryGetResource(key, ThemeVariant.Light, out var l), $"{kind}: no {key}");
+                    Assert.True(d.TryGetResource(key, ThemeVariant.Dark, out var dk), $"{kind}: no {key} in dark");
+                    Assert.Equal(Color.Parse(light), ((ISolidColorBrush)l!).Color);
+                    Assert.Equal(Color.Parse(dark), ((ISolidColorBrush)dk!).Color);
+                }
+                // The names from the look before hold the same colours: text is ink, a window the page's white.
+                foreach (var (old, now) in new[] { ("Fg", "Ink"), ("Fg2", "InkMuted"), ("Fg3", "InkSubtle"), ("Sep", "Line"), ("Rec", "Record") })
+                    foreach (var variant in Variants)
+                    {
+                        d.TryGetResource(old, variant, out var was);
+                        d.TryGetResource(now, variant, out var isNow);
+                        Assert.Equal(((ISolidColorBrush)isNow!).Color, ((ISolidColorBrush)was!).Color);
+                    }
+            }
+        // Each class's highlighter, in the order classes take them; a class's brush is known for which it is.
+        Assert.Equal(["Yellow", "Green", "Orange", "Pink", "Blue", "Teal", "Violet", "Lime"], Skin.ClassHues);
+        Assert.Equal("Orange", Skin.HueOf(Skin.ClassDot(2)));
+        Assert.Equal("Yellow", Skin.HueOf(Skin.ClassDot(8)));
+        Assert.Null(Skin.HueOf(Brushes.Gray));
+    }
 
     /// <summary>No coloured glow anywhere: every shadow token, in both looks, light and dark, for every colour theme, is
-    /// grey (black, white or in between), so the accent never bleeds round a button, a row or a dot.</summary>
+    /// grey (black, white, a hairline's grey), so the accent never bleeds round a button, a row or a dot. The one ring
+    /// with colour in it is the red round a recording.</summary>
     [AvaloniaFact]
     public void Every_shadow_is_grey()
     {
@@ -93,7 +138,7 @@ public partial class ThemeTests
                 foreach (var variant in Variants)
                     foreach (var (key, type) in Skin.Keys(kind))
                     {
-                        if (type != typeof(BoxShadows)) continue;
+                        if (type != typeof(BoxShadows) || key == "RecordRing") continue;
                         Assert.True(d.TryGetResource(key, variant, out var v) && v is BoxShadows, $"{theme.Name} {kind} {variant}: no {key}");
                         foreach (var s in (BoxShadows)v!)
                             if (!Neutral(s.Color)) coloured.Add($"{theme.Name} {kind} {variant} {key}: {s.Color}");
@@ -256,7 +301,7 @@ public partial class ThemeTests
         }
     }
 
-    /// <summary>Picking a theme repaints what's open: DynamicResources, and the fades under the library's bars.</summary>
+    /// <summary>Picking a theme repaints what's open (DynamicResources); light and dark repaint the fades too.</summary>
     [AvaloniaFact]
     public void A_theme_swaps_live()
     {
@@ -265,7 +310,7 @@ public partial class ThemeTests
         Skin.UseTheme(ColourThemes.Default);
         var swatch = new Border { Width = 20, Height = 20, [!Border.BackgroundProperty] = new DynamicResourceExtension("Accent") };
         var fade = new Border { Width = 20, Height = 20 };
-        Fades.Under(fade, "Win", 0.7);
+        Fades.Under(fade, "Surface", 0.7);
         var window = new Window { Width = 100, Height = 100, RequestedThemeVariant = ThemeVariant.Light, Content = new StackPanel { Children = { swatch, fade } } };
         window.Show();
         try
@@ -273,18 +318,19 @@ public partial class ThemeTests
             Dispatcher.UIThread.RunJobs();
             var plum = ColourThemes.Find("Plum");
             Assert.Equal(ColourThemes.Default.O(0.58, 0.12), ((ISolidColorBrush)swatch.Background!).Color);
-            Assert.Equal(ColourThemes.Default.Neutral(0.985, 1), ((LinearGradientBrush)fade.Background!).GradientStops[1].Color);
+            Assert.Equal(Skin.Light.Surface, ((LinearGradientBrush)fade.Background!).GradientStops[1].Color);
 
+            // The accent follows the theme; the page under the fade is the design's white, whatever the theme.
             Skin.UseTheme(plum);
             Dispatcher.UIThread.RunJobs();
             Assert.Same(plum, Skin.Theme);
             Assert.Equal(plum.O(plum.L, plum.C), ((ISolidColorBrush)swatch.Background!).Color);
-            Assert.Equal(plum.Neutral(0.985, 1), ((LinearGradientBrush)fade.Background!).GradientStops[1].Color);
+            Assert.Equal(Skin.Light.Surface, ((LinearGradientBrush)fade.Background!).GradientStops[1].Color);
 
             window.RequestedThemeVariant = ThemeVariant.Dark;
             Dispatcher.UIThread.RunJobs();
             Assert.Equal(plum.O(Math.Min(plum.L + 0.08, 0.72), plum.C), ((ISolidColorBrush)swatch.Background!).Color);
-            Assert.Equal(plum.Neutral(0.21, 1.5), ((LinearGradientBrush)fade.Background!).GradientStops[1].Color);
+            Assert.Equal(Skin.Dark.Surface, ((LinearGradientBrush)fade.Background!).GradientStops[1].Color);
         }
         finally
         {

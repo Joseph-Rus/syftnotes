@@ -199,7 +199,7 @@
                 <DataTemplate x:DataType="vm:CanvasCourseRow">
                   <Grid ColumnDefinitions="*,Auto" Height="34">
                     <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                      <Ellipse Classes="cv-dot" Fill="{Binding Dot}" />
+                      <c:Swatch Small="True" Fill="{Binding Dot}"/>
                       <TextBlock Classes="cv-dot-label" Text="{Binding Class}" />
                     </StackPanel>
                     <Button Grid.Column="1" Classes="cv-select" Width="240" VerticalAlignment="Center">

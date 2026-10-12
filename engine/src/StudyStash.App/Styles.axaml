@@ -30,7 +30,7 @@
         <Setter Property="Background" Value="{DynamicResource Press}" />
       </Style>
       <Style Selector="^:focus-visible /template/ Border#PART_Wash">
-        <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Focus}" />
         <Setter Property="BorderThickness" Value="2" />
       </Style>
       <Style Selector="^:disabled">
@@ -206,7 +206,7 @@
     <Setter Property="IsVisible" Value="False" />
     <Setter Property="IsHitTestVisible" Value="False" />
     <Setter Property="BorderThickness" Value="2" />
-    <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Focus}" />
   </Style>
   <Style Selector="Button.quiet:focus-visible Border.focusring">
     <Setter Property="IsVisible" Value="True" />
@@ -241,8 +241,11 @@
     <Setter Property="Fill" Value="{DynamicResource OnAccent}" />
   </Style>
 
-  <Style Selector="TextBlock">
+  <!-- One face everywhere (a marked-up or selectable line of text is a TextBlock too), its figures all one width so
+       times and counts line up. -->
+  <Style Selector=":is(TextBlock)">
     <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+    <Setter Property="FontFeatures" Value="+tnum" />
   </Style>
   <!-- A text field that's only its text: the design draws the field around it (the ask bars, the quick panel). -->
   <Style Selector="TextBox.bare">
@@ -252,7 +255,7 @@
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Foreground" Value="{DynamicResource Fg}" />
     <Setter Property="PlaceholderForeground" Value="{DynamicResource Fg3}" />
-    <Setter Property="CaretBrush" Value="{DynamicResource Accent}" />
+    <Setter Property="CaretBrush" Value="{DynamicResource Ink}" />
     <Setter Property="SelectionBrush" Value="{DynamicResource Hl}" />
     <Setter Property="SelectionForegroundBrush" Value="{DynamicResource Fg}" />
     <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -359,5 +362,423 @@
   <Style Selector="ContextMenu Separator">
     <Setter Property="Background" Value="{DynamicResource Sep}" />
     <Setter Property="Margin" Value="8,4" />
+  </Style>
+
+  <!-- ===== The look's own pieces, the same in both systems' windows (the design's semester.css) ===== -->
+
+  <!-- An icon alone as a button (the sidebar's toolbar, search, Settings): 32 px, muted until the pointer's on it. -->
+  <Style Selector="Button.icon-btn">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector="Button.icon-btn:pointerover">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.icon-btn.sm">
+    <Setter Property="Width" Value="24" />
+    <Setter Property="Height" Value="24" />
+  </Style>
+
+  <!-- The sidebar's rows. The chosen one is a white chip with a hairline round it and bold words. -->
+  <Style Selector="Button.nav-item">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector="Button.nav-item:pointerover">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.nav-item.class">
+    <Setter Property="Height" Value="32" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Normal" />
+  </Style>
+  <Style Selector="Button.nav-item.selected">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="Button.nav-item.selected /template/ Border#PART_Bg">
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+  </Style>
+  <!-- A count beside a row: plain grey figures, no badge behind them. -->
+  <Style Selector="TextBlock.count">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.side-group">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- A page: its title (the date, or a class's name), the sentence under it, a section's heading. -->
+  <Style Selector="TextBlock.page-title">
+    <Setter Property="FontSize" Value="40" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="LineHeight" Value="44" />
+    <Setter Property="LetterSpacing" Value="-1" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.page-lede">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="LineHeight" Value="24" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="MaxWidth" Value="560" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontSize" Value="17" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="LineHeight" Value="24" />
+    <Setter Property="LetterSpacing" Value="-0.17" />
+  </Style>
+  <Style Selector="TextBlock.empty">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="LineHeight" Value="24" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="MaxWidth" Value="480" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+
+  <!-- A link in words: muted and bold over a grey underline; under the pointer both turn ink. No accent colour. -->
+  <Style Selector="Button.text-link">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Padding" Value="0,0,0,2" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <Style Selector="Button.text-link /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Button.text-link /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="0,0,0,2" />
+  </Style>
+  <Style Selector="Button.text-link:pointerover, Button.text-link:focus-visible">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.text-link:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.text-link:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+  </Style>
+
+  <!-- Record: a white pill, and red only in its dot. Recording, the pill is ringed in red and the dot's centre is a
+       stop square; paused, the dot is a red ring round a red centre. The words beside it are the view's. -->
+  <Style Selector="Button.record">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Height" Value="48" />
+    <Setter Property="CornerRadius" Value="24" />
+    <Setter Property="Padding" Value="4,4,18,4" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <Style Selector="Button.record /template/ Border#PART_Bg">
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+  </Style>
+  <Style Selector="Button.record /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Button.record:pointerover /template/ Border#PART_Bg, Button.record:focus-visible /template/ Border#PART_Bg">
+    <Setter Property="BoxShadow" Value="{DynamicResource SubtleRing}" />
+  </Style>
+  <Style Selector="Button.record.recording /template/ Border#PART_Bg, Button.record.paused /template/ Border#PART_Bg">
+    <Setter Property="BoxShadow" Value="{DynamicResource RecordRing}" />
+  </Style>
+  <Style Selector="Border.record-dot">
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
+    <Setter Property="CornerRadius" Value="20" />
+    <Setter Property="Background" Value="{DynamicResource Record}" />
+  </Style>
+  <Style Selector="Border.record-dot > Border">
+    <Setter Property="Width" Value="14" />
+    <Setter Property="Height" Value="14" />
+    <Setter Property="CornerRadius" Value="7" />
+    <Setter Property="Background" Value="{DynamicResource OnRecord}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector=".recording Border.record-dot > Border">
+    <Setter Property="Width" Value="12" />
+    <Setter Property="Height" Value="12" />
+    <Setter Property="CornerRadius" Value="2" />
+  </Style>
+  <Style Selector=".paused Border.record-dot">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Record}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector=".paused Border.record-dot > Border">
+    <Setter Property="Background" Value="{DynamicResource Record}" />
+  </Style>
+  <!-- The floating recorder's dot is smaller. -->
+  <Style Selector="Border.record-dot.mini">
+    <Setter Property="Width" Value="32" />
+    <Setter Property="Height" Value="32" />
+    <Setter Property="CornerRadius" Value="16" />
+  </Style>
+  <Style Selector="Border.record-dot.mini > Border">
+    <Setter Property="Width" Value="11" />
+    <Setter Property="Height" Value="11" />
+    <Setter Property="CornerRadius" Value="5.5" />
+  </Style>
+  <Style Selector=".recording Border.record-dot.mini > Border">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+    <Setter Property="CornerRadius" Value="2" />
+  </Style>
+  <!-- A shortcut's keys beside what they do. -->
+  <Style Selector="Border.kbd">
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="5" />
+    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.kbd > TextBlock, TextBlock.kbd">
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+
+  <!-- The week: a sunken grid of days, today's column lifted out of it; each day its class meetings, a hairline,
+       then what's due, the name marked with its class's highlighter. -->
+  <Style Selector="Border.week">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <Style Selector="Border.day">
+    <Setter Property="Padding" Value="10,12" />
+  </Style>
+  <Style Selector="Border.day.today">
+    <Setter Property="Margin" Value="0,-4" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceToday}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusDay}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowToday}" />
+  </Style>
+  <Style Selector="TextBlock.day-name">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="VerticalAlignment" Value="Bottom" />
+    <Setter Property="Margin" Value="0,0,0,3" />
+  </Style>
+  <Style Selector="TextBlock.day-num">
+    <Setter Property="FontSize" Value="22" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="LineHeight" Value="26" />
+    <Setter Property="LetterSpacing" Value="-0.44" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector="Border.day.today TextBlock.day-name, Border.day.today TextBlock.day-num">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Border.day.late TextBlock.day-name">
+    <Setter Property="Foreground" Value="{DynamicResource Late}" />
+  </Style>
+  <Style Selector="TextBlock.micro">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LineHeight" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector="TextBlock.meeting-class">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.meeting-class.recorded">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <!-- Something due: its name, marked, over when. A click opens it; under the pointer the mark is ringed in ink. -->
+  <Style Selector="Button.deadline">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="HorizontalContentAlignment" Value="Left" />
+    <Setter Property="ClipToBounds" Value="False" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <Style Selector="Button.deadline /template/ Border#PART_Wash">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.deadline c|Highlight">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LineHeight" Value="19" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="Button.deadline:pointerover c|Highlight">
+    <Setter Property="Outlined" Value="True" />
+  </Style>
+  <Style Selector="Button.deadline.done c|Highlight">
+    <Setter Property="Struck" Value="True" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector="TextBlock.deadline-when">
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="LineHeight" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector="Button.deadline.late TextBlock.deadline-when">
+    <Setter Property="Foreground" Value="{DynamicResource Late}" />
+  </Style>
+
+  <!-- A lecture in a list: when, then its title over its class (marked) and a sentence or two, then how long. Rows are
+       parted by hairlines: no boxes, no icons. Under the pointer the title is underlined. -->
+  <Style Selector="Button.lecture">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Padding" Value="0,16" />
+    <Setter Property="VerticalContentAlignment" Value="Top" />
+  </Style>
+  <Style Selector="Button.lecture /template/ Border#PART_Wash">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="TextBlock.lecture-date">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+  </Style>
+  <Style Selector="TextBlock.lecture-title">
+    <Setter Property="FontSize" Value="17" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LineHeight" Value="22" />
+    <Setter Property="LetterSpacing" Value="-0.17" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Button.lecture:pointerover TextBlock.lecture-title">
+    <Setter Property="TextDecorations" Value="Underline" />
+  </Style>
+  <Style Selector="c|Highlight.lecture-class">
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="TextBlock.lecture-summary">
+    <Setter Property="FontSize" Value="14.5" />
+    <Setter Property="LineHeight" Value="22" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="MaxLines" Value="2" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    <Setter Property="MaxWidth" Value="590" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+  </Style>
+  <Style Selector="TextBlock.lecture-summary.pending">
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="FontStyle" Value="Italic" />
+  </Style>
+  <Style Selector="TextBlock.lecture-length">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+  </Style>
+  <Style Selector="Border.rule">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Line}" />
+  </Style>
+  <!-- The first row of a list has no hairline over it. -->
+  <Style Selector="ItemsControl.rows > ContentPresenter:nth-child(1) Border.rule">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <!-- A plain row to somewhere (a class's lists on Canvas, a linked folder): its name, a line about it, an arrow. -->
+  <Style Selector="Button.row-link">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Padding" Value="0,12" />
+  </Style>
+  <Style Selector="Button.row-link /template/ Border#PART_Wash">
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.row-link:pointerover TextBlock.row-title">
+    <Setter Property="TextDecorations" Value="Underline" />
+  </Style>
+  <Style Selector="TextBlock.row-title">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Bold" />
+  </Style>
+  <Style Selector="TextBlock.row-sub">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <!-- A quiet button with words (Attach, Full list, Link a folder): white, a hairline round it, the control's corners. -->
+  <Style Selector="Button.plain">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <Style Selector="Button.plain /template/ Border#PART_Bg">
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+  </Style>
+
+  <!-- Ask: docked at the foot of the page, floating on its shadow; with the caret in it, ringed in ink. -->
+  <Style Selector="Border.ask">
+    <Setter Property="Height" Value="52" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowFloat}" />
+    <Setter Property="Padding" Value="18,0,10,0" />
+  </Style>
+  <Style Selector="Border.ask:focus-within">
+    <Setter Property="BoxShadow" Value="{DynamicResource ShadowFloatFocus}" />
+  </Style>
+  <Style Selector="Button.ask-scope">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Padding" Value="8,6" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.ask-scope:pointerover">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.ask-send">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="Width" Value="34" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="Background" Value="{DynamicResource Ink}" />
+    <Setter Property="Foreground" Value="{DynamicResource Surface}" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 </Styles>
