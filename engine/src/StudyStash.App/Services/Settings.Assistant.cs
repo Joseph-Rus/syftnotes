@@ -39,7 +39,6 @@ public sealed partial class SettingsModel
             foreach (var e in keys)
             {
                 if (LibraryOwn(e) && LibraryProblem is not null) continue;
-                if (e.Key == "computer_audio" && !m.CanRecordComputerAudio) continue;
                 list.Add(e.Key switch
                 {
                     "appearance" => new SettingNow(e, m.Appearance.ToString().ToLowerInvariant()),

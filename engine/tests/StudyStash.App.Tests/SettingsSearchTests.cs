@@ -120,6 +120,20 @@ public class SettingsSearchTests
     }
 
     [AvaloniaFact]
+    public async Task Search_finds_recording_the_computers_sound_only_where_it_can()
+    {
+        var (model, host, home) = await SettingsAsync();
+        using (home)
+        using (host)
+        using (model)
+        {
+            Assert.Equal(model.CanRecordComputerAudio, model.Shows(SettingsIndex.ByKey("computer_audio")!));
+            model.SearchText = "zoom";
+            Assert.Equal(model.CanRecordComputerAudio, model.SearchHits.Any(h => h.Entry.Key == "computer_audio"));
+        }
+    }
+
+    [AvaloniaFact]
     public async Task The_helper_changes_settings_as_the_students_own_clicks_would()
     {
         var (model, host, home) = await SettingsAsync();

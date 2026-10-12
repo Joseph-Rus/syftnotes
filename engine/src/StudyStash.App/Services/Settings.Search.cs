@@ -42,7 +42,9 @@ public sealed partial class SettingsModel
     /// <summary>Whether this computer's Settings has <paramref name="entry"/>: its section is in the sidebar, and its
     /// role shows it.</summary>
     public bool Shows(SettingEntry entry) =>
-        NavItems.Any(n => n.Id == entry.Section) && SettingsIndex.ShownOn(entry, host.Settings.Role != AppRole.Library, host.Settings.Role == AppRole.Laptop);
+        NavItems.Any(n => n.Id == entry.Section) && SettingsIndex.ShownOn(entry, host.Settings.Role != AppRole.Library, host.Settings.Role == AppRole.Laptop)
+        // Recording the computer's own sound is only where this computer can (not on Linux, nor an older Mac).
+        && (entry.Key != "computer_audio" || CanRecordComputerAudio);
 
     partial void OnSearchTextChanged(string value)
     {
