@@ -3,6 +3,7 @@
      calendars and nothing left, one quiet line says so. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:StudyStash.App.Controls"
              xmlns:vm="using:StudyStash.App.ViewModels"
              x:Class="StudyStash.App.Views.WinComingUp"
              x:DataType="vm:ComingUpModel">
@@ -18,7 +19,7 @@
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:ComingUpRow">
           <Grid ColumnDefinitions="8,10,*,10,Auto" Margin="0,3">
-            <Ellipse Width="8" Height="8" Fill="{Binding Dot}" VerticalAlignment="Center" />
+            <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
             <StackPanel Grid.Column="2" VerticalAlignment="Center">
               <TextBlock Text="{Binding Title}" FontSize="14" TextTrimming="CharacterEllipsis" />
               <TextBlock IsVisible="{Binding HasDetail}" Text="{Binding Detail}" FontSize="12" Foreground="{DynamicResource Fg2}" TextTrimming="CharacterEllipsis" />

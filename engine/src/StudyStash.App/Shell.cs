@@ -314,8 +314,10 @@ public static partial class Shell
         if (quitting) return;
         quitting = true;
         ticker?.Stop();
-        // What's typed in a lecture's notes and not saved is written down: it's back in its editor next time.
+        // What's typed in a lecture's notes and not saved is written down: it's back in its editor next time. What's
+        // typed in a recording's notes goes with the recording.
         KeepDrafts();
+        FlushTyped();
         CloseAllToasts();
         StopCanvas();
         stop.Cancel();
@@ -485,44 +487,37 @@ public static partial class Shell
         library.OnClass = c =>
         {
             Remember();
-            library.NarrowDetail = false;
             if (c.IsHome)
             {
+                // Home from the sidebar is every note again, whatever its filter was on.
+                homeUnsorted = false;
                 _ = ShowHomeAsync();
-                return;
             }
-            // Due opens on its home (what's to hand in, by when and by class); its Full list is the two-column list.
-            if (c.IsDue)
+            else if (c.IsDue)
             {
-                dueSelection = null;
-                _ = ShowDueHomeAsync();
-                return;
+                dueOnly = null;
+                _ = ShowDuePageAsync();
             }
-            // A class opens on its home; Unsorted, which has none, on its lectures.
-            allLectures = false;
-            _ = c.IsUnsorted ? ShowClassAsync(c.Name) : ShowClassHomeAsync(c.Name);
+            else _ = ShowFolderAsync(c.Name);
         };
         library.OnMoveToFolder = MoveToFolderAsync;
-        library.OnLecture = l =>
+        library.OnFolder = name =>
         {
             Remember();
-            OpenFromList(() => ShowLectureAsync(l.Id));
+            _ = ShowFolderAsync(name);
         };
-        library.OnClassPage = () =>
-        {
-            if (openClass is not { } cls) return;
-            Remember();
-            _ = ShowClassHomeAsync(cls);
-        };
+        library.OnLeaveNote = LeaveNote;
+        library.PickerForNote = () => library.Note is { Live: false } note ? PickerFor(note.Id, note.ClassName) : null;
+        library.OnUndoMove = move => MoveNoteAsync(move.Id, move.To, move.From, say: false);
+        library.OnOpenRecording = OpenRecording;
+        library.ComingUp.OnRecord = id => _ = RecordEventAsync(id);
         library.OnGoBack = GoBack;
         library.OnGoForward = GoForward;
         library.SidebarHidden = host.Settings.SidebarHidden;
         library.OnSidebarToggled = hidden => host.Save(s => s.SidebarHidden = hidden);
-        library.ListHidden = host.Settings.ListHidden;
-        library.OnListToggled = hidden => host.Save(s => s.ListHidden = hidden);
         library.OnSearch = ToggleQuick;
         library.OnSettings = ShowSettings;
-        library.OnMove = MoveLecture;
+        library.OnAddClass = () => ShowSettings("Classes");
         library.OnDelete = DeleteLectureAsync;
         library.OnUndo = UndoDeleteAsync;
         library.OnExport = () => _ = ExportAsync();
@@ -540,70 +535,6 @@ public static partial class Shell
     /// <summary>The class picked for Record, while the library still has it; otherwise "" (the library sorts it).</summary>
     static string RecordClass() => chosenClass.Length > 0 && host.Classes().Any(c => c.Name == chosenClass) ? chosenClass : "";
 
-    /// <summary>Record is waiting on macOS's microphone prompt: another press does nothing until it's answered.</summary>
-    static bool askingForMic;
-
-    static async void ToggleRecording()
-    {
-        if (host.Recorder.Current is not null)
-        {
-            StopRecording();
-            return;
-        }
-        if (askingForMic) return;
-        if (host.Settings.Role == AppRole.Library)
-        {
-            Toast("This computer is your library", "Record on your laptop: this one keeps the lectures and writes the notes.", "Settings", SettingsFromAnywhere);
-            return;
-        }
-        if (!host.ModelReady)
-        {
-            var (title, text, action) = NoticeWords.NoModelYet(host.Downloading);
-            Toast(title, text, action, () => _ = host.DownloadModelAsync());
-            return;
-        }
-        RecordStart start;
-        askingForMic = true;
-        try
-        {
-            // Not asked yet: macOS's own prompt is all the student sees until they answer; recording starts after.
-            start = await host.RecordAsync(RecordClass());
-        }
-        catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException)
-        {
-            Toast("Couldn't start recording", e.Message, null, null);
-            Refresh();
-            return;
-        }
-        finally
-        {
-            askingForMic = false;
-        }
-        if (start.Trouble is { } trouble)
-        {
-            // The lecture didn't start: this stays until it's closed, or until a lecture does start.
-            Notify(new Notice
-            {
-                Title = trouble.Title, Text = trouble.Detail, ActionLabel = trouble.HasAction ? trouble.ActionLabel : null,
-                Act = trouble.ActionUrl.Length > 0 ? () => Dialogs.OpenUrl(trouble.ActionUrl) : null,
-                UntilClosed = true, StillTrue = () => host.Recorder.Current is null,
-            });
-        }
-        else if (start.Lecture is { } l)
-        {
-            liveId = l.Id;
-            recorder.Lines.Clear();
-            recorder.QuickWords = host.LiveWordsOn;
-            // Written down after class: nothing to show or ask about until it stops, and the recorder says so.
-            recorder.AfterClass = l.AfterClass;
-            recorder.Ask = l.AfterClass ? null : LiveAsk();
-            panel.LastLine = l.AfterClass ? "Only recording. It's written down after class." : "";
-            panelWindow?.Hide();
-            ShowRecorder(expanded: false);
-        }
-        Refresh();
-    }
-
     static void TogglePause()
     {
         if (host.Recorder.Current is not { } l) return;
@@ -612,13 +543,30 @@ public static partial class Shell
         Refresh();
     }
 
-    static void StopRecording()
+    static void StopRecording() => StopRecording(stay: false);
+
+    /// <summary>Stops what's recording. Its page (if the window is on it) becomes the note's own, saying where its
+    /// notes are on their way; <paramref name="stay"/> leaves the window where it is (another recording starts next).</summary>
+    static void StopRecording(bool stay)
     {
+        // What was typed in its notes goes with it.
+        FlushTyped();
+        bool onPage = library.Note is { Live: true } && openLecture is not null;
+        string? id = host.Recorder.Current?.Id;
         var l = host.StopRecording();
         chosenClass = "";
         recorderWindow?.Hide();
         if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
         else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS()), null, null);
+        if (onPage)
+        {
+            // The page it was on isn't a place to go back to: it's the note's page now (or, too short to keep, gone).
+            library.Note = null;
+            library.Ask = null;
+            if (l is not null && !stay) _ = ShowLectureAsync(l.Id);
+            else if (!stay) LeaveNote();
+        }
+        if (id is not null) backPlaces.RemoveAll(p => p.Lecture == id && l is null);
         Refresh();
     }
 
@@ -830,7 +778,8 @@ public static partial class Shell
     }
 
     /// <summary>The live words can be seen: the recorder is open on screen, or the menu's panel (its last line) is.</summary>
-    static bool WatchingWords() => (recorder.Expanded && recorderWindow?.IsVisible == true) || panelWindow?.IsVisible == true;
+    static bool WatchingWords() => (recorder.Expanded && recorderWindow?.IsVisible == true) || panelWindow?.IsVisible == true
+        || (mainWindow?.IsVisible == true && library.Note is { Live: true } && library.ShowNotePage);
 
     /// <summary>Windows: the small pill never takes the keyboard from the app you're typing in. The shortcut starts a
     /// recording from Word or a browser, the pill came up as the window in front, and what was typed next went to it.
@@ -984,7 +933,7 @@ public static partial class Shell
         var w = new Window
         {
             Title = "Study Stash", Width = 1280, Height = 800, MinWidth = 600, MinHeight = 560, WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 48,
+            ExtendClientAreaToDecorationsHint = true, ExtendClientAreaTitleBarHeightHint = Skin.Current == SkinKind.Mac ? WindowHeader.MacHeight : 32,
         };
         Look.Apply(w);
         if (Skin.Current == SkinKind.Mac)
@@ -1011,6 +960,9 @@ public static partial class Shell
                 DispatcherTimer.RunOnce(() => Program.Log($"[menu] {AppMenu.Describe()}"), TimeSpan.FromMilliseconds(500));
             };
         }
+        // The small recorder floats only while this window isn't the one in front.
+        w.Activated += (_, _) => ShowRecorderIfAway();
+        w.Deactivated += (_, _) => ShowRecorderIfAway();
         w.Closing += (_, e) =>
         {
             library.WalkAwayFromSupport();
@@ -1586,6 +1538,16 @@ public static partial class Shell
         if (recording) library.Support = null; // the ask for a tip never shows while recording
         panel.IsRecording = recording;
         panel.IsPaused = recorder.IsPaused = live?.State == LectureState.Paused;
+        if (library.Overview is { CanRecord: true } page) ShowRecording(page);
+        library.Recording = recording ? recorder : null;
+        // A recording this computer is still writing down or sending: its page follows where it is on its way (looked
+        // at again when something about it changed, and not more than every few seconds).
+        if (library.Note is { Local: true } waiting && library.ShowNotePage && DateTime.UtcNow - lastLocalLook > TimeSpan.FromSeconds(3)
+            && (host.Lectures.Get(waiting.Id) is not { } mine || LocalStamp(mine) != waiting.Stamp))
+        {
+            lastLocalLook = DateTime.UtcNow;
+            RequestLibraryReload();
+        }
         string cls = recording ? live!.ClassName : RecordClass() is { Length: > 0 } picked ? picked : CalendarClass();
         panel.ClassName = recorder.ClassName = cls;
         int color = host.ColorOf(cls);

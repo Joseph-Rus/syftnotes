@@ -195,14 +195,10 @@ public static partial class Shell
         UpdateDueItem();
         // A sync's news (new work, a score, an announcement) shows now, not at the notifications' next minute.
         _ = PollCanvasNotificationsAsync();
+        termAssignments = null;
         if (mainWindow?.IsVisible != true) return;
-        if (dueOpen) await ShowDueAsync();
-        else if (overviewOf is { } over) await ShowOverviewAsync(over);
-        else if (library.List == LibraryList.CanvasClass && library.CanvasClass is { } cls && CanvasClassRow(openClass) is { } row)
-            await cls.LoadAsync(row);
-        // The open class was just linked (or dropped): it becomes its own Canvas page (or plain lectures again).
-        else if (openClass is { } name && (CanvasClassRow(name) is not null) != (library.List == LibraryList.CanvasClass) && library.List != LibraryList.Due)
-            await ShowClassAsync(name);
+        if (overviewOf is { } over) await ShowOverviewAsync(over);
+        else if (openCanvasClass is { } name && library.CanvasClass is { } cls && CanvasClassRow(name) is { } row) await cls.LoadAsync(row);
     }
 
     /// <summary>Asks the library what's due and which classes are linked. False when it couldn't (no library, an
@@ -242,15 +238,18 @@ public static partial class Shell
 
     /// <summary>The Due page's card for when Canvas needs something: any state but connected or syncing. Its button
     /// connects Canvas (or shows how) in a window of its own.</summary>
+    static CanvasStatusModel? DueStatus()
+    {
+        if (canvasWatch?.State is not { } s || s.Status is "connected" or "syncing" or "") return null;
+        var card = library.Overview?.CanvasStatus ?? new CanvasStatusModel(Canvas()) { OnConnect = ShowCanvasConnect, OnShowMeHow = ShowCanvasConnect };
+        card.Show(s);
+        return card;
+    }
+
+    /// <summary>Due's page (if it's showing) says what Canvas needs now.</summary>
     static void UpdateDueStatus()
     {
-        if (canvasWatch?.State is { } s && s.Status is not ("connected" or "syncing" or ""))
-        {
-            var card = library.DueStatus ?? new CanvasStatusModel(Canvas()) { OnConnect = ShowCanvasConnect, OnShowMeHow = ShowCanvasConnect };
-            card.Show(s);
-            library.DueStatus = card;
-        }
-        else library.DueStatus = null;
+        if (library.Overview is { IsDuePage: true } due) due.CanvasStatus = DueStatus();
     }
 
     /// <summary>The dropdown's "Next due" line, from the last answer about what's due.</summary>
@@ -269,18 +268,18 @@ public static partial class Shell
             if (item is not null) library.Classes.Remove(item);
             return;
         }
-        if (item is null) library.Classes.Insert(0, new ClassItem { Name = "Due", IsDue = true, Count = canvasDue.ToHandIn, Selected = dueOpen });
+        if (item is null) library.Classes.Insert(0, new ClassItem { Name = "Due", IsDue = true, Count = canvasDue.ToHandIn, Selected = overviewOf == DueHome });
         else item.Count = canvasDue.ToHandIn;
     }
 
-    /// <summary>Opens the library at one assignment on the Due page (the dropdown's next due, a quick panel row, a
-    /// notification).</summary>
+    /// <summary>Opens the library at one assignment (the dropdown's next due, a quick panel row, a notification).</summary>
     static void OpenDueItem(string cls, string id)
     {
         Remember();
         panelWindow?.Hide();
         quickWindow?.Hide();
-        dueSelection = (cls, id);
+        LeavePage();
+        openAssignment = (cls, id);
         ShowLibrary();
     }
 
@@ -322,16 +321,18 @@ public static partial class Shell
         }
         if (n.Class is { Length: > 0 } c && CanvasClassRow(c) is not null)
         {
-            // An announcement opens in its class's reader, once the class's page has loaded.
+            // An announcement opens in its class's reader, once the class's Canvas lists have loaded.
+            Remember();
             announcementToOpen = n.AnnouncementId;
-            openClass = c;
-            overviewOf = null;
-            dueOpen = false;
-            dueSelection = null;
+            LeavePage();
+            openCanvasClass = c;
+            canvasTab = ClassTab.Announcements;
             ShowLibrary();
             return;
         }
-        dueOpen = true;
+        Remember();
+        LeavePage();
+        overviewOf = DueHome;
         ShowLibrary();
     }
 

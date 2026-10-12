@@ -64,6 +64,20 @@ public sealed partial class LibraryWeb
             return store.SetClass(id, cls) is null && store.Get(id) is null ? Http.Detail(404, "no such lecture")
                 : Http.Json(Reader.Lecture(id));
         })));
+        // A title of the student's own for a lecture: kept from then on, whatever writes its notes again.
+        app.MapPost("/api/v2/lectures/{id}/title", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            string id = (string)ctx.Request.RouteValues["id"]!;
+            string title = Py.Strip(Str(await Http.JsonBodyAsync(ctx.Request), "title") ?? "").ReplaceLineEndings(" ");
+            if (title.Length == 0) return Http.Detail(400, "what should it be called?");
+            if (title.Length > 200) return Http.Detail(400, "that title is too long: 200 characters at most");
+            return store.SetTitle(id, title) switch
+            {
+                Store.Renamed.Gone => Http.Detail(404, "no such lecture"),
+                Store.Renamed.Busy => Http.Detail(409, "Your library is still writing this lecture's notes. Rename it once they're done."),
+                _ => Http.Json(Reader.Lecture(id)),
+            };
+        })));
         app.MapPost("/api/v2/lectures/{id}/rewrite", (HttpContext ctx, string id) => Api(ctx, () =>
         {
             if (!store.Requeue(id)) return Http.Detail(404, "no such lecture");

@@ -218,19 +218,14 @@
   <Style Selector="Button.cv-due-row">
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="Theme" Value="{StaticResource Surface}" />
-    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
     <Setter Property="Padding" Value="12,10" />
     <Setter Property="Margin" Value="10,2" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
   </Style>
+  <!-- The chosen row is on a grey wash, its words as they were: no fill of colour (the lectures' list does the same). -->
   <Style Selector="Button.cv-due-row.cv-selected">
-    <Setter Property="Background" Value="{DynamicResource Tint}" />
-  </Style>
-  <Style Selector="Button.cv-due-row.cv-selected /template/ Border#PART_Bg">
-    <Setter Property="BoxShadow" Value="{DynamicResource EdgeTint}" />
-  </Style>
-  <Style Selector="Button.cv-due-row.cv-selected TextBlock">
-    <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
+    <Setter Property="Background" Value="{DynamicResource Hover}" />
   </Style>
   <Style Selector="TextBlock.cv-row-title">
     <Setter Property="FontSize" Value="13" />
@@ -247,14 +242,6 @@
   <Style Selector="TextBlock.cv-row-sub">
     <Setter Property="FontSize" Value="12" />
     <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
-  </Style>
-  <Style Selector="Ellipse.cv-row-dot">
-    <Setter Property="Width" Value="7" />
-    <Setter Property="Height" Value="7" />
-  </Style>
-  <Style Selector="Ellipse.cv-row-dot.cv-selected">
-    <Setter Property="Stroke" Value="{DynamicResource OnAccent}" />
-    <Setter Property="StrokeThickness" Value="1.5" />
   </Style>
 
   <!-- design 09: an assignment's detail -->

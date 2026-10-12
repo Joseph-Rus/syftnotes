@@ -980,7 +980,7 @@ public class RecordingTests
         Assert.Equal("rec-1", sent["id"]!.GetValue<string>());
         Assert.Equal("CS 101", sent["folder"]!.GetValue<string>());
         Assert.Equal("Sam", sent["owner"]!.GetValue<string>());
-        Assert.Equal("CS 101 lecture, Tue 22 Sep", sent["title"]!.GetValue<string>());
+        Assert.Equal("CS 101, Tue 22 Sep", sent["title"]!.GetValue<string>());
         Assert.Equal("[00:00] Okay.\n[18:05] The midterm.", sent["transcript"]!.GetValue<string>());
         Assert.Equal("recorder", sent["raw"]!["source"]!.GetValue<string>());
         Assert.Equal(LectureState.Writing, store.Get("rec-1")!.State);

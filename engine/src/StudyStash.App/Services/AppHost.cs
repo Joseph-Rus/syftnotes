@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using StudyStash.App.Platform;
 using StudyStash.Audio;
 using StudyStash.Core;
+using StudyStash.Core.Calendar;
 
 namespace StudyStash.App.Services;
 
@@ -69,8 +70,6 @@ public sealed class AppSettings
     public WindowPlace? LibraryWindow { get; set; }
     /// <summary>The library window's sidebar is folded away (the toolbar's sidebar button, ⌃⌘S or Ctrl+Shift+S).</summary>
     public bool SidebarHidden { get; set; }
-    /// <summary>The library window's list column is folded away (the toolbar's list button, ⌃⌘L or Ctrl+Shift+L).</summary>
-    public bool ListHidden { get; set; }
     /// <summary>The colour theme's name (Settings → Appearance): "Lagoon", "Plum"…</summary>
     public string Theme { get; set; } = "Lagoon";
     /// <summary>Light, dark, or match the computer (Settings → Appearance). Settings files saved before this
@@ -901,7 +900,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// start. A microphone that isn't allowed, isn't there or won't start comes back as <see cref="MicTrouble"/>
     /// instead of a lecture; the model or the disk not being ready still throws, as <see cref="StartRecording"/> does.
     /// </summary>
-    public async Task<RecordStart> RecordAsync(string className)
+    public async Task<RecordStart> RecordAsync(string className, CalendarEvent? forEvent = null)
     {
         var access = MicAccess();
         if (access == Audio.MicAccess.NotAsked)
@@ -914,7 +913,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             return new RecordStart(null, MicTrouble.Denied());
         try
         {
-            return new RecordStart(StartRecording(className), null);
+            return new RecordStart(StartRecording(className, forEvent), null);
         }
         catch (MicrophoneException e)
         {
@@ -923,16 +922,30 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         }
     }
 
-    public Lecture StartRecording(string className)
+    /// <param name="forEvent">The calendar event the student picked to record (Coming up, Up next): the lecture takes
+    /// its title and its folder from it, whatever else is on. Null records what's on now, as Record does.</param>
+    public Lecture StartRecording(string className, CalendarEvent? forEvent = null)
     {
         if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
-        var calendar = CalendarStart(className);
+        var calendar = CalendarStart(className, forEvent);
         var l = WithEvent(Recorder.Start(calendar.ClassName, Client().DisplayName, afterClass: !Settings.LiveTranscript), calendar);
         awake ??= new KeepAwake("Recording a lecture");
         // Live, Whisper starts on it; after class, the look lets go of a model still loaded from the lecture before.
         Whisper.Wake();
         return l;
     }
+
+    /// <summary>What the student has typed so far in the notes of the lecture being recorded: kept with the lecture,
+    /// and sent to the library with it, where the notes are written round it.</summary>
+    public void KeepTypedNotes(string id, string notes) => Lectures.Update(id, l => l.Notes = notes);
+
+    /// <summary>A title the student typed for a lecture this computer still has: it's the lecture's from then on (the
+    /// library doesn't write its own over it).</summary>
+    public void TitleLecture(string id, string title) => Lectures.Update(id, l =>
+    {
+        l.Title = title;
+        l.TitleTyped = true;
+    });
 
     public void Pause() => Recorder.Pause();
 

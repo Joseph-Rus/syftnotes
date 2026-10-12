@@ -1,0 +1,138 @@
+<!-- The sidebar under its toolbar (both looks): Home and Due, then the folders under Classes (with a + that adds one),
+     Clubs, Work and any group of the student's own, each folder with its swatch, name and count. Pinned over the foot:
+     Coming up, the next two events on the calendar, each a button that starts recording it (and, while something
+     records, a line that opens its page). At the foot, two plain lines about the library and Canvas. Unsorted isn't
+     here: notes in no folder are on Home. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.SidebarBody"
+             x:DataType="vm:LibraryModel">
+  <UserControl.Styles>
+    <!-- The library's two lines at the sidebar's foot; when something's wrong they say so in the late red. -->
+    <Style Selector="TextBlock.side-foot">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="Medium" />
+      <Setter Property="LineHeight" Value="20" />
+      <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="ItemsControl.bad TextBlock.side-foot">
+      <Setter Property="Foreground" Value="{DynamicResource Late}" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <!-- Whether the library answers, and when Canvas last synced: two plain lines at the foot, never under the
+         folders (they scroll). -->
+    <ItemsControl Name="StatusRow" DockPanel.Dock="Bottom" Classes.bad="{Binding !StatusGood}" ItemsSource="{Binding StatusLines}" Margin="16,0,16,2">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="x:String">
+          <TextBlock Classes="side-foot" Text="{Binding}" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- What's recording (one click from its page), and what's coming up: the whole of each event is the button that
+         records it. -->
+    <StackPanel Name="ComingUp" DockPanel.Dock="Bottom" Margin="6,8,6,12" Spacing="2">
+      <Button Name="RecordingNow" Classes="coming soon" IsVisible="{Binding IsRecording}" Command="{Binding OpenRecordingCommand}" HorizontalAlignment="Stretch"
+              HorizontalContentAlignment="Stretch" Margin="0,0,0,8" ToolTip.Tip="Open what's recording" AutomationProperties.Name="{Binding Recording.PillSaid, FallbackValue=''}">
+        <StackPanel>
+          <Grid ColumnDefinitions="Auto,8,*">
+            <Ellipse Width="9" Height="9" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="2" Classes="coming-title" Text="{Binding Recording.ShortClass, FallbackValue=''}" />
+          </Grid>
+          <TextBlock Classes="coming-when num" Text="{Binding Recording.Elapsed, FallbackValue=''}" />
+        </StackPanel>
+      </Button>
+      <StackPanel IsVisible="{Binding ComingUp.HasCalendars}" Spacing="2">
+        <TextBlock Classes="side-group" Text="Coming up" Margin="10,0,4,6" />
+        <ItemsControl Name="ComingRows" ItemsSource="{Binding ComingUp.Next}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ComingUpRow">
+              <Button Classes="coming" Classes.soon="{Binding Soon}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" ToolTip.Tip="Click to record"
+                      AutomationProperties.Name="{Binding Said}"
+                      Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).ComingUp.RecordCommand}" CommandParameter="{Binding}">
+                <StackPanel>
+                  <Grid ColumnDefinitions="Auto,8,*">
+                    <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Classes="coming-title" Text="{Binding Shown}" />
+                  </Grid>
+                  <TextBlock Classes="coming-when" Text="{Binding Short}" />
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Classes="side-foot" Text="Nothing for the rest of today or tomorrow." IsVisible="{Binding ComingUp.IsEmpty}" Margin="10,0" />
+      </StackPanel>
+    </StackPanel>
+
+    <ScrollViewer Name="ClassList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="6,0,6,0" c:WindowHeader.MovesWindow="True">
+      <StackPanel Classes="side">
+        <!-- Home: what's up next, and every note -->
+        <Button Name="HomeRow" Classes="nav-item" Classes.selected="{Binding Home.Selected}"
+                Command="{Binding PickClassCommand}" CommandParameter="{Binding Home}">
+          <Grid ColumnDefinitions="Auto,10,*">
+            <c:Icon Glyph="home" Size="18" />
+            <TextBlock Grid.Column="2" Text="Home" VerticalAlignment="Center" />
+          </Grid>
+        </Button>
+        <!-- Due: the calendar of what's to hand in, with how many are still open -->
+        <Button Name="DueRow" Classes="nav-item" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
+                Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
+          <Grid ColumnDefinitions="Auto,10,*,10,Auto">
+            <c:Icon Glyph="event_upcoming" Size="18" />
+            <TextBlock Grid.Column="2" Text="Due" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="4" Classes="count" Text="{Binding Due.Count, FallbackValue=0}" IsVisible="{Binding Due.ShowCount, FallbackValue=False}" />
+          </Grid>
+        </Button>
+        <Grid ColumnDefinitions="*,Auto" Margin="10,22,4,6">
+          <TextBlock Classes="side-group" Text="Classes" />
+          <Button Name="AddClass" Grid.Column="1" Classes="icon-btn sm" Command="{Binding AddClassCommand}" IsVisible="{Binding CanAddClass}"
+                  ToolTip.Tip="Add folder" AutomationProperties.Name="Add folder">
+            <c:Icon Glyph="add" Size="16" />
+          </Button>
+        </Grid>
+        <ItemsControl Name="Folders" ItemsSource="{Binding Classes}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ClassItem">
+              <StackPanel>
+                <!-- The first folder of another group: the group's name over it (Clubs, Work) -->
+                <TextBlock Classes="side-group" Text="{Binding Section}" Margin="10,22,4,6" IsVisible="{Binding HasSection}" />
+                <Button Classes="nav-item class" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
+                        Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
+                  <Button.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem Header="Move to group" ItemsSource="{Binding MoveChoices}">
+                        <MenuItem.ItemContainerTheme>
+                          <ControlTheme TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}" x:DataType="vm:FolderChoice">
+                            <Setter Property="Header" Value="{Binding Label}" />
+                            <Setter Property="Command" Value="{Binding Pick}" />
+                          </ControlTheme>
+                        </MenuItem.ItemContainerTheme>
+                      </MenuItem>
+                    </ContextMenu>
+                  </Button.ContextMenu>
+                  <!-- its swatch | the name, cut short with "…" (the whole name, and its code, on hover) | how many
+                       notes, when there are some -->
+                  <Grid ColumnDefinitions="Auto,10,*,Auto">
+                    <c:Swatch Fill="{Binding Dot}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" Classes="name" Text="{Binding Display}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding Tip}" c:Tips.WhenCut="True" />
+                    <TextBlock Grid.Column="3" Classes="count" Text="{Binding Count}" Margin="10,0,0,0" IsVisible="{Binding ShowCount}" />
+                  </Grid>
+                </Button>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

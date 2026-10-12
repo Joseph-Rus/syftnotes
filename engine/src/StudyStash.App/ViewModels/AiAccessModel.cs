@@ -21,8 +21,15 @@ public sealed class AiConnectionRow
     public string WinDetail => HasUsedWords ? $"{Detail} · {UsedWords}" : Detail;
     public bool CanRemove { get; init; }
     public IAsyncRelayCommand? Remove { get; internal set; }
-    /// <summary>terminal for Claude, code for ChatGPT and Codex, hub for anything else — the row's icon tile.</summary>
-    public string Icon => Name switch { "Claude Code" or "Claude" or "Claude Desktop" => "terminal", "Codex" or "ChatGPT" => "code", _ => "hub" };
+    /// <summary>The row's icon: the product's own mark for Claude, ChatGPT, Codex and Gemini, a plain one for anything else.</summary>
+    public string Icon => Name switch
+    {
+        "Claude Code" or "Claude" or "Claude Desktop" => "brand:claude",
+        "ChatGPT" => "brand:chatgpt",
+        "Codex" => "brand:codex",
+        "Gemini" or "Gemini CLI" or "Antigravity" => "brand:gemini",
+        _ => "hub",
+    };
     /// <summary>The first row in the list shows no separator above it.</summary>
     public bool First { get; set; }
 }
@@ -36,7 +43,15 @@ public sealed partial class AiAppRow : ObservableObject
     /// <summary>What the app is, in a few words ("The ChatGPT app, and Codex in the terminal or your editor"): the
     /// row's tooltip.</summary>
     public string About { get; init; } = "";
-    public string Icon => Id switch { "codex" => "code", "gemini" => "auto_awesome", "claude-code" => "terminal", _ => "desktop_windows" };
+    /// <summary>The app's own mark where it has one the student would know; the ChatGPT app and Codex share an id
+    /// here, and the row is named for ChatGPT.</summary>
+    public string Icon => Id switch
+    {
+        "codex" => "brand:chatgpt",
+        "gemini" => "brand:gemini",
+        "claude-code" or "claude-desktop" or "claude" => "brand:claude",
+        _ => "desktop_windows",
+    };
     [ObservableProperty] public partial string Status { get; set; } = "";
     /// <summary>Connected: an app started Study Stash since it was added.</summary>
     [ObservableProperty] public partial bool Ok { get; set; }

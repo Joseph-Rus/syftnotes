@@ -221,7 +221,7 @@ public class ToastTests
     /// and radius, grey items, nothing tinted.</summary>
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac, 10)]
-    [InlineData(SkinKind.Win, 8)]
+    [InlineData(SkinKind.Win, 10)]
     public void A_menu_is_a_plain_panel(SkinKind skin, double radius)
     {
         ((App)Application.Current!).UseSkin(skin);

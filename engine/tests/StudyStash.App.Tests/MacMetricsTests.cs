@@ -8,8 +8,8 @@ using StudyStash.App.Controls;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>Where the Mac look measures things the way the design's browser does: a shadow's blur spreads as far as
-/// CSS spreads it, and a line of SF Pro is as tall as a Mac makes it.</summary>
+/// <summary>Where the app measures things the way the design's browser does: a shadow's blur spreads as far as CSS
+/// spreads it, and a chat bubble that wraps takes its whole width.</summary>
 public class MacMetricsTests
 {
     static void Mac()
@@ -71,55 +71,6 @@ public class MacMetricsTests
             Assert.InRange(shortOne.Bounds.Width, 30, 100);
             Assert.Equal(200, longOne.Bounds.Width, 3);
             Assert.True(longOne.Bounds.Height > 40, "the long answer wraps");
-        }
-        finally
-        {
-            window.Close();
-        }
-    }
-
-    /// <summary>The heights a Mac (and the design's browser) gives one line of SF Pro Text and SF Pro Display.</summary>
-    [Theory]
-    [InlineData(11, false, 13)]
-    [InlineData(12, false, 15)]
-    [InlineData(13, false, 16)]
-    [InlineData(15, false, 18)]
-    [InlineData(17, false, 20)]
-    [InlineData(17, true, 20)]
-    [InlineData(26, true, 31)]
-    [InlineData(34, true, 40)]
-    public void A_line_of_SF_is_as_tall_as_on_a_Mac(double size, bool display, double height) =>
-        // Fully qualified: CSharpMath.Rendering bundles a font library under its own top-level "Typography"
-        // namespace, which now out-ranks our own Typography class for a bare name outside Controls' namespace.
-        Assert.Equal(height, StudyStash.App.Controls.Typography.LineHeight(size, display));
-
-    /// <summary>In the Mac look a line of the system text takes the Mac's height, a line height a view sets itself
-    /// stays, and the serif notes keep their own.</summary>
-    [AvaloniaFact]
-    public void Mac_text_takes_the_Macs_line_height()
-    {
-        Mac();
-        TextBlock Line(string fontKey, double size, double? lineHeight = null)
-        {
-            var t = new TextBlock { Text = "Recent", FontSize = size, HorizontalAlignment = HorizontalAlignment.Left };
-            t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(fontKey));
-            if (lineHeight is double h) t.LineHeight = h;
-            return t;
-        }
-        var small = Line("TextFont", 11);
-        var title = Line("DisplayFont", 34);
-        var own = Line("TextFont", 13, 18.85);
-        var serif = Line("SerifFont", 16);
-        var window = new Window { Width = 300, Height = 300, Content = new StackPanel { Children = { small, title, own, serif } } };
-        window.Show();
-        try
-        {
-            Dispatcher.UIThread.RunJobs();
-            Assert.Equal(13, small.Bounds.Height, 3);
-            Assert.Equal(40, title.Bounds.Height, 3);
-            Assert.Equal(18.85, own.LineHeight);
-            Assert.Equal(19, own.Bounds.Height, 3); // laid out to whole points
-            Assert.True(double.IsNaN(serif.LineHeight), $"the serif line was given {serif.LineHeight}");
         }
         finally
         {

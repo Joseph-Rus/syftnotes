@@ -14,6 +14,8 @@ public sealed partial class EngineMenuItem(string id, string name, string subtit
 {
     public string Id { get; } = id;
     public string Name { get; } = name;
+    /// <summary>The engine's own mark (Claude's, ChatGPT's), beside its name.</summary>
+    public string Icon => AiWords.EngineIcon(Id);
     public string Subtitle { get; } = subtitle;
     public bool Checked { get; } = @checked;
     public bool Enabled { get; } = enabled;
@@ -107,14 +109,48 @@ public sealed partial class AiAskModel : ObservableObject
     public EngineMenuModel Menu { get; } = new() { Header = "Answer with", FooterText = "Change defaults in Settings" };
     public List<EngineChoice> ScopeChoices { get; } =
     [
-        new("lecture", "This lecture"), new("class", "This class"), new("all", "All classes"),
+        new("lecture", "This lecture"), new("class", "This folder"), new("all", "All notes"),
     ];
+
+    string noun = Nouns.Lecture;
+    string? folder;
+
+    /// <summary>What the bar is under, in the page's own words: a lecture in a class, a meeting in a club, a recording
+    /// that's in no folder ("This meeting", "Ask about this meeting"), and its folder by name ("Machine Learning",
+    /// "Ask about Machine Learning").</summary>
+    public void NameScopes(string noun, string? folder)
+    {
+        this.noun = noun;
+        this.folder = string.IsNullOrEmpty(folder) ? null : folder;
+        for (int i = 0; i < ScopeChoices.Count; i++)
+        {
+            var c = new EngineChoice(ScopeChoices[i].Id, ScopeWords(ScopeChoices[i].Id));
+            c.Pick = new RelayCommand(() => Scope = c.Id);
+            ScopeChoices[i] = c;
+        }
+        EngineChoice.Mark(ScopeChoices, Scope);
+        OnPropertyChanged(nameof(ScopeName));
+        OnPropertyChanged(nameof(Placeholder));
+    }
+
+    string ScopeWords(string scope) => scope switch
+    {
+        "lecture" => $"This {noun}",
+        "class" => folder ?? "This folder",
+        _ => "All notes",
+    };
 
     /// <summary>The engine's name on the chip. One that isn't in the menu (no AI set up yet, so the default is an
     /// Ollama nobody installed) still goes by its name, "Ollama", not its id.</summary>
     public string EngineName => Menu.Items.FirstOrDefault(i => i.Id == Engine)?.Name ?? Engines.Name(Engine);
+    /// <summary>The engine on the ask bar: its own mark (Claude's, ChatGPT's), and what the button under it says.</summary>
+    public string EngineIcon => AiWords.EngineIcon(Engine);
+    public string EngineTip => $"Answer with {EngineName}";
+    /// <summary>Send shows once there's a question; until then the keys that put the caret in the bar do.</summary>
+    public bool CanSend => !Busy && Question.Trim().Length > 0;
+    public bool ShowKeys => !Busy && Question.Trim().Length == 0;
     public string ScopeName => ScopeChoices.FirstOrDefault(c => c.Id == Scope)?.Name ?? Scope;
-    public string Placeholder => AiWords.AskPlaceholder(Scope);
+    public string Placeholder => Live is not null ? AiWords.AskLive : AiWords.AskPlaceholder(Scope, noun, folder);
     public AiTurn? Latest => Turns.Count > 0 ? Turns[^1] : null;
     /// <summary>The latest answer shows above the ask bar until the student closes it; the next question opens it again.</summary>
     public bool HasLatest => Latest is not null && !AnswerClosed;
@@ -160,6 +196,8 @@ public sealed partial class AiAskModel : ObservableObject
 
     partial void OnQuestionChanged(string value)
     {
+        OnPropertyChanged(nameof(CanSend));
+        OnPropertyChanged(nameof(ShowKeys));
         if (value.Trim().Length == 0 || DateTime.UtcNow - warmedAt < TimeSpan.FromMinutes(1)) return;
         warmedAt = DateTime.UtcNow;
         _ = library.WarmAsync(Engine.Length > 0 ? Engine : null);
@@ -169,7 +207,20 @@ public sealed partial class AiAskModel : ObservableObject
     {
         warmedAt = DateTime.MinValue; // another engine may have something of its own to get ready
         foreach (var i in Menu.Items) i.Selected = i.Id == value;
+        EngineNamed();
+    }
+
+    partial void OnBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanSend));
+        OnPropertyChanged(nameof(ShowKeys));
+    }
+
+    void EngineNamed()
+    {
         OnPropertyChanged(nameof(EngineName));
+        OnPropertyChanged(nameof(EngineIcon));
+        OnPropertyChanged(nameof(EngineTip));
     }
 
     partial void OnScopeChanged(string value)
@@ -228,7 +279,7 @@ public sealed partial class AiAskModel : ObservableObject
         }
         if (Engine.Length == 0 || Menu.Items.All(i => i.Id != Engine)) Engine = overview.Ask;
         foreach (var i in Menu.Items) i.Selected = i.Id == Engine;
-        OnPropertyChanged(nameof(EngineName));
+        EngineNamed();
     }
 
     /// <summary>The question being answered right now, to stop it.</summary>

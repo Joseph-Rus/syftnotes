@@ -1,0 +1,43 @@
+<!-- A note in a list (both looks): when | its title, its folder and a sentence or two | how long. The whole row opens
+     the note; on Home the folder under the title is a button of its own that moves it (the folder's name in its
+     highlighter, or an inbox and "Unsorted"), its chevron showing while the pointer is on the row. Rows are parted by
+     hairlines: no boxes, no icons. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             x:Class="StudyStash.App.Views.NoteRowView"
+             x:DataType="vm:NoteItem"
+             ClipToBounds="False">
+  <Border Classes="note" Background="Transparent" ClipToBounds="False">
+    <StackPanel>
+      <Border Classes="rule" IsVisible="{Binding !First}" />
+      <Button Name="Row" Classes="lecture" Classes.first="{Binding First}" Click="OnOpen" AutomationProperties.Name="{Binding Said}" ClipToBounds="False">
+        <Button.ContextMenu>
+          <ContextMenu>
+            <MenuItem Header="Delete…" Click="OnDelete" />
+          </ContextMenu>
+        </Button.ContextMenu>
+        <Grid ColumnDefinitions="108,20,*,20,64">
+          <TextBlock Classes="lecture-date" Text="{Binding When}" />
+          <StackPanel Grid.Column="2" Spacing="4">
+            <TextBlock Classes="lecture-title" Text="{Binding Title}" />
+            <Button Name="Folder" Classes="folder-pick" Classes.open="{Binding Picking}" IsVisible="{Binding ShowFolder}" Click="OnPick"
+                    ToolTip.Tip="Change folder" AutomationProperties.Name="{Binding PickerSaid}">
+              <StackPanel Orientation="Horizontal" Spacing="4">
+                <c:Highlight Classes="lecture-class" Text="{Binding FolderShown}" Fill="{Binding Dot}" IsVisible="{Binding ShowHighlight}" VerticalAlignment="Center" />
+                <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowUnsorted}" VerticalAlignment="Center">
+                  <c:Icon Glyph="inbox" Size="15" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
+                  <TextBlock Classes="unsorted" Text="Unsorted" VerticalAlignment="Center" />
+                </StackPanel>
+                <c:Icon Classes="chevron" Glyph="expand_more" Size="14" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <TextBlock Classes="lecture-summary" Classes.pending="{Binding Pending}" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" />
+          </StackPanel>
+          <TextBlock Grid.Column="4" Classes="lecture-length" Text="{Binding Length}" />
+        </Grid>
+      </Button>
+    </StackPanel>
+  </Border>
+</UserControl>

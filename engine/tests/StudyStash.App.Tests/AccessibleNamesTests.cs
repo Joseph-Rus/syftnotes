@@ -177,9 +177,8 @@ public class AccessibleNamesTests
                 Assert.Equal(["Make it small", paused ? "Resume" : "Pause", "Stop"], icons.Take(3).Select(Said));
                 AllNamed(icons, "the recorder");
 
-                // Small: Stop shows when the pointer is over it, and says so.
+                // Small: its red dot is Stop, and says so.
                 model.Expanded = false;
-                model.Hovered = true;
                 Dispatcher.UIThread.RunJobs();
                 Assert.Contains("Stop", Shown<Button>(view).Select(Said));
                 window.Close();

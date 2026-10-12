@@ -28,41 +28,40 @@ public class AppShots
         var m = Demo.Library(due: true);
         m.Status = CanvasSynced;
         foreach (var c in m.Classes) c.Selected = c.Name == selected;
-        m.Groups.Clear();
+        m.Note = null;
+        m.Ask = null;
         return m;
     }
 
-    static async Task<LibraryModel> DueApp()
+    /// <summary>An assignment on a page of its own, as Due's calendar opens it.</summary>
+    static LibraryModel DueApp()
     {
-        var m = Sidebar("Due");
-        m.ClassTitle = "Due";
-        m.DueList = await CanvasShots.DueModel();
-        m.DueList.SelectItem("CS 101", "9001");
-        m.List = LibraryList.Due;
-        m.Note = null;
+        var m = Sidebar("CS 101");
         m.Assignment = CanvasShots.Detail("assignment-9001");
         return m;
     }
 
-    /// <summary>The Due page when Canvas needs something (Chrome signed out of Canvas): design 08's card above it.</summary>
-    static async Task<LibraryModel> DueAppSignedOut()
+    /// <summary>Due when Canvas needs something (Chrome signed out of Canvas): its card over the calendar.</summary>
+    static LibraryModel DueAppSignedOut()
     {
-        var m = await DueApp();
-        m.DueStatus = new CanvasStatusModel(CanvasFixtures.Context());
-        m.DueStatus.Show(CanvasFixtures.Load<CanvasApi.State>("state-signed-out"));
+        var m = Demo.Overview("\u0001due");
+        m.Status = CanvasSynced;
+        var card = new CanvasStatusModel(CanvasFixtures.Context());
+        card.Show(CanvasFixtures.Load<CanvasApi.State>("state-signed-out"));
+        m.Overview!.CanvasStatus = card;
         return m;
     }
 
+    /// <summary>A class's lists on Canvas: the list on the left, the assignment picked from it beside it.</summary>
     static LibraryModel ClassApp(bool narrow, ClassTab tab = ClassTab.Assignments)
     {
         var m = Sidebar("CS 101");
-        m.ClassTitle = "CS 101";
-        foreach (var g in Demo.Library().Groups) m.Groups.Add(g);
         var cls = CanvasShots.ClassModel();
         cls.Tab = tab;
         cls.Done[0].SelectCommand.Execute(null); // Problem set 4
+        m.CanvasOf = "CS 101";
+        m.CanvasDot = Skin.ClassDot(0);
         m.CanvasClass = cls;
-        m.List = LibraryList.CanvasClass;
         m.Narrow = narrow;
         if (!narrow) m.Assignment = CanvasShots.Detail("assignment-9002");
         return m;
@@ -79,32 +78,32 @@ public class AppShots
     }
 
     [AvaloniaFact]
-    public async Task Mac_app_canvas()
+    public void Mac_app_canvas()
     {
-        var due = await DueApp();
+        var due = DueApp();
         foreach (var t in Themes)
             Shot.Take("mac-09-canvas-due-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = due, Width = 1280, Height = 800 });
-        var signedOut = await DueAppSignedOut();
+        var signedOut = DueAppSignedOut();
         foreach (var t in Themes)
             Shot.Take("mac-09-canvas-due-app-signed-out", SkinKind.Mac, t, () => new MacLibrary { DataContext = signedOut, Width = 1280, Height = 800 });
         var cls = ClassApp(narrow: false);
         foreach (var t in Themes)
             Shot.Take("mac-10-canvas-class-tabs-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = cls, Width = 1280, Height = 800 });
-        var lectures = ClassApp(narrow: false, ClassTab.Lectures);
+        var modules = ClassApp(narrow: false, ClassTab.Modules);
         foreach (var t in Themes)
-            Shot.Take("mac-10-canvas-class-lectures-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = lectures, Width = 1280, Height = 800 });
+            Shot.Take("mac-10-canvas-class-modules-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = modules, Width = 1280, Height = 800 });
         var narrow = ClassApp(narrow: true);
         foreach (var t in Themes)
             Shot.Take("mac-11-canvas-class-sections-app", SkinKind.Mac, t, () => new MacLibrary { DataContext = narrow, Width = 588, Height = 800 });
     }
 
     [AvaloniaFact]
-    public async Task Win_app_canvas()
+    public void Win_app_canvas()
     {
-        var due = await DueApp();
+        var due = DueApp();
         foreach (var t in Themes)
             Shot.Take("win-09-canvas-due-app", SkinKind.Win, t, () => new WinLibrary { DataContext = due, Width = 1280, Height = 800 });
-        var signedOut = await DueAppSignedOut();
+        var signedOut = DueAppSignedOut();
         foreach (var t in Themes)
             Shot.Take("win-09-canvas-due-app-signed-out", SkinKind.Win, t, () => new WinLibrary { DataContext = signedOut, Width = 1280, Height = 800 });
         var cls = ClassApp(narrow: false);

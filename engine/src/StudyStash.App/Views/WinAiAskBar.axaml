@@ -1,5 +1,7 @@
-<!-- The ask bar under a lecture's notes (design 16): a field, an engine chip opening "Answer with", a scope chip,
-     and a send icon. The latest answer has its own card above it (WinAiAnswer), in its own room on the page. -->
+<!-- Ask, docked at the foot of a page (Home, a class's home, a lecture's notes): the question, what it's asked about
+     ("All classes"), which AI answers (its own mark; a click opens "Answer with"), and the shortcut that puts the caret
+     here, which gives way to Send once there's a question. It fills the width it's given. The latest answer has its own
+     card above it (WinAiAnswer), in its own room on the page. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -7,60 +9,55 @@
              xmlns:v="using:StudyStash.App.Views"
              x:Class="StudyStash.App.Views.WinAiAskBar"
              x:DataType="vm:AiAskModel"
-             HorizontalAlignment="Center">
+             ClipToBounds="False">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinAiStyles.axaml" />
   </UserControl.Styles>
 
-  <Panel>
-    <Border CornerRadius="8" Background="{DynamicResource Acrylic}" BorderBrush="{DynamicResource FlyStroke}" BorderThickness="1"
-            BoxShadow="{DynamicResource ShadowLg}" Height="52" Padding="16,0,8,0">
-      <Grid ColumnDefinitions="*,8,Auto,8,Auto,8,Auto" VerticalAlignment="Center">
-        <TextBox Classes="bare" MinWidth="72" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" FontSize="14" VerticalAlignment="Center">
-          <TextBox.KeyBindings>
-            <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
-          </TextBox.KeyBindings>
-        </TextBox>
-        <Button Name="EngineChip" Grid.Column="2" Classes="ai-chipbtn" VerticalAlignment="Center">
-          <Border Classes="ai-chip-engine">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <c:Icon Glyph="auto_awesome" Size="15" Foreground="{DynamicResource AccentText}" />
-              <TextBlock Name="EngineName" Text="{Binding EngineName}" TextTrimming="CharacterEllipsis" IsVisible="{Binding !$parent[v:WinAiAskBar].Compact}" />
-              <c:Icon Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" />
-            </StackPanel>
-          </Border>
-          <Button.Flyout>
-            <Flyout Placement="Top" VerticalOffset="-20" ShowMode="Standard" FlyoutPresenterClasses="bare">
-              <ContentControl Content="{Binding Menu}">
-                <ContentControl.ContentTemplate>
-                  <DataTemplate x:DataType="vm:EngineMenuModel">
-                    <v:WinAiEngineMenu />
-                  </DataTemplate>
-                </ContentControl.ContentTemplate>
-              </ContentControl>
-            </Flyout>
-          </Button.Flyout>
-        </Button>
-        <Button Grid.Column="4" Classes="ai-chipbtn" VerticalAlignment="Center">
-          <Border Classes="ai-chip-scope">
-            <StackPanel Orientation="Horizontal" Spacing="4">
-              <TextBlock Text="{Binding ScopeName}" />
-              <c:Icon Glyph="expand_more" Size="16" Foreground="{DynamicResource Fg2}" />
-            </StackPanel>
-          </Border>
-          <Button.Flyout>
-            <MenuFlyout Placement="Top" VerticalOffset="-20" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding ScopeChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
-          </Button.Flyout>
-        </Button>
-        <Button AutomationProperties.Name="Send question" Grid.Column="6" Classes="ai-send" Command="{Binding AskCommand}" VerticalAlignment="Center" IsVisible="{Binding !Busy}">
-          <c:Icon Glyph="send" Size="18" Foreground="{DynamicResource Fg3}" />
-        </Button>
-        <!-- While an answer is being written, the same place stops it -->
-        <Button Grid.Column="6" Classes="ai-send" Command="{Binding StopCommand}" VerticalAlignment="Center" IsVisible="{Binding Busy}"
-                ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
-          <c:Icon Glyph="stop" Filled="True" Size="18" Foreground="{DynamicResource Fg}" />
-        </Button>
-      </Grid>
-    </Border>
-  </Panel>
+  <Border Classes="ask" ClipToBounds="False">
+    <Grid ColumnDefinitions="*,12,Auto,2,Auto,8,Auto" VerticalAlignment="Center">
+      <TextBox Name="AskInput" Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" PlaceholderForeground="{DynamicResource InkSubtle}"
+               FontSize="15.5" VerticalAlignment="Center" AutomationProperties.Name="Ask about your lectures">
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
+      <!-- What it's asked about -->
+      <Button Grid.Column="2" Classes="ask-scope" AutomationProperties.Name="{Binding ScopeName}">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <TextBlock Text="{Binding ScopeName}" VerticalAlignment="Center" />
+          <c:Icon Glyph="expand_more" Size="14" VerticalAlignment="Center" />
+        </StackPanel>
+        <Button.Flyout>
+          <MenuFlyout Placement="Top" VerticalOffset="-12" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding ScopeChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
+        </Button.Flyout>
+      </Button>
+      <!-- Which AI answers: its own mark, no sparkle and no pill -->
+      <Button Name="EngineChip" Grid.Column="4" Classes="icon-btn" VerticalAlignment="Center" ToolTip.Tip="{Binding EngineTip}" AutomationProperties.Name="{Binding EngineTip}">
+        <c:Icon Glyph="{Binding EngineIcon}" Size="18" />
+        <Button.Flyout>
+          <Flyout Placement="Top" VerticalOffset="-12" ShowMode="Standard" FlyoutPresenterClasses="bare">
+            <ContentControl Content="{Binding Menu}">
+              <ContentControl.ContentTemplate>
+                <DataTemplate x:DataType="vm:EngineMenuModel">
+                  <v:WinAiEngineMenu />
+                </DataTemplate>
+              </ContentControl.ContentTemplate>
+            </ContentControl>
+          </Flyout>
+        </Button.Flyout>
+      </Button>
+      <!-- Nothing typed: the keys that bring the caret here. A question: Send takes their place. -->
+      <Border Grid.Column="6" Classes="kbd" IsVisible="{Binding ShowKeys}">
+        <TextBlock Text="{x:Static v:AskKeys.Shown}" />
+      </Border>
+      <Button AutomationProperties.Name="Send question" Grid.Column="6" Classes="ask-send" Command="{Binding AskCommand}" IsVisible="{Binding CanSend}" ToolTip.Tip="Send">
+        <c:Icon Glyph="arrow_upward" Size="18" />
+      </Button>
+      <!-- While an answer is being written, the same place stops it -->
+      <Button Grid.Column="6" Classes="ask-send" Command="{Binding StopCommand}" IsVisible="{Binding Busy}" ToolTip.Tip="Stop" AutomationProperties.Name="Stop the answer">
+        <c:Icon Glyph="stop" Filled="True" Size="12" />
+      </Button>
+    </Grid>
+  </Border>
 </UserControl>

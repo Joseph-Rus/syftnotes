@@ -177,8 +177,8 @@ public class WinChromeTests
         }
     }
 
-    /// <summary>The library's bar is 48 tall (32 when the window is narrow): the window's drag strip and caption
-    /// buttons follow whichever it is.</summary>
+    /// <summary>The library's bar is 32 tall, like every Windows window's: the window's drag strip and caption buttons
+    /// follow it.</summary>
     [AvaloniaFact]
     public void The_windows_title_bar_is_as_tall_as_the_header()
     {
@@ -190,13 +190,9 @@ public class WinChromeTests
             WinChrome.Apply(window);
             window.Show();
             window.UpdateLayout();
-            Assert.Equal(48, window.ExtendClientAreaTitleBarHeightHint);
-            Assert.Equal(48.0, window.Resources["CaptionButtonHeight"]);
-            Assert.Same(WinChrome.Decorations(), window.WindowDecorationsTheme);
-            model.Narrow = true;
-            window.UpdateLayout();
             Assert.Equal(32, window.ExtendClientAreaTitleBarHeightHint);
             Assert.Equal(32.0, window.Resources["CaptionButtonHeight"]);
+            Assert.Same(WinChrome.Decorations(), window.WindowDecorationsTheme);
             window.Close();
         }
         finally
@@ -229,30 +225,25 @@ public class WinChromeTests
         }
     }
 
-    /// <summary>The notes fade out under the ask bar by a mask, not a colour laid over them: over the real Mica (the
-    /// Mica token clear) a guessed colour was the pale band over the bottom of the page.</summary>
+    /// <summary>The notes fade out under the ask bar into the page's own colour: the page is a solid white sheet now
+    /// (not a layer over Mica), so the colour under the fade is known and nothing shows through it.</summary>
     [AvaloniaFact]
-    public void The_notes_fade_out_by_a_mask_whatever_is_behind_the_page()
+    public void The_notes_fade_out_into_the_pages_own_colour()
     {
         try
         {
             ((App)Application.Current!).UseSkin(SkinKind.Win);
             var view = new WinLibrary { DataContext = Demo.Library(), Width = 1280, Height = 800 };
-            var window = new Window { Width = 1280, Height = 800, Content = view };
+            var window = new Window { Width = 1280, Height = 800, RequestedThemeVariant = ThemeVariant.Light, Content = view };
             window.Show();
             window.UpdateLayout();
-            var fade = view.FindControl<Border>("Fade")!;
-            var notes = view.FindControl<ScrollViewer>("NoteScroll")!;
-            Assert.Null(fade.Background);
-            var mask = Assert.IsType<LinearGradientBrush>(notes.OpacityMask);
-            // Clear from the fade's top to the page's bottom: 120 px, gone for the last quarter.
-            Assert.Equal(notes.Bounds.Height - fade.Bounds.Height, mask.StartPoint.Point.Y, 0.5);
-            Assert.Equal(notes.Bounds.Height, mask.EndPoint.Point.Y, 0.5);
-            Assert.Equal(0, mask.GradientStops[1].Color.A);
-            window.Resources["Mica"] = Brushes.Transparent;
-            window.UpdateLayout();
-            Assert.Null(fade.Background);
-            Assert.NotNull(notes.OpacityMask);
+            var fade = view.Part<Border>("Fade");
+            var notes = view.Part<ScrollViewer>("NoteScroll");
+            Assert.Null(notes.OpacityMask);
+            var gradient = Assert.IsType<LinearGradientBrush>(fade.Background);
+            Assert.Equal(0, gradient.GradientStops[0].Color.A);
+            Assert.Equal(Skin.Light.Surface, gradient.GradientStops[^1].Color);
+            Assert.Equal(Skin.Light.Surface, ((ISolidColorBrush)view.FindControl<Border>("Pane")!.Background!).Color);
             window.Close();
         }
         finally

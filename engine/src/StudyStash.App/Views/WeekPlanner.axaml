@@ -1,0 +1,106 @@
+<!-- A week as a planner (both looks): what's late in a column of its own (only when something is), then Monday to
+     Sunday, today lifted out of the grid. Each day has its class meetings (the time, the class by its short name beside
+     its swatch, "Recorded" with a red dot where a lecture was) over a hairline, then what's due, the name in its
+     class's highlighter with when under it. Where there's too little room for eight columns it keeps its width and
+     scrolls sideways. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.WeekPlanner"
+             ClipToBounds="False">
+  <!-- (The room round the week is part of what scrolls, so today's column, standing proud of the grid, and the week's
+       own hairline aren't cut off at the scroller's edge.) -->
+  <ScrollViewer Name="WeekScroll" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="-8,-8">
+    <Panel>
+    <Border Name="Week" Classes="week" HorizontalAlignment="Left" Margin="8">
+      <ItemsControl ItemsSource="{Binding $parent[v:WeekPlanner].Days}" AutomationProperties.Name="The week" ClipToBounds="False">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><c:WeekRow /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:WeekDay">
+            <Panel>
+              <Border Width="1" Background="{DynamicResource Line}" HorizontalAlignment="Left" IsVisible="{Binding Ruled}" />
+              <Border Classes="day" Classes.today="{Binding IsToday}" Classes.late="{Binding IsLate}">
+                <StackPanel Spacing="10">
+                  <Grid ColumnDefinitions="*,Auto" MinHeight="26">
+                    <TextBlock Classes="day-name" Text="{Binding Name}" />
+                    <TextBlock Grid.Column="1" Classes="day-num" Text="{Binding Number}" />
+                  </Grid>
+                  <!-- Class meetings: the time, then the class by its short name beside its swatch; one that was
+                       recorded says so, with a red dot -->
+                  <ItemsControl ItemsSource="{Binding Meetings}" IsVisible="{Binding HasMeetings}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:WeekMeeting">
+                        <StackPanel>
+                          <StackPanel Orientation="Horizontal">
+                            <TextBlock Classes="micro" Text="{Binding Time}" />
+                            <Ellipse Width="6" Height="6" Fill="{DynamicResource Record}" Margin="9,0,5,0" VerticalAlignment="Center" IsVisible="{Binding Recorded}" />
+                            <TextBlock Classes="micro" Text="Recorded" IsVisible="{Binding Recorded}" />
+                          </StackPanel>
+                          <Grid ColumnDefinitions="Auto,6,*">
+                            <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Top" Margin="0,6,0,0" />
+                            <TextBlock Grid.Column="2" Classes="meeting-class" Classes.recorded="{Binding Recorded}" Text="{Binding Class}" />
+                          </Grid>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Border Classes="rule" IsVisible="{Binding Divided}" />
+                  <!-- What's due: the name in its class's highlighter, and when under it -->
+                  <ItemsControl ItemsSource="{Binding Deadlines}" IsVisible="{Binding HasDeadlines}" ClipToBounds="False">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:OverviewDue">
+                        <Button Classes="deadline" Classes.late="{Binding Late}" Classes.done="{Binding Done}" AutomationProperties.Name="{Binding Said}"
+                                Command="{Binding $parent[v:WeekPlanner].OpenDue}" CommandParameter="{Binding}">
+                          <StackPanel Spacing="2">
+                            <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" />
+                            <TextBlock Classes="deadline-when" Text="{Binding When}" />
+                          </StackPanel>
+                        </Button>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <!-- The rest of a full day, in a small list of its own -->
+                  <Button Classes="text-link" FontSize="13" Content="{Binding More}" IsVisible="{Binding HasMore}">
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedLeft" VerticalOffset="6" FlyoutPresenterClasses="bare">
+                        <Border Classes="menu" Width="240" Padding="10">
+                          <ItemsControl ItemsSource="{Binding Rest}" ClipToBounds="False">
+                            <ItemsControl.ItemsPanel>
+                              <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:OverviewDue">
+                                <Button Classes="deadline" Classes.late="{Binding Late}" Classes.done="{Binding Done}" AutomationProperties.Name="{Binding Said}"
+                                        Click="OnPicked" Command="{Binding Pick}">
+                                  <StackPanel Spacing="2">
+                                    <c:Highlight Text="{Binding Title}" Fill="{Binding Dot}" />
+                                    <TextBlock Classes="deadline-when" Text="{Binding When}" />
+                                  </StackPanel>
+                                </Button>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                        </Border>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
+                </StackPanel>
+              </Border>
+            </Panel>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </Border>
+    </Panel>
+  </ScrollViewer>
+</UserControl>

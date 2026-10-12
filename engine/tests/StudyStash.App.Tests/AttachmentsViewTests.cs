@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -84,11 +85,14 @@ public class AttachmentsViewTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
-    public async Task A_class_list_shows_its_files_above_its_lectures(SkinKind skin)
+    public async Task A_folders_page_lists_its_files_in_its_rail(SkinKind skin)
     {
-        var m = new LibraryModel { ClassTitle = "CS 101" };
+        var now = new DateTimeOffset(2026, 9, 30, 12, 0, 0, TimeSpan.Zero);
+        var sources = new OverviewModel.Sources { Now = now, Zone = TimeZoneInfo.Utc, Classes = [("CS 101", Brushes.Gray, 0)] };
+        var page = OverviewModel.ForClass(new ClassHomeFacts("CS 101", Brushes.Gray, 0, null, null, null, null), sources);
         var files = new AttachmentsModel(new OneLecture(rewrite: true), "CS 101", null);
-        m.ClassFiles = files;
+        page.Files = files;
+        var m = new LibraryModel { Overview = page };
         await files.LoadAsync();
         Control view = skin == SkinKind.Mac ? new MacLibrary { DataContext = m } : new WinLibrary { DataContext = m };
         var w = Host(view, skin);
@@ -96,11 +100,13 @@ public class AttachmentsViewTests
         {
             Assert.True(Shows(view, "Week 3 slides.pdf"));
             Assert.False(Shows(view, AttachmentWords.Reading));
-            Assert.False(Shows(view, AttachmentWords.Rewrite)); // a class never offers it
+            Assert.False(Shows(view, AttachmentWords.Rewrite)); // a folder never offers it
+            // Beside the folder's notes, in the rail; and Attach is beside Record at the page's head.
             var name = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == "Week 3 slides.pdf");
-            var title = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.Name == "ListTitle");
-            Assert.True(name.TranslatePoint(default, view)!.Value.Y > title.TranslatePoint(default, view)!.Value.Y);
-            m.ClassFiles = null;
+            var rail = view.GetVisualDescendants().OfType<StackPanel>().First(p => p.Name == "Rail");
+            Assert.Contains(rail, name.GetVisualAncestors());
+            Assert.True(view.GetVisualDescendants().OfType<Button>().First(b => b.Name == "Attach" && b.Classes.Contains("btn")).IsEffectivelyVisible);
+            page.Files = null;
             Dispatcher.UIThread.RunJobs();
             Assert.False(Shows(view, "Week 3 slides.pdf"));
         }

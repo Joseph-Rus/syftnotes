@@ -193,62 +193,13 @@ public class CanvasShots
             Shot.Take("win-06-canvas-settings-two-browsers", SkinKind.Win, t, () => CanvasFrames.WinSettings(new WinCanvasSettings { DataContext = two }));
     }
 
-    // ---- design 09: the Due list and an assignment ----
-
-    internal static async Task<CanvasDueModel> DueModel()
-    {
-        var model = new CanvasDueModel(CanvasFixtures.Context(new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas/due", "due")));
-        await model.LoadAsync();
-        return model;
-    }
+    // ---- an assignment's page ----
 
     internal static AssignmentModel Detail(string fixture)
     {
         var m = new AssignmentModel(CanvasFixtures.Context());
         m.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>(fixture));
         return m;
-    }
-
-    [AvaloniaFact]
-    public async Task Mac_due()
-    {
-        var due = await DueModel();
-        due.SelectItem("CS 101", "9001");
-        var lab3 = Detail("assignment-9001");
-        foreach (var t in Themes)
-        {
-            Control? built = null;
-            Shot.Take("mac-09-canvas-due", SkinKind.Mac, t,
-                () => built = CanvasFrames.MacApp("Due", new MacCanvasDue { DataContext = due }, new MacAssignment { DataContext = lab3 }));
-            AssertIcons(built!);
-        }
-
-        due.SelectItem("CS 101", "9002");
-        var ps4 = Detail("assignment-9002");
-        foreach (var t in Themes)
-            Shot.Take("mac-09-canvas-due-graded", SkinKind.Mac, t,
-                () => CanvasFrames.MacApp("Due", new MacCanvasDue { DataContext = due }, new MacAssignment { DataContext = ps4 }));
-    }
-
-    [AvaloniaFact]
-    public async Task Win_due()
-    {
-        var due = await DueModel();
-        due.SelectItem("CS 101", "9001");
-        var lab3 = Detail("assignment-9001");
-        foreach (var t in Themes)
-        {
-            Control? built = null;
-            Shot.Take("win-09-canvas-due", SkinKind.Win, t,
-                () => built = CanvasFrames.WinApp("Due", new WinCanvasDue { DataContext = due }, new WinAssignment { DataContext = lab3 }));
-            AssertIcons(built!);
-        }
-
-        due.SelectItem("CS 101", "9002");
-        var ps4 = Detail("assignment-9002");
-        foreach (var t in Themes)
-            Shot.Take("win-09-canvas-due-graded", SkinKind.Win, t,
-                () => CanvasFrames.WinApp("Due", new WinCanvasDue { DataContext = due }, new WinAssignment { DataContext = ps4 }));
     }
 
     // ---- design 10/11: a Canvas-linked class's own page ----

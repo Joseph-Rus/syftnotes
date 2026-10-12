@@ -6,8 +6,6 @@ namespace StudyStash.App;
 
 public partial class App : Application
 {
-    Avalonia.Styling.Style? tracking;
-
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -25,9 +23,6 @@ public partial class App : Application
     {
         Skin.Current = kind;
         Resources.MergedDictionaries[0] = kind == SkinKind.Win ? Platform.WinChrome.ForWindows(Skin.Build(kind)) : Skin.Build(kind);
-        if (tracking is not null) Styles.Remove(tracking);
-        tracking = kind == SkinKind.Mac ? Controls.Typography.MacStyle() : null;
-        if (tracking is not null) Styles.Add(tracking);
     }
 
     public override void OnFrameworkInitializationCompleted()

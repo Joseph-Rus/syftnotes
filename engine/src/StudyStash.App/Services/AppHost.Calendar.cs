@@ -54,11 +54,13 @@ public sealed partial class AppHost
     }
 
     /// <summary>What a recording for <paramref name="className"/> ("" when none was picked) starts as, given what's on.</summary>
-    RecordingStart CalendarStart(string className)
+    /// <param name="forEvent">The event the student picked to record; null for whatever is on now.</param>
+    RecordingStart CalendarStart(string className, CalendarEvent? forEvent = null)
     {
         try
         {
-            return RecordingEvents.For(className, EventNow(), [.. Classes().Select(c => c.Name)], RecordingEvents.Names(CalendarSettings.Load(Home)));
+            var now = forEvent is null ? EventNow() : new EventNow(forEvent, EventClass.For(forEvent.Title, CalendarClasses()));
+            return RecordingEvents.For(className, now, [.. Classes().Select(c => c.Name)], RecordingEvents.Names(CalendarSettings.Load(Home)));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

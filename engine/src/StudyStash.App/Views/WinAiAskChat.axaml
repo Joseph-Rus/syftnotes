@@ -93,7 +93,7 @@
           </TextBox>
           <Button Name="EngineChip" Grid.Column="2" Classes="ai-chipbtn" VerticalAlignment="Center">
             <StackPanel Orientation="Horizontal" Spacing="4" Height="30" Margin="6,0">
-              <c:Icon Glyph="auto_awesome" Size="14" Foreground="{DynamicResource AccentText}" />
+              <c:Icon Glyph="{Binding EngineIcon}" Size="14" />
               <TextBlock Text="{Binding EngineName}" TextTrimming="CharacterEllipsis" MaxWidth="90" FontSize="13" VerticalAlignment="Center" />
               <c:Icon Glyph="expand_more" Size="15" Foreground="{DynamicResource Fg2}" />
             </StackPanel>

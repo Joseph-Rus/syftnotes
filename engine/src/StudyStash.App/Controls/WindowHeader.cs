@@ -63,7 +63,6 @@ public sealed class WindowHeader : Panel
         // The drag area is the background only (never a parent of the buttons): the platform moves the window from
         // it, and zooms on a double-click.
         drag.Background = Brushes.Transparent;
-        if (mac) drag.Bind(Border.BackgroundProperty, drag.GetResourceObservable("Win"));
         WindowDecorationProperties.SetElementRole(drag, WindowDecorationsElementRole.TitleBar);
         drag.PointerPressed += OnPressed;
         drag.DoubleTapped += OnDoubleTapped;

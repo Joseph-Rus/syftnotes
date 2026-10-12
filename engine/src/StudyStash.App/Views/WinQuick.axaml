@@ -100,13 +100,13 @@
                   <Border Classes="pill" Width="3" Height="16" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" VerticalAlignment="Center" />
                   <!-- A lecture -->
                   <Grid IsVisible="{Binding IsLecture}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
-                    <Border Classes="dot" Width="8" Height="8" CornerRadius="4" Background="{Binding Dot}" VerticalAlignment="Center" />
+                    <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                     <TextBlock Grid.Column="3" Classes="meta lecture" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="12" VerticalAlignment="Center" Margin="12,0,0,0" />
                   </Grid>
                   <!-- A passage from notes -->
                   <Grid IsVisible="{Binding IsPassage}" Margin="12,8" ColumnDefinitions="Auto,12,*">
-                    <Border Classes="dot" Width="8" Height="8" CornerRadius="4" Background="{Binding Dot}" VerticalAlignment="Top" Margin="0,6,0,0" />
+                    <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Top" Margin="0,6,0,0" />
                     <StackPanel Grid.Column="2">
                       <c:Marked Source="{Binding Title}" Terms="{Binding $parent[UserControl].((vm:QuickModel)DataContext).Query}" Mark="{DynamicResource Hl}"
                                 MarkWeight="SemiBold" FontSize="14" LineHeight="19.6" TextWrapping="Wrap" />
@@ -115,7 +115,7 @@
                   </Grid>
                   <!-- A class -->
                   <Grid IsVisible="{Binding IsClass}" Height="40" Margin="12,0" ColumnDefinitions="Auto,12,*,Auto">
-                    <Border Classes="dot" Width="8" Height="8" CornerRadius="4" Background="{Binding Dot}" VerticalAlignment="Center" />
+                    <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="14" VerticalAlignment="Center" />
                     <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                   </Grid>

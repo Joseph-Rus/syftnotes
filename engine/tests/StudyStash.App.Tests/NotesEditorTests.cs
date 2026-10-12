@@ -54,22 +54,21 @@ public class NotesEditorTests
 
         window.KeyPress(Key.S, OperatingSystem.IsMacOS() ? RawInputModifiers.Meta : RawInputModifiers.Control, PhysicalKey.S, null);
         Dispatcher.UIThread.RunJobs();
-        Assert.StartsWith("## Summary\n\nMine. Paragraph 1", Assert.Single(lib.Edits).Markdown);
+        Assert.StartsWith("## Summary\n\n==Mine. Paragraph 1", Assert.Single(lib.Edits).Markdown);
         Assert.False(model.Editing);
     }
 
-    /// <summary>The notes' header reads as one line: "Written by Claude · Mon 8:36" sits on the same baseline as
-    /// "Summary" (smaller type beside bigger, not hung from its top), and Summary is level with Edit and Rewrite
-    /// notes at the other end of the row.</summary>
+    /// <summary>The line over the notes says who wrote them (when, on hover), level with Edit at the other end of the
+    /// row; with words of the student's own in them it says whose are whose.</summary>
     [AvaloniaFact]
-    public async Task The_macs_byline_sits_on_summarys_line_level_with_the_buttons()
+    public async Task The_line_over_the_notes_says_who_wrote_them_level_with_edit()
     {
         var skin = SkinKind.Mac;
         string at = new DateTime(2026, 9, 29, 9, 40, 0).ToString("o");
         string notes = "## Summary\n\nWhat the lecture was about.";
-        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview(), OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = new NotesVersion(notes, "Claude Code", at) } };
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview(), OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = new NotesVersion(notes, "Claude", at) } };
         var model = new AiNotesModel(lib) { Delay = (_, ct) => Task.Delay(Timeout.InfiniteTimeSpan, ct) };
-        await model.Load("lec-1", notes, "Claude Code", at);
+        await model.Load("lec-1", notes, "Claude", at);
 
         Skin.UseTheme(ColourThemes.Default);
         ((App)Application.Current!).UseSkin(skin);
@@ -78,16 +77,26 @@ public class NotesEditorTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var texts = page.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).ToList();
-        var title = texts.Single(t => t.Classes.Contains("ai-notes-title"));
-        var byline = texts.Single(t => t.Classes.Contains("ai-notes-byline"));
-        var edit = texts.Single(t => t.Text == "Edit");
-        // Where each one's letters stand, down the page.
-        double Baseline(TextBlock t) => t.TranslatePoint(new Point(0, t.Padding.Top + t.TextLayout.TextLines[0].Baseline), page)!.Value.Y;
+        List<TextBlock> Texts() => [.. page.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible)];
+        var writer = Texts().Single(t => t.Name == "LegendAi");
+        var edit = Texts().Single(t => t.Text == "Edit");
         double Middle(Visual v) => v.TranslatePoint(new Point(0, v.Bounds.Height / 2), page)!.Value.Y;
+        Assert.Equal("Written by Claude from the recording", writer.Text);
+        Assert.DoesNotContain(Texts(), t => t.Text == "What you wrote");
+        Assert.StartsWith("Written by Claude", (string)ToolTip.GetTip(page.GetVisualDescendants().OfType<StackPanel>().Single(p => p.Name == "Legend"))!);
+        Assert.True(Math.Abs(Middle(writer) - Middle(edit)) <= 1.5, $"the line's middle is at {Middle(writer):0.00}, Edit's at {Middle(edit):0.00}");
+        window.Close();
 
-        Assert.StartsWith("Written by", byline.Text);
-        Assert.True(Math.Abs(Baseline(byline) - Baseline(title)) <= 0.75, $"the byline's letters stand at {Baseline(byline):0.00}, Summary's at {Baseline(title):0.00}");
-        Assert.True(Math.Abs(Middle(title) - Middle(edit)) <= 1.5, $"Summary's middle is at {Middle(title):0.00}, Edit's at {Middle(edit):0.00}");
+        // Notes with the student's own words in them: both halves of the line.
+        const string mixed = "## ==History==\n\n- ==2017== The transformer paper.";
+        lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview(), OnRewrite = _ => new RewriteInfo("lec-1", "none") { Current = new NotesVersion(mixed, "Claude", at) } };
+        model = new AiNotesModel(lib) { Delay = (_, ct) => Task.Delay(Timeout.InfiniteTimeSpan, ct) };
+        await model.Load("lec-1", mixed, "Claude", at);
+        window = new Window { Width = 660, Height = 400, RequestedThemeVariant = ThemeVariant.Light, Content = page = new MacAiNotes { DataContext = model, Width = 620 } };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Contains(Texts(), t => t.Text == "What you wrote");
+        Assert.Contains(Texts(), t => t.Text == "Added by Claude from the recording");
+        window.Close();
     }
 }

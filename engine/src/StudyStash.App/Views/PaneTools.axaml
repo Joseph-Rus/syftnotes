@@ -1,0 +1,32 @@
+<!-- The page's tools, at its top right (both looks): over a note, a group of its own actions (Move to folder, Share,
+     Delete); over an assignment, Open in Canvas; then search and Settings. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             xmlns:c="using:StudyStash.App.Controls"
+             xmlns:v="using:StudyStash.App.Views"
+             x:Class="StudyStash.App.Views.PaneTools"
+             x:DataType="vm:LibraryModel">
+  <StackPanel Orientation="Horizontal" Spacing="2">
+    <StackPanel Name="NoteTools" Orientation="Horizontal" Spacing="2" IsVisible="{Binding ShowLectureTools}">
+      <Button Name="Move" Classes="icon-btn" Click="OnMove" ToolTip.Tip="Move to folder" AutomationProperties.Name="Move to folder">
+        <c:Icon Glyph="drive_file_move" Size="18" />
+      </Button>
+      <Button Name="Share" Classes="icon-btn" Command="{Binding ExportCommand}" ToolTip.Tip="Share" AutomationProperties.Name="Share">
+        <c:Icon Glyph="ios_share" Size="18" />
+      </Button>
+      <Button Name="DeleteLecture" Classes="icon-btn" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete" AutomationProperties.Name="Delete">
+        <c:Icon Glyph="delete" Size="18" />
+      </Button>
+      <Border Width="1" Height="16" Background="{DynamicResource Line}" Margin="6,0" VerticalAlignment="Center" />
+    </StackPanel>
+    <Button Name="OpenInCanvas" Classes="plain" Height="32" Margin="0,0,6,0" Command="{Binding Assignment.OpenInCanvasCommand, FallbackValue={x:Null}}" IsVisible="{Binding ShowAssignmentTools}"
+            Content="Open in Canvas" />
+    <Button Name="Search" Classes="icon-btn" Command="{Binding SearchCommand}" ToolTip.Tip="{x:Static v:KeyWords.Search}" AutomationProperties.Name="Search">
+      <c:Icon Glyph="search" Size="18" />
+    </Button>
+    <Button Name="Settings" Classes="icon-btn" Command="{Binding SettingsCommand}" ToolTip.Tip="{x:Static v:KeyWords.Settings}" AutomationProperties.Name="Settings">
+      <c:Icon Glyph="settings" Size="18" />
+    </Button>
+  </StackPanel>
+</UserControl>

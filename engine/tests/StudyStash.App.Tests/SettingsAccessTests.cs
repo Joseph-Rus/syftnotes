@@ -81,15 +81,12 @@ public class SettingsAccessTests
         {
             var buttons = view.GetVisualDescendants().OfType<Button>().Where(b => b.Command == model.SettingsCommand && b.IsEffectivelyVisible).ToList();
             Assert.NotEmpty(buttons);
-            if (skin == SkinKind.Mac)
-            {
-                // In the title bar's toolbar, right of search.
-                var header = view.FindControl<Control>("Header")!;
-                var gear = Assert.Single(buttons);
-                Assert.Contains(header, gear.GetVisualAncestors());
-                var search = header.GetVisualDescendants().OfType<Button>().Single(b => b.Command == model.SearchCommand);
-                Assert.True(gear.TranslatePoint(default, view)!.Value.X > search.TranslatePoint(default, view)!.Value.X);
-            }
+            // In the page's own toolbar at its top right, right of search: the same in both looks.
+            var tools = view.FindControl<Control>("PaneTools")!;
+            var gear = Assert.Single(buttons);
+            Assert.Contains(tools, gear.GetVisualAncestors());
+            var search = tools.GetVisualDescendants().OfType<Button>().Single(b => b.Command == model.SearchCommand);
+            Assert.True(gear.TranslatePoint(default, view)!.Value.X > search.TranslatePoint(default, view)!.Value.X);
             buttons[0].Command!.Execute(null);
             Assert.Equal(1, opened);
         }

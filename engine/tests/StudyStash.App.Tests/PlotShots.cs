@@ -119,7 +119,7 @@ public class PlotShots
                 ((App)Application.Current!).UseSkin(skin);
                 var size = new Size(1280, 800);
                 var model = RichShots.CardiacLibrary();
-                model.Note = new ViewModels.NoteModel { ClassName = "CSCI 4220", Dot = Skin.ClassDot(0), Meta = "Mon 28 Sep · 52 min", Title = "Logistic regression", Markdown = MlLecture };
+                model.Note = new ViewModels.NoteModel { ClassName = "CSCI 4220", Dot = Skin.ClassDot(0), When = "Monday 28 September at 9:30 AM, 52 min", Title = "Logistic regression", Markdown = MlLecture };
                 model.Diagrams = new Page();
                 Control content = skin == SkinKind.Mac
                     ? new Views.MacLibrary { DataContext = model, Width = size.Width, Height = size.Height }

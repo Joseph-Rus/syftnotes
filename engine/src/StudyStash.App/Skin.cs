@@ -6,8 +6,8 @@ using StudyStash.App.Services;
 
 namespace StudyStash.App;
 
-/// <summary>Which look: the Mac's (SF Pro, Liquid Glass, big round corners) or Windows 11's (Segoe UI, Mica and
-/// Acrylic, 4–8 px corners). Both are the same design; each follows its system's conventions.</summary>
+/// <summary>Which look: the Mac's or Windows'. Both are the same design, in the same colours and type; each keeps its
+/// system's conventions (where the window's buttons are, how a menu opens).</summary>
 public enum SkinKind
 {
     Mac,
@@ -19,17 +19,18 @@ public enum SkinKind
 public sealed record GlassFilter(double Blur, double Saturate, double Brightness);
 
 /// <summary>
-/// The design's tokens (Study Stash All Screens: the Mac in Liquid Glass, Windows 11 in Fluent, each light and dark),
-/// as resources the views ask for by name: <c>{DynamicResource Fg2}</c>. Fixed colours are the design's CSS values
-/// (rgba's alpha to #AARRGGBB); the accent and the surfaces' faint lean come from the colour theme, worked out in OKLCH
-/// the way the design's <c>renderVals()</c> does. Where the design stacks several box-shadows on one element, one
-/// token holds them all (GlassShadow = the glass's edge highlights + its shadow).
+/// The design's tokens (the Semester look: one palette for both systems, light and dark), as resources the views ask
+/// for by name: <c>{DynamicResource InkMuted}</c>. Everything is black, grey and white but a class's highlighter and
+/// the two reds (recording, late). The names from the look before (Fg2, Group, Card) still stand, holding the new
+/// colours, for the views that ask for them; only the accent comes from the colour theme, for the controls that still
+/// take one. Where the design stacks several box-shadows on one element, one token holds them all (ShadowFloat = the
+/// hairline round it + its shadow).
 /// </summary>
 public static class Skin
 {
     public static SkinKind Current { get; set; } = OperatingSystem.IsWindows() ? SkinKind.Win : SkinKind.Mac;
 
-    /// <summary>The colour theme the tokens are made from: Lagoon until the student picks another.</summary>
+    /// <summary>The colour theme the accent is made from: Lagoon until the student picks another.</summary>
     public static ColourTheme Theme { get; private set; } = ColourThemes.Default;
 
     /// <summary>STUDYSTASH_SKIN=mac|win shows the other system's look (for screenshots, or to compare).</summary>
@@ -41,10 +42,58 @@ public static class Skin
             _ => OperatingSystem.IsWindows() ? SkinKind.Win : SkinKind.Mac,
         };
 
-    // The class dots: the design's OKLCH hues (StudyStash.Core.ClassColors), the same in light and dark.
-    public static readonly IBrush[] ClassDots = [.. StudyStash.Core.ClassColors.Palette.Select(c => (IBrush)new SolidColorBrush(Color.Parse(StudyStash.Core.ClassColors.Hex(c))))];
+    /// <summary>The design's colours for light or for dark (tokens.css): the window behind everything
+    /// (<see cref="Canvas"/>, which the sidebar sits straight on), the page (<see cref="Surface"/>), the week's grid
+    /// and today's column lifted out of it, hairlines, the wash under the pointer, the three inks, the red that means
+    /// recording and the one that means late, and each class colour as a highlighter (behind ink) and as a swatch
+    /// (nothing on it, so brighter in dark).</summary>
+    public sealed record Palette(Color Canvas, Color Surface, Color SurfaceSunken, Color SurfaceToday, Color Line, Color Hover, Color Press,
+        Color Ink, Color InkMuted, Color InkSubtle, Color Record, Color OnRecord, Color Late, Color Focus,
+        IReadOnlyDictionary<string, Color> Highlighters, IReadOnlyDictionary<string, Color> Swatches, double TodayShade, double FloatShade);
+
+    static Dictionary<string, Color> Hues(params string[] hex) => new()
+    {
+        ["Yellow"] = Color.Parse(hex[0]), ["Green"] = Color.Parse(hex[1]), ["Pink"] = Color.Parse(hex[2]), ["Blue"] = Color.Parse(hex[3]),
+        ["Orange"] = Color.Parse(hex[4]), ["Violet"] = Color.Parse(hex[5]), ["Teal"] = Color.Parse(hex[6]), ["Lime"] = Color.Parse(hex[7]),
+    };
+
+    static readonly Dictionary<string, Color> LightHues = Hues("#FFE46B", "#B5EEA6", "#FFC2DF", "#BCDCFF", "#FFCF98", "#DACBFF", "#A6EBE1", "#E2F28C");
+
+    public static readonly Palette Light = new(
+        Canvas: Color.Parse("#E9EBEE"), Surface: Color.Parse("#FFFFFF"), SurfaceSunken: Color.Parse("#F5F6F7"), SurfaceToday: Color.Parse("#FFFFFF"),
+        Line: Color.Parse("#DDE0E4"), Hover: Color.FromArgb(0x1F, 127, 127, 127), Press: Color.FromArgb(0x33, 127, 127, 127),
+        Ink: Color.Parse("#1D1F23"), InkMuted: Color.Parse("#565C66"), InkSubtle: Color.Parse("#626973"),
+        Record: Color.Parse("#D42A1A"), OnRecord: Color.Parse("#FFFFFF"), Late: Color.Parse("#B3261E"), Focus: Color.Parse("#1D1F23"),
+        Highlighters: LightHues, Swatches: LightHues, TodayShade: 0.18, FloatShade: 0.25);
+
+    public static readonly Palette Dark = new(
+        Canvas: Color.Parse("#0E0F11"), Surface: Color.Parse("#191A1D"), SurfaceSunken: Color.Parse("#202226"), SurfaceToday: Color.Parse("#2A2C31"),
+        Line: Color.Parse("#2D3035"), Hover: Color.FromArgb(0x29, 127, 127, 127), Press: Color.FromArgb(0x42, 127, 127, 127),
+        Ink: Color.Parse("#ECEEF1"), InkMuted: Color.Parse("#A4A9B1"), InkSubtle: Color.Parse("#8D939C"),
+        Record: Color.Parse("#FF5A47"), OnRecord: Color.Parse("#1A0603"), Late: Color.Parse("#FF8A80"), Focus: Color.Parse("#ECEEF1"),
+        Highlighters: Hues("#5A4C00", "#1F4F2C", "#5B2244", "#1D4263", "#5B380F", "#3D2E68", "#134F48", "#44500E"),
+        Swatches: Hues("#E9CF4A", "#7FD27A", "#F08CBF", "#7DB8F2", "#F0A95A", "#B39CF5", "#62D3C3", "#C4DC55"), TodayShade: 0.6, FloatShade: 0.7);
+
+    /// <summary>The highlighter each class has, in the order classes take them as they're added (the class's place
+    /// in the library): the one bold colour in the app, behind an assignment's name or a class's own, and as the small
+    /// swatch beside a class.</summary>
+    public static readonly string[] ClassHues = ["Yellow", "Green", "Orange", "Pink", "Blue", "Teal", "Violet", "Lime"];
+
+    /// <summary>A class's colour as view models carry it: one brush per highlighter, the light swatch's own colour.
+    /// <see cref="Controls.Swatch"/> and <see cref="Controls.Highlight"/> know these and draw the look's own shade of
+    /// that highlighter, light or dark (<see cref="HueOf"/>); anything else that's handed one (a PDF) gets the colour
+    /// itself.</summary>
+    public static readonly IBrush[] ClassDots = [.. ClassHues.Select(h => (IBrush)new SolidColorBrush(Light.Highlighters[h]).ToImmutable())];
 
     public static IBrush ClassDot(int index) => ClassDots[((index % ClassDots.Length) + ClassDots.Length) % ClassDots.Length];
+
+    /// <summary>Which highlighter a class's brush stands for ("Yellow"), or null for any other brush (a calendar's
+    /// own colour, Unsorted's grey).</summary>
+    public static string? HueOf(IBrush? brush)
+    {
+        int i = brush is null ? -1 : Array.IndexOf(ClassDots, brush);
+        return i < 0 ? null : ClassHues[i];
+    }
 
     /// <summary>Switch colour themes while running: every open view follows at once (its colours are
     /// DynamicResources), no restart.</summary>
@@ -75,192 +124,214 @@ public static class Skin
     /// <summary>A look's tokens in the current colour theme.</summary>
     public static ResourceDictionary Build(SkinKind kind) => Build(kind, Theme);
 
-    /// <summary>A look's tokens in a colour theme: the colours and shadows light and dark (theme dictionaries), the
-    /// fonts and corner radii the same in both. Made again on every switch, so it stays cheap.</summary>
+    /// <summary>A look's tokens: the colours and shadows light and dark (theme dictionaries), the font and corner radii
+    /// the same in both. Made again on every switch of colour theme, so it stays cheap.</summary>
     public static ResourceDictionary Build(SkinKind kind, ColourTheme theme)
     {
         var d = new ResourceDictionary();
         ResourceDictionary light = new(), dark = new();
+        Semester(light, Light);
+        Semester(dark, Dark);
+        // One family, Atkinson Hyperlegible Next (the app's own files), and the system's font for what it has no
+        // letter for. Weight carries the hierarchy, so headings and reading text are the same face.
+        const string atkinson = "avares://StudyStash/Assets/Fonts#Atkinson Hyperlegible Next";
         if (kind == SkinKind.Mac)
         {
             MacTokens(light, theme, dark: false);
             MacTokens(dark, theme, dark: true);
-            d["TextFont"] = new FontFamily("SF Pro Text, avares://StudyStash/Assets/Fonts#Inter, Apple Symbols"); // Apple Symbols: key signs like ↩ as text, never an emoji
-            d["DisplayFont"] = new FontFamily("SF Pro Display, avares://StudyStash/Assets/Fonts#Inter Display, Apple Symbols");
-            // The design reads notes in New York. Where it isn't installed, Charter (on every Mac) reads as well.
-            d["SerifFont"] = new FontFamily("New York, Charter, Georgia, avares://StudyStash/Assets/Fonts#Inter, Apple Symbols");
-            d["RadiusPanel"] = new CornerRadius(14);
-            d["RadiusControl"] = new CornerRadius(6);
-            d["RadiusMenu"] = new CornerRadius(10);
-            d["PopupStrokeWidth"] = new Thickness(0.5);
+            // Apple Symbols: key signs like ↩ as text, never an emoji
+            d["TextFont"] = d["DisplayFont"] = d["SerifFont"] = new FontFamily($"{atkinson}, .AppleSystemUIFont, SF Pro Text, Apple Symbols");
+            d["PopupStrokeWidth"] = new Thickness(1);
         }
         else
         {
             WinTokens(light, theme, dark: false);
             WinTokens(dark, theme, dark: true);
             // Segoe UI Variable is Windows 11's; Windows 10 has Segoe UI.
-            d["TextFont"] = new FontFamily("Segoe UI Variable Text, Segoe UI, avares://StudyStash/Assets/Fonts#Inter");
-            d["DisplayFont"] = new FontFamily("Segoe UI Variable Display, Segoe UI, avares://StudyStash/Assets/Fonts#Inter Display");
-            d["SerifFont"] = new FontFamily("Segoe UI Variable Text, Segoe UI, avares://StudyStash/Assets/Fonts#Inter");
-            d["RadiusPanel"] = new CornerRadius(8);
-            d["RadiusControl"] = new CornerRadius(4);
-            d["RadiusMenu"] = new CornerRadius(8);
+            d["TextFont"] = d["DisplayFont"] = d["SerifFont"] = new FontFamily($"{atkinson}, Segoe UI Variable Text, Segoe UI");
             d["PopupStrokeWidth"] = new Thickness(1);
             d["CaptionButtonWidth"] = 46.0;
         }
+        // Nested, not one value everywhere: a control inside the week inside the page.
+        d["RadiusControl"] = new CornerRadius(8);
+        d["RadiusDay"] = new CornerRadius(10);
+        d["RadiusMenu"] = new CornerRadius(10);
+        d["RadiusPanel"] = new CornerRadius(12);
+        d["RadiusPane"] = new CornerRadius(14);
         d.ThemeDictionaries[ThemeVariant.Light] = light;
         d.ThemeDictionaries[ThemeVariant.Dark] = dark;
         FluentPopups.Add(d, light, dark);
         return d;
     }
 
-    /// <summary>The Mac in Liquid Glass: the design's macL / macD.</summary>
-    static void MacTokens(ResourceDictionary r, ColourTheme t, bool dark)
+    /// <summary>The design's own tokens, the same in both looks (tokens.css): the surfaces, the three inks, the two
+    /// reds, a highlighter and a swatch for each class colour, and the two shadows anything is lifted on.</summary>
+    static void Semester(ResourceDictionary r, Palette p)
+    {
+        void B(string key, Color c) => r[key] = new SolidColorBrush(c);
+        B("Canvas", p.Canvas);
+        B("Surface", p.Surface);
+        B("SurfaceSunken", p.SurfaceSunken);
+        B("SurfaceToday", p.SurfaceToday);
+        B("Line", p.Line);
+        B("Hover", p.Hover);
+        B("Press", p.Press);
+        B("Ink", p.Ink);
+        B("InkMuted", p.InkMuted);
+        B("InkSubtle", p.InkSubtle);
+        B("Record", p.Record);
+        B("OnRecord", p.OnRecord);
+        B("Late", p.Late);
+        B("Focus", p.Focus);
+        foreach (string hue in ClassHues)
+        {
+            B("Hl" + hue, p.Highlighters[hue]);
+            B("Swatch" + hue, p.Swatches[hue]);
+        }
+        r["ShadowToday"] = Shadows([Outer(0, 0, 0, 1, p.Line), Outer(0, 6, 14, -8, Black(p.TodayShade))]);
+        r["ShadowFloat"] = Shadows([Outer(0, 0, 0, 1, p.Line), Outer(0, 10, 30, -12, Black(p.FloatShade))]);
+        // The same, ringed in ink: the ask bar with the caret in it.
+        r["ShadowFloatFocus"] = Shadows([Outer(0, 0, 0, 1.5, p.Ink), Outer(0, 10, 30, -12, Black(p.FloatShade))]);
+        r["LineRing"] = Shadows([Outer(0, 0, 0, 1, p.Line)]);
+        r["SubtleRing"] = Shadows([Outer(0, 0, 0, 1, p.InkSubtle)]);
+        r["RecordRing"] = Shadows([Outer(0, 0, 0, 1.5, p.Record)]);
+    }
+
+    /// <summary>The accent a colour theme gives the controls that still take one (a filled button, a switch that's on,
+    /// a link in Settings and setup). The library window uses none: there the only colour is a class's highlighter.</summary>
+    static void Accents(ResourceDictionary r, ColourTheme t, bool dark, bool mac)
     {
         void B(string key, Color c) => r[key] = new SolidColorBrush(c);
         double L = t.L, c = t.C;
         bool lt = t.IsLight;
-        Color onAccent = lt ? Ink : Colors.White, sep;
-        BoxShadow[] edge, edgeSoft, edgeTint, gshadow, sideShadow, ctlShadow;
-        if (!dark)
+        if (mac)
         {
-            B("Glass", White(0.42));
-            B("Win", t.Neutral(0.985, 1));
-            B("Raised", t.Neutral(0.998, 0.5));
-            B("Group", t.Neutral(0.4, 3, 0.05));
-            B("Fg", Hex("#1D1D1F"));
-            B("Fg2", Black(0.6));
-            B("Fg3", Black(0.34));
-            B("Sep", sep = Black(0.08));
-            B("Fill", White(0.45));
-            B("Fill2", Black(0.06));
-            B("Mini", Colors.White);
-            B("Accent", t.O(L, c));
-            B("AccentText", lt ? t.O(0.45, c * 0.9) : t.O(Math.Min(L - 0.1, 0.48), c));
-            B("Tint", lt ? t.O(L, c, 0.92) : t.O(L, c, 0.88));
-            B("AccentTint", t.O(L, c, 0.2));
-            B("Hl", Oklch.ToColor(0.88, 0.16, t.Hl, 0.55));
-            B("Warn", Oklch.ToColor(0.68, 0.15, 65));
-            B("Ok", Oklch.ToColor(0.62, 0.14, 150));
-            // Not in the design: the recording dot, the system's own red (the menu bar's badge is the same).
-            B("Rec", Hex("#FF3B30"));
-            B("Hover", Black(0.04));
-            B("Press", Black(0.08));
-            // Not in the design: a floating window's glass when there's no blur behind it, solid enough to read.
-            B("GlassSolid", t.Neutral(0.97, 2, 0.94));
-            // Not in the design: notifications and menus, plain and opaque like the system's own.
-            B("PopupBg", Hex("#F6F6F6"));
-            B("PopupStroke", Black(0.1));
-            r["PopupShadow"] = Shadows([Outer(0, 8, 24, 0, Black(0.12)), Outer(0, 1, 3, 0, Black(0.06))]);
-            r["GlassFilter"] = new GlassFilter(22, 2.0, 1.04);
-            edge = [Inset(0, 1, 0, 0, White(0.85)), Inset(0, 0, 0, 0.5, White(0.6)), Inset(0, -1, 1, 0, White(0.25))];
-            edgeSoft = [Inset(0, 1, 0, 0, White(0.6)), Inset(0, 0, 0, 0.5, Black(0.04))];
-            // The design lifts accent fills with a glow of their own colour; the app keeps clean edges, so only the highlights.
-            edgeTint = [Inset(0, 1, 0, 0, White(0.45)), Inset(0, 0, 0, 0.5, White(0.25))];
-            gshadow = [Outer(0, 18, 50, 0, Black(0.16)), Outer(0, 2, 8, 0, Black(0.06))];
-            sideShadow = [Outer(0, 4, 16, 0, Black(0.08))];
-            ctlShadow = [Outer(0, 4, 12, 0, Black(0.1))];
+            B("Accent", dark && !lt ? t.O(Math.Min(L + 0.08, 0.72), c) : t.O(L, c));
+            B("AccentText", dark ? (lt ? t.O(L, c) : t.O(0.8, c * 0.8)) : lt ? t.O(0.45, c * 0.9) : t.O(Math.Min(L - 0.1, 0.48), c));
+            B("Tint", dark ? (lt ? t.O(L, c, 0.9) : t.O(Math.Min(L + 0.04, 0.68), c, 0.85)) : lt ? t.O(L, c, 0.92) : t.O(L, c, 0.88));
+            B("AccentTint", dark ? t.O(0.7, c, 0.26) : t.O(L, c, 0.2));
+            B("OnAccent", lt ? Ink : Colors.White);
         }
         else
         {
-            B("Glass", Rgba(40, 40, 44, 0.46));
-            B("Win", t.Neutral(0.21, 1.5));
-            B("Raised", t.Neutral(0.36, 1.5));
-            B("Group", t.Neutral(0.9, 2, 0.06));
-            B("Fg", Hex("#F5F5F7"));
-            B("Fg2", White(0.62));
-            B("Fg3", White(0.34));
-            B("Sep", sep = White(0.09));
-            B("Fill", White(0.08));
-            B("Fill2", White(0.12));
-            B("Mini", Hex("#2C2C2E"));
-            B("Accent", lt ? t.O(L, c) : t.O(Math.Min(L + 0.08, 0.72), c));
-            B("AccentText", lt ? t.O(L, c) : t.O(0.8, c * 0.8));
-            B("Tint", lt ? t.O(L, c, 0.9) : t.O(Math.Min(L + 0.04, 0.68), c, 0.85));
-            B("AccentTint", t.O(0.7, c, 0.26));
-            B("Hl", Oklch.ToColor(0.75, 0.15, t.Hl, 0.35));
-            B("Warn", Oklch.ToColor(0.8, 0.14, 75));
-            B("Ok", Oklch.ToColor(0.74, 0.15, 150));
-            B("Rec", Hex("#FF453A"));
-            B("Hover", White(0.05));
-            B("Press", White(0.1));
-            B("GlassSolid", t.Neutral(0.26, 1.5, 0.94));
-            B("PopupBg", Hex("#2C2C2E"));
-            B("PopupStroke", White(0.1));
-            r["PopupShadow"] = Shadows([Outer(0, 8, 24, 0, Black(0.4)), Outer(0, 1, 3, 0, Black(0.3))]);
-            r["GlassFilter"] = new GlassFilter(22, 1.8, 1.0);
-            edge = [Inset(0, 1, 0, 0, White(0.2)), Inset(0, 0, 0, 0.5, White(0.16)), Inset(0, -1, 1, 0, White(0.05))];
-            edgeSoft = [Inset(0, 1, 0, 0, White(0.1)), Inset(0, 0, 0, 0.5, White(0.06))];
-            edgeTint = [Inset(0, 1, 0, 0, White(0.3)), Inset(0, 0, 0, 0.5, White(0.18))];
-            gshadow = [Outer(0, 18, 50, 0, Black(0.5)), Outer(0, 2, 8, 0, Black(0.3))];
-            sideShadow = [Outer(0, 4, 16, 0, Black(0.3))];
-            ctlShadow = [Outer(0, 4, 12, 0, Black(0.35))];
+            B("Accent", dark ? (lt ? t.O(L, c) : t.O(0.8, c * 0.6)) : lt ? t.O(L, c) : t.O(Math.Max(L - 0.06, 0.42), c));
+            B("AccentText", dark ? (lt ? t.O(L, c) : t.O(0.8, c * 0.6)) : lt ? t.O(0.42, c * 0.9) : t.O(Math.Max(L - 0.12, 0.4), c));
+            B("OnAccent", dark || lt ? Ink : Colors.White);
         }
-        B("OnAccent", onAccent);
-        B("Good", Good);
-        r["Edge"] = Shadows(edge);
-        r["EdgeSoft"] = Shadows(edgeSoft);
-        r["EdgeTint"] = Shadows(edgeTint);
-        r["GShadow"] = Shadows(gshadow);
-        r["SideShadow"] = Shadows(sideShadow);
-        r["CtlShadow"] = Shadows(ctlShadow);
-        r["GlassShadow"] = Shadows([.. edge, .. gshadow]);
-        r["SideGlassShadow"] = Shadows([.. edge, .. sideShadow]);
-        r["CtlGlassShadow"] = Shadows([.. edge, .. ctlShadow]);
-        r["RaisedShadow"] = Shadows([.. edge, Outer(0, 0, 0, 0.5, sep), Outer(0, 1, 2, 0, Black(0.08))]);
-        r["SegShadow"] = Shadows([.. edge, Outer(0, 1, 3, 0, Black(0.12))]);
-        r["WindowShadow"] = Shadows([.. gshadow, Outer(0, 0, 0, 0.5, sep)]);
-        // Not in the design: the small recorder's capsule, an accent fill with the tinted buttons' edge, and the shadow
-        // it floats on over whatever else is on screen.
-        r["PillShadow"] = Shadows([.. edgeTint, PillDrop]);
-        // The dot's ring on a highlighted row: white on a dark accent, near-black ink on a light one — never a tint.
-        r["OnAccentRing"] = Shadows([Outer(0, 0, 0, 1.5, lt ? Rgba(0x17, 0x17, 0x17, 1) : Colors.White)]);
-        B("Ground", dark ? Hex("#161616") : Hex("#E4E2DF"));
     }
 
-    /// <summary>Windows 11 in Fluent: the design's winL / winD.</summary>
+    /// <summary>
+    /// The accent's tokens with no accent in them, for the library window: there the design has none (a link is ink
+    /// over a grey underline, the chosen row a chip, and the only colour a class's highlighter), so whatever inside
+    /// it asks for the accent (a Canvas list's chosen row, a filled button) gets ink, with the page's white on it.
+    /// A view adds this to its own resources, and everything in it follows.
+    /// </summary>
+    public static ResourceDictionary NoAccent()
+    {
+        var d = new ResourceDictionary();
+        foreach (var (variant, p) in new[] { (ThemeVariant.Light, Light), (ThemeVariant.Dark, Dark) })
+        {
+            var r = new ResourceDictionary
+            {
+                ["Accent"] = new SolidColorBrush(p.Ink), ["AccentText"] = new SolidColorBrush(p.Ink), ["Tint"] = new SolidColorBrush(p.Ink),
+                ["OnAccent"] = new SolidColorBrush(p.Surface), ["AccentTint"] = new SolidColorBrush(p.Hover), ["IcInfo"] = new SolidColorBrush(p.Ink),
+                ["OnAccentRing"] = Shadows([Outer(0, 0, 0, 1.5, p.Surface)]), ["SystemAccentColor"] = p.Ink,
+            };
+            d.ThemeDictionaries[variant] = r;
+        }
+        return d;
+    }
+
+    /// <summary>The Mac look: the design's tokens under the names its views ask for (a window is the page's white, a
+    /// grouped box the sunken grey, the three text colours the three inks).</summary>
+    static void MacTokens(ResourceDictionary r, ColourTheme t, bool dark)
+    {
+        void B(string key, Color c) => r[key] = new SolidColorBrush(c);
+        var p = dark ? Dark : Light;
+        bool lt = t.IsLight;
+        Accents(r, t, dark, mac: true);
+        // What was glass is a plain sheet: opaque, outlined, and only the floating ones have a shadow.
+        B("Glass", p.Surface);
+        B("GlassSolid", p.Surface);
+        B("Win", p.Surface);
+        B("Raised", p.Surface);
+        B("Group", p.SurfaceSunken);
+        B("Fg", p.Ink);
+        B("Fg2", p.InkMuted);
+        B("Fg3", p.InkSubtle);
+        B("Sep", p.Line);
+        B("Fill", p.Hover);
+        B("Fill2", p.Press);
+        B("Mini", p.Surface);
+        B("Hl", p.Highlighters["Yellow"]);
+        B("Warn", dark ? Oklch.ToColor(0.8, 0.14, 75) : Oklch.ToColor(0.68, 0.15, 65));
+        B("Ok", dark ? Oklch.ToColor(0.74, 0.15, 150) : Oklch.ToColor(0.62, 0.14, 150));
+        B("Rec", p.Record);
+        B("PopupBg", dark ? p.SurfaceToday : p.Surface);
+        B("PopupStroke", p.Line);
+        B("Good", Good);
+        B("Ground", dark ? Hex("#161616") : Hex("#E4E2DF"));
+        r["GlassFilter"] = new GlassFilter(0, 1, 1);
+        var ring = Outer(0, 0, 0, 1, p.Line);
+        var drop = Outer(0, 10, 30, -12, Black(p.FloatShade));
+        r["PopupShadow"] = Shadows([Outer(0, 8, 24, 0, Black(dark ? 0.4 : 0.12)), Outer(0, 1, 3, 0, Black(dark ? 0.3 : 0.06))]);
+        r["Edge"] = None;
+        r["EdgeSoft"] = None;
+        r["EdgeTint"] = None;
+        r["GShadow"] = Shadows([drop]);
+        r["SideShadow"] = None;
+        r["CtlShadow"] = None;
+        r["GlassShadow"] = Shadows([ring, drop]);
+        r["SideGlassShadow"] = None;
+        r["CtlGlassShadow"] = Shadows([ring]);
+        r["RaisedShadow"] = Shadows([ring]);
+        r["SegShadow"] = Shadows([ring]);
+        r["WindowShadow"] = Shadows([Outer(0, 18, 50, 0, Black(dark ? 0.5 : 0.16)), Outer(0, 2, 8, 0, Black(dark ? 0.3 : 0.06)), ring]);
+        r["PillShadow"] = Shadows([ring, drop]);
+        // The dot's ring on a highlighted row: white on a dark accent, near-black ink on a light one — never a tint.
+        r["OnAccentRing"] = Shadows([Outer(0, 0, 0, 1.5, lt ? Rgba(0x17, 0x17, 0x17, 1) : Colors.White)]);
+    }
+
+    /// <summary>The Windows look: the same tokens under the names its views ask for (the window behind is the
+    /// canvas, the content layer the page's white, a card the sunken grey with a hairline round it).</summary>
     static void WinTokens(ResourceDictionary r, ColourTheme t, bool dark)
     {
         void B(string key, Color c) => r[key] = new SolidColorBrush(c);
+        var p = dark ? Dark : Light;
         double L = t.L, c = t.C;
-        bool lt = t.IsLight;
-        Color accentText, stroke, bottom;
+        Accents(r, t, dark, mac: false);
+        B("Ground", dark ? Hex("#0E0F11") : Hex("#DADCE0"));
+        B("Mica", p.Canvas);
+        B("Layer", p.Surface);
+        B("LayerStroke", p.Line);
+        B("Acrylic", dark ? p.SurfaceToday : p.Surface);
+        B("FlyStroke", p.Line);
+        B("Footer", p.SurfaceSunken);
+        B("Card", p.SurfaceSunken);
+        B("CardStroke", p.Line);
+        B("Fg", p.Ink);
+        B("Fg2", p.InkMuted);
+        B("Fg3", p.InkSubtle);
+        B("Sep", p.Line);
+        B("Subtle", p.Hover);
+        B("Subtle2", p.Press);
+        B("Ctrl", p.Surface);
+        B("CtrlStroke", p.Line);
+        B("CtrlBottom", p.Line);
+        B("CtrlBorder", p.Line);
+        B("Hl", p.Highlighters["Yellow"]);
+        B("Taskbar", p.Canvas);
+        B("PopupBg", dark ? p.SurfaceToday : p.Surface);
+        B("PopupStroke", p.Line);
+        B("Mini", p.Surface);
+        B("Rec", p.Record);
+        B("Fill", p.Hover);
+        B("Fill2", p.Press);
+        B("Good", Good);
         if (!dark)
         {
-            B("Ground", Hex("#DADCE0"));
-            B("Mica", t.Neutral(0.96, 1));
-            B("Layer", White(0.55));
-            B("LayerStroke", Black(0.06));
-            B("Acrylic", t.Neutral(0.975, 1, 0.95));
-            B("FlyStroke", Black(0.1));
-            B("Footer", t.Neutral(0.94, 1));
-            B("Card", White(0.75));
-            B("CardStroke", Black(0.06));
-            B("Fg", Black(0.9));
-            B("Fg2", Black(0.62));
-            B("Fg3", Black(0.45));
-            B("Sep", Black(0.08));
-            B("Subtle", Black(0.04));
-            B("Subtle2", Black(0.06));
-            B("Ctrl", White(0.8));
-            B("CtrlStroke", stroke = Black(0.07));
-            B("CtrlBottom", bottom = Black(0.18));
-            B("Accent", lt ? t.O(L, c) : t.O(Math.Max(L - 0.06, 0.42), c));
-            B("AccentText", accentText = lt ? t.O(0.42, c * 0.9) : t.O(Math.Max(L - 0.12, 0.4), c));
-            B("OnAccent", lt ? Ink : Colors.White);
-            B("Hl", Oklch.ToColor(0.88, 0.16, t.Hl, 0.5));
-            B("Taskbar", t.Neutral(0.94, 1));
-            // Not in the design: a Windows 11 toast's or menu's plain, opaque panel.
-            B("PopupBg", Hex("#F9F9F9"));
-            B("PopupStroke", Black(0.1));
-            r["PopupShadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.14))]);
-            r["Shadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.14))]);
-            r["ShadowLg"] = Shadows([Outer(0, 32, 64, 0, Black(0.18)), Outer(0, 2, 21, 0, Black(0.14))]);
-            B("Mini", Colors.White);
             B("Ok", Hex("#0F7B0F"));
             B("Warn", Hex("#9D5D00"));
-            // Not in the design: the recording dot, the tray icon's red.
-            B("Rec", Hex("#E5484D"));
             B("IbInfo", Hex("#F6F6F6"));
             B("IbOk", Hex("#DFF6DD"));
             B("IbWarn", Hex("#FFF4CE"));
@@ -269,45 +340,11 @@ public static class Skin
             B("IcWarn", Hex("#9D5D00"));
             B("IcErr", Hex("#C42B1C"));
             B("IbGlyph", Colors.White);
-            B("Hover", Black(0.04));
-            B("Press", Black(0.02));
-            B("Fill", Black(0.04));
-            B("Fill2", Black(0.06));
         }
         else
         {
-            B("Ground", Hex("#0E0F11"));
-            B("Mica", t.Neutral(0.235, 1.5));
-            B("Layer", Rgba(58, 58, 58, 0.3));
-            B("LayerStroke", Black(0.25));
-            B("Acrylic", t.Neutral(0.28, 1.5, 0.96));
-            B("FlyStroke", White(0.09));
-            B("Footer", t.Neutral(0.2, 1.5));
-            B("Card", White(0.05));
-            B("CardStroke", White(0.07));
-            B("Fg", Colors.White);
-            B("Fg2", White(0.79));
-            B("Fg3", White(0.54));
-            B("Sep", White(0.08));
-            B("Subtle", White(0.06));
-            B("Subtle2", White(0.09));
-            B("Ctrl", White(0.06));
-            B("CtrlStroke", stroke = White(0.07));
-            B("CtrlBottom", bottom = White(0.12));
-            B("Accent", lt ? t.O(L, c) : t.O(0.8, c * 0.6));
-            B("AccentText", accentText = lt ? t.O(L, c) : t.O(0.8, c * 0.6));
-            B("OnAccent", Ink);
-            B("Hl", Oklch.ToColor(0.75, 0.15, t.Hl, 0.3));
-            B("Taskbar", t.Neutral(0.2, 1.5));
-            B("PopupBg", Hex("#2C2C2C"));
-            B("PopupStroke", White(0.09));
-            r["PopupShadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.3))]);
-            r["Shadow"] = Shadows([Outer(0, 8, 16, 0, Black(0.3))]);
-            r["ShadowLg"] = Shadows([Outer(0, 32, 64, 0, Black(0.4)), Outer(0, 2, 21, 0, Black(0.3))]);
-            B("Mini", Hex("#2B2B2B"));
             B("Ok", Hex("#6CCB5F"));
             B("Warn", Hex("#FCE100"));
-            B("Rec", Hex("#E5484D"));
             B("IbInfo", Hex("#2B2B2B"));
             B("IbOk", Hex("#393D1B"));
             B("IbWarn", Hex("#433519"));
@@ -316,16 +353,14 @@ public static class Skin
             B("IcWarn", Hex("#FCE100"));
             B("IcErr", Hex("#FF99A4"));
             B("IbGlyph", Colors.Black);
-            B("Hover", White(0.06));
-            B("Press", White(0.03));
-            B("Fill", White(0.06));
-            B("Fill2", White(0.09));
         }
-        B("IcInfo", accentText);
-        B("Good", Good);
-        // Not in the design: the small recorder's capsule, an accent fill with a hairline just inside it (dark on a
-        // light accent, light on a dark one), and the shadow it floats on over whatever else is on screen.
-        r["PillShadow"] = Shadows([Inset(0, 0, 0, 1, dark || lt ? Black(0.14) : White(0.2)), PillDrop]);
+        r["IcInfo"] = r["AccentText"];
+        var ring = Outer(0, 0, 0, 1, p.Line);
+        var drop = Outer(0, 10, 30, -12, Black(p.FloatShade));
+        r["PopupShadow"] = Shadows([Outer(0, 8, 16, 0, Black(dark ? 0.3 : 0.14))]);
+        r["Shadow"] = Shadows([drop]);
+        r["ShadowLg"] = Shadows([Outer(0, 32, 64, 0, Black(dark ? 0.4 : 0.18)), Outer(0, 2, 21, 0, Black(dark ? 0.3 : 0.14))]);
+        r["PillShadow"] = Shadows([ring, drop]);
         // The caption buttons Avalonia draws in a Windows window's title bar (Fluent's keys): our ink, hover and press.
         r["CaptionButtonForeground"] = r["Fg"];
         r["CaptionButtonBackground"] = r["Hover"];
@@ -340,18 +375,19 @@ public static class Skin
             r[$"SystemAccentColorLight{i}"] = t.O(Math.Min(0.95, al + 0.07 * i), c);
             r[$"SystemAccentColorDark{i}"] = t.O(Math.Max(0.2, al - 0.07 * i), c);
         }
-        // Fluent's control border: a hairline all round, darker along the bottom edge.
-        r["CtrlBorder"] = new LinearGradientBrush
-        {
-            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(0, 1, RelativeUnit.Relative),
-            GradientStops = { new GradientStop(stroke, 0.94), new GradientStop(bottom, 0.97) },
-        };
     }
 
+    /// <summary>The design's own tokens, in both looks.</summary>
+    static readonly string[] SemesterBrushes =
+    [
+        "Canvas", "Surface", "SurfaceSunken", "SurfaceToday", "Line", "Hover", "Press", "Ink", "InkMuted", "InkSubtle", "Record",
+        "OnRecord", "Late", "Focus",
+    ];
+    static readonly string[] SemesterShadows = ["ShadowToday", "ShadowFloat", "ShadowFloatFocus", "LineRing", "SubtleRing", "RecordRing"];
     static readonly string[] MacBrushes =
     [
         "Glass", "GlassSolid", "Win", "Raised", "Group", "Fg", "Fg2", "Fg3", "Sep", "Fill", "Fill2", "Mini", "Accent", "AccentText",
-        "Tint", "OnAccent", "AccentTint", "Hl", "Warn", "Ok", "Rec", "Good", "Hover", "Press", "PopupBg", "PopupStroke",
+        "Tint", "OnAccent", "AccentTint", "Hl", "Warn", "Ok", "Rec", "Good", "PopupBg", "PopupStroke",
     ];
     static readonly string[] MacShadows =
     [
@@ -362,20 +398,27 @@ public static class Skin
     [
         "Ground", "Mica", "Layer", "LayerStroke", "Acrylic", "FlyStroke", "Footer", "Card", "CardStroke", "Fg", "Fg2", "Fg3", "Sep",
         "Subtle", "Subtle2", "Ctrl", "CtrlStroke", "CtrlBottom", "CtrlBorder", "Accent", "AccentText", "OnAccent", "Hl", "Taskbar",
-        "Mini", "Ok", "Warn", "Rec", "PopupBg", "PopupStroke", "IbInfo", "IbOk", "IbWarn", "IbErr", "IcInfo", "IcOk", "IcWarn", "IcErr", "IbGlyph", "Good", "Hover", "Press",
+        "Mini", "Ok", "Warn", "Rec", "PopupBg", "PopupStroke", "IbInfo", "IbOk", "IbWarn", "IbErr", "IcInfo", "IcOk", "IcWarn", "IcErr", "IbGlyph", "Good",
     ];
     static readonly string[] WinShadows = ["Shadow", "ShadowLg", "PopupShadow", "PillShadow"];
 
-    /// <summary>Every token the design gives a look, and what it is (a brush, shadows, the glass's filter, a font, a
-    /// radius): what <see cref="Build(SkinKind, ColourTheme)"/> must make, light and dark.</summary>
+    /// <summary>Every token a look has, and what it is (a brush, shadows, the glass's filter, a font, a radius): what
+    /// <see cref="Build(SkinKind, ColourTheme)"/> must make, light and dark.</summary>
     public static IEnumerable<(string Key, Type Type)> Keys(SkinKind kind)
     {
         bool mac = kind == SkinKind.Mac;
+        foreach (var k in SemesterBrushes) yield return (k, typeof(IBrush));
+        foreach (var hue in ClassHues)
+        {
+            yield return ("Hl" + hue, typeof(IBrush));
+            yield return ("Swatch" + hue, typeof(IBrush));
+        }
+        foreach (var k in SemesterShadows) yield return (k, typeof(BoxShadows));
         foreach (var k in mac ? MacBrushes : WinBrushes) yield return (k, typeof(IBrush));
         foreach (var k in mac ? MacShadows : WinShadows) yield return (k, typeof(BoxShadows));
         if (mac) yield return ("GlassFilter", typeof(GlassFilter));
         foreach (var k in new[] { "TextFont", "DisplayFont", "SerifFont" }) yield return (k, typeof(FontFamily));
-        foreach (var k in new[] { "RadiusPanel", "RadiusControl", "RadiusMenu" }) yield return (k, typeof(CornerRadius));
+        foreach (var k in new[] { "RadiusPanel", "RadiusControl", "RadiusMenu", "RadiusDay", "RadiusPane" }) yield return (k, typeof(CornerRadius));
         yield return ("PopupStrokeWidth", typeof(Thickness));
     }
 
@@ -384,24 +427,20 @@ public static class Skin
     /// <summary>The dark ink text takes on a light accent (Chalkboard, Highlighter).</summary>
     static readonly Color Ink = Color.FromRgb(0x16, 0x17, 0x1A);
 
-    /// <summary>The shadow under the small recorder's capsule, the same in both looks, light and dark.</summary>
-    static readonly BoxShadow PillDrop = new() { OffsetY = 6, Blur = 18, Color = Color.FromArgb(0x59, 0, 0, 0) };
+    /// <summary>No shadow at all: where the look before had glass's edge highlights.</summary>
+    static readonly BoxShadows None = default;
 
     static Color Hex(string hex) => Color.Parse(hex);
-    static Color White(double a) => Rgba(255, 255, 255, a);
     static Color Black(double a) => Rgba(0, 0, 0, a);
     static Color Rgba(byte r, byte g, byte b, double a) => Color.FromArgb(Oklch.Byte(a), r, g, b);
 
     static BoxShadow Outer(double x, double y, double blur, double spread, Color c) =>
         new() { OffsetX = x, OffsetY = y, Blur = Blur(blur), Spread = spread, Color = c };
 
-    static BoxShadow Inset(double x, double y, double blur, double spread, Color c) =>
-        new() { OffsetX = x, OffsetY = y, Blur = Blur(blur), Spread = spread, Color = c, IsInset = true };
-
     /// <summary>
     /// A CSS box-shadow blur as Avalonia's. CSS blurs by a Gaussian of half the blur radius; Avalonia takes the radius
-    /// the way Skia once did (0.2887 × radius + 0.5), which is only about 0.6 of that, so the design's shadows and the
-    /// accent's glow would come out tight and hard.
+    /// the way Skia once did (0.2887 × radius + 0.5), which is only about 0.6 of that, so the design's shadows would
+    /// come out tight and hard.
     /// </summary>
     public static double Blur(double css) => Math.Max(0, (css / 2 - 0.5) / 0.288675);
 

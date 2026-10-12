@@ -1,0 +1,133 @@
+/*
+  Semester UI tokens. Drop this file in once and reference the variables everywhere.
+  Theme: set data-theme="light" | "dark" on <html>, or let prefers-color-scheme decide.
+*/
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("../fonts/AtkinsonHyperlegibleNext-Variable.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root, [data-theme="light"] {
+  /* Surfaces */
+  --color-canvas: #e9ebee;          /* desk behind everything; the sidebar sits directly on it */
+  --color-surface: #ffffff;         /* the main pane ("the page"), ask bar, selected nav item */
+  --color-surface-sunken: #f5f6f7;  /* week grid background */
+  --color-surface-today: #ffffff;   /* today's column, lifted out of the week grid */
+  --color-line: #dde0e4;            /* hairlines and 1px outlines */
+  --color-hover: rgba(127, 127, 127, 0.12);
+
+  /* Text */
+  --color-ink: #1d1f23;             /* primary text and icons */
+  --color-ink-muted: #565c66;       /* summaries, dates, inactive nav, class meetings */
+  --color-ink-subtle: #626973;      /* counts, times, placeholders, footer */
+
+  /* Signals: red means recording or late, nothing else */
+  --color-record: #d42a1a;
+  --color-on-record: #ffffff;
+  --color-late: #b3261e;
+  --color-focus: #1d1f23;           /* 2px solid focus outline, 2px offset */
+
+  /* Highlighters: one per class. Background behind --color-ink text. */
+  --hl-yellow: #ffe46b;
+  --hl-green:  #b5eea6;
+  --hl-pink:   #ffc2df;
+  --hl-blue:   #bcdcff;
+  --hl-orange: #ffcf98;
+  --hl-violet: #dacbff;
+  --hl-teal:   #a6ebe1;
+  --hl-lime:   #e2f28c;
+
+  /* Swatches: the small class marks in the sidebar and week grid (no text on them) */
+  --swatch-yellow: var(--hl-yellow);
+  --swatch-green:  var(--hl-green);
+  --swatch-pink:   var(--hl-pink);
+  --swatch-blue:   var(--hl-blue);
+  --swatch-orange: var(--hl-orange);
+  --swatch-violet: var(--hl-violet);
+  --swatch-teal:   var(--hl-teal);
+  --swatch-lime:   var(--hl-lime);
+
+  --shadow-today: 0 0 0 1px var(--color-line), 0 6px 14px -8px rgba(0, 0, 0, 0.18);
+  --shadow-float: 0 0 0 1px var(--color-line), 0 10px 30px -12px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] {
+  --color-canvas: #0e0f11;
+  --color-surface: #191a1d;
+  --color-surface-sunken: #202226;
+  --color-surface-today: #2a2c31;
+  --color-line: #2d3035;
+  --color-hover: rgba(127, 127, 127, 0.16);
+  --color-ink: #eceef1;
+  --color-ink-muted: #a4a9b1;
+  --color-ink-subtle: #8d939c;
+  --color-record: #ff5a47;
+  --color-on-record: #1a0603;
+  --color-late: #ff8a80;
+  --color-focus: #eceef1;
+  --hl-yellow: #5a4c00;
+  --hl-green:  #1f4f2c;
+  --hl-pink:   #5b2244;
+  --hl-blue:   #1d4263;
+  --hl-orange: #5b380f;
+  --hl-violet: #3d2e68;
+  --hl-teal:   #134f48;
+  --hl-lime:   #44500e;
+  --swatch-yellow: #e9cf4a;
+  --swatch-green:  #7fd27a;
+  --swatch-pink:   #f08cbf;
+  --swatch-blue:   #7db8f2;
+  --swatch-orange: #f0a95a;
+  --swatch-violet: #b39cf5;
+  --swatch-teal:   #62d3c3;
+  --swatch-lime:   #c4dc55;
+  --shadow-today: 0 0 0 1px var(--color-line), 0 6px 14px -8px rgba(0, 0, 0, 0.6);
+  --shadow-float: 0 0 0 1px var(--color-line), 0 10px 30px -12px rgba(0, 0, 0, 0.7);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-canvas: #0e0f11; --color-surface: #191a1d; --color-surface-sunken: #202226; --color-surface-today: #2a2c31;
+    --color-line: #2d3035; --color-hover: rgba(127,127,127,.16);
+    --color-ink: #eceef1; --color-ink-muted: #a4a9b1; --color-ink-subtle: #8d939c;
+    --color-record: #ff5a47; --color-on-record: #1a0603; --color-late: #ff8a80; --color-focus: #eceef1;
+    --hl-yellow: #5a4c00; --hl-green: #1f4f2c; --hl-pink: #5b2244; --hl-blue: #1d4263; --hl-orange: #5b380f; --hl-violet: #3d2e68; --hl-teal: #134f48; --hl-lime: #44500e;
+    --swatch-yellow: #e9cf4a; --swatch-green: #7fd27a; --swatch-pink: #f08cbf; --swatch-blue: #7db8f2; --swatch-orange: #f0a95a; --swatch-violet: #b39cf5; --swatch-teal: #62d3c3; --swatch-lime: #c4dc55;
+    --shadow-today: 0 0 0 1px var(--color-line), 0 6px 14px -8px rgba(0,0,0,.6);
+    --shadow-float: 0 0 0 1px var(--color-line), 0 10px 30px -12px rgba(0,0,0,.7);
+  }
+}
+
+:root {
+  /* Type: one family, weight does the work */
+  --font-sans: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --text-date:   800 40px/44px var(--font-sans);   /* page title: "Monday, October 12"; letter-spacing -0.025em */
+  --text-h2:     800 17px/24px var(--font-sans);   /* section headings; letter-spacing -0.01em */
+  --text-title:  700 17px/22px var(--font-sans);   /* lecture title; letter-spacing -0.01em */
+  --text-body:   400 15px/22px var(--font-sans);   /* default */
+  --text-lede:   400 16px/24px var(--font-sans);   /* sentence under the date */
+  --text-summary:400 14.5px/22px var(--font-sans); /* AI summaries, max 64ch, clamp 2 lines */
+  --text-nav:    500 15px/20px var(--font-sans);   /* sidebar nav; selected = 700 */
+  --text-class:  400 14px/20px var(--font-sans);   /* sidebar class names */
+  --text-due:    700 14px/19px var(--font-sans);   /* assignment names in the week grid */
+  --text-meta:   500 13px/18px var(--font-sans);   /* day names, class meetings, counts */
+  --text-micro:  500 12px/16px var(--font-sans);   /* times, "Recorded", footer */
+  --text-daynum: 800 22px/26px var(--font-sans);   /* week grid day numbers; letter-spacing -0.02em */
+
+  /* Space (4px base) */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px;
+  --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-14: 56px;
+
+  /* Radius: nested, not one value everywhere */
+  --radius-control: 8px;   /* nav items, icon buttons, scope picker */
+  --radius-day: 10px;      /* today's column */
+  --radius-panel: 12px;    /* week grid, ask bar */
+  --radius-pane: 14px;     /* main pane */
+  --radius-pill: 999px;    /* record button */
+
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+}

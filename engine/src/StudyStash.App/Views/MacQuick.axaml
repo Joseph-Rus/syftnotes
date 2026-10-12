@@ -60,9 +60,6 @@
     <Style Selector="Button.tint TextBlock.enter">
       <Setter Property="IsVisible" Value="True" />
     </Style>
-    <Style Selector="Button.tint Border.dot">
-      <Setter Property="BoxShadow" Value="{DynamicResource OnAccentRing}" />
-    </Style>
     <Style Selector="Button.tint c|Icon">
       <Setter Property="Foreground" Value="{DynamicResource OnAccent}" />
     </Style>
@@ -121,14 +118,14 @@
                   <Panel>
                     <!-- A lecture -->
                     <Grid IsVisible="{Binding IsLecture}" Height="40" Margin="14,0" ColumnDefinitions="8,10,*,Auto,10,12">
-                      <Border Classes="dot" Width="8" Height="8" CornerRadius="4" Background="{Binding Dot}" VerticalAlignment="Center" />
+                      <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="3" Classes="meta" Classes.strong="{Binding Strong}" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
                       <TextBlock Grid.Column="5" Classes="enter meta" Text="&#x21A9;&#xFE0E;" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Grid>
                     <!-- A passage from notes -->
                     <Grid IsVisible="{Binding IsPassage}" Margin="14,8" ColumnDefinitions="8,10,*">
-                      <Border Classes="dot" Width="8" Height="8" CornerRadius="4" Background="{Binding Dot}" VerticalAlignment="Top" Margin="0,5,0,0" />
+                      <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Top" Margin="0,5,0,0" />
                       <StackPanel Grid.Column="2">
                         <c:Marked Source="{Binding Title}" Terms="{Binding $parent[UserControl].((vm:QuickModel)DataContext).Query}" Mark="{DynamicResource Hl}"
                                   MarkRadius="4" MarkPadding="3" FontSize="13" LineHeight="18.2" TextWrapping="Wrap" />
@@ -137,7 +134,7 @@
                     </Grid>
                     <!-- A class -->
                     <Grid IsVisible="{Binding IsClass}" Height="36" Margin="14,0" ColumnDefinitions="8,10,*,Auto">
-                      <Border Classes="dot" Width="8" Height="8" CornerRadius="4" Background="{Binding Dot}" VerticalAlignment="Center" />
+                      <c:Swatch Classes="dot" Small="True" Fill="{Binding Dot}" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="13" FontWeight="Medium" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                       <TextBlock Grid.Column="3" Classes="meta" Text="{Binding Meta}" FontSize="13" VerticalAlignment="Center" Margin="10,0,0,0" />
                     </Grid>

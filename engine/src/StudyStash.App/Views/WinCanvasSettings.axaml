@@ -133,7 +133,7 @@
             <Border Classes="cv-item">
               <Grid ColumnDefinitions="Auto,*,Auto">
                 <Border Grid.Column="0" Width="20" HorizontalAlignment="Center" VerticalAlignment="Center">
-                  <Ellipse Classes="cv-dot" Fill="{Binding Dot}" HorizontalAlignment="Center" />
+                  <c:Swatch Small="True" Fill="{Binding Dot}" HorizontalAlignment="Center"/>
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="2" Margin="16,0,0,0" VerticalAlignment="Center" MinWidth="0">
                   <TextBlock Classes="cv-dot-label" Text="{Binding Class}" />

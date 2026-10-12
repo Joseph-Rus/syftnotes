@@ -45,6 +45,20 @@ public sealed partial class NoteView : StackPanel
     /// <summary>The line's own height in pixels (not a multiplier of the size, unlike the design's reading type).</summary>
     public static readonly StyledProperty<double> BodyLineHeightProperty = AvaloniaProperty.Register<NoteView, double>(nameof(BodyLineHeight), 22);
 
+    /// <summary>Tell whose words are whose: what the student typed (==marked== in the Markdown) is ink and heavier,
+    /// and everything written from the recording is the muted grey. Off, the notes are all one ink, as an answer or
+    /// an assignment's instructions are.</summary>
+    public static readonly StyledProperty<bool> ProvenanceProperty = AvaloniaProperty.Register<NoteView, bool>(nameof(Provenance));
+
+    public bool Provenance
+    {
+        get => GetValue(ProvenanceProperty);
+        set => SetValue(ProvenanceProperty, value);
+    }
+
+    /// <summary>The token a piece of the notes' text takes its colour from.</summary>
+    string TextInk => Provenance ? "InkMuted" : "Fg";
+
     /// <summary>Set when the notes are laid out for paper (a PDF), this many pixels to a page's height: nothing on
     /// paper scrolls, so every formula and diagram shrinks as far as it must to fit the column, a diagram no taller than
     /// a page; diagrams don't open larger; and a fence left open at the end is saved notes that can't be drawn, not an
@@ -140,7 +154,7 @@ public sealed partial class NoteView : StackPanel
     {
         base.OnPropertyChanged(change);
         if (change.Property == CompactProperty || change.Property == BodyFontProperty || change.Property == BodySizeProperty
-            || change.Property == BodyLineHeightProperty || change.Property == PageHeightProperty)
+            || change.Property == BodyLineHeightProperty || change.Property == PageHeightProperty || change.Property == ProvenanceProperty)
         {
             // Every block's type changes (a diagram on paper is another control from one on screen): none can be kept.
             blocks.Clear();
@@ -252,7 +266,7 @@ public sealed partial class NoteView : StackPanel
     {
         var t = new SpokenText { FontSize = size, LineHeight = size * lineHeight, TextWrapping = TextWrapping.Wrap };
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(resourceFont));
-        t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
+        t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable(TextInk));
         FollowLinks(t);
         return t;
     }
@@ -263,7 +277,7 @@ public sealed partial class NoteView : StackPanel
     {
         var t = new SpokenSelectableText { FontSize = BodySize, LineHeight = BodyLineHeight, TextWrapping = TextWrapping.Wrap };
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(BodyFont ?? "TextFont"));
-        t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
+        t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable(TextInk));
         t.Bind(SelectableTextBlock.SelectionBrushProperty, t.GetResourceObservable("Hl"));
         FollowLinks(t);
         return t;
@@ -344,10 +358,10 @@ public sealed partial class NoteView : StackPanel
                 case HeadingBlock h:
                     section = Plain(h.Inline);
                     var head = Text("DisplayFont", Mac ? 17 : 20, 1.25);
-                    head.FontWeight = FontWeight.SemiBold;
+                    head.FontWeight = Provenance ? FontWeight.ExtraBold : FontWeight.SemiBold;
                     head.Classes.Add(HeadingClass);
                     Fill(head, h.Inline);
-                    head.Margin = Compact ? default : new Thickness(0, first ? (Mac ? 18 : 16) : (Mac ? 14 : 12), 0, 0);
+                    head.Margin = Compact ? default : Provenance ? new Thickness(0, first ? 8 : 12, 0, -4) : new Thickness(0, first ? (Mac ? 18 : 16) : (Mac ? 14 : 12), 0, 0);
                     control = head;
                     break;
                 case ListBlock list when IsDefinitions(section, list):
@@ -736,7 +750,7 @@ public sealed partial class NoteView : StackPanel
     Control Code(string text)
     {
         var t = new TextBlock { Text = text.TrimEnd(), FontFamily = new FontFamily("SF Mono, Menlo, Cascadia Mono, Consolas, monospace"), FontSize = 13, LineHeight = 19.5, TextWrapping = TextWrapping.Wrap };
-        t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg"));
+        t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable(TextInk));
         var box = new Border { Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(Mac ? 8 : 4), Child = t };
         box.Bind(Border.BackgroundProperty, box.GetResourceObservable("Fill2"));
         return box;
@@ -752,7 +766,9 @@ public sealed partial class NoteView : StackPanel
         t.Inlines ??= [];
         if (inline is null) return;
         bool lead = trimLead;
-        foreach (var piece in Runs(inline, skip, null, null, t.FontSize, fgKey))
+        // (In a heading, which is heavier than the student's words would be, theirs keep the heading's weight.)
+        FontWeight? mine = (int)t.FontWeight > (int)FontWeight.SemiBold ? null : FontWeight.SemiBold;
+        foreach (var piece in Runs(inline, skip, null, null, t.FontSize, fgKey, mine))
         {
             if (lead)
             {
@@ -786,7 +802,8 @@ public sealed partial class NoteView : StackPanel
 
     /// <summary>The text as runs (or an inline formula's <see cref="InlineUIContainer"/>); weight and style are set
     /// only where the Markdown changes them, so a heading's runs stay as heavy as the heading.</summary>
-    static IEnumerable<Inline> Runs(ContainerInline container, MdInline? skip, FontWeight? weight, FontStyle? style, double bodySize, string? fgKey)
+    static IEnumerable<Inline> Runs(ContainerInline container, MdInline? skip, FontWeight? weight, FontStyle? style, double bodySize, string? fgKey,
+        FontWeight? mineWeight = FontWeight.SemiBold)
     {
         for (var i = container.FirstChild; i is not null; i = i.NextSibling)
         {
@@ -802,8 +819,16 @@ public sealed partial class NoteView : StackPanel
                     if (style is { } st) run.FontStyle = st;
                     yield return run;
                     break;
+                case EmphasisInline { DelimiterChar: '=' } mine:
+                    // What the student typed themselves: ink, and heavier, wherever it stands.
+                    foreach (var r in Runs(mine, skip, mineWeight ?? weight, style, bodySize, "Ink", mineWeight))
+                    {
+                        if (r is Run own) own.Bind(Run.ForegroundProperty, own.GetResourceObservable("Ink"));
+                        yield return r;
+                    }
+                    break;
                 case EmphasisInline e:
-                    foreach (var r in Runs(e, skip, e.DelimiterCount >= 2 ? FontWeight.SemiBold : weight, e.DelimiterCount == 1 ? FontStyle.Italic : style, bodySize, fgKey)) yield return r;
+                    foreach (var r in Runs(e, skip, e.DelimiterCount >= 2 ? FontWeight.SemiBold : weight, e.DelimiterCount == 1 ? FontStyle.Italic : style, bodySize, fgKey, mineWeight)) yield return r;
                     break;
                 case CodeInline c:
                     yield return new Run(c.Content) { FontFamily = new FontFamily("SF Mono, Menlo, Cascadia Mono, Consolas, monospace"), FontSize = 14 };
@@ -812,7 +837,7 @@ public sealed partial class NoteView : StackPanel
                     yield return new Run(" ");
                     break;
                 case LinkInline link:
-                    foreach (var r in Runs(link, skip, weight, style, bodySize, fgKey))
+                    foreach (var r in Runs(link, skip, weight, style, bodySize, fgKey, mineWeight))
                     {
                         if (!link.IsImage && link.Url is { Length: > 0 } url && r is Run linked)
                         {
@@ -824,7 +849,7 @@ public sealed partial class NoteView : StackPanel
                     }
                     break;
                 case ContainerInline other:
-                    foreach (var r in Runs(other, skip, weight, style, bodySize, fgKey)) yield return r;
+                    foreach (var r in Runs(other, skip, weight, style, bodySize, fgKey, mineWeight)) yield return r;
                     break;
             }
         }
