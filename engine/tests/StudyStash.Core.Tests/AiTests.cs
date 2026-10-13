@@ -303,8 +303,10 @@ public class AiTests
         // The turn's own folders may be read too: in print mode a file it can't open ends the turn with nothing said.
         Assert.True(GeminiProvider.AllowReading(path, ["/lib/scratch/", "/lib/pool", ""]));
         allow = JsonNode.Parse(File.ReadAllText(path))!["permissions"]!["allow"]!.AsArray().Select(a => a!.GetValue<string>()).ToList();
-        Assert.Contains("read_file(/lib/scratch)", allow);
-        Assert.Contains("read_file(/lib/pool)", allow);
+        // As the computer writes the folder (C:\lib\scratch on Windows), with no separator at its end.
+        string Rule(string folder) => $"read_file({Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder))})";
+        Assert.Contains(Rule("/lib/scratch"), allow);
+        Assert.Contains(Rule("/lib/pool"), allow);
         Assert.DoesNotContain(allow, a => a.StartsWith("read_file()", StringComparison.Ordinal));
         Assert.False(GeminiProvider.AllowReading(path, ["/lib/pool"])); // already there
     }

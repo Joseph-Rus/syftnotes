@@ -128,13 +128,14 @@ public class AskStreamTests
         using var dir = new TempDir();
         var cfg = Cfg(dir);
         using var store = new Store(cfg.DbPath, cfg.PoolDir);
-        var claude = new ScriptedAi("claude") { Script = [.. Pieces.Select(p => new AiEvent("text", p))], Pause = TimeSpan.FromMilliseconds(400) };
+        var claude = new ScriptedAi("claude") { Script = [.. Pieces.Select(p => new AiEvent("text", p))], Pause = TimeSpan.FromSeconds(1) };
         var ollama = new ScriptedAi("ollama") { Script = [new AiEvent("final", """{"answer":"From Ollama.","sources":[]}""")] };
         var ai = new AiJobs(cfg.Home)
         {
             Providers = id => id switch { "claude" => claude, "ollama" => ollama, _ => new ScriptedAi(id) },
             Checks = new FakeChecks().Installed("claude").Build(),
-            AskTimeout = TimeSpan.FromSeconds(1), // the whole answer takes longer; its first words don't
+            // The whole answer (3 s) takes longer; its first words (1 s) don't, with room for a slow test machine.
+            AskTimeout = TimeSpan.FromSeconds(2.5),
         };
         await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), Options(ai)));
         var remote = new AiRemote("http://localhost", "pw", site.Client);
