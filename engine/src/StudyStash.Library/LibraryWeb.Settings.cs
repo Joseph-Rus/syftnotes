@@ -71,6 +71,8 @@ public sealed partial class LibraryWeb
             string old = cfg.PoolPassword;
             cfg.PoolPassword = password;
             Configs.Save(cfg);
+            // Every browser signed in with the old password is signed out, for good.
+            sessions.Keep(password);
             // The library's own computer reaches it with the password too: keep that working.
             var here = Configs.LoadClient(cfg.Home);
             if (here.ServerUrl.Length > 0 && here.PoolKey == old && old.Length > 0)

@@ -8,8 +8,8 @@ namespace StudyStash.Library;
 /// <summary>
 /// The browsers signed in to the library's pages (sessions.json beside the config). Each sign-in gets a secret of its
 /// own for its <c>pool</c> cookie, and only a keyed hash of it is kept here: Log out ends that one sign-in on the
-/// library, so a copy of its cookie opens nothing afterwards. A sign-in lasts <see cref="Life"/>, through the
-/// library's restarts and updates.
+/// library, so a copy of its cookie opens nothing afterwards, and a new library password ends every sign-in made
+/// with the old one. A sign-in lasts <see cref="Life"/>, through the library's restarts and updates.
 /// </summary>
 public sealed class Sessions
 {
@@ -24,6 +24,8 @@ public sealed class Sessions
     {
         public string TokenHash { get; set; } = "";
         public DateTimeOffset Started { get; set; }
+        /// <summary>The mark of the password the library had when this browser signed in (<see cref="Mark"/>).</summary>
+        public string MadeWith { get; set; } = "";
     }
 
     sealed class State
@@ -109,33 +111,51 @@ public sealed class Sessions
 
     static bool Same(string a, string b) => CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
 
-    /// <summary>Sign-ins that have run their time go. True when any did. Called under the lock.</summary>
-    bool Tidy() => state.Sessions.RemoveAll(s => Now - s.Started >= Life) > 0;
+    /// <summary>A password's mark: a keyed hash, never the password. However the password comes to change (the app's
+    /// Settings, setup run again, config.toml by hand), sign-ins that carry another mark are over.</summary>
+    string Mark(string password) => Hash("password\n" + password);
 
-    /// <summary>A new sign-in: the secret for its cookie, given out only here.</summary>
-    public string Start()
+    /// <summary>Sign-ins made with another password, and ones that have run their time, go for good: an old password
+    /// that comes back doesn't bring its sign-ins with it. True when any went. Called under the lock.</summary>
+    bool Tidy(string mark) => state.Sessions.RemoveAll(s => !Same(s.MadeWith, mark) || Now - s.Started >= Life) > 0;
+
+    /// <summary>Only sign-ins made with <paramref name="password"/> stay: for when the library starts, and the moment
+    /// its password changes.</summary>
+    public void Keep(string password)
     {
-        string token = Http.TokenUrlSafe(32);
         lock (gate)
         {
             Fresh();
-            Tidy();
-            state.Sessions.Add(new Session { TokenHash = Hash(token), Started = Now });
+            if (Tidy(Mark(password))) Save();
+        }
+    }
+
+    /// <summary>A new sign-in, made with the library's password as it is now: the secret for its cookie, given out
+    /// only here.</summary>
+    public string Start(string password)
+    {
+        string token = Http.TokenUrlSafe(32), mark = Mark(password);
+        lock (gate)
+        {
+            Fresh();
+            Tidy(mark);
+            state.Sessions.Add(new Session { TokenHash = Hash(token), Started = Now, MadeWith = mark });
             while (state.Sessions.Count > MaxSessions) state.Sessions.Remove(state.Sessions.MinBy(s => s.Started)!);
             Save();
         }
         return token;
     }
 
-    /// <summary>Whether a cookie's secret is a sign-in that still stands: made here, not logged out, not run out.</summary>
-    public bool Check(string? token)
+    /// <summary>Whether a cookie's secret is a sign-in that still stands: made here with the library's password as
+    /// it is now, not logged out, not run out.</summary>
+    public bool Check(string? token, string password)
     {
         if (string.IsNullOrEmpty(token) || token.Length > 200) return false;
-        string h = Hash(token);
+        string h = Hash(token), mark = Mark(password);
         lock (gate)
         {
             Fresh();
-            if (Tidy()) Save();
+            if (Tidy(mark)) Save();
             return state.Sessions.Any(s => Same(s.TokenHash, h));
         }
     }

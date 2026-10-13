@@ -417,11 +417,39 @@ public class LibraryWebTests
         if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
         var now = DateTimeOffset.UtcNow;
         var kept = new Sessions(cfg.Home, () => now);
-        string token = kept.Start();
+        string token = kept.Start("pw");
         now += Sessions.Life - TimeSpan.FromMinutes(1);
-        Assert.True(kept.Check(token));
+        Assert.True(kept.Check(token, "pw"));
         now += TimeSpan.FromMinutes(2);
-        Assert.False(kept.Check(token));
+        Assert.False(kept.Check(token, "pw"));
+    }
+
+    [Fact]
+    public async Task A_new_password_signs_out_every_browser()
+    {
+        using var dir = new TempDir();
+        var cfg = MakeCfg(dir, "first-one");
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        await using var c = await Site(cfg, store);
+        await c.PostForm("/login", ("password", "first-one"), ("next", "/"));
+        Assert.Equal(HttpStatusCode.OK, (await c.Get("/settings")).StatusCode);
+
+        // The app's Settings changes the password: the browser signed in with the old one is out, and stays out when
+        // the old password comes back.
+        Assert.Equal(HttpStatusCode.OK, (await c.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings/password", "first-one", new { password = "a-new-one" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/settings")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings/password", "a-new-one", new { password = "first-one" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/settings")).StatusCode);
+        await c.PostForm("/login", ("password", "first-one"), ("next", "/"));
+        Assert.Equal(HttpStatusCode.OK, (await c.Get("/settings")).StatusCode);
+
+        // Changed while the library was stopped (the app starts it again with the new one, or config.toml by hand).
+        string signedIn = c.Cookie("pool")!;
+        cfg.PoolPassword = "changed-while-stopped";
+        await using var again = await Site(cfg, store);
+        cfg.PoolPassword = "first-one";
+        again.SetCookie("pool", signedIn);
+        Assert.Equal(HttpStatusCode.SeeOther, (await again.Get("/settings")).StatusCode);
     }
 
     // --- the API the laptop talks to -----------------------------------------------------------------------------

@@ -147,6 +147,8 @@ public sealed partial class LibraryWeb
         this.pipeline = pipeline;
         this.options = options;
         sessions = new Sessions(cfg.Home);
+        // A password changed while the library was stopped (the app's Settings start it again, or config.toml by hand).
+        sessions.Keep(cfg.PoolPassword);
     }
 
     /// <summary>The library's routes on this app. The caller decides where it listens (Kestrel, or a test server).</summary>
@@ -184,7 +186,7 @@ public sealed partial class LibraryWeb
     string? RoleOf(HttpContext ctx)
     {
         if (IsLocal(ctx) || cfg.PoolPassword.Length == 0) return "admin";
-        return sessions.Check(ctx.Request.Cookies[Sessions.Cookie]) ? "admin" : null;
+        return sessions.Check(ctx.Request.Cookies[Sessions.Cookie], cfg.PoolPassword) ? "admin" : null;
     }
 
     /// <summary>The role, or the redirect to the login page (one person, one password: members are admins). Where to
@@ -438,7 +440,7 @@ public sealed partial class LibraryWeb
         // The 0.2 admin password still works, so an old bookmark or password manager entry isn't a dead end.
         if (!new[] { cfg.PoolPassword, cfg.AdminPassword }.Any(p => p.Length > 0 && Same(password, p)))
             return Http.SeeOther($"/login?bad=1&next={Ui.Quote(next, "")}");
-        ctx.Response.Cookies.Append(Sessions.Cookie, sessions.Start(), new CookieOptions
+        ctx.Response.Cookies.Append(Sessions.Cookie, sessions.Start(cfg.PoolPassword), new CookieOptions
         {
             HttpOnly = true, SameSite = SameSiteMode.Lax, MaxAge = Sessions.Life, Path = "/",
         });
