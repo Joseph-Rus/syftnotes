@@ -44,14 +44,14 @@ public sealed class SetupTests
         // Just this computer: no password, no library to find; who writes the notes comes after the model.
         var one = SetupModel.For(SkinKind.Mac);
         Assert.Equal(AppRole.Both, one.Role);
-        Assert.Equal(["Welcome", "Microphone", "Transcription model", "Notes", "Canvas", "Classes", "Start at login", "Done"], Titles(one));
+        Assert.Equal(["Welcome", "Microphone", "Transcription model", "Notes", "Canvas", "Classes", "Open when you log in", "Done"], Titles(one));
         Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], one.Steps.Select(s => s.Number));
 
         var laptop = SetupModel.For(SkinKind.Mac, AppRole.Laptop);
         Assert.Equal(["Welcome", "Your library", "Microphone", "Transcription model", "Canvas", "Classes", "Done"], Titles(laptop));
 
         var library = SetupModel.For(SkinKind.Mac, AppRole.Library);
-        Assert.Equal(["Welcome", "Password", "Your AI", "Canvas", "Classes", "Start at login", "Connect your laptop"], Titles(library));
+        Assert.Equal(["Welcome", "Password", "Your AI", "Canvas", "Classes", "Open when you log in", "Connect your laptop"], Titles(library));
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class SetupTests
     {
         Assert.Equal(["Welcome", "Your library", "Microphone", "Transcription model", "Canvas", "Classes", "Taskbar", "Done"],
             Titles(SetupModel.For(SkinKind.Win, AppRole.Laptop)));
-        Assert.Equal(["Welcome", "Microphone", "Transcription model", "Notes", "Canvas", "Classes", "Start at login", "Taskbar", "Done"],
+        Assert.Equal(["Welcome", "Microphone", "Transcription model", "Notes", "Canvas", "Classes", "Open when you log in", "Taskbar", "Done"],
             Titles(SetupModel.For(SkinKind.Win)));
         Assert.DoesNotContain(SetupStep.Taskbar, SetupModel.StepsFor(AppRole.Library, SkinKind.Win));
         Assert.DoesNotContain(SetupStep.Taskbar, SetupModel.StepsFor(AppRole.Laptop, SkinKind.Mac));

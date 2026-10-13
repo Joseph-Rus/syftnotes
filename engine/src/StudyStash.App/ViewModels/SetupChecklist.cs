@@ -121,7 +121,7 @@ public static class SetupChecklist
                 !f.AiAppsConnected ? AiAppNames(f.AiApps) : f.AiApps.Count == 1 ? $"{f.AiApps[0]} connected" : "Both connected", Optional: true));
 
         if (m.IsOneComputer || m.IsLibrary)
-            items.Add(new("start_at_login", "Start at login", f.StartsAtLogin ? ChecklistState.Done
+            items.Add(new("start_at_login", "Open when you log in", f.StartsAtLogin ? ChecklistState.Done
                 : Left(f, "start_at_login") ?? (Now(f, "start_at_login") ? ChecklistState.Now : ChecklistState.Todo), Recommended: true));
 
         if (f.Windows && records)

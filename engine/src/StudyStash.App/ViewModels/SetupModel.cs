@@ -216,10 +216,12 @@ public sealed partial class SetupModel : ObservableObject
     public ObservableCollection<SetupAddress> Addresses { get; } = [];
     public string PasswordText => ShowPassword ? Password : new string('•', Math.Clamp(Password.Length, 8, 16));
     public string ShowPasswordText => ShowPassword ? "Hide" : "Show";
+    // The step's words: the switch goes by the name Settings → General gives it, "Open when you log in", in the sidebar,
+    // on the page and on the switch itself.
     public string StartAtLoginTitle => IsLibrary ? "Keep your library running" : "Keep Study Stash running";
     public string StartAtLoginLede => IsLibrary
-        ? "Start Study Stash when this computer starts, so your laptop can always reach it."
-        : $"Start Study Stash when you log in, so your library is ready and your notes get written whenever this {DeviceWord} is on.";
+        ? "Open Study Stash when you log in to this computer, so your laptop can always reach it."
+        : $"Open Study Stash when you log in, so your library is ready and your notes get written whenever this {DeviceWord} is on.";
     public string StartAtLoginHint => IsLibrary ? "Recommended for a library." : "Recommended.";
     /// <summary>Just this computer's last page: growing into a laptop and a library later.</summary>
     public string AddLaptopLater => "Want to record on a laptop too? Add it any time in Settings → Your library.";
@@ -388,7 +390,7 @@ public sealed partial class SetupModel : ObservableObject
         SetupStep.Model => "Transcription model",
         SetupStep.Canvas => "Canvas",
         SetupStep.Classes => "Classes",
-        SetupStep.StartAtLogin => "Start at login",
+        SetupStep.StartAtLogin => "Open when you log in",
         SetupStep.Taskbar => "Taskbar",
         _ => IsLibrary ? "Connect your laptop" : "Done",
     };
