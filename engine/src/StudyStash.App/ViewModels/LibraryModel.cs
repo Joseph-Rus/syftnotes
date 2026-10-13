@@ -108,6 +108,8 @@ public sealed partial class NoteModel : ObservableObject
     public Func<string, Task<bool>>? OnRename { get; set; }
     public bool CanRename => OnRename is not null;
     string named = "";
+    /// <summary>What the note is called now: its title, or the one it was last renamed to on this page.</summary>
+    public string TitleNow => named;
 
     /// <summary>The title as it stands (set once, when the page is made).</summary>
     public NoteModel Titled()

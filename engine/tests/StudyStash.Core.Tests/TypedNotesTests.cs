@@ -95,6 +95,44 @@ public class TypedNotesTests
         Assert.Equal("Transformers, from the 2017 paper on.", (string?)lecture["summary"]);
     }
 
+    /// <summary>Keep recording sends the lecture to the library again, longer, under the title the laptop knows it by:
+    /// the name it has in the library stays, above all one the student typed.</summary>
+    [Fact]
+    public async Task A_lecture_kept_recording_comes_in_again_and_keeps_its_name()
+    {
+        using var dir = new TempDir();
+        var cfg = new Config(dir["home"], dir["pool"]) { OllamaModel = "small:1b", SummaryEnabled = false, Classes = [new ClassDef("Machine Learning")] };
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        string ai = "Attention and transformers";
+        var p = new Pipeline(cfg, store,
+            (_, _, _) => Task.FromResult($$"""{"class_name": "Machine Learning", "confidence": 0.9, "lecture_title": "{{ai}}", "topics": []}"""), log: _ => { });
+        var l = new Lecture { Id = "rec-1", Started = "2026-10-12T09:30:00-07:00" };
+        l.Segments.Add(new Spoken(0, 5, Transcript));
+        async Task<NoteRow> SentAsync()
+        {
+            store.Enqueue(Wire.MeetingFromJson(l.Payload()));
+            Assert.Equal(1, await p.RunPendingAsync());
+            return store.Get("rec-1")!;
+        }
+        Assert.Equal("Attention and transformers", (await SentAsync()).LectureTitle);
+
+        // Kept recording: the AI would call the longer lecture something else, and doesn't get to.
+        ai = "Transformers, continued";
+        Assert.Equal("Attention and transformers", (await SentAsync()).LectureTitle);
+
+        // Renamed by the student in the library, then kept recording: the laptop doesn't know the new title, and it stays theirs.
+        Assert.Equal(Store.Renamed.Done, store.SetTitle("rec-1", "My transformers notes"));
+        var row = await SentAsync();
+        Assert.Equal("My transformers notes", row.LectureTitle);
+        Assert.True(store.Meeting(row).TitledByHand);
+        Assert.Contains("My transformers notes", File.ReadAllText(row.MdPath!));
+
+        // A title typed on the recording's page while it's kept recording is the newest: the lecture's from then on.
+        l.Title = "Transformers, the exam one";
+        l.TitleTyped = true;
+        Assert.Equal("Transformers, the exam one", (await SentAsync()).LectureTitle);
+    }
+
     static Task<TestSite> Site(Config cfg, Store store) =>
         TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), new LibraryWebOptions
         {
