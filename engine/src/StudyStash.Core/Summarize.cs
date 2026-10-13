@@ -246,7 +246,11 @@ public static partial class Summarize
         return (int)((ctx - reserved) * CharsPerToken);
     }
 
-    public static bool WantsSummary(Meeting m, Config cfg) => cfg.OllamaEnabled && cfg.SummaryEnabled && !TooShort(m);
+    public static bool WantsSummary(Meeting m, Config cfg) => NotesOn(cfg) && !TooShort(m);
+
+    /// <summary>The library writes notes for what it's sent: its AI is on, and so is writing notes with it. Both are off
+    /// after setup's "No AI for now", when a lecture is filed with its transcript and nothing more.</summary>
+    public static bool NotesOn(Config cfg) => cfg.OllamaEnabled && cfg.SummaryEnabled;
 
     /// <summary>Too little was said for study notes (a transcript under <see cref="MinTranscriptChars"/>, and no notes
     /// of another app's to write them from instead): the lecture keeps its transcript without them, whatever AI the
@@ -254,8 +258,13 @@ public static partial class Summarize
     public static bool TooShort(Meeting m) => Py.Strip(m.Transcript).Length < MinTranscriptChars && !FromNotes(m);
 
     /// <summary>Why a lecture has no notes written for it, as the library tells the app and the phone
-    /// (<see cref="LibraryReader.Lecture"/>'s "no_notes"): it's <see cref="TooShort"/>.</summary>
-    public const string NoNotesShort = "short";
+    /// (<see cref="LibraryReader.Lecture"/>'s "no_notes"): it's <see cref="TooShort"/>, or the library writes none
+    /// (<see cref="NotesOn"/>).</summary>
+    public const string NoNotesShort = "short", NoNotesOff = "off";
+
+    /// <summary>What a student is told of a lecture filed while the library writes no notes; <paramref name="it"/>
+    /// names it ("this lecture").</summary>
+    public static string NotesOffWords(string it) => $"Notes are off, so your library files {it} without any.";
 
     /// <summary>About how long someone speaks to fill <see cref="MinTranscriptChars"/>, as a student is told it, to the
     /// half minute: "a minute and a half".</summary>

@@ -57,6 +57,12 @@ public class NoticeWordsTests
         Assert.Equal("Too short for notes: Study Stash writes them from about a minute and a half of speech. The library files it with its transcript.",
             NoticeWords.Saved(LibraryState.Connected, mac: true, notes: false));
         Assert.Equal("Study Stash is writing it down, and the library files it.", NoticeWords.Saved(LibraryState.Connected, mac: true, notes: null));
+        // A library that writes no notes (setup's "No AI for now") promises none, however long the recording.
+        Assert.Equal("Study Stash is writing it down, and the library files it. Notes are off, so it has just its transcript.",
+            NoticeWords.Saved(LibraryState.Connected, mac: true, notes: true, off: true));
+        Assert.Equal("Notes are off, so your library files this recording without any. The transcript is in the Transcript tab. To have notes written, choose an AI in Settings → Your AI, "
+            + "then turn on “Write study notes from each lecture” and “Sort lectures into classes with AI” in Settings → Notes and sorting.", NoteModel.NotesAreOff(Nouns.Recording, transcript: true));
+        Assert.Equal("Write as much or as little as you like. Notes are off, so what you type is kept as it is, with the transcript.", new NoteModel { Live = true, NotesOff = true }.TypedHint);
         // Twenty seconds can't be enough however fast it's said; an hour written down as it went is; two minutes with
         // nothing written down yet could be either.
         Assert.False(Summarize.WillHaveNotes(20, 18, 300));

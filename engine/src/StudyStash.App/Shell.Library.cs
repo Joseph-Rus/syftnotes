@@ -257,9 +257,15 @@ public static partial class Shell
         // No notes written (yet): what the student typed while it recorded is all there is to read, and it's theirs.
         bool mine = notes.Length == 0 && typed.Trim().Length > 0;
         var keepRecording = ContinueFor(id);
-        // No notes will be written from it, and the library says why (it's too short for them): the page says so from
-        // the start, over whatever there is to read, rather than that notes are on their way.
-        string? why = S(l["no_notes"]) == Summarize.NoNotesShort ? NoteModel.TooShort(noun, S(l["transcript"]).Trim().Length > 0, keepRecording is not null) : null;
+        // No notes will be written from it, and the library says why (it's too short for them, or the library writes
+        // none): the page says so from the start, over whatever there is to read, rather than that notes are on their way.
+        bool heard = S(l["transcript"]).Trim().Length > 0;
+        string? why = S(l["no_notes"]) switch
+        {
+            Summarize.NoNotesShort => NoteModel.TooShort(noun, heard, keepRecording is not null),
+            Summarize.NoNotesOff => NoteModel.NotesAreOff(noun, heard),
+            _ => null,
+        };
         var note = new NoteModel
         {
             Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(Date(S(l["date"])), l["seconds"] is JsonValue v && v.TryGetValue(out double s) ? s : null),
@@ -270,7 +276,7 @@ public static partial class Shell
             ShowTranscript = transcript || (showing && library.Note!.ShowTranscript),
             // The library doesn't take a new name while it's still writing the notes (it would write its own over it).
             OnRename = host.Remote() is { } remote && !host.OlderLibrary ? title => RenameAsync(remote, id, title) : null,
-            OnContinue = keepRecording,
+            OnContinue = keepRecording, NotesOff = NotesOff,
         }.Titled();
         // A transcript without times (one pasted from another app) reads a paragraph per line it came with (each
         // speaker's turn), not as one wall of text.
@@ -339,7 +345,7 @@ public static partial class Shell
     static bool? WillHaveNotes(Lecture l) => Summarize.WillHaveNotes(l.Seconds, l.TranscribedSeconds, l.Transcript().Length);
 
     /// <summary>What a recording's page on this computer was drawn from: when it reads differently, the page is drawn again.</summary>
-    static string LocalStamp(Lecture l) => string.Join("\u0001", "local", l.State, l.Title, l.ClassName, l.Notes, l.Error, l.Segments.Count);
+    static string LocalStamp(Lecture l) => string.Join("\u0001", "local", l.State, l.Title, l.ClassName, l.Notes, l.Error, l.Segments.Count, NotesOff);
     static DateTime lastLocalLook = DateTime.MinValue;
 
     /// <summary>A recording this computer made that the library doesn't have yet (it's still being written down here,
@@ -362,7 +368,9 @@ public static partial class Shell
             Pending = l.State switch
             {
                 LectureState.Failed => l.Error.Length > 0 ? l.Error : $"This {noun} couldn't be written down.",
-                // Too short for notes, as far as its length tells already: no notes are promised for it.
+                // The library writes no notes, or it's too short for them as far as its length tells already: none
+                // are promised for it.
+                _ when NotesOff => NoteModel.NotesAreOff(noun, l.Segments.Count > 0),
                 _ when WillHaveNotes(l) == false => NoteModel.TooShort(noun, l.Segments.Count > 0, keepRecording is not null),
                 LectureState.Transcribing => $"This {noun} is being written down on this computer. Its notes come once that's done and your library has it.",
                 _ => host.Library == LibraryState.Connected ? $"On its way to your library, which writes the notes for this {noun}. They show here when they're done."
@@ -375,7 +383,7 @@ public static partial class Shell
                 host.TitleLecture(id, title);
                 return Task.FromResult(true);
             } : null,
-            OnContinue = keepRecording,
+            OnContinue = keepRecording, NotesOff = NotesOff,
         }.Titled();
         foreach (var line in l.Segments)
         {

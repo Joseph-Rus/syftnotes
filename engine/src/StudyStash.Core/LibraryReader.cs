@@ -86,18 +86,25 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         // would be. The words are for the phone, which can't work them out itself.
         string? why = WhyNoNotes(row, m);
         result["no_notes"] = why;
-        result["no_notes_why"] = why == Summarize.NoNotesShort ? Summarize.TooShortWords("This lecture") : null;
+        result["no_notes_why"] = why switch
+        {
+            Summarize.NoNotesShort => Summarize.TooShortWords("This lecture"),
+            Summarize.NoNotesOff => Summarize.NotesOffWords("this lecture"),
+            _ => null,
+        };
         return result;
     }
 
-    /// <summary>Why nothing writes notes for a lecture, when that's known: <see cref="Summarize.NoNotesShort"/> for
-    /// one with too little said to write them from, which is known as soon as it arrives (so nothing says its notes
-    /// are on their way while it's filed). Null when an AI wrote its notes, when it has the notes it came with, and
-    /// when notes were asked for and none came back (its error says why, if anything does).</summary>
-    static string? WhyNoNotes(NoteRow row, Meeting m)
+    /// <summary>Why nothing writes notes for a lecture, when that's known: <see cref="Summarize.NoNotesOff"/> while the
+    /// library writes none at all, <see cref="Summarize.NoNotesShort"/> for one with too little said to write them
+    /// from. Either is known as soon as it arrives (so nothing says its notes are on their way while it's filed). Null
+    /// when an AI wrote its notes, when it has the notes it came with, and when notes were asked for and none came
+    /// back (its error says why, if anything does).</summary>
+    string? WhyNoNotes(NoteRow row, Meeting m)
     {
-        if (!string.IsNullOrEmpty(row.SummaryModel) || Py.Strip(m.NotesMarkdown).Length > 0) return null;
-        return Summarize.TooShort(m) ? Summarize.NoNotesShort : null;
+        bool written = !string.IsNullOrEmpty(row.SummaryMd) && !string.IsNullOrEmpty(row.SummaryModel);
+        if (written || Py.Strip(m.NotesMarkdown).Length > 0) return null;
+        return !Summarize.NotesOn(Cfg) ? Summarize.NoNotesOff : Summarize.TooShort(m) ? Summarize.NoNotesShort : null;
     }
 
     /// <summary>The notes a lecture shows: ours, written from the transcript, or else the ones it came with.</summary>

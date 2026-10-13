@@ -112,7 +112,7 @@
                 </StackPanel>
               </Button>
               <Button Name="Stop" Grid.Column="10" Classes="btn sm ink" Command="{Binding Recorder.StopCommand, FallbackValue={x:Null}}" AutomationProperties.Name="Stop recording"
-                      ToolTip.Tip="Stop recording: the notes are written next">
+                      ToolTip.Tip="{Binding StopTip}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource Surface}" VerticalAlignment="Center" />
                   <TextBlock Text="Stop" VerticalAlignment="Center" />
@@ -178,7 +178,7 @@
               </Button>
               <!-- Recorded here: keep recording it, the new words going on the end of its transcript -->
               <Button Name="KeepRecording" Classes="link-btn" Command="{Binding ContinueCommand}" IsVisible="{Binding CanContinue}"
-                      ToolTip.Tip="Keep recording: what's said now is added to the end of this transcript, and the notes are written again"
+                      ToolTip.Tip="{Binding ContinueTip}"
                       AutomationProperties.Name="Keep recording">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Glyph="mic" Size="15" VerticalAlignment="Center" />

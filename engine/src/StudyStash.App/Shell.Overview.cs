@@ -482,7 +482,7 @@ public static partial class Shell
         LectureState.Paused => "Recording, paused",
         LectureState.Transcribing => l.Progress > 0 ? $"Being written down ({Math.Round(l.Progress * 100)}%)" : "Being written down",
         LectureState.Sending => host.Library == LibraryState.Connected ? "On its way to your library" : "Waiting for your library",
-        LectureState.Writing => WillHaveNotes(l) == false ? "Being filed" : "Writing notes…",
+        LectureState.Writing => NotesOff || WillHaveNotes(l) == false ? "Being filed" : "Writing notes…",
         LectureState.Failed => l.Error.Length > 0 ? l.Error : "Something went wrong",
         LectureState.Planned => AppHost.PlanStarts(l) is { } at && at > DateTimeOffset.Now
             ? $"Records at {at.ToLocalTime().ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture)}" : "Not recorded",
@@ -537,6 +537,7 @@ public static partial class Shell
             Events = Events(),
             Unsorted = host.Overview?["unsorted"] is JsonValue u && u.TryGetValue(out int unsorted) ? unsorted : 0,
             Writing = host.Overview?["writing"] is JsonValue w && w.TryGetValue(out int writing) ? writing : 0,
+            NotesOff = NotesOff,
             OpenClass = cls =>
             {
                 Remember();

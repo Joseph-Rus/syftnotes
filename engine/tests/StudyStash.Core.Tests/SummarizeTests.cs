@@ -159,6 +159,11 @@ public class SummarizeTests
         // Enough was said and nothing came back: that isn't called too short.
         Assert.Null(reader.Lecture("long")!["no_notes"]);
         Assert.Contains("_(no AI notes returned)_", Py.ReadText(store.Get("long")!.MdPath!));
+        // A library that writes no notes at all (setup's "No AI for now") says that of both, the short one too.
+        cfg.OllamaEnabled = cfg.SummaryEnabled = false;
+        Assert.Equal(Summarize.NoNotesOff, reader.Lecture("long")!["no_notes"]!.GetValue<string>());
+        Assert.Equal(Summarize.NoNotesOff, reader.Lecture("short")!["no_notes"]!.GetValue<string>());
+        Assert.Equal("Notes are off, so your library files this lecture without any.", reader.Lecture("long")!["no_notes_why"]!.GetValue<string>());
     }
 
     [Fact]

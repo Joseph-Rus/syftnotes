@@ -143,6 +143,12 @@ public class OverviewTests
         Assert.Equal("Nothing on your calendar for the rest of today or tomorrow.", free.UpNextEmpty);
         // Neither Canvas nor a calendar: the library is counted instead.
         Assert.Equal("Seven notes in three folders, and notes being written for one.", OverviewModel.Home(Sources(canvas: false, calendars: false)).Lede);
+        // A library that writes no notes (setup's "No AI for now") doesn't say any are being written, or will land.
+        var off = OverviewModel.Home(Sources(canvas: false, calendars: false) with { NotesOff = true });
+        Assert.Equal("Seven notes in three folders, and one being filed.", off.Lede);
+        Assert.Equal("Being filed", off.Notes[2].Summary);
+        Assert.Equal("No notes yet. Record something and it lands here with its transcript.",
+            OverviewModel.HomeLede(Sources(canvas: false, calendars: false) with { NotesOff = true, Classes = [], Unsorted = 0 }, canvas: false));
         // Something on right now is said first; later today, by its time.
         Assert.Equal("CS 101 is on now.", OverviewModel.EventSentence(Sources() with { Events = [Event("x", "CS 101", "CS 101", -0.5)] }));
         Assert.Equal("Dentist is at 6:00 PM.", OverviewModel.EventSentence(Sources() with { Events = [Event("x", "Dentist", null, 4)] }));
