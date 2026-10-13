@@ -129,7 +129,11 @@ public abstract class AiProvider
             }
         }
         string answer = Py.Strip(final.Length > 0 ? final : text.ToString());
-        return error.Length > 0 ? new AiResult(false, error, session, tools) : new AiResult(true, answer, session, tools);
+        if (error.Length > 0) return new AiResult(false, error, session, tools);
+        // Finished but said nothing (Antigravity does when print mode refuses a tool it wanted): that's no answer, so
+        // nothing is saved as a lecture's notes and the job can try again or fall back.
+        if (answer.Length == 0) return new AiResult(false, $"{Name} finished without answering.", session, tools);
+        return new AiResult(true, answer, session, tools);
     }
 
     // --- running a command ------------------------------------------------------------------------------------
@@ -527,10 +531,11 @@ public sealed class GeminiProvider : AiProvider
 
     /// <summary>
     /// Antigravity keeps its MCP servers in its own settings: add Study Stash's once. In print mode it can't ask
-    /// before running a command, so it refuses them; allow the ones that only read (ls, cat, grep…), or a
-    /// question that needs a look around comes back empty.
+    /// before running a command or opening a file, so it refuses them and ends with an empty answer; allow the
+    /// commands that only read (ls, cat, grep…) and reading the turn's own folders (<paramref name="folders"/>), or a
+    /// turn that wants a look around comes back empty.
     /// </summary>
-    public void Prepare(IReadOnlyList<string> mcp)
+    public void Prepare(IReadOnlyList<string> mcp, IEnumerable<string>? folders = null)
     {
         string exe = Exe() ?? "agy";
         // Once seen there, it stays: later turns don't wait for `agy mcp list` again before they start.
@@ -539,7 +544,7 @@ public sealed class GeminiProvider : AiProvider
             mcpAdded = listed.Stdout.Contains(ClaudeTools.ServerName, StringComparison.Ordinal)
                 || Machine.Run(exe, ["mcp", "add", ClaudeTools.ServerName, .. mcp], TimeSpan.FromSeconds(20)) is { ExitCode: 0 };
         }
-        AllowReading(Path.Combine(Py.UserHome(), ".gemini", "antigravity-cli", "settings.json"));
+        AllowReading(Path.Combine(Py.UserHome(), ".gemini", "antigravity-cli", "settings.json"), folders);
     }
 
     /// <summary>Study Stash's MCP server is in Antigravity's settings (seen by this process, or added by it).</summary>
@@ -547,8 +552,9 @@ public sealed class GeminiProvider : AiProvider
 
     public static readonly string[] ReadOnlyCommands = ["ls", "cat", "head", "tail", "grep", "rg", "find", "wc", "pdftotext", "file", "stat"];
 
-    /// <summary>Add read-only command rules to Antigravity's settings, keeping everything else in them.</summary>
-    public static bool AllowReading(string settingsPath)
+    /// <summary>Add read-only command rules, and reading each of <paramref name="folders"/> (Antigravity's
+    /// <c>read_file(/a/folder)</c>), to Antigravity's settings, keeping everything else in them. True when it changed them.</summary>
+    public static bool AllowReading(string settingsPath, IEnumerable<string>? folders = null)
     {
         if (!File.Exists(settingsPath)) return false;
         JsonObject root;
@@ -564,8 +570,10 @@ public sealed class GeminiProvider : AiProvider
         var allow = perms["allow"] as JsonArray ?? [];
         var have = allow.Select(S).ToHashSet();
         bool changed = false;
-        foreach (string c in ReadOnlyCommands)
-            if (have.Add($"command({c})")) { allow.Add($"command({c})"); changed = true; }
+        var rules = ReadOnlyCommands.Select(c => $"command({c})")
+            .Concat((folders ?? []).Where(f => f.Length > 0).Select(f => $"read_file({Path.TrimEndingDirectorySeparator(Path.GetFullPath(f))})"));
+        foreach (string rule in rules)
+            if (have.Add(rule)) { allow.Add(rule); changed = true; }
         if (!changed) return false;
         perms["allow"] = allow;
         root["permissions"] = perms;
@@ -586,7 +594,7 @@ public sealed class GeminiProvider : AiProvider
 
     public override IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true, CancellationToken ct = default)
     {
-        if (Available()) Prepare(req.Tools ? req.McpCommand : []);
+        if (Available()) Prepare(req.Tools ? req.McpCommand : [], [req.Cwd, .. req.ReadDirs]);
         return base.RunAsync(req, stream, ct);
     }
 
