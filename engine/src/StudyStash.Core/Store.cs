@@ -376,6 +376,52 @@ public sealed partial class Store : IDisposable
         }
     }
 
+    /// <summary>
+    /// The pipeline went through a lecture that has notes and wrote no new ones (its engine failed or wrote nothing,
+    /// notes are switched off, the transcript is too short): the lecture keeps everything it had (its notes and what
+    /// wrote them, its title, topics and class), and <paramref name="why"/> is kept with it for its page to say.
+    /// Dropped like <see cref="Finish"/>'s result when the note changed meanwhile. The note file is left exactly as it
+    /// is, so edits made in it stay too; only when the lecture itself is no longer the one the file was written from
+    /// (it was sent again with more recorded or typed, or moved to another class while it waited) is the file written
+    /// again, round the notes that were kept.
+    /// </summary>
+    public string? KeepNotes(NoteRow claimed, Meeting m, string why)
+    {
+        lock (gate)
+        {
+            var row = Get(claimed.Id);
+            if (row is null || row.Status != Working || row.UpdatedAt != claimed.UpdatedAt || string.IsNullOrEmpty(row.SummaryMd)) return null;
+            why = Py.Head(why, 2000);
+            var c = new Classification(string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName, row.Confidence ?? 0,
+                row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
+            if (!FileIsOf(row.MdPath, m, c.ClassName)) return Save(m, c, row.SummaryMd, row.SummaryModel ?? "", why);
+            Exec("UPDATE notes SET status=?, error=? WHERE id=?", Done, why, row.Id);
+            // Asking for the rewrite moved the lecture's date of change on: search's copy says the same again.
+            Index(row.Id, row.SummaryMd, m.Transcript, row.UpdatedAt ?? "");
+            return row.MdPath;
+        }
+    }
+
+    /// <summary>Whether a lecture's note file is where this lecture belongs and holds its transcript and typed notes
+    /// as they are now (as <see cref="Notes.Render"/> writes them). False too for a file that isn't there, or can't
+    /// be read.</summary>
+    bool FileIsOf(string? path, Meeting m, string className)
+    {
+        if (string.IsNullOrEmpty(path) || !Py.SamePath(path, TargetPath(m, className))) return false;
+        try
+        {
+            if (!File.Exists(path)) return false;
+            string text = Py.ReadText(path) + "\n"; // an editor may have taken the last line's end off
+            bool Holds(string heading, string body) =>
+                body.Length == 0 ? !text.Contains($"\n## {heading}\n", StringComparison.Ordinal) : text.Contains($"\n## {heading}\n\n{body}\n", StringComparison.Ordinal);
+            return Holds("Transcript", Py.Strip(m.Transcript)) && Holds("Private notes", Py.Strip(m.PrivateNotes));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     public Dictionary<string, int> StatusCounts()
     {
         lock (gate)

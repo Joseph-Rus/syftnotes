@@ -20,7 +20,8 @@ public sealed class SleptException(Exception inner) : Exception("the computer sl
 /// Turns queued lectures into filed ones: writes our notes from the transcript, sorts, saves. Runs in the
 /// background of the library, so an upload from the laptop returns at once even when a big model takes minutes.
 /// While the notes engine isn't answering, lectures stay in the queue and get their notes when it's back; notes cut
-/// off because the computer slept (<paramref name="sleep"/> tells) are written again after it wakes. A lecture is filed
+/// off because the computer slept (<paramref name="sleep"/> tells) are written again after it wakes. A lecture that
+/// has notes already (a rewrite, or one sent again) keeps them unless new ones are written. A lecture is filed
 /// as soon as its notes are written: <paramref name="filed"/> hears its id then, and whatever follows the notes (their
 /// diagrams, <see cref="Ai.DiagramJobs"/>) is queued there, never waited for.
 /// </summary>
@@ -65,9 +66,14 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
         var m = store.Meeting(row);
         m.Attached = store.AttachedTo(row.Id); // what the student attached, with the words read from it so far
         string summary = "", model = "", error = "";
+        // Why this run writes no notes, for a lecture that keeps the ones it has (below).
+        string unwritten = !Cfg.SummaryEnabled ? "The notes weren't rewritten: writing study notes is switched off in your library's Settings."
+            : !Cfg.OllamaEnabled ? "The notes weren't rewritten: AI is switched off in your library's Settings."
+            : "The notes weren't rewritten: the transcript is too short to write notes from.";
         if (Summarize.WantsSummary(m, Cfg))
         {
             model = notesModel?.Invoke() ?? Cfg.EffectiveSummaryModel; // what writes the notes, as the note records it
+            unwritten = $"The notes weren't rewritten: {model} wrote nothing.";
             string how = notesFast?.Invoke() == true ? " in fast mode" : ""; // Claude Code's fast mode costs more: the log says when it was used
             var watch = Stopwatch.StartNew();
             var slept = sleep.Start();
@@ -94,9 +100,24 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             catch (Exception e)
             {
                 error = $"Summary with {model} failed: {e.Message}";
+                // An engine's own words often start with its name ("Claude: Claude isn't installed"): it's just been said.
+                int named = e.Message.IndexOf(": ", StringComparison.Ordinal);
+                string why = named > 0 && model.StartsWith(e.Message[..named], StringComparison.Ordinal) ? e.Message[(named + 2)..] : e.Message;
+                unwritten = Sentence($"{model} couldn't rewrite the notes: {why}");
                 log($"[pipeline] {error}");
                 summary = model = "";
             }
+        }
+        // A lecture that has notes keeps them until new ones are written: a run that writes none (its engine failed or
+        // wrote nothing, notes are switched off, the transcript is too short) changes nothing about it but to say why.
+        // Filing it the way a new lecture with no notes is filed wiped the notes it had, its title and its topics.
+        if (Py.Strip(summary).Length == 0 && !string.IsNullOrEmpty(row.SummaryMd))
+        {
+            string? kept = store.KeepNotes(row, m, unwritten);
+            log(kept is null
+                ? $"[pipeline] '{m.Title}' changed while it was being written; not saving the old result"
+                : $"[pipeline] '{m.Title}' keeps the notes it has: {unwritten}");
+            return kept;
         }
         Classification c;
         if (row.ClassifiedBy == "human" && !string.IsNullOrEmpty(row.ClassName))
@@ -143,6 +164,13 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             }
         }
         return path;
+    }
+
+    /// <summary>An engine's own words as a sentence: a full stop is added when they end without one.</summary>
+    static string Sentence(string text)
+    {
+        string t = text.TrimEnd();
+        return t.Length > 0 && t[^1] is '.' or '!' or '?' ? t : t + ".";
     }
 
     static List<string> JsonTopics(string? json) =>
