@@ -3,18 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Study Stash: your own lecture library</title>
-<meta name="description" content="Record a lecture, and it's transcribed on your computer, filed under the right class and turned into study notes, next to your Canvas assignments. Free and open source, for Mac and Windows.">
-<meta name="theme-color" content="#f8f5ee" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#151a2b" media="(prefers-color-scheme: dark)">
+<title>Study Stash: your lectures, turned into notes</title>
+<meta name="description" content="Record a lecture and Study Stash writes it down on your own computer, then writes the notes: formulas, graphs and diagrams, next to your Canvas due dates. Free and open source, for Mac and Windows.">
+<meta name="theme-color" content="#f1efe6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1b1f" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Study Stash">
-<meta property="og:title" content="Study Stash: your own lecture library">
-<meta property="og:description" content="Record a lecture; it's transcribed on your computer, filed by class and turned into study notes. Free, open source, for Mac and Windows.">
+<meta property="og:title" content="Study Stash: your lectures, turned into notes">
+<meta property="og:description" content="Record a lecture; it's written down on your computer, filed by class and turned into study notes with formulas, graphs and diagrams. Free, open source, for Mac and Windows.">
 <meta property="og:image" content="assets/social.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preload" href="assets/fonts/AtkinsonHyperlegibleNext-Variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/site.css">
 <script src="assets/site.js" defer></script>
 </head>
@@ -39,138 +40,181 @@
 
 <section class="hero" aria-labelledby="hero-title">
   <div class="wrap">
-    <ul class="eyebrow">
-      <li>Free and open source</li>
-      <li>Mac and Windows</li>
-      <li>Stays on your computers</li>
-    </ul>
-    <h1 id="hero-title">Your lectures, <span class="hl">written up</span> and filed by class.</h1>
-    <p class="lede">Record a lecture, and it's transcribed on your computer, filed under the right class, and turned
-      into study notes, right next to your Canvas assignments and ready to ask about.</p>
-    <div class="btns" data-hero-downloads>
-      <a class="btn btn-primary" data-os="mac" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash.dmg">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.2zM13.8 5.1c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.5-.7.8-1.2 2-1.1 3.1 1.1.1 2.3-.6 3-1.4z"/></svg>
-        <span>Download for Mac<small>macOS 15 or later, Apple silicon or Intel</small></span>
-      </a>
-      <a class="btn btn-quiet" data-os="windows" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Setup.exe">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 3.8 10 2.6v8.7H1zm10.2-1.4L23 .8v10.5H11.2zM1 12.6h9v8.8l-9-1.3zm10.2 0H23v10.6l-11.8-1.7z"/></svg>
-        <span>Download for Windows<small>Windows 10 and 11</small></span>
-      </a>
+    <div class="hero-grid">
+      <div>
+        <h1 id="hero-title">Your lectures, turned into notes.</h1>
+        <p class="lede">Record a lecture. Study Stash writes down every word on your own computer, then writes the
+          notes for you: formulas worked through, graphs you can move, diagrams you can click, right next to your
+          Canvas due dates.</p>
+        <div class="btns" data-hero-downloads>
+          <a class="btn btn-primary" data-os="mac" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash.dmg">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16.4 12.7c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.8 1.3 10.3.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.7-1-2.7-4.2zM13.8 5.1c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.5-.7.8-1.2 2-1.1 3.1 1.1.1 2.3-.6 3-1.4z"/></svg>
+            <span>Download for Mac<small>macOS 15 or later, Apple silicon or Intel</small></span>
+          </a>
+          <a class="btn btn-quiet" data-os="windows" href="https://github.com/Joseph-Rus/study-stash/releases/latest/download/Study-Stash-Setup.exe">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 3.8 10 2.6v8.7H1zm10.2-1.4L23 .8v10.5H11.2zM1 12.6h9v8.8l-9-1.3zm10.2 0H23v10.6l-11.8-1.7z"/></svg>
+            <span>Download for Windows<small>Windows 10 and 11</small></span>
+          </a>
+        </div>
+        <p class="fine">Free and open source. One download for each computer, whether it records, keeps the library, or both.
+          <a href="https://github.com/Joseph-Rus/study-stash/releases/latest">Release notes and every file on GitHub</a>.</p>
+      </div>
+      <figure class="film">
+        <video controls playsinline preload="none" width="720" height="1280" poster="assets/img/promo-poster.webp"
+          aria-label="Study Stash in 37 seconds: recording a lecture, the notes, formulas, graphs and diagrams it writes, due dates from Canvas, asking a question, and connecting Claude and ChatGPT.">
+          <source src="assets/study-stash-promo.mp4" type="video/mp4">
+          <a href="assets/study-stash-promo.mp4">Watch Study Stash in 37 seconds</a>.
+        </video>
+        <figcaption class="fine">The whole app in 37 seconds.</figcaption>
+      </figure>
     </div>
-    <p class="fine">One download for each computer, whether it records, keeps the library, or both.
-      <a href="https://github.com/Joseph-Rus/study-stash/releases/latest">Release notes and every file on GitHub</a>.</p>
-
     <div class="stage">
-      <img src="assets/img/library-window.webp" width="1336" height="856" fetchpriority="high"
-        alt="The Study Stash library window: classes down the side, CS 101's lectures by week, and the notes for 'Recursion and the call stack' with a summary, key points, definitions and an Ask bar.">
+      <img src="assets/img/home.webp" width="2000" height="1218" fetchpriority="high"
+        alt="Study Stash's Home page: today's date, the day's classes under Up next, the newest notes with a line about each, an Ask bar, and the classes and what's due down the side.">
     </div>
   </div>
 </section>
 
-<section aria-labelledby="flow-title">
-  <div class="wrap">
-    <div class="section-head">
-      <p class="kicker">How it works</p>
-      <h2 id="flow-title">From the lecture hall to notes you'd actually reread.</h2>
-    </div>
-    <ol class="flow">
-      <li>
-        <h3>Record</h3>
-        <p>Click <strong>Record</strong> in the menu bar or tray, or press <kbd>⌥⇧R</kbd> / <kbd>Ctrl+Alt+R</kbd>. A
-          tiny pill shows the time and the level.</p>
-      </li>
-      <li>
-        <h3>Transcribe</h3>
-        <p>It's transcribed on your own computer, as you go or, to save battery, after class. The audio never leaves it.</p>
-      </li>
-      <li>
-        <h3>Write notes</h3>
-        <p>A summary, key points, definitions and questions to review, written by the AI you choose, with formulas
-          and diagrams drawn properly.</p>
-      </li>
-      <li>
-        <h3>File it</h3>
-        <p>Each lecture lands under its class, worked out from what was said. Anything it can't place waits in
-          Unsorted.</p>
-      </li>
-    </ol>
-    <figure class="demo">
-      <video controls preload="none" width="1280" height="720" poster="assets/img/demo-poster.webp"
-        aria-label="Study Stash's 50-second demo: recording a lecture, the notes and diagrams it writes, asking about them, and Canvas.">
-        <source src="assets/study-stash-demo.mp4" type="video/mp4">
-        <a href="assets/study-stash-demo.mp4">Watch the 50-second demo</a>.
-      </video>
-      <figcaption class="fine">The whole thing in 50 seconds, narrated, so turn the sound on.</figcaption>
-    </figure>
-  </div>
-</section>
-
-<section class="band" aria-labelledby="features-title">
-  <div class="wrap">
-    <h2 id="features-title" class="visually-hidden">What it does</h2>
-
-    <div class="feature">
-      <div>
-        <p class="kicker">Ask and find</p>
-        <h3>Ask about one lecture, a class, or all of them.</h3>
-        <p>The quick panel (<kbd>⌥Space</kbd> on a Mac, <kbd>Alt+Shift+Space</kbd> on Windows) finds lectures,
-          passages in your notes and classes in a second, and answers a question from your own notes, with the
-          lecture and the minute it came from.</p>
+<section class="reel reel-brick" aria-labelledby="record-title">
+  <div class="wrap reel-grid">
+    <div class="reel-text">
+      <h2 id="record-title">Record</h2>
+      <p class="reel-sub">Every word, written down live.</p>
+      <p>Click <strong>Record</strong> on Home, in the menu bar or the tray, or press <kbd>⌥⇧R</kbd> (<kbd>Ctrl+Alt+R</kbd> on Windows). Study Stash writes the lecture down as it's said, on your own computer. The audio never leaves it.</p>
         <ul>
-          <li>The Ask bar under every lecture's notes, with the engine you pick for that question</li>
+          <li>Type your own notes while it records; the write-up is built round them</li>
+          <li>Pause or stop from the menu bar</li>
+          <li>Or have it written down after class, to save battery</li>
+        </ul>
+    </div>
+    <figure class="card"><img src="assets/img/record.webp" width="1280" height="597" loading="lazy"
+      alt="A lecture being recorded for BIO 110, with Live transcript open: the lecturer's first sentences, each with the time it was said."></figure>
+  </div>
+  <img class="paper right" src="assets/img/paper-microphone.webp" width="501" height="872" alt="" loading="lazy">
+  <img class="paper left" src="assets/img/paper-headphones.webp" width="640" height="563" alt="" loading="lazy">
+</section>
+
+<section class="reel reel-butter flip" aria-labelledby="notes-title">
+  <div class="wrap reel-grid">
+    <div class="reel-text">
+      <h2 id="notes-title">Notes</h2>
+      <p class="reel-sub">Written for you after class.</p>
+      <p>When you stop, the lecture is filed under its class and written up: a summary, key points, definitions and questions to review, by the AI you choose.</p>
+        <ul>
+          <li>Filed under the right class, worked out from what was said</li>
+          <li>Fix or add to the notes yourself whenever you like</li>
+          <li>Plain Markdown files on your computer, one folder per class</li>
+        </ul>
+    </div>
+    <figure class="card"><img src="assets/img/notes.webp" width="1280" height="938" loading="lazy"
+      alt="The notes for 'The Cardiac Cycle: Phases, Valves, and Cardiac Output': a line saying Claude wrote them from the recording, a summary, and the first key points."></figure>
+  </div>
+  <img class="paper left" src="assets/img/paper-pencil.webp" width="640" height="125" alt="" loading="lazy">
+</section>
+
+<section class="reel reel-sky" aria-labelledby="formulas-title">
+  <div class="wrap reel-grid">
+    <div class="reel-text">
+      <h2 id="formulas-title">Formulas</h2>
+      <p class="reel-sub">Every formula, worked through.</p>
+      <p>Maths is written the way it was on the board, in proper notation, with each step of a worked example in the order it was done.</p>
+    </div>
+    <figure class="card"><img src="assets/img/formulas.webp" width="1280" height="581" loading="lazy"
+      alt="Notes from a calculus lecture: the local maximum and minimum of x cubed minus 3x worked out line by line, then the second derivative and the intercepts."></figure>
+  </div>
+  <img class="paper right" src="assets/img/paper-signs.webp" width="640" height="357" alt="" loading="lazy">
+</section>
+
+<section class="reel reel-charcoal flip" aria-labelledby="graphs-title">
+  <div class="wrap reel-grid">
+    <div class="reel-text">
+      <h2 id="graphs-title">Graphs</h2>
+      <p class="reel-sub">Drag a slider, watch it change.</p>
+      <p>When a lecture is about a curve, the notes draw it from its formula. Move a slider, or press play, and see what each number does.</p>
+    </div>
+    <figure class="card"><img src="assets/img/graph.webp" width="1280" height="1023" loading="lazy"
+      alt="A graph in the notes: the curve x cubed minus a x with its maximum, minimum and inflection point marked, a tangent line, and sliders for the coefficient and the tangent's point."></figure>
+  </div>
+  <img class="paper left" src="assets/img/paper-chart.webp" width="640" height="392" alt="" loading="lazy">
+</section>
+
+<section class="reel reel-forest" aria-labelledby="diagrams-title">
+  <div class="wrap reel-grid">
+    <div class="reel-text">
+      <h2 id="diagrams-title">Diagrams</h2>
+      <p class="reel-sub">Click a step to follow it.</p>
+      <p>A process becomes a diagram you can click through, and anatomy becomes a labelled drawing, made from what your lecturer said.</p>
+        <ul>
+          <li>Click a box to follow its arrows</li>
+          <li>Ask about any part: Explain this, Quiz me, or Where was this said?</li>
+        </ul>
+    </div>
+    <div class="cards">
+      <figure class="card"><img src="assets/img/heart.webp" width="1280" height="946" loading="lazy"
+      alt="A labelled drawing of the heart cut open in the notes: the aorta, both atria and ventricles, the four valves, and the veins and arteries."></figure>
+      <figure class="card"><img src="assets/img/cycle.webp" width="1280" height="987" loading="lazy"
+      alt="A diagram of the five phases of the cardiac cycle as a loop of boxes joined by arrows, each arrow saying what moves the heart to the next phase."></figure>
+    </div>
+  </div>
+  <img class="paper right" src="assets/img/paper-shapes.webp" width="640" height="673" alt="" loading="lazy">
+</section>
+
+<section class="reel reel-pink flip" aria-labelledby="due-title">
+  <div class="wrap reel-grid">
+    <div class="reel-text">
+      <h2 id="due-title">Due dates</h2>
+      <p class="reel-sub">Pulled in from Canvas for you.</p>
+      <p>Study Stash reads Canvas through your browser with your own sign-in, so there's no password or token to hand over, and it only reads. Nothing on Canvas changes.</p>
+        <ul>
+          <li>Everything due across your classes, as a calendar</li>
+          <li>Each assignment's instructions and rubric, your submissions and feedback</li>
+          <li>Works in Chrome and the browsers built on it, such as Edge and Brave</li>
+        </ul>
+    </div>
+    <figure class="card"><img src="assets/img/due.webp" width="1280" height="774" loading="lazy"
+      alt="The Due page: October as a calendar, with each class's assignments, quizzes and midterms on the days they're due, in the class's colour."></figure>
+  </div>
+  <img class="paper left" src="assets/img/paper-calendar.webp" width="640" height="736" alt="" loading="lazy">
+</section>
+
+<section class="reel reel-indigo" aria-labelledby="ask-title">
+  <div class="wrap reel-grid">
+    <div class="reel-text">
+      <h2 id="ask-title">Ask</h2>
+      <p class="reel-sub">Answers from your own lectures.</p>
+      <p>Ask about one lecture, a class, or all of them. The answer comes from your own notes, with the lecture and the minute it was said.</p>
+        <ul>
+          <li>An Ask bar on Home, on every class and under every lecture's notes</li>
+          <li>The quick panel from anywhere: <kbd>⌥Space</kbd> on a Mac, <kbd>Alt+Shift+Space</kbd> on Windows</li>
           <li>Answers appear as they're written</li>
-          <li>Claude can read your library too, over MCP, if you turn it on</li>
         </ul>
-      </div>
-      <div class="shot tall">
-        <img src="assets/img/quick-panel.webp" width="736" height="884" loading="lazy"
-          alt="The quick panel searching 'call stack': matching lectures, highlighted passages from notes and the class; below it, an answer to 'what's on the cs 101 midterm?' with its sources.">
-      </div>
     </div>
-
-    <div class="feature flip">
-      <div>
-        <p class="kicker">Canvas</p>
-        <h3>What's due, next to what was said about it.</h3>
-        <p>Study Stash reads Canvas through Chrome with your own sign-in, so there's no password or token to hand
-          over, and it only reads. Nothing on Canvas changes.</p>
-        <ul>
-          <li>What's due across your classes, with each assignment's instructions and rubric</li>
-          <li>Your submissions and feedback, modules, files, pages and announcements</li>
-          <li>Filed into each class's folder, about once an hour</li>
-        </ul>
-      </div>
-      <div class="shot">
-        <img src="assets/img/canvas-due.webp" width="1336" height="856" loading="lazy"
-          alt="Canvas in Study Stash: what's due across classes (overdue, this week, handed in), and 'Lab 3: recursion traces' open with its due date, points, instructions, rubric and submission.">
-      </div>
-    </div>
-
-    <div class="feature">
-      <div>
-        <p class="kicker">Always a click away</p>
-        <h3>Lives in your menu bar, not in your way.</h3>
-        <p>Record, your recent lectures and search are in the menu bar on a Mac and the tray on Windows. It looks at
-          home on both: Liquid Glass on a Mac, Windows 11's own look on a PC, light and dark, in twenty colour themes.</p>
-        <ul>
-          <li>Pause or stop from the menu bar while it records</li>
-          <li>Notes are plain Markdown files, one folder per class</li>
-          <li>Keeps itself up to date, never while it's recording</li>
-        </ul>
-      </div>
-      <div class="shot">
-        <img src="assets/img/menu-bar.webp" width="754" height="412" loading="lazy"
-          alt="The menu bar dropdown: Record CS 101 from your timetable, recent lectures being transcribed and filed, and search; beside it, the same dropdown while recording, with the time, the sound level, the last words heard, and Pause and Stop.">
-      </div>
-    </div>
+    <figure class="card"><img src="assets/img/ask.webp" width="1104" height="240" loading="lazy"
+      alt="An answer to 'What is a normal ejection fraction?': 55% to 70%, with the formula and the lecture's own example, from Claude, with the minute of the lecture it came from."></figure>
   </div>
+  <img class="paper right" src="assets/img/paper-bubble.webp" width="640" height="656" alt="" loading="lazy">
 </section>
 
+<section class="reel reel-teal flip" aria-labelledby="connect-title">
+  <div class="wrap reel-grid">
+    <div class="reel-text">
+      <h2 id="connect-title">Connect</h2>
+      <p class="reel-sub">Works with Claude and ChatGPT.</p>
+      <p>Turn it on in Settings, and the Claude and ChatGPT apps on your computer can read your lectures and notes to answer your questions. They can't change or delete anything.</p>
+        <ul>
+          <li>One Connect button for each app, nothing to type or paste</li>
+          <li>You choose what they can read: lectures, notes, Canvas</li>
+        </ul>
+    </div>
+    <figure class="card"><img src="assets/img/ai-apps.webp" width="1212" height="500" loading="lazy"
+      alt="Settings, AI apps: Claude Desktop and ChatGPT shown as connected, Claude Code with a Connect button, and a question to try in Claude."></figure>
+  </div>
+  <img class="paper left" src="assets/img/paper-plug.webp" width="349" height="846" alt="" loading="lazy">
+</section>
 <section aria-labelledby="pair-title">
   <div class="wrap">
     <div class="section-head">
-      <p class="kicker">One computer or two</p>
-      <h2 id="pair-title">One app with two jobs. Use it the way that suits you.</h2>
+      <h2 id="pair-title">One computer, or two.</h2>
       <p>Start on one computer. Later, record on a laptop too with <strong>Settings → Your library → Add a laptop</strong>,
         or move your library to a computer at home in <strong>Settings → Connection</strong>, with nothing to reinstall.</p>
     </div>
@@ -207,7 +251,6 @@
 
 <section class="night" aria-labelledby="privacy-title">
   <div class="wrap">
-    <p class="kicker">The privacy promise</p>
     <h2 id="privacy-title">Your recordings never leave your computers.</h2>
     <ul class="promises">
       <li><strong>Your audio never leaves.</strong>It's transcribed on the computer that recorded it.</li>
@@ -217,7 +260,7 @@
       <li><strong>Canvas and calendars are read-only.</strong>Study Stash reads with your own sign-in and changes nothing. What it reads goes only to your library.</li>
       <li><strong>Open source.</strong>Every line is <a href="https://github.com/Joseph-Rus/study-stash">on GitHub</a>, so you don't have to take our word for any of this.</li>
     </ul>
-    <p class="fine" style="color: var(--night-ink-2); margin-top: 2.5rem;">The details are in the <a href="privacy/">privacy policy</a>.</p>
+    <p class="fine">The details are in the <a href="privacy/">privacy policy</a>.</p>
   </div>
 </section>
 
@@ -235,13 +278,14 @@
   </div>
 </section>
 
-<section class="band" id="download" aria-labelledby="download-title">
+<section class="finale" id="download" aria-labelledby="download-title">
   <div class="wrap">
     <div class="section-head">
-      <p class="kicker">Download</p>
+      <img src="assets/img/icon.webp" width="256" height="256" alt="" loading="lazy">
       <h2 id="download-title">Free, for Mac and Windows.</h2>
       <p>The same app for every computer. Setup asks how you'll use it: just this computer, your library, or your
-        laptop.</p>
+        laptop. It comes in light and dark and twenty colour themes, and keeps itself up to date, never while it's
+        recording.</p>
     </div>
     <div class="download">
       <div class="dl" data-for-os="mac">

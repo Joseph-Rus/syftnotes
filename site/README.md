@@ -12,14 +12,22 @@ site/
   terms/index.html    terms of use (MIT, as is)
   support/index.html  support: GitHub issues, private security reports
   404.html            the page for a missing address
-  assets/             site.css, site.js, the icon, favicon, social picture, screenshots (WebP) and the demo video
+  assets/             site.css, site.js, the app's font, the icon, favicon, social picture, pictures of the app and the
+                      film's paper objects (WebP), and the film
   check.mjs           the check CI runs before publishing (not published)
 ```
 
-The colours are the app's: Lagoon, its default theme (`oklch(0.58 0.12 195)`, from
-`engine/src/StudyStash.App/ColourThemes.cs`), on the warm paper of the icon, with the icon's navy for ink and the
-quick panel's highlighter. Headings use the serif the app writes notes in (New York on a Mac, then Charter or
-Georgia); there are no web fonts. Light and dark follow the system.
+The look is the promo film's. The page is paper-coloured, set in the app's own typeface (Atkinson Hyperlegible
+Next, served from `assets/fonts/` under its Open Font License, so still nothing loads from another site), and each
+thing the app does gets a band of one bold colour with a big word, a sentence, a picture of the app as a card and a
+cut-paper object: Record, Notes, Formulas, Graphs, Diagrams, Due dates, Ask, Connect. The bands keep their colours
+in the dark; only the paper and its ink follow the system.
+
+**The pictures** are the real app (0.16.2) on a made-up library, never redrawn: `home.webp` is its whole window, and
+each card is a piece of the window at twice the size it's shown. The film in the opening is
+`assets/study-stash-promo.mp4` (its poster is `img/promo-poster.webp`), and the paper objects (`img/paper-*.webp`)
+are the film's own. `assets/study-stash-demo.mp4`, the older 50-second demo, is no longer on a page but stays
+published: the repository's README links to it.
 
 ## Preview
 
