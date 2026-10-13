@@ -90,6 +90,9 @@ public class BrowsersTests
         Assert.Equal([Browsers.Chrome, Browsers.Edge], Browsers.Offer(Browsers.Firefox, here, firefoxAddOn: ""));
         // Once the add-on is somewhere, it is: first, since it's the default.
         Assert.Equal([Browsers.Firefox, Browsers.Chrome, Browsers.Edge], Browsers.Offer(Browsers.Firefox, here, published));
+        // It is somewhere: Mozilla publishes it, and this Study Stash says where, so a student's own Firefox is used.
+        Assert.Equal(published, StudyStash.Core.Canvas.Extension.FirefoxPublishedAt);
+        Assert.Equal(Browsers.Firefox, Browsers.ToUse(Browsers.Firefox, here));
         // The one the student added it to before comes ahead of the default.
         Assert.Equal(Browsers.Chrome, Browsers.ToUse(Browsers.Edge, here, firefoxAddOn: "", picked: "Chrome"));
         // Nothing here takes it: Chrome is offered, and says to install a browser when it doesn't open.
@@ -115,7 +118,7 @@ public class BrowsersTests
         // A Mac with only Safari.
         var only = Browsers.Advise(Browsers.Safari, [Browsers.Safari], "")!;
         Assert.True(only.NoneHere);
-        Assert.Equal("Your usual browser, Safari, can’t run the Study Stash extension. It runs in Chrome, Edge, Brave, Arc, Opera and Vivaldi, "
+        Assert.Equal("Your usual browser, Safari, can’t run the Study Stash extension. It runs in Chrome, Edge, Brave, Arc, Opera, Vivaldi and Firefox, "
             + "and none of them is on this computer. Get Chrome, then press Add to Chrome.", only.Say(Browsers.Chrome));
         Assert.StartsWith("It runs in Chrome", Browsers.Advise(null, [], "")!.Say(Browsers.Chrome));
     }
