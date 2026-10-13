@@ -54,6 +54,9 @@ public sealed class Lecture
     public bool SpeakersDone { get; set; }
     /// <summary>How many times telling its voices apart has been started; it's given up on after a couple.</summary>
     public int LabelTries { get; set; }
+    /// <summary>Its voices, told apart ten minutes at a time while it still records, so that once it stops only the
+    /// last stretch is left to do before it goes to the library. Joined then, and let go.</summary>
+    public List<VoicePiece> VoicePieces { get; set; } = [];
     /// <summary>Who recorded it, as the library shows it.</summary>
     public string Owner { get; set; } = "";
     /// <summary>What the library filed it as, once it has: the class and the lecture's title there.</summary>

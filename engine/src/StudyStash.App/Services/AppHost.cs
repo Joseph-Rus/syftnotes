@@ -623,6 +623,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public void Start()
     {
         running.Add(Task.Run(() => Whisper.RunAsync(stop.Token)));
+        // Voices told apart ten minutes at a time while a lecture records, so its notes needn't wait for them once it stops.
+        running.Add(Task.Run(() => Whisper.RunVoicesAsync(stop.Token)));
         // The live words, on a thread of their own below the app's own work: a library-only computer never records.
         if (Settings.Role != AppRole.Library)
             new Thread(() => Captions.Run(stop.Token)) { IsBackground = true, Priority = ThreadPriority.BelowNormal, Name = "live words" }.Start();

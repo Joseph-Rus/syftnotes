@@ -936,8 +936,98 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     bool WantsVoices(Lecture l) => LabelVoices?.Invoke() == true && LoadVoices is not null && !l.SpeakersDone && l.AudioStart == 0
         && l.LabelTries < LabelTriesAllowed && l.Seconds is >= MinLabelSeconds and <= MaxLabelSeconds;
 
+    /// <summary>How much of a lecture is told apart at a time while it records (seconds).</summary>
+    public double PieceSeconds { get; init; } = 600;
+
+    /// <summary>A piece is told apart while it records only once this much more has been recorded after it, so the
+    /// stretch left for when it stops is never a few seconds too short to know a voice by.</summary>
+    public const double LastPieceAtLeast = 120;
+
+    /// <summary>Lectures whose voices failed while they recorded: the rest waits for the end, done in one go then.</summary>
+    readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> aheadFailed = new();
+
     /// <summary>
-    /// Tell the voices in a lecture that's all written down apart (who said each line), then let it go to the library.
+    /// While a lecture records (written down as it goes, its voices wanted): the next <see cref="PieceSeconds"/> of it
+    /// told apart, once there's that much and <see cref="LastPieceAtLeast"/> more. Kept with the lecture, so a restart
+    /// loses nothing. True when it did a piece.
+    /// </summary>
+    public async Task<bool> LabelAheadAsync(CancellationToken stop)
+    {
+        if (recording() is not { AfterClass: false } live || LabelVoices?.Invoke() != true || LoadVoices is null) return false;
+        if (store.Get(live.Id) is not { AudioStart: 0, SpeakersDone: false } l || aheadFailed.ContainsKey(l.Id)) return false;
+        string audio = store.AudioPath(l.Id);
+        double from = l.VoicePieces.LastOrDefault()?.End ?? 0;
+        double have;
+        try
+        {
+            have = File.Exists(audio) ? Sound.WavSeconds(audio) : 0;
+        }
+        catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
+        if (have - from < PieceSeconds + LastPieceAtLeast) return false;
+        VoicePiece piece;
+        var took = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            using var voices = LoadVoices();
+            piece = await ListenPieceAsync(voices, audio, from, from + PieceSeconds, stop);
+        }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            aheadFailed[l.Id] = true;
+            log($"[voices] {l.Id}: {e.Message} (the rest is told apart once it stops)");
+            return false;
+        }
+        store.Update(l.Id, x =>
+        {
+            if ((x.VoicePieces.LastOrDefault()?.End ?? 0) == from) x.VoicePieces.Add(piece);
+        });
+        log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"[voices] {l.Id}: {TimedText.Clock(from)}–{TimedText.Clock(piece.End)} told apart as it records, {piece.Prints.Count} voices in {took.Elapsed.TotalSeconds:0} s"));
+        return true;
+    }
+
+    /// <summary>One stretch of a lecture's sound, told apart: its turns in the lecture's own time, and its voices' prints.</summary>
+    static async Task<VoicePiece> ListenPieceAsync(ISpeakerLabeler voices, string audio, double from, double to, CancellationToken stop)
+    {
+        float[] samples = Sound.ReadWav(audio, (long)Math.Round(from * Sound.Rate), to < double.MaxValue ? (long)Math.Round((to - from) * Sound.Rate) : -1);
+        var turns = await voices.ListenAsync(samples, stop);
+        var prints = await voices.PrintsAsync(samples, turns, stop);
+        double end = from + (double)samples.Length / Sound.Rate;
+        return new VoicePiece(from, end, [.. turns.Select(t => new VoiceTurn(t.Start + from, t.End + from, t.Voice))], prints);
+    }
+
+    /// <summary>Tell voices apart while lectures record, until <paramref name="stop"/>: a piece whenever there's one
+    /// to do, and a look every half minute.</summary>
+    public async Task RunVoicesAsync(CancellationToken stop)
+    {
+        try
+        {
+            while (true)
+            {
+                bool worked;
+                try
+                {
+                    worked = await LabelAheadAsync(stop);
+                }
+                catch (Exception e) when (!stop.IsCancellationRequested)
+                {
+                    log($"[voices] {e.Message}");
+                    worked = false;
+                }
+                if (!worked) await Task.Delay(TimeSpan.FromSeconds(30), stop);
+            }
+        }
+        catch (OperationCanceledException) when (stop.IsCancellationRequested)
+        {
+        }
+    }
+
+    /// <summary>
+    /// Tell the voices in a lecture that's all written down apart (who said each line), then let it go to the library:
+    /// only what wasn't told apart while it recorded is left, and the pieces are joined into one lecture's voices.
     /// Whatever goes wrong, it goes as it is: the transcript is what matters. It's counted as tried before it starts,
     /// so a failure that takes the whole app down isn't started again for ever.
     /// </summary>
@@ -945,22 +1035,34 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
     {
         store.Update(l.Id, x => x.LabelTries++);
         IReadOnlyList<VoiceTurn>? turns = null;
+        var took = System.Diagnostics.Stopwatch.StartNew();
+        var pieces = new List<VoicePiece>(store.Get(l.Id)?.VoicePieces ?? []);
         try
         {
-            float[] samples = Sound.ReadWav(store.AudioPath(l.Id));
-            using var voices = LoadVoices!();
-            turns = await voices.ListenAsync(samples, stop);
+            string audio = store.AudioPath(l.Id);
+            double from = pieces.LastOrDefault()?.End ?? 0;
+            if (Sound.WavSeconds(audio) - from > 0.5)
+            {
+                using var voices = LoadVoices!();
+                pieces.Add(await ListenPieceAsync(voices, audio, from, double.MaxValue, stop));
+            }
+            turns = Speakers.Join(pieces);
         }
         catch (Exception e) when (e is not OperationCanceledException)
         {
             log($"[voices] {l.Id}: {e.Message} (sent without speakers)");
         }
+        aheadFailed.TryRemove(l.Id, out _);
+        if (pieces.Count > 1)
+            log(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"[voices] {l.Id}: the last {TimedText.Clock(pieces[^1].End - pieces[^1].Start)} told apart in {took.Elapsed.TotalSeconds:0} s after it stopped, joined with {pieces.Count - 1} piece(s) from while it recorded"));
         var saved = store.Update(l.Id, x =>
         {
-            // Picked up again meanwhile: its voices are told apart again once it stops, over all of it.
+            // Picked up again meanwhile: its voices are told apart again once it stops, from where they'd got to.
             if (x.State != LectureState.Transcribing) return;
             if (turns is not null) x.Segments = Speakers.Label(x.Segments, turns);
             x.SpeakersDone = true;
+            x.VoicePieces = [];
             x.State = LectureState.Sending;
         });
         if (saved is null) return true; // deleted meanwhile

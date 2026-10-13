@@ -1208,6 +1208,81 @@ public class RecordingTests
         Assert.Contains("[02:20] Speaker 2: line 14\n[02:30] Speaker 1: line 15", l.Transcript());
     }
 
+    /// <summary>Voices standing in for a lecture told apart a piece at a time: the lecturer throughout, and a student for
+    /// ten seconds, each with a print; how long each piece it was given was.</summary>
+    sealed class PieceVoices : ISpeakerLabeler
+    {
+        public List<double> Heard { get; } = [];
+
+        public Task<IReadOnlyList<VoiceTurn>> ListenAsync(float[] samples, CancellationToken stop)
+        {
+            double seconds = (double)samples.Length / Sound.Rate;
+            Heard.Add(seconds);
+            return Task.FromResult<IReadOnlyList<VoiceTurn>>([new VoiceTurn(0, 20, 7), new VoiceTurn(20, 30, 9), new VoiceTurn(30, seconds, 7)]);
+        }
+
+        public Task<Dictionary<int, float[]>> PrintsAsync(float[] samples, IReadOnlyList<VoiceTurn> turns, CancellationToken stop) =>
+            Task.FromResult(new Dictionary<int, float[]> { [7] = [1, 0.1f], [9] = [0, 1] });
+
+        public void Dispose() { }
+    }
+
+    [Fact]
+    public async Task Voices_are_told_apart_while_a_lecture_records_so_only_the_last_stretch_waits_for_the_end()
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        Recorded(store, "rec-live", 400, LectureState.Recording);
+        var voices = new PieceVoices();
+        bool live = true;
+        var worker = new TranscriptionWorker(store, () => new FakeWhisper(), () => live ? store.Get("rec-live") : null)
+        {
+            LabelVoices = () => true, LoadVoices = () => voices, PieceSeconds = 100,
+        };
+
+        // 400 seconds in: two pieces of 100, leaving at least two minutes for the end.
+        Assert.True(await worker.LabelAheadAsync(default));
+        Assert.True(await worker.LabelAheadAsync(default));
+        Assert.False(await worker.LabelAheadAsync(default));
+        var pieces = store.Get("rec-live")!.VoicePieces;
+        Assert.Equal([(0.0, 100.0), (100.0, 200.0)], pieces.Select(p => (p.Start, p.End)));
+        Assert.Equal(new VoiceTurn(120, 130, 9), pieces[1].Turns[1]); // in the lecture's own time
+        Assert.Equal([100.0, 100.0], voices.Heard);
+
+        // It stops, all written down: only the last 200 seconds are told apart now, and joined with the rest.
+        live = false;
+        store.Update("rec-live", x =>
+        {
+            x.State = LectureState.Transcribing;
+            x.TranscribedSeconds = 400;
+            x.Segments = [.. Enumerable.Range(0, 40).Select(i => new Spoken(i * 10, i * 10 + 10, $"line {i}"))];
+        });
+        while (await worker.StepAsync(default)) { }
+        Assert.Equal([100.0, 100.0, 200.0], voices.Heard);
+        var l = store.Get("rec-live")!;
+        Assert.Equal(LectureState.Sending, l.State);
+        Assert.True(l.SpeakersDone);
+        Assert.Empty(l.VoicePieces); // let go once joined
+    }
+
+    [Fact]
+    public void Pieces_voices_are_joined_by_their_prints_but_never_two_from_one_piece()
+    {
+        VoicePiece Piece(double at, params (int Voice, float[] Print)[] voices) =>
+            new(at, at + 100, [.. voices.Select((v, i) => new VoiceTurn(at + i * 10, at + i * 10 + 10, v.Voice))], voices.ToDictionary(v => v.Voice, v => v.Print));
+        float[] lecturer = [1, 0, 0], lecturerAgain = [0.95f, 0.1f, 0], student = [0, 1, 0], other = [0, 0, 1], soundsLike = [0.8f, 0, 0.6f];
+        var turns = Speakers.Join([
+            Piece(0, (0, lecturer), (1, student)),
+            Piece(100, (0, lecturerAgain), (1, other), (2, soundsLike)),
+        ]);
+
+        int Voice(double start) => turns.Single(t => t.Start == start).Voice;
+        Assert.Equal(Voice(0), Voice(100)); // the lecturer in both pieces
+        Assert.NotEqual(Voice(10), Voice(110)); // two students who don't sound alike
+        Assert.NotEqual(Voice(100), Voice(120)); // like the lecturer, but the piece told them apart
+        Assert.Equal(4, turns.Select(t => t.Voice).Distinct().Count());
+    }
+
     [Fact]
     public async Task A_lecture_goes_to_the_library_as_it_is_when_its_voices_fail_or_are_off_or_it_is_too_short()
     {
