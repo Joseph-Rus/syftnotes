@@ -28,8 +28,12 @@ public static class ClaudeWeb
     public static void ListenHere(Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions kestrel, int port) =>
         kestrel.Listen(System.Net.IPAddress.Loopback, port);
 
-    public static WebApplication Build(WebApplicationBuilder builder, Config cfg, LibraryReader reader, ClaudeAccess access, StudyStash.Core.Canvas.CanvasSync? canvas = null, StudyStash.Core.Ai.FileIndex? files = null)
+    /// <param name="tries">Wrong passwords, counted by the address they come from. Null: counted here; the service
+    /// gives the one the library's own pages count in too.</param>
+    public static WebApplication Build(WebApplicationBuilder builder, Config cfg, LibraryReader reader, ClaudeAccess access, StudyStash.Core.Canvas.CanvasSync? canvas = null, StudyStash.Core.Ai.FileIndex? files = null,
+        PasswordTries? tries = null)
     {
+        tries ??= new PasswordTries();
         var source = new LocalLibrary(reader, canvas, cfg.Home, files);
         builder.Services.AddMcpServer(o =>
         {
@@ -197,8 +201,8 @@ public static class ClaudeWeb
             }, 201);
         }));
 
-        app.MapGet("/authorize", Http.Handle(ctx => Authorize(ctx, cfg, access, post: null)));
-        app.MapPost("/authorize", Http.Handle(async ctx => await Authorize(ctx, cfg, access, await Http.FormAsync(ctx.Request))));
+        app.MapGet("/authorize", Http.Handle(ctx => Authorize(ctx, cfg, access, tries, post: null)));
+        app.MapPost("/authorize", Http.Handle(async ctx => await Authorize(ctx, cfg, access, tries, await Http.FormAsync(ctx.Request))));
 
         app.MapPost("/token", Http.Handle(async ctx =>
         {
@@ -367,7 +371,7 @@ public static class ClaudeWeb
 
     /// <summary>The sign-in page: what's asking, and the library's password to allow it. Allowed, it goes back to
     /// the app with a code; turned down, with access_denied. Every answer that goes back names this server (iss).</summary>
-    static async Task<IResult> Authorize(HttpContext ctx, Config cfg, ClaudeAccess access, IFormCollection? post)
+    static async Task<IResult> Authorize(HttpContext ctx, Config cfg, ClaudeAccess access, PasswordTries tries, IFormCollection? post)
     {
         // The page is only ever fetched fresh, never framed, and never sent to another site as a referrer.
         ctx.Response.Headers.CacheControl = "no-store";
@@ -397,14 +401,19 @@ public static class ClaudeWeb
         string csp = $"default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; form-action 'self' {redirectUri.GetLeftPart(UriPartial.Authority)}; frame-ancestors 'none'; base-uri 'none'";
         if (post is null) return Form(cfg, access, client, redirectUri, fields, csp, error: null);
         if (post.Get("decision") == "deny") return Results.Redirect(Back("error=access_denied"));
-        // The same page either way, so the wording alone can't say whether the lockout or the password check found
-        // the problem first.
-        if (access.LockedOut()) return Form(cfg, access, client, redirectUri, fields, csp, $"Too many wrong tries. Wait 15 minutes, then connect from {NameOf(client)} again.", 429);
-        string password = post.Get("password");
-        bool right = CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(password), Encoding.UTF8.GetBytes(cfg.PoolPassword));
-        if (!right)
+        // Wrong passwords are counted by the address they come from (this page is the one door a library on the
+        // internet shows everyone), so guessing from one place uses up only that place's tries: the student, anywhere
+        // else, still gets in. While an address waits, what it sends isn't looked at, right or wrong.
+        var tried = tries.Try(PasswordTries.AddressOf(ctx), post.Get("password"),
+            typed => CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(typed), Encoding.UTF8.GetBytes(cfg.PoolPassword)));
+        if (tried.Wait is { } wait)
         {
-            access.Failed();
+            ctx.Response.Headers.RetryAfter = PasswordTries.Seconds(wait);
+            return Form(cfg, access, client, redirectUri, fields, csp, PasswordTries.Words(wait), 429);
+        }
+        if (!tried.Right)
+        {
+            await tries.HoldAsync(tried.Hold, ctx.RequestAborted);
             return Form(cfg, access, client, redirectUri, fields, csp, "That isn't your library password. Try again.", 401);
         }
         return Results.Redirect(Back("code=" + Uri.EscapeDataString(access.NewCode(client, redirect, challenge, bound))));
@@ -478,7 +487,7 @@ public static class ClaudeWeb
         box-shadow:0 12px 40px rgba(0,0,0,.12),0 0 0 .5px var(--sep);text-align:center}
         img{margin:0 auto 2px;border-radius:12px}p.lib{margin:0;color:var(--fg3);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
         h1{font-size:19px;line-height:1.3;margin:2px 0 0;letter-spacing:-.01em}p{margin:0;color:var(--fg2);font-size:13px}
-        p.who{font-size:12.5px}p.warn{color:var(--warn)}p.note{color:var(--warn)}p.bad{color:var(--bad);font-weight:600}
+        p.who{font-size:12.5px}p.warn{color:var(--warn)}p.note{color:var(--warn)}p.bad{color:var(--bad);font-weight:600;text-wrap:balance}
         ul.reading{margin:6px 0 0;padding:0 0 0 18px;text-align:left;font-size:13px;color:var(--fg2)}ul.reading li{margin:2px 0}
         p.cant{font-size:12.5px}
         label{font-size:12.5px;color:var(--fg2);text-align:left;margin-top:6px}

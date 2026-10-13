@@ -277,7 +277,8 @@ public class ClaudeTests
     static async Task<(TestSite Site, ClaudeAccess Access)> Door(Config cfg, Store store, ClaudeAccess? shared = null)
     {
         var access = shared ?? new ClaudeAccess(cfg.Home);
-        var site = await TestSite.StartAsync(b => ClaudeWeb.Build(b, cfg, new LibraryReader(cfg, store), access));
+        // Wrong passwords are answered at once here: nobody waits on a test.
+        var site = await TestSite.StartAsync(b => ClaudeWeb.Build(b, cfg, new LibraryReader(cfg, store), access, tries: new PasswordTries(pause: (_, _) => Task.CompletedTask)));
         return (site, access);
     }
 
@@ -467,10 +468,25 @@ public class ClaudeTests
         var client = access.Register("Claude", ["https://claude.ai/cb"]);
         var fields = new[] { ("response_type", "code"), ("client_id", client.ClientId), ("redirect_uri", "https://claude.ai/cb"),
             ("code_challenge", Challenge(Verifier())), ("code_challenge_method", "S256") };
-        for (int i = 0; i < 8; i++) await site.Client.PostAsync("/authorize", Form([.. fields, ("password", "guess" + i), ("decision", "allow")]));
-        var right = await site.Client.PostAsync("/authorize", Form([.. fields, ("password", "pw"), ("decision", "allow")]));
-        Assert.Equal((HttpStatusCode)429, right.StatusCode);
-        Assert.Contains("Too many wrong tries", await right.Content.ReadAsStringAsync());
+        // Through Funnel every request comes from this computer, saying who it's from: the guesser's address is
+        // shut out, even with the right password by then, and the student's own address isn't.
+        async Task<int> From(string address, string password)
+        {
+            var ctx = await site.App.GetTestServer().SendAsync(x =>
+            {
+                x.Connection.RemoteIpAddress = IPAddress.Loopback;
+                x.Request.Method = "POST";
+                x.Request.Path = "/authorize";
+                x.Request.Host = new Microsoft.AspNetCore.Http.HostString("mini.tail1234.ts.net");
+                x.Request.Headers["X-Forwarded-For"] = address;
+                x.Request.ContentType = "application/x-www-form-urlencoded";
+                x.Request.Body = Form([.. fields, ("password", password), ("decision", "allow")]).ReadAsStream();
+            });
+            return ctx.Response.StatusCode;
+        }
+        for (int i = 0; i < PasswordTries.Most; i++) Assert.Equal(401, await From("203.0.113.5", "guess" + i));
+        Assert.Equal(429, await From("203.0.113.5", "pw"));
+        Assert.Equal(302, await From("198.51.100.9", "pw"));
 
         // An unknown client, or a redirect it didn't register, never gets redirected to.
         var unknown = await site.Client.GetAsync("/authorize?response_type=code&client_id=nope&redirect_uri=https%3A%2F%2Fevil.example%2F");

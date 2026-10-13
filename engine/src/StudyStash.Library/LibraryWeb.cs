@@ -53,6 +53,9 @@ public sealed class LibraryWebOptions
     public string? PhoneApp { get; init; }
     /// <summary>Reads an attachment's words (path → text, or null). Null: <see cref="StudyStash.Core.Ai.DocumentText"/>.</summary>
     public Func<string, CancellationToken, Task<string?>>? ReadDocument { get; init; }
+    /// <summary>Wrong passwords, counted by the address they come from. Null: counted here; the service gives the one
+    /// Claude's door counts in too, so a guess at either door uses up the same tries.</summary>
+    public PasswordTries? Tries { get; init; }
 }
 
 /// <summary>Small pieces of HTTP the Python engine got from its web framework.</summary>
@@ -74,6 +77,9 @@ public static class Http
 
     public static IResult SeeOther(string location) => new SeeOtherResult(location);
 
+    /// <summary>An answer that's sent only once <paramref name="hold"/> is over (a wrong password, answered slower).</summary>
+    public static IResult After(Func<Task> hold, IResult answer) => new HeldResult(hold, answer);
+
     /// <summary>A handler that takes only the request: as a plain Func, ASP.NET would take it for a RequestDelegate and
     /// throw away the page it returns.</summary>
     public static Delegate Handle(Func<HttpContext, Task<IResult>> handler) => handler;
@@ -86,6 +92,15 @@ public static class Http
             ctx.Response.ContentType = "text/html; charset=utf-8";
             ctx.Response.Headers["Content-Security-Policy"] = csp;
             return ctx.Response.WriteAsync(body);
+        }
+    }
+
+    sealed class HeldResult(Func<Task> hold, IResult answer) : IResult
+    {
+        public async Task ExecuteAsync(HttpContext ctx)
+        {
+            await hold();
+            await answer.ExecuteAsync(ctx);
         }
     }
 
@@ -132,13 +147,14 @@ public sealed partial class LibraryWeb
     {
         ["folder"] = "the class it was recorded for", ["rules"] = "its title", ["ollama"] = "AI", ["human"] = "a person", ["none"] = "nobody yet",
     };
-    static readonly string[] ProxyHeaders = ["x-forwarded-for", "forwarded", "tailscale-user-login"];
+    internal static readonly string[] ProxyHeaders = ["x-forwarded-for", "forwarded", "tailscale-user-login"];
 
     readonly Config cfg;
     readonly Store store;
     readonly Pipeline pipeline;
     readonly LibraryWebOptions options;
     readonly Sessions sessions;
+    readonly PasswordTries tries;
 
     LibraryWeb(Config cfg, Store store, Pipeline pipeline, LibraryWebOptions options)
     {
@@ -147,6 +163,7 @@ public sealed partial class LibraryWeb
         this.pipeline = pipeline;
         this.options = options;
         sessions = new Sessions(cfg.Home);
+        tries = options.Tries ?? new PasswordTries();
         // A password changed while the library was stopped (the app's Settings start it again, or config.toml by hand).
         sessions.Keep(cfg.PoolPassword);
     }
@@ -207,7 +224,28 @@ public sealed partial class LibraryWeb
         if (cfg.PoolPassword.Length == 0) return null;
         string h = ctx.Request.Headers.Authorization.ToString();
         string key = h.StartsWith("bearer ", StringComparison.OrdinalIgnoreCase) ? h[7..].Trim() : ctx.Request.Headers["x-pool-key"].ToString();
-        return Same(key, cfg.PoolPassword) ? null : Http.Detail(401, "wrong password");
+        return WrongKey(ctx, key, "wrong password");
+    }
+
+    /// <summary>
+    /// Null when <paramref name="key"/> is the library's password, else the refusal, with the address's wrong tries
+    /// counted (<see cref="PasswordTries"/>). It is a 401 even while the address has to wait, with the wait in its
+    /// words: a laptop on any version takes a 401 for a wrong password and says so, where another answer would
+    /// read as a library it can't reach.
+    /// </summary>
+    IResult? WrongKey(HttpContext ctx, string key, string wrong)
+    {
+        // No key at all is no guess (an app looking for its library asks without one): there's nothing to count.
+        if (key.Length == 0) return Http.Detail(401, wrong);
+        var tried = tries.Try(PasswordTries.AddressOf(ctx), key, k => Same(k, cfg.PoolPassword));
+        if (tried.Right) return null;
+        if (tried.Wait is { } wait)
+        {
+            ctx.Response.Headers.RetryAfter = PasswordTries.Seconds(wait);
+            return Http.Detail(401, PasswordTries.Words(wait));
+        }
+        var refusal = Http.Detail(401, wrong);
+        return tried.Hold > TimeSpan.Zero ? Http.After(() => tries.HoldAsync(tried.Hold, ctx.RequestAborted), refusal) : refusal;
     }
 
     // --- rendering -----------------------------------------------------------------------------------------
@@ -306,7 +344,7 @@ public sealed partial class LibraryWeb
             await next();
         });
 
-        app.MapGet("/login", (string? next, int? bad) => LoginForm(next ?? "/", bad ?? 0));
+        app.MapGet("/login", (HttpContext ctx, string? next, int? bad) => LoginForm(ctx, next ?? "/", bad ?? 0));
         app.MapPost("/login", Http.Handle(Login));
         app.MapGet("/logout", (HttpContext ctx) =>
         {
@@ -419,10 +457,14 @@ public sealed partial class LibraryWeb
 
     // --- login ---------------------------------------------------------------------------------------------------
 
-    IResult LoginForm(string next, int bad)
+    IResult LoginForm(HttpContext ctx, string next, int bad)
     {
         string nonce = options.Nonce();
-        string err = bad != 0 ? "<p class=\"bad\">That password is not right.</p>" : "";
+        // While this address has to wait the page says so, and for how long, however it was come to: a password
+        // typed now isn't looked at. Its two sentences get a line each: run together they break mid-sentence on a
+        // phone, with "minutes." alone on the second line.
+        string err = tries.Wait(PasswordTries.AddressOf(ctx)) is { } wait ? $"<p class=\"bad\">{Ui.Esc(PasswordTries.Words(wait)).Replace(". ", ".<br>")}</p>"
+            : bad != 0 ? "<p class=\"bad\">That password is not right.</p>" : "";
         string letter = Ui.Esc(Py.Head(cfg.PoolName.Length > 0 ? cfg.PoolName : "L", 1).ToUpperInvariant());
         string body = $"<div class=\"login\"><form method=\"post\" action=\"/login\"><div class=\"appicon\" aria-hidden=\"true\">{letter}</div>"
             + $"<h1>{Ui.Esc(cfg.PoolName)}</h1><p class=\"muted\">Enter your password to continue.</p>{err}"
@@ -438,8 +480,13 @@ public sealed partial class LibraryWeb
         var form = await Http.FormAsync(ctx.Request);
         string password = form.Get("password"), next = SafeNext(form.Get("next", "/"));
         // The 0.2 admin password still works, so an old bookmark or password manager entry isn't a dead end.
-        if (!new[] { cfg.PoolPassword, cfg.AdminPassword }.Any(p => p.Length > 0 && Same(password, p)))
+        var tried = tries.Try(PasswordTries.AddressOf(ctx), password, typed => new[] { cfg.PoolPassword, cfg.AdminPassword }.Any(p => p.Length > 0 && Same(typed, p)));
+        if (tried.Wait is not null) return Http.SeeOther($"/login?wait=1&next={Ui.Quote(next, "")}");
+        if (!tried.Right)
+        {
+            await tries.HoldAsync(tried.Hold, ctx.RequestAborted);
             return Http.SeeOther($"/login?bad=1&next={Ui.Quote(next, "")}");
+        }
         ctx.Response.Cookies.Append(Sessions.Cookie, sessions.Start(cfg.PoolPassword), new CookieOptions
         {
             HttpOnly = true, SameSite = SameSiteMode.Lax, MaxAge = Sessions.Life, Path = "/",

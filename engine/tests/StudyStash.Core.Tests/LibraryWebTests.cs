@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using StudyStash.Core.Calendar;
 using StudyStash.Library;
@@ -16,8 +17,9 @@ public class LibraryWebTests
     static readonly Action<string> Quiet = _ => { };
 
     static LibraryWebOptions Options(Func<double, Task<Release?>>? latest = null, bool ollama = true, TailscaleInfo? ts = null,
-        Func<Release, string, Task>? apply = null) => new()
+        Func<Release, string, Task>? apply = null, PasswordTries? tries = null) => new()
     {
+        Tries = tries,
         ListModels = _ => Task.FromResult(ollama ? Models : null),
         Tailscale = () => ts ?? Tailnet,
         Latest = latest ?? (_ => Task.FromResult<Release?>(null)),
@@ -450,6 +452,91 @@ public class LibraryWebTests
         cfg.PoolPassword = "first-one";
         again.SetCookie("pool", signedIn);
         Assert.Equal(HttpStatusCode.SeeOther, (await again.Get("/settings")).StatusCode);
+    }
+
+    /// <summary>A request from an address: straight to the library (<paramref name="address"/> is where the
+    /// connection comes from), or, from 127.0.0.1, passed on by Tailscale Serve for <paramref name="forwardedFor"/>.
+    /// With <paramref name="password"/> it's the sign-in form; with <paramref name="key"/>, the laptop's key.</summary>
+    static async Task<(int Status, string Location, string Body, string RetryAfter)> From(TestSite site, string address, string path,
+        string? password = null, string? key = null, string? forwardedFor = null)
+    {
+        var ctx = await site.App.GetTestServer().SendAsync(c =>
+        {
+            c.Connection.RemoteIpAddress = IPAddress.Parse(address);
+            c.Request.Method = password is null ? "GET" : "POST";
+            c.Request.Path = path;
+            if (password is not null)
+            {
+                c.Request.ContentType = "application/x-www-form-urlencoded";
+                c.Request.Body = new FormUrlEncodedContent([KeyValuePair.Create("password", password), KeyValuePair.Create("next", "/")]).ReadAsStream();
+            }
+            if (key is not null) c.Request.Headers.Authorization = "Bearer " + key;
+            if (forwardedFor is not null) c.Request.Headers["X-Forwarded-For"] = forwardedFor;
+        });
+        var r = ctx.Response;
+        return (r.StatusCode, r.Headers.Location.ToString(), await new StreamReader(r.Body).ReadToEndAsync(), r.Headers.RetryAfter.ToString());
+    }
+
+    [Fact]
+    public async Task Wrong_passwords_are_counted_by_address_and_shut_only_that_address_out_for_a_while()
+    {
+        using var dir = new TempDir();
+        var cfg = MakeCfg(dir, "pw");
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var now = DateTimeOffset.Parse("2026-10-13T09:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var held = new List<double>();
+        var tries = new PasswordTries(() => now, (hold, _) => { held.Add(hold.TotalSeconds); return Task.CompletedTask; });
+        await using var c = await Site(cfg, store, options: Options(tries: tries));
+        const string Guesser = "203.0.113.5", Student = "198.51.100.9", Here = "127.0.0.1";
+        const string WrongKey = "{\"detail\":\"wrong password\"}", Wait = "Too many wrong passwords. Try again in 10 minutes.";
+        // The sign-in page: where it sends the browser. A laptop's key: the status and what it's told.
+        async Task<string> SignIn(string address, string password, string? forwardedFor = null) => (await From(c, address, "/login", password: password, forwardedFor: forwardedFor)).Location;
+        async Task<(int, string)> Key(string address, string key, string? forwardedFor = null) =>
+            (await From(c, address, "/api/health", key: key, forwardedFor: forwardedFor)) is var r && r.Status == 200 ? (200, "") : (r.Status, r.Body);
+
+        // Ten wrong passwords on the sign-in page from one address, each claiming to be someone else: the claim gets
+        // it no fresh count, and after the first three each answer is held back a second longer, up to five.
+        for (int i = 0; i < PasswordTries.Most; i++) Assert.Equal("/login?bad=1&next=%2F", await SignIn(Guesser, "guess" + i, forwardedFor: "10.0.0." + i));
+        Assert.Equal([1, 2, 3, 4, 5, 5, 5], held);
+        // Now nothing from there is looked at, the right password included, at the page or with a laptop's key: the
+        // page says how long to wait, and the key's answer is still the 401 every laptop reads as a wrong password.
+        Assert.Equal("/login?wait=1&next=%2F", await SignIn(Guesser, "pw"));
+        Assert.Contains("<p class=\"bad\">Too many wrong passwords.<br>Try again in 10 minutes.</p>", (await From(c, Guesser, "/login")).Body);
+        Assert.Equal((401, $"{{\"detail\":\"{Wait}\"}}"), await Key(Guesser, "pw"));
+        Assert.Equal("600", (await From(c, Guesser, "/api/health", key: "pw")).RetryAfter);
+        for (int i = 0; i < PasswordTries.Most; i++) await c.Client.SendAsync(Req(HttpMethod.Get, "/api/health", "guess" + i));
+        Assert.Equal("wrong password", (await Assert.ThrowsAsync<InvalidOperationException>(() => LibraryApi.CheckServerAsync("http://localhost", "pw", c.Client))).Message);
+
+        // The student, anywhere else, is let in as ever; so is a laptop there, however often it asks.
+        Assert.Equal("/", await SignIn(Student, "pw"));
+        Assert.DoesNotContain("Too many", (await From(c, Student, "/login")).Body);
+        for (int i = 0; i < 30; i++) Assert.Equal((200, ""), await Key(Student, "pw"));
+
+        // This computer is never counted: its pages need no password, and its own apps' wrong keys are only wrong.
+        for (int i = 0; i < 30; i++) Assert.Equal((401, WrongKey), await Key(Here, "guess" + i));
+        Assert.Equal((200, ""), await Key(Here, "pw"));
+        Assert.Equal(200, (await From(c, Here, "/settings")).Status);
+
+        // Through Tailscale Serve everyone arrives from this computer, named by the header Serve writes. A laptop
+        // that still has the old password asks with it on a timer: one wrong password, however often, is one try,
+        // so it's told "wrong password" as it always was and the new one works the moment it's typed.
+        for (int i = 0; i < 30; i++) Assert.Equal((401, WrongKey), await Key(Here, "last-terms", forwardedFor: "100.64.0.7"));
+        Assert.Equal((200, ""), await Key(Here, "pw", forwardedFor: "100.64.0.7"));
+        // Someone guessing through Serve is shut out by the address Serve names, whatever they put before it.
+        for (int i = 0; i < PasswordTries.Most; i++) await Key(Here, "guess" + i, forwardedFor: "100.64.0.7, 100.64.0.8");
+        Assert.Equal(401, (await Key(Here, "pw", forwardedFor: "100.64.0.8")).Item1);
+        Assert.Equal((200, ""), await Key(Here, "pw", forwardedFor: "100.64.0.7"));
+
+        // An IPv6 sender has a whole network of addresses to send from: they're counted as one.
+        for (int i = 0; i < PasswordTries.Most; i++) await Key("2001:db8:85a3:7::" + (i + 1), "guess" + i);
+        Assert.Equal(401, (await Key("2001:db8:85a3:7:ffff::9", "pw")).Item1);
+        Assert.Equal((200, ""), await Key("2001:db8:85a3:8::1", "pw"));
+
+        // After the wait the right password works there again.
+        now += PasswordTries.Window - TimeSpan.FromSeconds(1);
+        Assert.Contains("Try again in 1 minute.", (await From(c, Guesser, "/login")).Body);
+        now += TimeSpan.FromSeconds(1);
+        Assert.Equal("/", await SignIn(Guesser, "pw"));
     }
 
     // --- the API the laptop talks to -----------------------------------------------------------------------------
