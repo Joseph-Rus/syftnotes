@@ -413,6 +413,8 @@ public sealed partial class LibraryModel : ObservableObject
             newValue.Narrow = Narrow;
             // The ask for a tip shows on Home, in the page's own flow.
             newValue.Asking = newValue.IsHome ? Support : null;
+            // A page read while the library was still deleting a note lists it: it's shown without it.
+            foreach (string id in gone) newValue.Remove(id);
         }
         PageChanged();
     }
@@ -560,6 +562,10 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Leaves a note's page for where the student came from (it was deleted): the host goes back.</summary>
     public Action? OnLeaveNote { get; set; }
 
+    /// <summary>The notes deleted here and not brought back. The page a deleted note's own page gives way to is asked
+    /// for in the same moment as the delete, so the library's answer can still list the note: no page shows one of these.</summary>
+    readonly HashSet<string> gone = [];
+
     /// <summary>Delete, confirmed: the note leaves the page at once (its own page gives way to where the student came
     /// from), the library deletes it, and "Deleted · Undo" shows for a few seconds. If the library refuses, the host
     /// reads the page again.</summary>
@@ -568,6 +574,7 @@ public sealed partial class LibraryModel : ObservableObject
     {
         if (Deleting is not { } d) return;
         Deleting = null;
+        gone.Add(d.Id);
         bool open = Remove(d);
         Moved = null;
         Deleted = d;
@@ -575,6 +582,7 @@ public sealed partial class LibraryModel : ObservableObject
         bool ok = OnDelete is null || await OnDelete(d);
         if (!ok)
         {
+            gone.Remove(d.Id);
             if (Deleted == d) Deleted = null;
             return;
         }
@@ -592,6 +600,7 @@ public sealed partial class LibraryModel : ObservableObject
     {
         if (Deleted is not { } d) return;
         Deleted = null;
+        gone.Remove(d.Id);
         if (OnUndo is not null) await OnUndo(d);
     }
 

@@ -275,6 +275,40 @@ public class LibraryWindowTests
     }
 
     [Fact]
+    public async Task A_note_deleted_from_its_own_page_is_out_of_Homes_list_at_once_and_back_on_Undo()
+    {
+        // Home as the library answers while "a" is still there: the page the note gives way to is asked for in the same
+        // moment as the delete, so its answer lists the note still.
+        OverviewModel Home(params string[] ids) => OverviewModel.Home(new OverviewModel.Sources
+        {
+            Now = Now, Zone = Zone, Classes = [("CS 101", Brushes.Gray, ids.Length)],
+            Lectures = [.. ids.Select((id, n) => new OverviewModel.LectureFacts(id, $"Lecture {id}", "CS 101", Now.AddDays(-n), 3000, "", false))],
+        });
+        var m = Lectures(open: true);
+        var library = new TaskCompletionSource<bool>();
+        m.OnLeaveNote = () => m.Overview = Home("a", "b", "c");
+        m.OnDelete = _ => library.Task;
+        m.OnUndo = _ =>
+        {
+            m.Overview = Home("a", "b", "c");
+            return Task.CompletedTask;
+        };
+
+        m.DeleteCommand.Execute(null);
+        var deleting = m.ConfirmDeleteCommand.ExecuteAsync(null);
+        Assert.Equal(["b", "c"], m.Overview!.Notes.Select(n => n.Id)); // gone before the library has answered
+        Assert.True(m.Overview.Notes[0].First);
+        library.SetResult(true);
+        await deleting;
+        // An answer that was on its way when the note went, arriving late.
+        m.Overview = Home("a", "b", "c");
+        Assert.Equal(["b", "c"], m.Overview!.Notes.Select(n => n.Id));
+
+        await m.UndoToastCommand.ExecuteAsync(null);
+        Assert.Equal(["a", "b", "c"], m.Overview!.Notes.Select(n => n.Id));
+    }
+
+    [Fact]
     public async Task A_moved_note_says_where_it_went_and_Undo_moves_it_back()
     {
         var m = new LibraryModel { UndoShows = TimeSpan.FromMinutes(1) };
