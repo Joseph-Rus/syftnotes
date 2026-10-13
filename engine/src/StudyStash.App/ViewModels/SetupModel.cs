@@ -335,7 +335,9 @@ public sealed partial class SetupModel : ObservableObject
     public bool CanEditLibrary => !LibraryOk && !Connecting;
     public bool HasModelProblem => !string.IsNullOrEmpty(ModelProblem);
     public bool ModelDownloading => !ModelReady && !HasModelProblem;
-    public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 440;
+    /// <summary>The download bar's fill, out of its track: the step's column, which is 416 wide in the Mac look (720,
+    /// less the 224 sidebar and 40 each side) and 440 in the Windows one (less its 208 sidebar and 36 each side).</summary>
+    public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 416;
     public double ModelBarWidthWin => Math.Clamp(ModelProgress, 0, 1) * 440;
     public string ModelBody => ChosenModel is { Model.Bundled: true } bundled
         ? $"Study Stash turns speech into text on this {DeviceWord}, so your recordings never leave it. {bundled.Name} comes with the app: there's nothing to download."
