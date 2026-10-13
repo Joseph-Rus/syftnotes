@@ -744,7 +744,12 @@ public static partial class Shell
             // look further, as they do under a note.
             LectureId = liveId, ClassName = cls.Length > 0 ? cls : null,
             OpenSettings = () => ShowSettings("AI"),
-            OnSource = s => Play(s.Id ?? liveId, s.At ?? 0),
+            OnSource = s =>
+            {
+                Play(s.Id ?? liveId, s.At ?? 0);
+                // A moment of this recording, with its page in the window: what's been heard so far shows at that line.
+                if ((s.Id ?? liveId) == liveId && s.At is double at && library.ShowNotePage && library.Note is { Live: true } page && page.Id == liveId) page.ShowAt(at);
+            },
         };
         // A recording in no folder has no folder to ask about.
         if (cls.Length == 0) ask.OnlyScopes("lecture", "all");

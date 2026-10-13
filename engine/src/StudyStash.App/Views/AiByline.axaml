@@ -1,0 +1,31 @@
+<!-- An answer's byline (both looks; under the answer in the page's card and in the recorder's chat): who answered, and
+     the moments in the recording it drew on. Each moment is a link of its own, so every one of them can be gone to:
+     the transcript opens at the line said then. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.AiByline"
+             x:DataType="vm:AiTurn">
+  <UserControl.Styles>
+    <Style Selector="TextBlock.moment">
+      <Setter Property="TextDecorations" Value="Underline" />
+    </Style>
+  </UserControl.Styles>
+
+  <ItemsControl ItemsSource="{Binding BylineParts}">
+    <ItemsControl.ItemsPanel>
+      <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+    </ItemsControl.ItemsPanel>
+    <ItemsControl.ItemTemplate>
+      <DataTemplate x:DataType="vm:BylinePart">
+        <Panel>
+          <TextBlock Classes="ai-byline" Text="{Binding Text}" IsVisible="{Binding !CanOpen}" />
+          <Button Theme="{StaticResource Surface}" Padding="0" IsVisible="{Binding CanOpen}" Command="{Binding Open}"
+                  ToolTip.Tip="{Binding Tip}" AutomationProperties.Name="{Binding Said}">
+            <TextBlock Classes="ai-byline" Classes.moment="{Binding IsMoment}" Text="{Binding Text}" />
+          </Button>
+        </Panel>
+      </DataTemplate>
+    </ItemsControl.ItemTemplate>
+  </ItemsControl>
+</UserControl>

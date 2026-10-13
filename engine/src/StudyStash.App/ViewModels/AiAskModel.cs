@@ -35,6 +35,22 @@ public sealed class EngineMenuModel
     public double Width { get; init; } = 260;
 }
 
+/// <summary>A piece of an answer's byline as it's shown: its words ("Claude · from ", " and "), or one of the moments
+/// it names ("01:52"), a link of its own that opens the transcript there.</summary>
+public sealed class BylinePart(string text, Action? open = null, bool moment = false)
+{
+    public string Text { get; } = text;
+    /// <summary>One of the moments the answer drew on: it reads as a link.</summary>
+    public bool IsMoment { get; } = moment;
+    /// <summary>What pressing it does; null for the words between.</summary>
+    public IRelayCommand? Open { get; } = open is null ? null : new RelayCommand(open);
+    public bool CanOpen => Open is not null;
+    /// <summary>What a moment does, under the pointer.</summary>
+    public string? Tip => IsMoment ? AiWords.MomentTip(Text) : null;
+    /// <summary>What a screen reader says for it.</summary>
+    public string Said => Tip ?? Text;
+}
+
 /// <summary>One question and its answer in an ask thread: what was asked, of which engine, and once it comes back,
 /// the answer, its byline, a fell-back note, or why it failed. A turn never edits itself back to thinking.</summary>
 public sealed partial class AiTurn : ObservableObject
@@ -45,6 +61,9 @@ public sealed partial class AiTurn : ObservableObject
     public string AskedName { get; }
     [ObservableProperty] public partial string? Answer { get; set; }
     [ObservableProperty] public partial string? Byline { get; set; }
+    /// <summary>The byline as it's shown: all words, until the ask bar that can open its sources gives each moment
+    /// it names a link of its own (<see cref="AiWords.AskBylineParts"/>).</summary>
+    [ObservableProperty] public partial IReadOnlyList<BylinePart> BylineParts { get; set; } = [];
     [ObservableProperty] public partial string? FellBackNote { get; set; }
     [ObservableProperty] public partial string? Failed { get; set; }
     public List<AskSource> Sources { get; set; } = [];
@@ -59,6 +78,7 @@ public sealed partial class AiTurn : ObservableObject
 
     partial void OnAnswerChanged(string? value) => OnPropertyChanged(nameof(IsThinking));
     partial void OnFailedChanged(string? value) => OnPropertyChanged(nameof(IsThinking));
+    partial void OnBylineChanged(string? value) => BylineParts = string.IsNullOrEmpty(value) ? [] : [new BylinePart(value)];
 }
 
 /// <summary>
@@ -190,7 +210,7 @@ public sealed partial class AiAskModel : ObservableObject
 
     /// <summary>Opens Settings → AI engines (the "Change defaults" footer link).</summary>
     public Action? OpenSettings { get; set; }
-    /// <summary>A turn's answer, tapped: jump to its first timed source.</summary>
+    /// <summary>One of an answer's sources, pressed in its byline: the transcript opens at its moment.</summary>
     public Action<AskSource>? OnSource { get; set; }
     /// <summary>Closes the "Answer with" popup once an engine is picked; the view wires this to the real flyout.</summary>
     public Action? CloseMenu { get; set; }
@@ -329,6 +349,7 @@ public sealed partial class AiAskModel : ObservableObject
             turn.Answer = reply.Answer;
             turn.Sources = reply.Sources;
             turn.Byline = AiWords.AskByline(reply.EngineName, reply.Sources);
+            turn.BylineParts = AiWords.AskBylineParts(reply.EngineName, reply.Sources, OnSource);
             if (reply.FellBack) turn.FellBackNote = AiWords.FellBackNote(reply.EngineName, reply.Why);
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested)
@@ -360,10 +381,4 @@ public sealed partial class AiAskModel : ObservableObject
     /// lecture opened): what's been written so far stays.</summary>
     [RelayCommand]
     public void Stop() => asking?.Cancel();
-
-    [RelayCommand]
-    void OpenTurnSource(AiTurn turn)
-    {
-        if (turn.Sources.FirstOrDefault() is { } s) OnSource?.Invoke(s);
-    }
 }

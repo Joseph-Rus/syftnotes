@@ -195,7 +195,7 @@ public sealed partial class NoteModel : ObservableObject
     /// <summary>The transcript as timed lines, when it has times: what a diagram's box is looked for in.</summary>
     public List<Spoken> Spoken { get; } = [];
 
-    /// <summary>The transcript's line to scroll to (its place in <see cref="Transcript"/>), once it's showing.</summary>
+    /// <summary>The transcript's line to scroll to (its place in <see cref="Lines"/>), once it's showing.</summary>
     public event Action<int>? Jumped;
 
     /// <summary>The transcript was opened from the notes at a moment a diagram pointed to: a button takes the student
@@ -204,15 +204,17 @@ public sealed partial class NoteModel : ObservableObject
 
     [RelayCommand] void BackToNotes() => ShowTranscript = false;
 
-    /// <summary>The transcript at a moment: its tab open, the line said then marked, and the page brought to it.</summary>
+    /// <summary>The transcript at a moment: its tab open, the line said then marked, and the page brought to it. While
+    /// it records, that's what's been heard so far.</summary>
     public void ShowAt(double seconds)
     {
         if (!ShowTranscript) CanGoBack = true;
-        if (Transcript.Count == 0) return;
+        var lines = Lines;
+        if (lines.Count == 0) return;
         int at = 0;
-        for (int i = 0; i < Transcript.Count; i++)
-            if (Transcript[i].Start is double s && s <= seconds + 0.5) at = i;
-        for (int i = 0; i < Transcript.Count; i++) Transcript[i].Here = i == at;
+        for (int i = 0; i < lines.Count; i++)
+            if (lines[i].Start is double s && s <= seconds + 0.5) at = i;
+        for (int i = 0; i < lines.Count; i++) lines[i].Here = i == at;
         ShowTranscript = true;
         Jumped?.Invoke(at);
     }

@@ -236,17 +236,29 @@ public static partial class AiWords
 
     /// <summary>An answer's byline: the engine, then the moments in the lecture it drew on, earliest first ("Ollama ·
     /// from 18:05 and 18:40"), or just the engine when nothing carries a moment.</summary>
-    public static string AskByline(string engineName, IEnumerable<AskSource> sources)
+    public static string AskByline(string engineName, IEnumerable<AskSource> sources) =>
+        string.Concat(AskBylineParts(engineName, [.. sources], null).Select(p => p.Text));
+
+    /// <summary>The byline in the pieces it's shown in. With <paramref name="open"/> (the page can show a source),
+    /// each moment is a link of its own that opens its source, so every one the answer drew on can be gone to; a
+    /// byline that names no moment opens the answer's first source, as one press.</summary>
+    public static List<BylinePart> AskBylineParts(string engineName, IReadOnlyList<AskSource> sources, Action<AskSource>? open)
     {
         // The moments the answer drew on, in the order they were said (an engine lists them by relevance), each once.
-        var times = sources.Where(s => s.At is not null).Select(s => s.At!.Value).Order().Select(TimedText.Clock).Distinct().ToList();
-        return times.Count switch
+        var moments = sources.Where(s => s.At is not null).OrderBy(s => s.At!.Value).DistinctBy(s => TimedText.Clock(s.At!.Value)).ToList();
+        if (moments.Count == 0) return [new BylinePart(engineName, open is not null && sources.Count > 0 ? () => open(sources[0]) : null)];
+        var parts = new List<BylinePart> { new($"{engineName} · from ") };
+        for (int i = 0; i < moments.Count; i++)
         {
-            0 => engineName,
-            1 => $"{engineName} · from {times[0]}",
-            _ => $"{engineName} · from {string.Join(", ", times[..^1])} and {times[^1]}",
-        };
+            if (i > 0) parts.Add(new BylinePart(i == moments.Count - 1 ? " and " : ", "));
+            var source = moments[i];
+            parts.Add(new BylinePart(TimedText.Clock(source.At!.Value), open is null ? null : () => open(source), moment: true));
+        }
+        return parts;
     }
+
+    /// <summary>What a moment in a byline does: "Read the transcript at 01:52".</summary>
+    public static string MomentTip(string time) => $"Read the transcript at {time}";
 
     /// <summary>"This answer came from Ollama. Claude Code didn't respond in time." — why already reads as a full
     /// sentence about the engine that was asked.</summary>

@@ -825,20 +825,38 @@ public class AiAskModelTests
     }
 
     [AvaloniaFact]
-    public async Task Tapping_the_byline_opens_its_first_source()
+    public async Task Each_moment_in_the_byline_opens_its_own_source()
     {
         var (model, lib) = Loaded();
         await model.Load();
-        var source = new AskSource("lec-1", "t", null, null, 5, "");
-        lib.OnAsk = r => new AskReply("a", [source], r.Engine!, "Ollama");
-        model.Question = "q";
-        await model.AskCommand.ExecuteAsync(null);
+        AskSource later = new("lec-1", "t", null, null, 152, ""), earlier = new("lec-1", "t", null, null, 112, ""), notes = new("lec-1", "t", null, null, null, "Summary");
+        lib.OnAsk = r => new AskReply("a", [later, notes, earlier], r.Engine!, "Ollama");
         AskSource? opened = null;
         model.OnSource = s => opened = s;
+        model.Question = "q";
+        await model.AskCommand.ExecuteAsync(null);
 
-        model.OpenTurnSourceCommand.Execute(model.Turns[0]);
+        // "Ollama · from 01:52 and 02:32": the words between aren't pressed, each time is.
+        var parts = model.Turns[0].BylineParts;
+        Assert.Equal(model.Turns[0].Byline, string.Concat(parts.Select(p => p.Text)));
+        Assert.Equal(["01:52", "02:32"], parts.Where(p => p.CanOpen).Select(p => p.Text));
+        parts.Single(p => p.Text == "02:32").Open!.Execute(null);
+        Assert.Same(later, opened);
+        parts.Single(p => p.Text == "01:52").Open!.Execute(null);
+        Assert.Same(earlier, opened);
 
-        Assert.Same(source, opened);
+        // A byline with no moment in it opens the answer's first source, as one press; with nothing to open them
+        // (Home's ask bar), a byline is only words.
+        lib.OnAsk = r => new AskReply("a", [notes], r.Engine!, "Ollama");
+        model.Question = "q";
+        await model.AskCommand.ExecuteAsync(null);
+        Assert.Single(model.Turns[1].BylineParts).Open!.Execute(null);
+        Assert.Same(notes, opened);
+        model.OnSource = null;
+        lib.OnAsk = r => new AskReply("a", [later], r.Engine!, "Ollama");
+        model.Question = "q";
+        await model.AskCommand.ExecuteAsync(null);
+        Assert.DoesNotContain(model.Turns[2].BylineParts, p => p.CanOpen);
     }
 
     [AvaloniaFact]
