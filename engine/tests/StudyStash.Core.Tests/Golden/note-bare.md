@@ -18,4 +18,4 @@ summary_by: ""
 
 ## Notes
 
-_(no AI notes returned)_
+_(Too short for notes: Study Stash writes them from about a minute and a half of speech.)_

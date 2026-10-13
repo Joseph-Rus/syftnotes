@@ -52,13 +52,19 @@ public static class NoticeWords
     }
 
     /// <summary>The lecture just stopped and is kept: where it goes from here, which depends on whether the library can
-    /// be reached.</summary>
-    public static string Saved(LibraryState library, bool mac) => library switch
+    /// be reached. <paramref name="notes"/>: whether notes will be written for it (<see cref="Summarize.WillHaveNotes"/>).
+    /// One too short for them says so, and one that could go either way isn't promised any.</summary>
+    public static string Saved(LibraryState library, bool mac, bool? notes = true) => library switch
     {
         LibraryState.Unreachable => $"Study Stash is writing it down. It waits on this {(mac ? "Mac" : "PC")} and goes to your library when it's back.",
         LibraryState.WrongPassword => "Study Stash is writing it down. Type your library's new password in Settings to send it.",
         LibraryState.NotSetUp => "Study Stash is writing it down. Connect to your library in Settings to file it.",
-        _ => "Study Stash is writing it down; the library files it and writes your notes.",
+        _ => notes switch
+        {
+            true => "Study Stash is writing it down; the library files it and writes your notes.",
+            false => $"{Summarize.TooShortWords()} The library files it with its transcript.",
+            null => "Study Stash is writing it down, and the library files it.",
+        },
     };
 
     /// <summary>Record, before there's a transcription model: download it (the button), or how far along it is.</summary>

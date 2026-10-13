@@ -65,6 +65,11 @@ export interface Lecture extends LectureSummary {
   classified_by: string | null;
   notes_model: string | null;
   error: string | null;
+  /** Why no notes were written from it, when the library knows ("short": too little was said); a library from
+   * before it says nothing. */
+  no_notes?: string | null;
+  /** That reason in a sentence ("This lecture is too short for notes: Study Stash writes them from about …"). */
+  no_notes_why?: string | null;
 }
 
 /** GET /api/v2/lectures/{id}/rendered (contract): the notes as safe HTML, diagrams inline, no scripts. */

@@ -81,8 +81,15 @@ public sealed partial class NoteModel : ObservableObject
     public string Markdown { get; init; } = "";
     /// <summary>The notes shown are the student's own typing and nothing else yet: all of it reads as theirs.</summary>
     public bool Mine { get; init; }
-    /// <summary>The notes aren't written yet (the library is on it), or couldn't be.</summary>
+    /// <summary>Where the notes are when none are written: on their way (the library is on it), they couldn't be, or
+    /// the recording is too short for them (<see cref="TooShort"/>, said over what the student typed if they did).</summary>
     public string? Pending { get; init; }
+
+    /// <summary>What the page says of a recording too short to have notes written (<see cref="Summarize.TooShort"/>):
+    /// that it is and what notes take, where its words are, and what adds to them. Keep recording is named only where
+    /// the page has the button (<paramref name="canContinue"/>: it was recorded on this computer).</summary>
+    public static string TooShort(string noun, bool transcript, bool canContinue) => Summarize.TooShortWords($"This {noun}")
+        + (transcript ? $" The transcript is in the Transcript tab{(canContinue ? "; Keep recording adds to it." : ".")}" : canContinue ? " Keep recording adds to it." : "");
     public ObservableCollection<HeardLine> Transcript { get; } = [];
     [ObservableProperty] public partial bool ShowTranscript { get; set; }
 

@@ -243,7 +243,7 @@ public static partial class Shell
         SelectInSidebar(openClass);
         string status = S(l["status"]), notes = S(l["notes"]), typed = S(l["typed"]), noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
         bool writing = status is "queued" or "working";
-        string stamp = string.Join("\u0001", S(l["title"]), cls, status, notes, typed, S(l["error"]), S(l["transcript"]).Length, S(l["updated"]));
+        string stamp = string.Join("\u0001", S(l["title"]), cls, status, notes, typed, S(l["error"]), S(l["transcript"]).Length, S(l["updated"]), S(l["no_notes"]));
         // Read again and nothing changed: the page stays as it is (where it's scrolled to, what's typed in Ask).
         if (showing && library.Note!.Stamp == stamp)
         {
@@ -252,16 +252,21 @@ public static partial class Shell
         }
         // No notes written (yet): what the student typed while it recorded is all there is to read, and it's theirs.
         bool mine = notes.Length == 0 && typed.Trim().Length > 0;
+        var keepRecording = ContinueFor(id);
+        // No notes will be written from it, and the library says why (it's too short for them): the page says so from
+        // the start, over whatever there is to read, rather than that notes are on their way.
+        string? why = S(l["no_notes"]) == Summarize.NoNotesShort ? NoteModel.TooShort(noun, S(l["transcript"]).Trim().Length > 0, keepRecording is not null) : null;
         var note = new NoteModel
         {
             Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(Date(S(l["date"])), l["seconds"] is JsonValue v && v.TryGetValue(out double s) ? s : null),
             Title = S(l["title"]), Markdown = mine ? TypedNotes.AllMine(typed) : notes, Mine = mine, Stamp = stamp,
-            Pending = writing ? $"Your library is writing the notes for this {noun}. They show here when they're done."
-                : notes.Length == 0 ? S(l["error"]) is { Length: > 0 } err ? err : mine ? null : $"There are no notes for this {noun}." : null,
+            Pending = writing ? why ?? $"Your library is writing the notes for this {noun}. They show here when they're done."
+                : notes.Length == 0 && S(l["error"]) is { Length: > 0 } err ? err
+                : why ?? (notes.Length == 0 && !mine ? $"There are no notes for this {noun}." : null),
             ShowTranscript = transcript || (showing && library.Note!.ShowTranscript),
             // The library doesn't take a new name while it's still writing the notes (it would write its own over it).
             OnRename = host.Remote() is { } remote && !host.OlderLibrary ? title => RenameAsync(remote, id, title) : null,
-            OnContinue = ContinueFor(id),
+            OnContinue = keepRecording,
         }.Titled();
         // A transcript without times (one pasted from another app) reads a paragraph per line it came with (each
         // speaker's turn), not as one wall of text.
@@ -280,7 +285,8 @@ public static partial class Shell
         library.CanvasClass = null;
         library.Overview = null;
         library.Note = note;
-        ShowLectureAi(l, note);
+        // Notes to read that nothing is writing now (with none written, what the student typed) can be edited and rewritten.
+        ShowLectureAi(l, note, written: !writing && (notes.Length > 0 || (mine && S(l["error"]).Length == 0)));
         ShowLectureFiles(note);
     }
 
@@ -324,6 +330,10 @@ public static partial class Shell
         host.Settings.Role != AppRole.Library && host.Lectures.Get(id) is { State: not (LectureState.Recording or LectureState.Paused) }
             ? () => ContinueRecording(id) : null;
 
+    /// <summary>Whether a recording this computer made will have notes written, as far as it can be told yet
+    /// (<see cref="Summarize.WillHaveNotes"/>): from how long it is, and how much of it has been written down.</summary>
+    static bool? WillHaveNotes(Lecture l) => Summarize.WillHaveNotes(l.Seconds, l.TranscribedSeconds, l.Transcript().Length);
+
     /// <summary>What a recording's page on this computer was drawn from: when it reads differently, the page is drawn again.</summary>
     static string LocalStamp(Lecture l) => string.Join("\u0001", "local", l.State, l.Title, l.ClassName, l.Notes, l.Error, l.Segments.Count);
     static DateTime lastLocalLook = DateTime.MinValue;
@@ -340,6 +350,7 @@ public static partial class Shell
         openClass = cls.Length > 0 ? cls : null;
         SelectInSidebar(openClass);
         string id = l.Id;
+        var keepRecording = ContinueFor(id);
         var note = new NoteModel
         {
             Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(l.StartedAt, l.Seconds > 0 ? l.Seconds : null), Title = WorkingTitle(l),
@@ -347,6 +358,8 @@ public static partial class Shell
             Pending = l.State switch
             {
                 LectureState.Failed => l.Error.Length > 0 ? l.Error : $"This {noun} couldn't be written down.",
+                // Too short for notes, as far as its length tells already: no notes are promised for it.
+                _ when WillHaveNotes(l) == false => NoteModel.TooShort(noun, l.Segments.Count > 0, keepRecording is not null),
                 LectureState.Transcribing => $"This {noun} is being written down on this computer. Its notes come once that's done and your library has it.",
                 _ => host.Library == LibraryState.Connected ? $"On its way to your library, which writes the notes for this {noun}. They show here when they're done."
                     : $"Waiting for your library. The notes for this {noun} are written once it's back.",
@@ -358,7 +371,7 @@ public static partial class Shell
                 host.TitleLecture(id, title);
                 return Task.FromResult(true);
             } : null,
-            OnContinue = ContinueFor(id),
+            OnContinue = keepRecording,
         }.Titled();
         foreach (var line in l.Segments)
         {
@@ -391,9 +404,9 @@ public static partial class Shell
         yield return text[start..].Trim();
     }
 
-    /// <summary>The lecture's notes, which another engine can rewrite (while they aren't still being written), and a
-    /// fresh ask bar for it: a new lecture starts a new conversation.</summary>
-    static void ShowLectureAi(JsonObject l, NoteModel note)
+    /// <summary>The lecture's notes, which another engine can rewrite (while they aren't still being written:
+    /// <paramref name="written"/>), and a fresh ask bar for it: a new lecture starts a new conversation.</summary>
+    static void ShowLectureAi(JsonObject l, NoteModel note, bool written)
     {
         var ai = Ai();
         // The new notes replace the old ones in one step: with none in between, the page never shows its plain Markdown
@@ -402,7 +415,7 @@ public static partial class Shell
         var before = library.Notes;
         AiNotesModel? notes = null;
         bool fresh = false;
-        if (!note.HasPending)
+        if (written)
         {
             // Notes with an edit in them come back as they were left: the ones on screen (Edit pressed while this
             // lecture was loading), or ones kept from before another lecture was opened.

@@ -53,6 +53,20 @@ public class NoticeWordsTests
         Assert.Contains("this PC", NoticeWords.Saved(LibraryState.Unreachable, mac: false));
         Assert.Contains("new password in Settings", NoticeWords.Saved(LibraryState.WrongPassword, mac: true));
         Assert.Contains("Connect to your library in Settings", NoticeWords.Saved(LibraryState.NotSetUp, mac: false));
+        // One too short for notes says so, and one that could go either way isn't promised any.
+        Assert.Equal("Too short for notes: Study Stash writes them from about a minute and a half of speech. The library files it with its transcript.",
+            NoticeWords.Saved(LibraryState.Connected, mac: true, notes: false));
+        Assert.Equal("Study Stash is writing it down, and the library files it.", NoticeWords.Saved(LibraryState.Connected, mac: true, notes: null));
+        // Twenty seconds can't be enough however fast it's said; an hour written down as it went is; two minutes with
+        // nothing written down yet could be either.
+        Assert.False(Summarize.WillHaveNotes(20, 18, 300));
+        Assert.True(Summarize.WillHaveNotes(3000, 2998, 48_000));
+        Assert.Null(Summarize.WillHaveNotes(120, 0, 0));
+        // The note's page says the same, and names Keep recording only where it has the button.
+        Assert.Equal("This recording is too short for notes: Study Stash writes them from about a minute and a half of speech. The transcript is in the Transcript tab; Keep recording adds to it.",
+            NoteModel.TooShort(Nouns.Recording, transcript: true, canContinue: true));
+        Assert.Equal("This lecture is too short for notes: Study Stash writes them from about a minute and a half of speech. The transcript is in the Transcript tab.",
+            NoteModel.TooShort(Nouns.Lecture, transcript: true, canContinue: false));
     }
 
     [Fact]
@@ -122,6 +136,7 @@ public class NoticeWordsTests
         {
             NoticeWords.Paused(RecordingWords.CantHearWindows, windows: true).Text,
             NoticeWords.Saved(LibraryState.Unreachable, mac: true),
+            NoticeWords.Saved(LibraryState.Connected, mac: true, notes: false),
             AppHost.BehindWords(900, 600, WhisperModels.LargeV3, WhisperModels.Advise(FakeHardware.PlainPc().Probe()))!.Value.Text,
             NoticeWords.LighterModel(WhisperModels.Advise(FakeHardware.PlainPc().Probe())).Text,
             IconWords.WhereItIs(mac: false, hidden: false).Text,

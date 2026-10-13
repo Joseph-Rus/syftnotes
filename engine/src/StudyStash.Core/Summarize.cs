@@ -30,6 +30,9 @@ public static partial class Summarize
     // Below this (a couple of minutes of speech) there's too little to fill the notes: small models then pad and
     // loop. Such lectures keep their transcript without study notes.
     public const int MinTranscriptChars = 1500;
+    // About what a second of a lecture makes of transcript (its words, and each line's time): what turns the fewest
+    // characters into a length of speech a student can be told.
+    public const double TranscriptCharsPerSecond = 16;
     // Good notes are well under 2,000 tokens. Without a cap, a small model that starts repeating itself never
     // stops: Ollama keeps shifting its context and generating (39,000 tokens seen, from llama3.2:3b).
     public const int MaxNotesTokens = 4096;
@@ -243,8 +246,51 @@ public static partial class Summarize
         return (int)((ctx - reserved) * CharsPerToken);
     }
 
-    public static bool WantsSummary(Meeting m, Config cfg) =>
-        cfg.OllamaEnabled && cfg.SummaryEnabled && (Py.Strip(m.Transcript).Length >= MinTranscriptChars || FromNotes(m));
+    public static bool WantsSummary(Meeting m, Config cfg) => cfg.OllamaEnabled && cfg.SummaryEnabled && !TooShort(m);
+
+    /// <summary>Too little was said for study notes (a transcript under <see cref="MinTranscriptChars"/>, and no notes
+    /// of another app's to write them from instead): the lecture keeps its transcript without them, whatever AI the
+    /// library has.</summary>
+    public static bool TooShort(Meeting m) => Py.Strip(m.Transcript).Length < MinTranscriptChars && !FromNotes(m);
+
+    /// <summary>Why a lecture has no notes written for it, as the library tells the app and the phone
+    /// (<see cref="LibraryReader.Lecture"/>'s "no_notes"): it's <see cref="TooShort"/>.</summary>
+    public const string NoNotesShort = "short";
+
+    /// <summary>About how long someone speaks to fill <see cref="MinTranscriptChars"/>, as a student is told it, to the
+    /// half minute: "a minute and a half".</summary>
+    public static string MinSpeech
+    {
+        get
+        {
+            int halves = Math.Max(1, (int)Math.Round(MinTranscriptChars / TranscriptCharsPerSecond / 30));
+            int whole = halves / 2;
+            string[] said = ["", "a", "two", "three", "four", "five"];
+            string n = whole < said.Length ? said[whole] : whole.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (whole == 0) return "half a minute";
+            if (whole == 1) return halves % 2 == 1 ? "a minute and a half" : "a minute";
+            return halves % 2 == 1 ? $"{n} and a half minutes" : $"{n} minutes";
+        }
+    }
+
+    /// <summary>What a student is told of a recording that's <see cref="TooShort"/>: that it is, and how much speech
+    /// notes are written from. <paramref name="it"/> names it ("This lecture"); with no name, "Too short for notes: …".</summary>
+    public static string TooShortWords(string it = "") =>
+        $"{(it.Length > 0 ? $"{it} is too short" : "Too short")} for notes: Study Stash writes them from about {MinSpeech} of speech.";
+
+    /// <summary>
+    /// Whether a recording that just stopped will have notes written for it, as far as its length and what's been
+    /// written down of it so far can tell: false when even fast speech couldn't fill the rest of it to
+    /// <see cref="MinTranscriptChars"/>, true when it's there already or slow speech would get it there, null when it
+    /// could go either way (a minute or two recorded with nothing written down yet).
+    /// </summary>
+    public static bool? WillHaveNotes(double seconds, double transcribedSeconds, int transcriptChars)
+    {
+        double left = Math.Max(0, seconds - transcribedSeconds);
+        if (transcriptChars + left * TranscriptCharsPerSecond * 2 < MinTranscriptChars) return false;
+        if (transcriptChars + left * TranscriptCharsPerSecond / 2 >= MinTranscriptChars) return true;
+        return null;
+    }
 
     /// <summary>The fewest letters of notes a lecture can arrive with, and no transcript, for study notes to be written
     /// from them: under this there's too little to write from, and the notes it came with are its notes.</summary>

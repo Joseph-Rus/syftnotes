@@ -573,7 +573,7 @@ public static partial class Shell
         chosenClass = "";
         recorderWindow?.Hide();
         if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
-        else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS()), null, null);
+        else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS(), WillHaveNotes(l)), null, null);
         if (onPage)
         {
             // The page it was on isn't a place to go back to: it's the note's page now (or, too short to keep, gone).

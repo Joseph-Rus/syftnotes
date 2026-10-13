@@ -82,7 +82,22 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         result["classified_by"] = row.ClassifiedBy;
         result["notes_model"] = row.SummaryModel;
         result["error"] = row.Error;
+        // Why no notes were written from it, when the library knows: the app and the phone say so where the notes
+        // would be. The words are for the phone, which can't work them out itself.
+        string? why = WhyNoNotes(row, m);
+        result["no_notes"] = why;
+        result["no_notes_why"] = why == Summarize.NoNotesShort ? Summarize.TooShortWords("This lecture") : null;
         return result;
+    }
+
+    /// <summary>Why nothing wrote notes for a filed lecture, when that's known: <see cref="Summarize.NoNotesShort"/>
+    /// for one with too little said to write them from. Null when an AI wrote its notes, when they're on their way,
+    /// when it has the notes it came with, and when notes were asked for and none came back (its error says why, if
+    /// anything does).</summary>
+    static string? WhyNoNotes(NoteRow row, Meeting m)
+    {
+        if (!string.IsNullOrEmpty(row.SummaryModel) || row.Status is Store.Queued or Store.Working || Py.Strip(m.NotesMarkdown).Length > 0) return null;
+        return Summarize.TooShort(m) ? Summarize.NoNotesShort : null;
     }
 
     /// <summary>The notes a lecture shows: ours, written from the transcript, or else the ones it came with.</summary>
