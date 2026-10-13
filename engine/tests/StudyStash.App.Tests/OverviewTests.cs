@@ -635,6 +635,33 @@ public class OverviewTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
+    public void Homes_ask_for_a_tip_shows_whole_with_its_buttons_over_what_comes_next(SkinKind skin)
+    {
+        var m = Demo.Semester();
+        m.AskForSupport(last: false);
+        var view = Library(skin, m);
+        var w = Host(view, skin, 1280, 860);
+        try
+        {
+            var page = view.GetVisualDescendants().OfType<Overview>().Single();
+            var card = Named<Control>(page, "SupportAsk");
+            Assert.True(card.IsEffectivelyVisible);
+            // The card holds all of itself. It was cut off under its first line, its three buttons left under the
+            // heading below: its box was named as the Ask bar's is, and took the bar's fixed height.
+            foreach (string name in new[] { "Tip", "Later", "Never" })
+                Assert.True(In(Named<Button>(card, name), view).Bottom <= In(card, view).Bottom + 0.5, $"{skin}: {name} is inside the card");
+            Assert.True(In(Named<StackPanel>(page, "UpNext"), view).Top >= In(card, view).Bottom, $"{skin}: Up next starts under the card");
+        }
+        finally
+        {
+            w.Close();
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
     public void A_folder_has_one_page_its_notes_with_a_rail_beside_them_and_no_tabs(SkinKind skin)
     {
         var view = Library(skin, Demo.Semester(Demo.Page.FolderClass));

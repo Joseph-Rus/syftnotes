@@ -590,17 +590,18 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
     </Style>
-    <Style Selector="Border.ask">
+    <!-- Not "ask": that name is the Ask bar's (Styles.axaml), whose fixed height and floating shadow it would take. -->
+    <Style Selector="Border.settings-ask">
       <Setter Property="MinHeight" Value="40" />
       <Setter Property="CornerRadius" Value="12" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Padding" Value="12,4,6,4" />
     </Style>
-    <Style Selector=".mac Border.ask">
+    <Style Selector=".mac Border.settings-ask">
       <Setter Property="Background" Value="{DynamicResource Raised}" />
       <Setter Property="BorderBrush" Value="{DynamicResource Sep}" />
     </Style>
-    <Style Selector=".win Border.ask">
+    <Style Selector=".win Border.settings-ask">
       <Setter Property="Background" Value="{DynamicResource Ctrl}" />
       <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorder}" />
     </Style>
@@ -1717,7 +1718,7 @@
                 <TextBlock Classes="say" Text="{Binding Problem}" Foreground="{DynamicResource Warn}" Margin="0" />
                 <Button Classes="pill" Command="{Binding SetUpCommand}" IsVisible="{Binding ProblemNeedsSetup}" HorizontalAlignment="Left"><TextBlock Text="Run setup" FontSize="13" /></Button>
               </StackPanel>
-              <Border Classes="ask">
+              <Border Classes="settings-ask">
                 <Grid ColumnDefinitions="*,6,Auto">
                   <TextBox Name="AskBox" Classes="bare" Text="{Binding Draft}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center"
                            TextWrapping="Wrap" MaxHeight="96" AutomationProperties.Name="Ask your AI">
