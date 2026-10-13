@@ -31,7 +31,34 @@ public static partial class Shell
     /// or of <paramref name="forEvent"/> (its title, its folder). <paramref name="openPage"/> opens its page in the
     /// library window. False when it couldn't start, which a notice or a toast has said why.
     /// </summary>
-    static async Task<bool> StartRecordingAsync(string className, CalendarEvent? forEvent, bool openPage)
+    static Task<bool> StartRecordingAsync(string className, CalendarEvent? forEvent, bool openPage) =>
+        BeginAsync(() => host.RecordAsync(className, forEvent), openPage);
+
+    /// <summary>Keep recording a note that stopped, minutes or days ago: what's said now goes on the end of its
+    /// transcript, its page opens as the recording's, and once it stops its notes are written again from all of it.
+    /// With something else recording it asks first, as an event does.</summary>
+    static void ContinueRecording(string id)
+    {
+        if (host.Recorder.Current is { } live)
+        {
+            if (live.Id == id)
+            {
+                OpenRecording();
+                return;
+            }
+            string now = live.Title.Length > 0 ? live.Title : live.ClassName.Length > 0 ? ClassNames.Display(live.ClassName) : "this recording";
+            library.Confirming = new ConfirmAsk($"Stop recording {now} and keep recording this one?",
+                "What's recorded so far is saved, and its notes are written as usual.", "Stop and switch", () =>
+                {
+                    StopRecording(stay: true);
+                    _ = BeginAsync(() => host.ContinueAsync(id), openPage: true);
+                });
+            return;
+        }
+        _ = BeginAsync(() => host.ContinueAsync(id), openPage: true);
+    }
+
+    static async Task<bool> BeginAsync(Func<Task<RecordStart>> begin, bool openPage)
     {
         if (host.Recorder.Current is not null || askingForMic) return false;
         if (host.Settings.Role == AppRole.Library)
@@ -50,7 +77,7 @@ public static partial class Shell
         try
         {
             // Not asked yet: macOS's own prompt is all the student sees until they answer; recording starts after.
-            start = await host.RecordAsync(className, forEvent);
+            start = await begin();
         }
         catch (Exception e) when (e is InvalidOperationException or PlatformNotSupportedException)
         {

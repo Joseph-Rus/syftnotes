@@ -73,11 +73,16 @@
           </Button>
           <!-- Record from here: into this folder on its page; on Home, into the event that's on, or Unsorted. Red is
                only the dot; while something records the pill is ringed in red, its dot a stop square, with the folder,
-               the level and the time. -->
+               the level and the time. Then a click on the pill opens the recording's page, and only the stop square
+               (a button of its own) stops it. -->
           <Button Name="Record" Classes="record" Classes.recording="{Binding Running}" Classes.paused="{Binding Paused}" Command="{Binding RecordCommand}"
                   IsVisible="{Binding CanRecord}" AutomationProperties.Name="{Binding RecordTip}" ToolTip.Tip="{Binding RecordTip}">
             <StackPanel Orientation="Horizontal" Spacing="12">
-              <Border Classes="record-dot"><Border /></Border>
+              <Button Name="StopRecording" Theme="{StaticResource Surface}" Padding="0" CornerRadius="20" Background="Transparent"
+                      Command="{Binding StopCommand}" IsHitTestVisible="{Binding Recording}" Focusable="{Binding Recording}"
+                      ToolTip.Tip="{Binding StopTip}" AutomationProperties.Name="Stop recording">
+                <Border Classes="record-dot"><Border /></Border>
+              </Button>
               <TextBlock Name="RecordWords" Text="{Binding RecordWords}" VerticalAlignment="Center" />
               <c:Waveform Bars="5" Height="16" MinBar="5" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
                           VerticalAlignment="Center" IsVisible="{Binding Running}" />

@@ -162,6 +162,15 @@
                   <TextBlock Text="Only my notes" VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
+              <!-- Recorded here: keep recording it, the new words going on the end of its transcript -->
+              <Button Name="KeepRecording" Classes="link-btn" Command="{Binding ContinueCommand}" IsVisible="{Binding CanContinue}"
+                      ToolTip.Tip="Keep recording: what's said now is added to the end of this transcript, and the notes are written again"
+                      AutomationProperties.Name="Keep recording">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Glyph="mic" Size="15" VerticalAlignment="Center" />
+                  <TextBlock Text="Keep recording" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
               <Button Name="Attach" Classes="link-btn"
                       Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).LectureFiles.AttachCommand, FallbackValue={x:Null}}"
                       IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasLectureFiles}"

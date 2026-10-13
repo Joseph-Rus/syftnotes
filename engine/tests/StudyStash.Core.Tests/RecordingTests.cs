@@ -271,6 +271,91 @@ public class RecordingTests
     }
 
     [Fact]
+    public void A_filed_lecture_is_picked_up_again_and_its_sound_added_to()
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        FakeMic? mic = null;
+        using var rec = new Recorder(store, () => mic = new FakeMic(), () => Tuesday);
+        var l = rec.Start("", "Sam");
+        mic!.Play(7);
+        rec.Stop();
+        store.Update(l.Id, x =>
+        {
+            x.State = LectureState.Filed;
+            x.FiledClass = "Data Mining";
+            x.TranscribedSeconds = 7;
+            x.SpeakersDone = true;
+        });
+
+        var again = rec.Continue(l.Id);
+        Assert.Equal(l.Id, again.Id);
+        Assert.Equal(LectureState.Recording, again.State);
+        Assert.Equal("Data Mining", again.ClassName); // where the library put it
+        Assert.False(again.SpeakersDone); // told apart again, over all of it
+        mic!.Play(6);
+        SpinWait.SpinUntil(() => rec.Elapsed > 12.99, 10000);
+        Assert.InRange(rec.Elapsed, 12.99, 13.01);
+        var done = rec.Stop()!;
+        Assert.Equal(LectureState.Transcribing, done.State);
+        Assert.InRange(done.Seconds, 12.99, 13.01);
+        Assert.Equal(0, done.AudioStart);
+        Assert.InRange(Sound.WavSeconds(store.AudioPath(l.Id)), 12.99, 13.01);
+        Assert.Equal(7, done.TranscribedSeconds); // Whisper goes on from where it was
+        Assert.Single(store.All());
+    }
+
+    [Fact]
+    public async Task A_lecture_is_picked_up_again_days_later_after_its_sound_was_cleared()
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        store.Add(new Lecture
+        {
+            Id = "rec-old", Started = "2026-09-15T10:00:00-07:00", State = LectureState.Filed, Seconds = 600, TranscribedSeconds = 600,
+            Segments = [new Spoken(0, 5, "what was said last week")], SpeakersDone = true, Notes = "typed last week",
+        });
+        FakeMic? mic = null;
+        using var rec = new Recorder(store, () => mic = new FakeMic(), () => Tuesday);
+        var again = rec.Continue("rec-old");
+        Assert.Equal(600, again.AudioStart);
+        Assert.True(again.SpeakersDone); // the old part's sound is gone: no telling voices apart over it
+        mic!.Play(30);
+        SpinWait.SpinUntil(() => rec.Elapsed > 629.99, 10000);
+        Assert.InRange(rec.Elapsed, 629.99, 630.01); // the time goes on from the old part's end
+        var done = rec.Stop()!;
+        Assert.InRange(done.Seconds, 629.99, 630.01);
+        Assert.InRange(Sound.WavSeconds(store.AudioPath("rec-old")), 29.99, 30.01);
+
+        var whisper = new FakeWhisper();
+        var worker = new TranscriptionWorker(store, () => whisper, () => null);
+        while (await worker.StepAsync(default)) { }
+        var l = store.Get("rec-old")!;
+        Assert.Equal(LectureState.Sending, l.State);
+        Assert.Equal("what was said last week", l.Segments[0].Text);
+        Assert.True(l.Segments.Count > 1);
+        Assert.All(l.Segments.Skip(1), sg => Assert.InRange(sg.Start, 600, 630)); // on the end of the transcript
+        Assert.InRange(l.TranscribedSeconds, 629.99, 630.01);
+        Assert.Equal("typed last week", l.Notes);
+        Assert.Equal("rec-old", (string)l.Payload()["id"]!); // the same note, sent again
+    }
+
+    [Fact]
+    public void A_lecture_picked_up_again_for_a_moment_only_is_left_as_it_was()
+    {
+        using var dir = new TempDir();
+        var store = new LectureStore(dir.Path);
+        store.Add(new Lecture { Id = "rec-old", Started = "2026-09-15T10:00:00-07:00", State = LectureState.Filed, Seconds = 600, TranscribedSeconds = 600 });
+        FakeMic? mic = null;
+        using var rec = new Recorder(store, () => mic = new FakeMic(), () => Tuesday);
+        rec.Continue("rec-old");
+        mic!.Play(1);
+        var l = rec.Stop()!;
+        Assert.Equal(LectureState.Filed, l.State);
+        Assert.NotNull(store.Get("rec-old"));
+    }
+
+    [Fact]
     public void A_moment_of_recording_isnt_kept()
     {
         using var dir = new TempDir();

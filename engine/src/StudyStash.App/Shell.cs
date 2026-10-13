@@ -1568,6 +1568,12 @@ public static partial class Shell
         panel.IsRecording = recording;
         panel.IsPaused = recorder.IsPaused = live?.State == LectureState.Paused;
         if (library.Overview is { CanRecord: true } page) ShowRecording(page);
+        // A recording started, stopped, moved on or was filed: Home's or a folder's list shows it where it is now.
+        if (LocalNotesStamp() is var drawn && drawn != localNotesDrawn)
+        {
+            localNotesDrawn = drawn;
+            if (library.Overview is { IsDuePage: false } && !library.ShowNotePage) RequestLibraryReload();
+        }
         library.Recording = recording ? recorder : null;
         // A recording this computer is still writing down or sending: its page follows where it is on its way (looked
         // at again when something about it changed, and not more than every few seconds).
@@ -1710,9 +1716,11 @@ public static partial class Shell
     /// transcript there.</summary>
     static void Play(string? lectureId, double at)
     {
-        if (lectureId is not null && File.Exists(host.Lectures.AudioPath(lectureId)))
+        // A note picked up again after its first sound was cleared has sound only from where that left off.
+        double from = lectureId is not null && host.Lectures.Get(lectureId) is { } l ? at - l.AudioStart : at;
+        if (lectureId is not null && from >= 0 && File.Exists(host.Lectures.AudioPath(lectureId)))
         {
-            Player.Play(host.Lectures.AudioPath(lectureId), Math.Max(0, at - 2));
+            Player.Play(host.Lectures.AudioPath(lectureId), Math.Max(0, from - 2));
             return;
         }
         if (lectureId is not null) OpenLecture(lectureId, transcript: true);

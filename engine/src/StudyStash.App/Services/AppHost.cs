@@ -911,7 +911,22 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     /// start. A microphone that isn't allowed, isn't there or won't start comes back as <see cref="MicTrouble"/>
     /// instead of a lecture; the model or the disk not being ready still throws, as <see cref="StartRecording"/> does.
     /// </summary>
-    public async Task<RecordStart> RecordAsync(string className, CalendarEvent? forEvent = null)
+    public Task<RecordStart> RecordAsync(string className, CalendarEvent? forEvent = null) => MicThenAsync(() => StartRecording(className, forEvent));
+
+    /// <summary>Keep recording a lecture that stopped (minutes or days ago): what's recorded now is added to the end of
+    /// its transcript, and its notes are written again. The microphone is asked for as Record asks.</summary>
+    public Task<RecordStart> ContinueAsync(string id) => MicThenAsync(() => ContinueRecording(id));
+
+    public Lecture ContinueRecording(string id)
+    {
+        if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
+        var l = Recorder.Continue(id);
+        awake ??= new KeepAwake("Recording a lecture");
+        Whisper.Wake();
+        return l;
+    }
+
+    async Task<RecordStart> MicThenAsync(Func<Lecture> start)
     {
         var access = MicAccess();
         if (access == Audio.MicAccess.NotAsked)
@@ -924,7 +939,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
             return new RecordStart(null, MicTrouble.Denied());
         try
         {
-            return new RecordStart(StartRecording(className, forEvent), null);
+            return new RecordStart(start(), null);
         }
         catch (MicrophoneException e)
         {

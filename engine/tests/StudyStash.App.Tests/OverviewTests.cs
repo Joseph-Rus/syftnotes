@@ -549,7 +549,7 @@ public class OverviewTests
         m.Recording = true;
         // The folder by its short name, the time beside it; a screen reader hears the time too.
         Assert.Equal(("Theory", "12:04", true), (m.RecordWords, m.Elapsed, m.Running));
-        Assert.Equal("Recording 12:04: stop", m.RecordTip);
+        Assert.Equal("Recording 12:04: open it", m.RecordTip);
         recorder.IsPaused = true;
         Assert.Equal(("Paused", true, false), (m.RecordWords, m.Paused, m.Running));
         m.Recorder = null;

@@ -261,6 +261,7 @@ public static partial class Shell
             ShowTranscript = transcript || (showing && library.Note!.ShowTranscript),
             // The library doesn't take a new name while it's still writing the notes (it would write its own over it).
             OnRename = host.Remote() is { } remote && !host.OlderLibrary ? title => RenameAsync(remote, id, title) : null,
+            OnContinue = ContinueFor(id),
         }.Titled();
         // A transcript without times (one pasted from another app) reads a paragraph per line it came with (each
         // speaker's turn), not as one wall of text.
@@ -317,6 +318,12 @@ public static partial class Shell
         }
     }
 
+    /// <summary>Keep recording, for a note this computer recorded (it keeps the transcript to add to); null for one
+    /// recorded elsewhere, on the computer that only keeps the library, or the one recording now.</summary>
+    static Action? ContinueFor(string id) =>
+        host.Settings.Role != AppRole.Library && host.Lectures.Get(id) is { State: not (LectureState.Recording or LectureState.Paused) }
+            ? () => ContinueRecording(id) : null;
+
     /// <summary>What a recording's page on this computer was drawn from: when it reads differently, the page is drawn again.</summary>
     static string LocalStamp(Lecture l) => string.Join("\u0001", "local", l.State, l.Title, l.ClassName, l.Notes, l.Error, l.Segments.Count);
     static DateTime lastLocalLook = DateTime.MinValue;
@@ -351,6 +358,7 @@ public static partial class Shell
                 host.TitleLecture(id, title);
                 return Task.FromResult(true);
             } : null,
+            OnContinue = ContinueFor(id),
         }.Titled();
         foreach (var line in l.Segments)
         {

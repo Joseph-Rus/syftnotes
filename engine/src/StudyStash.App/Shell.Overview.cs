@@ -78,7 +78,7 @@ public static partial class Shell
         int want = Math.Clamp(homeShown, OverviewModel.PageSize, 480);
         var lectures = await NotesAsync(lib, homeUnsorted ? Configs.Unsorted : null, want + 1, null);
         if (turn != pageTurn) return;
-        var sources = OverviewSources([.. lectures.Take(want)]);
+        var sources = OverviewSources(WithLocal([.. lectures.Take(want)], null, homeUnsorted, all: lectures.Count <= want));
         var home = OverviewModel.Home(sources, homeUnsorted);
         home.CanLoadMore = lectures.Count > want;
         home.OnFilter = unsorted =>
@@ -123,7 +123,7 @@ public static partial class Shell
         openClass = name;
         SelectInSidebar(name);
         if (host.Remote() is not { } lib) return;
-        var lectures = await NotesAsync(lib, name, 500, null);
+        var lectures = WithLocal(await NotesAsync(lib, name, 500, null), name, false, all: true);
         if (turn != pageTurn) return;
         var row = CanvasClassRow(name);
         var info = (host.Overview?["classes"] as JsonArray ?? []).OfType<JsonObject>().FirstOrDefault(c => S(c["name"]) == name);
@@ -359,13 +359,14 @@ public static partial class Shell
         if (host.Settings.Role != AppRole.Library)
         {
             ShowRecording(page);
-            // The button says what a click does: Record starts one (and opens its page), and while one runs (its dot a
-            // stop square, the folder, the level and the time beside it) the click stops it.
+            // Record starts one (and opens its page). While one runs (its dot a stop square, the folder, the level and
+            // the time beside it) a click opens its page, and only the stop square stops it.
             page.OnRecord = () =>
             {
-                if (host.Recorder.Current is not null) StopRecording();
+                if (host.Recorder.Current is not null) OpenRecording();
                 else _ = StartRecordingAsync(cls ?? "", null, openPage: true);
             };
+            page.OnStop = () => StopRecording();
         }
         // Home's "Buy us a coffee": the Ko-fi page, and the library window's own ask for a tip goes for good (as it
         // does from the ask itself, which answers here if it's showing).
@@ -442,6 +443,55 @@ public static partial class Shell
         return [.. list.OfType<JsonObject>().Select(l => new OverviewModel.LectureFacts(S(l["id"]), S(l["title"]), S(l["class"]), Date(S(l["date"])),
             l["seconds"] is JsonValue v && v.TryGetValue(out double sec) ? sec : null, S(l["summary"]), S(l["status"]) is "queued" or "working", S(l["date"])))];
     }
+
+    /// <summary>
+    /// The notes a list shows, with the recordings this computer has that aren't filed yet among them: one recording
+    /// now, or being written down, or on its way to the library is a "New note" (or the title typed for it) from the
+    /// moment it starts, saying where it is in the summary's place, and opens as it is. One the library lists already
+    /// (picked up again, or having its notes written) keeps its row and says the same. <paramref name="all"/>: the
+    /// list is the whole of it, so older ones belong in it too, not only those as new as its last row.
+    /// </summary>
+    static List<OverviewModel.LectureFacts> WithLocal(List<OverviewModel.LectureFacts> listed, string? cls, bool unsorted, bool all)
+    {
+        var mine = LocalNotes().Where(l => cls is not null ? l.Class == cls : !unsorted || l.Class.Length == 0 || l.Class == Configs.Unsorted)
+            .ToDictionary(l => l.Id);
+        if (mine.Count == 0) return listed;
+        var notes = listed.Select(f => mine.Remove(f.Id, out var here) ? f with { Status = here.Status } : f).ToList();
+        var oldest = all || notes.Count == 0 ? null : notes[^1].Date;
+        notes.AddRange(mine.Values.Where(l => oldest is null || l.Date >= oldest));
+        return [.. notes.OrderByDescending(n => n.Date ?? DateTimeOffset.MinValue)];
+    }
+
+    /// <summary>The recordings this computer has that the library hasn't filed yet, as a list's rows.</summary>
+    static IEnumerable<OverviewModel.LectureFacts> LocalNotes()
+    {
+        if (host.Settings.Role == AppRole.Library) yield break;
+        foreach (var l in host.Lectures.All())
+        {
+            if (LocalStatus(l) is not { } status) continue;
+            string title = l.TitleTyped && l.Title.Length > 0 ? l.Title : l.FiledTitle.Length > 0 ? l.FiledTitle : "New note";
+            yield return new OverviewModel.LectureFacts(l.Id, title, l.ClassName, l.StartedAt, l.Seconds > 0 ? l.Seconds : null, "", false, l.Started, status);
+        }
+    }
+
+    /// <summary>Where a recording is on its way, as its row says it; null once it's filed.</summary>
+    static string? LocalStatus(Lecture l) => l.State switch
+    {
+        LectureState.Recording => "Recording now",
+        LectureState.Paused => "Recording, paused",
+        LectureState.Transcribing => l.Progress > 0 ? $"Being written down ({Math.Round(l.Progress * 100)}%)" : "Being written down",
+        LectureState.Sending => host.Library == LibraryState.Connected ? "On its way to your library" : "Waiting for your library",
+        LectureState.Writing => "Writing notes…",
+        LectureState.Failed => l.Error.Length > 0 ? l.Error : "Something went wrong",
+        _ => null,
+    };
+
+    /// <summary>What the lists last drew of this computer's recordings: when it reads differently (one started,
+    /// stopped, was sent or filed), the list showing is drawn again.</summary>
+    static string localNotesDrawn = "";
+
+    static string LocalNotesStamp() =>
+        string.Join("\u0001", host.Lectures.All().Where(l => l.State != LectureState.Filed).Select(l => $"{l.Id}:{l.State}:{l.Title}:{l.ClassName}"));
 
     /// <summary>The page showing says whether something is recording, and reads the folder, the level and the time
     /// from the recorder while it is.</summary>

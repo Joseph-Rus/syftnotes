@@ -94,6 +94,12 @@ public sealed partial class NoteModel : ObservableObject
     /// <summary>The library doesn't have it yet: this computer recorded it and is still writing it down, or sending it.</summary>
     public bool Local { get; init; }
 
+    /// <summary>Keep recording: what's said now goes on the end of its transcript (minutes or days later), and its
+    /// notes are written again. Only for one this computer recorded, and not while it's the one recording.</summary>
+    public Action? OnContinue { get; init; }
+    public bool CanContinue => OnContinue is not null && !Live;
+    [RelayCommand] void Continue() => OnContinue?.Invoke();
+
     // --- the title, typed over to rename ---------------------------------------------------------------------------
 
     /// <summary>What's in the title's field.</summary>

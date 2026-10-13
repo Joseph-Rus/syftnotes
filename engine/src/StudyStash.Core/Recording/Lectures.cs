@@ -39,6 +39,9 @@ public sealed class Lecture
     public LectureState State { get; set; } = LectureState.Recording;
     /// <summary>How far into the audio Whisper has got.</summary>
     public double TranscribedSeconds { get; set; }
+    /// <summary>Where in the lecture its sound file starts: 0, unless it was picked up again after the sound from
+    /// before had been cleared away (days later), when the new sound starts where the transcript left off.</summary>
+    public double AudioStart { get; set; }
     /// <summary>Written down after class, not as it records (Settings → Recording, when it started): nothing is
     /// written down while it records or is paused, so the computer only records; all of it is once it stops.</summary>
     public bool AfterClass { get; set; }

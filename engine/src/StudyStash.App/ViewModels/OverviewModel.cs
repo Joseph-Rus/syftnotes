@@ -315,8 +315,11 @@ public sealed partial class OverviewModel : ObservableObject
 
     /// <summary>Record from here: Home lets the library sort the recording (or files it with the event on now), a
     /// folder's page records into that folder. While something records the button shows it (which folder, the level,
-    /// the time) and a click stops it.</summary>
+    /// the time) and a click opens its page; only its stop square (<see cref="OnStop"/>) stops it.</summary>
     public Action? OnRecord { get; set; }
+    public Action? OnStop { get; set; }
+    [RelayCommand] void Stop() => OnStop?.Invoke();
+    public string StopTip => $"Stop recording ({RecordKeys})";
     public bool CanRecord => OnRecord is not null;
     [ObservableProperty] public partial bool Recording { get; set; }
     /// <summary>The recording under way: the button reads its class, level, time and whether it's paused from it.</summary>
@@ -331,7 +334,7 @@ public sealed partial class OverviewModel : ObservableObject
     /// shortcut in Settings does the same from any app.)</summary>
     public string RecordKeys { get; init; } = Skin.Current == SkinKind.Mac ? "⌘R" : "Ctrl+R";
     /// <summary>Where the recording goes, for the button's tip and for a screen reader (which hears the time too).</summary>
-    public string RecordTip => Recording ? $"{(Paused ? "Paused" : "Recording")} {Elapsed}: stop" : IsHome ? $"Start recording ({RecordKeys})" : $"Record a {Noun} into {Title} ({RecordKeys})";
+    public string RecordTip => Recording ? $"{(Paused ? "Paused" : "Recording")} {Elapsed}: open it" : IsHome ? $"Start recording ({RecordKeys})" : $"Record a {Noun} into {Title} ({RecordKeys})";
     partial void OnRecordingChanged(bool value) => RecordChanged();
     partial void OnRecorderChanged(RecorderModel? oldValue, RecorderModel? newValue)
     {
@@ -482,7 +485,10 @@ public sealed partial class OverviewModel : ObservableObject
     public sealed record Event(string Id, string Title, DateTimeOffset Start, DateTimeOffset End, string? Class);
 
     /// <summary>One note as the library lists it.</summary>
-    public sealed record LectureFacts(string Id, string Title, string Class, DateTimeOffset? Date, double? Seconds, string Summary, bool Writing, string DateText = "");
+    /// <param name="Status">Where a recording this computer has is on its way ("Recording now", "Writing notes…"), in
+    /// the summary's place; null for a note the library has filed.</param>
+    public sealed record LectureFacts(string Id, string Title, string Class, DateTimeOffset? Date, double? Seconds, string Summary, bool Writing, string DateText = "",
+        string? Status = null);
 
     static DateTimeOffset Local(DateTimeOffset d, Sources s) => TimeZoneInfo.ConvertTime(d, s.Zone);
 
@@ -551,7 +557,7 @@ public sealed partial class OverviewModel : ObservableObject
     {
         // Home says "Today" and "Yesterday"; a folder's own list, under "This week", says the day itself.
         Id = l.Id, Title = l.Title, When = l.Date is not { } d ? "" : showFolder ? Day(d, s.Now, s.Zone) : Date(d, s), Length = l.Seconds is { } sec ? Core.TimedText.Length(sec) : "",
-        Summary = l.Writing ? "Writing notes…" : PlainMath.Inline(l.Summary), Pending = l.Writing, Date = l.DateText,
+        Summary = l.Status ?? (l.Writing ? "Writing notes…" : PlainMath.Inline(l.Summary)), Pending = l.Writing || l.Status is not null, Date = l.DateText,
         Folder = l.Class == Core.Configs.Unsorted ? "" : l.Class, Dot = dot(l.Class), Noun = Nouns.For(l.Class, s.GroupOf(l.Class)), ShowFolder = showFolder,
         Open = () => s.OpenLecture?.Invoke(l.Class, l.Id),
     };

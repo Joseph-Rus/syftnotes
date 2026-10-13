@@ -108,6 +108,10 @@ public sealed class Recorder : IDisposable
     }
 
     string? currentId;
+    // Where the current lecture's sound file starts in the lecture (Lecture.AudioStart).
+    double audioStart;
+    // A lecture picked up again (Continue): how it was, and how long, before. Null for a new one.
+    (LectureState State, double Seconds)? resumed;
 
     /// <summary>The lecture being recorded, or paused; null when nothing is.</summary>
     public Lecture? Current => currentId is null ? null : store.Get(currentId);
@@ -128,7 +132,7 @@ public sealed class Recorder : IDisposable
     {
         get
         {
-            lock (gate) return wav?.Seconds ?? Current?.Seconds ?? 0;
+            lock (gate) return wav is null ? Current?.Seconds ?? 0 : audioStart + wav.Seconds;
         }
     }
 
@@ -139,10 +143,11 @@ public sealed class Recorder : IDisposable
         lock (gate)
         {
             if (wav is null) return null;
-            long from = Math.Clamp((long)Math.Round(fromSeconds * Sound.Rate), Math.Max(ringFrom, ringEnd - RecentSamples), ringEnd);
+            // The ring is in the file's time; a lecture picked up again after its sound was cleared starts later.
+            long from = Math.Clamp((long)Math.Round((fromSeconds - audioStart) * Sound.Rate), Math.Max(ringFrom, ringEnd - RecentSamples), ringEnd);
             var samples = new float[ringEnd - from];
             for (long i = from; i < ringEnd; i++) samples[i - from] = ring[i % RecentSamples];
-            return new RecentSound(samples, from / (double)Sound.Rate);
+            return new RecentSound(samples, audioStart + from / (double)Sound.Rate);
         }
     }
 
@@ -180,6 +185,8 @@ public sealed class Recorder : IDisposable
             {
                 store.Add(lecture);
                 currentId = lecture.Id;
+                audioStart = 0;
+                resumed = null;
                 Open(append: false, fresh: true);
             }
             catch (Exception e)
@@ -193,6 +200,85 @@ public sealed class Recorder : IDisposable
             }
             LastProblem = null;
             log($"[recorder] recording {lecture.Id} for '{className}'{(afterClass ? ", written down after class" : "")}");
+        }
+        Changed?.Invoke();
+        return Current!;
+    }
+
+    /// <summary>
+    /// Pick a lecture that stopped up again, minutes or days later: what's recorded now goes on the end of it, and
+    /// once it stops the new part is written down after the old, and it goes to the library again (whose notes are
+    /// written again from all of it). Its sound file is added to while this computer still has it; when that's been
+    /// cleared away, a new one starts where the transcript left off. Throws InvalidOperationException with words to
+    /// show when it can't.
+    /// </summary>
+    public Lecture Continue(string id)
+    {
+        lock (transitions)
+        {
+            if (Current is { } already)
+            {
+                if (already.Id == id) return already;
+                throw new InvalidOperationException("Something is already recording: stop it first.");
+            }
+            if (store.Get(id) is not { } before) throw new InvalidOperationException("That recording isn't on this computer any more.");
+            if (freeBytes(store.Dir) is < SpaceToStart)
+            {
+                log("[recorder] not picking up again: the disk is nearly full");
+                throw new InvalidOperationException(RecordingWords.NearlyFull);
+            }
+            string audio = store.AudioPath(id);
+            // Its sound file is added to when it's still here and still ends where the lecture does.
+            bool keepSound = false;
+            try
+            {
+                if (File.Exists(audio))
+                {
+                    double ends = before.AudioStart + Sound.WavSeconds(audio);
+                    keepSound = ends >= before.Seconds - 1 && ends <= before.Seconds + 10;
+                }
+            }
+            catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
+            {
+                log($"[recorder] {id}: its sound file couldn't be read ({e.Message}): starting a new one");
+            }
+            // Where the transcript ends: what was recorded, or as far as it was written down when that's further.
+            double end = Math.Max(before.Seconds, before.TranscribedSeconds);
+            double start = keepSound ? before.AudioStart : end;
+            try
+            {
+                // A sound file that doesn't fit is set aside, not lost.
+                if (!keepSound && File.Exists(audio)) File.Move(audio, audio + ".before", overwrite: true);
+                Save(id, x =>
+                {
+                    x.Seconds = keepSound ? x.Seconds : end;
+                    if (!keepSound) x.TranscribedSeconds = end;
+                    x.AudioStart = start;
+                    // Its folder is where the library put it; its voices are told apart again over all of it, when
+                    // all of its sound is here.
+                    if (x.FiledClass.Length > 0) x.ClassName = x.FiledClass;
+                    x.SpeakersDone = start > 0;
+                    x.LabelTries = 0;
+                    x.Error = "";
+                    x.RetryAt = null;
+                    x.Tries = 0;
+                });
+                currentId = id;
+                audioStart = start;
+                resumed = (before.State, before.Seconds);
+                Open(append: keepSound, fresh: true);
+            }
+            catch (Exception e)
+            {
+                currentId = null;
+                resumed = null;
+                log($"[recorder] couldn't pick {id} up again: {e.Message}");
+                if (e is IOException or UnauthorizedAccessException)
+                    throw new InvalidOperationException(e is IOException io && Disk.IsFull(io) ? RecordingWords.NearlyFull : RecordingWords.CouldntSave(e.Message), e);
+                throw;
+            }
+            LastProblem = null;
+            log($"[recorder] picked {id} up again at {TimedText.Clock(end)}{(keepSound ? "" : ", in a new sound file")}");
         }
         Changed?.Invoke();
         return Current!;
@@ -516,18 +602,26 @@ public sealed class Recorder : IDisposable
             if (l.State == LectureState.Recording) Close();
             currentId = null;
             LastProblem = null;
+            var was = resumed;
+            resumed = null;
             string audio = store.AudioPath(l.Id);
             double? seconds;
             try
             {
-                seconds = File.Exists(audio) ? Sound.WavSeconds(audio) : 0;
+                seconds = File.Exists(audio) ? l.AudioStart + Sound.WavSeconds(audio) : l.AudioStart;
             }
             catch (Exception e) when (e is InvalidDataException or IOException or UnauthorizedAccessException)
             {
                 log($"[recorder] {l.Id}: the recording couldn't be read: {e.Message}");
                 seconds = null;
             }
-            if (seconds is not { } s)
+            if (was is { } before && (seconds is not { } total || total - before.Seconds < keepAtLeastSeconds))
+            {
+                // Picked up again for a moment only (or its new sound can't be read): it's as it was before.
+                l = Save(l.Id, x => x.State = before.State);
+                log($"[recorder] {l?.Id}: picked up again for a moment only: left as it was");
+            }
+            else if (seconds is not { } s)
             {
                 l = Save(l.Id, x =>
                 {
@@ -605,13 +699,19 @@ public sealed class Recorder : IDisposable
             string audio = store.AudioPath(l.Id);
             try
             {
-                if (!File.Exists(audio))
+                if (!File.Exists(audio) && l.Segments.Count == 0)
                 {
                     store.Delete(l.Id);
                     continue;
                 }
-                using (new WavWriter(audio, Sound.Rate, append: true)) { } // fixes the header a crash left behind
-                double seconds = Sound.WavSeconds(audio);
+                double seconds = l.AudioStart;
+                if (File.Exists(audio))
+                {
+                    using (new WavWriter(audio, Sound.Rate, append: true)) { } // fixes the header a crash left behind
+                    seconds += Sound.WavSeconds(audio);
+                }
+                // One picked up again keeps what it had before, whatever became of its new sound.
+                seconds = Math.Max(seconds, l.TranscribedSeconds);
                 store.Update(l.Id, x =>
                 {
                     x.Seconds = seconds;
@@ -726,10 +826,13 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
             string audio = store.AudioPath(l.Id);
             if (!File.Exists(audio))
             {
-                if (!isLive) Fail(l.Id, "its recording is missing");
+                // Picked up again days later for a moment that's gone: all it has is written down already.
+                if (!isLive && l.AudioStart > 0 && l.TranscribedSeconds >= l.Seconds - 0.01) Done(l.Id);
+                else if (!isLive) Fail(l.Id, "its recording is missing");
                 continue;
             }
-            long from = (long)Math.Round(l.TranscribedSeconds * Sound.Rate);
+            // The file's own time: a lecture picked up again after its sound was cleared starts its file later on.
+            long from = (long)Math.Round(Math.Max(0, l.TranscribedSeconds - l.AudioStart) * Sound.Rate);
             float[] window;
             try
             {
@@ -744,14 +847,21 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
             int take = Segmenter.CutLength(window, final: !isLive, minSeconds, maxSeconds);
             // All written down, and its voices next: it goes on to the library once they're told apart.
             if (take == 0 && !isLive && l.TranscribedSeconds >= l.Seconds - 0.01 && WantsVoices(l)) return await LabelAsync(l, stop);
+            if (take == 0 && !isLive && l.TranscribedSeconds >= l.Seconds - 0.01)
+            {
+                // Picked up again and stopped: nothing left of it to write down, so it goes on (TranscribeAsync does
+                // this for a piece; here there's none).
+                Done(l.Id);
+                continue;
+            }
             if (take == 0) continue; // a live lecture without a full piece yet
-            return await TranscribeAsync(l, isLive, new Chunk(from, window[..take]), stop);
+            return await TranscribeAsync(l, isLive, new Chunk(from, window[..take]), l.AudioStart, stop);
         }
         return false;
     }
 
     /// <summary>One piece: false when Whisper isn't there to do it (it won't load).</summary>
-    async Task<bool> TranscribeAsync(Lecture l, bool isLive, Chunk chunk, CancellationToken stop)
+    async Task<bool> TranscribeAsync(Lecture l, bool isLive, Chunk chunk, double audioStart, CancellationToken stop)
     {
         var heard = new List<Spoken>();
         string language = "";
@@ -786,7 +896,7 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
             {
                 string text = TimedText.Tidy(s.Text);
                 if (text.Length == 0) continue;
-                heard.Add(new Spoken(chunk.StartSeconds + s.Start, chunk.StartSeconds + s.End, text));
+                heard.Add(new Spoken(audioStart + chunk.StartSeconds + s.Start, audioStart + chunk.StartSeconds + s.End, text));
             }
             language = t.Language;
         }
@@ -796,7 +906,7 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
         var saved = store.Update(l.Id, x =>
         {
             x.Segments = [.. x.Segments, .. heard];
-            x.TranscribedSeconds = chunk.EndSeconds;
+            x.TranscribedSeconds = audioStart + chunk.EndSeconds;
             if (x.Language.Length == 0) x.Language = language;
             // All of it written down: on to the library, unless its voices are still to be told apart.
             done = x.State == LectureState.Transcribing && x.TranscribedSeconds >= x.Seconds - 0.01 && !WantsVoices(x);
@@ -821,7 +931,7 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
             $", the model worked {TimedText.Clock(s)} on it ({s / l.Seconds:0%} of its length{(l.AfterClass ? ", after class" : "")})");
     }
 
-    bool WantsVoices(Lecture l) => LabelVoices?.Invoke() == true && LoadVoices is not null && !l.SpeakersDone
+    bool WantsVoices(Lecture l) => LabelVoices?.Invoke() == true && LoadVoices is not null && !l.SpeakersDone && l.AudioStart == 0
         && l.LabelTries < LabelTriesAllowed && l.Seconds is >= MinLabelSeconds and <= MaxLabelSeconds;
 
     /// <summary>
@@ -845,9 +955,11 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
         }
         var saved = store.Update(l.Id, x =>
         {
+            // Picked up again meanwhile: its voices are told apart again once it stops, over all of it.
+            if (x.State != LectureState.Transcribing) return;
             if (turns is not null) x.Segments = Speakers.Label(x.Segments, turns);
             x.SpeakersDone = true;
-            if (x.State == LectureState.Transcribing) x.State = LectureState.Sending;
+            x.State = LectureState.Sending;
         });
         if (saved is null) return true; // deleted meanwhile
         log($"[voices] {saved.Id}: {saved.Segments.Select(sg => sg.Speaker).Where(n => n > 0).Distinct().Count()} voices");
@@ -887,6 +999,18 @@ public sealed class TranscriptionWorker(LectureStore store, Func<ITranscriber> l
         if (Problem == problem) return;
         Problem = problem;
         ProblemChanged?.Invoke();
+    }
+
+    /// <summary>All of it is written down already: on to the library.</summary>
+    void Done(string id)
+    {
+        bool done = false;
+        var l = store.Update(id, x =>
+        {
+            done = x.State == LectureState.Transcribing;
+            if (done) x.State = LectureState.Sending;
+        });
+        if (done && l is not null) Finished?.Invoke(l);
     }
 
     void Fail(string id, string why)
@@ -1028,6 +1152,8 @@ public sealed class LectureSender(LectureStore store, Func<ClientConfig> config,
                     await host.Post($"{server}/api/ingest", payload.ToJsonString(), cc.PoolKey);
                     changed = store.Update(l.Id, x =>
                     {
+                        // Picked up again while it went: it's sent again once it stops.
+                        if (x.State != LectureState.Sending) return;
                         x.State = LectureState.Writing;
                         x.Error = "";
                         x.RetryAt = null;
@@ -1038,7 +1164,10 @@ public sealed class LectureSender(LectureStore store, Func<ClientConfig> config,
                 }
                 catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
                 {
-                    changed = store.Update(l.Id, x => Refused(x, e, now));
+                    changed = store.Update(l.Id, x =>
+                    {
+                        if (x.State == LectureState.Sending) Refused(x, e, now);
+                    });
                 }
             }
             else if (l.State == LectureState.Writing)
@@ -1058,12 +1187,16 @@ public sealed class LectureSender(LectureStore store, Func<ClientConfig> config,
                 if (status is null)
                 {
                     // The library lost it (restored from a backup, or someone deleted it): send it again.
-                    changed = store.Update(l.Id, x => x.State = LectureState.Sending);
+                    changed = store.Update(l.Id, x =>
+                    {
+                        if (x.State == LectureState.Writing) x.State = LectureState.Sending;
+                    });
                 }
                 else if (state is Store.Done or Store.Failed)
                 {
                     changed = store.Update(l.Id, x =>
                     {
+                        if (x.State != LectureState.Writing) return;
                         x.State = LectureState.Filed;
                         x.FiledClass = Py.AsString(status["class_name"]) ?? "";
                         x.FiledTitle = Py.AsString(status["lecture_title"]) ?? "";
