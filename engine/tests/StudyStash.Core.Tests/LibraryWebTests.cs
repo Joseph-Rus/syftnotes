@@ -377,19 +377,51 @@ public class LibraryWebTests
     }
 
     [Fact]
-    public async Task A_login_cookie_from_the_python_engine_still_works()
+    public async Task Log_out_ends_the_sign_in_wherever_its_cookie_is()
     {
-        // Both engines sign it with the key in web_secret, so switching engines doesn't sign anyone out.
         using var dir = new TempDir();
         var cfg = MakeCfg(dir, "pw");
         Directory.CreateDirectory(cfg.Home);
         File.WriteAllText(Path.Combine(cfg.Home, "web_secret"), "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff");
         using var store = new Store(cfg.DbPath, cfg.PoolDir);
         await using var c = await Site(cfg, store);
+        // The cookie every sign-in got before each had its own (one value for everyone, for good) opens nothing now:
         // hmac.new(bytes.fromhex(that), b"admin", hashlib.sha256).hexdigest()
         c.SetCookie("pool", "274fba6ac9d9127073375a2d3c345f69729c751b36420b304f67219b21269d82");
-        var r = await c.Get("/settings");
-        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/settings")).StatusCode);
+
+        await c.PostForm("/login", ("password", "pw"), ("next", "/"));
+        string phone = c.Cookie("pool")!;
+        await c.PostForm("/login", ("password", "pw"), ("next", "/"));
+        string laptop = c.Cookie("pool")!;
+        Assert.NotEqual(phone, laptop);
+
+        // Log out on the laptop: a copy of its cookie put back opens nothing, and the phone is still signed in.
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/logout")).StatusCode);
+        Assert.Null(c.Cookie("pool"));
+        c.SetCookie("pool", laptop);
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/settings")).StatusCode);
+        c.SetCookie("pool", phone);
+        Assert.Equal(HttpStatusCode.OK, (await c.Get("/settings")).StatusCode);
+
+        // The library starts again (it updates itself): the phone is still signed in, the laptop still out.
+        await using var again = await Site(cfg, store);
+        again.SetCookie("pool", laptop);
+        Assert.Equal(HttpStatusCode.SeeOther, (await again.Get("/settings")).StatusCode);
+        again.SetCookie("pool", phone);
+        Assert.Equal(HttpStatusCode.OK, (await again.Get("/settings")).StatusCode);
+
+        // The file that keeps sign-ins holds no cookie and is for this account alone; a sign-in runs out after 180 days.
+        string file = Path.Combine(cfg.Home, "sessions.json");
+        Assert.DoesNotContain(phone, File.ReadAllText(file));
+        if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
+        var now = DateTimeOffset.UtcNow;
+        var kept = new Sessions(cfg.Home, () => now);
+        string token = kept.Start();
+        now += Sessions.Life - TimeSpan.FromMinutes(1);
+        Assert.True(kept.Check(token));
+        now += TimeSpan.FromMinutes(2);
+        Assert.False(kept.Check(token));
     }
 
     // --- the API the laptop talks to -----------------------------------------------------------------------------

@@ -138,7 +138,7 @@ public sealed partial class LibraryWeb
     readonly Store store;
     readonly Pipeline pipeline;
     readonly LibraryWebOptions options;
-    readonly byte[] secret;
+    readonly Sessions sessions;
 
     LibraryWeb(Config cfg, Store store, Pipeline pipeline, LibraryWebOptions options)
     {
@@ -146,7 +146,7 @@ public sealed partial class LibraryWeb
         this.store = store;
         this.pipeline = pipeline;
         this.options = options;
-        secret = WebSecret(cfg);
+        sessions = new Sessions(cfg.Home);
     }
 
     /// <summary>The library's routes on this app. The caller decides where it listens (Kestrel, or a test server).</summary>
@@ -165,29 +165,7 @@ public sealed partial class LibraryWeb
         !next.StartsWith('/') || next.StartsWith("//", StringComparison.Ordinal) || next.Any(ch => ch == '\\' || char.IsControl(ch))
             ? "/" : Ui.Quote(next, "/?#[]@!$&'()*+,;=:%");
 
-    /// <summary>The key login cookies are signed with, kept in web_secret so logins survive restarts, updates, and a
-    /// switch between engines.</summary>
-    static byte[] WebSecret(Config cfg)
-    {
-        string path = Path.Combine(cfg.Home, "web_secret");
-        try
-        {
-            if (File.Exists(path)) return Convert.FromHexString(Py.Strip(Py.ReadText(path)));
-            Directory.CreateDirectory(cfg.Home);
-            byte[] key = RandomNumberGenerator.GetBytes(32);
-            Py.WriteText(path, Convert.ToHexStringLower(key));
-            Py.OwnerOnly(path);
-            return key;
-        }
-        catch (Exception e) when (e is IOException or FormatException or UnauthorizedAccessException)
-        {
-            return RandomNumberGenerator.GetBytes(32);
-        }
-    }
-
     // --- who is asking ---------------------------------------------------------------------------------------
-
-    string Sign(string what) => Convert.ToHexStringLower(HMACSHA256.HashData(secret, Encoding.UTF8.GetBytes(what)));
 
     static bool Same(string a, string b) =>
         CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
@@ -201,13 +179,12 @@ public sealed partial class LibraryWeb
             && !ProxyHeaders.Any(h => ctx.Request.Headers.ContainsKey(h));
     }
 
-    /// <summary>"admin" (everything) for you: on this computer, with no password set, or logged in.</summary>
+    /// <summary>"admin" (everything) for you: on this computer, with no password set, or logged in. A cookie from
+    /// before each sign-in had its own (one value for everyone, for good) opens nothing now.</summary>
     string? RoleOf(HttpContext ctx)
     {
-        string cookie = ctx.Request.Cookies["pool"] ?? "";
         if (IsLocal(ctx) || cfg.PoolPassword.Length == 0) return "admin";
-        if (cookie.Length > 0 && new[] { "admin", "member" }.Any(w => Same(cookie, Sign(w)))) return "admin"; // 0.2 cookies too
-        return null;
+        return sessions.Check(ctx.Request.Cookies[Sessions.Cookie]) ? "admin" : null;
     }
 
     /// <summary>The role, or the redirect to the login page (one person, one password: members are admins). Where to
@@ -331,7 +308,9 @@ public sealed partial class LibraryWeb
         app.MapPost("/login", Http.Handle(Login));
         app.MapGet("/logout", (HttpContext ctx) =>
         {
-            ctx.Response.Cookies.Delete("pool");
+            // The sign-in ends here, not only in this browser: a copy of its cookie kept somewhere opens nothing.
+            sessions.End(ctx.Request.Cookies[Sessions.Cookie]);
+            ctx.Response.Cookies.Delete(Sessions.Cookie);
             return Http.SeeOther("/login");
         });
 
@@ -459,9 +438,9 @@ public sealed partial class LibraryWeb
         // The 0.2 admin password still works, so an old bookmark or password manager entry isn't a dead end.
         if (!new[] { cfg.PoolPassword, cfg.AdminPassword }.Any(p => p.Length > 0 && Same(password, p)))
             return Http.SeeOther($"/login?bad=1&next={Ui.Quote(next, "")}");
-        ctx.Response.Cookies.Append("pool", Sign("admin"), new CookieOptions
+        ctx.Response.Cookies.Append(Sessions.Cookie, sessions.Start(), new CookieOptions
         {
-            HttpOnly = true, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromDays(180), Path = "/",
+            HttpOnly = true, SameSite = SameSiteMode.Lax, MaxAge = Sessions.Life, Path = "/",
         });
         return Http.SeeOther(next);
     }
