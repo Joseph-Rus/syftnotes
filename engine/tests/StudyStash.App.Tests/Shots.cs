@@ -232,6 +232,23 @@ public class SurfaceShots
                 new MacPanel { DataContext = Demo.Panel(recording: true), VerticalAlignment = VerticalAlignment.Top }));
     }
 
+    /// <summary>The dropdown with its class picker open under Record, and Coming up's events (each a button).</summary>
+    [AvaloniaFact]
+    public void Mac_dropdown_classes()
+    {
+        foreach (var t in Themes)
+            Shot.Take("mac-01-dropdown-classes", SkinKind.Mac, t, () =>
+            {
+                var p = Demo.Panel(recording: false);
+                p.ClassChoices.Add(new ClassChoice("", ClassPicker.SortLabel, null, false));
+                p.ClassChoices.Add(new ClassChoice("CS 101", "CS 101", Skin.ClassDot(0), true));
+                p.ClassChoices.Add(new ClassChoice("BIO 110", "BIO 110", Skin.ClassDot(1), false));
+                p.ClassesOpen = true;
+                p.ComingUp.Show(true, [new ComingUpRow("e1", "Tomorrow 8:45 AM", "Data Mining", "TEGR 301", null, Skin.ClassDot(3), false)]);
+                return new MacPanel { DataContext = p, VerticalAlignment = VerticalAlignment.Top };
+            });
+    }
+
     /// <summary>A library-only computer's dropdown: the library's state instead of Record.</summary>
     [AvaloniaFact]
     public void Mac_dropdown_library()

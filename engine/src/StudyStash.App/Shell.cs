@@ -468,6 +468,18 @@ public static partial class Shell
             _ = UpdateNowAsync();
         };
         panel.OnSwitchClass = PickClass;
+        panel.OnPickClass = name =>
+        {
+            panel.ClassesOpen = false;
+            chosenClass = name;
+            Program.Log($"[panel] class picked: {(name.Length == 0 ? "let the library sort it" : name)}");
+            Refresh();
+        };
+        panel.ComingUp.OnRecord = id =>
+        {
+            panelWindow?.Hide();
+            _ = RecordEventAsync(id);
+        };
         panel.OnFixProblem = FixProblem;
         panel.OnOpenLecture = OpenRecentLecture;
 
@@ -580,6 +592,20 @@ public static partial class Shell
     /// changes Record's label and the line under it at once.</summary>
     static void PickClass()
     {
+        // On a Mac the picker opens in the dropdown: a menu hung under the button opened behind the dropdown.
+        if (OperatingSystem.IsMacOS())
+        {
+            if (!panel.ClassesOpen)
+            {
+                var classes = host.Classes().ToList();
+                bool sorted = chosenClass.Length == 0 || classes.All(c => c.Name != chosenClass);
+                panel.ClassChoices.Clear();
+                panel.ClassChoices.Add(new ClassChoice("", ClassPicker.SortLabel, null, sorted));
+                foreach (var c in classes) panel.ClassChoices.Add(new ClassChoice(c.Name, c.Name, Skin.ClassDot(c.Color), c.Name == chosenClass));
+            }
+            panel.ClassesOpen = !panel.ClassesOpen;
+            return;
+        }
         var menu = ClassPicker.Build([.. host.Classes().Select(c => (c.Name, c.Color))], chosenClass, name =>
         {
             chosenClass = name;
@@ -755,6 +781,7 @@ public static partial class Shell
             panelWindow.Hide();
             return;
         }
+        panel.ClassesOpen = false;
         // The click that opens it follows the deactivate that just closed it (one gesture, two events): don't reopen.
         if (panelWindow is not null && DateTime.UtcNow - panelWindow.LastDeactivateHide < Floating.ToggleDebounce) return;
         if (panelWindow is null)
@@ -1565,8 +1592,7 @@ public static partial class Shell
         panel.Hint = recording ? null
             : !panel.CanRecord && problem is not null ? problem.Title
             : RecordClass().Length > 0 ? "Picked by you"
-            : CalendarHint() is { } fromCalendar ? fromCalendar
-            : ClassPicker.SortHint;
+            : CalendarHint();
         var (status, good) = host.Status();
         panel.Status = status;
         panel.StatusGood = good;

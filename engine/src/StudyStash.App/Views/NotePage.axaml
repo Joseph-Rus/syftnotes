@@ -12,14 +12,18 @@
              x:Class="StudyStash.App.Views.NotePage"
              x:DataType="vm:LibraryModel">
   <UserControl.Styles>
+    <!-- The page is one column the notes' width, centred in the pane however wide it is (the sidebar shut, a big
+         screen); the ask bar keeps to the same column. -->
     <Style Selector="StackPanel.np-page">
       <Setter Property="Margin" Value="56,6,56,140" />
+      <Setter Property="MaxWidth" Value="704" />
     </Style>
     <Style Selector="StackPanel.np-page.narrow">
       <Setter Property="Margin" Value="24,6,24,140" />
     </Style>
     <Style Selector="Panel.np-ask">
       <Setter Property="Margin" Value="56,0,56,20" />
+      <Setter Property="MaxWidth" Value="704" />
     </Style>
     <Style Selector="Panel.np-ask.narrow">
       <Setter Property="Margin" Value="24,0,24,20" />

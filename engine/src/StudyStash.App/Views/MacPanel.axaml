@@ -1,6 +1,6 @@
 <!-- The menu bar dropdown (Surfaces, macOS 01): 320 pt of Liquid Glass, as compact as the system's own menu bar extras
      (Control Centre, Wi-Fi). Idle: Record (the class picked, or the library sorts it), a 32 pt pill tinted with the accent, and the small
-     chevron beside it switches class. Recording: the timer, the waveform, the last line heard, Pause and Stop. -->
+     chevron beside it opens the class picker under it. Recording: the timer, the waveform, the last line heard, Pause and Stop. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -65,6 +65,21 @@
             <c:Icon Glyph="unfold_more" Size="16" Foreground="{DynamicResource Fg}" />
           </Button>
         </Grid>
+        <!-- The class picker, open under Record: a check on what Record will do now -->
+        <ItemsControl Name="ClassChoices" ItemsSource="{Binding ClassChoices}" IsVisible="{Binding ClassesOpen}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ClassChoice">
+              <Button Classes="row" AutomationProperties.Name="{Binding Label}"
+                      Command="{Binding $parent[UserControl].((vm:PanelModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
+                <Grid ColumnDefinitions="7,8,*,8,Auto">
+                  <c:Swatch Small="True" Fill="{Binding Dot}" IsVisible="{Binding HasDot}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="2" Text="{Binding Label}" FontSize="13" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  <c:Icon Grid.Column="4" Glyph="check" Size="13" Foreground="{DynamicResource Fg}" IsVisible="{Binding Picked}" VerticalAlignment="Center" />
+                </Grid>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
         <StackPanel Spacing="2" Margin="8,0">
           <TextBlock Text="{Binding Hint}" IsVisible="{Binding HasHint}" FontSize="11" Foreground="{DynamicResource Fg2}"
                      TextTrimming="CharacterEllipsis" />

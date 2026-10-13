@@ -1,5 +1,5 @@
 <!-- Coming up, in the dropdown and the library window (Mac): the next few events today and tomorrow from the
-     student's calendars, each with when, what, and the class it's for (its dot). Hidden with no calendars; with
+     student's calendars, each with when, what, and the class it's for (its dot); a click records it. Hidden with no calendars; with
      calendars and nothing left, one quiet line says so. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -13,14 +13,17 @@
     <ItemsControl ItemsSource="{Binding Rows}" Margin="0,3,0,0">
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:ComingUpRow">
-          <Grid ColumnDefinitions="7,8,*,8,Auto" Margin="8,4">
-            <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
-            <StackPanel Grid.Column="2">
-              <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
-              <TextBlock IsVisible="{Binding HasDetail}" Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
-            </StackPanel>
-            <TextBlock Grid.Column="4" Classes="num" Text="{Binding When}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-          </Grid>
+          <Button Classes="row" AutomationProperties.Name="{Binding Said}"
+                  Command="{Binding $parent[UserControl].((vm:ComingUpModel)DataContext).RecordCommand}" CommandParameter="{Binding}">
+            <Grid ColumnDefinitions="7,8,*,8,Auto">
+              <c:Swatch Small="True" Fill="{Binding Dot}" VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="2">
+                <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                <TextBlock IsVisible="{Binding HasDetail}" Text="{Binding Detail}" FontSize="11" Foreground="{DynamicResource Fg2}" Margin="0,1,0,0" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+              <TextBlock Grid.Column="4" Classes="num" Text="{Binding When}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+            </Grid>
+          </Button>
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>

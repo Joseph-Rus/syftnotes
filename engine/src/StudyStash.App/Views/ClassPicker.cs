@@ -13,8 +13,6 @@ namespace StudyStash.App.Views;
 public static class ClassPicker
 {
     public const string SortLabel = "Let the library sort it";
-    /// <summary>The line under Record while the library will sort the lecture.</summary>
-    public const string SortHint = "The library sorts it by what's said";
 
     /// <summary>The menu for <paramref name="classes"/>, <paramref name="chosen"/> checked: "" lets the library sort
     /// it, a class's name records into that class. Picking a row hands <paramref name="pick"/> the same kind of value.</summary>

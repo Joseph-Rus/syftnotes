@@ -7,6 +7,13 @@ using StudyStash.App.Platform;
 
 namespace StudyStash.App.ViewModels;
 
+/// <summary>A row in the dropdown's class picker: the class's name ("" lets the library sort it), what it says, its
+/// dot (none for letting the library sort it), and whether Record will do it now.</summary>
+public sealed record ClassChoice(string Name, string Label, IBrush? Dot, bool Picked)
+{
+    public bool HasDot => Dot is not null;
+}
+
 /// <summary>A lecture in a list: its class dot, title, where it is ("Transcribing 42%", "Filed in CS 101"), and when.</summary>
 public sealed partial class LectureItem : ObservableObject
 {
@@ -48,7 +55,7 @@ public sealed partial class PanelModel : ObservableObject
     /// <summary>The class Record will file under ("" lets the library sort it).</summary>
     [ObservableProperty] public partial string ClassName { get; set; } = "";
     [ObservableProperty] public partial IBrush ClassDot { get; set; } = Brushes.Gray;
-    /// <summary>The line under Record: "Picked by you", "The library sorts it by what's said", or null.</summary>
+    /// <summary>The line under Record: "Picked by you", what's on the calendar, or null.</summary>
     [ObservableProperty] public partial string? Hint { get; set; }
     /// <summary>"Next due: Quiz 3 practice · Tomorrow, 9:00 AM" under the hint, once Canvas is linked; null hides it.</summary>
     [ObservableProperty] public partial NextDueModel? NextDue { get; set; }
@@ -69,6 +76,10 @@ public sealed partial class PanelModel : ObservableObject
     public bool HasProblem => ProblemTitle is not null;
 
     public ObservableCollection<LectureItem> Recent { get; } = [];
+    /// <summary>The class picker, open under Record in the dropdown itself (a menu over the dropdown opened behind
+    /// it): "Let the library sort it", then each class, a check on what Record will do now.</summary>
+    public ObservableCollection<ClassChoice> ClassChoices { get; } = [];
+    [ObservableProperty] public partial bool ClassesOpen { get; set; }
     /// <summary>What's coming up on the student's calendars, above Recent.</summary>
     public ComingUpModel ComingUp { get; } = new();
 
@@ -145,6 +156,8 @@ public sealed partial class PanelModel : ObservableObject
     // What the buttons do: the shell fills these in.
     public Action? OnRecord { get; set; }
     public Action? OnSwitchClass { get; set; }
+    /// <summary>A class picked in the picker ("" lets the library sort it).</summary>
+    public Action<string>? OnPickClass { get; set; }
     public Action? OnPause { get; set; }
     public Action? OnStop { get; set; }
     public Action? OnShowRecorder { get; set; }
@@ -168,6 +181,7 @@ public sealed partial class PanelModel : ObservableObject
     [RelayCommand] void Record() => OnRecord?.Invoke();
     [RelayCommand] void FixProblem() => OnFixProblem?.Invoke();
     [RelayCommand] void SwitchClass() => OnSwitchClass?.Invoke();
+    [RelayCommand] void PickClass(ClassChoice choice) => OnPickClass?.Invoke(choice.Name);
     [RelayCommand] void Pause() => OnPause?.Invoke();
     [RelayCommand] void Stop() => OnStop?.Invoke();
     [RelayCommand] void ShowRecorder() => OnShowRecorder?.Invoke();
