@@ -5,12 +5,18 @@ using System.Text.Json.Nodes;
 
 namespace StudyStash.Core.Tests;
 
+/// <summary>Tests that listen on a real local port picked a moment before: run apart from every other test, so none
+/// takes the port in between. The sign-in test failed that way once in a full run, and passes alone.</summary>
+[CollectionDefinition("LocalPorts", DisableParallelization = true)]
+public sealed class LocalPorts;
+
 /// <summary>
 /// Signing in to Granola, checked against the MCP authorization spec (2025-11-25) and the RFCs it builds on: PKCE
 /// (RFC 7636), protected resource metadata (RFC 9728), server metadata (RFC 8414 / OpenID), dynamic client
 /// registration (RFC 7591) and resource indicators (RFC 8707). The fake sign-in server publishes Granola's real
 /// metadata and checks every request the way a real one must.
 /// </summary>
+[Collection("LocalPorts")]
 public class OAuthTests
 {
     const string Mcp = "https://mcp.granola.ai/mcp";
