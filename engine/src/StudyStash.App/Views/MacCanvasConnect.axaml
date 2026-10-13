@@ -45,7 +45,7 @@
             <Border Classes="cv-field" Width="220">
               <TextBox Classes="bare" Text="{Binding SchoolField}" PlaceholderText="school.instructure.com" FontSize="13" />
             </Border>
-            <Button Classes="cv-pill cv-mini cv-primary" IsEnabled="{Binding !SavingSchool}" Command="{Binding ContinueCommand}"><TextBlock Text="Continue" /></Button>
+            <Button Classes="cv-pill cv-mini cv-primary" IsEnabled="{Binding !SavingSchool}" Command="{Binding ContinueCommand}"><TextBlock Text="Save" /></Button>
           </StackPanel>
         </Grid>
         <TextBlock Classes="cv-help cv-body" Text="{Binding SchoolError}" IsVisible="{Binding SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
