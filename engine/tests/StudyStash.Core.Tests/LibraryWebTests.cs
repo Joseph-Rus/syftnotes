@@ -282,6 +282,29 @@ public class LibraryWebTests
     }
 
     [Fact]
+    public async Task A_rewrite_that_didnt_happen_leaves_the_notes_on_the_page_and_says_why()
+    {
+        using var dir = new TempDir();
+        var cfg = MakeCfg(dir); // AI off: nothing can write new notes
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        store.Save(new Meeting("n1") { Title = "Cells", Date = "2026-09-01", Transcript = "today we talk about the cell membrane and osmosis" },
+            new Classification("Bio 110", 0.9, "ollama", "Cells and membranes", ["cells"]), "## Summary\nWater follows salt across the membrane.", "Claude");
+        var pipeline = new Pipeline(cfg, store, log: Quiet);
+        await using var c = await Site(cfg, store, pipeline);
+
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.PostForm("/note/n1/resummarize")).StatusCode); // "Rewrite summary"
+        Assert.Contains("A new summary is being written", await c.Text("/note/n1"));
+        await pipeline.RunPendingAsync();
+
+        string page = await c.Text("/note/n1");
+        Assert.Contains("<h1>Cells and membranes</h1>", page);
+        Assert.Contains("<dt>Summary</dt><dd>Notes by Claude, from the transcript</dd>", page);
+        Assert.Contains("Water follows salt across the membrane.", page);
+        Assert.Contains("The notes weren&#x27;t rewritten: AI is switched off in your library&#x27;s Settings. Your current notes are unchanged.<form", page);
+        Assert.DoesNotContain("No study notes yet", page);
+    }
+
+    [Fact]
     public async Task Settings_offers_an_update_when_a_newer_release_is_out()
     {
         using var dir = new TempDir();
