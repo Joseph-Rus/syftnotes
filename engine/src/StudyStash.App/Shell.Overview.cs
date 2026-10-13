@@ -456,7 +456,8 @@ public static partial class Shell
         var mine = LocalNotes().Where(l => cls is not null ? l.Class == cls : !unsorted || l.Class.Length == 0 || l.Class == Configs.Unsorted)
             .ToDictionary(l => l.Id);
         if (mine.Count == 0) return listed;
-        var notes = listed.Select(f => mine.Remove(f.Id, out var here) ? f with { Status = here.Status } : f).ToList();
+        // (One the library hasn't filed yet has no folder there: its row keeps the one it was recorded in.)
+        var notes = listed.Select(f => mine.Remove(f.Id, out var here) ? f with { Status = here.Status, Class = f.Class.Length == 0 ? here.Class : f.Class } : f).ToList();
         var oldest = all || notes.Count == 0 ? null : notes[^1].Date;
         notes.AddRange(mine.Values.Where(l => oldest is null || l.Date >= oldest));
         return [.. notes.OrderByDescending(n => n.Date ?? DateTimeOffset.MinValue)];

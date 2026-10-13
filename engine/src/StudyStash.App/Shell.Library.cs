@@ -238,11 +238,14 @@ public static partial class Shell
             else if (reached && !showing) await ShowHomeAsync(); // it's gone (deleted on another computer): nothing to open
             return;
         }
-        string cls = S(l["class"]) is { } c && c != Configs.Unsorted ? c : "";
+        string cls = S(l["class"]) is { } c && c != Configs.Unsorted ? c : "", status = S(l["status"]);
+        bool writing = status is "queued" or "working";
+        // The library gives a note its folder when it files it. Until then one recorded here is in the folder it was
+        // recorded in, as its page said while it recorded: not "Unsorted", with its folder left unselected.
+        if (cls.Length == 0 && writing && host.Lectures.Get(id) is { ClassName: { Length: > 0 } recordedIn } && recordedIn != Configs.Unsorted) cls = recordedIn;
         openClass = cls.Length > 0 ? cls : null;
         SelectInSidebar(openClass);
-        string status = S(l["status"]), notes = S(l["notes"]), typed = S(l["typed"]), noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
-        bool writing = status is "queued" or "working";
+        string notes = S(l["notes"]), typed = S(l["typed"]), noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
         string stamp = string.Join("\u0001", S(l["title"]), cls, status, notes, typed, S(l["error"]), S(l["transcript"]).Length, S(l["updated"]), S(l["no_notes"]));
         // Read again and nothing changed: the page stays as it is (where it's scrolled to, what's typed in Ask).
         if (showing && library.Note!.Stamp == stamp)
