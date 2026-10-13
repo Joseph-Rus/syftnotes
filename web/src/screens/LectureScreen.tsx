@@ -5,6 +5,7 @@ import { useResource } from '../data/resource';
 import { lectureMeta } from '../format';
 import { href } from '../router';
 import { renderMath } from '../ui/math';
+import { scrollTables } from '../ui/tables';
 import { Paperclip, Sparkle } from '../ui/icons';
 import { Dot, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { AttachmentRow } from './attachments';
@@ -21,7 +22,9 @@ export function LectureScreen({ api, id }: { api: Api; id: string }) {
   const noteBody = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (noteBody.current && notes.data?.html) renderMath(noteBody.current);
+    if (!noteBody.current || !notes.data?.html) return;
+    renderMath(noteBody.current);
+    scrollTables(noteBody.current);
   }, [notes.data?.html]);
 
   const refresh = async () => {

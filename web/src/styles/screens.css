@@ -222,6 +222,10 @@
   border-collapse: collapse;
   font-size: 14px;
 }
+/* The box ui/tables.ts puts each table in: one too wide for the screen scrolls sideways there. */
+.prose .table-scroll {
+  overflow-x: auto;
+}
 .prose th,
 .prose td {
   border-bottom: 0.5px solid var(--sep);
