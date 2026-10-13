@@ -1,3 +1,4 @@
+using System.Globalization;
 using Avalonia.Threading;
 using StudyStash.App.Platform;
 using StudyStash.App.Services;
@@ -63,6 +64,8 @@ public static partial class Shell
     static async Task<bool> BeginAsync(Func<Task<RecordStart>> begin, bool openPage)
     {
         if (host.Recorder.Current is not null || askingForMic) return false;
+        // What's typed in a planned note's page goes with it into the recording.
+        FlushTyped();
         if (host.Settings.Role == AppRole.Library)
         {
             Toast("This computer is your library", "Record on your laptop: this one keeps the lectures and writes the notes.", "Settings", SettingsFromAnywhere);
@@ -140,6 +143,15 @@ public static partial class Shell
             if (overviewOf == "") _ = ShowHomeAsync();
             return;
         }
+        // Not started yet: its note opens, not recording. Recording starts on its own when the event does.
+        if (pick.Start > DateTimeOffset.Now + PlanAhead && host.Settings.Role != AppRole.Library)
+        {
+            var planned = host.PlanEvent(pick);
+            if (host.Recorder.Current?.Id == planned.Id) OpenRecording();
+            else OpenLecture(planned.Id);
+            Refresh();
+            return;
+        }
         if (host.Recorder.Current is { } live)
         {
             if (live.Event?.Id == eventId)
@@ -157,6 +169,68 @@ public static partial class Shell
             return;
         }
         await StartRecordingAsync("", pick, openPage: true);
+    }
+
+    /// <summary>An event this close to its start records when it's clicked, as one that's on does; further off, its
+    /// note opens and waits for it.</summary>
+    static readonly TimeSpan PlanAhead = TimeSpan.FromMinutes(1);
+
+    /// <summary>
+    /// A planned note's page: the event's name and folder, when it starts and that recording starts on its own then
+    /// (with Start now), and the student's own notes, kept as they're typed.
+    /// </summary>
+    static void ShowPlannedPage(Lecture l)
+    {
+        string id = l.Id, cls = l.ClassName, noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
+        if (library.Note is { Planned: true } shown && shown.Id == id && library.ShowNotePage) return;
+        openClass = cls.Length > 0 ? cls : null;
+        SelectInSidebar(openClass);
+        var starts = Services.AppHost.PlanStarts(l)?.ToLocalTime();
+        string at = starts is { } s ? s.ToString(s.Date == DateTime.Today ? "h:mm tt" : "ddd d MMM 'at' h:mm tt", CultureInfo.InvariantCulture) : "";
+        bool past = starts is { } st && st <= DateTimeOffset.Now;
+        var note = new NoteModel
+        {
+            Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(starts, null), Title = WorkingTitle(l), Local = true,
+            Planned = true, Typed = l.Notes, Writer = NotesWriter(), Stamp = LocalStamp(l),
+            PlanWords = past ? "Not recorded. Start recording when you're ready." : $"Starts at {at}. Recording starts on its own then.",
+            OnStartNow = () => ContinueRecording(id),
+            OnRename = title =>
+            {
+                host.TitleLecture(id, title);
+                return Task.FromResult(true);
+            },
+        }.Titled();
+        note.OnTyped = text => KeepTypedSoon(id, text);
+        ClearPane();
+        library.Overview = null;
+        library.Note = note;
+    }
+
+    static DateTime lastPlanLook = DateTime.MinValue;
+    static readonly HashSet<string> plansTried = [];
+
+    /// <summary>
+    /// Every few seconds: a planned note whose event has started records now, unless something else is recording
+    /// (that one isn't cut short) or it was tried already and couldn't start. Its page follows if it's the one showing,
+    /// and a toast says it started, with Stop. Planned notes whose event ended with nothing in them go.
+    /// </summary>
+    static void StartPlansOnTime()
+    {
+        if (DateTime.UtcNow - lastPlanLook < TimeSpan.FromSeconds(5)) return;
+        lastPlanLook = DateTime.UtcNow;
+        if (host.Settings.Role == AppRole.Library) return;
+        var now = DateTimeOffset.Now;
+        host.ForgetEndedPlans(now);
+        if (host.Recorder.Current is not null || askingForMic || host.DuePlan(now) is not { } due || !plansTried.Add(due.Id)) return;
+        bool showing = library.Note is { Planned: true } p && p.Id == due.Id && library.ShowNotePage && mainWindow?.IsVisible == true;
+        string name = WorkingTitle(due);
+        Program.Log($"[calendar] {due.Id}: its event started: recording");
+        _ = StartPlanAsync(due.Id, name, showing);
+    }
+
+    static async Task StartPlanAsync(string id, string name, bool openPage)
+    {
+        if (await BeginAsync(() => host.ContinueAsync(id), openPage)) Toast($"Recording {name}", "It started on time, as planned.", "Stop", () => StopRecording());
     }
 
     /// <summary>The page of what's recording, from wherever the window is.</summary>
@@ -287,11 +361,13 @@ public static partial class Shell
         if (host.Recorder.Current is null)
         {
             recorderWindow?.Hide();
+            UpdateDock();
             return;
         }
         bool front = mainWindow is { IsVisible: true, IsActive: true };
         if (!front) ShowRecorder(recorder.Expanded && recorderWindow?.IsVisible == true);
         else if (recorderWindow?.IsVisible == true && !recorder.Expanded) recorderWindow.Hide();
+        UpdateDock();
         host.WatchLiveWords(WatchingWords());
     }
 }

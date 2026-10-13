@@ -36,7 +36,7 @@ public partial class NotePage : UserControl
             if (key == showing) return;
             showing = key;
             NoteScroll.Offset = default;
-            if (note.Live) Dispatcher.UIThread.Post(Typed.FocusEnd, DispatcherPriority.Input);
+            if (note.Typing) Dispatcher.UIThread.Post(Typed.FocusEnd, DispatcherPriority.Input);
         }
         DataContextChanged += (_, _) =>
         {
@@ -83,7 +83,7 @@ public partial class NotePage : UserControl
         {
             e.Handled = true;
             note.CommitTitleCommand.Execute(null);
-            if (note.Live) Typed.FocusEnd();
+            if (note.Typing) Typed.FocusEnd();
             else NoteScroll.Focus();
         }
         else if (e.Key == Key.Escape)

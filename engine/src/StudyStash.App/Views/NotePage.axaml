@@ -121,6 +121,20 @@
             </Grid>
           </Border>
 
+          <!-- Planned for a calendar event: when it starts, and Start now -->
+          <Border Name="PlanBar" Classes="recbar" IsVisible="{Binding Planned}" Margin="0,2,0,26">
+            <Grid ColumnDefinitions="Auto,14,*,14,Auto">
+              <Ellipse Width="12" Height="12" Stroke="{DynamicResource Record}" StrokeThickness="2" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding PlanWords}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" />
+              <Button Name="StartNow" Grid.Column="4" Classes="btn sm ink" Command="{Binding StartNowCommand}" AutomationProperties.Name="Start recording now">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Ellipse Width="10" Height="10" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
+                  <TextBlock Text="Start now" VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+            </Grid>
+          </Border>
+
           <!-- Where it is, and what it is -->
           <WrapPanel Name="Crumb">
             <Button Name="FolderLink" Classes="crumb-link" IsVisible="{Binding HasClass}" Margin="0,0,10,0" VerticalAlignment="Center" AutomationProperties.Name="{Binding FolderSaid}"
@@ -194,7 +208,7 @@
           <StackPanel Name="NotesBody" IsVisible="{Binding ShowNotes}" MaxWidth="704" HorizontalAlignment="Left" Margin="0,18,0,0">
             <!-- While it records: the student's own, kept as they type. A line that starts "# " becomes a heading,
                  "- " a bullet, as the space is typed. -->
-            <StackPanel IsVisible="{Binding Live}" Spacing="18">
+            <StackPanel IsVisible="{Binding Typing}" Spacing="18">
               <c:TypedEditor Name="Typed" Text="{Binding Typed}" Placeholder="Your notes" MinHeight="120" />
               <TextBlock Name="TypedHint" Classes="notes-hint" Text="{Binding TypedHint}" />
             </StackPanel>
