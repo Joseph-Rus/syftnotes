@@ -135,7 +135,7 @@ public static partial class SelfTest
         Library = new LibraryService(libHome, cfg);
         await Library.StartAsync();
         if (Library.State is not (LibraryServiceState.Running or LibraryServiceState.Elsewhere))
-            throw new InvalidOperationException(Library.Failure ?? "the library didn't start");
+            throw new InvalidOperationException($"{Library.Failure ?? "the library didn't start"} {Library.LastLines}".TrimEnd());
         Environment.SetEnvironmentVariable("STUDYSTASH_SELFTEST_LIBRARY_PORT", port.ToString());
     }
 

@@ -68,6 +68,7 @@ public sealed partial class LibraryWeb
         {
             string password = (await Http.JsonBodyAsync(ctx.Request))?["password"] is JsonValue v && v.TryGetValue(out string? p) ? p.Trim() : "";
             if (password.Length < 4) return Http.Detail(400, "Use a password of at least 4 characters.");
+            if (Configs.PasswordProblem(password) is { } problem) return Http.Detail(400, problem);
             string old = cfg.PoolPassword;
             cfg.PoolPassword = password;
             Configs.Save(cfg);

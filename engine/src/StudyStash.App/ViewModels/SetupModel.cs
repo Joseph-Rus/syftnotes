@@ -410,6 +410,8 @@ public sealed partial class SetupModel : ObservableObject
                      nameof(ShowNotesSummary), nameof(LibrarySummary) })
             OnPropertyChanged(p);
         NotifyStepDerived();
+        // A password already in the field (the one a library here has) that can't be used is said on its page.
+        SayPasswordProblem();
     }
 
     /// <summary>Steps before this one are done (a check); this one and the ones after are still to come, even if
@@ -536,7 +538,22 @@ public sealed partial class SetupModel : ObservableObject
     partial void OnPasswordChanged(string value)
     {
         Retyped();
+        SayPasswordProblem();
         OnPropertyChanged(nameof(PasswordText));
+    }
+
+    /// <summary>The line under the fields is the typed password's problem, not something else setup said.</summary>
+    string? passwordProblem;
+
+    /// <summary>A library's new password with a letter that can't be used (<see cref="Core.Configs.PasswordProblem"/>)
+    /// is said as it's typed, under the field, and the line goes again once the letter does.</summary>
+    void SayPasswordProblem()
+    {
+        if (!IsLibrary || LibraryOk || Connecting) return;
+        string? problem = Core.Configs.PasswordProblem(Password.Trim());
+        if (problem is not null) LibraryResult = problem;
+        else if (LibraryResult is not null && LibraryResult == passwordProblem) LibraryResult = null;
+        passwordProblem = problem;
     }
 
     partial void OnShowPasswordChanged(bool value)

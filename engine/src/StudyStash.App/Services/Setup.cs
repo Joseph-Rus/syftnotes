@@ -274,6 +274,9 @@ public static class Setup
             {
                 string url = NormalizeAddress(m.Address);
                 if (url.Length == 0) throw new InvalidOperationException("Type your library's address, like http://mac-mini:8787.");
+                // Behind the dots, a letter no library's password can have (the keyboard was set to another language, say).
+                if (Configs.OddInPassword(m.Password.Trim()) is { } odd)
+                    throw new InvalidOperationException($"That password isn't right: a library's password can't have {odd} in it.");
                 var health = await LibraryApi.CheckServerAsync(url, m.Password.Trim());
                 var cc = host.Client();
                 cc.ServerUrl = url;
