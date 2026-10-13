@@ -34,7 +34,7 @@ public class AccessibleNamesTests
 
     static void AllNamed(IEnumerable<Control> controls, string where)
     {
-        var bad = controls.Where(c => Nameless(Said(c))).Select(c => $"{c.GetType().Name} {c.Name} ({string.Join(".", c.Classes)})").ToList();
+        var bad = controls.Where(c => Nameless(Said(c))).Select(c => $"{c.GetType().Name} {c.Name} ({string.Join(".", c.Classes)}) holding {(c as ContentControl)?.Content?.GetType().Name} in {c.FindAncestorOfType<UserControl>()?.GetType().Name}").ToList();
         Assert.True(bad.Count == 0, $"{where}: nothing to say for {string.Join(", ", bad)}");
     }
 
@@ -150,6 +150,39 @@ public class AccessibleNamesTests
             Assert.NotEmpty(steps);
             AllNamed(steps, "Guided setup, the steps");
             window.Close();
+        }
+        finally
+        {
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    /// <summary>The library window, page by page: every button on it says its words. A button made of an icon and a
+    /// label, a switch and its words, or a whole row was read as what it's built from ("Avalonia.Controls.Grid" for
+    /// each of the sidebar's rows) until <see cref="SpokenButtons"/> named any button by the words it shows.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void Every_button_on_every_page_of_the_library_window_says_its_words(SkinKind skin)
+    {
+        try
+        {
+            ((App)Application.Current!).UseSkin(skin);
+            foreach (var page in Enum.GetValues<Demo.Page>())
+            {
+                var model = Demo.Semester(page);
+                Control view = skin == SkinKind.Mac ? new MacLibrary { DataContext = model } : new WinLibrary { DataContext = model };
+                var window = new Window { Width = 1280, Height = 860, RequestedThemeVariant = ThemeVariant.Light, Content = view };
+                window.Show();
+                Dispatcher.UIThread.RunJobs();
+                window.UpdateLayout();
+                AllNamed(Shown<Button>(view), $"{skin}, {page}");
+                window.Close();
+            }
+            // The sidebar's rows say more than they show: what's still to hand in, how many notes.
+            var library = Demo.Semester();
+            Assert.Equal("Home", library.Home.Said);
+            Assert.Matches(@"^Due, \d+ to hand in$", library.Due!.Said);
         }
         finally
         {
