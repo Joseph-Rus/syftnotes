@@ -542,7 +542,10 @@ public static partial class Shell
             // (Somewhere else was opened meanwhile: nothing to show.) After the page has finished being put up.
             if (openLecture == id) Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                if (openLecture == id && library.Note is { Live: false } now && now.Id == id) now.ShowAt(at);
+                if (openLecture != id || library.Note is not { Live: false } now || now.Id != id) return;
+                // It opens at its transcript: there were no notes being read here to offer a way back to.
+                now.ShowTranscript = true;
+                now.ShowAt(at);
             });
         }
         library.PropertyChanged += Shown;
