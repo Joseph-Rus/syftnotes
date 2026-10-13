@@ -271,11 +271,16 @@ public sealed partial class AiSetupModel : ObservableObject
     }
 
     /// <summary>Picking a row: an engine that can write notes becomes the pick; one that can't yet shows how to get it
-    /// going instead.</summary>
+    /// going instead. Where a row has one button and no steps, the row is never dead: Claude's and ChatGPT's do what
+    /// their button does (it only opens the screens that get them ready). The free AI's button starts a long
+    /// download at once, so its row says to press it and stays unpicked: a click never leaves notes switched on
+    /// with an AI that has nothing to write them with.</summary>
     void Pick(AiSetupRow row)
     {
-        if (row.CanWrite) SelectedNotes = row.Id;
-        else ShowHelpOf(row, true);
+        if (row.CanWrite && !row.ShowOneButton) SelectedNotes = row.Id;
+        else if (row.HasHelp) ShowHelpOf(row, true);
+        else if (row.ShowOneButton && row.Id != "ollama") _ = row.OpenCommand.ExecuteAsync(null);
+        else if (row.ShowOneButton || row.ShowSignIn) Say = $"{row.Name} isn't ready to write notes yet. Press “{(row.ShowSignIn ? "Sign in" : row.OpenLabel)}” on its row to get it ready.";
     }
 
     [RelayCommand]
