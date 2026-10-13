@@ -586,6 +586,13 @@ public static partial class Shell
             if (host.Remote() is not { } lib) throw new HttpRequestException("Can't reach your library right now.");
             await lib.DeleteAsync(d.Id);
             Program.Log($"[library] deleted {d.Id}");
+            // This computer's own recording of it, still on its way or being written: it stops going. Otherwise the
+            // sender, finding the library no longer has it, sent it again and it came back in Unsorted. It's kept as
+            // filed, and dropped once the library's trash lets it go, as any other.
+            host.Lectures.Update(d.Id, l =>
+            {
+                if (l.State is LectureState.Sending or LectureState.Writing) l.State = LectureState.Filed;
+            });
             _ = host.CheckLibraryAsync();
             return true;
         }

@@ -350,6 +350,23 @@ public sealed class AppUpdates
         }
     }
 
+    /// <summary>How long after a recording stops an update waits for its notes to be written by the library on this
+    /// computer: long enough for a long lecture's, short enough that one stuck on its way never holds updates off.</summary>
+    internal static readonly TimeSpan WritingWait = TimeSpan.FromMinutes(30);
+
+    /// <summary>A lecture recorded in the last <see cref="WritingWait"/> is still on its way to the library on this
+    /// computer, or being written there: an update restarts that library, which would drop the notes it's writing
+    /// (11:48 one day: a lecture's notes waited two hours behind an update that started two seconds after it was sent).
+    /// When it stopped is its sound file's last write, which holds for one picked up again days later too.</summary>
+    internal static bool WritingHere(AppHost host)
+    {
+        if (host.LocalLibrary is null) return false;
+        var since = DateTime.UtcNow - WritingWait;
+        return host.Lectures.All().Any(l => l.State is LectureState.Sending or LectureState.Writing
+                                            && File.Exists(host.Lectures.AudioPath(l.Id))
+                                            && File.GetLastWriteTimeUtc(host.Lectures.AudioPath(l.Id)) > since);
+    }
+
     /// <summary>auto_update, read fresh each round: client.toml's, and config.toml's too when the library is on this
     /// computer (Settings → Your library → Update automatically writes that one). Either off is off; a file that
     /// can't be read counts as off, so nothing installs on a guess.</summary>
@@ -381,6 +398,7 @@ public sealed class AppUpdates
         if (!string.Equals(host.Home, Configs.DefaultHome, StringComparison.Ordinal)) relaunchArgs.AddRange(["--home", host.Home]);
         bool Idle() => host.Recorder.Current is null
                        && !host.Lectures.All().Any(l => l.State is LectureState.Recording or LectureState.Paused or LectureState.Transcribing)
+                       && !WritingHere(host)
                        && busy?.Invoke() != true;
         var updates = new AppUpdates
         {
