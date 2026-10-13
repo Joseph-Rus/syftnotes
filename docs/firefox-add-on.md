@@ -7,9 +7,10 @@ The Canvas extension is one set of files (`extension/`) that runs in two familie
   ([chrome-web-store.md](chrome-web-store.md)).
 - **Firefox and the browsers built on it** (Zen, LibreWolf, Waterfox). This page.
 
-Version 1.6 was submitted to addons.mozilla.org on 2026-10-06 (listed, add-on URL `study-stash-for-canvas`) and is
-awaiting review. Until it's approved and `Extension.FirefoxPublishedAt` is set, the app doesn't offer Firefox. This
-page is what's built, how to try it today, and what publishing took.
+Version 1.6 is published on addons.mozilla.org (submitted 2026-10-06, public by the listing's own date on
+2026-10-09): [Study Stash for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/).
+`Extension.FirefoxPublishedAt` names that page, so from Study Stash 0.16.3 the Canvas step offers Firefox and the
+browsers built on it. This page is what's built, what a student sees, how it was tried, and what publishing took.
 
 ## Why Firefox can't use the folder
 
@@ -46,22 +47,63 @@ pastes a code from Study Stash.
 - **Where the code is shown.** The library's Settings page, under Canvas, **Set up the extension on this computer**
   (the code for a browser on the library's computer). In the app, the Canvas connect step shows it when the student's
   browser is Firefox.
-- **A Firefox that has the add-on before Study Stash knows where it is.** While `Extension.FirefoxPublishedAt` is
-  empty the step says Firefox can't run the extension yet and uses another browser. A student whose usual browser is
-  Firefox (or one built on it) also gets **I already have it in Firefox**: the step becomes that browser's, with the
-  code to paste and nothing to add. That covers the days between Mozilla publishing the add-on and the Study Stash
-  release that names its page, and an add-on installed from a file.
+- **A Study Stash that doesn't know where the add-on is.** With `Extension.FirefoxPublishedAt` empty (as it was
+  through 0.16.2, and would be again if the listing ever had to come down) the step says Firefox can't run the
+  extension yet and uses another browser. A student whose usual browser is Firefox (or one built on it) also gets
+  **I already have it in Firefox**: the step becomes that browser's, with the code to paste and nothing to add.
 
-**Tested.** `ExtensionStoreTests` checks the Firefox zip and its manifest. `ExtensionScriptTests` runs the real scripts
-in Jint as Firefox runs them (no `importScripts`, `moz-extension://`): patterns without a port, `b=Firefox`, and the
-words. In a real Firefox (Developer Edition 158, driven over WebDriver BiDi with the permission prompt answered by a
-preference) the packed zip was installed, its popup took a pasted code, and the background page then asked a library
-on this Mac's network address over plain http, read a pretend Canvas with the cookies of a tab signed in to it
-(including `SameSite=Strict` ones), handed back JSON and a file, refused a URL that wasn't Canvas, and kept asking
-through 70 idle seconds. In Zen (Firefox 143) the same zip installed, named itself and asked for the same sites.
-That run isn't in the repo's tests: it needs a Firefox on the machine.
+## What a student sees
 
-## Try it today
+**Add to Firefox** in the Canvas step opens Mozilla's page for the add-on in their Firefox and shows the code. From
+there, as release Firefox 157 words it:
+
+1. **Mozilla's page.** A blue **Add to Firefox** button. Above it sits Mozilla's notice for every add-on it hasn't
+   picked as Recommended: "This add-on is not actively monitored for security by Mozilla. Make sure you trust it
+   before installing."
+2. **Firefox asks to add it.** "Add Study Stash for Canvas", with "The developer says this extension collects:
+   website content, personal communications" ([what it says it sends](#4-what-it-says-it-sends)). **Add**, or Cancel.
+3. **The add-on's button**, under the puzzle-piece Extensions button until it's pinned. Its popup says "Paste the
+   code from Study Stash". Paste, **Connect**.
+4. **Firefox asks for the sites.** "Study Stash for Canvas requests additional settings", listing the school's
+   Canvas, `inscloudgate.net` and the library's address. **Allow**, or Deny.
+
+The add-on checks in with the library within a second or two of Allow, and the step moves on to the courses. The
+popup then says "Canvas synced just now." (or "never", before the first sync).
+
+The step's own words follow those four: "On the page that opens in Firefox, click the blue Add to Firefox button,
+then Add when Firefox asks", then the button and the code, then "Click Allow when Firefox asks".
+
+## Tested
+
+`ExtensionStoreTests` checks the Firefox zip and its manifest. `ExtensionScriptTests` runs the real scripts in Jint as
+Firefox runs them (no `importScripts`, `moz-extension://`): patterns without a port, `b=Firefox`, and the words.
+
+**The published copy, in release Firefox (2026-10-13, Firefox 157.0.1 on a Mac).** The file Mozilla serves holds the
+repo's scripts, popup and icons byte for byte, plus Mozilla's signature. A Firefox with a fresh profile, which
+installs only what Mozilla signed, went to the listing, pressed **Add to Firefox** and answered **Add**. The add-on's
+real toolbar popup took the code the app makes (`Extension.ConnectionCode` from the library's key and Canvas address),
+**Connect**, and Firefox's question was answered **Allow**. Against this engine's library and a pretend Canvas it
+then checked in as Firefox (version 1.6, protocol 3), answered Find my courses at once, and synced a class: 27
+requests to Canvas, every one with the session of the tab signed in to it, and the class's files on disk. It ran
+twice: with the library at `127.0.0.1`, and at this Mac's address on its network over plain http, the way a laptop
+reaches a library on another computer. Firefox's two questions were answered by pressing their buttons from a script,
+and the code was put in the field by one; nothing else stood in for the student.
+
+**Before it was published (Firefox Developer Edition 158, the packed zip, 2026-10-06):** the background page read a
+pretend Canvas with the cookies of a tab signed in to it (including `SameSite=Strict` ones), handed back JSON and a
+file, refused a URL that wasn't Canvas, and kept asking through 70 idle seconds. In Zen (Firefox 143) the same zip
+installed, named itself and asked for the same sites.
+
+Neither run is in the repo's tests: they need a Firefox on the machine. Not tried: anything on Windows, Mozilla's
+page in Zen, LibreWolf or Waterfox (the step's words take its button to say Add to Firefox there too), and a
+student's own hand on the two questions.
+
+**The popup's page in a tab is not the popup.** Opened as `moz-extension://…/popup.html` in a tab, Firefox 157 holds
+the page's request to a library on this computer behind a question of its own ("wants to access other apps and
+services on this device"), and the page says "Can't reach your library" until it's answered. The toolbar popup and
+the background page are not asked. Test with the real popup.
+
+## Try a copy that isn't the published one
 
 Firefox **Developer Edition** and **Nightly** install an unsigned add-on once told to. The release Firefox doesn't.
 
@@ -74,8 +116,9 @@ Firefox **Developer Edition** and **Nightly** install an unsigned add-on once to
 For a quick look in any Firefox: `about:debugging`, **This Firefox**, **Load Temporary Add-on…**, and pick the `.xpi`.
 It lasts until Firefox closes.
 
-To try the app's own Firefox step before the add-on is published, start the app with `STUDYSTASH_FIREFOX_ADDON` set
-to the `.xpi`'s path (or a web address): that's what **Add to Firefox** opens.
+To point the app's Firefox step somewhere else than Mozilla's page, start the app with `STUDYSTASH_FIREFOX_ADDON`
+set to a web address: that's what **Add to Firefox** opens. A file's path isn't opened (the app hands a browser web
+addresses only).
 
 ## Publishing it
 
@@ -124,13 +167,14 @@ It reads no passwords and no cookies: Firefox sends the student's own Canvas ses
 
 ### 5. Review, then one line in the engine
 
-Listed add-ons are usually reviewed within a few days. Optional access to every site gets a closer look, like in
-Chrome's store, and the reviewer notes above answer the usual question.
+Listed add-ons are usually reviewed within a few days; 1.6 was public three days after it went in. Optional access to every site gets a closer
+look, like in Chrome's store, and the reviewer notes above answer the usual question.
 
 `https://addons.mozilla.org/api/v5/addons/addon/study-stash-for-canvas/` answers 401 while it's awaiting review and
-200 once it's public. When the page is live, set `Extension.FirefoxPublishedAt` to its address
-(`https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/`). Until then it's empty and the app doesn't
-offer Firefox, so nothing a student sees depends on an add-on that isn't there.
+200 once it's public (its `status` is then `public`, and `current_version.file.url` is the signed file). Once the
+page was live, `Extension.FirefoxPublishedAt` was set to its address
+(`https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/`). Emptied, the app stops offering Firefox, so
+nothing a student sees depends on an add-on that isn't there.
 
 ### Signing it without listing it
 

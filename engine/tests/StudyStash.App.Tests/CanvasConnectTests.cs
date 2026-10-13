@@ -292,7 +292,8 @@ public class CanvasConnectTests
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
         Assert.True(m.IsFirefox);
         Assert.Equal("Add to Firefox", m.AddLabel);
-        Assert.Equal("In Firefox, click Add when it asks to add Study Stash for Canvas.", m.FirefoxStep1);
+        // Mozilla's page for the add-on has a button of its own to press before Firefox asks anything.
+        Assert.Equal("On the page that opens in Firefox, click the blue Add to Firefox button, then Add when Firefox asks.", m.FirefoxStep1);
 
         await m.AddToBrowserCommand.ExecuteAsync(null);
 

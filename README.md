@@ -473,19 +473,24 @@ the notes, in a quick answer and in the Ask chat:
 
 Study Stash reads Canvas through your browser with your own sign-in — no Canvas password or token —
 and only reads; nothing on Canvas changes. It works in Chrome and the browsers built on it (Edge,
-Brave, Arc, Opera, Vivaldi). The extension runs in Firefox too, but its add-on isn't published
-yet: [docs/firefox-add-on.md](docs/firefox-add-on.md). On your library's computer:
+Brave, Arc, Opera, Vivaldi), and in Firefox and the browsers built on it (Zen, LibreWolf,
+Waterfox). On your library's computer:
 
 1. **Settings → Your library → Canvas** (or the Canvas step in setup): type your school's Canvas
    address.
-2. Click **Add to Chrome** (the button names your own browser: Add to Edge, Add to Brave; if the
+2. Click **Add to Chrome** (the button names your own browser: Add to Edge, Add to Firefox; if the
    browser you usually use can't run the extension, like Safari, Study Stash says so and uses
-   another one on your computer, or points you to Chrome when there's none). It opens
-   that browser's extensions page and shows the extension's folder. Turn on **Developer mode**,
-   click **Load unpacked**, and pick that folder — or drag the folder onto the Extensions page. On
-   a Mac the folder is **Study Stash → Chrome extension** in your home folder
-   (`~/Study Stash/Chrome extension`), where the browser's window can see it; on Windows it's
-   `chrome-extension` in `%USERPROFILE%\.study-stash`.
+   another one on your computer, or points you to Chrome when there's none).
+   - **Chrome and its family:** it opens that browser's extensions page and shows the extension's
+     folder. Turn on **Developer mode**, click **Load unpacked**, and pick that folder — or drag
+     the folder onto the Extensions page. On a Mac the folder is **Study Stash → Chrome
+     extension** in your home folder (`~/Study Stash/Chrome extension`), where the browser's
+     window can see it; on Windows it's `chrome-extension` in `%USERPROFILE%\.study-stash`.
+   - **Firefox and its family:** it opens
+     [Study Stash for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/)
+     on Mozilla's add-ons site. Click the blue **Add to Firefox** button, then **Add**. Click the
+     add-on's **Study Stash** button (it may be under the puzzle-piece Extensions button), paste
+     the code Study Stash shows, click **Connect**, then **Allow**. It needs Firefox 140 or later.
 3. Sign in to Canvas in that browser, then click **Find my courses** and match each class to its
    course.
 

@@ -624,6 +624,9 @@ public sealed partial class LibraryWeb
             : refusedAt is not null || s.ExtensionSeen.Length > 0 && !s.LastKeyMatches ? $"{Ui.Esc(s.BrowserName(start: true))} has an old key: connect it again"
             : s.SeenWithKey.Length > 0 ? $"Not lately (is {Ui.Esc(s.BrowserName())} open?)" : "Not set up";
         string code = Extension.ConnectionCode($"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), s.Url);
+        // Firefox's copy is on Mozilla's site; a browser's store copy is wherever that store has it.
+        string addOn = Extension.FirefoxAddOn.StartsWith("https://", StringComparison.Ordinal)
+            ? $"<a href=\"{Ui.Esc(Extension.FirefoxAddOn)}\">Study Stash for Canvas</a>" : "Study Stash for Canvas";
         string folder = Extension.Folder(cfg.Home);
         string where = Extension.Ready(folder) ? $"<code>{Ui.Esc(folder)}</code>" : $"<code>{Ui.Esc(folder)}</code> (not ready: restart Study Stash)";
         return $"<div class=\"group-head\" id=\"canvas\">Canvas</div>{say}<form method=\"post\" action=\"/settings/canvas\"><div class=\"group\">"
@@ -643,7 +646,7 @@ public sealed partial class LibraryWeb
             + "<div class=\"row\"><span class=\"grow\">2. Click Load unpacked and pick that folder, or drag the folder onto the Extensions page</span></div>"
             + "</div>"
             + (code.Length == 0 ? "" : "<div class=\"group-head\">Firefox, or a copy from a browser's store</div><div class=\"group\">"
-                + "<div class=\"row\"><span class=\"grow\">1. Add Study Stash for Canvas to the browser, click its button and paste this code</span></div>"
+                + $"<div class=\"row\"><span class=\"grow\">1. Add {addOn} to the browser, click its button and paste this code</span></div>"
                 + $"<div class=\"row\"><code style=\"word-break:break-all;user-select:all\">{Ui.Esc(code)}</code></div>"
                 + "<div class=\"row\"><span class=\"grow\">2. Click Connect, then Allow</span></div>"
                 + "</div>")

@@ -223,9 +223,9 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     {
         (false, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} shows you the extension’s folder and opens {BrowserName}’s extensions page. There:",
         (false, true) => $"{BrowserName}’s extensions page is open, and the folder is showing. In {BrowserName}:",
-        (true, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens the Study Stash add-on there. Then:",
+        (true, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens the Study Stash add-on’s page there. Then:",
         (true, true) when haveItAlready => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. To connect the add-on you have there:",
-        (true, true) => $"The Study Stash add-on is open in {BrowserName}. There:",
+        (true, true) => $"The Study Stash add-on’s page is open in {BrowserName}. There:",
     };
     /// <summary>The student's usual browser can't take the extension (Safari; Firefox before its add-on is out), or
     /// nothing on this computer can: said above the step's help, with the browser Study Stash will use instead, until
@@ -249,10 +249,12 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public string ConnectedIn(bool start = false) =>
         CanvasSettings.BrowserName(state.Extension?.Browser is { Length: > 0 } named ? named : AddedToBrowser ? BrowserName : "", start);
 
-    /// <summary>Firefox's three steps, where Chrome's family has its three pictures.</summary>
+    /// <summary>Firefox's three steps, where Chrome's family has its three pictures. The first is what Mozilla's page
+    /// for the add-on takes: its own blue Add to Firefox button, then the browser's question
+    /// (docs/firefox-add-on.md, "What a student sees").</summary>
     public string FirefoxStep1 => haveItAlready
         ? $"In {BrowserName}, click the Study Stash button (it may be under the puzzle-piece Extensions button)."
-        : $"In {BrowserName}, click Add when it asks to add Study Stash for Canvas.";
+        : $"On the page that opens in {BrowserName}, click the blue Add to Firefox button, then Add when {BrowserName} asks.";
     public string FirefoxStep2 => haveItAlready
         ? "Paste this code and click Connect."
         : "Click the Study Stash button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.";
