@@ -80,7 +80,7 @@ public sealed class SetupTests
         Assert.All(new[] { one, laptop, library }, m => Assert.Equal("Welcome", m.StepLabel));
         Assert.Equal("Set up Study Stash on this PC", SetupModel.For(SkinKind.Win).HeaderTitle);
         Assert.Contains("all on this Mac", one.OneComputerAbout, StringComparison.Ordinal);
-        Assert.Contains("No server needed", one.OneComputerAbout, StringComparison.Ordinal);
+        Assert.Contains("No other computer needed", one.OneComputerAbout, StringComparison.Ordinal);
         Assert.Contains("Mac mini", library.LibraryAbout, StringComparison.Ordinal);
         Assert.DoesNotContain("Mac", SetupModel.For(SkinKind.Win).LibraryAbout, StringComparison.Ordinal);
     }

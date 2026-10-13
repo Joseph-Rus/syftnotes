@@ -132,7 +132,7 @@ public sealed partial class SetupModel : ObservableObject
     public bool CanChooseLaptop => !Again || IsLaptop;
     public bool CanChooseLibrary => !Again || IsLibrary;
     // The welcome's three choices, in the student's words.
-    public string OneComputerAbout => $"Records, transcribes and writes your notes, all on this {DeviceWord}. No server needed; notes are written while it's on.";
+    public string OneComputerAbout => $"Records, transcribes and writes your notes, all on this {DeviceWord}. No other computer needed; notes are written while it's on.";
     public static string LaptopAbout => "Records lectures and sends them to your library on another computer.";
     public string LibraryAbout => skin == SkinKind.Mac
         ? "A computer that stays on, like a Mac mini. It keeps your lectures and writes the notes."
@@ -293,9 +293,15 @@ public sealed partial class SetupModel : ObservableObject
     /// then Classes is the plain add-your-own step.</summary>
     public ObservableCollection<SetupCourse> Courses { get; } = [];
     public bool HasCourses => Courses.Count > 0;
-    public string ClassesLede => HasCourses
-        ? "Your Canvas courses become your classes. The library reads each lecture and files it under the one it's about. Untick any you don't record."
-        : "The library reads each lecture and files it under the class it's about. Name your classes and say what each covers. You can skip this.";
+    /// <summary>What classes are for. With "No AI for now" chosen two steps back nothing reads the lectures, so it
+    /// says what happens instead: a lecture goes under the class it's recorded in, or waits in Unsorted.</summary>
+    public string ClassesLede => (HasCourses, Ai is { NoAi: true }) switch
+    {
+        (true, false) => "Your Canvas courses become your classes. The library reads each lecture and files it under the one it's about. Untick any you don't record.",
+        (true, true) => "Your Canvas courses become your classes. With no AI for now, a lecture goes under the class you record it in, or waits in Unsorted. Untick any you don't record.",
+        (false, false) => "The library reads each lecture and files it under the class it's about. Name your classes and say what each covers. You can skip this.",
+        (false, true) => "With no AI for now, a lecture goes under the class you record it in, or waits in Unsorted. Name your classes here. You can skip this.",
+    };
     /// <summary>Continue on Classes is adding the ticked courses and linking them to Canvas.</summary>
     [ObservableProperty] public partial bool AddingCourses { get; set; }
     [ObservableProperty] public partial string NewClass { get; set; } = "";
@@ -480,11 +486,13 @@ public sealed partial class SetupModel : ObservableObject
         if (oldValue is not null) oldValue.PropertyChanged -= OnAiPropertyChanged;
         if (newValue is not null) newValue.PropertyChanged += OnAiPropertyChanged;
         OnPropertyChanged(nameof(AiHelpOpen));
+        OnPropertyChanged(nameof(ClassesLede));
     }
 
     void OnAiPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(AiSetupModel.HelpOpen)) OnPropertyChanged(nameof(AiHelpOpen));
+        if (e.PropertyName == nameof(AiSetupModel.NoAi)) OnPropertyChanged(nameof(ClassesLede));
     }
 
     partial void OnCanvasChanged(CanvasConnectModel? oldValue, CanvasConnectModel? newValue)

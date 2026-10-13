@@ -468,6 +468,12 @@ public static class Setup
             m.ClassProblem = about.Length > 0 ? "Give the class a name too, like CS 101." : null;
             return;
         }
+        // Said here, in a student's words; the library's own refusal is a note to whoever calls its API.
+        if (name.Length > 60)
+        {
+            m.ClassProblem = "Keep the class's name to 60 characters.";
+            return;
+        }
         if (host.Remote() is not { } lib)
         {
             m.ClassProblem = "Connect to your library first: the classes are its.";

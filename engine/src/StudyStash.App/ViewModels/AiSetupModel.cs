@@ -264,6 +264,11 @@ public sealed partial class AiSetupModel : ObservableObject
         OnPropertyChanged(nameof(ChoiceWords));
     }
 
+    /// <summary>What the library said when it refused, for the student: turned away at the door ("wrong password"),
+    /// the app's copy of the library's password is out of date, and Settings is where the new one goes.</summary>
+    static string Words(LibraryRefusedException ex) =>
+        ex.Status == 401 ? "The library's password changed. Type the new one in Settings." : ex.Message;
+
     /// <summary>A row's help opens alone (the list stays short enough to see).</summary>
     void ShowHelpOf(AiSetupRow row, bool show)
     {
@@ -317,7 +322,7 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         catch (LibraryRefusedException ex)
         {
-            Say = ex.Message;
+            Say = Words(ex);
         }
         catch
         {
@@ -436,7 +441,7 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         catch (LibraryRefusedException ex)
         {
-            Say = ex.Message;
+            Say = Words(ex);
         }
         catch
         {
@@ -465,7 +470,7 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         catch (LibraryRefusedException ex)
         {
-            Say = ex.Message;
+            Say = Words(ex);
         }
         catch
         {
@@ -503,7 +508,7 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         catch (LibraryRefusedException ex)
         {
-            Say = ex.Message;
+            Say = Words(ex);
             return false;
         }
         catch
