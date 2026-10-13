@@ -64,6 +64,10 @@ public static partial class TypedNotes
     /// kept. What a lecture shows when nothing was written from its recording.</summary>
     public static string AllMine(string typed) => string.Join("\n", typed.ReplaceLineEndings("\n").Split('\n').Select(Mine));
 
+    /// <summary>Every word of the notes is the student's: they read exactly as what a student typed does
+    /// (<see cref="AllMine"/>), with nothing added from the recording.</summary>
+    public static bool IsAllMine(string? markdown) => HasMarks(markdown) && AllMine(Unmarked(markdown!)) == markdown!.ReplaceLineEndings("\n");
+
     /// <summary>A line with its words marked as the student's (its heading or bullet marker left outside the marks).
     /// A line with nothing to mark, or that isn't words (a table's row, a rule, a fence, a diagram's line) stays as it is.</summary>
     static string Mine(string line)

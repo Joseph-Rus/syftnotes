@@ -1105,6 +1105,35 @@ public class AiNotesModelTests
     }
 
     [AvaloniaFact]
+    public async Task What_a_student_typed_stays_on_a_note_the_library_wrote_no_notes_for_and_Edit_keeps_it()
+    {
+        // A recording too short for notes, filed: all there is to read is what the student typed while it recorded,
+        // and the library's own notes for it are none.
+        string typed = TypedNotes.AllMine("- my own bullet about the heart");
+        var (model, lib) = Loaded(new RewriteInfo("lec-1", "none") { Current = new NotesVersion("", "", Current.At) });
+
+        await model.Load("lec-1", typed, "", Current.At, typed: true);
+
+        // The library's answer (no notes) doesn't take their words off the page; the line over them says they're theirs.
+        Assert.Equal("- ==my own bullet about the heart==", model.ShownMarkdown);
+        Assert.True(model.AllMine);
+        Assert.False(model.SomeMine);
+
+        // Edit opens their text, and Save keeps it: sent as an edit of the library's notes (none), so it isn't
+        // turned down as an edit of other notes.
+        model.EditCommand.Execute(null);
+        Assert.Equal("- my own bullet about the heart", model.EditText);
+        model.EditText += "\n- and the valves";
+        await model.SaveEditCommand.ExecuteAsync(null);
+
+        var sent = Assert.Single(lib.Edits);
+        Assert.Equal("- ==my own bullet about the heart==\n- ==and the valves==", sent.Markdown);
+        Assert.Equal(Notes.Fingerprint(""), sent.BasedOn);
+        Assert.False(model.Editing);
+        Assert.Equal(sent.Markdown, model.ShownMarkdown);
+    }
+
+    [AvaloniaFact]
     public async Task Unsaved_typing_is_written_down_and_is_back_in_its_editor_after_the_app_restarts()
     {
         using var home = new StudyStash.Core.Tests.TempDir();

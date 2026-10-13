@@ -67,15 +67,15 @@
     </Border>
 
     <!-- Whose words are whose: the student's in ink, what was added from the recording in grey (who wrote that, and
-         when, on hover). On the right, Edit (while editing: Cancel and Save) and, under the dots, writing the notes
-         again with another AI. -->
+         when, on hover); with nothing added, just "What you wrote". On the right, Edit (while editing: Cancel and
+         Save) and, under the dots, writing the notes again with another AI. -->
     <Grid ColumnDefinitions="*,12,Auto,Auto" MinHeight="28">
       <StackPanel Name="Legend" Orientation="Horizontal" Spacing="18" VerticalAlignment="Center" ToolTip.Tip="{Binding BylineTip}" Background="Transparent">
         <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasMine}">
           <Border Width="14" Height="3" CornerRadius="2" Background="{DynamicResource Ink}" VerticalAlignment="Center" />
           <TextBlock Classes="legend mine" Text="What you wrote" />
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="6">
+        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !AllMine}">
           <Border Width="14" Height="3" CornerRadius="2" Background="{DynamicResource InkMuted}" VerticalAlignment="Center" />
           <TextBlock Name="LegendAi" Classes="legend" Text="{Binding LegendAi}" />
         </StackPanel>

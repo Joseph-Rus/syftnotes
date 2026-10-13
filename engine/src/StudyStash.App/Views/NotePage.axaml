@@ -152,9 +152,9 @@
               <Button Name="TranscriptTab" Classes="tab" Classes.on="{Binding ShowTranscript}" Content="{Binding TranscriptTab}" Command="{Binding TranscriptsCommand}" />
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center" Margin="0,0,0,6">
-              <!-- Only what the student wrote, without what was added from the recording -->
+              <!-- Only what the student wrote, without what was added from the recording (when something was) -->
               <Button Name="OnlyMine" Classes="switch" Classes.on="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes.OnlyMine, FallbackValue=False}"
-                      IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes.HasMine, FallbackValue=False}"
+                      IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes.SomeMine, FallbackValue=False}"
                       Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes.ToggleOnlyMineCommand, FallbackValue={x:Null}}"
                       ToolTip.Tip="Show only what you wrote, without what was added from the recording">
                 <StackPanel Orientation="Horizontal" Spacing="8">

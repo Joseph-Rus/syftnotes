@@ -124,6 +124,13 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     [GeneratedRegex(@"\A\s*---[ \t]*\r?\n.*?\r?\n---[ \t]*(\r?\n|\z)", RegexOptions.Singleline)]
     private static partial Regex FrontMatter();
 
+    // The marks round what the student wrote themselves (==like this==, Summarize.Mark): never shown as they're kept.
+    [GeneratedRegex(@"==(?=\S)(.+?)(?<=\S)==")]
+    private static partial Regex Typed();
+
+    [GeneratedRegex(@"\A(?:[-*+]|\d+[.)])\s+")]
+    private static partial Regex ListItem();
+
     /// <summary>The lecture in a line: the first sentence of its Summary (or Overview), for lists.</summary>
     public static string FirstSentence(string notes)
     {
@@ -133,9 +140,13 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         foreach (string heading in new[] { "Summary", "Overview" })
             if ((text = Notes.Section(notes, heading)).Length > 0) break;
         if (text.Length == 0)
-            text = string.Join(" ", notes.ReplaceLineEndings("\n").Split('\n').Select(l => l.Trim()).SkipWhile(l => l.Length == 0 || l.StartsWith('#'))
-                .TakeWhile(l => l.Length > 0 && !l.StartsWith('#')));
-        text = Markup().Replace(text, m => m.Groups[1].Success ? m.Groups[1].Value : "").Replace('\n', ' ').Trim();
+        {
+            var lines = notes.ReplaceLineEndings("\n").Split('\n').Select(l => l.Trim()).SkipWhile(l => l.Length == 0 || l.StartsWith('#'))
+                .TakeWhile(l => l.Length > 0 && !l.StartsWith('#')).ToList();
+            // A list (a student's own notes, a bullet a line) is said by its first item, not all of them run together.
+            text = lines.Count > 0 && ListItem().Match(lines[0]) is { Success: true } item ? lines[0][item.Length..] : string.Join(" ", lines);
+        }
+        text = Typed().Replace(Markup().Replace(text, m => m.Groups[1].Success ? m.Groups[1].Value : ""), "$1").Replace('\n', ' ').Trim();
         string first = SentenceEnd().Split(text).FirstOrDefault() ?? "";
         return first.Length > 200 ? first[..197].TrimEnd() + "…" : first;
     }

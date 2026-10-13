@@ -410,10 +410,11 @@ public static partial class Shell
             else if (!unsavedNotes.Remove(note.Id, out notes))
             {
                 fresh = true;
-                notes = new AiNotesModel(ai);
+                var made = notes = new AiNotesModel(ai);
                 FollowEdits(notes);
                 notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
+                    KeepOwnNotes(note.Id, made);
                     if (openLecture == note.Id) _ = ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true);
                 });
             }
@@ -423,7 +424,8 @@ public static partial class Shell
             library.Notes = notes;
             LeaveNotes(before);
         }
-        if (fresh) _ = notes!.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]));
+        // (With no notes written for it, the notes are what the student typed: the library's own are none.)
+        if (fresh) _ = notes!.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]), typed: note.Mine);
         // Typing that was in this lecture's editor when the app last quit goes back into it.
         if (fresh && EarlierDrafts().Remove(note.Id, out var draft)) notes!.RestoreEdit(draft.From, draft.Text);
         else if (notes is not null && !ReferenceEquals(before, notes)) _ = notes.Refresh(); // kept: the library says where they stand now
@@ -441,6 +443,22 @@ public static partial class Shell
         if (!ReferenceEquals(library.Ask, recorder.Ask)) library.Ask?.Stop(); // an answer about the note being left isn't wanted any more
         library.Ask = ask;
         _ = ask.Load();
+    }
+
+    /// <summary>Notes saved by hand that are all the student's own (what they typed while it recorded, changed or added
+    /// to since): the recording on this computer keeps them as what the student typed, so Keep recording starts from
+    /// them, and the notes written after it are written round them.</summary>
+    static void KeepOwnNotes(string id, AiNotesModel notes)
+    {
+        if (!notes.AllMine || host.Lectures.Get(id) is not { State: not (LectureState.Recording or LectureState.Paused) }) return;
+        try
+        {
+            host.KeepTypedNotes(id, TypedNotes.Unmarked(notes.CurrentMarkdown));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Program.Log($"[notes] the edited notes couldn't be kept with the recording: {e.Message}");
+        }
     }
 
     /// <summary>Notes a student had typed in and not saved when they opened something else, by lecture: back in their

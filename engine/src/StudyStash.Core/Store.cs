@@ -117,8 +117,11 @@ public static partial class Notes
         bool fromNotes = summarized && Summarize.FromNotes(m);
         if (summarized)
         {
-            lines.AddRange(["## Summary", "", DemoteHeadings(Py.Strip(summaryMd)), "",
-                $"_Written by {summaryModel} from {(fromNotes ? "the notes it came with" : "the transcript")}._", ""]);
+            lines.AddRange(["## Summary", "", DemoteHeadings(Py.Strip(summaryMd)), ""]);
+            // Notes no model wrote are the student's own (what they typed, saved as the notes of a recording too
+            // short to have any written): no line says who wrote them from what.
+            if (summaryModel.Length > 0)
+                lines.AddRange([$"_Written by {summaryModel} from {(fromNotes ? "the notes it came with" : "the transcript")}._", ""]);
         }
         if (!summarized || (fromNotes && Py.Strip(m.NotesMarkdown).Length > 0))
         {
