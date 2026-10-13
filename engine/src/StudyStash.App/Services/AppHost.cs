@@ -984,9 +984,12 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Changed?.Invoke();
     }
 
-    public Lecture? StopRecording()
+    public Lecture? StopRecording() => StopRecording(out _);
+
+    /// <summary>Stops what's recording; <paramref name="how"/> says what became of it (kept, or too short to keep).</summary>
+    public Lecture? StopRecording(out Stopped how)
     {
-        var l = Recorder.Stop();
+        var l = Recorder.Stop(out how);
         awake?.Dispose();
         awake = null;
         Whisper.Wake();

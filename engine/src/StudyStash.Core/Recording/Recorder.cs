@@ -29,6 +29,20 @@ public interface ITranscriber : IDisposable
     Task<Transcription> TranscribeAsync(float[] samples, string prompt, string language, CancellationToken stop);
 }
 
+/// <summary>What became of a recording when it stopped.</summary>
+public enum Stopped
+{
+    /// <summary>Nothing was recording.</summary>
+    Nothing,
+    /// <summary>It's kept: on its way to Whisper and the library (or it can't be read back, and is kept as failed).</summary>
+    Kept,
+    /// <summary>It was under <see cref="Recorder.KeepAtLeastSeconds"/>: thrown away.</summary>
+    TooShort,
+    /// <summary>A note picked up again (Keep recording) for under <see cref="Recorder.KeepAtLeastSeconds"/>: nothing
+    /// was added, and it's as it was before.</summary>
+    LeftAsItWas,
+}
+
 /// <summary>What the recorder tells the student when it can't record, or had to stop: what happened and what to do.</summary>
 public static class RecordingWords
 {
@@ -589,16 +603,26 @@ public sealed class Recorder : IDisposable
         return true;
     }
 
+    /// <summary>How long a recording has to be to be kept, in seconds: a shorter one is thrown away when it stops
+    /// (Record pressed by mistake), and a note picked up again for less than this is left as it was.</summary>
+    public const double KeepAtLeastSeconds = 5;
+
     /// <summary>Stop recording: the lecture goes to Whisper for the rest, then to the library. Null when nothing
     /// was recording, or when it was too short to keep (it's thrown away). A recording that can't be read back is
     /// kept and marked Failed ("The recording couldn't be read"); nothing is thrown.</summary>
-    public Lecture? Stop(double keepAtLeastSeconds = 5)
+    public Lecture? Stop(double keepAtLeastSeconds = KeepAtLeastSeconds) => Stop(out _, keepAtLeastSeconds);
+
+    /// <summary><see cref="Stop(double)"/>, saying what became of the recording (<paramref name="how"/>), so the
+    /// student can be told when it wasn't kept.</summary>
+    public Lecture? Stop(out Stopped how, double keepAtLeastSeconds = KeepAtLeastSeconds)
     {
         Lecture? l;
+        how = Stopped.Nothing;
         lock (transitions)
         {
             l = Current;
             if (l is null) return null;
+            how = Stopped.Kept;
             if (l.State == LectureState.Recording) Close();
             currentId = null;
             LastProblem = null;
@@ -619,6 +643,7 @@ public sealed class Recorder : IDisposable
             {
                 // Picked up again for a moment only (or its new sound can't be read): it's as it was before.
                 l = Save(l.Id, x => x.State = before.State);
+                how = Stopped.LeftAsItWas;
                 log($"[recorder] {l?.Id}: picked up again for a moment only: left as it was");
             }
             else if (seconds is not { } s)
@@ -632,6 +657,7 @@ public sealed class Recorder : IDisposable
             else if (s < keepAtLeastSeconds)
             {
                 Forget(l.Id);
+                how = Stopped.TooShort;
                 log($"[recorder] {l.Id} was {s:0.0}s: not kept");
                 l = null;
             }

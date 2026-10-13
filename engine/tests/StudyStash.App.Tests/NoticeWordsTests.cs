@@ -70,6 +70,14 @@ public class NoticeWordsTests
     }
 
     [Fact]
+    public void A_recording_stopped_too_soon_to_keep_says_so()
+    {
+        Assert.Equal(("Recording not kept", "It was under 5 seconds, so there was nothing to write down."), NoticeWords.NotKept(Stopped.TooShort));
+        Assert.Equal(("Note left as it was", "Under 5 seconds were recorded, so nothing was added to it."), NoticeWords.NotKept(Stopped.LeftAsItWas));
+        Assert.Null(NoticeWords.NotKept(Stopped.Kept));
+    }
+
+    [Fact]
     public void Record_before_the_model_is_here_offers_the_download_or_says_how_far_it_is()
     {
         Assert.Equal(("Download the transcription model", "Record works once it's here.", "Download"), NoticeWords.NoModelYet(null));

@@ -67,6 +67,19 @@ public static class NoticeWords
         },
     };
 
+    /// <summary>A recording that stopped before it was long enough to keep (<see cref="Recorder.KeepAtLeastSeconds"/>):
+    /// a new one is thrown away, and a note picked up again (Keep recording) is left as it was. Null when it was kept.</summary>
+    public static (string Title, string Text)? NotKept(Stopped how)
+    {
+        string least = Recorder.KeepAtLeastSeconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        return how switch
+        {
+            Stopped.TooShort => ("Recording not kept", $"It was under {least} seconds, so there was nothing to write down."),
+            Stopped.LeftAsItWas => ("Note left as it was", $"Under {least} seconds were recorded, so nothing was added to it."),
+            _ => null,
+        };
+    }
+
     /// <summary>Record, before there's a transcription model: download it (the button), or how far along it is.</summary>
     public static (string Title, string Text, string? Action) NoModelYet(DownloadProgress? downloading) => downloading is { } d
         ? ("Downloading the transcription model", $"{d.Amount}. Record works once it's here.", null)
