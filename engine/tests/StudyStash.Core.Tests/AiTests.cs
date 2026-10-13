@@ -144,6 +144,37 @@ public class AiTests
         public override IEnumerable<AiEvent> Parse(string line) => line.Trim().Length > 0 ? [new AiEvent("final", line.Trim())] : [];
     }
 
+    /// <summary>An engine that runs no command: it says what it's given, as events.</summary>
+    sealed class ScriptedAi(params AiEvent[] events) : AiProvider
+    {
+        public override string Id => "scripted";
+        public override string Name => "Scripted";
+        public override string Binary => "scripted";
+        public override string Site => "";
+        public override bool Available() => true;
+        public override List<string> Command(AiRequest req, bool stream) => ["scripted"];
+        public override IEnumerable<AiEvent> Parse(string line) => [];
+#pragma warning disable CS1998 // the events are all there already
+        public override async IAsyncEnumerable<AiEvent> RunAsync(AiRequest req, bool stream = true, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+#pragma warning restore CS1998
+        {
+            foreach (var e in events) yield return e;
+        }
+    }
+
+    [Fact]
+    public async Task An_engine_that_finishes_without_answering_has_failed_so_no_notes_are_saved_empty()
+    {
+        // Antigravity in print mode, when it refuses a tool it wanted: a successful end, and not a word.
+        var silent = await new ScriptedAi(new AiEvent("session", "c1"), new AiEvent("final", "  \n")).CompleteAsync(new AiRequest("Write notes.", "/lib"));
+        Assert.False(silent.Ok);
+        Assert.Equal("Scripted finished without answering.", silent.Text);
+
+        var answered = await new ScriptedAi(new AiEvent("text", "## Summary\n"), new AiEvent("final", "")).CompleteAsync(new AiRequest("Write notes.", "/lib"));
+        Assert.True(answered.Ok);
+        Assert.Equal("## Summary", answered.Text);
+    }
+
     [Fact]
     public async Task A_long_prompt_reaches_the_cli_whole_through_its_input_even_an_npm_style_cmd_on_windows()
     {
@@ -268,5 +299,13 @@ public class AiTests
         Assert.Contains("command(grep)", allow);
         Assert.False(GeminiProvider.AllowReading(path)); // already there
         Assert.False(GeminiProvider.AllowReading(dir["missing.json"]));
+
+        // The turn's own folders may be read too: in print mode a file it can't open ends the turn with nothing said.
+        Assert.True(GeminiProvider.AllowReading(path, ["/lib/scratch/", "/lib/pool", ""]));
+        allow = JsonNode.Parse(File.ReadAllText(path))!["permissions"]!["allow"]!.AsArray().Select(a => a!.GetValue<string>()).ToList();
+        Assert.Contains("read_file(/lib/scratch)", allow);
+        Assert.Contains("read_file(/lib/pool)", allow);
+        Assert.DoesNotContain(allow, a => a.StartsWith("read_file()", StringComparison.Ordinal));
+        Assert.False(GeminiProvider.AllowReading(path, ["/lib/pool"])); // already there
     }
 }
