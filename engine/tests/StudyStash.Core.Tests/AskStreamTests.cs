@@ -128,15 +128,14 @@ public class AskStreamTests
         using var dir = new TempDir();
         var cfg = Cfg(dir);
         using var store = new Store(cfg.DbPath, cfg.PoolDir);
-        // Three pieces, 1.2 s apart: the first words come well inside the 3 s, the whole answer after them. (At 0.4 s
-        // and 1 s, a slow CI machine once took over a second to its first words, and the answer went to Ollama.)
-        var claude = new ScriptedAi("claude") { Script = [.. Pieces.Select(p => new AiEvent("text", p))], Pause = TimeSpan.FromMilliseconds(1200) };
+        var claude = new ScriptedAi("claude") { Script = [.. Pieces.Select(p => new AiEvent("text", p))], Pause = TimeSpan.FromSeconds(1) };
         var ollama = new ScriptedAi("ollama") { Script = [new AiEvent("final", """{"answer":"From Ollama.","sources":[]}""")] };
         var ai = new AiJobs(cfg.Home)
         {
             Providers = id => id switch { "claude" => claude, "ollama" => ollama, _ => new ScriptedAi(id) },
             Checks = new FakeChecks().Installed("claude").Build(),
-            AskTimeout = TimeSpan.FromSeconds(3), // the whole answer takes longer; its first words don't
+            // The whole answer (3 s) takes longer; its first words (1 s) don't, with room for a slow test machine.
+            AskTimeout = TimeSpan.FromSeconds(2.5),
         };
         await using var site = await TestSite.StartAsync(b => LibraryWeb.Build(b, cfg, store, new Pipeline(cfg, store, log: _ => { }), Options(ai)));
         var remote = new AiRemote("http://localhost", "pw", site.Client);
