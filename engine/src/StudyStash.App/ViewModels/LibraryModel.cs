@@ -139,20 +139,31 @@ public sealed partial class NoteModel : ObservableObject
 
     /// <summary>It's being recorded now.</summary>
     public bool Live { get; init; }
-    public bool Saved => !Live;
+    public bool Saved => !Live && !Planned;
+    /// <summary>Opened for a calendar event that hasn't started: nothing is recorded yet, notes can be typed, and
+    /// recording starts on its own when the event does (or with Start now).</summary>
+    public bool Planned { get; init; }
+    /// <summary>The planned bar's words: "Starts at 10:30 AM. Recording starts on its own then."</summary>
+    public string PlanWords { get; init; } = "";
+    public Action? OnStartNow { get; init; }
+    [RelayCommand] void StartNow() => OnStartNow?.Invoke();
+    /// <summary>The student's own notes are typed here: while it records, or before, for a planned one.</summary>
+    public bool Typing => Live || Planned;
     /// <summary>The recording: its level, its time, Pause and Stop; what's been heard so far is its lines.</summary>
     public RecorderModel? Recorder { get; init; }
     /// <summary>What the student types while it records: their own notes, which the write-up is built round.</summary>
     [ObservableProperty] public partial string Typed { get; set; } = "";
     public Action<string>? OnTyped { get; set; }
     partial void OnTypedChanged(string value) => OnTyped?.Invoke(value);
-    public string TypedHint => $"Write as much or as little as you like. When you stop recording, {Writer} writes up the {Noun} around your notes.";
+    public string TypedHint => Planned ? $"Jot down anything before it starts. When the recording stops, {Writer} writes up the {Noun} around your notes."
+        : $"Write as much or as little as you like. When you stop recording, {Writer} writes up the {Noun} around your notes.";
     /// <summary>Who writes the notes when it stops, as the hint names them.</summary>
     public string Writer { get; init; } = "Claude";
     public string TranscriptTab => Live ? "Live transcript" : "Transcript";
     /// <summary>The transcript's lines: what's been heard so far while it records, the whole of it after.</summary>
     public ObservableCollection<HeardLine> Lines => Live && Recorder is not null ? Recorder.Lines : Transcript;
-    public string NoTranscriptText => Live ? Recorder?.Waiting ?? RecorderModel.LiveWaiting : $"This {Noun} has no transcript.";
+    public string NoTranscriptText => Live ? Recorder?.Waiting ?? RecorderModel.LiveWaiting
+        : Planned ? "Nothing yet: the transcript starts when recording does." : $"This {Noun} has no transcript.";
     public string RecordingWord => Recorder?.IsPaused == true ? "Paused" : "Recording";
     /// <summary>The bar's dot breathes while it records: not while paused, nor for someone who asked for less motion.</summary>
     public bool Pulses => Live && Recorder?.IsPaused != true && !Platform.Motion.Reduced;

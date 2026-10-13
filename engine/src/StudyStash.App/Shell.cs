@@ -1492,6 +1492,7 @@ public static partial class Shell
     static void Tick()
     {
         SaySettledProblems();
+        StartPlansOnTime();
         if (setup is not null && micCheck is not null) Setup.TickMic(setup, host, micCheck);
         var live = host.Recorder.Current;
         if (live is null) return;
@@ -1580,7 +1581,9 @@ public static partial class Shell
         // A recording this computer is still writing down or sending: its page follows where it is on its way (looked
         // at again when something about it changed, and not more than every few seconds).
         if (library.Note is { Local: true } waiting && library.ShowNotePage && DateTime.UtcNow - lastLocalLook > TimeSpan.FromSeconds(3)
-            && (host.Lectures.Get(waiting.Id) is not { } mine || LocalStamp(mine) != waiting.Stamp))
+            && (host.Lectures.Get(waiting.Id) is not { } mine
+                // A planned one changes as it's typed in: it's drawn again only once it starts recording (or goes).
+                || (waiting.Planned ? mine.State != LectureState.Planned : LocalStamp(mine) != waiting.Stamp)))
         {
             lastLocalLook = DateTime.UtcNow;
             RequestLibraryReload();
@@ -1671,7 +1674,7 @@ public static partial class Shell
     {
         // A lecture written down after class is recording: one still waiting for Whisper waits until it stops too.
         bool inClass = host.Recorder.Current is { AfterClass: true };
-        var items = host.Lectures.All().Where(l => l.Id != liveId).Take(4).Select(l =>
+        var items = host.Lectures.All().Where(l => l.Id != liveId && l.State != LectureState.Planned).Take(4).Select(l =>
         {
             int color = host.ColorOf(l.FiledClass.Length > 0 ? l.FiledClass : l.ClassName);
             return new LectureItem
