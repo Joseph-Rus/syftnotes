@@ -551,7 +551,8 @@ public static partial class Shell
     /// <summary>Opens the library at a note's page (search, a notification, an answer's source).</summary>
     static void OpenLecture(string id, bool transcript = false)
     {
-        Remember();
+        // The note that's already on the page isn't a place to go back to from itself.
+        if (Here() != new Place(Lecture: id)) Remember();
         LeavePage();
         openLecture = id;
         bool loaded = mainWindow?.IsVisible == true && host.Library == LibraryState.Connected && library.Classes.Count > 0;
@@ -883,8 +884,10 @@ public static partial class Shell
                 ShowLibrary();
                 break;
             case QuickKind.Source or QuickKind.Passage when row.LectureId is { } id && row.At is double at:
-                if (File.Exists(host.Lectures.AudioPath(id))) Play(id, at);
-                OpenLecture(id, transcript: row.Kind == QuickKind.Source);
+                // Said at a moment (an answer's source, or a passage found in a transcript): the note opens at its
+                // transcript there, the line marked. The note already on the page only needs its window brought up.
+                if (id == openLecture) ShowLibrary();
+                PlaySource(id, at);
                 break;
             case QuickKind.Lecture or QuickKind.Passage or QuickKind.Source when row.LectureId is { } id:
                 OpenLecture(id);
