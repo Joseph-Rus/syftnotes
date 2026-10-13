@@ -43,17 +43,28 @@ public sealed partial class StepItem : ObservableObject
     public bool Optional { get; init; }
     [ObservableProperty] public partial bool Done { get; set; }
     [ObservableProperty] public partial bool Current { get; set; }
+    /// <summary>An optional step passed without doing it (Canvas, left unconnected): it keeps its number and says
+    /// "Skipped", where a step that was done gets the check.</summary>
+    [ObservableProperty] public partial bool Skipped { get; set; }
 
     public bool Todo => !Done && !Current;
-    public bool ShowNumber => !Done;
-    /// <summary>"Optional" until the step's been passed (then its check says enough).</summary>
+    public bool ShowCheck => Done && !Skipped;
+    public bool ShowNumber => !ShowCheck;
+    /// <summary>"Optional" until the step's been passed (then its check, or "Skipped", says enough).</summary>
     public bool ShowOptional => Optional && !Done;
+    public bool ShowSkipped => Done && Skipped;
 
-    partial void OnDoneChanged(bool value)
+    partial void OnDoneChanged(bool value) => NotifyShown();
+
+    partial void OnSkippedChanged(bool value) => NotifyShown();
+
+    void NotifyShown()
     {
         OnPropertyChanged(nameof(Todo));
+        OnPropertyChanged(nameof(ShowCheck));
         OnPropertyChanged(nameof(ShowNumber));
         OnPropertyChanged(nameof(ShowOptional));
+        OnPropertyChanged(nameof(ShowSkipped));
     }
 
     partial void OnCurrentChanged(bool value) => OnPropertyChanged(nameof(Todo));
@@ -434,6 +445,14 @@ public sealed partial class SetupModel : ObservableObject
             Steps[i].Current = i == at;
             Steps[i].Done = at >= 0 && i < at;
         }
+        MarkSkipped();
+    }
+
+    /// <summary>Canvas passed with no browser connected ("Skip for now", or Continue past it) reads as skipped, not as
+    /// done.</summary>
+    void MarkSkipped()
+    {
+        foreach (var s in Steps) s.Skipped = s.Step == SetupStep.Canvas && s.Done && Canvas?.BrowserConnected != true;
     }
 
     void NotifyStepDerived()
@@ -474,12 +493,14 @@ public sealed partial class SetupModel : ObservableObject
         if (newValue is not null) newValue.PropertyChanged += OnCanvasPropertyChanged;
         if (newValue is { Found.Count: > 0 }) TakeCourses(newValue.Found);
         OnPropertyChanged(nameof(CanContinue));
+        MarkSkipped();
     }
 
     void OnCanvasPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(CanvasConnectModel.CanFinish)) OnPropertyChanged(nameof(CanContinue));
         if (e.PropertyName == nameof(CanvasConnectModel.Found) && sender is CanvasConnectModel c) TakeCourses(c.Found);
+        if (e.PropertyName == nameof(CanvasConnectModel.BrowserConnected)) MarkSkipped();
     }
 
     partial void OnAddingCoursesChanged(bool value) => OnPropertyChanged(nameof(CanContinue));

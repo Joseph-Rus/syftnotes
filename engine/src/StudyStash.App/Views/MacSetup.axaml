@@ -273,12 +273,13 @@
                 <DataTemplate x:DataType="vm:StepItem">
                   <Border Classes="step" Classes.current="{Binding Current}" Classes.todo="{Binding Todo}">
                     <Grid ColumnDefinitions="Auto,10,*,Auto">
-                      <c:Icon IsVisible="{Binding Done}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource AccentText}" />
+                      <c:Icon IsVisible="{Binding ShowCheck}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource AccentText}" />
                       <Border IsVisible="{Binding ShowNumber}" Classes="num" Width="16" Height="16" Margin="1,0" CornerRadius="8" BorderThickness="1.5">
                         <TextBlock Text="{Binding Number}" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
                       </Border>
                       <TextBlock Grid.Column="2" Classes="title" Text="{Binding Title}" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="3" Text="Optional" IsVisible="{Binding ShowOptional}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Text="Skipped" IsVisible="{Binding ShowSkipped}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                     </Grid>
                   </Border>
                 </DataTemplate>
