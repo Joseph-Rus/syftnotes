@@ -105,8 +105,19 @@ public static class Setup
         m.OnConnect = () => ConnectAsync(m, host, here);
         m.OnFind = () => FindAsync(m, host);
         m.OnAddClass = () => AddClassAsync(m, host);
-        // Leaving Classes adds the Canvas courses that are ticked (and links them).
-        m.LeaveAsync = step => step == SetupStep.Classes ? AddCoursesAsync(m, host) : Task.FromResult(true);
+        // Leaving Classes adds the class still typed in its fields, as Add would (a class typed and never added was
+        // dropped without a word), then the Canvas courses that are ticked (and links them). A class the library
+        // won't take keeps the step open, saying why.
+        m.LeaveAsync = async step =>
+        {
+            if (step != SetupStep.Classes) return true;
+            if (m.NewClass.Trim().Length > 0 || m.NewAbout.Trim().Length > 0)
+            {
+                await AddClassAsync(m, host);
+                if (m.HasClassProblem) return false;
+            }
+            return await AddCoursesAsync(m, host);
+        };
         m.CanLeave = step =>
         {
             if ((step is SetupStep.Password or SetupStep.Library || step == SetupStep.Welcome && m.IsOneComputer) && !m.LibraryOk)
@@ -443,11 +454,16 @@ public static class Setup
         }
     }
 
-    /// <summary>Classes' Add: the class goes into the library at once, with what it covers when typed.</summary>
+    /// <summary>Classes' Add (and Continue, with a class still in the fields): the class goes into the library at
+    /// once, with what it covers when typed. What it covers typed without a name is asked for its name, not dropped.</summary>
     static async Task AddClassAsync(SetupModel m, AppHost host)
     {
         string name = m.NewClass.Trim(), about = m.NewAbout.Trim();
-        if (name.Length == 0) return;
+        if (name.Length == 0)
+        {
+            m.ClassProblem = about.Length > 0 ? "Give the class a name too, like CS 101." : null;
+            return;
+        }
         if (host.Remote() is not { } lib)
         {
             m.ClassProblem = "Connect to your library first: the classes are its.";

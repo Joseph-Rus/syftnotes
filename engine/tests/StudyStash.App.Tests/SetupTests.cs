@@ -585,6 +585,34 @@ public sealed class SetupTests
         Assert.DoesNotContain(m.Classes, c => c.Name == "Unsorted");
     }
 
+    [Fact]
+    public async Task Continue_on_Classes_adds_the_class_still_typed_and_stays_when_it_cant_be_added()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        using var home = new TempHome();
+        using var host = Host(home);
+        var cc = host.Client();
+        cc.ServerUrl = rig.Url;
+        cc.PoolKey = LibraryRig.Password;
+        Configs.SaveClient(cc);
+        await host.CheckLibraryAsync();
+        var m = Setup.Make(host, AppRole.Laptop);
+        m.Go(SetupStep.Classes);
+
+        // What it covers with no name: asked for the name, nothing dropped.
+        m.NewAbout = "Limits, derivatives and integrals";
+        await m.NextCommand.ExecuteAsync(null);
+        Assert.Equal(SetupStep.Classes, m.Step);
+        Assert.Equal("Give the class a name too, like CS 101.", m.ClassProblem);
+
+        // Typed and never Added: Continue adds it, as Add would, and goes on.
+        m.NewClass = "MATH 221";
+        await m.NextCommand.ExecuteAsync(null);
+        Assert.NotEqual(SetupStep.Classes, m.Step);
+        Assert.Equal("Limits, derivatives and integrals", Configs.Load(rig.Home).Classes.Single(c => c.Name == "MATH 221").Description);
+        Assert.Equal(("", ""), (m.NewClass, m.NewAbout));
+    }
+
     // ---- Classes from Canvas courses ----
 
     static CanvasConnectModel FoundCourses(FakeLibrary? handler = null)
