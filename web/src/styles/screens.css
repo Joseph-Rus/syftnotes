@@ -317,9 +317,14 @@
 /* --- an iPad: two columns, no bottom tab bar ------------------------------------------------------------------ */
 
 @media (min-width: 700px) {
+  /* The screen gets the room that's left beside the sidebar and no more, across and down. A track left to size
+     itself is never smaller than what's in it: across, the widest thing in a lecture (a table, a long title) pushed
+     the screen's right side off an iPad held upright; down, the screen grew as tall as its notes, so nothing was left
+     to scroll and only the first screenful could be read. */
   .app-shell {
     display: grid;
-    grid-template-columns: 260px 1fr;
+    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     height: 100%;
   }
   .tabbar {
