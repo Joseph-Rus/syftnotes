@@ -251,7 +251,8 @@ public sealed partial class SetupModel : ObservableObject
     public ObservableCollection<ModelChoice> Models { get; } = [];
     /// <summary>The one downloading: shown as a card with Change, which opens the list.</summary>
     [ObservableProperty] public partial ModelChoice? ChosenModel { get; set; }
-    /// <summary>The list is open (Change was pressed): the card and the download make way for it.</summary>
+    /// <summary>The list is open (Change was pressed): the card and the download make way for it, until a model is
+    /// picked, Cancel is pressed or the step is left.</summary>
     [ObservableProperty] public partial bool ChoosingModel { get; set; }
     public bool ShowModelCard => ChosenModel is not null && !ChoosingModel;
     public bool ShowModelDownload => !ChoosingModel;
@@ -437,6 +438,8 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnStepChanged(SetupStep value)
     {
+        // The list of models doesn't stay open behind Back or Continue.
+        if (value != SetupStep.Model) ChoosingModel = false;
         NotifyStepDerived();
         OnEnter?.Invoke(value);
     }
@@ -619,7 +622,8 @@ public sealed partial class SetupModel : ObservableObject
     }
     [RelayCommand] void RetryModel() => OnRetryModel?.Invoke();
 
-    [RelayCommand] void ChangeModel() => ChoosingModel = true;
+    /// <summary>The card's Change opens the list of models; the list's own Cancel shuts it again, the model as it was.</summary>
+    [RelayCommand] void ChangeModel() => ChoosingModel = !ChoosingModel;
 
     [RelayCommand]
     void PickModel(ModelChoice choice)

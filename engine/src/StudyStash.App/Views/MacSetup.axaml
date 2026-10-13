@@ -476,7 +476,11 @@
                   </StackPanel>
                 </Grid>
               </Button>
-              <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding ChoosingModel}" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
+              <!-- The list shuts again without a pick: the model stays the one it was. -->
+              <Button Classes="link" IsVisible="{Binding ChoosingModel}" Command="{Binding ChangeModelCommand}" HorizontalAlignment="Right" Margin="0,14,0,0">
+                <TextBlock Text="Cancel" />
+              </Button>
+              <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding ChoosingModel}" Margin="0,6,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
