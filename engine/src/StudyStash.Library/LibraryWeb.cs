@@ -158,9 +158,12 @@ public sealed partial class LibraryWeb
     }
 
     /// <summary>Only same-site paths. Browsers read "\" as "/" and drop tabs and newlines, so "/\evil.com" or
-    /// "/\t/evil.com" would otherwise leave the site.</summary>
+    /// "/\t/evil.com" would otherwise leave the site. A page of the library is safe to go back to whatever its
+    /// address holds: a class's name has spaces ("MATH 221") and letters of any alphabet, which come back written the
+    /// way an address carries them (%20), so the redirect is one every browser and web server takes.</summary>
     public static string SafeNext(string next) =>
-        !next.StartsWith('/') || next.StartsWith("//", StringComparison.Ordinal) || next.Any(ch => ch == '\\' || ch <= ' ') ? "/" : next;
+        !next.StartsWith('/') || next.StartsWith("//", StringComparison.Ordinal) || next.Any(ch => ch == '\\' || char.IsControl(ch))
+            ? "/" : Ui.Quote(next, "/?#[]@!$&'()*+,;=:%");
 
     /// <summary>The key login cookies are signed with, kept in web_secret so logins survive restarts, updates, and a
     /// switch between engines.</summary>
@@ -207,13 +210,15 @@ public sealed partial class LibraryWeb
         return null;
     }
 
-    /// <summary>The role, or the redirect to the login page (one person, one password: members are admins).</summary>
+    /// <summary>The role, or the redirect to the login page (one person, one password: members are admins). Where to
+    /// come back to is the address as it was asked for, still encoded: put back together from the decoded path, a
+    /// class called "C#" or "Why?" would come back as another page.</summary>
     (string? Role, IResult? Login) Member(HttpContext ctx)
     {
         string? role = RoleOf(ctx);
         if (role is not null) return (role, null);
         string query = ctx.Request.QueryString.HasValue ? ctx.Request.QueryString.Value! : "";
-        return (null, Http.SeeOther("/login?next=" + Ui.Quote(ctx.Request.Path.Value + query, "")));
+        return (null, Http.SeeOther("/login?next=" + Ui.Quote(ctx.Request.Path.ToUriComponent() + query, "")));
     }
 
     /// <summary>The laptop's key: Authorization: Bearer &lt;password&gt;. Null when it may come in.</summary>

@@ -345,6 +345,35 @@ public class LibraryWebTests
             Assert.Equal("/", LibraryWeb.SafeNext(bad));
         foreach (var c in (JsonArray)Golden.Library("safe_next")!)
             Assert.Equal(c![1].S(), LibraryWeb.SafeNext(c[0].S()));
+        // A class's page is a place to come back to whatever its name holds, written the way an address carries it.
+        Assert.Equal("/class/MATH%20221", LibraryWeb.SafeNext("/class/MATH 221"));
+        Assert.Equal("/class/MATH%20221?said=1#top", LibraryWeb.SafeNext("/class/MATH%20221?said=1#top"));
+        Assert.Equal("/class/Espa%C3%B1ol%20(honors)", LibraryWeb.SafeNext("/class/Español (honors)"));
+        foreach (string bad in new[] { "/\u007f/evil.com", "/\u0085/evil.com", "/ok\r\nSet-Cookie: x=1", "http://evil.com", "http:evil.com", "/ \\evil.com", " //evil.com" })
+            Assert.Equal("/", LibraryWeb.SafeNext(bad));
+    }
+
+    [Fact]
+    public async Task Signing_in_goes_back_to_a_class_whose_name_has_a_space()
+    {
+        using var dir = new TempDir();
+        var cfg = MakeCfg(dir, "pw");
+        cfg.Classes.Add(new ClassDef("C# Lab"));
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        await using var c = await Site(cfg, store);
+        foreach (var (asked, back) in new[] { ("/class/Bio%20110", "/class/Bio%20110"), ("/class/C%23%20Lab?said=hi%20there", "/class/C%23%20Lab?said=hi%20there") })
+        {
+            c.ClearCookies();
+            var away = await c.Get(asked);
+            Assert.Equal(HttpStatusCode.SeeOther, away.StatusCode);
+            string next = System.Web.HttpUtility.ParseQueryString(new Uri(new Uri("http://localhost"), away.Headers.Location!.OriginalString).Query)["next"]!;
+            var r = await c.PostForm("/login", ("password", "pw"), ("next", next));
+            Assert.Equal(back, r.Headers.Location!.OriginalString);
+            Assert.Equal(HttpStatusCode.OK, (await c.Get(back)).StatusCode);
+        }
+        // A sign-in page kept from before, with the space as it was: the class still, not the home page.
+        Assert.Equal("/class/Bio%20110", (await c.PostForm("/login", ("password", "pw"), ("next", "/class/Bio 110"))).Headers.Location!.OriginalString);
+        Assert.Equal("/", (await c.PostForm("/login", ("password", "pw"), ("next", "//example.com"))).Headers.Location!.OriginalString);
     }
 
     [Fact]
