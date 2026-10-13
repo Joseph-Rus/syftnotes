@@ -399,4 +399,62 @@ public class MenuPickTests
             w.Close();
         }
     }
+
+    /// <summary>A row in one of the app's own menus (a flyout of buttons) that reads <paramref name="text"/>.</summary>
+    static Button Row(Control menu, string text) =>
+        menu.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Text == text && t.IsEffectivelyVisible)
+            .Select(t => t.GetVisualAncestors().OfType<Button>().First()).FirstOrDefault()
+        ?? throw new InvalidOperationException($"no \"{text}\" in the menu");
+
+    /// <summary>Due's calendar: its class menu shows the class you click, and closes.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void The_calendars_class_menu_picks_the_class_you_click(SkinKind skin)
+    {
+        var page = OverviewModel.ForDue(OverviewTests.Sources());
+        var cal = page.Calendar!;
+        var view = new DueCalendar { DataContext = cal };
+        var w = Host(view, skin);
+        try
+        {
+            var filter = view.FindControl<Button>("Filter")!;
+            Click(Row(OpenFlyout(filter), "BIO 110"));
+            Assert.Equal("BIO 110", cal.Class);
+            Assert.False(filter.Flyout!.IsOpen);
+            Click(Row(OpenFlyout(filter), "All classes"));
+            Assert.Null(cal.Class);
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
+    /// <summary>Home's notes menu: Unsorted shows only those, a folder opens its page.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void Homes_notes_menu_picks_what_you_click(SkinKind skin)
+    {
+        var opened = new List<string>();
+        var home = OverviewModel.Home(OverviewTests.Sources(opened));
+        bool? unsorted = null;
+        home.OnFilter = u => unsorted = u;
+        var view = new Overview { DataContext = home };
+        var w = Host(view, skin);
+        try
+        {
+            var filter = view.GetVisualDescendants().OfType<Button>().First(b => b.Flyout is Flyout && b.IsEffectivelyVisible
+                && b.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Text == "All notes"));
+            Click(Row(OpenFlyout(filter), "Unsorted"));
+            Assert.True(unsorted);
+            Click(Row(OpenFlyout(filter), "CS 101"));
+            Assert.Contains(opened, o => o.Contains("CS 101"));
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
 }

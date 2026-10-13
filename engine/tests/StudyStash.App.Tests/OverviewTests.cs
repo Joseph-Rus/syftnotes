@@ -34,7 +34,7 @@ public class OverviewTests
     static OverviewModel.Event Event(string id, string title, string? cls, double inHours, double hours = 1) =>
         new(id, title, Now.AddHours(inHours), Now.AddHours(inHours + hours), cls);
 
-    static OverviewModel.Sources Sources(List<string>? opened = null, bool canvas = true, bool calendars = true, CanvasApi.Item[]? week = null) => new()
+    internal static OverviewModel.Sources Sources(List<string>? opened = null, bool canvas = true, bool calendars = true, CanvasApi.Item[]? week = null) => new()
     {
         Now = Now, Zone = Zone,
         Classes = [("CS 101", Skin.ClassDot(0), 3), ("BIO 110", Skin.ClassDot(1), 1), ("Chess club", Skin.ClassDot(2), 2)],
