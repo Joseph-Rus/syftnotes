@@ -572,6 +572,7 @@ public static partial class Shell
         var l = host.StopRecording(out var how);
         chosenClass = "";
         recorderWindow?.Hide();
+        UpdateDock();
         // Stopped before there was enough to keep: nothing is saved (or, for a note picked up again, added), and it says so.
         if (NoticeWords.NotKept(how) is var (title, text)) Toast(title, text, null, null);
         else if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
@@ -1484,16 +1485,30 @@ public static partial class Shell
     }
 
     /// <summary>A Mac shows the app in the Dock (and ⌘Tab) while the library, setup or Settings is open, and keeps it
-    /// to the menu bar otherwise.</summary>
-    static void UpdateDock() =>
-        Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
-            || canvasConnectWindow?.IsVisible == true || browserChoiceWindow?.IsVisible == true));
+    /// to the menu bar otherwise. While the small recorder floats over another app it keeps to the menu bar too: macOS
+    /// lets only a menu-bar app's window float over another app's full-screen Space, so with the Dock icon the pill
+    /// vanished behind a full-screen app. Coming back to the library window brings the Dock icon back.</summary>
+    static void UpdateDock()
+    {
+        bool open = mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
+            || canvasConnectWindow?.IsVisible == true || browserChoiceWindow?.IsVisible == true;
+        bool pillAway = recorderWindow?.IsVisible == true && mainWindow?.IsActive != true && setupWindow?.IsActive != true && settingsWindow?.IsActive != true;
+        bool dock = !quitting && open && !pillAway;
+        if (dock == inDock) return;
+        inDock = dock;
+        Desktop.ShowInDock(dock);
+        // Now a menu-bar app: the pill is put in front again, on whichever Space is showing (a full-screen app's too).
+        if (!dock && pillAway) Dispatcher.UIThread.Post(() => recorderWindow?.OrderFront(), DispatcherPriority.Background);
+    }
+
+    static bool? inDock;
 
     // --- keeping it all up to date ------------------------------------------------------------------------------------
 
     static void Tick()
     {
         SaySettledProblems();
+        StartPlansOnTime();
         if (setup is not null && micCheck is not null) Setup.TickMic(setup, host, micCheck);
         var live = host.Recorder.Current;
         if (live is null) return;
@@ -1582,7 +1597,9 @@ public static partial class Shell
         // A recording this computer is still writing down or sending: its page follows where it is on its way (looked
         // at again when something about it changed, and not more than every few seconds).
         if (library.Note is { Local: true } waiting && library.ShowNotePage && DateTime.UtcNow - lastLocalLook > TimeSpan.FromSeconds(3)
-            && (host.Lectures.Get(waiting.Id) is not { } mine || LocalStamp(mine) != waiting.Stamp))
+            && (host.Lectures.Get(waiting.Id) is not { } mine
+                // A planned one changes as it's typed in: it's drawn again only once it starts recording (or goes).
+                || (waiting.Planned ? mine.State != LectureState.Planned : LocalStamp(mine) != waiting.Stamp)))
         {
             lastLocalLook = DateTime.UtcNow;
             RequestLibraryReload();
@@ -1673,7 +1690,7 @@ public static partial class Shell
     {
         // A lecture written down after class is recording: one still waiting for Whisper waits until it stops too.
         bool inClass = host.Recorder.Current is { AfterClass: true };
-        var items = host.Lectures.All().Where(l => l.Id != liveId).Take(4).Select(l =>
+        var items = host.Lectures.All().Where(l => l.Id != liveId && l.State != LectureState.Planned).Take(4).Select(l =>
         {
             int color = host.ColorOf(l.FiledClass.Length > 0 ? l.FiledClass : l.ClassName);
             return new LectureItem

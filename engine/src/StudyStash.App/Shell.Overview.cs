@@ -470,7 +470,7 @@ public static partial class Shell
         foreach (var l in host.Lectures.All())
         {
             if (LocalStatus(l) is not { } status) continue;
-            string title = l.TitleTyped && l.Title.Length > 0 ? l.Title : l.FiledTitle.Length > 0 ? l.FiledTitle : "New note";
+            string title = (l.TitleTyped || l.State == LectureState.Planned) && l.Title.Length > 0 ? l.Title : l.FiledTitle.Length > 0 ? l.FiledTitle : "New note";
             yield return new OverviewModel.LectureFacts(l.Id, title, l.ClassName, l.StartedAt, l.Seconds > 0 ? l.Seconds : null, "", false, l.Started, status);
         }
     }
@@ -484,6 +484,8 @@ public static partial class Shell
         LectureState.Sending => host.Library == LibraryState.Connected ? "On its way to your library" : "Waiting for your library",
         LectureState.Writing => WillHaveNotes(l) == false ? "Being filed" : "Writing notes…",
         LectureState.Failed => l.Error.Length > 0 ? l.Error : "Something went wrong",
+        LectureState.Planned => AppHost.PlanStarts(l) is { } at && at > DateTimeOffset.Now
+            ? $"Records at {at.ToLocalTime().ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture)}" : "Not recorded",
         _ => null,
     };
 

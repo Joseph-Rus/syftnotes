@@ -20,6 +20,9 @@ public enum LectureState
     Writing,
     Filed,
     Failed,
+    /// <summary>Not recorded yet: a note opened for a calendar event before it starts. What's typed in it is kept, and
+    /// recording starts into it when the event does (or when the student starts it sooner).</summary>
+    Planned,
 }
 
 /// <summary>
@@ -34,7 +37,7 @@ public sealed class Lecture
     public string ClassName { get; set; } = "";
     public string Title { get; set; } = "";
     /// <summary>When recording started, with the laptop's UTC offset: "2026-09-23T10:02:12-07:00".</summary>
-    public required string Started { get; init; }
+    public required string Started { get; set; }
     public double Seconds { get; set; }
     public LectureState State { get; set; } = LectureState.Recording;
     /// <summary>How far into the audio Whisper has got.</summary>

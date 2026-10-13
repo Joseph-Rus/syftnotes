@@ -234,7 +234,8 @@ public static partial class Shell
         if (l is null)
         {
             // Not in the library (yet): one recorded here that's still being written down or sent shows what it has.
-            if (host.Lectures.Get(id) is { } local) ShowLocalLecture(local, transcript);
+            if (host.Lectures.Get(id) is { State: LectureState.Planned } plan) ShowPlannedPage(plan);
+            else if (host.Lectures.Get(id) is { } local) ShowLocalLecture(local, transcript);
             else if (reached && !showing) await ShowHomeAsync(); // it's gone (deleted on another computer): nothing to open
             return;
         }
@@ -330,7 +331,7 @@ public static partial class Shell
     /// <summary>Keep recording, for a note this computer recorded (it keeps the transcript to add to); null for one
     /// recorded elsewhere, on the computer that only keeps the library, or the one recording now.</summary>
     static Action? ContinueFor(string id) =>
-        host.Settings.Role != AppRole.Library && host.Lectures.Get(id) is { State: not (LectureState.Recording or LectureState.Paused) }
+        host.Settings.Role != AppRole.Library && host.Lectures.Get(id) is { State: not (LectureState.Recording or LectureState.Paused or LectureState.Planned) }
             ? () => ContinueRecording(id) : null;
 
     /// <summary>Whether a recording this computer made will have notes written, as far as it can be told yet

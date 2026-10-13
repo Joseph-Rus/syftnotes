@@ -265,6 +265,8 @@ public sealed class Recorder : IDisposable
                 if (!keepSound && File.Exists(audio)) File.Move(audio, audio + ".before", overwrite: true);
                 Save(id, x =>
                 {
+                    // A planned note starts now, whenever it was planned for.
+                    if (x.State == LectureState.Planned) x.Started = clock().ToString("yyyy-MM-dd'T'HH:mm:sszzz", System.Globalization.CultureInfo.InvariantCulture);
                     x.Seconds = keepSound ? x.Seconds : end;
                     if (!keepSound) x.TranscribedSeconds = end;
                     x.AudioStart = start;
