@@ -84,6 +84,11 @@ img, video { max-width: 100%; height: auto; display: block; }
 a { color: var(--accent-ink); text-decoration-thickness: 1.5px; text-underline-offset: 0.18em; }
 a:hover { text-decoration-thickness: 2.5px; }
 :focus-visible { outline: 3px solid var(--accent-fill); outline-offset: 3px; border-radius: 6px; }
+/* On a band of colour the ring is the band's own ink (black on the light ones, cream on the dark): the indigo one is
+   lost on the indigo band and weak on the dark ones. The download cards are paper, so theirs stays as it is. */
+.reel :focus-visible { outline-color: var(--fg); }
+.night :focus-visible, .finale :focus-visible { outline-color: var(--cream); }
+.finale .dl :focus-visible { outline-color: var(--accent-fill); }
 ::selection { background: var(--mark); color: inherit; }
 
 h1, h2, h3 { font-family: var(--font); font-weight: 800; letter-spacing: -0.03em; line-height: 1.02; margin: 0; text-wrap: balance; }
@@ -93,6 +98,7 @@ h3 { font-size: 1.35rem; letter-spacing: -0.02em; line-height: 1.15; font-weight
 p { margin: 0 0 1em; text-wrap: pretty; }
 strong { font-weight: 700; }
 kbd { font: 600 0.85em/1 var(--mono); padding: 0.18em 0.42em; border: 1.5px solid currentColor; border-radius: 6px; white-space: nowrap; opacity: 0.9; }
+.reel-brick kbd { opacity: 1; } /* at 0.9 the keys on the brick band are under 4.5:1 */
 code { font: 0.9em var(--mono); background: var(--paper-2); padding: 0.1em 0.35em; border-radius: 5px; }
 
 /* A highlighter, in the film's butter yellow (the other pages use it in their headings). */
@@ -254,7 +260,7 @@ section { padding: clamp(4rem, 9vw, 7rem) 0; }
 .finale .section-head h2 { font-size: clamp(2.6rem, 1.2rem + 5.4vw, 5.2rem); letter-spacing: -0.045em; line-height: 0.95; }
 .finale .section-head p { color: rgb(247 241 226 / 0.88); }
 .finale > .wrap > .fine { color: rgb(247 241 226 / 0.8); }
-.finale code { background: rgb(255 255 255 / 0.16); color: inherit; }
+.finale code { background: rgb(255 255 255 / 0.12); color: var(--cream); }
 .finale .fine a { color: inherit; }
 .download { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.25rem; }
 .dl { background: var(--card); color: var(--ink); border: 2px solid transparent; border-radius: var(--radius); padding: clamp(1.4rem, 3vw, 2rem); display: flex; flex-direction: column; gap: 1rem; box-shadow: 0 24px 50px -18px rgb(0 0 0 / 0.5); }
@@ -296,6 +302,7 @@ section { padding: clamp(4rem, 9vw, 7rem) 0; }
 .steps > li::after { content: ""; position: absolute; left: 1.1rem; top: 2.4rem; bottom: 0.3rem; width: 1.5px; background: var(--rule); }
 .steps > li:last-child::after { display: none; }
 .steps h3 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+.steps code { overflow-wrap: anywhere; } /* the library's long address wraps on a narrow phone */
 .platforms { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0 0; }
 .platforms > div { background: var(--card); border: 1.5px solid var(--rule); border-radius: 14px; padding: 1rem 1.1rem; }
 .platforms h4 { margin: 0 0 0.5rem; font: 750 1rem/1.3 var(--font); color: var(--ink); display: flex; align-items: center; gap: 0.45rem; }
