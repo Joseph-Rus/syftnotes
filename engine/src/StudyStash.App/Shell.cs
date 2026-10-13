@@ -129,6 +129,8 @@ public static partial class Shell
         if (OperatingSystem.IsMacOS()) AppMenu.Use(app, AppMenu.ShowAbout, SettingsFromAnywhere);
         ApplyShortcutsSetting(force: true);
         ticker = new DispatcherTimer(TimeSpan.FromMilliseconds(250), DispatcherPriority.Background, (_, _) => Tick());
+        // The waveforms read the newest levels themselves, more often than the tick, while one is on screen.
+        Controls.Waveform.Live = () => host.Recorder.Current is null ? null : host.Recorder.Levels();
         ticker.Start();
         Refresh();
         SayIfUpdated();

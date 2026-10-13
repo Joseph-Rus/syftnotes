@@ -14,14 +14,20 @@ public sealed class Spinner : Control
     public static readonly StyledProperty<IBrush?> ForegroundProperty = TextBlock.ForegroundProperty.AddOwner<Spinner>();
     public static readonly StyledProperty<double> ThicknessProperty = AvaloniaProperty.Register<Spinner, double>(nameof(Thickness), 2);
 
-    readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(33) };
+    /// <summary>Once round a second, whenever the frames come: the angle is the time's, so a busy moment that makes a
+    /// frame late never slows it down (it used to turn a fixed step a frame, and crawled whenever the app was busy).</summary>
+    const double TurnsPerSecond = 1;
+
+    readonly DispatcherTimer timer = new(DispatcherPriority.Normal) { Interval = TimeSpan.FromMilliseconds(33) };
+    readonly long began = System.Diagnostics.Stopwatch.GetTimestamp();
     double angle;
 
     public Spinner()
     {
         timer.Tick += (_, _) =>
         {
-            angle = (angle + 12) % 360;
+            double seconds = (System.Diagnostics.Stopwatch.GetTimestamp() - began) / (double)System.Diagnostics.Stopwatch.Frequency;
+            angle = seconds * TurnsPerSecond * 360 % 360;
             InvalidateVisual();
         };
         _ = new Seen(this, Sync);

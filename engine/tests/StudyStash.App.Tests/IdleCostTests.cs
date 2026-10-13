@@ -57,6 +57,20 @@ public class IdleCostTests
     }
 
     [AvaloniaFact]
+    public void A_waveform_follows_the_recording_only_while_it_can_be_seen()
+    {
+        var wave = new StudyStash.App.Controls.Waveform { Bars = 5, Height = 16 };
+        var row = new StackPanel { Children = { wave }, IsVisible = false };
+        var w = Show(row);
+        Assert.False(wave.Following); // the recorder's pill, put away
+        row.IsVisible = true;
+        Assert.True(wave.Following);
+        w.Hide(); // the library window closed to the menu bar
+        Assert.False(wave.Following);
+        w.Close();
+    }
+
+    [AvaloniaFact]
     public void A_spinner_in_a_window_that_closes_stops_for_good()
     {
         // A window that closes is hidden first and taken apart after, and a spinner taken apart counted as seen again:
