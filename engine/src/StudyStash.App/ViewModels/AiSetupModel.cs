@@ -108,6 +108,16 @@ public sealed partial class AiSetupModel : ObservableObject
     /// that can't, which then doesn't offer "No AI for now".</summary>
     public Func<bool, Task<bool>>? WriteNotes { get; init; }
     public bool OffersNoAi => WriteNotes is not null;
+    /// <summary>Whether the library writes notes now: false once "No AI for now" was chosen, and the list then opens on
+    /// it again. Null (the host can't ask, or the library didn't say) leaves the engines to decide.</summary>
+    public Func<Task<bool?>>? NotesOn { get; init; }
+    /// <summary>Setup run again on a computer that's set up: the library's engine was chosen before, so it stays
+    /// picked even while it isn't ready (its download stopped, say).</summary>
+    public bool ChosenBefore { get; init; }
+    /// <summary>"I don't have a paid plan" was the answer on setup's first screen: the free AI is the pick when it's
+    /// on this computer already, its model too.</summary>
+    public bool PreferFree { get; init; }
+    bool? notesOn;
 
     [ObservableProperty] public partial string SelectedNotes { get; set; } = "ollama";
     [ObservableProperty] public partial string SelectedAsk { get; set; } = SameAsNotes;
@@ -140,6 +150,7 @@ public sealed partial class AiSetupModel : ObservableObject
         try
         {
             overview = await library.EnginesAsync();
+            if (!picked && NotesOn is not null) notesOn = await NotesOn();
         }
         catch
         {
@@ -155,11 +166,21 @@ public sealed partial class AiSetupModel : ObservableObject
     /// that's installed and not known to be signed out.</summary>
     static bool CanWrite(EngineInfo e) => e.Installed && (e.Id == "ollama" || e.State is not ("not_signed_in" or "not_installed"));
 
-    /// <summary>The first time: the library's own pick when it can write notes, else the first engine that's ready,
-    /// else no AI for now (where offered).</summary>
+    /// <summary>It writes notes as it is, with nothing more to press: the free AI only once its model is here too.</summary>
+    static bool WritesNow(EngineInfo e) => CanWrite(e) && (e.Id != "ollama" || e.State == "ready");
+
+    /// <summary>Where the list opens, once (coming back to the step keeps what was picked on it): on what the library
+    /// does now. Notes switched off ("No AI for now", chosen before) is that choice again. The library's own engine is
+    /// the pick when it writes notes as it is, or when it was chosen before (setup run again, or the free AI being got
+    /// ready this minute). Otherwise nothing has been chosen yet: the first engine that's ready, else no AI for now
+    /// (where offered), so nothing is left picked that would switch notes on with an AI that can't write them.</summary>
     string FirstPick(AiOverview overview)
     {
-        if (overview.Engines.FirstOrDefault(e => e.Id == overview.Notes) is { } notes && CanWrite(notes)) return notes.Id;
+        if (notesOn == false && OffersNoAi) return None;
+        if (PreferFree && !ChosenBefore && overview.Engines.Any(e => e.Id == "ollama" && WritesNow(e))) return "ollama";
+        if (overview.Engines.FirstOrDefault(e => e.Id == overview.Notes) is { } notes
+            && (WritesNow(notes) || CanWrite(notes) && (ChosenBefore || overview.Pulling is not null)))
+            return notes.Id;
         if (overview.Engines.FirstOrDefault(e => e.State == "ready" && CanWrite(e)) is { } ready) return ready.Id;
         return OffersNoAi ? None : overview.Notes;
     }

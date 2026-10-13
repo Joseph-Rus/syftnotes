@@ -629,6 +629,32 @@ public class AiSetupModelTests
     }
 
     [AvaloniaFact]
+    public async Task The_notes_step_opens_on_what_the_library_does_now_and_a_first_run_picks_nothing_that_cant_write()
+    {
+        // The free AI's app is on this Mac without what it writes notes with, and nothing has been chosen yet.
+        var lib = new FakeAiLibrary { Overview = Nothing("model_missing") };
+        var first = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), PreferFree = true };
+        await first.Load();
+        Assert.True(first.NoAi);
+
+        // Setup run again after "No AI for now": that's still the choice, though the free AI is all here by now.
+        var off = new AiSetupModel(new FakeAiLibrary { Overview = AiTestData.MixedOverview() })
+        {
+            WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(false), ChosenBefore = true,
+        };
+        await off.Load();
+        Assert.True(off.NoAi);
+
+        // Run again with the free AI chosen before and its model gone missing: it stays the pick.
+        var kept = new AiSetupModel(new FakeAiLibrary { Overview = Nothing("model_missing") })
+        {
+            WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), ChosenBefore = true,
+        };
+        await kept.Load();
+        Assert.Equal("ollama", kept.SelectedNotes);
+    }
+
+    [AvaloniaFact]
     public async Task A_free_AI_that_couldnt_be_got_says_why_and_offers_to_try_again()
     {
         var lib = new FakeAiLibrary { Overview = Nothing("not_installed") };
