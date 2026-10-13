@@ -214,6 +214,8 @@
             </StackPanel>
             <StackPanel IsVisible="{Binding Saved}" Spacing="14">
               <TextBlock Name="Pending" IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
+              <!-- A rewrite the library couldn't do: why, over the notes it left as they were -->
+              <TextBlock Name="NotRewritten" IsVisible="{Binding WasNotRewritten}" Text="{Binding NotRewritten}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
               <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasNotes}">
                 <c:BySkin Name="AiNotes" Mac="{x:Type v:MacAiNotes}" Win="{x:Type v:WinAiNotes}" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes}" />
               </Panel>
