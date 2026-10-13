@@ -15,17 +15,18 @@ public partial class MacSetup : UserControl
             Fit(m);
             m.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses) or nameof(SetupModel.AiHelpOpen)) Fit(m);
+                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses) or nameof(SetupModel.AiHelpOpen) or nameof(SetupModel.HasWelcomeProblem)) Fit(m);
             };
         };
     }
 
     /// <summary>The design's own size for each step: 900×660 for Canvas, 900×640 for the AI engines (800 tall while an engine's setup steps show), 720×600 for
-    /// Classes made from Canvas courses, 720×480 for the rest.</summary>
+    /// Classes made from Canvas courses, 720×480 for the rest (a little taller while the welcome says why the library
+    /// couldn't be made: its three choices fill the page, and the sentence takes two lines).</summary>
     void Fit(SetupModel m)
     {
         Width = m.Wide ? 900 : 720;
-        Height = m.OnCanvas ? 660 : m.OnAi ? (m.AiHelpOpen ? 800 : 640) : m.OnClasses && m.HasCourses ? 600 : 480;
+        Height = m.OnCanvas ? 660 : m.OnAi ? (m.AiHelpOpen ? 800 : 640) : m.OnClasses && m.HasCourses ? 600 : m.OnWelcome && m.HasWelcomeProblem ? 504 : 480;
     }
 
     /// <summary>A real window has the system's traffic lights (in its title bar), rounded corners and shadow;
