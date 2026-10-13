@@ -76,7 +76,7 @@
     <ScrollViewer Name="ClassList" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="6,0,6,0" c:WindowHeader.MovesWindow="True">
       <StackPanel Classes="side">
         <!-- Home: what's up next, and every note -->
-        <Button Name="HomeRow" Classes="nav-item" Classes.selected="{Binding Home.Selected}"
+        <Button Name="HomeRow" Classes="nav-item" Classes.selected="{Binding Home.Selected}" AutomationProperties.Name="Home"
                 Command="{Binding PickClassCommand}" CommandParameter="{Binding Home}">
           <Grid ColumnDefinitions="Auto,10,*">
             <c:Icon Glyph="home" Size="18" />
@@ -85,6 +85,7 @@
         </Button>
         <!-- Due: the calendar of what's to hand in, with how many are still open -->
         <Button Name="DueRow" Classes="nav-item" Classes.selected="{Binding Due.Selected, FallbackValue=False}" IsVisible="{Binding HasDue}"
+                AutomationProperties.Name="{Binding Due.Said, FallbackValue=Due}"
                 Command="{Binding PickClassCommand}" CommandParameter="{Binding Due}">
           <Grid ColumnDefinitions="Auto,10,*,10,Auto">
             <c:Icon Glyph="event_upcoming" Size="18" />
@@ -105,7 +106,7 @@
               <StackPanel>
                 <!-- The first folder of another group: the group's name over it (Clubs, Work) -->
                 <TextBlock Classes="side-group" Text="{Binding Section}" Margin="10,22,4,6" IsVisible="{Binding HasSection}" />
-                <Button Classes="nav-item class" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}"
+                <Button Classes="nav-item class" Classes.selected="{Binding Selected}" IsVisible="{Binding !IsDue}" AutomationProperties.Name="{Binding Said}"
                         Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).PickClassCommand}" CommandParameter="{Binding}">
                   <Button.ContextMenu>
                     <ContextMenu>

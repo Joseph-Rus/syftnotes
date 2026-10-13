@@ -25,7 +25,13 @@ public sealed partial class ClassItem : ObservableObject
     public string Tip => ClassNames.Code(Name) is { Length: > 0 } code ? $"{Display} · {code}" : Display;
     /// <summary>A count of nothing isn't shown.</summary>
     public bool ShowCount => Count > 0;
-    partial void OnCountChanged(int value) => OnPropertyChanged(nameof(ShowCount));
+    /// <summary>What a screen reader says for its row: "Home", "Due, 18 to hand in", "BIO 110, 4 notes".</summary>
+    public string Said => !ShowCount ? Display : IsDue ? $"{Display}, {Count} to hand in" : $"{Display}, {Count} note{(Count == 1 ? "" : "s")}";
+    partial void OnCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(ShowCount));
+        OnPropertyChanged(nameof(Said));
+    }
     /// <summary>The sidebar group it's in ("" for Classes; "Clubs", "Work", or one of the student's own).</summary>
     public string Group { get; init; } = "";
     /// <summary>What its recordings are called: lectures in a class, meetings in any other group.</summary>
