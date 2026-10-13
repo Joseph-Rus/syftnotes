@@ -89,8 +89,9 @@ public sealed partial class AiAskModel : ObservableObject
     /// <summary>Set by the host: the lecture or class this ask bar is under (whichever the current scope needs).</summary>
     public string? LectureId { get; set; }
     public string? ClassName { get; set; }
-    /// <summary>The recorder's chat asks with the transcript so far, not a saved lecture: the host sets this (and
-    /// <see cref="LiveTitle"/>); everywhere else it's null and the scope/lecture/class above apply instead.</summary>
+    /// <summary>The recorder's chat asks with the transcript so far: the host sets this (and <see cref="LiveTitle"/>),
+    /// with the recording's own id and folder above, so the scope says how far beyond what's been said to look (not
+    /// at all, for "This lecture"). Everywhere else it's null.</summary>
     public Func<string?>? Live { get; set; }
     public string LiveTitle { get; set; } = "This lecture, now";
 
@@ -313,8 +314,9 @@ public sealed partial class AiAskModel : ObservableObject
                 Engine = Engine,
                 Live = live,
                 LiveTitle = live is not null ? LiveTitle : null,
-                Lecture = live is null && Scope == "lecture" ? LectureId : null,
-                Class = live is null && Scope == "class" ? ClassName : null,
+                // While it records the scope still says how far to look: this recording alone, its folder, everything.
+                Lecture = Scope == "lecture" ? LectureId : null,
+                Class = Scope == "class" ? ClassName : null,
             };
             AskReply? reply = await library.AskAsync(request, paced.Show, stop.Token);
             paced.End();

@@ -734,14 +734,21 @@ public static partial class Shell
     /// library's default for questions until another is picked).</summary>
     static AiAskModel LiveAsk()
     {
+        string cls = host.Recorder.Current?.ClassName is { Length: > 0 } c && c != Configs.Unsorted ? c : "";
         var ask = new AiAskModel(Ai())
         {
             // What's been said so far: the transcript as far as it has got, and the live words after it.
             Live = host.LiveTranscript,
-            LiveTitle = $"{(host.Recorder.Current?.ClassName is { Length: > 0 } c ? c : "This lecture")}, now",
+            LiveTitle = $"{(cls.Length > 0 ? cls : "This lecture")}, now",
+            // The scope's "This lecture" is this recording and nothing else in the library; its folder and All notes
+            // look further, as they do under a note.
+            LectureId = liveId, ClassName = cls.Length > 0 ? cls : null,
             OpenSettings = () => ShowSettings("AI"),
             OnSource = s => Play(s.Id ?? liveId, s.At ?? 0),
         };
+        // A recording in no folder has no folder to ask about.
+        if (cls.Length == 0) ask.OnlyScopes("lecture", "all");
+        ask.NameScopes(Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : ""), cls.Length > 0 ? ClassNames.Display(cls) : null);
         _ = ask.Load();
         return ask;
     }

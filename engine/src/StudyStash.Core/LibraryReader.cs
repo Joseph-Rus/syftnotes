@@ -194,17 +194,22 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     /// <summary>
     /// A question answered from your own lectures by the library's model: the passages that best match it (in one
     /// lecture, one class, or all), and while you record, what's been said so far. The answer names its sources, each
-    /// with the moment in the recording when there is one.
+    /// with the moment in the recording when there is one. A question about one lecture reads that lecture and no
+    /// other, the one being recorded too: the library doesn't have it yet, so what's been said so far is all of it.
     /// </summary>
     public async Task<JsonObject> AskAsync(string question, string? lectureId = null, string? className = null,
         string? liveTranscript = null, string liveTitle = "This lecture", AskChatFn? chat = null)
     {
         var picked = new List<(NoteRow? Note, Passage Passage)>();
-        if (!string.IsNullOrWhiteSpace(liveTranscript))
-            foreach (var p in BestOf(Passages.FromTranscript("live", liveTranscript), question, 6)) picked.Add((null, p));
-        if (lectureId is not null && Store.Get(lectureId) is { } one)
+        bool live = !string.IsNullOrWhiteSpace(liveTranscript);
+        if (live)
+            foreach (var p in BestOf(Passages.FromTranscript("live", liveTranscript!), question, 6)) picked.Add((null, p));
+        if (lectureId is not null)
         {
-            foreach (var p in BestOf(Store.PassagesOf(lectureId), question, 8)) picked.Add((one, p));
+            // A note that's being recorded again is in the library as it was: its notes are read too, and its
+            // transcript came with the question, as far as it has got.
+            if (Store.Get(lectureId) is { } one)
+                foreach (var p in BestOf([.. Store.PassagesOf(lectureId).Where(p => !live || p.Kind != Passage.TranscriptKind)], question, 8)) picked.Add((one, p));
         }
         else if (Passages.AnyWords(question) is string match)
         {
