@@ -414,7 +414,7 @@
               <TextBlock Grid.Row="3" Classes="label" Text="Password" />
               <Border Grid.Row="4" Classes="field">
                 <Grid ColumnDefinitions="*,Auto">
-                  <TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" RevealPassword="{Binding ShowPassword}" FontSize="14" />
+                  <TextBox Classes="bare" Text="{Binding ConnectPassword}" PasswordChar="•" RevealPassword="{Binding ShowPassword}" FontSize="14" />
                   <Button Grid.Column="1" Classes="link" Command="{Binding ToggleShowPasswordCommand}" Margin="6,0,0,0">
                     <TextBlock Text="{Binding ShowPasswordText}" />
                   </Button>

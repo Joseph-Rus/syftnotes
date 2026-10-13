@@ -155,7 +155,12 @@ public sealed partial class SetupModel : ObservableObject
 
     // The library: created here (library flow) or connected to (laptop flow)
     [ObservableProperty] public partial string Address { get; set; } = "";
+    /// <summary>The password a library made here is given (or the one it already has).</summary>
     [ObservableProperty] public partial string Password { get; set; } = "";
+    /// <summary>The laptop's Connect page: the password of the library it connects to, on another computer. Not the
+    /// same field as <see cref="Password"/>: typed here, it doesn't turn up as dots in "Give your library a password"
+    /// when the student goes back and makes this computer the library instead.</summary>
+    [ObservableProperty] public partial string ConnectPassword { get; set; } = "";
     [ObservableProperty] public partial string LibraryName { get; set; } = "";
     /// <summary>The password fields show what's typed.</summary>
     [ObservableProperty] public partial bool ShowPassword { get; set; }
@@ -539,9 +544,10 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnAddressChanged(string value) => Retyped();
 
+    partial void OnConnectPasswordChanged(string value) => Retyped();
+
     partial void OnPasswordChanged(string value)
     {
-        Retyped();
         SayPasswordProblem();
         OnPropertyChanged(nameof(PasswordText));
     }

@@ -93,18 +93,21 @@ public sealed class SetupTests
         Assert.False(m.IsLaptop || m.IsLibrary);
         Assert.Equal("Welcome to Study Stash", m.WelcomeTitle);
         m.LibraryName = "Ada's library";
-        m.Password = "correct-horse";
         m.Address = "http://mac-mini:8787";
 
         m.ChooseLaptopCommand.Execute(null);
         Assert.Equal(AppRole.Laptop, m.Role);
         Assert.Equal(SetupStep.Welcome, m.Step);
         Assert.Equal(SetupStep.Library, m.Steps[1].Step);
+        m.ConnectPassword = "the-mac-minis"; // typed on the laptop's Connect page
 
         m.ChooseLibraryCommand.Execute(null);
         Assert.Equal(AppRole.Library, m.Role);
         Assert.Equal(SetupStep.Password, m.Steps[1].Step);
         Assert.Equal("Set up your library", m.HeaderTitle);
+        // A new library's password field starts empty: the other library's password isn't carried into it.
+        Assert.Equal("", m.Password);
+        m.Password = "correct-horse";
 
         m.ChooseOneComputerCommand.Execute(null);
         Assert.Equal(AppRole.Both, m.Role);
@@ -115,7 +118,7 @@ public sealed class SetupTests
         Assert.False(m.LibraryOk);
         m.ChooseOneComputerCommand.Execute(null);
         // What was typed stays, whichever card was tried.
-        Assert.Equal(("Ada's library", "correct-horse", "http://mac-mini:8787"), (m.LibraryName, m.Password, m.Address));
+        Assert.Equal(("Ada's library", "correct-horse", "the-mac-minis", "http://mac-mini:8787"), (m.LibraryName, m.Password, m.ConnectPassword, m.Address));
     }
 
     [Fact]
@@ -536,7 +539,7 @@ public sealed class SetupTests
             using var host = Host(home);
             var m = Setup.Make(host, AppRole.Laptop);
             m.Address = url;
-            m.Password = "whatever";
+            m.ConnectPassword = "whatever";
 
             await m.ConnectCommand.ExecuteAsync(null);
 

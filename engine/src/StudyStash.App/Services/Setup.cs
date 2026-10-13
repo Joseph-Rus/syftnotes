@@ -287,12 +287,12 @@ public static class Setup
                 string url = NormalizeAddress(m.Address);
                 if (url.Length == 0) throw new InvalidOperationException("Type your library's address, like http://mac-mini:8787.");
                 // Behind the dots, a letter no library's password can have (the keyboard was set to another language, say).
-                if (Configs.OddInPassword(m.Password.Trim()) is { } odd)
+                if (Configs.OddInPassword(m.ConnectPassword.Trim()) is { } odd)
                     throw new InvalidOperationException($"That password isn't right: a library's password can't have {odd} in it.");
-                var health = await LibraryApi.CheckServerAsync(url, m.Password.Trim());
+                var health = await LibraryApi.CheckServerAsync(url, m.ConnectPassword.Trim());
                 var cc = host.Client();
                 cc.ServerUrl = url;
-                cc.PoolKey = m.Password.Trim();
+                cc.PoolKey = m.ConnectPassword.Trim();
                 cc.PoolName = health["pool_name"]?.GetValue<string>() ?? "";
                 if (cc.DisplayName.Length == 0) cc.DisplayName = Person();
                 host.SaveClient(cc);
@@ -342,6 +342,10 @@ public static class Setup
             else
             {
                 m.Address = found.Url;
+                // This computer's own library: the app knows its password (one made for just this computer was never
+                // shown to anyone), so the field isn't left for the student to fill.
+                if (found.Local && File.Exists(cfg.ConfigPath) && found.Url.EndsWith($":{cfg.WebPort}", StringComparison.Ordinal))
+                    m.ConnectPassword = cfg.PoolPassword;
                 m.LibraryResult = found.Local ? $"Found a library on this {m.DeviceWord}."
                     : found.Name.Length > 0 ? $"Found {found.Name} on your Tailscale network. Type its password."
                     : "Found a library on your Tailscale network. Type its password.";
