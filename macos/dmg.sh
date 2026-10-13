@@ -7,6 +7,29 @@
 # The DMG: a stage folder with the app plus a link to /Applications. The disk shows the app's icon when it opens
 # (.VolumeIcon.icns, flagged on the volume, which only a mounted read-write copy can take), and the .dmg file itself
 # wears it too.
+# hdiutil, tried up to three times. On a busy Mac (CI's, now and then) it fails once and works a few seconds later:
+# two release rehearsals stopped here, after the app was built and signed, with nothing in the log, because it runs
+# quietly. So the first try is quiet, and a try after a failure says everything it does.
+hdi() {
+  hdi_verb=$1
+  shift
+  hdi_try=1
+  while :; do
+    if [ "$hdi_try" -eq 1 ]; then
+      hdiutil "$hdi_verb" -quiet "$@" && return 0
+    else
+      hdiutil "$hdi_verb" "$@" && return 0
+    fi
+    if [ "$hdi_try" -ge 3 ]; then
+      echo "hdiutil $hdi_verb failed three times" >&2
+      return 1
+    fi
+    echo "hdiutil $hdi_verb didn't work (try $hdi_try of 3); trying again in 5 seconds" >&2
+    hdi_try=$((hdi_try + 1))
+    sleep 5
+  done
+}
+
 stage_dmg() {
   app_path=$1
   volname=$2
@@ -20,13 +43,14 @@ stage_dmg() {
   ln -s /Applications "$stage/Applications"
   cp "$app_path/Contents/Resources/AppIcon.icns" "$stage/.VolumeIcon.icns"
   SetFile -c icnC "$stage/.VolumeIcon.icns" 2>/dev/null || true
-  hdiutil create -quiet -volname "$volname" -srcfolder "$stage" -ov -format UDRW "$rw"
+  hdi create -volname "$volname" -srcfolder "$stage" -ov -format UDRW "$rw"
   if hdiutil attach -quiet -nobrowse -mountpoint "$mnt" "$rw"; then
     SetFile -a C "$mnt" 2>/dev/null || true
-    hdiutil detach -quiet "$mnt"
+    # A volume something is still looking at won't let go: asked three times, then made to.
+    hdi detach "$mnt" || hdiutil detach -force "$mnt"
   fi
   rm -f "$dmg"
-  hdiutil convert -quiet "$rw" -format UDZO -o "$dmg"
+  hdi convert "$rw" -format UDZO -ov -o "$dmg"
   osascript -l JavaScript -e 'ObjC.import("AppKit"); function run(a) { $.NSWorkspace.sharedWorkspace.setIconForFileOptions($.NSImage.alloc.initWithContentsOfFile(a[0]), a[1], 0); }' \
     "$app_path/Contents/Resources/AppIcon.icns" "$dmg" >/dev/null 2>&1 || true
   rm -rf "$stage" "$rw" "$mnt"

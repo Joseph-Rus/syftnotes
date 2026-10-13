@@ -18,7 +18,7 @@
             <MenuItem Header="Delete…" Click="OnDelete" />
           </ContextMenu>
         </Button.ContextMenu>
-        <Grid ColumnDefinitions="108,20,*,20,64">
+        <Grid ColumnDefinitions="108,20,*,20,Auto">
           <TextBlock Classes="lecture-date" Text="{Binding When}" />
           <StackPanel Grid.Column="2" Spacing="4">
             <TextBlock Classes="lecture-title" Text="{Binding Title}" />
@@ -35,7 +35,8 @@
             </Button>
             <TextBlock Classes="lecture-summary" Classes.pending="{Binding Pending}" Text="{Binding Summary}" IsVisible="{Binding HasSummary}" />
           </StackPanel>
-          <TextBlock Grid.Column="4" Classes="lecture-length" Text="{Binding Length}" />
+          <!-- As wide as it needs: "1 h 12 min" is wider than the 64 the design gives "52 min", and was cut short. -->
+          <TextBlock Grid.Column="4" Classes="lecture-length" Text="{Binding Length}" MinWidth="64" TextAlignment="Right" />
         </Grid>
       </Button>
     </StackPanel>

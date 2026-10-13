@@ -112,12 +112,15 @@ public static partial class Notes
             $"*{m.Date}*  \u00b7  class: **{c.ClassName}**" + (topics.Length > 0 ? $"  \u00b7  topics: {topics}" : ""),
             "",
         };
+        // Written from the notes it came with (a lecture brought over with no transcript): the file says so, and
+        // keeps those notes under their own heading, since ours are only a rewriting of them.
+        bool fromNotes = summarized && Summarize.FromNotes(m);
         if (summarized)
         {
             lines.AddRange(["## Summary", "", DemoteHeadings(Py.Strip(summaryMd)), "",
-                $"_Written by {summaryModel} from the transcript._", ""]);
+                $"_Written by {summaryModel} from {(fromNotes ? "the notes it came with" : "the transcript")}._", ""]);
         }
-        else
+        if (!summarized || (fromNotes && Py.Strip(m.NotesMarkdown).Length > 0))
         {
             string notes = Py.Strip(m.NotesMarkdown);
             lines.AddRange(["## Notes", "", notes.Length > 0 ? notes : "_(no AI notes returned)_", ""]);

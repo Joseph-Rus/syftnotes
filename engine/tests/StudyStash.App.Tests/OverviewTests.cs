@@ -898,4 +898,29 @@ public class OverviewTests
             Shot.Take("win-45-recording", SkinKind.Win, t, () => new WinLibrary { DataContext = Demo.Semester(Demo.Page.Recording), Width = 1280, Height = 860 }, size: Wide);
         }
     }
+
+    /// <summary>A note's length is shown whole, however long it reads: "1 h 12 min" is wider than "52 min", and most
+    /// lectures run over an hour.</summary>
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void A_notes_length_over_an_hour_is_shown_whole(SkinKind skin)
+    {
+        ((App)Application.Current!).UseSkin(skin);
+        var row = new NoteRowView { DataContext = new NoteItem { Id = "l1", Title = "Recursion and the call stack", When = "Yesterday", Length = "1 h 12 min", Summary = "A recursive function solves a problem by calling itself." } };
+        var w = new Window { Width = 900, Height = 300, Content = row };
+        try
+        {
+            w.Show();
+            Dispatcher.UIThread.RunJobs();
+            var length = row.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Classes.Contains("lecture-length"));
+            Assert.True(length.TextLayout.WidthIncludingTrailingWhitespace <= length.Bounds.Width + 0.5,
+                $"{skin}: \"{length.Text}\" needs {length.TextLayout.WidthIncludingTrailingWhitespace:0.0} and has {length.Bounds.Width:0.0}");
+        }
+        finally
+        {
+            w.Close();
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
 }

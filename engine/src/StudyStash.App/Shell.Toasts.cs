@@ -80,6 +80,31 @@ public static partial class Shell
         });
     }
 
+    /// <summary>The pop-up for lectures seen in Granola for the first time (Settings → Granola switches it off): one
+    /// lecture is offered there and then, with Transfer; several open Settings → Granola, where each can be brought
+    /// over or left where it is.</summary>
+    static void SayGranolaHas(IReadOnlyList<GranolaTransfer.Waiting> found)
+    {
+        if (quitting || found.Count == 0 || !host.Settings.GranolaNotify) return;
+        var (title, text, action) = NoticeWords.GranolaHas([.. found.Select(f => f.Title)]);
+        if (found.Count == 1) Toast(title, text, action, () => _ = TransferFromGranolaAsync(found[0]));
+        else Toast(title, text, action, () => ShowSettings("Granola"));
+    }
+
+    /// <summary>Transfer, pressed on the pop-up: the lecture goes to the library, and a second notification says it
+    /// went, or why it didn't (with the way to Settings → Granola, where it's still listed).</summary>
+    static async Task TransferFromGranolaAsync(GranolaTransfer.Waiting lecture)
+    {
+        bool went = await Task.Run(() => host.Granola.TransferAsync(lecture.GranolaId));
+        var (title, text) = NoticeWords.GranolaBrought(lecture.Title, went ? null : host.Granola.Problem ?? "Try again from Settings.");
+        if (went)
+        {
+            Toast(title, text, null, null);
+            RequestLibraryReload();
+        }
+        else Toast(title, text, "Open Settings", () => ShowSettings("Granola"));
+    }
+
     /// <summary>Says <paramref name="notice"/>: as one of the computer's own notifications where it has them, else as
     /// a card of the app's own, on top of the stack (the same one showing already starts its time again instead). Its
     /// words are the app's own, already plain.</summary>

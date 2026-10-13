@@ -244,7 +244,17 @@ public static partial class Summarize
     }
 
     public static bool WantsSummary(Meeting m, Config cfg) =>
-        cfg.OllamaEnabled && cfg.SummaryEnabled && Py.Strip(m.Transcript).Length >= MinTranscriptChars;
+        cfg.OllamaEnabled && cfg.SummaryEnabled && (Py.Strip(m.Transcript).Length >= MinTranscriptChars || FromNotes(m));
+
+    /// <summary>The fewest letters of notes a lecture can arrive with, and no transcript, for study notes to be written
+    /// from them: under this there's too little to write from, and the notes it came with are its notes.</summary>
+    public const int MinArrivedNotesChars = 400;
+
+    /// <summary>A lecture that came with another app's notes and no transcript to speak of (one brought over from
+    /// Granola on a plan that keeps the transcript back): its study notes are written from those notes. What the
+    /// student typed doesn't count toward it: a short recording they typed notes into is still a recording.</summary>
+    public static bool FromNotes(Meeting m) =>
+        Py.Strip(m.Transcript).Length < MinTranscriptChars && Py.Strip(m.NotesMarkdown).Length >= MinArrivedNotesChars;
 
     [GeneratedRegex("<think>.*?</think>", RegexOptions.Singleline)]
     internal static partial Regex Thinking();
@@ -367,6 +377,22 @@ public static partial class Summarize
     static string TypedPart(Meeting m) => Typed(m).Length == 0 ? ""
         : "\n\nThe student's own notes, typed during the lecture (keep every line, marked with ==, as told above):\n\n" + Typed(m);
 
+    /// <summary>The rules for a lecture written up from the notes it came with: there's no transcript to check them against.</summary>
+    public static readonly string NotesRules = """
+        Rules:
+        - Use only what is in these notes. Never invent facts, dates, or examples: where the notes say little, the study notes are short, and a section with nothing for it is left out.
+        - Write every formula in LaTeX ($...$ or $$...$$).
+        - Write in the language of the notes. Output Markdown only, with no preamble.
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>Study notes for a lecture that has no transcript, from the notes it came with (the other app's summary
+    /// of it), written round what the student typed during it when they typed anything, as a recording's are.</summary>
+    public static string NotesPrompt(Meeting m, string notes, string attached = "") =>
+        "You are an expert note-taker for university lectures. There is no transcript of this lecture: another app took "
+        + "the notes below while it was given. Rewrite them as study notes.\n\n"
+        + $"{Shape(m)}\n\n{Drawing(Drawings.None)}\n\n{NotesRules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}"
+        + $"\n\nThe notes it came with:\n{notes}";
+
     /// <summary>What the student attached, under its own heading, for the notes to draw on; nothing when there's none.</summary>
     static string AttachedPart(string attached) => attached.Length == 0 ? ""
         : "\n\nThe student attached these to the lecture. Use them to get names, terms, formulas and slide titles right, and to "
@@ -452,6 +478,13 @@ public static partial class Summarize
         // What the student attached takes part of the room (never more than a third), and the transcript the rest.
         string attached = Attachments.Context(m.Attached, Math.Min(Attachments.MaxContextChars, budget / AttachedShare));
         budget -= attached.Length + Typed(m).Length;
+        if (FromNotes(m))
+        {
+            // No transcript: the notes are written from the ones it came with, which fit in one call (cut to fit if
+            // not), round whatever the student typed, which is kept as theirs the way a recording's is.
+            string came = Py.Head(Py.Strip(m.NotesMarkdown), Math.Max(0, budget));
+            return KeepTyped(CleanOutput(await chat(cfg, model, NotesPrompt(m, came, attached), ctx)), Typed(m));
+        }
         string text = Py.Strip(TimedText.Plain(m.Transcript)); // a recording's times would only distract the model
         // A transcript that says who's speaking says what that means, once, before the words (and in each part of a long one).
         string hint = Speakers.HasLabels(text) ? Speakers.NotesHint + "\n\n" : "";

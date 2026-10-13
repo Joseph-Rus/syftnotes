@@ -90,6 +90,9 @@ public sealed class AppSettings
     public DateTimeOffset? SupportAskLater { get; set; }
     /// <summary>The ask for a tip never shows again: they tipped, said don't ask again, or put it off twice.</summary>
     public bool SupportAskDone { get; set; }
+    /// <summary>Settings → Granola's "Tell me when Granola has a new lecture": a notification with Transfer. On
+    /// until it's switched off; it says nothing until Granola is signed in to.</summary>
+    public bool GranolaNotify { get; set; } = true;
     /// <summary>The notes' diagrams have shown, once, how to explore one ("Click a box to follow its arrows").</summary>
     public bool DiagramHintSeen { get; set; }
     /// <summary>The browser the student added the Canvas extension to on this computer ("Chrome", "Firefox"…): the
@@ -239,7 +242,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public AppHost(string home, Func<IAudioSource>? microphone = null, Func<ITranscriber>? whisper = null, LaptopHost? laptop = null,
         Action<string>? log = null, ILoginItems? loginItems = null, ModelSetting? models = null, HttpClient? http = null,
         Func<LibraryService>? localLibrary = null, IMicPermissions? micPermissions = null, IHardwareProbe? hardware = null,
-        Func<ISpeakerLabeler>? voices = null)
+        Func<ISpeakerLabeler>? voices = null, Func<GranolaOAuth, ILectureSource>? granola = null)
     {
         this.voices = voices;
         var probe = hardware ?? HardwareProbe.System;
@@ -279,6 +282,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         Memos = new VoiceMemoImport(Lectures, () => Remote(), StudyStash.Audio.AudioFiles.ToRecording, () => Client().DisplayName,
             () => RemoteLibrary.Computer is { Length: > 0 } c ? c : Machine.HostName(), () => Whisper.Wake(), this.log);
         Memos.Imported += _ => Changed?.Invoke();
+        Granola = new GranolaImport(Path.Combine(Home, "granola-tokens.json"), Path.Combine(Home, "granola-client.json"),
+            new GranolaLedger(Path.Combine(Home, "granola.json")), Client, net, granola, this.log);
         Recorder.Changed += () => Changed?.Invoke();
         Recorder.Problem += why =>
         {
@@ -376,6 +381,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
 
     /// <summary>Voice memos from the phone, brought in as lectures for Whisper (<see cref="Start"/> runs it).</summary>
     public VoiceMemoImport Memos { get; }
+
+    /// <summary>The student's Granola, once they've signed in to it in Settings: looked at for lectures Study Stash
+    /// doesn't have (<see cref="Start"/> runs it), which Transfer brings over.</summary>
+    public GranolaImport Granola { get; }
 
     /// <summary>The library over its API, once one is set up.</summary>
     public RemoteLibrary? Remote()
@@ -622,6 +631,8 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         StartCalendars();
         // Voice memos sent from the phone are written down where lectures are recorded; a library-only computer can't.
         if (Settings.Role != AppRole.Library) running.Add(Task.Run(() => Memos.RunAsync(stop.Token)));
+        // Granola is on the computer lectures are recorded on, so that's where it's looked at.
+        if (Settings.Role != AppRole.Library) running.Add(Task.Run(() => Granola.RunAsync(stop.Token)));
         pruning = new Timer(_ => PruneAudio(), null, TimeSpan.Zero, PruneEvery);
         watchdog = new Timer(_ => CheckRecorder(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
         // A download that quitting (or a closed laptop) cut short picks up where it stopped. A library-only

@@ -114,6 +114,8 @@ public static partial class Shell
             if (title == AppHost.RecordingPaused) SayRecordingPaused(why);
             else Toast(title, why, null, null);
         });
+        // Granola has a lecture Study Stash doesn't: said once, with Transfer.
+        host.Granola.Found += found => Dispatcher.UIThread.Post(() => SayGranolaHas(found));
         if (host.PretendMic) Program.Log("[app] recording from a pretend microphone (STUDYSTASH_MIC_FILE)");
         Wire();
         host.Start();

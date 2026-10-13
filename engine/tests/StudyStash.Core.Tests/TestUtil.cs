@@ -31,6 +31,7 @@ public sealed class TempDir : IDisposable
 public static class Golden
 {
     static readonly Lazy<JsonObject> cases = new(() => (JsonObject)JsonNode.Parse(Text("cases.json"))!);
+    static readonly Lazy<JsonObject> granola = new(() => (JsonObject)JsonNode.Parse(Text("granola.json"))!);
     static readonly Lazy<JsonObject> library = new(() => (JsonObject)JsonNode.Parse(Text("library.json"))!);
     static readonly Lazy<JsonObject> pages = new(() => (JsonObject)JsonNode.Parse(ThisVersion(Text("pages.json")))!);
     static readonly Lazy<JsonObject> platform = new(() => (JsonObject)JsonNode.Parse(ThisVersion(Text("platform.json")))!);
@@ -45,6 +46,9 @@ public static class Golden
     public static JsonArray Cases(string name) => (JsonArray)cases.Value[name]!;
 
     public static JsonNode Case(string name) => cases.Value[name]!;
+
+    /// <summary>Granola's replies, and signing in.</summary>
+    public static JsonNode? Granola(string name) => granola.Value[name];
 
     /// <summary>Stage 3's cases: the pieces the library's pages are made of.</summary>
     public static JsonNode? Library(string name) => library.Value[name];

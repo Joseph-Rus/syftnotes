@@ -21,6 +21,22 @@ public static class NoticeWords
         return (title, filedTitle.Length > 0 ? filedTitle : "Its notes are written.", "Open note");
     }
 
+    /// <summary>Granola has lectures Study Stash doesn't: one is named and offered there and then (Transfer); several
+    /// are counted, and the button shows them in Settings → Granola, where each can be brought over or left.</summary>
+    public static (string Title, string Text, string Action) GranolaHas(IReadOnlyList<string> titles)
+    {
+        if (titles.Count == 1)
+            return ("Granola has a lecture Study Stash doesn't", $"{Named(titles[0])}. Bring it over, and Study Stash files it and writes its notes.", "Transfer");
+        return ($"Granola has {titles.Count} lectures Study Stash doesn't", $"{Named(titles[0])} and {(titles.Count == 2 ? "one more" : $"{titles.Count - 1} more")}.", "Show them");
+    }
+
+    /// <summary>A lecture brought over from Granola, or why it wasn't.</summary>
+    public static (string Title, string Text) GranolaBrought(string title, string? problem) => problem is null
+        ? ("Brought over from Granola", $"{Named(title)} is with your library, which is writing its notes.")
+        : ("Couldn't bring it over from Granola", problem);
+
+    static string Named(string title) => title.Trim().Length > 0 ? title.Trim() : "A lecture with no title";
+
     /// <summary>What to do about the lecture that paused by itself (<paramref name="why"/> is the recorder's reason):
     /// Resume once the microphone or the disk is sorted, or the privacy settings when the system won't let Study Stash
     /// hear (<paramref name="opensSettings"/>).</summary>

@@ -30,6 +30,15 @@ Study Stash is your own lecture library. Record a lecture and it's transcribed o
 filed under the right class and turned into study notes, next to your Canvas assignments and ready
 to ask about. Two students build it, with Claude.
 
+## Your notes and the lecture's, on one page
+
+Recording opens the lecture's page at once, and you can type your own notes there while it records,
+as much or as little as you like. When you stop, the write-up is built round what you typed: every
+line of yours is kept, in ink, and what the lecture said about it is added in grey. **Only my
+notes** hides what was added.
+
+![Recording a lecture from Up next, typing notes while it records, and reading the write-up](docs/design/semester-ui-pictures/1-record-and-notes.gif)
+
 ## The notes come with the pictures
 
 Once a lecture's notes are written, a second pass reads the transcript and decides whether anything
@@ -76,13 +85,15 @@ this**, **Quiz me** and **Where was this said?**, which opens the transcript at 
   to review, written by Claude, ChatGPT or Gemini with the plan
   you already have, or by a free model on your own computer (Ollama, the advanced way). Rewrite a
   lecture's notes with another AI and keep whichever you like, or fix them yourself with **Edit**.
+- **Takes your own notes too, while it records.** Type on the lecture's page as it records, and the
+  write-up keeps every line of yours and adds the rest round it.
 - **Files every lecture under its class**, working out which from what was said, or using the class
-  you picked. Anything it can't place waits in **Unsorted**, and a lecture you don't need can be
-  deleted (with Undo).
-- **Shows you everything at a glance.** The library opens on **Home**: what's due soon, what's
-  coming up, your newest lectures and a card for every class. Each class (or club) has a home of
-  its own too: its lectures, what's to hand in, when it next meets, its files, and on Canvas its
-  assignments, modules and announcements.
+  you picked. One it can't place stays on Home as Unsorted, where the folder under its title moves
+  it in a click (with Undo), and a lecture you don't need can be deleted (with Undo).
+- **Shows you what's next.** The library opens on **Home**: the date, a sentence on what's pressing,
+  **Up next** (click an event to record it) and every note, newest first. Each folder, a class, a
+  club or work, has one page: its notes by week, and beside them what's due, its lists on Canvas and
+  when it next meets.
 - **Ask about any lecture, class, or all of them.** The Ask bar under a lecture's notes answers
   from your notes and transcripts, with the engine you pick for that question.
 - **Finds anything in a second.** The quick panel (⌥Space on a Mac, Alt+Shift+Space on Windows)
@@ -94,21 +105,24 @@ this**, **Quiz me** and **Where was this said?**, which opens the transcript at 
 - **Takes your own notes and slides too.** Attach iPad handwriting, slides, PDFs or photos to a
   lecture or class (drag them in). Their words, handwriting included, are read on your computer
   and go into the lecture's notes, Ask and Claude.
-- **Brings in Canvas.** What's due across your classes, each assignment's instructions, rubric,
-  your submission and feedback, module files and pages, announcements, quizzes and discussions.
+- **Brings in Canvas.** What's due across your classes as a calendar, by month or by week, with
+  what's missing and what's handed in; and each assignment's instructions, rubric, your submission
+  and feedback, module files and pages, announcements, quizzes and discussions.
+- **Brings lectures over from Granola.** If you record in Granola too, sign in once and Study Stash
+  offers each lecture it doesn't have, with a **Transfer** button. See [Granola](#granola).
 - **Comes with you on your phone.** Your library serves a phone app over Tailscale: read your
   notes, see what's coming up, search, and add photos and PDFs to a lecture from your iPhone or
   iPad. Settings → Your library → Phone shows a code to pair it ([docs/phone.md](docs/phone.md)).
 - **Lets AI apps read your library** over MCP: Claude Desktop, Claude Code, the ChatGPT app (with
   Codex) and Gemini CLI on your computer with one click (no Tailscale needed), and claude.ai and
   chatgpt.com through a Tailscale Funnel.
-- **Looks at home on your computer.** A native Mac look (Liquid Glass) and Windows 11's, light and
-  dark, with twenty colour themes in Settings → Appearance.
+- **Easy to read.** Black, grey and white, in a typeface made to be legible (Atkinson Hyperlegible
+  Next), with each class's highlighter the one colour. Light and dark, on a Mac and on Windows.
 - **Keeps itself up to date**, quietly, when nothing is recording.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/home-dark.png">
-  <img src="docs/images/home-light.png" alt="Home in the library window: the day's numbers, recent lectures, what's due soon and coming up, and a card for every class">
+  <img src="docs/images/home-light.png" alt="Home in the library window: the date, what's pressing, Up next, and every note, newest first">
 </picture>
 
 <p align="center">
@@ -116,7 +130,7 @@ this**, **Quiz me** and **Where was this said?**, which opens the transcript at 
   <img src="docs/images/quick-panel.png" width="40%" alt="The quick panel: search results, and an answer from your notes">
 </p>
 
-![Canvas in Study Stash: what's due, and an assignment with its rubric](docs/images/canvas-due.png)
+![Due as a calendar: each thing due in its class's highlighter, with what's missing and what's handed in](docs/design/semester-ui-pictures/due-light.png)
 
 ## One computer or two
 
@@ -252,8 +266,10 @@ shows the chosen model's lines only.
 transcript ("Speaker 2:") where a voice other than the lecturer's seems to speak; it is careful
 rather than complete, and can be wrong.
 
-**While it records**, a small pill in your theme's colour floats on screen with a level meter. Point
-at it for the time and Stop, click it to open the recorder, or pause and stop from the menu bar.
+**While it records**, the lecture's page has the recording's bar across its top: the level, the
+time, Pause and Stop. When the library window isn't the one in front, a small white pill floats on
+screen instead: its red dot is Stop, then the class, the level and the time. Pause and stop from the
+menu bar too.
 
 ## Your AI
 
@@ -477,6 +493,27 @@ Canvas then syncs about once an hour while that browser is open (it can stay min
 assignments with rubrics, your submissions and feedback, modules, files, pages and announcements,
 filed into each class's folder.
 
+## Granola
+
+If you also record lectures in [Granola](https://granola.ai), Study Stash can bring them over. In
+**Settings → Granola**, press **Connect** and sign in on Granola's own page in your browser. Study
+Stash never sees your password. From then on it looks at your Granola every few minutes. When there's
+a lecture it doesn't have, a notification offers it with a **Transfer** button, and the Granola page
+lists every one that's waiting, each with **Transfer** and **Leave it**.
+
+A transferred lecture goes to your library the way a recording does: it's filed under its class and
+gets study notes. What the notes are written from depends on your Granola plan, because Study Stash
+only gets what Granola's own connection for apps shares:
+
+- **Free Granola plan:** each lecture's notes (Granola's summary, and anything you typed) from the
+  last 30 days, and no transcript. The study notes are written from Granola's summary, so they can
+  only be as full as it is, and the lecture has no transcript to read or search.
+- **Paid Granola plan:** the transcript too, and the notes are written from that.
+
+Study Stash only reads from Granola and changes nothing there. **Disconnect** forgets the sign-in on
+this computer, and the lectures already brought over stay. The page is on the computer you record
+on. Study Stash isn't affiliated with Granola.
+
 ## Claude, Codex, Gemini and MCP
 
 Your library speaks [MCP](https://modelcontextprotocol.io), so AI apps can read your lectures, notes
@@ -526,7 +563,8 @@ they are; only the app goes. To remove them too, delete the folders under
 ## Where your data lives
 
 Your settings, the lecture database and the recordings are under `~/.study-stash` (or `--home`, or
-the `STUDYSTASH_HOME` environment variable). The notes themselves are plain Markdown files in a
+the `STUDYSTASH_HOME` environment variable). If you connect Granola, its sign-in is kept there too, in
+`granola-tokens.json`. The notes themselves are plain Markdown files in a
 folder per class, by default in **Documents/Study Stash** on the library's computer (Settings → Your library →
 Library → Notes folder shows where), which you can open, back up or sync however you like. On a Mac
 the browser extension's folder is `~/Study Stash/Chrome extension`, because a browser's Load
