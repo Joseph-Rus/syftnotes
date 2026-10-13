@@ -456,12 +456,23 @@ public sealed class SetupTests
     }
 
     [Fact]
-    public void Setup_run_again_on_the_library_keeps_its_name_password_and_notes_and_starts_it_at_login()
+    public void Setup_run_again_on_the_library_keeps_its_name_password_notes_and_whether_it_starts_at_login()
     {
         using var home = new TempHome();
         string notes = home["Lecture notes"];
         Configs.Save(new Config(home.Path, notes) { PoolName = "Sam's library", PoolPassword = "kept-password" });
-        var login = new CountingLoginItems();
+        // A library is here but Study Stash was never asked to start at login (setup was closed part-way, or its
+        // switch was left off): the switch is off, and finishing writes no login item.
+        var never = new CountingLoginItems();
+        using (var unasked = Host(home, login: never))
+        {
+            var again = Setup.Make(unasked, AppRole.Both);
+            Assert.True(again.ExistingLibrary);
+            Assert.False(again.StartAtLogin);
+            Setup.Finish(again, unasked);
+            Assert.Empty(never.Calls);
+        }
+        var login = new CountingLoginItems(starts: true);
         using var host = Host(home, login: login);
         var m = Setup.Make(host, AppRole.Library);
         Assert.True(m.ExistingLibrary);

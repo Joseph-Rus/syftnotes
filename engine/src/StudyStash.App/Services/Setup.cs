@@ -58,16 +58,17 @@ public static class Setup
         m.LibraryName = $"{Person()}'s library";
         here ??= LibraryHere.ThisComputer();
         m.NotesFolder = here.Folder ?? LibraryHere.DefaultFolder;
-        // Setup run again on the library: it keeps its name, password and notes folder, and it starts at login as it
-        // should (Finish writes the login item afresh, pointing at this copy of the app).
+        // Setup run again on the library: it keeps its name, password and notes folder.
         if (LibraryHere.Existing(host.Home) is { } had)
         {
             m.ExistingLibrary = true;
             if (had.PoolName.Length > 0) m.LibraryName = had.PoolName;
             m.Password = had.PoolPassword;
             m.NotesFolder = had.PoolDir;
-            m.StartAtLogin = true;
         }
+        // The switch shows what the student last chose: on only when Study Stash already starts at login (Finish
+        // then writes the login item afresh, pointing at this copy of the app). A library already here doesn't turn
+        // it on by itself: setup closed part-way and opened again would write a login item nobody asked for.
         if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;
         m.Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, !m.IsLibrary)
         {

@@ -177,8 +177,7 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial bool Connecting { get; set; }
     /// <summary>Looking for a library on this computer or your Tailscale network ("Find it").</summary>
     [ObservableProperty] public partial bool Finding { get; set; }
-    /// <summary>Start Study Stash when the student logs in: off unless they tick it (or the library was already here,
-    /// or it already started at login).</summary>
+    /// <summary>Start Study Stash when the student logs in: off unless they tick it (or it already started at login).</summary>
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
     /// <summary>This computer already has a library (setup run again): the password step keeps what it has.</summary>
     [ObservableProperty] public partial bool ExistingLibrary { get; set; }

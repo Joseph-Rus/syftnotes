@@ -974,8 +974,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public void Skip(string step)
     {
         skipped.Add(step);
-        // Setup's Finish turns start at login on when its box is ticked (a library that was here before ticks it): left
-        // for later means it stays as it is.
+        // Setup's Finish turns start at login on when its box is ticked (one that already starts at login ticks it):
+        // left for later means it stays as it is.
         if (step == "start_at_login") Setup.StartAtLogin = false;
         Refresh();
     }
