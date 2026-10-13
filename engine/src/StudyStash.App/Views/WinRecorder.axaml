@@ -57,7 +57,7 @@
                      Opacity="{Binding IsRunning, Converter={x:Static c:Converters.Shown}}" />
           <TextBlock Text="Paused" FontSize="14" FontWeight="Bold" Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Shown}}" />
         </Panel>
-        <c:Waveform Bars="5" Height="16" MinBar="5" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" VerticalAlignment="Center"
+        <c:Waveform Bars="3" Height="16" MinBar="5" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" VerticalAlignment="Center"
                     Opacity="{Binding IsRunning, Converter={x:Static c:Converters.Shown}}" />
         <TextBlock Name="PillTime" Text="{Binding Elapsed}" FontSize="14" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" MinWidth="40"
                    VerticalAlignment="Center" Margin="0,0,6,0" />

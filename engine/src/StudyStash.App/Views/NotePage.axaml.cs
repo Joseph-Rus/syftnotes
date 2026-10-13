@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -18,7 +19,12 @@ public partial class NotePage : UserControl
         Fades.Over(TopFade, "Surface", 0.3);
         // (At its top the page has nothing above it to fade: the line that says where it is stays whole.)
         TopFade.IsVisible = false;
-        NoteScroll.ScrollChanged += (_, _) => TopFade.IsVisible = NoteScroll.Offset.Y > 1;
+        NoteScroll.ScrollChanged += (_, _) =>
+        {
+            TopFade.IsVisible = NoteScroll.Offset.Y > 1;
+            PinTabs();
+        };
+        NoteScroll.SizeChanged += (_, _) => PinTabs();
         Fades.Under(Fade, "Surface", 0.55);
         // Another note opens at its top; a recording's page opens with the caret in its notes.
         string? showing = null;
@@ -42,6 +48,19 @@ public partial class NotePage : UserControl
     }
 
     NoteModel? Note => (DataContext as LibraryModel)?.Note;
+
+    /// <summary>Where the page's own Notes | Transcript row is, down the scrolled page; null while it isn't laid out.</summary>
+    double? TabsAt() => Tabs.TranslatePoint(default, NoteScroll) is { } at ? at.Y + NoteScroll.Offset.Y : null;
+
+    /// <summary>The page has scrolled past its Notes | Transcript: they're pinned at its top.</summary>
+    void PinTabs() => PinnedTabs.IsVisible = TabsAt() is { } at && NoteScroll.Offset.Y > at;
+
+    /// <summary>A pinned tab: the other tab shows from its top, just under the pinned row, not wherever the page was.</summary>
+    void OnPinnedTab(object? sender, RoutedEventArgs e) => Dispatcher.UIThread.Post(() =>
+    {
+        if (TabsAt() is { } at && NoteScroll.Offset.Y > at) NoteScroll.Offset = NoteScroll.Offset.WithY(at);
+        PinTabs();
+    }, DispatcherPriority.Loaded);
 
     /// <summary>The chevron beside the folder: the folder picker, under it.</summary>
     void OnPickFolder(object? sender, RoutedEventArgs e) => OpenPicker(ChangeFolder);

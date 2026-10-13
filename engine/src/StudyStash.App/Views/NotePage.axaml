@@ -101,7 +101,7 @@
             <Grid ColumnDefinitions="Auto,14,Auto,14,Auto,14,Auto,*,Auto,8,Auto">
               <Ellipse Width="12" Height="12" Fill="{DynamicResource Record}" Classes.pulse="{Binding Pulses}" VerticalAlignment="Center" />
               <TextBlock Grid.Column="2" Text="{Binding RecordingWord}" FontSize="15" FontWeight="Bold" VerticalAlignment="Center" />
-              <c:Waveform Grid.Column="4" Bars="5" Height="16" MinBar="5" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
+              <c:Waveform Grid.Column="4" Bars="3" Height="16" MinBar="5" Levels="{Binding Recorder.Levels, FallbackValue={x:Null}}" Foreground="{DynamicResource Record}"
                           VerticalAlignment="Center" IsVisible="{Binding Recorder.IsRunning, FallbackValue=False}" />
               <TextBlock Grid.Column="6" Text="{Binding Recorder.Elapsed, FallbackValue=''}" FontSize="15" FontWeight="Medium" Foreground="{DynamicResource InkMuted}"
                          VerticalAlignment="Center" />
@@ -146,7 +146,7 @@
                    AutomationProperties.Name="Title" LostFocus="OnTitleLeft" KeyDown="OnTitleKey" />
 
           <!-- Notes | Transcript, and on the right the page's own tools -->
-          <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,22,0,0">
+          <Grid Name="Tabs" ColumnDefinitions="Auto,*,Auto" Margin="0,22,0,0">
             <StackPanel Orientation="Horizontal">
               <Button Name="NotesTab" Classes="tab" Classes.on="{Binding ShowNotes}" Content="Notes" Command="{Binding NotesCommand}" />
               <Button Name="TranscriptTab" Classes="tab" Classes.on="{Binding ShowTranscript}" Content="{Binding TranscriptTab}" Command="{Binding TranscriptsCommand}" />
@@ -240,6 +240,23 @@
 
       <!-- The page fades in under the toolbar, and out under the ask bar (or above the answer) -->
       <Border Name="TopFade" Height="20" VerticalAlignment="Top" IsHitTestVisible="False" />
+      <!-- Notes | Transcript stay at the top once the page has scrolled past them (while it records, the time and a
+           quiet dot too): switching never means scrolling back up. -->
+      <Border Name="PinnedTabs" VerticalAlignment="Top" Background="{DynamicResource Surface}" IsVisible="False">
+        <StackPanel Classes="np-page" Classes.narrow="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Narrow}" Margin="0" DataContext="{Binding Note}" x:DataType="vm:NoteModel">
+          <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
+            <StackPanel Orientation="Horizontal">
+              <Button Classes="tab" Classes.on="{Binding ShowNotes}" Content="Notes" Command="{Binding NotesCommand}" Click="OnPinnedTab" />
+              <Button Classes="tab" Classes.on="{Binding ShowTranscript}" Content="{Binding TranscriptTab}" Command="{Binding TranscriptsCommand}" Click="OnPinnedTab" />
+            </StackPanel>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,0,6" IsVisible="{Binding Live}">
+              <Ellipse Width="8" Height="8" Fill="{DynamicResource Record}" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding Recorder.Elapsed, FallbackValue=''}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Grid>
+          <Border Classes="rule" />
+        </StackPanel>
+      </Border>
       <Border Name="Fade" Classes="fade" Classes.answer="{Binding HasAnswer}" VerticalAlignment="Bottom" IsHitTestVisible="False" IsVisible="{Binding HasAsk}" />
       <!-- A diagram showed where it was said: one click back to the notes, where the diagram is -->
       <Button Name="BackToNotes" Theme="{StaticResource Surface}" IsVisible="{Binding Note.CanGoBack, FallbackValue=False}"
