@@ -177,10 +177,11 @@ public class AccessibleNamesTests
                 Assert.Equal(["Make it small", paused ? "Resume" : "Pause", "Stop"], icons.Take(3).Select(Said));
                 AllNamed(icons, "the recorder");
 
-                // Small: its red dot is Stop, and says so.
+                // Small: its red dot is Stop (on a Mac, Stop or Resume once the pointer is on it), and says so.
                 model.Expanded = false;
+                if (skin == SkinKind.Mac) model.Hovered = true;
                 Dispatcher.UIThread.RunJobs();
-                Assert.Contains("Stop", Shown<Button>(view).Select(Said));
+                Assert.Contains(skin == SkinKind.Mac && paused ? "Resume" : "Stop", Shown<Button>(view).Select(Said));
                 window.Close();
             }
         }

@@ -160,6 +160,7 @@ public static partial class Shell
         public static void StopRecording() => Shell.StopRecording();
         public static void TogglePause() => Shell.TogglePause();
         public static void ShowRecorder(bool expanded) => Shell.ShowRecorder(expanded);
+        public static void ShowLibrary() => Shell.ShowLibrary();
         /// <summary>One step of dragging the recorder, as the pointer would take it: the self-test's check that it
         /// goes right up to a Mac's menu bar and down to Windows' taskbar.</summary>
         public static void DragRecorder(PixelPoint at, PixelPoint pointer)
@@ -307,8 +308,34 @@ public static partial class Shell
     public static void Quit(int code = 0)
     {
         if (quitting) return;
+        LeaveAnyway(code);
         CleanUp();
         life.Shutdown(code);
+    }
+
+    /// <summary>How long quitting may take before the app goes regardless.</summary>
+    static readonly TimeSpan QuitLimit = TimeSpan.FromSeconds(30);
+
+    /// <summary>Quitting that hangs somewhere doesn't keep the app half-gone: once <see cref="QuitLimit"/> has passed it
+    /// ends for good, so an update's waiter opens the new copy (one quit for an update once hung for two hours, the
+    /// library and a lecture's notes down all that time).</summary>
+    static void LeaveAnyway(int code) => new Thread(() =>
+    {
+        Thread.Sleep(QuitLimit);
+        Program.Log($"[app] still quitting after {QuitLimit.TotalSeconds:0} s (last step: {quitStep}): leaving now");
+        Environment.Exit(code);
+    }) { IsBackground = true, Name = "quit limit" }.Start();
+
+    /// <summary>The step quitting is on, for the log if it hangs.</summary>
+    static volatile string quitStep = "starting";
+
+    /// <summary>One step of quitting, named so a hang says where it was, and timed: a slow one is written down.</summary>
+    static void QuitStep(string name, Action step)
+    {
+        quitStep = name;
+        var took = System.Diagnostics.Stopwatch.StartNew();
+        step();
+        if (took.Elapsed > TimeSpan.FromSeconds(1)) Program.Log($"[app] quitting: {name} took {took.Elapsed.TotalSeconds:0.0} s");
     }
 
     /// <summary>Everything quitting does before the app goes, once: the recording is saved, Whisper and the sender stop,
@@ -320,25 +347,34 @@ public static partial class Shell
         ticker?.Stop();
         // What's typed in a lecture's notes and not saved is written down: it's back in its editor next time. What's
         // typed in a recording's notes goes with the recording.
-        KeepDrafts();
-        FlushTyped();
-        CloseAllToasts();
-        StopCanvas();
+        QuitStep("keeping drafts", () => { KeepDrafts(); FlushTyped(); });
+        QuitStep("closing notifications", CloseAllToasts);
+        QuitStep("stopping Canvas", StopCanvas);
         stop.Cancel();
-        try
+        QuitStep("stopping the engine", () =>
         {
-            host.Dispose();
-        }
-        catch (Exception e)
+            try
+            {
+                host.Dispose();
+            }
+            catch (Exception e)
+            {
+                Program.Log($"[error] stopping: {e}");
+            }
+        });
+        QuitStep("closing the floating windows", Floating.UnpanelAll);
+        QuitStep("removing the icon", () =>
         {
-            Program.Log($"[error] stopping: {e}");
-        }
-        tray?.Dispose();
-        tray = null;
-        if (OperatingSystem.IsMacOS()) MacStatusItem.Destroy();
-        Player.Stop();
-        SaveLibraryPlace();
-        host.Save(_ => { });
+            tray?.Dispose();
+            tray = null;
+            if (OperatingSystem.IsMacOS()) MacStatusItem.Destroy();
+        });
+        QuitStep("stopping playback", Player.Stop);
+        QuitStep("saving settings", () =>
+        {
+            SaveLibraryPlace();
+            host.Save(_ => { });
+        });
         Program.Log("[app] quitting");
     }
 
@@ -487,6 +523,13 @@ public static partial class Shell
 
         recorder.OnPause = TogglePause;
         recorder.OnStop = () => StopRecording();
+        // The pointer on the pill: its card quotes the last lines heard, so the live words come while it's there.
+        recorder.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName != nameof(RecorderModel.Hovered)) return;
+            host.WatchLiveWords(WatchingWords());
+            ShowPillCard();
+        };
         recorder.OnExpand = expanded =>
         {
             RecorderTakesKeyboard(expanded);
@@ -810,7 +853,7 @@ public static partial class Shell
     }
 
     /// <summary>The live words can be seen: the recorder is open on screen, or the menu's panel (its last line) is.</summary>
-    static bool WatchingWords() => (recorder.Expanded && recorderWindow?.IsVisible == true) || panelWindow?.IsVisible == true
+    static bool WatchingWords() => ((recorder.Expanded || recorder.Hovered) && recorderWindow?.IsVisible == true) || panelWindow?.IsVisible == true
         || (mainWindow?.IsVisible == true && library.Note is { Live: true } && library.ShowNotePage);
 
     /// <summary>Windows: the small pill never takes the keyboard from the app you're typing in. The shortcut starts a
@@ -841,10 +884,36 @@ public static partial class Shell
         host.WatchLiveWords(WatchingWords());
     }
 
+    /// <summary>The card beside the Mac's pill while the pointer is on it.</summary>
+    static Floating? pillCard;
+
+    /// <summary>Shows the pill's card beside it (to its left, or its right where the screen ends) while the pointer is on
+    /// the small pill, and hides it otherwise. A window that never takes the keyboard or the clicks.</summary>
+    static void ShowPillCard()
+    {
+        if (!recorder.Hovered || recorder.Expanded || Skin.Current != SkinKind.Mac || recorderWindow?.Panel() is not { } pill)
+        {
+            pillCard?.Hide();
+            return;
+        }
+        pillCard ??= new Floating { Content = new PillCard { DataContext = recorder }, OverFullScreen = true, ShowActivated = false, Title = "Study Stash recorder card" };
+        var (area, scale) = pillCard.WorkArea(pill.Center);
+        var size = pillCard.Measured(scale);
+        int room = (int)(Floating.ShadowRoom * scale), gap = (int)(10 * scale), width = size.Width - 2 * room;
+        int x = pill.X - gap - width >= area.X ? pill.X - gap - width : pill.Right + gap;
+        pillCard.MoveTo(new PixelPoint(x - room, pill.Y - room), area, scale);
+        if (!pillCard.IsVisible) pillCard.Show();
+    }
+
     static Floating MakeRecorderWindow()
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
-        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, Title = "Study Stash recorder" };
+        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, OverFullScreen = true, Title = "Study Stash recorder" };
+        // Gone from the screen: its card goes with it.
+        w.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == Visual.IsVisibleProperty && !w.IsVisible) recorder.Hovered = false;
+        };
         AppMenu.AddSettingsKey(w, SettingsFromAnywhere);
         // Drag it anywhere by its background; where it lands is saved once the drag ends, not on every pixel moved.
         // It moves by hand, not by the system's own window drag, so it can go right up to a Mac's menu bar (see
@@ -1089,6 +1158,9 @@ public static partial class Shell
         UpdateDock();
         Raise(w);
         Desktop.Activate();
+        // The library in front: the small pill goes now, not only once macOS says the app is active (it may not, when
+        // another app was in front), and comes back when the library is left.
+        if (recorderWindow?.IsVisible == true && !recorder.Expanded) recorderWindow.Hide();
         _ = LoadLibraryAsync();
     }
 
@@ -1483,23 +1555,11 @@ public static partial class Shell
     }
 
     /// <summary>A Mac shows the app in the Dock (and ⌘Tab) while the library, setup or Settings is open, and keeps it
-    /// to the menu bar otherwise. While the small recorder floats over another app it keeps to the menu bar too: macOS
-    /// lets only a menu-bar app's window float over another app's full-screen Space, so with the Dock icon the pill
-    /// vanished behind a full-screen app. Coming back to the library window brings the Dock icon back.</summary>
-    static void UpdateDock()
-    {
-        bool open = mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
-            || canvasConnectWindow?.IsVisible == true || browserChoiceWindow?.IsVisible == true;
-        bool pillAway = recorderWindow?.IsVisible == true && mainWindow?.IsActive != true && setupWindow?.IsActive != true && settingsWindow?.IsActive != true;
-        bool dock = !quitting && open && !pillAway;
-        if (dock == inDock) return;
-        inDock = dock;
-        Desktop.ShowInDock(dock);
-        // Now a menu-bar app: the pill is put in front again, on whichever Space is showing (a full-screen app's too).
-        if (!dock && pillAway) Dispatcher.UIThread.Post(() => recorderWindow?.OrderFront(), DispatcherPriority.Background);
-    }
-
-    static bool? inDock;
+    /// to the menu bar otherwise. (Never to the menu bar while one of them is open: macOS hides an app's windows as
+    /// it goes, the library's with them, which 0.16.7 did while the pill floated over another app.)</summary>
+    static void UpdateDock() =>
+        Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
+            || canvasConnectWindow?.IsVisible == true || browserChoiceWindow?.IsVisible == true));
 
     // --- keeping it all up to date ------------------------------------------------------------------------------------
 

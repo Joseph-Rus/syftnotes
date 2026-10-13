@@ -39,12 +39,17 @@ public class Floating : Window
             LastDeactivateHide = DateTime.UtcNow;
         };
         Opened += (_, _) => JoinFullScreenSpaces();
+        Closing += (_, _) => Unpanel();
         PositionChanged += (_, _) => SayClearAreaChanged();
     }
 
     /// <summary>Notifications step out of this window's way (the dropdown, the recorder, the quick panel): they never
     /// cover it.</summary>
     public bool KeepClear { get; init; }
+
+    /// <summary>A Mac: this window is a non-activating panel, the only kind macOS lets float over another app's
+    /// full-screen Space while the app keeps its Dock icon (the recorder pill over full-screen slides or Zoom).</summary>
+    public bool OverFullScreen { get; init; }
 
     /// <summary>A window that <see cref="KeepClear"/>s showed, hid, moved or changed size: notifications look again at
     /// where they can go.</summary>
@@ -220,6 +225,35 @@ public class Floating : Window
         }
     }
 
+    /// <summary>A Mac: what AppKit itself says of this window — shown, its size in points, and whether any of it is
+    /// actually visible on the Space showing (not behind another app, not on another Space). Null anywhere else, or
+    /// before it has an NSWindow. The self-test's check that the pill is really there, not just "shown".</summary>
+    public (bool Visible, double Width, double Height, bool OnScreen)? Native() => NativeOf(this);
+
+    /// <summary><see cref="Native"/> for any window: the library's too.</summary>
+    public static (bool Visible, double Width, double Height, bool OnScreen)? NativeOf(Window window)
+    {
+        if (!OperatingSystem.IsMacOS()) return null;
+        try
+        {
+            IntPtr w = window.TryGetPlatformHandle() switch
+            {
+                { HandleDescriptor: "NSWindow", Handle: var h } => h,
+                { HandleDescriptor: "NSView", Handle: var v } when v != IntPtr.Zero => objc_msgSend(v, sel_registerName("window")),
+                _ => IntPtr.Zero,
+            };
+            if (w == IntPtr.Zero) return null;
+            bool visible = objc_msgSend_bool(w, sel_registerName("isVisible")) != 0;
+            var frame = objc_msgSend_rect(w, sel_registerName("frame"));
+            bool onScreen = (objc_msgSend_nuint(w, sel_registerName("occlusionState")) & 2) != 0; // NSWindowOcclusionStateVisible
+            return (visible, frame.Width, frame.Height, onScreen);
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>A Mac: the NSWindow (Avalonia 12 hands it itself; older backends handed its view). Zero anywhere
     /// else, and in tests.</summary>
     IntPtr NativeWindow() => TryGetPlatformHandle() switch
@@ -240,6 +274,7 @@ public class Floating : Window
         {
             IntPtr nsWindow = NativeWindow();
             if (nsWindow == IntPtr.Zero) return;
+            if (OverFullScreen) MakePanel(nsWindow);
             const nuint canJoinAllSpaces = 1 << 0, fullScreenAuxiliary = 1 << 8;
             objc_msgSend_setCollectionBehavior(nsWindow, sel_registerName("setCollectionBehavior:"), canJoinAllSpaces | fullScreenAuxiliary);
             objc_msgSend_setBool(nsWindow, sel_registerName("setHasShadow:"), 0);
@@ -247,6 +282,84 @@ public class Floating : Window
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
         }
+    }
+
+    /// <summary>
+    /// Turns this window into Avalonia's own panel class (AvnPanel: the same code and the same fields as its AvnWindow,
+    /// only over NSPanel, which adds none; the self-test checks the two still match) and makes it non-activating: then
+    /// macOS shows it over another app's full-screen Space, and a click on it doesn't bring the app forward. It stays
+    /// put when the app isn't in front (a panel would hide then by default).
+    /// </summary>
+    void MakePanel(IntPtr nsWindow)
+    {
+        if (!PanelFits()) return;
+        IntPtr panel = objc_getClass("AvnPanel");
+        IntPtr was = object_getClass(nsWindow);
+        if (was == panel) return;
+        // What it was (AppKit's key-value observing subclass of AvnWindow, by now): it's put back before the window
+        // goes, or AppKit's own clean-up, finding the class it observed through gone, aborts the app as it quits.
+        swapped = (nsWindow, was);
+        Panels.Add(this);
+        object_setClass(nsWindow, panel);
+        const nuint nonactivatingPanel = 1 << 7;
+        nuint mask = objc_msgSend_nuint(nsWindow, sel_registerName("styleMask"));
+        objc_msgSend_setCollectionBehavior(nsWindow, sel_registerName("setStyleMask:"), mask | nonactivatingPanel);
+        objc_msgSend_setBool(nsWindow, sel_registerName("setHidesOnDeactivate:"), 0);
+        objc_msgSend_setBool(nsWindow, sel_registerName("setFloatingPanel:"), 1);
+    }
+
+    /// <summary>The NSWindow made a panel, and the class it had: put back by <see cref="Unpanel"/>.</summary>
+    (IntPtr Window, IntPtr Class)? swapped;
+
+    static readonly List<Floating> Panels = [];
+
+    /// <summary>Puts this window's own class back before it closes (see <see cref="MakePanel"/>).</summary>
+    void Unpanel()
+    {
+        if (swapped is not { } s) return;
+        swapped = null;
+        Panels.Remove(this);
+        try
+        {
+            object_setClass(s.Window, s.Class);
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
+
+    /// <summary>Every window made a panel goes back to its own class: the app is quitting.</summary>
+    public static void UnpanelAll()
+    {
+        foreach (var w in Panels.ToList()) w.Unpanel();
+    }
+
+    /// <summary>AvnPanel and AvnWindow have the same size and the same fields at the same places, so one can stand in
+    /// for the other: false (nothing changes) if a newer Avalonia ever makes them differ.</summary>
+    public static bool PanelFits()
+    {
+        IntPtr window = objc_getClass("AvnWindow"), panel = objc_getClass("AvnPanel");
+        if (window == IntPtr.Zero || panel == IntPtr.Zero || class_getInstanceSize(window) != class_getInstanceSize(panel)) return false;
+        return Fields(window).SequenceEqual(Fields(panel));
+    }
+
+    static List<(string, long)> Fields(IntPtr cls)
+    {
+        IntPtr list = class_copyIvarList(cls, out uint count);
+        var fields = new List<(string, long)>();
+        try
+        {
+            for (int i = 0; i < count; i++)
+            {
+                IntPtr ivar = Marshal.ReadIntPtr(list, i * IntPtr.Size);
+                fields.Add((Marshal.PtrToStringUTF8(ivar_getName(ivar)) ?? "", ivar_getOffset(ivar)));
+            }
+        }
+        finally
+        {
+            if (list != IntPtr.Zero) free(list);
+        }
+        return fields;
     }
 
     /// <summary>When this window last hid itself because it lost focus (clicking elsewhere, or the icon that opened
@@ -357,4 +470,51 @@ public class Floating : Window
 
     [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
     static extern void objc_msgSend_setBool(IntPtr receiver, IntPtr selector, byte value);
+
+    [DllImport("/usr/lib/libobjc.A.dylib")]
+    static extern IntPtr object_setClass(IntPtr obj, IntPtr cls);
+
+    [DllImport("/usr/lib/libobjc.A.dylib")]
+    static extern IntPtr object_getClass(IntPtr obj);
+
+    [DllImport("/usr/lib/libobjc.A.dylib")]
+    static extern nuint class_getInstanceSize(IntPtr cls);
+
+    [DllImport("/usr/lib/libobjc.A.dylib")]
+    static extern IntPtr class_copyIvarList(IntPtr cls, out uint count);
+
+    [DllImport("/usr/lib/libobjc.A.dylib")]
+    static extern IntPtr ivar_getName(IntPtr ivar);
+
+    [DllImport("/usr/lib/libobjc.A.dylib")]
+    static extern long ivar_getOffset(IntPtr ivar);
+
+    [DllImport("libc")]
+    static extern void free(IntPtr p);
+
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    static extern byte objc_msgSend_bool(IntPtr receiver, IntPtr selector);
+
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    static extern nuint objc_msgSend_nuint(IntPtr receiver, IntPtr selector);
+
+    // An NSRect comes back in registers on Apple silicon, and through objc_msgSend_stret on Intel.
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    static extern NSRect objc_msgSend_rect_arm(IntPtr receiver, IntPtr selector);
+
+    [DllImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend_stret")]
+    static extern void objc_msgSend_rect_stret(out NSRect result, IntPtr receiver, IntPtr selector);
+
+    static NSRect objc_msgSend_rect(IntPtr receiver, IntPtr selector)
+    {
+        if (RuntimeInformation.ProcessArchitecture == Architecture.Arm64) return objc_msgSend_rect_arm(receiver, selector);
+        objc_msgSend_rect_stret(out var r, receiver, selector);
+        return r;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct NSRect
+    {
+        public double X, Y, Width, Height;
+    }
 }

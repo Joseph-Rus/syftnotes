@@ -6,6 +6,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using StudyStash.App.Controls.Rich;
+using StudyStash.App.Platform;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Windows;
@@ -465,6 +466,68 @@ public static partial class SelfTest
         await Wait(0.3);
     }
 
+    /// <summary>A Mac: the library open, then another app brought forward, as a student does once class starts. The pill
+    /// must really be on screen then — AppKit's own word for it: shown, a real size, and visible on the Space showing —
+    /// not just "shown" to Avalonia (0.16.7's pill opened 0×0 and nobody saw it). Coming back to the library hides it.</summary>
+    static async Task CheckRecorderAwayAsync()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        bool libraryWasOpen = Shell.Windows.Main?.IsVisible == true;
+        Shell.Windows.ShowLibrary();
+        await Wait(1);
+        Desktop.Deactivate();
+        bool seen = await Until(() => Shell.Windows.Recorder is Floating { IsVisible: true } f && f.Native() is { Visible: true, Width: > 20, Height: > 20, OnScreen: true }, 5);
+        var w = Shell.Windows.Recorder as Floating;
+        var native = w?.Native();
+        // The library stays where it was, behind the other app: never taken off the screen as the pill shows.
+        bool libraryKept = Shell.Windows.Main is Window m && Floating.NativeOf(m) is { Visible: true };
+        Say(libraryKept ? "recorder away: the library window is still open behind the other app"
+            : "FAILED recorder away: the library window went off the screen as the pill showed");
+        Say(seen ? $"recorder away: on screen over another app, {native?.Width:0}×{native?.Height:0} pt"
+            : $"FAILED recorder away: with another app in front the pill isn't on screen (shown {w?.IsVisible}, AppKit {native?.ToString() ?? "no window"}, {w?.Bounds.Width:0}×{w?.Bounds.Height:0})");
+        ScreenPicture("recorder-away");
+        // The pointer on it: Stop in the S's place, and the card with the class, the time and the last lines.
+        Shell.Windows.RecorderModel.Hovered = true;
+        await Wait(1);
+        ScreenPicture("recorder-hover");
+        Say($"recorder hover: {Shell.Windows.RecorderModel.HoverTitle}, {(Shell.Windows.RecorderModel.ShowStop ? "Stop" : "no Stop")} in the S's place");
+        Shell.Windows.RecorderModel.Hovered = false;
+        await CheckRecorderOverFullScreenAsync();
+        Shell.Windows.ShowLibrary();
+        await Wait(1);
+        bool active = Shell.Windows.Main?.IsActive == true;
+        Say(Shell.Windows.Recorder?.IsVisible == true ? $"FAILED recorder away: the library is open again ({(active ? "in front" : "macOS didn't bring it forward")}), yet the pill still shows"
+            : $"recorder away: hidden again with the library open ({(active ? "in front" : "macOS didn't bring it forward")})");
+        if (!libraryWasOpen) Shell.Windows.Main?.Hide();
+        Shell.Windows.ShowRecorder(expanded: false);
+        await Wait(0.5);
+    }
+
+    /// <summary>A Mac, given STUDYSTASH_SELFTEST_FULLSCREEN (a program that puts a window of its own in full screen:
+    /// macos/fullscreen-app.swift, built): with that app full screen in front, in its own Space, the pill is still on
+    /// screen over it. Only where asked: it takes over the screen for a few seconds.</summary>
+    static async Task CheckRecorderOverFullScreenAsync()
+    {
+        if (Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_FULLSCREEN") is not { Length: > 0 } helper || !File.Exists(helper)) return;
+        Say(Floating.PanelFits() ? "recorder over full screen: the pill is a panel" : "FAILED recorder over full screen: Avalonia's panel no longer matches its window, so the pill can't be one");
+        using var other = System.Diagnostics.Process.Start(helper);
+        try
+        {
+            // The full-screen animation, into its own Space.
+            await Wait(4);
+            var w = Shell.Windows.Recorder as Floating;
+            bool seen = await Until(() => w?.Native() is { Visible: true, Width: > 20, Height: > 20, OnScreen: true }, 3);
+            ScreenPicture("recorder-fullscreen");
+            Say(seen ? "recorder over full screen: on screen over another app's full-screen window"
+                : $"FAILED recorder over full screen: not on screen over another app's full-screen window (AppKit {w?.Native()?.ToString() ?? "no window"})");
+        }
+        finally
+        {
+            other.Kill();
+            await Wait(2);
+        }
+    }
+
     /// <summary>
     /// The recorder opened shows what's being said within a couple of seconds (the live words: Cactus Whistle on ARM, a
     /// small Whisper on x64) where this computer is fast enough for them, or later where its first passes were near the
@@ -537,6 +600,7 @@ public static partial class SelfTest
         await Wait(1.5);
         Shot(Shell.Windows.Recorder, "recorder-pill");
         await CheckRecorderDragAsync();
+        await CheckRecorderAwayAsync();
 
         Shell.Windows.TogglePause();
         await Wait(0.5);

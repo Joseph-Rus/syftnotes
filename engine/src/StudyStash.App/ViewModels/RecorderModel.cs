@@ -79,9 +79,39 @@ public sealed partial class RecorderModel : ObservableObject
     /// <summary>The pill, for a screen reader: what it's doing, in which class, and for how long.</summary>
     public string PillSaid => $"{(IsPaused ? "Paused" : "Recording")} {ShortClass}, {Elapsed}";
 
+    /// <summary>The pointer is on the small pill: Stop (or Resume) shows in the mark's place, and a card beside it says
+    /// the class, the time and the last lines heard.</summary>
+    [ObservableProperty] public partial bool Hovered { get; set; }
+
+    /// <summary>The hover card's heading: "Data Mining · 1:03:18", or "… · paused at 1:03:18".</summary>
+    public string HoverTitle => $"{DisplayClass} · {(IsPaused ? "paused at " : "")}{Elapsed}";
+    /// <summary>The line before the newest, and the newest: what the hover card quotes.</summary>
+    public string EarlierLine => Lines.Count > 1 ? Quote(Lines[^2].Text) : "";
+    public string NewestLine => Lines.Count > 0 ? Quote(Lines[^1].Text) : "";
+    public bool HasEarlierLine => Lines.Count > 1;
+    /// <summary>The mark shows unless Stop or Resume has its place (the pointer is on the pill).</summary>
+    public bool ShowMark => !Hovered;
+    public bool ShowStop => Hovered && !IsPaused;
+    public bool ShowResume => Hovered && IsPaused;
+
+    static string Quote(string s) => $"“{(s.Length <= 140 ? s : s[..140].TrimEnd() + "…")}”";
+
     public RecorderModel()
     {
-        Lines.CollectionChanged += (_, _) => OnPropertyChanged(nameof(NoLines));
+        Lines.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(NoLines));
+            OnPropertyChanged(nameof(EarlierLine));
+            OnPropertyChanged(nameof(NewestLine));
+            OnPropertyChanged(nameof(HasEarlierLine));
+        };
+    }
+
+    partial void OnHoveredChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ShowMark));
+        OnPropertyChanged(nameof(ShowStop));
+        OnPropertyChanged(nameof(ShowResume));
     }
 
     partial void OnIsPausedChanged(bool value)
@@ -90,6 +120,9 @@ public sealed partial class RecorderModel : ObservableObject
         OnPropertyChanged(nameof(PauseGlyph));
         OnPropertyChanged(nameof(PauseTip));
         OnPropertyChanged(nameof(PillSaid));
+        OnPropertyChanged(nameof(HoverTitle));
+        OnPropertyChanged(nameof(ShowStop));
+        OnPropertyChanged(nameof(ShowResume));
     }
 
     partial void OnClassNameChanged(string value)
@@ -97,9 +130,14 @@ public sealed partial class RecorderModel : ObservableObject
         OnPropertyChanged(nameof(DisplayClass));
         OnPropertyChanged(nameof(ShortClass));
         OnPropertyChanged(nameof(PillSaid));
+        OnPropertyChanged(nameof(HoverTitle));
     }
 
-    partial void OnElapsedChanged(string value) => OnPropertyChanged(nameof(PillSaid));
+    partial void OnElapsedChanged(string value)
+    {
+        OnPropertyChanged(nameof(PillSaid));
+        OnPropertyChanged(nameof(HoverTitle));
+    }
 
     partial void OnAfterClassChanged(bool value)
     {

@@ -1,0 +1,18 @@
+<!-- The card beside the Mac's recorder pill while the pointer is on it: the class and the time, and the last two lines
+     heard. A window of its own (a popup would hide whenever another app is in front, which is when the pill is there). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StudyStash.App.ViewModels"
+             x:Class="StudyStash.App.Views.PillCard"
+             x:DataType="vm:RecorderModel"
+             IsHitTestVisible="False">
+  <Border Width="280" Padding="12,10" CornerRadius="10" Background="{DynamicResource Surface}" BorderBrush="{DynamicResource Line}" BorderThickness="1"
+          BoxShadow="{DynamicResource ShadowFloat}">
+    <StackPanel Spacing="6">
+      <TextBlock Text="{Binding HoverTitle}" FontSize="12" FontWeight="Bold" />
+      <TextBlock Text="{Binding EarlierLine}" IsVisible="{Binding HasEarlierLine}" FontSize="12.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding NewestLine}" IsVisible="{Binding !NoLines}" FontSize="12.5" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Waiting}" IsVisible="{Binding NoLines}" FontSize="12.5" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
+    </StackPanel>
+  </Border>
+</UserControl>

@@ -41,6 +41,23 @@ public static partial class SelfTest
         }
     }
 
+    /// <summary>A Mac: the whole screen as the student sees it, every app's windows and the pill's own, as
+    /// <c>&lt;name&gt;-screen.png</c> (macOS's screencapture; a run without Screen Recording permission gets the desktop
+    /// alone, which is still worth a look).</summary>
+    static void ScreenPicture(string name)
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        try
+        {
+            using var p = System.Diagnostics.Process.Start("/usr/sbin/screencapture", ["-x", Path.Combine(Dir!, name + "-screen.png")]);
+            p?.WaitForExit(10_000);
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+        {
+            Say($"{name} (screen): no picture ({e.Message})");
+        }
+    }
+
     static string Hex(uint bgra) => $"#{(bgra >> 16) & 0xFF:X2}{(bgra >> 8) & 0xFF:X2}{bgra & 0xFF:X2}";
 
     sealed record Picture(WriteableBitmap Bitmap, uint[] Pixels, int Width, int Height, (int X, int Y) Ground)

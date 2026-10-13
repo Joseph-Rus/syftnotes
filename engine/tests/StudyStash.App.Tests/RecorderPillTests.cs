@@ -31,7 +31,6 @@ public class RecorderPillTests
     static List<T> Showing<T>(Visual root) where T : Visual => [.. root.GetVisualDescendants().OfType<T>().Where(Shown)];
 
     [AvaloniaTheory]
-    [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
     public void The_pill_is_a_small_white_capsule_with_stop_the_class_and_the_time(SkinKind skin)
     {
@@ -60,7 +59,6 @@ public class RecorderPillTests
     /// <summary>Pausing swaps the class for "Paused" and rests the meter, each in the other's room: a see-through
     /// window resized on screen under the pointer is what made the recorder lag once.</summary>
     [AvaloniaTheory]
-    [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
     public void Pausing_never_changes_the_pills_size(SkinKind skin)
     {
@@ -77,6 +75,60 @@ public class RecorderPillTests
         model.IsPaused = false;
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(size, pill.Bounds.Size);
+    }
+
+    /// <summary>A Mac's pill stands upright and says nothing: the S over three level bars. With the pointer on it the S
+    /// is Stop, one click, and a card beside it says the class, the time and the last two lines heard.</summary>
+    [AvaloniaFact]
+    public void A_Macs_pill_is_upright_and_shows_stop_and_a_card_on_hover()
+    {
+        var model = Demo.Recorder();
+        bool stopped = false;
+        model.OnStop = () => stopped = true;
+        var (_, pill) = Show(SkinKind.Mac, model);
+
+        Assert.Equal(new Size(36, 62), pill.Bounds.Size);
+        Assert.Empty(Showing<TextBlock>(pill));
+        Assert.Empty(Showing<Button>(pill));
+        Assert.True(Shown(pill.FindControl<Viewbox>("PillMark") ?? pill.GetVisualDescendants().OfType<Viewbox>().First()));
+
+        model.Hovered = true;
+        Dispatcher.UIThread.RunJobs();
+        var stop = Assert.Single(Showing<Button>(pill));
+        Assert.Equal("Stop", Avalonia.Automation.AutomationProperties.GetName(stop));
+        Assert.DoesNotContain(pill.GetVisualDescendants().OfType<Viewbox>(), Shown);
+        Assert.Equal(new Size(36, 62), pill.Bounds.Size);
+        Assert.Equal("CS 101 · 24:18", model.HoverTitle.Replace(model.DisplayClass, "CS 101"));
+        Assert.Equal($"“{model.Lines[^1].Text}”", model.NewestLine);
+        Assert.Equal($"“{model.Lines[^2].Text}”", model.EarlierLine);
+        stop.Command!.Execute(null);
+        Assert.True(stopped);
+    }
+
+    /// <summary>Paused, hovering a Mac's pill offers Resume where Stop was, and the pill keeps its size.</summary>
+    [AvaloniaFact]
+    public void A_paused_Mac_pill_offers_resume_on_hover()
+    {
+        var model = Demo.Recorder();
+        bool paused = false;
+        model.OnPause = () => paused = true;
+        var (_, pill) = Show(SkinKind.Mac, model);
+
+        model.IsPaused = true;
+        Dispatcher.UIThread.RunJobs();
+        // Paused, without the pointer: the S (dimmed) and the resting meter, nothing to click.
+        Assert.True(Shown(pill.GetVisualDescendants().OfType<Viewbox>().First()));
+        Assert.True(Shown(pill.GetVisualDescendants().OfType<StudyStash.App.Controls.Waveform>().First()));
+        Assert.Empty(Showing<Button>(pill));
+
+        model.Hovered = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(new Size(36, 62), pill.Bounds.Size);
+        var resume = Assert.Single(Showing<Button>(pill));
+        Assert.Equal("Resume", Avalonia.Automation.AutomationProperties.GetName(resume));
+        Assert.StartsWith(model.DisplayClass + " · paused at ", model.HoverTitle);
+        resume.Command!.Execute(null);
+        Assert.True(paused);
     }
 
     [Fact]

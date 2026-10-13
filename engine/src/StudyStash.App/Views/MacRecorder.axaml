@@ -1,4 +1,4 @@
-<!-- The floating recorder (Mac): small, a white pill with a red dot (Stop), the class, a level meter and the time; open,
+<!-- The floating recorder (Mac): small, an upright pill of the S and a level meter (Stop and a card on hover); open,
      360 × 520, the transcript fading upward and a chat below whose answers link to moments in the recording. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -20,12 +20,22 @@
       <Setter Property="CornerRadius" Value="16" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
     </Style>
-    <Style Selector="Button.stop">
+    <Style Selector="Button.stop, Button.resume">
       <Setter Property="Theme" Value="{StaticResource Surface}" />
-      <Setter Property="Width" Value="32" />
-      <Setter Property="Height" Value="32" />
-      <Setter Property="CornerRadius" Value="16" />
+      <Setter Property="CornerRadius" Value="12" />
       <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.stop, Button.resume">
+      <Setter Property="Width" Value="24" />
+      <Setter Property="Height" Value="24" />
+      <Setter Property="Padding" Value="0" />
+    </Style>
+    <Style Selector="Button.stop">
+      <Setter Property="Background" Value="{DynamicResource Record}" />
+    </Style>
+    <Style Selector="Button.stop /template/ Border#PART_Bg">
+      <Setter Property="Background" Value="{DynamicResource Record}" />
     </Style>
     <Style Selector="TextBlock.old">
       <Setter Property="Foreground" Value="{DynamicResource Fg2}" />
@@ -35,27 +45,31 @@
     </Style>
   </UserControl.Styles>
   <Panel>
-    <!-- The pill: a small white capsule floating over whatever else is on screen, and red only in its dot. The dot is
-         Stop (a stop square in it while it records; a red ring round a red centre while it's paused), then the class
-         by its short name, a level meter that moves with what the microphone hears, and the time. A click anywhere
-         else on it opens the recorder; a drag moves it. Paused, "Paused" takes the class's place and the meter rests,
-         each in the room the other had, so the pill never changes size under the pointer. -->
-    <Border Name="Pill" IsVisible="{Binding !Expanded}" Classes.recording="{Binding IsRunning}" Classes.paused="{Binding IsPaused}" Height="44" CornerRadius="22"
-            Padding="6,0" Background="{DynamicResource Surface}" BoxShadow="{DynamicResource ShadowFloat}" HorizontalAlignment="Left"
-            AutomationProperties.Name="{Binding PillSaid}">
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <Button AutomationProperties.Name="Stop" Classes="stop" Command="{Binding StopCommand}" ToolTip.Tip="Stop" VerticalAlignment="Center">
-          <Border Classes="record-dot mini"><Border /></Border>
-        </Button>
-        <Panel VerticalAlignment="Center">
-          <TextBlock Name="PillClass" Text="{Binding ShortClass}" FontSize="14" FontWeight="Bold" MaxWidth="150" TextTrimming="CharacterEllipsis"
-                     Opacity="{Binding IsRunning, Converter={x:Static c:Converters.Shown}}" />
-          <TextBlock Text="Paused" FontSize="14" FontWeight="Bold" Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Shown}}" />
+    <!-- The pill, upright and quiet: the Study Stash S over a three-bar level meter, nothing else. With the pointer on
+         it the S turns into Stop (Resume while paused), one click away, and a card beside it says the class, the time
+         and the last lines heard (PillCard, a window of its own beside it). A click anywhere else on it opens the recorder; a drag moves it. Paused, the meter
+         rests and the S dims. -->
+    <Border Name="Pill" IsVisible="{Binding !Expanded}" Classes.recording="{Binding IsRunning}" Classes.paused="{Binding IsPaused}"
+            Width="36" Height="62" CornerRadius="18" Background="{DynamicResource Surface}" BoxShadow="{DynamicResource ShadowFloat}"
+            HorizontalAlignment="Left" VerticalAlignment="Top" AutomationProperties.Name="{Binding PillSaid}">
+      <StackPanel Spacing="6" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Panel Width="24" Height="24" HorizontalAlignment="Center">
+          <Viewbox Name="PillMark" Width="18" Height="18" IsVisible="{Binding ShowMark}" Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Dim}}">
+            <Canvas Width="460" Height="510">
+              <Path Data="M362 97C330 73 270 63 206 63C140 63 98 103 98 159C98 213 146 233 212 251C288 271 336 293 336 349C336 409 282 445 204 445C144 445 94 425 66 393"
+                    Stroke="{DynamicResource Fg}" StrokeThickness="104" StrokeLineCap="Round" />
+              <Ellipse Canvas.Left="362" Canvas.Top="399" Width="80" Height="80" Fill="{DynamicResource Fg}" />
+            </Canvas>
+          </Viewbox>
+          <Button AutomationProperties.Name="Stop" Classes="stop" Command="{Binding StopCommand}" IsVisible="{Binding ShowStop}">
+            <Border Width="8" Height="8" CornerRadius="2" Background="{DynamicResource OnRecord}" />
+          </Button>
+          <Button AutomationProperties.Name="Resume" Classes="resume" Command="{Binding PauseCommand}" IsVisible="{Binding ShowResume}">
+            <c:Icon Glyph="play_arrow" Filled="True" Size="14" Foreground="{DynamicResource Fg}" />
+          </Button>
         </Panel>
-        <c:Waveform Bars="3" Height="16" MinBar="5" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" VerticalAlignment="Center"
-                    Opacity="{Binding IsRunning, Converter={x:Static c:Converters.Shown}}" />
-        <TextBlock Name="PillTime" Text="{Binding Elapsed}" FontSize="14" FontWeight="Medium" Foreground="{DynamicResource InkMuted}" MinWidth="40"
-                   VerticalAlignment="Center" Margin="0,0,6,0" />
+        <c:Waveform Bars="3" Height="12" MinBar="4" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" HorizontalAlignment="Center"
+                    Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Dim}}" />
       </StackPanel>
     </Border>
 

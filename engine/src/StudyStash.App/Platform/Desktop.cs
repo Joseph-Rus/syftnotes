@@ -65,6 +65,20 @@ public static class Desktop
         }
     }
 
+    /// <summary>A Mac: step back as if the student clicked into another app (the self-test's way of leaving the
+    /// library for a class's slides).</summary>
+    public static void Deactivate()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        try
+        {
+            ObjC.Send(ObjC.App, ObjC.sel_registerName("deactivate"));
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
+
     // --- starting at login -------------------------------------------------------------------------------------------
 
     const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
