@@ -103,7 +103,17 @@ public class UiTests
         {
             listener.Stop();
         }
-        Assert.Equal("free", await HostInfo.PortStatusAsync(port));
+        Assert.Equal("free", await FreedAsync(port));
+    }
+
+    /// <summary>The port's status once it has had a moment to come free: on a Mac the probe's own connection to the
+    /// closed listener can hold the port a little while (a CI run saw "busy" straight after Stop).</summary>
+    static async Task<string> FreedAsync(int port)
+    {
+        var until = DateTime.UtcNow.AddSeconds(5);
+        string status;
+        while ((status = await HostInfo.PortStatusAsync(port)) != "free" && DateTime.UtcNow < until) await Task.Delay(100);
+        return status;
     }
 
     [Fact]
@@ -123,7 +133,7 @@ public class UiTests
         {
             listener.Stop();
         }
-        Assert.True(HostInfo.PortFree(port));
+        Assert.Equal("free", await FreedAsync(port));
     }
 
     [Fact]
