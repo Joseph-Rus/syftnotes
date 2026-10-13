@@ -353,11 +353,13 @@ public static partial class Shell
         if (host.Recorder.Current is null)
         {
             recorderWindow?.Hide();
+            UpdateDock();
             return;
         }
         bool front = mainWindow is { IsVisible: true, IsActive: true };
         if (!front) ShowRecorder(recorder.Expanded && recorderWindow?.IsVisible == true);
         else if (recorderWindow?.IsVisible == true && !recorder.Expanded) recorderWindow.Hide();
+        UpdateDock();
         host.WatchLiveWords(WatchingWords());
     }
 }

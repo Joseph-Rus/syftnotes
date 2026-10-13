@@ -572,6 +572,7 @@ public static partial class Shell
         var l = host.StopRecording();
         chosenClass = "";
         recorderWindow?.Hide();
+        UpdateDock();
         if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
         else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS()), null, null);
         if (onPage)
@@ -1482,10 +1483,23 @@ public static partial class Shell
     }
 
     /// <summary>A Mac shows the app in the Dock (and ⌘Tab) while the library, setup or Settings is open, and keeps it
-    /// to the menu bar otherwise.</summary>
-    static void UpdateDock() =>
-        Desktop.ShowInDock(!quitting && (mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
-            || canvasConnectWindow?.IsVisible == true || browserChoiceWindow?.IsVisible == true));
+    /// to the menu bar otherwise. While the small recorder floats over another app it keeps to the menu bar too: macOS
+    /// lets only a menu-bar app's window float over another app's full-screen Space, so with the Dock icon the pill
+    /// vanished behind a full-screen app. Coming back to the library window brings the Dock icon back.</summary>
+    static void UpdateDock()
+    {
+        bool open = mainWindow?.IsVisible == true || setupWindow?.IsVisible == true || settingsWindow?.IsVisible == true
+            || canvasConnectWindow?.IsVisible == true || browserChoiceWindow?.IsVisible == true;
+        bool pillAway = recorderWindow?.IsVisible == true && mainWindow?.IsActive != true && setupWindow?.IsActive != true && settingsWindow?.IsActive != true;
+        bool dock = !quitting && open && !pillAway;
+        if (dock == inDock) return;
+        inDock = dock;
+        Desktop.ShowInDock(dock);
+        // Now a menu-bar app: the pill is put in front again, on whichever Space is showing (a full-screen app's too).
+        if (!dock && pillAway) Dispatcher.UIThread.Post(() => recorderWindow?.OrderFront(), DispatcherPriority.Background);
+    }
+
+    static bool? inDock;
 
     // --- keeping it all up to date ------------------------------------------------------------------------------------
 
