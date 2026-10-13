@@ -90,13 +90,13 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         return result;
     }
 
-    /// <summary>Why nothing wrote notes for a filed lecture, when that's known: <see cref="Summarize.NoNotesShort"/>
-    /// for one with too little said to write them from. Null when an AI wrote its notes, when they're on their way,
-    /// when it has the notes it came with, and when notes were asked for and none came back (its error says why, if
-    /// anything does).</summary>
+    /// <summary>Why nothing writes notes for a lecture, when that's known: <see cref="Summarize.NoNotesShort"/> for
+    /// one with too little said to write them from, which is known as soon as it arrives (so nothing says its notes
+    /// are on their way while it's filed). Null when an AI wrote its notes, when it has the notes it came with, and
+    /// when notes were asked for and none came back (its error says why, if anything does).</summary>
     static string? WhyNoNotes(NoteRow row, Meeting m)
     {
-        if (!string.IsNullOrEmpty(row.SummaryModel) || row.Status is Store.Queued or Store.Working || Py.Strip(m.NotesMarkdown).Length > 0) return null;
+        if (!string.IsNullOrEmpty(row.SummaryModel) || Py.Strip(m.NotesMarkdown).Length > 0) return null;
         return Summarize.TooShort(m) ? Summarize.NoNotesShort : null;
     }
 

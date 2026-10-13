@@ -145,6 +145,8 @@ public class SummarizeTests
         }, Quiet);
         store.Enqueue(new Meeting("short") { Title = "A first try", Transcript = "[00:00] Testing, one two three." });
         store.Enqueue(new Meeting("long") { Title = "Lecture", Transcript = Lines(40) });
+        // (Known as soon as it arrives: nothing says a short one's notes are on their way while it's filed.)
+        Assert.Equal(Summarize.NoNotesShort, new LibraryReader(cfg, store).Lecture("short")!["no_notes"]!.GetValue<string>());
         Assert.Equal(2, await p.RunPendingAsync());
         Assert.Equal(["long"], asked);
 
