@@ -23,6 +23,10 @@ public sealed class SherpaSpeakerLabeler : ISpeakerLabeler
     const int PrintStretches = 6;
     const double ShortestStretch = 1.5;
 
+    /// <summary>The longest stretch a print is taken from: TitaNet's export takes at most 12288 frames (about two
+    /// minutes), and anything longer aborts the whole app from inside onnxruntime, so a long one gives its middle.</summary>
+    const double LongestStretch = 60;
+
     /// <param name="folder">Where the model's two files are.</param>
     public SherpaSpeakerLabeler(string folder, int threads = 0)
     {
@@ -59,7 +63,9 @@ public sealed class SherpaSpeakerLabeler : ISpeakerLabeler
                 foreach (var t in voice.Where(t => t.End - t.Start >= ShortestStretch).OrderByDescending(t => t.End - t.Start).Take(PrintStretches))
                 {
                     stop.ThrowIfCancellationRequested();
-                    int from = Math.Clamp((int)(t.Start * Sound.Rate), 0, samples.Length), to = Math.Clamp((int)(t.End * Sound.Rate), from, samples.Length);
+                    double start = t.Start, end = t.End;
+                    if (end - start > LongestStretch) (start, end) = ((start + end - LongestStretch) / 2, (start + end + LongestStretch) / 2);
+                    int from = Math.Clamp((int)(start * Sound.Rate), 0, samples.Length), to = Math.Clamp((int)(end * Sound.Rate), from, samples.Length);
                     if (to - from < ShortestStretch * Sound.Rate) continue;
                     using var stream = prints.CreateStream();
                     stream.AcceptWaveform(Sound.Rate, samples[from..to]);

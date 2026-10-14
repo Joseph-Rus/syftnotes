@@ -55,7 +55,20 @@ public sealed class Waveform : Control
     public static readonly StyledProperty<IBrush?> ForegroundProperty = TextBlock.ForegroundProperty.AddOwner<Waveform>();
     public static readonly StyledProperty<double> MinBarProperty = AvaloniaProperty.Register<Waveform, double>(nameof(MinBar), 4);
 
-    static Waveform() => AffectsRender<Waveform>(LevelsProperty, BarsProperty, ForegroundProperty);
+    /// <summary>Its bars stretched to the last few seconds' loudness (the pill's three): a lecturer across the room is
+    /// -35 to -25 dBFS, which on the plain scale moved a 12 px bar between 5 and 7 px.</summary>
+    public static readonly StyledProperty<bool> LivelyProperty = AvaloniaProperty.Register<Waveform, bool>(nameof(Lively));
+
+    /// <summary>Below this (-45 dBFS) a lively waveform is flat: a quiet room's hum.</summary>
+    const double Hush = 0.25;
+
+    static Waveform() => AffectsRender<Waveform>(LevelsProperty, BarsProperty, ForegroundProperty, LivelyProperty);
+
+    public bool Lively
+    {
+        get => GetValue(LivelyProperty);
+        set => SetValue(LivelyProperty, value);
+    }
 
     public IReadOnlyList<double>? Levels
     {
@@ -89,9 +102,12 @@ public sealed class Waveform : Control
         var levels = Levels is null ? null : live ?? Levels;
         var brush = Foreground ?? Brushes.Gray;
         double h = Bounds.Height;
+        // Lively: the loudest of the last 3 s fills the bar, and anything at the room's hum or under is flat.
+        double span = Lively && levels is { Count: > 0 } ? Math.Max(levels.Max() - Hush, 0.15) : 0;
         for (int i = 0; i < Bars; i++)
         {
             double level = levels is { Count: > 0 } ? levels[Math.Max(0, levels.Count - Bars + i)] : 0;
+            if (span > 0) level = Math.Clamp((level - Hush) / span, 0, 1);
             double bar = Math.Max(MinBar, Math.Min(h, level * h));
             context.DrawRectangle(brush, null, new RoundedRect(new Rect(i * 5, (h - bar) / 2, 3, bar), 2));
         }

@@ -68,7 +68,7 @@
             <c:Icon Glyph="play_arrow" Filled="True" Size="14" Foreground="{DynamicResource Fg}" />
           </Button>
         </Panel>
-        <c:Waveform Bars="3" Height="12" MinBar="4" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" HorizontalAlignment="Center"
+        <c:Waveform Bars="3" Height="12" MinBar="4" Lively="True" Levels="{Binding Levels}" Foreground="{DynamicResource Record}" HorizontalAlignment="Center"
                     Opacity="{Binding IsPaused, Converter={x:Static c:Converters.Dim}}" />
       </StackPanel>
     </Border>

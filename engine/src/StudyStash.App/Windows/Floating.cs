@@ -38,7 +38,12 @@ public class Floating : Window
             Hide();
             LastDeactivateHide = DateTime.UtcNow;
         };
-        Opened += (_, _) => JoinFullScreenSpaces();
+        Opened += (_, _) =>
+        {
+            JoinFullScreenSpaces();
+            if (ClickThrough) IgnoreClicks(true);
+        };
+        clicks.Tick += (_, _) => FollowPointer();
         Closing += (_, _) => Unpanel();
         PositionChanged += (_, _) => SayClearAreaChanged();
     }
@@ -50,6 +55,51 @@ public class Floating : Window
     /// <summary>A Mac: this window is a non-activating panel, the only kind macOS lets float over another app's
     /// full-screen Space while the app keeps its Dock icon (the recorder pill over full-screen slides or Zoom).</summary>
     public bool OverFullScreen { get; init; }
+
+    /// <summary>A Mac: the pointer and clicks go straight through it to whatever's under it (the pill's card, which
+    /// would otherwise take the pointer off the pill whenever its clear room lay over it).</summary>
+    public bool ClickThrough { get; init; }
+
+    /// <summary>A Mac: only the panel itself takes the pointer; its clear shadow room lets clicks through to what's
+    /// under it (the recorder pill's room is 60 points all round, a box nothing behind it could be clicked in). macOS
+    /// only lets a whole window ignore the mouse, so while it's shown the pointer is looked at every 30 ms.</summary>
+    public bool ClicksOnPanelOnly { get; init; }
+
+    readonly Avalonia.Threading.DispatcherTimer clicks = new() { Interval = TimeSpan.FromMilliseconds(30) };
+    bool ignoring;
+
+    void IgnoreClicks(bool ignore)
+    {
+        if (ignore == ignoring && !ClickThrough) return;
+        try
+        {
+            IntPtr w = NativeWindow();
+            if (w == IntPtr.Zero) return;
+            objc_msgSend_setBool(w, sel_registerName("setIgnoresMouseEvents:"), (byte)(ignore ? 1 : 0));
+            ignoring = ignore;
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
+
+    /// <summary>Takes the mouse while the pointer's on the panel, lets it through elsewhere; never in the middle of a
+    /// press (a drag that runs ahead of the pill keeps going).</summary>
+    void FollowPointer()
+    {
+        try
+        {
+            IntPtr w = NativeWindow();
+            if (w == IntPtr.Zero || objc_msgSend_nuint(objc_getClass("NSEvent"), sel_registerName("pressedMouseButtons")) != 0) return;
+            var at = MouseLocation(w, sel_registerName("mouseLocationOutsideOfEventStream")); // points, from its bottom left
+            var pad = holder.Padding;
+            var panel = new Rect(pad.Left, pad.Top, ClientSize.Width - pad.Left - pad.Right, ClientSize.Height - pad.Top - pad.Bottom);
+            IgnoreClicks(!panel.Contains(new Point(at.X, ClientSize.Height - at.Y)));
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
 
     /// <summary>A window that <see cref="KeepClear"/>s showed, hid, moved or changed size: notifications look again at
     /// where they can go.</summary>
@@ -64,6 +114,11 @@ public class Floating : Window
     {
         base.OnPropertyChanged(change);
         if (change.Property == IsVisibleProperty || change.Property == ClientSizeProperty) SayClearAreaChanged();
+        if (change.Property == IsVisibleProperty && ClicksOnPanelOnly && OperatingSystem.IsMacOS())
+        {
+            if (IsVisible) clicks.Start();
+            else clicks.Stop();
+        }
     }
 
     /// <summary>The panel it shows, on screen in pixels (the window less its shadow room); null while it's hidden.</summary>
