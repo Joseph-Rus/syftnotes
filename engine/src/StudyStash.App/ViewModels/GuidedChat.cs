@@ -103,7 +103,7 @@ public sealed partial class CardEntry : ChatEntry
         "chrome_helper" => $"Add Study Stash's helper to {Canvas?.BrowserName ?? "your browser"}",
         "course_picker" => "Pick your courses",
         "ai_app" => $"Let {Arg} read your lectures?",
-        "start_at_login" => "Start Study Stash when you log in?",
+        "start_at_login" => "Open Study Stash when you log in?",
         "taskbar_tip" => "Keep Study Stash on the taskbar",
         _ => "You're set up",
     };

@@ -96,6 +96,48 @@ public sealed class LibraryHereTests
     }
 
     [Fact]
+    public async Task A_password_that_cant_be_sent_is_refused_before_anything_is_saved()
+    {
+        using var home = new TempHome();
+        using var host = Host(home.Path);
+        var here = new LibraryHere();
+        var refused = await Assert.ThrowsAsync<ArgumentException>(() => here.CreateAsync(host, "Ada's library", "pässword", "Ada"));
+        Assert.Equal("The password can't have “ä” in it. Use only the letters a to z, numbers, and symbols like ! or #.", refused.Message);
+        Assert.Null(host.LocalLibrary);
+        Assert.False(File.Exists(home["config.toml"]));
+        // Everything a password made before the rule can be made of still passes: every symbol, and spaces.
+        Assert.Null(Configs.PasswordProblem("correct horse 9 !\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"));
+    }
+
+    [Fact]
+    public async Task Just_this_computer_gives_a_library_whose_password_cant_be_sent_a_new_one_and_starts_it()
+    {
+        string exe = BuiltEngine();
+        Assert.True(File.Exists(exe), $"build the solution first: no {exe}");
+        using var home = new TempHome();
+        // What a setup from before the rule left behind: the app could never reach this library, however often it tried.
+        Configs.Save(new Config(home.Path, home["Notes"]) { PoolName = "Sam's library", PoolPassword = "pässword", WebHost = "127.0.0.1", WebPort = FreePort() });
+        using var host = Host(home.Path);
+        var here = new LibraryHere { Command = [exe] };
+        try
+        {
+            await here.CreateAsync(host, null, null, "Sam");
+            var cfg = Configs.Load(home.Path);
+            Assert.Null(Configs.PasswordProblem(cfg.PoolPassword));
+            Assert.Equal(cfg.PoolPassword, Configs.LoadClient(home.Path).PoolKey);
+            Assert.Equal(LibraryServiceState.Running, host.LocalLibrary!.State);
+        }
+        finally { if (host.LocalLibrary is { } svc) await svc.StopAsync(); }
+    }
+
+    static int FreePort()
+    {
+        using var probe = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        probe.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+        return ((IPEndPoint)probe.LocalEndPoint!).Port;
+    }
+
+    [Fact]
     public async Task A_library_already_here_keeps_its_folder_port_reach_name_and_password()
     {
         string exe = BuiltEngine();

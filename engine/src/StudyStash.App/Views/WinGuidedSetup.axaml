@@ -694,7 +694,7 @@
                             <!-- A laptop connecting to its library -->
                             <StackPanel Spacing="8" IsVisible="{Binding IsConnection}">
                               <TextBox Classes="field" Text="{Binding Setup.Address}" PlaceholderText="Your library's address, like mac-mini:8787" />
-                              <TextBox Classes="field" Text="{Binding Setup.Password}" PasswordChar="•" PlaceholderText="Its password" />
+                              <TextBox Classes="field" Text="{Binding Setup.ConnectPassword}" PasswordChar="•" PlaceholderText="Its password" />
                               <TextBlock Classes="note" Text="{Binding Setup.LibraryResult}" IsVisible="{Binding Setup.HasLibraryResult}" />
                               <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                                 <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />

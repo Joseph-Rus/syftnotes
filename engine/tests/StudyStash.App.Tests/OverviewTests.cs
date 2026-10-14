@@ -143,6 +143,12 @@ public class OverviewTests
         Assert.Equal("Nothing on your calendar for the rest of today or tomorrow.", free.UpNextEmpty);
         // Neither Canvas nor a calendar: the library is counted instead.
         Assert.Equal("Seven notes in three folders, and notes being written for one.", OverviewModel.Home(Sources(canvas: false, calendars: false)).Lede);
+        // A library that writes no notes (setup's "No AI for now") doesn't say any are being written, or will land.
+        var off = OverviewModel.Home(Sources(canvas: false, calendars: false) with { NotesOff = true });
+        Assert.Equal("Seven notes in three folders, and one being filed.", off.Lede);
+        Assert.Equal("Being filed", off.Notes[2].Summary);
+        Assert.Equal("No notes yet. Record something and it lands here with its transcript.",
+            OverviewModel.HomeLede(Sources(canvas: false, calendars: false) with { NotesOff = true, Classes = [], Unsorted = 0 }, canvas: false));
         // Something on right now is said first; later today, by its time.
         Assert.Equal("CS 101 is on now.", OverviewModel.EventSentence(Sources() with { Events = [Event("x", "CS 101", "CS 101", -0.5)] }));
         Assert.Equal("Dentist is at 6:00 PM.", OverviewModel.EventSentence(Sources() with { Events = [Event("x", "Dentist", null, 4)] }));
@@ -624,6 +630,33 @@ public class OverviewTests
             Assert.True(In(ask, view).Left >= In(page, view).Left && In(ask, view).Right <= In(page, view).Right, $"{skin}: Ask runs off the page");
             Assert.True(In(ask, view).Bottom <= In(page, view).Bottom, $"{skin}: Ask hangs under the page");
             Assert.Equal("Ask anything about your notes", ask.GetVisualDescendants().OfType<TextBox>().Single().PlaceholderText);
+        }
+        finally
+        {
+            w.Close();
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void Homes_ask_for_a_tip_shows_whole_with_its_buttons_over_what_comes_next(SkinKind skin)
+    {
+        var m = Demo.Semester();
+        m.AskForSupport(last: false);
+        var view = Library(skin, m);
+        var w = Host(view, skin, 1280, 860);
+        try
+        {
+            var page = view.GetVisualDescendants().OfType<Overview>().Single();
+            var card = Named<Control>(page, "SupportAsk");
+            Assert.True(card.IsEffectivelyVisible);
+            // The card holds all of itself. It was cut off under its first line, its three buttons left under the
+            // heading below: its box was named as the Ask bar's is, and took the bar's fixed height.
+            foreach (string name in new[] { "Tip", "Later", "Never" })
+                Assert.True(In(Named<Button>(card, name), view).Bottom <= In(card, view).Bottom + 0.5, $"{skin}: {name} is inside the card");
+            Assert.True(In(Named<StackPanel>(page, "UpNext"), view).Top >= In(card, view).Bottom, $"{skin}: Up next starts under the card");
         }
         finally
         {

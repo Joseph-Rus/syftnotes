@@ -40,6 +40,8 @@ public static partial class Shell
     /// With something else recording it asks first, as an event does.</summary>
     static void ContinueRecording(string id)
     {
+        // The name on the note's page is the library's own, as it stands now: the recording goes by it.
+        string? title = library.Note is { Live: false, Local: false } shown && shown.Id == id ? shown.TitleNow : null;
         if (host.Recorder.Current is { } live)
         {
             if (live.Id == id)
@@ -49,14 +51,14 @@ public static partial class Shell
             }
             string now = live.Title.Length > 0 ? live.Title : live.ClassName.Length > 0 ? ClassNames.Display(live.ClassName) : "this recording";
             library.Confirming = new ConfirmAsk($"Stop recording {now} and keep recording this one?",
-                "What's recorded so far is saved, and its notes are written as usual.", "Stop and switch", () =>
+                SavedSoFar, "Stop and switch", () =>
                 {
                     StopRecording(stay: true);
-                    _ = BeginAsync(() => host.ContinueAsync(id), openPage: true);
+                    _ = BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
                 });
             return;
         }
-        _ = BeginAsync(() => host.ContinueAsync(id), openPage: true);
+        _ = BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
     }
 
     static async Task<bool> BeginAsync(Func<Task<RecordStart>> begin, bool openPage)
@@ -159,7 +161,7 @@ public static partial class Shell
             }
             string now = live.Title.Length > 0 ? live.Title : live.ClassName.Length > 0 ? ClassNames.Display(live.ClassName) : "this recording";
             library.Confirming = new ConfirmAsk($"Stop recording {now} and start {pick.Title}?",
-                "What's recorded so far is saved, and its notes are written as usual.", "Stop and start", () =>
+                SavedSoFar, "Stop and start", () =>
                 {
                     StopRecording(stay: true);
                     _ = StartRecordingAsync("", pick, openPage: true);
@@ -189,7 +191,7 @@ public static partial class Shell
         var note = new NoteModel
         {
             Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(starts, null), Title = WorkingTitle(l), Local = true,
-            Planned = true, Typed = l.Notes, Writer = NotesWriter(), Stamp = LocalStamp(l),
+            Planned = true, Typed = l.Notes, Writer = NotesWriter(), NotesOff = NotesOff, Stamp = LocalStamp(l),
             PlanWords = past ? "Not recorded. Start recording when you're ready."
                 : $"Starts at {at}. Write anything here and recording starts on its own then; leave it empty and nothing is kept.",
             OnStartNow = () => ContinueRecording(id),
@@ -271,8 +273,8 @@ public static partial class Shell
         string noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
         var note = new NoteModel
         {
-            Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(l.StartedAt, null), Title = WorkingTitle(l),
-            Live = true, Recorder = recorder, Typed = l.Notes, Writer = NotesWriter(),
+            Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(l.StartedAt, null), Title = RecordingTitle(l),
+            Live = true, Recorder = recorder, Typed = l.Notes, Writer = NotesWriter(), NotesOff = NotesOff,
             OnRename = title =>
             {
                 host.TitleLecture(id, title);
@@ -287,11 +289,26 @@ public static partial class Shell
         host.WatchLiveWords(WatchingWords());
     }
 
+    /// <summary>What a recording's page calls it. A note that's being recorded again has a name already (the one typed
+    /// on it, else the one the library filed it under) and keeps it; a new recording goes by its working title until
+    /// it has one.</summary>
+    internal static string RecordingTitle(Lecture l) =>
+        l.FiledTitle.Length > 0 && !(l.TitleTyped && l.Title.Length > 0) ? l.FiledTitle : WorkingTitle(l);
+
     /// <summary>Who writes a lecture's notes, as the hint under the student's own names them ("Claude"): the AI the
     /// library is set to write notes with, once the app has heard which; until then, "your library".</summary>
     static string notesWriter = "";
 
     static string NotesWriter() => notesWriter.Length > 0 ? notesWriter : "your library";
+
+    /// <summary>The library writes no notes (after setup's "No AI for now", or switched off in Settings → Notes and
+    /// sorting): what's recorded is filed with its transcript and nothing more, so nothing here says notes are on
+    /// their way, whatever AI the library names. False until the library has said.</summary>
+    static bool NotesOff => host.Overview is { } said && said.ContainsKey("notes_model") && said["notes_model"] is null;
+
+    /// <summary>What's said of the recording that stops so another can start: it's saved, and (while the library
+    /// writes notes) gets its notes like any other.</summary>
+    static string SavedSoFar => NotesOff ? "What's recorded so far is saved." : "What's recorded so far is saved, and its notes are written as usual.";
 
     /// <summary>Asks the library which AI writes its notes (when the window is read: it can change in Settings).</summary>
     static async Task HearNotesWriterAsync()

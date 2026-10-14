@@ -88,6 +88,33 @@ public static class Configs
         }
     }
 
+    /// <summary>
+    /// Why <paramref name="password"/> can't be a library's password, in the student's words, or null when it can.
+    /// Laptops, the app on the library's own computer and the AI tools all send the password in a request's header
+    /// (Authorization: Bearer), and a header carries only plain ASCII: an accented letter, another alphabet or an emoji
+    /// never arrives, from this version or any older one. So such a password is refused wherever one is typed, before
+    /// anything is saved. Every password made before this rule that works is plain already, and stays as it is.
+    /// </summary>
+    public static string? PasswordProblem(string password) => OddInPassword(password) is { } odd
+        ? $"The password can't have {odd} in it. Use only the letters a to z, numbers, and symbols like ! or #."
+        : null;
+
+    /// <summary>The first character of <paramref name="password"/> that can't travel in a header, as it's said to the
+    /// student (“ä”), or null when every one can.</summary>
+    public static string? OddInPassword(string password)
+    {
+        var parts = StringInfo.GetTextElementEnumerator(password);
+        while (parts.MoveNext())
+        {
+            string part = parts.GetTextElement();
+            if (part.All(c => c is >= ' ' and <= '~')) continue;
+            // One that can't be seen (pasted in, most likely) isn't quoted.
+            bool unseen = part.Any(c => char.IsControl(c) || char.IsWhiteSpace(c) || char.GetUnicodeCategory(c) == UnicodeCategory.Format);
+            return unseen ? "a tab, a line break or an unusual space" : $"“{part}”";
+        }
+        return null;
+    }
+
     // --- writing -----------------------------------------------------------------------------------
 
     static string Toml(bool b) => b ? "true" : "false";

@@ -11,6 +11,13 @@ public class FirstSentenceTests
     }
 
     [Fact]
+    public void Notes_a_student_wrote_themselves_read_without_their_marks_or_their_bullet()
+    {
+        Assert.Equal("my own bullet about the heart", LibraryReader.FirstSentence("- ==my own bullet about the heart==\n- ==and the valves=="));
+        Assert.Equal("The heart has four chambers.", LibraryReader.FirstSentence("## Summary\n==The heart has four chambers.== Blood moves through them in order."));
+    }
+
+    [Fact]
     public void A_rule_further_down_is_left_alone()
     {
         const string notes = "## Summary\nLoops repeat work. More here.\n\n---\n\nAfter the rule.";

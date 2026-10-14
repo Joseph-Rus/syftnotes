@@ -23,11 +23,16 @@ public sealed class Meeting(string id)
     public IReadOnlyList<AttachedText> Attached { get; set; } = [];
 
     /// <summary>In <see cref="Raw"/>: who named the lecture. <see cref="ByHand"/> when the student typed its title (on
-    /// the recording, or renaming it later): then no AI names it from what was said.</summary>
-    public const string TitleBy = "title_by", ByHand = "human";
+    /// the recording, or renaming it later): then no AI names it from what was said. <see cref="Kept"/> when it came in
+    /// again (it was kept recording) already named by the library: it isn't named a second time.</summary>
+    public const string TitleBy = "title_by", ByHand = "human", Kept = "kept";
 
     /// <summary>The student gave the lecture its title themselves.</summary>
     public bool TitledByHand => Raw[TitleBy] is JsonValue v && v.TryGetValue(out string? by) && by == ByHand;
+
+    /// <summary>The lecture has its name (the student's own, or the one it had when it came in again): writing its
+    /// notes doesn't change it.</summary>
+    public bool TitleStays => Raw[TitleBy] is JsonValue v && v.TryGetValue(out string? by) && by is ByHand or Kept;
 
     /// <summary>dataclasses.replace(m, notes_markdown=...): a copy with other notes.</summary>
     public Meeting WithNotes(string notesMarkdown) => new(Id)

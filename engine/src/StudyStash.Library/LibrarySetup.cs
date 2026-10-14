@@ -322,6 +322,7 @@ public sealed partial class LibrarySetup
         string name = Py.Strip(Field(data, "name")) is { Length: > 0 } n ? n : "Lecture notes";
         string password = Py.Strip(Field(data, "password"));
         if (password.Length < 4) throw new SetupProblem("Use a password of at least 4 characters.");
+        if (Configs.PasswordProblem(password) is { } problem) throw new SetupProblem(problem);
         string folder = Py.ExpandUser(Field(data, "folder") is { Length: > 0 } f ? f : Cfg.PoolDir);
         try
         {

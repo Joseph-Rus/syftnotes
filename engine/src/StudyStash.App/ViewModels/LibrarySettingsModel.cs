@@ -259,6 +259,15 @@ public sealed partial class LibrarySettingsModel : ObservableObject
 
     partial void OnHasPasswordChanged(bool value) => OnPropertyChanged(nameof(PasswordLine));
 
+    // A new password with a letter that can't be used (Configs.PasswordProblem) is said as it's typed, and the line
+    // goes again once the letter does.
+    partial void OnNewPasswordChanged(string oldValue, string newValue) => PasswordSay = Typed(oldValue, newValue, PasswordSay);
+
+    partial void OnLaptopPasswordChanged(string oldValue, string newValue) => LaptopSay = Typed(oldValue, newValue, LaptopSay);
+
+    static string? Typed(string before, string now, string? said) =>
+        Configs.PasswordProblem(now.Trim()) ?? (said is not null && said == Configs.PasswordProblem(before.Trim()) ? null : said);
+
     partial void OnTailscaleChanged(bool value)
     {
         OnPropertyChanged(nameof(ReachLine));
@@ -521,6 +530,12 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             PasswordSay = "Use a password of at least 4 characters.";
             return;
         }
+        // Checked here too: a library from before the rule would save it, and then nothing could connect.
+        if (Configs.PasswordProblem(password) is { } problem)
+        {
+            PasswordSay = problem;
+            return;
+        }
         if (connect() is not { } call) return;
         try
         {
@@ -558,6 +573,11 @@ public sealed partial class LibrarySettingsModel : ObservableObject
         if (password.Length < 4)
         {
             LaptopSay = "Use a password of at least 4 characters.";
+            return;
+        }
+        if (Configs.PasswordProblem(password) is { } problem)
+        {
+            LaptopSay = problem;
             return;
         }
         if (await ChangeLaptopsAsync(true, password))

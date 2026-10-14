@@ -58,16 +58,17 @@ public static class Setup
         m.LibraryName = $"{Person()}'s library";
         here ??= LibraryHere.ThisComputer();
         m.NotesFolder = here.Folder ?? LibraryHere.DefaultFolder;
-        // Setup run again on the library: it keeps its name, password and notes folder, and it starts at login as it
-        // should (Finish writes the login item afresh, pointing at this copy of the app).
+        // Setup run again on the library: it keeps its name, password and notes folder.
         if (LibraryHere.Existing(host.Home) is { } had)
         {
             m.ExistingLibrary = true;
             if (had.PoolName.Length > 0) m.LibraryName = had.PoolName;
             m.Password = had.PoolPassword;
             m.NotesFolder = had.PoolDir;
-            m.StartAtLogin = true;
         }
+        // The switch shows what the student last chose: on only when Study Stash already starts at login (Finish
+        // then writes the login item afresh, pointing at this copy of the app). A library already here doesn't turn
+        // it on by itself: setup closed part-way and opened again would write a login item nobody asked for.
         if (host.LoginItems.StartsAtLogin(host.Home)) m.StartAtLogin = true;
         m.Keys = new ShortcutsModel(() => host.Settings.Keys, change => host.Save(s => change(s.Keys)), Skin.Current == SkinKind.Mac, !m.IsLibrary)
         {
@@ -104,8 +105,19 @@ public static class Setup
         m.OnConnect = () => ConnectAsync(m, host, here);
         m.OnFind = () => FindAsync(m, host);
         m.OnAddClass = () => AddClassAsync(m, host);
-        // Leaving Classes adds the Canvas courses that are ticked (and links them).
-        m.LeaveAsync = step => step == SetupStep.Classes ? AddCoursesAsync(m, host) : Task.FromResult(true);
+        // Leaving Classes adds the class still typed in its fields, as Add would (a class typed and never added was
+        // dropped without a word), then the Canvas courses that are ticked (and links them). A class the library
+        // won't take keeps the step open, saying why.
+        m.LeaveAsync = async step =>
+        {
+            if (step != SetupStep.Classes) return true;
+            if (m.NewClass.Trim().Length > 0 || m.NewAbout.Trim().Length > 0)
+            {
+                await AddClassAsync(m, host);
+                if (m.HasClassProblem) return false;
+            }
+            return await AddCoursesAsync(m, host);
+        };
         m.CanLeave = step =>
         {
             if ((step is SetupStep.Password or SetupStep.Library || step == SetupStep.Welcome && m.IsOneComputer) && !m.LibraryOk)
@@ -274,10 +286,13 @@ public static class Setup
             {
                 string url = NormalizeAddress(m.Address);
                 if (url.Length == 0) throw new InvalidOperationException("Type your library's address, like http://mac-mini:8787.");
-                var health = await LibraryApi.CheckServerAsync(url, m.Password.Trim());
+                // Behind the dots, a letter no library's password can have (the keyboard was set to another language, say).
+                if (Configs.OddInPassword(m.ConnectPassword.Trim()) is { } odd)
+                    throw new InvalidOperationException($"That password isn't right: a library's password can't have {odd} in it.");
+                var health = await LibraryApi.CheckServerAsync(url, m.ConnectPassword.Trim());
                 var cc = host.Client();
                 cc.ServerUrl = url;
-                cc.PoolKey = m.Password.Trim();
+                cc.PoolKey = m.ConnectPassword.Trim();
                 cc.PoolName = health["pool_name"]?.GetValue<string>() ?? "";
                 if (cc.DisplayName.Length == 0) cc.DisplayName = Person();
                 host.SaveClient(cc);
@@ -327,6 +342,10 @@ public static class Setup
             else
             {
                 m.Address = found.Url;
+                // This computer's own library: the app knows its password (one made for just this computer was never
+                // shown to anyone), so the field isn't left for the student to fill.
+                if (found.Local && File.Exists(cfg.ConfigPath) && found.Url.EndsWith($":{cfg.WebPort}", StringComparison.Ordinal))
+                    m.ConnectPassword = cfg.PoolPassword;
                 m.LibraryResult = found.Local ? $"Found a library on this {m.DeviceWord}."
                     : found.Name.Length > 0 ? $"Found {found.Name} on your Tailscale network. Type its password."
                     : "Found a library on your Tailscale network. Type its password.";
@@ -439,11 +458,22 @@ public static class Setup
         }
     }
 
-    /// <summary>Classes' Add: the class goes into the library at once, with what it covers when typed.</summary>
+    /// <summary>Classes' Add (and Continue, with a class still in the fields): the class goes into the library at
+    /// once, with what it covers when typed. What it covers typed without a name is asked for its name, not dropped.</summary>
     static async Task AddClassAsync(SetupModel m, AppHost host)
     {
         string name = m.NewClass.Trim(), about = m.NewAbout.Trim();
-        if (name.Length == 0) return;
+        if (name.Length == 0)
+        {
+            m.ClassProblem = about.Length > 0 ? "Give the class a name too, like CS 101." : null;
+            return;
+        }
+        // Said here, in a student's words; the library's own refusal is a note to whoever calls its API.
+        if (name.Length > 60)
+        {
+            m.ClassProblem = "Keep the class's name to 60 characters.";
+            return;
+        }
         if (host.Remote() is not { } lib)
         {
             m.ClassProblem = "Connect to your library first: the classes are its.";

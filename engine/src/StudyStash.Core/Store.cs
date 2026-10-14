@@ -85,6 +85,11 @@ public static partial class Notes
         return string.Join("\n", output);
     }
 
+    /// <summary>Where a note file's notes would be, when none were written: the recording was too short for them
+    /// (<see cref="Summarize.TooShort"/>), or notes were asked for and none came back.</summary>
+    public static readonly string TooShortForNotes = $"_({Summarize.TooShortWords()})_";
+    public const string NoNotesReturned = "_(no AI notes returned)_";
+
     public static string Render(Meeting m, Classification c, string summaryMd = "", string summaryModel = "")
     {
         var topicList = c.Topics ?? [];
@@ -117,13 +122,16 @@ public static partial class Notes
         bool fromNotes = summarized && Summarize.FromNotes(m);
         if (summarized)
         {
-            lines.AddRange(["## Summary", "", DemoteHeadings(Py.Strip(summaryMd)), "",
-                $"_Written by {summaryModel} from {(fromNotes ? "the notes it came with" : "the transcript")}._", ""]);
+            lines.AddRange(["## Summary", "", DemoteHeadings(Py.Strip(summaryMd)), ""]);
+            // Notes no model wrote are the student's own (what they typed, saved as the notes of a recording too
+            // short to have any written): no line says who wrote them from what.
+            if (summaryModel.Length > 0)
+                lines.AddRange([$"_Written by {summaryModel} from {(fromNotes ? "the notes it came with" : "the transcript")}._", ""]);
         }
         if (!summarized || (fromNotes && Py.Strip(m.NotesMarkdown).Length > 0))
         {
             string notes = Py.Strip(m.NotesMarkdown);
-            lines.AddRange(["## Notes", "", notes.Length > 0 ? notes : "_(no AI notes returned)_", ""]);
+            lines.AddRange(["## Notes", "", notes.Length > 0 ? notes : Summarize.TooShort(m) ? TooShortForNotes : NoNotesReturned, ""]);
         }
         if (Py.Strip(m.PrivateNotes).Length > 0) lines.AddRange(["## Private notes", "", Py.Strip(m.PrivateNotes), ""]);
         if (Py.Strip(m.Transcript).Length > 0) lines.AddRange(["## Transcript", "", Py.Strip(m.Transcript), ""]);
@@ -300,11 +308,26 @@ public sealed partial class Store : IDisposable
 
     // --- the processing queue ------------------------------------------------------------------------------------
 
-    /// <summary>Accept a lecture the laptop sent. The pipeline picks it up and files it.</summary>
+    /// <summary>Accept a lecture the laptop sent. The pipeline picks it up and files it. One that's here already was
+    /// kept recording (minutes or days later) and comes in again, longer: it keeps the name it has.</summary>
     public void Enqueue(Meeting m)
     {
         lock (gate)
         {
+            var before = Get(m.Id);
+            if (before is { LectureTitle: { Length: > 0 } name } && !m.TitledByHand)
+            {
+                // The laptop sends it under the title it knows it by, which isn't one typed here since (that stays the
+                // student's), nor the one its notes were filed under (that isn't made up a second time). One still
+                // under the title it first came with was never named, and is named now as a new lecture is.
+                var was = Meeting(before);
+                if (was.TitledByHand)
+                {
+                    m.Title = name;
+                    m.Raw[Core.Meeting.TitleBy] = Core.Meeting.ByHand;
+                }
+                else if (was.TitleStays || name != before.Title) m.Raw[Core.Meeting.TitleBy] = Core.Meeting.Kept;
+            }
             string now = Now();
             Exec("""
                 INSERT INTO notes(id,title,date,owner,attendees,folder,has_transcript,raw_json,payload_json,
@@ -318,6 +341,9 @@ public sealed partial class Store : IDisposable
                 m.Id, m.Title, m.Date, m.Owner, PyJson.Dumps(m.Attendees), m.Folder,
                 Py.Strip(m.Transcript).Length > 0 ? 1L : 0L, Py.Head(PyJson.Dumps(m.Raw), 200_000),
                 Wire.MeetingJson(m), Queued, now, now);
+            // A title typed on the recording's page while it was kept recording is the newest there is: it's the
+            // lecture's from now on (the pipeline keeps the name the row has).
+            if (before is not null && m.TitledByHand) Exec("UPDATE notes SET lecture_title=? WHERE id=?", m.Title, m.Id);
         }
     }
 
@@ -373,6 +399,52 @@ public sealed partial class Store : IDisposable
             if (row.ClassifiedBy == "human" && !string.IsNullOrEmpty(row.ClassName))
                 c = new Classification(row.ClassName, 1.0, "human", c.LectureTitle, c.Topics);
             return Save(m, c, summaryMd, summaryModel, error);
+        }
+    }
+
+    /// <summary>
+    /// The pipeline went through a lecture that has notes and wrote no new ones (its engine failed or wrote nothing,
+    /// notes are switched off, the transcript is too short): the lecture keeps everything it had (its notes and what
+    /// wrote them, its title, topics and class), and <paramref name="why"/> is kept with it for its page to say.
+    /// Dropped like <see cref="Finish"/>'s result when the note changed meanwhile. The note file is left exactly as it
+    /// is, so edits made in it stay too; only when the lecture itself is no longer the one the file was written from
+    /// (it was sent again with more recorded or typed, or moved to another class while it waited) is the file written
+    /// again, round the notes that were kept.
+    /// </summary>
+    public string? KeepNotes(NoteRow claimed, Meeting m, string why)
+    {
+        lock (gate)
+        {
+            var row = Get(claimed.Id);
+            if (row is null || row.Status != Working || row.UpdatedAt != claimed.UpdatedAt || string.IsNullOrEmpty(row.SummaryMd)) return null;
+            why = Py.Head(why, 2000);
+            var c = new Classification(string.IsNullOrEmpty(row.ClassName) ? Configs.Unsorted : row.ClassName, row.Confidence ?? 0,
+                row.ClassifiedBy ?? "", row.LectureTitle ?? "", JsonList(row.Topics));
+            if (!FileIsOf(row.MdPath, m, c.ClassName)) return Save(m, c, row.SummaryMd, row.SummaryModel ?? "", why);
+            Exec("UPDATE notes SET status=?, error=? WHERE id=?", Done, why, row.Id);
+            // Asking for the rewrite moved the lecture's date of change on: search's copy says the same again.
+            Index(row.Id, row.SummaryMd, m.Transcript, row.UpdatedAt ?? "");
+            return row.MdPath;
+        }
+    }
+
+    /// <summary>Whether a lecture's note file is where this lecture belongs and holds its transcript and typed notes
+    /// as they are now (as <see cref="Notes.Render"/> writes them). False too for a file that isn't there, or can't
+    /// be read.</summary>
+    bool FileIsOf(string? path, Meeting m, string className)
+    {
+        if (string.IsNullOrEmpty(path) || !Py.SamePath(path, TargetPath(m, className))) return false;
+        try
+        {
+            if (!File.Exists(path)) return false;
+            string text = Py.ReadText(path) + "\n"; // an editor may have taken the last line's end off
+            bool Holds(string heading, string body) =>
+                body.Length == 0 ? !text.Contains($"\n## {heading}\n", StringComparison.Ordinal) : text.Contains($"\n## {heading}\n\n{body}\n", StringComparison.Ordinal);
+            return Holds("Transcript", Py.Strip(m.Transcript)) && Holds("Private notes", Py.Strip(m.PrivateNotes));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 

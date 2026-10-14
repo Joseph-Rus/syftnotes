@@ -4,6 +4,7 @@ import type { AssignmentDetail } from '../api/types';
 import { dueWhen, relative } from '../format';
 import { useResource } from '../data/resource';
 import { renderMath } from '../ui/math';
+import { scrollTables } from '../ui/tables';
 import { External } from '../ui/icons';
 import { Button, Dot, Problem, Screen, Section, SkeletonRows } from '../ui/kit';
 import { useClassColors } from './classColors';
@@ -41,7 +42,9 @@ export function AssignmentScreen({ api, className, id }: { api: Api; className: 
 function Page({ a, color }: { a: AssignmentDetail; color: string }) {
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (body.current) renderMath(body.current);
+    if (!body.current) return;
+    renderMath(body.current);
+    scrollTables(body.current);
   }, [a.instructions_html]);
 
   const status = a.score_text || a.label;

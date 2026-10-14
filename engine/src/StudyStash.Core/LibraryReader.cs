@@ -82,7 +82,32 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         result["classified_by"] = row.ClassifiedBy;
         result["notes_model"] = row.SummaryModel;
         result["error"] = row.Error;
+        // The notes are the library's own (written for it, or saved by the student), not ones the lecture came with:
+        // an error beside those is a rewrite that didn't happen, and they're as they were.
+        result["notes_kept"] = !string.IsNullOrEmpty(row.SummaryMd) && !string.IsNullOrEmpty(row.Error);
+        // Why no notes were written from it, when the library knows: the app and the phone say so where the notes
+        // would be. The words are for the phone, which can't work them out itself.
+        string? why = WhyNoNotes(row, m);
+        result["no_notes"] = why;
+        result["no_notes_why"] = why switch
+        {
+            Summarize.NoNotesShort => Summarize.TooShortWords("This lecture"),
+            Summarize.NoNotesOff => Summarize.NotesOffWords("this lecture"),
+            _ => null,
+        };
         return result;
+    }
+
+    /// <summary>Why nothing writes notes for a lecture, when that's known: <see cref="Summarize.NoNotesOff"/> while the
+    /// library writes none at all, <see cref="Summarize.NoNotesShort"/> for one with too little said to write them
+    /// from. Either is known as soon as it arrives (so nothing says its notes are on their way while it's filed). Null
+    /// when an AI wrote its notes, when it has the notes it came with, and when notes were asked for and none came
+    /// back (its error says why, if anything does).</summary>
+    string? WhyNoNotes(NoteRow row, Meeting m)
+    {
+        bool written = !string.IsNullOrEmpty(row.SummaryMd) && !string.IsNullOrEmpty(row.SummaryModel);
+        if (written || Py.Strip(m.NotesMarkdown).Length > 0) return null;
+        return !Summarize.NotesOn(Cfg) ? Summarize.NoNotesOff : Summarize.TooShort(m) ? Summarize.NoNotesShort : null;
     }
 
     /// <summary>The notes a lecture shows: ours, written from the transcript, or else the ones it came with.</summary>
@@ -124,6 +149,13 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     [GeneratedRegex(@"\A\s*---[ \t]*\r?\n.*?\r?\n---[ \t]*(\r?\n|\z)", RegexOptions.Singleline)]
     private static partial Regex FrontMatter();
 
+    // The marks round what the student wrote themselves (==like this==, Summarize.Mark): never shown as they're kept.
+    [GeneratedRegex(@"==(?=\S)(.+?)(?<=\S)==")]
+    private static partial Regex Typed();
+
+    [GeneratedRegex(@"\A(?:[-*+]|\d+[.)])\s+")]
+    private static partial Regex ListItem();
+
     /// <summary>The lecture in a line: the first sentence of its Summary (or Overview), for lists.</summary>
     public static string FirstSentence(string notes)
     {
@@ -133,9 +165,13 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         foreach (string heading in new[] { "Summary", "Overview" })
             if ((text = Notes.Section(notes, heading)).Length > 0) break;
         if (text.Length == 0)
-            text = string.Join(" ", notes.ReplaceLineEndings("\n").Split('\n').Select(l => l.Trim()).SkipWhile(l => l.Length == 0 || l.StartsWith('#'))
-                .TakeWhile(l => l.Length > 0 && !l.StartsWith('#')));
-        text = Markup().Replace(text, m => m.Groups[1].Success ? m.Groups[1].Value : "").Replace('\n', ' ').Trim();
+        {
+            var lines = notes.ReplaceLineEndings("\n").Split('\n').Select(l => l.Trim()).SkipWhile(l => l.Length == 0 || l.StartsWith('#'))
+                .TakeWhile(l => l.Length > 0 && !l.StartsWith('#')).ToList();
+            // A list (a student's own notes, a bullet a line) is said by its first item, not all of them run together.
+            text = lines.Count > 0 && ListItem().Match(lines[0]) is { Success: true } item ? lines[0][item.Length..] : string.Join(" ", lines);
+        }
+        text = Typed().Replace(Markup().Replace(text, m => m.Groups[1].Success ? m.Groups[1].Value : ""), "$1").Replace('\n', ' ').Trim();
         string first = SentenceEnd().Split(text).FirstOrDefault() ?? "";
         return first.Length > 200 ? first[..197].TrimEnd() + "…" : first;
     }
@@ -194,17 +230,22 @@ public sealed partial class LibraryReader(Config cfg, Store store)
     /// <summary>
     /// A question answered from your own lectures by the library's model: the passages that best match it (in one
     /// lecture, one class, or all), and while you record, what's been said so far. The answer names its sources, each
-    /// with the moment in the recording when there is one.
+    /// with the moment in the recording when there is one. A question about one lecture reads that lecture and no
+    /// other, the one being recorded too: the library doesn't have it yet, so what's been said so far is all of it.
     /// </summary>
     public async Task<JsonObject> AskAsync(string question, string? lectureId = null, string? className = null,
         string? liveTranscript = null, string liveTitle = "This lecture", AskChatFn? chat = null)
     {
         var picked = new List<(NoteRow? Note, Passage Passage)>();
-        if (!string.IsNullOrWhiteSpace(liveTranscript))
-            foreach (var p in BestOf(Passages.FromTranscript("live", liveTranscript), question, 6)) picked.Add((null, p));
-        if (lectureId is not null && Store.Get(lectureId) is { } one)
+        bool live = !string.IsNullOrWhiteSpace(liveTranscript);
+        if (live)
+            foreach (var p in BestOf(Passages.FromTranscript("live", liveTranscript!), question, 6)) picked.Add((null, p));
+        if (lectureId is not null)
         {
-            foreach (var p in BestOf(Store.PassagesOf(lectureId), question, 8)) picked.Add((one, p));
+            // A note that's being recorded again is in the library as it was: its notes are read too, and its
+            // transcript came with the question, as far as it has got.
+            if (Store.Get(lectureId) is { } one)
+                foreach (var p in BestOf([.. Store.PassagesOf(lectureId).Where(p => !live || p.Kind != Passage.TranscriptKind)], question, 8)) picked.Add((one, p));
         }
         else if (Passages.AnyWords(question) is string match)
         {

@@ -772,11 +772,10 @@ img.install-icon {
     var(--shadow);
 }
 
-/* --- a wide screen (iPad): the composer sits beside the sidebar ----------------------------------------------------- */
+/* --- a wide screen (iPad): the composer sits at the bottom of its screen, which is already beside the sidebar ------- */
 
 @media (min-width: 700px) {
   .composer {
-    left: 260px;
     bottom: 0;
     padding-bottom: calc(var(--safe-bottom) + 10px);
   }

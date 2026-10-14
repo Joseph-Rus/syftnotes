@@ -239,12 +239,15 @@ public static partial class Shell
             else if (reached && !showing) await ShowHomeAsync(); // it's gone (deleted on another computer): nothing to open
             return;
         }
-        string cls = S(l["class"]) is { } c && c != Configs.Unsorted ? c : "";
+        string cls = S(l["class"]) is { } c && c != Configs.Unsorted ? c : "", status = S(l["status"]);
+        bool writing = status is "queued" or "working";
+        // The library gives a note its folder when it files it. Until then one recorded here is in the folder it was
+        // recorded in, as its page said while it recorded: not "Unsorted", with its folder left unselected.
+        if (cls.Length == 0 && writing && host.Lectures.Get(id) is { ClassName: { Length: > 0 } recordedIn } && recordedIn != Configs.Unsorted) cls = recordedIn;
         openClass = cls.Length > 0 ? cls : null;
         SelectInSidebar(openClass);
-        string status = S(l["status"]), notes = S(l["notes"]), typed = S(l["typed"]), noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
-        bool writing = status is "queued" or "working";
-        string stamp = string.Join("\u0001", S(l["title"]), cls, status, notes, typed, S(l["error"]), S(l["transcript"]).Length, S(l["updated"]));
+        string notes = S(l["notes"]), typed = S(l["typed"]), noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
+        string stamp = string.Join("\u0001", S(l["title"]), cls, status, notes, typed, S(l["error"]), S(l["transcript"]).Length, S(l["updated"]), S(l["no_notes"]));
         // Read again and nothing changed: the page stays as it is (where it's scrolled to, what's typed in Ask).
         if (showing && library.Note!.Stamp == stamp)
         {
@@ -253,16 +256,30 @@ public static partial class Shell
         }
         // No notes written (yet): what the student typed while it recorded is all there is to read, and it's theirs.
         bool mine = notes.Length == 0 && typed.Trim().Length > 0;
+        var keepRecording = ContinueFor(id);
+        // No notes will be written from it, and the library says why (it's too short for them, or the library writes
+        // none): the page says so from the start, over whatever there is to read, rather than that notes are on their way.
+        bool heard = S(l["transcript"]).Trim().Length > 0;
+        string? why = S(l["no_notes"]) switch
+        {
+            Summarize.NoNotesShort => NoteModel.TooShort(noun, heard, keepRecording is not null),
+            Summarize.NoNotesOff => NoteModel.NotesAreOff(noun, heard),
+            _ => null,
+        };
         var note = new NoteModel
         {
             Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(Date(S(l["date"])), l["seconds"] is JsonValue v && v.TryGetValue(out double s) ? s : null),
             Title = S(l["title"]), Markdown = mine ? TypedNotes.AllMine(typed) : notes, Mine = mine, Stamp = stamp,
-            Pending = writing ? $"Your library is writing the notes for this {noun}. They show here when they're done."
-                : notes.Length == 0 ? S(l["error"]) is { Length: > 0 } err ? err : mine ? null : $"There are no notes for this {noun}." : null,
+            Pending = writing ? why ?? $"Your library is writing the notes for this {noun}. They show here when they're done."
+                : notes.Length == 0 && S(l["error"]) is { Length: > 0 } err ? err
+                : why ?? (notes.Length == 0 && !mine ? $"There are no notes for this {noun}." : null),
+            // The library was asked to write its notes again and couldn't: they're as they were, and it says why.
+            NotRewritten = !writing && l["notes_kept"] is JsonValue kept && kept.TryGetValue(out bool yes) && yes && S(l["error"]).TrimEnd() is { Length: > 0 } unwritten
+                ? $"{unwritten}{(unwritten.EndsWith('.') ? "" : ".")} Your current notes are unchanged." : null,
             ShowTranscript = transcript || (showing && library.Note!.ShowTranscript),
             // The library doesn't take a new name while it's still writing the notes (it would write its own over it).
             OnRename = host.Remote() is { } remote && !host.OlderLibrary ? title => RenameAsync(remote, id, title) : null,
-            OnContinue = ContinueFor(id),
+            OnContinue = keepRecording, NotesOff = NotesOff,
         }.Titled();
         // A transcript without times (one pasted from another app) reads a paragraph per line it came with (each
         // speaker's turn), not as one wall of text.
@@ -281,7 +298,8 @@ public static partial class Shell
         library.CanvasClass = null;
         library.Overview = null;
         library.Note = note;
-        ShowLectureAi(l, note);
+        // Notes to read that nothing is writing now (with none written, what the student typed) can be edited and rewritten.
+        ShowLectureAi(l, note, written: !writing && (notes.Length > 0 || (mine && S(l["error"]).Length == 0)));
         ShowLectureFiles(note);
     }
 
@@ -325,8 +343,12 @@ public static partial class Shell
         host.Settings.Role != AppRole.Library && host.Lectures.Get(id) is { State: not (LectureState.Recording or LectureState.Paused or LectureState.Planned) }
             ? () => ContinueRecording(id) : null;
 
+    /// <summary>Whether a recording this computer made will have notes written, as far as it can be told yet
+    /// (<see cref="Summarize.WillHaveNotes"/>): from how long it is, and how much of it has been written down.</summary>
+    static bool? WillHaveNotes(Lecture l) => Summarize.WillHaveNotes(l.Seconds, l.TranscribedSeconds, l.Transcript().Length);
+
     /// <summary>What a recording's page on this computer was drawn from: when it reads differently, the page is drawn again.</summary>
-    static string LocalStamp(Lecture l) => string.Join("\u0001", "local", l.State, l.Title, l.ClassName, l.Notes, l.Error, l.Segments.Count);
+    static string LocalStamp(Lecture l) => string.Join("\u0001", "local", l.State, l.Title, l.ClassName, l.Notes, l.Error, l.Segments.Count, NotesOff);
     static DateTime lastLocalLook = DateTime.MinValue;
 
     /// <summary>A recording this computer made that the library doesn't have yet (it's still being written down here,
@@ -341,6 +363,7 @@ public static partial class Shell
         openClass = cls.Length > 0 ? cls : null;
         SelectInSidebar(openClass);
         string id = l.Id;
+        var keepRecording = ContinueFor(id);
         var note = new NoteModel
         {
             Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(l.StartedAt, l.Seconds > 0 ? l.Seconds : null), Title = WorkingTitle(l),
@@ -348,6 +371,10 @@ public static partial class Shell
             Pending = l.State switch
             {
                 LectureState.Failed => l.Error.Length > 0 ? l.Error : $"This {noun} couldn't be written down.",
+                // The library writes no notes, or it's too short for them as far as its length tells already: none
+                // are promised for it.
+                _ when NotesOff => NoteModel.NotesAreOff(noun, l.Segments.Count > 0),
+                _ when WillHaveNotes(l) == false => NoteModel.TooShort(noun, l.Segments.Count > 0, keepRecording is not null),
                 LectureState.Transcribing => $"This {noun} is being written down on this computer. Its notes come once that's done and your library has it.",
                 _ => host.Library == LibraryState.Connected ? $"On its way to your library, which writes the notes for this {noun}. They show here when they're done."
                     : $"Waiting for your library. The notes for this {noun} are written once it's back.",
@@ -359,7 +386,7 @@ public static partial class Shell
                 host.TitleLecture(id, title);
                 return Task.FromResult(true);
             } : null,
-            OnContinue = ContinueFor(id),
+            OnContinue = keepRecording, NotesOff = NotesOff,
         }.Titled();
         foreach (var line in l.Segments)
         {
@@ -392,9 +419,9 @@ public static partial class Shell
         yield return text[start..].Trim();
     }
 
-    /// <summary>The lecture's notes, which another engine can rewrite (while they aren't still being written), and a
-    /// fresh ask bar for it: a new lecture starts a new conversation.</summary>
-    static void ShowLectureAi(JsonObject l, NoteModel note)
+    /// <summary>The lecture's notes, which another engine can rewrite (while they aren't still being written:
+    /// <paramref name="written"/>), and a fresh ask bar for it: a new lecture starts a new conversation.</summary>
+    static void ShowLectureAi(JsonObject l, NoteModel note, bool written)
     {
         var ai = Ai();
         // The new notes replace the old ones in one step: with none in between, the page never shows its plain Markdown
@@ -403,7 +430,7 @@ public static partial class Shell
         var before = library.Notes;
         AiNotesModel? notes = null;
         bool fresh = false;
-        if (!note.HasPending)
+        if (written)
         {
             // Notes with an edit in them come back as they were left: the ones on screen (Edit pressed while this
             // lecture was loading), or ones kept from before another lecture was opened.
@@ -411,10 +438,11 @@ public static partial class Shell
             else if (!unsavedNotes.Remove(note.Id, out notes))
             {
                 fresh = true;
-                notes = new AiNotesModel(ai);
+                var made = notes = new AiNotesModel(ai);
                 FollowEdits(notes);
                 notes.NotesChanged += () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
+                    KeepOwnNotes(note.Id, made);
                     if (openLecture == note.Id) _ = ShowLectureAsync(note.Id, library.Note?.ShowTranscript == true);
                 });
             }
@@ -424,7 +452,8 @@ public static partial class Shell
             library.Notes = notes;
             LeaveNotes(before);
         }
-        if (fresh) _ = notes!.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]));
+        // (With no notes written for it, the notes are what the student typed: the library's own are none.)
+        if (fresh) _ = notes!.Load(note.Id, note.Markdown, S(l["notes_model"]), S(l["updated"]), typed: note.Mine);
         // Typing that was in this lecture's editor when the app last quit goes back into it.
         if (fresh && EarlierDrafts().Remove(note.Id, out var draft)) notes!.RestoreEdit(draft.From, draft.Text);
         else if (notes is not null && !ReferenceEquals(before, notes)) _ = notes.Refresh(); // kept: the library says where they stand now
@@ -442,6 +471,22 @@ public static partial class Shell
         if (!ReferenceEquals(library.Ask, recorder.Ask)) library.Ask?.Stop(); // an answer about the note being left isn't wanted any more
         library.Ask = ask;
         _ = ask.Load();
+    }
+
+    /// <summary>Notes saved by hand that are all the student's own (what they typed while it recorded, changed or added
+    /// to since): the recording on this computer keeps them as what the student typed, so Keep recording starts from
+    /// them, and the notes written after it are written round them.</summary>
+    static void KeepOwnNotes(string id, AiNotesModel notes)
+    {
+        if (!notes.AllMine || host.Lectures.Get(id) is not { State: not (LectureState.Recording or LectureState.Paused) }) return;
+        try
+        {
+            host.KeepTypedNotes(id, TypedNotes.Unmarked(notes.CurrentMarkdown));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Program.Log($"[notes] the edited notes couldn't be kept with the recording: {e.Message}");
+        }
     }
 
     /// <summary>Notes a student had typed in and not saved when they opened something else, by lecture: back in their
@@ -517,18 +562,46 @@ public static partial class Shell
     }
 
     /// <summary>A source an answer points to: its moment in the recording plays (when the audio's here), and the lecture
-    /// opens at its transcript.</summary>
+    /// opens at its transcript, at the line said then: marked, and the page brought to it.</summary>
     static void PlaySource(string id, double? at)
     {
-        if (at is double t && File.Exists(host.Lectures.AudioPath(id))) Play(id, t);
-        if (id != openLecture) OpenLecture(id, transcript: at is not null);
-        else if (library.Note is { } n && at is not null) n.ShowTranscript = true;
+        if (at is not double t)
+        {
+            if (id != openLecture) OpenLecture(id);
+            return;
+        }
+        if (File.Exists(host.Lectures.AudioPath(id))) Play(id, t);
+        if (id != openLecture) OpenAt(id, t);
+        else library.Note?.ShowAt(t);
+    }
+
+    /// <summary>Another note's page, opened at a moment in its transcript: once the page is up (whichever read of it
+    /// gets there first), the line said then is marked and the page brought to it.</summary>
+    static void OpenAt(string id, double at)
+    {
+        void Shown(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(LibraryModel.Note)) return;
+            if (openLecture == id && (library.Note is not { Live: false } n || n.Id != id)) return; // still on its way
+            library.PropertyChanged -= Shown;
+            // (Somewhere else was opened meanwhile: nothing to show.) After the page has finished being put up.
+            if (openLecture == id) Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (openLecture != id || library.Note is not { Live: false } now || now.Id != id) return;
+                // It opens at its transcript: there were no notes being read here to offer a way back to.
+                now.ShowTranscript = true;
+                now.ShowAt(at);
+            });
+        }
+        library.PropertyChanged += Shown;
+        OpenLecture(id, transcript: true);
     }
 
     /// <summary>Opens the library at a note's page (search, a notification, an answer's source).</summary>
     static void OpenLecture(string id, bool transcript = false)
     {
-        Remember();
+        // The note that's already on the page isn't a place to go back to from itself.
+        if (Here() != new Place(Lecture: id)) Remember();
         LeavePage();
         openLecture = id;
         bool loaded = mainWindow?.IsVisible == true && host.Library == LibraryState.Connected && library.Classes.Count > 0;
@@ -885,8 +958,10 @@ public static partial class Shell
                 ShowLibrary();
                 break;
             case QuickKind.Source or QuickKind.Passage when row.LectureId is { } id && row.At is double at:
-                if (File.Exists(host.Lectures.AudioPath(id))) Play(id, at);
-                OpenLecture(id, transcript: row.Kind == QuickKind.Source);
+                // Said at a moment (an answer's source, or a passage found in a transcript): the note opens at its
+                // transcript there, the line marked. The note already on the page only needs its window brought up.
+                if (id == openLecture) ShowLibrary();
+                PlaySource(id, at);
                 break;
             case QuickKind.Lecture or QuickKind.Passage or QuickKind.Source when row.LectureId is { } id:
                 OpenLecture(id);

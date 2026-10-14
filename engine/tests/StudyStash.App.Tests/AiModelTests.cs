@@ -623,9 +623,44 @@ public class AiSetupModelTests
         Assert.Equal(["claude", "codex"], asked);
         Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
 
-        // Clicking the row itself (it can't write notes yet) doesn't open a list of steps: there aren't any.
+        // Clicking the row itself (it can't write notes yet) is never dead: there are no steps to open, so it does
+        // what its button does.
         claude.SelectCommand.Execute(null);
         Assert.False(claude.ShowHelp);
+        Assert.Equal(["claude", "codex", "claude"], asked);
+        Assert.NotEqual("claude", model.SelectedNotes);
+    }
+
+    [AvaloniaFact]
+    public async Task The_notes_step_opens_on_what_the_library_does_now_and_a_first_run_picks_nothing_that_cant_write()
+    {
+        // The free AI's app is on this Mac without what it writes notes with, and nothing has been chosen yet.
+        var lib = new FakeAiLibrary { Overview = Nothing("model_missing") };
+        var first = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), PreferFree = true };
+        await first.Load();
+        Assert.True(first.NoAi);
+        // Its row says to press its button (which starts the download); a click alone doesn't pick it.
+        var free = first.Engines.Single(r => r.Id == "ollama");
+        free.SelectCommand.Execute(null);
+        Assert.True(first.NoAi);
+        Assert.Equal("Free AI on this Mac isn't ready to write notes yet. Press “Set it up” on its row to get it ready.", first.Say);
+        Assert.DoesNotContain("set-up:ollama", lib.Calls);
+
+        // Setup run again after "No AI for now": that's still the choice, though the free AI is all here by now.
+        var off = new AiSetupModel(new FakeAiLibrary { Overview = AiTestData.MixedOverview() })
+        {
+            WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(false), ChosenBefore = true,
+        };
+        await off.Load();
+        Assert.True(off.NoAi);
+
+        // Run again with the free AI chosen before and its model gone missing: it stays the pick.
+        var kept = new AiSetupModel(new FakeAiLibrary { Overview = Nothing("model_missing") })
+        {
+            WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), ChosenBefore = true,
+        };
+        await kept.Load();
+        Assert.Equal("ollama", kept.SelectedNotes);
     }
 
     [AvaloniaFact]
@@ -825,20 +860,38 @@ public class AiAskModelTests
     }
 
     [AvaloniaFact]
-    public async Task Tapping_the_byline_opens_its_first_source()
+    public async Task Each_moment_in_the_byline_opens_its_own_source()
     {
         var (model, lib) = Loaded();
         await model.Load();
-        var source = new AskSource("lec-1", "t", null, null, 5, "");
-        lib.OnAsk = r => new AskReply("a", [source], r.Engine!, "Ollama");
-        model.Question = "q";
-        await model.AskCommand.ExecuteAsync(null);
+        AskSource later = new("lec-1", "t", null, null, 152, ""), earlier = new("lec-1", "t", null, null, 112, ""), notes = new("lec-1", "t", null, null, null, "Summary");
+        lib.OnAsk = r => new AskReply("a", [later, notes, earlier], r.Engine!, "Ollama");
         AskSource? opened = null;
         model.OnSource = s => opened = s;
+        model.Question = "q";
+        await model.AskCommand.ExecuteAsync(null);
 
-        model.OpenTurnSourceCommand.Execute(model.Turns[0]);
+        // "Ollama · from 01:52 and 02:32": the words between aren't pressed, each time is.
+        var parts = model.Turns[0].BylineParts;
+        Assert.Equal(model.Turns[0].Byline, string.Concat(parts.Select(p => p.Text)));
+        Assert.Equal(["01:52", "02:32"], parts.Where(p => p.CanOpen).Select(p => p.Text));
+        parts.Single(p => p.Text == "02:32").Open!.Execute(null);
+        Assert.Same(later, opened);
+        parts.Single(p => p.Text == "01:52").Open!.Execute(null);
+        Assert.Same(earlier, opened);
 
-        Assert.Same(source, opened);
+        // A byline with no moment in it opens the answer's first source, as one press; with nothing to open them
+        // (Home's ask bar), a byline is only words.
+        lib.OnAsk = r => new AskReply("a", [notes], r.Engine!, "Ollama");
+        model.Question = "q";
+        await model.AskCommand.ExecuteAsync(null);
+        Assert.Single(model.Turns[1].BylineParts).Open!.Execute(null);
+        Assert.Same(notes, opened);
+        model.OnSource = null;
+        lib.OnAsk = r => new AskReply("a", [later], r.Engine!, "Ollama");
+        model.Question = "q";
+        await model.AskCommand.ExecuteAsync(null);
+        Assert.DoesNotContain(model.Turns[2].BylineParts, p => p.CanOpen);
     }
 
     [AvaloniaFact]
@@ -1102,6 +1155,35 @@ public class AiNotesModelTests
 
         Assert.False(model.Editing);
         Assert.Equal("==My own words.==", model.ShownMarkdown); // saved as the student's own
+    }
+
+    [AvaloniaFact]
+    public async Task What_a_student_typed_stays_on_a_note_the_library_wrote_no_notes_for_and_Edit_keeps_it()
+    {
+        // A recording too short for notes, filed: all there is to read is what the student typed while it recorded,
+        // and the library's own notes for it are none.
+        string typed = TypedNotes.AllMine("- my own bullet about the heart");
+        var (model, lib) = Loaded(new RewriteInfo("lec-1", "none") { Current = new NotesVersion("", "", Current.At) });
+
+        await model.Load("lec-1", typed, "", Current.At, typed: true);
+
+        // The library's answer (no notes) doesn't take their words off the page; the line over them says they're theirs.
+        Assert.Equal("- ==my own bullet about the heart==", model.ShownMarkdown);
+        Assert.True(model.AllMine);
+        Assert.False(model.SomeMine);
+
+        // Edit opens their text, and Save keeps it: sent as an edit of the library's notes (none), so it isn't
+        // turned down as an edit of other notes.
+        model.EditCommand.Execute(null);
+        Assert.Equal("- my own bullet about the heart", model.EditText);
+        model.EditText += "\n- and the valves";
+        await model.SaveEditCommand.ExecuteAsync(null);
+
+        var sent = Assert.Single(lib.Edits);
+        Assert.Equal("- ==my own bullet about the heart==\n- ==and the valves==", sent.Markdown);
+        Assert.Equal(Notes.Fingerprint(""), sent.BasedOn);
+        Assert.False(model.Editing);
+        Assert.Equal(sent.Markdown, model.ShownMarkdown);
     }
 
     [AvaloniaFact]

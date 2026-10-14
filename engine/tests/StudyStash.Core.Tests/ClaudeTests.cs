@@ -240,6 +240,16 @@ public class ClaudeTests
         })));
         Assert.Contains("CS 101, now at 18:05", prompt);
         Assert.Null(live["sources"]![0]!["id"]);
+        // Asked about this recording alone (it isn't in the library yet): only what's been said in it is read, though
+        // another lecture says more about the midterm, at the same minute.
+        Assert.Contains("Recursion and the call stack (CS 101", prompt);
+        live = await Json(await site.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/ask", new
+        {
+            question = "What did she say about the midterm?", lecture = "rec-20260924-100212-ab12cd", live = "[18:05] The midterm has recursion traces.", live_title = "CS 101, now",
+        })));
+        Assert.DoesNotContain("Recursion and the call stack", prompt);
+        Assert.Equal(["[1] CS 101, now at 18:05:"], prompt!.Split('\n').Where(l => l.StartsWith('[')));
+        Assert.Null(live["sources"]!.AsArray().Single()!["id"]);
 
         // No AI model on the library: Ask says so.
         await using var plain = await Site(cfg, store);

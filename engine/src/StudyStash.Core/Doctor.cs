@@ -17,6 +17,9 @@ public static class LibraryApi
     public static async Task<JsonObject> CheckServerAsync(string serverUrl, string poolKey, HttpClient? http = null)
     {
         string url = serverUrl.TrimEnd('/') + "/api/health";
+        // One that can't travel in a header can't be any library's password; sending it would fail in a way that
+        // reads as the library being out of reach.
+        if (Configs.OddInPassword(poolKey) is not null) throw new InvalidOperationException("wrong password");
         HttpResponseMessage r;
         try
         {

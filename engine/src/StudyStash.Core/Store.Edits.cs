@@ -99,7 +99,10 @@ public sealed partial class Store
                 {
                     byte[] bytes = File.ReadAllBytes(path);
                     string text = new UTF8Encoding(false).GetString(bytes).Replace("\r\n", "\n").Replace('\r', '\n');
-                    if (text != Notes.Render(m, c, current, model))
+                    // (A file from before a too-short recording's file said so has the older words where its notes
+                    // would be: nobody has touched that one either.)
+                    string written = Notes.Render(m, c, current, model);
+                    if (text != written && text != written.Replace(Notes.TooShortForNotes, Notes.NoNotesReturned))
                     {
                         edited = text;
                         crlf = bytes.AsSpan().IndexOf("\r\n"u8) >= 0; // its own line endings stay

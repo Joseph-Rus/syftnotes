@@ -25,7 +25,13 @@ public sealed partial class ClassItem : ObservableObject
     public string Tip => ClassNames.Code(Name) is { Length: > 0 } code ? $"{Display} · {code}" : Display;
     /// <summary>A count of nothing isn't shown.</summary>
     public bool ShowCount => Count > 0;
-    partial void OnCountChanged(int value) => OnPropertyChanged(nameof(ShowCount));
+    /// <summary>What a screen reader says for its row: "Home", "Due, 18 to hand in", "BIO 110, 4 notes".</summary>
+    public string Said => !ShowCount ? Display : IsDue ? $"{Display}, {Count} to hand in" : $"{Display}, {Count} note{(Count == 1 ? "" : "s")}";
+    partial void OnCountChanged(int value)
+    {
+        OnPropertyChanged(nameof(ShowCount));
+        OnPropertyChanged(nameof(Said));
+    }
     /// <summary>The sidebar group it's in ("" for Classes; "Clubs", "Work", or one of the student's own).</summary>
     public string Group { get; init; } = "";
     /// <summary>What its recordings are called: lectures in a class, meetings in any other group.</summary>
@@ -81,8 +87,27 @@ public sealed partial class NoteModel : ObservableObject
     public string Markdown { get; init; } = "";
     /// <summary>The notes shown are the student's own typing and nothing else yet: all of it reads as theirs.</summary>
     public bool Mine { get; init; }
-    /// <summary>The notes aren't written yet (the library is on it), or couldn't be.</summary>
+    /// <summary>Where the notes are when none are written: on their way (the library is on it), they couldn't be, or
+    /// the recording is too short for them (<see cref="TooShort"/>, said over what the student typed if they did).</summary>
     public string? Pending { get; init; }
+    /// <summary>The library was asked to write these notes again and couldn't: why, said over the notes it left as
+    /// they were.</summary>
+    public string? NotRewritten { get; init; }
+    public bool WasNotRewritten => !string.IsNullOrEmpty(NotRewritten);
+
+    /// <summary>What the page says of a recording too short to have notes written (<see cref="Summarize.TooShort"/>):
+    /// that it is and what notes take, where its words are, and what adds to them. Keep recording is named only where
+    /// the page has the button (<paramref name="canContinue"/>: it was recorded on this computer).</summary>
+    public static string TooShort(string noun, bool transcript, bool canContinue) => Summarize.TooShortWords($"This {noun}")
+        + (transcript ? $" The transcript is in the Transcript tab{(canContinue ? "; Keep recording adds to it." : ".")}" : canContinue ? " Keep recording adds to it." : "");
+
+    /// <summary>What the page says where the notes would be while the library writes none (<see cref="Summarize.NotesOn"/>
+    /// is false, as after setup's "No AI for now"): that notes are off, where the words are, and where notes are
+    /// turned on. They need an AI (Settings → Your AI) and both of the library's AI switches (<see cref="Summarize.NotesOn"/>),
+    /// which Settings → Notes and sorting has under these names.</summary>
+    public static string NotesAreOff(string noun, bool transcript) => Summarize.NotesOffWords($"this {noun}")
+        + (transcript ? " The transcript is in the Transcript tab." : "")
+        + " To have notes written, choose an AI in Settings → Your AI, then turn on “Write study notes from each lecture” and “Sort lectures into classes with AI” in Settings → Notes and sorting.";
     public ObservableCollection<HeardLine> Transcript { get; } = [];
     [ObservableProperty] public partial bool ShowTranscript { get; set; }
 
@@ -108,6 +133,8 @@ public sealed partial class NoteModel : ObservableObject
     public Func<string, Task<bool>>? OnRename { get; set; }
     public bool CanRename => OnRename is not null;
     string named = "";
+    /// <summary>What the note is called now: its title, or the one it was last renamed to on this page.</summary>
+    public string TitleNow => named;
 
     /// <summary>The title as it stands (set once, when the page is made).</summary>
     public NoteModel Titled()
@@ -155,10 +182,15 @@ public sealed partial class NoteModel : ObservableObject
     [ObservableProperty] public partial string Typed { get; set; } = "";
     public Action<string>? OnTyped { get; set; }
     partial void OnTypedChanged(string value) => OnTyped?.Invoke(value);
-    public string TypedHint => Planned ? $"Jot down anything before it starts. When the recording stops, {Writer} writes up the {Noun} around your notes."
-        : $"Write as much or as little as you like. When you stop recording, {Writer} writes up the {Noun} around your notes.";
+    public string TypedHint => (Planned ? "Jot down anything before it starts. " : "Write as much or as little as you like. ")
+        + (NotesOff ? "Notes are off, so what you type is kept as it is, with the transcript."
+            : Planned ? $"When the recording stops, {Writer} writes up the {Noun} around your notes." : $"When you stop recording, {Writer} writes up the {Noun} around your notes.");
     /// <summary>Who writes the notes when it stops, as the hint names them.</summary>
     public string Writer { get; init; } = "Claude";
+    /// <summary>The library writes no notes (setup's "No AI for now"): nothing on the page says any are coming.</summary>
+    public bool NotesOff { get; init; }
+    public string StopTip => NotesOff ? "Stop recording" : "Stop recording: the notes are written next";
+    public string ContinueTip => "Keep recording: what's said now is added to the end of this transcript" + (NotesOff ? "" : ", and the notes are written again");
     public string TranscriptTab => Live ? "Live transcript" : "Transcript";
     /// <summary>The transcript's lines: what's been heard so far while it records, the whole of it after.</summary>
     public ObservableCollection<HeardLine> Lines => Live && Recorder is not null ? Recorder.Lines : Transcript;
@@ -204,7 +236,7 @@ public sealed partial class NoteModel : ObservableObject
     /// <summary>The transcript as timed lines, when it has times: what a diagram's box is looked for in.</summary>
     public List<Spoken> Spoken { get; } = [];
 
-    /// <summary>The transcript's line to scroll to (its place in <see cref="Transcript"/>), once it's showing.</summary>
+    /// <summary>The transcript's line to scroll to (its place in <see cref="Lines"/>), once it's showing.</summary>
     public event Action<int>? Jumped;
 
     /// <summary>The transcript was opened from the notes at a moment a diagram pointed to: a button takes the student
@@ -213,15 +245,17 @@ public sealed partial class NoteModel : ObservableObject
 
     [RelayCommand] void BackToNotes() => ShowTranscript = false;
 
-    /// <summary>The transcript at a moment: its tab open, the line said then marked, and the page brought to it.</summary>
+    /// <summary>The transcript at a moment: its tab open, the line said then marked, and the page brought to it. While
+    /// it records, that's what's been heard so far.</summary>
     public void ShowAt(double seconds)
     {
         if (!ShowTranscript) CanGoBack = true;
-        if (Transcript.Count == 0) return;
+        var lines = Lines;
+        if (lines.Count == 0) return;
         int at = 0;
-        for (int i = 0; i < Transcript.Count; i++)
-            if (Transcript[i].Start is double s && s <= seconds + 0.5) at = i;
-        for (int i = 0; i < Transcript.Count; i++) Transcript[i].Here = i == at;
+        for (int i = 0; i < lines.Count; i++)
+            if (lines[i].Start is double s && s <= seconds + 0.5) at = i;
+        for (int i = 0; i < lines.Count; i++) lines[i].Here = i == at;
         ShowTranscript = true;
         Jumped?.Invoke(at);
     }
@@ -413,6 +447,8 @@ public sealed partial class LibraryModel : ObservableObject
             newValue.Narrow = Narrow;
             // The ask for a tip shows on Home, in the page's own flow.
             newValue.Asking = newValue.IsHome ? Support : null;
+            // A page read while the library was still deleting a note lists it: it's shown without it.
+            foreach (string id in gone) newValue.Remove(id);
         }
         PageChanged();
     }
@@ -531,8 +567,14 @@ public sealed partial class LibraryModel : ObservableObject
     [ObservableProperty] public partial LectureDeletion? Deleted { get; set; }
     public bool AskingDelete => Deleting is not null;
     public bool HasDeleted => Deleted is not null;
-    /// <summary>How long "Deleted · Undo" stays (the library keeps the lecture in its trash for longer).</summary>
+    /// <summary>How long "Moved to… · Undo" stays.</summary>
     public TimeSpan UndoShows { get; set; } = TimeSpan.FromSeconds(10);
+    /// <summary>How long "Deleted · Undo" stays, unless its × puts it away first: the few minutes the question
+    /// promised. (The library keeps a deleted note in its trash for ten, so an Undo within these finds it.)</summary>
+    public TimeSpan DeletedShows { get; set; } = TimeSpan.FromMinutes(5);
+    /// <summary>The notes deleted in the last few minutes, the latest last. The toast names the latest; once that one
+    /// is undone or its minutes are up it names the one before, so each of them keeps the Undo it was promised.</summary>
+    readonly List<LectureDeletion> undoable = [];
 
     /// <summary>Deletes the lecture on the library (the host calls its API); false if the library refused.</summary>
     public Func<LectureDeletion, Task<bool>>? OnDelete { get; set; }
@@ -560,22 +602,29 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Leaves a note's page for where the student came from (it was deleted): the host goes back.</summary>
     public Action? OnLeaveNote { get; set; }
 
+    /// <summary>The notes deleted here and not brought back. The page a deleted note's own page gives way to is asked
+    /// for in the same moment as the delete, so the library's answer can still list the note: no page shows one of these.</summary>
+    readonly HashSet<string> gone = [];
+
     /// <summary>Delete, confirmed: the note leaves the page at once (its own page gives way to where the student came
-    /// from), the library deletes it, and "Deleted · Undo" shows for a few seconds. If the library refuses, the host
+    /// from), the library deletes it, and "Deleted · Undo" shows for a few minutes. If the library refuses, the host
     /// reads the page again.</summary>
     [RelayCommand(AllowConcurrentExecutions = true)]
     async Task ConfirmDelete()
     {
         if (Deleting is not { } d) return;
         Deleting = null;
+        gone.Add(d.Id);
         bool open = Remove(d);
         Moved = null;
+        undoable.Add(d);
         Deleted = d;
         if (open) OnLeaveNote?.Invoke();
         bool ok = OnDelete is null || await OnDelete(d);
         if (!ok)
         {
-            if (Deleted == d) Deleted = null;
+            gone.Remove(d.Id);
+            Forget(d);
             return;
         }
         _ = HideDeletedAfterAWhile(d);
@@ -583,20 +632,35 @@ public sealed partial class LibraryModel : ObservableObject
 
     async Task HideDeletedAfterAWhile(LectureDeletion d)
     {
-        await Task.Delay(UndoShows);
-        if (Deleted == d) Deleted = null;
+        await Task.Delay(DeletedShows);
+        Forget(d);
+    }
+
+    /// <summary>A deletion's Undo is over (it was undone, its minutes are up, or the library refused to delete it): the
+    /// toast goes back to the deletion before it, if one can still be undone. (This very deletion, not one that reads
+    /// the same: a note deleted, brought back and deleted again has its own few minutes.)</summary>
+    void Forget(LectureDeletion d)
+    {
+        undoable.RemoveAll(x => ReferenceEquals(x, d));
+        if (ReferenceEquals(Deleted, d)) Deleted = undoable.Count > 0 ? undoable[^1] : null;
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
     async Task Undo()
     {
         if (Deleted is not { } d) return;
-        Deleted = null;
+        Forget(d);
+        gone.Remove(d.Id);
         if (OnUndo is not null) await OnUndo(d);
     }
 
+    /// <summary>The toast's ×: "Deleted · Undo" is put away, and with it any deletion waiting behind it.</summary>
     [RelayCommand]
-    void DismissDeleted() => Deleted = null;
+    void DismissDeleted()
+    {
+        undoable.Clear();
+        Deleted = null;
+    }
 
     /// <summary>Takes a note out of the page's list and its folder's count, and closes it if it's open (true then).</summary>
     public bool Remove(LectureDeletion d)
@@ -620,10 +684,10 @@ public sealed partial class LibraryModel : ObservableObject
     public Func<NoteMove, Task>? OnUndoMove { get; set; }
     partial void OnMovedChanged(NoteMove? value) => ToastChanged();
 
-    /// <summary>A note was moved: the toast says where, with Undo, for a few seconds.</summary>
+    /// <summary>A note was moved: the toast says where, with Undo, for a few seconds. (A deletion that can still be
+    /// undone waits behind it, and shows again after.)</summary>
     public void SayMoved(NoteMove move)
     {
-        Deleted = null;
         Moved = move;
         _ = HideMovedAfterAWhile(move);
     }
@@ -637,10 +701,13 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>The toast at the page's foot: what just happened, and Undo.</summary>
     public string ToastSaid => Moved?.Said ?? Deleted?.Said ?? "";
     public bool HasToast => Moved is not null || Deleted is not null;
+    /// <summary>"Deleted · Undo" stays for minutes, so it has a × to put it away; "Moved" goes by itself in seconds.</summary>
+    public bool CanDismissToast => Moved is null && Deleted is not null;
     void ToastChanged()
     {
         OnPropertyChanged(nameof(ToastSaid));
         OnPropertyChanged(nameof(HasToast));
+        OnPropertyChanged(nameof(CanDismissToast));
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]

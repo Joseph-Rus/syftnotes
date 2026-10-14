@@ -195,6 +195,105 @@ public class PipelineTests
         Assert.Null(p.EngineProblem);
     }
 
+    // --- a lecture that already has notes ----------------------------------------------------------------------------
+
+    const string Written = "## Summary\nRecursion, and the midterm.\n\n```mermaid\nflowchart LR\nA[\"Call\"] --> B[\"Base case\"]\n```";
+
+    /// <summary>A lecture filed a while ago with notes Claude wrote (a diagram in them), a title and topics the AI gave
+    /// it, a line the student added by hand in the app, and another added to its note file in another app.</summary>
+    static NoteRow FiledWithNotes(Store store, string transcript)
+    {
+        store.Save(new Meeting("l1") { Title = "Lecture, Mon 12 Oct", Date = "2026-10-12T09:30:00", Transcript = transcript },
+            new Classification("BIO 110", 0.9, "ollama", "Recursion and the call stack", ["recursion", "the call stack"]), Written, "Claude");
+        Assert.Equal(NotesEdited.Saved, store.EditNotes("l1", Written + "\n\nMy own line: ask about tail calls."));
+        File.AppendAllText(store.Get("l1")!.MdPath!, "\nA line added in another app.\n");
+        return store.Get("l1")!;
+    }
+
+    /// <summary>The engine that sorts and names lectures is as far away as the one that writes notes.</summary>
+    static readonly SortChatFn NoSort = (_, _, _) => throw new InvalidOperationException("Claude: You've hit your usage limit.");
+
+    [Theory]
+    [InlineData("fails", "Claude couldn't rewrite the notes: You've hit your usage limit.")]
+    [InlineData("nothing", "The notes weren't rewritten: Claude wrote nothing.")]
+    [InlineData("off", "The notes weren't rewritten: writing study notes is switched off in your library's Settings.")]
+    [InlineData("short", "The notes weren't rewritten: the transcript is too short to write notes from.")]
+    public async Task A_rewrite_that_writes_no_notes_leaves_the_lecture_as_it_was_and_says_why(string how, string said)
+    {
+        using var dir = new TempDir();
+        var cfg = CfgFor(dir);
+        cfg.SummaryEnabled = how != "off";
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var before = FiledWithNotes(store, how == "short" ? "Recursion, briefly." : Lines(40));
+        string file = File.ReadAllText(before.MdPath!);
+        var filed = new List<string>();
+        var p = new Pipeline(cfg, store, NoSort, (_, _) => how == "fails" ? throw new InvalidOperationException("Claude: You've hit your usage limit.") : Task.FromResult(""),
+            Quiet, notesModel: () => "Claude", filed: filed.Add);
+
+        Assert.True(store.Requeue("l1")); // "Rewrite summary", "Rewrite all", "Try again"
+        Assert.Equal(1, await p.RunPendingAsync());
+
+        var row = store.Get("l1")!;
+        Assert.Equal((before.SummaryMd, "Claude"), (row.SummaryMd, row.SummaryModel));
+        Assert.Contains("My own line", row.SummaryMd);
+        Assert.Equal(("Recursion and the call stack", before.Topics, "BIO 110", "ollama"), (row.LectureTitle, row.Topics, row.ClassName, row.ClassifiedBy));
+        Assert.Equal(("done", said), (row.Status, row.Error));
+        Assert.Equal(file, File.ReadAllText(row.MdPath!)); // the note file isn't touched: what was added to it elsewhere stays
+        Assert.NotEmpty(store.SearchPassages("midterm")); // search and Ask still read the notes
+        Assert.Equal(0, store.IndexMissing());
+        Assert.Empty(filed); // nothing was filed: diagrams on their way for these notes aren't dropped
+    }
+
+    [Fact]
+    public async Task A_rewrite_that_writes_new_notes_replaces_the_old_ones()
+    {
+        using var dir = new TempDir();
+        var cfg = CfgFor(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        FiledWithNotes(store, Lines(40));
+        bool up = false;
+        var p = new Pipeline(cfg, store, Sort, (_, _) => up ? Task.FromResult("## Summary\nRecursion, written again.") : throw new InvalidOperationException("not signed in"),
+            Quiet, notesModel: () => "Claude sonnet");
+        store.Requeue("l1");
+        await p.RunPendingAsync();
+        Assert.StartsWith("Claude sonnet couldn't rewrite the notes", store.Get("l1")!.Error);
+
+        up = true;
+        store.Requeue("l1"); // "Try again"
+        Assert.Equal(1, await p.RunPendingAsync());
+
+        var row = store.Get("l1")!;
+        Assert.Equal(("## Summary\nRecursion, written again.", "Claude sonnet", "done"), (row.SummaryMd, row.SummaryModel, row.Status));
+        Assert.True(string.IsNullOrEmpty(row.Error)); // the try that failed isn't said any more
+        string text = Py.ReadText(row.MdPath!);
+        Assert.Contains("Recursion, written again.", text);
+        Assert.DoesNotContain("My own line", text);
+    }
+
+    [Fact]
+    public async Task A_lecture_sent_again_keeps_its_notes_when_new_ones_cant_be_written_and_takes_what_was_recorded()
+    {
+        using var dir = new TempDir();
+        var cfg = CfgFor(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var before = FiledWithNotes(store, Lines(40));
+        var p = new Pipeline(cfg, store, NoSort, (_, _) => throw new InvalidOperationException("Claude: You've hit your usage limit."), Quiet, notesModel: () => "Claude");
+
+        // Keep recording: the laptop sends the lecture again, with what was said since on the end of its transcript.
+        store.Enqueue(new Meeting("l1") { Title = "Lecture, Mon 12 Oct", Date = "2026-10-12T09:30:00", Transcript = Lines(40) + "And one more thing about memoization.\n" });
+        Assert.Equal(1, await p.RunPendingAsync());
+
+        var row = store.Get("l1")!;
+        Assert.Equal((before.SummaryMd, "Claude", "Recursion and the call stack", before.Topics, "BIO 110"),
+            (row.SummaryMd, row.SummaryModel, row.LectureTitle, row.Topics, row.ClassName));
+        Assert.Equal(("done", "Claude couldn't rewrite the notes: You've hit your usage limit."), (row.Status, row.Error));
+        string text = Py.ReadText(row.MdPath!);
+        Assert.Contains("My own line", text); // the note file is written again round the notes that were kept
+        Assert.Contains("one more thing about memoization", text);
+        Assert.NotEmpty(store.SearchPassages("memoization"));
+        Assert.NotEmpty(store.SearchPassages("midterm"));
+    }
+
     [Fact]
     public void What_counts_as_no_answer()
     {

@@ -112,7 +112,7 @@
                 </StackPanel>
               </Button>
               <Button Name="Stop" Grid.Column="10" Classes="btn sm ink" Command="{Binding Recorder.StopCommand, FallbackValue={x:Null}}" AutomationProperties.Name="Stop recording"
-                      ToolTip.Tip="Stop recording: the notes are written next">
+                      ToolTip.Tip="{Binding StopTip}">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                   <Border Width="10" Height="10" CornerRadius="2" Background="{DynamicResource Surface}" VerticalAlignment="Center" />
                   <TextBlock Text="Stop" VerticalAlignment="Center" />
@@ -166,9 +166,9 @@
               <Button Name="TranscriptTab" Classes="tab" Classes.on="{Binding ShowTranscript}" Content="{Binding TranscriptTab}" Command="{Binding TranscriptsCommand}" />
             </StackPanel>
             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center" Margin="0,0,0,6">
-              <!-- Only what the student wrote, without what was added from the recording -->
+              <!-- Only what the student wrote, without what was added from the recording (when something was) -->
               <Button Name="OnlyMine" Classes="switch" Classes.on="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes.OnlyMine, FallbackValue=False}"
-                      IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes.HasMine, FallbackValue=False}"
+                      IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes.SomeMine, FallbackValue=False}"
                       Command="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes.ToggleOnlyMineCommand, FallbackValue={x:Null}}"
                       ToolTip.Tip="Show only what you wrote, without what was added from the recording">
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -178,7 +178,7 @@
               </Button>
               <!-- Recorded here: keep recording it, the new words going on the end of its transcript -->
               <Button Name="KeepRecording" Classes="link-btn" Command="{Binding ContinueCommand}" IsVisible="{Binding CanContinue}"
-                      ToolTip.Tip="Keep recording: what's said now is added to the end of this transcript, and the notes are written again"
+                      ToolTip.Tip="{Binding ContinueTip}"
                       AutomationProperties.Name="Keep recording">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Glyph="mic" Size="15" VerticalAlignment="Center" />
@@ -214,6 +214,8 @@
             </StackPanel>
             <StackPanel IsVisible="{Binding Saved}" Spacing="14">
               <TextBlock Name="Pending" IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
+              <!-- A rewrite the library couldn't do: why, over the notes it left as they were -->
+              <TextBlock Name="NotRewritten" IsVisible="{Binding WasNotRewritten}" Text="{Binding NotRewritten}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
               <Panel IsVisible="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).HasNotes}">
                 <c:BySkin Name="AiNotes" Mac="{x:Type v:MacAiNotes}" Win="{x:Type v:WinAiNotes}" DataContext="{Binding $parent[UserControl].((vm:LibraryModel)DataContext).Notes}" />
               </Panel>

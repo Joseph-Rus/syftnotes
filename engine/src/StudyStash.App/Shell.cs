@@ -612,12 +612,14 @@ public static partial class Shell
         FlushTyped();
         bool onPage = library.Note is { Live: true } && openLecture is not null;
         string? id = host.Recorder.Current?.Id;
-        var l = host.StopRecording();
+        var l = host.StopRecording(out var how);
         chosenClass = "";
         recorderWindow?.Hide();
         UpdateDock();
-        if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
-        else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS()), null, null);
+        // Stopped before there was enough to keep: nothing is saved (or, for a note picked up again, added), and it says so.
+        if (NoticeWords.NotKept(how) is var (title, text)) Toast(title, text, null, null);
+        else if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
+        else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS(), WillHaveNotes(l), NotesOff), null, null);
         if (onPage)
         {
             // The page it was on isn't a place to go back to: it's the note's page now (or, too short to keep, gone).
@@ -778,14 +780,26 @@ public static partial class Shell
     /// library's default for questions until another is picked).</summary>
     static AiAskModel LiveAsk()
     {
+        string cls = host.Recorder.Current?.ClassName is { Length: > 0 } c && c != Configs.Unsorted ? c : "";
         var ask = new AiAskModel(Ai())
         {
             // What's been said so far: the transcript as far as it has got, and the live words after it.
             Live = host.LiveTranscript,
-            LiveTitle = $"{(host.Recorder.Current?.ClassName is { Length: > 0 } c ? c : "This lecture")}, now",
+            LiveTitle = $"{(cls.Length > 0 ? cls : "This lecture")}, now",
+            // The scope's "This lecture" is this recording and nothing else in the library; its folder and All notes
+            // look further, as they do under a note.
+            LectureId = liveId, ClassName = cls.Length > 0 ? cls : null,
             OpenSettings = () => ShowSettings("AI"),
-            OnSource = s => Play(s.Id ?? liveId, s.At ?? 0),
+            OnSource = s =>
+            {
+                Play(s.Id ?? liveId, s.At ?? 0);
+                // A moment of this recording, with its page in the window: what's been heard so far shows at that line.
+                if ((s.Id ?? liveId) == liveId && s.At is double at && library.ShowNotePage && library.Note is { Live: true } page && page.Id == liveId) page.ShowAt(at);
+            },
         };
+        // A recording in no folder has no folder to ask about.
+        if (cls.Length == 0) ask.OnlyScopes("lecture", "all");
+        ask.NameScopes(Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : ""), cls.Length > 0 ? ClassNames.Display(cls) : null);
         _ = ask.Load();
         return ask;
     }
@@ -1389,6 +1403,11 @@ public static partial class Shell
                         OpenTerminal = TerminalApp.Open,
                         OpenUrl = url => Dialogs.OpenUrl(url),
                         WriteNotes = WriteNotesAsync,
+                        NotesOn = NotesOnAsync,
+                        ChosenBefore = model.Again,
+                        // "I don't have a paid plan" on guided setup's first screen comes here with the free AI on
+                        // this computer picked for the notes when it's here already.
+                        PreferFree = host.Settings.SetupAi == "ollama",
                         // Claude and ChatGPT are got ready by guided setup's own two screens, with buttons, where
                         // setup's window has them.
                         SetUpPaid = guidedSetup is { } withButtons ? withButtons.GetReadyForNotesAsync : null,
@@ -1400,7 +1419,7 @@ public static partial class Shell
                             if (model.Ai?.Engines.FirstOrDefault(r => r.Id == id) is { } row) _ = row.CheckAgainCommand.ExecuteAsync(null);
                         };
                 }
-                _ = LoadAiStepAsync(model.Ai);
+                _ = model.Ai.Load();
                 break;
             case SetupStep.Canvas when model.Canvas is null:
                 var watch = CanvasPoll();
@@ -1413,14 +1432,20 @@ public static partial class Shell
         }
     }
 
-    /// <summary>The AI step reads the library; "I don't have a paid plan" on guided setup's first screen comes here
-    /// with the free AI on this computer picked for the notes when it's here already. When it isn't, its row has the
-    /// one button that gets it, and "No AI for now" stays picked until it's pressed: nothing is left chosen that
-    /// can't write notes.</summary>
-    static async Task LoadAiStepAsync(AiSetupModel ai)
+    /// <summary>Whether the library writes notes now (setup's "No AI for now" turned that off); null when it can't be
+    /// asked, or didn't say.</summary>
+    static async Task<bool?> NotesOnAsync()
     {
-        await ai.Load();
-        if (host.Settings.SetupAi == "ollama" && ai.Engines.Any(e => e is { Id: "ollama", CanWrite: true })) ai.SelectedNotes = "ollama";
+        if (host.Remote() is not { } lib) return null;
+        try
+        {
+            return (await lib.SettingsAsync(HttpMethod.Get))?["notes"]?["write"] is JsonValue v && v.TryGetValue(out bool on) ? on : null;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            host.Log($"[setup] couldn't ask whether notes are on: {e.Message}");
+            return null;
+        }
     }
 
     /// <summary>Which flow, and which library password, setup's AI step was made for.</summary>
@@ -1761,7 +1786,7 @@ public static partial class Shell
                     LectureState.Transcribing when inClass => $"Transcribing after this class ({Math.Round(l.Progress * 100)}%)",
                     LectureState.Transcribing => $"Transcribing {Math.Round(l.Progress * 100)}%",
                     LectureState.Sending => host.Library == LibraryState.Connected ? "Sending…" : "Waiting for your library",
-                    LectureState.Writing => "Writing notes…",
+                    LectureState.Writing => NotesOff || WillHaveNotes(l) == false ? "Being filed" : "Writing notes…",
                     LectureState.Filed => $"Filed in {(l.FiledClass.Length > 0 ? l.FiledClass : "your library")}",
                     LectureState.Failed => l.Error.Length > 0 ? l.Error : "Something went wrong",
                     _ => "Recording…",

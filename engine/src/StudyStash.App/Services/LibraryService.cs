@@ -50,8 +50,12 @@ public sealed class LibraryService : IDisposable
     /// <summary>The port and password it's running with (or would, once started).</summary>
     public Config Cfg => cfg;
     public LibraryServiceState State { get; private set; } = LibraryServiceState.Stopped;
-    /// <summary>Why it's <see cref="LibraryServiceState.Failed"/> or <see cref="LibraryServiceState.PortTaken"/>; null otherwise.</summary>
+    /// <summary>Why it's <see cref="LibraryServiceState.Failed"/> or <see cref="LibraryServiceState.PortTaken"/>, in
+    /// words a student can be shown; null otherwise.</summary>
     public string? Failure { get; private set; }
+    /// <summary>The last lines the library printed, for the app's own log beside a <see cref="Failure"/>: they're the
+    /// engine talking to whoever reads logs, never words for a student.</summary>
+    public string LastLines { get { lock (gate) return string.Join(" / ", tail); } }
     /// <summary>The child's process id while we're running one we started; null otherwise (a test kills it by this).</summary>
     public int? Pid { get { lock (gate) return proc?.Id; } }
     /// <summary>Called (on a worker thread) whenever <see cref="State"/> or <see cref="Failure"/> changes.</summary>
@@ -156,7 +160,8 @@ public sealed class LibraryService : IDisposable
         if (p.HasExited) return; // OnExited already moved us past Starting
         if (!healthy)
         {
-            SetState(LibraryServiceState.Failed, "It didn't answer in time." + LastLines());
+            log($"[library] didn't answer in time: {LastLines}");
+            SetState(LibraryServiceState.Failed, "It didn't answer in time.");
             return;
         }
         SetState(LibraryServiceState.Running);
@@ -171,11 +176,6 @@ public sealed class LibraryService : IDisposable
             while (tail.Count > 20) tail.Dequeue();
         }
         try { File.AppendAllText(LogPath, line + Environment.NewLine); } catch (IOException) { } catch (UnauthorizedAccessException) { }
-    }
-
-    string LastLines()
-    {
-        lock (gate) return tail.Count == 0 ? "" : " " + string.Join(" / ", tail);
     }
 
     void RotateLogIfBig()
@@ -202,7 +202,8 @@ public sealed class LibraryService : IDisposable
         lock (gate) count = recentExits.Count;
         if (count > MaxRestartsIn10Min)
         {
-            SetState(LibraryServiceState.Failed, "It kept stopping." + LastLines());
+            log($"[library] kept stopping: {LastLines}");
+            SetState(LibraryServiceState.Failed, "It kept stopping.");
             return;
         }
         int delay = RestartDelaysSeconds[Math.Min(count - 1, RestartDelaysSeconds.Length - 1)];

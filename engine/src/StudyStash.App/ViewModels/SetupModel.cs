@@ -43,17 +43,28 @@ public sealed partial class StepItem : ObservableObject
     public bool Optional { get; init; }
     [ObservableProperty] public partial bool Done { get; set; }
     [ObservableProperty] public partial bool Current { get; set; }
+    /// <summary>An optional step passed without doing it (Canvas, left unconnected): it keeps its number and says
+    /// "Skipped", where a step that was done gets the check.</summary>
+    [ObservableProperty] public partial bool Skipped { get; set; }
 
     public bool Todo => !Done && !Current;
-    public bool ShowNumber => !Done;
-    /// <summary>"Optional" until the step's been passed (then its check says enough).</summary>
+    public bool ShowCheck => Done && !Skipped;
+    public bool ShowNumber => !ShowCheck;
+    /// <summary>"Optional" until the step's been passed (then its check, or "Skipped", says enough).</summary>
     public bool ShowOptional => Optional && !Done;
+    public bool ShowSkipped => Done && Skipped;
 
-    partial void OnDoneChanged(bool value)
+    partial void OnDoneChanged(bool value) => NotifyShown();
+
+    partial void OnSkippedChanged(bool value) => NotifyShown();
+
+    void NotifyShown()
     {
         OnPropertyChanged(nameof(Todo));
+        OnPropertyChanged(nameof(ShowCheck));
         OnPropertyChanged(nameof(ShowNumber));
         OnPropertyChanged(nameof(ShowOptional));
+        OnPropertyChanged(nameof(ShowSkipped));
     }
 
     partial void OnCurrentChanged(bool value) => OnPropertyChanged(nameof(Todo));
@@ -121,7 +132,7 @@ public sealed partial class SetupModel : ObservableObject
     public bool CanChooseLaptop => !Again || IsLaptop;
     public bool CanChooseLibrary => !Again || IsLibrary;
     // The welcome's three choices, in the student's words.
-    public string OneComputerAbout => $"Records, transcribes and writes your notes, all on this {DeviceWord}. No server needed; notes are written while it's on.";
+    public string OneComputerAbout => $"Records, transcribes and writes your notes, all on this {DeviceWord}. No other computer needed; notes are written while it's on.";
     public static string LaptopAbout => "Records lectures and sends them to your library on another computer.";
     public string LibraryAbout => skin == SkinKind.Mac
         ? "A computer that stays on, like a Mac mini. It keeps your lectures and writes the notes."
@@ -155,7 +166,12 @@ public sealed partial class SetupModel : ObservableObject
 
     // The library: created here (library flow) or connected to (laptop flow)
     [ObservableProperty] public partial string Address { get; set; } = "";
+    /// <summary>The password a library made here is given (or the one it already has).</summary>
     [ObservableProperty] public partial string Password { get; set; } = "";
+    /// <summary>The laptop's Connect page: the password of the library it connects to, on another computer. Not the
+    /// same field as <see cref="Password"/>: typed here, it doesn't turn up as dots in "Give your library a password"
+    /// when the student goes back and makes this computer the library instead.</summary>
+    [ObservableProperty] public partial string ConnectPassword { get; set; } = "";
     [ObservableProperty] public partial string LibraryName { get; set; } = "";
     /// <summary>The password fields show what's typed.</summary>
     [ObservableProperty] public partial bool ShowPassword { get; set; }
@@ -177,8 +193,7 @@ public sealed partial class SetupModel : ObservableObject
     [ObservableProperty] public partial bool Connecting { get; set; }
     /// <summary>Looking for a library on this computer or your Tailscale network ("Find it").</summary>
     [ObservableProperty] public partial bool Finding { get; set; }
-    /// <summary>Start Study Stash when the student logs in: off unless they tick it (or the library was already here,
-    /// or it already started at login).</summary>
+    /// <summary>Start Study Stash when the student logs in: off unless they tick it (or it already started at login).</summary>
     [ObservableProperty] public partial bool StartAtLogin { get; set; }
     /// <summary>This computer already has a library (setup run again): the password step keeps what it has.</summary>
     [ObservableProperty] public partial bool ExistingLibrary { get; set; }
@@ -212,10 +227,12 @@ public sealed partial class SetupModel : ObservableObject
     public ObservableCollection<SetupAddress> Addresses { get; } = [];
     public string PasswordText => ShowPassword ? Password : new string('•', Math.Clamp(Password.Length, 8, 16));
     public string ShowPasswordText => ShowPassword ? "Hide" : "Show";
+    // The step's words: the switch goes by the name Settings → General gives it, "Open when you log in", in the sidebar,
+    // on the page and on the switch itself.
     public string StartAtLoginTitle => IsLibrary ? "Keep your library running" : "Keep Study Stash running";
     public string StartAtLoginLede => IsLibrary
-        ? "Start Study Stash when this computer starts, so your laptop can always reach it."
-        : $"Start Study Stash when you log in, so your library is ready and your notes get written whenever this {DeviceWord} is on.";
+        ? "Open Study Stash when you log in to this computer, so your laptop can always reach it."
+        : $"Open Study Stash when you log in, so your library is ready and your notes get written whenever this {DeviceWord} is on.";
     public string StartAtLoginHint => IsLibrary ? "Recommended for a library." : "Recommended.";
     /// <summary>Just this computer's last page: growing into a laptop and a library later.</summary>
     public string AddLaptopLater => "Want to record on a laptop too? Add it any time in Settings → Your library.";
@@ -252,7 +269,8 @@ public sealed partial class SetupModel : ObservableObject
     public ObservableCollection<ModelChoice> Models { get; } = [];
     /// <summary>The one downloading: shown as a card with Change, which opens the list.</summary>
     [ObservableProperty] public partial ModelChoice? ChosenModel { get; set; }
-    /// <summary>The list is open (Change was pressed): the card and the download make way for it.</summary>
+    /// <summary>The list is open (Change was pressed): the card and the download make way for it, until a model is
+    /// picked, Cancel is pressed or the step is left.</summary>
     [ObservableProperty] public partial bool ChoosingModel { get; set; }
     public bool ShowModelCard => ChosenModel is not null && !ChoosingModel;
     public bool ShowModelDownload => !ChoosingModel;
@@ -275,9 +293,15 @@ public sealed partial class SetupModel : ObservableObject
     /// then Classes is the plain add-your-own step.</summary>
     public ObservableCollection<SetupCourse> Courses { get; } = [];
     public bool HasCourses => Courses.Count > 0;
-    public string ClassesLede => HasCourses
-        ? "Your Canvas courses become your classes. The library reads each lecture and files it under the one it's about. Untick any you don't record."
-        : "The library reads each lecture and files it under the class it's about. Name your classes and say what each covers. You can skip this.";
+    /// <summary>What classes are for. With "No AI for now" chosen two steps back nothing reads the lectures, so it
+    /// says what happens instead: a lecture goes under the class it's recorded in, or waits in Unsorted.</summary>
+    public string ClassesLede => (HasCourses, Ai is { NoAi: true }) switch
+    {
+        (true, false) => "Your Canvas courses become your classes. The library reads each lecture and files it under the one it's about. Untick any you don't record.",
+        (true, true) => "Your Canvas courses become your classes. With no AI for now, a lecture goes under the class you record it in, or waits in Unsorted. Untick any you don't record.",
+        (false, false) => "The library reads each lecture and files it under the class it's about. Name your classes and say what each covers. You can skip this.",
+        (false, true) => "With no AI for now, a lecture goes under the class you record it in, or waits in Unsorted. Name your classes here. You can skip this.",
+    };
     /// <summary>Continue on Classes is adding the ticked courses and linking them to Canvas.</summary>
     [ObservableProperty] public partial bool AddingCourses { get; set; }
     [ObservableProperty] public partial string NewClass { get; set; } = "";
@@ -335,7 +359,9 @@ public sealed partial class SetupModel : ObservableObject
     public bool CanEditLibrary => !LibraryOk && !Connecting;
     public bool HasModelProblem => !string.IsNullOrEmpty(ModelProblem);
     public bool ModelDownloading => !ModelReady && !HasModelProblem;
-    public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 440;
+    /// <summary>The download bar's fill, out of its track: the step's column, which is 416 wide in the Mac look (720,
+    /// less the 224 sidebar and 40 each side) and 440 in the Windows one (less its 208 sidebar and 36 each side).</summary>
+    public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 416;
     public double ModelBarWidthWin => Math.Clamp(ModelProgress, 0, 1) * 440;
     public string ModelBody => ChosenModel is { Model.Bundled: true } bundled
         ? $"Study Stash turns speech into text on this {DeviceWord}, so your recordings never leave it. {bundled.Name} comes with the app: there's nothing to download."
@@ -381,7 +407,7 @@ public sealed partial class SetupModel : ObservableObject
         SetupStep.Model => "Transcription model",
         SetupStep.Canvas => "Canvas",
         SetupStep.Classes => "Classes",
-        SetupStep.StartAtLogin => "Start at login",
+        SetupStep.StartAtLogin => "Open when you log in",
         SetupStep.Taskbar => "Taskbar",
         _ => IsLibrary ? "Connect your laptop" : "Done",
     };
@@ -410,6 +436,8 @@ public sealed partial class SetupModel : ObservableObject
                      nameof(ShowNotesSummary), nameof(LibrarySummary) })
             OnPropertyChanged(p);
         NotifyStepDerived();
+        // A password already in the field (the one a library here has) that can't be used is said on its page.
+        SayPasswordProblem();
     }
 
     /// <summary>Steps before this one are done (a check); this one and the ones after are still to come, even if
@@ -423,6 +451,14 @@ public sealed partial class SetupModel : ObservableObject
             Steps[i].Current = i == at;
             Steps[i].Done = at >= 0 && i < at;
         }
+        MarkSkipped();
+    }
+
+    /// <summary>Canvas passed with no browser connected ("Skip for now", or Continue past it) reads as skipped, not as
+    /// done.</summary>
+    void MarkSkipped()
+    {
+        foreach (var s in Steps) s.Skipped = s.Step == SetupStep.Canvas && s.Done && Canvas?.BrowserConnected != true;
     }
 
     void NotifyStepDerived()
@@ -436,6 +472,8 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnStepChanged(SetupStep value)
     {
+        // The list of models doesn't stay open behind Back or Continue.
+        if (value != SetupStep.Model) ChoosingModel = false;
         NotifyStepDerived();
         OnEnter?.Invoke(value);
     }
@@ -448,11 +486,13 @@ public sealed partial class SetupModel : ObservableObject
         if (oldValue is not null) oldValue.PropertyChanged -= OnAiPropertyChanged;
         if (newValue is not null) newValue.PropertyChanged += OnAiPropertyChanged;
         OnPropertyChanged(nameof(AiHelpOpen));
+        OnPropertyChanged(nameof(ClassesLede));
     }
 
     void OnAiPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(AiSetupModel.HelpOpen)) OnPropertyChanged(nameof(AiHelpOpen));
+        if (e.PropertyName == nameof(AiSetupModel.NoAi)) OnPropertyChanged(nameof(ClassesLede));
     }
 
     partial void OnCanvasChanged(CanvasConnectModel? oldValue, CanvasConnectModel? newValue)
@@ -461,12 +501,14 @@ public sealed partial class SetupModel : ObservableObject
         if (newValue is not null) newValue.PropertyChanged += OnCanvasPropertyChanged;
         if (newValue is { Found.Count: > 0 }) TakeCourses(newValue.Found);
         OnPropertyChanged(nameof(CanContinue));
+        MarkSkipped();
     }
 
     void OnCanvasPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(CanvasConnectModel.CanFinish)) OnPropertyChanged(nameof(CanContinue));
         if (e.PropertyName == nameof(CanvasConnectModel.Found) && sender is CanvasConnectModel c) TakeCourses(c.Found);
+        if (e.PropertyName == nameof(CanvasConnectModel.BrowserConnected)) MarkSkipped();
     }
 
     partial void OnAddingCoursesChanged(bool value) => OnPropertyChanged(nameof(CanContinue));
@@ -533,10 +575,26 @@ public sealed partial class SetupModel : ObservableObject
 
     partial void OnAddressChanged(string value) => Retyped();
 
+    partial void OnConnectPasswordChanged(string value) => Retyped();
+
     partial void OnPasswordChanged(string value)
     {
-        Retyped();
+        SayPasswordProblem();
         OnPropertyChanged(nameof(PasswordText));
+    }
+
+    /// <summary>The line under the fields is the typed password's problem, not something else setup said.</summary>
+    string? passwordProblem;
+
+    /// <summary>A library's new password with a letter that can't be used (<see cref="Core.Configs.PasswordProblem"/>)
+    /// is said as it's typed, under the field, and the line goes again once the letter does.</summary>
+    void SayPasswordProblem()
+    {
+        if (!IsLibrary || LibraryOk || Connecting) return;
+        string? problem = Core.Configs.PasswordProblem(Password.Trim());
+        if (problem is not null) LibraryResult = problem;
+        else if (LibraryResult is not null && LibraryResult == passwordProblem) LibraryResult = null;
+        passwordProblem = problem;
     }
 
     partial void OnShowPasswordChanged(bool value)
@@ -603,7 +661,8 @@ public sealed partial class SetupModel : ObservableObject
     }
     [RelayCommand] void RetryModel() => OnRetryModel?.Invoke();
 
-    [RelayCommand] void ChangeModel() => ChoosingModel = true;
+    /// <summary>The card's Change opens the list of models; the list's own Cancel shuts it again, the model as it was.</summary>
+    [RelayCommand] void ChangeModel() => ChoosingModel = !ChoosingModel;
 
     [RelayCommand]
     void PickModel(ModelChoice choice)

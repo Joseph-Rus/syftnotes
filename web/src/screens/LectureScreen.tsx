@@ -5,6 +5,7 @@ import { useResource } from '../data/resource';
 import { lectureMeta } from '../format';
 import { href } from '../router';
 import { renderMath } from '../ui/math';
+import { scrollTables } from '../ui/tables';
 import { Paperclip, Sparkle } from '../ui/icons';
 import { Dot, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { AttachmentRow } from './attachments';
@@ -21,7 +22,9 @@ export function LectureScreen({ api, id }: { api: Api; id: string }) {
   const noteBody = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (noteBody.current && notes.data?.html) renderMath(noteBody.current);
+    if (!noteBody.current || !notes.data?.html) return;
+    renderMath(noteBody.current);
+    scrollTables(noteBody.current);
   }, [notes.data?.html]);
 
   const refresh = async () => {
@@ -83,16 +86,19 @@ export function LectureScreen({ api, id }: { api: Api; id: string }) {
   );
 }
 
-/** Where the notes are when there aren't any yet: being written, failed, or never asked for. */
+/** Where the notes are when there aren't any: none will be written and the library says why (the lecture is too short
+ * for them), they're being written, they failed, or none came back. */
 function NoNotes({ lecture }: { lecture: Lecture }) {
-  const words =
-    lecture.status === 'queued' || lecture.status === 'working'
+  const below = lecture.transcript ? ' The transcript is below.' : '';
+  const words = lecture.no_notes_why
+    ? lecture.no_notes_why + below
+    : lecture.status === 'queued' || lecture.status === 'working'
       ? 'Notes are being written. Pull down in a minute to see them.'
       : lecture.status === 'failed'
         ? `Notes couldn't be written${lecture.error ? `: ${lecture.error}` : ''}.`
         : lecture.summary
           ? lecture.summary
-          : 'No notes were written for this lecture. The transcript is below.';
+          : `No notes were written for this lecture.${below}`;
   return (
     <div class="section">
       <div class="callout">

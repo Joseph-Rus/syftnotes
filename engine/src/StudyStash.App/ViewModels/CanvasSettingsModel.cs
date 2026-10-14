@@ -13,6 +13,15 @@ public sealed record CourseChoice(string? Id, string Label)
 {
     public override string ToString() => Label;
 
+    /// <summary>A course by what the library knows of it: its name (with its short code beside it when the name
+    /// doesn't say it), or just its code, or "Course 4110" when Canvas hasn't said either.</summary>
+    public static string LabelOf(CanvasApi.Course c)
+    {
+        string name = c.Title.Length > 0 ? c.Title : c.Name;
+        if (name.Length == 0) return c.ShortCode.Length > 0 ? c.ShortCode : c.Code.Length > 0 ? c.Code : $"Course {c.Id}";
+        return c.ShortCode.Length > 0 && !name.Contains(c.ShortCode, StringComparison.OrdinalIgnoreCase) ? $"{name} · {c.ShortCode}" : name;
+    }
+
     /// <summary>Every course Find my courses found, as a picker lists them: by its name, with its short code beside
     /// it ("Software Engineering · CSCI 321") when the name doesn't say it. An older library's labels stay as sent.</summary>
     public static List<CourseChoice> From(CanvasApi.Overview? o)
@@ -247,7 +256,11 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
                 };
             }
             foreach (var choice in choices) row.Choices.Add(choice);
-            row.Selected = c.Linked && c.Canvas is { } canvas ? row.Choices.FirstOrDefault(x => x.Id == canvas.Id) : row.Choices[0];
+            // A class linked to a course Find my courses hasn't listed (a past term's, or no courses found yet) still
+            // says which course that is: its dropdown showed nothing at all.
+            if (c.Linked && c.Canvas is { Id.Length: > 0 } linked && row.Choices.All(x => x.Id != linked.Id))
+                row.Choices.Insert(0, new CourseChoice(linked.Id, CourseChoice.LabelOf(linked)));
+            row.Selected = c.Linked && c.Canvas is { } canvas ? row.Choices.FirstOrDefault(x => x.Id == canvas.Id) : row.Choices.FirstOrDefault();
             row.OnTryAgain = r => _ = ScoutAsync(r);
             row.OnPick = (r, choice) => _ = PickCourseAsync(r, choice);
             Courses.Add(row);

@@ -91,10 +91,10 @@ public sealed class WindowHeader : Panel
             titleRow.Children.Add(mark);
             titleRow.Children.Add(title);
             Children.Add(titleRow);
-            maximise = Caption("crop_square", 13);
-            captions.Children.Add(Caption("remove", 15));
+            maximise = Caption("crop_square", 13, "Maximize");
+            captions.Children.Add(Caption("remove", 15, "Minimize"));
             captions.Children.Add(maximise);
-            captions.Children.Add(Caption("close", 15));
+            captions.Children.Add(Caption("close", 15, "Close"));
             Children.Add(captions);
             // A real window's drag strip and caption buttons are as tall as this bar, whatever it's styled to.
             SizeChanged += (_, e) =>
@@ -190,11 +190,12 @@ public sealed class WindowHeader : Panel
 
     static Ellipse Light(string colour) => new() { Width = 12, Height = 12, Fill = Brush.Parse(colour) };
 
-    Button Caption(string glyph, double size)
+    Button Caption(string glyph, double size, string said)
     {
         var icon = new Icon { Glyph = glyph, Size = size };
         icon.Bind(Icon.ForegroundProperty, this.GetResourceObservable("Fg"));
         var b = new Button { Width = CaptionWidth, HorizontalContentAlignment = HorizontalAlignment.Center, Content = icon, Focusable = false };
+        Avalonia.Automation.AutomationProperties.SetName(b, said);
         // The app's quiet button look (Styles.axaml), like the rest of the Windows title bar's buttons.
         if (Application.Current?.TryFindResource("Surface", out var theme) == true && theme is Avalonia.Styling.ControlTheme surface) b.Theme = surface;
         return b;

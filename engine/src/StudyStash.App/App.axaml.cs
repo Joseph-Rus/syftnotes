@@ -14,6 +14,7 @@ public partial class App : Application
         Platform.MacPopupShadow.Use();
         Platform.WinPopupCorners.Use();
         Controls.Tips.Use();
+        Controls.SpokenButtons.Use();
         Resources.MergedDictionaries.Add(Skin.Build(Skin.Current));
         UseSkin(Skin.Current);
     }

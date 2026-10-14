@@ -26,6 +26,9 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     readonly IAiLibrary library;
     CancellationTokenSource? pollCts;
     string lastEngine = "";
+    /// <summary>The lecture's notes as the library keeps them: "" while it has written none, when the notes on the page
+    /// are what the student typed while it recorded (or the ones the lecture came with).</summary>
+    string written = "";
 
     public AiNotesModel(IAiLibrary library) => this.library = library;
 
@@ -63,6 +66,12 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     partial void OnOnlyMineChanged(bool value) => OnPropertyChanged(nameof(ShownMarkdown));
     /// <summary>Some of the notes are the student's own words (typed while recording, or changed by hand since).</summary>
     public bool HasMine => TypedNotes.HasMarks(CurrentMarkdown);
+    /// <summary>Every word of the notes is the student's own (what they typed while it recorded, when no notes were
+    /// written from the recording): the line over them says just "What you wrote".</summary>
+    public bool AllMine => TypedNotes.IsAllMine(CurrentMarkdown);
+    /// <summary>Some of the notes are the student's and some were added from the recording: "Only my notes" has
+    /// something to hide.</summary>
+    public bool SomeMine => HasMine && !AllMine;
     /// <summary>Who wrote the rest, as the line over the notes names them ("Claude"); "" for an older lecture that doesn't say.</summary>
     public string Writer { get; private set; } = "";
     /// <summary>The line over the notes saying whose words are whose: with some of the student's, "What you wrote" in
@@ -158,10 +167,13 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     }
 
     /// <summary>Sets the notes as they stand right now (from the lecture the host already has), then reads the
-    /// library once to build the "Rewrite notes with" menu and pick up any job already running.</summary>
-    public async Task Load(string lectureId, string markdown, string notesModel, string updatedAt)
+    /// library once to build the "Rewrite notes with" menu and pick up any job already running.
+    /// <paramref name="typed"/>: the library has written no notes for the lecture, and these are what the student
+    /// typed while it recorded, which the page shows as theirs.</summary>
+    public async Task Load(string lectureId, string markdown, string notesModel, string updatedAt, bool typed = false)
     {
         LectureId = lectureId;
+        written = typed ? "" : markdown;
         SetCurrent(markdown, Engines.WhoWrote(notesModel), updatedAt);
         Engine = WriterId;
         await Refresh();
@@ -176,6 +188,8 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
         Writer = engineName;
         OnPropertyChanged(nameof(CurrentBody));
         OnPropertyChanged(nameof(HasMine));
+        OnPropertyChanged(nameof(AllMine));
+        OnPropertyChanged(nameof(SomeMine));
         OnPropertyChanged(nameof(LegendAi));
         OnPropertyChanged(nameof(ShownMarkdown));
         OnPropertyChanged(nameof(ShownByline));
@@ -235,7 +249,13 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
 
     void Apply(RewriteInfo info)
     {
-        if (info.Current is { } cur) SetCurrent(cur.Markdown, cur.By, cur.At);
+        if (info.Current is { } cur)
+        {
+            written = cur.Markdown;
+            // The library has written no notes for this lecture (a recording too short for them, say): what's on the
+            // page is what the student typed (or the notes it came with), and it stays there.
+            if (cur.Markdown.Length > 0 || CurrentMarkdown.Length == 0) SetCurrent(cur.Markdown, cur.By, cur.At);
+        }
         EngineName = info.EngineName;
         Error = info.Error;
         if (info.Engine.Length > 0) lastEngine = info.Engine;
@@ -432,8 +452,11 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     // --- Editing the notes by hand --------------------------------------------------------------------------------
 
     NoteEdit? edit;
-    /// <summary>The notes the edit started from, whole: the library is told, so it never saves over other ones unseen.</summary>
+    /// <summary>The notes the edit started from, whole.</summary>
     string editFrom = "";
+    /// <summary>The library's own notes when the edit started (<see cref="written"/>): the library is told, so it never
+    /// saves over other ones unseen.</summary>
+    string editBase = "";
 
     /// <summary>The student is editing the current notes: the notes area is a text editor until Save or Cancel.</summary>
     [ObservableProperty] public partial bool Editing { get; set; }
@@ -474,6 +497,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     void BeginEdit()
     {
         editFrom = CurrentMarkdown;
+        editBase = written;
         edit = NoteEdit.Begin(CurrentBody);
         editStart = TypedNotes.Unmarked(edit.Text);
         EditText = editStart;
@@ -500,6 +524,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
     {
         if (Editing || State != RewriteState.Idle) return;
         editFrom = from;
+        editBase = from == CurrentMarkdown ? written : from;
         edit = NoteEdit.Begin(AiWords.DropLeadingSummary(from));
         editStart = TypedNotes.Unmarked(edit.Text);
         EditProblem = "";
@@ -536,7 +561,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             // The leading "Summary" heading the editor leaves out goes back as it was.
             string head = editFrom[..(editFrom.Length - AiWords.DropLeadingSummary(editFrom).Length)];
             // A line left as it was keeps whose it was; one the student changed or added is theirs.
-            var info = await library.EditNotesAsync(LectureId, head + edit.End(TypedNotes.Remark(EditText, edit.Text)), Notes.Fingerprint(editFrom));
+            var info = await library.EditNotesAsync(LectureId, head + edit.End(TypedNotes.Remark(EditText, edit.Text)), Notes.Fingerprint(editBase));
             if (info is null)
             {
                 OlderLibrary = true;
@@ -575,6 +600,7 @@ public sealed partial class AiNotesModel : ObservableObject, IDisposable
             if (await library.RewriteAsync(LectureId) is not { } info) return false;
             Apply(info);
             editFrom = CurrentMarkdown;
+            editBase = written;
             return true;
         }
         catch

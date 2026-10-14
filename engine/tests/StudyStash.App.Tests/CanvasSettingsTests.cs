@@ -26,6 +26,16 @@ public class CanvasSettingsTests
         .Json(HttpMethod.Post, "/api/v2/canvas/scout", "canvas")
         .Json(HttpMethod.Post, "/api/v2/canvas", "canvas");
 
+    /// <summary>A class linked to a course that Find my courses hasn't listed still names the course in its dropdown
+    /// (it showed nothing): by its name, or its code, or its number when Canvas has said neither.</summary>
+    [Fact]
+    public void A_linked_course_that_isnt_listed_says_what_it_is()
+    {
+        Assert.Equal("Software Engineering · CSCI 321", CourseChoice.LabelOf(new CanvasApi.Course { Id = "7", Title = "Software Engineering", ShortCode = "CSCI 321" }));
+        Assert.Equal("BIO 110", CourseChoice.LabelOf(new CanvasApi.Course { Id = "4110", Code = "BIO 110" }));
+        Assert.Equal("Course 4110", CourseChoice.LabelOf(new CanvasApi.Course { Id = "4110" }));
+    }
+
     [Fact]
     public async Task LoadAsync_shows_connection_and_courses_as_mac_06_does()
     {

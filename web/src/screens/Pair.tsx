@@ -50,13 +50,16 @@ export function Pair({ api, library, onPaired }: { api: Api; library: Me['librar
           inputMode="numeric"
           autocomplete="one-time-code"
           pattern="\d*"
-          maxLength={6}
           placeholder="000000"
           value={code}
           disabled={busy}
           aria-label="6-digit code"
           onInput={(e) => {
+            // No maxlength on the box: the browser would cut "123 456" (as Settings prints it) to "123 45" before
+            // this hears of it. The six are counted here, after spaces and anything else that isn't a digit are gone.
             const next = cleanCode(e.currentTarget.value);
+            // The box shows what will be sent, even when that's what it showed already (a letter typed after "12").
+            if (e.currentTarget.value !== next) e.currentTarget.value = next;
             setCode(next);
             if (next.length === 6) void submit(next);
           }}
