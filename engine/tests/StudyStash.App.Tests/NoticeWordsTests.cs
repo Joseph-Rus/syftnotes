@@ -27,6 +27,19 @@ public class NoticeWordsTests
     }
 
     [Fact]
+    public void A_lecture_whose_AI_needs_signing_in_again_says_so_and_offers_Sign_in()
+    {
+        var (title, text, action) = NoticeWords.Filed("CS 101", "Recursion", Core.Ai.Engines.NotesNeedSignIn("Claude"));
+        Assert.Equal("Filed in CS 101", title);
+        Assert.Equal("Recursion: its notes weren't written because Claude needs you to sign in again.", text);
+        Assert.Equal("Sign in", action);
+        // Settings' card: with nothing standing in, it says the notes wait for the sign-in, not that Ollama answers.
+        Assert.Equal("Until then, lectures are filed without notes. They're written once you've signed in.",
+            AiWords.ProblemMessage("not_signed_in", "Claude", "", "", 0, ""));
+        Assert.Equal("Until then, questions go to Ollama.", AiWords.ProblemMessage("not_signed_in", "Claude", "Ollama", "", 0, ""));
+    }
+
+    [Fact]
     public void A_paused_lecture_offers_resume_and_doesnt_say_paused_twice()
     {
         Assert.Equal(("The microphone stopped. Plug it back in, then press Resume.", "Resume", false), NoticeWords.Paused(RecordingWords.MicStopped, windows: false));

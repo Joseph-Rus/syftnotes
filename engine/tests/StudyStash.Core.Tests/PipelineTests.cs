@@ -256,7 +256,8 @@ public class PipelineTests
             Quiet, notesModel: () => "Claude sonnet");
         store.Requeue("l1");
         await p.RunPendingAsync();
-        Assert.StartsWith("Claude sonnet couldn't rewrite the notes", store.Get("l1")!.Error);
+        // Signed out: said as what to do (SignInAgainTests has the rest).
+        Assert.Equal(Ai.Engines.RewriteNeedsSignIn("Claude"), store.Get("l1")!.Error);
 
         up = true;
         store.Requeue("l1"); // "Try again"

@@ -395,7 +395,10 @@ public static partial class AiWords
     public static string ProblemMessage(string kind, string engineName, string fallbackName, string until, double sizeGb, string detail) => kind switch
     {
         "engine_offline" => "New lectures wait and get their notes when it's back.",
-        "not_signed_in" => $"Until then, questions go to {fallbackName}.",
+        // No stand-in (fallbackName empty): nothing writes the notes until it's signed in. The library writes the ones it
+        // missed once it is.
+        "not_signed_in" => fallbackName.Length > 0 ? $"Until then, questions go to {fallbackName}."
+            : "Until then, lectures are filed without notes. They're written once you've signed in.",
         "model_missing" => sizeGb > 0 ? $"About {sizeGb:0} GB, downloaded once on your library." : "Downloaded once on your library.",
         "usage_limit" => ParseUntil(until) is { } t ? $"Questions go to {fallbackName} until {UntilClock(t)}." : $"Questions go to {fallbackName}.",
         "fell_back" => detail,

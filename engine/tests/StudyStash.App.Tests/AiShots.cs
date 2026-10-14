@@ -560,6 +560,21 @@ public class AiShots
         return sheet;
     }
 
+    /// <summary>Claude signed out while it writes the notes: the lecture's notification (Sign in), and Settings' card.</summary>
+    [AvaloniaFact]
+    public void Ai_sign_in_again()
+    {
+        foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })
+            foreach (var t in Themes)
+                Shot.Take($"{(skin == SkinKind.Mac ? "mac" : "win")}-18-ai-sign-in-again", skin, t, () =>
+                {
+                    var filed = ViewModels.NoticeWords.Filed("CS 101", "Recursion and the call stack", Core.Ai.Engines.NotesNeedSignIn("Claude"));
+                    return Shot.Side(
+                        new ToastView { Title = filed.Title, Text = filed.Text, ActionLabel = filed.Action, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top },
+                        ProblemsSheet(skin, AiDemo.SignedOut().Problems, 900));
+                });
+    }
+
     [AvaloniaFact]
     public void Mac_ai_problems()
     {

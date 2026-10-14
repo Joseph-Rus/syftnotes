@@ -184,6 +184,15 @@ public static class Cli
             var diagrams = new DiagramJobs(cfg, store, ai) { NotesBusy = () => writer?.Writing == true };
             var pipeline = writer = new Pipeline(cfg, store, ai.SortAsync, ai.SummarizeAsync, notesModel: () => ai.Describe("notes", cfg), notesFast: ai.NotesInFastMode,
                 filed: id => diagrams.AfterFiled(id, ai.TakeDiagramsFollow(id)));
+            // An AI that needed signing in again answers once more: the lectures it couldn't write notes for meanwhile
+            // get them now, without the student asking for each.
+            ai.SignedInAgain += id =>
+            {
+                int n = store.RequeueSignedIn(Engines.Name(id));
+                if (n == 0) return;
+                Console.WriteLine($"[pipeline] {Engines.Name(id)} is signed in again: writing the notes of {n} lecture(s) it couldn't before");
+                pipeline.Wake();
+            };
             var working = pipeline.Start(stop.Token);
             var designing = diagrams.Start(stop.Token);
             Task updating = Task.CompletedTask;

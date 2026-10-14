@@ -371,6 +371,15 @@ public sealed partial class Store : IDisposable
         lock (gate) return Exec("UPDATE notes SET status=?, updated_at=? WHERE id=?", Queued, Now(), noteId) > 0;
     }
 
+    /// <summary>Lectures filed with no notes because <paramref name="engineName"/> needed signing in again
+    /// (<see cref="Ai.Engines.NotesNeedSignIn"/>), queued to be written now it answers again: how many.</summary>
+    public int RequeueSignedIn(string engineName)
+    {
+        lock (gate)
+            return Exec("UPDATE notes SET status=?, updated_at=? WHERE status=? AND COALESCE(summary_md, '')='' AND error=?",
+                Queued, Now(), Done, Ai.Engines.NotesNeedSignIn(engineName));
+    }
+
     public int RequeueAll()
     {
         lock (gate) return Exec("UPDATE notes SET status=?, updated_at=? WHERE status IN (?, ?)", Queued, Now(), Done, Failed);
