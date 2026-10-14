@@ -18,13 +18,11 @@ sealed class FakeHardware(HardwareProfile profile) : IHardwareProbe
         return profile;
     }
 
-    /// <summary>A PC with a small graphics card Whisper can use (2 GB) and too little memory for Parakeet (6 GB): the
-    /// compact turbo.</summary>
-    public static FakeHardware PlainPc() => new(new HardwareProfile(HostOs.Windows, Architecture.X64, 8, true, 6,
+    /// <summary>A PC with a small graphics card Whisper can use (2 GB): the compact turbo.</summary>
+    public static FakeHardware PlainPc() => new(new HardwareProfile(HostOs.Windows, Architecture.X64, 8, true, 16,
         new GraphicsCard("AMD Radeon(TM) Graphics", 2, false), Vulkan: true));
 
-    /// <summary>A PC with only the graphics built into its processor (no card Whisper can use): Parakeet, made for the
-    /// processor.</summary>
+    /// <summary>A PC with only the graphics built into its processor (no card Whisper can use): Whisper on the processor.</summary>
     public static FakeHardware ProcessorPc() => new(new HardwareProfile(HostOs.Windows, Architecture.X64, 8, true, 16,
         new GraphicsCard("Intel(R) UHD Graphics 620", 0.125, true), Vulkan: true));
 
@@ -79,7 +77,7 @@ public class ModelAdviceTests
         }
         using var mac = new TempHome();
         var (onMac, _) = Host(mac, FakeHardware.AppleSilicon());
-        using (onMac) Assert.Same(WhisperModels.Parakeet, onMac.Model); // Apple silicon starts on Parakeet
+        using (onMac) Assert.Same(WhisperModels.LargeV3TurboSmall, onMac.Model); // Apple silicon starts compact too
     }
 
     [Fact]
@@ -300,8 +298,8 @@ public class ModelAdviceTests
         Assert.EndsWith("Whisper large-v3 turbo may fall behind a lecture here: pick Whisper large-v3 turbo (compact) to switch. The one you have stays.",
             SettingsModel.AdviceWords(WhisperModels.LargeV3Turbo, advice, keepsUp), StringComparison.Ordinal);
 
-        // A Mac starts on Parakeet, and the compact model (or large-v3) it may have had keeps up as well as ever: no word
-        // that it may fall behind.
+        // A Mac starts on the compact model, and large-v3, which it keeps up with too, gets no word that it may fall
+        // behind.
         var mac = FakeHardware.AppleSilicon().Probe();
         foreach (var inUse in new[] { WhisperModels.LargeV3TurboSmall, WhisperModels.LargeV3 })
             Assert.Equal(WhisperModels.Advise(mac).Why, SettingsModel.AdviceWords(inUse, WhisperModels.Advise(mac), WhisperModels.Heaviest(mac)));
@@ -332,8 +330,8 @@ public class FallingBehindTests
         // Already on the one for this computer (or lighter): the next lighter Whisper.
         Assert.EndsWith("Whisper small would keep up.",
             AppHost.BehindWords(900, 600, WhisperModels.LargeV3TurboSmall, PlainPc)!.Value.Text, StringComparison.Ordinal);
-        // A bigger one than a Mac starts on, falling behind: the one it starts on.
-        Assert.EndsWith("NVIDIA Parakeet v3 would keep up.",
+        // A bigger one than a Mac starts on, falling behind: the compact one it starts on.
+        Assert.EndsWith("Whisper large-v3 turbo (compact) would keep up.",
             AppHost.BehindWords(900, 600, WhisperModels.LargeV3, AppleSilicon)!.Value.Text, StringComparison.Ordinal);
 
         // The lightest one has nothing lighter to offer (tiny is only for trying things out).
