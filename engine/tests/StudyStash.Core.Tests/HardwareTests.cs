@@ -21,9 +21,10 @@ public class HardwareTests
     /// keeps up with (a bigger one than that gets a word, once).</summary>
     public static TheoryData<string, HardwareProfile, string, string> Computers => new()
     {
-        // Apple silicon starts on Parakeet, and keeps up with large-v3 if the student picks it; a Mac with too little
-        // memory for Parakeet starts on the compact model.
-        { "M1 with 8 GB", Mac(8), "parakeet-v3", "large-v3" },
+        // Apple silicon starts on Parakeet, and keeps up with large-v3 if the student picks it; an 8 GB Mac starts on
+        // the compact model, which runs on its graphics and leaves the memory for everything else open in class.
+        { "M1 with 8 GB", Mac(8), "large-v3-turbo-q5", "large-v3" },
+        { "M2 with 16 GB", Mac(16), "parakeet-v3", "large-v3" },
         { "M3 Pro with 36 GB", Mac(36), "parakeet-v3", "large-v3" },
         { "Apple silicon that won't say its memory", Mac(null), "parakeet-v3", "large-v3" },
         { "Apple silicon with 4 GB", Mac(4), "large-v3-turbo-q5", "large-v3-turbo-q5" },
@@ -38,6 +39,7 @@ public class HardwareTests
         { "PC, 6 GB card", Pc(card: Card(6)), "parakeet-v3", "large-v3-turbo" },
         { "PC, 4 GB card", Pc(card: Card(3.9)), "parakeet-v3", "large-v3-turbo" },
         { "PC, 2 GB card", Pc(card: Card(2)), "parakeet-v3", "large-v3-turbo-q5" },
+        { "PC, 6 GB card, 8 GB of memory", Pc(ram: 8, card: Card(6)), "large-v3-turbo-q5", "large-v3-turbo" },
         // No card Whisper can use: the processor decides. Parakeet does a lecture's pieces on it in a small part of
         // Whisper's time, so with 4 fast cores and 8 GB it's what to start on (and, on 8, Whisper's compact turbo also keeps up).
         { "PC, 8 GB card but no Vulkan", Pc(card: Card(8), vulkan: false), "parakeet-v3", "large-v3-turbo-q5" },

@@ -146,7 +146,8 @@ public static class WhisperModels
     /// turbo's 7.83%, and 11.31% to 16.13% on AMI (unscripted meetings, the nearest a benchmark comes to a lecture);
     /// it never makes up words over silence, and keeps up 10 to 30 times over on the processor alone (sherpa-onnx; 0.04
     /// of a lecture's length on 5 threads here). So it's the pick wherever it fits (<see cref="FitsParakeet"/>) and
-    /// reads the lecture's language (<paramref name="parakeet"/>), on Apple silicon and graphics cards too.
+    /// reads the lecture's language (<paramref name="parakeet"/>), on Apple silicon and graphics cards too, once there's
+    /// room for it beside everything else open in class (<see cref="RoomyGb"/>).
     /// </para>
     /// <para>
     /// Except where Whisper large-v3 is clearly ahead on FLEURS (Parakeet v3's own paper, arXiv 2509.14128, words wrong
@@ -164,7 +165,7 @@ public static class WhisperModels
     public static ModelAdvice Advise(HardwareProfile hw, bool parakeet = true, string language = "")
     {
         string device = hw.DeviceWord;
-        if (parakeet && FitsParakeet(hw))
+        if (parakeet && FitsParakeet(hw) && (ProcessorOnly(hw) || hw.RamGb is not < RoomyGb))
         {
             if (WhisperAheadIn(language) is { } named && Heaviest(hw, parakeet: false).Model.Id == LargeV3.Id)
                 return new(LargeV3, $"In {named}, Whisper large-v3 makes fewer mistakes than any other model, and this {device} keeps up with a lecture on it.");
@@ -178,6 +179,16 @@ public static class WhisperModels
             ? "The compact model keeps up with a lecture and leaves this Mac room for everything else. Its Apple silicon can run a bigger one too."
             : $"The compact model keeps up with a lecture and leaves this PC room for everything else. Its graphics card ({hw.WhisperCard?.Name}) can run a bigger one too.");
     }
+
+    /// <summary>
+    /// Memory for Parakeet beside everything else open in class, where Whisper has the graphics to run on instead.
+    /// Writing a lecture down as it's recorded keeps the model loaded all lecture: Parakeet holds about 3 GB of the
+    /// computer's own memory, the compact turbo about 0.8 GB on the graphics. On an 8 GB Mac or PC that's the difference
+    /// between a computer that keeps up with a browser and slides alongside and one that doesn't, for a few more words
+    /// wrong (7.8% to 6.3%). A computer with no graphics Whisper can use keeps Parakeet from 8 GB: on the processor
+    /// it's the lightest model that's any good.
+    /// </summary>
+    const double RoomyGb = 12;
 
     /// <summary>The languages Whisper large-v3 writes down clearly better than Parakeet (see <see cref="Advise"/>), by
     /// name, or null for the rest.</summary>
