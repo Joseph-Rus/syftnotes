@@ -100,6 +100,9 @@ public static class AppMenu
         if (!OperatingSystem.IsMacOS()) return;
         var bar = ForWindow(window, library, settings);
         NativeMenu.SetMenu(window, bar);
+        // The menu bar is built afresh as a window's menus go up and each time it comes to the front.
+        MendKeysSoon();
+        window.Activated += (_, _) => MendKeysSoon();
         // The system's menu bar keeps a window's menus after the window has closed, for as long as the app runs (about
         // 24 KB a window: each item, what watches it, and its hold on the system's own item). Emptied, the items are
         // let go one by one and next to nothing is left to keep.
@@ -131,6 +134,7 @@ public static class AppMenu
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern IntPtr SendId(IntPtr r, IntPtr sel, IntPtr a);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern void SendIdId(IntPtr r, IntPtr sel, IntPtr a, IntPtr b);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern IntPtr SendLong(IntPtr r, IntPtr sel, nint a);
+    [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern void SendULong(IntPtr r, IntPtr sel, nuint a);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern nint GetLong(IntPtr r, IntPtr sel);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern nuint GetULong(IntPtr r, IntPtr sel);
     [DllImport(Lib, EntryPoint = "objc_msgSend")] static extern byte GetBool(IntPtr r, IntPtr sel);
@@ -156,6 +160,34 @@ public static class AppMenu
             SendIdId(options, sel_registerName("setObject:forKey:"), NS(""), NS("Version"));
             Desktop.Activate();
             SendId(App, sel_registerName("orderFrontStandardAboutPanelWithOptions:"), options);
+        }
+        catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
+        {
+        }
+    }
+
+    static void MendKeysSoon() => Avalonia.Threading.DispatcherTimer.RunOnce(MendKeys, TimeSpan.FromMilliseconds(200));
+
+    /// <summary>Hide Others gets ⌥⌘H, as on every Mac. The app menu the system builds for the app gives it ⌥⌘Q, one
+    /// key from Quit, and ⌥⌘H did nothing.</summary>
+    public static void MendKeys()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        try
+        {
+            var main = Send(App, sel_registerName("mainMenu"));
+            if (main == IntPtr.Zero || GetLong(main, sel_registerName("numberOfItems")) == 0) return;
+            var sub = Send(SendLong(main, sel_registerName("itemAtIndex:"), 0), sel_registerName("submenu"));
+            if (sub == IntPtr.Zero) return;
+            IntPtr hideOthers = sel_registerName("hideOtherApplications:");
+            nint n = GetLong(sub, sel_registerName("numberOfItems"));
+            for (nint j = 0; j < n; j++)
+            {
+                var item = SendLong(sub, sel_registerName("itemAtIndex:"), j);
+                if (Send(item, sel_registerName("action")) != hideOthers && Str(Send(item, sel_registerName("title"))) != "Hide Others") continue;
+                SendId(item, sel_registerName("setKeyEquivalent:"), NS("h"));
+                SendULong(item, sel_registerName("setKeyEquivalentModifierMask:"), (1 << 19) | (1 << 20)); // ⌥⌘
+            }
         }
         catch (Exception e) when (e is DllNotFoundException or EntryPointNotFoundException)
         {
