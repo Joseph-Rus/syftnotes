@@ -145,6 +145,29 @@ public sealed partial class AiEnginesModel : ObservableObject
     [ObservableProperty] public partial bool Fallback { get; set; }
     [ObservableProperty] public partial bool Busy { get; set; }
     [ObservableProperty] public partial string? Say { get; set; }
+
+    /// <summary>What the page says of the last thing done on it ("Claude works with your API key.", "The key was
+    /// saved, but Claude said: …", a refusal), where the student is looking: under API keys when it was a key, else
+    /// under the AIs. Neither view showed it, so a key the AI's maker refused looked saved and fine.</summary>
+    bool aboutKey;
+    public string? SayOfKeys => aboutKey ? Say : null;
+    public string? SayOfAis => aboutKey ? null : Say;
+    public bool HasSayOfKeys => SayOfKeys is { Length: > 0 };
+    public bool HasSayOfAis => SayOfAis is { Length: > 0 };
+
+    partial void OnSayChanged(string? value)
+    {
+        OnPropertyChanged(nameof(SayOfKeys));
+        OnPropertyChanged(nameof(SayOfAis));
+        OnPropertyChanged(nameof(HasSayOfKeys));
+        OnPropertyChanged(nameof(HasSayOfAis));
+    }
+
+    // Each thing done on the page starts by being busy: what's said next is about that one, not the key before it.
+    partial void OnBusyChanged(bool value)
+    {
+        if (value) aboutKey = false;
+    }
     [ObservableProperty] public partial bool OlderLibrary { get; set; }
     [ObservableProperty] public partial bool Offline { get; set; }
 
@@ -341,6 +364,7 @@ public sealed partial class AiEnginesModel : ObservableObject
     {
         if (key.Trim().Length == 0 && !row.HasKey) return;
         Busy = true;
+        aboutKey = true;
         Say = key.Trim().Length > 0 ? $"Trying {row.Name} with your key…" : null;
         try
         {
