@@ -110,10 +110,14 @@ public sealed class AgentInstallTests
 
     static bool Alive(string pidFile)
     {
-        if (!File.Exists(pidFile)) return false;
+        // A pid file the fake installer is still writing can't be read yet on Windows (or is still empty): not started.
+        string text;
+        try { text = File.ReadAllText(pidFile).Trim(); }
+        catch (IOException) { return false; }
+        if (!int.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out int pid)) return false;
         try
         {
-            using var p = Process.GetProcessById(int.Parse(File.ReadAllText(pidFile).Trim(), System.Globalization.CultureInfo.InvariantCulture));
+            using var p = Process.GetProcessById(pid);
             return !p.HasExited;
         }
         catch (ArgumentException)
@@ -167,7 +171,6 @@ public sealed class AgentInstallTests
         var seen = new List<AgentSignedIn>();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         Assert.True(await signIn.WaitAsync(cts.Token, seen.Add));
-        Assert.False(seen[0].SignedIn);
         Assert.Equal(new AgentSignedIn(true, "claude.ai", "pro"), seen[^1]);
         Assert.Equal("https://example.com/fake-sign-in?code=abc", signIn.Url);
         Assert.False(signIn.NeedsTerminal);

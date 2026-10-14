@@ -265,15 +265,13 @@ public static partial class SelfTest
         Shot(Shell.Windows.Setup, "setup-microphone");
         m.NextCommand.Execute(null);
 
-        // Model: entering the step starts the download from our own mirror (never Hugging Face).
-        bool downloading = await Until(() => m.ModelProgress is > 0.05 and < 0.95, 20);
+        // The model has no step of its own: it started downloading on the microphone's step, from our own mirror (never
+        // Hugging Face), and goes on while setup does. Waiting for it here keeps setup where it is (on Canvas).
+        bool downloading = await Until(() => m.ModelProgress is > 0.05 and < 0.95 || m.ModelReady, 20);
         Say(downloading ? $"model downloading: {m.ModelDone} {m.ModelLeft}" : "model: no progress seen in 20 s");
-        Shot(Shell.Windows.Setup, "setup-model-downloading");
         bool ready = await Until(() => m.ModelReady, 60);
         Say(ready ? "model ready" : $"model: not ready in 60 s ({m.ModelProblem})");
-        Shot(Shell.Windows.Setup, "setup-model-ready");
         if (!ready) throw new InvalidOperationException("the model never finished downloading");
-        m.NextCommand.Execute(null);
 
         // Canvas is optional: the self-test skips it (there's no Chrome or Canvas here to connect).
         if (m.OnCanvas)
@@ -327,7 +325,7 @@ public static partial class SelfTest
     }
 
     /// <summary>Just this computer: the welcome's first choice makes the library here (listening to this computer
-    /// alone), then the microphone, the model, who writes the notes, Canvas (skipped), a class, and start at login (left
+    /// alone), then the microphone (the model downloads meanwhile), who writes the notes, Canvas (skipped), a class, and start at login (left
     /// off: the self-test never adds a login item).</summary>
     static async Task RunOneComputerSetupAsync(AppHost host)
     {
@@ -367,11 +365,12 @@ public static partial class SelfTest
         Shot(Shell.Windows.Setup, "setup-microphone");
         m.NextCommand.Execute(null);
 
+        // The model downloads from the microphone's step on, with no step of its own. Waiting for it here keeps setup on
+        // who writes the notes: pressing Next there would save its choice (no AI) over the self-test's engine.
         bool ready = await Until(() => m.ModelReady, 60);
         Say(ready ? "model ready" : $"model: not ready in 60 s ({m.ModelProblem})");
-        Shot(Shell.Windows.Setup, "setup-model-ready");
         if (!ready) throw new InvalidOperationException("the model never finished downloading");
-        m.NextCommand.Execute(null);
+        if (m.Step != SetupStep.Ai) throw new InvalidOperationException($"expected who writes the notes after the microphone, got {m.Step}");
 
         // Who writes the notes: the engines on this computer, as the library sees them. The self-test's engine stands
         // in for Ollama (the library's own pick), whatever this computer has installed, so the step is left as it is.
