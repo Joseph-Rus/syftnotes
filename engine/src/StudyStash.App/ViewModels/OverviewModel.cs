@@ -471,6 +471,9 @@ public sealed partial class OverviewModel : ObservableObject
         public IReadOnlyList<Event>? Events { get; init; }
         public int Unsorted { get; init; }
         public int Writing { get; init; }
+        /// <summary>The library writes no notes (setup's "No AI for now"): a recording lands with its transcript, and
+        /// nothing here says notes are being written.</summary>
+        public bool NotesOff { get; init; }
         public Action<string>? OpenClass { get; init; }
         /// <summary>Opens a note (its folder, its id).</summary>
         public Action<string, string>? OpenLecture { get; init; }
@@ -557,7 +560,7 @@ public sealed partial class OverviewModel : ObservableObject
     {
         // Home says "Today" and "Yesterday"; a folder's own list, under "This week", says the day itself.
         Id = l.Id, Title = l.Title, When = l.Date is not { } d ? "" : showFolder ? Day(d, s.Now, s.Zone) : Date(d, s), Length = l.Seconds is { } sec ? Core.TimedText.Length(sec) : "",
-        Summary = l.Status ?? (l.Writing ? "Writing notes…" : PlainMath.Inline(l.Summary)), Pending = l.Writing || l.Status is not null, Date = l.DateText,
+        Summary = l.Status ?? (l.Writing ? s.NotesOff ? "Being filed" : "Writing notes…" : PlainMath.Inline(l.Summary)), Pending = l.Writing || l.Status is not null, Date = l.DateText,
         Folder = l.Class == Core.Configs.Unsorted ? "" : l.Class, Dot = dot(l.Class), Noun = Nouns.For(l.Class, s.GroupOf(l.Class)), ShowFolder = showFolder,
         Open = () => s.OpenLecture?.Invoke(l.Class, l.Id),
     };
@@ -662,9 +665,10 @@ public sealed partial class OverviewModel : ObservableObject
         if (soon.Length > 0 || due.Length > 0) return string.Join(" ", new[] { soon, due }.Where(x => x.Length > 0));
         if (canvas) return "Nothing due this week.";
         int notes = s.Classes.Sum(c => c.Lectures) + s.Unsorted;
-        if (notes == 0) return "No notes yet. Record something and its notes land here.";
+        if (notes == 0) return s.NotesOff ? "No notes yet. Record something and it lands here with its transcript." : "No notes yet. Record something and its notes land here.";
         string have = $"{Count(notes)} note{(notes == 1 ? "" : "s")} in {Count(s.Classes.Count).ToLowerInvariant()} folder{(s.Classes.Count == 1 ? "" : "s")}";
-        return s.Writing > 0 ? $"{have}, and notes being written for {Count(s.Writing).ToLowerInvariant()}." : have + ".";
+        if (s.Writing == 0) return have + ".";
+        return s.NotesOff ? $"{have}, and {Count(s.Writing).ToLowerInvariant()} being filed." : $"{have}, and notes being written for {Count(s.Writing).ToLowerInvariant()}.";
     }
 
     /// <summary>
@@ -735,7 +739,7 @@ public sealed partial class OverviewModel : ObservableObject
             ShowUpNext = s.Events is not null,
             OnlyUnsorted = onlyUnsorted,
             NotesEmpty = onlyUnsorted ? "Nothing to sort. Every note is in a folder."
-                : $"No notes yet. Record something from here or the {(OperatingSystem.IsMacOS() ? "menu bar" : "tray")} and its notes land here.",
+                : $"No notes yet. Record something from here or the {(OperatingSystem.IsMacOS() ? "menu bar" : "tray")} and {(s.NotesOff ? "it lands here with its transcript" : "its notes land here")}.",
         };
         var today = Local(s.Now, s).Date;
         foreach (var e in Coming(s).Take(UpNextRows))

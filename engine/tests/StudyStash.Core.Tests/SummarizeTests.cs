@@ -131,6 +131,42 @@ public class SummarizeTests
     }
 
     [Fact]
+    public async Task A_lecture_too_short_for_notes_says_so_and_one_the_AI_wrote_nothing_for_doesnt()
+    {
+        using var dir = new TempDir();
+        var cfg = CfgFor(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        // The AI is only asked for notes when enough was said to write them from; here it returns none.
+        var asked = new List<string>();
+        var p = new Pipeline(cfg, store, Sort("""{"class_name": "Calc 1", "confidence": 0.9, "lecture_title": "Derivatives", "topics": []}"""), (m, _) =>
+        {
+            asked.Add(m.Id);
+            return Task.FromResult("");
+        }, Quiet);
+        store.Enqueue(new Meeting("short") { Title = "A first try", Transcript = "[00:00] Testing, one two three." });
+        store.Enqueue(new Meeting("long") { Title = "Lecture", Transcript = Lines(40) });
+        // (Known as soon as it arrives: nothing says a short one's notes are on their way while it's filed.)
+        Assert.Equal(Summarize.NoNotesShort, new LibraryReader(cfg, store).Lecture("short")!["no_notes"]!.GetValue<string>());
+        Assert.Equal(2, await p.RunPendingAsync());
+        Assert.Equal(["long"], asked);
+
+        // The short one says why it has no notes, in the lecture the app and the phone read and in its note file.
+        var reader = new LibraryReader(cfg, store);
+        var tooShort = reader.Lecture("short")!;
+        Assert.Equal(Summarize.NoNotesShort, tooShort["no_notes"]!.GetValue<string>());
+        Assert.Equal("This lecture is too short for notes: Study Stash writes them from about a minute and a half of speech.", tooShort["no_notes_why"]!.GetValue<string>());
+        Assert.Contains("_(Too short for notes: Study Stash writes them from about a minute and a half of speech.)_", Py.ReadText(store.Get("short")!.MdPath!));
+        // Enough was said and nothing came back: that isn't called too short.
+        Assert.Null(reader.Lecture("long")!["no_notes"]);
+        Assert.Contains("_(no AI notes returned)_", Py.ReadText(store.Get("long")!.MdPath!));
+        // A library that writes no notes at all (setup's "No AI for now") says that of both, the short one too.
+        cfg.OllamaEnabled = cfg.SummaryEnabled = false;
+        Assert.Equal(Summarize.NoNotesOff, reader.Lecture("long")!["no_notes"]!.GetValue<string>());
+        Assert.Equal(Summarize.NoNotesOff, reader.Lecture("short")!["no_notes"]!.GetValue<string>());
+        Assert.Equal("Notes are off, so your library files this lecture without any.", reader.Lecture("long")!["no_notes_why"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Pipeline_uses_our_summary_and_sorts_on_it()
     {
         using var dir = new TempDir();

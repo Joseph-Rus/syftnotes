@@ -52,14 +52,35 @@ public static class NoticeWords
     }
 
     /// <summary>The lecture just stopped and is kept: where it goes from here, which depends on whether the library can
-    /// be reached.</summary>
-    public static string Saved(LibraryState library, bool mac) => library switch
+    /// be reached. <paramref name="notes"/>: whether notes will be written for it (<see cref="Summarize.WillHaveNotes"/>).
+    /// One too short for them says so, and one that could go either way isn't promised any; nor is any while the
+    /// library writes none (<paramref name="off"/>).</summary>
+    public static string Saved(LibraryState library, bool mac, bool? notes = true, bool off = false) => library switch
     {
         LibraryState.Unreachable => $"Study Stash is writing it down. It waits on this {(mac ? "Mac" : "PC")} and goes to your library when it's back.",
         LibraryState.WrongPassword => "Study Stash is writing it down. Type your library's new password in Settings to send it.",
         LibraryState.NotSetUp => "Study Stash is writing it down. Connect to your library in Settings to file it.",
-        _ => "Study Stash is writing it down; the library files it and writes your notes.",
+        _ when off => "Study Stash is writing it down, and the library files it. Notes are off, so it has just its transcript.",
+        _ => notes switch
+        {
+            true => "Study Stash is writing it down; the library files it and writes your notes.",
+            false => $"{Summarize.TooShortWords()} The library files it with its transcript.",
+            null => "Study Stash is writing it down, and the library files it.",
+        },
     };
+
+    /// <summary>A recording that stopped before it was long enough to keep (<see cref="Recorder.KeepAtLeastSeconds"/>):
+    /// a new one is thrown away, and a note picked up again (Keep recording) is left as it was. Null when it was kept.</summary>
+    public static (string Title, string Text)? NotKept(Stopped how)
+    {
+        string least = Recorder.KeepAtLeastSeconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        return how switch
+        {
+            Stopped.TooShort => ("Recording not kept", $"It was under {least} seconds, so there was nothing to write down."),
+            Stopped.LeftAsItWas => ("Note left as it was", $"Under {least} seconds were recorded, so nothing was added to it."),
+            _ => null,
+        };
+    }
 
     /// <summary>Record, before there's a transcription model: download it (the button), or how far along it is.</summary>
     public static (string Title, string Text, string? Action) NoModelYet(DownloadProgress? downloading) => downloading is { } d

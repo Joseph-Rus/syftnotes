@@ -83,16 +83,19 @@ export function LectureScreen({ api, id }: { api: Api; id: string }) {
   );
 }
 
-/** Where the notes are when there aren't any yet: being written, failed, or never asked for. */
+/** Where the notes are when there aren't any: none will be written and the library says why (the lecture is too short
+ * for them), they're being written, they failed, or none came back. */
 function NoNotes({ lecture }: { lecture: Lecture }) {
-  const words =
-    lecture.status === 'queued' || lecture.status === 'working'
+  const below = lecture.transcript ? ' The transcript is below.' : '';
+  const words = lecture.no_notes_why
+    ? lecture.no_notes_why + below
+    : lecture.status === 'queued' || lecture.status === 'working'
       ? 'Notes are being written. Pull down in a minute to see them.'
       : lecture.status === 'failed'
         ? `Notes couldn't be written${lecture.error ? `: ${lecture.error}` : ''}.`
         : lecture.summary
           ? lecture.summary
-          : 'No notes were written for this lecture. The transcript is below.';
+          : `No notes were written for this lecture.${below}`;
   return (
     <div class="section">
       <div class="callout">

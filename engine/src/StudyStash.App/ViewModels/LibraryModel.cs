@@ -87,12 +87,27 @@ public sealed partial class NoteModel : ObservableObject
     public string Markdown { get; init; } = "";
     /// <summary>The notes shown are the student's own typing and nothing else yet: all of it reads as theirs.</summary>
     public bool Mine { get; init; }
-    /// <summary>The notes aren't written yet (the library is on it), or couldn't be.</summary>
+    /// <summary>Where the notes are when none are written: on their way (the library is on it), they couldn't be, or
+    /// the recording is too short for them (<see cref="TooShort"/>, said over what the student typed if they did).</summary>
     public string? Pending { get; init; }
     /// <summary>The library was asked to write these notes again and couldn't: why, said over the notes it left as
     /// they were.</summary>
     public string? NotRewritten { get; init; }
     public bool WasNotRewritten => !string.IsNullOrEmpty(NotRewritten);
+
+    /// <summary>What the page says of a recording too short to have notes written (<see cref="Summarize.TooShort"/>):
+    /// that it is and what notes take, where its words are, and what adds to them. Keep recording is named only where
+    /// the page has the button (<paramref name="canContinue"/>: it was recorded on this computer).</summary>
+    public static string TooShort(string noun, bool transcript, bool canContinue) => Summarize.TooShortWords($"This {noun}")
+        + (transcript ? $" The transcript is in the Transcript tab{(canContinue ? "; Keep recording adds to it." : ".")}" : canContinue ? " Keep recording adds to it." : "");
+
+    /// <summary>What the page says where the notes would be while the library writes none (<see cref="Summarize.NotesOn"/>
+    /// is false, as after setup's "No AI for now"): that notes are off, where the words are, and where notes are
+    /// turned on. They need an AI (Settings → Your AI) and both of the library's AI switches (<see cref="Summarize.NotesOn"/>),
+    /// which Settings → Notes and sorting has under these names.</summary>
+    public static string NotesAreOff(string noun, bool transcript) => Summarize.NotesOffWords($"this {noun}")
+        + (transcript ? " The transcript is in the Transcript tab." : "")
+        + " To have notes written, choose an AI in Settings → Your AI, then turn on “Write study notes from each lecture” and “Sort lectures into classes with AI” in Settings → Notes and sorting.";
     public ObservableCollection<HeardLine> Transcript { get; } = [];
     [ObservableProperty] public partial bool ShowTranscript { get; set; }
 
@@ -165,10 +180,15 @@ public sealed partial class NoteModel : ObservableObject
     [ObservableProperty] public partial string Typed { get; set; } = "";
     public Action<string>? OnTyped { get; set; }
     partial void OnTypedChanged(string value) => OnTyped?.Invoke(value);
-    public string TypedHint => Planned ? $"Jot down anything before it starts. When the recording stops, {Writer} writes up the {Noun} around your notes."
-        : $"Write as much or as little as you like. When you stop recording, {Writer} writes up the {Noun} around your notes.";
+    public string TypedHint => (Planned ? "Jot down anything before it starts. " : "Write as much or as little as you like. ")
+        + (NotesOff ? "Notes are off, so what you type is kept as it is, with the transcript."
+            : Planned ? $"When the recording stops, {Writer} writes up the {Noun} around your notes." : $"When you stop recording, {Writer} writes up the {Noun} around your notes.");
     /// <summary>Who writes the notes when it stops, as the hint names them.</summary>
     public string Writer { get; init; } = "Claude";
+    /// <summary>The library writes no notes (setup's "No AI for now"): nothing on the page says any are coming.</summary>
+    public bool NotesOff { get; init; }
+    public string StopTip => NotesOff ? "Stop recording" : "Stop recording: the notes are written next";
+    public string ContinueTip => "Keep recording: what's said now is added to the end of this transcript" + (NotesOff ? "" : ", and the notes are written again");
     public string TranscriptTab => Live ? "Live transcript" : "Transcript";
     /// <summary>The transcript's lines: what's been heard so far while it records, the whole of it after.</summary>
     public ObservableCollection<HeardLine> Lines => Live && Recorder is not null ? Recorder.Lines : Transcript;

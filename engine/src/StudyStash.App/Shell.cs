@@ -612,12 +612,14 @@ public static partial class Shell
         FlushTyped();
         bool onPage = library.Note is { Live: true } && openLecture is not null;
         string? id = host.Recorder.Current?.Id;
-        var l = host.StopRecording();
+        var l = host.StopRecording(out var how);
         chosenClass = "";
         recorderWindow?.Hide();
         UpdateDock();
-        if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
-        else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS()), null, null);
+        // Stopped before there was enough to keep: nothing is saved (or, for a note picked up again, added), and it says so.
+        if (NoticeWords.NotKept(how) is var (title, text)) Toast(title, text, null, null);
+        else if (l is { State: LectureState.Failed }) Toast(l.Error, "Its sound file is damaged, so it can't be written down.", null, null);
+        else if (l is not null) Toast("Recording saved", NoticeWords.Saved(host.Library, OperatingSystem.IsMacOS(), WillHaveNotes(l), NotesOff), null, null);
         if (onPage)
         {
             // The page it was on isn't a place to go back to: it's the note's page now (or, too short to keep, gone).
@@ -1761,7 +1763,7 @@ public static partial class Shell
                     LectureState.Transcribing when inClass => $"Transcribing after this class ({Math.Round(l.Progress * 100)}%)",
                     LectureState.Transcribing => $"Transcribing {Math.Round(l.Progress * 100)}%",
                     LectureState.Sending => host.Library == LibraryState.Connected ? "Sending…" : "Waiting for your library",
-                    LectureState.Writing => "Writing notes…",
+                    LectureState.Writing => NotesOff || WillHaveNotes(l) == false ? "Being filed" : "Writing notes…",
                     LectureState.Filed => $"Filed in {(l.FiledClass.Length > 0 ? l.FiledClass : "your library")}",
                     LectureState.Failed => l.Error.Length > 0 ? l.Error : "Something went wrong",
                     _ => "Recording…",

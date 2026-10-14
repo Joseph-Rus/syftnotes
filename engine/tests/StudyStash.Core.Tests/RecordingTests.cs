@@ -350,7 +350,8 @@ public class RecordingTests
         using var rec = new Recorder(store, () => mic = new FakeMic(), () => Tuesday);
         rec.Continue("rec-old");
         mic!.Play(1);
-        var l = rec.Stop()!;
+        var l = rec.Stop(out var how)!;
+        Assert.Equal(Stopped.LeftAsItWas, how); // which the app says, in place of "Recording saved"
         Assert.Equal(LectureState.Filed, l.State);
         Assert.NotNull(store.Get("rec-old"));
     }
@@ -364,7 +365,8 @@ public class RecordingTests
         using var rec = new Recorder(store, () => mic = new FakeMic());
         var l = rec.Start("");
         mic!.Play(1);
-        Assert.Null(rec.Stop());
+        Assert.Null(rec.Stop(out var how));
+        Assert.Equal(Stopped.TooShort, how); // which the app says: nothing is saved without a word
         Assert.Empty(store.All());
         Assert.False(File.Exists(store.AudioPath(l.Id)));
     }

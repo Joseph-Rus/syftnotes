@@ -232,7 +232,8 @@ public static partial class Shell
         // Lectures waiting for their notes aren't in a class yet (the notes say which): without this, a class that has
         // a week of lectures queued reads 0 and they look lost.
         if (host.Library == LibraryState.Connected && host.Overview?["writing"] is JsonValue w && w.TryGetValue(out int writing) && writing > 0)
-            status += writing == 1 ? " · Writing notes for 1 lecture" : $" · Writing notes for {writing} lectures";
+            status += NotesOff ? writing == 1 ? " · Filing 1 lecture" : $" · Filing {writing} lectures"
+                : writing == 1 ? " · Writing notes for 1 lecture" : $" · Writing notes for {writing} lectures";
         return status;
     }
 

@@ -456,7 +456,8 @@ public static partial class Shell
         var mine = LocalNotes().Where(l => cls is not null ? l.Class == cls : !unsorted || l.Class.Length == 0 || l.Class == Configs.Unsorted)
             .ToDictionary(l => l.Id);
         if (mine.Count == 0) return listed;
-        var notes = listed.Select(f => mine.Remove(f.Id, out var here) ? f with { Status = here.Status } : f).ToList();
+        // (One the library hasn't filed yet has no folder there: its row keeps the one it was recorded in.)
+        var notes = listed.Select(f => mine.Remove(f.Id, out var here) ? f with { Status = here.Status, Class = f.Class.Length == 0 ? here.Class : f.Class } : f).ToList();
         var oldest = all || notes.Count == 0 ? null : notes[^1].Date;
         notes.AddRange(mine.Values.Where(l => oldest is null || l.Date >= oldest));
         return [.. notes.OrderByDescending(n => n.Date ?? DateTimeOffset.MinValue)];
@@ -482,7 +483,7 @@ public static partial class Shell
         LectureState.Paused => "Recording, paused",
         LectureState.Transcribing => l.Progress > 0 ? $"Being written down ({Math.Round(l.Progress * 100)}%)" : "Being written down",
         LectureState.Sending => host.Library == LibraryState.Connected ? "On its way to your library" : "Waiting for your library",
-        LectureState.Writing => "Writing notes…",
+        LectureState.Writing => NotesOff || WillHaveNotes(l) == false ? "Being filed" : "Writing notes…",
         LectureState.Failed => l.Error.Length > 0 ? l.Error : "Something went wrong",
         _ => null,
     };
@@ -535,6 +536,7 @@ public static partial class Shell
             Events = Events(),
             Unsorted = host.Overview?["unsorted"] is JsonValue u && u.TryGetValue(out int unsorted) ? unsorted : 0,
             Writing = host.Overview?["writing"] is JsonValue w && w.TryGetValue(out int writing) ? writing : 0,
+            NotesOff = NotesOff,
             OpenClass = cls =>
             {
                 Remember();
