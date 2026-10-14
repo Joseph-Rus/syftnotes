@@ -151,7 +151,7 @@ public static class SetupChecklist
             "computer" => m.IsLaptop && m.Steps.Any(s => s.Step == SetupStep.Library) && (m.Again || m.LibraryOk || m.Connecting) ? SetupStep.Library : SetupStep.Welcome,
             "library_password" => SetupStep.Password,
             "microphone" => SetupStep.Microphone,
-            "model" => SetupStep.Model,
+            "model" => SetupStep.Microphone, // the model has no step of its own: it downloads from the microphone's on
             "notes" => SetupStep.Ai,
             "classes" => SetupStep.Classes,
             "canvas" => SetupStep.Canvas,

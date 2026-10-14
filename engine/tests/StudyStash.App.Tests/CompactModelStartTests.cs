@@ -4,8 +4,8 @@ using StudyStash.Audio;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>Every computer starts on the compact large-v3 turbo, easy on the computer, unless it's too weak for it;
-/// the bigger models stay a choice. An install already on a bigger model its computer keeps up with keeps it, with no
+/// <summary>Every computer starts on the compact large-v3 turbo, easy on the computer, unless it's too weak for it, and
+/// none on Parakeet (about 3 GB while it works); the other models stay a choice in Settings. An install already on a bigger model its computer keeps up with keeps it, with no
 /// word about it; one on more than its computer keeps up with hears about the heaviest that does, once.</summary>
 public class CompactModelStartTests
 {
@@ -23,23 +23,24 @@ public class CompactModelStartTests
     [InlineData("apple silicon")]
     [InlineData("strong pc")]
     [InlineData("plain pc")]
+    [InlineData("pc with no card")]
     public void A_new_install_starts_on_the_compact_model(string computer)
     {
         using var home = new TempHome();
-        var hw = computer switch { "apple silicon" => FakeHardware.AppleSilicon(), "strong pc" => StrongPc(), _ => FakeHardware.PlainPc() };
+        var hw = computer switch { "apple silicon" => FakeHardware.AppleSilicon(), "strong pc" => StrongPc(), "plain pc" => FakeHardware.PlainPc(), _ => FakeHardware.ProcessorPc() };
         using var host = Host(home, hw);
         Assert.Same(WhisperModels.LargeV3TurboSmall, host.Model);
         Assert.Same(WhisperModels.LargeV3TurboSmall, host.Advice.Model);
     }
 
     [Fact]
-    public void A_PC_with_no_graphics_card_starts_on_Parakeet_unless_the_lecture_is_in_a_language_it_does_not_read()
+    public void A_PC_with_no_graphics_card_starts_on_Whisper_too_whatever_the_lecture_s_language()
     {
         using var home = new TempHome();
         using (var host = Host(home, FakeHardware.ProcessorPc()))
         {
-            Assert.Same(WhisperModels.Parakeet, host.Model);
-            Assert.True(host.ParakeetFits);
+            Assert.Same(WhisperModels.LargeV3TurboSmall, host.Model);
+            Assert.True(host.ParakeetFits); // it could run Parakeet (a choice in Settings): it just doesn't start on it
         }
         using var korean = new TempHome();
         new AppSettings { Language = "ko" }.Save(korean.Path);
@@ -92,7 +93,7 @@ public class CompactModelStartTests
     }
 
     [Fact]
-    public void Settings_offers_every_model_and_marks_the_compact_one_for_this_computer()
+    public void Settings_offers_every_model_and_marks_the_one_for_this_computer()
     {
         var advice = WhisperModels.Advise(FakeHardware.AppleSilicon().Probe());
         using var home = new TempHome();
