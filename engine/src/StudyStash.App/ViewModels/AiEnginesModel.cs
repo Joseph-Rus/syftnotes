@@ -108,6 +108,11 @@ public sealed partial class AiEnginesModel : ObservableObject
 
     public AiEnginesModel(IAiLibrary library) => this.library = library;
 
+    /// <summary>AIs whose Sign in was pressed: their row's button is Check until it's pressed, since nothing else here
+    /// learns the student has signed in (the library still remembers the AI turning them away). Check that finds it
+    /// still signed out gives Sign in back.</summary>
+    readonly HashSet<string> signingIn = [];
+
     /// <summary>The line under the pane's title: where the engines run (the library elsewhere, or this computer).</summary>
     public string Lede { get; init; } = "Choose which AI writes your notes and answers your questions. You can change it here any time. It runs on your library, and you can set it up there or from this laptop.";
 
@@ -398,7 +403,8 @@ public sealed partial class AiEnginesModel : ObservableObject
             Good = AiWords.StateIsGood(e.State),
             Warn = AiWords.StateIsWarn(e.State),
             Muted = AiWords.StateIsMuted(e.State),
-            ActionWords = e.Installed || e.Id == "ollama" ? AiWords.RowActionWords(e.State) : "Get it",
+            ActionWords = !e.Installed && e.Id != "ollama" ? "Get it"
+                : e.State == "not_signed_in" && signingIn.Contains(e.Id) ? "Check" : AiWords.RowActionWords(e.State),
             IsPrimary = AiWords.RowActionPrimary(e.State),
             NeedsOptions = AiWords.NeedsOptions(e.State),
             Model = e.Model,
@@ -423,7 +429,8 @@ public sealed partial class AiEnginesModel : ObservableObject
         {
             AiSaid? said = row.State switch
             {
-                "not_signed_in" => await library.SignInAsync(row.Id),
+                "not_signed_in" when signingIn.Remove(row.Id) => await library.CheckAsync(row.Id),
+                "not_signed_in" => await SignInAsync(row.Id),
                 "not_running" => await library.StartAsync(row.Id),
                 "model_missing" => await library.DownloadAsync(row.Id),
                 "unchecked" => await library.CheckAsync(row.Id),
@@ -434,6 +441,8 @@ public sealed partial class AiEnginesModel : ObservableObject
         catch (LibraryRefusedException ex)
         {
             Say = ex.Message;
+            // Sign in from a laptop says where to sign in: the row's button is Check for when that's done.
+            if (signingIn.Contains(row.Id)) await Load();
         }
         catch
         {
@@ -443,6 +452,14 @@ public sealed partial class AiEnginesModel : ObservableObject
         {
             Busy = false;
         }
+    }
+
+    /// <summary>Sign in: the library opens a terminal to do it in (or says where to, from a laptop); the row's button
+    /// becomes Check for when it's done.</summary>
+    Task<AiSaid?> SignInAsync(string id)
+    {
+        signingIn.Add(id);
+        return library.SignInAsync(id);
     }
 
     async Task CheckAsync(string id)

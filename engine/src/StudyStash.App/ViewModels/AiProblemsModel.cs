@@ -93,7 +93,7 @@ public sealed class AiProblemsModel(IAiLibrary library)
             Icon = AiWords.ProblemIcon(p.Kind),
             ColorKey = AiWords.ProblemColorKey(p.Kind),
             Severity = AiWords.ProblemSeverity(p.Kind),
-            PrimaryWords = AiWords.ProblemAction(p.Kind),
+            PrimaryWords = p.Kind == "not_signed_in" && signingIn.Contains(p.Engine) ? "Check" : AiWords.ProblemAction(p.Kind),
         };
         problem.PrimaryCommand = new AsyncRelayCommand(() => Act(p));
         problem.CloseCommand = new AsyncRelayCommand(() => CloseServerAsync(p.Id));
@@ -107,7 +107,9 @@ public sealed class AiProblemsModel(IAiLibrary library)
             AiSaid? said = p.Kind switch
             {
                 "engine_offline" => await library.StartAsync(p.Engine),
-                "not_signed_in" => await library.SignInAsync(p.Engine),
+                // Signed in since Sign in was pressed: Check, and the card goes (Sign in comes back if it's still out).
+                "not_signed_in" when signingIn.Remove(p.Engine) => await library.CheckAsync(p.Engine),
+                "not_signed_in" => await SignInAsync(p.Engine),
                 "model_missing" => await library.DownloadAsync(p.Engine),
                 "usage_limit" => await Dismissed(p.Id),
                 _ => null,
@@ -116,12 +118,22 @@ public sealed class AiProblemsModel(IAiLibrary library)
         }
         catch (LibraryRefusedException)
         {
-            // The row stays; its own action can be tried again.
+            // The row stays; its own action can be tried again (Check, once Sign in has said where to sign in).
+            if (signingIn.Contains(p.Engine)) await Load();
         }
         catch
         {
             // Offline: nothing to update here — the pane that owns "Offline" words shows that.
         }
+    }
+
+    /// <summary>AIs whose Sign in was pressed on their card: the card's button is Check until it's pressed.</summary>
+    readonly HashSet<string> signingIn = [];
+
+    Task<AiSaid?> SignInAsync(string engine)
+    {
+        signingIn.Add(engine);
+        return library.SignInAsync(engine);
     }
 
     async Task<AiSaid?> Dismissed(string id)
