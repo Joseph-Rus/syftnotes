@@ -259,6 +259,9 @@ public static partial class Shell
             Title = S(l["title"]), Markdown = mine ? TypedNotes.AllMine(typed) : notes, Mine = mine, Stamp = stamp,
             Pending = writing ? $"Your library is writing the notes for this {noun}. They show here when they're done."
                 : notes.Length == 0 ? S(l["error"]) is { Length: > 0 } err ? err : mine ? null : $"There are no notes for this {noun}." : null,
+            // The library was asked to write its notes again and couldn't: they're as they were, and it says why.
+            NotRewritten = !writing && l["notes_kept"] is JsonValue kept && kept.TryGetValue(out bool yes) && yes && S(l["error"]).TrimEnd() is { Length: > 0 } why
+                ? $"{why}{(why.EndsWith('.') ? "" : ".")} Your current notes are unchanged." : null,
             ShowTranscript = transcript || (showing && library.Note!.ShowTranscript),
             // The library doesn't take a new name while it's still writing the notes (it would write its own over it).
             OnRename = host.Remote() is { } remote && !host.OlderLibrary ? title => RenameAsync(remote, id, title) : null,

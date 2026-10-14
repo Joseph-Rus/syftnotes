@@ -176,6 +176,30 @@ public class AiRewriteTests
     }
 
     [Fact]
+    public async Task An_engine_that_writes_nothing_is_a_failed_rewrite_with_no_empty_notes_to_use()
+    {
+        using var dir = new TempDir();
+        var cfg = Cfg(dir);
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        Seed(store);
+        // It answered, with its thinking and no notes after it.
+        var claude = new ScriptedAi("claude", "Claude") { Script = [new AiEvent("final", "<think>Membranes first, then the pump.</think>")] };
+        var ai = new AiJobs(cfg.Home) { Providers = _ => claude, Checks = new FakeChecks().Installed("claude").Build() };
+        await using var site = await Site(cfg, store, ai);
+        var remote = new AiRemote("http://localhost", "pw", site.Client);
+
+        await remote.RewriteStartAsync("lec-1", "claude");
+        var failed = await UntilAsync(remote, "lec-1", i => i.State != "working");
+        Assert.Equal(("failed", "Claude wrote nothing."), (failed.State, failed.Error));
+        Assert.Null(failed.Draft);
+
+        // "Use new" on nothing would have put nothing in the notes' place.
+        var refused = await Assert.ThrowsAsync<LibraryRefusedException>(() => remote.RewriteUseAsync("lec-1"));
+        Assert.Equal(409, refused.Status);
+        Assert.Equal("Old notes about cells.", store.Get("lec-1")!.SummaryMd);
+    }
+
+    [Fact]
     public async Task A_second_start_while_one_is_already_running_is_refused()
     {
         using var dir = new TempDir();

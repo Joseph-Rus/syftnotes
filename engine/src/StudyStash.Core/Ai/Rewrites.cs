@@ -182,6 +182,8 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             // response, cancellation), it ends this job as failed or cancelled rather than faulting unseen.
             failure = e;
         }
+        // New notes with nothing in them aren't notes: nothing is offered in place of the ones the lecture has.
+        if (failure is null && Py.Strip(draft).Length == 0) failure = new InvalidOperationException($"{Engines.Name(job.Engine)} wrote nothing.");
         lock (gate)
         {
             // Keep or a fresh Start already moved this lecture on; this run's result no longer belongs anywhere.
@@ -254,7 +256,8 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
         var row = Require(id);
         lock (gate)
         {
-            if (!jobs.TryGetValue(id, out var job) || job.State != "ready" || job.DraftMarkdown is not { } draft)
+            // A draft with nothing in it (one kept from before a rewrite that wrote nothing counted as failed) isn't new notes.
+            if (!jobs.TryGetValue(id, out var job) || job.State != "ready" || job.DraftMarkdown is not { } draft || Py.Strip(draft).Length == 0)
                 throw new RewriteRefusedException(409, "there are no new notes ready to use yet.");
             if (row.Status is Store.Queued or Store.Working)
                 throw new RewriteRefusedException(409, "the library is writing this lecture's notes right now.");

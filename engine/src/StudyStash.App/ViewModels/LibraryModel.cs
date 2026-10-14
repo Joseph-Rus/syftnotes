@@ -89,6 +89,10 @@ public sealed partial class NoteModel : ObservableObject
     public bool Mine { get; init; }
     /// <summary>The notes aren't written yet (the library is on it), or couldn't be.</summary>
     public string? Pending { get; init; }
+    /// <summary>The library was asked to write these notes again and couldn't: why, said over the notes it left as
+    /// they were.</summary>
+    public string? NotRewritten { get; init; }
+    public bool WasNotRewritten => !string.IsNullOrEmpty(NotRewritten);
     public ObservableCollection<HeardLine> Transcript { get; } = [];
     [ObservableProperty] public partial bool ShowTranscript { get; set; }
 

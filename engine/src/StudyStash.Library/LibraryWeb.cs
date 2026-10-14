@@ -584,8 +584,11 @@ public sealed partial class LibraryWeb
         else if (!string.IsNullOrEmpty(r.Error))
         {
             string retry = role == "admin" ? $"<form method=\"post\" action=\"/note/{nid}/resummarize\"><button>Try again</button></form>" : "";
-            string shown = cameWithNotes ? " Showing the notes it came with." : "";
-            notice = $"<div class=\"notice bad\"><div>{Ui.Esc(Py.Head(r.Error, 300))}.{shown}{retry}</div></div>";
+            // Notes of its own are still on the page under this (a rewrite that didn't happen leaves them as they were).
+            string shown = !string.IsNullOrEmpty(r.SummaryMd) ? " Your current notes are unchanged." : cameWithNotes ? " Showing the notes it came with." : "";
+            string why = Py.Head(r.Error, 300);
+            string stop = why.TrimEnd().EndsWith('.') ? "" : "."; // an engine's own words can end with theirs
+            notice = $"<div class=\"notice bad\"><div>{Ui.Esc(why)}{stop}{shown}{retry}</div></div>";
         }
 
         var docs = new List<(string Id, string Label, string Html)>();

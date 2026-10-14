@@ -82,6 +82,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         result["classified_by"] = row.ClassifiedBy;
         result["notes_model"] = row.SummaryModel;
         result["error"] = row.Error;
+        // The notes are the library's own (written for it, or saved by the student), not ones the lecture came with:
+        // an error beside those is a rewrite that didn't happen, and they're as they were.
+        result["notes_kept"] = !string.IsNullOrEmpty(row.SummaryMd) && !string.IsNullOrEmpty(row.Error);
         return result;
     }
 
