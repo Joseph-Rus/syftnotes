@@ -70,18 +70,27 @@ public sealed class Sessions
         }
     }
 
+    /// <summary>What the file holds. One that can't be read as sign-ins holds none, and isn't read again until it
+    /// changes (the next sign-in writes it afresh).</summary>
     State Load()
     {
+        byte[] bytes;
         try
         {
-            byte[] bytes = File.Exists(path) ? File.ReadAllBytes(path) : [];
-            var loaded = bytes.Length == 0 ? new State() : JsonSerializer.Deserialize<State>(bytes, Json) ?? new State();
-            loadedBytes = bytes;
-            return loaded;
+            bytes = File.Exists(path) ? File.ReadAllBytes(path) : [];
         }
-        catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             loadedBytes = null;
+            return new State();
+        }
+        loadedBytes = bytes;
+        try
+        {
+            return bytes.Length == 0 ? new State() : JsonSerializer.Deserialize<State>(bytes, Json) ?? new State();
+        }
+        catch (JsonException)
+        {
             return new State();
         }
     }
@@ -92,19 +101,29 @@ public sealed class Sessions
     {
         byte[] bytes;
         try { bytes = File.Exists(path) ? File.ReadAllBytes(path) : []; }
-        catch (IOException) { return; } // another copy is mid-write; try again next time
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return; } // another copy is mid-write, or it can't be read: what's in memory stands
         if (loadedBytes is null || !bytes.AsSpan().SequenceEqual(loadedBytes)) state = Load();
     }
 
+    /// <summary>A file that can't be written (a full disk, a folder that went read-only) doesn't keep anyone from
+    /// signing in or stop the library starting: sign-ins are then right for as long as this library runs, and the
+    /// file is tried again at the next change.</summary>
     void Save()
     {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        string tmp = path + ".tmp";
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(state, Json);
-        File.WriteAllBytes(tmp, bytes);
-        Py.OwnerOnly(tmp);
-        File.Move(tmp, path, overwrite: true);
-        loadedBytes = bytes;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            string tmp = path + ".tmp";
+            byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(state, Json);
+            File.WriteAllBytes(tmp, bytes);
+            Py.OwnerOnly(tmp);
+            File.Move(tmp, path, overwrite: true);
+            loadedBytes = bytes;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Console.WriteLine($"[sign-in] couldn't write {path}: {e.Message}");
+        }
     }
 
     string Hash(string what) => Convert.ToHexStringLower(HMACSHA256.HashData(key, Encoding.UTF8.GetBytes(what)));
