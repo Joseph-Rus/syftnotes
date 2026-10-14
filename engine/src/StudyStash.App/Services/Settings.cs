@@ -387,7 +387,8 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         // A library-only computer opens on its library.
         if (!records) Section = "Library";
         var cc = host.Client();
-        ai ??= new AiRemote(cc.ServerUrl, cc.PoolKey);
+        // The password as it is at each request: it can change while Settings is open (Add a laptop, Password → Change).
+        ai ??= new AiRemote(cc.ServerUrl, () => host.Client().PoolKey);
         Engines = new AiEnginesModel(ai)
         {
             OpenUrl = url => Dialogs.OpenUrl(url),

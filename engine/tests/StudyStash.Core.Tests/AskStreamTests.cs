@@ -290,4 +290,29 @@ public class AskStreamTests
         Assert.Contains("--include-partial-messages", claude.Command(new AiRequest("hi", "/lib"), stream: true));
         Assert.DoesNotContain("--strict-mcp-config", claude.Command(new AiRequest("hi", "/lib") { Tools = true, McpCommand = ["/app/studystash", "mcp"] }, stream: true));
     }
+
+    /// <summary>Settings stays open across a change of the library's password (Add a laptop, Password → Change…): what
+    /// the AI pages send is the password as it is at each request. Kept from when the window opened, every request
+    /// after the change was turned away, and Your AI and AI apps said the library wasn't answering.</summary>
+    [Fact]
+    public async Task The_password_sent_is_the_one_the_library_has_now_not_the_one_it_had_when_settings_opened()
+    {
+        var sent = new List<string?>();
+        using var http = new HttpClient(new Keys(sent));
+        string password = "old-pw";
+        var remote = new AiRemote("http://localhost", () => password, http);
+        await remote.EnginesAsync();
+        password = "new-pw";
+        await remote.EnginesAsync();
+        Assert.Equal(["Bearer old-pw", "Bearer new-pw"], sent);
+    }
+
+    sealed class Keys(List<string?> sent) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            sent.Add(request.Headers.Authorization?.ToString());
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json") });
+        }
+    }
 }
