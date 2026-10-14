@@ -40,6 +40,8 @@ public static partial class Shell
     /// With something else recording it asks first, as an event does.</summary>
     static void ContinueRecording(string id)
     {
+        // The name on the note's page is the library's own, as it stands now: the recording goes by it.
+        string? title = library.Note is { Live: false, Local: false } shown && shown.Id == id ? shown.TitleNow : null;
         if (host.Recorder.Current is { } live)
         {
             if (live.Id == id)
@@ -52,11 +54,11 @@ public static partial class Shell
                 SavedSoFar, "Stop and switch", () =>
                 {
                     StopRecording(stay: true);
-                    _ = BeginAsync(() => host.ContinueAsync(id), openPage: true);
+                    _ = BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
                 });
             return;
         }
-        _ = BeginAsync(() => host.ContinueAsync(id), openPage: true);
+        _ = BeginAsync(() => host.ContinueAsync(id, title), openPage: true);
     }
 
     static async Task<bool> BeginAsync(Func<Task<RecordStart>> begin, bool openPage)
@@ -271,7 +273,7 @@ public static partial class Shell
         string noun = Nouns.For(cls, cls.Length > 0 ? host.GroupOf(cls) : "");
         var note = new NoteModel
         {
-            Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(l.StartedAt, null), Title = WorkingTitle(l),
+            Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(l.StartedAt, null), Title = RecordingTitle(l),
             Live = true, Recorder = recorder, Typed = l.Notes, Writer = NotesWriter(), NotesOff = NotesOff,
             OnRename = title =>
             {
@@ -286,6 +288,12 @@ public static partial class Shell
         library.Ask = recorder.Ask;
         host.WatchLiveWords(WatchingWords());
     }
+
+    /// <summary>What a recording's page calls it. A note that's being recorded again has a name already (the one typed
+    /// on it, else the one the library filed it under) and keeps it; a new recording goes by its working title until
+    /// it has one.</summary>
+    internal static string RecordingTitle(Lecture l) =>
+        l.FiledTitle.Length > 0 && !(l.TitleTyped && l.Title.Length > 0) ? l.FiledTitle : WorkingTitle(l);
 
     /// <summary>Who writes a lecture's notes, as the hint under the student's own names them ("Claude"): the AI the
     /// library is set to write notes with, once the app has heard which; until then, "your library".</summary>

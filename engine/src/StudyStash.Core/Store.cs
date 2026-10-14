@@ -308,11 +308,26 @@ public sealed partial class Store : IDisposable
 
     // --- the processing queue ------------------------------------------------------------------------------------
 
-    /// <summary>Accept a lecture the laptop sent. The pipeline picks it up and files it.</summary>
+    /// <summary>Accept a lecture the laptop sent. The pipeline picks it up and files it. One that's here already was
+    /// kept recording (minutes or days later) and comes in again, longer: it keeps the name it has.</summary>
     public void Enqueue(Meeting m)
     {
         lock (gate)
         {
+            var before = Get(m.Id);
+            if (before is { LectureTitle: { Length: > 0 } name } && !m.TitledByHand)
+            {
+                // The laptop sends it under the title it knows it by, which isn't one typed here since (that stays the
+                // student's), nor the one its notes were filed under (that isn't made up a second time). One still
+                // under the title it first came with was never named, and is named now as a new lecture is.
+                var was = Meeting(before);
+                if (was.TitledByHand)
+                {
+                    m.Title = name;
+                    m.Raw[Core.Meeting.TitleBy] = Core.Meeting.ByHand;
+                }
+                else if (was.TitleStays || name != before.Title) m.Raw[Core.Meeting.TitleBy] = Core.Meeting.Kept;
+            }
             string now = Now();
             Exec("""
                 INSERT INTO notes(id,title,date,owner,attendees,folder,has_transcript,raw_json,payload_json,
@@ -326,6 +341,9 @@ public sealed partial class Store : IDisposable
                 m.Id, m.Title, m.Date, m.Owner, PyJson.Dumps(m.Attendees), m.Folder,
                 Py.Strip(m.Transcript).Length > 0 ? 1L : 0L, Py.Head(PyJson.Dumps(m.Raw), 200_000),
                 Wire.MeetingJson(m), Queued, now, now);
+            // A title typed on the recording's page while it was kept recording is the newest there is: it's the
+            // lecture's from now on (the pipeline keeps the name the row has).
+            if (before is not null && m.TitledByHand) Exec("UPDATE notes SET lecture_title=? WHERE id=?", m.Title, m.Id);
         }
     }
 

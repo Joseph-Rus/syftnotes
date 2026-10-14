@@ -145,7 +145,8 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             }
         }
         // A title the student typed (on the recording, or renaming it since) is the lecture's: no AI names it over them.
-        if (m.TitledByHand) c.LectureTitle = !string.IsNullOrEmpty(row.LectureTitle) ? row.LectureTitle : m.Title;
+        // Nor is one that was kept recording named again: it has the name its first notes were filed under.
+        if (m.TitleStays) c.LectureTitle = !string.IsNullOrEmpty(row.LectureTitle) ? row.LectureTitle : m.Title;
         string? path = store.Finish(row, m, c, summary, model, error);
         if (path is not null && summary.Length > 0) store.MarkAttachmentsUsed(m.Attached.Select(a => a.Id));
         log(path is null

@@ -562,18 +562,46 @@ public static partial class Shell
     }
 
     /// <summary>A source an answer points to: its moment in the recording plays (when the audio's here), and the lecture
-    /// opens at its transcript.</summary>
+    /// opens at its transcript, at the line said then: marked, and the page brought to it.</summary>
     static void PlaySource(string id, double? at)
     {
-        if (at is double t && File.Exists(host.Lectures.AudioPath(id))) Play(id, t);
-        if (id != openLecture) OpenLecture(id, transcript: at is not null);
-        else if (library.Note is { } n && at is not null) n.ShowTranscript = true;
+        if (at is not double t)
+        {
+            if (id != openLecture) OpenLecture(id);
+            return;
+        }
+        if (File.Exists(host.Lectures.AudioPath(id))) Play(id, t);
+        if (id != openLecture) OpenAt(id, t);
+        else library.Note?.ShowAt(t);
+    }
+
+    /// <summary>Another note's page, opened at a moment in its transcript: once the page is up (whichever read of it
+    /// gets there first), the line said then is marked and the page brought to it.</summary>
+    static void OpenAt(string id, double at)
+    {
+        void Shown(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(LibraryModel.Note)) return;
+            if (openLecture == id && (library.Note is not { Live: false } n || n.Id != id)) return; // still on its way
+            library.PropertyChanged -= Shown;
+            // (Somewhere else was opened meanwhile: nothing to show.) After the page has finished being put up.
+            if (openLecture == id) Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (openLecture != id || library.Note is not { Live: false } now || now.Id != id) return;
+                // It opens at its transcript: there were no notes being read here to offer a way back to.
+                now.ShowTranscript = true;
+                now.ShowAt(at);
+            });
+        }
+        library.PropertyChanged += Shown;
+        OpenLecture(id, transcript: true);
     }
 
     /// <summary>Opens the library at a note's page (search, a notification, an answer's source).</summary>
     static void OpenLecture(string id, bool transcript = false)
     {
-        Remember();
+        // The note that's already on the page isn't a place to go back to from itself.
+        if (Here() != new Place(Lecture: id)) Remember();
         LeavePage();
         openLecture = id;
         bool loaded = mainWindow?.IsVisible == true && host.Library == LibraryState.Connected && library.Classes.Count > 0;
@@ -930,8 +958,10 @@ public static partial class Shell
                 ShowLibrary();
                 break;
             case QuickKind.Source or QuickKind.Passage when row.LectureId is { } id && row.At is double at:
-                if (File.Exists(host.Lectures.AudioPath(id))) Play(id, at);
-                OpenLecture(id, transcript: row.Kind == QuickKind.Source);
+                // Said at a moment (an answer's source, or a passage found in a transcript): the note opens at its
+                // transcript there, the line marked. The note already on the page only needs its window brought up.
+                if (id == openLecture) ShowLibrary();
+                PlaySource(id, at);
                 break;
             case QuickKind.Lecture or QuickKind.Passage or QuickKind.Source when row.LectureId is { } id:
                 OpenLecture(id);

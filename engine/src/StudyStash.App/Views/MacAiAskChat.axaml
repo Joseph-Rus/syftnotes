@@ -45,11 +45,7 @@
                     <c:NoteView Compact="True" BodySize="13" BodyLineHeight="18.85" Markdown="{Binding Answer}" IsVisible="{Binding Answer, Converter={x:Static c:Converters.NotEmpty}}" />
                     <TextBlock Classes="ai-answer" Text="{Binding Failed}" Foreground="{DynamicResource Warn}"
                                IsVisible="{Binding Failed, Converter={x:Static c:Converters.NotEmpty}}" />
-                    <Button Theme="{StaticResource Surface}" Padding="0" HorizontalContentAlignment="Left"
-                            Command="{Binding $parent[UserControl].((vm:AiAskModel)DataContext).OpenTurnSourceCommand}" CommandParameter="{Binding}"
-                            IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}">
-                      <TextBlock Classes="ai-byline" Text="{Binding Byline}" />
-                    </Button>
+                    <v:AiByline HorizontalAlignment="Left" IsVisible="{Binding Byline, Converter={x:Static c:Converters.NotEmpty}}" />
                     <TextBlock Classes="ai-byline" Text="{Binding FellBackNote}" IsVisible="{Binding FellBackNote, Converter={x:Static c:Converters.NotEmpty}}" />
                   </StackPanel>
                 </Border>

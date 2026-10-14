@@ -916,12 +916,22 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public Task<RecordStart> RecordAsync(string className, CalendarEvent? forEvent = null) => MicThenAsync(() => StartRecording(className, forEvent));
 
     /// <summary>Keep recording a lecture that stopped (minutes or days ago): what's recorded now is added to the end of
-    /// its transcript, and its notes are written again. The microphone is asked for as Record asks.</summary>
-    public Task<RecordStart> ContinueAsync(string id) => MicThenAsync(() => ContinueRecording(id));
+    /// its transcript, and its notes are written again. The microphone is asked for as Record asks.
+    /// <paramref name="title"/> is what the library calls the note now, when the app has just read it.</summary>
+    public Task<RecordStart> ContinueAsync(string id, string? title = null) => MicThenAsync(() => ContinueRecording(id, title));
 
-    public Lecture ContinueRecording(string id)
+    public Lecture ContinueRecording(string id, string? title = null)
     {
         if (!ModelReady) throw new InvalidOperationException("Download the transcription model first (Settings → Recording).");
+        // The note may have been renamed in the library since it was filed: its name there is the one its page goes by
+        // while it records again. A title typed on the recording the first time gives way to it too, or it would go
+        // back to the library as the student's newest and replace the one they chose since.
+        if (title is { Length: > 0 })
+            Lectures.Update(id, x =>
+            {
+                x.FiledTitle = title;
+                if (x.TitleTyped) x.Title = title;
+            });
         var l = Recorder.Continue(id);
         awake ??= new KeepAwake("Recording a lecture");
         Whisper.Wake();
