@@ -575,10 +575,17 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>The school address's own button ("Save"): the library takes the address and the step moves on to
+    /// the browser. Nothing typed is said, not passed over in silence.</summary>
     [RelayCommand]
     async Task Continue()
     {
         if (context.Client is not { } client) return;
+        if (SchoolField.Trim().Length == 0)
+        {
+            SchoolError = "Type your school's Canvas address, like school.instructure.com.";
+            return;
+        }
         SavingSchool = true;
         SchoolError = null;
         try

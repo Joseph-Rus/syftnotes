@@ -273,12 +273,13 @@
                 <DataTemplate x:DataType="vm:StepItem">
                   <Border Classes="step" Classes.current="{Binding Current}" Classes.todo="{Binding Todo}">
                     <Grid ColumnDefinitions="Auto,10,*,Auto">
-                      <c:Icon IsVisible="{Binding Done}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource AccentText}" />
+                      <c:Icon IsVisible="{Binding ShowCheck}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource AccentText}" />
                       <Border IsVisible="{Binding ShowNumber}" Classes="num" Width="16" Height="16" Margin="1,0" CornerRadius="8" BorderThickness="1.5">
                         <TextBlock Text="{Binding Number}" FontSize="9" HorizontalAlignment="Center" VerticalAlignment="Center" />
                       </Border>
                       <TextBlock Grid.Column="2" Classes="title" Text="{Binding Title}" VerticalAlignment="Center" />
                       <TextBlock Grid.Column="3" Text="Optional" IsVisible="{Binding ShowOptional}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Text="Skipped" IsVisible="{Binding ShowSkipped}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                     </Grid>
                   </Border>
                 </DataTemplate>
@@ -354,7 +355,7 @@
                 </Button>
               </StackPanel>
               <!-- Just this computer: Continue makes the library here; while it does, and if it can't, say so. -->
-              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0" Height="18" IsVisible="{Binding ShowWelcomeStatus}">
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,12,0,0" MinHeight="18" IsVisible="{Binding ShowWelcomeStatus}">
                 <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                 <TextBlock IsVisible="{Binding Connecting}" Text="Getting your library ready…" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                 <TextBlock IsVisible="{Binding HasWelcomeProblem}" Text="{Binding LibraryResult}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="420"
@@ -389,7 +390,7 @@
                 <TextBlock Grid.Column="2" Text="{Binding NotesFolderWords}" ToolTip.Tip="{Binding NotesFolder}" FontSize="12" Foreground="{DynamicResource Fg2}"
                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
               </Grid>
-              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" Height="18">
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" MinHeight="18">
                 <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                 <c:Icon IsVisible="{Binding LibraryOk}" Glyph="check_circle" Filled="True" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
                 <TextBlock IsVisible="{Binding HasLibraryResult}" Text="{Binding LibraryResult}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="400"
@@ -410,14 +411,14 @@
                 <TextBlock Grid.Row="3" Classes="label" Text="Password" />
                 <Border Grid.Row="4" Classes="field">
                   <Grid ColumnDefinitions="*,Auto">
-                    <TextBox Classes="bare" Text="{Binding Password}" PasswordChar="•" RevealPassword="{Binding ShowPassword}" FontSize="13" />
+                    <TextBox Classes="bare" Text="{Binding ConnectPassword}" PasswordChar="•" RevealPassword="{Binding ShowPassword}" FontSize="13" />
                     <Button Grid.Column="1" Classes="link" Command="{Binding ToggleShowPasswordCommand}" Margin="6,0,2,0">
                       <TextBlock Text="{Binding ShowPasswordText}" />
                     </Button>
                   </Grid>
                 </Border>
               </Grid>
-              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" Height="18">
+              <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" MinHeight="18">
                 <c:Spinner IsVisible="{Binding Connecting}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                 <c:Spinner IsVisible="{Binding Finding}" Width="14" Height="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
                 <c:Icon IsVisible="{Binding LibraryOk}" Glyph="check_circle" Filled="True" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Center" />
@@ -476,7 +477,11 @@
                   </StackPanel>
                 </Grid>
               </Button>
-              <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding ChoosingModel}" Margin="0,16,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
+              <!-- The list shuts again without a pick: the model stays the one it was. -->
+              <Button Classes="link" IsVisible="{Binding ChoosingModel}" Command="{Binding ChangeModelCommand}" HorizontalAlignment="Right" Margin="0,14,0,0">
+                <TextBlock Text="Cancel" />
+              </Button>
+              <ItemsControl ItemsSource="{Binding Models}" IsVisible="{Binding ChoosingModel}" Margin="0,6,0,0" MaxWidth="440" HorizontalAlignment="Stretch">
                 <ItemsControl.ItemsPanel>
                   <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
@@ -560,10 +565,10 @@
               <Border Classes="group" Margin="0,24,0,0">
                 <Grid Classes="row" ColumnDefinitions="*,12,Auto" Height="56">
                   <StackPanel VerticalAlignment="Center" Spacing="2">
-                    <TextBlock Text="Start Study Stash when I log in" FontSize="13" />
+                    <TextBlock Text="Open when you log in" FontSize="13" />
                     <TextBlock Text="{Binding StartAtLoginHint}" FontSize="12" Foreground="{DynamicResource Fg2}" />
                   </StackPanel>
-                  <ToggleButton AutomationProperties.Name="Start Study Stash when I log in" Grid.Column="2" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
+                  <ToggleButton AutomationProperties.Name="Open when you log in" Grid.Column="2" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
                 </Grid>
               </Border>
             </StackPanel>

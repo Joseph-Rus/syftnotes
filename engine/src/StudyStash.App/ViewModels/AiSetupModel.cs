@@ -108,6 +108,16 @@ public sealed partial class AiSetupModel : ObservableObject
     /// that can't, which then doesn't offer "No AI for now".</summary>
     public Func<bool, Task<bool>>? WriteNotes { get; init; }
     public bool OffersNoAi => WriteNotes is not null;
+    /// <summary>Whether the library writes notes now: false once "No AI for now" was chosen, and the list then opens on
+    /// it again. Null (the host can't ask, or the library didn't say) leaves the engines to decide.</summary>
+    public Func<Task<bool?>>? NotesOn { get; init; }
+    /// <summary>Setup run again on a computer that's set up: the library's engine was chosen before, so it stays
+    /// picked even while it isn't ready (its download stopped, say).</summary>
+    public bool ChosenBefore { get; init; }
+    /// <summary>"I don't have a paid plan" was the answer on setup's first screen: the free AI is the pick when it's
+    /// on this computer already, its model too.</summary>
+    public bool PreferFree { get; init; }
+    bool? notesOn;
 
     [ObservableProperty] public partial string SelectedNotes { get; set; } = "ollama";
     [ObservableProperty] public partial string SelectedAsk { get; set; } = SameAsNotes;
@@ -140,6 +150,7 @@ public sealed partial class AiSetupModel : ObservableObject
         try
         {
             overview = await library.EnginesAsync();
+            if (!picked && NotesOn is not null) notesOn = await NotesOn();
         }
         catch
         {
@@ -155,11 +166,21 @@ public sealed partial class AiSetupModel : ObservableObject
     /// that's installed and not known to be signed out.</summary>
     static bool CanWrite(EngineInfo e) => e.Installed && (e.Id == "ollama" || e.State is not ("not_signed_in" or "not_installed"));
 
-    /// <summary>The first time: the library's own pick when it can write notes, else the first engine that's ready,
-    /// else no AI for now (where offered).</summary>
+    /// <summary>It writes notes as it is, with nothing more to press: the free AI only once its model is here too.</summary>
+    static bool WritesNow(EngineInfo e) => CanWrite(e) && (e.Id != "ollama" || e.State == "ready");
+
+    /// <summary>Where the list opens, once (coming back to the step keeps what was picked on it): on what the library
+    /// does now. Notes switched off ("No AI for now", chosen before) is that choice again. The library's own engine is
+    /// the pick when it writes notes as it is, or when it was chosen before (setup run again, or the free AI being got
+    /// ready this minute). Otherwise nothing has been chosen yet: the first engine that's ready, else no AI for now
+    /// (where offered), so nothing is left picked that would switch notes on with an AI that can't write them.</summary>
     string FirstPick(AiOverview overview)
     {
-        if (overview.Engines.FirstOrDefault(e => e.Id == overview.Notes) is { } notes && CanWrite(notes)) return notes.Id;
+        if (notesOn == false && OffersNoAi) return None;
+        if (PreferFree && !ChosenBefore && overview.Engines.Any(e => e.Id == "ollama" && WritesNow(e))) return "ollama";
+        if (overview.Engines.FirstOrDefault(e => e.Id == overview.Notes) is { } notes
+            && (WritesNow(notes) || CanWrite(notes) && (ChosenBefore || overview.Pulling is not null)))
+            return notes.Id;
         if (overview.Engines.FirstOrDefault(e => e.State == "ready" && CanWrite(e)) is { } ready) return ready.Id;
         return OffersNoAi ? None : overview.Notes;
     }
@@ -243,6 +264,11 @@ public sealed partial class AiSetupModel : ObservableObject
         OnPropertyChanged(nameof(ChoiceWords));
     }
 
+    /// <summary>What the library said when it refused, for the student: turned away at the door ("wrong password"),
+    /// the app's copy of the library's password is out of date, and Settings is where the new one goes.</summary>
+    static string Words(LibraryRefusedException ex) =>
+        ex.Status == 401 ? "The library's password changed. Type the new one in Settings." : ex.Message;
+
     /// <summary>A row's help opens alone (the list stays short enough to see).</summary>
     void ShowHelpOf(AiSetupRow row, bool show)
     {
@@ -250,11 +276,16 @@ public sealed partial class AiSetupModel : ObservableObject
     }
 
     /// <summary>Picking a row: an engine that can write notes becomes the pick; one that can't yet shows how to get it
-    /// going instead.</summary>
+    /// going instead. Where a row has one button and no steps, the row is never dead: Claude's and ChatGPT's do what
+    /// their button does (it only opens the screens that get them ready). The free AI's button starts a long
+    /// download at once, so its row says to press it and stays unpicked: a click never leaves notes switched on
+    /// with an AI that has nothing to write them with.</summary>
     void Pick(AiSetupRow row)
     {
-        if (row.CanWrite) SelectedNotes = row.Id;
-        else ShowHelpOf(row, true);
+        if (row.CanWrite && !row.ShowOneButton) SelectedNotes = row.Id;
+        else if (row.HasHelp) ShowHelpOf(row, true);
+        else if (row.ShowOneButton && row.Id != "ollama") _ = row.OpenCommand.ExecuteAsync(null);
+        else if (row.ShowOneButton || row.ShowSignIn) Say = $"{row.Name} isn't ready to write notes yet. Press “{(row.ShowSignIn ? "Sign in" : row.OpenLabel)}” on its row to get it ready.";
     }
 
     [RelayCommand]
@@ -291,7 +322,7 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         catch (LibraryRefusedException ex)
         {
-            Say = ex.Message;
+            Say = Words(ex);
         }
         catch
         {
@@ -410,7 +441,7 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         catch (LibraryRefusedException ex)
         {
-            Say = ex.Message;
+            Say = Words(ex);
         }
         catch
         {
@@ -439,7 +470,7 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         catch (LibraryRefusedException ex)
         {
-            Say = ex.Message;
+            Say = Words(ex);
         }
         catch
         {
@@ -477,7 +508,7 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         catch (LibraryRefusedException ex)
         {
-            Say = ex.Message;
+            Say = Words(ex);
             return false;
         }
         catch

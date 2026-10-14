@@ -611,7 +611,7 @@ public class SurfaceShots
     {
         var m = SetupModel.For(skin, role);
         m.LibraryName = "Ada's library";
-        m.Password = "correct-horse";
+        m.Password = m.ConnectPassword = "correct-horse";
         m.Address = "http://mac-mini:8787";
         m.Classes.Add(new SetupClass { Name = "CS 101", About = "Recursion, the call stack and Big-O", Dot = Skin.ClassDot(0) });
         m.Classes.Add(new SetupClass { Name = "BIO 110", About = "Cells, membranes and genetics", Dot = Skin.ClassDot(1) });

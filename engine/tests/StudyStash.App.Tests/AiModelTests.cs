@@ -623,9 +623,44 @@ public class AiSetupModelTests
         Assert.Equal(["claude", "codex"], asked);
         Assert.DoesNotContain(lib.Calls, c => c.StartsWith("sign-in", StringComparison.Ordinal));
 
-        // Clicking the row itself (it can't write notes yet) doesn't open a list of steps: there aren't any.
+        // Clicking the row itself (it can't write notes yet) is never dead: there are no steps to open, so it does
+        // what its button does.
         claude.SelectCommand.Execute(null);
         Assert.False(claude.ShowHelp);
+        Assert.Equal(["claude", "codex", "claude"], asked);
+        Assert.NotEqual("claude", model.SelectedNotes);
+    }
+
+    [AvaloniaFact]
+    public async Task The_notes_step_opens_on_what_the_library_does_now_and_a_first_run_picks_nothing_that_cant_write()
+    {
+        // The free AI's app is on this Mac without what it writes notes with, and nothing has been chosen yet.
+        var lib = new FakeAiLibrary { Overview = Nothing("model_missing") };
+        var first = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), PreferFree = true };
+        await first.Load();
+        Assert.True(first.NoAi);
+        // Its row says to press its button (which starts the download); a click alone doesn't pick it.
+        var free = first.Engines.Single(r => r.Id == "ollama");
+        free.SelectCommand.Execute(null);
+        Assert.True(first.NoAi);
+        Assert.Equal("Free AI on this Mac isn't ready to write notes yet. Press “Set it up” on its row to get it ready.", first.Say);
+        Assert.DoesNotContain("set-up:ollama", lib.Calls);
+
+        // Setup run again after "No AI for now": that's still the choice, though the free AI is all here by now.
+        var off = new AiSetupModel(new FakeAiLibrary { Overview = AiTestData.MixedOverview() })
+        {
+            WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(false), ChosenBefore = true,
+        };
+        await off.Load();
+        Assert.True(off.NoAi);
+
+        // Run again with the free AI chosen before and its model gone missing: it stays the pick.
+        var kept = new AiSetupModel(new FakeAiLibrary { Overview = Nothing("model_missing") })
+        {
+            WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), ChosenBefore = true,
+        };
+        await kept.Load();
+        Assert.Equal("ollama", kept.SelectedNotes);
     }
 
     [AvaloniaFact]

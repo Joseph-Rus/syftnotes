@@ -136,7 +136,7 @@ public static partial class SelfTest
         Library = new LibraryService(libHome, cfg);
         await Library.StartAsync();
         if (Library.State is not (LibraryServiceState.Running or LibraryServiceState.Elsewhere))
-            throw new InvalidOperationException(Library.Failure ?? "the library didn't start");
+            throw new InvalidOperationException($"{Library.Failure ?? "the library didn't start"} {Library.LastLines}".TrimEnd());
         Environment.SetEnvironmentVariable("STUDYSTASH_SELFTEST_LIBRARY_PORT", port.ToString());
     }
 
@@ -247,12 +247,12 @@ public static partial class SelfTest
         Say($"find: {m.LibraryResult}");
         Shot(Shell.Windows.Setup, "setup-library-found");
 
-        m.Password = "not-the-password";
+        m.ConnectPassword = "not-the-password";
         await m.ConnectCommand.ExecuteAsync(null);
         Say($"wrong password: {m.LibraryResult}");
         Shot(Shell.Windows.Setup, "setup-library-wrong-password");
 
-        m.Password = LibraryPassword ?? "";
+        m.ConnectPassword = LibraryPassword ?? "";
         await m.ConnectCommand.ExecuteAsync(null);
         Say($"connect: {m.LibraryResult}");
         Shot(Shell.Windows.Setup, "setup-library");

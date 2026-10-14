@@ -483,7 +483,7 @@ public static partial class SetupChat
                 "canvas" => "Left Canvas for later",
                 "classes" => "Left classes for later",
                 "ai_app" => "Left your AI app for later",
-                "start_at_login" => "Left start at login off",
+                "start_at_login" => "Left “Open when you log in” off",
                 "taskbar" => "Skipped the taskbar tip",
                 _ => "Skipped a step",
             },

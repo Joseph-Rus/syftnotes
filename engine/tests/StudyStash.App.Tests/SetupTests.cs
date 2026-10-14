@@ -44,14 +44,14 @@ public sealed class SetupTests
         // Just this computer: no password, no library to find; who writes the notes comes after the model.
         var one = SetupModel.For(SkinKind.Mac);
         Assert.Equal(AppRole.Both, one.Role);
-        Assert.Equal(["Welcome", "Microphone", "Transcription model", "Notes", "Canvas", "Classes", "Start at login", "Done"], Titles(one));
+        Assert.Equal(["Welcome", "Microphone", "Transcription model", "Notes", "Canvas", "Classes", "Open when you log in", "Done"], Titles(one));
         Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], one.Steps.Select(s => s.Number));
 
         var laptop = SetupModel.For(SkinKind.Mac, AppRole.Laptop);
         Assert.Equal(["Welcome", "Your library", "Microphone", "Transcription model", "Canvas", "Classes", "Done"], Titles(laptop));
 
         var library = SetupModel.For(SkinKind.Mac, AppRole.Library);
-        Assert.Equal(["Welcome", "Password", "Your AI", "Canvas", "Classes", "Start at login", "Connect your laptop"], Titles(library));
+        Assert.Equal(["Welcome", "Password", "Your AI", "Canvas", "Classes", "Open when you log in", "Connect your laptop"], Titles(library));
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class SetupTests
     {
         Assert.Equal(["Welcome", "Your library", "Microphone", "Transcription model", "Canvas", "Classes", "Taskbar", "Done"],
             Titles(SetupModel.For(SkinKind.Win, AppRole.Laptop)));
-        Assert.Equal(["Welcome", "Microphone", "Transcription model", "Notes", "Canvas", "Classes", "Start at login", "Taskbar", "Done"],
+        Assert.Equal(["Welcome", "Microphone", "Transcription model", "Notes", "Canvas", "Classes", "Open when you log in", "Taskbar", "Done"],
             Titles(SetupModel.For(SkinKind.Win)));
         Assert.DoesNotContain(SetupStep.Taskbar, SetupModel.StepsFor(AppRole.Library, SkinKind.Win));
         Assert.DoesNotContain(SetupStep.Taskbar, SetupModel.StepsFor(AppRole.Laptop, SkinKind.Mac));
@@ -80,7 +80,7 @@ public sealed class SetupTests
         Assert.All(new[] { one, laptop, library }, m => Assert.Equal("Welcome", m.StepLabel));
         Assert.Equal("Set up Study Stash on this PC", SetupModel.For(SkinKind.Win).HeaderTitle);
         Assert.Contains("all on this Mac", one.OneComputerAbout, StringComparison.Ordinal);
-        Assert.Contains("No server needed", one.OneComputerAbout, StringComparison.Ordinal);
+        Assert.Contains("No other computer needed", one.OneComputerAbout, StringComparison.Ordinal);
         Assert.Contains("Mac mini", library.LibraryAbout, StringComparison.Ordinal);
         Assert.DoesNotContain("Mac", SetupModel.For(SkinKind.Win).LibraryAbout, StringComparison.Ordinal);
     }
@@ -93,18 +93,21 @@ public sealed class SetupTests
         Assert.False(m.IsLaptop || m.IsLibrary);
         Assert.Equal("Welcome to Study Stash", m.WelcomeTitle);
         m.LibraryName = "Ada's library";
-        m.Password = "correct-horse";
         m.Address = "http://mac-mini:8787";
 
         m.ChooseLaptopCommand.Execute(null);
         Assert.Equal(AppRole.Laptop, m.Role);
         Assert.Equal(SetupStep.Welcome, m.Step);
         Assert.Equal(SetupStep.Library, m.Steps[1].Step);
+        m.ConnectPassword = "the-mac-minis"; // typed on the laptop's Connect page
 
         m.ChooseLibraryCommand.Execute(null);
         Assert.Equal(AppRole.Library, m.Role);
         Assert.Equal(SetupStep.Password, m.Steps[1].Step);
         Assert.Equal("Set up your library", m.HeaderTitle);
+        // A new library's password field starts empty: the other library's password isn't carried into it.
+        Assert.Equal("", m.Password);
+        m.Password = "correct-horse";
 
         m.ChooseOneComputerCommand.Execute(null);
         Assert.Equal(AppRole.Both, m.Role);
@@ -115,7 +118,7 @@ public sealed class SetupTests
         Assert.False(m.LibraryOk);
         m.ChooseOneComputerCommand.Execute(null);
         // What was typed stays, whichever card was tried.
-        Assert.Equal(("Ada's library", "correct-horse", "http://mac-mini:8787"), (m.LibraryName, m.Password, m.Address));
+        Assert.Equal(("Ada's library", "correct-horse", "the-mac-minis", "http://mac-mini:8787"), (m.LibraryName, m.Password, m.ConnectPassword, m.Address));
     }
 
     [Fact]
@@ -456,12 +459,23 @@ public sealed class SetupTests
     }
 
     [Fact]
-    public void Setup_run_again_on_the_library_keeps_its_name_password_and_notes_and_starts_it_at_login()
+    public void Setup_run_again_on_the_library_keeps_its_name_password_notes_and_whether_it_starts_at_login()
     {
         using var home = new TempHome();
         string notes = home["Lecture notes"];
         Configs.Save(new Config(home.Path, notes) { PoolName = "Sam's library", PoolPassword = "kept-password" });
-        var login = new CountingLoginItems();
+        // A library is here but Study Stash was never asked to start at login (setup was closed part-way, or its
+        // switch was left off): the switch is off, and finishing writes no login item.
+        var never = new CountingLoginItems();
+        using (var unasked = Host(home, login: never))
+        {
+            var again = Setup.Make(unasked, AppRole.Both);
+            Assert.True(again.ExistingLibrary);
+            Assert.False(again.StartAtLogin);
+            Setup.Finish(again, unasked);
+            Assert.Empty(never.Calls);
+        }
+        var login = new CountingLoginItems(starts: true);
         using var host = Host(home, login: login);
         var m = Setup.Make(host, AppRole.Library);
         Assert.True(m.ExistingLibrary);
@@ -525,7 +539,7 @@ public sealed class SetupTests
             using var host = Host(home);
             var m = Setup.Make(host, AppRole.Laptop);
             m.Address = url;
-            m.Password = "whatever";
+            m.ConnectPassword = "whatever";
 
             await m.ConnectCommand.ExecuteAsync(null);
 
@@ -572,6 +586,34 @@ public sealed class SetupTests
         await m.AddClassCommand.ExecuteAsync(null);
         Assert.StartsWith("The library didn't take the class", m.ClassProblem);
         Assert.DoesNotContain(m.Classes, c => c.Name == "Unsorted");
+    }
+
+    [Fact]
+    public async Task Continue_on_Classes_adds_the_class_still_typed_and_stays_when_it_cant_be_added()
+    {
+        await using var rig = await LibraryRig.StartAsync();
+        using var home = new TempHome();
+        using var host = Host(home);
+        var cc = host.Client();
+        cc.ServerUrl = rig.Url;
+        cc.PoolKey = LibraryRig.Password;
+        Configs.SaveClient(cc);
+        await host.CheckLibraryAsync();
+        var m = Setup.Make(host, AppRole.Laptop);
+        m.Go(SetupStep.Classes);
+
+        // What it covers with no name: asked for the name, nothing dropped.
+        m.NewAbout = "Limits, derivatives and integrals";
+        await m.NextCommand.ExecuteAsync(null);
+        Assert.Equal(SetupStep.Classes, m.Step);
+        Assert.Equal("Give the class a name too, like CS 101.", m.ClassProblem);
+
+        // Typed and never Added: Continue adds it, as Add would, and goes on.
+        m.NewClass = "MATH 221";
+        await m.NextCommand.ExecuteAsync(null);
+        Assert.NotEqual(SetupStep.Classes, m.Step);
+        Assert.Equal("Limits, derivatives and integrals", Configs.Load(rig.Home).Classes.Single(c => c.Name == "MATH 221").Description);
+        Assert.Equal(("", ""), (m.NewClass, m.NewAbout));
     }
 
     // ---- Classes from Canvas courses ----

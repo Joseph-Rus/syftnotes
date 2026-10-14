@@ -387,10 +387,10 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
-    public async Task Not_now_to_start_at_login_leaves_it_off_though_setup_has_its_box_ticked_for_a_library_already_here()
+    public async Task Not_now_to_start_at_login_leaves_it_off_though_setup_has_its_box_ticked_because_it_already_did()
     {
         await using var rig = new Rig(role: AppRole.Both);
-        rig.Setup.StartAtLogin = true; // what setup does for a library that was here before
+        rig.Setup.StartAtLogin = true; // what setup does when Study Stash already starts at login
         rig.Guided.Skip("start_at_login");
         Assert.False(rig.Setup.StartAtLogin);
         Assert.Equal(ChecklistState.Skipped, rig.Item("start_at_login").State);

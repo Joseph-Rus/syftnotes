@@ -291,13 +291,13 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
                 }
                 m.StartAtLogin = true;
                 g.StartsAtLogin = true;
-                Fold(card, "Starts when you log in");
-                g.Note("Start at login is on", "Start at login is on.");
+                Fold(card, "Opens when you log in");
+                g.Note("“Open when you log in” is on", "Start at login is on.");
                 break;
             case ("start_at_login", "notnow"):
                 g.Skip("start_at_login");
                 Fold(card, "Not now");
-                g.Note("Start at login is off for now", "The student said \"Not now\" to start at login.", good: false);
+                g.Note("“Open when you log in” is off for now", "The student said \"Not now\" to start at login.", good: false);
                 break;
             case ("taskbar_tip", "open"):
                 m.TaskbarSettingsCommand.Execute(null);

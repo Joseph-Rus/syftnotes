@@ -45,6 +45,7 @@ public sealed class LibraryHere
         var cfg = Existing(host.Home) ?? throw new InvalidOperationException("There's no library on this computer.");
         password = password?.Trim();
         if (laptops && password is not null && password.Length < 4) throw new ArgumentException("Use a password of at least 4 characters.");
+        if (laptops && password is not null && Configs.PasswordProblem(password) is { } problem) throw new ArgumentException(problem);
         if (laptops && password is null && cfg.PoolPassword.Length < 4) throw new ArgumentException("Give your library a password first.");
         string old = cfg.PoolPassword;
         cfg.WebHost = laptops ? "0.0.0.0" : "127.0.0.1";
@@ -80,6 +81,30 @@ public sealed class LibraryHere
         await svc.StartAsync();
     }
 
+    /// <summary>Why the library just started can't be used, in the student's words, or null when it's up and answers
+    /// this app. One that stepped aside for a library already on the port (<see cref="LibraryServiceState.Elsewhere"/>)
+    /// is asked with the password too: "ready" is never said over a library that turns the app away.</summary>
+    static async Task<string?> ProblemAsync(LibraryService svc, Config cfg)
+    {
+        string device = OperatingSystem.IsMacOS() ? "Mac" : "PC";
+        if (svc.State == LibraryServiceState.Running) return null;
+        if (svc.State != LibraryServiceState.Elsewhere)
+            return "The library didn't start." + (svc.Failure is { Length: > 0 } f ? $" {f.TrimEnd('.')}." : "") + " Its log is in the logs folder.";
+        try
+        {
+            await LibraryApi.CheckServerAsync($"http://127.0.0.1:{cfg.WebPort}", cfg.PoolPassword);
+            return null;
+        }
+        catch (InvalidOperationException e) when (e.Message == "wrong password")
+        {
+            return $"Another library is already running on this {device} with a different password. Restart this {device}, then try again.";
+        }
+        catch (Exception e) when (e is InvalidOperationException or System.Text.Json.JsonException)
+        {
+            return $"A library is already running on this {device}, but it isn't answering. Restart this {device}, then try again.";
+        }
+    }
+
     /// <summary>8787 if it (and 8788, for Claude) are free; otherwise the next pair that both are.</summary>
     static int FreePortPair(int first)
     {
@@ -110,7 +135,10 @@ public sealed class LibraryHere
     /// A library already here keeps its notes folder, port and who can reach it, unless <paramref name="localOnly"/>
     /// keeps it to this computer or <paramref name="laptops"/> opens it to them; a null name or password keeps its own
     /// (or, for a new library, names it and makes up a password). One this app already runs (setup gone back and
-    /// forth between its choices) starts again with the new settings.
+    /// forth between its choices) starts again with the new settings. A password that's too short or can't be sent
+    /// (<see cref="Configs.PasswordProblem"/>) is refused before anything is saved or started. A library that doesn't
+    /// come up, or that the app can't talk to, is stopped again and its settings put back as they were: nothing is
+    /// left running behind a setup that said it failed, and the next try starts clean.
     /// </summary>
     public async Task<string> CreateAsync(AppHost host, string? name, string? password, string displayName,
         AppRole role = AppRole.Both, bool localOnly = false, bool laptops = false)
@@ -118,8 +146,17 @@ public sealed class LibraryHere
         var existing = Existing(host.Home);
         var cfg = existing ?? Configs.Load(host.Home);
         name = name?.Trim() is { Length: > 0 } n ? n : existing?.PoolName is { Length: > 0 } had ? had : "My library";
-        password = password is null ? (existing?.PoolPassword is { Length: >= 4 } kept ? kept : StudyStash.Library.Http.TokenUrlSafe(12)) : password.Trim();
+        // No password asked for (just this computer): the library keeps its own, unless that's one the app could never
+        // send. Then it gets a new one, made up like a new library's, instead of a start that fails every time.
+        password = password is null
+            ? (existing?.PoolPassword is { Length: >= 4 } kept && Configs.PasswordProblem(kept) is null ? kept : StudyStash.Library.Http.TokenUrlSafe(12))
+            : password.Trim();
         if (password.Length < 4) throw new ArgumentException("Use a password of at least 4 characters.");
+        if (Configs.PasswordProblem(password) is { } problem) throw new ArgumentException(problem);
+        if (existing is not null && existing.PoolPassword != password && Configs.PasswordProblem(existing.PoolPassword) is not null)
+            host.Log("[library] its password had a character that can't be sent, so it has a new one");
+        // What's on disk now, to put back if the library doesn't come up with the new settings.
+        string? before = existing is null ? null : File.ReadAllText(cfg.ConfigPath);
         if (existing is null)
         {
             cfg.PoolDir = Folder ?? DefaultFolder;
@@ -146,8 +183,20 @@ public sealed class LibraryHere
             svc = Command is null ? new LibraryService(host.Home, cfg) : new LibraryService(host.Home, cfg, Command);
             await svc.StartAsync();
         }
-        if (svc.State is not (LibraryServiceState.Running or LibraryServiceState.Elsewhere))
-            throw new InvalidOperationException("The library didn't start." + (svc.Failure is { Length: > 0 } f ? $" {f}." : "") + " Its log is in the logs folder.");
+        if (await ProblemAsync(svc, cfg) is { } why)
+        {
+            host.Log($"[library] setup couldn't use the library: {why} {svc.LastLines}".TrimEnd());
+            await svc.StopAsync();
+            if (svc != host.LocalLibrary) svc.Dispose();
+            if (before is null) File.Delete(cfg.ConfigPath);
+            else
+            {
+                File.WriteAllText(cfg.ConfigPath, before);
+                // The app's own library goes back to the settings it had, for the next time it's started.
+                if (svc == host.LocalLibrary && Existing(host.Home) is { } old) (svc.Cfg.PoolPassword, svc.Cfg.PoolName, svc.Cfg.WebHost) = (old.PoolPassword, old.PoolName, old.WebHost);
+            }
+            throw new InvalidOperationException(why);
+        }
         host.UseLocalLibrary(svc);
         host.Save(s => s.Role = role);
         var cc = host.Client();
