@@ -196,7 +196,9 @@ public sealed class Rewrites(Config cfg, Store store, AiJobs ai, Action<string>?
             else if (failure is not null)
             {
                 job.State = "failed";
-                job.Error = failure.Message;
+                // Signed out: said as what to do, not as the AI's own "Not logged in · Please run /login".
+                job.Error = job.Engine != "ollama" && Engines.LooksSignedOut(failure.Message)
+                    ? Engines.RewriteNeedsSignIn(Engines.Name(job.Engine)) : failure.Message;
                 log($"[rewrite] {Engines.Name(job.Engine)} couldn't rewrite '{m.Title}': {failure.Message}");
                 ai.Record(job.Engine, false, failure.Message);
             }

@@ -52,8 +52,19 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         {
             Model = how.Model, Effort = how.Effort, Fast = how.Fast, Timeout = TimeSpan.FromMinutes(15),
         }, ct);
+        Proved(choice.Provider, result);
         if (!result.Ok) throw new InvalidOperationException($"{provider.Name}: {result.Text}");
         return result.Text;
+    }
+
+    /// <summary>What a job's run says about its AI, kept as <see cref="Record"/> keeps it: notes that fail because Claude
+    /// is signed out make Settings say "Not signed in" (and offer Sign in), as Ask and the diagrams already did. A run
+    /// that works only writes when there's something to clear, not on every part of every lecture's notes.</summary>
+    void Proved(string id, AiResult result)
+    {
+        if (id == "ollama") return;
+        if (!result.Ok) Record(id, false, result.Text);
+        else if (Settings is var s && (s.Tests.GetValueOrDefault(id) != "works" || s.Limits.ContainsKey(id))) Record(id, true, "");
     }
 
     /// <summary>The same prompt, told to answer with JSON only; then the JSON object in what came back.</summary>
@@ -74,6 +85,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         {
             Model = model, Effort = effort, Fast = fast, Timeout = TimeSpan.FromMinutes(15),
         }, ct, soFar);
+        Proved(engine, result);
         if (!result.Ok) throw new InvalidOperationException(result.Text);
         return result.Text;
     }
@@ -500,10 +512,16 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         bool ok = r.Ok && r.Text.Contains("ready", StringComparison.OrdinalIgnoreCase);
         string why = ok ? "" : r.Ok ? $"it answered \"{Py.Head(r.Text, 80)}\"" : r.Text;
         var s = Settings;
+        bool back = ok && Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(provider.Id, ""));
         s.Tests[provider.Id] = ok ? "works" : why;
         s.Save(home);
+        if (back) SignedInAgain?.Invoke(provider.Id);
         return (ok, why);
     }
+
+    /// <summary>An AI that needed signing in again answers once more (Settings' Check after signing in, or any job
+    /// that worked): its id. The library then writes the notes it couldn't write meanwhile.</summary>
+    public event Action<string>? SignedInAgain;
 
     /// <summary>What an engine's run just proved: success clears any usage limit and marks it working; an
     /// auth-looking error is kept so the engines pane shows "Not signed in"; a limit-looking error is kept as an
@@ -511,8 +529,10 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     public void Record(string id, bool ok, string error)
     {
         var s = Settings;
+        bool back = false;
         if (ok)
         {
+            back = Engines.LooksLikeAuth(s.Tests.GetValueOrDefault(id, ""));
             s.Tests[id] = "works";
             s.Limits.Remove(id);
         }
@@ -526,6 +546,7 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
         }
         else return; // a plain failure: not lasting enough to change the engine's remembered state
         s.Save(home);
+        if (back) SignedInAgain?.Invoke(id);
     }
 
     /// <summary>Download <paramref name="model"/> through Ollama, in the background, reporting progress through

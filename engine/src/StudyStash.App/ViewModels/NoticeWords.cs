@@ -1,6 +1,7 @@
 using StudyStash.App.Services;
 using StudyStash.Audio;
 using StudyStash.Core;
+using StudyStash.Core.Ai;
 
 namespace StudyStash.App.ViewModels;
 
@@ -12,10 +13,13 @@ public static class NoticeWords
     public const string PausedTitle = AppHost.RecordingPaused;
 
     /// <summary>A lecture the library has filed: its class, its title, and whether its notes were written (when they
-    /// weren't, the transcript is there all the same).</summary>
+    /// weren't, the transcript is there all the same). Notes its AI couldn't write because it needs signing in again
+    /// say so, and the button is Sign in, to Settings → Your AI.</summary>
     public static (string Title, string Text, string Action) Filed(string filedClass, string filedTitle, string error)
     {
         string title = $"Filed in {(filedClass.Length > 0 ? filedClass : "your library")}";
+        if (Engines.NeedsSignIn(error) is { } who)
+            return (title, (filedTitle.Length > 0 ? $"{filedTitle}: its" : "Its") + $" notes weren't written because {who} needs you to sign in again.", "Sign in");
         if (error.Length > 0)
             return (title, (filedTitle.Length > 0 ? $"{filedTitle}: its" : "Its") + " notes couldn't be written. The transcript is there.", "Open");
         return (title, filedTitle.Length > 0 ? filedTitle : "Its notes are written.", "Open note");

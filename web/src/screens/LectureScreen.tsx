@@ -96,7 +96,10 @@ function NoNotes({ lecture }: { lecture: Lecture }) {
       ? 'Notes are being written. Pull down in a minute to see them.'
       : lecture.status === 'failed'
         ? `Notes couldn't be written${lecture.error ? `: ${lecture.error}` : ''}.`
-        : lecture.summary
+        : lecture.error
+          ? // Filed without notes, and the library says why (its AI needs signing in again, say).
+            `${lecture.error.trim()}${/[.!?]$/.test(lecture.error.trim()) ? '' : '.'}${below}`
+          : lecture.summary
           ? lecture.summary
           : `No notes were written for this lecture.${below}`;
   return (

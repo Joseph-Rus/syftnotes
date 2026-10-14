@@ -87,7 +87,9 @@ public sealed class AiProblemsModel(IAiLibrary library)
             Kind = p.Kind,
             Caption = AiWords.ProblemCaption(p.Kind),
             Title = AiWords.ProblemTitle(p.Kind, p.EngineName, fallbackName),
-            Message = AiWords.ProblemMessage(p.Kind, p.EngineName, fallbackName, p.Until, p.SizeGb, ""),
+            // A sign-in with no stand-in says so, rather than naming Ollama, which isn't used.
+            Message = AiWords.ProblemMessage(p.Kind, p.EngineName, p.Kind == "not_signed_in" && p.FallbackTo.Length == 0 ? "" : fallbackName,
+                p.Until, p.SizeGb, ""),
             Icon = AiWords.ProblemIcon(p.Kind),
             ColorKey = AiWords.ProblemColorKey(p.Kind),
             Severity = AiWords.ProblemSeverity(p.Kind),
