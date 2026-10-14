@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/preact';
+import { fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { Api } from '../src/api/client';
 import type { DueList, LibraryOverview, VoiceMemo } from '../src/api/types';
 import { forget } from '../src/data/resource';
 import { ClassScreen } from '../src/screens/ClassScreen';
 import { DueScreen } from '../src/screens/Due';
+import { Pair } from '../src/screens/Pair';
 import { titleFrom, VoiceMemoScreen } from '../src/screens/VoiceMemo';
 
 /** An Api whose library answers from `routes` (by path under /api/v2), JSON. */
@@ -55,6 +56,36 @@ const item = (name: string, cls: string, due: string, extra: Partial<DueList['gr
 });
 
 beforeEach(() => forget());
+
+describe('pairing', () => {
+  /** What a browser leaves in a box when `text` is typed or pasted into it: it cuts at the box's maxlength before the
+   * app hears of it (jsdom doesn't, so this does). */
+  function put(box: HTMLInputElement, text: string) {
+    box.value = box.maxLength >= 0 ? text.slice(0, box.maxLength) : text;
+    fireEvent.input(box);
+  }
+
+  test('the code pasted as Settings prints it, with its space, pairs, and the box shows what was sent', async () => {
+    const sent: unknown[] = [];
+    const fetcher = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      sent.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({ device: { id: 'd1', name: 'iPhone' } }), { status: 200 });
+    }) as typeof fetch;
+    const onPaired = vi.fn();
+    render(<Pair api={new Api({ fetch: fetcher })} library={null} onPaired={onPaired} />);
+    const box = screen.getByLabelText('6-digit code') as HTMLInputElement;
+
+    // A letter after two digits doesn't stay in the box.
+    put(box, '12');
+    put(box, '12a');
+    expect(box.value).toBe('12');
+
+    put(box, '123 456');
+    expect(box.value).toBe('123456');
+    await waitFor(() => expect(onPaired).toHaveBeenCalled());
+    expect(sent).toEqual([{ code: '123456', name: 'This browser' }]);
+  });
+});
 
 describe('Due', () => {
   test('the next thing first, then what is to do by when, with an empty group left out', async () => {
