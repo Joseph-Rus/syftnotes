@@ -68,6 +68,11 @@ public class LibraryWindowTests
             ClassItem? picked = null;
             m.OnClass = c => picked = c;
             var ml = Text(side, "Machine Learning").FindAncestorOfType<Button>()!;
+            // A screen reader says each row's name (and its count), not what the row is built from.
+            Assert.Equal("Home", Avalonia.Automation.AutomationProperties.GetName(Text(side, "Home").FindAncestorOfType<Button>()!));
+            Assert.Equal(m.Due!.Said, Avalonia.Automation.AutomationProperties.GetName(Text(side, "Due").FindAncestorOfType<Button>()!));
+            Assert.Equal(m.Classes.First(c => c.Name == "Machine Learning").Said, Avalonia.Automation.AutomationProperties.GetName(ml));
+            Assert.StartsWith("Machine Learning", Avalonia.Automation.AutomationProperties.GetName(ml));
             ml.Command!.Execute(ml.CommandParameter);
             Assert.Equal("Machine Learning", picked!.Name);
             Assert.Equal(Nouns.Lecture, picked.Noun);
