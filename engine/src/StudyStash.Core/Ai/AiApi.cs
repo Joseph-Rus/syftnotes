@@ -191,8 +191,13 @@ public interface IAiLibrary
 /// <see cref="RemoteLibrary"/>: a plain 404 with no JSON detail means an older library without this route (null,
 /// not an error); one of our own refusals (400/409/503/401) throws <see cref="LibraryRefusedException"/> with its
 /// words.</summary>
-public sealed class AiRemote(string serverUrl, string key, HttpClient? http = null) : IAiLibrary
+public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? http = null) : IAiLibrary
 {
+    /// <summary>With a password that stays as it is for as long as this is used. (Settings stays open across a change
+    /// of the library's password, and gives the one that says what it is now: with the old one kept, Your AI and AI
+    /// apps said the library wasn't answering until Settings was closed and opened again.)</summary>
+    public AiRemote(string serverUrl, string key, HttpClient? http = null) : this(serverUrl, () => key, http) { }
+
     /// <summary>snake_case both ways, so the library and the app agree on every key without translating by hand.</summary>
     public static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web)
     {
@@ -206,7 +211,7 @@ public sealed class AiRemote(string serverUrl, string key, HttpClient? http = nu
     HttpRequestMessage Request(HttpMethod method, string path, JsonNode? body)
     {
         var request = new HttpRequestMessage(method, root + path);
-        if (key.Length > 0) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + key);
+        if (key() is { Length: > 0 } now) request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + now);
         if (body is not null) request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
         return request;
     }
