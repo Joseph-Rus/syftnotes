@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Nodes;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
 using StudyStash.Core.Calendar;
 using StudyStash.Library;
@@ -16,8 +17,9 @@ public class LibraryWebTests
     static readonly Action<string> Quiet = _ => { };
 
     static LibraryWebOptions Options(Func<double, Task<Release?>>? latest = null, bool ollama = true, TailscaleInfo? ts = null,
-        Func<Release, string, Task>? apply = null) => new()
+        Func<Release, string, Task>? apply = null, PasswordTries? tries = null) => new()
     {
+        Tries = tries,
         ListModels = _ => Task.FromResult(ollama ? Models : null),
         Tailscale = () => ts ?? Tailnet,
         Latest = latest ?? (_ => Task.FromResult<Release?>(null)),
@@ -368,22 +370,196 @@ public class LibraryWebTests
             Assert.Equal("/", LibraryWeb.SafeNext(bad));
         foreach (var c in (JsonArray)Golden.Library("safe_next")!)
             Assert.Equal(c![1].S(), LibraryWeb.SafeNext(c[0].S()));
+        // A class's page is a place to come back to whatever its name holds, written the way an address carries it.
+        Assert.Equal("/class/MATH%20221", LibraryWeb.SafeNext("/class/MATH 221"));
+        Assert.Equal("/class/MATH%20221?said=1#top", LibraryWeb.SafeNext("/class/MATH%20221?said=1#top"));
+        Assert.Equal("/class/Espa%C3%B1ol%20(honors)", LibraryWeb.SafeNext("/class/Español (honors)"));
+        foreach (string bad in new[] { "/\u007f/evil.com", "/\u0085/evil.com", "/ok\r\nSet-Cookie: x=1", "http://evil.com", "http:evil.com", "/ \\evil.com", " //evil.com" })
+            Assert.Equal("/", LibraryWeb.SafeNext(bad));
     }
 
     [Fact]
-    public async Task A_login_cookie_from_the_python_engine_still_works()
+    public async Task Signing_in_goes_back_to_a_class_whose_name_has_a_space()
     {
-        // Both engines sign it with the key in web_secret, so switching engines doesn't sign anyone out.
+        using var dir = new TempDir();
+        var cfg = MakeCfg(dir, "pw");
+        cfg.Classes.Add(new ClassDef("C# Lab"));
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        await using var c = await Site(cfg, store);
+        foreach (var (asked, back) in new[] { ("/class/Bio%20110", "/class/Bio%20110"), ("/class/C%23%20Lab?said=hi%20there", "/class/C%23%20Lab?said=hi%20there") })
+        {
+            c.ClearCookies();
+            var away = await c.Get(asked);
+            Assert.Equal(HttpStatusCode.SeeOther, away.StatusCode);
+            string next = System.Web.HttpUtility.ParseQueryString(new Uri(new Uri("http://localhost"), away.Headers.Location!.OriginalString).Query)["next"]!;
+            var r = await c.PostForm("/login", ("password", "pw"), ("next", next));
+            Assert.Equal(back, r.Headers.Location!.OriginalString);
+            Assert.Equal(HttpStatusCode.OK, (await c.Get(back)).StatusCode);
+        }
+        // A sign-in page kept from before, with the space as it was: the class still, not the home page.
+        Assert.Equal("/class/Bio%20110", (await c.PostForm("/login", ("password", "pw"), ("next", "/class/Bio 110"))).Headers.Location!.OriginalString);
+        Assert.Equal("/", (await c.PostForm("/login", ("password", "pw"), ("next", "//example.com"))).Headers.Location!.OriginalString);
+    }
+
+    [Fact]
+    public async Task Log_out_ends_the_sign_in_wherever_its_cookie_is()
+    {
         using var dir = new TempDir();
         var cfg = MakeCfg(dir, "pw");
         Directory.CreateDirectory(cfg.Home);
         File.WriteAllText(Path.Combine(cfg.Home, "web_secret"), "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff");
         using var store = new Store(cfg.DbPath, cfg.PoolDir);
         await using var c = await Site(cfg, store);
+        // The cookie every sign-in got before each had its own (one value for everyone, for good) opens nothing now:
         // hmac.new(bytes.fromhex(that), b"admin", hashlib.sha256).hexdigest()
         c.SetCookie("pool", "274fba6ac9d9127073375a2d3c345f69729c751b36420b304f67219b21269d82");
-        var r = await c.Get("/settings");
-        Assert.Equal(HttpStatusCode.OK, r.StatusCode);
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/settings")).StatusCode);
+
+        await c.PostForm("/login", ("password", "pw"), ("next", "/"));
+        string phone = c.Cookie("pool")!;
+        await c.PostForm("/login", ("password", "pw"), ("next", "/"));
+        string laptop = c.Cookie("pool")!;
+        Assert.NotEqual(phone, laptop);
+
+        // Log out on the laptop: a copy of its cookie put back opens nothing, and the phone is still signed in.
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/logout")).StatusCode);
+        Assert.Null(c.Cookie("pool"));
+        c.SetCookie("pool", laptop);
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/settings")).StatusCode);
+        c.SetCookie("pool", phone);
+        Assert.Equal(HttpStatusCode.OK, (await c.Get("/settings")).StatusCode);
+
+        // The library starts again (it updates itself): the phone is still signed in, the laptop still out.
+        await using var again = await Site(cfg, store);
+        again.SetCookie("pool", laptop);
+        Assert.Equal(HttpStatusCode.SeeOther, (await again.Get("/settings")).StatusCode);
+        again.SetCookie("pool", phone);
+        Assert.Equal(HttpStatusCode.OK, (await again.Get("/settings")).StatusCode);
+
+        // The file that keeps sign-ins holds no cookie and is for this account alone; a sign-in runs out after 180 days.
+        string file = Path.Combine(cfg.Home, "sessions.json");
+        Assert.DoesNotContain(phone, File.ReadAllText(file));
+        if (!OperatingSystem.IsWindows()) Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(file));
+        var now = DateTimeOffset.UtcNow;
+        var kept = new Sessions(cfg.Home, () => now);
+        string token = kept.Start("pw");
+        now += Sessions.Life - TimeSpan.FromMinutes(1);
+        Assert.True(kept.Check(token, "pw"));
+        now += TimeSpan.FromMinutes(2);
+        Assert.False(kept.Check(token, "pw"));
+    }
+
+    [Fact]
+    public async Task A_new_password_signs_out_every_browser()
+    {
+        using var dir = new TempDir();
+        var cfg = MakeCfg(dir, "first-one");
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        await using var c = await Site(cfg, store);
+        await c.PostForm("/login", ("password", "first-one"), ("next", "/"));
+        Assert.Equal(HttpStatusCode.OK, (await c.Get("/settings")).StatusCode);
+
+        // The app's Settings changes the password: the browser signed in with the old one is out, and stays out when
+        // the old password comes back.
+        Assert.Equal(HttpStatusCode.OK, (await c.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings/password", "first-one", new { password = "a-new-one" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/settings")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await c.Client.SendAsync(Req(HttpMethod.Post, "/api/v2/settings/password", "a-new-one", new { password = "first-one" }))).StatusCode);
+        Assert.Equal(HttpStatusCode.SeeOther, (await c.Get("/settings")).StatusCode);
+        await c.PostForm("/login", ("password", "first-one"), ("next", "/"));
+        Assert.Equal(HttpStatusCode.OK, (await c.Get("/settings")).StatusCode);
+
+        // Changed while the library was stopped (the app starts it again with the new one, or config.toml by hand).
+        string signedIn = c.Cookie("pool")!;
+        cfg.PoolPassword = "changed-while-stopped";
+        await using var again = await Site(cfg, store);
+        cfg.PoolPassword = "first-one";
+        again.SetCookie("pool", signedIn);
+        Assert.Equal(HttpStatusCode.SeeOther, (await again.Get("/settings")).StatusCode);
+    }
+
+    /// <summary>A request from an address: straight to the library (<paramref name="address"/> is where the
+    /// connection comes from), or, from 127.0.0.1, passed on by Tailscale Serve for <paramref name="forwardedFor"/>.
+    /// With <paramref name="password"/> it's the sign-in form; with <paramref name="key"/>, the laptop's key.</summary>
+    static async Task<(int Status, string Location, string Body, string RetryAfter)> From(TestSite site, string address, string path,
+        string? password = null, string? key = null, string? forwardedFor = null)
+    {
+        var ctx = await site.App.GetTestServer().SendAsync(c =>
+        {
+            c.Connection.RemoteIpAddress = IPAddress.Parse(address);
+            c.Request.Method = password is null ? "GET" : "POST";
+            c.Request.Path = path;
+            if (password is not null)
+            {
+                c.Request.ContentType = "application/x-www-form-urlencoded";
+                c.Request.Body = new FormUrlEncodedContent([KeyValuePair.Create("password", password), KeyValuePair.Create("next", "/")]).ReadAsStream();
+            }
+            if (key is not null) c.Request.Headers.Authorization = "Bearer " + key;
+            if (forwardedFor is not null) c.Request.Headers["X-Forwarded-For"] = forwardedFor;
+        });
+        var r = ctx.Response;
+        return (r.StatusCode, r.Headers.Location.ToString(), await new StreamReader(r.Body).ReadToEndAsync(), r.Headers.RetryAfter.ToString());
+    }
+
+    [Fact]
+    public async Task Wrong_passwords_are_counted_by_address_and_shut_only_that_address_out_for_a_while()
+    {
+        using var dir = new TempDir();
+        var cfg = MakeCfg(dir, "pw");
+        using var store = new Store(cfg.DbPath, cfg.PoolDir);
+        var now = DateTimeOffset.Parse("2026-10-13T09:00:00Z", System.Globalization.CultureInfo.InvariantCulture);
+        var held = new List<double>();
+        var tries = new PasswordTries(() => now, (hold, _) => { held.Add(hold.TotalSeconds); return Task.CompletedTask; });
+        await using var c = await Site(cfg, store, options: Options(tries: tries));
+        const string Guesser = "203.0.113.5", Student = "198.51.100.9", Here = "127.0.0.1";
+        const string WrongKey = "{\"detail\":\"wrong password\"}", Wait = "Too many wrong passwords. Try again in 10 minutes.";
+        // The sign-in page: where it sends the browser. A laptop's key: the status and what it's told.
+        async Task<string> SignIn(string address, string password, string? forwardedFor = null) => (await From(c, address, "/login", password: password, forwardedFor: forwardedFor)).Location;
+        async Task<(int, string)> Key(string address, string key, string? forwardedFor = null) =>
+            (await From(c, address, "/api/health", key: key, forwardedFor: forwardedFor)) is var r && r.Status == 200 ? (200, "") : (r.Status, r.Body);
+
+        // Ten wrong passwords on the sign-in page from one address, each claiming to be someone else: the claim gets
+        // it no fresh count, and after the first three each answer is held back a second longer, up to five.
+        for (int i = 0; i < PasswordTries.Most; i++) Assert.Equal("/login?bad=1&next=%2F", await SignIn(Guesser, "guess" + i, forwardedFor: "10.0.0." + i));
+        Assert.Equal([1, 2, 3, 4, 5, 5, 5], held);
+        // Now nothing from there is looked at, the right password included, at the page or with a laptop's key: the
+        // page says how long to wait, and the key's answer is still the 401 every laptop reads as a wrong password.
+        Assert.Equal("/login?wait=1&next=%2F", await SignIn(Guesser, "pw"));
+        Assert.Contains("<p class=\"bad\">Too many wrong passwords.<br>Try again in 10 minutes.</p>", (await From(c, Guesser, "/login")).Body);
+        Assert.Equal((401, $"{{\"detail\":\"{Wait}\"}}"), await Key(Guesser, "pw"));
+        Assert.Equal("600", (await From(c, Guesser, "/api/health", key: "pw")).RetryAfter);
+        for (int i = 0; i < PasswordTries.Most; i++) await c.Client.SendAsync(Req(HttpMethod.Get, "/api/health", "guess" + i));
+        Assert.Equal("wrong password", (await Assert.ThrowsAsync<InvalidOperationException>(() => LibraryApi.CheckServerAsync("http://localhost", "pw", c.Client))).Message);
+
+        // The student, anywhere else, is let in as ever; so is a laptop there, however often it asks.
+        Assert.Equal("/", await SignIn(Student, "pw"));
+        Assert.DoesNotContain("Too many", (await From(c, Student, "/login")).Body);
+        for (int i = 0; i < 30; i++) Assert.Equal((200, ""), await Key(Student, "pw"));
+
+        // This computer is never counted: its pages need no password, and its own apps' wrong keys are only wrong.
+        for (int i = 0; i < 30; i++) Assert.Equal((401, WrongKey), await Key(Here, "guess" + i));
+        Assert.Equal((200, ""), await Key(Here, "pw"));
+        Assert.Equal(200, (await From(c, Here, "/settings")).Status);
+
+        // Through Tailscale Serve everyone arrives from this computer, named by the header Serve writes. A laptop
+        // that still has the old password asks with it on a timer: one wrong password, however often, is one try,
+        // so it's told "wrong password" as it always was and the new one works the moment it's typed.
+        for (int i = 0; i < 30; i++) Assert.Equal((401, WrongKey), await Key(Here, "last-terms", forwardedFor: "100.64.0.7"));
+        Assert.Equal((200, ""), await Key(Here, "pw", forwardedFor: "100.64.0.7"));
+        // Someone guessing through Serve is shut out by the address Serve names, whatever they put before it.
+        for (int i = 0; i < PasswordTries.Most; i++) await Key(Here, "guess" + i, forwardedFor: "100.64.0.7, 100.64.0.8");
+        Assert.Equal(401, (await Key(Here, "pw", forwardedFor: "100.64.0.8")).Item1);
+        Assert.Equal((200, ""), await Key(Here, "pw", forwardedFor: "100.64.0.7"));
+
+        // An IPv6 sender has a whole network of addresses to send from: they're counted as one.
+        for (int i = 0; i < PasswordTries.Most; i++) await Key("2001:db8:85a3:7::" + (i + 1), "guess" + i);
+        Assert.Equal(401, (await Key("2001:db8:85a3:7:ffff::9", "pw")).Item1);
+        Assert.Equal((200, ""), await Key("2001:db8:85a3:8::1", "pw"));
+
+        // After the wait the right password works there again.
+        now += PasswordTries.Window - TimeSpan.FromSeconds(1);
+        Assert.Contains("Try again in 1 minute.", (await From(c, Guesser, "/login")).Body);
+        now += TimeSpan.FromSeconds(1);
+        Assert.Equal("/", await SignIn(Guesser, "pw"));
     }
 
     // --- the API the laptop talks to -----------------------------------------------------------------------------

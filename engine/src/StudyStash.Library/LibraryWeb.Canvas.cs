@@ -25,15 +25,16 @@ public sealed partial class LibraryWeb
     /// <summary>The extension's key (X-Study-Stash-Key), or the library password like the rest of the API. An
     /// extension with another key (an old registration, or another library's) is turned away even when the library
     /// has no password: it would otherwise look connected while the student's Chrome can't be told apart from a
-    /// stale one. When it last knocked is kept, so the app can say to connect it again.</summary>
+    /// stale one. When it last knocked is kept, so the app can say to connect it again. A key that isn't the
+    /// extension's may be a try at the password, so it's counted as one like any other.</summary>
     IResult? RequireExtension(HttpContext ctx)
     {
         string given = ctx.Request.Headers["X-Study-Stash-Key"].ToString();
         if (CanvasSettings.KeyMatches(cfg.Home, given)) return null;
-        if (given.Length > 0 && !(cfg.PoolPassword.Length > 0 && Same(given, cfg.PoolPassword)))
+        if (given.Length > 0 && (cfg.PoolPassword.Length > 0 ? WrongKey(ctx, given, "Wrong key.") : Http.Detail(401, "Wrong key.")) is { } refused)
         {
             refusedAt = Canvas.Clock().ToString("o", CultureInfo.InvariantCulture);
-            return Http.Detail(401, "Wrong key.");
+            return refused;
         }
         return RequireKey(ctx);
     }

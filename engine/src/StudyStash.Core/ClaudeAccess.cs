@@ -99,7 +99,6 @@ public sealed class ClaudeAccess
     readonly Func<DateTimeOffset> clock;
     readonly Lock gate = new();
     readonly ConcurrentDictionary<string, ClaudeCode> codes = new();
-    readonly List<double> failures = [];
     State state;
     DateTime loadedAt;
 
@@ -341,21 +340,6 @@ public sealed class ClaudeAccess
     }
 
     // --- signing in -------------------------------------------------------------------------------------------------
-
-    /// <summary>Too many wrong passwords lately: the sign-in page refuses for a while (it's on the internet).</summary>
-    public bool LockedOut()
-    {
-        lock (gate)
-        {
-            failures.RemoveAll(t => Now - t > 900);
-            return failures.Count >= 8;
-        }
-    }
-
-    public void Failed()
-    {
-        lock (gate) failures.Add(Now);
-    }
 
     /// <summary>A code for a sign-in just allowed: for this client, back to the redirect exactly as asked, for the MCP
     /// address <paramref name="resource"/>.</summary>

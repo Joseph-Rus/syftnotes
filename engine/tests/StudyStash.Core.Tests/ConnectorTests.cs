@@ -51,6 +51,8 @@ public class ConnectorTests
         public readonly Config Cfg;
         public readonly Store Store;
         public readonly ClaudeAccess Access;
+        /// <summary>Wrong passwords, counted on the door's clock, with no holding an answer back.</summary>
+        public readonly PasswordTries Tries;
         public readonly Dictionary<string, string> Docs = [];
         public readonly List<string> Fetched = [];
         public DateTimeOffset Now = DateTimeOffset.Parse("2026-09-23T10:00:00Z");
@@ -69,6 +71,7 @@ public class ConnectorTests
             };
             Directory.CreateDirectory(Cfg.Home);
             Store = new Store(Cfg.DbPath, Cfg.PoolDir);
+            Tries = new PasswordTries(() => Now, (_, _) => Task.CompletedTask);
             Access = new ClaudeAccess(Cfg.Home, () => Now)
             {
                 FetchClientDocument = (url, _) =>
@@ -91,7 +94,7 @@ public class ConnectorTests
                 index = new StudyStash.Core.Ai.FileIndex(door.Cfg.Home, () => files, () => []);
                 await index.UpdateAsync();
             }
-            door.Site = await TestSite.StartAsync(b => ClaudeWeb.Build(b, door.Cfg, new LibraryReader(door.Cfg, door.Store), door.Access, sync, index));
+            door.Site = await TestSite.StartAsync(b => ClaudeWeb.Build(b, door.Cfg, new LibraryReader(door.Cfg, door.Store), door.Access, sync, index, door.Tries));
             return door;
         }
 
@@ -116,7 +119,7 @@ public class ConnectorTests
             var builder = WebApplication.CreateSlimBuilder();
             builder.WebHost.UseUrls("http://127.0.0.1:0");
             builder.Logging.ClearProviders();
-            door.live = ClaudeWeb.Build(builder, door.Cfg, new LibraryReader(door.Cfg, door.Store), door.Access);
+            door.live = ClaudeWeb.Build(builder, door.Cfg, new LibraryReader(door.Cfg, door.Store), door.Access, tries: door.Tries);
             await door.live.StartAsync();
             door.Port = new Uri(door.live.Urls.Single()).Port;
             return door;
@@ -528,10 +531,15 @@ public class ConnectorTests
         Assert.Contains("role=\"alert\"", wrongHtml);
         Assert.Contains("That isn&#x27;t your library password. Try again.", wrongHtml);
 
-        for (int i = 0; i < 8; i++) door.Access.Failed();
+        for (int i = 1; i < PasswordTries.Most; i++) await c.PostAsync("/authorize", Form([.. fields, ("password", "nope" + i), ("decision", "allow")]));
         var locked = await c.PostAsync("/authorize", Form([.. fields, ("password", "pw"), ("decision", "allow")]));
         Assert.Equal((HttpStatusCode)429, locked.StatusCode);
-        Assert.Contains("Too many wrong tries. Wait 15 minutes, then connect from Claude again.", await locked.Content.ReadAsStringAsync());
+        Assert.Equal("600", locked.Headers.GetValues("Retry-After").Single());
+        Assert.Contains("Too many wrong passwords. Try again in 10 minutes.", await locked.Content.ReadAsStringAsync());
+        door.Now += PasswordTries.Window - TimeSpan.FromSeconds(30);
+        Assert.Contains("Try again in 1 minute.", await (await c.PostAsync("/authorize", Form([.. fields, ("password", "pw"), ("decision", "allow")]))).Content.ReadAsStringAsync());
+        door.Now += TimeSpan.FromSeconds(30);
+        Assert.Equal(HttpStatusCode.Redirect, (await c.PostAsync("/authorize", Form([.. fields, ("password", "pw"), ("decision", "allow")]))).StatusCode);
 
         door.Cfg.PoolPassword = "";
         var noPassword = await c.GetAsync("/authorize?" + Query(fields));

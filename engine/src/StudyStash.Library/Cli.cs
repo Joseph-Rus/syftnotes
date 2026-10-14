@@ -194,6 +194,8 @@ public static class Cli
             // Settings' "Update now": on a Mac or Linux this restarts the service onto the new version, this copy included.
             // One record of who may read through Claude, for the library's Settings and for Claude's door alike.
             var access = new ClaudeAccess(home);
+            // One count of wrong passwords, for the library's own doors and for Claude's.
+            var tries = new PasswordTries();
             // Search over files that aren't lectures (the Canvas mirror, the AI's files, readable folders).
             var fileIndex = LibraryWeb.MakeFileIndex(cfg, store);
             var indexing = fileIndex.RunAsync(Console.WriteLine, stop.Token);
@@ -212,14 +214,14 @@ public static class Cli
                 Apply = (rel, h) => Updates.ApplyAsync(rel, h, UpdateHost.ThisComputer()), Claude = access, Reach = ClaudeReach.ThisComputer(), WebCheck = ReachCheck.ThisComputer(),
                 AskChat = ai.Ask(() => cfg), Ai = ai, Diagrams = diagrams, Canvas = canvas, Scout = scout, Files = fileIndex,
                 Inbox = new Inbox(cfg.PoolDir, () => cfg.ClassNames(), c => store.ClassDir(c), ai, new History(cfg.PoolDir)),
-                StartAtLogin = LoginItems?.Invoke(home),
+                StartAtLogin = LoginItems?.Invoke(home), Tries = tries,
             });
             await app.StartAsync(stop.Token);
             // Claude's door: MCP and its sign-in, on this computer only; Tailscale Serve or Funnel passes it on when that's on.
             var claudeBuilder = WebApplication.CreateSlimBuilder();
             claudeBuilder.Logging.ClearProviders();
             claudeBuilder.WebHost.ConfigureKestrel(k => ClaudeWeb.ListenHere(k, ClaudeWeb.PortFor(cfg)));
-            var claude = ClaudeWeb.Build(claudeBuilder, cfg, new LibraryReader(cfg, store), access, canvas, fileIndex);
+            var claude = ClaudeWeb.Build(claudeBuilder, cfg, new LibraryReader(cfg, store), access, canvas, fileIndex, tries);
             try
             {
                 await claude.StartAsync(stop.Token);

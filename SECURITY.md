@@ -10,11 +10,14 @@ within a week.
 
 - **The library** is protected by one password, sent over your own network or Tailscale. It's
   plain http, so keep it on Tailscale or a network you trust; don't expose its port to the
-  internet.
+  internet. Wrong passwords are counted by the address they come from: after ten different ones
+  in ten minutes, nothing from that address is looked at until the oldest is ten minutes old, at
+  every door the password opens. Each browser sign-in has its own secret (only a hash is kept):
+  Log out ends it on the library, and a new password ends them all.
 - **Claude's own door** (for claude.ai, over Tailscale Funnel) is a separate OAuth 2.1
   authorization server: authorization code with PKCE, short-lived access tokens with rotating
-  refresh tokens, and dynamic client registration. Only token hashes are kept, and repeated wrong
-  sign-in attempts are slowed down. A token made by hand in Settings, for another MCP client, can
+  refresh tokens, and dynamic client registration. Only token hashes are kept, and wrong passwords
+  on its sign-in page are counted and refused the same way, by address. A token made by hand in Settings, for another MCP client, can
   be revoked on its own.
 - **Secrets stay on your own computer.** The library's config and its Claude access file are
   written readable by you only.

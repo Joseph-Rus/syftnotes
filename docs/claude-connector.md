@@ -186,7 +186,7 @@ A sign-in also ends on its own after 30 days without use.
 | "The internet can't find … yet" right after turning it on | A new Funnel name takes a minute or two to reach public DNS. Wait, then choose **Check again**. If Claude already tried and failed, wait about 5 minutes before choosing Connect in Claude again, because Claude remembers what it found for a few minutes. |
 | "… answers, but not with Study Stash" | Something else is using port 443 on this computer through Tailscale. Turn the Claude switch off (this also clears a Tailscale Serve setup on port 443), then on again. |
 | Claude says it couldn't connect, but the card says it's reachable | Check that the URL in Claude ends in `/mcp` and starts with `https://`. Remove the connector in Claude and add it again. |
-| "That isn't your library password" | This is the library password from Settings → Library, not your Tailscale or Claude password. After 8 wrong tries, the sign-in waits 15 minutes. |
+| "That isn't your library password" | This is the library password from Settings → Library, not your Tailscale or Claude password. After 10 different wrong passwords from one place, the sign-in stops looking at passwords from there for up to 10 minutes, and says how long ("Too many wrong passwords. Try again in 10 minutes."). Signing in from anywhere else isn't held up by it. |
 | "Your library has no password yet" | Set one in Study Stash → Settings → Library. The switch can't be turned on without it. |
 
 Things you don't need to change:
