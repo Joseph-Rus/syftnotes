@@ -129,8 +129,13 @@ public static class Engines
 
     // --- reading an error for what it means, never for who's right -------------------------------------------
 
-    static readonly Regex AuthLike = new(@"not (logged|signed) in|log ?in|sign ?in|authenticat|unauthori[sz]ed|\b401\b|api key|credential",
+    // A sign-in that ran out is said without "log in" too: "OAuth token has expired. Please obtain a new token…".
+    static readonly Regex AuthLike = new(@"not (logged|signed) in|log ?in|sign ?in|authenticat|unauthori[sz]ed|\b401\b|api key|credential|oauth|token (has )?(expired|been revoked)|session (has )?expired",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    // A key that's turned down ("Invalid API key · Fix external API key") isn't fixed by signing in; a CLI that's signed
+    // out says "api key" too, but with its /login.
+    static readonly Regex KeyRefused = new(@"api key", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    static readonly Regex LoginLike = new(@"log ?in", RegexOptions.IgnoreCase | RegexOptions.Compiled);
     static readonly Regex LimitLike = new(@"usage limit|rate limit|quota|limit reached|too many requests|\b429\b|resets? (at|in)",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
     static readonly Regex InDuration = new(@"in (\d+)\s*(hour|minute)s?", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -138,6 +143,35 @@ public static class Engines
 
     public static bool LooksLikeAuth(string error) => AuthLike.IsMatch(error);
     public static bool LooksLikeLimit(string error) => LimitLike.IsMatch(error);
+
+    /// <summary>Whether an AI's error means the student has to sign in to it again (signed out, or its sign-in ran
+    /// out): an auth error that isn't a turned-down API key.</summary>
+    public static bool LooksSignedOut(string error) =>
+        LooksLikeAuth(error) && !(KeyRefused.IsMatch(error) && !LoginLike.IsMatch(error));
+
+    const string SignInAgain = " needs you to sign in again.";
+    const string NotesBecause = "Your notes weren't written because ";
+    const string RewriteBecause = "The notes weren't rewritten because ";
+
+    /// <summary>Why a lecture has no notes when the AI that writes them needs signing in again, kept as the lecture's
+    /// own reason so the app, the phone and the library's pages all say it. Once the AI answers again the library
+    /// writes those notes by itself (<see cref="AiJobs.SignedInAgain"/>, <see cref="Store.RequeueSignedIn"/>).</summary>
+    public static string NotesNeedSignIn(string name) =>
+        $"{NotesBecause}{name}{SignInAgain} Sign in from Settings → Your AI, and they're written then.";
+
+    /// <summary>The same for notes that were to be written again: the ones there stay as they were.</summary>
+    public static string RewriteNeedsSignIn(string name) =>
+        $"{RewriteBecause}{name}{SignInAgain} Sign in from Settings → Your AI, then rewrite them.";
+
+    /// <summary>The AI a lecture's reason says needs signing in again (<see cref="NotesNeedSignIn"/>,
+    /// <see cref="RewriteNeedsSignIn"/>), or null when the reason is anything else.</summary>
+    public static string? NeedsSignIn(string why)
+    {
+        string start = why.StartsWith(NotesBecause, StringComparison.Ordinal) ? NotesBecause
+            : why.StartsWith(RewriteBecause, StringComparison.Ordinal) ? RewriteBecause : "";
+        int end = start.Length > 0 ? why.IndexOf(SignInAgain, start.Length, StringComparison.Ordinal) : -1;
+        return end > start.Length ? why[start.Length..end] : null;
+    }
 
     /// <summary>When a usage limit's error ("resets at 3pm", "at 3:00 PM", "in 2 hours") lasts until: that time
     /// today (tomorrow if it's already past), or an hour from now when nothing in the message says.</summary>

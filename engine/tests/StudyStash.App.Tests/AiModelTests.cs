@@ -396,6 +396,45 @@ public class AiSetupModelTests
         };
     }
 
+    /// <summary>Sign in opens a terminal, and nothing tells the app when the student has signed in there: the button
+    /// becomes Check, which finds Claude ready (and the library writes the notes it missed); still signed out, Sign in
+    /// comes back. The same on Settings' card.</summary>
+    [AvaloniaFact]
+    public async Task Sign_in_becomes_Check_until_Claude_is_signed_in()
+    {
+        var signedOut = With(("claude", "not_signed_in")) with { Problems = [new AiProblemInfo("not_signed_in:claude", "not_signed_in", "claude", "Claude")] };
+        var ready = With(("claude", "ready")) with { Problems = [] };
+        bool signedIn = false;
+        var lib = new FakeAiLibrary
+        {
+            Overview = signedOut,
+            OnSignIn = _ => new AiSaid("Opened Terminal to sign in to Claude.", signedOut),
+            OnCheck = (_, _) => signedIn ? new AiSaid("Claude is ready.", ready) : new AiSaid("Not logged in · Please run /login", signedOut),
+        };
+        var model = new AiEnginesModel(lib);
+        await model.Load();
+        AiEngineRow Claude() => model.Engines.Single(r => r.Id == "claude");
+        Assert.Equal("Sign in", Claude().ActionWords);
+
+        await Claude().ActCommand.ExecuteAsync(null);
+        Assert.Equal("Check", Claude().ActionWords);
+        await Claude().ActCommand.ExecuteAsync(null); // not signed in yet: Sign in again
+        Assert.Equal("Sign in", Claude().ActionWords);
+        await Claude().ActCommand.ExecuteAsync(null);
+        signedIn = true;
+        await Claude().ActCommand.ExecuteAsync(null);
+        Assert.Equal("ready", Claude().State);
+        Assert.Equal(2, lib.Calls.Count(c => c.StartsWith("check", StringComparison.Ordinal)));
+
+        var card = new AiProblemsModel(new FakeAiLibrary { Overview = signedOut, OnSignIn = _ => new AiSaid("", signedOut), OnCheck = (_, _) => new AiSaid("", ready) });
+        await card.Load();
+        Assert.Equal("Sign in", card.Problems.Single().PrimaryWords);
+        await card.Problems.Single().PrimaryCommand!.ExecuteAsync(null);
+        Assert.Equal("Check", card.Problems.Single().PrimaryWords);
+        await card.Problems.Single().PrimaryCommand!.ExecuteAsync(null);
+        Assert.Empty(card.Problems);
+    }
+
     [AvaloniaFact]
     public async Task Claude_Code_and_Codex_show_the_makers_commands_to_install_and_sign_in()
     {

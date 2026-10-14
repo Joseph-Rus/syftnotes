@@ -82,8 +82,8 @@
             <Button Name="HaveIt" Classes="cv-quiet" HorizontalAlignment="Left" Command="{Binding HaveItCommand}" IsVisible="{Binding ShowHaveIt}"><TextBlock Classes="cv-link" Text="{Binding HaveItLabel}" /></Button>
           </StackPanel>
           <TextBlock Classes="cv-step-body" Text="{Binding BrowserHelp}" />
-          <!-- Chrome's family: three pictures of its extensions page -->
-          <StackPanel Spacing="12" IsVisible="{Binding IsChromium}">
+          <!-- The folder (Opera, Chromium, or a student who chose it): three pictures of the browser's extensions page -->
+          <StackPanel Spacing="12" IsVisible="{Binding FromFolder}">
           <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
             <Border Classes="cv-illus" Height="84">
               <StackPanel Spacing="10">
@@ -117,26 +117,26 @@
             <Grid Grid.Column="2" ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding PickCaption}" TextWrapping="Wrap" /></Grid>
           </Grid>
           </StackPanel>
-          <!-- Firefox's family: three steps, and the code its second step pastes -->
-          <StackPanel Spacing="8" IsVisible="{Binding IsFirefox}">
-            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="1" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding FirefoxStep1}" TextWrapping="Wrap" /></Grid>
-            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="2" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding FirefoxStep2}" TextWrapping="Wrap" /></Grid>
+          <!-- The store (the Chrome Web Store, or Mozilla's for Firefox's family): three steps, and the code its second step pastes -->
+          <StackPanel Spacing="8" IsVisible="{Binding FromStore}">
+            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="1" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding StoreStep1}" TextWrapping="Wrap" /></Grid>
+            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="2" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding StoreStep2}" TextWrapping="Wrap" /></Grid>
             <Border Classes="cv-code" Margin="14,0,0,0" IsVisible="{Binding ShowCode}">
               <Grid ColumnDefinitions="*,10,Auto">
                 <SelectableTextBlock AutomationProperties.Name="Connection code" Text="{Binding ConnectionCode}" />
                 <Button Grid.Column="2" Classes="cv-btn cv-mini" VerticalAlignment="Top" Command="{Binding CopyCodeCommand}"><TextBlock Text="{Binding CopyLabel}" /></Button>
               </Grid>
             </Border>
-            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding FirefoxStep3}" TextWrapping="Wrap" /></Grid>
+            <Grid ColumnDefinitions="14,*"><TextBlock Classes="cv-caption-num" Text="3" /><TextBlock Grid.Column="1" Classes="cv-caption" Text="{Binding StoreStep3}" TextWrapping="Wrap" /></Grid>
           </StackPanel>
-          <!-- Quiet links: the folder and the extensions page again (or the add-on again), and another browser when there is one -->
+          <!-- Quiet links: the folder and the extensions page again (or the store's page again), and another browser when there is one -->
           <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowLinks}">
             <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding ShowFolderLinks}">
               <Button Classes="cv-quiet" Command="{Binding ShowFolderCommand}"><TextBlock Classes="cv-link" Text="Show the folder again" /></Button>
               <TextBlock Classes="cv-link-sep" Text="·" />
               <Button Classes="cv-quiet" Command="{Binding OpenExtensionsCommand}"><TextBlock Classes="cv-link" Text="{Binding OpenExtensionsLabel}" /></Button>
             </StackPanel>
-            <Button Classes="cv-quiet" IsVisible="{Binding ShowAddOnLink}" Command="{Binding OpenAddOnCommand}"><TextBlock Classes="cv-link" Text="Open the add-on again" /></Button>
+            <Button Classes="cv-quiet" IsVisible="{Binding ShowAddOnLink}" Command="{Binding OpenAddOnCommand}"><TextBlock Classes="cv-link" Text="{Binding AddOnAgainLabel}" /></Button>
             <TextBlock Classes="cv-link-sep" Text="·" IsVisible="{Binding ShowSwitchAfterLinks}" />
             <Button Name="OtherBrowser" Classes="cv-quiet" IsVisible="{Binding CanSwitchBrowser}">
               <TextBlock Classes="cv-link" Text="Use another browser" />
@@ -145,6 +145,8 @@
               </Button.Flyout>
             </Button>
           </StackPanel>
+          <!-- The Chrome Web Store wouldn't do (a school's Chrome may not install from it): the folder instead, or back to the store -->
+          <Button Name="OtherWay" Classes="cv-quiet" HorizontalAlignment="Left" IsVisible="{Binding ShowOtherWay}" Command="{Binding OtherWayCommand}"><TextBlock Classes="cv-link" Text="{Binding OtherWayLabel}" /></Button>
           <TextBlock Classes="cv-help" Text="{Binding BrowserError}" IsVisible="{Binding BrowserError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
         <Border Classes="cv-sep" />

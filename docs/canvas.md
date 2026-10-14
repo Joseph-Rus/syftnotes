@@ -191,9 +191,11 @@ error "Chrome isn't signed in to Canvas.", and a file read that Canvas refused s
 ## The extension
 
 `extension/` is a Manifest V3 extension (version **1.6**; it has its own version, separate from the app's). The same
-files run in Chrome 120 or later and the browsers built on it (Edge, Brave, Arc, Opera, Vivaldi), which load the folder
-described here, and in Firefox 140 or later and the browsers built on it (Zen, LibreWolf, Waterfox), which take a
-packed, signed copy connected by a pasted code instead: [firefox-add-on.md](firefox-add-on.md). Wherever this page
+files run in Chrome 120 or later and the browsers built on it (Edge, Brave, Arc, Opera, Vivaldi), and in Firefox 140 or
+later and the browsers built on it (Zen, LibreWolf, Waterfox). Chrome, Edge, Brave, Arc and Vivaldi add the copy
+published on the Chrome Web Store ([chrome-web-store.md](chrome-web-store.md)), and Firefox's family the one on
+Mozilla's site ([firefox-add-on.md](firefox-add-on.md)), each connected by a pasted code. Opera and Chromium, and a
+student whose Chrome won't install from the store, load the folder described here. Wherever this page
 says Chrome, any browser of its family does the same. The engine carries it as embedded resources (`extension/<file>` in `StudyStash.Core`), and
 `Extension.Ensure(dir, library, key, canvasUrl)` writes it out as a folder for Chrome's "Load unpacked": the scripts
 (`background.js`, `connection.js`, the popup, the "S." icons that `macos/make_icon.swift out.chrome` draws), a manifest,
@@ -214,8 +216,10 @@ for that.
 The same files also pack as a **Chrome Web Store** zip (`StudyStash extension-zip OUT.zip`, `Extension.PackForStore`):
 no config files, no `host_permissions`, `optional_host_permissions` for any site instead. A store copy connects by a
 pasted code (`connection_code`, base64url of `config.json`) and asks Chrome for its three sites in that click. Its
-extra status is `no_access` (connected, but Chrome hasn't allowed the sites). See
-[chrome-web-store.md](chrome-web-store.md); nothing is published.
+extra status is `no_access` (connected, but Chrome hasn't allowed the sites). Version 1.6 is published (Unlisted), and
+the app's Canvas step offers it first: [chrome-web-store.md](chrome-web-store.md). A store copy never reloads itself
+from a folder; its store updates it, so the library never calls it outdated (`CanvasSettings.ExtensionOutdated` is
+only for a copy from before protocol 2, which can't reload itself either).
 
 **Permissions stay minimal.** `permissions` is `["alarms", "storage"]` (the 30-second alarm; the extension's own status
 and reload guard) and nothing else: no tabs, cookies or content scripts. `host_permissions` is empty in the repo;
@@ -341,7 +345,10 @@ What protocol 2 (1.3) does, answer by answer (all kept in 1.4):
   shows `"extension_update": {"from","to","at"}` until `POST /api/v2/canvas {"dismiss_update": true}` (design 08's
   "Extension updated" state: "The Chrome extension updated itself", "Now version 1.4. Nothing to do.", Dismiss; the
   version is `to`). `extension_latest` is the library's version and
-  `extension_outdated` is true while the running one is older, compared as versions (1.10 is newer than 1.9).
+  `extension_outdated` is true while the running one is older, compared as versions (1.10 is newer than 1.9), and
+  can't bring itself up to date: only a copy from before protocol 2 (1.3). A later folder's copy reloads itself, and a
+  store's copy (Chrome Web Store, Firefox) is updated by its store, often days after a new Study Stash has a newer
+  folder; neither is ever told to reload by hand.
 
 ### Setting it up, and the folder's life
 
@@ -356,9 +363,10 @@ There is no "Make it" step anywhere: each computer's folder is written and kept 
    library as the laptop reaches it (`CanvasClient.ServerUrl`), the key and the Canvas address. It writes again when
    any of those or the extension version changes, and never when nothing did. When the app and the library share a
    computer and a folder, it only reports the library's own.
-3. **The student** loads the folder once in Chrome (chrome://extensions, Developer mode, Load unpacked, or drags the
-   folder onto that page), or installs
-   the Chrome Web Store copy and pastes the code (`connection_code`, `ExtensionKeeper.ConnectionCode`). The screens
+3. **The student** installs the Chrome Web Store copy and pastes the code (`connection_code`,
+   `ExtensionKeeper.ConnectionCode`), which the Canvas step offers first in Chrome, Edge, Brave, Arc and Vivaldi; or
+   (Opera, Chromium, a Chrome that won't install from the store) loads the folder once (chrome://extensions, Developer
+   mode, Load unpacked, or drags the folder onto that page). The screens
    can show "Add to Chrome" until `connected` (a check-in within 90 s for protocol 3), then which Chrome it is
    (`seen_where`).
 4. **After that, nothing by hand.** A folder rewritten with new host permissions or a new version reloads the running

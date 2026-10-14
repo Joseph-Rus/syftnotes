@@ -211,6 +211,16 @@ public static class Extension
     public static IReadOnlyList<string> StoreFiles() =>
         [.. Files().Where(f => f is not ("config.js" or "config.json")).Order(StringComparer.Ordinal)];
 
+    /// <summary>The Chrome Web Store copy's ID (from the item's own key, so it never changes). An unpacked folder's
+    /// copy has another, made from its folder's path: nothing in the extension, the library or the app goes by
+    /// either (docs/chrome-web-store.md, "The extension's ID").</summary>
+    public const string ChromeStoreId = "dfhoenhdjjbnopbepgkgjdgdnfmecjjd";
+
+    /// <summary>The store copy's page on the Chrome Web Store (Unlisted: only someone with the link finds it), which
+    /// Add to Chrome opens in Chrome, Edge, Brave, Arc and Vivaldi. "" here sends them back to the folder
+    /// (docs/chrome-web-store.md).</summary>
+    public const string ChromeStorePublishedAt = "https://chromewebstore.google.com/detail/study-stash-for-canvas/" + ChromeStoreId;
+
     /// <summary>The add-on's ID in Firefox: Mozilla signs the add-on under it, and an update must carry the same one,
     /// so it never changes once the add-on is published.</summary>
     public const string FirefoxId = "canvas@study-stash-app.web.app";

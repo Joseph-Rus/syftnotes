@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Sockets;
+using StudyStash.Core.Ai;
 
 namespace StudyStash.Core;
 
@@ -105,6 +106,13 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
                 string why = named > 0 && model.StartsWith(e.Message[..named], StringComparison.Ordinal) ? e.Message[(named + 2)..] : e.Message;
                 unwritten = Sentence($"{model} couldn't rewrite the notes: {why}");
                 log($"[pipeline] {error}");
+                // An AI that needs signing in again: its own words ("Not logged in · Please run /login") don't tell a
+                // student why their notes aren't there or what to do, so the lecture says it plainly.
+                if (Engines.WhoWrote(model) is { Length: > 0 } who && who != "Ollama" && Engines.LooksSignedOut(e.Message))
+                {
+                    error = Engines.NotesNeedSignIn(who);
+                    unwritten = Engines.RewriteNeedsSignIn(who);
+                }
                 summary = model = "";
             }
         }

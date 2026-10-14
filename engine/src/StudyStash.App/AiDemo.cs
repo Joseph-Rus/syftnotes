@@ -230,6 +230,15 @@ public static class AiDemo
     // 18 · AI problems: the design's six, plus the app's own library-offline and rewrite-failed and a compare view.
     // -----------------------------------------------------------------------------------------------------------
 
+    /// <summary>Claude signed out while it writes the notes, with nothing standing in: Settings' card, with Sign in.</summary>
+    public static AiProblemsModel SignedOut()
+    {
+        var overview = Overview() with { Problems = [new AiProblemInfo("not_signed_in:claude", "not_signed_in", "claude", "Claude")] };
+        var m = new AiProblemsModel(new Library(overview));
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
     /// <summary>The design's six problems, in its own order (row-major into the sheet's two columns).</summary>
     public static AiProblemsModel Problems()
     {

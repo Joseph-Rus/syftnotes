@@ -106,7 +106,8 @@ public static partial class Shell
         host.Filed += l => Dispatcher.UIThread.Post(() =>
         {
             var (title, text, action) = NoticeWords.Filed(l.FiledClass, l.FiledTitle, l.Error);
-            Toast(title, text, action, () => OpenLecture(l.Id));
+            // Notes that wait for a sign-in: the button goes to where it's done; the lecture's page says the same.
+            Toast(title, text, action, Core.Ai.Engines.NeedsSignIn(l.Error) is null ? () => OpenLecture(l.Id) : () => ShowSettings("AI"));
             RequestLibraryReload();
         });
         host.Problem += (title, why) => Dispatcher.UIThread.Post(() =>
