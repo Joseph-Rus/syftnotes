@@ -28,6 +28,12 @@ public sealed partial class ModelChoice : ObservableObject
     public string Line => Why.Length > 0 ? Why : Model.About;
     [ObservableProperty] public partial bool Chosen { get; set; }
     [ObservableProperty] public partial bool Here { get; set; }
+    /// <summary>Downloaded and not the one in use: its Remove frees the space. (Cactus Whistle comes with the app:
+    /// nothing to free. The one in use is changed first, by picking another.)</summary>
+    public bool CanRemove => Here && !Chosen && !Model.Bundled;
+    public string RemoveSaid => $"Remove {Name} from this computer";
+    partial void OnChosenChanged(bool value) => OnPropertyChanged(nameof(CanRemove));
+    partial void OnHereChanged(bool value) => OnPropertyChanged(nameof(CanRemove));
 
     /// <summary>The models to offer, the one in use (<paramref name="chosen"/>) marked: Whisper tiny is only for
     /// trying things out, so it's there only when it's the one in use, and Cactus Whistle only where this copy of the
@@ -179,23 +185,17 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     public double ModelBarWidth => Math.Clamp(ModelProgress, 0, 1) * 480;
     partial void OnModelProgressChanged(double value) => OnPropertyChanged(nameof(ModelBarWidth));
     readonly ModelAdvice advice;
-    /// <summary>Models downloaded here but not in use (after a switch): offered for removal, never removed unasked.</summary>
+    /// <summary>Models downloaded here but not in use (after a switch): each has its own Remove in the list, never
+    /// removed unasked.</summary>
     [ObservableProperty] public partial string SpareLine { get; set; } = "";
-    public bool HasSpare => SpareLine.Length > 0 && !ConfirmingRemove;
-    /// <summary>Remove was pressed: the question, with Remove and Keep them.</summary>
+    /// <summary>A model's Remove was pressed: the question about that one, with Remove and Keep.</summary>
     [ObservableProperty] public partial bool ConfirmingRemove { get; set; }
-    public string RemoveQuestion => spare.Count switch
-    {
-        0 => "",
-        1 => $"Remove {spare[0].Name} from this computer? It frees {WhisperModel.SizeOf(spare[0].Bytes)}, and you can download it again any time.",
-        _ => $"Remove {string.Join(" and ", spare.Select(m => m.Name))} from this computer? They free {WhisperModel.SizeOf(spare.Sum(m => m.Bytes))}, and you can download them again any time.",
-    };
-    partial void OnSpareLineChanged(string value) => OnPropertyChanged(nameof(HasSpare));
-    partial void OnConfirmingRemoveChanged(bool value)
-    {
-        OnPropertyChanged(nameof(HasSpare));
-        OnPropertyChanged(nameof(RemoveQuestion));
-    }
+    /// <summary>The model the question is about.</summary>
+    WhisperModel? removing;
+    public string RemoveQuestion => removing is { } m
+        ? $"Remove {m.Name} from this computer? It frees {WhisperModel.SizeOf(m.Bytes)}, and you can download it again here any time."
+        : "";
+    partial void OnConfirmingRemoveChanged(bool value) => OnPropertyChanged(nameof(RemoveQuestion));
     List<WhisperModel> spare = [];
     [ObservableProperty] public partial string Language { get; set; } = "";
     /// <summary>When a lecture is written down: as it records (the recorder's transcript and chat), or after class
@@ -541,14 +541,18 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         ModelLine = ModelWords(host);
         SpeakersLine = SpeakersWords(host);
         LiveTranscriptLine = LiveTranscriptWords(host.Recorder.Current, host.Settings.LiveTranscript);
-        ModelAdviceLine = AdviceWords(host.Model, advice);
+        ModelAdviceLine = AdviceWords(host.Model, advice, WhisperModels.Heaviest(host.Hardware, host.ParakeetFits));
         ModelDownloading = host.Downloading is not null;
         ModelProgress = host.Downloading?.Fraction ?? 0;
         // Whistle comes with the app: it's never spare (nothing to free).
         spare = [.. WhisperModels.All.Where(m => !m.Bundled && m.Id != host.Model.Id && m.Id != host.DownloadingModel?.Id && WhisperModels.IsDownloaded(host.Home, m))];
         SpareLine = spare.Count == 0 ? ""
             : $"Also on this computer: {string.Join(", ", spare.Select(m => $"{m.Name} ({WhisperModel.SizeOf(m.Bytes)})"))}.";
-        if (spare.Count == 0) ConfirmingRemove = false;
+        if (removing is not null && !spare.Any(m => m.Id == removing.Id))
+        {
+            removing = null;
+            ConfirmingRemove = false;
+        }
         OnPropertyChanged(nameof(RemoveQuestion));
         foreach (var m in Models)
         {
@@ -570,8 +574,11 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
 
     /// <summary>Settings → Recording's line about the model for this computer: why it suits it, and when the one in use
     /// is heavier, that it may fall behind (never a switch: the student picks).</summary>
-    public static string AdviceWords(WhisperModel inUse, ModelAdvice advice) =>
-        WhisperModels.Heavier(inUse, advice.Model)
+    /// <remarks>Whether the one in use may fall behind is measured against the heaviest model this computer keeps up
+    /// with (<paramref name="keepsUp"/>), not against the one it starts on: that's picked for accuracy (Parakeet), and
+    /// the compact turbo a Mac had before keeps up there as well as ever.</remarks>
+    public static string AdviceWords(WhisperModel inUse, ModelAdvice advice, ModelAdvice keepsUp) =>
+        WhisperModels.Heavier(inUse, keepsUp.Model)
             ? $"{advice.Why} {inUse.Name} may fall behind a lecture here: pick {advice.Model.Name} to switch. The one you have stays."
             : advice.Why;
 
@@ -1016,18 +1023,32 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
         else _ = host.DownloadModelAsync(choice.Model);
     }
 
-    [RelayCommand] void AskRemoveSpare() => ConfirmingRemove = true;
+    /// <summary>A downloaded model's own Remove: asks first, under the list.</summary>
+    [RelayCommand]
+    void AskRemoveModel(ModelChoice choice)
+    {
+        if (!choice.CanRemove) return;
+        removing = choice.Model;
+        ConfirmingRemove = false; // the question is asked afresh, about this one
+        ConfirmingRemove = true;
+    }
 
-    [RelayCommand] void KeepSpare() => ConfirmingRemove = false;
+    [RelayCommand]
+    void KeepSpare()
+    {
+        removing = null;
+        ConfirmingRemove = false;
+    }
 
-    /// <summary>The student said yes: remove the models not in use.</summary>
+    /// <summary>The student said yes: the model asked about goes from this computer.</summary>
     [RelayCommand]
     void RemoveSpare()
     {
-        var problems = spare.Select(host.RemoveModel).OfType<string>().ToList();
+        string? problem = removing is { } m ? host.RemoveModel(m) : null;
+        removing = null;
         ConfirmingRemove = false;
         Refresh();
-        if (problems.Count > 0) ModelLine = string.Join(" ", problems);
+        if (problem is not null) ModelLine = problem;
     }
 
     /// <summary>Download (or try again now).</summary>

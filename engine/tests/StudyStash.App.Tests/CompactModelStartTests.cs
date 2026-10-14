@@ -4,8 +4,9 @@ using StudyStash.Audio;
 
 namespace StudyStash.App.Tests;
 
-/// <summary>Every computer starts on the compact large-v3 turbo, easy on the computer, unless it's too weak for it;
-/// the bigger models stay a choice. An install already on a bigger model its computer keeps up with keeps it, with no
+/// <summary>Every computer with the processor and memory for it starts on Parakeet, which makes the fewest mistakes
+/// (else the compact large-v3 turbo, easy on the computer, unless it's too weak for that); the other models stay a
+/// choice in Settings. An install already on a bigger model its computer keeps up with keeps it, with no
 /// word about it; one on more than its computer keeps up with hears about the heaviest that does, once.</summary>
 public class CompactModelStartTests
 {
@@ -22,14 +23,26 @@ public class CompactModelStartTests
     [Theory]
     [InlineData("apple silicon")]
     [InlineData("strong pc")]
-    [InlineData("plain pc")]
-    public void A_new_install_starts_on_the_compact_model(string computer)
+    [InlineData("pc with no card")]
+    public void A_new_install_starts_on_Parakeet(string computer)
     {
         using var home = new TempHome();
-        var hw = computer switch { "apple silicon" => FakeHardware.AppleSilicon(), "strong pc" => StrongPc(), _ => FakeHardware.PlainPc() };
+        var hw = computer switch { "apple silicon" => FakeHardware.AppleSilicon(), "strong pc" => StrongPc(), _ => FakeHardware.ProcessorPc() };
         using var host = Host(home, hw);
-        Assert.Same(WhisperModels.LargeV3TurboSmall, host.Model);
-        Assert.Same(WhisperModels.LargeV3TurboSmall, host.Advice.Model);
+        Assert.Same(WhisperModels.Parakeet, host.Model);
+        Assert.Same(WhisperModels.Parakeet, host.Advice.Model);
+    }
+
+    /// <summary>A lecture in a language Parakeet doesn't read starts on the compact model, as every computer did before.</summary>
+    [Fact]
+    public void A_new_install_in_a_language_Parakeet_does_not_read_or_with_too_little_memory_starts_on_the_compact_model()
+    {
+        using var home = new TempHome();
+        new AppSettings { Language = "ja" }.Save(home.Path);
+        using (var host = Host(home, FakeHardware.AppleSilicon())) Assert.Same(WhisperModels.LargeV3TurboSmall, host.Model);
+        using var small = new TempHome();
+        using var pc = Host(small, FakeHardware.PlainPc()); // 6 GB of memory
+        Assert.Same(WhisperModels.LargeV3TurboSmall, pc.Model);
     }
 
     [Fact]
@@ -92,15 +105,15 @@ public class CompactModelStartTests
     }
 
     [Fact]
-    public void Settings_offers_every_model_and_marks_the_compact_one_for_this_computer()
+    public void Settings_offers_every_model_and_marks_the_one_for_this_computer()
     {
         var advice = WhisperModels.Advise(FakeHardware.AppleSilicon().Probe());
         using var home = new TempHome();
         var choices = ModelChoice.For(WhisperModels.LargeV3, advice, home.Path).ToList();
         Assert.Equal(["large-v3", "large-v3-turbo", "large-v3-turbo-q5", "parakeet-v3", "small", "base", .. (WhistleTranscriber.Available ? ["whistle"] : Array.Empty<string>())], choices.Select(c => c.Model.Id));
         var marked = Assert.Single(choices, c => c.Recommended);
-        Assert.Same(WhisperModels.LargeV3TurboSmall, marked.Model);
-        Assert.StartsWith("The compact model keeps up with a lecture and leaves this Mac room", marked.Line, StringComparison.Ordinal);
+        Assert.Same(WhisperModels.Parakeet, marked.Model);
+        Assert.Equal("Parakeet writes a lecture down with the fewest mistakes, and keeps up easily on this Mac.", marked.Line);
         Assert.True(choices.Single(c => c.Model == WhisperModels.LargeV3).Chosen); // the one in use stays chosen
         Assert.Contains("heaviest", choices.Single(c => c.Model == WhisperModels.LargeV3).Line, StringComparison.Ordinal);
     }

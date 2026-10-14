@@ -66,7 +66,7 @@ public static class WhisperModels
     /// on two recorded lectures: 17% and 7% of words different, where the compact turbo differs on 13% and 6% and
     /// Whisper small on 20% and 9%.</summary>
     public static readonly WhisperModel Parakeet = new("parakeet-v3", "NVIDIA Parakeet v3", "parakeet-tdt-0.6b-v3", 2549800429, "",
-        "Nearly as accurate as the compact turbo, and quick on the processor alone: it doesn't need a graphics card. Writes whole sentences and never makes up words over silence. Reads English and 24 other European languages.")
+        "The fewest mistakes in English and most European languages, and quick on the processor alone: it doesn't need a graphics card. Writes whole sentences and never makes up words over silence. Reads English and 24 other European languages.")
     {
         Engine = SpeechEngine.Parakeet,
         Source = "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3/resolve/main",
@@ -137,24 +137,65 @@ public static class WhisperModels
     }
 
     /// <summary>
-    /// The model a computer starts on, and one plain line why: the compact large-v3 turbo, on every computer that keeps
-    /// up with it (Apple silicon and PCs with a strong graphics card too), because it's light on the computer and
-    /// leaves room for everything else; a computer too weak for it starts on the lighter one it can run
-    /// (<see cref="Heaviest"/>). The bigger models stay a choice in setup and Settings → Recording. A computer with no
-    /// graphics card Whisper can use, and the processor and memory for it, starts on Parakeet instead, when
-    /// <paramref name="parakeet"/> (it doesn't read the lecture's language, or it won't run here: false).
+    /// The model a computer starts on, and one plain line why. Setup doesn't ask: a student can't be expected to know
+    /// one model from another, so this is the pick, and Settings → Recording is where it can be changed.
+    /// <para>
+    /// Picked by how many words each gets wrong against what was really said, not against another model's output
+    /// (engine/tools/TranscribeBench scores every model against large-v3's own transcript, which favours Whisper's
+    /// family). On the Open ASR Leaderboard, English, Parakeet v3 gets 6.34% of words wrong to Whisper large-v3
+    /// turbo's 7.83%, and 11.31% to 16.13% on AMI (unscripted meetings, the nearest a benchmark comes to a lecture);
+    /// it never makes up words over silence, and keeps up 10 to 30 times over on the processor alone (sherpa-onnx; 0.04
+    /// of a lecture's length on 5 threads here). So it's the pick wherever it fits (<see cref="FitsParakeet"/>) and
+    /// reads the lecture's language (<paramref name="parakeet"/>), on Apple silicon and graphics cards too.
+    /// </para>
+    /// <para>
+    /// Except where Whisper large-v3 is clearly ahead on FLEURS (Parakeet v3's own paper, arXiv 2509.14128, words wrong
+    /// Parakeet / large-v3: Danish 18.41 / 12.57, Finnish 13.21 / 7.70, Swedish 15.08 / 7.88, Polish 7.31 / 4.74, Dutch
+    /// 7.48 / 5.57; German 5.04 / 4.30 is too close to give up Parakeet's other strengths for) and the computer runs
+    /// large-v3 and keeps up (<see cref="Heaviest"/>). Another language, or a computer too small for Parakeet, gets the
+    /// Whisper it keeps up with, up to the compact turbo (light on the computer, with room for everything else), as
+    /// before. And an ARM computer too small for either (Whisper small or base, otherwise) gets Cactus Whistle, which
+    /// the app carries: nothing to download, as accurate as Whisper base (LibriSpeech 4.31 / 10.49 to base's 4.90 /
+    /// 11.00, TED-LIUM 7.61 to 5.00) and far quicker, in the seven languages it reads.
+    /// </para>
     /// </summary>
-    public static ModelAdvice Advise(HardwareProfile hw, bool parakeet = true)
+    /// <param name="language">The lecture language the student set ("en", "pt-BR", "Spanish"; "" or "auto" for each
+    /// lecture's own).</param>
+    public static ModelAdvice Advise(HardwareProfile hw, bool parakeet = true, string language = "")
     {
-        // On the processor alone Parakeet is what to start on: it was made for it (see Heaviest), nearly as accurate as
-        // the compact turbo, and never makes up words over silence.
-        if (parakeet && ProcessorOnly(hw) && FitsParakeet(hw))
-            return new(Parakeet, $"This {hw.DeviceWord} has no graphics card Whisper can use, so Parakeet, made for the processor, keeps up with a lecture.");
+        string device = hw.DeviceWord;
+        if (parakeet && FitsParakeet(hw))
+        {
+            if (WhisperAheadIn(language) is { } named && Heaviest(hw, parakeet: false).Model.Id == LargeV3.Id)
+                return new(LargeV3, $"In {named}, Whisper large-v3 makes fewer mistakes than any other model, and this {device} keeps up with a lecture on it.");
+            return new(Parakeet, $"Parakeet writes a lecture down with the fewest mistakes, and keeps up easily on this {device}.");
+        }
         var heaviest = Heaviest(hw, parakeet);
+        if (heaviest.Model.Id is "small" or "base" && WhistleTranscriber.Available && WhistleLanguages.Code(language) is { Length: > 0 })
+            return new(Whistle, $"Cactus Whistle comes with the app, so there's nothing to download, and it keeps up easily on this {device}, as accurately as Whisper base.");
         if (!Heavier(heaviest.Model, LargeV3TurboSmall)) return heaviest;
         return new(LargeV3TurboSmall, hw.AppleSilicon
             ? "The compact model keeps up with a lecture and leaves this Mac room for everything else. Its Apple silicon can run a bigger one too."
             : $"The compact model keeps up with a lecture and leaves this PC room for everything else. Its graphics card ({hw.WhisperCard?.Name}) can run a bigger one too.");
+    }
+
+    /// <summary>The languages Whisper large-v3 writes down clearly better than Parakeet (see <see cref="Advise"/>), by
+    /// name, or null for the rest.</summary>
+    static string? WhisperAheadIn(string language) => WhisperAhead.TryGetValue(LanguageCode(language), out string? name) ? name : null;
+
+    static readonly Dictionary<string, string> WhisperAhead = new()
+    {
+        ["da"] = "Danish", ["fi"] = "Finnish", ["sv"] = "Swedish", ["pl"] = "Polish", ["nl"] = "Dutch",
+    };
+
+    /// <summary>"pt-BR" and "Polish" as "pt" and "pl": the code before any region, or a language's English name.</summary>
+    static string LanguageCode(string language)
+    {
+        string l = language.Trim().ToLowerInvariant();
+        if (l.Length == 0) return "";
+        string code = l.Split('-', '_')[0];
+        if (code.Length == 2) return code;
+        return WhisperAhead.FirstOrDefault(kv => kv.Value.Equals(language.Trim(), StringComparison.OrdinalIgnoreCase)).Key ?? "";
     }
 
     /// <summary>

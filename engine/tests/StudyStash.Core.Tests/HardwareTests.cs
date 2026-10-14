@@ -16,27 +16,28 @@ public class HardwareTests
 
     static GraphicsCard Card(double gb, string name = "NVIDIA GeForce RTX 3060") => new(name, gb, gb < 1);
 
-    /// <summary>Each computer: the model it starts on (the compact turbo, Parakeet where there's no graphics card Whisper
-    /// can use and the processor for it, or something lighter if it's too weak), and the heaviest it keeps up with (a
-    /// bigger one than that gets a word, once).</summary>
+    /// <summary>Each computer: the model it starts on (Parakeet wherever it has the processor and the memory for it, as
+    /// it makes the fewest mistakes; else the compact turbo, or something lighter if it's too weak), and the heaviest it
+    /// keeps up with (a bigger one than that gets a word, once).</summary>
     public static TheoryData<string, HardwareProfile, string, string> Computers => new()
     {
-        // Apple silicon starts compact too, and keeps up with large-v3 if the student picks it; only a Mac with very
-        // little memory is kept to the compact model.
-        { "M1 with 8 GB", Mac(8), "large-v3-turbo-q5", "large-v3" },
-        { "M3 Pro with 36 GB", Mac(36), "large-v3-turbo-q5", "large-v3" },
-        { "Apple silicon that won't say its memory", Mac(null), "large-v3-turbo-q5", "large-v3" },
+        // Apple silicon starts on Parakeet, and keeps up with large-v3 if the student picks it; a Mac with too little
+        // memory for Parakeet starts on the compact model.
+        { "M1 with 8 GB", Mac(8), "parakeet-v3", "large-v3" },
+        { "M3 Pro with 36 GB", Mac(36), "parakeet-v3", "large-v3" },
+        { "Apple silicon that won't say its memory", Mac(null), "parakeet-v3", "large-v3" },
         { "Apple silicon with 4 GB", Mac(4), "large-v3-turbo-q5", "large-v3-turbo-q5" },
         // An Intel Mac has no Whisper graphics: it's the processor's call, and Parakeet is made for the processor.
         { "Intel Mac, 8 cores", Mac(16, Architecture.X64, 8), "parakeet-v3", "large-v3-turbo-q5" },
         { "Intel Mac, 4 cores", Mac(8, Architecture.X64, 4), "parakeet-v3", "parakeet-v3" },
-        // A PC with a real graphics card and Vulkan starts compact; what it keeps up with is what fits the card's memory.
-        { "PC, 12 GB card", Pc(card: Card(12)), "large-v3-turbo-q5", "large-v3" },
-        { "PC, 8 GB card (says 7.8)", Pc(card: Card(7.8)), "large-v3-turbo-q5", "large-v3" },
+        // A PC with a real graphics card starts on Parakeet too (on its processor: it needs no card); what Whisper keeps
+        // up with is what fits the card's memory. Too little memory for Parakeet: the compact model, on the card.
+        { "PC, 12 GB card", Pc(card: Card(12)), "parakeet-v3", "large-v3" },
+        { "PC, 8 GB card (says 7.8)", Pc(card: Card(7.8)), "parakeet-v3", "large-v3" },
         { "PC, 8 GB card, 6 GB of memory", Pc(ram: 6, card: Card(8)), "large-v3-turbo-q5", "large-v3-turbo" },
-        { "PC, 6 GB card", Pc(card: Card(6)), "large-v3-turbo-q5", "large-v3-turbo" },
-        { "PC, 4 GB card", Pc(card: Card(3.9)), "large-v3-turbo-q5", "large-v3-turbo" },
-        { "PC, 2 GB card", Pc(card: Card(2)), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "PC, 6 GB card", Pc(card: Card(6)), "parakeet-v3", "large-v3-turbo" },
+        { "PC, 4 GB card", Pc(card: Card(3.9)), "parakeet-v3", "large-v3-turbo" },
+        { "PC, 2 GB card", Pc(card: Card(2)), "parakeet-v3", "large-v3-turbo-q5" },
         // No card Whisper can use: the processor decides. Parakeet does a lecture's pieces on it in a small part of
         // Whisper's time, so with 4 fast cores and 8 GB it's what to start on (and, on 8, Whisper's compact turbo also keeps up).
         { "PC, 8 GB card but no Vulkan", Pc(card: Card(8), vulkan: false), "parakeet-v3", "large-v3-turbo-q5" },
@@ -69,8 +70,8 @@ public class HardwareTests
     [Fact]
     public void The_reason_is_one_plain_line()
     {
-        Assert.Equal("This PC has no graphics card Whisper can use, so Parakeet, made for the processor, keeps up with a lecture.",
-            WhisperModels.Advise(Pc(cores: 8)).Why);
+        Assert.Equal("Parakeet writes a lecture down with the fewest mistakes, and keeps up easily on this PC.", WhisperModels.Advise(Pc(cores: 8)).Why);
+        Assert.Equal("Parakeet writes a lecture down with the fewest mistakes, and keeps up easily on this Mac.", WhisperModels.Advise(Mac(16)).Why);
         Assert.Equal("This PC has no graphics card Whisper can use, and Parakeet, made for the processor, keeps up with a lecture.",
             WhisperModels.Heaviest(Pc(cores: 4, ram: 8)).Why);
         // Where Parakeet can't be used (a language it doesn't read, or it won't run here), Whisper is what it was.
@@ -78,9 +79,9 @@ public class HardwareTests
             WhisperModels.Advise(Pc(cores: 8), parakeet: false).Why);
         Assert.Equal("small", WhisperModels.Advise(Pc(cores: 4, ram: 8), parakeet: false).Model.Id);
         Assert.Equal("The compact model keeps up with a lecture and leaves this Mac room for everything else. Its Apple silicon can run a bigger one too.",
-            WhisperModels.Advise(Mac(16)).Why);
+            WhisperModels.Advise(Mac(16), parakeet: false).Why);
         Assert.Equal("The compact model keeps up with a lecture and leaves this PC room for everything else. Its graphics card (NVIDIA GeForce RTX 3060) can run a bigger one too.",
-            WhisperModels.Advise(Pc(card: Card(6))).Why);
+            WhisperModels.Advise(Pc(card: Card(6)), parakeet: false).Why);
         Assert.Equal("This Mac has 4 GB of memory, so the compact model leaves room for everything else.", WhisperModels.Advise(Mac(4)).Why);
         Assert.Equal("This PC has little memory, so Whisper base keeps up with a lecture and leaves room for everything else.",
             WhisperModels.Advise(Pc(ram: 3)).Why);
@@ -90,6 +91,27 @@ public class HardwareTests
         Assert.Equal("This Mac's Apple silicon runs the most accurate model and keeps up with a lecture.", WhisperModels.Heaviest(Mac(16)).Why);
         Assert.Equal("This PC's graphics card (NVIDIA GeForce RTX 3060) has room for large-v3 turbo, which keeps up with a lecture.",
             WhisperModels.Heaviest(Pc(card: Card(6))).Why);
+    }
+
+    /// <summary>The lecture's language matters: where Whisper large-v3 makes clearly fewer mistakes than Parakeet
+    /// (Danish, Finnish, Swedish, Polish, Dutch on FLEURS) and the computer runs large-v3, it's the pick; German is too
+    /// close to give Parakeet up for; a computer that can't run large-v3 keeps Parakeet; and an ARM computer too small for
+    /// Parakeet or the compact model gets Cactus Whistle, which the app carries, in a language it reads.</summary>
+    [Fact]
+    public void The_lectures_language_can_make_whisper_large_v3_the_pick()
+    {
+        Assert.Equal("large-v3", WhisperModels.Advise(Mac(36), language: "pl").Model.Id);
+        Assert.Equal("In Polish, Whisper large-v3 makes fewer mistakes than any other model, and this Mac keeps up with a lecture on it.",
+            WhisperModels.Advise(Mac(36), language: "pl").Why);
+        Assert.Equal("large-v3", WhisperModels.Advise(Pc(card: Card(12)), language: "sv-SE").Model.Id);
+        Assert.Equal("large-v3", WhisperModels.Advise(Mac(16), language: "Danish").Model.Id);
+        Assert.Equal("parakeet-v3", WhisperModels.Advise(Mac(36), language: "de").Model.Id);
+        Assert.Equal("parakeet-v3", WhisperModels.Advise(Mac(36), language: "en").Model.Id);
+        Assert.Equal("parakeet-v3", WhisperModels.Advise(Pc(cores: 8), language: "pl").Model.Id); // no large-v3 here
+        // Small ARM computer (no Parakeet: 6 GB): Whisper small otherwise, Cactus Whistle where this build carries it.
+        var smallArm = Pc(cores: 4, ram: 6, card: null, arch: Architecture.Arm64);
+        Assert.Equal(WhistleTranscriber.Available ? "whistle" : "small", WhisperModels.Advise(smallArm, language: "en").Model.Id);
+        Assert.Equal("small", WhisperModels.Advise(smallArm, language: "ja").Model.Id); // a language Whistle doesn't read
     }
 
     [Fact]
