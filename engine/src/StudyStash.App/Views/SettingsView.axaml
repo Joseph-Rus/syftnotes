@@ -1037,7 +1037,14 @@
                                 </StackPanel>
                                 <TextBlock Text="{Binding About}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
                               </StackPanel>
-                              <c:Icon Grid.Column="1" IsVisible="{Binding Here}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Accent}" Margin="10,0,0,0" />
+                              <StackPanel Grid.Column="1" Spacing="6" Margin="10,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                <c:Icon IsVisible="{Binding Here}" Glyph="check_circle" Filled="True" Size="18" Foreground="{DynamicResource Accent}" HorizontalAlignment="Right" />
+                                <!-- Downloaded and not in use: its own Remove (asks first, under the list) -->
+                                <Button Classes="pill" IsVisible="{Binding CanRemove}" AutomationProperties.Name="{Binding RemoveSaid}" ToolTip.Tip="{Binding RemoveSaid}"
+                                        Command="{Binding $parent[UserControl].((s:SettingsModel)DataContext).AskRemoveModelCommand}" CommandParameter="{Binding}">
+                                  <TextBlock Text="Remove" FontSize="12" />
+                                </Button>
+                              </StackPanel>
                             </Grid>
                           </Border>
                         </Panel>
@@ -1051,11 +1058,7 @@
                   <Border Width="{Binding ModelBarWidth}" CornerRadius="2" Background="{DynamicResource Accent}" HorizontalAlignment="Left" />
                 </Border>
                 <TextBlock Classes="say" Text="{Binding ModelLine}" />
-                <!-- A model no longer in use (after a switch) stays until the student says to remove it. -->
-                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0" IsVisible="{Binding HasSpare}">
-                  <TextBlock Text="{Binding SpareLine}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="380" />
-                  <Button Classes="pill" Command="{Binding AskRemoveSpareCommand}" VerticalAlignment="Center"><TextBlock Text="Remove" FontSize="13" /></Button>
-                </StackPanel>
+                <!-- A model no longer in use (after a switch) stays until the student presses its Remove in the list. -->
                 <StackPanel Spacing="8" Margin="0,8,0,0" IsVisible="{Binding ConfirmingRemove}">
                   <TextBlock Text="{Binding RemoveQuestion}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" MaxWidth="480" HorizontalAlignment="Left" />
                   <StackPanel Orientation="Horizontal" Spacing="8">

@@ -16,41 +16,41 @@ public class HardwareTests
 
     static GraphicsCard Card(double gb, string name = "NVIDIA GeForce RTX 3060") => new(name, gb, gb < 1);
 
-    /// <summary>Each computer: the model it starts on (the compact turbo, Parakeet where there's no graphics card Whisper
-    /// can use and the processor for it, or something lighter if it's too weak), and the heaviest it keeps up with (a
-    /// bigger one than that gets a word, once).</summary>
+    /// <summary>Each computer: the model it starts on (the compact turbo, light on the computer, or a lighter Whisper if
+    /// it's too weak for that; never Parakeet, which holds about 3 GB), and the heaviest it keeps up with (a bigger one
+    /// than that gets a word, once).</summary>
     public static TheoryData<string, HardwareProfile, string, string> Computers => new()
     {
-        // Apple silicon starts compact too, and keeps up with large-v3 if the student picks it; only a Mac with very
-        // little memory is kept to the compact model.
+        // Apple silicon starts compact, and keeps up with large-v3 if the student picks it.
         { "M1 with 8 GB", Mac(8), "large-v3-turbo-q5", "large-v3" },
+        { "M2 with 16 GB", Mac(16), "large-v3-turbo-q5", "large-v3" },
         { "M3 Pro with 36 GB", Mac(36), "large-v3-turbo-q5", "large-v3" },
         { "Apple silicon that won't say its memory", Mac(null), "large-v3-turbo-q5", "large-v3" },
         { "Apple silicon with 4 GB", Mac(4), "large-v3-turbo-q5", "large-v3-turbo-q5" },
-        // An Intel Mac has no Whisper graphics: it's the processor's call, and Parakeet is made for the processor.
-        { "Intel Mac, 8 cores", Mac(16, Architecture.X64, 8), "parakeet-v3", "large-v3-turbo-q5" },
-        { "Intel Mac, 4 cores", Mac(8, Architecture.X64, 4), "parakeet-v3", "parakeet-v3" },
-        // A PC with a real graphics card and Vulkan starts compact; what it keeps up with is what fits the card's memory.
+        // An Intel Mac has no Whisper graphics: the processor decides.
+        { "Intel Mac, 8 cores", Mac(16, Architecture.X64, 8), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "Intel Mac, 4 cores", Mac(8, Architecture.X64, 4), "small", "parakeet-v3" },
+        // A PC with a real graphics card and Vulkan starts compact, on the card.
         { "PC, 12 GB card", Pc(card: Card(12)), "large-v3-turbo-q5", "large-v3" },
         { "PC, 8 GB card (says 7.8)", Pc(card: Card(7.8)), "large-v3-turbo-q5", "large-v3" },
         { "PC, 8 GB card, 6 GB of memory", Pc(ram: 6, card: Card(8)), "large-v3-turbo-q5", "large-v3-turbo" },
         { "PC, 6 GB card", Pc(card: Card(6)), "large-v3-turbo-q5", "large-v3-turbo" },
         { "PC, 4 GB card", Pc(card: Card(3.9)), "large-v3-turbo-q5", "large-v3-turbo" },
         { "PC, 2 GB card", Pc(card: Card(2)), "large-v3-turbo-q5", "large-v3-turbo-q5" },
-        // No card Whisper can use: the processor decides. Parakeet does a lecture's pieces on it in a small part of
-        // Whisper's time, so with 4 fast cores and 8 GB it's what to start on (and, on 8, Whisper's compact turbo also keeps up).
-        { "PC, 8 GB card but no Vulkan", Pc(card: Card(8), vulkan: false), "parakeet-v3", "large-v3-turbo-q5" },
-        { "PC, graphics built into the processor", Pc(card: Card(0.125, "Intel(R) UHD Graphics 620")), "parakeet-v3", "large-v3-turbo-q5" },
-        { "PC, 1.5 GB card", Pc(card: new GraphicsCard("AMD Radeon(TM) Graphics", 1.5, false)), "parakeet-v3", "large-v3-turbo-q5" },
-        { "ARM PC with a card (no Vulkan Whisper for ARM)", Pc(card: Card(8), arch: Architecture.Arm64), "parakeet-v3", "large-v3-turbo-q5" },
-        { "PC, no card, 8 threads, 8 GB", Pc(cores: 8, ram: 8), "parakeet-v3", "large-v3-turbo-q5" },
+        // No card Whisper can use: the processor decides. 8 fast threads and 8 GB keep up with the compact turbo;
+        // fewer, or less memory, Whisper small; very little, Whisper base.
+        { "PC, 8 GB card but no Vulkan", Pc(card: Card(8), vulkan: false), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "PC, graphics built into the processor", Pc(card: Card(0.125, "Intel(R) UHD Graphics 620")), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "PC, 1.5 GB card", Pc(card: new GraphicsCard("AMD Radeon(TM) Graphics", 1.5, false)), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "ARM PC with a card (no Vulkan Whisper for ARM)", Pc(card: Card(8), arch: Architecture.Arm64), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "PC, no card, 8 threads, 8 GB", Pc(cores: 8, ram: 8), "large-v3-turbo-q5", "large-v3-turbo-q5" },
         { "PC, no card, 8 threads, no AVX2", Pc(cores: 8, fastMath: false), "small", "small" },
-        { "PC, no card, 4 threads", Pc(cores: 4, ram: 8), "parakeet-v3", "parakeet-v3" },
+        { "PC, no card, 4 threads", Pc(cores: 4, ram: 8), "small", "parakeet-v3" },
         { "PC, no card, 16 threads, 6 GB", Pc(cores: 16, ram: 6), "small", "small" },
         { "PC, no card, 2 threads", Pc(cores: 2, ram: 8), "base", "base" },
         { "PC, no card, 3 GB", Pc(cores: 8, ram: 3), "base", "base" },
-        { "PC that won't say its memory", Pc(cores: 8, ram: null), "parakeet-v3", "large-v3-turbo-q5" },
-        { "Linux, 8 threads", new(HostOs.Linux, Architecture.X64, 8, true, 16), "parakeet-v3", "large-v3-turbo-q5" },
+        { "PC that won't say its memory", Pc(cores: 8, ram: null), "large-v3-turbo-q5", "large-v3-turbo-q5" },
+        { "Linux, 8 threads", new(HostOs.Linux, Architecture.X64, 8, true, 16), "large-v3-turbo-q5", "large-v3-turbo-q5" },
     };
 
     [Theory]
@@ -69,13 +69,9 @@ public class HardwareTests
     [Fact]
     public void The_reason_is_one_plain_line()
     {
-        Assert.Equal("This PC has no graphics card Whisper can use, so Parakeet, made for the processor, keeps up with a lecture.",
-            WhisperModels.Advise(Pc(cores: 8)).Why);
+        Assert.Equal("This PC has no graphics card Whisper can use, so the compact model keeps up with a lecture.", WhisperModels.Advise(Pc(cores: 8)).Why);
         Assert.Equal("This PC has no graphics card Whisper can use, and Parakeet, made for the processor, keeps up with a lecture.",
             WhisperModels.Heaviest(Pc(cores: 4, ram: 8)).Why);
-        // Where Parakeet can't be used (a language it doesn't read, or it won't run here), Whisper is what it was.
-        Assert.Equal("This PC has no graphics card Whisper can use, so the compact model keeps up with a lecture.",
-            WhisperModels.Advise(Pc(cores: 8), parakeet: false).Why);
         Assert.Equal("small", WhisperModels.Advise(Pc(cores: 4, ram: 8), parakeet: false).Model.Id);
         Assert.Equal("The compact model keeps up with a lecture and leaves this Mac room for everything else. Its Apple silicon can run a bigger one too.",
             WhisperModels.Advise(Mac(16)).Why);
@@ -90,6 +86,24 @@ public class HardwareTests
         Assert.Equal("This Mac's Apple silicon runs the most accurate model and keeps up with a lecture.", WhisperModels.Heaviest(Mac(16)).Why);
         Assert.Equal("This PC's graphics card (NVIDIA GeForce RTX 3060) has room for large-v3 turbo, which keeps up with a lecture.",
             WhisperModels.Heaviest(Pc(card: Card(6))).Why);
+    }
+
+    /// <summary>Light first: no computer starts on a model heavier than the compact turbo, never on Parakeet (about 3 GB
+    /// while it works), whatever its language; an ARM computer too small for the compact turbo gets Cactus Whistle,
+    /// which the app carries, in a language it reads.</summary>
+    [Fact]
+    public void No_computer_starts_on_more_than_the_compact_model()
+    {
+        foreach (var hw in new[] { Mac(36), Mac(8), Pc(card: Card(12)), Pc(cores: 4, ram: 8), Pc(cores: 16, ram: 64) })
+            foreach (string language in new[] { "", "en", "pl", "ja" })
+            {
+                var advice = WhisperModels.Advise(hw, language: language);
+                Assert.False(WhisperModels.Heavier(advice.Model, WhisperModels.LargeV3TurboSmall), $"{hw.Describe()} ({language}): {advice.Model.Id}");
+                Assert.NotEqual("parakeet-v3", advice.Model.Id);
+            }
+        var smallArm = Pc(cores: 4, ram: 6, card: null, arch: Architecture.Arm64);
+        Assert.Equal(WhistleTranscriber.Available ? "whistle" : "small", WhisperModels.Advise(smallArm, language: "en").Model.Id);
+        Assert.Equal("small", WhisperModels.Advise(smallArm, language: "ja").Model.Id); // a language Whistle doesn't read
     }
 
     [Fact]

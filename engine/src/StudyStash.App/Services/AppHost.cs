@@ -250,7 +250,10 @@ public sealed partial class AppHost : IDisposable, IProblemSource
         this.log = log ?? (s => Console.WriteLine(s));
         _ = this.hardware.ContinueWith(t =>
         {
-            var advice = WhisperModels.Advise(t.Result);
+            // (Settings may not be read yet this early: the lecture language is then each lecture's own.)
+            var settings = Settings;
+            var advice = settings is null ? WhisperModels.Advise(t.Result)
+                : WhisperModels.Advise(t.Result, ParakeetLanguages.Knows(settings.Language) && !settings.ParakeetFailed, settings.Language);
             this.log($"[model] this computer: {t.Result.Describe()}; the model for it: {advice.Model.Name}");
         }, TaskContinuationOptions.OnlyOnRanToCompletion);
         Home = home;
@@ -402,7 +405,7 @@ public sealed partial class AppHost : IDisposable, IProblemSource
     public HardwareProfile Hardware => hardware.GetAwaiter().GetResult();
 
     /// <summary>The model that keeps up with a lecture on this computer, and why.</summary>
-    public ModelAdvice Advice => WhisperModels.Advise(Hardware, ParakeetFits);
+    public ModelAdvice Advice => WhisperModels.Advise(Hardware, ParakeetFits, Settings.Language);
 
     /// <summary>Parakeet can be the model for this computer: it reads the lecture's language, and it ran here before (or
     /// hasn't been tried).</summary>

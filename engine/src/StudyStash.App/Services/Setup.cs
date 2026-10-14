@@ -77,7 +77,7 @@ public static class Setup
         m.ModelName = host.Model.Name;
         m.ModelSize = About(host.Model.Bytes);
         // Only a computer that records needs the model (and only it asks what the computer has).
-        if (m.Steps.Any(s => s.Step == SetupStep.Model)) ShowModels(m, host);
+        if (Records(m)) ShowModels(m, host);
         if (cc.ServerUrl.Length > 0 && host.Library == LibraryState.Connected && (m.IsLaptop || host.LocalLibrary is not null))
         {
             m.LibraryOk = true;
@@ -130,7 +130,9 @@ public static class Setup
         m.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName != nameof(SetupModel.Step)) return;
-            if (m.Step == SetupStep.Model)
+            // The student doesn't pick a model: the one for this computer starts downloading as soon as setup knows
+            // this computer records (its microphone's step), and goes on in the background through the steps after.
+            if (m.Step is SetupStep.Microphone or SetupStep.Model && Records(m))
             {
                 if (m.Models.Count == 0) ShowModels(m, host);
                 _ = host.DownloadModelAsync();
@@ -142,6 +144,10 @@ public static class Setup
         Refresh(m, host);
         return m;
     }
+
+    /// <summary>This computer records (a laptop, or just this computer), so it needs a transcription model: a library
+    /// on its own doesn't.</summary>
+    static bool Records(SetupModel m) => m.Steps.Any(s => s.Step == SetupStep.Microphone);
 
     /// <summary>The models to pick from, the one for this computer marked (and picked, unless another already was),
     /// with one line why it suits this computer.</summary>
@@ -195,7 +201,7 @@ public static class Setup
     /// Never touches login items otherwise: that would change this computer unasked.</summary>
     public static void Finish(SetupModel m, AppHost host)
     {
-        bool records = m.Steps.Any(s => s.Step == SetupStep.Model);
+        bool records = Records(m);
         host.Save(s =>
         {
             s.Role = m.Role;

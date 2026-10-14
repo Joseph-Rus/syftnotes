@@ -715,7 +715,7 @@ public class SurfaceShots
         if (renaming) library.Settings = FakeLibrarySettings.CodeNamed();
         var model = Services.SettingsModel.Make(host, library: () => library.Call);
         model.Section = section == "Unreachable" || one ? "Library" : renaming ? "Classes" : heavier || removing || after ? "Recording" : section;
-        if (removing) model.AskRemoveSpareCommand.Execute(null);
+        if (removing && model.Models.FirstOrDefault(c => c.CanRemove) is { } spare) model.AskRemoveModelCommand.Execute(spare);
         if (heavier)
         {
             model.ModelDownloading = true;

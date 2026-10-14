@@ -386,9 +386,11 @@ public sealed partial class SetupModel : ObservableObject
         var steps = new List<SetupStep> { SetupStep.Welcome };
         steps.AddRange(role switch
         {
-            AppRole.Laptop => [SetupStep.Library, SetupStep.Microphone, SetupStep.Model],
+            // No step for the transcription model: the one for this computer (WhisperModels.Advise) is downloaded in
+            // the background from the microphone's step on, and the last page says how it's getting on.
+            AppRole.Laptop => [SetupStep.Library, SetupStep.Microphone],
             AppRole.Library => [SetupStep.Password, SetupStep.Ai],
-            _ => [SetupStep.Microphone, SetupStep.Model, SetupStep.Ai],
+            _ => [SetupStep.Microphone, SetupStep.Ai],
         });
         steps.AddRange([SetupStep.Canvas, SetupStep.Classes]);
         if (role != AppRole.Laptop) steps.Add(SetupStep.StartAtLogin);

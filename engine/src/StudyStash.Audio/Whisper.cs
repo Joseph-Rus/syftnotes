@@ -66,7 +66,7 @@ public static class WhisperModels
     /// on two recorded lectures: 17% and 7% of words different, where the compact turbo differs on 13% and 6% and
     /// Whisper small on 20% and 9%.</summary>
     public static readonly WhisperModel Parakeet = new("parakeet-v3", "NVIDIA Parakeet v3", "parakeet-tdt-0.6b-v3", 2549800429, "",
-        "Nearly as accurate as the compact turbo, and quick on the processor alone: it doesn't need a graphics card. Writes whole sentences and never makes up words over silence. Reads English and 24 other European languages.")
+        "The fewest mistakes in English and most European languages, but heavier: it holds about 3 GB of memory while it works. Quick on the processor alone: it doesn't need a graphics card. Writes whole sentences and never makes up words over silence. Reads English and 24 other European languages.")
     {
         Engine = SpeechEngine.Parakeet,
         Source = "https://huggingface.co/csukuangfj/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3/resolve/main",
@@ -137,20 +137,29 @@ public static class WhisperModels
     }
 
     /// <summary>
-    /// The model a computer starts on, and one plain line why: the compact large-v3 turbo, on every computer that keeps
-    /// up with it (Apple silicon and PCs with a strong graphics card too), because it's light on the computer and
-    /// leaves room for everything else; a computer too weak for it starts on the lighter one it can run
-    /// (<see cref="Heaviest"/>). The bigger models stay a choice in setup and Settings → Recording. A computer with no
-    /// graphics card Whisper can use, and the processor and memory for it, starts on Parakeet instead, when
-    /// <paramref name="parakeet"/> (it doesn't read the lecture's language, or it won't run here: false).
+    /// The model a computer starts on, and one plain line why. Setup doesn't ask: a student can't be expected to know
+    /// one model from another, so this is the pick, and Settings → Recording is where it can be changed.
+    /// <para>
+    /// Light first: nothing a computer starts on holds more than about 1.5 GB while a lecture records (writing it down
+    /// as it's recorded keeps the model loaded all class, beside a browser and slides). So the compact large-v3 turbo
+    /// (about 0.8 GB, on the graphics where there are any) on every computer that keeps up with it, and the lighter
+    /// Whisper it keeps up with on one that doesn't (<see cref="Heaviest"/>, without Parakeet). Parakeet v3 makes fewer
+    /// mistakes in English (6.34% of words wrong on the Open ASR Leaderboard to the turbo's 7.83%) but holds about 3 GB
+    /// at full precision, and its 8-bit file, a fifth of that, was about as accurate as Whisper base on a lecture from
+    /// a laptop's microphone: so it's a choice in Settings, not where anyone starts. An ARM computer too small for the
+    /// compact turbo (Whisper small or base, otherwise) gets Cactus Whistle, which the app carries: nothing to download,
+    /// about 0.1 GB, as accurate as Whisper base (LibriSpeech 4.31 / 10.49 to base's 4.90 / 11.00) and far quicker, in
+    /// the seven languages it reads.
+    /// </para>
     /// </summary>
-    public static ModelAdvice Advise(HardwareProfile hw, bool parakeet = true)
+    /// <param name="parakeet">Kept for callers: Parakeet is never the computer's first model now.</param>
+    /// <param name="language">The lecture language the student set ("en", "pt-BR", "Spanish"; "" or "auto" for each
+    /// lecture's own): Cactus Whistle only for a language it reads.</param>
+    public static ModelAdvice Advise(HardwareProfile hw, bool parakeet = true, string language = "")
     {
-        // On the processor alone Parakeet is what to start on: it was made for it (see Heaviest), nearly as accurate as
-        // the compact turbo, and never makes up words over silence.
-        if (parakeet && ProcessorOnly(hw) && FitsParakeet(hw))
-            return new(Parakeet, $"This {hw.DeviceWord} has no graphics card Whisper can use, so Parakeet, made for the processor, keeps up with a lecture.");
-        var heaviest = Heaviest(hw, parakeet);
+        var heaviest = Heaviest(hw, parakeet: false);
+        if (heaviest.Model.Id is "small" or "base" && WhistleTranscriber.Available && WhistleLanguages.Code(language) is { Length: > 0 })
+            return new(Whistle, $"Cactus Whistle comes with the app, so there's nothing to download, and it keeps up easily on this {hw.DeviceWord}, as accurately as Whisper base.");
         if (!Heavier(heaviest.Model, LargeV3TurboSmall)) return heaviest;
         return new(LargeV3TurboSmall, hw.AppleSilicon
             ? "The compact model keeps up with a lecture and leaves this Mac room for everything else. Its Apple silicon can run a bigger one too."
