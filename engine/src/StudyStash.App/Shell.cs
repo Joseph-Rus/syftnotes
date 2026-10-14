@@ -910,7 +910,7 @@ public static partial class Shell
             pillCard?.Hide();
             return;
         }
-        pillCard ??= new Floating { Content = new PillCard { DataContext = recorder }, OverFullScreen = true, ShowActivated = false, Title = "Study Stash recorder card" };
+        pillCard ??= new Floating { Content = new PillCard { DataContext = recorder }, OverFullScreen = true, ShowActivated = false, ClickThrough = true, Title = "Study Stash recorder card" };
         var (area, scale) = pillCard.WorkArea(pill.Center);
         var size = pillCard.Measured(scale);
         int room = (int)(Floating.ShadowRoom * scale), gap = (int)(10 * scale), width = size.Width - 2 * room;
@@ -922,7 +922,7 @@ public static partial class Shell
     static Floating MakeRecorderWindow()
     {
         var view = Skin.Current == SkinKind.Mac ? (Control)new MacRecorder { DataContext = recorder } : new WinRecorder { DataContext = recorder };
-        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, OverFullScreen = true, Title = "Study Stash recorder" };
+        var w = new Floating { Content = view, KeepClear = true, SteadySize = true, OverFullScreen = true, ClicksOnPanelOnly = true, Title = "Study Stash recorder" };
         // Gone from the screen: its card goes with it.
         w.PropertyChanged += (_, e) =>
         {
