@@ -190,7 +190,8 @@ public static partial class Shell
         {
             Id = id, ClassName = cls, Dot = DotFor(cls), Noun = noun, When = NoteWhen(starts, null), Title = WorkingTitle(l), Local = true,
             Planned = true, Typed = l.Notes, Writer = NotesWriter(), Stamp = LocalStamp(l),
-            PlanWords = past ? "Not recorded. Start recording when you're ready." : $"Starts at {at}. Recording starts on its own then.",
+            PlanWords = past ? "Not recorded. Start recording when you're ready."
+                : $"Starts at {at}. Write anything here and recording starts on its own then; leave it empty and nothing is kept.",
             OnStartNow = () => ContinueRecording(id),
             OnRename = title =>
             {
@@ -219,6 +220,7 @@ public static partial class Shell
         if (host.Settings.Role == AppRole.Library) return;
         var now = DateTimeOffset.Now;
         host.ForgetEndedPlans(now);
+        host.ForgetEmptyPlans(library.Note is { Planned: true } open ? open.Id : typedWaiting?.Id);
         if (host.Recorder.Current is not null || askingForMic || host.DuePlan(now) is not { } due || !plansTried.Add(due.Id)) return;
         bool showing = library.Note is { Planned: true } p && p.Id == due.Id && library.ShowNotePage && mainWindow?.IsVisible == true;
         string name = WorkingTitle(due);

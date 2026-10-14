@@ -1,6 +1,7 @@
 using Avalonia.Media;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
+using StudyStash.Core;
 using StudyStash.Core.Calendar;
 
 namespace StudyStash.App;
@@ -30,6 +31,10 @@ public static partial class Shell
         bool any = host.HasCalendars;
         var rows = ComingUpModel.For(upcoming.Events, DateTimeOffset.Now, TimeZoneInfo.Local, host.CalendarClasses(),
             cls => host.ColorOf(cls) is >= 0 and var color ? Skin.ClassDot(color) : (IBrush?)null);
+        // An event with notes already written for it says so: they're where its recording goes when it starts.
+        var ready = host.Lectures.All().Where(l => l.State == LectureState.Planned && l.Notes.Trim().Length > 0 && l.Event is not null)
+            .Select(l => l.Event!.Id).ToHashSet();
+        rows = [.. rows.Select(r => ready.Contains(r.Id) ? r with { When = $"{r.When} · notes ready", Short = $"{r.Short} · notes ready" } : r)];
         panel.ComingUp.Show(any, rows);
         library.ComingUp.Show(any, rows);
     }

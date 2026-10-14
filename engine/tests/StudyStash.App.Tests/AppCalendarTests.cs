@@ -60,11 +60,12 @@ public class AppCalendarTests
         Assert.Equal("Data Mining", plan.Title);
         Assert.Null(host.Recorder.Current); // nothing records yet
         Assert.Same(plan, host.PlanEvent(e)); // the one note for the event
+        Assert.Null(host.DuePlan(now.AddMinutes(31))); // only opened, nothing typed: it doesn't record on its own
+
+        host.KeepTypedNotes(plan.Id, "- bring the slides");
         Assert.Null(host.DuePlan(now));
         Assert.Equal(plan.Id, host.DuePlan(now.AddMinutes(31))?.Id);
         Assert.Null(host.DuePlan(now.AddMinutes(121))); // over: too late to start on its own
-
-        host.KeepTypedNotes(plan.Id, "- bring the slides");
         var start = await host.ContinueAsync(plan.Id);
         Assert.Equal(plan.Id, start.Lecture!.Id);
         Assert.Equal(LectureState.Recording, start.Lecture.State);
@@ -79,6 +80,29 @@ public class AppCalendarTests
         host.KeepTypedNotes(plan.Id, "");
         host.ForgetEndedPlans(now.AddMinutes(121));
         Assert.Null(host.Lectures.Get(plan.Id));
+    }
+
+    /// <summary>An event's note opened and left empty leaves nothing: it goes once it's not the one open. One with
+    /// something typed in it stays to record.</summary>
+    [Fact]
+    public void A_planned_note_left_empty_goes()
+    {
+        using var home = new TempHome();
+        var now = DateTimeOffset.Now;
+        var a = new CalendarEvent("uid/3", "cal1", "ics:abc", "Compilers", now.AddHours(18), now.AddHours(19), false, "TEGR 302", [], null, false);
+        var b = new CalendarEvent("uid/4", "cal1", "ics:abc", "Data Mining", now.AddHours(20), now.AddHours(21), false, "TEGR 301", [], null, false);
+        File.WriteAllText(Upcoming.PathIn(home.Path), JsonSerializer.Serialize(new UpcomingCache(now, [a, b]), new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase }));
+        CalendarSettings.Update(home.Path, s => s.Calendars.Add(new CalendarInfo("cal1", "ics:abc", "School", null, true)));
+        using var host = Host(home);
+
+        var empty = host.PlanEvent(a);
+        var typed = host.PlanEvent(b);
+        host.KeepTypedNotes(typed.Id, "- read chapter 4");
+        host.ForgetEmptyPlans(keep: empty.Id); // still open
+        Assert.NotNull(host.Lectures.Get(empty.Id));
+        host.ForgetEmptyPlans(keep: null); // left
+        Assert.Null(host.Lectures.Get(empty.Id));
+        Assert.NotNull(host.Lectures.Get(typed.Id));
     }
 
     [Fact]

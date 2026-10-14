@@ -581,6 +581,15 @@ public static partial class Shell
     /// window has already taken it out of the list; if the library refuses, the list is read again.</summary>
     static async Task<bool> DeleteLectureAsync(LectureDeletion d)
     {
+        // A planned note is only on this computer (the library has nothing of it until it records): it goes here.
+        if (host.Lectures.Get(d.Id) is { State: LectureState.Planned } plan)
+        {
+            deletedPlans[d.Id] = plan;
+            host.Lectures.Delete(d.Id);
+            Program.Log($"[calendar] deleted the planned note {d.Id}");
+            Refresh();
+            return true;
+        }
         try
         {
             if (host.Remote() is not { } lib) throw new HttpRequestException("Can't reach your library right now.");
@@ -604,9 +613,18 @@ public static partial class Shell
         }
     }
 
+    /// <summary>Planned notes deleted here, kept for Undo.</summary>
+    static readonly Dictionary<string, Lecture> deletedPlans = [];
+
     /// <summary>"Undo": the lecture comes back from the library's trash, and opens where it was.</summary>
     static async Task UndoDeleteAsync(LectureDeletion d)
     {
+        if (deletedPlans.Remove(d.Id, out var plan))
+        {
+            host.Lectures.Add(plan);
+            Refresh();
+            return;
+        }
         try
         {
             if (host.Remote() is not { } lib) throw new HttpRequestException("Can't reach your library right now.");

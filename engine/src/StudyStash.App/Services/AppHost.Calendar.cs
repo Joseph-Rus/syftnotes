@@ -96,9 +96,10 @@ public sealed partial class AppHost
     static DateTimeOffset? PlanEnds(Lecture l) =>
         l.Event is { } e && DateTimeOffset.TryParse(e.End, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var at) ? at : null;
 
-    /// <summary>A planned note whose event has started and not ended: it's time to record it. Null when there's none.</summary>
+    /// <summary>A planned note whose event has started and not ended, with something typed in it: it's time to record
+    /// it. One only opened (a click on an event that hasn't started) records nothing on its own. Null when there's none.</summary>
     public Lecture? DuePlan(DateTimeOffset now) => Lectures.All().FirstOrDefault(l => l.State == LectureState.Planned
-        && PlanStarts(l) is { } starts && starts <= now && (PlanEnds(l) is not { } ends || now < ends));
+        && l.Notes.Trim().Length > 0 && PlanStarts(l) is { } starts && starts <= now && (PlanEnds(l) is not { } ends || now < ends));
 
     /// <summary>Planned notes whose event ended without being recorded and with nothing typed in them go: there's
     /// nothing in them to keep. One with notes typed stays (Keep recording can still record it).</summary>
@@ -107,6 +108,17 @@ public sealed partial class AppHost
         foreach (var l in Lectures.All().Where(l => l.State == LectureState.Planned && l.Notes.Trim().Length == 0 && PlanEnds(l) is { } ends && ends <= now))
         {
             log($"[calendar] {l.Id}: its event ended without a recording or notes: let go");
+            Lectures.Delete(l.Id);
+        }
+    }
+
+    /// <summary>Planned notes with nothing typed in them go once they're not the one open (<paramref name="keep"/>):
+    /// opening an event's note and leaving it empty leaves nothing behind, in a list or recording on its own.</summary>
+    public void ForgetEmptyPlans(string? keep)
+    {
+        foreach (var l in Lectures.All().Where(l => l.State == LectureState.Planned && l.Id != keep && l.Notes.Trim().Length == 0))
+        {
+            log($"[calendar] {l.Id}: left with nothing in it: let go");
             Lectures.Delete(l.Id);
         }
     }
