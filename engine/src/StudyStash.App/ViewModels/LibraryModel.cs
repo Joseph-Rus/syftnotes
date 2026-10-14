@@ -447,6 +447,8 @@ public sealed partial class LibraryModel : ObservableObject
             newValue.Narrow = Narrow;
             // The ask for a tip shows on Home, in the page's own flow.
             newValue.Asking = newValue.IsHome ? Support : null;
+            // A page read while the library was still deleting a note lists it: it's shown without it.
+            foreach (string id in gone) newValue.Remove(id);
         }
         PageChanged();
     }
@@ -565,8 +567,14 @@ public sealed partial class LibraryModel : ObservableObject
     [ObservableProperty] public partial LectureDeletion? Deleted { get; set; }
     public bool AskingDelete => Deleting is not null;
     public bool HasDeleted => Deleted is not null;
-    /// <summary>How long "Deleted · Undo" stays (the library keeps the lecture in its trash for longer).</summary>
+    /// <summary>How long "Moved to… · Undo" stays.</summary>
     public TimeSpan UndoShows { get; set; } = TimeSpan.FromSeconds(10);
+    /// <summary>How long "Deleted · Undo" stays, unless its × puts it away first: the few minutes the question
+    /// promised. (The library keeps a deleted note in its trash for ten, so an Undo within these finds it.)</summary>
+    public TimeSpan DeletedShows { get; set; } = TimeSpan.FromMinutes(5);
+    /// <summary>The notes deleted in the last few minutes, the latest last. The toast names the latest; once that one
+    /// is undone or its minutes are up it names the one before, so each of them keeps the Undo it was promised.</summary>
+    readonly List<LectureDeletion> undoable = [];
 
     /// <summary>Deletes the lecture on the library (the host calls its API); false if the library refused.</summary>
     public Func<LectureDeletion, Task<bool>>? OnDelete { get; set; }
@@ -594,22 +602,29 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>Leaves a note's page for where the student came from (it was deleted): the host goes back.</summary>
     public Action? OnLeaveNote { get; set; }
 
+    /// <summary>The notes deleted here and not brought back. The page a deleted note's own page gives way to is asked
+    /// for in the same moment as the delete, so the library's answer can still list the note: no page shows one of these.</summary>
+    readonly HashSet<string> gone = [];
+
     /// <summary>Delete, confirmed: the note leaves the page at once (its own page gives way to where the student came
-    /// from), the library deletes it, and "Deleted · Undo" shows for a few seconds. If the library refuses, the host
+    /// from), the library deletes it, and "Deleted · Undo" shows for a few minutes. If the library refuses, the host
     /// reads the page again.</summary>
     [RelayCommand(AllowConcurrentExecutions = true)]
     async Task ConfirmDelete()
     {
         if (Deleting is not { } d) return;
         Deleting = null;
+        gone.Add(d.Id);
         bool open = Remove(d);
         Moved = null;
+        undoable.Add(d);
         Deleted = d;
         if (open) OnLeaveNote?.Invoke();
         bool ok = OnDelete is null || await OnDelete(d);
         if (!ok)
         {
-            if (Deleted == d) Deleted = null;
+            gone.Remove(d.Id);
+            Forget(d);
             return;
         }
         _ = HideDeletedAfterAWhile(d);
@@ -617,20 +632,35 @@ public sealed partial class LibraryModel : ObservableObject
 
     async Task HideDeletedAfterAWhile(LectureDeletion d)
     {
-        await Task.Delay(UndoShows);
-        if (Deleted == d) Deleted = null;
+        await Task.Delay(DeletedShows);
+        Forget(d);
+    }
+
+    /// <summary>A deletion's Undo is over (it was undone, its minutes are up, or the library refused to delete it): the
+    /// toast goes back to the deletion before it, if one can still be undone. (This very deletion, not one that reads
+    /// the same: a note deleted, brought back and deleted again has its own few minutes.)</summary>
+    void Forget(LectureDeletion d)
+    {
+        undoable.RemoveAll(x => ReferenceEquals(x, d));
+        if (ReferenceEquals(Deleted, d)) Deleted = undoable.Count > 0 ? undoable[^1] : null;
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]
     async Task Undo()
     {
         if (Deleted is not { } d) return;
-        Deleted = null;
+        Forget(d);
+        gone.Remove(d.Id);
         if (OnUndo is not null) await OnUndo(d);
     }
 
+    /// <summary>The toast's ×: "Deleted · Undo" is put away, and with it any deletion waiting behind it.</summary>
     [RelayCommand]
-    void DismissDeleted() => Deleted = null;
+    void DismissDeleted()
+    {
+        undoable.Clear();
+        Deleted = null;
+    }
 
     /// <summary>Takes a note out of the page's list and its folder's count, and closes it if it's open (true then).</summary>
     public bool Remove(LectureDeletion d)
@@ -654,10 +684,10 @@ public sealed partial class LibraryModel : ObservableObject
     public Func<NoteMove, Task>? OnUndoMove { get; set; }
     partial void OnMovedChanged(NoteMove? value) => ToastChanged();
 
-    /// <summary>A note was moved: the toast says where, with Undo, for a few seconds.</summary>
+    /// <summary>A note was moved: the toast says where, with Undo, for a few seconds. (A deletion that can still be
+    /// undone waits behind it, and shows again after.)</summary>
     public void SayMoved(NoteMove move)
     {
-        Deleted = null;
         Moved = move;
         _ = HideMovedAfterAWhile(move);
     }
@@ -671,10 +701,13 @@ public sealed partial class LibraryModel : ObservableObject
     /// <summary>The toast at the page's foot: what just happened, and Undo.</summary>
     public string ToastSaid => Moved?.Said ?? Deleted?.Said ?? "";
     public bool HasToast => Moved is not null || Deleted is not null;
+    /// <summary>"Deleted · Undo" stays for minutes, so it has a × to put it away; "Moved" goes by itself in seconds.</summary>
+    public bool CanDismissToast => Moved is null && Deleted is not null;
     void ToastChanged()
     {
         OnPropertyChanged(nameof(ToastSaid));
         OnPropertyChanged(nameof(HasToast));
+        OnPropertyChanged(nameof(CanDismissToast));
     }
 
     [RelayCommand(AllowConcurrentExecutions = true)]

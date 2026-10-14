@@ -156,14 +156,18 @@ public static partial class Shell
         LeavePage();
         overviewOf = DueHome;
         SelectInSidebar(null, due: true);
-        if (host.Remote() is null) return;
+        if (host.Remote() is not { } lib) return;
         await LoadCanvasAsync();
         if (turn != pageTurn) return;
         UpdateDueItem();
         UpdateNextDue();
         var term = await TermAsync();
         if (turn != pageTurn) return;
-        var page = OverviewModel.ForDue(OverviewSources([], WithTerm(CanvasLinked ? canvasDue : null, term)), dueOnly);
+        // The week's planner says which class meetings were recorded. The calendars hold this week's meetings (from
+        // Monday on), and the newest hundred notes reach back well past those.
+        var recorded = Events() is null ? [] : await NotesAsync(lib, null, 100, null);
+        if (turn != pageTurn) return;
+        var page = OverviewModel.ForDue(OverviewSources(recorded, WithTerm(CanvasLinked ? canvasDue : null, term)), dueOnly);
         if (library.Overview is { IsDuePage: true, Calendar: { } before } && page.Calendar is { } now) now.Resume(before);
         if (page.Calendar is { } calendar)
             calendar.PropertyChanged += (_, e) =>

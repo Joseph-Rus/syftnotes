@@ -164,7 +164,7 @@ public class LibraryWindowTests
     /// <paramref name="open"/>.</summary>
     static LibraryModel Lectures(bool open = false)
     {
-        var m = new LibraryModel { UndoShows = TimeSpan.FromMilliseconds(50) };
+        var m = new LibraryModel { UndoShows = TimeSpan.FromMilliseconds(50), DeletedShows = TimeSpan.FromMilliseconds(50) };
         m.Classes.Add(new ClassItem { Name = "CS 101", Count = 3, Selected = true });
         OverviewModel.LectureFacts L(string id, string title, int daysAgo) => new(id, title, "CS 101", Now.AddDays(-daysAgo), 3000, "", false);
         var sources = new OverviewModel.Sources
@@ -227,7 +227,7 @@ public class LibraryWindowTests
         Assert.True(m.HasDeleted && m.HasToast);
         Assert.Equal("Deleted “Recursion and the call stack”", m.ToastSaid);
 
-        // "Deleted · Undo" goes by itself after a few seconds.
+        // "Deleted · Undo" goes by itself once its minutes are up.
         await Task.Delay(400, TestContext.Current.CancellationToken);
         Assert.False(m.HasToast);
 
@@ -258,7 +258,11 @@ public class LibraryWindowTests
     public async Task Undo_brings_the_note_back_through_the_library_and_a_refusal_says_nothing_was_deleted()
     {
         var m = Lectures();
-        m.UndoShows = TimeSpan.FromMinutes(1);
+        // The question says "You can undo it for a few minutes": Undo stays that long, and inside the time the library
+        // keeps a deleted note in its trash.
+        Assert.Contains("You can undo it for a few minutes.", new LectureDeletion("a", "Recursion", "CS 101").Warning);
+        Assert.InRange(new LibraryModel().DeletedShows, TimeSpan.FromMinutes(3), StudyStash.Library.LibraryWeb.TrashKeeps - TimeSpan.FromMinutes(1));
+        m.DeletedShows = TimeSpan.FromMinutes(1);
         var undone = new List<string>();
         m.OnDelete = _ => Task.FromResult(true);
         m.OnUndo = d =>
@@ -268,8 +272,20 @@ public class LibraryWindowTests
         };
         m.DeleteCommand.Execute(Rows(m)[0]);
         await m.ConfirmDeleteCommand.ExecuteAsync(null);
+        // A second one deleted, and a note moved, while the first can still be undone: neither takes its Undo away.
+        m.DeleteCommand.Execute(Rows(m)[0]);
+        await m.ConfirmDeleteCommand.ExecuteAsync(null);
+        m.SayMoved(new NoteMove("c", "CS 101", ""));
+        Assert.Equal("Moved to Unsorted.", m.ToastSaid);
+        Assert.False(m.CanDismissToast);
+        await Task.Delay(400, TestContext.Current.CancellationToken); // the move's own few seconds
+        Assert.Equal("Deleted “Stack frames and scope”", m.ToastSaid);
+        Assert.True(m.CanDismissToast);
         await m.UndoToastCommand.ExecuteAsync(null);
-        Assert.Equal(["a"], undone);
+        Assert.Equal(["b"], undone);
+        Assert.Equal("Deleted “Recursion and the call stack”", m.ToastSaid);
+        // The toast's × puts it away.
+        m.DismissDeletedCommand.Execute(null);
         Assert.False(m.HasToast);
 
         // The library refuses: no "Deleted · Undo" (the host reads the page again and says why).
@@ -277,6 +293,40 @@ public class LibraryWindowTests
         m.DeleteCommand.Execute(Rows(m)[0]);
         await m.ConfirmDeleteCommand.ExecuteAsync(null);
         Assert.False(m.HasToast);
+    }
+
+    [Fact]
+    public async Task A_note_deleted_from_its_own_page_is_out_of_Homes_list_at_once_and_back_on_Undo()
+    {
+        // Home as the library answers while "a" is still there: the page the note gives way to is asked for in the same
+        // moment as the delete, so its answer lists the note still.
+        OverviewModel Home(params string[] ids) => OverviewModel.Home(new OverviewModel.Sources
+        {
+            Now = Now, Zone = Zone, Classes = [("CS 101", Brushes.Gray, ids.Length)],
+            Lectures = [.. ids.Select((id, n) => new OverviewModel.LectureFacts(id, $"Lecture {id}", "CS 101", Now.AddDays(-n), 3000, "", false))],
+        });
+        var m = Lectures(open: true);
+        var library = new TaskCompletionSource<bool>();
+        m.OnLeaveNote = () => m.Overview = Home("a", "b", "c");
+        m.OnDelete = _ => library.Task;
+        m.OnUndo = _ =>
+        {
+            m.Overview = Home("a", "b", "c");
+            return Task.CompletedTask;
+        };
+
+        m.DeleteCommand.Execute(null);
+        var deleting = m.ConfirmDeleteCommand.ExecuteAsync(null);
+        Assert.Equal(["b", "c"], m.Overview!.Notes.Select(n => n.Id)); // gone before the library has answered
+        Assert.True(m.Overview.Notes[0].First);
+        library.SetResult(true);
+        await deleting;
+        // An answer that was on its way when the note went, arriving late.
+        m.Overview = Home("a", "b", "c");
+        Assert.Equal(["b", "c"], m.Overview!.Notes.Select(n => n.Id));
+
+        await m.UndoToastCommand.ExecuteAsync(null);
+        Assert.Equal(["a", "b", "c"], m.Overview!.Notes.Select(n => n.Id));
     }
 
     [Fact]
@@ -312,7 +362,7 @@ public class LibraryWindowTests
             deleted.Add(d.Id);
             return Task.FromResult(true);
         };
-        m.UndoShows = TimeSpan.FromMinutes(1);
+        m.DeletedShows = TimeSpan.FromMinutes(1);
         var view = Library(skin, m);
         var w = Host(view, skin);
         try
@@ -342,6 +392,7 @@ public class LibraryWindowTests
             var toast = Named<Border>("UndoToast");
             Assert.True(toast.IsEffectivelyVisible);
             Assert.Contains(toast.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "Undo");
+            Assert.True(Named<Button>("DismissToast").IsEffectivelyVisible); // it stays for minutes, so it can be put away
 
             // On the folder's page, a row's context menu offers Delete too.
             var folder = Lectures();
