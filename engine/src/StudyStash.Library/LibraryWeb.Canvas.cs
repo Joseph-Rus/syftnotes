@@ -625,9 +625,12 @@ public sealed partial class LibraryWeb
             : refusedAt is not null || s.ExtensionSeen.Length > 0 && !s.LastKeyMatches ? $"{Ui.Esc(s.BrowserName(start: true))} has an old key: connect it again"
             : s.SeenWithKey.Length > 0 ? $"Not lately (is {Ui.Esc(s.BrowserName())} open?)" : "Not set up";
         string code = Extension.ConnectionCode($"http://127.0.0.1:{cfg.WebPort}", CanvasSettings.ExtensionKey(cfg.Home), s.Url);
-        // Firefox's copy is on Mozilla's site; a browser's store copy is wherever that store has it.
-        string addOn = Extension.FirefoxAddOn.StartsWith("https://", StringComparison.Ordinal)
-            ? $"<a href=\"{Ui.Esc(Extension.FirefoxAddOn)}\">Study Stash for Canvas</a>" : "Study Stash for Canvas";
+        // Chrome's family adds it from the Chrome Web Store and Firefox's from Mozilla's site, each connected by the code;
+        // Opera and Chromium load the folder.
+        static string Link(string to, string words) =>
+            to.StartsWith("https://", StringComparison.Ordinal) ? $"<a href=\"{Ui.Esc(to)}\">{words}</a>" : words;
+        string stores = $"from the {Link(Extension.ChromeStorePublishedAt, "Chrome Web Store")}, or in Firefox from "
+            + $"{Link(Extension.FirefoxAddOn, "Mozilla's add-ons site")}";
         string folder = Extension.Folder(cfg.Home);
         string where = Extension.Ready(folder) ? $"<code>{Ui.Esc(folder)}</code>" : $"<code>{Ui.Esc(folder)}</code> (not ready: restart Study Stash)";
         return $"<div class=\"group-head\" id=\"canvas\">Canvas</div>{say}<form method=\"post\" action=\"/settings/canvas\"><div class=\"group\">"
@@ -641,16 +644,19 @@ public sealed partial class LibraryWeb
             + "assignments and instructions, your submissions and feedback, modules, files and announcements, into each class's Canvas folder.</p>"
             + scouts
             + "<details class=\"help\"><summary>Set up the extension on this computer</summary>"
-            + "<div class=\"group-head\">Chrome, Edge, Brave, Arc, Opera or Vivaldi</div><div class=\"group\">"
+            + "<div class=\"group-head\">Chrome, Edge, Brave, Arc, Vivaldi or Firefox</div><div class=\"group\">"
+            + $"<div class=\"row\"><span class=\"grow\">1. Add Study Stash for Canvas {stores}</span></div>"
+            + (code.Length == 0
+                ? "<div class=\"row\"><span class=\"grow\">2. Save your school's Canvas address above: the code to connect it shows here</span></div>"
+                : "<div class=\"row\"><span class=\"grow\">2. Click its Study Stash button and paste this code</span></div>"
+                    + $"<div class=\"row\"><code style=\"word-break:break-all;user-select:all\">{Ui.Esc(code)}</code></div>"
+                    + "<div class=\"row\"><span class=\"grow\">3. Click Connect, then Allow</span></div>")
+            + "</div>"
+            + "<div class=\"group-head\">Opera, or a browser that can't add it from a store</div><div class=\"group\">"
             + $"<div class=\"row\"><span class=\"grow\">The extension's folder is ready: {where}</span></div>"
             + "<div class=\"row\"><span class=\"grow\">1. In that browser, open chrome://extensions and turn on Developer mode</span></div>"
             + "<div class=\"row\"><span class=\"grow\">2. Click Load unpacked and pick that folder, or drag the folder onto the Extensions page</span></div>"
             + "</div>"
-            + (code.Length == 0 ? "" : "<div class=\"group-head\">Firefox, or a copy from a browser's store</div><div class=\"group\">"
-                + $"<div class=\"row\"><span class=\"grow\">1. Add {addOn} to the browser, click its button and paste this code</span></div>"
-                + $"<div class=\"row\"><code style=\"word-break:break-all;user-select:all\">{Ui.Esc(code)}</code></div>"
-                + "<div class=\"row\"><span class=\"grow\">2. Click Connect, then Allow</span></div>"
-                + "</div>")
             + "<p class=\"group-foot\">On a laptop that reaches this library from elsewhere, set it up from the Study Stash app's Settings instead.</p></details>";
     }
 

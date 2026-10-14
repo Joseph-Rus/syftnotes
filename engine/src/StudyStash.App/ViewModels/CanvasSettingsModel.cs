@@ -135,8 +135,9 @@ public sealed partial class CanvasSettingsModel : ObservableObject, IDisposable
     /// <summary>Windows' line under Sync: "Runs while Edge is open".</summary>
     [ObservableProperty] public partial string SyncRuns { get; set; } = "Runs while your browser is open";
 
-    /// <summary>Connect Canvas's steps (the extension's folder and the browser's Load unpacked, or Firefox's add-on and
-    /// code): from the extension row, to set it up again after it's gone from the browser, or in another one.</summary>
+    /// <summary>Connect Canvas's steps (the store's page and the code: the Chrome Web Store's, or Firefox's add-on; or
+    /// the extension's folder and the browser's Load unpacked): from the extension row, to set it up again after it's
+    /// gone from the browser, or in another one.</summary>
     public Action? OnSetUpExtension { get; set; }
 
     [RelayCommand]

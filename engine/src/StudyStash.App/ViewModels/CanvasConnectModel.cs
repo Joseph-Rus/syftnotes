@@ -173,15 +173,26 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public ObservableCollection<BrowserChoice> BrowserChoices { get; } = [];
     /// <summary>The browser this step adds the extension to: the one to use, until the student picks another.</summary>
     [NotifyPropertyChangedFor(nameof(BrowserName), nameof(IsFirefox), nameof(IsChromium), nameof(AddLabel), nameof(WaitingLabel), nameof(OpenExtensionsLabel),
-        nameof(BrowserHelp), nameof(FirefoxStep1), nameof(FirefoxStep3), nameof(ShowCode), nameof(ShowFolderLinks), nameof(ShowAddOnLink), nameof(AdviceText))]
+        nameof(AddOnAgainLabel), nameof(AdviceText))]
     [ObservableProperty]
     public partial Browser Browser { get; set; } = Browsers.Chrome;
     /// <summary>Its name, for every sentence in the step ("Add to Edge", "Waiting for Edge…").</summary>
     public string BrowserName => Browser.Name;
-    /// <summary>Firefox and the browsers built on it: the add-on is fetched and connected with a pasted code, so the
-    /// step shows three steps and the code where Chrome's family has its three pictures.</summary>
+    /// <summary>Firefox and the browsers built on it: the add-on comes from Mozilla's page and is connected with a
+    /// pasted code, always (<see cref="FromStore"/>).</summary>
     public bool IsFirefox => Browser.Family == BrowserFamily.Firefox;
     public bool IsChromium => !IsFirefox;
+    /// <summary>The student chose to load the folder in a browser that adds the extension from the Chrome Web Store
+    /// ("Load it from a folder instead": a school's Chrome may not let the store install anything).</summary>
+    [ObservableProperty] public partial bool LoadFolder { get; set; }
+    /// <summary>This browser has a store page for the extension (<see cref="Browsers.StorePage"/>).</summary>
+    bool HasStorePage => Browsers.StorePage(Browser).Length > 0;
+    /// <summary>The step adds the extension from the browser's store and connects it with a pasted code: Firefox's
+    /// family always (it keeps nothing else), and Chrome, Edge, Brave, Arc and Vivaldi unless the student chose the
+    /// folder. Shows three steps and the code where the folder has its three pictures.</summary>
+    public bool FromStore => IsFirefox || !LoadFolder && HasStorePage;
+    /// <summary>The step loads the folder Study Stash writes: Opera, Chromium, or a student who chose it.</summary>
+    public bool FromFolder => !FromStore;
     /// <summary>More than one browser here can take the extension: the step offers a quiet way to use another.</summary>
     public bool CanSwitchBrowser => BrowserChoices.Count > 1 && !BrowserConnected;
     public string AddLabel => $"Add to {BrowserName}";
@@ -199,9 +210,8 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     /// <summary>The third picture's caption: pick the folder, or (with Developer mode on) drag it onto the page.</summary>
     public string PickCaption => $"Pick the {FolderName} folder, or drag it onto the page";
     /// <summary>Add to Chrome has been pressed: the button gives way to quiet links and the "Waiting for Chrome…" row.</summary>
-    [NotifyPropertyChangedFor(nameof(WaitingForBrowser), nameof(ShowBrowserStatus), nameof(ShowAddToBrowser), nameof(ShowAddRow), nameof(BrowserHelp),
-        nameof(ShowFolderLinks), nameof(ShowAddOnLink), nameof(ShowLinks), nameof(ShowSwitchAfterLinks), nameof(ShowAdvice), nameof(ShowGetBrowser),
-        nameof(ShowHaveIt))]
+    [NotifyPropertyChangedFor(nameof(WaitingForBrowser), nameof(ShowBrowserStatus), nameof(ShowAddToBrowser), nameof(ShowAddRow), nameof(ShowAdvice),
+        nameof(ShowGetBrowser), nameof(ShowHaveIt))]
     [ObservableProperty]
     public partial bool AddedToBrowser { get; set; }
     [NotifyPropertyChangedFor(nameof(CanFinish))]
@@ -209,23 +219,40 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public partial bool AddingToBrowser { get; set; }
     /// <summary>A browser with the extension is talking to the library.</summary>
     [NotifyPropertyChangedFor(nameof(WaitingForBrowser), nameof(ShowBrowserStatus), nameof(ShowAddToBrowser), nameof(ShowAddRow), nameof(CanSwitchBrowser),
-        nameof(ShowLinks), nameof(ShowSwitchAfterLinks), nameof(ShowAdvice), nameof(ShowGetBrowser), nameof(ShowHaveIt))]
+        nameof(ShowAdvice), nameof(ShowGetBrowser), nameof(ShowHaveIt))]
     [ObservableProperty]
     public partial bool BrowserConnected { get; set; }
+
+    partial void OnBrowserChanged(Browser value) => HowChanged();
+    partial void OnLoadFolderChanged(bool value) => HowChanged();
+    partial void OnAddedToBrowserChanged(bool value) => HowChanged();
+    partial void OnBrowserConnectedChanged(bool value) => HowChanged();
+
+    /// <summary>The browser, the way it gets the extension, or how far that's got changed: the step's words, its
+    /// pictures or steps and its quiet links follow.</summary>
+    void HowChanged()
+    {
+        foreach (string name in (string[])[nameof(FromStore), nameof(FromFolder), nameof(BrowserHelp), nameof(StoreStep1), nameof(StoreStep2), nameof(StoreStep3),
+            nameof(ShowCode), nameof(ShowFolderLinks), nameof(ShowAddOnLink), nameof(ShowOtherWay), nameof(OtherWayLabel),
+            nameof(ShowLinks), nameof(ShowSwitchAfterLinks)])
+            OnPropertyChanged(name);
+    }
     [ObservableProperty] public partial string? BrowserError { get; set; }
     public bool ShowAddToBrowser => !AddedToBrowser && !BrowserConnected;
     /// <summary>Guided setup's helper card has a foot while there's something in it: its button, or the way to
     /// another browser.</summary>
     public bool ShowAddRow => ShowAddToBrowser || CanSwitchBrowser;
-    /// <summary>The line above the three pictures (or Firefox's three steps): what the button does, then (once
-    /// pressed) what's open now.</summary>
-    public string BrowserHelp => (IsFirefox, AddedToBrowser) switch
+    /// <summary>The line above the folder's three pictures (or the store's three steps): what the button does, then
+    /// (once pressed) what's open now.</summary>
+    public string BrowserHelp => (FromStore, IsFirefox, AddedToBrowser) switch
     {
-        (false, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} shows you the extension’s folder and opens {BrowserName}’s extensions page. There:",
-        (false, true) => $"{BrowserName}’s extensions page is open, and the folder is showing. In {BrowserName}:",
-        (true, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens the Study Stash add-on’s page there. Then:",
-        (true, true) when haveItAlready => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. To connect the add-on you have there:",
-        (true, true) => $"The Study Stash add-on’s page is open in {BrowserName}. There:",
+        (false, _, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} shows you the extension’s folder and opens {BrowserName}’s extensions page. There:",
+        (false, _, true) => $"{BrowserName}’s extensions page is open, and the folder is showing. In {BrowserName}:",
+        (true, true, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens the Study Stash add-on’s page there. Then:",
+        (true, true, true) when haveItAlready => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. To connect the add-on you have there:",
+        (true, true, true) => $"The Study Stash add-on’s page is open in {BrowserName}. There:",
+        (true, false, false) => $"Study Stash reads Canvas through your own sign-in in {BrowserName}. Add to {BrowserName} opens Study Stash for Canvas on the Chrome Web Store there. Then:",
+        (true, false, true) => $"Study Stash for Canvas is open on the Chrome Web Store in {BrowserName}. There:",
     };
     /// <summary>The student's usual browser can't take the extension (Safari; Firefox before its add-on is out), or
     /// nothing on this computer can: said above the step's help, with the browser Study Stash will use instead, until
@@ -249,35 +276,46 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     public string ConnectedIn(bool start = false) =>
         CanvasSettings.BrowserName(state.Extension?.Browser is { Length: > 0 } named ? named : AddedToBrowser ? BrowserName : "", start);
 
-    /// <summary>Firefox's three steps, where Chrome's family has its three pictures. The first is what Mozilla's page
-    /// for the add-on takes: its own blue Add to Firefox button, then the browser's question
-    /// (docs/firefox-add-on.md, "What a student sees").</summary>
-    public string FirefoxStep1 => haveItAlready
+    /// <summary>The store's three steps, where the folder has its three pictures. The first is what the store's page
+    /// takes: its own button, then the browser's question. Mozilla's page has a blue Add to Firefox button and Firefox
+    /// asks Add (docs/firefox-add-on.md, "What a student sees"); the Chrome Web Store's button is blue Add to Chrome
+    /// (Add to Brave in Brave) and the browser asks Add extension; in Edge it's Get extension, then Edge's own question
+    /// whether to allow extensions from other stores, the first time (docs/chrome-web-store.md, "What a student
+    /// sees").</summary>
+    public string StoreStep1 => haveItAlready
         ? $"In {BrowserName}, click the Study Stash button (it may be under the puzzle-piece Extensions button)."
-        : $"On the page that opens in {BrowserName}, click the blue Add to Firefox button, then Add when {BrowserName} asks.";
-    public string FirefoxStep2 => haveItAlready
+        : IsFirefox ? $"On the page that opens in {BrowserName}, click the blue Add to Firefox button, then Add when {BrowserName} asks."
+        : Browser == Browsers.Edge ? "On the page that opens in Edge, click Get extension. If Edge asks to allow extensions from other stores, click Allow. Then click Add extension."
+        : $"On the page that opens in {BrowserName}, click the blue {Browser.StoreButton} button, then Add extension when {BrowserName} asks.";
+    public string StoreStep2 => haveItAlready
         ? "Paste this code and click Connect."
         : "Click the Study Stash button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.";
-    public string FirefoxStep3 => $"Click Allow when {BrowserName} asks.";
-    /// <summary>The code a Firefox copy is connected with (<see cref="Extension.ConnectionCode"/>: the library as this
+    public string StoreStep3 => $"Click Allow when {BrowserName} asks.";
+    /// <summary>The code a store's copy is connected with (<see cref="Extension.ConnectionCode"/>: the library as this
     /// computer reaches it, the extension's key and the Canvas address); "" until the library has said.</summary>
     [NotifyPropertyChangedFor(nameof(ShowCode))]
     [ObservableProperty]
     public partial string ConnectionCode { get; set; } = "";
-    public bool ShowCode => IsFirefox && ConnectionCode.Length > 0;
+    public bool ShowCode => FromStore && ConnectionCode.Length > 0;
     /// <summary>Copy was pressed: the button says so.</summary>
     [NotifyPropertyChangedFor(nameof(CopyLabel))]
     [ObservableProperty]
     public partial bool CodeCopied { get; set; }
     public string CopyLabel => CodeCopied ? "Copied" : "Copy";
 
-    // The quiet links under the step, once the button's been pressed: the folder and the extensions page again
-    // (Chrome's family) or the add-on again (Firefox's), and the way to another browser when there is one.
-    public bool ShowFolderLinks => AddedToBrowser && IsChromium;
-    public bool ShowAddOnLink => AddedToBrowser && IsFirefox && !haveItAlready;
+    // The quiet links under the step, once the button's been pressed: the folder and the extensions page again, or
+    // the store's page again, and the way to another browser when there is one. Under them, on a line of its own, the
+    // folder in place of the Chrome Web Store (or back to it).
+    public bool ShowFolderLinks => AddedToBrowser && FromFolder;
+    public bool ShowAddOnLink => AddedToBrowser && FromStore && !haveItAlready;
+    public string AddOnAgainLabel => IsFirefox ? "Open the add-on again" : "Open the Chrome Web Store again";
     public bool ShowLinks => AddedToBrowser || CanSwitchBrowser;
     /// <summary>The dot between those links and "Use another browser": only when there's a link before it.</summary>
     public bool ShowSwitchAfterLinks => (ShowFolderLinks || ShowAddOnLink) && CanSwitchBrowser;
+    /// <summary>The Chrome Web Store didn't work out (a school's Chrome may not install from it): once Add to Chrome
+    /// has been pressed, the folder is offered instead; and from the folder, the store again.</summary>
+    public bool ShowOtherWay => IsChromium && HasStorePage && !BrowserConnected && (LoadFolder || AddedToBrowser);
+    public string OtherWayLabel => LoadFolder ? "Add it from the Chrome Web Store instead" : "Can’t add it from the store? Load it from a folder instead";
 
     // ---- step 3: find my courses ----
     [ObservableProperty] public partial bool SignedOut { get; set; }
@@ -359,7 +397,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         if (step == 5 && state.LastSync is { } synced) SyncedLine = $"Canvas synced {CanvasWords.Clock(synced, context.Clock.Zone)}.";
         if (!entering)
         {
-            if (step == 2 && IsFirefox) _ = ShowCodeAsync(); // the school's address is in the code, and may just have changed
+            if (step == 2 && FromStore) _ = ShowCodeAsync(); // the school's address is in the code, and may just have changed
             return;
         }
         switch (step)
@@ -447,11 +485,23 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         if (browser == Browser) return;
         pickedHere = true;
         haveItAlready = false;
+        LoadFolder = false;
         AddedToBrowser = false;
         BrowserError = null;
         Use(browser);
-        OnPropertyChanged(nameof(FirefoxStep2));
         context.Actions.RememberBrowser(browser);
+    }
+
+    /// <summary>"Load it from a folder instead", once Add to Chrome has opened the Chrome Web Store (a school's Chrome
+    /// may not install from it), or "Add it from the Chrome Web Store instead": the step is the other way's, with its
+    /// own button to press.</summary>
+    [RelayCommand]
+    void OtherWay()
+    {
+        LoadFolder = !LoadFolder;
+        AddedToBrowser = false;
+        BrowserError = null;
+        if (FromStore && Current == 2) _ = ShowCodeAsync();
     }
 
     /// <summary>"I already have it in Firefox": the step becomes that browser's, as it is once Add to Firefox has
@@ -476,7 +526,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
             pickedHere = true;
             haveItAlready = true;
             Use(usual);
-            OnPropertyChanged(nameof(FirefoxStep2));
+            HowChanged();
             context.Actions.RememberBrowser(usual);
             AddedToBrowser = true;
             if (Current == 2) hurry ??= watch.Hurry();
@@ -495,11 +545,11 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     {
         Browser = browser;
         foreach (var c in BrowserChoices) c.Current = c.Browser == browser;
-        if (IsFirefox && Current == 2) _ = ShowCodeAsync();
+        if (FromStore && Current == 2) _ = ShowCodeAsync();
     }
 
-    /// <summary>The code for Firefox's second step, as soon as the open step is Firefox's. A library that doesn't
-    /// answer just now leaves it out: Add to Firefox asks again, and says so.</summary>
+    /// <summary>The code for the store's second step, as soon as the open step is a store's. A library that doesn't
+    /// answer just now leaves it out: Add to Chrome (or Firefox) asks again, and says so.</summary>
     async Task ShowCodeAsync()
     {
         if (context.Client is not { } client) return;
@@ -509,11 +559,11 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         }
         catch (Exception e) when (e is CanvasLibraryException or HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
         {
-            // No code for now: pressing Add to Firefox asks again, and says why not.
+            // No code for now: pressing Add to Chrome (or Firefox) asks again, and says why not.
         }
     }
 
-    /// <summary>Asks the library for what a Firefox copy connects with and makes <see cref="ConnectionCode"/> from it
+    /// <summary>Asks the library for what a store's copy connects with and makes <see cref="ConnectionCode"/> from it
     /// ("" when there's no Canvas address or key yet). Null from a library too old to say.</summary>
     async Task<CanvasApi.ExtensionKey?> ReadCodeAsync(CanvasClient client)
     {
@@ -616,12 +666,13 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// Add to Chrome, or any browser of its family: gets the extension's folder ready on this computer (the library's
-    /// own when it runs here, else one made here pointing at the library), shows it in Finder/Explorer, and opens that
-    /// browser's extensions page — the three illustrated steps say what to do there. Add to Firefox, or any browser
-    /// of its family: opens the Study Stash add-on in it, with the code to paste showing here; no folder. After
-    /// either the button gives way to quiet links, and the watch says "Connected" as soon as the browser checks in.
-    /// A browser that couldn't be started is said, and the button stays.
+    /// Add to Chrome (or Edge, Brave, Arc, Vivaldi), or Add to Firefox (or a browser built on it): opens the
+    /// extension's page in that browser's store, the Chrome Web Store's or Mozilla's, with the code to paste showing
+    /// here; no folder. Add to Opera or Chromium, or to a browser whose student chose the folder: gets the extension's
+    /// folder ready on this computer (the library's own when it runs here, else one made here pointing at the
+    /// library), shows it in Finder/Explorer, and opens that browser's extensions page — the three illustrated steps
+    /// say what to do there. After either the button gives way to quiet links, and the watch says "Connected" as soon
+    /// as the browser checks in. A browser that couldn't be started is said, and the button stays.
     /// </summary>
     [RelayCommand]
     async Task AddToBrowser()
@@ -633,7 +684,7 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         {
             bool connected = false;
             string? problem;
-            if (IsFirefox)
+            if (FromStore)
             {
                 var info = await ReadCodeAsync(client);
                 if (ConnectionCode.Length == 0)
@@ -747,14 +798,14 @@ public sealed partial class CanvasConnectModel : ObservableObject, IDisposable
         if (context.Actions.OpenExtensions(Browser) is { } problem) BrowserError = problem;
     }
 
-    /// <summary>"Open the add-on again", after Add to Firefox.</summary>
+    /// <summary>"Open the add-on again" after Add to Firefox, "Open the Chrome Web Store again" after Add to Chrome.</summary>
     [RelayCommand]
     void OpenAddOn()
     {
         if (context.Actions.OpenAddOn(Browser) is { } problem) BrowserError = problem;
     }
 
-    /// <summary>Copy, beside Firefox's code.</summary>
+    /// <summary>Copy, beside the store's code.</summary>
     [RelayCommand]
     void CopyCode()
     {

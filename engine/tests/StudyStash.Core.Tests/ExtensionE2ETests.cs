@@ -423,6 +423,49 @@ public sealed class ExtensionE2ETests(ExtensionRig rig, ITestOutputHelper output
         Assert.Equal(System.Text.Json.JsonSerializer.Serialize($"{pasted.App} {pasted.Canvas}"), kept);
         Assert.Equal(before, ApiHits()); // nothing asked the pretend Canvas
     }
+
+    /// <summary>The Chrome Web Store item's public key, as it is in the package the store serves (the store gives each
+    /// copy its ID from it): <see cref="Extension.ChromeStoreId"/>.</summary>
+    const string ChromeStoreKey =
+        "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAr1Z3e7APYHndeOZt9TgmunKBY1tZNGDjqs3NuV/SjAEZxRKwsCSwtUmvCRu5Gdfw3UW+iiw+3lt4pnxb9ZAh4Bz0///heGZxd+LI"
+        + "ZeL+k5j14PQY8pCxocc+jkFvewXbXxCYa1AxcwB3RK6Sw9yl8PF304efsG4262bUnVqSs1+Rd1FpTvnhBqPFmhEDMVK1fp/FVDaIYl19h6Kv84mj0rtZYug2G00xOGJ5JlvchvuAsoUz"
+        + "Zx1hpmmugfBAO+SeZMw4VD91JCaPDU27/dDcnBcJ1HtMXykl2/rNIaKJmYt4FGrtGgNpxT96tQbxW/Qo2wwJpSxrbV401cHS9GDwRwIDAQAB";
+
+    [ChromeFact]
+    public async Task S9c_the_chrome_web_stores_copy_under_its_own_id_connects_by_its_code_and_finds_courses()
+    {
+        // The store zip under the store's own ID, connected by the code the library shows. Headless Chrome can't press
+        // Allow on Chrome's question, so the three sites Allow grants (the same as a folder's) are in its manifest.
+        Assert.Equal(Extension.ChromeStoreId, string.Concat(System.Security.Cryptography.SHA256.HashData(Convert.FromBase64String(ChromeStoreKey))[..16]
+            .Select(b => $"{(char)('a' + (b >> 4))}{(char)('a' + (b & 15))}")));
+        rig.StopChrome();
+        string zip = rig.Scratch("store-id.zip"), store = rig.Scratch("store-id-extension");
+        Extension.PackForStore(zip);
+        System.IO.Compression.ZipFile.ExtractToDirectory(zip, store);
+        var manifest = JsonNode.Parse(File.ReadAllText(Path.Combine(store, "manifest.json")))!.AsObject();
+        manifest["key"] = ChromeStoreKey;
+        manifest["host_permissions"] = JsonNode.Parse(File.ReadAllText(Path.Combine(rig.Folder, "manifest.json")))!["host_permissions"]!.DeepClone();
+        File.WriteAllText(Path.Combine(store, "manifest.json"), manifest.ToJsonString());
+        rig.StartChrome("chrome-profile-store-id", store);
+        await rig.UntilAsync(async () => await rig.EvaluateAsync("chrome.runtime.id") is var id && id != "null" ? id : null,
+            TimeSpan.FromSeconds(30), "the store's copy to start");
+        Assert.Equal($"\"{Extension.ChromeStoreId}\"", await rig.EvaluateAsync("chrome.runtime.id"));
+
+        string code = ExtensionRig.S((await rig.GetAsync("/api/v2/canvas/extension"))["connection_code"]);
+        await rig.EvaluateAsync($"connectWithCode({System.Text.Json.JsonSerializer.Serialize(code)}).catch(e => 'asked')", "popup.html");
+        await rig.EvaluateAsync("pump(true), 'woken'"); // as Allow would (permissions.onAdded); it keeps asking for work from here
+        var sw = Stopwatch.StartNew();
+        var about = await rig.UntilAsync(async () =>
+        {
+            var e = await rig.GetAsync("/api/v2/canvas/extension");
+            return e["connected"]?.GetValue<bool>() == true && ExtensionRig.S(e["seen_version"]) == Extension.Version() ? e : null;
+        }, TimeSpan.FromSeconds(60), "the store's copy to check in");
+        Note($"the store's copy ({Extension.ChromeStoreId}) checked in {sw.Elapsed.TotalSeconds:0.0} s after its code was pasted");
+        Assert.Equal(Extension.Protocol, about["seen_protocol"]!.GetValue<int>());
+        var found = await rig.PostAsync("/api/v2/canvas/courses", "{}");
+        Assert.Equal("", ExtensionRig.S(found["error"]));
+        Assert.False((await rig.GetAsync("/api/v2/canvas"))["extension_outdated"]!.GetValue<bool>());
+    }
 }
 
 /// <summary>One pretend Canvas, one library and one Chrome for all the end-to-end tests, started once (and only

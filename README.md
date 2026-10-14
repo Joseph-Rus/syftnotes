@@ -481,11 +481,20 @@ Waterfox). On your library's computer:
 2. Click **Add to Chrome** (the button names your own browser: Add to Edge, Add to Firefox; if the
    browser you usually use can't run the extension, like Safari, Study Stash says so and uses
    another one on your computer, or points you to Chrome when there's none).
-   - **Chrome and its family:** it opens that browser's extensions page and shows the extension's
-     folder. Turn on **Developer mode**, click **Load unpacked**, and pick that folder — or drag
-     the folder onto the Extensions page. On a Mac the folder is **Study Stash → Chrome
-     extension** in your home folder (`~/Study Stash/Chrome extension`), where the browser's
-     window can see it; on Windows it's `chrome-extension` in `%USERPROFILE%\.study-stash`.
+   - **Chrome, Edge, Brave, Arc and Vivaldi:** it opens
+     [Study Stash for Canvas](https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd)
+     on the Chrome Web Store. Click the blue **Add to Chrome** button (Add to Brave in Brave),
+     then **Add extension**. In Edge the button says **Get extension**, and the first time Edge
+     asks to allow extensions from other stores: click **Allow**. Then click the extension's
+     **Study Stash** button (it may be under the puzzle-piece Extensions button), paste the code
+     Study Stash shows, click **Connect**, then **Allow**.
+   - **Opera and Chromium**, or if your school's Chrome won't add it from the store (**Can't add
+     it from the store? Load it from a folder instead**): it opens that browser's extensions page
+     and shows the extension's folder. Turn on **Developer mode**, click **Load unpacked**, and
+     pick that folder — or drag the folder onto the Extensions page. On a Mac the folder is
+     **Study Stash → Chrome extension** in your home folder (`~/Study Stash/Chrome extension`),
+     where the browser's window can see it; on Windows it's `chrome-extension` in
+     `%USERPROFILE%\.study-stash`.
    - **Firefox and its family:** it opens
      [Study Stash for Canvas](https://addons.mozilla.org/firefox/addon/study-stash-for-canvas/)
      on Mozilla's add-ons site. Click the blue **Add to Firefox** button, then **Add**. Click the
@@ -572,8 +581,9 @@ the `STUDYSTASH_HOME` environment variable). If you connect Granola, its sign-in
 `granola-tokens.json`. The notes themselves are plain Markdown files in a
 folder per class, by default in **Documents/Study Stash** on the library's computer (Settings → Your library →
 Library → Notes folder shows where), which you can open, back up or sync however you like. On a Mac
-the browser extension's folder is `~/Study Stash/Chrome extension`, because a browser's Load
-unpacked window doesn't show folders whose names start with a dot.
+the browser extension's folder (for Opera, or a browser that can't add it from a store) is
+`~/Study Stash/Chrome extension`, because a browser's Load unpacked window doesn't show folders
+whose names start with a dot.
 
 ## Build from source
 

@@ -93,9 +93,11 @@ public sealed class CanvasSettings
     /// <summary>The Chrome that checked in last used the current key.</summary>
     [JsonIgnore] public bool LastKeyMatches => ExtensionSeen.Length > 0 && ExtensionKeyId == CurrentKeyId;
 
-    /// <summary>The extension Chrome runs is older than this library's: its folder wasn't brought up to date (one the
-    /// laptop app made, say), so it can't reload into the new version by itself.</summary>
-    [JsonIgnore] public bool ExtensionOutdated => Extension.IsOlder(ExtensionVersion, Extension.Version());
+    /// <summary>The extension the browser runs is older than this library's and can't bring itself up to date: one
+    /// from before protocol 2 (1.3) never reloads itself from its folder. A later one reloads itself when its folder is
+    /// rewritten, and a copy from a store (the Chrome Web Store's, Firefox's) is updated by that store, often days after
+    /// a new Study Stash has a newer folder: neither is ever told to reload by hand.</summary>
+    [JsonIgnore] public bool ExtensionOutdated => ExtensionProtocol < 2 && Extension.IsOlder(ExtensionVersion, Extension.Version());
 
     /// <summary>The browser the extension runs in, for a sentence: its name once an extension has said it
     /// (<see cref="ExtensionBrowser"/>), "your browser" until then ("Your browser" to <paramref name="start"/> one).</summary>

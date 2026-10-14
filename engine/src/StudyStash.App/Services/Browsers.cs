@@ -5,9 +5,9 @@ using StudyStash.Core.Canvas;
 
 namespace StudyStash.App.Services;
 
-/// <summary>What a browser is built on, which is how the Canvas extension gets into it: Chrome's family loads the
-/// folder Study Stash writes ("Load unpacked"); Firefox's family takes a signed add-on, connected by a pasted code;
-/// Safari takes neither.</summary>
+/// <summary>What a browser is built on, which is how the Canvas extension gets into it: Chrome's family adds it from the
+/// Chrome Web Store, or loads the folder Study Stash writes ("Load unpacked"); Firefox's family takes a signed add-on
+/// from Mozilla. A store's copy is connected by a pasted code. Safari takes neither.</summary>
 public enum BrowserFamily
 {
     Chromium,
@@ -20,10 +20,12 @@ public enum BrowserFamily
 /// first) and bundle id, where its exe lives on Windows (under Program Files, Program Files (x86) or the account's
 /// local app data), and how Windows names it as the default browser (the start of its ProgId). <see cref="Says"/> is
 /// what its extension tells the library it runs in, where that isn't its own name: Arc says Chrome; Zen and Firefox
-/// Developer Edition say Firefox.
+/// Developer Edition say Firefox. <see cref="StoreButton"/> is what the button on its store's page for the extension
+/// says there ("Add to Chrome", Brave's "Add to Brave", Edge's "Get extension"); null for a browser that loads the
+/// folder instead, or takes no extension.
 /// </summary>
 public sealed record Browser(string Name, BrowserFamily Family, IReadOnlyList<string> MacApps, string MacBundle, IReadOnlyList<string> WindowsExe,
-    IReadOnlyList<string> ProgIds, string? SaysItIs = null)
+    IReadOnlyList<string> ProgIds, string? SaysItIs = null, string? StoreButton = null)
 {
     public string Says => SaysItIs ?? Name;
 }
@@ -60,30 +62,30 @@ public sealed record BrowserAdvice(Browser? Usual, bool NoneHere)
 public static class Browsers
 {
     public static readonly Browser Chrome = new("Chrome", BrowserFamily.Chromium, ["Google Chrome"], "com.google.Chrome",
-        [@"Google\Chrome\Application\chrome.exe"], ["ChromeHTML"]);
+        [@"Google\Chrome\Application\chrome.exe"], ["ChromeHTML"], StoreButton: "Add to Chrome");
     public static readonly Browser Edge = new("Edge", BrowserFamily.Chromium, ["Microsoft Edge"], "com.microsoft.edgemac",
-        [@"Microsoft\Edge\Application\msedge.exe"], ["MSEdgeHTM"]);
+        [@"Microsoft\Edge\Application\msedge.exe"], ["MSEdgeHTM"], StoreButton: "Get extension");
     public static readonly Browser Brave = new("Brave", BrowserFamily.Chromium, ["Brave Browser"], "com.brave.Browser",
-        [@"BraveSoftware\Brave-Browser\Application\brave.exe"], ["BraveHTML"]);
+        [@"BraveSoftware\Brave-Browser\Application\brave.exe"], ["BraveHTML"], StoreButton: "Add to Brave");
     public static readonly Browser Arc = new("Arc", BrowserFamily.Chromium, ["Arc"], "company.thebrowser.Browser",
-        [@"Microsoft\WindowsApps\Arc.exe"], [], SaysItIs: "Chrome");
+        [@"Microsoft\WindowsApps\Arc.exe"], [], SaysItIs: "Chrome", StoreButton: "Add to Chrome");
     public static readonly Browser Opera = new("Opera", BrowserFamily.Chromium, ["Opera"], "com.operasoftware.Opera",
         [@"Programs\Opera\opera.exe", @"Opera\opera.exe", @"Programs\Opera\launcher.exe", @"Opera\launcher.exe"], ["OperaStable"]);
     public static readonly Browser Vivaldi = new("Vivaldi", BrowserFamily.Chromium, ["Vivaldi"], "com.vivaldi.Vivaldi",
-        [@"Vivaldi\Application\vivaldi.exe"], ["VivaldiHTM"]);
+        [@"Vivaldi\Application\vivaldi.exe"], ["VivaldiHTM"], StoreButton: "Add to Chrome");
     public static readonly Browser Chromium = new("Chromium", BrowserFamily.Chromium, ["Chromium"], "org.chromium.Chromium",
         [@"Chromium\Application\chrome.exe"], ["ChromiumHTM"]);
     public static readonly Browser Firefox = new("Firefox", BrowserFamily.Firefox, ["Firefox"], "org.mozilla.firefox",
-        [@"Mozilla Firefox\firefox.exe"], ["FirefoxURL", "FirefoxHTML"]);
+        [@"Mozilla Firefox\firefox.exe"], ["FirefoxURL", "FirefoxHTML"], StoreButton: "Add to Firefox");
     public static readonly Browser FirefoxDeveloper = new("Firefox Developer Edition", BrowserFamily.Firefox, ["Firefox Developer Edition"],
         "org.mozilla.firefoxdeveloperedition", [@"Firefox Developer Edition\firefox.exe"], ["FirefoxURL-CA9422711AE1A81C", "FirefoxHTML-CA9422711AE1A81C"],
-        SaysItIs: "Firefox");
+        SaysItIs: "Firefox", StoreButton: "Add to Firefox");
     public static readonly Browser Zen = new("Zen", BrowserFamily.Firefox, ["Zen", "Zen Browser"], "app.zen-browser.zen",
-        [@"Zen Browser\zen.exe"], ["ZenURL", "ZenHTML"], SaysItIs: "Firefox");
+        [@"Zen Browser\zen.exe"], ["ZenURL", "ZenHTML"], SaysItIs: "Firefox", StoreButton: "Add to Firefox");
     public static readonly Browser LibreWolf = new("LibreWolf", BrowserFamily.Firefox, ["LibreWolf"], "io.gitlab.librewolf-community.librewolf",
-        [@"LibreWolf\librewolf.exe"], ["LibreWolfURL", "LibreWolfHTM"]);
+        [@"LibreWolf\librewolf.exe"], ["LibreWolfURL", "LibreWolfHTM"], StoreButton: "Add to Firefox");
     public static readonly Browser Waterfox = new("Waterfox", BrowserFamily.Firefox, ["Waterfox"], "net.waterfox.waterfox",
-        [@"Waterfox\waterfox.exe"], ["WaterfoxURL", "WaterfoxHTML"]);
+        [@"Waterfox\waterfox.exe"], ["WaterfoxURL", "WaterfoxHTML"], StoreButton: "Add to Firefox");
     public static readonly Browser Safari = new("Safari", BrowserFamily.Safari, ["Safari"], "com.apple.Safari", [], []);
 
     /// <summary>Every browser Study Stash knows, in the order it offers them: Chrome's family, then Firefox's.</summary>
@@ -105,6 +107,22 @@ public static class Browsers
     /// <summary>The browser of that name ("Edge"), or null for one Study Stash doesn't know (and for "").</summary>
     public static Browser? Named(string? name) =>
         string.IsNullOrEmpty(name) ? null : Known.FirstOrDefault(b => b.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Where a browser gets the extension from its store, which Add to (browser) opens: Mozilla's page for Firefox's
+    /// family (<see cref="Extension.FirefoxAddOn"/>, or <paramref name="firefoxAddOn"/>), the Chrome Web Store's for
+    /// Chrome, Edge, Brave, Arc and Vivaldi (<see cref="Extension.ChromeStorePublishedAt"/>, or
+    /// <paramref name="chromeStore"/>), and "" for a browser that loads the folder: Opera installs from the Chrome Web
+    /// Store only after an add-on of Opera's own, and a Chromium may be a build that can't install from it at all.
+    /// </summary>
+    public static string StorePage(Browser browser, string? chromeStore = null, string? firefoxAddOn = null) =>
+        browser.StoreButton is null ? ""
+        : browser.Family switch
+        {
+            BrowserFamily.Firefox => firefoxAddOn ?? Extension.FirefoxAddOn,
+            BrowserFamily.Chromium => chromeStore ?? Extension.ChromeStorePublishedAt,
+            _ => "",
+        };
 
     /// <summary>Whether the extension can go in a browser: always in Chrome's family; in Firefox's only once there's
     /// somewhere to get the add-on (<see cref="Extension.FirefoxAddOn"/>, or <paramref name="firefoxAddOn"/>); never

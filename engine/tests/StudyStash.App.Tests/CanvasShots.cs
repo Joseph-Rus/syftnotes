@@ -347,11 +347,14 @@ public class CanvasShots
         return m;
     }
 
-    /// <summary>Setup's Canvas step: "chrome" (Add to Chrome, not pressed yet), "waiting" (pressed: the folder and
-    /// Chrome are open; on a <paramref name="mac"/>, the folder Chrome's picker shows there), or "found" (Chrome
-    /// connected and five courses found). On a computer with other browsers: "edge" (Edge is the one to use, with a
-    /// quiet way to another), "firefox" (Firefox's three steps and its code) and "firefox-waiting" (Add to Firefox
-    /// pressed). For a student who uses Safari: "safari" (Chrome is here, and is used instead) and "no-browser"
+    /// <summary>Setup's Canvas step: "chrome" (Add to Chrome, not pressed yet: the Chrome Web Store's three steps and
+    /// the code), "waiting" (pressed: the store's page is open in Chrome), "folder" (the store wouldn't do, so the
+    /// student chose the folder: its three pictures), "folder-waiting" (Add to Chrome pressed for the folder: it and
+    /// Chrome's extensions page are open; on a <paramref name="mac"/>, the folder Chrome's picker shows there), or
+    /// "found" (Chrome connected and five courses found). On a computer with other browsers: "edge" (Edge is the one
+    /// to use, with a quiet way to another; its store step says Get extension), "edge-waiting" (Add to Edge pressed),
+    /// "opera" (Opera loads the folder), "firefox" (Firefox's three steps and its code) and "firefox-waiting" (Add to
+    /// Firefox pressed). For a student who uses Safari: "safari" (Chrome is here, and is used instead) and "no-browser"
     /// (nothing here will do: get Chrome). For one who uses Firefox before Study Stash knows where its add-on is:
     /// "firefox-not-yet" (Chrome is used instead, or they say they have the add-on already) and "firefox-have-it"
     /// (they said so: its code, and nothing to add).</summary>
@@ -365,7 +368,8 @@ public class CanvasShots
             .Json(HttpMethod.Post, "/api/v2/canvas/courses", FoundCourses);
         IReadOnlyList<Browser>? browsers = at switch
         {
-            "edge" => [Browsers.Edge, Browsers.Chrome, Browsers.Firefox],
+            "edge" or "edge-waiting" => [Browsers.Edge, Browsers.Chrome, Browsers.Firefox],
+            "opera" => [Browsers.Opera],
             "firefox" or "firefox-waiting" => [Browsers.Firefox, Browsers.Chrome],
             "safari" or "firefox-not-yet" or "firefox-have-it" => [Browsers.Chrome, Browsers.Edge],
             _ => null,
@@ -375,10 +379,11 @@ public class CanvasShots
         var context = CanvasFixtures.Context(handler, "the-home", browsers: browsers, advice: advice);
         var m = new CanvasConnectModel(context, new CanvasWatch(context), forSetup: true);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>(at == "found" ? "state-connected" : "state-no-extension"), []);
-        if (at is "waiting" or "firefox-waiting") await m.AddToBrowserCommand.ExecuteAsync(null);
+        if (at is "folder" or "folder-waiting") m.OtherWayCommand.Execute(null);
+        if (at is "waiting" or "edge-waiting" or "firefox-waiting" or "folder-waiting") await m.AddToBrowserCommand.ExecuteAsync(null);
         if (at == "firefox-have-it") await m.HaveItCommand.ExecuteAsync(null);
-        if (at == "waiting" && mac) m.ExtensionFolder = Path.Combine("~", "Study Stash", "Chrome extension");
-        for (int i = 0; i < 100 && m.IsFirefox && m.ConnectionCode.Length == 0; i++) await Task.Delay(10); // the code is asked for as the step opens
+        if (at == "folder-waiting" && mac) m.ExtensionFolder = Path.Combine("~", "Study Stash", "Chrome extension");
+        for (int i = 0; i < 100 && m.FromStore && m.ConnectionCode.Length == 0; i++) await Task.Delay(10); // the code is asked for as the step opens
         m.Dispose(); // a still picture: the watch needn't keep asking
         return m;
     }
@@ -455,7 +460,7 @@ public class CanvasShots
     [AvaloniaFact]
     public async Task Mac_connect_setup()
     {
-        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser", "firefox-not-yet", "firefox-have-it" })
+        foreach (var at in new[] { "chrome", "waiting", "folder", "folder-waiting", "found", "edge", "edge-waiting", "opera", "firefox", "firefox-waiting", "safari", "no-browser", "firefox-not-yet", "firefox-have-it" })
         {
             var m = await SetupStepAsync(at, mac: true);
             foreach (var t in Themes)
@@ -470,7 +475,7 @@ public class CanvasShots
     [AvaloniaFact]
     public async Task Win_connect_setup()
     {
-        foreach (var at in new[] { "chrome", "waiting", "found", "edge", "firefox", "firefox-waiting", "safari", "no-browser", "firefox-not-yet", "firefox-have-it" })
+        foreach (var at in new[] { "chrome", "waiting", "folder", "folder-waiting", "found", "edge", "edge-waiting", "opera", "firefox", "firefox-waiting", "safari", "no-browser", "firefox-not-yet", "firefox-have-it" })
         {
             var m = await SetupStepAsync(at);
             foreach (var t in Themes)
