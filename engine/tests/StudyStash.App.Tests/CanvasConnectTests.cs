@@ -151,7 +151,55 @@ public class CanvasConnectTests
     }
 
     [Fact]
-    public async Task Add_to_Chrome_shows_the_folder_then_opens_chromes_extensions_page_once_each()
+    public async Task Add_to_Chrome_opens_the_Chrome_Web_Store_with_the_code_to_paste_and_never_a_folder()
+    {
+        var log = new List<(string What, string Arg)>();
+        var handler = new FakeLibrary()
+            .Json(HttpMethod.Get, "/api/v2/canvas", NoExtensionYet)
+            .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
+        var m = Model(handler, home: "the-home", log: log);
+        await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        // The store comes first: no Developer mode, no folder. Its first step is what the store's page takes.
+        Assert.True(m.FromStore);
+        Assert.Equal("Add to Chrome", m.AddLabel);
+        Assert.Equal("Study Stash reads Canvas through your own sign-in in Chrome. Add to Chrome opens Study Stash for Canvas on the Chrome Web Store there. Then:", m.BrowserHelp);
+        Assert.Equal("On the page that opens in Chrome, click the blue Add to Chrome button, then Add extension when Chrome asks.", m.StoreStep1);
+        Assert.Equal("Click Allow when Chrome asks.", m.StoreStep3);
+        Assert.Equal("https://chromewebstore.google.com/detail/study-stash-for-canvas/dfhoenhdjjbnopbepgkgjdgdnfmecjjd", Browsers.StorePage(Browsers.Chrome));
+
+        await m.AddToBrowserCommand.ExecuteAsync(null);
+
+        Assert.Equal([("OpenAddOn", "Chrome"), ("RememberBrowser", "Chrome")], log);
+        Assert.Null(m.ExtensionFolder);
+        Assert.False(m.ShowFolderLinks);
+        Assert.True(m.ShowAddOnLink);
+        Assert.Equal("Open the Chrome Web Store again", m.AddOnAgainLabel);
+        Assert.Equal("Study Stash for Canvas is open on the Chrome Web Store in Chrome. There:", m.BrowserHelp);
+        // The store's copy has no folder to read: the code connects it to the library as this computer reaches it.
+        Assert.True(m.ShowCode);
+        Assert.Equal(new StudyStash.Core.Canvas.ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"),
+            StudyStash.Core.Canvas.Extension.ReadConnectionCode(m.ConnectionCode));
+        Assert.Equal("Waiting for Chrome…", m.WaitingLabel);
+        // A school's Chrome may not install from the store: the folder is one quiet link away.
+        Assert.True(m.ShowOtherWay);
+        Assert.Equal("Can’t add it from the store? Load it from a folder instead", m.OtherWayLabel);
+        m.Dispose();
+
+        // Opera installs from the Chrome Web Store only after an add-on of Opera's own: it loads the folder.
+        log.Clear();
+        var opera = Model(handler, home: "the-home", log: log, browsers: [Browsers.Opera]);
+        await opera.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        Assert.True(opera.FromFolder);
+        Assert.False(opera.ShowOtherWay);
+        Assert.Contains("opens Opera’s extensions page", opera.BrowserHelp);
+        await opera.AddToBrowserCommand.ExecuteAsync(null);
+        Assert.Contains(("OpenExtensions", "Opera"), log);
+        Assert.False(opera.ShowCode);
+        opera.Dispose();
+    }
+
+    [Fact]
+    public async Task Loading_the_folder_instead_shows_it_then_opens_chromes_extensions_page_once_each()
     {
         var log = new List<(string What, string Arg)>();
         var handler = new FakeLibrary()
@@ -160,6 +208,15 @@ public class CanvasConnectTests
             .Json(HttpMethod.Get, "/api/v2/canvas/extension", "extension");
         var m = Model(handler, home: "the-home", log: log);
         await m.StartAsync(CanvasFixtures.Load<CanvasApi.State>("state-no-extension"), [], TestContext.Current.CancellationToken);
+        await m.AddToBrowserCommand.ExecuteAsync(null); // the store first
+
+        // The store wouldn't install it: the step is the folder's, with its own button to press.
+        m.OtherWayCommand.Execute(null);
+        Assert.True(m.FromFolder);
+        Assert.True(m.ShowAddToBrowser);
+        Assert.False(m.ShowCode);
+        Assert.Equal("Add it from the Chrome Web Store instead", m.OtherWayLabel);
+        log.Clear();
 
         await m.AddToBrowserCommand.ExecuteAsync(null);
 
@@ -180,7 +237,7 @@ public class CanvasConnectTests
     }
 
     [Fact]
-    public async Task Add_to_Chrome_says_so_when_the_library_has_no_folder_for_it()
+    public async Task Add_to_Chrome_says_so_when_the_library_has_nothing_to_connect_it_with()
     {
         var log = new List<(string What, string Arg)>();
         var handler = new FakeLibrary().Json(HttpMethod.Get, "/api/v2/canvas", NoExtensionYet); // no canvas/extension: nothing to make
@@ -268,16 +325,19 @@ public class CanvasConnectTests
         m.BrowserChoices[1].Pick.Execute(null);
 
         Assert.Equal("Add to Edge", m.AddLabel);
-        Assert.Contains("opens Edge’s extensions page", m.BrowserHelp);
-        Assert.True(m.IsChromium); // Edge loads the folder like Chrome: the same three pictures
+        // Edge adds it from the Chrome Web Store too, after a question of its own the first time.
+        Assert.True(m.FromStore);
+        Assert.Equal("Study Stash reads Canvas through your own sign-in in Edge. Add to Edge opens Study Stash for Canvas on the Chrome Web Store there. Then:", m.BrowserHelp);
+        Assert.Equal("On the page that opens in Edge, click Get extension. If Edge asks to allow extensions from other stores, click Allow. Then click Add extension.", m.StoreStep1);
         Assert.Equal([false, true], m.BrowserChoices.Select(c => c.Current));
         Assert.Equal([("RememberBrowser", "Edge")], log); // the one Study Stash opens Canvas in from now on
 
         log.Clear();
         await m.AddToBrowserCommand.ExecuteAsync(null);
-        Assert.Contains(("OpenExtensions", "Edge"), log);
+        Assert.Equal([("OpenAddOn", "Edge"), ("RememberBrowser", "Edge")], log);
         Assert.Equal("Waiting for Edge…", m.WaitingLabel);
-        Assert.Equal("Open Edge extensions", m.OpenExtensionsLabel);
+        Assert.True(m.ShowSwitchAfterLinks); // Open the Chrome Web Store again · Use another browser
+        Assert.True(m.ShowOtherWay); // and under them, the folder instead
         m.Dispose();
     }
 
@@ -293,7 +353,7 @@ public class CanvasConnectTests
         Assert.True(m.IsFirefox);
         Assert.Equal("Add to Firefox", m.AddLabel);
         // Mozilla's page for the add-on has a button of its own to press before Firefox asks anything.
-        Assert.Equal("On the page that opens in Firefox, click the blue Add to Firefox button, then Add when Firefox asks.", m.FirefoxStep1);
+        Assert.Equal("On the page that opens in Firefox, click the blue Add to Firefox button, then Add when Firefox asks.", m.StoreStep1);
 
         await m.AddToBrowserCommand.ExecuteAsync(null);
 
@@ -302,6 +362,8 @@ public class CanvasConnectTests
         Assert.Null(m.ExtensionFolder);
         Assert.False(m.ShowFolderLinks);
         Assert.True(m.ShowAddOnLink);
+        Assert.Equal("Open the add-on again", m.AddOnAgainLabel);
+        Assert.False(m.ShowOtherWay); // Firefox keeps only Mozilla's copy: there's no folder to offer
         // The code to paste connects to the library as this computer reaches it, with the extension's key and the school.
         Assert.True(m.ShowCode);
         Assert.Equal(new StudyStash.Core.Canvas.ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"),
@@ -331,7 +393,7 @@ public class CanvasConnectTests
         Assert.Equal("Your usual browser, Firefox Developer Edition, can’t run the Study Stash extension yet. Study Stash will use Chrome instead.", m.AdviceText);
         Assert.True(m.ShowHaveIt);
         Assert.Equal("I already have it in Firefox Developer Edition", m.HaveItLabel);
-        Assert.False(m.ShowCode);
+        Assert.Equal("Chrome", m.BrowserName); // Chrome's step (its store, and the same code) until they say so
 
         await m.HaveItCommand.ExecuteAsync(null);
 
@@ -343,8 +405,8 @@ public class CanvasConnectTests
         Assert.Equal(new StudyStash.Core.Canvas.ExtensionConnection("https://library.test", "test-key-abc123", "https://school.instructure.com"),
             StudyStash.Core.Canvas.Extension.ReadConnectionCode(m.ConnectionCode));
         Assert.Equal("Study Stash reads Canvas through your own sign-in in Firefox Developer Edition. To connect the add-on you have there:", m.BrowserHelp);
-        Assert.Equal("In Firefox Developer Edition, click the Study Stash button (it may be under the puzzle-piece Extensions button).", m.FirefoxStep1);
-        Assert.Equal("Paste this code and click Connect.", m.FirefoxStep2);
+        Assert.Equal("In Firefox Developer Edition, click the Study Stash button (it may be under the puzzle-piece Extensions button).", m.StoreStep1);
+        Assert.Equal("Paste this code and click Connect.", m.StoreStep2);
         Assert.True(m.WaitingForBrowser);
         Assert.Equal("Waiting for Firefox Developer Edition…", m.WaitingLabel);
         Assert.False(m.ShowAdvice);
@@ -352,13 +414,13 @@ public class CanvasConnectTests
         Assert.False(m.ShowAddOnLink); // there's no add-on page to open again
         Assert.False(m.ShowFolderLinks);
 
-        // Chrome after all: the step is Chrome's again, as it was.
+        // Chrome after all: the step is Chrome's again, as it was (its own store and button).
         Assert.True(m.CanSwitchBrowser);
         m.BrowserChoices[0].Pick.Execute(null);
         Assert.True(m.IsChromium);
-        Assert.False(m.ShowCode);
         Assert.True(m.ShowHaveIt);
-        Assert.Equal("Click the Study Stash button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.", m.FirefoxStep2);
+        Assert.Equal("On the page that opens in Chrome, click the blue Add to Chrome button, then Add extension when Chrome asks.", m.StoreStep1);
+        Assert.Equal("Click the Study Stash button (it may be under the puzzle-piece Extensions button), paste this code and click Connect.", m.StoreStep2);
 
         // Safari can't run it at all: there's nothing to already have.
         var safari = Model(handler, advice: new BrowserAdvice(Browsers.Safari, NoneHere: false));

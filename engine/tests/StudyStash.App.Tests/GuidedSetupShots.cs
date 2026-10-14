@@ -199,8 +199,8 @@ public sealed class GuidedSetupShots
             case "chrome_helper":
                 var ctx = CanvasFixtures.Context(new FakeLibrary(), browsers: browsers);
                 s.Canvas = new CanvasConnectModel(ctx, new CanvasWatch(ctx), forSetup: true) { AddedToBrowser = true, ExtensionFolder = "/Users/student/Study Stash/Chrome extension" };
-                // Firefox's card shows the code its second step pastes (as long as a student's own).
-                if (s.Canvas.IsFirefox)
+                // A store's card (the Chrome Web Store's, Mozilla's) shows the code its second step pastes (as long as a student's own).
+                if (s.Canvas.FromStore)
                     s.Canvas.ConnectionCode = StudyStash.Core.Canvas.Extension.ConnectionCode("http://127.0.0.1:8787", "q1W2e3R4t5Y6u7I8o9P0a1S2d3F4g5H6", "https://school.instructure.com");
                 break;
             case "course_picker":

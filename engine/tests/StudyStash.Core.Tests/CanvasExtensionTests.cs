@@ -298,6 +298,16 @@ public class CanvasExtensionTests
         await JsonOf(await AsExtension($"/api/v2/canvas/work?v={Extension.Version()}&p={Extension.Protocol}"));
         Assert.Null((await AsApp(HttpMethod.Get))["extension_update"]);
 
+        // A copy from the Chrome Web Store (or Firefox's) is updated by its store, often days after a new Study Stash
+        // has a newer folder: older than this library's, it still gets work and is never told to reload by hand.
+        now = now.AddMinutes(1);
+        work = await JsonOf(await AsExtension($"/api/v2/canvas/work?v=1.5&p={Extension.Protocol}&b=Chrome&force=1"));
+        Assert.NotEmpty(work["jobs"]!.AsArray());
+        state = await AsApp(HttpMethod.Get);
+        Assert.Equal("1.5", state["extension_version"]!.GetValue<string>());
+        Assert.False(state["extension_outdated"]!.GetValue<bool>());
+        Assert.Empty(state["state"]!["warnings"]!.AsArray());
+
         // The door still wants the extension's key (or the library's password).
         Assert.Equal(HttpStatusCode.Unauthorized, (await site.Client.GetAsync("/api/v2/canvas/work?v=1.3&p=2")).StatusCode);
     }
@@ -352,6 +362,9 @@ public class CanvasExtensionTests
         string page = await site.Text("/settings");
         Assert.DoesNotContain("Make it", page);
         Assert.Contains($"The extension's folder is ready: <code>{Ui.Esc(folder)}</code>", page);
+        // The Chrome Web Store comes first, linked, with the code to paste; the folder is for Opera and the like.
+        Assert.Contains($"<a href=\"{Extension.ChromeStorePublishedAt}\">Chrome Web Store</a>", page);
+        Assert.True(page.IndexOf("Chrome Web Store", StringComparison.Ordinal) < page.IndexOf("Load unpacked", StringComparison.Ordinal));
         // An old page's "Make it" just goes back to Settings.
         Assert.Equal("/settings#canvas", (await site.PostForm("/settings/canvas/extension")).Headers.Location!.OriginalString);
     }

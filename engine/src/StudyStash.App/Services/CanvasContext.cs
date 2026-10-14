@@ -14,8 +14,9 @@ public sealed record CanvasClock(Func<DateTimeOffset> Now, TimeZoneInfo Zone);
 /// for and launch nothing. <see cref="OpenInBrowser"/> and <see cref="OpenBrowser"/> open the browser the student
 /// reads Canvas in. <see cref="Browsers"/> is the browsers the extension can be added to here, the one to use first;
 /// <see cref="RememberBrowser"/> keeps the one the student added it to. <see cref="OpenExtensions"/> (a browser of
-/// Chrome's family at its extensions page) and <see cref="OpenAddOn"/> (the Firefox copy's page, in a browser of
-/// Firefox's family) hand back a sentence when the browser couldn't be started, null when it could. <see cref="Advise"/> says when the
+/// Chrome's family at its extensions page) and <see cref="OpenAddOn"/> (the extension's page in the browser's store:
+/// the Chrome Web Store's, or Mozilla's for Firefox's family) hand back a sentence when the browser couldn't be
+/// started, null when it could. <see cref="Advise"/> says when the
 /// student's usual browser can't take the extension, or nothing here can (null when there's nothing to say).</summary>
 public sealed record CanvasActions(
     Action<string> OpenUrl,
@@ -56,7 +57,7 @@ public sealed record CanvasContext(CanvasClient? Client, CanvasClock Clock, Func
                 if (host.Settings.CanvasBrowser != browser.Name) host.Save(s => s.CanvasBrowser = browser.Name);
             },
             OpenExtensions: browser => Browsers.OpenExtensions(browser),
-            OpenAddOn: browser => Browsers.Open(browser, Core.Canvas.Extension.FirefoxAddOn),
+            OpenAddOn: browser => Browsers.Open(browser, Browsers.StorePage(browser)),
             RevealFolder: Reveal,
             OpenFile: path => Machine.Open(path),
             PrepareExtension: (key, canvasUrl) => Core.Canvas.Extension.EnsureFor(host.Home, cc.ServerUrl, key, canvasUrl).Path,

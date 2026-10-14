@@ -2,9 +2,9 @@
 
 The Canvas extension is one set of files (`extension/`) that runs in two families of browser:
 
-- **Chrome and the browsers built on it** (Edge, Brave, Arc, Opera, Vivaldi, Chromium). They load the folder Study
-  Stash writes ("Load unpacked", see [canvas.md](canvas.md#the-extension)), or a copy from the Chrome Web Store
-  ([chrome-web-store.md](chrome-web-store.md)).
+- **Chrome and the browsers built on it** (Edge, Brave, Arc, Opera, Vivaldi, Chromium). Chrome, Edge, Brave, Arc and
+  Vivaldi add the copy published on the Chrome Web Store ([chrome-web-store.md](chrome-web-store.md)); Opera and
+  Chromium load the folder Study Stash writes ("Load unpacked", see [canvas.md](canvas.md#the-extension)).
 - **Firefox and the browsers built on it** (Zen, LibreWolf, Waterfox). This page.
 
 Version 1.6 is published on addons.mozilla.org (submitted 2026-10-06, public by the listing's own date on
@@ -193,9 +193,10 @@ Listing it is less to run.
 
 ## Other browsers
 
-- **Edge, Brave, Arc, Opera, Vivaldi** run the Chrome copy as it is: the folder ("Load unpacked" on their own
-  extensions page, which `chrome://extensions` opens in each of them), or the Chrome Web Store copy, which they all
-  install. Edge's and Opera's own stores take the same store zip.
+- **Edge, Brave, Arc, Vivaldi** run the Chrome copy as it is, from the Chrome Web Store, which the Canvas step opens
+  in each of them. **Opera** loads the folder ("Load unpacked" on its own extensions page, which `chrome://extensions`
+  opens), since it installs from the Chrome Web Store only after an add-on of its own. Edge's and Opera's own stores
+  would take the same store zip; it isn't published there.
 - **Zen, LibreWolf, Waterfox** install the Firefox add-on from addons.mozilla.org.
 - **Safari** isn't built. A Safari extension ships inside a Mac app as a signed app extension, made with Xcode
   (`xcrun safari-web-extension-converter` starts from these same files), and is turned on in Safari's settings. That's
