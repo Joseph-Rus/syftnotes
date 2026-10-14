@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy policy · Study Stash</title>
 <meta name="description" content="Study Stash's privacy policy: everything stays on your own computers. What the app reads from Google Calendar, Microsoft calendars and Canvas, what it does with it, and how to take it back.">
-<meta name="theme-color" content="#f8f5ee" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#151a2b" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f1efe6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1b1f" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="Study Stash">
 <meta property="og:title" content="Study Stash privacy policy">
 <meta property="og:description" content="Everything stays on your own computers. No accounts, no servers, no analytics.">
 <link rel="icon" type="image/png" href="../assets/favicon.png">
 <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
-<link rel="stylesheet" href="../assets/site.css">
+<link rel="stylesheet" href="../assets/site.css?v=3">
 <script src="../assets/site.js" defer></script>
 </head>
 <body>
@@ -41,7 +41,7 @@
       <p class="lede">Study Stash is an app you run yourself, not a service. There's no Study Stash account, no Study
         Stash server and no analytics. This page says exactly what the app reads, where it keeps it, and how to take it
         back.</p>
-      <p class="updated">Last updated 28 September 2026</p>
+      <p class="updated">Last updated 13 October 2026</p>
       <ul class="toc" aria-label="On this page">
         <li><a href="#short">In short</a></li>
         <li><a href="#stays">What stays on your computers</a></li>
@@ -61,8 +61,8 @@
         <li><strong>Your recordings, transcripts, notes and everything else Study Stash makes are kept on your own
           computers</strong>: your laptop, and your library's computer if you use one. Nothing is sent to the people who
           make Study Stash, and we have no way to see it.</li>
-        <li><strong>The audio never leaves the computer that recorded it.</strong> Whisper transcribes it on that
-          computer.</li>
+        <li><strong>The audio never leaves the computer that recorded it.</strong> It's transcribed on that computer,
+          by Whisper, NVIDIA Parakeet or Cactus Whistle, depending on the computer and the model you choose.</li>
         <li><strong>No analytics, tracking, advertising or crash reporting.</strong> The app has no code that reports
           on you, and this website has no cookies, trackers or third-party scripts.</li>
         <li><strong>Calendars and Canvas are read-only</strong> and reached with your own sign-in. What Study Stash reads
@@ -74,15 +74,19 @@
         <a href="https://github.com/Joseph-Rus/study-stash">source code</a>.</p>
 
       <h2 id="stays">What stays on your computers</h2>
-      <p>Study Stash keeps its data in one folder, <code>~/.study-stash</code> in your home folder (on Windows,
-        <code>C:\Users\&lt;you&gt;\.study-stash</code>), unless you choose another place. In it are:</p>
+      <p>Study Stash keeps its data in two folders, unless you choose other places. Your notes are in
+        <strong>Documents/Study Stash</strong> on your library's computer (<strong>Settings → Your library → Library →
+        Notes folder</strong> shows where). Its settings, the lecture database and your recordings are in
+        <code>~/.study-stash</code> in your home folder (on Windows,
+        <code>C:\Users\&lt;you&gt;\.study-stash</code>). Between them, they hold:</p>
       <ul>
         <li>your recordings and their transcripts;</li>
         <li>your study notes, as plain Markdown files in a folder per class, and the lecture database;</li>
         <li>your classes, settings, and the questions you've asked and their answers;</li>
         <li>what Study Stash has copied from Canvas and your calendars (below);</li>
-        <li>the sign-ins it needs: your library's password, and the tokens that let it read your calendars. Files
-          holding secrets are written so only your own user account can read them.</li>
+        <li>the sign-ins it needs: your library's password, the tokens that let it read your calendars, your Granola
+          sign-in if you connect Granola, and an API key for Claude, ChatGPT or Gemini if you give Study Stash one.
+          Files holding secrets are written so only your own user account can read them.</li>
       </ul>
       <p><strong>Between your own computers.</strong> With a laptop and a library, the laptop sends each lecture to
         the library, and the library sends back notes, over your home network or over
@@ -92,9 +96,10 @@
         at any time. Tailscale is a separate service with its own
         <a href="https://tailscale.com/privacy-policy">privacy policy</a>; it sees which of your devices are connected,
         not what they send each other.</p>
-      <p><strong>Deleting it.</strong> Delete a lecture, a class or a phone in the app, or delete the
-        <code>.study-stash</code> folder to remove everything. Uninstalling the app leaves the folder in place, so your
-        notes aren't lost by accident.</p>
+      <p><strong>Deleting it.</strong> Delete a lecture, a class or a phone in the app. To remove everything, delete
+        both folders: your notes folder and <code>.study-stash</code> (and, on a Mac, the Canvas extension's own
+        folder, <code>~/Study Stash/Chrome extension</code>). Uninstalling the app leaves them in place, so your notes
+        aren't lost by accident.</p>
 
       <h2 id="calendars">Calendars (Google, Microsoft, Apple and calendar links)</h2>
       <p>If you connect a calendar, Study Stash uses it to show your upcoming classes and events, and to work out which
@@ -171,17 +176,18 @@
       <h2 id="canvas">Canvas</h2>
       <p>Study Stash copies your Canvas courses (what's due, assignments and rubrics, your submissions and feedback,
         modules, files, pages, announcements, quizzes and discussions) into your library, so they sit next to your
-        lectures. It does this through the <strong>Study Stash for Canvas</strong> Chrome extension, using your own
-        Canvas sign-in in Chrome. Study Stash never sees your Canvas password, and the extension never reads your
-        cookies: Chrome sends them to Canvas as it would for any page you open.</p>
+        lectures. It does this through the <strong>Study Stash for Canvas</strong> browser extension, in Chrome, Firefox
+        or a browser built on one of them, using your own Canvas sign-in in that browser. Study Stash never sees your
+        Canvas password, and the extension never reads your cookies: the browser sends them to Canvas as it would for
+        any page you open.</p>
       <ul>
         <li>It only reads. Nothing on Canvas is changed or submitted.</li>
         <li>What it reads goes only to your own library, on a computer you control. Not to the developers, not to
           anyone else.</li>
         <li>The extension can reach only your school's Canvas, Canvas's file storage and your library: the sites you
           give it.</li>
-        <li>To stop, remove the extension from Chrome. To delete what was copied, delete the class's Canvas folder in
-          your library.</li>
+        <li>To stop, remove the extension from your browser. To delete what was copied, delete the class's Canvas
+          folder in your library.</li>
       </ul>
 
       <h2 id="ai">AI engines</h2>
@@ -194,21 +200,31 @@
           transcript (or the notes and passages a question needs) and the company's service writes the answer. That
           company handles it under its terms and privacy policy, with your account. Study Stash's developers never
           see it.</li>
-        <li><strong>Claude and other MCP apps</strong> can read your library only if you set that up in
-          <strong>Settings → AI tool access</strong>, and only read. Internet access for claude.ai is off unless you turn
-          it on, and it's protected by signing in with your library password.</li>
+        <li><strong>An API key</strong> for Claude, ChatGPT or Gemini can be used instead, if you give Study Stash one
+          in <strong>Settings → Your library → Your AI</strong>. Study Stash then sends the transcript (or the notes
+          and passages a question needs) straight to that company's API, with your key. The key is kept in a file in
+          <code>.study-stash</code> on your library's computer and is sent only to that company's API.</li>
+        <li><strong>Claude, ChatGPT and other AI apps</strong> can read your library only if you set that up in
+          <strong>Settings → Your library → AI apps</strong>, and only read. The apps on your computer (the Claude
+          and ChatGPT apps, Claude Code, Gemini CLI) read it through that computer once you choose
+          <strong>Connect</strong>, with no address on the internet. claude.ai and chatgpt.com in a browser, and the
+          Claude phone app, run on Anthropic's and OpenAI's servers, so they need your library to have an address on
+          the internet: that's off unless you turn it on, and it's protected by signing in with your library
+          password.</li>
       </ul>
       <p>Without an engine, lectures are still transcribed and filed.</p>
 
       <h2 id="network">What the app contacts</h2>
-      <p>Apart from your own computers and the services you connect (your calendars, Canvas, and the AI engine you
-        choose), Study Stash contacts:</p>
+      <p>Apart from your own computers and the services you connect (your calendars, Canvas, Granola, and the AI
+        engine you choose), Study Stash contacts:</p>
       <ul>
         <li><strong>GitHub</strong>, to check for and download updates from Study Stash's own
           <a href="https://github.com/Joseph-Rus/study-stash/releases">releases</a>. Each download is checked
           against the release's checksums. You can turn automatic updates off.</li>
-        <li><strong>Hugging Face</strong>, once, to download the Whisper transcription model, and
-          <strong>ollama.com</strong> if you ask it to install Ollama or a model.</li>
+        <li><strong>Hugging Face</strong>, to download the transcription model you pick (a Whisper model or NVIDIA
+          Parakeet; Cactus Whistle comes with the app) and, if you turn on <strong>Tell speakers apart</strong>, the
+          models that tell voices apart. And <strong>ollama.com</strong> if you ask it to install Ollama or a
+          model.</li>
         <li><strong>jsDelivr</strong>, a public CDN, when your library's web pages show formulas: your browser loads
           the KaTeX maths typesetter from it.</li>
         <li><strong>Cloudflare's public DNS</strong>, only when you check whether claude.ai can reach your library, to
@@ -216,6 +232,14 @@
       </ul>
       <p>None of these requests include your notes, recordings, calendar or Canvas data, and none identify you beyond
         what any web request does (your IP address).</p>
+      <p><strong>Granola</strong> is contacted only if you connect it in <strong>Settings → Granola</strong>, to bring
+        over lectures you recorded there. You sign in on Granola's own page in your browser, so Study Stash never sees
+        your Granola password. It then looks at your lectures in Granola every few minutes, through Granola's own
+        connection for apps (<code>mcp.granola.ai</code>), and a lecture you choose to transfer goes to your own
+        library, the way a recording does. It only reads: nothing in Granola is changed. The sign-in is kept in
+        <code>.study-stash</code> on the computer you record on, with the email address of your Granola account (so
+        Settings can show it) and a note of which lectures you've brought over or left. <strong>Disconnect</strong>
+        forgets the sign-in, and the lectures already brought over stay.</p>
 
       <h2 id="website">This website</h2>
       <p>This site is static pages hosted by Firebase Hosting. It sets no cookies, runs no analytics and loads nothing
