@@ -557,7 +557,7 @@ public static partial class SelfTest
             await RoundAsync(s, actions, took);
             double seconds = clock.Elapsed.TotalSeconds;
             var now = await MeasureAsync();
-            SoakSay($"round {r} ({seconds:0} s): heap {Mb(now.Heap)} MB ({(now.Heap - last.Heap) / 1024.0:+0;-0} KB), {FootWord} {Mb(now.Foot)} MB ({(now.Foot - last.Foot) / 1048576.0:+0.0;-0.0}), "
+            SoakSay($"round {r} ({seconds:0} s): heap {Mb(now.Heap)} MB ({(now.Heap - last.Heap) / 1024.0:+0;-0} KB), {FootWord} {Mb(now.Foot)} MB ({Math.Round((now.Foot - last.Foot) / 1048576.0, 1):+0.0;-0.0;0.0}), "
                     + $"working set {Mb(now.Set)} MB; app objects up since the start: {Grew(start, now)}");
             last = now;
         }
