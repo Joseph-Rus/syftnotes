@@ -349,7 +349,8 @@ jobs:
     name: Mac app self-test (just this computer)
     needs: [version]
     if: needs.version.outputs.tested != 'true'
-    timeout-minutes: 25
+    # THROWAWAY (branch memory-soak-0.16, never merged): the memory soak runs after the self-test.
+    timeout-minutes: 100
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -364,10 +365,23 @@ jobs:
           cache-dependency-path: web/package-lock.json
       - name: Build Study Stash.app
         run: sh macos/build-app.sh dist/mac
-      - name: Self-test, just this computer - setup makes the app's own library, and the notes are written here
+      # THROWAWAY (branch memory-soak-0.16): the self-test goes on to the memory soak (8 rounds of everything a student
+      # does, measured after each); heap snapshots A (after the warm-up) and B (after the rounds) by dotnet-gcdump.
+      - name: dotnet-gcdump, for the soak's heap snapshots
+        run: dotnet tool install dotnet-gcdump --tool-path "$RUNNER_TEMP/tools"
+      - name: Self-test, just this computer - setup makes the app's own library, and the notes are written here; then the memory soak
         env:
           STUDYSTASH_SELFTEST_FLOW: one-computer
-        run: sh macos/selftest.sh "dist/mac/Study Stash.app" "$RUNNER_TEMP/selftest/one-computer"
+          STUDYSTASH_SOAK: "8"
+          STUDYSTASH_SOAK_EACH: "3"
+          STUDYSTASH_SOAK_PAUSE: "1"
+          STUDYSTASH_SELFTEST_SECONDS: "4800"
+        run: |
+          OUT="$RUNNER_TEMP/selftest/one-computer"
+          sh macos/selftest.sh "dist/mac/Study Stash.app" "$OUT" &
+          test=$!
+          sh .github/scripts/memory-soak-snapshots.sh "$OUT" "$RUNNER_TEMP/tools/dotnet-gcdump" "$test" "$STUDYSTASH_SOAK"
+          wait $test
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -422,7 +436,8 @@ jobs:
     name: Windows app (self-test, Setup.exe)
     needs: [version]
     if: needs.version.outputs.tested != 'true' || (needs.version.outputs.installers == 'true' && needs.version.outputs.reuse_run == '')
-    timeout-minutes: ${{ needs.version.outputs.win_signing != 'off' && 40 || 25 }}
+    # THROWAWAY (branch memory-soak-0.16, never merged): the memory soak runs after the laptop self-test.
+    timeout-minutes: ${{ needs.version.outputs.win_signing != 'off' && 120 || 100 }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -605,9 +620,15 @@ jobs:
           if ($env:HOW -eq "rehearsal") { $check.Rehearsal = $true }
           .\windows\verify-signing.ps1 @check "$app\StudyStash.exe" "$app\unins000.exe" "$app\libSkiaSharp.dll"
       # A release runs this from the copy the installer put there; a merge, which has no installer, from the build.
-      - name: Self-test (D5), as a laptop - its native code came with the installer, and a lecture's formulas and flowchart draw
+      # THROWAWAY (branch memory-soak-0.16): the laptop self-test goes on to the memory soak (8 rounds of everything a
+      # student does, measured after each); heap snapshots A (after the warm-up) and B (after the rounds) by dotnet-gcdump.
+      - name: dotnet-gcdump, for the soak's heap snapshots
+        shell: pwsh
+        run: dotnet tool install dotnet-gcdump --tool-path "$env:RUNNER_TEMP\tools"
+      - name: Self-test (D5), as a laptop - its native code came with the installer, and a lecture's formulas and flowchart draw; then the memory soak
         if: needs.version.outputs.tested != 'true' || needs.version.outputs.installers == 'true'
         shell: pwsh
+        timeout-minutes: 85
         run: |
           $selftestHome = "$env:RUNNER_TEMP\selftest-home"
           $out = "$env:RUNNER_TEMP\selftest"
@@ -616,10 +637,25 @@ jobs:
           $env:STUDYSTASH_MIC_FILE = (Resolve-Path "engine\tests\StudyStash.Core.Tests\Fixtures\speech.wav").Path
           $env:STUDYSTASH_MIC_SPEED = "4"
           $env:STUDYSTASH_MODEL_FILE = $env:STUDYSTASH_WHISPER_MODEL
+          $env:STUDYSTASH_SOAK = "8"
+          $env:STUDYSTASH_SOAK_EACH = "3"
+          $env:STUDYSTASH_SOAK_PAUSE = "1"
           $exe = if ("${{ needs.version.outputs.installers }}" -eq "true") { "$env:LOCALAPPDATA\Programs\Study Stash\StudyStash.exe" } else { (Resolve-Path "dist\windows\win-x64\StudyStash.exe").Path }
           Write-Host "Self-testing $exe"
           $p = Start-Process -FilePath $exe -ArgumentList "--home", $selftestHome -PassThru
-          if (-not $p.WaitForExit(480000)) { $p.Kill(); throw "Study Stash didn't exit within 480 s" }
+          # The soak pauses twice for a heap snapshot (pause-A, pause-B beside soak.txt), and goes on once go-A / go-B appear.
+          $gcdump = "$env:RUNNER_TEMP\tools\dotnet-gcdump.exe"
+          foreach ($name in "A", "B") {
+            while (-not (Test-Path "$out\pause-$name") -and -not $p.HasExited) { Start-Sleep 1 }
+            if ($p.HasExited) { break }
+            & $gcdump collect -p $p.Id -o "$out\$name.gcdump" | Select-Object -Last 1 | Write-Host
+            New-Item -ItemType File -Force -Path "$out\go-$name" | Out-Null
+            Write-Host "snapshot $name taken at $(Get-Date -Format HH:mm:ss)"
+          }
+          if (-not $p.WaitForExit(4800000)) { $p.Kill(); throw "Study Stash didn't exit within 80 minutes" }
+          foreach ($name in "A", "B") { if (Test-Path "$out\$name.gcdump") { & $gcdump report "$out\$name.gcdump" > "$out\$name.txt" } }
+          if ((Test-Path "$out\A.txt") -and (Test-Path "$out\B.txt")) { python .github\scripts\memory-soak-gcdump-diff.py "$out\A.txt" "$out\B.txt" $env:STUDYSTASH_SOAK > "$out\diff.txt"; Get-Content "$out\diff.txt" -TotalCount 45 | Write-Host }
+          if (Test-Path "$out\soak.txt") { Write-Host "--- soak.txt"; Get-Content "$out\soak.txt" | Write-Host }
           $lines = Get-Content "$out\selftest.txt"
           $lines | Write-Host
           if ($p.ExitCode -ne 0) { throw "exit code $($p.ExitCode)" }

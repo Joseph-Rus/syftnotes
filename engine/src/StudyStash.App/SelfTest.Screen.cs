@@ -46,7 +46,7 @@ public static partial class SelfTest
     /// alone, which is still worth a look).</summary>
     static void ScreenPicture(string name)
     {
-        if (!OperatingSystem.IsMacOS()) return;
+        if (!OperatingSystem.IsMacOS() || Shell.Soak.On) return; // THROWAWAY (memory soak): never a picture of the screen
         try
         {
             using var p = System.Diagnostics.Process.Start("/usr/sbin/screencapture", ["-x", Path.Combine(Dir!, name + "-screen.png")]);

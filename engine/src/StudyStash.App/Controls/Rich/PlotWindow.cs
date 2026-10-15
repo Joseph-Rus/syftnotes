@@ -62,7 +62,7 @@ public static class PlotWindow
         w.Title = view.Title;
         w.Content = ground;
         w.Show();
-        w.Activate();
+        Shell.Soak.Front(w);
         view.Focus(NavigationMethod.Pointer);
         return w;
     }

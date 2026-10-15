@@ -142,6 +142,8 @@ public sealed class SelfTestEngine : IAsyncDisposable
         "  D --> A",
         "```",
         "",
+        // THROWAWAY (memory soak): a plot too, to open larger.
+        .. Shell.Soak.On ? new[] { "```plot", StudyStash.Core.Rich.PlotDesign.Normal, "```", "" } : [],
         "## Announcements",
         "- The midterm is coming up: review recursion and the earlier units before then.",
         "",

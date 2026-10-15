@@ -125,7 +125,7 @@ public static partial class Shell
     {
         if (browserChoiceWindow is { } open)
         {
-            if (byHand) open.Activate();
+            if (byHand) Soak.Front(open);
             return;
         }
         string asked = ask.Where + "\n" + string.Join("\n", ask.Browsers);
@@ -155,7 +155,7 @@ public static partial class Shell
         w.Show();
         UpdateDock();
         // Asked for, it takes the keyboard like any window the student opens. Come up by itself, it doesn't.
-        if (byHand) w.Activate();
+        if (byHand) Soak.Front(w);
     }
 
     /// <summary>The student's pick: the library is told, the app opens Canvas in that browser from now on, and the
@@ -404,7 +404,7 @@ public static partial class Shell
         canvasConnectWindow = w;
         w.Show();
         UpdateDock();
-        w.Activate();
+        Soak.Front(w);
         Desktop.Activate();
         _ = StartConnectAsync(model, watch);
     }

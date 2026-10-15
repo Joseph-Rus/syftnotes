@@ -197,8 +197,9 @@ public static partial class SelfTest
         try
         {
             var script = Script();
-            if (await Task.WhenAny(script, Task.Delay(TimeSpan.FromMinutes(12))) != script)
-                throw new TimeoutException("the self-test ran past 12 minutes");
+            // THROWAWAY (memory soak): the soak takes as long as its rounds do.
+            if (await Task.WhenAny(script, Task.Delay(TimeSpan.FromMinutes(Shell.Soak.On ? 170 : 12))) != script)
+                throw new TimeoutException("the self-test ran past its time");
             await script;
             Say("ok");
         }
@@ -216,9 +217,16 @@ public static partial class SelfTest
     {
         var host = Shell.Host;
         Say($"skin {Skin.Current}, home {host.Home}{(OneComputer ? ", just this computer" : "")}");
+        if (Shell.Soak.On) StartTracking();
         if (OneComputer) await RunOneComputerSetupAsync(host);
         else await RunSetupAsync(host);
         await RunRecordingAsync(host);
+        // THROWAWAY (memory soak): after setup and the first lecture, everything a student does, over and over.
+        if (Shell.Soak.On)
+        {
+            await RunSoakAsync(host);
+            return;
+        }
         await RunProblemsAsync(host);
         await RunNotificationsAsync();
         await RunSettingsAsync();
@@ -243,8 +251,10 @@ public static partial class SelfTest
         m.NextCommand.Execute(null);
 
         // Library: find it (our own, on its own port, never 8787), a wrong password, then the right one.
-        await m.FindCommand.ExecuteAsync(null);
-        Say($"find: {m.LibraryResult}");
+        // THROWAWAY (memory soak): Find tries 8787 and Tailscale first, and the owner's Mac has a real library there.
+        if (Shell.Soak.On) m.Address = $"http://127.0.0.1:{Environment.GetEnvironmentVariable("STUDYSTASH_SELFTEST_LIBRARY_PORT")}";
+        else await m.FindCommand.ExecuteAsync(null);
+        Say($"find: {m.LibraryResult} ({m.Address})");
         Shot(Shell.Windows.Setup, "setup-library-found");
 
         m.ConnectPassword = "not-the-password";
@@ -598,8 +608,12 @@ public static partial class SelfTest
         if (live is null) throw new InvalidOperationException("Record didn't start a lecture");
         await Wait(1.5);
         Shot(Shell.Windows.Recorder, "recorder-pill");
-        await CheckRecorderDragAsync();
-        await CheckRecorderAwayAsync();
+        // THROWAWAY (memory soak): on the owner's own screen the pill isn't dragged, and the app never steps back.
+        if (!Shell.Soak.Quiet)
+        {
+            await CheckRecorderDragAsync();
+            await CheckRecorderAwayAsync();
+        }
 
         Shell.Windows.TogglePause();
         await Wait(0.5);

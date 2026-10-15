@@ -71,6 +71,9 @@ public static partial class Shell
     {
         app = application;
         life = desktop;
+        // THROWAWAY (memory soak): on someone's own screen, windows open without taking the keyboard from them.
+        if (Soak.Quiet)
+            application.Styles.Add(new Avalonia.Styling.Style(x => Avalonia.Styling.Selectors.Is<Window>(x)) { Setters = { new Avalonia.Styling.Setter(Window.ShowActivatedProperty, false) } });
         string home = Program.Home;
         // First, so a copy started a moment after this one finds it listening (what it says waits for the UI thread).
         Desktop.Listen(home, OnHandOff, stop.Token);
@@ -661,7 +664,7 @@ public static partial class Shell
             Program.Log($"[panel] class picked: {(name.Length == 0 ? "let the library sort it" : name)}");
             Refresh();
             // The dropdown stays up, showing Record's new label and the line under it.
-            panelWindow?.Activate();
+            Soak.Front(panelWindow);
         });
         if (panelWindow is null) return;
         var dropdown = panelWindow;
@@ -862,7 +865,7 @@ public static partial class Shell
             ? Placement.MacDropdown(anchor, panelWindow.ScreenList(), size, room)
             : Placement.TrayFlyout(anchor, panelWindow.ScreenList(), size, room));
         panelWindow.Show();
-        panelWindow.Activate();
+        Soak.Front(panelWindow);
         Desktop.Activate();
         host.WatchLiveWords(true);
     }
@@ -1037,7 +1040,7 @@ public static partial class Shell
         int room = (int)(Floating.ShadowRoom * scale);
         quickWindow.Put(Placement.QuickPanel(pointer, quickWindow.ScreenList(), size, room));
         quickWindow.Show();
-        quickWindow.Activate();
+        Soak.Front(quickWindow);
         Desktop.Activate();
         if (view is MacQuick mq) mq.FocusQuery();
         else if (view is WinQuick wq) wq.FocusQuery();
@@ -1185,7 +1188,7 @@ public static partial class Shell
     static void Raise(Window w)
     {
         if (w.WindowState == WindowState.Minimized) w.WindowState = WindowState.Normal;
-        w.Activate();
+        Soak.Front(w);
     }
 
     /// <summary>Settings → General's Run setup again: Settings makes way, and setup opens (guided, straight to the chat
@@ -1297,7 +1300,7 @@ public static partial class Shell
         setupWindow = w;
         w.Show();
         UpdateDock();
-        w.Activate();
+        Soak.Front(w);
         Desktop.Activate();
         _ = OpenGuidedAsync();
 
@@ -1576,7 +1579,7 @@ public static partial class Shell
         settingsWindow = w;
         w.Show();
         UpdateDock();
-        w.Activate();
+        Soak.Front(w);
         Desktop.Activate();
     }
 

@@ -55,7 +55,7 @@ public static class Desktop
     /// <summary>A Mac: bring the app forward, so the window it opened is in front of the one you were in.</summary>
     public static void Activate()
     {
-        if (!OperatingSystem.IsMacOS()) return;
+        if (!OperatingSystem.IsMacOS() || Shell.Soak.Quiet) return; // THROWAWAY (memory soak)
         try
         {
             ObjC.SendBool(ObjC.App, ObjC.sel_registerName("activateIgnoringOtherApps:"), true);

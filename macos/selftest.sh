@@ -46,9 +46,9 @@ pid=$!
 seconds=0
 while kill -0 "$pid" 2>/dev/null; do
   seconds=$((seconds + 1))
-  if [ "$seconds" -ge 480 ]; then
+  if [ "$seconds" -ge "${STUDYSTASH_SELFTEST_SECONDS:-480}" ]; then # THROWAWAY (memory soak): longer for the soak
     kill -9 "$pid" 2>/dev/null || true
-    echo "selftest.sh: Study Stash didn't exit within 480 s" >&2
+    echo "selftest.sh: Study Stash didn't exit within ${STUDYSTASH_SELFTEST_SECONDS:-480} s" >&2
     exit 1
   fi
   sleep 1

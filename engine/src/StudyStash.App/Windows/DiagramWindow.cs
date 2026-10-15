@@ -61,7 +61,7 @@ public static class DiagramWindow
         w.Title = request.Title;
         w.Content = content;
         w.Show();
-        w.Activate();
+        Shell.Soak.Front(w);
         // The keyboard starts on the diagram (a flowchart, or a drawing's stage), so its keys work at once; nothing is
         // left focused in what the window showed before.
         Control? keys = (Control?)content.GetLogicalDescendants().OfType<DiagramView>().FirstOrDefault()
