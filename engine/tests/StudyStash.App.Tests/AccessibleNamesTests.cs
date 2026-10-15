@@ -190,6 +190,39 @@ public class AccessibleNamesTests
         }
     }
 
+    /// <summary>A button whose words keep changing (the sidebar's recording row says the time every second) says the
+    /// newest and keeps no other: every name it had stayed with it, 4,000 an hour of recording, for as long as the app ran.</summary>
+    [AvaloniaFact]
+    public void A_button_whose_words_keep_changing_keeps_only_its_newest_name()
+    {
+        var time = new TextBlock { Text = "00:00" };
+        var button = new Button { Content = new StackPanel { Orientation = Avalonia.Layout.Orientation.Horizontal, Children = { new TextBlock { Text = "CS 101" }, time } } };
+        var window = new Window { Width = 300, Height = 100, Content = button };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var earlier = Tick(button, time, 200);
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        Assert.Equal("CS 101, 03:19", Said(button));
+        Assert.Equal(0, earlier.Count(name => name.IsAlive));
+        window.Close();
+    }
+
+    /// <summary>The time on the button goes up a second at a time; what's kept of each name it was given is a weak
+    /// reference (all but the newest).</summary>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    static List<WeakReference> Tick(Button button, TextBlock time, int seconds)
+    {
+        var earlier = new List<WeakReference>();
+        for (int s = 1; s < seconds; s++)
+        {
+            earlier.Add(new WeakReference(Avalonia.Automation.AutomationProperties.GetName(button)));
+            time.Text = $"{s / 60:00}:{s % 60:00}";
+        }
+        return earlier;
+    }
+
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
