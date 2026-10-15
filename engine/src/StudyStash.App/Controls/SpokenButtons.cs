@@ -18,6 +18,11 @@ public static class SpokenButtons
     /// <summary>The button's name is its own words, kept by this class (not a name a view gave it).</summary>
     static readonly AttachedProperty<bool> OursProperty = AvaloniaProperty.RegisterAttached<Button, bool>("Ours", typeof(SpokenButtons));
 
+    /// <summary>The name each button was given last, to take back when it's named again: a name set at a style's
+    /// strength stays until it's taken back, so a button whose words keep changing (the sidebar's recording row says
+    /// the time every second) kept every name it ever had, about 4,000 an hour of recording.</summary>
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Button, IDisposable> given = new();
+
     static bool used;
 
     /// <summary>What a button that is only an icon, with no name and no tooltip, is for: the last resort, for the icons
@@ -52,8 +57,11 @@ public static class SpokenButtons
         if (words.Length == 0 && button.Content is Icon { Glyph: { } glyph } && ByIcon.TryGetValue(glyph, out string? meant)) words = meant;
         if (words.Length == 0) return;
         button.SetValue(OursProperty, true);
-        // A style's strength, so a name a view binds later still wins.
-        button.SetValue(AutomationProperties.NameProperty, words, BindingPriority.Style);
+        // A style's strength, so a name a view binds later still wins. The new one first, then the last one taken back.
+        var named = button.SetValue(AutomationProperties.NameProperty, words, BindingPriority.Style);
+        if (given.TryGetValue(button, out var before)) before.Dispose();
+        if (named is not null) given.AddOrUpdate(button, named);
+        else given.Remove(button);
     }
 
     static void Again(TextBlock text)
