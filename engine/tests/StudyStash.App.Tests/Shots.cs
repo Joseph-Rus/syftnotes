@@ -508,13 +508,13 @@ public class SurfaceShots
     [AvaloniaFact]
     public void Mac_setup()
     {
-        foreach (var t in Themes) Shot.Take("mac-05-setup", SkinKind.Mac, t, () => new MacSetup { DataContext = Demo.Setup(SkinKind.Mac), DrawChrome = true });
+        foreach (var t in Themes) Shot.Take("mac-05-setup", SkinKind.Mac, t, () => new MacSetup { DataContext = Demo.Setup(SkinKind.Mac), DrawChrome = true }, size: new Size(1700, 708));
     }
 
     [AvaloniaFact]
     public void Win_setup()
     {
-        foreach (var t in Themes) Shot.Take("win-05-setup", SkinKind.Win, t, () => new WinSetup { DataContext = Demo.Setup(SkinKind.Win), DrawChrome = true });
+        foreach (var t in Themes) Shot.Take("win-05-setup", SkinKind.Win, t, () => new WinSetup { DataContext = Demo.Setup(SkinKind.Win), DrawChrome = true }, size: new Size(1700, 708));
     }
 
     /// <summary>Every page of the three setups (just this computer, the laptop, the library), in both looks, light and
@@ -529,7 +529,7 @@ public class SurfaceShots
                 foreach (var step in SetupModel.StepsFor(role, skin))
                 {
                     var m = await SetupPage(skin, role, step);
-                    var size = step switch { SetupStep.Canvas => new Size(1100, 928), SetupStep.Ai => new Size(1100, 808), _ => new Size(850, 608) };
+                    var size = step switch { SetupStep.Canvas => new Size(1100, 928), SetupStep.Ai => new Size(1100, 928), _ => new Size(888, 708) };
                     string flow = role switch { AppRole.Library => "library", AppRole.Laptop => "laptop", _ => "one-computer" };
                     string name = $"{look}-05-setup-{flow}-{step.ToString().ToLowerInvariant()}";
                     foreach (var t in Themes)
@@ -540,7 +540,7 @@ public class SurfaceShots
             foreach (var (step, what) in new[] { (SetupStep.Canvas, "canvas-found"), (SetupStep.Classes, "classes-canvas") })
             {
                 var m = await SetupPage(skin, AppRole.Laptop, step, canvasFound: true);
-                var size = step == SetupStep.Canvas ? new Size(1100, 928) : new Size(850, 768);
+                var size = step == SetupStep.Canvas ? new Size(1100, 928) : new Size(888, 768);
                 foreach (var t in Themes)
                     Shot.Take($"{look}-05-setup-laptop-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
                         size: size);
@@ -553,7 +553,7 @@ public class SurfaceShots
                 foreach (var t in Themes)
                     Shot.Take($"{look}-05-setup-{(role == AppRole.Laptop ? "laptop" : "one-computer")}-model-change", skin, t,
                         () => skin == SkinKind.Mac ? new MacSetup { DataContext = m, DrawChrome = true } : new WinSetup { DataContext = m, DrawChrome = true },
-                        size: new Size(850, 608));
+                        size: new Size(888, 708));
             }
             // Setup run again on the library: it keeps its name, password and notes folder.
             var again = await SetupPage(skin, AppRole.Library, SetupStep.Password);
@@ -561,7 +561,7 @@ public class SurfaceShots
             again.NotesFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Documents", "Lecture notes");
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-library-password-existing", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = again, DrawChrome = true } : new WinSetup { DataContext = again, DrawChrome = true },
-                    size: new Size(850, 608));
+                    size: new Size(888, 708));
             // Just this computer's notes step with an engine's setup steps open: Claude Code not installed yet, and
             // Codex installed but not signed in.
             foreach (var (engine, state) in new[] { ("claude", "not_installed"), ("codex", "not_signed_in") })
@@ -571,7 +571,7 @@ public class SurfaceShots
                 help.Ai.Engines.Single(r => r.Id == engine).ToggleHelpCommand.Execute(null);
                 foreach (var t in Themes)
                     Shot.Take($"{look}-05-setup-one-computer-ai-{engine}-help", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = help, DrawChrome = true } : new WinSetup { DataContext = help, DrawChrome = true },
-                        size: new Size(1100, skin == SkinKind.Mac ? 968 : 1028));
+                        size: new Size(1100, 1048));
             }
             // The same step for a student with no paid plan: the free AI with its one button, and while it's being got.
             foreach (var (what, state, pulling) in new (string, string, StudyStash.Core.Ai.PullInfo?)[]
@@ -581,19 +581,19 @@ public class SurfaceShots
                 free.Ai = AiDemo.SetupFree(skin == SkinKind.Win, state, pulling);
                 foreach (var t in Themes)
                     Shot.Take($"{look}-05-setup-one-computer-ai-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = free, DrawChrome = true } : new WinSetup { DataContext = free, DrawChrome = true },
-                        size: new Size(1100, skin == SkinKind.Mac ? 808 : 868));
+                        size: new Size(1100, 928));
             }
             // Just this computer's welcome while its library is being made, and when it couldn't be.
             var making = SetupModel.For(skin);
             making.Connecting = true;
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-one-computer-welcome-making", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = making, DrawChrome = true } : new WinSetup { DataContext = making, DrawChrome = true },
-                    size: new Size(850, 608));
+                    size: new Size(888, 748));
             var failed = SetupModel.For(skin);
             failed.LibraryResult = "The library didn't start. Its log is in the logs folder.";
             foreach (var t in Themes)
                 Shot.Take($"{look}-05-setup-one-computer-welcome-problem", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = failed, DrawChrome = true } : new WinSetup { DataContext = failed, DrawChrome = true },
-                    size: new Size(850, 608));
+                    size: new Size(888, 748));
             // The microphone step when the microphone won't open: none plugged in, and refused by the system.
             foreach (var (what, trouble) in new[] { ("none", Audio.MicTrouble.NoDevice(skin == SkinKind.Win)), ("denied", Audio.MicTrouble.Denied(skin == SkinKind.Win)) })
             {
@@ -601,7 +601,7 @@ public class SurfaceShots
                 mic.MicTrouble = trouble;
                 foreach (var t in Themes)
                     Shot.Take($"{look}-05-setup-laptop-microphone-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = mic, DrawChrome = true } : new WinSetup { DataContext = mic, DrawChrome = true },
-                        size: new Size(850, 608));
+                        size: new Size(888, 708));
             }
         }
     }

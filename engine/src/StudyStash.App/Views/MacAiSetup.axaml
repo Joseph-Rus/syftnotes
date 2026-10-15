@@ -1,8 +1,8 @@
-<!-- Setup's AI step (design 15): "Choose who writes your notes" (a radio list of the engines on this computer, Ollama
-     recommended; Claude Code and Codex with "Set up": the commands to install and sign in, Copy, Open Terminal and
-     Check again; and "No AI for now") and "Who answers your questions" (starts as Same as notes). The step's body
-     only: the host draws the step label, the sidebar and the Back/Continue footer, and calls SaveAsync on Continue.
-     Every row: radio | name and one line | its action, right-aligned; the help lines up under the name. -->
+<!-- Setup's AI step: "Choose who writes your notes" (the engines on this computer, each a card: its radio, name and one
+     line, and what it needs, Set it up or Sign in; Claude Code and Codex with the commands to install and sign in, Copy,
+     Open Terminal and Check again; and "No AI for now"), then "Who answers your questions" (starts as Same as notes).
+     The step's body only: the host draws the step label, the steps and the Back/Continue foot, and calls SaveAsync on
+     Continue. In setup's look (SetupStyles): white cards with a hairline, the chosen one ringed in ink. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StudyStash.App.ViewModels"
@@ -11,213 +11,136 @@
              x:DataType="vm:AiSetupModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/MacAiStyles.axaml" />
-    <!-- An engine that can't write notes yet: its radio is faint (clicking the row shows how to get it going). -->
-    <Style Selector="Border.ai-radio.dim">
-      <Setter Property="Opacity" Value="0.45" />
-    </Style>
-    <Style Selector="ProgressBar.ai-work">
-      <Setter Property="Height" Value="6" />
-      <Setter Property="MinHeight" Value="6" />
-      <Setter Property="CornerRadius" Value="3" />
-      <Setter Property="Background" Value="{DynamicResource Fill2}" />
-      <Setter Property="Foreground" Value="{DynamicResource Accent}" />
-      <Setter Property="HorizontalAlignment" Value="Stretch" />
-    </Style>
-    <Style Selector="Border.stepnum">
-      <Setter Property="Width" Value="18" />
-      <Setter Property="Height" Value="18" />
-      <Setter Property="CornerRadius" Value="9" />
-      <Setter Property="Background" Value="{DynamicResource Fill2}" />
-      <Setter Property="VerticalAlignment" Value="Top" />
-    </Style>
-    <Style Selector="Border.stepnum TextBlock">
-      <Setter Property="FontSize" Value="11" />
-      <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="HorizontalAlignment" Value="Center" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-    <!-- A command to paste: monospace on the raised fill, Copy at its right end. -->
-    <Style Selector="Border.code">
-      <Setter Property="MinHeight" Value="30" />
-      <Setter Property="CornerRadius" Value="8" />
-      <Setter Property="Background" Value="{DynamicResource Raised}" />
-      <Setter Property="BoxShadow" Value="{DynamicResource RaisedShadow}" />
-      <Setter Property="Padding" Value="10,3,3,3" />
-    </Style>
-    <Style Selector="Border.code SelectableTextBlock">
-      <Setter Property="FontFamily" Value="SF Mono, Menlo, Cascadia Mono, Consolas, monospace" />
-      <Setter Property="FontSize" Value="12" />
-      <Setter Property="TextWrapping" Value="Wrap" />
-      <Setter Property="VerticalAlignment" Value="Center" />
-    </Style>
-    <Style Selector="Border.ai-pill.small">
-      <Setter Property="Height" Value="24" />
-      <Setter Property="CornerRadius" Value="12" />
-      <Setter Property="Padding" Value="10,0" />
-    </Style>
-    <Style Selector="Border.ai-pill.small TextBlock">
-      <Setter Property="FontSize" Value="12" />
-    </Style>
+    <StyleInclude Source="avares://StudyStash/Views/SetupStyles.axaml" />
+    <StyleInclude Source="avares://StudyStash/Views/SetupAiStyles.axaml" />
   </UserControl.Styles>
 
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="40,0,40,20" Spacing="20" MaxWidth="600">
+    <StackPanel Margin="40,0,40,20" MaxWidth="660" HorizontalAlignment="Left">
+      <TextBlock Classes="page-title step-title" Text="Choose who writes your notes" />
+      <TextBlock Classes="page-lede step-lede" Text="{Binding Lede}" />
+      <TextBlock Classes="hint" Margin="0,10,0,0" Text="{Binding OlderLibraryWords}" IsVisible="{Binding OlderLibrary}" />
+      <TextBlock Classes="hint" Margin="0,10,0,0" Text="Your library isn't answering. Check it's on and connected." IsVisible="{Binding Offline}" />
 
-      <StackPanel Spacing="8">
-        <TextBlock Classes="ai-title" Text="Choose who writes your notes" c:Typography.Extra="-0.39" />
-        <TextBlock Classes="ai-sub" MaxWidth="520" HorizontalAlignment="Left" Text="{Binding Lede}" />
-      </StackPanel>
-
-      <TextBlock Text="{Binding OlderLibraryWords}" Classes="ai-sub" IsVisible="{Binding OlderLibrary}" />
-      <TextBlock Text="Your library isn't answering. Check it's on and connected." Classes="ai-sub" IsVisible="{Binding Offline}" />
-
-      <StackPanel Spacing="8">
-        <Border Classes="ai-group">
-          <StackPanel>
-            <ItemsControl ItemsSource="{Binding Engines}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:AiSetupRow">
-                  <StackPanel>
-                    <Border Classes="ai-sep" Margin="44,0,0,0" IsVisible="{Binding !First}" />
-                    <Grid ColumnDefinitions="Auto,12,*,Auto" MinHeight="41" Margin="16,8">
-                      <Button AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding About}" Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
-                        <Grid ColumnDefinitions="Auto,12,*">
-                          <Border Classes="ai-radio" Classes.on="{Binding Selected}" Classes.dim="{Binding !CanWrite}" VerticalAlignment="Center">
-                            <Ellipse Width="6" Height="6" Fill="White" IsVisible="{Binding Selected}" />
-                          </Border>
-                          <Border Classes="focusring ai-radioring" />
-                          <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                              <TextBlock Classes="ai-row-title" Text="{Binding Name}" VerticalAlignment="Center" />
-                              <!-- The free AI that runs on the computer itself: not the easy way, and said so -->
-                              <TextBlock Classes="ai-row-sub" Text="Advanced" IsVisible="{Binding Advanced}" VerticalAlignment="Center" />
-                            </StackPanel>
-                            <TextBlock Classes="ai-row-sub" Text="{Binding About}" TextWrapping="Wrap" />
-                          </StackPanel>
-                        </Grid>
-                      </Button>
-                      <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                        <!-- Not ready yet: one button gets it ready (the free AI, Claude or ChatGPT), and nothing is left to do by hand -->
-                        <Button AutomationProperties.Name="{Binding OpenLabel}" Name="SetUpFree" Classes="ai-pillbtn" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOneButton}">
-                          <Border Classes="ai-pill">
-                            <TextBlock Text="{Binding OpenLabel}" />
-                          </Border>
-                        </Button>
-                        <Button AutomationProperties.Name="Sign in" Classes="ai-pillbtn" Command="{Binding SignInCommand}" IsVisible="{Binding ShowSignIn}">
-                          <Border Classes="ai-pill">
-                            <TextBlock Text="Sign in" />
-                          </Border>
-                        </Button>
-                        <Button AutomationProperties.Name="{Binding HelpLabel}" Classes="ai-pillbtn" Command="{Binding ToggleHelpCommand}" IsVisible="{Binding HasHelp}">
-                          <Border Classes="ai-pill">
-                            <TextBlock Text="{Binding HelpLabel}" />
-                          </Border>
-                        </Button>
+      <ItemsControl ItemsSource="{Binding Engines}" Margin="0,22,0,0">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:AiSetupRow">
+            <Border Classes="engine" Classes.on="{Binding Selected}">
+              <StackPanel>
+                <!-- radio | name and one line (the choice itself) | what it needs, at the right -->
+                <Grid ColumnDefinitions="*,12,Auto" MinHeight="44">
+                  <Button AutomationProperties.Name="{Binding Name}" AutomationProperties.HelpText="{Binding About}" Classes="ai-textbtn ai-choice quiet" Command="{Binding SelectCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+                    <Grid ColumnDefinitions="Auto,14,*">
+                      <Border Classes="radio" Classes.on="{Binding Selected}" Classes.dim="{Binding !CanWrite}"><Ellipse /></Border>
+                      <Border Classes="focusring ai-radioring" />
+                      <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Classes="choice-title" Text="{Binding Name}" />
+                          <!-- The free AI that runs on the computer itself: not the easy way, and said so -->
+                          <Border Classes="tag" IsVisible="{Binding Advanced}"><TextBlock Text="Advanced" /></Border>
+                        </StackPanel>
+                        <TextBlock Classes="choice-about" Text="{Binding About}" />
                       </StackPanel>
                     </Grid>
-                    <!-- The free AI being got ready: how far along -->
-                    <StackPanel IsVisible="{Binding Working}" Margin="44,0,16,12" Spacing="6">
-                      <ProgressBar Classes="ai-work" Minimum="0" Maximum="1" Value="{Binding Fraction}" IsIndeterminate="{Binding Steady}" />
-                      <TextBlock Classes="ai-row-sub" Text="{Binding Progress}" TextWrapping="Wrap" />
-                    </StackPanel>
-                    <!-- How to get it going: numbered steps under the name, then Open Terminal | Check again -->
-                    <StackPanel IsVisible="{Binding ShowHelp}" Margin="44,0,16,14" Spacing="12">
-                      <ItemsControl ItemsSource="{Binding Help}">
-                        <ItemsControl.ItemsPanel>
-                          <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:AiSetupStep">
-                            <Grid ColumnDefinitions="18,10,*">
-                              <Border Classes="stepnum"><TextBlock Text="{Binding Number}" /></Border>
-                              <StackPanel Grid.Column="2" Spacing="6">
-                                <TextBlock Text="{Binding Title}" FontSize="12" LineHeight="18" TextWrapping="Wrap" />
-                                <Border Classes="code" IsVisible="{Binding HasCommand}">
-                                  <Grid ColumnDefinitions="*,8,Auto">
-                                    <SelectableTextBlock Text="{Binding Command}" />
-                                    <Button AutomationProperties.Name="Copy" Grid.Column="2" Classes="ai-pillbtn" Command="{Binding CopyCommand}" VerticalAlignment="Center">
-                                      <Border Classes="ai-pill small">
-                                        <StackPanel Orientation="Horizontal" Spacing="4">
-                                          <c:Icon Glyph="content_copy" Size="13" Foreground="{DynamicResource Fg2}" />
-                                          <TextBlock Text="Copy" />
-                                        </StackPanel>
-                                      </Border>
-                                    </Button>
-                                  </Grid>
-                                </Border>
-                                <TextBlock Text="{Binding Note}" IsVisible="{Binding HasNote}" FontSize="11" LineHeight="16" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
-                              </StackPanel>
-                            </Grid>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                      <Grid ColumnDefinitions="28,*,Auto">
-                        <Button AutomationProperties.Name="{Binding OpenLabel}" Grid.Column="1" Classes="ai-pillbtn" Command="{Binding OpenCommand}" HorizontalAlignment="Left">
-                          <Border Classes="ai-pill small">
-                            <TextBlock Text="{Binding OpenLabel}" />
-                          </Border>
-                        </Button>
-                        <Button AutomationProperties.Name="Check again" Grid.Column="2" Classes="ai-pillbtn" Command="{Binding CheckAgainCommand}">
-                          <Border Classes="ai-pill small">
-                            <StackPanel Orientation="Horizontal" Spacing="4">
-                              <c:Icon Glyph="refresh" Size="13" Foreground="{DynamicResource Fg2}" />
-                              <TextBlock Text="Check again" />
-                            </StackPanel>
-                          </Border>
-                        </Button>
-                      </Grid>
-                    </StackPanel>
+                  </Button>
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <!-- Not ready yet: one button gets it ready (the free AI, Claude or ChatGPT), and nothing is left to do by hand -->
+                    <Button AutomationProperties.Name="{Binding OpenLabel}" Name="SetUpFree" Classes="btn sm" Command="{Binding OpenCommand}" IsVisible="{Binding ShowOneButton}" Content="{Binding OpenLabel}" />
+                    <Button AutomationProperties.Name="Sign in" Classes="btn sm" Command="{Binding SignInCommand}" IsVisible="{Binding ShowSignIn}" Content="Sign in" />
+                    <Button AutomationProperties.Name="{Binding HelpLabel}" Classes="btn sm" Command="{Binding ToggleHelpCommand}" IsVisible="{Binding HasHelp}" Content="{Binding HelpLabel}" />
                   </StackPanel>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <!-- No AI for now: transcripts only, notes turned on later in Settings -->
-            <StackPanel IsVisible="{Binding OffersNoAi}">
-              <Border Classes="ai-sep" Margin="44,0,0,0" />
-              <Grid ColumnDefinitions="Auto,12,*,Auto" MinHeight="41" Margin="16,8">
-                <Button AutomationProperties.Name="No AI for now" AutomationProperties.HelpText="Just transcripts. Turn notes on later in Settings." Grid.ColumnSpan="3" Classes="ai-textbtn ai-choice quiet" Command="{Binding PickNoAiCommand}" HorizontalContentAlignment="Stretch" Padding="0">
-                  <Grid ColumnDefinitions="Auto,12,*">
-                    <Border Classes="ai-radio" Classes.on="{Binding NoAi}" VerticalAlignment="Center">
-                      <Ellipse Width="6" Height="6" Fill="White" IsVisible="{Binding NoAi}" />
-                    </Border>
-                    <Border Classes="focusring ai-radioring" />
-                    <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
-                      <TextBlock Classes="ai-row-title" Text="No AI for now" />
-                      <TextBlock Classes="ai-row-sub" Text="Just transcripts. Turn notes on later in Settings." />
-                    </StackPanel>
+                </Grid>
+                <!-- The free AI being got ready: how far along -->
+                <StackPanel IsVisible="{Binding Working}" Margin="34,10,0,4" Spacing="6">
+                  <ProgressBar Classes="work" Minimum="0" Maximum="1" Value="{Binding Fraction}" IsIndeterminate="{Binding Steady}" />
+                  <TextBlock Classes="hint" Text="{Binding Progress}" />
+                </StackPanel>
+                <!-- How to get it going: numbered steps under the name, then Open Terminal | Check again -->
+                <StackPanel IsVisible="{Binding ShowHelp}" Margin="34,12,0,4" Spacing="14">
+                  <ItemsControl ItemsSource="{Binding Help}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Spacing="14" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:AiSetupStep">
+                        <Grid ColumnDefinitions="20,10,*">
+                          <Border Classes="stepnum"><TextBlock Text="{Binding Number}" /></Border>
+                          <StackPanel Grid.Column="2" Spacing="8">
+                            <TextBlock Classes="say" Text="{Binding Title}" FontSize="13.5" LineHeight="20" />
+                            <Border Classes="code" IsVisible="{Binding HasCommand}">
+                              <Grid ColumnDefinitions="*,8,Auto">
+                                <SelectableTextBlock Text="{Binding Command}" />
+                                <Button AutomationProperties.Name="Copy" Grid.Column="2" Classes="btn sm" Command="{Binding CopyCommand}" VerticalAlignment="Center">
+                                  <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <c:Icon Glyph="content_copy" Size="14" />
+                                    <TextBlock Text="Copy" VerticalAlignment="Center" />
+                                  </StackPanel>
+                                </Button>
+                              </Grid>
+                            </Border>
+                            <TextBlock Classes="hint" Text="{Binding Note}" IsVisible="{Binding HasNote}" FontSize="12.5" LineHeight="18" />
+                          </StackPanel>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Grid ColumnDefinitions="30,*,Auto">
+                    <Button AutomationProperties.Name="{Binding OpenLabel}" Grid.Column="1" Classes="btn sm" Command="{Binding OpenCommand}" HorizontalAlignment="Left" Content="{Binding OpenLabel}" />
+                    <Button AutomationProperties.Name="Check again" Grid.Column="2" Classes="btn sm" Command="{Binding CheckAgainCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <c:Icon Glyph="refresh" Size="14" />
+                        <TextBlock Text="Check again" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
                   </Grid>
-                </Button>
-              </Grid>
-            </StackPanel>
-          </StackPanel>
-        </Border>
-        <StackPanel Orientation="Horizontal" Spacing="8" Margin="16,0,0,0" IsVisible="{Binding HasSay}">
-          <c:Spinner IsVisible="{Binding Busy}" Width="12" Height="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
-          <TextBlock Classes="ai-row-sub" Text="{Binding Say}" TextWrapping="Wrap" MaxWidth="520" VerticalAlignment="Center" />
-        </StackPanel>
-      </StackPanel>
-
-      <Border Classes="ai-group">
-        <Grid Classes="ai-row" ColumnDefinitions="*,Auto" Margin="16,8">
-          <StackPanel Classes="ai-row-text" VerticalAlignment="Center">
-            <TextBlock Classes="ai-row-title" Text="Who answers your questions" />
-            <TextBlock Classes="ai-row-sub" Text="You can pick per question too" />
-          </StackPanel>
-          <Button AutomationProperties.Name="Who answers your questions" Grid.Column="1" Classes="ai-select-btn" VerticalAlignment="Center">
-            <Border Classes="ai-select">
-              <Grid ColumnDefinitions="*,6,Auto">
-                <TextBlock Text="{Binding SelectedAskName}" TextTrimming="CharacterEllipsis" />
-                <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource Fg2}" />
-              </Grid>
+                </StackPanel>
+              </StackPanel>
             </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <!-- No AI for now: transcripts only, notes turned on later in Settings -->
+      <Border Classes="engine" Classes.on="{Binding NoAi}" Margin="0,10,0,0" IsVisible="{Binding OffersNoAi}">
+        <Grid MinHeight="44">
+          <Button AutomationProperties.Name="No AI for now" AutomationProperties.HelpText="Just transcripts. Turn notes on later in Settings." Classes="ai-textbtn ai-choice quiet" Command="{Binding PickNoAiCommand}" HorizontalContentAlignment="Stretch" Padding="0">
+            <Grid ColumnDefinitions="Auto,14,*">
+              <Border Classes="radio" Classes.on="{Binding NoAi}"><Ellipse /></Border>
+              <Border Classes="focusring ai-radioring" />
+              <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
+                <TextBlock Classes="choice-title" Text="No AI for now" />
+                <TextBlock Classes="choice-about" Text="Just transcripts. Turn notes on later in Settings." />
+              </StackPanel>
+            </Grid>
+          </Button>
+        </Grid>
+      </Border>
+      <Grid ColumnDefinitions="Auto,8,*" Margin="2,12,0,0" IsVisible="{Binding HasSay}">
+        <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="2" Classes="hint" Text="{Binding Say}" VerticalAlignment="Center" />
+      </Grid>
+
+      <!-- Who answers questions asked in the library: a heading, and the choice in a panel of its own. -->
+      <TextBlock Classes="h2 part" Text="Who answers your questions" Margin="0,28,0,8" />
+      <Border Classes="group" MaxWidth="10000">
+        <Grid Classes="row" ColumnDefinitions="*,12,Auto" MinHeight="56">
+          <TextBlock Classes="hint" Text="You can pick per question too" VerticalAlignment="Center" />
+          <Button AutomationProperties.Name="Who answers your questions" Grid.Column="2" Classes="picker" VerticalAlignment="Center" MinWidth="180" HorizontalContentAlignment="Stretch">
+            <Grid ColumnDefinitions="*,8,Auto">
+              <TextBlock Text="{Binding SelectedAskName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <c:Icon Grid.Column="2" Glyph="unfold_more" Size="15" Foreground="{DynamicResource InkSubtle}" VerticalAlignment="Center" />
+            </Grid>
             <Button.Flyout>
-              <!-- Left open, the click that closes it still reaches what it lands on: Continue moves on in one click. -->
-              <MenuFlyout Placement="BottomEdgeAlignedRight" OverlayDismissEventPassThrough="True" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
+              <!-- Left open, the click that closes it still reaches what it lands on: Continue moves on in one click. It
+                   opens upward: the picker is at the page's foot, and opened downward it would lie over Continue. -->
+              <MenuFlyout Placement="TopEdgeAlignedRight" OverlayDismissEventPassThrough="True" FlyoutPresenterTheme="{StaticResource AiMenuFlyout}" ItemsSource="{Binding AskChoices}" ItemContainerTheme="{StaticResource AiChoiceItem}" />
             </Button.Flyout>
           </Button>
         </Grid>
       </Border>
-
     </StackPanel>
   </ScrollViewer>
 </UserControl>

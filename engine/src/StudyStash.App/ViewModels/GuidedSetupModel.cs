@@ -250,9 +250,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public bool OnSignIn => Screen == GuidedScreen.SignIn;
     public bool OnChat => Screen == GuidedScreen.Chat;
     public bool HasStepLabel => !OnPick;
-    /// <summary>The design's size for each screen: 720×480, and 900×560 for the chat.</summary>
-    public double ViewWidth => OnChat ? 900 : 720;
-    public double ViewHeight => OnChat ? 560 : 480;
+    /// <summary>Each screen's size: 760×600 (a little taller than setup by hand's 760×580: the three AIs to pick from
+    /// fill the page), and 960×640 for the chat.</summary>
+    public double ViewWidth => OnChat ? 960 : 760;
+    public double ViewHeight => OnChat ? 640 : 600;
     public bool ShowInstalled => Installed;
     public bool ShowReady => AiReady && OnSignIn;
     public bool ShowCheckingPlan => CheckingPlan;

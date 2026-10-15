@@ -238,7 +238,7 @@ public sealed class GuidedSetupShots
             string look = skin == SkinKind.Mac ? "mac" : "win";
             foreach (var (name, make) in States())
                 foreach (var t in Themes)
-                    Shot.Take($"{look}-05-setup-guided-{name}", skin, t, () => View(skin, make(skin)), size: new Size(850, 608));
+                    Shot.Take($"{look}-05-setup-guided-{name}", skin, t, () => View(skin, make(skin)), size: new Size(888, 748));
         }
     }
 
@@ -287,7 +287,7 @@ public sealed class GuidedSetupShots
             if (skin == SkinKind.Win) states.Add(("taskbar", () => Chat(skin, "taskbar_tip")));
             foreach (var (name, make) in states)
                 foreach (var t in Themes)
-                    Shot.Take($"{look}-05-setup-guided-chat-{name}", skin, t, () => View(skin, make()), size: new Size(1030, 688));
+                    Shot.Take($"{look}-05-setup-guided-chat-{name}", skin, t, () => View(skin, make()), size: new Size(1088, 768));
         }
     }
 }

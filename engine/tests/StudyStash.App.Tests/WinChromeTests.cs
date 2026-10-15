@@ -90,7 +90,7 @@ public class WinChromeTests
             {
                 var view = new WinSetup { DataContext = Demo.Setup(SkinKind.Win), DrawChrome = false };
                 return new DrawnHost(view, WinChrome.Decorations(), 32, resizable: false) { Width = view.Width, Height = view.Height };
-            });
+            }, size: new Size(1700, 708));
             var model = Services.SettingsModel.Make(host);
             Shot.Take("win-settings-real", SkinKind.Win, t, () => new DrawnHost(new SettingsView { DataContext = model, DrawChrome = false }, WinChrome.Decorations(), 32, resizable: false)
                 { Width = 900, Height = 860 }, size: new Size(1100, 988));
