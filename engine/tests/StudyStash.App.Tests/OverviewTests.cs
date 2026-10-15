@@ -563,6 +563,29 @@ public class OverviewTests
         Assert.Equal("Record", m.RecordWords);
     }
 
+    [Fact]
+    public void Pages_left_while_it_records_let_the_recorder_go()
+    {
+        // Record on Home: Home follows the recorder, then the recording's own page does, until it stops and the note's
+        // page opens. The recorder lasts as long as the app, so a page still following it was kept for good: every
+        // page Record was pressed on, with its notes and its ask bar, and every recording's page.
+        var recorder = new RecorderModel { Elapsed = "00:01" };
+        var home = OverviewModel.Home(Sources());
+        home.Recorder = recorder;
+        var library = new LibraryModel { Overview = home };
+        var recording = new NoteModel { Id = "rec-1", Live = true, Recorder = recorder }.Following();
+        library.Overview = null;
+        library.Note = recording;
+        library.Note = new NoteModel { Id = "rec-1" };
+        int heard = 0;
+        home.PropertyChanged += (_, _) => heard++;
+        recording.PropertyChanged += (_, _) => heard++;
+        recorder.Elapsed = "00:02";
+        recorder.IsPaused = true;
+        recorder.Lines.Add(new HeardLine { Text = "Every recursive function needs a base case." });
+        Assert.Equal(0, heard);
+    }
+
     static Window Host(Control content, SkinKind skin, double width, double height)
     {
         ((App)Application.Current!).UseSkin(skin);
