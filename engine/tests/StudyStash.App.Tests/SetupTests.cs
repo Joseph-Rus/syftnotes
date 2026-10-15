@@ -242,13 +242,13 @@ public sealed class SetupTests
         m.Ai = new AiSetupModel(new FakeAiLibrary { Overview = o with { Engines = [.. o.Engines.Select(e => e.Id == "claude" ? e with { State = "not_installed", Installed = false } : e)] } });
         await m.Ai.Load();
         var view = new MacSetup { DataContext = m };
-        Assert.Equal(640, view.Height);
+        Assert.Equal(780, view.Height);
         Assert.False(m.AiHelpOpen);
 
         m.Ai.Engines.Single(r => r.Id == "claude").ToggleHelpCommand.Execute(null);
 
         Assert.True(m.AiHelpOpen);
-        Assert.Equal(800, view.Height);
+        Assert.Equal(900, view.Height);
         m.Go(SetupStep.Canvas);
         Assert.False(m.AiHelpOpen);
     }

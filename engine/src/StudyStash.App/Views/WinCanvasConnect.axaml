@@ -11,6 +11,8 @@
              x:DataType="vm:CanvasConnectModel">
   <UserControl.Styles>
     <StyleInclude Source="avares://StudyStash/Views/WinCanvasStyles.axaml" />
+    <!-- Inside setup: setup's look (only under ".in-setup"; from Settings these steps keep their own). -->
+    <StyleInclude Source="avares://StudyStash/Views/SetupCanvasStyles.axaml" />
   </UserControl.Styles>
   <DockPanel>
     <!-- The small window's own footer, under the steps (which scroll when they run long): Skip for now on the left; Back and Finish on the right, one height, one line -->

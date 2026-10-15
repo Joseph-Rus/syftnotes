@@ -1,0 +1,246 @@
+<!-- Connecting Canvas inside setup (its Canvas step, and the guided chat's browser card), in setup's look: the
+     library window's (SetupStyles). Every selector starts at ".in-setup", the class setup's views carry, so the same
+     steps opened from Settings keep their own look. Included after the look's Canvas styles (MacCanvasStyles,
+     WinCanvasStyles), whose cv- classes it restyles, so it wins over them. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:StudyStash.App.Controls">
+
+  <!-- The title and the sentence under it: setup's page title and lede. -->
+  <Style Selector=".in-setup TextBlock.cv-h1">
+    <Setter Property="FontFamily" Value="{DynamicResource TextFont}" />
+    <Setter Property="FontSize" Value="30" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="LineHeight" Value="36" />
+    <Setter Property="LetterSpacing" Value="-0.6" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="Margin" Value="0,6,0,0" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-intro">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="LineHeight" Value="24" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="MaxWidth" Value="560" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- The steps: one white panel with a hairline (drawn inside it: the steps' own scrolling would cut one outside it
+       off), the rows parted by hairlines. -->
+  <Style Selector=".in-setup Border.cv-group">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector=".in-setup Border.cv-sep">
+    <Setter Property="Height" Value="1" />
+    <Setter Property="Background" Value="{DynamicResource Line}" />
+    <Setter Property="Margin" Value="16,0,0,0" />
+  </Style>
+  <Style Selector=".in-setup Grid.cv-srow">
+    <Setter Property="Height" Value="52" />
+    <Setter Property="Margin" Value="16,0" />
+  </Style>
+  <!-- Each step's marker: its number in a grey ring (ink while it's the one to do), a grey check once done. -->
+  <Style Selector=".in-setup Border.cv-num">
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector=".in-setup Border.cv-num TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector=".in-setup Border.cv-num.cv-current">
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector=".in-setup Border.cv-num.cv-current TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector=".in-setup c|Icon.cv-num-done">
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-step-title">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-step-title.cv-current">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-step-title.cv-todo">
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-value">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <!-- Done ("Connected", "Chrome"): ink, not green. -->
+  <Style Selector=".in-setup TextBlock.cv-value.cv-good">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="FontWeight" Value="Medium" />
+  </Style>
+  <Style Selector=".in-setup StackPanel.cv-action > c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-step-body">
+    <Setter Property="FontSize" Value="13.5" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-step-body.cv-advice">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-caption">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="19" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-caption-num">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="19" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-help">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+
+  <!-- A step's button: btn sm (a white pill with a hairline), and the one the step is there for (Add to Chrome, Find my
+       courses, Save) btn sm ink. Its keyboard focus a ring 2 px out. -->
+  <Style Selector=".in-setup Button.cv-pill, .in-setup Button.cv-btn">
+    <Setter Property="Height" Value="34" />
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="Padding" Value="14,0" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-pill TextBlock, .in-setup Button.cv-btn TextBlock">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-pill /template/ Border#PART_Bg, .in-setup Button.cv-btn /template/ Border#PART_Bg">
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-pill /template/ Border#PART_Wash, .in-setup Button.cv-btn /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-pill:pointerover /template/ Border#PART_Bg, .in-setup Button.cv-btn:pointerover /template/ Border#PART_Bg">
+    <Setter Property="BoxShadow" Value="{DynamicResource SubtleRing}" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-pill.cv-primary, .in-setup Button.cv-btn.cv-primary">
+    <Setter Property="Background" Value="{DynamicResource Ink}" />
+    <Setter Property="Foreground" Value="{DynamicResource Surface}" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-pill.cv-primary /template/ Border#PART_Bg, .in-setup Button.cv-btn.cv-primary /template/ Border#PART_Bg">
+    <Setter Property="BoxShadow" Value="none" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-pill.cv-primary:pointerover, .in-setup Button.cv-btn.cv-primary:pointerover">
+    <Setter Property="Opacity" Value="0.9" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-pill.cv-mini, .in-setup Button.cv-btn.cv-mini">
+    <Setter Property="Height" Value="34" />
+    <Setter Property="CornerRadius" Value="17" />
+    <Setter Property="Padding" Value="14,0" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-pill:focus-visible /template/ Border#PART_Wash, .in-setup Button.cv-btn:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="True" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Focus}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Margin" Value="-4" />
+    <Setter Property="CornerRadius" Value="21" />
+  </Style>
+
+  <!-- The school's address: setup's field. -->
+  <Style Selector=".in-setup Border.cv-field">
+    <Setter Property="Height" Value="34" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="10,0" />
+  </Style>
+  <Style Selector=".in-setup Border.cv-field:focus-within">
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="Padding" Value="8.5,0" />
+    <Setter Property="BoxShadow" Value="none" />
+  </Style>
+  <Style Selector=".in-setup Border.cv-field TextBox.bare">
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+
+  <!-- Quiet links (Show the folder again, Use another browser): the library's text-link, muted words over a grey line. -->
+  <Style Selector=".in-setup TextBlock.cv-link">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-quiet">
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-quiet /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="0,0,0,2" />
+    <Setter Property="Padding" Value="0,0,0,1" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-quiet /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-quiet:pointerover TextBlock.cv-link, .in-setup Button.cv-quiet:focus-visible TextBlock.cv-link">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-quiet:pointerover /template/ ContentPresenter#PART_ContentPresenter, .in-setup Button.cv-quiet:focus-visible /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector=".in-setup Button.cv-quiet:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="True" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Focus}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Margin" Value="-6,-3" />
+    <Setter Property="CornerRadius" Value="6" />
+  </Style>
+  <Style Selector=".in-setup TextBlock.cv-link-sep">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+
+  <!-- The pictures of the browser's pages and the code to paste: drawn on the page's white with a hairline, and the
+       code on the sunken grey. -->
+  <Style Selector=".in-setup Border.cv-illus">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <Style Selector=".in-setup Border.cv-code">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Padding" Value="12,8,8,8" />
+  </Style>
+  <Style Selector=".in-setup Border.cv-code SelectableTextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LineHeight" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+
+  <!-- The first sync: a grey track filled in ink. -->
+  <Style Selector=".in-setup Border.cv-track">
+    <Setter Property="Height" Value="6" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource Line}" />
+  </Style>
+  <Style Selector=".in-setup Border.cv-bar, .in-setup Border.cv-bar-fill">
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource Ink}" />
+  </Style>
+</Styles>
