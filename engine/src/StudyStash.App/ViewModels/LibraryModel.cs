@@ -205,24 +205,42 @@ public sealed partial class NoteModel : ObservableObject
     /// <summary>What a screen reader hears of the bar: "Recording, 12:04".</summary>
     public string RecordingSaid => $"{RecordingWord}, {Recorder?.Elapsed}";
 
-    /// <summary>Follows the recorder for the bar's words (Recording or Paused) and the live transcript's emptiness.</summary>
+    /// <summary>Follows the recorder for the bar's words (Recording or Paused) and the live transcript's emptiness,
+    /// until <see cref="StopFollowing"/>.</summary>
     public NoteModel Following()
     {
-        if (Recorder is null) return this;
-        Recorder.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName is nameof(RecorderModel.IsPaused))
-            {
-                OnPropertyChanged(nameof(RecordingWord));
-                OnPropertyChanged(nameof(PauseWord));
-                OnPropertyChanged(nameof(Pulses));
-            }
-            if (e.PropertyName is nameof(RecorderModel.IsPaused) or nameof(RecorderModel.Elapsed)) OnPropertyChanged(nameof(RecordingSaid));
-            if (e.PropertyName is nameof(RecorderModel.Waiting)) OnPropertyChanged(nameof(NoTranscriptText));
-        };
-        Recorder.Lines.CollectionChanged += (_, _) => OnPropertyChanged(nameof(NoTranscript));
+        if (Recorder is null || following) return this;
+        following = true;
+        Recorder.PropertyChanged += RecorderSaid;
+        Recorder.Lines.CollectionChanged += LinesChanged;
         return this;
     }
+
+    /// <summary>The page is left: it stops following the recorder, which lasts as long as the app does and would
+    /// otherwise keep every recording's page (and what was typed on it) for good.</summary>
+    public void StopFollowing()
+    {
+        if (Recorder is null || !following) return;
+        following = false;
+        Recorder.PropertyChanged -= RecorderSaid;
+        Recorder.Lines.CollectionChanged -= LinesChanged;
+    }
+
+    bool following;
+
+    void RecorderSaid(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(RecorderModel.IsPaused))
+        {
+            OnPropertyChanged(nameof(RecordingWord));
+            OnPropertyChanged(nameof(PauseWord));
+            OnPropertyChanged(nameof(Pulses));
+        }
+        if (e.PropertyName is nameof(RecorderModel.IsPaused) or nameof(RecorderModel.Elapsed)) OnPropertyChanged(nameof(RecordingSaid));
+        if (e.PropertyName is nameof(RecorderModel.Waiting)) OnPropertyChanged(nameof(NoTranscriptText));
+    }
+
+    void LinesChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => OnPropertyChanged(nameof(NoTranscript));
 
     partial void OnShowTranscriptChanged(bool value)
     {
@@ -442,6 +460,9 @@ public sealed partial class LibraryModel : ObservableObject
     partial void OnOverviewChanged(OverviewModel? oldValue, OverviewModel? newValue)
     {
         if (oldValue?.Files is { } files && !ReferenceEquals(files, newValue?.Files)) files.Dispose();
+        // A page left while something records lets the recorder go: the recorder lasts as long as the app does, and kept
+        // every page Record was pressed on (its notes, its ask bar and what was asked in it) for good.
+        if (oldValue is not null && !ReferenceEquals(oldValue, newValue)) oldValue.Recorder = null;
         if (newValue is not null)
         {
             newValue.Narrow = Narrow;
@@ -485,6 +506,12 @@ public sealed partial class LibraryModel : ObservableObject
     public bool HasNote => Note is not null;
     public bool NoNote => Note is null;
     public bool HasEmpty => !string.IsNullOrEmpty(Empty);
+
+    partial void OnNoteChanged(NoteModel? oldValue, NoteModel? newValue)
+    {
+        // A recording's page that's left (it stopped, or another page opened) lets the recorder go, as a page does.
+        if (oldValue is not null && !ReferenceEquals(oldValue, newValue)) oldValue.StopFollowing();
+    }
 
     partial void OnNoteChanged(NoteModel? value)
     {
