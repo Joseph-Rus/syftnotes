@@ -91,6 +91,8 @@ public static partial class SelfTest
         for (int i = 0; i < 4; i++)
         {
             await Task.Delay(350); // the dispatcher lets go of what it was holding for the last frame
+            // The large objects' heap too: left as it is, its holes count as heap (40 MB of them, once, after setup).
+            System.Runtime.GCSettings.LargeObjectHeapCompactionMode = System.Runtime.GCLargeObjectHeapCompactionMode.CompactOnce;
             GC.Collect(GC.MaxGeneration, GCCollectionMode.Forced, blocking: true, compacting: true);
             GC.WaitForPendingFinalizers();
         }
