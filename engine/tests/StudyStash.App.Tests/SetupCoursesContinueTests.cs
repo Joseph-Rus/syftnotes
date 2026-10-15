@@ -228,7 +228,7 @@ public class SetupCoursesContinueTests
                         if (view is WinSetup win) win.DrawChrome = true;
                         if (room is { } h) view.Height = h;
                         return view;
-                    }, size: new Size(1100, 800));
+                    }, size: new Size(1100, 908));
                 }
         // The connect window from Settings, the term found, at its own size.
         foreach (var skin in new[] { SkinKind.Mac, SkinKind.Win })

@@ -1,0 +1,573 @@
+<!-- Setup's look (both setups, both looks, the notes step too): the library window's own. The steps straight on the
+     window's canvas, as the library's sidebar is, the chosen one its white chip; the page one white sheet with a
+     hairline round it; a title, a sentence under it and a heading per part in the library's type; and its buttons
+     (btn, btn sm, btn ink, text-link) from Styles.axaml. No accent anywhere: what's chosen is ringed in ink, a tag is
+     grey words on the sunken grey. Only what setup has and the library doesn't is here. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:StudyStash.App.Controls">
+
+  <!-- ===== The window ===== -->
+
+  <!-- The page: one white sheet, a hairline round it, no shadow (the library's Pane). -->
+  <Style Selector="Border.setup-pane">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPane}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+  </Style>
+  <!-- What's on it is cut to its corners. -->
+  <Style Selector="Border.setup-clip">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPane}" />
+    <Setter Property="ClipToBounds" Value="True" />
+  </Style>
+  <!-- The page's words: the same side margins on every page, the buttons under them at the foot. -->
+  <Style Selector="StackPanel.setup-page">
+    <Setter Property="Margin" Value="40,30,40,16" />
+  </Style>
+  <Style Selector="Grid.setup-foot">
+    <Setter Property="Margin" Value="40,8,24,24" />
+  </Style>
+  <Style Selector="Grid.setup-foot Button.btn">
+    <Setter Property="MinWidth" Value="100" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+  </Style>
+
+  <!-- ===== The steps, on the canvas: the library's sidebar rows ===== -->
+
+  <Style Selector="StackPanel.setup-side">
+    <Setter Property="Margin" Value="6,6,6,0" />
+  </Style>
+  <!-- Which setup this is, over the steps: a sidebar group's label, its icon beside it. -->
+  <Style Selector="StackPanel.flow">
+    <Setter Property="Margin" Value="10,0,10,10" />
+  </Style>
+  <Style Selector="StackPanel.flow c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <!-- A step: a nav-item's row. The open one is the white chip, its words bold in ink. (Its hairline is drawn inside
+       it: a list cuts each of its items off at the item's own edges, so a ring outside one wouldn't show.) -->
+  <Style Selector="Border.step">
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Padding" Value="9,0" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Border.step.current">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+  </Style>
+  <Style Selector="Border.step TextBlock.title">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <Style Selector="Border.step.current TextBlock.title">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <!-- Its marker: the number in a grey ring (ink on the open step), or a check once it's done. -->
+  <Style Selector="Border.num">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.num TextBlock">
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.step.current Border.num, Button.item.now Border.num">
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Border.step.current Border.num TextBlock">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="c|Icon.done">
+    <Setter Property="Glyph" Value="check_circle" />
+    <Setter Property="Filled" Value="True" />
+    <Setter Property="Size" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- Guided setup's checklist beside the chat: the same rows, a second line for detail; the one under way the chip. -->
+  <Style Selector="Button.item">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Padding" Value="10,7" />
+    <Setter Property="MinHeight" Value="34" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="BorderBrush" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.item.now">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+  </Style>
+  <Style Selector="Button.item TextBlock.title">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <Style Selector="Button.item.now TextBlock.title">
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.item:pointerover TextBlock.title">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Button.item TextBlock.detail">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="LineHeight" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="Margin" Value="0,1,0,0" />
+  </Style>
+  <Style Selector="Button.item TextBlock.detail.warn">
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+  </Style>
+  <!-- The one under way: an ink dot in an ink ring; still to do: a grey ring. -->
+  <Style Selector="Border.now-dot">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Border.now-dot > Ellipse">
+    <Setter Property="Width" Value="8" />
+    <Setter Property="Height" Value="8" />
+    <Setter Property="Fill" Value="{DynamicResource Ink}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.todo-dot">
+    <Setter Property="Width" Value="18" />
+    <Setter Property="Height" Value="18" />
+    <Setter Property="CornerRadius" Value="9" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
+  </Style>
+
+  <!-- ===== The page's words ===== -->
+
+  <!-- "Step 2 of 7": small and grey, over the title. -->
+  <Style Selector="TextBlock.step-label">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <!-- The page's title: Home's date in a narrower window (page-title, a little smaller, the same weight). -->
+  <Style Selector=":is(TextBlock).page-title.step-title">
+    <Setter Property="FontSize" Value="30" />
+    <Setter Property="LineHeight" Value="36" />
+    <Setter Property="LetterSpacing" Value="-0.6" />
+    <Setter Property="Margin" Value="0,6,0,0" />
+  </Style>
+  <!-- The chat's title, over a conversation: smaller again. -->
+  <Style Selector=":is(TextBlock).page-title.step-title.chat-title">
+    <Setter Property="FontSize" Value="24" />
+    <Setter Property="LineHeight" Value="30" />
+    <Setter Property="LetterSpacing" Value="-0.5" />
+    <Setter Property="Margin" Value="0,2,0,0" />
+  </Style>
+  <Style Selector="TextBlock.page-lede.step-lede">
+    <Setter Property="Margin" Value="0,10,0,0" />
+    <Setter Property="MaxWidth" Value="520" />
+  </Style>
+  <!-- A part of a page under its title ("Who answers your questions"): an h2. -->
+  <Style Selector="TextBlock.h2.part">
+    <Setter Property="Margin" Value="0,0,0,8" />
+  </Style>
+  <!-- Plain words on the page: what's happening (in ink), and a quieter line under it. -->
+  <Style Selector="TextBlock.say">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="LineHeight" Value="21" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="TextBlock.hint">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="19" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- A field's name over it. -->
+  <Style Selector="TextBlock.label">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Margin" Value="0,0,0,6" />
+  </Style>
+  <!-- Done, said with an ink check; a problem, with the warning's amber icon (red is only for recording). -->
+  <Style Selector="c|Icon.ok">
+    <Setter Property="Glyph" Value="check_circle" />
+    <Setter Property="Filled" Value="True" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="c|Icon.warn">
+    <Setter Property="Glyph" Value="warning" />
+    <Setter Property="Filled" Value="True" />
+    <Setter Property="Foreground" Value="{DynamicResource Warn}" />
+  </Style>
+
+  <!-- ===== Buttons: Styles.axaml's own (btn, btn sm, btn ink, text-link), and their keyboard focus ===== -->
+
+  <!-- A link with an icon after its words (What's Claude Pro? ↗). -->
+  <Style Selector="Button.text-link c|Icon">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.text-link.small">
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <!-- Show or Hide inside a password field: a quiet word, ink under the pointer. -->
+  <Style Selector="Button.link-btn">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Padding" Value="4,2" />
+  </Style>
+  <Style Selector="Button.link-btn:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="True" />
+    <Setter Property="Background" Value="Transparent" />
+  </Style>
+  <Style Selector="Button.btn c|Icon">
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+
+  <!-- ===== Choices: a white panel with a hairline; the chosen one ringed in ink, its radio an ink dot ===== -->
+  <!-- (Their hairline and ring are drawn inside them, as a step's is: in a list a ring outside would be cut off.) -->
+
+  <Style Selector="Button.choice">
+    <Setter Property="Theme" Value="{StaticResource Surface}" />
+    <Setter Property="MinHeight" Value="72" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="Padding" Value="16,12" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="ClipToBounds" Value="False" />
+  </Style>
+  <Style Selector="Button.choice /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Button.choice:pointerover">
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <!-- (After the pointer's, so the chosen one keeps its ink ring under the pointer.) -->
+  <Style Selector="Button.choice.on">
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <!-- One line high (the models, a card's choices in the chat): the control's corners. -->
+  <Style Selector="Button.choice.row">
+    <Setter Property="MinHeight" Value="40" />
+    <Setter Property="Padding" Value="12,6" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+  </Style>
+  <Style Selector="TextBlock.choice-title">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="LineHeight" Value="20" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.choice.row TextBlock.choice-title">
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+  <Style Selector="TextBlock.choice-about">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="c|Icon.choice-icon">
+    <Setter Property="Size" Value="22" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Button.choice.on c|Icon.choice-icon">
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+  </Style>
+  <!-- The radio: a grey ring, or an ink dot with the page's white in its middle. -->
+  <Style Selector="Border.radio">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="BorderBrush" Value="{DynamicResource InkSubtle}" />
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.radio > Ellipse">
+    <Setter Property="Width" Value="8" />
+    <Setter Property="Height" Value="8" />
+    <Setter Property="Fill" Value="{DynamicResource Surface}" />
+    <Setter Property="IsVisible" Value="False" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.radio.on">
+    <Setter Property="Background" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="Border.radio.on > Ellipse">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <Style Selector="Border.radio.dim">
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+  <!-- A tag (Recommended, Already on this Mac, Advanced, Optional, Skipped): grey words on the sunken grey. -->
+  <Style Selector="Border.tag">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Padding" Value="7,2" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.tag TextBlock">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="LineHeight" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.tag c|Icon">
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- On the canvas (the steps) the sunken grey would be lighter than what's round it: the canvas's own hover grey. -->
+  <Style Selector="Border.step Border.tag">
+    <Setter Property="Background" Value="{DynamicResource Hover}" />
+  </Style>
+  <Style Selector="Border.step.current Border.tag">
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+  </Style>
+
+  <!-- ===== Fields, lists, switches ===== -->
+
+  <!-- A text field: white, a hairline round it, the control's corners, as tall as a small button; ringed in ink while
+       the caret's in it (the ring drawn inside, so the words don't move). -->
+  <Style Selector="Border.field">
+    <Setter Property="Height" Value="34" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="10,0,6,0" />
+  </Style>
+  <Style Selector="Border.field:focus-within">
+    <Setter Property="BorderThickness" Value="1.5" />
+    <Setter Property="Padding" Value="8.5,0,4.5,0" />
+    <Setter Property="BoxShadow" Value="none" />
+  </Style>
+  <Style Selector="Border.field TextBox.bare">
+    <Setter Property="FontSize" Value="14" />
+  </Style>
+  <!-- A list of what's set (the library's addresses, what's ready on the last page): a white panel, a row each,
+       hairlines between. -->
+  <Style Selector="Border.group">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="MaxWidth" Value="480" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="Grid.row">
+    <Setter Property="MinHeight" Value="48" />
+    <Setter Property="Margin" Value="16,0,12,0" />
+  </Style>
+  <Style Selector="Grid.row TextBlock.key">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Grid.row TextBlock.value">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+  </Style>
+  <Style Selector="Border.group Border.rule">
+    <Setter Property="Margin" Value="16,0,0,0" />
+  </Style>
+  <!-- A switch: the library's (grey off, ink on), as a ToggleButton. Its focus is a ring round the track. -->
+  <Style Selector="ToggleButton.switch">
+    <Setter Property="Width" Value="36" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="ClipToBounds" Value="False" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <Border Name="Ring" Margin="-4" CornerRadius="15" BorderThickness="2" BorderBrush="{DynamicResource Focus}" IsVisible="False" />
+          <Border Name="Track" CornerRadius="11" Background="{DynamicResource Line}" />
+          <Border Name="Knob" Width="18" Height="18" CornerRadius="9" Background="{DynamicResource Surface}"
+                  HorizontalAlignment="Left" Margin="2,0,0,0" BoxShadow="0 1 2 0 #40000000" />
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="ToggleButton.switch:checked /template/ Border#Track">
+    <Setter Property="Background" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="ToggleButton.switch:checked /template/ Border#Knob">
+    <Setter Property="HorizontalAlignment" Value="Right" />
+    <Setter Property="Margin" Value="0,0,2,0" />
+  </Style>
+  <Style Selector="ToggleButton.switch:focus-visible /template/ Border#Ring">
+    <Setter Property="IsVisible" Value="True" />
+  </Style>
+  <!-- Classes' tick for a Canvas course: just the box, in the rows' first column. -->
+  <Style Selector="CheckBox.tick">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <!-- ===== Progress, problems, details ===== -->
+
+  <!-- How far along: a grey track, filled in ink. -->
+  <Style Selector="Border.track">
+    <Setter Property="Height" Value="6" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource Line}" />
+  </Style>
+  <Style Selector="Border.track Border.bar">
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource Ink}" />
+  </Style>
+  <Style Selector="ProgressBar.work">
+    <Setter Property="Height" Value="6" />
+    <Setter Property="MinHeight" Value="6" />
+    <Setter Property="CornerRadius" Value="3" />
+    <Setter Property="Background" Value="{DynamicResource Line}" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+  </Style>
+  <!-- Something went wrong: its words beside the warning icon on the sunken grey, what to do under them. -->
+  <Style Selector="Border.problem">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="Padding" Value="14,12" />
+    <Setter Property="MaxWidth" Value="480" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+  </Style>
+  <!-- Details: the exact command and what it printed. -->
+  <Style Selector="Border.mono">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="Padding" Value="10,8" />
+    <Setter Property="MaxWidth" Value="480" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+  </Style>
+  <Style Selector="Border.mono SelectableTextBlock">
+    <Setter Property="FontFamily" Value="SF Mono, Menlo, Cascadia Mono, Consolas, monospace" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="LineHeight" Value="16" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+
+  <!-- ===== Guided setup's chat ===== -->
+
+  <!-- A card the AI opens in the chat: a white panel with a hairline, its title an h2's weight. -->
+  <Style Selector="Border.card">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="18,16" />
+    <Setter Property="Width" Value="540" />
+    <Setter Property="HorizontalAlignment" Value="Left" />
+  </Style>
+  <Style Selector="TextBlock.card-title">
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontWeight" Value="ExtraBold" />
+    <Setter Property="LineHeight" Value="22" />
+    <Setter Property="LetterSpacing" Value="-0.16" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <!-- What the AI says, who said it, and what Study Stash did ("Checked your setup"). -->
+  <Style Selector="TextBlock.ai-byline">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkSubtle}" />
+  </Style>
+  <Style Selector="TextBlock.ai-answer">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="LineHeight" Value="22" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="TextBlock.ai-thinking">
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <!-- The student's own words: on the sunken grey, at the right. -->
+  <Style Selector="Border.ai-bubble-q">
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="Padding" Value="14,9" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="HorizontalAlignment" Value="Right" />
+  </Style>
+  <Style Selector="Border.ai-bubble-q TextBlock">
+    <Setter Property="FontSize" Value="15" />
+    <Setter Property="LineHeight" Value="21" />
+    <Setter Property="Foreground" Value="{DynamicResource Ink}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+  </Style>
+  <Style Selector="Border.ai-bubble-q.queued">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
+  <Style Selector="TextBlock.note-line">
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <!-- The Ask bar's look for the reply field. -->
+  <Style Selector="Border.ask TextBox.bare">
+    <Setter Property="FontSize" Value="15" />
+  </Style>
+  <!-- ===== Keyboard focus ===== -->
+
+  <!-- The library's pills show no outline when the keyboard reaches them; setup's do, 2 px in the focus colour, 2 px
+       out from the edge, round the pill, the card or the words. (Last in the file, so it wins over the styles above
+       that hide the wash it's drawn on.) -->
+  <Style Selector="Button.btn:focus-visible /template/ Border#PART_Wash, Button.choice:focus-visible /template/ Border#PART_Wash, Button.text-link:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="IsVisible" Value="True" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Focus}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Margin" Value="-4" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+  </Style>
+  <Style Selector="Button.btn:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="CornerRadius" Value="28" />
+  </Style>
+  <Style Selector="Button.btn.sm:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="CornerRadius" Value="21" />
+  </Style>
+  <Style Selector="Button.choice:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="CornerRadius" Value="16" />
+  </Style>
+  <Style Selector="Button.choice.row:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="CornerRadius" Value="12" />
+  </Style>
+  <Style Selector="Button.text-link:focus-visible /template/ Border#PART_Wash">
+    <Setter Property="CornerRadius" Value="6" />
+    <Setter Property="Margin" Value="-6,-3,-6,-3" />
+  </Style>
+</Styles>

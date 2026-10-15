@@ -8,6 +8,9 @@ public partial class WinGuidedSetup : UserControl
     public WinGuidedSetup()
     {
         InitializeComponent();
+        // The library window's look: no accent anywhere, so whatever inside asks for it (the browser card's pictures, a
+        // ticked box, the shortcuts) gets ink.
+        Resources.MergedDictionaries.Add(Skin.NoAccent());
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not GuidedSetupModel g) return;
@@ -19,7 +22,7 @@ public partial class WinGuidedSetup : UserControl
         };
     }
 
-    /// <summary>The design's size for each screen: 720×480 before the chat, 900×560 for it.</summary>
+    /// <summary>Each screen's size (GuidedSetupModel.ViewWidth and ViewHeight): setup by hand's before the chat, bigger for it.</summary>
     void Fit(GuidedSetupModel g)
     {
         Width = g.ViewWidth;

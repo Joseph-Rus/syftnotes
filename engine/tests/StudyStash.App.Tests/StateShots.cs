@@ -34,7 +34,7 @@ public class StateShots
                     m.MicLevels = Wave;
                     m.MicHeard = true;
                     return View(skin, m);
-                }, size: new Size(850, 608));
+                }, size: new Size(888, 708));
     }
 
     [AvaloniaFact]
@@ -49,7 +49,7 @@ public class StateShots
                     m.Address = "http://mac-mini.example.ts.net:8787";
                     m.LibraryResult = "Found mac-mini on your Tailscale network. Type its password.";
                     return View(skin, m);
-                }, size: new Size(850, 608));
+                }, size: new Size(888, 708));
     }
 
     [AvaloniaFact]
@@ -66,7 +66,7 @@ public class StateShots
                     m.LibraryOk = true;
                     m.LibraryResult = $"Ada's library is ready on this {m.DeviceWord}.";
                     return View(skin, m);
-                }, size: new Size(850, 608));
+                }, size: new Size(888, 708));
     }
 
     // --- the dropdown, saying what's wrong (task 6) -----------------------------------------------------------------

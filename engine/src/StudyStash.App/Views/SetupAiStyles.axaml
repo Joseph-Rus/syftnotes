@@ -1,0 +1,59 @@
+<!-- Setup's notes step (MacAiSetup, WinAiSetup) in setup's look: what it has that the other steps don't. Included after
+     SetupStyles. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- An engine: a choice card (white, a hairline round it, the panel's corners) that holds its own buttons beside the
+       choice, so it's a panel round a button rather than the button itself. The hairline and the chosen one's ink ring
+       are drawn inside it (a list cuts a ring outside off), the padding giving way so nothing in it moves. -->
+  <Style Selector="Border.engine">
+    <Setter Property="Background" Value="{DynamicResource Surface}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusPanel}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="15,11" />
+  </Style>
+  <Style Selector="Border.engine.on">
+    <Setter Property="BorderBrush" Value="{DynamicResource Ink}" />
+    <Setter Property="BorderThickness" Value="2" />
+    <Setter Property="Padding" Value="14,10" />
+  </Style>
+  <!-- The radio's keyboard focus: a ring just outside it. -->
+  <Style Selector="Border.ai-radioring">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="CornerRadius" Value="14" />
+  </Style>
+  <Style Selector="Button.ai-choice:pointerover Border.radio:not(.on), Button.ai-choice:pressed Border.radio:not(.on)">
+    <Setter Property="BorderBrush" Value="{DynamicResource InkMuted}" />
+  </Style>
+  <!-- How to get one going: each step's number on the sunken grey, the command to paste in a sunken box. -->
+  <Style Selector="Border.stepnum">
+    <Setter Property="Width" Value="20" />
+    <Setter Property="Height" Value="20" />
+    <Setter Property="CornerRadius" Value="10" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="BoxShadow" Value="{DynamicResource LineRing}" />
+    <Setter Property="VerticalAlignment" Value="Top" />
+  </Style>
+  <Style Selector="Border.stepnum TextBlock">
+    <Setter Property="FontSize" Value="11" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="Foreground" Value="{DynamicResource InkMuted}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+  <Style Selector="Border.code">
+    <Setter Property="MinHeight" Value="42" />
+    <Setter Property="CornerRadius" Value="{DynamicResource RadiusControl}" />
+    <Setter Property="Background" Value="{DynamicResource SurfaceSunken}" />
+    <Setter Property="Padding" Value="12,4,4,4" />
+  </Style>
+  <Style Selector="Border.code SelectableTextBlock">
+    <Setter Property="FontFamily" Value="SF Mono, Menlo, Cascadia Mono, Consolas, monospace" />
+    <Setter Property="FontSize" Value="12.5" />
+    <Setter Property="LineHeight" Value="18" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+  </Style>
+</Styles>
