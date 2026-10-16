@@ -4,6 +4,8 @@
 //   swift make_icon.swift out.tiles           icon-<px>.png: the Windows / web tile (cream, the S in navy), no margin
 //   swift make_icon.swift out.ico             the Windows icon: the tile at 16–256 px in one .ico
 //   swift make_icon.swift out.marks           mark-<px>.png: the monochrome "S." for the menu bar and the tray
+//   swift make_icon.swift out.ios             AppIcon-1024.png and AppIcon-1024-dark.png for the iPhone/iPad app:
+//                                             the tile filling a square picture (iOS rounds the corners itself)
 //   swift make_icon.swift out.chrome          icon-<px>.png for the Chrome extension (copy them into extension/):
 //                                             16, 32 and 48 a bold navy "S." on a flat cream tile (the toolbar, the
 //                                             extensions page), 128 the tile at 96 px with Chrome's 16-px margin
@@ -68,6 +70,9 @@ func canvas(_ px: Int) -> CGContext {
     CGContext(data: nil, width: px, height: px, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpace(name: CGColorSpace.sRGB)!,
               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
 }
+
+/// The iPhone/iPad icon: the 824-unit tile fills the whole picture, square, for iOS to round.
+var squareForIOS = false
 
 /// Device pixels per design unit for the picture being drawn: CoreGraphics takes shadow offsets and blurs in device
 /// pixels, not in the scaled units everything else is drawn in.
@@ -143,7 +148,13 @@ func iconRep(_ px: Int, _ look: Look) -> NSBitmapImageRep {
     let ctx = canvas(px)
     let tileRect = CGRect(x: 100, y: 100, width: 824, height: 824)
     var radius: CGFloat = 185
-    if look == .tile {  // the 824-unit tile fills 96% of the picture, with Windows 11's softer corner
+    if squareForIOS {
+        let scale = CGFloat(px) / 824
+        ctx.translateBy(x: -100 * scale, y: -100 * scale)
+        ctx.scaleBy(x: scale, y: scale)
+        radius = 0
+        unit = scale
+    } else if look == .tile {  // the 824-unit tile fills 96% of the picture, with Windows 11's softer corner
         let scale = 0.96 * CGFloat(px) / 824
         ctx.translateBy(x: 0.02 * CGFloat(px) - 100 * scale, y: 0.02 * CGFloat(px) - 100 * scale)
         ctx.scaleBy(x: scale, y: scale)
@@ -373,6 +384,11 @@ case "tiles":
     }
 case "ico":
     try! ico([16, 20, 24, 32, 40, 48, 64, 128, 256]).write(to: out)
+case "ios":
+    try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
+    squareForIOS = true
+    try! icon(1024, .light).write(to: out.appendingPathComponent("AppIcon-1024.png"))
+    try! icon(1024, .dark).write(to: out.appendingPathComponent("AppIcon-1024-dark.png"))
 case "chrome":
     try? FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
     for px in [16, 32, 48] { try! toolbarIcon(px).write(to: out.appendingPathComponent("icon-\(px).png")) }
