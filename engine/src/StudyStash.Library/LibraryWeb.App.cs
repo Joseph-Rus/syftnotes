@@ -144,6 +144,24 @@ public sealed partial class LibraryWeb
             return Http.Json(Reader.Overview());
         })));
 
+        // A calendar event's title as another name of a class ({class, alias}; remove: true takes it away): every
+        // event with that title (a class that meets every week) is that class's from then on, and so are the
+        // lectures recorded in it.
+        app.MapPost("/api/v2/classes/alias", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string? name = Str(body, "class"), alias = Str(body, "alias");
+            bool remove = body?["remove"] is JsonValue rv && rv.TryGetValue(out bool r) && r;
+            if (name is null || alias is null || alias.Length > 120) return Http.Detail(400, "say which class, and the name (up to 120 characters)");
+            var known = cfg.Classes.FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (known is null) return Http.Detail(404, "there's no class called " + name);
+            // One name belongs to one class: given to this one, it's taken from any other.
+            foreach (var c in cfg.Classes) c.Aliases.RemoveAll(a => a.Equals(alias, StringComparison.OrdinalIgnoreCase));
+            if (!remove && !alias.Equals(known.Name, StringComparison.OrdinalIgnoreCase)) known.Aliases.Add(alias);
+            Configs.Save(cfg);
+            return Http.Json(Reader.Overview());
+        })));
+
         // Which AI does the work: one for everything, and optionally another per kind of work (ai.json).
         app.MapGet("/api/v2/ai", (HttpContext ctx) => Api(ctx, () => Http.Json(AiSettings.Load(cfg.Home).ToJson())));
         app.MapPost("/api/v2/ai", Http.Handle(ctx => ApiAsync(ctx, async () =>
