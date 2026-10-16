@@ -37,10 +37,10 @@ public static class SettingsIndex
     /// that records).</summary>
     public static readonly IReadOnlyList<(string Id, string Name)> Sections =
     [
-        ("General", "General"), ("Appearance", "Appearance"), ("Shortcuts", "Shortcuts"), ("Recording", "Recording"),
-        ("Calendars", "Calendars"), ("Granola", "Granola"), ("Connection", "Connection"), ("Library", "Library"), ("Classes", "Classes"),
-        ("Notes", "Notes and sorting"), ("AI", "Your AI"), ("Access", "AI apps"), ("Canvas", "Canvas"), ("Folders", "Folders"),
-        ("Phone", "Phone"),
+        ("General", "General"), ("Appearance", "Appearance"), ("Recording", "Recording"), ("Calendars", "Calendars"), ("Phone", "Phone"),
+        ("Classes", "Classes"), ("Notes", "Notes"), ("AI", "Your AI"), ("Canvas", "Canvas"),
+        ("Access", "AI apps"), ("Granola", "Granola"), ("Folders", "Your files"),
+        ("Library", "Library"), ("Connection", "Connection"),
     ];
 
     /// <summary>A section's name as the sidebar shows it ("Notes and sorting"), or the id when there's none.</summary>
@@ -68,7 +68,7 @@ public static class SettingsIndex
         new() { Section = "General", Title = "Run setup again", Detail = "The first-run steps, with what's set up already kept.",
             Words = "setup wizard onboarding guided start over" },
         new() { Section = "General", Title = "Quit Study Stash", Words = "exit close stop app" },
-        new() { Section = "General", Title = "Speech models", Detail = "The models Study Stash uses, and their licences.",
+        new() { Section = "General", Title = "Credits", Detail = "The speech models and illustration parts Study Stash uses, and their licences.",
             Words = "licenses licences credits about open source" },
 
         Page("Appearance", "Pick how Study Stash looks.", "look theme"),
@@ -77,13 +77,12 @@ public static class SettingsIndex
         new() { Section = "Appearance", Title = "Colour theme", Detail = "The accent for buttons, the selection and highlights.",
             Words = "color colour accent theme highlight tint", Key = "colour_theme" },
 
-        Page("Shortcuts", "Change the keys for searching, recording, asking and Settings.", "keyboard hotkeys keys"),
-        new() { Section = "Shortcuts", Title = "Search and Record work from any app", Detail = "The shortcuts work while you're in another app.",
+        new() { Section = "General", Title = "Search and Record work from any app", Detail = "The shortcuts work while you're in another app.",
             Words = "global anywhere hotkeys keyboard shortcuts", Key = "shortcuts_anywhere", Short = "Shortcuts from any app", Takes = OnOff },
-        new() { Section = "Shortcuts", Title = "Search your lectures", Detail = "Its keyboard shortcut.", Words = "hotkey keys search panel quick" },
-        new() { Section = "Shortcuts", Title = "Start or stop recording", Detail = "Its keyboard shortcut.", Words = "hotkey keys record", Only = "records" },
-        new() { Section = "Shortcuts", Title = "Ask about what you searched", Detail = "Its keyboard shortcut.", Words = "hotkey keys ask question" },
-        new() { Section = "Shortcuts", Title = "Open Settings", Detail = "Its keyboard shortcut.", Words = "hotkey keys preferences" },
+        new() { Section = "General", Title = "Search your lectures", Detail = "Its keyboard shortcut.", Words = "hotkey keys search panel quick" },
+        new() { Section = "General", Title = "Start or stop recording", Detail = "Its keyboard shortcut.", Words = "hotkey keys record", Only = "records" },
+        new() { Section = "General", Title = "Ask about what you searched", Detail = "Its keyboard shortcut.", Words = "hotkey keys ask question" },
+        new() { Section = "General", Title = "Open Settings", Detail = "Its keyboard shortcut.", Words = "hotkey keys preferences" },
 
         Page("Recording", "How each lecture is written down on this computer.", "record recorder microphone mic audio transcript", "records"),
         new() { Section = "Recording", Title = "Transcription model", Detail = "The model that turns speech into text on this computer.",
@@ -126,7 +125,10 @@ public static class SettingsIndex
         new() { Section = "Library", Title = "Notes folder", Detail = "Where the library keeps its notes.",
             Words = "folder where files stored location obsidian markdown" },
         new() { Section = "Library", Title = "Update automatically", Detail = "The library installs each new version by itself.",
-            Words = "updates upgrade new version auto library", Key = "library_auto_update", Short = "Library updates", Takes = OnOff },
+            Words = "updates upgrade new version auto library", Key = "library_auto_update", Short = "Library updates", Takes = OnOff, Only = "laptop" },
+        // The library is this computer: its updates are the app's, in General.
+        new() { Section = "General", Title = "Update automatically", Detail = "Study Stash installs each new version by itself.",
+            Words = "updates upgrade new version auto library", Key = "library_auto_update", Short = "Updates", Takes = OnOff, Only = "library" },
 
         Page("Classes", "The classes your library files lectures into.", "course courses subject subjects add rename remove aliases"),
         new() { Section = "Classes", Title = "Use Canvas course names", Detail = "Renames your classes to their Canvas courses' names.",

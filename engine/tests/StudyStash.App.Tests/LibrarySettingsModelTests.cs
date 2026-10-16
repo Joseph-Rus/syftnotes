@@ -24,7 +24,7 @@ public class LibrarySettingsModelTests
     }
 
     [AvaloniaFact]
-    public void The_sidebar_keeps_this_laptop_and_your_library_apart()
+    public void The_sidebar_puts_what_is_used_most_first_and_the_advanced_last()
     {
         var fake = new FakeLibrarySettings();
         var (model, host, home) = Open(fake);
@@ -33,9 +33,15 @@ public class LibrarySettingsModelTests
         using var _m = model;
 
         Assert.Equal("This laptop", model.ComputerNavTitle);
-        Assert.Equal(["General", "Appearance", "Shortcuts", "Recording", "Calendars", "Granola", "Connection"], model.ComputerNav.Select(n => n.Label));
-        Assert.Equal(["Library", "Classes", "Notes and sorting", "Your AI", "AI apps", "Canvas", "Folders", "Phone"], model.LibraryNav.Select(n => n.Label));
-        Assert.Empty(fake.Calls); // nothing asked before a library page opens
+        Assert.Equal(["Study Stash", "Your library", "Connect and import", "Advanced"], model.NavGroups.Select(g => g.Title));
+        Assert.Equal(["General", "Appearance", "Recording", "Calendars", "Phone"], model.NavGroups[0].Items.Select(n => n.Label));
+        Assert.Equal(["Classes", "Notes", "Your AI", "Canvas"], model.NavGroups[1].Items.Select(n => n.Label));
+        Assert.Equal(["AI apps", "Granola", "Your files"], model.NavGroups[2].Items.Select(n => n.Label));
+        Assert.Equal(["Library", "Connection"], model.NavGroups[3].Items.Select(n => n.Label));
+        Assert.Empty(fake.Calls); // nothing asked before a page that reads the library opens
+        // Shortcuts are part of General now: the old page's name opens it, which reads the library (what it's for).
+        model.Section = "Shortcuts";
+        Assert.Equal("General", model.Section);
     }
 
     [AvaloniaFact]
@@ -47,7 +53,7 @@ public class LibrarySettingsModelTests
         using var _host = host;
         using var _m = model;
 
-        Assert.Equal(["General", "Appearance", "Shortcuts", "Connection"], model.ComputerNav.Select(n => n.Label));
+        Assert.Equal(["General", "Appearance", "Connection"], model.ComputerNav.Select(n => n.Label));
         Assert.True(model.OnLibrary);
         Assert.True(model.Lib.IsHere);
         Assert.True(model.Lib.IsReady);

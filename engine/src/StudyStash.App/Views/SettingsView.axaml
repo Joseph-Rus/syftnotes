@@ -700,13 +700,17 @@
 
             <StackPanel Spacing="2" IsVisible="{Binding !Searching}">
             <ContentControl Content="{Binding AssistantNav}" ContentTemplate="{StaticResource NavRow}" Margin="0,0,0,6" />
-            <TextBlock Classes="navgroup" Text="{Binding ComputerNavTitle}" />
-            <ItemsControl ItemsSource="{Binding ComputerNav}" ItemTemplate="{StaticResource NavRow}">
-              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-            </ItemsControl>
-            <TextBlock Classes="navgroup second" Text="Your library" />
-            <ItemsControl ItemsSource="{Binding LibraryNav}" ItemTemplate="{StaticResource NavRow}">
-              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl ItemsSource="{Binding NavGroups}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="s:NavGroup">
+                  <StackPanel Spacing="2">
+                    <TextBlock Classes="navgroup" Classes.second="{Binding Later}" Text="{Binding Title}" />
+                    <ItemsControl ItemsSource="{Binding Items}" ItemTemplate="{StaticResource NavRow}">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
             </ItemsControl>
             </StackPanel>
           </StackPanel>
@@ -719,20 +723,20 @@
               <!-- General -->
               <StackPanel IsVisible="{Binding OnGeneral}" Spacing="8">
                 <TextBlock Classes="h" Text="General" />
-                <TextBlock Classes="body" Text="How Study Stash starts, setup, and its version." />
+                <TextBlock Classes="body" Text="How Study Stash starts and updates, its shortcuts, and setup." />
                 <TextBlock Classes="section" Text="Startup" />
                 <Border Classes="group">
                   <Border Classes="row">
                     <Grid ColumnDefinitions="*,Auto">
                       <StackPanel Spacing="2">
                         <TextBlock Classes="row-title" Text="Open when you log in" />
-                        <TextBlock Classes="row-sub" Text="To the menu bar or tray" />
+                        <TextBlock Classes="row-sub" Text="{Binding StartAtLoginSub}" TextWrapping="Wrap" />
                       </StackPanel>
                       <ToggleButton AutomationProperties.Name="Open when you log in" Grid.Column="1" Classes="switch" IsChecked="{Binding StartAtLogin}" VerticalAlignment="Center" />
                     </Grid>
                   </Border>
                 </Border>
-                <!-- A laptop's own updates: this computer's version and switch. The library's are under Your library → Library;
+                <!-- A laptop's own updates: this computer's version and switch. The library's are under Advanced → Library;
                      on a computer that is the library there's only that one place. -->
                 <StackPanel Spacing="8" IsVisible="{Binding IsLaptopRole}">
                   <TextBlock Classes="section" Text="Updates" />
@@ -764,6 +768,61 @@
                     </StackPanel>
                   </Border>
                 </StackPanel>
+                <!-- The library is this computer: its version and updates are the app's, here in General. -->
+                <StackPanel Spacing="8" IsVisible="{Binding LibraryHere}">
+                      <TextBlock Classes="section" Text="Updates" />
+                      <Border Classes="group">
+                        <StackPanel>
+                          <Border Classes="row">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <TextBlock Classes="row-title" Text="{Binding Lib.UpdateLine}" TextWrapping="Wrap" />
+                              <Button Grid.Column="1" Classes="pill primary act" Command="{Binding Lib.UpdateNowCommand}" IsVisible="{Binding Lib.CanUpdateNow}" Margin="12,0,0,0">
+                                <TextBlock Text="Update now" FontSize="13" FontWeight="Medium" />
+                              </Button>
+                            </Grid>
+                          </Border>
+                          <Border Classes="rowsep" />
+                          <Border Classes="row">
+                            <Grid ColumnDefinitions="*,Auto">
+                              <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="row-title" Text="Update automatically" />
+                                <TextBlock Classes="row-sub" Text="{Binding Lib.AutoUpdateSub}" TextWrapping="Wrap" />
+                              </StackPanel>
+                              <ToggleButton AutomationProperties.Name="Update automatically" Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.AutoUpdate}" />
+                            </Grid>
+                          </Border>
+                        </StackPanel>
+                      </Border>
+                </StackPanel>
+                <StackPanel Spacing="8">
+                  <TextBlock Classes="section gap" Text="Shortcuts" />
+                                  <CheckBox IsChecked="{Binding Shortcuts}" Margin="0,4,0,4">
+                    <TextBlock Text="Search and Record work from any app" FontSize="13" />
+                  </CheckBox>
+                  <v:ShortcutsEditor DataContext="{Binding Keys}" />
+                  <TextBlock Classes="say" Text="{Binding ShortcutsSay}" IsVisible="{Binding ShortcutsSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+                </StackPanel>
+                <!-- What it's for: the library's, so every computer and phone goes by it. School brings Canvas and classes. -->
+                <StackPanel Spacing="8" IsVisible="{Binding Lib.IsReady}">
+                  <TextBlock Classes="section gap" Text="What you use it for" />
+                  <Border Classes="group">
+                    <Border Classes="row">
+                      <StackPanel Spacing="8">
+                        <ItemsControl ItemsSource="{Binding Lib.Uses}">
+                          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:UseChoice">
+                              <CheckBox IsChecked="{Binding Ticked}" Margin="0,0,18,4" ToolTip.Tip="{Binding About}">
+                                <TextBlock Text="{Binding Title}" FontSize="13" />
+                              </CheckBox>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="row-sub" TextWrapping="Wrap" Text="School brings in Canvas and classes, and study notes. Without it you get folders, and notes written for meetings and talks: decisions, action items, open questions." />
+                      </StackPanel>
+                    </Border>
+                  </Border>
+                </StackPanel>
                 <TextBlock Classes="section" Text="Setup" />
                 <Border Classes="group">
                   <Border Classes="row">
@@ -786,10 +845,17 @@
                   <StackPanel>
                     <Border Classes="row">
                       <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Classes="row-title" Text="{Binding Version, StringFormat='Study Stash {0}'}" />
-                        <Button Grid.Column="1" Classes="pill" Command="{Binding QuitCommand}" VerticalAlignment="Center"><TextBlock Text="Quit Study Stash" /></Button>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                          <TextBlock Classes="row-title" Text="Credits" />
+                          <TextBlock Classes="row-sub" Text="The speech models and illustration parts Study Stash uses, and their licences" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                          <Button Classes="pill" Command="{Binding ToggleCreditsCommand}"><TextBlock Text="{Binding CreditsButton}" /></Button>
+                          <Button Classes="pill" Command="{Binding QuitCommand}"><TextBlock Text="Quit Study Stash" /></Button>
+                        </StackPanel>
                       </Grid>
                     </Border>
+                    <StackPanel IsVisible="{Binding ShowCredits}">
                     <Border Classes="rowsep" />
                     <!-- The credit NVIDIA's licence (CC BY 4.0) asks for, beside OpenAI's; Cactus Whistle and its engine are
                          carried in the app under Apache-2.0, whose text is beside it (needle/LICENSE.txt). -->
@@ -807,21 +873,13 @@
                         <TextBlock Classes="row-sub" Text="{x:Static rich:PartsLibrary.AboutLine}" TextWrapping="Wrap" />
                       </StackPanel>
                     </Border>
+                    </StackPanel>
                   </StackPanel>
                 </Border>
               </StackPanel>
 
               <!-- Appearance -->
               <!-- Shortcuts: every key the student can change, and whether search and Record work from any app. -->
-              <StackPanel IsVisible="{Binding OnShortcuts}" Spacing="8">
-                <TextBlock Classes="h" Text="Shortcuts" />
-                <TextBlock Classes="body" Text="Change the keys for searching, recording, asking and Settings." TextWrapping="Wrap" />
-                <CheckBox IsChecked="{Binding Shortcuts}" Margin="0,4,0,4">
-                  <TextBlock Text="Search and Record work from any app" FontSize="13" />
-                </CheckBox>
-                <v:ShortcutsEditor DataContext="{Binding Keys}" />
-                <TextBlock Classes="say" Text="{Binding ShortcutsSay}" IsVisible="{Binding ShortcutsSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
-              </StackPanel>
 
               <StackPanel IsVisible="{Binding OnAppearance}" Spacing="8">
                 <TextBlock Classes="h" Text="Appearance" />
@@ -1233,7 +1291,8 @@
                     <TextBlock Classes="section gap" Text="On its computer" />
                     <Border Classes="group">
                       <StackPanel>
-                        <Border Classes="row">
+                        <!-- On this computer it's the app's own login item: General → Open when you log in. -->
+                        <Border Classes="row" IsVisible="{Binding !Lib.IsHere}">
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
                               <TextBlock Classes="row-title" Text="{Binding Lib.StartAtLoginTitle}" />
@@ -1242,7 +1301,7 @@
                             <ToggleButton AutomationProperties.Name="{Binding Lib.StartAtLoginTitle}" Grid.Column="1" Classes="switch act" IsChecked="{Binding Lib.StartAtLoginOn}" IsEnabled="{Binding Lib.CanStartAtLogin}" Margin="12,0,0,0" />
                           </Grid>
                         </Border>
-                        <Border Classes="rowsep" />
+                        <Border Classes="rowsep" IsVisible="{Binding !Lib.IsHere}" />
                         <Border Classes="row">
                           <Grid ColumnDefinitions="*,Auto">
                             <StackPanel Spacing="2" VerticalAlignment="Center">
@@ -1256,21 +1315,7 @@
                         </Border>
                       </StackPanel>
                     </Border>
-                    <!-- A laptop: keeping everything on this computer instead (Connection → This computer) -->
-                    <Border Classes="group" IsVisible="{Binding IsLaptopRole}">
-                      <Border Classes="row">
-                        <Grid ColumnDefinitions="*,Auto">
-                          <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Classes="row-title" Text="Use just this computer" />
-                            <TextBlock Classes="row-sub" Text="{Binding JustThisComputerLine}" TextWrapping="Wrap" />
-                          </StackPanel>
-                          <Button Grid.Column="1" Classes="pill act" Command="{Binding GoJustThisComputerCommand}" Margin="12,0,0,0">
-                            <TextBlock Text="Use just this computer…" FontSize="13" />
-                          </Button>
-                        </Grid>
-                      </Border>
-                    </Border>
-
+                    <StackPanel Spacing="8" IsVisible="{Binding IsLaptopRole}">
                     <TextBlock Classes="section gap" Text="{Binding Lib.UpdatesHeading}" />
                     <Border Classes="group">
                       <StackPanel>
@@ -1294,6 +1339,7 @@
                         </Border>
                       </StackPanel>
                     </Border>
+                    </StackPanel>
                   </StackPanel>
 
                   <!-- Classes: each its own card, the name, other names and what it covers lined up in columns -->

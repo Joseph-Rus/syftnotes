@@ -212,6 +212,8 @@ public sealed partial class LibraryWeb
                 ["laptops"] = !(System.Net.IPAddress.TryParse(cfg.WebHost, out var ip) && System.Net.IPAddress.IsLoopback(ip)),
             },
             ["start_at_login"] = atLogin,
+            // What it's for (empty until asked): school, or folders for everything else.
+            ["uses"] = new JsonArray(cfg.Uses.Select(u => (JsonNode?)u).ToArray()),
             ["updates"] = new JsonObject
             {
                 ["version"] = Engine.Version,
@@ -344,6 +346,9 @@ public sealed partial class LibraryWeb
             if (Text(ollama["sort_model"]) is { Length: > 0 } sortModel) cfg.OllamaModel = sortModel;
         }
         if (Bool(body["auto_update"]) is { } auto) cfg.AutoUpdate = auto;
+        if (body["uses"] is JsonArray uses)
+            cfg.Uses = [.. uses.Select(n => n is JsonValue v && v.TryGetValue(out string? u) ? u.Trim().ToLowerInvariant() : "")
+                .Where(u => Config.UseKinds.Contains(u)).Distinct()];
         Configs.Save(cfg);
         if (terminal is not null || sortEngine is not null)
         {

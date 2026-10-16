@@ -86,6 +86,22 @@ public sealed partial class LibrarySettingsModel : ObservableObject
     /// <summary>True while a loaded answer fills the fields: nothing is sent back.</summary>
     bool filling;
 
+    /// <summary>What the library is for, as ticked in General: setup's choices, changeable any time.</summary>
+    public UseChoice[] Uses { get; } = UseChoice.All();
+    bool usesWatched;
+
+    void WatchUses()
+    {
+        if (usesWatched) return;
+        usesWatched = true;
+        foreach (var u in Uses)
+            u.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(UseChoice.Ticked) || filling) return;
+                _ = SendAsync(new JsonObject { ["uses"] = new JsonArray([.. Uses.Where(x => x.Ticked).Select(x => (JsonNode?)x.Kind)]) }, "What it's for");
+            };
+    }
+
     static readonly double[] Confidences = [0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
 
     /// <summary>Over the library <paramref name="connect"/> reaches (null: no library set up yet).</summary>
@@ -395,6 +411,10 @@ public sealed partial class LibrarySettingsModel : ObservableObject
             // An older library doesn't say: it listens to the network, as every library did.
             LaptopsCanConnect = s["reach"]?["laptops"] is not JsonValue lc || !lc.TryGetValue(out bool laptops) || laptops;
             StartsAtLogin = s["start_at_login"] is JsonValue sv && sv.TryGetValue(out bool on) ? on : null;
+            WatchUses();
+            var said = (s["uses"] as JsonArray ?? []).Select(Str).ToHashSet();
+            // Not asked yet (or a library from before): school, as it always was.
+            foreach (var use in Uses) use.Ticked = said.Count == 0 ? use.Kind == "student" : said.Contains(use.Kind);
             var u = s["updates"];
             Version = Str(u?["version"]);
             bool newer = Flag(u?["newer"]);

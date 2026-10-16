@@ -58,6 +58,9 @@ public sealed partial class NavItem : ObservableObject
     [ObservableProperty] public partial bool On { get; set; }
 }
 
+/// <summary>A group of the Settings sidebar, under its heading: what's used most first, the advanced last.</summary>
+public sealed record NavGroup(string Title, IReadOnlyList<NavItem> Items, bool Later = true);
+
 /// <summary>One choice in the Appearance mode picker: "Match system", "Light" or "Dark", and whether it's the one in
 /// use.</summary>
 public sealed partial class AppearanceOption : ObservableObject
@@ -84,22 +87,18 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// connection to the library; a library-only computer doesn't record, so it has no Recording).</summary>
     public IReadOnlyList<NavItem> ComputerNav { get; }
 
-    /// <summary>The sidebar's second group: the library's own settings, read and changed through its API, so its web
-    /// page is never needed.</summary>
-    public IReadOnlyList<NavItem> LibraryNav { get; } =
-    [
-        new() { Id = "Library", Glyph = "dns", Label = "Library" },
-        new() { Id = "Classes", Glyph = "book_2", Label = "Classes" },
-        new() { Id = "Notes", Glyph = "edit_note", Label = "Notes and sorting" },
-        new() { Id = "AI", Glyph = "auto_awesome", Label = "Your AI" },
-        new() { Id = "Access", Glyph = "hub", Label = "AI apps" },
-        new() { Id = "Canvas", Glyph = "school", Label = "Canvas" },
-        new() { Id = "Folders", Glyph = "folder", Label = "Folders" },
-        new() { Id = "Phone", Glyph = "smartphone", Label = "Phone" },
-    ];
+    /// <summary>The sidebar, in groups by how often each is wanted: this app (General first), what's in the library,
+    /// what's connected to it, and the library's own workings last. Each page still says whose it is (this computer's,
+    /// or the library's, read through its API).</summary>
+    public IReadOnlyList<NavGroup> NavGroups { get; }
 
-    /// <summary>Every row of the sidebar, both groups.</summary>
-    public IEnumerable<NavItem> NavItems => ComputerNav.Concat(LibraryNav).Prepend(AssistantNav);
+    /// <summary>The library's own pages, wherever the sidebar puts them.</summary>
+    public IReadOnlyList<NavItem> LibraryNav => [.. NavGroups.SelectMany(g => g.Items).Where(n => LibraryPages.Contains(n.Id))];
+
+    static readonly HashSet<string> LibraryPages = ["Library", "Classes", "Notes", "AI", "Access", "Canvas", "Folders", "Phone"];
+
+    /// <summary>Every row of the sidebar.</summary>
+    public IEnumerable<NavItem> NavItems => NavGroups.SelectMany(g => g.Items).Prepend(AssistantNav);
 
     /// <summary>The first group's heading: "This laptop" on a laptop, this Mac or PC where the library runs.</summary>
     public string ComputerNavTitle { get; }
@@ -276,7 +275,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool CanUpdateHere { get; set; }
     [ObservableProperty] public partial bool UpdateHereBusy { get; set; }
     [ObservableProperty] public partial bool AutoUpdateHere { get; set; }
-    public string AutoUpdateHereSub => "Study Stash on this laptop installs each new version by itself, never while you're recording. Your library has its own switch under Your library → Library.";
+    public string AutoUpdateHereSub => "Study Stash on this laptop installs each new version by itself, never while you're recording. Your library has its own switch under Advanced → Library.";
     Func<AppUpdates?> updater = () => AppUpdates.Current;
 
     /// <summary>For a test: Check now and Update now go through <paramref name="updates"/>, not the running app's.</summary>
@@ -298,12 +297,12 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     /// <summary>One of the library's own pages, which share a heading and what to say when the library can't be reached.</summary>
     public bool OnLibraryPage => OnLibrary || OnClasses || OnNotes || OnFolders;
     /// <summary>The page's heading, above the library's own pages.</summary>
-    public string LibraryPageTitle => Section switch { "Classes" => "Classes", "Notes" => "Notes and sorting", "Folders" => "Folders", _ => "Library" };
+    public string LibraryPageTitle => Section switch { "Classes" => "Classes", "Notes" => "Notes and sorting", "Folders" => "Your files", _ => "Library" };
     public string LibraryPageLine => Section switch
     {
         "Classes" => "The classes your library files lectures into. It reads each lecture and picks the class it's about from these names and what each covers; a lecture you record for a class goes straight there.",
         "Notes" => "How your library writes the notes for each lecture and sorts it into a class.",
-        "Folders" => "Folders on the library's computer that search, and the AI when you chat, may read.",
+        "Folders" => "Folders on the library's computer (your school or work files) that search, and the AI when you chat, may read.",
         _ => Lib.IsHere ? $"Your library, on this {(OperatingSystem.IsWindows() ? "PC" : "Mac")}." : "Your library, on the computer that keeps your lectures.",
     };
     public bool OnAi => Section == "AI";
@@ -340,18 +339,40 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
     {
         this.host = host;
         bool records = host.Settings.Role != AppRole.Library;
-        ComputerNav =
-        [
-            new() { Id = "General", Glyph = "tune", Label = "General" },
-            new() { Id = "Appearance", Glyph = "palette", Label = "Appearance" },
-            new() { Id = "Shortcuts", Glyph = "keyboard", Label = "Shortcuts" },
-            .. records ? new NavItem[] { new() { Id = "Recording", Glyph = "mic", Label = "Recording" } } : [],
-            .. records ? new NavItem[] { new() { Id = "Calendars", Glyph = "event", Label = "Calendars" } } : [],
-            .. records ? new NavItem[] { new() { Id = "Granola", Glyph = "drive_file_move", Label = "Granola" } } : [],
-            new() { Id = "Connection", Glyph = "link", Label = "Connection" },
-        ];
+        // Not for school (what the library is for says so): Folders, and no Canvas.
+        bool school = host.Overview?["for_school"] is not System.Text.Json.Nodes.JsonValue fs || !fs.TryGetValue(out bool sc) || sc;
         string device = OperatingSystem.IsWindows() ? "PC" : "Mac";
         ComputerNavTitle = host.Settings.Role == AppRole.Laptop ? "This laptop" : $"This {device}";
+        NavItem Nav(string id, string glyph, string label) => new() { Id = id, Glyph = glyph, Label = label };
+        NavGroups =
+        [
+            new("Study Stash",
+            [
+                Nav("General", "tune", "General"),
+                Nav("Appearance", "palette", "Appearance"),
+                .. records ? new[] { Nav("Recording", "mic", "Recording"), Nav("Calendars", "event", "Calendars") } : [],
+                Nav("Phone", "smartphone", "Phone"),
+            ], Later: false),
+            new("Your library",
+            [
+                Nav("Classes", "book_2", school ? "Classes" : "Folders"),
+                Nav("Notes", "edit_note", "Notes"),
+                Nav("AI", "auto_awesome", "Your AI"),
+                .. school ? new[] { Nav("Canvas", "school", "Canvas") } : [],
+            ]),
+            new("Connect and import",
+            [
+                Nav("Access", "hub", "AI apps"),
+                .. records ? new[] { Nav("Granola", "drive_file_move", "Granola") } : [],
+                Nav("Folders", "folder", "Your files"),
+            ]),
+            new("Advanced",
+            [
+                Nav("Library", "dns", "Library"),
+                Nav("Connection", "link", "Connection"),
+            ]),
+        ];
+        ComputerNav = [.. NavGroups.SelectMany(g => g.Items).Where(n => !LibraryPages.Contains(n.Id))];
         Lib = new LibrarySettingsModel(library ?? (() => host.Remote() is { } lib ? (m, path, body) => lib.SettingsAsync(m, path, body) : null))
         {
             IsHere = host.Settings.LibraryHere,
@@ -480,7 +501,7 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             case "Calendars":
                 Calendars.Load();
                 break;
-            case "Library" or "Classes" or "Notes" or "Folders":
+            case "Library" or "Classes" or "Notes" or "Folders" or "General":
                 _ = Lib.Load();
                 break;
             case "Phone":
@@ -582,8 +603,25 @@ public sealed partial class SettingsModel : ObservableObject, IDisposable
             ? $"{advice.Why} {inUse.Name} may fall behind a lecture here: pick {advice.Model.Name} to switch. The one you have stays."
             : advice.Why;
 
+    /// <summary>Under Open when you log in: with the library here, the same login item keeps it running too.</summary>
+    public string StartAtLoginSub => LibraryHere
+        ? $"To the menu bar or tray, with your library, so notes get written whenever this {(OperatingSystem.IsWindows() ? "PC" : "Mac")} is on"
+        : "To the menu bar or tray";
+
+    /// <summary>The credits, folded away under About until asked for.</summary>
+    [ObservableProperty] public partial bool ShowCredits { get; set; }
+    public string CreditsButton => ShowCredits ? "Hide" : "Show";
+    partial void OnShowCreditsChanged(bool value) => OnPropertyChanged(nameof(CreditsButton));
+    [CommunityToolkit.Mvvm.Input.RelayCommand] void ToggleCredits() => ShowCredits = !ShowCredits;
+
     partial void OnSectionChanged(string value)
     {
+        // Shortcuts are part of General now: a link or a search that names the old page opens General.
+        if (value == "Shortcuts")
+        {
+            Section = "General";
+            return;
+        }
         foreach (string p in new[]
                  {
                      nameof(OnConnection), nameof(OnRecording), nameof(OnLibrary), nameof(OnClasses), nameof(OnNotes), nameof(OnFolders),
