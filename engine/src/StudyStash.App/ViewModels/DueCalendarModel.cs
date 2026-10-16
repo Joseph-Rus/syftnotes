@@ -61,7 +61,7 @@ public sealed partial class DueCalendarModel : ObservableObject
             .Where(x => x.i.DueAt is not null).GroupBy(x => (x.i.Class, x.i.Id)).Select(g => g.First())];
         var today = Today;
         month = new DateTime(today.Year, today.Month, 1);
-        week = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        week = OverviewModel.WeekStart(today);
         Build();
     }
 
@@ -79,8 +79,8 @@ public sealed partial class DueCalendarModel : ObservableObject
     public ObservableCollection<CalendarCell> Cells { get; } = [];
     public ObservableCollection<WeekDay> Week { get; } = [];
     public ObservableCollection<CalendarFilter> Filters { get; } = [];
-    /// <summary>Mon to Sun: the grid's heading.</summary>
-    public string[] Days { get; } = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    /// <summary>Sun to Sat, as Canvas's calendar has them: the grid's heading.</summary>
+    public string[] Days { get; } = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     /// <summary>The grid's rows this month: five, or six when the month runs over.</summary>
     public int Rows => Math.Max(1, Cells.Count / 7);
 
@@ -121,7 +121,7 @@ public sealed partial class DueCalendarModel : ObservableObject
     {
         var today = Today;
         month = new DateTime(today.Year, today.Month, 1);
-        week = today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
+        week = OverviewModel.WeekStart(today);
         Build();
     }
 
@@ -171,8 +171,8 @@ public sealed partial class DueCalendarModel : ObservableObject
         }
         else
         {
-            // The grid starts on the Monday on or before the 1st and runs whole weeks to the month's end.
-            var first = month.AddDays(-(((int)month.DayOfWeek + 6) % 7));
+            // The grid starts on the Sunday on or before the 1st and runs whole weeks to the month's end.
+            var first = OverviewModel.WeekStart(month);
             var last = month.AddMonths(1).AddDays(-1);
             int rows = (int)Math.Ceiling(((last - first).Days + 1) / 7.0);
             var byDay = Showing.GroupBy(x => Local(x.Item.DueAt!.Value).Date).ToDictionary(g => g.Key, g => g.OrderBy(x => x.Item.DueAt).ToList());

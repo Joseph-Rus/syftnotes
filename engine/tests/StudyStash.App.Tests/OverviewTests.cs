@@ -18,7 +18,7 @@ namespace StudyStash.App.Tests;
 public class OverviewTests
 {
     static readonly TimeZoneInfo Zone = TimeZoneInfo.CreateCustomTimeZone("Test", TimeSpan.FromHours(-7), "Test", "Test");
-    /// <summary>A Wednesday, two in the afternoon: the week is Monday 28 September to Sunday 4 October.</summary>
+    /// <summary>A Wednesday, two in the afternoon: the week is Sunday 27 September to Saturday 3 October.</summary>
     static readonly DateTimeOffset Now = new(2026, 9, 30, 14, 0, 0, TimeSpan.FromHours(-7));
     static readonly DateTimeOffset Midnight = new(2026, 9, 30, 0, 0, 0, TimeSpan.FromHours(-7));
 
@@ -220,12 +220,15 @@ public class OverviewTests
         Assert.Equal(("Due", "Problem set is due tonight, and Lab report is still missing."), (page.Title, page.Lede));
         Assert.False(page.HasAsk);
         var cal = page.Calendar!;
-        // September 2026: Monday first, five whole weeks, the days outside the month quieter, the 1st naming its month.
+        // September 2026: Sunday first, as Canvas has it, five whole weeks, the days outside the month quieter, the 1st
+        // naming its month.
         Assert.Equal("September 2026", cal.Heading);
+        Assert.Equal(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], cal.Days);
         Assert.Equal(35, cal.Cells.Count);
-        Assert.Equal(("31", true), (cal.Cells[0].Number, cal.Cells[0].IsOut));
-        Assert.Equal("1 Sep", cal.Cells[1].Number);
-        Assert.Equal("1 Oct", cal.Cells[31].Number);
+        Assert.Equal(("30", true), (cal.Cells[0].Number, cal.Cells[0].IsOut));
+        Assert.Equal(DayOfWeek.Sunday, cal.Cells[0].Date.DayOfWeek);
+        Assert.Equal("1 Sep", cal.Cells[2].Number);
+        Assert.Equal("1 Oct", cal.Cells[32].Number);
         CalendarCell Day(int month, int day) => cal.Cells.Single(c => c.Date.Month == month && c.Date.Day == day);
         Assert.True(Day(9, 30).IsToday);
         // Today's says "Tonight"; one past its day and not handed in says Missing; one handed in is struck through.
@@ -260,13 +263,13 @@ public class OverviewTests
         cal.GoTodayCommand.Execute(null);
         Assert.Equal("September 2026", cal.Heading);
 
-        // The week: the planner, what's missing from before it in a column of its own, then Monday to Sunday.
+        // The week: the planner, what's missing from before it in a column of its own, then Sunday to Saturday.
         cal.ShowWeekCommand.Execute(null);
-        Assert.Equal("28 Sep – 4 Oct", cal.Heading);
-        Assert.Equal(["Mon", "Tue", "Today", "Thu", "Fri", "Sat", "Sun"], cal.Week.Select(d => d.Name));
-        Assert.Equal(["Problem set"], cal.Week[2].Deadlines.Select(d => d.Title));
-        Assert.Equal(["10:00", "2:11"], cal.Week[2].Meetings.Select(e => e.Time)); // the class, and the club's officers
-        Assert.False(cal.Week[2].Meetings[1].Recorded);
+        Assert.Equal("27 Sep – 3 Oct", cal.Heading);
+        Assert.Equal(["Sun", "Mon", "Tue", "Today", "Thu", "Fri", "Sat"], cal.Week.Select(d => d.Name));
+        Assert.Equal(["Problem set"], cal.Week[3].Deadlines.Select(d => d.Title));
+        Assert.Equal(["10:00", "2:11"], cal.Week[3].Meetings.Select(e => e.Time)); // the class, and the club's officers
+        Assert.False(cal.Week[3].Meetings[1].Recorded);
         // Opened for one class (a folder's "See these on the calendar"), it starts on that class.
         Assert.Equal("CS 101", OverviewModel.ForDue(Sources(), "CS 101").Calendar!.Class);
 
@@ -841,7 +844,8 @@ public class OverviewTests
             var page = view.GetVisualDescendants().OfType<Overview>().Single();
             var words = Words(page);
             Assert.Contains("Reading quiz 6 is due tonight, and Asynchronous Lecture 5 is still missing.", words);
-            foreach (string there in new[] { "October 2026", "Mon", "Sun", "1 Oct", "1 Nov", "Today", "Tonight 11:59 PM", "Missing", "1 more", "All classes", "Month", "Week" }) Assert.Contains(there, words);
+            // Sunday to Saturday; October 2026 ends on a Saturday, so the grid ends with it (no "1 Nov").
+            foreach (string there in new[] { "October 2026", "Sun", "Sat", "1 Oct", "Today", "Tonight 11:59 PM", "Missing", "1 more", "All classes", "Month", "Week" }) Assert.Contains(there, words);
             var cells = page.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("cal-cell")).ToList();
             Assert.Equal(35, cells.Count);
             Assert.Single(cells, c => c.Classes.Contains("today"));
