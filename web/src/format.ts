@@ -63,11 +63,10 @@ export function lectureMeta(date: string | null, seconds: number | null, now = n
   return [d ? shortDate(d, now) : '', duration(seconds)].filter(Boolean).join(' · ');
 }
 
-/** Monday of `d`'s week. */
+/** Sunday of `d`'s week: weeks run Sunday to Saturday, as Canvas's calendar and the app have them. */
 function weekStart(d: Date): Date {
   const s = startOfDay(d);
-  const back = (s.getDay() + 6) % 7;
-  return new Date(s.getFullYear(), s.getMonth(), s.getDate() - back);
+  return new Date(s.getFullYear(), s.getMonth(), s.getDate() - s.getDay());
 }
 
 /** The heading a lecture sits under in a class: "This week", "Last week", then the month ("August", "May 2025"). */

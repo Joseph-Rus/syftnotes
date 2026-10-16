@@ -508,7 +508,7 @@ public static partial class Shell
         page.Recording = recording;
     }
 
-    /// <summary>The events on the student's calendars, as far as the app keeps them (this week from Monday, and the
+    /// <summary>The events on the student's calendars, as far as the app keeps them (this week from Sunday, and the
     /// week ahead), each with the folder it's clearly for. Null without calendars, and on a computer that only keeps
     /// the library.</summary>
     static List<OverviewModel.Event>? Events()

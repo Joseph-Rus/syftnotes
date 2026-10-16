@@ -54,11 +54,11 @@ describe('lectures', () => {
   });
 
   test('lectures sit under this week, last week, then their month', () => {
-    expect(lectureGroup('2026-09-22', now)).toBe('This week'); // Monday
-    expect(lectureGroup('2026-09-21', now)).toBe('This week');
-    expect(lectureGroup('2026-09-20', now)).toBe('Last week'); // Sunday before
-    expect(lectureGroup('2026-09-14', now)).toBe('Last week');
-    expect(lectureGroup('2026-09-13', now)).toBe('September');
+    expect(lectureGroup('2026-09-22', now)).toBe('This week');
+    expect(lectureGroup('2026-09-20', now)).toBe('This week'); // Sunday: weeks start on Sunday
+    expect(lectureGroup('2026-09-19', now)).toBe('Last week'); // the Saturday before
+    expect(lectureGroup('2026-09-13', now)).toBe('Last week');
+    expect(lectureGroup('2026-09-12', now)).toBe('September');
     expect(lectureGroup('2025-12-01', now)).toBe('December 2025');
     expect(lectureGroup(null, now)).toBe('Undated');
   });

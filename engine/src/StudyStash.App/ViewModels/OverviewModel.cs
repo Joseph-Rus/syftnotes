@@ -466,7 +466,7 @@ public sealed partial class OverviewModel : ObservableObject
         public CanvasApi.DueResponse? Due { get; init; }
         /// <summary>The classes linked to Canvas.</summary>
         public IReadOnlyList<CanvasApi.ClassRow> Canvas { get; init; } = [];
-        /// <summary>The events on the student's calendars, as far as the app keeps them (this week from Monday, and
+        /// <summary>The events on the student's calendars, as far as the app keeps them (this week from Sunday, and
         /// seven days ahead), each with the folder it's clearly for; null without calendars.</summary>
         public IReadOnlyList<Event>? Events { get; init; }
         public int Unsorted { get; init; }
@@ -523,12 +523,12 @@ public sealed partial class OverviewModel : ObservableObject
     /// <summary>A time of day: "11:59 PM".</summary>
     public static string Time(DateTimeOffset when, TimeZoneInfo zone) => Words(TimeZoneInfo.ConvertTime(when, zone), "h:mm tt");
 
-    /// <summary>The Monday of the week <paramref name="now"/> is in.</summary>
-    static DateTime Monday(Sources s)
-    {
-        var today = Local(s.Now, s).Date;
-        return today.AddDays(-(((int)today.DayOfWeek + 6) % 7));
-    }
+    /// <summary>The first day of <paramref name="day"/>'s week: its Sunday. Weeks run Sunday to Saturday, as Canvas's
+    /// calendar has them: the Due calendar's month and week, "this week" in what's due, and a folder's "This week".</summary>
+    public static DateTime WeekStart(DateTime day) => day.Date.AddDays(-(int)day.DayOfWeek);
+
+    /// <summary>The first day (the Sunday) of the week it is now.</summary>
+    static DateTime WeekStart(Sources s) => WeekStart(Local(s.Now, s).Date);
 
     static IEnumerable<CanvasApi.Item> StillToHandIn(CanvasApi.DueResponse? due) =>
         due is null ? [] : due.Groups.Where(g => g.Key != "handed_in").SelectMany(g => g.Items).Where(CanvasWords.ToHandIn);
@@ -623,10 +623,10 @@ public sealed partial class OverviewModel : ObservableObject
     public static string DueSentence(Sources s, bool missing = true)
     {
         var today = Local(s.Now, s).Date;
-        var monday = Monday(s);
+        var weekStart = WeekStart(s);
         var open = StillToHandIn(s.Due).ToList();
         var late = open.Where(i => LateBefore(i, s)).ToList();
-        var week = open.Where(i => !LateBefore(i, s) && i.DueAt is { } d && Local(d, s).Date >= today && Local(d, s).Date < monday.AddDays(7))
+        var week = open.Where(i => !LateBefore(i, s) && i.DueAt is { } d && Local(d, s).Date >= today && Local(d, s).Date < weekStart.AddDays(7))
             .OrderBy(i => i.DueAt).ToList();
         string first = "";
         if (week.Count > 0)
@@ -673,19 +673,19 @@ public sealed partial class OverviewModel : ObservableObject
 
     /// <summary>
     /// A week as the planner shows it: what's missing (a column of its own, only in the week that's on, and only when
-    /// something is), then Monday to Sunday, each with its class meetings (from the student's calendars; none are made
+    /// something is), then Sunday to Saturday, each with its class meetings (from the student's calendars; none are made
     /// up without them) over what's due that day. A handed-in thing stays on its day, struck through. More than
     /// <see cref="DayRows"/> due on a day shows one fewer and "+2 more".
     /// </summary>
-    public static List<WeekDay> WeekOf(Sources s, Func<string, IBrush> dot, DateTime monday, string? only = null)
+    public static List<WeekDay> WeekOf(Sources s, Func<string, IBrush> dot, DateTime weekStart, string? only = null)
     {
         var today = Local(s.Now, s).Date;
         bool Wanted(string cls) => only is null || cls == only;
         var open = StillToHandIn(s.Due).Where(i => Wanted(i.Class)).ToList();
         var done = HandedIn(s.Due).Where(i => Wanted(i.Class)).ToList();
         var days = new List<WeekDay>();
-        var late = today >= monday && today < monday.AddDays(7)
-            ? open.Where(i => LateBefore(i, s) && (i.DueAt is not { } d || Local(d, s).Date < monday)).OrderBy(i => i.DueAt ?? DateTimeOffset.MinValue).ToList()
+        var late = today >= weekStart && today < weekStart.AddDays(7)
+            ? open.Where(i => LateBefore(i, s) && (i.DueAt is not { } d || Local(d, s).Date < weekStart)).OrderBy(i => i.DueAt ?? DateTimeOffset.MinValue).ToList()
             : [];
         if (late.Count > 0)
         {
@@ -695,7 +695,7 @@ public sealed partial class OverviewModel : ObservableObject
         }
         for (int n = 0; n < 7; n++)
         {
-            var date = monday.AddDays(n);
+            var date = weekStart.AddDays(n);
             var day = new WeekDay
             {
                 Name = date == today ? "Today" : Words(date, "ddd"), Number = date.Day.ToString(CultureInfo.InvariantCulture),
@@ -799,13 +799,13 @@ public sealed partial class OverviewModel : ObservableObject
     /// </summary>
     public static string Meets(string folder, Sources s, bool asClass)
     {
-        var monday = Monday(s);
+        var weekStart = WeekStart(s);
         var own = (s.Events ?? []).Where(e => e.Class == folder).ToList();
         // The events named for the folder and nothing more are its regular meetings; one with a name of its own (a team
         // sync, an officers' meeting) is a one-off, and only counts when there are none of the regular kind.
         var regular = own.Where(e => string.Equals(Named(e), ClassNames.Display(folder), StringComparison.OrdinalIgnoreCase)).ToList();
         if (regular.Count > 0) own = regular;
-        var week = own.Where(e => Local(e.Start, s).Date >= monday && Local(e.Start, s).Date < monday.AddDays(7)).ToList();
+        var week = own.Where(e => Local(e.Start, s).Date >= weekStart && Local(e.Start, s).Date < weekStart.AddDays(7)).ToList();
         if (week.Count == 0) week = own.Where(e => e.Start >= s.Now).ToList();
         if (week.Count == 0) return "";
         var days = week.Select(e => Local(e.Start, s).DayOfWeek).Distinct().OrderBy(d => ((int)d + 6) % 7).ToList();
@@ -833,9 +833,9 @@ public sealed partial class OverviewModel : ObservableObject
     {
         var today = Local(s.Now, s).Date;
         var d = date is { } at ? Local(at, s).Date : today;
-        var monday = Monday(s);
-        if (d >= monday) return "This week";
-        if (d >= monday.AddDays(-7)) return "Last week";
+        var weekStart = WeekStart(s);
+        if (d >= weekStart) return "This week";
+        if (d >= weekStart.AddDays(-7)) return "Last week";
         return d.Year == today.Year ? d.ToString("MMMM", CultureInfo.InvariantCulture) : d.ToString("MMMM yyyy", CultureInfo.InvariantCulture);
     }
 
