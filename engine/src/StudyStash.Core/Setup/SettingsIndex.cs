@@ -174,7 +174,7 @@ public static class SettingsIndex
 
         Page("Phone", "Read your notes and lectures, search and ask, and add files from your phone.",
             "iphone android mobile qr code home screen app"),
-        new() { Section = "Phone", Title = "Add a phone", Detail = "Point your phone's camera at the code.", Words = "iphone android mobile qr code" },
+        new() { Section = "Phone", Title = "Add a phone", Detail = "Scan the code in the Study Stash app on your iPhone or iPad.", Words = "iphone android mobile qr code" },
     ];
 
     /// <summary>The entry change_setting knows by <paramref name="key"/>, or null.</summary>

@@ -10,7 +10,7 @@
              x:DataType="vm:PhonesModel">
   <StackPanel Spacing="4">
     <TextBlock Classes="h" Text="Phone" />
-    <TextBlock Classes="body" Text="Read your notes and lectures, search and ask, and add files from your phone. It's a web app your library serves: add it to your home screen and it opens like any other app." />
+    <TextBlock Classes="body" Text="Record lectures, read your notes, search, ask and study, write by hand and add files from your phone: the Study Stash app on iPhone and iPad, or on Android the web app your library serves." />
     <TextBlock Classes="say" Text="Asking your library…" IsVisible="{Binding IsLoading}" />
     <Border Classes="group" IsVisible="{Binding ShowProblem}">
       <Border Classes="row">
@@ -49,11 +49,11 @@
             </Viewbox>
           </Border>
           <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center">
-            <TextBlock Classes="row-sub" Text="1. Point your phone's camera at the code." TextWrapping="Wrap" />
-            <TextBlock Classes="row-sub" Text="2. Type this in the page that opens:" TextWrapping="Wrap" />
+            <TextBlock Classes="row-sub" Text="1. In the Study Stash app on your iPhone or iPad, tap Scan the QR code. On Android, point the camera at it." TextWrapping="Wrap" />
+            <TextBlock Classes="row-sub" Text="2. Type this code:" TextWrapping="Wrap" />
             <SelectableTextBlock Name="PhoneCode" Text="{Binding Code}" FontFamily="Cascadia Mono, Consolas, SF Mono, Menlo, monospace" FontSize="32" FontWeight="SemiBold" LetterSpacing="4" Margin="0,2" />
             <TextBlock Classes="row-sub" Text="{Binding Left}" />
-            <TextBlock Classes="row-sub" Text="3. Add it to your home screen from the browser's menu." TextWrapping="Wrap" />
+            <TextBlock Classes="row-sub" Text="On Android, add the page that opens to your home screen." TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
               <Button Classes="pill" Command="{Binding AddPhoneCommand}" IsVisible="{Binding RanOut}"><TextBlock Text="New code" /></Button>
               <Button Classes="pill" Command="{Binding DoneCommand}"><TextBlock Text="Done" /></Button>
