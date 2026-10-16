@@ -355,3 +355,104 @@
     padding-bottom: 24px;
   }
 }
+
+/* Study: flashcards to flip and a quiz, made from one lecture. */
+.study {
+  padding: 8px var(--gutter) 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.study-making {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 80px var(--gutter);
+  color: var(--fg2);
+}
+.cards-count {
+  margin: 0;
+  color: var(--fg2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.flashcard {
+  min-height: 280px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--raised);
+  box-shadow: var(--shadow);
+  color: var(--fg);
+  font: inherit;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: transform 0.25s ease;
+}
+.flashcard:active {
+  transform: scale(0.98);
+}
+.flashcard-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg2);
+}
+.flashcard-text {
+  font-family: var(--font-display);
+  font-size: 22px;
+  line-height: 1.35;
+}
+.flashcard.flipped .flashcard-text {
+  font-family: inherit;
+  font-size: 18px;
+}
+.cards-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.quiz-question {
+  font-family: var(--font-display);
+  font-size: 21px;
+  margin: 4px 0 6px;
+}
+.quiz-choice {
+  border: 2px solid transparent;
+  border-radius: 14px;
+  background: var(--raised);
+  color: var(--fg);
+  font: inherit;
+  padding: 14px;
+  text-align: left;
+}
+.quiz-choice.right {
+  border-color: var(--ok);
+}
+.quiz-choice.wrong {
+  border-color: var(--red);
+}
+.quiz-why {
+  color: var(--fg2);
+  margin: 4px 0;
+}
+.quiz-score {
+  text-align: center;
+  padding-top: 48px;
+}
+.quiz-score strong {
+  font-size: 56px;
+}

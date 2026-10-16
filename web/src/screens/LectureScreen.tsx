@@ -6,7 +6,7 @@ import { lectureMeta } from '../format';
 import { href } from '../router';
 import { renderMath } from '../ui/math';
 import { scrollTables } from '../ui/tables';
-import { Paperclip, Sparkle } from '../ui/icons';
+import { Checklist, Paperclip, Sparkle } from '../ui/icons';
 import { Dot, IconButton, Problem, Row, Screen, Section, SkeletonRows } from '../ui/kit';
 import { AttachmentRow } from './attachments';
 import { useClassColors } from './classColors';
@@ -42,9 +42,14 @@ export function LectureScreen({ api, id }: { api: Api; id: string }) {
       quiet back={{ label: cls || 'Library', to: backTo }}
       onRefresh={refresh}
       actions={
-        <IconButton label="Add files" href={href({ name: 'upload', class: null, lecture: id })}>
-          <Paperclip size={22} />
-        </IconButton>
+        <>
+          <IconButton label="Study: flashcards and a quiz" href={href({ name: 'study', id })}>
+            <Checklist size={22} />
+          </IconButton>
+          <IconButton label="Add files" href={href({ name: 'upload', class: null, lecture: id })}>
+            <Paperclip size={22} />
+          </IconButton>
+        </>
       }
     >
       {lecture.error && !l ? (

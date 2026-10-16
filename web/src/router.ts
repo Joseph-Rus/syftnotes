@@ -7,6 +7,7 @@ export type Route =
   | { name: 'library' }
   | { name: 'class'; class: string }
   | { name: 'lecture'; id: string }
+  | { name: 'study'; id: string }
   | { name: 'search'; q: string }
   | { name: 'ask'; chat: string | null }
   | { name: 'due' }
@@ -27,6 +28,7 @@ export function tabOf(route: Route): Tab {
     case 'lecture':
     case 'upload':
     case 'memo':
+    case 'study':
     case 'not-found':
       return 'library';
     case 'due':
@@ -48,6 +50,7 @@ export function depthOf(route: Route): number {
     case 'assignment':
     case 'upload':
     case 'memo':
+    case 'study':
       return 3;
     case 'ask':
       return route.chat ? 1 : 0;
@@ -68,6 +71,8 @@ export function href(route: Route): string {
       return `${BASE}class/${seg(route.class)}`;
     case 'lecture':
       return `${BASE}lecture/${seg(route.id)}`;
+    case 'study':
+      return `${BASE}study/${seg(route.id)}`;
     case 'search':
       return route.q ? `${BASE}search?q=${seg(route.q)}` : `${BASE}search`;
     case 'ask':
@@ -113,6 +118,8 @@ export function parse(pathname: string, search = ''): Route {
       return arg ? { name: 'class', class: arg } : { name: 'library' };
     case 'lecture':
       return arg ? { name: 'lecture', id: arg } : { name: 'library' };
+    case 'study':
+      return arg ? { name: 'study', id: arg } : { name: 'library' };
     case 'search':
       return { name: 'search', q: query.get('q') ?? '' };
     case 'ask':

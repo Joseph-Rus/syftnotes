@@ -13,6 +13,7 @@ import { Unreachable } from './screens/Unreachable';
 import { Home } from './screens/Home';
 import { ClassScreen } from './screens/ClassScreen';
 import { LectureScreen } from './screens/LectureScreen';
+import { StudyScreen } from './screens/Study';
 import { UploadScreen } from './screens/Upload';
 import { SearchScreen } from './screens/Search';
 import { DueScreen } from './screens/Due';
@@ -131,6 +132,8 @@ function Screens({ api, offline, onRemoved }: { api: Api; offline: boolean; onRe
       return <ClassScreen api={api} className={route.class} />;
     case 'lecture':
       return <LectureScreen api={api} id={route.id} />;
+    case 'study':
+      return <StudyScreen api={api} id={route.id} />;
     case 'search':
       return <SearchScreen api={api} q={route.q} />;
     case 'due':
