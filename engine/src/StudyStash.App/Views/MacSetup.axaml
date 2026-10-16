@@ -297,8 +297,31 @@
 
                   <!-- Classes: the Canvas courses found (ticked), the library's classes so far, and a row to add one; every
                        row on the same columns: marker | name | what it covers | action. -->
+                  <!-- What it's for: school brings Canvas and classes; anything else is folders -->
+                  <StackPanel IsVisible="{Binding OnUses}">
+                    <TextBlock Classes="page-title step-title" Text="What will you use Study Stash for?" />
+                    <TextBlock Classes="page-lede step-lede" Text="Pick any that fit. School brings in Canvas and classes; anything else gets folders, and the notes are written for it." />
+                    <ItemsControl ItemsSource="{Binding UseChoices}" Margin="0,20,0,0" MaxWidth="480" HorizontalAlignment="Stretch">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:UseChoice">
+                          <Border Classes="choice-row" Padding="12,10" CornerRadius="10" BorderThickness="1" BorderBrush="{DynamicResource Line}">
+                            <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+                              <c:Icon Classes="choice-icon" Glyph="{Binding Glyph}" />
+                              <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Classes="choice-title" Text="{Binding Title}" />
+                                <TextBlock Classes="choice-about" Text="{Binding About}" />
+                              </StackPanel>
+                              <CheckBox Grid.Column="4" AutomationProperties.Name="{Binding Title}" Classes="tick" IsChecked="{Binding Ticked}" VerticalAlignment="Center" />
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+
                   <StackPanel IsVisible="{Binding OnClasses}">
-                    <TextBlock Classes="page-title step-title" Text="Add your classes" />
+                    <TextBlock Classes="page-title step-title" Text="{Binding ClassesTitle}" />
                     <TextBlock Classes="page-lede step-lede" Text="{Binding ClassesLede}" />
                     <ScrollViewer Margin="0,18,0,0" MaxWidth="480" MaxHeight="236" HorizontalAlignment="Stretch" IsVisible="{Binding HasCourses}">
                       <ItemsControl ItemsSource="{Binding Courses}">

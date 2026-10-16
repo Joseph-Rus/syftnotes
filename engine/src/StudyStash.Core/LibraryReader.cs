@@ -53,6 +53,9 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             ["writing"] = status.GetValueOrDefault(Store.Queued) + status.GetValueOrDefault(Store.Working),
             ["ask"] = Cfg.OllamaEnabled,
             ["notes_model"] = Cfg.SummaryEnabled && Cfg.OllamaEnabled ? Cfg.EffectiveSummaryModel : null,
+            // What it's for (empty until asked) and so whether it's for school: classes, Canvas and due dates, or folders.
+            ["uses"] = new JsonArray(Cfg.Uses.Select(u => (JsonNode?)u).ToArray()),
+            ["for_school"] = Cfg.ForSchool,
         };
     }
 

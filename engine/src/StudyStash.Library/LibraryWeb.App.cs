@@ -144,6 +144,18 @@ public sealed partial class LibraryWeb
             return Http.Json(Reader.Overview());
         })));
 
+        // What Study Stash is for ({uses: ["student", "work", ...]}), as setup or the phone asked: not a student, and
+        // it's folders rather than classes, without Canvas.
+        app.MapPost("/api/v2/uses", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            if (body?["uses"] is not JsonArray list) return Http.Detail(400, "say what it's for: uses, a list of " + string.Join(", ", Config.UseKinds));
+            cfg.Uses = [.. list.Select(n => n is JsonValue v && v.TryGetValue(out string? u) ? u.Trim().ToLowerInvariant() : "")
+                .Where(u => Config.UseKinds.Contains(u)).Distinct()];
+            Configs.Save(cfg);
+            return Http.Json(Reader.Overview());
+        })));
+
         // A calendar event's title as another name of a class ({class, alias}; remove: true takes it away): every
         // event with that title (a class that meets every week) is that class's from then on, and so are the
         // lectures recorded in it.

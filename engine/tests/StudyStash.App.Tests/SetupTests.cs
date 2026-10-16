@@ -44,22 +44,22 @@ public sealed class SetupTests
         // Just this computer: no password, no library to find; who writes the notes comes after the model.
         var one = SetupModel.For(SkinKind.Mac);
         Assert.Equal(AppRole.Both, one.Role);
-        Assert.Equal(["Welcome", "Microphone", "Notes", "Canvas", "Classes", "Open when you log in", "Done"], Titles(one));
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7], one.Steps.Select(s => s.Number));
+        Assert.Equal(["Welcome", "Microphone", "Notes", "What it's for", "Canvas", "Classes", "Open when you log in", "Done"], Titles(one));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], one.Steps.Select(s => s.Number));
 
         var laptop = SetupModel.For(SkinKind.Mac, AppRole.Laptop);
-        Assert.Equal(["Welcome", "Your library", "Microphone", "Canvas", "Classes", "Done"], Titles(laptop));
+        Assert.Equal(["Welcome", "Your library", "Microphone", "What it's for", "Canvas", "Classes", "Done"], Titles(laptop));
 
         var library = SetupModel.For(SkinKind.Mac, AppRole.Library);
-        Assert.Equal(["Welcome", "Password", "Your AI", "Canvas", "Classes", "Open when you log in", "Connect your laptop"], Titles(library));
+        Assert.Equal(["Welcome", "Password", "Your AI", "What it's for", "Canvas", "Classes", "Open when you log in", "Connect your laptop"], Titles(library));
     }
 
     [Fact]
     public void Windows_adds_the_taskbar_only_where_Study_Stash_records()
     {
-        Assert.Equal(["Welcome", "Your library", "Microphone", "Canvas", "Classes", "Taskbar", "Done"],
+        Assert.Equal(["Welcome", "Your library", "Microphone", "What it's for", "Canvas", "Classes", "Taskbar", "Done"],
             Titles(SetupModel.For(SkinKind.Win, AppRole.Laptop)));
-        Assert.Equal(["Welcome", "Microphone", "Notes", "Canvas", "Classes", "Open when you log in", "Taskbar", "Done"],
+        Assert.Equal(["Welcome", "Microphone", "Notes", "What it's for", "Canvas", "Classes", "Open when you log in", "Taskbar", "Done"],
             Titles(SetupModel.For(SkinKind.Win)));
         Assert.DoesNotContain(SetupStep.Taskbar, SetupModel.StepsFor(AppRole.Library, SkinKind.Win));
         Assert.DoesNotContain(SetupStep.Taskbar, SetupModel.StepsFor(AppRole.Laptop, SkinKind.Mac));
@@ -259,7 +259,7 @@ public sealed class SetupTests
         var mac = SetupModel.For(SkinKind.Mac, AppRole.Laptop);
         mac.Go(SetupStep.Canvas);
         Assert.True(mac.Steps.Single(s => s.Step == SetupStep.Canvas).Optional); // the sidebar still says so
-        Assert.Equal("Step 4 of 6", mac.StepLabel);
+        Assert.Equal("Step 5 of 7", mac.StepLabel);
         Assert.Equal("Continue", mac.ContinueLabel);
         Assert.True(mac.Wide);
         Assert.Equal(SetupStep.Classes, mac.Steps[mac.Index].Step);
@@ -274,7 +274,7 @@ public sealed class SetupTests
     {
         var m = SetupModel.For(SkinKind.Mac, AppRole.Library);
         m.Go(SetupStep.Ai);
-        Assert.Equal("Library setup · step 3 of 7", m.StepLabel);
+        Assert.Equal("Library setup · step 3 of 8", m.StepLabel);
         Assert.False(m.OnPlainStep);
         m.Go(SetupStep.Done);
         Assert.True(m.IsLast);
@@ -284,7 +284,7 @@ public sealed class SetupTests
 
         var one = SetupModel.For(SkinKind.Mac);
         one.Go(SetupStep.Ai);
-        Assert.Equal("Step 3 of 7", one.StepLabel);
+        Assert.Equal("Step 3 of 8", one.StepLabel);
     }
 
     [Fact]
@@ -310,7 +310,26 @@ public sealed class SetupTests
         Assert.Equal(SetupStep.Ai, m.Step);
         m.LeaveAsync = _ => Task.FromResult(true);
         await m.NextCommand.ExecuteAsync(null);
+        Assert.Equal(SetupStep.Uses, m.Step);
+        await m.NextCommand.ExecuteAsync(null);
         Assert.Equal(SetupStep.Canvas, m.Step);
+    }
+
+    [Fact]
+    public void Not_for_school_has_no_Canvas_step_and_classes_are_folders()
+    {
+        var m = SetupModel.For(SkinKind.Mac, AppRole.Both);
+        Assert.True(m.ForSchool);
+        Assert.Contains(m.Steps, s => s.Step == SetupStep.Canvas);
+        m.UseChoices.Single(u => u.Kind == "work").Ticked = true;
+        Assert.False(m.ForSchool);
+        Assert.DoesNotContain(m.Steps, s => s.Step == SetupStep.Canvas);
+        Assert.Equal("Folders", m.Steps.Single(s => s.Step == SetupStep.Classes).Title);
+        Assert.Equal("Add your folders", m.ClassesTitle);
+        Assert.Equal(["work"], m.Uses);
+        m.UseChoices.Single(u => u.Kind == "student").Ticked = true;
+        Assert.True(m.ForSchool);
+        Assert.Contains(m.Steps, s => s.Step == SetupStep.Canvas);
     }
 
     [Fact]

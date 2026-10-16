@@ -110,6 +110,22 @@ public static class Setup
         // won't take keeps the step open, saying why.
         m.LeaveAsync = async step =>
         {
+            if (step == SetupStep.Uses)
+            {
+                // What it's for is the library's: every computer and phone reading it goes by it. A library from
+                // before it was asked doesn't keep it, and setup carries on.
+                if (m.Uses.Any() && host.Remote() is { } lib)
+                {
+                    try
+                    {
+                        await lib.SetUsesAsync(m.Uses);
+                    }
+                    catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+                    {
+                    }
+                }
+                return true;
+            }
             if (step != SetupStep.Classes) return true;
             if (m.NewClass.Trim().Length > 0 || m.NewAbout.Trim().Length > 0)
             {

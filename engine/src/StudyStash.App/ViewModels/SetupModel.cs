@@ -20,6 +20,9 @@ public enum SetupStep
     Ai,
     Microphone,
     Model,
+    /// <summary>What it's for (student, work, research, creative, personal): not a student, and there's no Canvas step
+    /// and classes are folders.</summary>
+    Uses,
     /// <summary>Optional: bring in Canvas (design 07).</summary>
     Canvas,
     Classes,
@@ -70,6 +73,25 @@ public sealed partial class StepItem : ObservableObject
     partial void OnCurrentChanged(bool value) => OnPropertyChanged(nameof(Todo));
 }
 
+/// <summary>One thing Study Stash can be for, ticked or not, on setup's "What's it for?" page.</summary>
+public sealed partial class UseChoice : ObservableObject
+{
+    public string Kind { get; init; } = "";
+    public string Title { get; init; } = "";
+    public string About { get; init; } = "";
+    public string Glyph { get; init; } = "";
+    [ObservableProperty] public partial bool Ticked { get; set; }
+
+    public static UseChoice[] All() =>
+    [
+        new() { Kind = "student", Title = "School", About = "Lectures, classes, Canvas and what's due", Glyph = "school" },
+        new() { Kind = "work", Title = "Work", About = "Meetings, calls and projects", Glyph = "forum" },
+        new() { Kind = "research", Title = "Research", About = "Interviews, seminars and reading groups", Glyph = "travel_explore" },
+        new() { Kind = "creative", Title = "Creative", About = "Critiques, studio time and ideas", Glyph = "palette" },
+        new() { Kind = "personal", Title = "Personal", About = "Talks, podcasts, notes to self", Glyph = "headphones" },
+    ];
+}
+
 /// <summary>A class in your library, as setup lists it: its name and what it covers ("CS 101 · Recursion, stacks and
 /// Big-O"), which the library's AI reads to sort each lecture.</summary>
 public sealed partial class SetupClass : ObservableObject
@@ -103,6 +125,31 @@ public sealed partial class SetupModel : ObservableObject
 {
     public ObservableCollection<StepItem> Steps { get; } = [];
     [ObservableProperty] public partial SetupStep Step { get; set; }
+
+    /// <summary>What it's for, as ticked on its page.</summary>
+    public UseChoice[] UseChoices { get; } = UseChoice.All();
+    /// <summary>For school (school ticked, or nothing yet): Canvas and classes. Otherwise folders, and no Canvas step.</summary>
+    public bool ForSchool => UseChoices.All(u => !u.Ticked) || UseChoices.Any(u => u.Ticked && u.Kind == "student");
+    public IEnumerable<string> Uses => UseChoices.Where(u => u.Ticked).Select(u => u.Kind);
+    public bool OnUses => Step == SetupStep.Uses;
+    public string ClassesTitle => ForSchool ? "Add your classes" : "Add your folders";
+
+    bool usesWatched;
+
+    /// <summary>A tick changed: Canvas comes and goes with school, and Classes is Folders without it.</summary>
+    void WatchUses()
+    {
+        if (usesWatched) return;
+        usesWatched = true;
+        foreach (var u in UseChoices)
+            u.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(UseChoice.Ticked)) return;
+                SetRole(Role);
+                OnPropertyChanged(nameof(ForSchool));
+                OnPropertyChanged(nameof(ClassesTitle));
+            };
+    }
     /// <summary>What this computer is for: set by <see cref="SetRole"/>, which also rebuilds <see cref="Steps"/>.</summary>
     [ObservableProperty] public partial AppRole Role { get; set; } = AppRole.Both;
     SkinKind skin = SkinKind.Mac;
@@ -381,7 +428,9 @@ public sealed partial class SetupModel : ObservableObject
     public static AppRole Suggested(AppRole? installer) => installer == AppRole.Library ? AppRole.Library : AppRole.Both;
 
     /// <summary>The steps of each flow, in order. Windows adds the taskbar where Study Stash records.</summary>
-    public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin)
+    public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin) => StepsFor(role, skin, forSchool: true);
+
+    public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin, bool forSchool)
     {
         var steps = new List<SetupStep> { SetupStep.Welcome };
         steps.AddRange(role switch
@@ -392,7 +441,9 @@ public sealed partial class SetupModel : ObservableObject
             AppRole.Library => [SetupStep.Password, SetupStep.Ai],
             _ => [SetupStep.Microphone, SetupStep.Ai],
         });
-        steps.AddRange([SetupStep.Canvas, SetupStep.Classes]);
+        steps.Add(SetupStep.Uses);
+        if (forSchool) steps.Add(SetupStep.Canvas);
+        steps.Add(SetupStep.Classes);
         if (role != AppRole.Laptop) steps.Add(SetupStep.StartAtLogin);
         if (role != AppRole.Library && skin == SkinKind.Win) steps.Add(SetupStep.Taskbar);
         steps.Add(SetupStep.Done);
@@ -408,7 +459,8 @@ public sealed partial class SetupModel : ObservableObject
         SetupStep.Microphone => "Microphone",
         SetupStep.Model => "Transcription model",
         SetupStep.Canvas => "Canvas",
-        SetupStep.Classes => "Classes",
+        SetupStep.Classes => ForSchool ? "Classes" : "Folders",
+        SetupStep.Uses => "What it's for",
         SetupStep.StartAtLogin => "Open when you log in",
         SetupStep.Taskbar => "Taskbar",
         _ => IsLibrary ? "Connect your laptop" : "Done",
@@ -420,6 +472,7 @@ public sealed partial class SetupModel : ObservableObject
     /// or reaches it again); what was typed stays.</summary>
     public void SetRole(AppRole role)
     {
+        WatchUses();
         bool otherFlow = role != Role;
         Role = role;
         if (otherFlow && Steps.Count > 0)
@@ -430,7 +483,7 @@ public sealed partial class SetupModel : ObservableObject
         var wanted = Step;
         Steps.Clear();
         int n = 1;
-        foreach (var step in StepsFor(role, skin))
+        foreach (var step in StepsFor(role, skin, ForSchool))
             Steps.Add(new StepItem { Step = step, Number = n++, Title = TitleOf(step), Optional = step is SetupStep.Canvas or SetupStep.Classes });
         Go(Steps.Any(s => s.Step == wanted) ? wanted : Steps[0].Step);
         foreach (string p in new[] { nameof(IsOneComputer), nameof(IsLibrary), nameof(IsLaptop), nameof(LibraryIsHere), nameof(HeaderTitle), nameof(FlowName),
@@ -466,7 +519,7 @@ public sealed partial class SetupModel : ObservableObject
     void NotifyStepDerived()
     {
         foreach (string p in new[] { nameof(Index), nameof(IsLast), nameof(StepLabel), nameof(ContinueLabel), nameof(CanGoBack), nameof(OnWelcome), nameof(OnPassword),
-                     nameof(OnMicrophone), nameof(OnLibrary), nameof(OnModel), nameof(OnClasses), nameof(OnStartAtLogin), nameof(OnTaskbar), nameof(OnAi),
+                     nameof(OnMicrophone), nameof(OnUses), nameof(OnLibrary), nameof(OnModel), nameof(OnClasses), nameof(OnStartAtLogin), nameof(OnTaskbar), nameof(OnAi),
                      nameof(OnCanvas), nameof(OnDone), nameof(OnLibraryDone), nameof(OnLaptopDone), nameof(OnOneComputerDone), nameof(OnPlainStep),
                      nameof(Wide), nameof(CanContinue), nameof(AiHelpOpen) })
             OnPropertyChanged(p);

@@ -40,6 +40,15 @@ public sealed class Config(string home, string poolDir)
     public string SummaryModel { get; set; } = ""; // blank = the sorting model
     public int SummaryMaxContext { get; set; } = 32768;
     public List<ClassDef> Classes { get; set; } = [];
+    /// <summary>What Study Stash is for, as setup asked ("student", "work", "research", "creative", "personal"; any
+    /// of them). Empty until asked, and read as school, as every library was before it was asked.</summary>
+    public List<string> Uses { get; set; } = [];
+
+    /// <summary>The ways setup offers, in its order.</summary>
+    public static readonly string[] UseKinds = ["student", "work", "research", "creative", "personal"];
+
+    /// <summary>For school: Canvas, due dates and "classes". Otherwise folders, and no Canvas.</summary>
+    public bool ForSchool => Uses.Count == 0 || Uses.Contains("student");
 
     public string EffectiveSummaryModel => SummaryModel.Length > 0 ? SummaryModel : OllamaModel;
     public string DbPath => Path.Combine(Home, "state.db");
@@ -155,6 +164,13 @@ public static class Configs
             $"admin_password = {Toml(cfg.AdminPassword)}",
             "# Install new releases automatically (checked every few hours by the background service).",
             $"auto_update = {Toml(cfg.AutoUpdate)}",
+        };
+        // Once asked (a library from before keeps its file as it was).
+        if (cfg.Uses.Count > 0)
+            lines.AddRange(["# What it's for: any of student, work, research, creative, personal. Not a student: folders, no Canvas.",
+                $"uses = {Toml(cfg.Uses)}"]);
+        lines.AddRange(new[]
+        {
             "",
             "[ollama]",
             $"enabled = {Toml(cfg.OllamaEnabled)}",
@@ -174,7 +190,7 @@ public static class Configs
             "",
             "# Classes lectures are sorted into. A lecture recorded for a class, or whose title matches a name or alias,",
             "# is filed before the model is asked.",
-        };
+        });
         foreach (var c in cfg.Classes)
         {
             lines.AddRange([
@@ -276,6 +292,8 @@ public static class Configs
             SummaryModel = Str(Get(summary, "model", "")),
             SummaryMaxContext = Int(Get(summary, "max_context", 32768L)),
             Classes = classes,
+            Uses = data.TryGetValue("uses", out var u) && u is TomlArray ua
+                ? ua.Select(x => Str(x!).Trim().ToLowerInvariant()).Where(x => Config.UseKinds.Contains(x)).Distinct().ToList() : [],
         };
     }
 
