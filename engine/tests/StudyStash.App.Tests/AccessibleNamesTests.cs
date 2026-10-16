@@ -113,7 +113,7 @@ public class AccessibleNamesTests
                 var cards = Shown<Button>(view).Where(b => b.Classes.Contains("choice") || b.Classes.Contains("ai-choice")).Cast<Control>();
                 AllNamed(cards.Concat(Shown<ToggleButton>(view)), $"Setup, {step}");
             }
-            m.Go(m.Steps.First().Step);
+            m.Go(SetupStep.Welcome);
             Dispatcher.UIThread.RunJobs();
             var welcome = Shown<Button>(view).Where(b => b.Classes.Contains("choice")).Select(Said).ToList();
             Assert.Equal(["Just this computer", "This is my laptop", "This is my library"], welcome);

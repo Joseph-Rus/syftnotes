@@ -10,6 +10,8 @@ namespace StudyStash.App.ViewModels;
 /// <summary>Setup's pages, in the order they come in any flow (each flow uses some of them).</summary>
 public enum SetupStep
 {
+    /// <summary>The first page: what Study Stash does, in four steps, before any choice.</summary>
+    Intro,
     /// <summary>What this computer is for, and what setting it up involves.</summary>
     Welcome,
     /// <summary>The library: name it and give it a password (Continue creates it).</summary>
@@ -72,6 +74,9 @@ public sealed partial class StepItem : ObservableObject
 
     partial void OnCurrentChanged(bool value) => OnPropertyChanged(nameof(Todo));
 }
+
+/// <summary>One step of "how it works" on setup's first page, or of what to do next on its last.</summary>
+public sealed record IntroPoint(string Glyph, string Title, string About);
 
 /// <summary>One thing Study Stash can be for, ticked or not, on setup's "What's it for?" page.</summary>
 public sealed partial class UseChoice : ObservableObject
@@ -168,12 +173,37 @@ public sealed partial class SetupModel : ObservableObject
     /// what's there filled in, and stays what it is (a library, a laptop or just this computer). Changing that moves
     /// lectures between computers, which only Settings → Connection does.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(WelcomeTitle), nameof(WelcomeBody), nameof(CanChooseOneComputer), nameof(CanChooseLaptop), nameof(CanChooseLibrary))]
+    [NotifyPropertyChangedFor(nameof(WelcomeTitle), nameof(WelcomeBody), nameof(IntroTitle), nameof(CanChooseOneComputer), nameof(CanChooseLaptop), nameof(CanChooseLibrary))]
     public partial bool Again { get; set; }
-    public string WelcomeTitle => Again ? "Set up Study Stash again" : "Welcome to Study Stash";
+
+    /// <summary>Run again: no How it works page, and it opens on Your computers.</summary>
+    partial void OnAgainChanged(bool value)
+    {
+        if (Steps.Count > 0) SetRole(Role);
+    }
+    public string WelcomeTitle => Again ? "Set up Study Stash again" : "Where will Study Stash run?";
     public string WelcomeBody => Again
-        ? "Go through the steps again; what's already set up stays as it is. To change what this computer is for, use Settings → Connection."
-        : "How will you use it? You can add another computer later.";
+        ? "Go through the steps again; what's already set up stays as it is. To change what this computer is for, use Settings → Advanced → Connection."
+        : "Most people use just this computer. You can add a laptop, or your phone, any time.";
+
+    /// <summary>The first page: what happens to a lecture, from Record to notes on every device.</summary>
+    public string IntroTitle => Again ? "Set up Study Stash again" : "Welcome to Study Stash";
+    public string IntroBody => "Your lectures, written up for you. Here's how it works, then a few steps to set it up: about three minutes.";
+    public IntroPoint[] IntroPoints { get; } =
+    [
+        new("mic", "Record when class starts", "Press Record, or its shortcut, and Study Stash writes down what's said, on this computer. Type your own notes as it records, if you like."),
+        new("auto_awesome", "Notes are written for you", "After class your AI turns the transcript into study notes: a summary, the key points, definitions, formulas and diagrams, and questions to review."),
+        new("folder_open", "Everything filed, and searchable", "Each lecture goes in its class on its own. Search every word that was said, or ask a question across all your notes."),
+        new("smartphone", "With you everywhere", "Your calendar and Canvas say what's next and what's due, and your iPhone or iPad has it all, Pencil notes too."),
+    ];
+    public bool OnIntro => Step == SetupStep.Intro;
+
+    /// <summary>The last page's next steps, for a computer that records.</summary>
+    public IntroPoint[] NextSteps => [
+        new("mic", "Record your first class", "Type your own notes as it records if you like: the notes are written around yours, and yours stay word for word."),
+        new("smartphone", "Get it on your phone", "Install Study Stash on your iPhone or iPad, then open Settings → Phone → Add a phone here and scan the code."),
+        new("forum", "Ask anything", "Search finds every lecture, word for word; Ask answers from your own notes, and says which lecture it used."),
+    ];
     /// <summary>The welcome's choices: any of them the first time; only the one this computer already is when run again.</summary>
     public bool CanChooseOneComputer => !Again || IsOneComputer;
     public bool CanChooseLaptop => !Again || IsLaptop;
@@ -282,7 +312,7 @@ public sealed partial class SetupModel : ObservableObject
         : $"Open Study Stash when you log in, so your library is ready and your notes get written whenever this {DeviceWord} is on.";
     public string StartAtLoginHint => IsLibrary ? "Recommended for a library." : "Recommended.";
     /// <summary>Just this computer's last page: growing into a laptop and a library later.</summary>
-    public string AddLaptopLater => "Want to record on a laptop too? Add it any time in Settings → Your library.";
+    public string AddLaptopLater => "Want to record on a laptop too? Add it any time in Settings → Advanced → Library.";
     /// <summary>The last page's shortcuts, to change them before starting (null in a test that doesn't need them).</summary>
     public ShortcutsModel? Keys { get; set; }
     public bool HasKeys => Keys is not null;
@@ -368,11 +398,12 @@ public sealed partial class SetupModel : ObservableObject
     public int Index => Steps.ToList().FindIndex(s => s.Step == Step) + 1;
     public bool IsLast => Index == Count;
     public string StepLabel =>
-        OnWelcome ? "Welcome"
+        OnIntro ? "Welcome"
         : OnAi && IsLibrary ? $"Library setup · step {Index} of {Count}"
         : $"Step {Index} of {Count}";
     public string ContinueLabel =>
         IsLast ? "Open Study Stash"
+        : OnIntro ? "Get started"
         : OnPassword && !LibraryOk ? (ExistingLibrary ? "Start library" : "Create library")
         : OnLibrary && !LibraryOk ? "Connect"
         : "Continue";
@@ -430,9 +461,10 @@ public sealed partial class SetupModel : ObservableObject
     /// <summary>The steps of each flow, in order. Windows adds the taskbar where Study Stash records.</summary>
     public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin) => StepsFor(role, skin, forSchool: true);
 
-    public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin, bool forSchool)
+    public static IReadOnlyList<SetupStep> StepsFor(AppRole role, SkinKind skin, bool forSchool, bool intro = true)
     {
-        var steps = new List<SetupStep> { SetupStep.Welcome };
+        // How it works comes first, the first time; run again, it's known.
+        var steps = intro ? new List<SetupStep> { SetupStep.Intro, SetupStep.Welcome } : new List<SetupStep> { SetupStep.Welcome };
         steps.AddRange(role switch
         {
             // No step for the transcription model: the one for this computer (WhisperModels.Advise) is downloaded in
@@ -452,7 +484,8 @@ public sealed partial class SetupModel : ObservableObject
 
     string TitleOf(SetupStep step) => step switch
     {
-        SetupStep.Welcome => "Welcome",
+        SetupStep.Intro => "Welcome",
+        SetupStep.Welcome => "Your computers",
         SetupStep.Password => "Password",
         SetupStep.Library => "Your library",
         SetupStep.Ai => IsLibrary ? "Your AI" : "Notes",
@@ -483,7 +516,7 @@ public sealed partial class SetupModel : ObservableObject
         var wanted = Step;
         Steps.Clear();
         int n = 1;
-        foreach (var step in StepsFor(role, skin, ForSchool))
+        foreach (var step in StepsFor(role, skin, ForSchool, intro: !Again))
             Steps.Add(new StepItem { Step = step, Number = n++, Title = TitleOf(step), Optional = step is SetupStep.Canvas or SetupStep.Classes });
         Go(Steps.Any(s => s.Step == wanted) ? wanted : Steps[0].Step);
         foreach (string p in new[] { nameof(IsOneComputer), nameof(IsLibrary), nameof(IsLaptop), nameof(LibraryIsHere), nameof(HeaderTitle), nameof(FlowName),
@@ -519,7 +552,7 @@ public sealed partial class SetupModel : ObservableObject
     void NotifyStepDerived()
     {
         foreach (string p in new[] { nameof(Index), nameof(IsLast), nameof(StepLabel), nameof(ContinueLabel), nameof(CanGoBack), nameof(OnWelcome), nameof(OnPassword),
-                     nameof(OnMicrophone), nameof(OnUses), nameof(OnLibrary), nameof(OnModel), nameof(OnClasses), nameof(OnStartAtLogin), nameof(OnTaskbar), nameof(OnAi),
+                     nameof(OnMicrophone), nameof(OnUses), nameof(OnIntro), nameof(OnLibrary), nameof(OnModel), nameof(OnClasses), nameof(OnStartAtLogin), nameof(OnTaskbar), nameof(OnAi),
                      nameof(OnCanvas), nameof(OnDone), nameof(OnLibraryDone), nameof(OnLaptopDone), nameof(OnOneComputerDone), nameof(OnPlainStep),
                      nameof(Wide), nameof(CanContinue), nameof(AiHelpOpen) })
             OnPropertyChanged(p);

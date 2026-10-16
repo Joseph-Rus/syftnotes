@@ -186,6 +186,7 @@ public sealed class LibraryHereTests
         using var home = new TempHome();
         using var host = Host(home.Path);
         var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Study Stash"] });
+        m.Go(SetupStep.Welcome); // past How it works
         try
         {
             Assert.True(m.IsOneComputer);
@@ -254,6 +255,7 @@ public sealed class LibraryHereTests
         using var home = new TempHome();
         using var host = Host(home.Path);
         var m = Setup.Make(host, AppRole.Both, here: new LibraryHere { Command = [exe], Folder = home["Study Stash"] });
+        m.Go(SetupStep.Welcome); // past How it works
         try
         {
             await m.NextCommand.ExecuteAsync(null); // Just this computer: its library, to itself

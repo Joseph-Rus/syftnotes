@@ -44,22 +44,22 @@ public sealed class SetupTests
         // Just this computer: no password, no library to find; who writes the notes comes after the model.
         var one = SetupModel.For(SkinKind.Mac);
         Assert.Equal(AppRole.Both, one.Role);
-        Assert.Equal(["Welcome", "Microphone", "Notes", "What it's for", "Canvas", "Classes", "Open when you log in", "Done"], Titles(one));
-        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8], one.Steps.Select(s => s.Number));
+        Assert.Equal(["Welcome", "Your computers", "Microphone", "Notes", "What it's for", "Canvas", "Classes", "Open when you log in", "Done"], Titles(one));
+        Assert.Equal([1, 2, 3, 4, 5, 6, 7, 8, 9], one.Steps.Select(s => s.Number));
 
         var laptop = SetupModel.For(SkinKind.Mac, AppRole.Laptop);
-        Assert.Equal(["Welcome", "Your library", "Microphone", "What it's for", "Canvas", "Classes", "Done"], Titles(laptop));
+        Assert.Equal(["Welcome", "Your computers", "Your library", "Microphone", "What it's for", "Canvas", "Classes", "Done"], Titles(laptop));
 
         var library = SetupModel.For(SkinKind.Mac, AppRole.Library);
-        Assert.Equal(["Welcome", "Password", "Your AI", "What it's for", "Canvas", "Classes", "Open when you log in", "Connect your laptop"], Titles(library));
+        Assert.Equal(["Welcome", "Your computers", "Password", "Your AI", "What it's for", "Canvas", "Classes", "Open when you log in", "Connect your laptop"], Titles(library));
     }
 
     [Fact]
     public void Windows_adds_the_taskbar_only_where_Study_Stash_records()
     {
-        Assert.Equal(["Welcome", "Your library", "Microphone", "What it's for", "Canvas", "Classes", "Taskbar", "Done"],
+        Assert.Equal(["Welcome", "Your computers", "Your library", "Microphone", "What it's for", "Canvas", "Classes", "Taskbar", "Done"],
             Titles(SetupModel.For(SkinKind.Win, AppRole.Laptop)));
-        Assert.Equal(["Welcome", "Microphone", "Notes", "What it's for", "Canvas", "Classes", "Open when you log in", "Taskbar", "Done"],
+        Assert.Equal(["Welcome", "Your computers", "Microphone", "Notes", "What it's for", "Canvas", "Classes", "Open when you log in", "Taskbar", "Done"],
             Titles(SetupModel.For(SkinKind.Win)));
         Assert.DoesNotContain(SetupStep.Taskbar, SetupModel.StepsFor(AppRole.Library, SkinKind.Win));
         Assert.DoesNotContain(SetupStep.Taskbar, SetupModel.StepsFor(AppRole.Laptop, SkinKind.Mac));
@@ -91,19 +91,21 @@ public sealed class SetupTests
         var m = SetupModel.For(SkinKind.Mac);
         Assert.True(m.IsOneComputer);
         Assert.False(m.IsLaptop || m.IsLibrary);
-        Assert.Equal("Welcome to Study Stash", m.WelcomeTitle);
+        Assert.Equal("Welcome to Study Stash", m.IntroTitle);
+        Assert.Equal("Where will Study Stash run?", m.WelcomeTitle);
         m.LibraryName = "Ada's library";
         m.Address = "http://mac-mini:8787";
 
+        m.Go(SetupStep.Welcome);
         m.ChooseLaptopCommand.Execute(null);
         Assert.Equal(AppRole.Laptop, m.Role);
         Assert.Equal(SetupStep.Welcome, m.Step);
-        Assert.Equal(SetupStep.Library, m.Steps[1].Step);
+        Assert.Equal(SetupStep.Library, m.Steps[2].Step);
         m.ConnectPassword = "the-mac-minis"; // typed on the laptop's Connect page
 
         m.ChooseLibraryCommand.Execute(null);
         Assert.Equal(AppRole.Library, m.Role);
-        Assert.Equal(SetupStep.Password, m.Steps[1].Step);
+        Assert.Equal(SetupStep.Password, m.Steps[2].Step);
         Assert.Equal("Set up your library", m.HeaderTitle);
         // A new library's password field starts empty: the other library's password isn't carried into it.
         Assert.Equal("", m.Password);
@@ -111,7 +113,7 @@ public sealed class SetupTests
 
         m.ChooseOneComputerCommand.Execute(null);
         Assert.Equal(AppRole.Both, m.Role);
-        Assert.Equal(SetupStep.Microphone, m.Steps[1].Step);
+        Assert.Equal(SetupStep.Microphone, m.Steps[2].Step);
         // A library made for one choice is made again for another (each keeps it its own way).
         m.LibraryOk = true;
         m.ChooseLibraryCommand.Execute(null);
@@ -128,7 +130,7 @@ public sealed class SetupTests
         m.LibraryOk = true;
         m.Again = true;
         Assert.Equal("Set up Study Stash again", m.WelcomeTitle);
-        Assert.Contains("Settings → Connection", m.WelcomeBody, StringComparison.Ordinal);
+        Assert.Contains("Settings → Advanced → Connection", m.WelcomeBody, StringComparison.Ordinal);
         Assert.True(m.CanChooseLibrary);
         Assert.False(m.CanChooseOneComputer || m.CanChooseLaptop);
 
@@ -184,6 +186,7 @@ public sealed class SetupTests
             m.LibraryResult = m.LibraryOk ? "Ada's library is ready on this Mac." : "The library didn't start.";
             return Task.CompletedTask;
         };
+        m.Go(SetupStep.Welcome);
         Assert.Equal("Continue", m.ContinueLabel);
 
         await m.NextCommand.ExecuteAsync(null);
@@ -203,6 +206,7 @@ public sealed class SetupTests
         // The laptop's welcome makes nothing: it connects on its own step.
         var laptop = SetupModel.For(SkinKind.Mac, AppRole.Laptop);
         laptop.OnConnect = () => throw new InvalidOperationException("the laptop's welcome shouldn't connect");
+        laptop.Go(SetupStep.Welcome);
         await laptop.NextCommand.ExecuteAsync(null);
         Assert.Equal(SetupStep.Library, laptop.Step);
     }
@@ -220,7 +224,7 @@ public sealed class SetupTests
         Assert.True(m.OnOneComputerDone);
         Assert.False(m.OnLibraryDone);
         Assert.Equal("Done", m.Steps[^1].Title);
-        Assert.Contains("Settings → Your library", m.AddLaptopLater, StringComparison.Ordinal);
+        Assert.Contains("Settings → Advanced → Library", m.AddLaptopLater, StringComparison.Ordinal);
         Assert.False(m.ShowNotesSummary);
         m.NotesSummary = "Ollama";
         Assert.True(m.ShowNotesSummary);
@@ -259,7 +263,7 @@ public sealed class SetupTests
         var mac = SetupModel.For(SkinKind.Mac, AppRole.Laptop);
         mac.Go(SetupStep.Canvas);
         Assert.True(mac.Steps.Single(s => s.Step == SetupStep.Canvas).Optional); // the sidebar still says so
-        Assert.Equal("Step 5 of 7", mac.StepLabel);
+        Assert.Equal("Step 6 of 8", mac.StepLabel);
         Assert.Equal("Continue", mac.ContinueLabel);
         Assert.True(mac.Wide);
         Assert.Equal(SetupStep.Classes, mac.Steps[mac.Index].Step);
@@ -274,7 +278,7 @@ public sealed class SetupTests
     {
         var m = SetupModel.For(SkinKind.Mac, AppRole.Library);
         m.Go(SetupStep.Ai);
-        Assert.Equal("Library setup · step 3 of 8", m.StepLabel);
+        Assert.Equal("Library setup · step 4 of 9", m.StepLabel);
         Assert.False(m.OnPlainStep);
         m.Go(SetupStep.Done);
         Assert.True(m.IsLast);
@@ -284,7 +288,7 @@ public sealed class SetupTests
 
         var one = SetupModel.For(SkinKind.Mac);
         one.Go(SetupStep.Ai);
-        Assert.Equal("Step 3 of 8", one.StepLabel);
+        Assert.Equal("Step 4 of 9", one.StepLabel);
     }
 
     [Fact]
@@ -392,7 +396,10 @@ public sealed class SetupTests
         using var host = Host(home);
         var m = Setup.Make(host, AppRole.Library);
         Assert.True(m.IsLibrary);
-        m.NextCommand.Execute(null); // Welcome -> Password
+        Assert.Equal(SetupStep.Intro, m.Step);
+        Assert.Equal("Get started", m.ContinueLabel);
+        m.NextCommand.Execute(null); // How it works -> Your computers
+        m.NextCommand.Execute(null); // Your computers -> Password
         Assert.Equal(SetupStep.Password, m.Step);
         Assert.Equal("Create library", m.ContinueLabel);
 

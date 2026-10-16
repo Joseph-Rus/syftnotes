@@ -78,6 +78,28 @@
 
                   <!-- Welcome: how Study Stash will be used, three choices: icon | name (and Recommended) over a line
                        of help | the radio. -->
+                  <!-- The first page: what happens to a lecture, before any choice. -->
+                  <StackPanel IsVisible="{Binding OnIntro}">
+                    <TextBlock Classes="page-title step-title" Text="{Binding IntroTitle}" />
+                    <TextBlock Classes="page-lede step-lede" Text="{Binding IntroBody}" />
+                    <ItemsControl ItemsSource="{Binding IntroPoints}" Margin="0,20,0,0" MaxWidth="500" HorizontalAlignment="Stretch">
+                      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="14" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:IntroPoint">
+                          <Grid ColumnDefinitions="Auto,14,*">
+                            <Border Width="36" Height="36" CornerRadius="10" Background="{DynamicResource Fill}" VerticalAlignment="Top">
+                              <c:Icon Glyph="{Binding Glyph}" Size="18" Foreground="{DynamicResource AccentText}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <StackPanel Grid.Column="2" Spacing="2">
+                              <TextBlock Classes="choice-title" Text="{Binding Title}" />
+                              <TextBlock Classes="choice-about" Text="{Binding About}" TextWrapping="Wrap" />
+                            </StackPanel>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+
                   <StackPanel IsVisible="{Binding OnWelcome}">
                     <TextBlock Classes="page-title step-title" Text="{Binding WelcomeTitle}" />
                     <TextBlock Classes="page-lede step-lede" Text="{Binding WelcomeBody}" />
@@ -420,6 +442,24 @@
                   <StackPanel IsVisible="{Binding OnLaptopDone}">
                     <TextBlock Classes="page-title step-title" Text="You're set" />
                     <TextBlock Classes="page-lede step-lede" Text="{Binding RecordHint}" />
+                    <!-- A computer that records: what to do next. -->
+                    <StackPanel IsVisible="{Binding !IsLibrary}" Margin="0,16,0,4" MaxWidth="480" HorizontalAlignment="Left" Spacing="10">
+                      <TextBlock Classes="label" Text="What to do next" />
+                      <ItemsControl ItemsSource="{Binding NextSteps}">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:IntroPoint">
+                            <Grid ColumnDefinitions="Auto,10,*">
+                              <c:Icon Glyph="{Binding Glyph}" Size="16" Foreground="{DynamicResource AccentText}" VerticalAlignment="Top" Margin="0,1,0,0" />
+                              <StackPanel Grid.Column="2" Spacing="1">
+                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" />
+                                <TextBlock Classes="hint" Text="{Binding About}" TextWrapping="Wrap" />
+                              </StackPanel>
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
                     <Border Classes="group" Margin="0,22,0,0">
                       <StackPanel>
                         <Grid Classes="row" ColumnDefinitions="Auto,12,150,*">

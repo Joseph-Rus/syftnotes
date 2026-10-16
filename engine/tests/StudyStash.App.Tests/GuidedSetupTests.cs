@@ -291,7 +291,7 @@ public sealed class GuidedSetupTests
         Assert.Equal(GuidedScreen.Manual, g.Screen);
         Assert.True(g.PreferOllama);
         Assert.Equal("ollama", AppSettings.Load(rig.Home.Path).SetupAi);
-        Assert.Equal(SetupStep.Welcome, rig.Setup.Step);
+        Assert.Equal(SetupStep.Intro, rig.Setup.Step); // set up by hand opens on How it works
         Assert.Equal(0, FakeAgents.Turns(rig.Bin));
         Assert.False(File.Exists(FakeAgents.ExePath(rig.Bin, "claude")));
     }
