@@ -180,7 +180,11 @@ public static class SettingsIndex
     ];
 
     /// <summary>The entry change_setting knows by <paramref name="key"/>, or null.</summary>
-    public static SettingEntry? ByKey(string key) => All.FirstOrDefault(e => e.Changeable && e.Key == key);
+    /// <summary>The setting with this key, as this computer shows it (one setting can sit on a different page on a
+    /// laptop than where the library is: the library's updates are in General when it's this computer).</summary>
+    public static SettingEntry? ByKey(string key, Func<SettingEntry, bool>? shown = null) =>
+        All.FirstOrDefault(e => e.Changeable && e.Key == key && (shown?.Invoke(e) ?? true))
+        ?? All.FirstOrDefault(e => e.Changeable && e.Key == key);
 
     /// <summary>Words that say nothing about which setting: left out of a search (unless they're all there is).</summary>
     static readonly HashSet<string> Filler =

@@ -199,7 +199,7 @@ public sealed class SettingsTools(ISettingsDriver driver)
     {
         key = (key ?? "").Trim();
         value = (value ?? "").Trim();
-        if (SettingsIndex.ByKey(key) is not { } entry || !driver.Shown(entry))
+        if (SettingsIndex.ByKey(key, driver.Shown) is not { } entry || !driver.Shown(entry))
         {
             if (SettingsIndex.All.FirstOrDefault(e => e.Title.Equals(key, StringComparison.OrdinalIgnoreCase)) is { } named && driver.Shown(named))
                 return named.Changeable

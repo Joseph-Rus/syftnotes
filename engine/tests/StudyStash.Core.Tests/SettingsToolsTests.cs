@@ -87,7 +87,7 @@ public sealed class SettingsToolsTests : IAsyncLifetime
     [InlineData("whisper", "Transcription model")]
     [InlineData("start at login", "Open when you log in")]
     [InlineData("iphone", "Phone")]
-    [InlineData("hotkeys", "Shortcuts")]
+    [InlineData("hotkeys", "Search and Record work from any app")]
     public void Search_finds_a_setting_by_the_words_a_student_uses(string query, string first)
     {
         var hits = SettingsIndex.Search(query);
@@ -108,8 +108,12 @@ public sealed class SettingsToolsTests : IAsyncLifetime
     [Fact]
     public void Every_changeable_setting_has_a_unique_key_and_says_what_it_takes()
     {
-        var keys = SettingsIndex.All.Where(e => e.Changeable).Select(e => e.Key).ToList();
-        Assert.Equal(keys.Count, keys.Distinct().Count());
+        // Unique on any one computer (a setting may sit on another page on a laptop than where the library is).
+        foreach (var (records, laptop) in new[] { (true, true), (true, false), (false, false) })
+        {
+            var keys = SettingsIndex.All.Where(e => e.Changeable && SettingsIndex.ShownOn(e, records, laptop)).Select(e => e.Key).ToList();
+            Assert.Equal(keys.Count, keys.Distinct().Count());
+        }
         Assert.All(SettingsIndex.All.Where(e => e.Changeable && e.Key is not ("colour_theme" or "transcription_model")), e => Assert.NotEmpty(e.Takes));
         Assert.All(SettingsIndex.All, e => Assert.NotNull(SettingsIndex.Sections.FirstOrDefault(s => s.Id == e.Section).Id));
         Assert.All(SettingsIndex.Sections, s => Assert.Single(SettingsIndex.All, e => e.Section == s.Id && e.IsPage));
@@ -201,7 +205,7 @@ public sealed class SettingsToolsTests : IAsyncLifetime
         Assert.Equal("Added SAE Club to Clubs", SetupChat.Chip("add_class", new JsonObject { ["name"] = "SAE Club", ["folder"] = "Clubs" }));
         Assert.Equal("Moved BIO 110 to Work", SetupChat.Chip("move_to_folder", new JsonObject { ["name"] = "BIO 110", ["folder"] = "Work" }));
         Assert.Equal("Changed Recording the computer's sound", SetupChat.Chip("change_setting", new JsonObject { ["key"] = "computer_audio", ["value"] = "a very long value indeed here" }));
-        Assert.Equal("Showed Notes and sorting", SetupChat.Chip("open_settings", new JsonObject { ["section"] = "notes" }));
+        Assert.Equal("Showed Notes", SetupChat.Chip("open_settings", new JsonObject { ["section"] = "notes" }));
         Assert.Equal("Searched Settings", SetupChat.Chip("find_setting", null));
     }
 
