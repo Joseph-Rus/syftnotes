@@ -227,12 +227,23 @@ public static partial class SelfTest
 
     // --- setup -------------------------------------------------------------------------------------------------------
 
+    /// <summary>Setup's first page says how Study Stash works: seen, then on to the computer's choices.</summary>
+    static async Task PastIntroAsync(SetupModel m)
+    {
+        if (!m.OnIntro) return;
+        await Wait(1);
+        Shot(Shell.Windows.Setup, "setup-intro");
+        await m.NextCommand.ExecuteAsync(null);
+        if (!m.OnWelcome) throw new InvalidOperationException($"expected the computer's choices after How it works, got {m.Step}");
+    }
+
     static async Task RunSetupAsync(AppHost host)
     {
         bool opened = await Until(() => Shell.Windows.Setup is not null, 10);
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
         await ByHandAsync();
+        await PastIntroAsync(m);
 
         // Welcome: three choices, starting on just this computer; the self-test is a laptop with its own library.
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps");
@@ -264,6 +275,14 @@ public static partial class SelfTest
         Say(heard ? "microphone heard" : "microphone: nothing heard in 10 s");
         Shot(Shell.Windows.Setup, "setup-microphone");
         m.NextCommand.Execute(null);
+
+        // What it's for: left as it is (school), so Canvas and Classes come next.
+        if (m.OnUses)
+        {
+            await Wait(1);
+            Shot(Shell.Windows.Setup, "setup-uses");
+            await m.NextCommand.ExecuteAsync(null);
+        }
 
         // The model has no step of its own: it started downloading on the microphone's step, from our own mirror (never
         // Hugging Face), and goes on while setup does. Waiting for it here keeps setup where it is (on Canvas).
@@ -333,6 +352,7 @@ public static partial class SelfTest
         Say(opened ? "setup opened" : "setup didn't open");
         var m = Shell.Windows.SetupModel ?? throw new InvalidOperationException("no setup window");
         await ByHandAsync();
+        await PastIntroAsync(m);
 
         m.ChooseOneComputerCommand.Execute(null);
         Say($"welcome: {m.FlowName}, {m.Steps.Count} steps: {string.Join(", ", m.Steps.Select(x => x.Title))}");
