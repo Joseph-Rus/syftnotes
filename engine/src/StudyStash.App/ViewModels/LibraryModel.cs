@@ -310,6 +310,11 @@ public sealed record ConfirmAsk(string Title, string Text, string Yes, Action Ac
 /// </summary>
 public sealed partial class LibraryModel : ObservableObject
 {
+    /// <summary>The library is for school (or hasn't been told otherwise): its sidebar says Classes, else Folders.</summary>
+    [ObservableProperty] public partial bool ForSchool { get; set; } = true;
+    public string ClassesHeading => ForSchool ? "Classes" : "Folders";
+    partial void OnForSchoolChanged(bool value) => OnPropertyChanged(nameof(ClassesHeading));
+
     /// <summary>What's coming up on the student's calendars, at the foot of the sidebar: each a button that records it.</summary>
     public ComingUpModel ComingUp { get; } = new();
 

@@ -94,7 +94,7 @@
           </Grid>
         </Button>
         <Grid ColumnDefinitions="*,Auto" Margin="10,22,4,6">
-          <TextBlock Classes="side-group" Text="Classes" />
+          <TextBlock Classes="side-group" Text="{Binding ClassesHeading}" />
           <Button Name="AddClass" Grid.Column="1" Classes="icon-btn sm" Command="{Binding AddClassCommand}" IsVisible="{Binding CanAddClass}"
                   ToolTip.Tip="Add folder" AutomationProperties.Name="Add folder">
             <c:Icon Glyph="add" Size="16" />

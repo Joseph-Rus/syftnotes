@@ -55,7 +55,11 @@ public static partial class Shell
         await host.CheckLibraryAsync();
         if (quitting || host.Library != LibraryState.Connected) return;
         library.ShowCounts(host.Classes().Select(c => (c.Name, c.Lectures)), host.Overview?["unsorted"]?.GetValue<int>() ?? 0);
+        library.ForSchool = ForSchool;
     }
+
+    /// <summary>What the library is for says school, or says nothing (a library from before it was asked).</summary>
+    static bool ForSchool => host.Overview?["for_school"] is not System.Text.Json.Nodes.JsonValue v || !v.TryGetValue(out bool school) || school;
 
     static bool libraryReloadWhole;
 
@@ -145,6 +149,7 @@ public static partial class Shell
         UpdateDueItem();
         UpdateNextDue();
         int unsorted = host.Overview?["unsorted"]?.GetValue<int>() ?? 0;
+        library.ForSchool = ForSchool;
         library.UnsortedCount = unsorted;
         if (host.Library != LibraryState.Connected || host.OlderLibrary)
         {
