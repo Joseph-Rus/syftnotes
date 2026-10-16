@@ -60,6 +60,36 @@ public static partial class Summarize
         Three to five numbered questions a student should be able to answer after this lecture.
         """.ReplaceLineEndings("\n");
 
+    /// <summary>The notes' shape for a library that isn't for school (work, research, creative, personal): what was
+    /// decided and who does what come first, instead of study material.</summary>
+    public static readonly string MeetingStructure = """
+        Use exactly this structure, and skip any section the recording has nothing for:
+
+        ## Summary
+        Two to four sentences: what this was, who was in it when that's clear, and what came of it.
+
+        ## Decisions
+        Bullets: each thing decided or agreed, in one sentence.
+
+        ## Action items
+        A checklist: "- [ ] who: what, by when", exactly as said; "someone" when no one was named.
+
+        ## Discussion
+        The main points and ideas, grouped under short bold labels, with the reasons and numbers given.
+
+        ## Open questions
+        Bullets: what was left unanswered or needs following up.
+        """.ReplaceLineEndings("\n");
+
+    /// <summary>A notes prompt made for meetings and talks rather than lectures (for a library not for school).</summary>
+    public static string ForMeetings(string prompt) => prompt
+        .Replace(Structure, MeetingStructure)
+        .Replace("You are an expert note-taker for university lectures. Write study notes for this lecture", "You are an expert note-taker for meetings, talks and conversations. Write clear, useful notes for this recording")
+        .Replace("You are an expert note-taker for university lectures.", "You are an expert note-taker for meetings, talks and conversations.")
+        .Replace("Rewrite them as study notes.", "Rewrite them as clear, useful notes.")
+        .Replace("of a lecture transcript", "of a recording's transcript")
+        .Replace("one lecture", "one recording");
+
     /// <summary>The notes' shape when the student typed notes of their own while the lecture recorded: their lines
     /// are the outline, kept word for word and marked as theirs (==like this==, which reads as a highlighter's mark
     /// in any Markdown app), with what the lecture said added round them.</summary>
@@ -527,6 +557,12 @@ public static partial class Summarize
         Drawings drawings = Drawings.Flowcharts)
     {
         chat ??= (c, model, prompt, ctx) => OllamaGenerateAsync(c, model, prompt, ctx);
+        if (!cfg.ForSchool)
+        {
+            // Not for school: notes for a meeting or a talk (decisions, action items), not study notes.
+            var asked = chat;
+            chat = (c, model, prompt, ctx) => asked(c, model, ForMeetings(prompt), ctx);
+        }
         string model = cfg.EffectiveSummaryModel;
         int ctx = await ContextSizeAsync(cfg, model, show);
         int budget = TranscriptBudget(ctx);
