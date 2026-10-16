@@ -53,3 +53,16 @@ public class ClassAliasTests
         Assert.Equal(HttpStatusCode.BadRequest, (await site.Client.SendAsync(Post(new { @class = "CS 101" }))).StatusCode);
     }
 }
+
+public class EventSuggestTests
+{
+    static readonly List<StudyStash.Core.Calendar.ClassHint> Classes =
+        [new("Machine Learning", []), new("Theory of Computation and Compilers", [], "CSCI 4150"), new("Data Mining", [])];
+
+    [Theory]
+    [InlineData("Machine & Deep Learning", "Machine Learning")]
+    [InlineData("Lunch with Sam", null)]
+    [InlineData("Data Mining", null)] // matched outright, nothing to suggest
+    public void A_title_with_every_word_of_a_class_suggests_it(string title, string? expected) =>
+        Assert.Equal(expected, StudyStash.Core.Calendar.EventClass.Suggest(title, Classes));
+}

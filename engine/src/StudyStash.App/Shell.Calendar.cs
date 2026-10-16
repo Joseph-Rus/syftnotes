@@ -18,6 +18,23 @@ public static partial class Shell
     static string? CalendarHint() =>
         chosenClass.Length == 0 && host.Settings.Role != AppRole.Library && host.EventNow() is { } now ? CalendarWords.FromCalendar(now.Event.Title) : null;
 
+    /// <summary>Every event called this is the suggested class's from now on (the library keeps the title as one of
+    /// the class's names), then Coming up shows it so.</summary>
+    static async Task FileEventAsync(ComingUpRow row)
+    {
+        if (row.Suggested is not { } cls || host.Remote() is not { } lib) return;
+        try
+        {
+            await lib.SetAliasAsync(cls, row.Title);
+            await host.CheckLibraryAsync();
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException)
+        {
+            return;
+        }
+        UpdateComingUp();
+    }
+
     /// <summary>Coming up, in the dropdown and the library window, from what the calendars last read.</summary>
     static void UpdateComingUp()
     {

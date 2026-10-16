@@ -50,6 +50,25 @@ public static partial class EventClass
         return scored[0].Score >= 3 && (scored.Count == 1 || scored[1].Score < scored[0].Score) ? scored[0].Name : null;
     }
 
+    /// <summary>
+    /// A class to suggest for an event <see cref="For"/> found none for: one whose every word (of its name or another
+    /// name, three letters or more) is in the title, "Machine Learning" for "Machine &amp; Deep Learning". The student
+    /// confirms it, and the title becomes one of the class's names, so from then on every event called that is
+    /// matched outright. Null when no class, or more than one equally, fits.
+    /// </summary>
+    public static string? Suggest(string title, IReadOnlyList<ClassHint> classes)
+    {
+        if (string.IsNullOrWhiteSpace(title) || For(title, classes) is not null) return null;
+        var words = Classify.Norm(title).Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet();
+        var fits = classes
+            .SelectMany(c => c.Aliases.Prepend(c.Name).Select(n => (Class: c.Name,
+                Words: Classify.Norm(n).Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(w => w.Length >= 3 && w != "and").ToList())))
+            .Where(x => x.Words.Count >= 2 && x.Words.All(words.Contains))
+            .OrderByDescending(x => x.Words.Count).ToList();
+        if (fits.Count == 0) return null;
+        return fits.Count == 1 || fits[1].Words.Count < fits[0].Words.Count || fits.All(f => f.Class == fits[0].Class) ? fits[0].Class : null;
+    }
+
     /// <summary>The library's classes, with their Canvas course codes (on the library, from config.toml and canvas.json).</summary>
     public static List<ClassHint> Of(Config cfg)
     {

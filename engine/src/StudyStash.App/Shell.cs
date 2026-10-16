@@ -571,6 +571,8 @@ public static partial class Shell
         library.OnUndoMove = move => MoveNoteAsync(move.Id, move.To, move.From, say: false);
         library.OnOpenRecording = OpenRecording;
         library.ComingUp.OnRecord = id => _ = RecordEventAsync(id);
+        library.ComingUp.OnFile = row => _ = FileEventAsync(row);
+        panel.ComingUp.OnFile = row => _ = FileEventAsync(row);
         library.OnGoBack = GoBack;
         library.OnGoForward = GoForward;
         library.SidebarHidden = host.Settings.SidebarHidden;

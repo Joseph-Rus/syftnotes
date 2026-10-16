@@ -246,6 +246,10 @@ public sealed class RemoteLibrary(string serverUrl, string key, HttpClient? http
     public async Task<JsonObject> AddClassAsync(string name, string? description = null, string? group = null) =>
         (JsonObject)(await SendAsync(HttpMethod.Post, "/classes", new JsonObject { ["name"] = name, ["description"] = description, ["group"] = group }))!;
 
+    /// <summary>A calendar event's title as another name of a class: every event called that is that class's.</summary>
+    public async Task<JsonObject?> SetAliasAsync(string className, string alias, bool remove = false) =>
+        await SendAsync(HttpMethod.Post, "/classes/alias", new JsonObject { ["class"] = className, ["alias"] = alias, ["remove"] = remove }) as JsonObject;
+
     /// <summary>What Study Stash is for ("student", "work", ...): not a student, and it's folders rather than classes.</summary>
     public async Task<JsonObject?> SetUsesAsync(IEnumerable<string> uses) =>
         await SendAsync(HttpMethod.Post, "/uses", new JsonObject { ["uses"] = new JsonArray([.. uses.Select(u => (JsonNode?)u)]) }) as JsonObject;

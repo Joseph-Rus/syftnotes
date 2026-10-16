@@ -7,8 +7,12 @@ namespace StudyStash.App.ViewModels;
 
 /// <summary>One event in Coming up: when, what, where, and the class it's for with that class's dot. In the library
 /// window's sidebar it's a button that records it, with a short line for when ("In 11 minutes", "Tomorrow 8:45 AM").</summary>
-public sealed record ComingUpRow(string Id, string When, string Title, string? Location, string? ClassName, IBrush Dot, bool Now, string Short = "", bool Soon = false)
+public sealed record ComingUpRow(string Id, string When, string Title, string? Location, string? ClassName, IBrush Dot, bool Now, string Short = "", bool Soon = false,
+    string? Suggested = null)
 {
+    /// <summary>No class matched, but one looks right: "File every one in Machine Learning", to confirm.</summary>
+    public bool HasSuggestion => ClassName is null && Suggested is not null;
+    public string SuggestText => $"File every “{Title}” in {Suggested}";
     public bool HasClass => ClassName is not null;
     public bool HasLocation => !string.IsNullOrEmpty(Location);
     /// <summary>"CS 101 · Engineering Hall 204", or whichever of the two there is.</summary>
@@ -41,6 +45,9 @@ public sealed partial class ComingUpModel : ObservableObject
     /// <summary>Starts recording an event (its id) into its folder.</summary>
     public Action<string>? OnRecord { get; set; }
     [CommunityToolkit.Mvvm.Input.RelayCommand] void Record(ComingUpRow row) => OnRecord?.Invoke(row.Id);
+    /// <summary>Files every event with this one's title in the class suggested for it.</summary>
+    public Action<ComingUpRow>? OnFile { get; set; }
+    [CommunityToolkit.Mvvm.Input.RelayCommand] void File(ComingUpRow row) => OnFile?.Invoke(row);
 
     public bool HasRows => Rows.Count > 0;
     public bool IsEmpty => HasCalendars && Rows.Count == 0;
@@ -62,6 +69,8 @@ public sealed partial class ComingUpModel : ObservableObject
         [.. Upcoming.Coming(events, now, zone, count).Select(e =>
         {
             string? cls = EventClass.For(e.Title, classes);
+            string? suggested = cls is null ? EventClass.Suggest(e.Title, classes) : null;
+            if (suggested is not null && dot(suggested) is null) suggested = null;
             var brush = cls is null ? null : dot(cls);
             if (brush is null) cls = null;
             var at = TimeZoneInfo.ConvertTime(e.Start, zone);
@@ -70,7 +79,7 @@ public sealed partial class ComingUpModel : ObservableObject
             string time = at.ToString("h:mm tt", System.Globalization.CultureInfo.InvariantCulture);
             string brief = on ? "Now" : soon ? minutes == 1 ? "In a minute" : $"In {minutes} minutes"
                 : $"{(at.Date == TimeZoneInfo.ConvertTime(now, zone).Date ? "Today" : "Tomorrow")} {time}";
-            return new ComingUpRow(e.Id, CalendarWords.When(e, now, zone), e.Title, e.Location, cls, brush ?? Brushes.Gray, on, brief, soon || on);
+            return new ComingUpRow(e.Id, CalendarWords.When(e, now, zone), e.Title, e.Location, cls, brush ?? Brushes.Gray, on, brief, soon || on, suggested);
         })];
 
     /// <summary>Show these rows, changing the list only when they changed (so the dropdown doesn't flicker).</summary>
@@ -78,7 +87,8 @@ public sealed partial class ComingUpModel : ObservableObject
     {
         HasCalendars = hasCalendars;
         if (Rows.Count == rows.Count && Rows.Zip(rows).All(p => p.First.Id == p.Second.Id && p.First.When == p.Second.When && p.First.Title == p.Second.Title
-            && p.First.ClassName == p.Second.ClassName && p.First.Location == p.Second.Location && p.First.Short == p.Second.Short)) return;
+            && p.First.ClassName == p.Second.ClassName && p.First.Location == p.Second.Location && p.First.Short == p.Second.Short
+            && p.First.Suggested == p.Second.Suggested)) return;
         Rows.Clear();
         foreach (var r in rows) Rows.Add(r);
         Next.Clear();

@@ -7,12 +7,27 @@
              xmlns:vm="using:StudyStash.App.ViewModels"
              x:Class="StudyStash.App.Views.MacComingUp"
              x:DataType="vm:ComingUpModel">
+  <UserControl.Styles>
+    <!-- "File every … in Machine Learning": a line of accent text under the event, not a second row. -->
+    <Style Selector="Button.suggest">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.suggest:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="TextBlock.TextDecorations" Value="Underline" />
+    </Style>
+  </UserControl.Styles>
+
   <StackPanel IsVisible="{Binding HasCalendars}">
     <TextBlock Text="{Binding Heading}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource Fg2}" Margin="8,2,8,0" />
     <TextBlock IsVisible="{Binding IsEmpty}" Text="{Binding EmptyText}" FontSize="12" Foreground="{DynamicResource Fg3}" Margin="8,4,8,2" />
     <ItemsControl ItemsSource="{Binding Rows}" Margin="0,3,0,0">
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:ComingUpRow">
+          <StackPanel>
           <Button Classes="row" AutomationProperties.Name="{Binding Said}"
                   Command="{Binding $parent[UserControl].((vm:ComingUpModel)DataContext).RecordCommand}" CommandParameter="{Binding}">
             <Grid ColumnDefinitions="7,8,*,8,Auto">
@@ -24,6 +39,10 @@
               <TextBlock Grid.Column="4" Classes="num" Text="{Binding When}" FontSize="11" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
             </Grid>
           </Button>
+          <Button Classes="suggest" IsVisible="{Binding HasSuggestion}" Margin="23,0,8,4" HorizontalAlignment="Left" FontSize="11"
+                  Command="{Binding $parent[UserControl].((vm:ComingUpModel)DataContext).FileCommand}" CommandParameter="{Binding}"
+                  Content="{Binding SuggestText}" ToolTip.Tip="From now on, every event called this goes in that class, and what's recorded in it." />
+          </StackPanel>
         </DataTemplate>
       </ItemsControl.ItemTemplate>
     </ItemsControl>
