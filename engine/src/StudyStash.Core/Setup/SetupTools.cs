@@ -164,8 +164,9 @@ public sealed class SetupTools(ISetupDriver driver)
             ([Description("The choice to start on: one_computer, laptop or library. Leave out for one_computer.")] string? suggested = null) =>
                 OfferComputerAsync(suggested),
             Named("offer_computer_setup", "Offer: how you'll use it",
-                "Shows the card where the student picks how they'll use Study Stash: just this computer, a laptop (library elsewhere), or the "
-                + "library (a computer that stays on). They press Set up; just this computer also makes the library here.")),
+                "Shows the card where the student picks how they'll use Study Stash: just this computer (shown first, recommended), or under "
+                + "Advanced a laptop (library elsewhere) or the library (a computer that stays on); a suggested laptop or library opens "
+                + "Advanced. They press Set up; just this computer also makes the library here.")),
         McpServerTool.Create(() => OfferAsync("library_password"), Named("offer_library_password", "Offer: library password",
             "A library: shows the card where the student names the library and gives it a password, then creates it. The password never "
             + "reaches you.")),

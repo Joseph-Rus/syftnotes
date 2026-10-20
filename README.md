@@ -208,14 +208,15 @@ shows how far along it is, with nothing to do in a browser or a terminal. You ca
 while it downloads. **Set up by hand** is on every screen too, and
 **Settings → General → Run setup** runs either again.
 
-Setup by hand asks how you'll use it:
+Setup by hand starts on **Just this Mac** (or **Just this PC**), which is what most students want:
+check the microphone, download the transcription model, choose who writes the notes, Canvas, your
+classes, and starting at login (recommended, so your library runs whenever you're logged in).
 
-- **Just this computer:** check the microphone, download the transcription model, choose who
-  writes the notes, Canvas, your classes, and starting at login (recommended, so your library runs
-  whenever you're logged in).
-- **This is my library:** a password for your library, who writes the notes, Canvas, your classes, and
+Under **Advanced**, for a laptop you take to class and a computer at home that stays on:
+
+- **My computer at home:** a password for your library, who writes the notes, Canvas, your classes, and
   starting at login. It ends by showing the address and password to connect a laptop.
-- **This is my laptop:** find your library (or type its address and password), check the microphone,
+- **My laptop for class:** find your library (or type its address and password), check the microphone,
   download the transcription model, Canvas, and your classes.
 
 Changed your mind, or your plans changed? Switch any time in **Settings → Connection → This

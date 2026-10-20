@@ -56,7 +56,7 @@ public static class SetupChecklist
             new("ai", $"{AgentCli.Get(f.Ai).Brand} is ready", f.AiReady ? ChecklistState.Done : ChecklistState.Todo),
         };
 
-        string title = !chosen ? "How you'll use it" : m.IsLaptop ? "This is my laptop" : m.IsLibrary ? "This is my library" : $"Just this {device}";
+        string title = !chosen ? "Where lectures are kept" : m.IsLaptop ? SetupModel.LaptopTitle : m.IsLibrary ? SetupModel.LibraryTitle : $"Just this {device}";
         bool computerDone = chosen && (m.IsLibrary || m.LibraryOk);
         string computerDetail = !chosen ? "" : m.IsLaptop
             ? m.LibraryOk ? (m.LibraryResult ?? "").TrimEnd('.') : m.Connecting ? "Connecting…" : "Not connected yet"
