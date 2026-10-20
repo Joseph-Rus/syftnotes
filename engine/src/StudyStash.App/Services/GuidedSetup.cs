@@ -341,14 +341,14 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
         g.RoleChosen = true;
         if (m.IsLaptop)
         {
-            Fold(card, "This is my laptop");
-            g.Note("This is your laptop", "The student chose: this is their laptop, and their library is on another computer. Next, connect to it (offer_library_connection).");
+            Fold(card, SetupModel.LaptopTitle);
+            g.Note("Your laptop for class", "The student chose: this is their laptop, and their library is on another computer. Next, connect to it (offer_library_connection).");
             return;
         }
         if (m.IsLibrary)
         {
-            Fold(card, "This is my library");
-            g.Note("This is your library", "The student chose: this computer is their library. Next, its name and password (offer_library_password).");
+            Fold(card, SetupModel.LibraryTitle);
+            g.Note("Your computer at home", "The student chose: this computer is their library. Next, its name and password (offer_library_password).");
             return;
         }
         if (!m.LibraryOk) await Busy(card, () => m.ConnectCommand.ExecuteAsync(null));

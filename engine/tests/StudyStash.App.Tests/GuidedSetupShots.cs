@@ -147,7 +147,7 @@ public sealed class GuidedSetupShots
         g.AiReady = true;
         g.Screen = GuidedScreen.Chat;
         string device = skin == SkinKind.Mac ? "Mac" : "PC";
-        var hi = new AiEntry("Claude") { Text = $"Hi! This takes about 5 minutes. Will you use Study Stash on just this {device}, or record on a laptop and keep your library on another computer?" };
+        var hi = new AiEntry("Claude") { Text = $"Hi! This takes about 5 minutes. First, where your lectures are kept: most people keep everything on this {device}." };
         hi.Chip("Checked your setup");
         g.Thread.Add(hi);
         if (chosen && role == AppRole.Both)
@@ -160,8 +160,8 @@ public sealed class GuidedSetupShots
         }
         else if (chosen)
         {
-            g.Thread.Add(new StudentEntry(role == AppRole.Library ? "This is my library" : "This is my laptop"));
-            g.Thread.Add(new NoteEntry(role == AppRole.Library ? "This is your library" : "This is your laptop", true));
+            g.Thread.Add(new StudentEntry(role == AppRole.Library ? "This is my computer at home" : "This is my laptop for class"));
+            g.Thread.Add(new NoteEntry(role == AppRole.Library ? "Your computer at home" : "Your laptop for class", true));
             g.RoleChosen = true;
             if (role == AppRole.Laptop) g.Setup.Address = "mac-mini:8787";
         }

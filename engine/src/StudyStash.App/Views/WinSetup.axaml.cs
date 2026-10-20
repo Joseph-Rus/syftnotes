@@ -18,7 +18,7 @@ public partial class WinSetup : UserControl
             Fit(m);
             m.PropertyChanged += (_, e) =>
             {
-                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses) or nameof(SetupModel.AiHelpOpen) or nameof(SetupModel.ShowWelcomeStatus)) Fit(m);
+                if (e.PropertyName is nameof(SetupModel.Step) or nameof(SetupModel.HasCourses) or nameof(SetupModel.AiHelpOpen) or nameof(SetupModel.ShowWelcomeStatus) or nameof(SetupModel.OtherComputersOpen)) Fit(m);
             };
         };
     }
@@ -27,7 +27,7 @@ public partial class WinSetup : UserControl
     void Fit(SetupModel m)
     {
         Width = m.Wide ? 900 : 760;
-        Height = m.OnCanvas ? 760 : m.OnAi ? (m.AiHelpOpen ? 880 : 760) : m.OnClasses && m.HasCourses ? 620 : m.OnWelcome && m.ShowWelcomeStatus ? 600 : 560;
+        Height = m.OnCanvas ? 760 : m.OnAi ? (m.AiHelpOpen ? 880 : 760) : m.OnClasses && m.HasCourses ? 620 : m.OnWelcome ? (m.OtherComputersOpen ? 700 : 560) + (m.ShowWelcomeStatus ? 40 : 0) : 560;
     }
 
     /// <summary>A real window has the system's caption buttons in its title bar, and its corners, edge and shadow;

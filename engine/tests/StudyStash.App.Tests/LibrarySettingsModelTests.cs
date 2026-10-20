@@ -102,7 +102,7 @@ public class LibrarySettingsModelTests
         Assert.True(lib.ShowReach);
         Assert.NotEmpty(lib.Addresses);
         Assert.Equal("Laptops can connect", lib.LaptopsTitle);
-        Assert.Contains("This is my laptop", lib.LaptopSay, StringComparison.Ordinal);
+        Assert.Contains("My laptop for class", lib.LaptopSay, StringComparison.Ordinal);
 
         await lib.TurnOffLaptopsCommand.ExecuteAsync(null);
         Assert.Equal((false, (string?)null), calls[1]);

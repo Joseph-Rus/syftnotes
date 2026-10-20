@@ -371,7 +371,7 @@
                               <StackPanel Spacing="12">
                                 <TextBlock Classes="card-title" Text="{Binding Title}" />
 
-                                <!-- How you'll use it -->
+                                <!-- Where lectures are kept: just this computer, and under Advanced a laptop or a computer at home -->
                                 <StackPanel Spacing="6" IsVisible="{Binding IsComputer}">
                                   <Button AutomationProperties.Name="{Binding JustThis}" Classes="choice row" Classes.on="{Binding ChoseOne}" Command="{Binding ChooseCommand}" CommandParameter="one">
                                     <Grid ColumnDefinitions="Auto,12,*">
@@ -382,18 +382,30 @@
                                       </StackPanel>
                                     </Grid>
                                   </Button>
-                                  <Button AutomationProperties.Name="This is my laptop" Classes="choice row" Classes.on="{Binding ChoseLaptop}" Command="{Binding ChooseCommand}" CommandParameter="laptop">
-                                    <Grid ColumnDefinitions="Auto,12,*">
-                                      <Border Classes="radio" Classes.on="{Binding ChoseLaptop}"><Ellipse /></Border>
-                                      <TextBlock Grid.Column="2" Classes="choice-title"><Run Text="This is my laptop" /><Run Text="  (library elsewhere)" FontWeight="Normal" Foreground="{DynamicResource InkMuted}" /></TextBlock>
-                                    </Grid>
+                                  <!-- Advanced: a laptop for class and a computer at home, folded away (most students have one computer) -->
+                                  <Button Classes="text-link small" Margin="0,4,0,0" Command="{Binding ToggleOtherCommand}"
+                                          AutomationProperties.Name="{x:Static vm:SetupModel.OtherComputersLabel}">
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                      <c:Icon Glyph="chevron_right" Size="16" IsVisible="{Binding !OtherOpen}" />
+                                      <c:Icon Glyph="expand_more" Size="16" IsVisible="{Binding OtherOpen}" />
+                                      <TextBlock Text="{x:Static vm:SetupModel.OtherComputersLabel}" VerticalAlignment="Center" />
+                                    </StackPanel>
                                   </Button>
-                                  <Button AutomationProperties.Name="This is my library" Classes="choice row" Classes.on="{Binding ChoseLibrary}" Command="{Binding ChooseCommand}" CommandParameter="library">
-                                    <Grid ColumnDefinitions="Auto,12,*">
-                                      <Border Classes="radio" Classes.on="{Binding ChoseLibrary}"><Ellipse /></Border>
-                                      <TextBlock Grid.Column="2" Classes="choice-title"><Run Text="This is my library" /><Run Text="  (a computer that stays on)" FontWeight="Normal" Foreground="{DynamicResource InkMuted}" /></TextBlock>
-                                    </Grid>
-                                  </Button>
+                                  <StackPanel Spacing="6" IsVisible="{Binding OtherOpen}">
+                                    <TextBlock Classes="hint" Text="{x:Static vm:SetupModel.OtherComputersAbout}" />
+                                    <Button AutomationProperties.Name="{x:Static vm:SetupModel.LaptopTitle}" AutomationProperties.HelpText="{x:Static vm:SetupModel.LaptopAbout}" Classes="choice row" Classes.on="{Binding ChoseLaptop}" Command="{Binding ChooseCommand}" CommandParameter="laptop">
+                                      <Grid ColumnDefinitions="Auto,12,*">
+                                        <Border Classes="radio" Classes.on="{Binding ChoseLaptop}"><Ellipse /></Border>
+                                        <TextBlock Grid.Column="2" Classes="choice-title"><Run Text="{x:Static vm:SetupModel.LaptopTitle}" /><Run Text="  (lectures kept on your computer at home)" FontWeight="Normal" Foreground="{DynamicResource InkMuted}" /></TextBlock>
+                                      </Grid>
+                                    </Button>
+                                    <Button AutomationProperties.Name="{x:Static vm:SetupModel.LibraryTitle}" AutomationProperties.HelpText="{Binding Setup.LibraryAbout}" Classes="choice row" Classes.on="{Binding ChoseLibrary}" Command="{Binding ChooseCommand}" CommandParameter="library">
+                                      <Grid ColumnDefinitions="Auto,12,*">
+                                        <Border Classes="radio" Classes.on="{Binding ChoseLibrary}"><Ellipse /></Border>
+                                        <TextBlock Grid.Column="2" Classes="choice-title"><Run Text="{x:Static vm:SetupModel.LibraryTitle}" /><Run Text="  (stays on and keeps them)" FontWeight="Normal" Foreground="{DynamicResource InkMuted}" /></TextBlock>
+                                      </Grid>
+                                    </Button>
+                                  </StackPanel>
                                   <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,6,0,0">
                                     <c:Spinner IsVisible="{Binding Busy}" Width="14" Height="14" Foreground="{DynamicResource InkMuted}" VerticalAlignment="Center" />
                                     <Button Classes="btn sm ink" Command="{Binding PressCommand}" CommandParameter="setup" IsEnabled="{Binding !Busy}" Content="Set up" />

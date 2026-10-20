@@ -167,7 +167,7 @@ public sealed partial class SetupModel : ObservableObject
     /// <summary>The library lives on this computer (made here in setup): just this computer, or a library.</summary>
     public bool LibraryIsHere => Role != AppRole.Laptop;
     public string HeaderTitle => IsLibrary ? "Set up your library" : $"Set up Study Stash on this {DeviceWord}";
-    public string FlowName => Role switch { AppRole.Library => "Library setup", AppRole.Laptop => "Laptop setup", _ => "One-computer setup" };
+    public string FlowName => Role switch { AppRole.Library => "Computer at home", AppRole.Laptop => "Laptop for class", _ => "Setup" };
     public string FlowIcon => Role switch { AppRole.Library => "dns", AppRole.Laptop => "laptop_mac", _ => "desktop_windows" };
     /// <summary>Setup run again from Settings, on a computer that's already set up: it walks the same steps with
     /// what's there filled in, and stays what it is (a library, a laptop or just this computer). Changing that moves
@@ -176,15 +176,20 @@ public sealed partial class SetupModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(WelcomeTitle), nameof(WelcomeBody), nameof(IntroTitle), nameof(CanChooseOneComputer), nameof(CanChooseLaptop), nameof(CanChooseLibrary))]
     public partial bool Again { get; set; }
 
-    /// <summary>Run again: no How it works page, and it opens on Your computers.</summary>
+    /// <summary>Run again: no How it works page, and it opens on This Mac (or This PC).</summary>
     partial void OnAgainChanged(bool value)
     {
         if (Steps.Count > 0) SetRole(Role);
     }
-    public string WelcomeTitle => Again ? "Set up Study Stash again" : "Where will Study Stash run?";
+    public string WelcomeTitle => Again ? "Set up Study Stash again" : "Where your lectures are kept";
     public string WelcomeBody => Again
         ? "Go through the steps again; what's already set up stays as it is. To change what this computer is for, use Settings → Advanced → Connection."
-        : "Most people use just this computer. You can add a laptop, or your phone, any time.";
+        : $"Most people keep everything on this {DeviceWord}: it records your lectures, writes the notes and keeps them here. Your phone can join any time.";
+
+    /// <summary>The welcome's Advanced, a laptop for class and a computer at home, is open. Folded away at first, so
+    /// a student with one computer isn't asked about two; open from the start when this computer is already one of
+    /// them (the library download, or setup run again on a laptop or a library).</summary>
+    [ObservableProperty] public partial bool OtherComputersOpen { get; set; }
 
     /// <summary>The first page: what happens to a lecture, from Record to notes on every device.</summary>
     public string IntroTitle => Again ? "Set up Study Stash again" : "Welcome to Study Stash";
@@ -208,12 +213,17 @@ public sealed partial class SetupModel : ObservableObject
     public bool CanChooseOneComputer => !Again || IsOneComputer;
     public bool CanChooseLaptop => !Again || IsLaptop;
     public bool CanChooseLibrary => !Again || IsLibrary;
-    // The welcome's three choices, in the student's words.
-    public string OneComputerAbout => $"Records, transcribes and writes your notes, all on this {DeviceWord}. No other computer needed; notes are written while it's on.";
-    public static string LaptopAbout => "Records lectures and sends them to your library on another computer.";
+    // The welcome's three choices, in the student's words: just this computer, then under Advanced the two that go
+    // together, a laptop for class and a computer at home.
+    public string OneComputerTitle => $"Just this {DeviceWord}";
+    public string OneComputerAbout => $"Records, writes your notes and keeps them all on this {DeviceWord}. No other computer needed.";
+    public const string LaptopTitle = "My laptop for class", LibraryTitle = "My computer at home";
+    public const string OtherComputersLabel = "Advanced: a laptop and a computer at home";
+    public static string LaptopAbout => "Records your lectures and sends them to your computer at home, which keeps them and writes the notes. Set that one up first.";
     public string LibraryAbout => skin == SkinKind.Mac
-        ? "A computer that stays on, like a Mac mini. It keeps your lectures and writes the notes."
-        : "A computer that stays on at home. It keeps your lectures and writes the notes.";
+        ? "Stays on, like a Mac mini, and becomes your library: it keeps every lecture and writes the notes for your laptop."
+        : "Stays on at home and becomes your library: it keeps every lecture and writes the notes for your laptop.";
+    public const string OtherComputersAbout = "Only if you record on a laptop and keep your lectures on a computer at home that stays on. Most people don't need this.";
 
     // Microphone
     [ObservableProperty] public partial bool MicAllowed { get; set; }
@@ -454,8 +464,8 @@ public sealed partial class SetupModel : ObservableObject
         return m;
     }
 
-    /// <summary>The welcome's choice to start on: the installer's library download starts on "This is my library";
-    /// the laptop download, or a build that doesn't say, on "Just this computer" (the one most students want).</summary>
+    /// <summary>The welcome's choice to start on: the installer's library download starts on "My computer at home";
+    /// the laptop download, or a build that doesn't say, on "Just this Mac" (the one most students want).</summary>
     public static AppRole Suggested(AppRole? installer) => installer == AppRole.Library ? AppRole.Library : AppRole.Both;
 
     /// <summary>The steps of each flow, in order. Windows adds the taskbar where Study Stash records.</summary>
@@ -485,7 +495,7 @@ public sealed partial class SetupModel : ObservableObject
     string TitleOf(SetupStep step) => step switch
     {
         SetupStep.Intro => "Welcome",
-        SetupStep.Welcome => "Your computers",
+        SetupStep.Welcome => $"This {DeviceWord}",
         SetupStep.Password => "Password",
         SetupStep.Library => "Your library",
         SetupStep.Ai => IsLibrary ? "Your AI" : "Notes",
@@ -508,6 +518,7 @@ public sealed partial class SetupModel : ObservableObject
         WatchUses();
         bool otherFlow = role != Role;
         Role = role;
+        if (role != AppRole.Both) OtherComputersOpen = true;
         if (otherFlow && Steps.Count > 0)
         {
             LibraryOk = false;
@@ -766,6 +777,8 @@ public sealed partial class SetupModel : ObservableObject
     [RelayCommand] void ToggleShowPassword() => ShowPassword = !ShowPassword;
     [RelayCommand] void Copy(string? text) => OnCopy?.Invoke(text ?? "");
     [RelayCommand] void CopyPassword() => OnCopy?.Invoke(Password);
+
+    [RelayCommand] void ToggleOtherComputers() => OtherComputersOpen = !OtherComputersOpen;
 
     /// <summary>The welcome's three choices; picking one shows its steps in the sidebar, keeping what's been typed.</summary>
     [RelayCommand]

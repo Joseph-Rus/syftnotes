@@ -729,7 +729,7 @@ public class SurfaceShots
             model.Lib.LaptopPassword = "correct-horse";
         }
         if (section == "One-computer-on")
-            model.Lib.LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, choose “This is my laptop”, and enter one of the addresses below and this password.";
+            model.Lib.LaptopSay = "Laptops can connect now. On your laptop, install Study Stash, and in its setup open Advanced and choose “My laptop for class”. Then enter one of the addresses below and this password.";
         return (model, host, home);
     }
 

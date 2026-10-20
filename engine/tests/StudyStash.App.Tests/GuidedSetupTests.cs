@@ -419,7 +419,7 @@ public sealed class GuidedSetupTests
         var f = new ChecklistFacts { AiReady = true };
         var items = Items(m, f);
         Assert.Equal(["ai", "computer", "microphone", "model", "notes", "classes", "canvas", "start_at_login"], items.Select(i => i.Id));
-        Assert.Equal("How you'll use it", Of(items, "computer").Title);
+        Assert.Equal("Where lectures are kept", Of(items, "computer").Title);
         Assert.False(SetupChecklist.ReadyToFinish(items));
 
         m.LibraryOk = true;
@@ -452,7 +452,7 @@ public sealed class GuidedSetupTests
         var items = Items(laptop, f);
         Assert.Equal(["ai", "computer", "microphone", "model", "classes", "canvas", "taskbar"], items.Select(i => i.Id));
         Assert.Equal("ChatGPT is ready", Of(items, "ai").Title);
-        Assert.Equal(("This is my laptop", "Not connected yet"), (Of(items, "computer").Title, Of(items, "computer").Detail));
+        Assert.Equal(("My laptop for class", "Not connected yet"), (Of(items, "computer").Title, Of(items, "computer").Detail));
         Assert.True(Of(items, "taskbar").Optional);
 
         var library = SetupModel.For(SkinKind.Mac, AppRole.Library);

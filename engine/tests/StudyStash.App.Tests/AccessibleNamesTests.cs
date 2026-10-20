@@ -115,8 +115,12 @@ public class AccessibleNamesTests
             }
             m.Go(SetupStep.Welcome);
             Dispatcher.UIThread.RunJobs();
-            var welcome = Shown<Button>(view).Where(b => b.Classes.Contains("choice")).Select(Said).ToList();
-            Assert.Equal(["Just this computer", "This is my laptop", "This is my library"], welcome);
+            // A laptop for class and a computer at home are folded away under Advanced until it's opened.
+            List<string> Welcome() => Shown<Button>(view).Where(b => b.Classes.Contains("choice")).Select(Said).ToList();
+            Assert.Equal([m.OneComputerTitle], Welcome());
+            m.ToggleOtherComputersCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal([m.OneComputerTitle, "My laptop for class", "My computer at home"], Welcome());
             window.Close();
         }
         finally
