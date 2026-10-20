@@ -28,7 +28,8 @@ namespace StudyStash.App.Controls;
 /// Display 20), reading text (New York 16/1.6 on a Mac, Segoe UI 15/1.6 on Windows), bullets and numbered questions
 /// with their markers in the tertiary color, and the Definitions section as two columns with a rule above each term.
 /// Diagrams are drawn (a ```mermaid flowchart, a ```svg drawing), in a bullet too; one that can't be drawn shows its
-/// source calmly instead.
+/// source calmly instead. On screen its text can be selected with a drag from paragraph to paragraph and copied
+/// (NoteSelection.cs).
 /// </summary>
 public sealed partial class NoteView : StackPanel
 {
@@ -244,10 +245,14 @@ public sealed partial class NoteView : StackPanel
 
     readonly Seen seen;
 
-    public NoteView() => seen = new Seen(this, inView =>
+    public NoteView()
     {
-        if (inView && unbuilt) BuildWhenSeen();
-    });
+        seen = new Seen(this, inView =>
+        {
+            if (inView && unbuilt) BuildWhenSeen();
+        });
+        SetUpSelecting();
+    }
 
     /// <summary>Whether the notes are waiting to be built (the view is hidden and they changed since it was).</summary>
     internal bool Unbuilt => unbuilt;
@@ -262,23 +267,44 @@ public sealed partial class NoteView : StackPanel
     /// design's reading size in a lecture's notes.</summary>
     double EffectiveBodySize => Compact ? BodySize : DefaultBodySize;
 
-    TextBlock Text(string resourceFont, double size, double lineHeight)
+    /// <summary>A new piece of the notes' text: on screen, one the selection runs through (<see cref="NoteText"/>), the
+    /// first in a list item copied after its bullet; on paper, or for a bullet's own dot, plain.</summary>
+    TextBlock Piece(bool selectable = true)
     {
-        var t = new SpokenText { FontSize = size, LineHeight = size * lineHeight, TextWrapping = TextWrapping.Wrap };
+        if (Print || !selectable) return new SpokenText();
+        var t = new NoteText { CopyLead = lead };
+        lead = null;
+        t.Bind(SelectableTextBlock.SelectionBrushProperty, t.GetResourceObservable("Hl"));
+        return t;
+    }
+
+    /// <summary>What the next piece of text is copied with in front: the bullet or number of the list item it starts.</summary>
+    string? lead;
+
+    /// <summary>How many lists the one being built is inside (a bullet's copied indent).</summary>
+    int listDepth;
+
+    TextBlock Text(string resourceFont, double size, double lineHeight, bool selectable = true)
+    {
+        var t = Piece(selectable);
+        t.FontSize = size;
+        t.LineHeight = size * lineHeight;
+        t.TextWrapping = TextWrapping.Wrap;
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(resourceFont));
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable(TextInk));
         FollowLinks(t);
         return t;
     }
 
-    /// <summary>A compact answer's paragraph text: the caller's own font, size and line height, selectable (an answer
-    /// can be copied a sentence at a time, not just as a whole).</summary>
-    TextBlock CompactText()
+    /// <summary>A compact answer's paragraph text: the caller's own font, size and line height.</summary>
+    TextBlock CompactText(bool selectable = true)
     {
-        var t = new SpokenSelectableText { FontSize = BodySize, LineHeight = BodyLineHeight, TextWrapping = TextWrapping.Wrap };
+        var t = Piece(selectable);
+        t.FontSize = BodySize;
+        t.LineHeight = BodyLineHeight;
+        t.TextWrapping = TextWrapping.Wrap;
         t.Bind(TextBlock.FontFamilyProperty, t.GetResourceObservable(BodyFont ?? "TextFont"));
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable(TextInk));
-        t.Bind(SelectableTextBlock.SelectionBrushProperty, t.GetResourceObservable("Hl"));
         FollowLinks(t);
         return t;
     }
@@ -292,9 +318,10 @@ public sealed partial class NoteView : StackPanel
         return t;
     }
 
+    /// <summary>A bullet's dot or an item's number: not highlighted with the words beside it (they're copied after it).</summary>
     TextBlock Marker(string text)
     {
-        var t = Compact ? CompactText() : Text(Mac ? "SerifFont" : "TextFont", DefaultBodySize, 1.6);
+        var t = Compact ? CompactText(selectable: false) : Text(Mac ? "SerifFont" : "TextFont", DefaultBodySize, 1.6, selectable: false);
         t.Text = text;
         t.TextWrapping = TextWrapping.NoWrap;
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable("Fg3"));
@@ -313,6 +340,10 @@ public sealed partial class NoteView : StackPanel
 
     void Build()
     {
+        // What was selected may be gone, or somewhere else now.
+        Unselect();
+        lead = null;
+        listDepth = 0;
         Children.Clear();
         Spacing = Compact ? 8 : Mac ? 14 : 12;
         previous = diagrams;
@@ -674,6 +705,7 @@ public sealed partial class NoteView : StackPanel
             name.FontWeight = FontWeight.SemiBold;
             name.Text = Plain(term);
             var meaning = Secondary(14);
+            if (meaning is NoteText copied) copied.CopyJoin = ": ";
             Fill(meaning, p.Inline, skip: term, trimLead: true, fgKey: "Fg2");
             Grid.SetColumn(meaning, 2);
             row.Children.Add(name);
@@ -687,17 +719,22 @@ public sealed partial class NoteView : StackPanel
     {
         var items = new StackPanel { Spacing = 6 };
         int n = int.TryParse(list.OrderedStart, out int start) ? start : 1;
+        string indent = new(' ', 2 * listDepth++);
         foreach (var item in list.OfType<ListItemBlock>())
         {
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,12,*") };
-            row.Children.Add(Marker(list.IsOrdered ? $"{n++}" : "•"));
+            string mark = list.IsOrdered ? $"{n++}" : "•";
+            row.Children.Add(Marker(mark));
+            lead = indent + (list.IsOrdered ? $"{mark}. " : "• ");
             var content = new StackPanel { Spacing = 6 };
             foreach (var inner in item)
                 if (BlockControl(inner) is { } c) content.Children.Add(c);
+            lead = null;
             Grid.SetColumn(content, 2);
             row.Children.Add(content);
             items.Children.Add(row);
         }
+        listDepth--;
         return items;
     }
 
@@ -724,6 +761,7 @@ public sealed partial class NoteView : StackPanel
             for (int c = 0; c < row.Count; c++)
             {
                 var cell = Text("TextFont", size, 1.5);
+                if (c > 0 && cell is NoteText copied) copied.CopyJoin = "\t";
                 cell.Margin = new Thickness(0, 0, c < columns - 1 ? 16 : 0, 0);
                 if (row.IsHeader) cell.FontWeight = FontWeight.SemiBold;
                 cell.TextAlignment = c < table.ColumnDefinitions.Count ? table.ColumnDefinitions[c].Alignment switch
@@ -749,7 +787,12 @@ public sealed partial class NoteView : StackPanel
 
     Control Code(string text)
     {
-        var t = new TextBlock { Text = text.TrimEnd(), FontFamily = new FontFamily("SF Mono, Menlo, Cascadia Mono, Consolas, monospace"), FontSize = 13, LineHeight = 19.5, TextWrapping = TextWrapping.Wrap };
+        var t = Piece();
+        t.Text = text.TrimEnd();
+        t.FontFamily = new FontFamily("SF Mono, Menlo, Cascadia Mono, Consolas, monospace");
+        t.FontSize = 13;
+        t.LineHeight = 19.5;
+        t.TextWrapping = TextWrapping.Wrap;
         t.Bind(TextBlock.ForegroundProperty, t.GetResourceObservable(TextInk));
         var box = new Border { Padding = new Thickness(12, 10), CornerRadius = new CornerRadius(Mac ? 8 : 4), Child = t };
         box.Bind(Border.BackgroundProperty, box.GetResourceObservable("Fill2"));
@@ -860,8 +903,13 @@ public sealed partial class NoteView : StackPanel
     void FollowLinks(TextBlock t)
     {
         Point? down = null;
-        t.PointerMoved += (_, e) => t.Cursor = LinkAt(t, e.GetPosition(t)) is null ? null : new Cursor(StandardCursorType.Hand);
-        t.PointerExited += (_, _) => t.Cursor = null;
+        // Off a link, the text's own cursor: the I-beam over text that can be selected.
+        t.PointerMoved += (_, e) =>
+        {
+            if (LinkAt(t, e.GetPosition(t)) is null) t.ClearValue(CursorProperty);
+            else t.Cursor = new Cursor(StandardCursorType.Hand);
+        };
+        t.PointerExited += (_, _) => t.ClearValue(CursorProperty);
         t.AddHandler(PointerPressedEvent, (_, e) => down = e.GetPosition(t), Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, true);
         t.AddHandler(PointerReleasedEvent, (_, e) =>
         {

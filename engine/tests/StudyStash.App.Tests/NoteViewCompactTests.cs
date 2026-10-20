@@ -55,7 +55,7 @@ public class NoteViewCompactTests
     {
         var note = new NoteView { Compact = true, BodySize = 13, BodyLineHeight = 18.85, Markdown = "## From your notes\n\nA short answer." };
         var window = Show(note);
-        var heading = Assert.Single(note.GetLogicalDescendants().OfType<TextBlock>(), t => t is not SelectableTextBlock);
+        var heading = Assert.Single(note.GetLogicalDescendants().OfType<TextBlock>(), t => t.Classes.Contains(NoteView.HeadingClass));
         Assert.Equal(new Thickness(0), heading.Margin);
         window.Close();
     }

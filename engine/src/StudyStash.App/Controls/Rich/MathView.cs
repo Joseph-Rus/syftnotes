@@ -164,6 +164,29 @@ sealed class MathDisplay : Decorator
         Child = scroller;
     }
 
+    /// <summary>The formula as the notes write it: what copying it gives.</summary>
+    public string? Latex => math.Latex;
+
+    /// <summary>What it's drawn on while it's in the notes' selection (the highlighter's colour); null, nothing.</summary>
+    public IBrush? Selected
+    {
+        get => selected;
+        set
+        {
+            if (ReferenceEquals(selected, value)) return;
+            selected = value;
+            InvalidateVisual();
+        }
+    }
+
+    IBrush? selected;
+
+    public override void Render(DrawingContext context)
+    {
+        if (selected is not null) context.FillRectangle(selected, new Rect(Bounds.Size));
+        base.Render(context);
+    }
+
     protected override AvaloniaSize MeasureOverride(AvaloniaSize availableSize)
     {
         math.Scale = 1;
