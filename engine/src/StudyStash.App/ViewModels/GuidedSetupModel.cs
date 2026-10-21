@@ -67,8 +67,10 @@ public interface IGuidedActions
 /// Guided setup (the design's Pick your AI → Install → Sign in → chat): the student picks Claude or ChatGPT, Study
 /// Stash installs its CLI with its maker's installer only when they press Install, they sign in on the provider's own
 /// page, and then their own AI, run headless and locked to Study Stash's setup tools, walks them through the rest in a
-/// chat, with a checklist beside it that only Study Stash ticks. "Set up by hand" (today's setup, over the same
-/// <see cref="SetupModel"/>, so nothing done is lost) is one click away throughout.
+/// chat, with a checklist beside it that only Study Stash ticks. Gemini and "I don't have a paid plan" are answers
+/// too, with no chat (Gemini's command-line tool can't be locked to the setup tools; a small free model can't follow
+/// the brief): they go to setup by hand, whose notes step opens on that AI (<see cref="NotesPick"/>). "Set up by hand"
+/// (today's setup, over the same <see cref="SetupModel"/>, so nothing done is lost) is one click away throughout.
 /// </summary>
 public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 {

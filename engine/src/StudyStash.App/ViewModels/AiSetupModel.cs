@@ -75,10 +75,11 @@ public sealed partial class AiSetupRow : ObservableObject
 }
 
 /// <summary>
-/// Setup's AI step (design 15): "Choose who writes your notes" (a radio list of the engines on this computer, Ollama
-/// recommended, Claude Code and Codex with the steps to install and sign in when they aren't ready, and "No AI for
-/// now" for transcripts alone) and "Who answers your questions" (a select that starts as Same as notes). The step's
-/// body only: the host's sidebar and Back/Continue footer are its own. Continue calls <see cref="SaveAsync"/>.
+/// Setup's AI step (design 15): "Choose who writes your notes" (a radio list: the free AI marked Advanced, Claude and
+/// ChatGPT with one button each to get them ready, Gemini, each of those three able to run on an API key pasted in the
+/// box under the list, and "No AI for now" for transcripts alone) and "Who answers your questions" (a select that
+/// starts as Same as notes). The step's body only: the host's sidebar and Back/Continue footer are its own. Continue
+/// calls <see cref="SaveAsync"/>, which first tries an AI that's only installed.
 /// </summary>
 public sealed partial class AiSetupModel : ObservableObject
 {
