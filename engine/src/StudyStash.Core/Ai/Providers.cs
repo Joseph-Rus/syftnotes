@@ -473,8 +473,9 @@ public class CodexProvider : AiProvider
     /// <summary>The student's own Codex config.toml (where its MCP servers are named).</summary>
     public Func<string> ConfigPath { get; init; } = () => SetupChat.CodexConfig();
 
-    /// <summary>Codex programs whose sign-in turned out to be kept in the student's own config.toml (a plain answer
-    /// without it was turned away as signed out, and with it worked): their plain answers read it from then on.</summary>
+    /// <summary>Codex programs whose plain answers read the student's own config.toml: their sign-in turned out to be
+    /// kept there (turned away as signed out without it, and with it worked), or they're older than
+    /// <c>--ignore-user-config</c> (turned away for the flag itself). Remembered for as long as the library runs.</summary>
     static readonly ConcurrentDictionary<string, bool> KeptConfig = new();
 
     string CodexExe() => (Id == "codex" ? Exe() : null) ?? Which("codex") ?? "codex";
@@ -482,7 +483,18 @@ public class CodexProvider : AiProvider
     /// <summary>A plain answer (notes, Check, Ask: no tools, no files to change) on ChatGPT's own Codex.</summary>
     bool Plain(AiRequest req) => Id == "codex" && !req.Tools && !req.Write;
 
-    public override List<string> Command(AiRequest req, bool stream) => Command(req, stream, readConfig: !Plain(req) || KeptConfig.ContainsKey(CodexExe()));
+    /// <summary>
+    /// Whether a plain answer reads the student's config.toml (with their MCP servers, hooks, notify and apps off): when
+    /// it has to (above), or when they point Codex at a model provider of their own there (its definition is in that
+    /// file, and without it the notes would go to another provider).
+    /// </summary>
+    bool ReadsConfig(AiRequest req) =>
+        !Plain(req) || KeptConfig.ContainsKey(CodexExe()) || SetupChat.CodexTopLevel(ConfigPath()).Provider is { Length: > 0 } p && p != "openai";
+
+    public override List<string> Command(AiRequest req, bool stream) => Command(req, stream, readConfig: ReadsConfig(req));
+
+    /// <summary>The command-line flag an older Codex turns away ("error: unexpected argument '--ignore-user-config'").</summary>
+    static bool RefusedTheFlag(string error) => error.Contains("--ignore-user-config", StringComparison.Ordinal);
 
     /// <summary>
     /// <paramref name="readConfig"/> off (a plain answer): the student's own config.toml is skipped, so nothing of
@@ -510,7 +522,10 @@ public class CodexProvider : AiProvider
         if (req.Tools && req.McpCommand.Count > 0)
             cmd.AddRange(["-c", $"mcp_servers.{McpKey}.command={JsonSerializer.Serialize(req.McpCommand[0])}",
                 "-c", $"mcp_servers.{McpKey}.args={new JsonArray(req.McpCommand.Skip(1).Select(a => (JsonNode)a).ToArray()).ToJsonString()}"]);
-        if (req.Model.Length > 0) cmd.AddRange(["-m", req.Model]);
+        // The model: the one picked in Settings; else, with the student's config.toml skipped, the one they set there
+        // (otherwise the notes would quietly move to Codex's own default).
+        string model = req.Model.Length > 0 ? req.Model : !readConfig && Plain(req) ? SetupChat.CodexTopLevel(ConfigPath()).Model : "";
+        if (model.Length > 0) cmd.AddRange(["-m", model]);
         if (req.Effort.Length > 0 && Id == "codex") cmd.AddRange(["-c", $"model_reasoning_effort=\"{req.Effort}\""]);
         if (req.Session.Length > 0) cmd.AddRange(["resume", req.Session]);
         cmd.Add(PromptOnInput ? "-" : WithSystem(req));
@@ -566,15 +581,22 @@ public class CodexProvider : AiProvider
         return fresh.RunCoreAsync(req, stream, ct);
     }
 
-    /// <summary>A plain answer turned away as signed out without the student's config.toml is asked once more reading
-    /// it (their sign-in may be kept there), its MCP servers off; when that works, it's remembered.</summary>
+    /// <summary>A plain answer turned away without the student's config.toml, as signed out (their sign-in may be kept
+    /// there) or for the flag that skips it (a Codex older than it), is asked once more reading it, its MCP servers
+    /// off; that's remembered (an older Codex at once; a sign-in when it then works).</summary>
     protected virtual async IAsyncEnumerable<AiEvent> RunCoreAsync(AiRequest req, bool stream, [EnumeratorCancellation] CancellationToken ct)
     {
         string exe = CodexExe();
-        bool retry = Plain(req) && ApiKey is null && !KeptConfig.ContainsKey(exe) && Available();
+        bool retry = Plain(req) && ApiKey is null && !ReadsConfig(req) && Available();
         bool signedOut = false;
         await foreach (var e in base.RunAsync(req, stream, ct))
         {
+            if (retry && e.Kind == "error" && RefusedTheFlag(e.Text))
+            {
+                KeptConfig[exe] = true;
+                signedOut = true;
+                break;
+            }
             if (retry && e.Kind == "error" && Engines.LooksSignedOut(e.Text))
             {
                 signedOut = true;

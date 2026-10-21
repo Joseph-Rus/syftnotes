@@ -413,6 +413,19 @@ public class SetupChatTests
     }
 
     [Fact]
+    public async Task An_older_codex_that_doesnt_know_the_flag_is_asked_again_without_it()
+    {
+        using var dir = new TempDir();
+        string exe = FakeAgents.WriteCli(dir["bin"], "codex");
+        File.WriteAllText(Path.Combine(dir["bin"], "refuse"), "--ignore-user-config");
+        FakeAgents.Replay(dir["bin"], ["""{"type":"thread.started","thread_id":"t-2"}""", CodexItem("item.completed", new JsonObject { ["type"] = "agent_message", ["text"] = "ready" }), """{"type":"turn.completed"}"""]);
+        var check = await SetupChat.CheckPlanAsync("codex", exe, null, SetupChat.Folder(dir["home"]), ownMcpServers: ["github"]);
+        Assert.True(check.Ok, check.Said);
+        Assert.True(check.KeptConfig);
+        Assert.Contains("mcp_servers.github.enabled=false", FakeAgents.Argv(dir["bin"], 2));
+    }
+
+    [Fact]
     public void A_codex_configs_own_mcp_servers_are_found_by_name_only()
     {
         using var dir = new TempDir();

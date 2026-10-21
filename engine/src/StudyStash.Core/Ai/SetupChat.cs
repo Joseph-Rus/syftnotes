@@ -292,6 +292,33 @@ public static partial class SetupChat
     [GeneratedRegex(@"^\s*\[\s*mcp_servers\s*\.\s*([A-Za-z0-9_-]+)\s*[\].]|^\s*mcp_servers\s*\.\s*([A-Za-z0-9_-]+)\s*\.", RegexOptions.Multiline)]
     private static partial Regex McpServerName();
 
+    [GeneratedRegex(@"^\s*(model|model_provider)\s*=\s*(?:""([^""\r\n]*)""|'([^'\r\n]*)')", RegexOptions.Multiline)]
+    private static partial Regex TopLevelModel();
+
+    /// <summary>The model and model provider a Codex config.toml sets at its top (before its first table), "" for
+    /// either it doesn't set. Only those two values are kept.</summary>
+    public static (string Model, string Provider) CodexTopLevel(string configPath)
+    {
+        string text;
+        try
+        {
+            text = File.Exists(configPath) ? File.ReadAllText(configPath) : "";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return ("", "");
+        }
+        int table = Regex.Match(text, @"^\s*\[", RegexOptions.Multiline) is { Success: true } t ? t.Index : text.Length;
+        string model = "", provider = "";
+        foreach (Match m in TopLevelModel().Matches(text[..table]))
+        {
+            string value = m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value;
+            if (m.Groups[1].Value == "model") model = value;
+            else provider = value;
+        }
+        return (model.Trim(), provider.Trim());
+    }
+
     /// <summary>The names of the MCP servers a Codex config.toml sets up (its <c>[mcp_servers.NAME]</c> tables and
     /// <c>mcp_servers.NAME.…</c> keys): names only, nothing else in it is kept. None when it can't be read.</summary>
     public static IReadOnlyList<string> CodexServers(string configPath)
@@ -455,7 +482,8 @@ public static partial class SetupChat
             Prompt = "Reply with the single word: ready", Timeout = timeout ?? TimeSpan.FromSeconds(60),
         };
         var check = await OnceAsync(turn, ct);
-        if (provider == "codex" && check.Problem == ChatProblem.Auth && !ct.IsCancellationRequested)
+        // (An older Codex that doesn't know --ignore-user-config turns the flag itself away: asked again without it too.)
+        if (provider == "codex" && (check.Problem == ChatProblem.Auth || check.Said.Contains("--ignore-user-config", StringComparison.Ordinal)) && !ct.IsCancellationRequested)
             check = await OnceAsync(turn with { IgnoreUserConfig = false, OwnMcpServers = ownMcpServers }, ct) is { Problem: not ChatProblem.Auth } again ? again with { KeptConfig = true } : check;
         return check;
     }

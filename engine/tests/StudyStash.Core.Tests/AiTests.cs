@@ -141,6 +141,42 @@ public class AiTests
         Assert.Contains("mcp_servers.study-stash.enabled=false", FakeAgents.Argv(dir["codex"], 3));
     }
 
+    /// <summary>A Codex older than --ignore-user-config turns the flag itself away: the answer is asked again without
+    /// it (the student's MCP servers named off), and that's remembered. With the config skipped, the model the student
+    /// set there is still the one used; a model provider of their own keeps their config read.</summary>
+    [Fact]
+    public async Task An_older_codex_answers_without_the_flag_and_the_students_own_model_stays()
+    {
+        using var dir = new TempDir();
+        string[] works = ["""{"type":"thread.started","thread_id":"t"}""", """{"type":"item.completed","item":{"type":"agent_message","text":"ready"}}""", """{"type":"turn.completed"}"""];
+        string old = FakeAgents.WriteCli(dir["old"], "codex");
+        File.WriteAllText(Path.Combine(dir["old"], "refuse"), "--ignore-user-config");
+        FakeAgents.Replay(dir["old"], works);
+        File.WriteAllText(dir["old.toml"], "[mcp_servers.github]\ncommand = \"gh-mcp\"\n");
+        var codex = new CodexProvider { At = old, ConfigPath = () => dir["old.toml"] };
+        var first = await codex.CompleteAsync(new AiRequest("hi", dir.Path));
+        Assert.True(first.Ok, first.Text);
+        Assert.Contains("--ignore-user-config", FakeAgents.Argv(dir["old"], 1));
+        Assert.DoesNotContain("--ignore-user-config", FakeAgents.Argv(dir["old"], 2));
+        Assert.Contains("mcp_servers.github.enabled=false", FakeAgents.Argv(dir["old"], 2));
+        Assert.True((await codex.CompleteAsync(new AiRequest("again", dir.Path))).Ok);
+        Assert.Equal(3, FakeAgents.Turns(dir["old"])); // straight to it the next time
+
+        string now = FakeAgents.WriteCli(dir["now"], "codex");
+        FakeAgents.Replay(dir["now"], works);
+        File.WriteAllText(dir["model.toml"], "model = \"gpt-5.5\"\n\n[mcp_servers.github]\ncommand = \"gh-mcp\"\nmodel = \"not-this\"\n");
+        var cmd = new CodexProvider { At = now, ConfigPath = () => dir["model.toml"], PromptOnInput = true }.Command(new AiRequest("hi", dir.Path), stream: false);
+        Assert.Contains("--ignore-user-config", cmd);
+        Assert.Equal("gpt-5.5", cmd[cmd.IndexOf("-m") + 1]);
+        Assert.Equal("o-pick", new CodexProvider { At = now, ConfigPath = () => dir["model.toml"] }.Command(new AiRequest("hi", dir.Path) { Model = "o-pick" }, stream: false) is var picked ? picked[picked.IndexOf("-m") + 1] : "");
+
+        File.WriteAllText(dir["provider.toml"], "model_provider = 'azure'\nmodel = \"my-deployment\"\n[mcp_servers.github]\ncommand = \"gh-mcp\"\n");
+        var own = new CodexProvider { At = now, ConfigPath = () => dir["provider.toml"] }.Command(new AiRequest("hi", dir.Path), stream: false);
+        Assert.DoesNotContain("--ignore-user-config", own);
+        Assert.Contains("mcp_servers.github.enabled=false", own);
+        Assert.DoesNotContain("-m", own);
+    }
+
     [Fact]
     public void On_windows_the_prompt_goes_in_on_input_where_no_command_line_can_cut_it()
     {
