@@ -185,6 +185,8 @@ public sealed partial class NoteModel : ObservableObject
     public string TypedHint => (Planned ? "Jot down anything before it starts. " : "Write as much or as little as you like. ")
         + (NotesOff ? "Notes are off, so what you type is kept as it is, with the transcript."
             : Planned ? $"When the recording stops, {Writer} writes up the {Noun} around your notes." : $"When you stop recording, {Writer} writes up the {Noun} around your notes.");
+    /// <summary>The second line under the notes being typed: the Markdown that works in them, and the keys for bold and italic.</summary>
+    public static string FormatHint => $"Type # for a heading, - for a bullet, 1. for a numbered list, [ ] for a checkbox. {(OperatingSystem.IsMacOS() ? "⌘B and ⌘I" : "Ctrl+B and Ctrl+I")} make words bold or italic.";
     /// <summary>Who writes the notes when it stops, as the hint names them.</summary>
     public string Writer { get; init; } = "Claude";
     /// <summary>The library writes no notes (setup's "No AI for now"): nothing on the page says any are coming.</summary>

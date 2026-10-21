@@ -91,17 +91,20 @@ public static partial class Summarize
         .Replace("one lecture", "one recording");
 
     /// <summary>The notes' shape when the student typed notes of their own while the lecture recorded: their lines
-    /// are the outline, kept word for word and marked as theirs (==like this==, which reads as a highlighter's mark
-    /// in any Markdown app), with what the lecture said added round them.</summary>
+    /// are the outline, kept word for word, in the Markdown they typed them in (bold, checkboxes, numbered lines, how
+    /// their bullets nest) and marked as theirs (==like this==, which reads as a highlighter's mark in any Markdown
+    /// app), with what the lecture said added round them.</summary>
     public static readonly string AroundTyped = """
-        The student typed their own notes during the lecture. Write the study notes around them, in this shape:
+        The student typed their own notes during the lecture, in Markdown. Write the study notes around them, in this shape:
 
         ## Summary
         Two to four sentences: what the lecture covered and how it fits the course.
 
         Then the student's notes, as the outline of everything after the summary:
-        - Keep every line the student typed, word for word and in the order they typed it. A line they typed as a heading stays a heading (##); every other line of theirs starts a bullet of its own.
-        - Wrap each thing the student typed in double equals signs, ==exactly as they typed it==, and wrap nothing else in them: those marks are how the student's words are told from yours.
+        - Keep every line the student typed, word for word and in the order they typed it, with their formatting exactly as they typed it: their **bold**, *italics*, `code`, ~~strikethrough~~, [links](address) and $maths$ stay just as they are.
+        - A line they typed as a heading stays a heading, one level down (# as ##, ## as ###, ### as ####). A numbered line of theirs stays numbered, a checkbox stays a checkbox (- [ ] or - [x], ticked as they left it), a quote stays a quote, and their bullets keep their nesting. Every other line of theirs starts a bullet of its own.
+        - Wrap each thing the student typed in double equals signs, ==exactly as they typed it==, and wrap nothing else in them: those marks are how the student's words are told from yours. Their formatting goes inside the marks (==**Mitosis**: cell division==); a heading's #s, a bullet's -, a number and a checkbox stay outside them (## ==Cell division==, - [ ] ==Read chapter 3==).
+        - A block of code the student typed (from a ``` line to the next) and a --- rule of theirs stay exactly as they typed them, with no marks.
         - After a line of the student's, on the same bullet, add what the lecture said about it, in a sentence or two.
         - Where the lecture covered something that matters and the student wrote nothing, add bullets of your own, and sections under headings of your own, in the order it was taught.
         - If the lecture has enough for them, end with "## Questions to review": three to five numbered questions.
@@ -507,39 +510,340 @@ public static partial class Summarize
             + $"fact.\n\n{Shape(m)}\n\n{Drawing(drawings)}\n\n{Rules}\n\n{Header(m)}{TypedPart(m)}{AttachedPart(attached)}\n\n{joined}";
     }
 
-    [GeneratedRegex(@"^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s+)*")]
+    /// <summary>What a line starts with before its words: a heading's #s, a bullet (and its checkbox), a number, a quote's &gt;.</summary>
+    [GeneratedRegex(@"^\s*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\](?:\s+|$))?|\d+[.)]\s+|>\s+)*")]
     private static partial Regex LineLead();
 
     [GeneratedRegex(@"\s+")]
     private static partial Regex Blanks();
 
-    /// <summary>A typed line down to its words: no heading or bullet marker in front, no marks, one space between words.</summary>
+    /// <summary>A line whose bullet, checkbox or heading the model put inside the marks ("==- [ ] Read==", "##
+    /// ==# Cells=="): it would read as words, not as a checkbox or a heading.</summary>
+    [GeneratedRegex(@"^(\s*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+|>\s+)*)==((?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\[[ xX]\]\s+|\d+[.)]\s+|>\s+)+)(?=\S)")]
+    private static partial Regex LeadInsideMark();
+
+    /// <summary>A code block's ``` line the model put inside the marks ("- ==```=="): the block would read as words.</summary>
+    [GeneratedRegex(@"^(\s*(?:[-*+]\s+|\d+[.)]\s+|>\s+)*)==((?:```|~~~)[^=]*?)==\s*$")]
+    private static partial Regex MarkedFence();
+
+    [GeneratedRegex(@"^(\s*)==(.*)==\s*$")]
+    private static partial Regex MarkedLine();
+
+    /// <summary>
+    /// The notes with what the model got wrong about the marks' place put right: a heading's #s, a bullet or a checkbox
+    /// that went inside them comes back out in front (a second heading's #s inside a heading are dropped), and a block
+    /// of the student's code it marked line by line is a block of code again, unmarked.
+    /// </summary>
+    static string MarksPlaced(string notes)
+    {
+        var lines = notes.Split('\n');
+        bool fence = false, markedFence = false;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            if (MarkedFence().Match(line) is { Success: true } f)
+            {
+                lines[i] = f.Groups[1].Value + f.Groups[2].Value;
+                fence = !fence;
+                markedFence = fence;
+                continue;
+            }
+            string t = line.TrimStart();
+            if (t.StartsWith("```", StringComparison.Ordinal) || t.StartsWith("~~~", StringComparison.Ordinal))
+            {
+                fence = !fence;
+                markedFence = false;
+                continue;
+            }
+            if (fence)
+            {
+                if (markedFence && MarkedLine().Match(line) is { Success: true } code) lines[i] = code.Groups[1].Value + code.Groups[2].Value;
+                continue;
+            }
+            lines[i] = LeadInsideMark().Replace(line, m =>
+            {
+                string outer = m.Groups[1].Value, inner = m.Groups[2].Value;
+                if (outer.Trim().Length == 0) return outer + (inner.StartsWith('[') ? "- " : "") + inner + Mark;
+                if (outer.TrimStart().StartsWith('#') && inner.StartsWith('#')) return outer + Mark;
+                return outer + inner + Mark;
+            });
+        }
+        return string.Join("\n", lines);
+    }
+
+    /// <summary>A pair of marks and what's between them.</summary>
+    [GeneratedRegex(@"==(?=\S)(.+?)(?<=\S)==")]
+    private static partial Regex Marked();
+
+    [GeneratedRegex(@"\G\[([^\]\n]*)\]\(([^)\n]*)\)")]
+    private static partial Regex LinkHere();
+
+    /// <summary>A typed line down to its words: no heading, bullet, checkbox or number in front, no marks, one space
+    /// between words. Its formatting is kept: that's how the student typed it.</summary>
     static string Words(string line) => Blanks().Replace(LineLead().Replace(line, "").Replace(Mark, ""), " ").Trim();
 
     /// <summary>
-    /// The notes with every line the student typed in them, marked as theirs, whatever the model did: a line of theirs
-    /// it wrote without the marks gets them, and one it left out altogether is added at the end under "Also in your
-    /// notes". The student's own words are never lost to a model that didn't follow its instructions.
+    /// What some Markdown reads as, without the marks of its formatting: no **, *, _ round words, ~~, ` or ==, a link
+    /// as its words without its address; one space between words. With <paramref name="at"/>, where each character
+    /// of what's returned is in the Markdown. Two lines that read the same are the same line, however each is
+    /// formatted.
+    /// </summary>
+    public static string Bare(string markdown, List<int>? at = null)
+    {
+        var bare = new System.Text.StringBuilder();
+        at?.Clear();
+        int linkTextEnd = -1, linkEnd = -1;
+        void Add(char c, int i)
+        {
+            bare.Append(c);
+            at?.Add(i);
+        }
+        for (int i = 0; i < markdown.Length; i++)
+        {
+            char c = markdown[i];
+            if (i == linkTextEnd)
+            {
+                // "](address)": the link's words are done.
+                i = linkEnd;
+                linkTextEnd = -1;
+                continue;
+            }
+            if (c == '\\' && i + 1 < markdown.Length && (char.IsPunctuation(markdown[i + 1]) || char.IsSymbol(markdown[i + 1])))
+            {
+                Add(markdown[++i], i);
+                continue;
+            }
+            if (c == '[' && linkTextEnd < 0 && LinkHere().Match(markdown, i) is { Success: true } link)
+            {
+                linkTextEnd = i + 1 + link.Groups[1].Length;
+                linkEnd = i + link.Length - 1;
+                continue;
+            }
+            if (c is '*' or '`') continue;
+            if (c is '~' or '=' && i + 1 < markdown.Length && markdown[i + 1] == c)
+            {
+                while (i + 1 < markdown.Length && markdown[i + 1] == c) i++;
+                continue;
+            }
+            // (An underscore inside a word, snake_case, is the word's own.)
+            if (c == '_' && !(i > 0 && char.IsLetterOrDigit(markdown[i - 1]) && i + 1 < markdown.Length && char.IsLetterOrDigit(markdown[i + 1]))) continue;
+            if (char.IsWhiteSpace(c))
+            {
+                if (bare.Length > 0 && bare[^1] != ' ') Add(' ', i);
+                continue;
+            }
+            Add(c, i);
+        }
+        if (bare.Length > 0 && bare[^1] == ' ')
+        {
+            bare.Length--;
+            at?.RemoveAt(at.Count - 1);
+        }
+        return bare.ToString();
+    }
+
+    /// <summary>
+    /// What the student typed, in the pieces the notes are checked for: each line of words, with what it started with;
+    /// and, kept whole, each block of code (fences and all), formula block, table, and line that's only a formula. A
+    /// block is looked for as it is and never marked (marks would break it); a rule is only a rule.
+    /// </summary>
+    static (List<(string Lead, string Words)> Lines, List<string> Blocks) TypedPieces(string typed)
+    {
+        var lines = new List<(string, string)>();
+        var blocks = new List<string>();
+        string[] rows = [.. Py.Strip(typed).Split('\n').Select(r => r.TrimEnd('\r'))];
+        static bool Fence(string t) => t.StartsWith("```", StringComparison.Ordinal) || t.StartsWith("~~~", StringComparison.Ordinal);
+        for (int i = 0; i < rows.Length; i++)
+        {
+            string line = rows[i], t = line.Trim();
+            int end = -1;
+            if (Fence(t))
+            {
+                // To its closing fence (or the end, when it wasn't closed).
+                end = i + 1;
+                while (end < rows.Length && !Fence(rows[end].Trim())) end++;
+                end = Math.Min(end, rows.Length - 1);
+            }
+            else if (t == "$$")
+            {
+                end = i + 1;
+                while (end < rows.Length && rows[end].Trim() != "$$") end++;
+                end = Math.Min(end, rows.Length - 1);
+            }
+            else if (t.Contains('|') && i + 1 < rows.Length && TableRule().IsMatch(rows[i + 1].Trim()))
+            {
+                // A table: its header, the row under it, and every row after with a | in it.
+                end = i + 1;
+                while (end + 1 < rows.Length && rows[end + 1].Contains('|') && rows[end + 1].Trim().Length > 0) end++;
+            }
+            else if (Formula().IsMatch(t)) end = i;
+            if (end >= 0)
+            {
+                string block = string.Join("\n", rows[i..(end + 1)]);
+                if (Squeezed(block).Length > 0 && !blocks.Contains(block)) blocks.Add(block);
+                i = end;
+                continue;
+            }
+            if (Rule().IsMatch(t)) continue;
+            string words = Words(line);
+            if (words.Length > 0 && !lines.Any(l => l.Item2 == words)) lines.Add((LineLead().Match(line).Value.Trim(), words));
+        }
+        return (lines, blocks);
+    }
+
+    /// <summary>The row under a table's header: |---|:--:|.</summary>
+    [GeneratedRegex(@"^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?$")]
+    private static partial Regex TableRule();
+
+    /// <summary>A line that's only a formula: $$…$$ (or $…$).</summary>
+    [GeneratedRegex(@"^\${1,2}[^$]+\${1,2}$")]
+    private static partial Regex Formula();
+
+    /// <summary>Some Markdown with what doesn't change what it says taken out: spaces, line breaks, a table's |s and
+    /// -s, fences and $s, and the student's marks. A block of theirs is in the notes when its squeezed text is in the
+    /// notes' squeezed text, however the model indented it, tagged its fence or wrote its formula's delimiters.</summary>
+    static string Squeezed(string markdown)
+    {
+        var kept = new System.Text.StringBuilder(markdown.Length);
+        foreach (string row in markdown.Split('\n'))
+        {
+            string t = row.Trim();
+            // A fence line (and its language) and a table's rule say nothing of what's in them.
+            if (t.StartsWith("```", StringComparison.Ordinal) || t.StartsWith("~~~", StringComparison.Ordinal) || TableRule().IsMatch(t)) continue;
+            foreach (char c in t.Replace(Mark, ""))
+                if (!char.IsWhiteSpace(c) && c is not '|' and not '$') kept.Append(c);
+        }
+        return kept.ToString();
+    }
+
+    [GeneratedRegex(@"^(?:-{3,}|\*{3,}|_{3,})$")]
+    private static partial Regex Rule();
+
+    /// <summary>Where the notes' blocks of code are (each from its opening ``` to its closing one): nothing in them is
+    /// marked, nor taken for a line the student typed.</summary>
+    static List<(int From, int To)> Code(string notes)
+    {
+        var blocks = new List<(int, int)>();
+        int open = -1;
+        for (int start = 0; start < notes.Length;)
+        {
+            int end = notes.IndexOf('\n', start);
+            if (end < 0) end = notes.Length;
+            string t = notes[start..end].Trim();
+            if (t.StartsWith("```", StringComparison.Ordinal) || t.StartsWith("~~~", StringComparison.Ordinal))
+            {
+                if (open < 0) open = start;
+                else
+                {
+                    blocks.Add((open, end));
+                    open = -1;
+                }
+            }
+            start = end + 1;
+        }
+        if (open >= 0) blocks.Add((open, notes.Length));
+        return blocks;
+    }
+
+    static bool InCode(List<(int From, int To)> code, int at) => code.Any(b => at >= b.From && at <= b.To);
+
+    /// <summary>
+    /// The notes with every line the student typed in them, marked as theirs and formatted as they typed it, whatever
+    /// the model did: a line of theirs it wrote without the marks gets them, one it marked but wrote with other
+    /// formatting (or none) gets the student's back, and one it left out altogether is added at the end under "Also in
+    /// your notes". Lines are matched by their words, so Markdown's marks (**, *, a link's address) can't hide a line
+    /// that's there. The student's own words are never lost to a model that didn't follow its instructions.
     /// </summary>
     public static string KeepTyped(string notes, string typed)
     {
-        var lines = Py.Strip(typed).Split('\n').Select(Words).Where(l => l.Length > 0).Distinct().ToList();
-        if (lines.Count == 0 || Py.Strip(notes).Length == 0) return notes;
-        var missing = new List<string>();
-        foreach (string line in lines)
+        var (lines, blocks) = TypedPieces(typed);
+        if (lines.Count + blocks.Count == 0 || Py.Strip(notes).Length == 0) return notes;
+        notes = MarksPlaced(notes);
+        var missing = new List<(string Lead, string Words)>();
+        foreach (var (lead, line) in lines)
         {
+            var code = Code(notes);
             if (notes.Contains(Mark + line + Mark, StringComparison.Ordinal)) continue;
-            // There, but unmarked (and not inside a longer mark, or a code or maths span): mark its first appearance.
-            int at = notes.IndexOf(line, StringComparison.Ordinal);
-            if (at >= 0 && !InsideMark(notes, at))
+            string bare = Bare(line);
+            if (bare.Length == 0) continue;
+            // Marked, but formatted otherwise (or not at all): the student's formatting is put back.
+            var marked = Marked().Matches(notes).FirstOrDefault(m => !InCode(code, m.Index) && Bare(m.Groups[1].Value) == bare);
+            if (marked is not null)
             {
-                notes = notes[..at] + Mark + line + Mark + notes[(at + line.Length)..];
+                notes = notes[..marked.Groups[1].Index] + line + notes[(marked.Groups[1].Index + marked.Groups[1].Length)..];
                 continue;
             }
-            if (at < 0) missing.Add(line);
+            // There as typed, but unmarked (and not inside a longer mark, or a code or maths span): mark its first appearance
+            // as whole words ("cell" isn't the start of "cells").
+            int at = Whole(notes, line);
+            if (at >= 0 && !InCode(code, at))
+            {
+                if (!InsideMark(notes, at)) notes = notes[..at] + Mark + line + Mark + notes[(at + line.Length)..];
+                continue;
+            }
+            // There in other formatting (or none), unmarked: marked as theirs, in their own formatting.
+            if (Unmarked(notes, line, bare, code) is { } found)
+            {
+                notes = found;
+                continue;
+            }
+            missing.Add((lead, line));
         }
-        if (missing.Count == 0) return notes;
-        return notes.TrimEnd() + "\n\n## Also in your notes\n" + string.Join("\n", missing.Select(l => $"- {Mark}{l}{Mark}")) + "\n";
+        // A block of code, a formula or a table the model left out goes back whole, as it was typed.
+        string squeezed = Squeezed(notes);
+        var gone = blocks.Where(b => !squeezed.Contains(Squeezed(b), StringComparison.Ordinal)).ToList();
+        if (missing.Count == 0 && gone.Count == 0) return notes;
+        var also = new List<string>();
+        if (missing.Count > 0) also.Add(string.Join("\n", missing.Select(l => $"{(l.Lead.Contains('[') ? l.Lead : "-")} {Mark}{l.Words}{Mark}")));
+        also.AddRange(gone);
+        return notes.TrimEnd() + "\n\n## Also in your notes\n" + string.Join("\n\n", also) + "\n";
+    }
+
+    /// <summary>Where <paramref name="words"/> first stand in <paramref name="text"/> as whole words (not the start or
+    /// end of a longer word), or -1.</summary>
+    static int Whole(string text, string words)
+    {
+        for (int at = text.IndexOf(words, StringComparison.Ordinal); at >= 0; at = text.IndexOf(words, at + 1, StringComparison.Ordinal))
+            if (Bounded(text, at, words.Length)) return at;
+        return -1;
+    }
+
+    /// <summary>[at, at + length) of the text doesn't begin or end in the middle of a word.</summary>
+    static bool Bounded(string text, int at, int length) =>
+        (at == 0 || !char.IsLetterOrDigit(text[at - 1]) || !char.IsLetterOrDigit(text[at]))
+        && (at + length >= text.Length || !char.IsLetterOrDigit(text[at + length]) || !char.IsLetterOrDigit(text[at + length - 1]));
+
+    /// <summary>A line of the notes whose words include <paramref name="bare"/> however they're formatted: the notes
+    /// with those words put back as the student typed them (<paramref name="line"/>) and marked, when the formatting
+    /// round them allows; as they were when they're inside a mark already, or when formatting runs from inside them to
+    /// outside. Null when no line of the notes reads that way.</summary>
+    static string? Unmarked(string notes, string line, string bare, List<(int From, int To)> code)
+    {
+        var at = new List<int>();
+        for (int start = 0; start < notes.Length;)
+        {
+            int end = notes.IndexOf('\n', start);
+            if (end < 0) end = notes.Length;
+            string here = notes[start..end];
+            int found = InCode(code, start) ? -1 : Whole(Bare(here, at), bare);
+            if (found >= 0)
+            {
+                int from = start + at[found], to = start + at[found + bare.Length - 1] + 1;
+                if (InsideMark(notes, from)) return notes;
+                // The marks of formatting right round the words go inside the student's marks with them, and so do marks
+                // the model put round part of them ("**Mitosis**: ==cell division==" becomes one mark round it all).
+                int lineStart = start + LineLead().Match(here).Length;
+                while (from > lineStart && notes[from - 1] is '*' or '_' or '~' or '`' or '[' or '=') from--;
+                while (to < end && notes[to] is '*' or '_' or '~' or '`' or '=') to++;
+                if (to < end && notes[to] == ']' && LinkTail(notes, to) is int tail) to = tail;
+                // Formatting, or a mark, that starts inside them and ends outside (or the other way) is left alone, the
+                // words as the model wrote them: the line is there, and putting marks in would leave a stray ==.
+                if (!Balanced(notes[from..to])) return notes;
+                return notes[..from] + Mark + line + Mark + notes[to..];
+            }
+            start = end + 1;
+        }
+        return null;
     }
 
     /// <summary>Whether a place in the notes is already between a pair of marks on its line.</summary>
@@ -550,6 +854,20 @@ public static partial class Summarize
         for (int i = notes.IndexOf(Mark, lineStart, StringComparison.Ordinal); i >= 0 && i < at; i = notes.IndexOf(Mark, i + Mark.Length, StringComparison.Ordinal)) marks++;
         return marks % 2 == 1;
     }
+
+    /// <summary>Where a link's "](address)" ends, from its "]".</summary>
+    static int? LinkTail(string notes, int close)
+    {
+        if (close + 1 >= notes.Length || notes[close + 1] != '(') return null;
+        int end = notes.IndexOf(')', close + 1);
+        int line = notes.IndexOf('\n', close);
+        return end < 0 || (line >= 0 && line < end) ? null : end + 1;
+    }
+
+    /// <summary>Every mark in it is closed in it: as many ** as close them, ` as `, ~~ as ~~, == as ==, [ as ].</summary>
+    static bool Balanced(string words) =>
+        words.Count(c => c == '*') % 2 == 0 && words.Count(c => c == '`') % 2 == 0 && words.Split("~~").Length % 2 == 1
+        && words.Split(Mark).Length % 2 == 1 && words.Count(c => c == '[') == words.Count(c => c == ']');
 
     /// <summary>Our own study notes for a lecture, written from its transcript, drawing what <paramref name="drawings"/>
     /// allows; a diagram that came out broken is sent back once to be fixed (<see cref="RepairDiagramsAsync"/>).</summary>

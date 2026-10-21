@@ -206,11 +206,14 @@
 
           <!-- The notes: 68 characters wide (704), 16 on 26 -->
           <StackPanel Name="NotesBody" IsVisible="{Binding ShowNotes}" MaxWidth="704" HorizontalAlignment="Left" Margin="0,18,0,0">
-            <!-- While it records: the student's own, kept as they type. A line that starts "# " becomes a heading,
-                 "- " a bullet, as the space is typed. -->
+            <!-- While it records: the student's own, kept as they type, in Markdown that shows formatted. A line that
+                 starts "# " becomes a heading, "- " a bullet, "[ ] " a checkbox, as the space is typed. -->
             <StackPanel IsVisible="{Binding Typing}" Spacing="18">
               <c:TypedEditor Name="Typed" Text="{Binding Typed}" Placeholder="Your notes" MinHeight="120" />
-              <TextBlock Name="TypedHint" Classes="notes-hint" Text="{Binding TypedHint}" />
+              <StackPanel Spacing="4">
+                <TextBlock Name="TypedHint" Classes="notes-hint" Text="{Binding TypedHint}" />
+                <TextBlock Name="FormatHint" Classes="notes-hint" FontSize="13" Text="{x:Static vm:NoteModel.FormatHint}" />
+              </StackPanel>
             </StackPanel>
             <StackPanel IsVisible="{Binding Saved}" Spacing="14">
               <c:PageText Name="Pending" IsVisible="{Binding HasPending}" Text="{Binding Pending}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
