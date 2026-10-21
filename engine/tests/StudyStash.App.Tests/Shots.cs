@@ -583,6 +583,16 @@ public class SurfaceShots
                     Shot.Take($"{look}-05-setup-one-computer-ai-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = free, DrawChrome = true } : new WinSetup { DataContext = free, DrawChrome = true },
                         size: new Size(1100, 928));
             }
+            // Gemini, the answer on guided setup's first screen and not on this computer: the step opens on its API key.
+            // And Claude not here, with its one button and "Use an API key" beside it.
+            foreach (var (what, engine, state, prefer) in new[] { ("gemini-key", "gemini", "not_installed", "gemini"), ("claude-key-link", "claude", "not_installed", "") })
+            {
+                var keyed = await SetupPage(skin, AppRole.Both, SetupStep.Ai);
+                keyed.Ai = AiDemo.SetupKeyed(skin == SkinKind.Win, engine, state, prefer);
+                foreach (var t in Themes)
+                    Shot.Take($"{look}-05-setup-one-computer-ai-{what}", skin, t, () => skin == SkinKind.Mac ? new MacSetup { DataContext = keyed, DrawChrome = true } : new WinSetup { DataContext = keyed, DrawChrome = true },
+                        size: new Size(1100, 1048));
+            }
             // Just this computer's welcome while its library is being made, and when it couldn't be.
             var making = SetupModel.For(skin);
             making.Connecting = true;

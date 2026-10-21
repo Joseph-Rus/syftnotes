@@ -37,6 +37,13 @@ public sealed class GuidedSetupShots
             g.PickCommand.Execute("free");
             return g;
         });
+        // Gemini: no chat with it, so Continue goes to setup by hand too.
+        yield return ("pick-gemini", skin =>
+        {
+            var g = Guided(skin);
+            g.PickCommand.Execute("gemini");
+            return g;
+        });
         yield return ("pick-installed", skin =>
         {
             var g = Guided(skin);

@@ -32,6 +32,9 @@ public sealed partial class AiSetupRow : ObservableObject
     /// slower computer while it works and simpler notes. Marked, so a student who isn't doesn't take it for the easy way.</summary>
     public bool Advanced { get; init; }
     public bool ShowSignIn { get; init; }
+    /// <summary>"Use an API key" shows on the row: an AI that takes one (Claude, ChatGPT, Gemini) and isn't ready yet,
+    /// where the host can save keys. The key goes in the panel under the list (<see cref="AiSetupModel.KeyFor"/>).</summary>
+    public bool ShowKeyLink { get; init; }
     /// <summary>It can write notes now (as far as anyone can tell without asking it): picking it is allowed.</summary>
     public bool CanWrite { get; init; }
     /// <summary>The first row in the list shows no separator above it.</summary>
@@ -64,6 +67,7 @@ public sealed partial class AiSetupRow : ObservableObject
     }
 
     public IRelayCommand SelectCommand { get; internal set; } = null!;
+    public IRelayCommand KeyCommand { get; internal set; } = null!;
     public IAsyncRelayCommand SignInCommand { get; internal set; } = null!;
     public IRelayCommand ToggleHelpCommand { get; internal set; } = null!;
     public IAsyncRelayCommand OpenCommand { get; internal set; } = null!;
@@ -114,10 +118,14 @@ public sealed partial class AiSetupModel : ObservableObject
     /// <summary>Setup run again on a computer that's set up: the library's engine was chosen before, so it stays
     /// picked even while it isn't ready (its download stopped, say).</summary>
     public bool ChosenBefore { get; init; }
-    /// <summary>"I don't have a paid plan" was the answer on setup's first screen: the free AI is the pick when it's
-    /// on this computer already, its model too.</summary>
-    public bool PreferFree { get; init; }
+    /// <summary>The AI the student answered with on setup's first screen, for a first run: "ollama" ("I don't have a paid
+    /// plan"), "gemini", or Claude or ChatGPT once guided setup got it ready. It's the pick when it can write notes
+    /// (the free AI only once its model is here too); Gemini that isn't ready opens on what it needs. "" for none.</summary>
+    public string Prefer { get; init; } = "";
+    /// <summary>The host can save an API key for an AI (setup's window can; a test that doesn't say can't).</summary>
+    public bool TakesKeys { get; init; }
     bool? notesOn;
+    bool preferShown;
 
     [ObservableProperty] public partial string SelectedNotes { get; set; } = "ollama";
     [ObservableProperty] public partial string SelectedAsk { get; set; } = SameAsNotes;
@@ -127,6 +135,11 @@ public sealed partial class AiSetupModel : ObservableObject
     [ObservableProperty] public partial bool Offline { get; set; }
     /// <summary>A row's steps are showing (the setup window grows to fit them).</summary>
     [ObservableProperty] public partial bool HelpOpen { get; set; }
+    /// <summary>The API key panel under the list is open for this AI ("claude", "codex", "gemini"), or "" when shut.
+    /// It lives under the list, not in a row: the rows are made afresh each time the library answers, and a box in one
+    /// would lose what's being typed.</summary>
+    [ObservableProperty] public partial string KeyFor { get; set; } = "";
+    [ObservableProperty] public partial string KeyDraft { get; set; } = "";
 
     public bool NoAi => SelectedNotes == None;
     public bool HasSay => !string.IsNullOrEmpty(Say);
@@ -142,6 +155,106 @@ public sealed partial class AiSetupModel : ObservableObject
     }
 
     partial void OnSayChanged(string? value) => OnPropertyChanged(nameof(HasSay));
+
+    partial void OnKeyForChanged(string value)
+    {
+        foreach (string n in new[] { nameof(KeyOpen), nameof(KeyTitle), nameof(KeyLede), nameof(KeyWhere), nameof(KeyAlternative), nameof(HasKeyAlternative) })
+            OnPropertyChanged(n);
+        HelpOpen = Engines.Any(r => r.ShowHelp) || KeyOpen;
+    }
+
+    // --- the API key panel ------------------------------------------------------------------------------------------
+
+    public bool KeyOpen => KeyFor.Length > 0;
+    string KeyName => Core.Ai.Engines.Name(KeyFor);
+    string KeyMaker => KeyFor switch { "claude" => "Anthropic", "codex" => "OpenAI", _ => "Google" };
+    public string KeyTitle => $"Your {KeyName} API key";
+    /// <summary>Where the key is made, what it costs (Claude's and ChatGPT's are paid for as they're used, apart from a
+    /// plan), and where it goes.</summary>
+    public string KeyLede => KeyFor switch
+    {
+        "" => "",
+        "gemini" => $"Make one in {KeyWhere}, then paste it here. It stays on this {Device} and only goes to Google.",
+        _ => $"Make one in {KeyWhere}, then paste it here. A key is paid for as it's used, apart from a {KeyName} plan. It stays on this {Device} and only goes to {KeyMaker}.",
+    };
+    public string KeyWhere => KeyFor switch { "claude" => "the Anthropic Console", "codex" => "OpenAI's platform", _ => "Google AI Studio" };
+    static string KeyUrl(string id) => id switch
+    {
+        "claude" => "https://console.anthropic.com/settings/keys",
+        "codex" => "https://platform.openai.com/api-keys",
+        _ => "https://aistudio.google.com/apikey",
+    };
+    /// <summary>Gemini's other way, where it isn't on this computer at all: Google's own app, signed in.</summary>
+    public string KeyAlternative => KeyFor == "gemini" && Engines.FirstOrDefault(r => r.Id == "gemini") is { State: "not_installed" }
+        ? "Or install Google's Antigravity app and sign in to it, then press Check again." : "";
+    public bool HasKeyAlternative => KeyAlternative.Length > 0;
+    string Device => Windows ? "PC" : "Mac";
+
+    void OpenKey(string id)
+    {
+        Say = null;
+        foreach (var r in Engines) r.ShowHelp = false;
+        KeyDraft = "";
+        KeyFor = id;
+    }
+
+    [RelayCommand]
+    void CloseKey()
+    {
+        KeyFor = "";
+        KeyDraft = "";
+    }
+
+    [RelayCommand]
+    void GetKey()
+    {
+        if (KeyFor.Length > 0) OpenUrl?.Invoke(KeyUrl(KeyFor));
+    }
+
+    [RelayCommand]
+    Task CheckKeyAlternative() => CheckAgainAsync(KeyFor);
+
+    /// <summary>Save: the library keeps the key and tries the AI with it at once. When it answers, that AI is the pick
+    /// and the panel shuts; when it doesn't, the panel stays, with what the AI said.</summary>
+    [RelayCommand]
+    async Task SaveKey()
+    {
+        string id = KeyFor, key = KeyDraft.Trim();
+        if (id.Length == 0 || key.Length == 0) return;
+        Busy = true;
+        Say = $"Trying {Core.Ai.Engines.Name(id)} with your key…";
+        try
+        {
+            var said = await library.KeyAsync(id, key);
+            KeyDraft = "";
+            if (said is null)
+            {
+                OlderLibrary = true;
+                Say = null;
+                return;
+            }
+            if (said.Overview is not null) Apply(said.Overview);
+            else await Load();
+            Say = said.Said;
+            if (said.Overview?.Engines.FirstOrDefault(e => e.Id == id) is { State: "ready" } && Engines.FirstOrDefault(r => r.Id == id) is { CanWrite: true })
+            {
+                SelectedNotes = id;
+                KeyFor = "";
+            }
+        }
+        catch (LibraryRefusedException ex)
+        {
+            Say = Words(ex);
+        }
+        catch
+        {
+            Offline = true;
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
 
     /// <summary>Reads the library's AI once and fills the rows: called when the step opens.</summary>
     public async Task Load()
@@ -177,7 +290,9 @@ public sealed partial class AiSetupModel : ObservableObject
     string FirstPick(AiOverview overview)
     {
         if (notesOn == false && OffersNoAi) return None;
-        if (PreferFree && !ChosenBefore && overview.Engines.Any(e => e.Id == "ollama" && WritesNow(e))) return "ollama";
+        if (Prefer.Length > 0 && !ChosenBefore && overview.Engines.FirstOrDefault(e => e.Id == Prefer) is { } preferred
+            && (Prefer == "ollama" ? WritesNow(preferred) : CanWrite(preferred)))
+            return Prefer;
         if (overview.Engines.FirstOrDefault(e => e.Id == overview.Notes) is { } notes
             && (WritesNow(notes) || CanWrite(notes) && (ChosenBefore || overview.Pulling is not null)))
             return notes.Id;
@@ -215,9 +330,12 @@ public sealed partial class AiSetupModel : ObservableObject
         bool freeNeedsWork = overview.Engines.FirstOrDefault(e => e.Id == "ollama") is { State: "not_installed" or "not_running" or "model_missing" };
         // Claude or ChatGPT, not on this computer or not signed in, where the host gets them ready with buttons.
         bool Buttons(EngineInfo e) => SetUpPaid is not null && e is { Id: "claude" or "codex", State: "not_installed" or "not_signed_in" };
+        // Gemini, not here at all: its one button is its API key (Google's own app is installed by the student).
+        bool GeminiKey(EngineInfo e) => TakesKeys && e is { Id: "gemini", State: "not_installed" };
+        bool NotReady(EngineInfo e) => e.State is "not_installed" or "not_signed_in";
         Engines.Clear();
-        // Claude Code and Codex always show, with the steps to get them going; Gemini only once it's here.
-        foreach (var e in overview.Engines.Where(e => e.Id is "ollama" or "claude" or "codex" || e.Installed))
+        // Every AI shows, each with what gets it going: the free AI, Claude, ChatGPT and Gemini.
+        foreach (var e in overview.Engines)
         {
             var steps = Buttons(e) ? [] : EngineSetupWords.Steps(e.Id, e.State, Windows);
             string terminal = EngineSetupWords.TerminalName(Windows);
@@ -225,15 +343,16 @@ public sealed partial class AiSetupModel : ObservableObject
             {
                 Id = e.Id,
                 Name = AiWords.SetupName(e.Id, e.Name, Windows ? "PC" : "Mac"),
-                About = AiWords.SetupAbout(e.Id, e.State, Windows ? "PC" : "Mac", e.SetUpGb, e.Small),
+                About = AiWords.SetupAbout(e.Id, e.State, Windows ? "PC" : "Mac", e.SetUpGb, e.Small, e.HasKey),
                 State = e.State,
                 Advanced = e.Id == "ollama",
-                OneButton = e.Id == "ollama" && freeNeedsWork || Buttons(e),
+                OneButton = e.Id == "ollama" && freeNeedsWork || Buttons(e) || GeminiKey(e),
                 Working = e.Id == "ollama" && working is not null,
                 Progress = e.Id == "ollama" && working is not null ? AiWords.FreeAiProgress(working) : "",
                 Fraction = working?.Fraction ?? 0,
                 Steady = working is { Step: "start" },
                 ShowSignIn = e.State == "not_signed_in" && steps.Count == 0 && !Buttons(e),
+                ShowKeyLink = TakesKeys && e.Id is ("claude" or "codex" or "gemini") && NotReady(e) && !GeminiKey(e),
                 CanWrite = CanWrite(e),
                 Selected = e.Id == SelectedNotes,
                 First = Engines.Count == 0,
@@ -245,23 +364,36 @@ public sealed partial class AiSetupModel : ObservableObject
                 OpenLabel = (e.Id, e.State) switch
                 {
                     ("ollama", _) => failed is null ? "Set it up" : "Try again",
+                    _ when GeminiKey(e) => "Add a key",
                     (_, "not_signed_in") when Buttons(e) => "Sign in",
                     _ when Buttons(e) => "Set it up",
                     (_, "not_signed_in") => $"Sign in in {terminal}",
                     _ => $"Open {terminal}",
                 },
                 ShowHelp = open.Contains(e.Id) && steps.Count > 0,
-                HelpChanged = () => HelpOpen = Engines.Any(r => r.ShowHelp),
+                HelpChanged = () => HelpOpen = Engines.Any(r => r.ShowHelp) || KeyOpen,
             };
             row.SelectCommand = new RelayCommand(() => Pick(row));
+            row.KeyCommand = new RelayCommand(() => OpenKey(row.Id));
             row.SignInCommand = new AsyncRelayCommand(() => SignInAsync(row.Id));
             row.ToggleHelpCommand = new RelayCommand(() => ShowHelpOf(row, !row.ShowHelp));
             row.OpenCommand = new AsyncRelayCommand(() => OpenAsync(row));
             row.CheckAgainCommand = new AsyncRelayCommand(() => CheckAgainAsync(row.Id));
             Engines.Add(row);
         }
-        HelpOpen = Engines.Any(r => r.ShowHelp);
+        // The AI answered with on the first screen, not ready yet: it opens on what it needs, once (Gemini's key, or
+        // its sign-in steps).
+        if (!preferShown && Prefer.Length > 0 && !ChosenBefore && SelectedNotes != Prefer && Engines.FirstOrDefault(r => r.Id == Prefer) is { CanWrite: false } wanted)
+        {
+            preferShown = true;
+            if (wanted.ShowOneButton && wanted.Id == "gemini") KeyFor = "gemini";
+            else if (wanted.HasHelp) wanted.ShowHelp = true;
+        }
+        if (KeyFor.Length > 0 && Engines.All(r => r.Id != KeyFor)) KeyFor = "";
+        HelpOpen = Engines.Any(r => r.ShowHelp) || KeyOpen;
         OnPropertyChanged(nameof(ChoiceWords));
+        OnPropertyChanged(nameof(KeyAlternative));
+        OnPropertyChanged(nameof(HasKeyAlternative));
     }
 
     /// <summary>What the library said when it refused, for the student: turned away at the door ("wrong password"),
@@ -272,6 +404,7 @@ public sealed partial class AiSetupModel : ObservableObject
     /// <summary>A row's help opens alone (the list stays short enough to see).</summary>
     void ShowHelpOf(AiSetupRow row, bool show)
     {
+        if (show && row.HasHelp) KeyFor = "";
         foreach (var r in Engines) r.ShowHelp = r == row && show && r.HasHelp;
     }
 
@@ -284,6 +417,7 @@ public sealed partial class AiSetupModel : ObservableObject
     {
         if (row.CanWrite && !row.ShowOneButton) SelectedNotes = row.Id;
         else if (row.HasHelp) ShowHelpOf(row, true);
+        else if (row.ShowOneButton && row.Id == "gemini") OpenKey("gemini");
         else if (row.ShowOneButton && row.Id != "ollama") _ = row.OpenCommand.ExecuteAsync(null);
         else if (row.ShowOneButton || row.ShowSignIn) Say = $"{row.Name} isn't ready to write notes yet. Press “{(row.ShowSignIn ? "Sign in" : row.OpenLabel)}” on its row to get it ready.";
     }
@@ -375,6 +509,11 @@ public sealed partial class AiSetupModel : ObservableObject
             await SetUpFreeAsync();
             return;
         }
+        if (row.Id == "gemini" && row.OneButton)
+        {
+            OpenKey("gemini");
+            return;
+        }
         if (row.OneButton && SetUpPaid is { } withButtons)
         {
             Say = null;
@@ -421,6 +560,7 @@ public sealed partial class AiSetupModel : ObservableObject
             if (row is { CanWrite: true })
             {
                 SelectedNotes = id;
+                if (KeyFor == id) KeyFor = "";
                 if (row.HasHelp)
                 {
                     // Ollama's here, but still needs starting or its model: the next step shows.

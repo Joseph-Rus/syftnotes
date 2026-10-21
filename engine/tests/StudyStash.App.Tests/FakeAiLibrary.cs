@@ -22,6 +22,8 @@ public sealed class FakeAiLibrary : IAiLibrary
     public Func<string, AiSaid?>? OnDownload { get; set; }
     public Func<string, AiSaid?>? OnSignIn { get; set; }
     public Func<string, string, AiSaid?>? OnCheck { get; set; }
+    /// <summary>(engine, key): what the library says to a key. Without it, a key works at once.</summary>
+    public Func<string, string, AiSaid?>? OnKey { get; set; }
     public Func<AiOverview?>? OnEngines { get; set; }
     public Func<string?, string?, bool?, AiOverview?>? OnDefaults { get; set; }
     public Func<AskRequest, AskReply?>? OnAsk { get; set; }
@@ -116,6 +118,15 @@ public sealed class FakeAiLibrary : IAiLibrary
         if (Overview is null) return Task.FromResult<AiSaid?>(null);
         Overview = Overview with { Engines = [.. Overview.Engines.Select(e => e.Id == engine ? e with { State = "ready" } : e)] };
         return Task.FromResult<AiSaid?>(new AiSaid("Works.", Overview));
+    }
+
+    public Task<AiSaid?> KeyAsync(string engine, string key)
+    {
+        Calls.Add($"key:{engine}");
+        if (OnKey is not null) return Task.FromResult(OnKey(engine, key));
+        if (Overview is null) return Task.FromResult<AiSaid?>(null);
+        Overview = Overview with { Engines = [.. Overview.Engines.Select(e => e.Id == engine ? e with { State = "ready", Installed = true, HasKey = true } : e)] };
+        return Task.FromResult<AiSaid?>(new AiSaid($"{Row(Overview, engine).Name} works with your API key.", Overview));
     }
 
     public Task<AiOverview?> ModelAsync(string engine, string model)

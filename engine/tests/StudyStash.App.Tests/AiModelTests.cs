@@ -675,7 +675,7 @@ public class AiSetupModelTests
     {
         // The free AI's app is on this Mac without what it writes notes with, and nothing has been chosen yet.
         var lib = new FakeAiLibrary { Overview = Nothing("model_missing") };
-        var first = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), PreferFree = true };
+        var first = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), Prefer = "ollama" };
         await first.Load();
         Assert.True(first.NoAi);
         // Its row says to press its button (which starts the download); a click alone doesn't pick it.

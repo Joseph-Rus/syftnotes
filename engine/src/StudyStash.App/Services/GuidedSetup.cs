@@ -65,7 +65,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
             Suggests = Installer == AppRole.Library ? "library" : "",
             Items = items, ReadyToFinish = SetupChecklist.ReadyToFinish(items),
             Addresses = m.IsLibrary && m.LibraryOk ? [.. m.Addresses.Select(a => a.Url)] : [],
-            NotesWriter = g.NotesWriter switch { "" => "", "none" => "nobody (transcripts only)", "ollama" => "Ollama", var e => AgentCli.Get(e).Brand },
+            NotesWriter = g.NotesWriter switch { "" => "", "none" => "nobody (transcripts only)", var e => Engines.Name(e) },
             Busy = m.Connecting ? (m.IsLaptop ? "connecting to the library" : "making the library")
                 : m.Finding ? "looking for the library"
                 : m.AddingCourses ? "adding the classes"
@@ -157,7 +157,7 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
         string? refused = await (WriteNotes ?? WriteOnLibraryAsync)(engine);
         if (refused is not null) return refused;
         g.NotesWriter = engine;
-        m.NotesSummary = engine == "none" ? "Transcripts only for now" : $"Notes by {(engine == "ollama" ? "Ollama" : AgentCli.Get(engine).Brand)}";
+        m.NotesSummary = engine == "none" ? "Transcripts only for now" : $"Notes by {Engines.Name(engine)}";
         return null;
     }
 

@@ -403,7 +403,7 @@ public sealed class SetupTools(ISetupDriver driver)
         engine = (engine ?? "").Trim().ToLowerInvariant();
         if (!Writers.Contains(engine)) return No("engine is claude, codex, ollama or none.");
         if (await driver.SetNotesWriterAsync(engine) is { } refused) return No(refused);
-        return Say(engine == "none" ? "Notes are off for now: lectures keep their transcripts." : $"{(engine == "ollama" ? "Ollama" : AgentCli.Get(engine).Brand)} writes the notes now.");
+        return Say(engine == "none" ? "Notes are off for now: lectures keep their transcripts." : $"{Engines.Name(engine)} writes the notes now.");
     }
 
     async Task<CallToolResult> SkipAsync(string step)

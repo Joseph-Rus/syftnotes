@@ -113,7 +113,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public Action? OnFinish { get; set; }
 
     [ObservableProperty] public partial GuidedScreen Screen { get; set; } = GuidedScreen.PickAi;
-    /// <summary>"claude", "codex", or "" (nothing picked yet: nothing is, on a first run).</summary>
+    /// <summary>"claude", "codex", "gemini", "free", or "" (nothing picked yet: nothing is, on a first run). Gemini and
+    /// "free" have no chat: Continue goes to setup by hand, with that AI picked for the notes when it's ready.</summary>
     [ObservableProperty] public partial string Picked { get; set; } = "";
     [ObservableProperty] public partial AgentFound ClaudeFound { get; set; } = AgentFound.None;
     [ObservableProperty] public partial AgentFound CodexFound { get; set; } = AgentFound.None;
@@ -157,6 +158,13 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>Setup by hand should have the free model on this computer picked for notes.</summary>
     public bool PreferOllama { get; private set; }
 
+    /// <summary>The AI setup by hand's notes step opens on (<see cref="AiSetupModel.Prefer"/>): Claude or ChatGPT once
+    /// it's ready here, Gemini or the free AI when that was the answer on the first screen (now, or the last time setup
+    /// ran), else "" (the step goes by what the library does).</summary>
+    public string NotesPick => AiReady && Picked is ("claude" or "codex") ? Picked
+        : PickedGemini ? "gemini"
+        : settings().SetupAi is "ollama" or "gemini" ? settings().SetupAi : "";
+
     public bool Again => Setup.Again;
     public string Device => Setup.DeviceWord;
     public AgentCliInfo Cli => AgentCli.Get(Picked == "codex" ? "codex" : "claude");
@@ -169,19 +177,26 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     public string PickTitle => Again ? "Set up Study Stash again" : "Welcome to Study Stash";
     public static string PickLede => "An AI sets up Study Stash with you, writes your notes and answers your questions. Which do you have?";
-    // The three answers, in the student's own terms: what they pay for, never the tools underneath (Claude Code, Codex,
-    // Ollama), which the next screens name once, where they're installed.
+    // The answers, in the student's own terms: what they pay for, never the tools underneath (Claude Code, Codex,
+    // Antigravity, Ollama), which the next screens name once, where they're installed.
     public static string ClaudeLine => "I have a paid Claude plan (Pro or Max).";
     public static string CodexLine => "I have a paid ChatGPT plan (Plus or higher).";
+    /// <summary>Gemini has no setup chat (its command-line tool can't be held to setup's own tools), so it's set up by
+    /// hand: the line says where it's connected.</summary>
+    public static string GeminiLine => "I use Gemini. You'll connect it on the notes step.";
     public static string FreeTitle => "I don't have a paid plan";
-    public string FreeLine => $"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {Device} (Ollama).";
+    public string FreeLine => $"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {Device} (Ollama), or an API key.";
     public string AlreadyHere => $"Already on this {Device}";
     public bool ClaudeHere => ClaudeFound.Works;
     public bool CodexHere => CodexFound.Works;
     public bool PickedClaude => Picked == "claude";
     public bool PickedCodex => Picked == "codex";
+    public bool PickedGemini => Picked == "gemini";
     /// <summary>No paid plan: Continue goes to setup by hand, with the free AI on this computer picked for the notes.</summary>
     public bool PickedFree => Picked == "free";
+    /// <summary>An answer with no chat (Gemini, no paid plan): nothing to install or sign in to here, and Continue goes
+    /// to setup by hand.</summary>
+    public bool PickedByHand => PickedFree || PickedGemini;
 
     /// <summary>Setup by hand's notes step asked for Claude or ChatGPT to be got ready on this computer: the two
     /// screens guided setup has for that (download and set up, sign in) show, and then it's back to that step with the
@@ -250,10 +265,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public bool OnSignIn => Screen == GuidedScreen.SignIn;
     public bool OnChat => Screen == GuidedScreen.Chat;
     public bool HasStepLabel => !OnPick;
-    /// <summary>Each screen's size: 760×600 (a little taller than setup by hand's 760×580: the three AIs to pick from
-    /// fill the page), and 960×640 for the chat.</summary>
+    /// <summary>Each screen's size: 760×640 (taller than setup by hand's 760×580: the four answers to pick from fill
+    /// the page), and 960×640 for the chat, the same height.</summary>
     public double ViewWidth => OnChat ? 960 : 760;
-    public double ViewHeight => OnChat ? 640 : 600;
+    public double ViewHeight => 640;
     public bool ShowInstalled => Installed;
     public bool ShowReady => AiReady && OnSignIn;
     public bool ShowCheckingPlan => CheckingPlan;
@@ -265,9 +280,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     void BuildSteps()
     {
         int at = Screen switch { GuidedScreen.PickAi => 0, GuidedScreen.Install => 1, GuidedScreen.SignIn => 2, _ => 3 };
-        // Without a paid plan there's nothing to install or sign in to: setup by hand comes next.
-        string[] titles = PickedFree ? ["Pick your AI", "Set up Study Stash"] : ["Pick your AI", $"Get {Brand} ready", $"Sign in to {Brand}", "Set up Study Stash"];
-        if (PickedFree) at = Math.Min(at, 1);
+        // Without a paid plan, or with Gemini, there's nothing to install or sign in to here: setup by hand comes next.
+        // Nothing picked yet, the steps don't name an AI the student hasn't chosen.
+        string ai = PickedClaude || PickedCodex ? Brand : "";
+        string[] titles = PickedByHand ? ["Pick your AI", "Set up Study Stash"]
+            : ["Pick your AI", ai.Length > 0 ? $"Get {ai} ready" : "Get your AI ready", ai.Length > 0 ? $"Sign in to {ai}" : "Sign in", "Set up Study Stash"];
+        if (PickedByHand) at = Math.Min(at, 1);
         if (Steps.Count != titles.Length)
         {
             Steps.Clear();
@@ -277,7 +295,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         {
             if (Steps[i].Title != titles[i]) Steps[i] = new StepItem { Number = i + 1, Title = titles[i] };
             Steps[i].Current = i == at;
-            Steps[i].Done = i < at || i == 1 && !PickedFree && at > 0 && Found.Works && !OnInstall;
+            Steps[i].Done = i < at || i == 1 && !PickedByHand && at > 0 && Found.Works && !OnInstall;
         }
     }
 
@@ -291,7 +309,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     partial void OnPickedChanged(string value)
     {
         BuildSteps();
-        Notify(nameof(Cli), nameof(Other), nameof(Brand), nameof(Found), nameof(PickedClaude), nameof(PickedCodex), nameof(PickedFree), nameof(CanContinue), nameof(StepLabel),
+        Notify(nameof(Cli), nameof(Other), nameof(Brand), nameof(Found), nameof(PickedClaude), nameof(PickedCodex), nameof(PickedGemini), nameof(PickedFree),
+            nameof(PickedByHand), nameof(CanContinue), nameof(StepLabel),
             nameof(InstallTitle), nameof(InstallLede), nameof(InstallButton), nameof(InstallSource), nameof(InstallLine), nameof(UseOtherLabel), nameof(SignInTitle),
             nameof(SignInLede), nameof(Privacy), nameof(PlanNote), nameof(ReadyWords), nameof(SidebarTitle), nameof(FieldHint), nameof(Thinking));
     }
@@ -368,6 +387,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             return;
         }
         RoleChosen = Again;
+        // Setup run again after Gemini or no paid plan was the answer: that answer again.
+        if (Picked.Length == 0 && s.SetupAi is "gemini") Picked = "gemini";
+        else if (Picked.Length == 0 && s.SetupAi is "ollama") Picked = "free";
         // One of them is on this computer already and the other isn't: it starts picked, so it's just Continue.
         if (Picked.Length == 0 && claude.Works != codex.Works) Picked = claude.Works ? "claude" : "codex";
         Screen = GuidedScreen.PickAi;
@@ -412,7 +434,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [RelayCommand]
     void Pick(string id)
     {
-        if (id is "claude" or "codex" or "free") Picked = id;
+        if (id is "claude" or "codex" or "gemini" or "free") Picked = id;
     }
 
     [RelayCommand]
@@ -423,17 +445,23 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
 
     /// <summary>"No subscription?": today's setup by hand, with the free model on this computer picked for notes.</summary>
     [RelayCommand]
-    void UseOllama()
+    void UseOllama() => ByHandWith("ollama");
+
+    /// <summary>
+    /// An answer with no chat (Gemini, or no paid plan): setup by hand from its first page, the answer kept so its notes
+    /// step opens on that AI (<see cref="AiSetupModel.Prefer"/>): picked when it's ready, else showing what it needs.
+    /// </summary>
+    void ByHandWith(string engine)
     {
         if (ForNotes)
         {
-            // Asked for from the notes step, which has the free AI's own button: back there.
+            // Asked for from the notes step, which has each AI's own button: back there.
             StopWork();
             BackToNotes(ready: false);
             return;
         }
-        save(s => s.SetupAi = "ollama");
-        PreferOllama = true;
+        save(s => s.SetupAi = engine);
+        PreferOllama = engine == "ollama";
         StopWork();
         Setup.Go(Setup.Steps[0].Step);
         Screen = GuidedScreen.Manual;
@@ -485,7 +513,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             BackToNotes(ready: false);
             return;
         }
-        if (!AiReady && settings().SetupAi is not ("claude" or "codex" or "ollama")) save(s => s.SetupAi = "manual");
+        if (!AiReady && settings().SetupAi is not ("claude" or "codex" or "gemini" or "ollama")) save(s => s.SetupAi = "manual");
         if (!AiReady) StopWork();
         var items = SetupChecklist.From(Setup, Facts());
         Setup.Go(chatStarted ? SetupChecklist.StepFor(Setup, items, item) : Setup.Steps[0].Step);
@@ -523,6 +551,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         {
             case GuidedScreen.PickAi when PickedFree:
                 UseOllama();
+                break;
+            case GuidedScreen.PickAi when PickedGemini:
+                ByHandWith("gemini");
                 break;
             case GuidedScreen.PickAi when Picked.Length > 0:
                 save(s => s.SetupAi = Picked);
@@ -839,7 +870,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         question = null;
         door.NewTurn();
         string work = SetupChat.Folder(services.Home);
-        string brief = SetupChat.Prepare(work, SetupChat.Brief(services.Windows, Again, Setup.IsLibrary && !RoleChosen && !Setup.LibraryOk), door.Url);
+        string brief = SetupChat.Prepare(work, SetupChat.Brief(services.Windows, Again, Setup.IsLibrary && !RoleChosen && !Setup.LibraryOk, Cli.Id), door.Url);
         var turn = new SetupTurn
         {
             Provider = Cli.Id, Exe = exe, Version = Found.Version, WorkDir = work, BriefFile = brief, McpUrl = door.Url, Token = door.Token,

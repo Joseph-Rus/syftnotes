@@ -111,7 +111,7 @@ public class SetupChatTests
         foreach (string s in new[]
         {
             "approval_policy=\"never\"", "sandbox_mode=\"read-only\"", "features.shell_tool=false", "features.unified_exec=false", "web_search=\"disabled\"",
-            "tools.view_image=false", "features.apps=false", "features.multi_agent=false", "features.memories=false", "features.hooks=false",
+            "tools.view_image=false", "features.view_image=false", "features.apps=false", "features.multi_agent=false", "features.memories=false", "features.hooks=false",
             "project_doc_max_bytes=0", "model_reasoning_effort=\"low\"",
             $"mcp_servers.study_stash_setup.url=\"{Url}\"", "mcp_servers.study_stash_setup.bearer_token_env_var=\"STUDYSTASH_SETUP_TOKEN\"",
             "mcp_servers.study_stash_setup.default_tools_approval_mode=\"auto\"", "mcp_servers.study_stash_setup.required=true",

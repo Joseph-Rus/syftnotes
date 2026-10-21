@@ -265,35 +265,102 @@ public sealed class GuidedSetupTests
     }
 
     [AvaloniaFact]
-    public async Task No_paid_plan_is_one_of_the_three_answers_and_opens_setup_by_hand_with_the_free_AI_for_notes()
+    public async Task No_paid_plan_and_gemini_are_answers_like_claude_and_chatgpt_and_open_setup_by_hand()
     {
         await using var rig = await new Rig().OpenAsync();
         var g = rig.Guided;
         // The first screen asks what the student has, in their terms. The tools underneath aren't named on it.
-        Assert.DoesNotContain("Claude Code", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
-        Assert.DoesNotContain("Codex", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + g.FreeLine);
-        // The free AI that runs on the computer is named once, as what it is: Ollama, and advanced. Without a plan the
-        // plain way is no AI at all, and Study Stash still records and transcribes.
-        Assert.DoesNotContain("Ollama", GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine);
-        Assert.Equal($"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {g.Device} (Ollama).", g.FreeLine);
+        string words = GuidedSetupModel.PickLede + GuidedSetupModel.ClaudeLine + GuidedSetupModel.CodexLine + GuidedSetupModel.GeminiLine + g.FreeLine;
+        foreach (string tool in new[] { "Claude Code", "Codex", "Antigravity" }) Assert.DoesNotContain(tool, words);
+        // The free AI that runs on the computer is named once, as what it is: Ollama, and advanced; so is an API key.
+        // Without a plan the plain way is no AI at all, and Study Stash still records and transcribes.
+        Assert.DoesNotContain("Ollama", words.Replace(g.FreeLine, ""));
+        Assert.Equal($"That's fine: Study Stash still records and transcribes. Advanced: a free AI on this {g.Device} (Ollama), or an API key.", g.FreeLine);
         g.Picked = "";
         Assert.False(g.CanContinue);
+        // Nothing picked yet, the steps name no AI.
+        Assert.Equal(["Pick your AI", "Get your AI ready", "Sign in", "Set up Study Stash"], g.Steps.Select(s => s.Title));
         g.PickCommand.Execute("claude");
         Assert.Equal(["Pick your AI", "Get Claude ready", "Sign in to Claude", "Set up Study Stash"], g.Steps.Select(s => s.Title));
 
-        // "I don't have a paid plan" is an answer like the other two, not a small link under them: nothing to install
-        // or sign in to, and Continue goes on.
-        g.PickCommand.Execute("free");
-        Assert.True(g.PickedFree);
-        Assert.True(g.CanContinue);
-        Assert.Equal(["Pick your AI", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        // Gemini and "I don't have a paid plan" are answers like the other two: nothing to install or sign in to here,
+        // and Continue goes on, to setup by hand.
+        foreach (string answer in new[] { "gemini", "free" })
+        {
+            g.PickCommand.Execute(answer);
+            Assert.True(g.PickedByHand);
+            Assert.True(g.CanContinue);
+            Assert.Equal(["Pick your AI", "Set up Study Stash"], g.Steps.Select(s => s.Title));
+        }
         await g.ContinueCommand.ExecuteAsync(null);
         Assert.Equal(GuidedScreen.Manual, g.Screen);
         Assert.True(g.PreferOllama);
         Assert.Equal("ollama", AppSettings.Load(rig.Home.Path).SetupAi);
+        Assert.Equal("ollama", g.NotesPick);
         Assert.Equal(SetupStep.Intro, rig.Setup.Step); // set up by hand opens on How it works
         Assert.Equal(0, FakeAgents.Turns(rig.Bin));
         Assert.False(File.Exists(FakeAgents.ExePath(rig.Bin, "claude")));
+    }
+
+    /// <summary>
+    /// Each AI the first screen offers, picked and carried on with, ends with that AI writing the notes. Claude and
+    /// ChatGPT through the chat (here a fake CLI): once the library's made, the AI picked writes the notes. Gemini and the
+    /// free AI through setup by hand: its notes step opens on that AI (Gemini's key box showing, since it isn't on this
+    /// computer yet), and Continue saves it.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("claude")]
+    [InlineData("codex")]
+    [InlineData("gemini")]
+    [InlineData("free")]
+    public async Task Each_ai_picked_on_the_first_screen_ends_up_writing_the_notes(string answer)
+    {
+        bool chat = answer is "claude" or "codex";
+        await using var rig = await new Rig(cli: chat ? answer : "claude", installed: chat, signedIn: chat, role: AppRole.Both).OpenAsync();
+        var g = rig.Guided;
+        g.PickCommand.Execute(answer);
+        await g.ContinueCommand.ExecuteAsync(null);
+
+        if (chat)
+        {
+            await Until(() => g.Screen == GuidedScreen.Chat && !g.Busy, "the chat");
+            // The brief tells the AI it's the one the student picked, and so writes the notes.
+            Assert.Contains($"call set_notes_writer with \"{answer}\"", File.ReadAllText(Path.Combine(SetupChat.Folder(rig.Home.Path), "brief.md")));
+            // The computer card's Set up on a computer whose library is already made: the AI picked writes the notes.
+            rig.Setup.LibraryOk = true;
+            Assert.False((await rig.CallAsync("offer_computer_setup")).Error);
+            await g.Thread.OfType<CardEntry>().Last().PressCommand.ExecuteAsync("setup");
+            Assert.Equal([answer], rig.Writers);
+            Assert.Equal((ChecklistState.Done, $"Written by {Engines.Name(answer)}"), (rig.Item("notes").State, rig.Item("notes").Detail));
+            Assert.Equal(answer, g.NotesPick);
+            return;
+        }
+
+        Assert.Equal(GuidedScreen.Manual, g.Screen);
+        string engine = answer == "free" ? "ollama" : "gemini";
+        Assert.Equal(engine, g.NotesPick);
+        // The notes step, as setup's window makes it (Shell.EnterSetupStep), over a library where the free AI is
+        // ready and Gemini isn't on this computer.
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() with { Notes = "ollama" } };
+        var opened = new List<string>();
+        var notes = new AiSetupModel(lib) { Windows = false, Prefer = g.NotesPick, TakesKeys = true, WriteNotes = _ => Task.FromResult(true), OpenUrl = opened.Add };
+        await notes.Load();
+        if (engine == "gemini")
+        {
+            Assert.Equal("gemini", notes.KeyFor); // its key box shows, the rest of the list as it was
+            Assert.Equal("Your Gemini API key", notes.KeyTitle);
+            Assert.NotEqual("gemini", notes.SelectedNotes);
+            notes.GetKeyCommand.Execute(null);
+            Assert.Equal(["https://aistudio.google.com/apikey"], opened);
+            notes.KeyDraft = "AIza-test-key";
+            await notes.SaveKeyCommand.ExecuteAsync(null);
+            Assert.Equal("", notes.KeyFor);
+            Assert.Equal("", notes.KeyDraft);
+            Assert.Contains("key:gemini", lib.Calls);
+        }
+        Assert.Equal(engine, notes.SelectedNotes);
+        Assert.True(await notes.SaveAsync());
+        Assert.Equal(engine, lib.DefaultsCalls[^1].Notes);
     }
 
     [AvaloniaFact]

@@ -16,7 +16,7 @@ public sealed record ChecklistFacts
     /// <summary>The student pressed Set up on the computer card (or setup is run again, or the library's already
     /// made or reached).</summary>
     public bool RoleChosen { get; init; }
-    /// <summary>Who writes the notes: "claude", "codex", "ollama", "none", or "" not set yet.</summary>
+    /// <summary>Who writes the notes: "claude", "codex", "gemini", "ollama", "none", or "" not set yet.</summary>
     public string NotesWriter { get; init; } = "";
     public IReadOnlySet<string> Skipped { get; init; } = new HashSet<string>();
     public bool TaskbarDone { get; init; }
@@ -100,7 +100,8 @@ public static class SetupChecklist
                 "" => "",
                 "none" => "Transcripts only for now",
                 "ollama" => "Written by Ollama",
-                var e => $"Written by {AgentCli.Get(e).Brand}",
+                // By the AI's own name: Claude, ChatGPT, Gemini.
+                var e => $"Written by {Engines.Name(e)}",
             };
             items.Add(new("notes", "Notes", f.NotesWriter.Length > 0 ? ChecklistState.Done : ChecklistState.Todo, writer));
         }
