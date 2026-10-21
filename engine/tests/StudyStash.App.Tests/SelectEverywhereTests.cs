@@ -9,6 +9,7 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using StudyStash.App.Controls;
+using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
 
@@ -157,17 +158,84 @@ public class SelectEverywhereTests
             Assert.Equal("say is on the midterm?\nRecursion traces", Selected(question));
             Assert.Equal(Selected(question), await Copied(window));
 
+            // Copy in the right-click menu over the answer copies the whole selection, the question's part too.
+            await window.Clipboard!.SetTextAsync("");
+            var menu = answer.GetVisualAncestors().OfType<NoteView>().First().ContextMenu!;
+            menu.Items.OfType<MenuItem>().First(i => Equals(i.Header, "Copy")).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("say is on the midterm?\nRecursion traces", await window.Clipboard!.TryGetTextAsync());
+
             // ⌘A (Ctrl+A) takes the whole conversation, a failed answer's reason too.
             Press(window, Application.Current!.PlatformSettings!.HotkeyConfiguration.SelectAll[0]);
             var all = Selected(question);
             Assert.StartsWith("What did she say is on the midterm?\nRecursion traces and call-stack diagrams.", all);
             Assert.EndsWith("Which proofs are left off?\nOllama stopped before it answered: the model isn't loaded.", all);
 
-            // The field still takes typing, and its own text still selects there.
+            // A click into the field ends the selection (the field's is the one now), and what was copied pastes
+            // there whole, its lines as one: the field takes no Return, and kept only the first line.
             var field = chat.GetVisualDescendants().OfType<TextBox>().First();
             Click(window, Middle(field));
             Assert.True(field.IsFocused);
             Assert.Equal("", Selected(question));
+            Press(window, Application.Current!.PlatformSettings!.HotkeyConfiguration.Paste[0]);
+            Assert.Equal("say is on the midterm? Recursion traces", field.Text);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void A_drag_on_the_recorders_words_selects_them_and_its_background_still_moves_it(SkinKind skin)
+    {
+        var model = Demo.Recorder(expanded: true);
+        Control view = skin == SkinKind.Mac ? new MacRecorder { DataContext = model } : new WinRecorder { DataContext = model };
+        // What the recorder's window moves by (Shell.MakeRecorderWindow): a press that reaches the view itself.
+        int grabbed = 0;
+        view.PointerPressed += (_, _) => grabbed++;
+        var window = Show(view, skin, 420, 600);
+        try
+        {
+            var first = Piece(view, "Okay, the midterm");
+            var second = Piece(view, "Think of each");
+            Drag(window, At(first, "Recursion"), At(second, " a plate"));
+            Assert.Equal("Recursion traces will be on it, the stack diagrams from last week.\n[19:30] Think of each call as", Selected(first));
+            Assert.Equal(0, grabbed);
+
+            // The room between two lines, and the recorder's top, still take hold of the window.
+            var gap = first.TranslatePoint(new Point(first.Bounds.Width / 2, first.Bounds.Height + 6), window)!.Value;
+            Click(window, gap);
+            Assert.Equal(1, grabbed);
+            var name = view.GetVisualDescendants().OfType<TextBlock>().First(t => t.IsEffectivelyVisible && t.Text == model.DisplayClass);
+            Click(window, Middle(name));
+            Assert.Equal(2, grabbed);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void An_assignment_selects_as_one_page_from_its_title_through_its_instructions(SkinKind skin)
+    {
+        var model = new AssignmentModel(CanvasFixtures.Context());
+        model.Show(CanvasFixtures.Load<CanvasApi.AssignmentDetail>("assignment-9001"));
+        Control view = skin == SkinKind.Mac ? new MacAssignment { DataContext = model } : new WinAssignment { DataContext = model };
+        var window = Show(view, skin, 760, 1000);
+        try
+        {
+            var title = Piece(view, "Lab 3");
+            var instructions = Piece(view, "Trace factorial");
+            Drag(window, At(title, "recursion"), At(instructions, " and fib"));
+            // Each tile's value after its name; the instructions, a lecture's notes of their own, run on from the rest.
+            Assert.Equal("recursion traces\nDue: Tue 30 Sep, 11:59 PM\nPoints: 20\nStatus: To do\nInstructions\nTrace factorial(4)", Selected(title));
+            Assert.True(title.SelectionStart > 0 && instructions.SelectionEnd > 0, "both ends are drawn selected");
         }
         finally
         {
