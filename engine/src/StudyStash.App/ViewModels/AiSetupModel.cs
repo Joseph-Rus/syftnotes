@@ -624,6 +624,34 @@ public sealed partial class AiSetupModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// An AI that's only installed (never tried: Claude's sign-in is in the keychain, Antigravity's somewhere of its own)
+    /// is tried once before it's saved, with one tiny question, so a signed-out one doesn't pass setup and leave the
+    /// notes to fail later. True when it answered (or the library is too old to ask); else the step says why and stays.
+    /// </summary>
+    async Task<bool> CheckedAsync(string id)
+    {
+        if (id == "ollama" || Engines.FirstOrDefault(r => r.Id == id) is not { State: "unchecked" } row) return true;
+        Say = $"Checking {row.Name} works…";
+        var check = await library.CheckAsync(id);
+        if (check is null)
+        {
+            Say = null;
+            return true;
+        }
+        if (check.Overview is not null) Apply(check.Overview);
+        if (check.Overview?.Engines.FirstOrDefault(e => e.Id == id) is { State: "ready" })
+        {
+            Say = null;
+            return true;
+        }
+        string device = Windows ? "PC" : "Mac";
+        Say = Core.Ai.Engines.LooksSignedOut(check.Said)
+            ? $"{row.Name} isn't signed in on this {device}. Sign in from its row, or pick another."
+            : $"{row.Name} didn't answer: {Py.Head(check.Said, 160).TrimEnd('.')}. Try again, or pick another.";
+        return false;
+    }
+
     /// <summary>The setup host calls this on Continue: saves the pick (ask follows notes when the student left it
     /// as Same as notes) and says whether it worked. "No AI for now" turns note writing off instead (and on again
     /// once an engine is picked).</summary>
@@ -642,6 +670,7 @@ public sealed partial class AiSetupModel : ObservableObject
                 if (SelectedAsk != SameAsNotes && await library.DefaultsAsync(ask: SelectedAsk) is null) { OlderLibrary = true; return false; }
                 return true;
             }
+            if (!await CheckedAsync(SelectedNotes)) return false;
             string ask = SelectedAsk == SameAsNotes ? SelectedNotes : SelectedAsk;
             var overview = await library.DefaultsAsync(notes: SelectedNotes, ask: ask);
             if (overview is null) { OlderLibrary = true; return false; }

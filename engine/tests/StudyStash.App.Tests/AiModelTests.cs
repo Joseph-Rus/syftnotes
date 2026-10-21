@@ -670,6 +670,30 @@ public class AiSetupModelTests
         Assert.NotEqual("claude", model.SelectedNotes);
     }
 
+    /// <summary>An AI that's only installed is tried once before setup saves it: a signed-out one stops on the step,
+    /// saying so, where it used to pass setup and leave the notes to fail later.</summary>
+    [AvaloniaFact]
+    public async Task Setup_tries_an_ai_thats_only_installed_before_it_saves_it()
+    {
+        var lib = new FakeAiLibrary { Overview = With(("claude", "unchecked")) };
+        var model = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true) };
+        await model.Load();
+        model.Engines.Single(r => r.Id == "claude").SelectCommand.Execute(null);
+        Assert.Equal("claude", model.SelectedNotes);
+
+        lib.OnCheck = (id, _) => new AiSaid("Not logged in · Please run /login", lib.Overview = With((id, "not_signed_in")));
+        Assert.False(await model.SaveAsync());
+        Assert.Equal("Claude isn't signed in on this Mac. Sign in from its row, or pick another.", model.Say);
+        Assert.Empty(lib.DefaultsCalls);
+
+        lib.OnCheck = (id, _) => new AiSaid("Claude is ready.", lib.Overview = With((id, "ready")));
+        lib.Overview = With(("claude", "unchecked"));
+        await model.Load();
+        Assert.True(await model.SaveAsync());
+        Assert.Equal("claude", lib.DefaultsCalls[^1].Notes);
+        Assert.Equal(2, lib.Calls.Count(c => c == "check:claude"));
+    }
+
     [AvaloniaFact]
     public async Task The_notes_step_opens_on_what_the_library_does_now_and_a_first_run_picks_nothing_that_cant_write()
     {
