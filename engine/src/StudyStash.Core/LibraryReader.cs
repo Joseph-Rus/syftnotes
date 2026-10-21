@@ -367,7 +367,7 @@ public sealed partial class LibraryReader(Config cfg, Store store)
             foreach (var p in again)
                 if (!found.Any(f => f.Item2 == p)) found.Add((note, p));
         }
-        return found;
+        return found.Count > 8 ? found[..8] : found; // what came before leaves room for what the new question finds
     }
 
     /// <summary>The answer's JSON; when it doesn't parse because its LaTeX kept single backslashes, it parses with
