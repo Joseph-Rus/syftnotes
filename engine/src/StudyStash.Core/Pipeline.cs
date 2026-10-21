@@ -81,6 +81,8 @@ public sealed class Pipeline(Config cfg, Store store, SortChatFn? chat = null,
             try
             {
                 summary = await summarize(m, Cfg);
+                // What really wrote them (another model than the one asked, when a limit moved it): the byline's.
+                model = notesModel?.Invoke() ?? model;
                 // The engine just answered: say so now, before the row's status turns to "done" below, so anyone
                 // watching never sees a finished lecture next to a stale "isn't answering" message.
                 if (engineProblem is not null)

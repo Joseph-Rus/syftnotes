@@ -85,6 +85,9 @@ public sealed partial class ApiKeyRow : ObservableObject
     [ObservableProperty] public partial string Hint { get; set; } = "";
     [ObservableProperty] public partial string Draft { get; set; } = "";
     public bool HasKey => Hint.Length > 0;
+    /// <summary>A line under the row (Gemini's: what Google's free tier does with what's sent, and who can have a key).</summary>
+    public string Note { get; init; } = "";
+    public bool HasNote => Note.Length > 0;
     public string Sub => HasKey ? $"Key {Hint} saved" : $"From {Where}";
     partial void OnHintChanged(string value)
     {
@@ -344,7 +347,11 @@ public sealed partial class AiEnginesModel : ObservableObject
             foreach (var (id, name, where, url) in KeyPlaces)
                 if (overview.Engines.FirstOrDefault(e => e.Id == id) is { } e)
                 {
-                    var k = new ApiKeyRow { Id = id, Name = name, Where = where, WhereUrl = url, Hint = e.KeyHint, First = Keys.Count == 0 };
+                    var k = new ApiKeyRow
+                    {
+                        Id = id, Name = name, Where = where, WhereUrl = url, Hint = e.KeyHint, First = Keys.Count == 0,
+                        Note = id == "gemini" ? string.Join("\n", ApiKeys.GeminiKeyNotes("computer")) : "",
+                    };
                     k.SaveCommand = new AsyncRelayCommand(() => SetKeyAsync(k, k.Draft));
                     k.RemoveCommand = new AsyncRelayCommand(() => SetKeyAsync(k, ""));
                     k.GetKeyCommand = new RelayCommand(() => OpenUrl?.Invoke(k.WhereUrl));

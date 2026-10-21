@@ -236,6 +236,7 @@
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="vm:ApiKeyRow">
               <Border Classes="ai-card" Margin="0,0,0,2">
+                <StackPanel>
                 <Grid Classes="ai-row" ColumnDefinitions="Auto,16,*,Auto">
                   <c:Icon Glyph="key" Size="20" />
                   <StackPanel Classes="ai-row-text" Grid.Column="2" VerticalAlignment="Center">
@@ -263,6 +264,9 @@
                     </Button>
                   </StackPanel>
                 </Grid>
+                <!-- Gemini: what Google's free tier does with what's sent, and who can have a free key -->
+                <TextBlock Classes="ai-row-sub" Margin="36,6,0,0" TextWrapping="Wrap" Text="{Binding Note}" IsVisible="{Binding HasNote}" />
+                </StackPanel>
               </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
