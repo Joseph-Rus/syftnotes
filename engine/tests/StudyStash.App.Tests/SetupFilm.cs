@@ -244,7 +244,10 @@ sealed class SetupFilmRig : IAsyncDisposable
                         WriteNotes = WriteNotesAsync,
                         NotesOn = NotesOnAsync,
                         ChosenBefore = setup.Again,
-                        PreferFree = host.Settings.SetupAi == "ollama",
+                        // As Shell.EnterSetupStep: the first screen's answer is the one the step opens on, and any AI
+                        // that takes one can have an API key pasted there.
+                        Prefer = guided.NotesPick,
+                        TakesKeys = true,
                         SetUpPaid = guided.GetReadyForNotesAsync,
                     };
                     guided.ReadyForNotes = id =>
@@ -456,7 +459,7 @@ sealed class SetupFilmRig : IAsyncDisposable
     // Guided setup: pick the AI, Continue, and then the chat.
     async Task GuidedAsync()
     {
-        // The first screen's answers are its Pick buttons, each with the AI's id (main has claude, codex and free).
+        // The first screen's answers are its Pick buttons, each with the AI's id (claude, codex, gemini and free).
         var picks = guidedView.GetVisualDescendants().OfType<Button>().Where(b => b.Command == guided.PickCommand && b.IsEffectivelyVisible).ToList();
         Log("first screen offers: " + string.Join(", ", picks.Select(b => b.CommandParameter as string)));
         if (picks.FirstOrDefault(b => b.CommandParameter as string == o.Provider) is not { } pick)
@@ -469,6 +472,15 @@ sealed class SetupFilmRig : IAsyncDisposable
         await PressAsync(pick, $"picks {Who}");
         Hold(0.5);
         await PressAsync(ButtonFor(guidedView, b => b.Name == "Continue"), "Continue");
+        // An answer with no chat (Gemini): setup by hand, its notes step opening on that AI.
+        if (guided.Screen == GuidedScreen.Manual)
+        {
+            Log($"{Who} has no setup chat: Continue went on to setup by hand");
+            Caption($"{Who}: no setup chat, so setup by hand opens on it");
+            Hold(0.8);
+            await ByHandStepsAsync();
+            return;
+        }
         // Signed in already (the CLI's own status says so), the plan check runs: one tiny turn with no tools.
         if (!await WaitAsync(() => guided.Screen == GuidedScreen.Chat || guided is { Screen: GuidedScreen.SignIn, CheckingPlan: false } && (guided.HasSignInProblem || guided.HasPlanProblem || guided.ShowOpenSignIn) || guided.Screen == GuidedScreen.Install,
                 $"{Who}: checking the sign-in and plan (real)", TimeSpan.FromMinutes(3)))
@@ -621,6 +633,12 @@ sealed class SetupFilmRig : IAsyncDisposable
             await PressAsync(ButtonFor(guidedView, b => b.Name == "Continue"), "Continue");
         }
         else await PressAsync(ButtonFor(guidedView, b => b.Name == "ByHand"), "Set up by hand");
+        await ByHandStepsAsync();
+    }
+
+    /// <summary>Setup by hand, page by page, to the end (or where it stops).</summary>
+    async Task ByHandStepsAsync()
+    {
         await WaitAsync(() => guided.Screen == GuidedScreen.Manual, "Setup by hand opens");
         Hold(0.6);
         for (int guard = 0; guard < 20 && !finished; guard++)
