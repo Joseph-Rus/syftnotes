@@ -40,7 +40,8 @@ public class TypedNotesTests
         Assert.Contains("==exactly as they typed it==", prompt);
         // Typed in Markdown: their bold, checkboxes and nesting stay theirs, inside the marks.
         Assert.Contains("with their formatting exactly as they typed it", prompt);
-        Assert.Contains("(- [ ] ==Read chapter 3==)", prompt);
+        Assert.Contains("(## ==Cell division==, - [ ] ==Read chapter 3==)", prompt);
+        Assert.Contains("A block of code the student typed", prompt);
         Assert.Contains("- q · k → softmax → weights on v", prompt);
         Assert.DoesNotContain("## Key points", prompt);
         Assert.Contains("- ChatGPT, Nov 2022", Summarize.MergePrompt(typed, ["part one", "part two"]));
@@ -105,6 +106,19 @@ public class TypedNotesTests
         Assert.DoesNotContain("==divide", kept);
         Assert.EndsWith("## Also in your notes\n- [x] ==email the TA==\n", kept);
         Assert.Equal(kept, Summarize.KeepTyped(kept, typed.ReplaceLineEndings("\n")));
+        // What a quicker model got wrong in a real run: a heading's # inside the marks under its own ##, and the
+        // student's code marked line by line inside a bullet. Both come out as they should read.
+        const string slipped = """
+            ## ==# **Mitosis** basics==
+            - ==4 phases: *P M A T*==
+            - ==```==
+              ==cells = n0 * 2**gens==
+              ==```==
+              - The number of cells doubles each generation.
+            """;
+        string mended = Summarize.KeepTyped(slipped.ReplaceLineEndings("\n"), "# **Mitosis** basics\n- 4 phases: *P M A T*\n```\ncells = n0 * 2**gens\n```");
+        Assert.StartsWith("## ==**Mitosis** basics==\n- ==4 phases: *P M A T*==\n- ```\n  cells = n0 * 2**gens\n  ```\n", mended);
+        Assert.DoesNotContain("Also in your notes", mended);
         // Lines are the same line however each is formatted.
         Assert.Equal("Mitosis: see the textbook, snake_case", Summarize.Bare("**Mitosis**: *see* [the textbook](https://x.y)`,` snake_case"));
     }

@@ -103,7 +103,8 @@ public static partial class Summarize
         Then the student's notes, as the outline of everything after the summary:
         - Keep every line the student typed, word for word and in the order they typed it, with their formatting exactly as they typed it: their **bold**, *italics*, `code`, ~~strikethrough~~, [links](address) and $maths$ stay just as they are.
         - A line they typed as a heading stays a heading, one level down (# as ##, ## as ###, ### as ####). A numbered line of theirs stays numbered, a checkbox stays a checkbox (- [ ] or - [x], ticked as they left it), a quote stays a quote, and their bullets keep their nesting. Every other line of theirs starts a bullet of its own.
-        - Wrap each thing the student typed in double equals signs, ==exactly as they typed it==, and wrap nothing else in them: those marks are how the student's words are told from yours. Their formatting goes inside the marks (==**Mitosis**: cell division==); a heading's #s, a bullet's -, a number and a checkbox stay outside them (- [ ] ==Read chapter 3==).
+        - Wrap each thing the student typed in double equals signs, ==exactly as they typed it==, and wrap nothing else in them: those marks are how the student's words are told from yours. Their formatting goes inside the marks (==**Mitosis**: cell division==); a heading's #s, a bullet's -, a number and a checkbox stay outside them (## ==Cell division==, - [ ] ==Read chapter 3==).
+        - A block of code the student typed (from a ``` line to the next) and a --- rule of theirs stay exactly as they typed them, with no marks.
         - After a line of the student's, on the same bullet, add what the lecture said about it, in a sentence or two.
         - Where the lecture covered something that matters and the student wrote nothing, add bullets of your own, and sections under headings of your own, in the order it was taught.
         - If the lecture has enough for them, end with "## Questions to review": three to five numbered questions.
@@ -516,10 +517,59 @@ public static partial class Summarize
     [GeneratedRegex(@"\s+")]
     private static partial Regex Blanks();
 
-    /// <summary>A line the model began with the marks, its bullet, checkbox or heading inside them ("==- [ ] Read=="):
-    /// it would read as words, not as a checkbox.</summary>
-    [GeneratedRegex(@"^(\s*)==((?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+|>\s+)+)(?=\S)")]
+    /// <summary>A line whose bullet, checkbox or heading the model put inside the marks ("==- [ ] Read==", "##
+    /// ==# Cells=="): it would read as words, not as a checkbox or a heading.</summary>
+    [GeneratedRegex(@"^(\s*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\d+[.)]\s+|>\s+)*)==((?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\]\s+)?|\[[ xX]\]\s+|\d+[.)]\s+|>\s+)+)(?=\S)")]
     private static partial Regex LeadInsideMark();
+
+    /// <summary>A code block's ``` line the model put inside the marks ("- ==```=="): the block would read as words.</summary>
+    [GeneratedRegex(@"^(\s*(?:[-*+]\s+|\d+[.)]\s+|>\s+)*)==((?:```|~~~)[^=]*?)==\s*$")]
+    private static partial Regex MarkedFence();
+
+    [GeneratedRegex(@"^(\s*)==(.*)==\s*$")]
+    private static partial Regex MarkedLine();
+
+    /// <summary>
+    /// The notes with what the model got wrong about the marks' place put right: a heading's #s, a bullet or a checkbox
+    /// that went inside them comes back out in front (a second heading's #s inside a heading are dropped), and a block
+    /// of the student's code it marked line by line is a block of code again, unmarked.
+    /// </summary>
+    static string MarksPlaced(string notes)
+    {
+        var lines = notes.Split('\n');
+        bool fence = false, markedFence = false;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            if (MarkedFence().Match(line) is { Success: true } f)
+            {
+                lines[i] = f.Groups[1].Value + f.Groups[2].Value;
+                fence = !fence;
+                markedFence = fence;
+                continue;
+            }
+            string t = line.TrimStart();
+            if (t.StartsWith("```", StringComparison.Ordinal) || t.StartsWith("~~~", StringComparison.Ordinal))
+            {
+                fence = !fence;
+                markedFence = false;
+                continue;
+            }
+            if (fence)
+            {
+                if (markedFence && MarkedLine().Match(line) is { Success: true } code) lines[i] = code.Groups[1].Value + code.Groups[2].Value;
+                continue;
+            }
+            lines[i] = LeadInsideMark().Replace(line, m =>
+            {
+                string outer = m.Groups[1].Value, inner = m.Groups[2].Value;
+                if (outer.Trim().Length == 0) return outer + (inner.StartsWith('[') ? "- " : "") + inner + Mark;
+                if (outer.TrimStart().StartsWith('#') && inner.StartsWith('#')) return outer + Mark;
+                return outer + inner + Mark;
+            });
+        }
+        return string.Join("\n", lines);
+    }
 
     /// <summary>A pair of marks and what's between them.</summary>
     [GeneratedRegex(@"==(?=\S)(.+?)(?<=\S)==")]
@@ -655,8 +705,7 @@ public static partial class Summarize
     {
         var lines = TypedLines(typed);
         if (lines.Count == 0 || Py.Strip(notes).Length == 0) return notes;
-        // A bullet, checkbox or heading the model put inside the marks goes back in front of them.
-        notes = string.Join("\n", notes.Split('\n').Select(l => l.TrimStart().StartsWith("==", StringComparison.Ordinal) ? LeadInsideMark().Replace(l, "$1$2==") : l));
+        notes = MarksPlaced(notes);
         var missing = new List<(string Lead, string Words)>();
         foreach (var (lead, line) in lines)
         {
