@@ -31,7 +31,7 @@
       </Grid>
       <ScrollViewer Name="Thread" Classes="ai-answer-scroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" c:FollowEnd.IsOn="True">
         <!-- Every question and its answer select as one, a drag running on from a question into its answer -->
-        <ItemsControl ItemsSource="{Binding Turns}" Background="{x:Null}" Margin="16,2,16,12" c:TextSelection.Area="True">
+        <ItemsControl ItemsSource="{Binding Turns}" Margin="16,2,16,12" c:TextSelection.Area="True">
           <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate><StackPanel Spacing="16" /></ItemsPanelTemplate>
           </ItemsControl.ItemsPanel>

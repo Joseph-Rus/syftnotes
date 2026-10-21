@@ -64,6 +64,32 @@ public class AskRemembersTests
     }
 
     [AvaloniaFact]
+    public async Task Closing_the_card_ends_the_conversation_and_an_answer_on_its_way_lands_nowhere()
+    {
+        var (model, lib) = await Loaded();
+        await Ask(model, "What are the three kinds of blood vessel?");
+        model.CloseAnswerCommand.Execute(null);
+        Assert.Empty(model.Turns);
+        await Ask(model, "And the second one?");
+        Assert.Null(lib.AskRequests[^1].History); // nothing before it carried in
+
+        // Closed while an answer is still being written: it stops, and no stray turn is left.
+        lib.OnAskStream = async (r, soFar, stop) =>
+        {
+            soFar("Capillaries");
+            await Task.Delay(Timeout.InfiniteTimeSpan, stop);
+            return null;
+        };
+        model.Question = "Explain that more simply";
+        var asking = model.AskCommand.ExecuteAsync(null);
+        model.CloseAnswerCommand.Execute(null);
+        await asking;
+        Assert.Empty(model.Turns);
+        Assert.False(model.Busy);
+        Assert.False(model.HasLatest);
+    }
+
+    [AvaloniaFact]
     public async Task New_chat_starts_afresh()
     {
         var (model, lib) = await Loaded();
@@ -121,6 +147,53 @@ public class AskRemembersTests
         var text = root.GetVisualDescendants().OfType<NoteText>().First(t => t.IsEffectivelyVisible && Words(t).StartsWith(words, StringComparison.Ordinal));
         var box = text.TextLayout.HitTestTextPosition(Words(text).IndexOf(at, StringComparison.Ordinal));
         return text.TranslatePoint(new Point(box.X + 1 + text.Padding.Left, box.Y + box.Height / 2 + text.Padding.Top), TopLevel.GetTopLevel(text)!)!.Value;
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac, false)]
+    [InlineData(SkinKind.Win, false)]
+    [InlineData(SkinKind.Mac, true)]
+    [InlineData(SkinKind.Win, true)]
+    public async Task A_question_asked_shows_even_with_the_thread_scrolled_up(SkinKind skin, bool recorder)
+    {
+        var lib = new FakeAiLibrary { Overview = AiTestData.MixedOverview() };
+        lib.OnAsk = r => new AskReply("The second one is capillaries: one cell thick, so gases cross them.", [], "claude", "Claude") { Remembered = r.History?.Count ?? 0 };
+        var model = new AiAskModel(lib);
+        await model.Load();
+        for (int i = 1; i <= 5; i++)
+            model.Turns.Add(new AiTurn($"Question {i}?", "Claude") { Answer = string.Concat(Enumerable.Repeat("Arteries, capillaries and veins. ", 8)), Byline = "Claude" });
+        Control view = (skin, recorder) switch
+        {
+            (SkinKind.Mac, false) => new MacAiAnswer { DataContext = model },
+            (SkinKind.Win, false) => new WinAiAnswer { DataContext = model },
+            (SkinKind.Mac, true) => new MacAiAskChat { DataContext = model },
+            _ => new WinAiAskChat { DataContext = model },
+        };
+        view.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom;
+        var window = Show(view, skin, 820);
+        try
+        {
+            var thread = view.GetVisualDescendants().OfType<ScrollViewer>().Single(s => s.Name == "Thread");
+            static double End(ScrollViewer s) => s.Extent.Height - s.Viewport.Height;
+            Assert.True(End(thread) > 100 && thread.Offset.Y >= End(thread) - 1);
+
+            // The student scrolls up to read the first answer again; the thread stays there while nothing is asked.
+            thread.Offset = new Vector(0, 0);
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Assert.Equal(0, thread.Offset.Y);
+
+            // Then asks: the thread goes to its end, where the question and its answer are.
+            await Ask(model, "And the second one?");
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(thread.Offset.Y >= End(thread) - 1, $"at {thread.Offset.Y} of {End(thread)}");
+        }
+        finally
+        {
+            window.Close();
+        }
     }
 
     [AvaloniaTheory]

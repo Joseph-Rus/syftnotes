@@ -24,6 +24,15 @@ public static class FollowEnd
         if (e.NewValue is true) view.ScrollChanged += Changed;
     });
 
+    /// <summary>Back to the end, and following it again however far up the student had scrolled: a question was just
+    /// asked, and it and its answer are what they want to see.</summary>
+    public static void ToEnd(ScrollViewer view)
+    {
+        view.SetValue(AwayProperty, false);
+        double end = Math.Max(0, view.Extent.Height - view.Viewport.Height);
+        if (view.Offset.Y < end) view.Offset = new Vector(view.Offset.X, end);
+    }
+
     public static bool GetIsOn(ScrollViewer view) => view.GetValue(IsOnProperty);
     public static void SetIsOn(ScrollViewer view, bool on) => view.SetValue(IsOnProperty, on);
 

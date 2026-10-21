@@ -120,11 +120,13 @@ public class AskStreamingTests
         model.Question = "q";
 
         var asking = model.AskCommand.ExecuteAsync(null);
-        model.CloseAnswerCommand.Execute(null); // closing the answer stops it too
+        var turn = model.Turns[0];
+        model.CloseAnswerCommand.Execute(null); // closing the answer stops it too, and ends the conversation
         await asking;
 
-        Assert.False(model.Turns[0].IsThinking);
-        Assert.Equal(AiWords.Stopped, model.Turns[0].Byline);
+        Assert.False(turn.IsThinking);
+        Assert.Equal(AiWords.Stopped, turn.Byline);
+        Assert.Empty(model.Turns);
     }
 
     [AvaloniaFact]

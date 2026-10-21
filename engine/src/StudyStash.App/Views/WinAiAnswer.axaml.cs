@@ -8,5 +8,6 @@ public partial class WinAiAnswer : UserControl
     {
         InitializeComponent();
         AnswerHeight.Follow(this, Thread);
+        AskThread.Follow(this, Thread);
     }
 }

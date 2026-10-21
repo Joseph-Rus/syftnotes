@@ -184,11 +184,13 @@ public sealed partial class AiAskModel : ObservableObject
 
     partial void OnAnswerClosedChanged(bool value) => ThreadShown();
 
-    /// <summary>The answer card's close button: the notes get their room back, and an answer still being written stops.</summary>
+    /// <summary>The answer card's close button: the notes get their room back, and the conversation ends there, as New
+    /// chat ends it: the next question starts afresh, nothing before it carried in. An answer still being written stops
+    /// and goes with it.</summary>
     [RelayCommand]
     void CloseAnswer()
     {
-        Stop();
+        EndChat();
         AnswerClosed = true;
     }
 
@@ -197,13 +199,23 @@ public sealed partial class AiAskModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanStartOver))]
     void NewChat()
     {
-        Stop();
-        Turns.Clear();
+        EndChat();
         AnswerClosed = false;
-        OnPropertyChanged(nameof(Latest));
-        ThreadShown();
         Started?.Invoke();
     }
+
+    /// <summary>The conversation is over: its turns go (one still being answered stops, and its answer lands nowhere).</summary>
+    void EndChat()
+    {
+        Stop();
+        Turns.Clear();
+        OnPropertyChanged(nameof(Latest));
+        ThreadShown();
+    }
+
+    /// <summary>The student asked: a turn was added at the end of the thread. The views bring the thread back to its end,
+    /// even where the student had scrolled up to read something earlier, so the question and its answer show.</summary>
+    public event Action? Asked;
 
     public bool CanStartOver => Turns.Count > 0;
 
@@ -220,7 +232,11 @@ public sealed partial class AiAskModel : ObservableObject
     /// being written stops. The conversation is kept for this lecture: the next question, or "Show the chat", shows it
     /// again (a new recording starts a new one).</summary>
     [RelayCommand(CanExecute = nameof(HasLatest))]
-    void CloseChat() => CloseAnswer();
+    void CloseChat()
+    {
+        Stop();
+        AnswerClosed = true;
+    }
 
     /// <summary>"Show the chat": the conversation closed a moment ago, back as it was.</summary>
     [RelayCommand]
@@ -354,6 +370,7 @@ public sealed partial class AiAskModel : ObservableObject
         AnswerClosed = false;
         OnPropertyChanged(nameof(Latest));
         ThreadShown();
+        Asked?.Invoke();
         Busy = true;
         using var stop = asking = new CancellationTokenSource();
         var paced = new Paced(text => turn.Answer = PartialText.Showable(text));

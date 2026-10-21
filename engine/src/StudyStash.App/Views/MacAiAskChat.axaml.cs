@@ -8,6 +8,7 @@ public partial class MacAiAskChat : UserControl
     public MacAiAskChat()
     {
         InitializeComponent();
+        AskThread.Follow(this, Thread);
         DataContextChanged += (_, _) =>
         {
             if (DataContext is not AiAskModel m) return;
