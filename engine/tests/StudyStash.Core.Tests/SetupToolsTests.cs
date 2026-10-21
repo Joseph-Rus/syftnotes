@@ -215,7 +215,7 @@ public sealed class SetupToolsTests : IAsyncLifetime
         Assert.True((await Call(mcp, "add_class", new() { ["name"] = "BIO 110", ["about"] = new string('d', 301) })).Error);
         Assert.True((await Call(mcp, "offer_chrome_helper", new() { ["school_address"] = "rm -rf ~" })).Error);
         Assert.True((await Call(mcp, "offer_computer_setup", new() { ["suggested"] = "server" })).Error);
-        Assert.True((await Call(mcp, "set_notes_writer", new() { ["engine"] = "gemini" })).Error);
+        Assert.True((await Call(mcp, "set_notes_writer", new() { ["engine"] = "grok" })).Error);
         Assert.True((await Call(mcp, "skip_step", new() { ["step"] = "microphone" })).Error);
         Assert.Empty(driver.Classes);
         Assert.Empty(driver.Cards);
@@ -229,10 +229,12 @@ public sealed class SetupToolsTests : IAsyncLifetime
         await using var mcp = await Connect();
         Assert.Contains("Added BIO 110", (await Call(mcp, "add_class", new() { ["name"] = "BIO 110", ["about"] = "Cells, genetics and evolution" })).Text);
         Assert.Contains("Claude writes the notes", (await Call(mcp, "set_notes_writer", new() { ["engine"] = "claude" })).Text);
+        // Gemini too, when it's set up here (the driver says whether it is).
+        Assert.Contains("Gemini writes the notes", (await Call(mcp, "set_notes_writer", new() { ["engine"] = "gemini" })).Text);
         Assert.False((await Call(mcp, "skip_step", new() { ["step"] = "canvas" })).Error);
         Assert.False((await Call(mcp, "open_manual_setup", new() { ["step"] = "microphone" })).Error);
         Assert.Equal(("BIO 110", "Cells, genetics and evolution"), driver.Classes.Single());
-        Assert.Equal(["claude"], driver.Writers);
+        Assert.Equal(["claude", "gemini"], driver.Writers);
         Assert.Equal(["canvas"], driver.Skipped);
         Assert.Equal(["microphone"], driver.Manual);
 

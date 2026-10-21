@@ -1401,9 +1401,14 @@ public static partial class Shell
                         WriteNotes = WriteNotesAsync,
                         NotesOn = NotesOnAsync,
                         ChosenBefore = model.Again,
-                        // "I don't have a paid plan" on guided setup's first screen comes here with the free AI on
-                        // this computer picked for the notes when it's here already.
-                        PreferFree = host.Settings.SetupAi == "ollama",
+                        // The answer on guided setup's first screen: "I don't have a paid plan" comes here with the
+                        // free AI on this computer picked for the notes when it's here already, Gemini with Gemini
+                        // (or its key showing), and Claude or ChatGPT, once guided setup got it ready, with that.
+                        Prefer = guidedSetup?.NotesPick ?? (host.Settings.SetupAi is "ollama" or "gemini" ? host.Settings.SetupAi : ""),
+                        // Claude, ChatGPT and Gemini can each run on an API key the student pastes on the step; carried
+                        // on from a plan other apps can't use, that AI's key box is open.
+                        TakesKeys = true,
+                        OpenKeyFor = guidedSetup?.NotesKeyFor ?? "",
                         // Claude and ChatGPT are got ready by guided setup's own two screens, with buttons, where
                         // setup's window has them.
                         SetUpPaid = guidedSetup is { } withButtons ? withButtons.GetReadyForNotesAsync : null,

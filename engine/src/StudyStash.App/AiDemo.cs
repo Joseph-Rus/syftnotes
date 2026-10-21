@@ -103,6 +103,7 @@ public static class AiDemo
             Lede = oneComputer ? $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings → Your AI."
                 : "This computer is your library, so the AI runs here. You can change this later from any of your computers, in Settings → Your AI.",
             WriteNotes = oneComputer ? _ => Task.FromResult(true) : null,
+            TakesKeys = true,
         };
         m.Load().GetAwaiter().GetResult();
         return m;
@@ -124,6 +125,26 @@ public static class AiDemo
         return m;
     }
 
+    /// <summary>Just this computer's notes step as setup's own window has it (Claude and ChatGPT got ready with buttons,
+    /// any of the three on an API key), one engine in <paramref name="state"/>, and <paramref name="prefer"/> the
+    /// answer on guided setup's first screen ("gemini" opens on its key).</summary>
+    public static AiSetupModel SetupKeyed(bool windows, string engine, string state, string prefer = "")
+    {
+        var o = SetupOverview();
+        o = o with { Engines = [.. o.Engines.Select(e => e.Id == engine ? e with { State = state, Installed = state != "not_installed" } : e)] };
+        var m = new AiSetupModel(new Library(o))
+        {
+            Windows = windows,
+            Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings → Your AI.",
+            WriteNotes = _ => Task.FromResult(true),
+            SetUpPaid = _ => Task.CompletedTask,
+            TakesKeys = true,
+            Prefer = prefer,
+        };
+        m.Load().GetAwaiter().GetResult();
+        return m;
+    }
+
     /// <summary>Setup's notes step on a computer with no paid AI on it: the free one in <paramref name="state"/>, and,
     /// with <paramref name="pulling"/>, being got ready right now (a still: nothing asks the library again).</summary>
     public static AiSetupModel SetupFree(bool windows, string state, PullInfo? pulling = null)
@@ -140,8 +161,10 @@ public static class AiDemo
             Lede = $"They run on this {(windows ? "PC" : "Mac")}, as part of your library. You can change this later in Settings → Your AI.",
             WriteNotes = _ => Task.FromResult(true),
             Wait = () => new TaskCompletionSource().Task,
-            // As in setup's own window: Claude and ChatGPT are got ready with buttons, not commands.
+            // As in setup's own window: Claude and ChatGPT are got ready with buttons, not commands, and any of the
+            // three can have an API key instead.
             SetUpPaid = _ => Task.CompletedTask,
+            TakesKeys = true,
         };
         m.Load().GetAwaiter().GetResult();
         return m;

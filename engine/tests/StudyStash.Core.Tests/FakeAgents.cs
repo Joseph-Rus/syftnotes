@@ -9,7 +9,8 @@ namespace StudyStash.Core.Tests;
 /// is the sign-in), and runs a "turn" the way <c>claude -p</c> / <c>codex exec</c> would: it writes down its
 /// arguments, the names (never the values) of its environment variables and its input, then prints
 /// <c>replay-N.jsonl</c> (or <c>replay.jsonl</c>) line by line. Files beside it change what it does: <c>broken</c>
-/// (its --version fails), <c>login-fails</c>, <c>sleep</c> (seconds to wait before answering), <c>exit</c>.
+/// (its --version fails), <c>login-fails</c>, <c>sleep</c> (seconds to wait before answering), <c>exit</c>,
+/// <c>refuse</c> (an argument it doesn't know, as an older version: a turn given it stops with clap's error).
 /// </summary>
 public static class FakeAgents
 {
@@ -94,6 +95,10 @@ public static class FakeAgents
         n=$(( $(cat "$D/turns" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$D/turns"; echo $$ > "$D/pid-$n"
         for a in "$@"; do printf '%s\n' "$a"; done > "$D/argv-$n.txt"
         env | cut -d= -f1 | sort > "$D/env-$n.txt"
+        if [ -f "$D/refuse" ]; then
+          r="$(cat "$D/refuse")"
+          for a in "$@"; do [ "$a" = "$r" ] && { echo "error: unexpected argument '$r' found" >&2; exit 2; }; done
+        fi
         cat > "$D/stdin-$n.txt"
         f="$D/replay-$n.jsonl"; [ -f "$f" ] || f="$D/replay.jsonl"
         if [ -f "$D/sleep" ]; then
@@ -162,6 +167,10 @@ public static class FakeAgents
         Set-Content "$D\pid-$n" $PID
         $argv | Set-Content "$D\argv-$n.txt"
         Get-ChildItem env: | ForEach-Object { $_.Name } | Sort-Object | Set-Content "$D\env-$n.txt"
+        if (Test-Path "$D\refuse") {
+          $r = (Get-Content "$D\refuse" -Raw).Trim()
+          if ($argv -contains $r) { [Console]::Error.WriteLine("error: unexpected argument '$r' found"); exit 2 }
+        }
         [Console]::In.ReadToEnd() | Set-Content "$D\stdin-$n.txt"
         $f = "$D\replay-$n.jsonl"; if (-not (Test-Path $f)) { $f = "$D\replay.jsonl" }
         if (Test-Path "$D\sleep") {

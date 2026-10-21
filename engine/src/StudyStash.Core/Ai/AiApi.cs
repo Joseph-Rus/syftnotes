@@ -204,7 +204,10 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
     };
 
-    static readonly HttpClient Shared = new() { Timeout = TimeSpan.FromSeconds(150) };
+    /// <summary>How long the app waits for the library to answer.</summary>
+    public static readonly TimeSpan Waits = TimeSpan.FromSeconds(150);
+
+    static readonly HttpClient Shared = new() { Timeout = Waits };
     readonly HttpClient client = http ?? Shared;
     readonly string root = serverUrl.TrimEnd('/') + "/api/v2/ai";
 

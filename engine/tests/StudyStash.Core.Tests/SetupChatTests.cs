@@ -111,7 +111,7 @@ public class SetupChatTests
         foreach (string s in new[]
         {
             "approval_policy=\"never\"", "sandbox_mode=\"read-only\"", "features.shell_tool=false", "features.unified_exec=false", "web_search=\"disabled\"",
-            "tools.view_image=false", "features.apps=false", "features.multi_agent=false", "features.memories=false", "features.hooks=false",
+            "tools.view_image=false", "features.view_image=false", "features.apps=false", "features.multi_agent=false", "features.memories=false", "features.hooks=false",
             "project_doc_max_bytes=0", "model_reasoning_effort=\"low\"",
             $"mcp_servers.study_stash_setup.url=\"{Url}\"", "mcp_servers.study_stash_setup.bearer_token_env_var=\"STUDYSTASH_SETUP_TOKEN\"",
             "mcp_servers.study_stash_setup.default_tools_approval_mode=\"auto\"", "mcp_servers.study_stash_setup.required=true",
@@ -226,6 +226,8 @@ public class SetupChatTests
             CodexItem("item.completed", new JsonObject { ["id"] = "i1", ["type"] = "mcp_tool_call", ["server"] = "study_stash_setup", ["tool"] = "get_setup_status" }),
             CodexItem("item.started", new JsonObject { ["id"] = "i2", ["type"] = "mcp_tool_call", ["server"] = "study_stash_setup", ["tool"] = "add_class", ["arguments"] = """{"name":"CS 101"}""" }),
             CodexItem("item.completed", new JsonObject { ["id"] = "i3", ["type"] = "agent_message", ["text"] = "Hi! Just this Mac, or two computers?" }),
+            // The same words again as its answer (seen with the ChatGPT app's Codex): shown once.
+            CodexItem("item.completed", new JsonObject { ["id"] = "i4", ["type"] = "agent_message", ["text"] = "Hi! Just this Mac, or two computers?" }),
             """{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}""",
         ]);
         var events = await Run(Turn(dir, "codex", exe));
@@ -395,14 +397,55 @@ public class SetupChatTests
         string exe = FakeAgents.WriteCli(dir["bin"], "codex");
         FakeAgents.Replay(dir["bin"], ["""{"type":"thread.started","thread_id":"t-1"}""", """{"type":"turn.failed","error":{"message":"401 Unauthorized: not logged in"}}"""], 1);
         FakeAgents.Replay(dir["bin"], ["""{"type":"thread.started","thread_id":"t-2"}""", CodexItem("item.completed", new JsonObject { ["type"] = "agent_message", ["text"] = "ready" }), """{"type":"turn.completed"}"""], 2);
-        var check = await SetupChat.CheckPlanAsync("codex", exe, null, SetupChat.Folder(dir["home"]));
+        var check = await SetupChat.CheckPlanAsync("codex", exe, null, SetupChat.Folder(dir["home"]), ownMcpServers: ["study-stash", "github"]);
 
         Assert.True(check.Ok, check.Said);
         Assert.True(check.KeptConfig);
         Assert.Contains("--ignore-user-config", FakeAgents.Argv(dir["bin"], 1));
         Assert.DoesNotContain("--ignore-user-config", FakeAgents.Argv(dir["bin"], 2));
-        // Everything else stays locked the second time too.
+        // Everything else stays locked the second time too, and the student's own MCP servers (which Codex would
+        // start, reading their config) are each turned off.
         Assert.Contains("features.shell_tool=false", FakeAgents.Argv(dir["bin"], 2));
+        Assert.Contains("mcp_servers.study-stash.enabled=false", FakeAgents.Argv(dir["bin"], 2));
+        Assert.Contains("mcp_servers.github.enabled=false", FakeAgents.Argv(dir["bin"], 2));
+        Assert.Contains("notify=[]", FakeAgents.Argv(dir["bin"], 2));
+        Assert.DoesNotContain(FakeAgents.Argv(dir["bin"], 1), a => a.EndsWith(".enabled=false", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task An_older_codex_that_doesnt_know_the_flag_is_asked_again_without_it()
+    {
+        using var dir = new TempDir();
+        string exe = FakeAgents.WriteCli(dir["bin"], "codex");
+        File.WriteAllText(Path.Combine(dir["bin"], "refuse"), "--ignore-user-config");
+        FakeAgents.Replay(dir["bin"], ["""{"type":"thread.started","thread_id":"t-2"}""", CodexItem("item.completed", new JsonObject { ["type"] = "agent_message", ["text"] = "ready" }), """{"type":"turn.completed"}"""]);
+        var check = await SetupChat.CheckPlanAsync("codex", exe, null, SetupChat.Folder(dir["home"]), ownMcpServers: ["github"]);
+        Assert.True(check.Ok, check.Said);
+        Assert.True(check.KeptConfig);
+        Assert.Contains("mcp_servers.github.enabled=false", FakeAgents.Argv(dir["bin"], 2));
+    }
+
+    [Fact]
+    public void A_codex_configs_own_mcp_servers_are_found_by_name_only()
+    {
+        using var dir = new TempDir();
+        string config = Path.Combine(dir["codex"], "config.toml");
+        Directory.CreateDirectory(Path.GetDirectoryName(config)!);
+        File.WriteAllText(config, """
+            model = "gpt-5"
+            mcp_servers.inline.command = "x"
+
+            [mcp_servers.study-stash]
+            command = "/Applications/Study Stash.app/Contents/MacOS/studystash"
+
+            [mcp_servers.github.env]
+            TOKEN = "not read"
+
+            [model_providers.local]
+            base_url = "http://localhost:11434/v1"
+            """);
+        Assert.Equal(["inline", "study-stash", "github"], SetupChat.CodexServers(config));
+        Assert.Empty(SetupChat.CodexServers(Path.Combine(dir["codex"], "missing.toml")));
     }
 
     [Fact]

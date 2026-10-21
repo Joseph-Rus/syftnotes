@@ -35,6 +35,7 @@ public static class EngineSetupWords
     {
         "claude" => "claude",
         "codex" => "codex login",
+        "gemini" => "agy",
         _ => "",
     };
 
@@ -51,9 +52,12 @@ public static class EngineSetupWords
     public static IReadOnlyList<HowToStep> Steps(string id, string state, bool windows)
     {
         string where = TerminalName(windows);
-        HowToStep SignIn() => id == "claude"
-            ? new HowToStep("Sign in: run this, then sign in with your Claude account in the browser", SignInCommand(id), Plan(id))
-            : new HowToStep("Sign in: run this and choose Sign in with ChatGPT", SignInCommand(id), Plan(id));
+        HowToStep SignIn() => id switch
+        {
+            "claude" => new HowToStep("Sign in: run this, then sign in with your Claude account in the browser", SignInCommand(id), Plan(id)),
+            "gemini" => new HowToStep("Sign in: run this, then sign in with your Google account", SignInCommand(id), "Or use an API key instead: there's no app to install for that."),
+            _ => new HowToStep("Sign in: run this and choose Sign in with ChatGPT", SignInCommand(id), Plan(id)),
+        };
         return (id, state) switch
         {
             // The free AI has no steps to follow: its row's one button gets it ready (AiSetupModel).
@@ -62,7 +66,9 @@ public static class EngineSetupWords
                 new HowToStep($"Install it: paste this into {where}", InstallCommand(id, windows), $"Or with npm: {NpmCommand(id)}"),
                 SignIn(),
             ],
-            ("claude" or "codex", "not_signed_in") => [SignIn()],
+            // Gemini's Antigravity is installed from Google's own site (its row's one button is an API key instead):
+            // once it's here, it only needs signing in.
+            ("claude" or "codex" or "gemini", "not_signed_in") => [SignIn()],
             _ => [],
         };
     }

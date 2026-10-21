@@ -142,6 +142,7 @@ public static partial class AiWords
         "ollama" => $"Free AI on this {device}",
         "claude" => "Claude",
         "codex" => "ChatGPT",
+        "gemini" => "Gemini",
         _ => name,
     };
 
@@ -159,7 +160,7 @@ public static partial class AiWords
     /// <summary>A row's line in setup's "who writes your notes" list. For the free AI that still needs setting up:
     /// how much there is to download for this computer (<paramref name="gb"/>), and, where only the small one fits
     /// (<paramref name="small"/>), that its notes are simpler: said before the download, not found out after.</summary>
-    public static string SetupAbout(string id, string state, string device = "computer", double gb = 0, bool small = false) => id == "ollama"
+    public static string SetupAbout(string id, string state, string device = "computer", double gb = 0, bool small = false, bool hasKey = false) => id == "ollama"
         ? state switch
         {
             "not_installed" => $"Free and private (Ollama). Study Stash downloads it for you: {HowBig(gb)}, once.{Simpler(small, device)}",
@@ -167,7 +168,21 @@ public static partial class AiWords
             "model_missing" => $"Free and private (Ollama). It's here, and still needs what it writes notes with: {HowBig(gb)}, once.{Simpler(small, device)}",
             _ => $"Free and private (Ollama). It runs on this {device}: nothing you record leaves it.",
         }
-        : id is "claude" or "codex" ? (id == "claude" ? "With your paid Claude plan, through Claude Code. " : "With your paid ChatGPT plan, through Codex. ") + state switch
+        // An API key the student gave it writes the notes, whatever else is installed.
+        : hasKey ? state switch
+        {
+            "ready" => "With your API key. It works.",
+            "limited" => "With your API key. Hit its usage limit for now.",
+            "failed" or "not_signed_in" => "With your API key, which didn't work last time.",
+            _ => "With your API key.",
+        }
+        : id is "claude" or "codex" or "gemini" ? (id switch
+        {
+            "claude" => "With your paid Claude plan, through Claude Code. ",
+            "codex" => "With your paid ChatGPT plan, through Codex. ",
+            // Gemini runs on an API key from Google AI Studio, or through Google's Antigravity, signed in.
+            _ => state == "not_installed" ? "With an API key, or Google's Antigravity app. " : "Through Google's Antigravity. ",
+        }) + state switch
         {
             "ready" => "Signed in on this computer.",
             "not_signed_in" => "Installed. Sign in to use it.",
