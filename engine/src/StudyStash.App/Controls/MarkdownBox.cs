@@ -311,19 +311,20 @@ public class MarkdownBox : TextBox
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
-        if (change.Property == IsFocusedProperty || change.Property == HideMarksProperty)
-        {
-            // After the click that brought the caret here has found its letter in the text as it was drawn (marks
-            // hidden), not in the wider text with them showing.
-            Dispatcher.UIThread.Post(() =>
-            {
-                bool shown = !HideMarks || IsFocused;
-                if (shown == marksShown) return;
-                marksShown = shown;
-                presenter?.Refresh();
-            }, DispatcherPriority.Input);
-        }
+        // The caret came in: the marks show once the click that brought it has found its letter in the text as it was
+        // drawn (marks hidden), not in the wider text with them showing. Otherwise (the caret left, or the field was
+        // just made) at once, so a page opening never shows them for a moment.
+        if (change.Property == IsFocusedProperty && IsFocused) Dispatcher.UIThread.Post(ShowMarks, DispatcherPriority.Input);
+        else if (change.Property == IsFocusedProperty || change.Property == HideMarksProperty) ShowMarks();
         else if (change.Property == WholeNotesProperty) presenter?.Refresh();
+    }
+
+    void ShowMarks()
+    {
+        bool shown = !HideMarks || IsFocused;
+        if (shown == marksShown) return;
+        marksShown = shown;
+        presenter?.Refresh();
     }
 
     /// <summary>Whether the marks show now (for a test).</summary>

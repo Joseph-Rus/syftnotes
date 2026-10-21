@@ -313,11 +313,11 @@ public sealed partial class TypedEditor : UserControl
             l.Box.LineHeight = l.Marker.LineHeight = height;
             l.Box.Code = inCode;
             bool done = task && l.Lead.Contains("[x]", StringComparison.OrdinalIgnoreCase);
-            l.Box.Muted = done || l.Fence;
+            l.Box.Muted = done || l.Fence || IsRule(l);
             l.Box.Struck = done;
             l.Box.Padding = inCode ? new Thickness(10, 0) : default;
-            if (inCode) l.Row.Bind(Panel.BackgroundProperty, l.Row.GetResourceObservable("Fill2"));
-            else l.Row.Background = null;
+            if (inCode && l.Row.Background is null) l.Row.Bind(Panel.BackgroundProperty, l.Row.GetResourceObservable("Fill2"));
+            else if (!inCode) l.Row.ClearValue(Panel.BackgroundProperty);
             // (A heading under an empty line the student left has its room already.)
             bool spaced = i > 0 && lines[i - 1] is { Kind: Kind.Plain } above && string.IsNullOrEmpty(above.Box.Text);
             l.Row.Margin = new Thickness(0, heading && i > 0 && !spaced ? 18 : list || quote ? 3 : 0, 0, heading ? 4 : list || quote ? 3 : 0);
@@ -352,14 +352,15 @@ public sealed partial class TypedEditor : UserControl
     /// <summary>The number a numbered line's own text gives it ("3. " is 3).</summary>
     static long Start(string lead) => NumberLead().Match(lead) is { Success: true } m && long.TryParse(m.Groups[2].Value, out long n) ? n : 1;
 
-    /// <summary>A line that's only "---" is a rule: a line across the page while the caret's in another line.</summary>
-    void ShowRule(Line l)
+    /// <summary>A line that's only "---" is a rule: a line across the page while the caret's in another line (and
+    /// its faint dashes while the caret's in it).</summary>
+    static bool IsRule(Line l) => l.Kind == Kind.Plain && !l.InCode && RuleLine().IsMatch(l.Box.Text ?? "");
+
+    static void ShowRule(Line l)
     {
-        bool rule = l.Kind == Kind.Plain && !l.InCode && RuleLine().IsMatch(l.Box.Text ?? "");
-        bool drawn = rule && !l.Box.IsFocused;
+        bool drawn = IsRule(l) && !l.Box.IsFocused;
         l.Rule.IsVisible = drawn;
         l.Box.Opacity = drawn ? 0 : 1;
-        if (rule) l.Box.Muted = true;
     }
 
     void ShowPlaceholder()
