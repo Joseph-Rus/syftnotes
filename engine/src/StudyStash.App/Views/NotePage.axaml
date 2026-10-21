@@ -230,8 +230,10 @@
             </StackPanel>
           </StackPanel>
 
-          <!-- The transcript: each line's time, then what was said; while it records, what's been heard so far -->
-          <StackPanel Name="TranscriptBody" IsVisible="{Binding ShowTranscript}" MaxWidth="704" HorizontalAlignment="Left" Margin="0,18,0,0">
+          <!-- The transcript: each line's time, then what was said; while it records, what's been heard so far. One drag
+               selects from line to line, as the notes do; copied, a line taken from its start keeps its time. -->
+          <StackPanel Name="TranscriptBody" IsVisible="{Binding ShowTranscript}" MaxWidth="704" HorizontalAlignment="Left" Margin="0,18,0,0"
+                      c:TextSelection.Area="True">
             <TextBlock Name="NoTranscript" IsVisible="{Binding NoTranscript}" Text="{Binding NoTranscriptText}" FontSize="14.5" LineHeight="22" Foreground="{DynamicResource InkMuted}" TextWrapping="Wrap" />
             <ItemsControl Name="TranscriptLines" ItemsSource="{Binding Lines}">
               <ItemsControl.ItemsPanel>
@@ -244,7 +246,7 @@
                     <Grid ColumnDefinitions="Auto,*">
                       <Button Classes="heard-time num" Content="{Binding Time}" IsVisible="{Binding Time, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Click="OnTime"
                               AutomationProperties.Name="{Binding Time}" />
-                      <SelectableTextBlock Grid.Column="1" Text="{Binding Text}" FontSize="16" LineHeight="26.4" TextWrapping="Wrap" SelectionBrush="{DynamicResource Hl}" />
+                      <c:PageText Grid.Column="1" Text="{Binding Text}" CopyLead="{Binding CopyLead}" FontSize="16" LineHeight="26.4" TextWrapping="Wrap" />
                     </Grid>
                   </Border>
                 </DataTemplate>

@@ -16,6 +16,9 @@ public sealed partial class HeardLine : ObservableObject
     [ObservableProperty] public partial bool Here { get; set; }
     /// <summary>The newest line reads in the full text color; older ones fade to secondary.</summary>
     public bool Latest { get; init; }
+    /// <summary>What the line is copied with in front when a selection takes it from its start: its time, as a
+    /// downloaded transcript writes it ("[12:30] ").</summary>
+    public string? CopyLead => Time.Length > 0 ? $"[{Time}] " : null;
 }
 
 /// <summary>A moment an answer points to: "18:05", to play the recording from there.</summary>
