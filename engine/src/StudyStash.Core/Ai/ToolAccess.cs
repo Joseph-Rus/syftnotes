@@ -23,16 +23,22 @@ public static class ToolAccess
         ["canvas"] = ("Canvas assignments and files", "Canvas"),
     };
 
+    /// <summary>The switch in Settings → AI apps that lets AI apps save the notes they write (save_notes).</summary>
+    public const string SaveToggle = "Save notes they write";
+
     /// <summary>What a tool says when the toggle its scope needs is off, naming that toggle.</summary>
-    public static string Refused(string scope) => Toggles.TryGetValue(scope, out var t)
+    public static string Refused(string scope) => scope == "save"
+        ? $"Study Stash's settings don't let AI apps save notes right now (Settings → AI apps → {SaveToggle}). Nothing was saved: the student can switch it on, or copy these notes into Study Stash with Paste notes."
+        : Toggles.TryGetValue(scope, out var t)
         ? $"Study Stash's settings don't let AI tools read {t.What} right now (Settings → AI apps → {t.Toggle})."
         : "Study Stash's settings don't let AI tools read that right now (Settings → AI apps).";
 
     /// <summary>The scope a tool needs, or null only for list_classes (just the class names and counts). Every other
-    /// tool is named here on purpose: a test fails when a new tool isn't.</summary>
+    /// tool is named here on purpose: a test fails when a new tool isn't. save_notes is the one that writes: "save".</summary>
     public static string? Scope(string tool) => tool switch
     {
-        "list_lectures" or "search_notes" or "get_transcript" => "lectures",
+        "list_lectures" or "search_notes" or "get_transcript" or "notes_brief" => "lectures",
+        "save_notes" => "save",
         "get_lecture" or "list_attachments" or "read_attachment" => "notes",
         "search_files" or "read_file" or "due_assignments" or "get_assignment" or "class_modules" or "class_files" or "class_announcements"
             or "canvas_courses" or "canvas_api" or "canvas_page" or "canvas_download" => "canvas",
@@ -44,6 +50,7 @@ public static class ToolAccess
         "lectures" => reading.Lectures,
         "notes" => reading.Notes,
         "canvas" => reading.Canvas,
+        "save" => reading.SaveNotes,
         _ => true,
     };
 

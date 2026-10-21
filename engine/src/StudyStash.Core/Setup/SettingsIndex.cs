@@ -157,12 +157,14 @@ public static class SettingsIndex
         new() { Section = "AI", Title = "Rich notes", Detail = "Diagrams, drawings and formula plots in the notes.",
             Words = "diagrams drawings plots pictures figures illustrations mermaid" },
 
-        Page("Access", "ChatGPT, Claude and other AI apps can read your lectures and notes to answer your questions.",
+        Page("Access", "ChatGPT, Claude and other AI apps can read your lectures and notes to answer your questions, and save notes you ask them to write.",
             "mcp connector claude desktop chatgpt app permissions"),
         new() { Section = "Access", Title = "AI apps on this computer", Detail = "Connect the ChatGPT or Claude app to your library.",
             Words = "claude desktop chatgpt app mcp connect connector" },
         new() { Section = "Access", Title = "What they can read", Detail = "What AI apps may read: lectures, notes, recordings, Canvas.",
             Words = "privacy permissions read access" },
+        new() { Section = "Access", Title = Ai.ToolAccess.SaveToggle, Detail = "Let AI apps save the notes you ask them to write for a lecture.",
+            Words = "save write notes free claude app no paid plan subscription" },
         new() { Section = "Access", Title = "Let Claude and ChatGPT reach your library from the internet", Detail = "For claude.ai, chatgpt.com and their phone apps.",
             Words = "web phone claude.ai chatgpt.com tailscale funnel remote internet" },
 

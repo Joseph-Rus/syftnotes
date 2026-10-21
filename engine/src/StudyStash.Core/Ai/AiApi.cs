@@ -104,9 +104,20 @@ public sealed record RewriteInfo(string Lecture, string State)
     /// <summary>"adding" while the designer adds the current notes' diagrams (they follow the notes, a few minutes
     /// later); "" otherwise, and from a library older than that.</summary>
     public string Diagrams { get; init; } = "";
+    /// <summary>The notes the lecture had before they were last replaced (by an edit, an AI app or a paste), which can
+    /// be put back: who wrote them and when they were replaced (their words stay on the library). Null when there are
+    /// none, and from a library older than that.</summary>
+    public NotesVersion? Earlier { get; init; }
 }
 
-public sealed record ReadingScopes(bool Lectures = true, bool Notes = true, bool Canvas = true, bool Audio = false);
+/// <summary>What AI apps may read while tool access is on, and <see cref="SaveNotes"/>: whether they may save the notes
+/// a student asks them to write for a lecture (save_notes), on unless the student switches it off.</summary>
+public sealed record ReadingScopes(bool Lectures = true, bool Notes = true, bool Canvas = true, bool Audio = false, bool SaveNotes = true);
+
+/// <summary>How Study Stash writes a lecture's notes (<see cref="Summarize.Brief"/>), for an AI it doesn't run itself,
+/// and what "Copy for your AI" puts on the clipboard: the brief and the transcript, in one message or, for a lecture
+/// too long for one, in <see cref="Parts"/> of their own.</summary>
+public sealed record NotesBrief(string Brief, List<string> Parts);
 
 public sealed record ToolConnection(string Id, string Name, string Kind)
 {
@@ -179,6 +190,15 @@ public interface IAiLibrary
     /// refuses (412) rather than save over them; null saves over whatever is there. Null from a library too old to
     /// take edits.</summary>
     Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Saves notes the student pasted from a chat as the lecture's notes, tidied of what the chat put round
+    /// them, the student's typed lines kept in them. A lecture with notes keeps them unless <paramref name="replace"/>
+    /// (409); <paramref name="basedOn"/> as for an edit. Null from a library too old to take them.</summary>
+    Task<RewriteInfo?> SaveNotesAsync(string lecture, string markdown, bool replace, string? basedOn) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>Puts back the notes the lecture had before they were last replaced. Null from a library too old to.</summary>
+    Task<RewriteInfo?> RestoreNotesAsync(string lecture) => Task.FromResult<RewriteInfo?>(null);
+    /// <summary>What to ask a free chat for the lecture's notes, the transcript with it (<see cref="NotesBrief"/>). Null
+    /// from a library too old to say.</summary>
+    Task<NotesBrief?> NotesBriefAsync(string lecture) => Task.FromResult<NotesBrief?>(null);
     Task<ToolAccessInfo?> AccessAsync();
     Task<ToolAccessInfo?> SetAccessAsync(bool? on = null, ReadingScopes? reading = null);
     /// <summary>Turns Funnel on or off on the library's computer, then checks it from the internet.</summary>
@@ -350,6 +370,15 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
 
     public async Task<RewriteInfo?> EditNotesAsync(string lecture, string markdown, string? basedOn) => As<RewriteInfo>(await SendAsync(
         HttpMethod.Post, $"/rewrite/{Seg(lecture)}/edit", new JsonObject { ["markdown"] = markdown, ["based_on"] = basedOn }));
+
+    public async Task<RewriteInfo?> SaveNotesAsync(string lecture, string markdown, bool replace, string? basedOn) => As<RewriteInfo>(await SendAsync(
+        HttpMethod.Post, $"/rewrite/{Seg(lecture)}/save", new JsonObject { ["markdown"] = markdown, ["replace"] = replace, ["based_on"] = basedOn, ["from"] = "paste" }));
+
+    public async Task<RewriteInfo?> RestoreNotesAsync(string lecture) =>
+        As<RewriteInfo>(await SendAsync(HttpMethod.Post, $"/rewrite/{Seg(lecture)}/restore"));
+
+    public async Task<NotesBrief?> NotesBriefAsync(string lecture) =>
+        As<NotesBrief>(await SendAsync(HttpMethod.Get, $"/rewrite/{Seg(lecture)}/brief?for=chat"));
 
     public async Task<ToolAccessInfo?> AccessAsync() => As<ToolAccessInfo>(await SendAsync(HttpMethod.Get, "/access"));
 

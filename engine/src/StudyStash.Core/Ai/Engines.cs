@@ -106,12 +106,20 @@ public static class Engines
     /// (<see cref="AiJobs.Describe"/>: an Ollama model like "qwen3:30b", or "Claude sonnet", "ChatGPT", "Gemini …").</summary>
     public static string WhoWrote(string notesModel) => notesModel switch
     {
+        // Notes the student brought back from a chat, or that an AI app saved without saying which it is.
+        _ when notesModel.StartsWith(YourAi, StringComparison.Ordinal) => YourAi,
         _ when notesModel.StartsWith("Claude", StringComparison.Ordinal) => "Claude",
         _ when notesModel.StartsWith("ChatGPT", StringComparison.Ordinal) || notesModel.StartsWith("Codex", StringComparison.Ordinal) => "ChatGPT",
         _ when notesModel.StartsWith("Gemini", StringComparison.Ordinal) => "Gemini",
         { Length: > 0 } => "Ollama",
         _ => "",
     };
+
+    /// <summary>Who wrote notes the library didn't write itself, when it can't say which AI: "your AI".</summary>
+    public const string YourAi = "your AI";
+
+    /// <summary>The writer of notes pasted from a chat ("Paste notes"), as the note's file and its byline name them.</summary>
+    public const string PastedWriter = YourAi + " (pasted from a chat)";
 
     /// <summary>The command a terminal runs to sign in ("claude", "codex login", "agy").</summary>
     public static (string Exe, string[] Args) SignInCommand(string id) => id switch

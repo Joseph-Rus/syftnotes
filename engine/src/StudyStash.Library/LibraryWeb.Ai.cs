@@ -311,6 +311,41 @@ public sealed partial class LibraryWeb
             return RewriteResult(() => Rewrites.Edit((string)ctx.Request.RouteValues["lecture"]!, markdown, Str(body, "based_on")));
         })));
 
+        // Notes an AI the library doesn't run wrote: an AI app through Study Stash's connection (from "app", which the
+        // student can switch off in Settings → AI apps, checked here on every save), or a chat the student pasted them
+        // from ("paste"). replace: the lecture's own notes may be replaced (they're kept, to put back).
+        app.MapPost("/api/v2/ai/rewrite/{lecture}/save", Http.Handle(ctx => ApiAsync(ctx, async () =>
+        {
+            var body = await Http.JsonBodyAsync(ctx.Request);
+            string? markdown = body?["markdown"] is JsonValue mv && mv.TryGetValue(out string? text) ? text : null;
+            if (markdown is null) return Http.Detail(400, "what are the notes?");
+            bool fromApp = Str(body, "from") == "app";
+            if (fromApp && !Claude.ToolsOn) return Http.Detail(403, ToolAccess.Off);
+            if (fromApp && !Claude.Reading.SaveNotes) return Http.Detail(403, ToolAccess.Refused("save"));
+            bool replace = body?["replace"] is JsonValue rv && rv.TryGetValue(out bool r) && r;
+            string writer = fromApp ? WriterSaid(Str(body, "writer")) : Engines.PastedWriter;
+            return RewriteResult(() => Rewrites.Save((string)ctx.Request.RouteValues["lecture"]!, markdown, replace, writer, Str(body, "based_on")));
+        })));
+
+        // Puts back the notes the lecture had before they were last replaced.
+        app.MapPost("/api/v2/ai/rewrite/{lecture}/restore", Http.Handle(ctx => ApiAsync(ctx, () =>
+            Task.FromResult(RewriteResult(() => Rewrites.Restore((string)ctx.Request.RouteValues["lecture"]!))))));
+
+        // How the library writes this lecture's notes, for an AI it doesn't run: for=app (an AI app, through the
+        // connection), or for=chat, with the whole request to copy into a free chat.
+        app.MapGet("/api/v2/ai/rewrite/{lecture}/brief", Http.Handle(ctx => ApiAsync(ctx, () =>
+        {
+            bool chat = ctx.Request.Query["for"].ToString() != "app";
+            try
+            {
+                return Task.FromResult(AiJson(Rewrites.Brief((string)ctx.Request.RouteValues["lecture"]!, chat)));
+            }
+            catch (RewriteRefusedException e)
+            {
+                return Task.FromResult(Http.Detail(e.Status, e.Message));
+            }
+        })));
+
         app.MapGet("/api/v2/ai/access", Http.Handle(ctx => ApiAsync(ctx, async () =>
         {
             await NoticeFunnelOffAsync(force: false);
@@ -325,7 +360,8 @@ public sealed partial class LibraryWeb
             {
                 bool Flag(string key, bool was) => r[key] is JsonValue fv && fv.TryGetValue(out bool f) ? f : was;
                 var was = Claude.Reading;
-                Claude.Reading = new ReadingScopes(Flag("lectures", was.Lectures), Flag("notes", was.Notes), Flag("canvas", was.Canvas), Flag("audio", was.Audio));
+                Claude.Reading = new ReadingScopes(Flag("lectures", was.Lectures), Flag("notes", was.Notes), Flag("canvas", was.Canvas), Flag("audio", was.Audio),
+                    Flag("save_notes", was.SaveNotes));
             }
             return AiJson(ToolAccessJson());
         })));
@@ -428,6 +464,14 @@ public sealed partial class LibraryWeb
                 check?.Item2, check?.Item3, check?.Item4, cfg.PoolPassword.Length > 0)
             { Needs = needs?.Words, NeedsUrl = needs?.FixUrl };
         }
+    }
+
+    /// <summary>Who an AI app says wrote the notes it saves, as the notes will name them: one short line, or "your AI"
+    /// when it says nothing.</summary>
+    static string WriterSaid(string? writer)
+    {
+        string said = string.Join(" ", (writer ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return said.Length == 0 ? Engines.YourAi + " (through an AI app)" : Py.Head(said, 60);
     }
 
     ToolAccessInfo ToolAccessJson() => new(Claude.ToolsOn, Claude.Reading,

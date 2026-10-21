@@ -213,6 +213,7 @@ public sealed partial class Store : IDisposable
         Migrate();
         HasPassages = CreatePassages();
         CreateAttachments();
+        CreateEarlierNotes();
     }
 
     public void Dispose() => conn.Dispose();
