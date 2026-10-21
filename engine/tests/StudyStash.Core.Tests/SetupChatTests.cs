@@ -406,6 +406,7 @@ public class SetupChatTests
         Assert.Contains("features.shell_tool=false", FakeAgents.Argv(dir["bin"], 2));
         Assert.Contains("mcp_servers.study-stash.enabled=false", FakeAgents.Argv(dir["bin"], 2));
         Assert.Contains("mcp_servers.github.enabled=false", FakeAgents.Argv(dir["bin"], 2));
+        Assert.Contains("notify=[]", FakeAgents.Argv(dir["bin"], 2));
         Assert.DoesNotContain(FakeAgents.Argv(dir["bin"], 1), a => a.EndsWith(".enabled=false", StringComparison.Ordinal));
     }
 

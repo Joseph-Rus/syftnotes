@@ -273,8 +273,11 @@ public static partial class SetupChat
         // The student's own config.toml is read only for a sign-in kept there: the MCP servers it names stay off
         // (setting the table empty doesn't do it: Codex merges overrides into it).
         if (!t.IgnoreUserConfig)
+        {
             foreach (string own in t.OwnMcpServers ?? CodexServers(CodexConfig()))
                 if (own != Server) Set($"mcp_servers.{own}.enabled", "false");
+            Set("notify", "[]"); // a program of theirs run after each turn
+        }
         if (t.Session.Length > 0) cmd.AddRange(["resume", t.Session]);
         cmd.Add("-");
         return cmd;
