@@ -101,6 +101,21 @@ public sealed partial class LibraryWeb
         await asking;
     }
 
+    /// <summary>A follow-up's conversation so far, as the app sends it; null when there's none, or none that can be
+    /// read (the question is then asked on its own, as a library before this did).</summary>
+    static List<AskTurn>? AskHistory(JsonNode? history)
+    {
+        if (history is not JsonArray) return null;
+        try
+        {
+            return history.Deserialize<List<AskTurn?>>(AiRemote.Options) is { } turns ? AskMemory.Last(turns, int.MaxValue, int.MaxValue) : null;
+        }
+        catch (Exception e) when (e is JsonException or NotSupportedException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
     void MapAi(WebApplication app)
     {
         app.MapGet("/api/v2/ai/engines", Http.Handle(ctx => ApiAsync(ctx, async () => AiJson(await AiOverviewAsync()))));
@@ -261,7 +276,7 @@ public sealed partial class LibraryWeb
             var request = new AskRequest(question)
             {
                 Lecture = Str(body, "lecture"), Class = Str(body, "class"), Engine = Str(body, "engine"),
-                Live = Str(body, "live"), LiveTitle = Str(body, "live_title"),
+                Live = Str(body, "live"), LiveTitle = Str(body, "live_title"), History = AskHistory(body?["history"]),
             };
             if (body?["stream"] is JsonValue sv && sv.TryGetValue(out bool stream) && stream)
             {

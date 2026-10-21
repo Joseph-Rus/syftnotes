@@ -76,9 +76,20 @@ public sealed record AskRequest(string Question)
     public string? Engine { get; init; }
     public string? Live { get; init; }
     public string? LiveTitle { get; init; }
+    /// <summary>The conversation so far, oldest first, when this is a follow-up: the app sends the last few turns, each
+    /// cut short (<see cref="AskMemory"/>). Null for a first question. A library too old to know it ignores it.</summary>
+    public List<AskTurn>? History { get; init; }
 }
 
 public sealed record AskSource(string? Id, string Title, string? Class, string? Date, double? At, string Section);
+
+/// <summary>An earlier question in the same conversation and the answer it got, sent along with a follow-up so the AI
+/// knows what "that" or "the second one" means. Its sources are what the answer drew on: the follow-up reads them
+/// again.</summary>
+public sealed record AskTurn(string Question, string Answer)
+{
+    public List<AskSource> Sources { get; init; } = [];
+}
 
 public sealed record AskReply(string Answer, List<AskSource> Sources, string Engine, string EngineName)
 {
@@ -86,6 +97,9 @@ public sealed record AskReply(string Answer, List<AskSource> Sources, string Eng
     public string AskedName { get; init; } = "";
     public bool FellBack { get; init; }
     public string Why { get; init; } = "";
+    /// <summary>How many of the conversation's earlier turns went to the AI with this question (the most recent ones;
+    /// 0 for none). Null from a library too old to remember a conversation: it answered the question on its own.</summary>
+    public int? Remembered { get; init; }
 }
 
 public sealed record NotesVersion(string Markdown, string By, string At);
