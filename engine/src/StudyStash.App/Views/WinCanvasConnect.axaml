@@ -40,7 +40,7 @@
           </Panel>
           <TextBlock Grid.Column="2" Classes="cv-step-title" Classes.cv-current="{Binding Step1.IsCurrent}" Classes.cv-todo="{Binding Step1.IsToDo}" Text="{Binding Step1.Title}" />
           <StackPanel Grid.Column="3" Classes="cv-action" IsVisible="{Binding Step1.IsDone}">
-            <TextBlock Classes="cv-value" Text="{Binding Step1.Summary}" />
+            <c:PageText Classes="cv-value" Text="{Binding Step1.Summary}" />
             <Button Classes="cv-btn cv-mini" Command="{Binding ChangeSchoolCommand}"><TextBlock Text="Change" /></Button>
           </StackPanel>
           <StackPanel Grid.Column="3" Classes="cv-action" IsVisible="{Binding Step1.IsCurrent}">
@@ -50,7 +50,7 @@
             <Button Classes="cv-btn cv-mini cv-primary" IsEnabled="{Binding !SavingSchool}" Command="{Binding ContinueCommand}"><TextBlock Text="Save" /></Button>
           </StackPanel>
         </Grid>
-        <TextBlock Classes="cv-help cv-body" Text="{Binding SchoolError}" IsVisible="{Binding SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <c:PageText Classes="cv-help cv-body" Text="{Binding SchoolError}" IsVisible="{Binding SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <Border Classes="cv-sep" />
 
         <!-- 2 The browser extension: Add to Chrome, Edge, Firefox… -->
@@ -149,7 +149,7 @@
           </StackPanel>
           <!-- The Chrome Web Store wouldn't do (a school's Chrome may not install from it): the folder instead, or back to the store -->
           <Button Name="OtherWay" Classes="cv-quiet" HorizontalAlignment="Left" IsVisible="{Binding ShowOtherWay}" Command="{Binding OtherWayCommand}"><TextBlock Classes="cv-link" Text="{Binding OtherWayLabel}" /></Button>
-          <TextBlock Classes="cv-help" Text="{Binding BrowserError}" IsVisible="{Binding BrowserError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <c:PageText Classes="cv-help" Text="{Binding BrowserError}" IsVisible="{Binding BrowserError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
         <Border Classes="cv-sep" />
 
@@ -175,7 +175,7 @@
         </Grid>
         <StackPanel Classes="cv-body" IsVisible="{Binding Step3.IsCurrent}">
           <TextBlock Classes="cv-step-body" Text="{Binding SignInHelp}" IsVisible="{Binding SignedOut}" />
-          <TextBlock Classes="cv-step-body" Text="{Binding CoursesSay}" IsVisible="{Binding ShowCoursesSay}" />
+          <c:PageText Classes="cv-step-body" Text="{Binding CoursesSay}" IsVisible="{Binding ShowCoursesSay}" />
         </StackPanel>
         <!-- Which courses to bring in: this term's ticked, the rest (past terms, sandboxes, chapel) not -->
         <StackPanel Classes="cv-body" Spacing="6" IsVisible="{Binding ShowPicker}">
@@ -232,7 +232,7 @@
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <TextBlock Classes="cv-help" Text="{Binding LinkError}" IsVisible="{Binding LinkError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <c:PageText Classes="cv-help" Text="{Binding LinkError}" IsVisible="{Binding LinkError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           </StackPanel>
 
           <!-- 5 Sync now -->

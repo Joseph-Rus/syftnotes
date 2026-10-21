@@ -86,7 +86,7 @@
         </StackPanel>
       </Border>
 
-      <TextBlock IsVisible="{Binding HasNote}" Text="{Binding Note}" FontSize="14" Foreground="{DynamicResource Fg2}" Margin="16,4,16,12" TextWrapping="Wrap" />
+      <c:PageText IsVisible="{Binding HasNote}" Text="{Binding Note}" FontSize="14" Foreground="{DynamicResource Fg2}" Margin="16,4,16,12" TextWrapping="Wrap" />
 
       <!-- Results, or the answer's sources -->
       <ItemsControl ItemsSource="{Binding Rows}" Margin="4,0,4,8" Classes.answer="{Binding Answering}">

@@ -10,9 +10,9 @@
     <StyleInclude Source="avares://StudyStash/Views/MacCanvasStyles.axaml" />
   </UserControl.Styles>
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel MaxWidth="600" Margin="56,28,56,48" Spacing="12" HorizontalAlignment="Center">
-      <TextBlock Classes="cv-meta" Text="{Binding Meta}" />
-      <TextBlock Classes="cv-detail-title" c:Typography.Extra="-0.6" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
+    <StackPanel MaxWidth="600" Margin="56,28,56,48" Spacing="12" HorizontalAlignment="Center" c:TextSelection.Area="True">
+      <c:PageText Classes="cv-meta" Text="{Binding Meta}" />
+      <c:PageText Classes="cv-detail-title" c:Typography.Extra="-0.6" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
       <c:NoteView Markdown="{Binding Body}" />
       <Button Classes="cv-hand-in" Margin="0,8,0,0" Command="{Binding OpenInCanvasCommand}">
         <StackPanel Orientation="Horizontal" Spacing="4">

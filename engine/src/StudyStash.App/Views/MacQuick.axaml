@@ -105,7 +105,7 @@
                       IsVisible="{Binding Answer, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         </StackPanel>
 
-        <TextBlock IsVisible="{Binding HasNote}" Text="{Binding Note}" FontSize="13" Foreground="{DynamicResource Fg2}" Margin="14,10" TextWrapping="Wrap" />
+        <c:PageText IsVisible="{Binding HasNote}" Text="{Binding Note}" FontSize="13" Foreground="{DynamicResource Fg2}" Margin="14,10" TextWrapping="Wrap" />
 
         <!-- Results, or the answer's sources -->
         <ItemsControl ItemsSource="{Binding Rows, Converter={x:Static c:Converters.NotActions}}" Classes.answer="{Binding Answering}">

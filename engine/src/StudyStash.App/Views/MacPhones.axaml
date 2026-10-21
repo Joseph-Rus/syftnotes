@@ -51,7 +51,7 @@
           <StackPanel Grid.Column="2" Spacing="6" VerticalAlignment="Center">
             <TextBlock Classes="row-sub" Text="1. In the Study Stash app on your iPhone or iPad, tap Scan the QR code. On Android, point the camera at it." TextWrapping="Wrap" />
             <TextBlock Classes="row-sub" Text="2. Type this code:" TextWrapping="Wrap" />
-            <SelectableTextBlock Name="PhoneCode" Text="{Binding Code}" FontFamily="SF Mono, Menlo, Cascadia Mono, Consolas, monospace" FontSize="34" FontWeight="SemiBold" LetterSpacing="4" Margin="0,2" />
+            <c:PageText Name="PhoneCode" Text="{Binding Code}" FontFamily="SF Mono, Menlo, Cascadia Mono, Consolas, monospace" FontSize="34" FontWeight="SemiBold" LetterSpacing="4" Margin="0,2" />
             <TextBlock Classes="row-sub" Text="{Binding Left}" />
             <TextBlock Classes="row-sub" Text="On Android, add the page that opens to your home screen." TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
@@ -61,7 +61,7 @@
           </StackPanel>
         </Grid>
       </Border>
-      <TextBlock Classes="say" Text="{Binding Say}" IsVisible="{Binding Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+      <c:PageText Classes="say" Text="{Binding Say}" IsVisible="{Binding Say, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
       <Button Classes="pill" Command="{Binding OpenFixCommand}" IsVisible="{Binding HasFix}" HorizontalAlignment="Left"><TextBlock Text="Open the page" FontSize="13" /></Button>
 
       <!-- The phones already added -->

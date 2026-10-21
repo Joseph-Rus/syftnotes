@@ -50,10 +50,10 @@
       <Grid ColumnDefinitions="Auto,12,*">
         <Border Classes="ai-problem-glyph err" VerticalAlignment="Top" Margin="0,3,0,0"><TextBlock Text="✕" /></Border>
         <StackPanel Grid.Column="2" Spacing="8">
-          <TextBlock Classes="ai-problem-text">
+          <c:PageText Classes="ai-problem-text">
             <Run FontWeight="SemiBold" Text="{Binding FailedTitle}" />
             <Run Text=" " /><Run Text="{Binding FailedMessage}" />
-          </TextBlock>
+          </c:PageText>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button Classes="ai-pillbtn" Command="{Binding TryAgainCommand}">
               <Border Classes="ai-pill"><TextBlock Text="Try again" /></Border>
@@ -124,7 +124,7 @@
         <TextBox Name="Editor" Classes="bare ai-editor" Text="{Binding EditText}" AcceptsReturn="True" TextWrapping="Wrap"
                  AutomationProperties.Name="Notes" />
       </Border>
-      <TextBlock Classes="ai-editor-problem" IsVisible="{Binding HasEditProblem}" Text="{Binding EditProblem}" />
+      <c:PageText Classes="ai-editor-problem" IsVisible="{Binding HasEditProblem}" Text="{Binding EditProblem}" />
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
         <Button Classes="ai-textbtn" Command="{Binding CancelEditCommand}">
           <Border Classes="ai-pill-plain"><TextBlock Text="Cancel" /></Border>

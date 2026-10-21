@@ -4,6 +4,7 @@
      drops courses, Keep them / Remove them. Inside the connect steps ("inset") the rows sit in the step's own card. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="using:StudyStash.App.Controls"
              xmlns:vm="using:StudyStash.App.ViewModels"
              x:Class="StudyStash.App.Views.WinCoursePicker"
              x:DataType="vm:CoursePickerModel">
@@ -83,6 +84,6 @@
         <Button Classes="cv-btn cv-primary" IsVisible="{Binding OnlyAdds}" IsEnabled="{Binding !Saving}" Command="{Binding SaveCommand}"><TextBlock Text="Save" /></Button>
       </StackPanel>
     </Grid>
-    <TextBlock Classes="cv-value" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
+    <c:PageText Classes="cv-value" TextWrapping="Wrap" Text="{Binding Say}" IsVisible="{Binding HasSay}" />
   </StackPanel>
 </UserControl>

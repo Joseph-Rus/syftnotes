@@ -18,9 +18,9 @@
                 VerticalAlignment="Top" Margin="0,3,0,0">
           <TextBlock Text="{Binding Glyph}" />
         </Border>
-        <TextBlock Grid.Column="2" Classes="ai-problem-text" Margin="0,1,0,0">
+        <c:PageText Grid.Column="2" Classes="ai-problem-text" Margin="0,1,0,0">
           <Run FontWeight="SemiBold" Text="{Binding Title}" /><Run Text=" " /><Run Text="{Binding Message}" />
-        </TextBlock>
+        </c:PageText>
         <Button Grid.Column="4" Classes="ai-pillbtn" Command="{Binding SecondaryCommand}"
                 IsVisible="{Binding SecondaryWords, Converter={x:Static c:Converters.NotEmpty}}">
           <Border Classes="ai-pill"><TextBlock Text="{Binding SecondaryWords}" /></Border>

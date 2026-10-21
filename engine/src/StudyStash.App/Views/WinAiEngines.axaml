@@ -227,7 +227,7 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
       <!-- What the last thing done here came to (a download, a sign-in, a choice the library refused) -->
-      <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding SayOfAis}" IsVisible="{Binding HasSayOfAis}" />
+      <c:PageText Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding SayOfAis}" IsVisible="{Binding HasSayOfAis}" />
 
       <!-- API keys: an engine can run on a key instead of (or as well as) its app -->
       <StackPanel IsVisible="{Binding HasKeys}">
@@ -268,7 +268,7 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
         <!-- What the key just saved came to: "Claude works with your API key.", or what its maker said of it -->
-        <TextBlock Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding SayOfKeys}" IsVisible="{Binding HasSayOfKeys}" />
+        <c:PageText Classes="ai-sub" MaxWidth="560" Margin="0,8,0,0" HorizontalAlignment="Left" TextWrapping="Wrap" Text="{Binding SayOfKeys}" IsVisible="{Binding HasSayOfKeys}" />
       </StackPanel>
 
       <!-- If an engine isn’t available -->
