@@ -1,0 +1,337 @@
+// How typed-notes-markdown.gif was made, off screen: copy this file into engine/tests/StudyStash.App.Tests/ as
+// TypedMarkdownFilm.cs (it isn't kept there: it would add 240 pictures to a run), then
+//   STUDYSTASH_FILM=1 STUDYSTASH_SHOTS=<an empty folder> dotnet test engine/tests/StudyStash.App.Tests --filter TypedMarkdownFilm
+//   ffmpeg -framerate 12 -i typed-notes-markdown-%04d.png -vf "scale=900:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse" -loop 0 typed-notes-markdown.gif
+// The keys are real key events (Avalonia.Headless); the notes after Stop are what Claude (Sonnet) wrote round these typed
+// notes in a real run of the app's own notes request on a made-up lecture.
+
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
+using Avalonia.Headless;
+using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Media;
+using Avalonia.Styling;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using StudyStash.App.Controls;
+using StudyStash.App.ViewModels;
+using StudyStash.App.Views;
+
+namespace StudyStash.App.Tests;
+
+/// <summary>Frames for a short film of notes typed in Markdown while a lecture records, then the notes Claude wrote round
+/// them (its real answer in a run of the app's own notes request), in the library window as the app draws it, off screen.
+/// Runs only with STUDYSTASH_FILM=1.</summary>
+public class TypedMarkdownFilm
+{
+    const int Fps = 12;
+
+    sealed class Tour
+    {
+        public readonly Window Window;
+        public readonly MacLibrary View = new();
+        readonly Canvas over = new() { IsHitTestVisible = false };
+        readonly Avalonia.Controls.Shapes.Path pointer = new()
+        {
+            Data = Geometry.Parse("M0,0 L0,17 L4.6,13 L7.6,20 L10.4,18.8 L7.4,12 L13,12 Z"), Fill = Brushes.Black, Stroke = Brushes.White, StrokeThickness = 1.2,
+        };
+        readonly Ellipse ring = new() { Width = 26, Height = 26, Stroke = new SolidColorBrush(Color.FromArgb(150, 0, 0, 0)), StrokeThickness = 3, IsVisible = false };
+        readonly string name;
+        readonly List<Demo.Page> back = [];
+        int frames;
+        Point at = new(700, 520);
+        public LibraryModel Model = null!;
+        public Demo.Page Here;
+        public bool Recording;
+        public int Seconds;
+        public Action<LibraryModel, Demo.Page>? Prepare;
+        readonly Random random = new(3);
+
+        public Tour(string name, ThemeVariant theme)
+        {
+            this.name = name;
+            Skin.UseTheme(ColourThemes.Default);
+            ((App)Application.Current!).UseSkin(SkinKind.Mac);
+            over.Children.Add(ring);
+            over.Children.Add(pointer);
+            Window = new Window { Width = 1280, Height = 860, RequestedThemeVariant = theme, Content = new Panel { Children = { View, over } } };
+            Look.Apply(Window);
+            Place();
+        }
+
+        public void Show(Demo.Page page, bool remember = true)
+        {
+            if (remember && Model is not null) back.Add(Here);
+            bool fresh = page == Demo.Page.Recording && !Recording;
+            if (fresh)
+            {
+                Recording = true;
+                Seconds = 0;
+            }
+            else if (page == Demo.Page.Note) Recording = false;
+            Here = page;
+            var m = Demo.Semester(page, recording: Recording && page != Demo.Page.Recording, go: p => Show(p));
+            m.DrawChrome = false;
+            m.CanGoBack = back.Count > 0;
+            m.OnGoBack = () =>
+            {
+                if (back.Count == 0) return;
+                var to = back[^1];
+                back.RemoveAt(back.Count - 1);
+                Show(to, remember: false);
+            };
+            if (fresh && m.Note is { } live) live.Typed = "";
+            Prepare?.Invoke(m, page);
+            Model = m;
+            View.DataContext = m;
+            if (!Window.IsVisible) Window.Show();
+            Settle();
+        }
+
+        public void Settle()
+        {
+            Dispatcher.UIThread.RunJobs();
+            Window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+        }
+
+        void Place()
+        {
+            Canvas.SetLeft(pointer, at.X);
+            Canvas.SetTop(pointer, at.Y);
+            Canvas.SetLeft(ring, at.X - 13);
+            Canvas.SetTop(ring, at.Y - 13);
+        }
+
+        public void Frame()
+        {
+            // While something records, its clock runs and its level moves.
+            if (Recording && (Model.Note?.Recorder ?? Model.Recording) is { } recorder)
+            {
+                if (frames % Fps == 0) Seconds++;
+                recorder.Elapsed = $"{Seconds / 60:00}:{Seconds % 60:00}";
+                if (frames % 2 == 0) recorder.Levels = [.. Enumerable.Range(0, 5).Select(_ => 0.25 + random.NextDouble() * 0.7)];
+            }
+            Settle();
+            var frame = Window.CaptureRenderedFrame() ?? throw new InvalidOperationException("nothing rendered");
+            using var file = File.Create(System.IO.Path.Combine(Shot.Dir, $"{name}-{frames++:0000}.png"));
+            frame.Save(file, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        }
+
+        public void Hold(double seconds)
+        {
+            for (int i = 0; i < Math.Max(1, (int)(seconds * Fps)); i++) Frame();
+        }
+
+        /// <summary>The pointer glides to a place in a control (as fractions of its width and height).</summary>
+        public void MoveTo(Control c, double fx = 0.5, double fy = 0.5, int steps = 9)
+        {
+            Settle();
+            var to = c.TranslatePoint(new Point(c.Bounds.Width * fx, c.Bounds.Height * fy), Window)!.Value;
+            var from = at;
+            for (int i = 1; i <= steps; i++)
+            {
+                double t = i / (double)steps, eased = t * t * (3 - 2 * t);
+                at = new Point(from.X + (to.X - from.X) * eased, from.Y + (to.Y - from.Y) * eased);
+                Place();
+                Window.MouseMove(at);
+                Frame();
+            }
+        }
+
+        /// <summary>A click where the pointer is: a ring shows it; <paramref name="real"/> presses the mouse there.</summary>
+        public void Click(bool real = true)
+        {
+            ring.IsVisible = true;
+            Frame();
+            Frame();
+            ring.IsVisible = false;
+            if (real)
+            {
+                Window.MouseDown(at, MouseButton.Left);
+                Window.MouseUp(at, MouseButton.Left);
+            }
+            Settle();
+            Window.MouseMove(at);
+            Frame();
+        }
+
+        /// <summary>A menu, drawn where it opens (a real one is a window of its own, which a picture of this one leaves out).</summary>
+        public void Open(Control menu, Control under, double dx = 0, double dy = 6)
+        {
+            var corner = under.TranslatePoint(new Point(dx, under.Bounds.Height + dy), Window)!.Value;
+            Canvas.SetLeft(menu, corner.X);
+            Canvas.SetTop(menu, corner.Y);
+            over.Children.Insert(0, menu);
+            Settle();
+            // No room under it: it opens upward, as the real one does.
+            if (corner.Y + menu.Bounds.Height > Window.Height - 8)
+            {
+                Canvas.SetTop(menu, under.TranslatePoint(default, Window)!.Value.Y - menu.Bounds.Height - dy);
+                Settle();
+            }
+        }
+
+        public void Close(Control menu)
+        {
+            over.Children.Remove(menu);
+            Settle();
+        }
+
+        public Button Side(string folder) =>
+            View.GetVisualDescendants().OfType<TextBlock>().First(t => t.Text == folder && t.IsEffectivelyVisible && t.FindAncestorOfType<SidebarBody>() is not null).FindAncestorOfType<Button>()!;
+
+        public Button Named(string content) =>
+            View.GetVisualDescendants().OfType<Button>().First(b => b.IsEffectivelyVisible && (b.Content as string == content || b.GetVisualDescendants().OfType<TextBlock>().Any(t => t.Text == content)));
+    }
+
+    /// <summary>What Claude (Sonnet) wrote round the notes typed below, in a real run of the app's notes request on a
+    /// made-up lecture, after <see cref="Core.Summarize.KeepTyped"/> (which had nothing to change).</summary>
+    const string Written = """
+        ## Summary
+        This lecture covered mitosis, the process by which one cell divides into two genetically identical cells. It went through the four phases in order (prophase, metaphase, anaphase, telophase), noted that DNA is copied beforehand in interphase, and then used the doubling formula $N = N_0 \cdot 2^n$ to describe population growth. It is the foundation for the lab and for the chapter 12 reading.
+
+        ## ==Cell division==
+        Today's topic was cell division, specifically mitosis.
+
+        - ==**Mitosis**: one cell → two *identical* cells== The two cells are genetically identical to the original cell.
+          - ==prophase, then `metaphase`== The four phases in order are prophase, metaphase, anaphase, telophase. In prophase, chromatin condenses into visible chromosomes, the nuclear envelope breaks down, and the spindle starts to form from the centrosomes. Metaphase is covered under the numbered points below.
+            - **Anaphase**: the sister chromatids are pulled apart to opposite poles. This is the moment the cell actually has two full sets of chromosomes.
+            - **Telophase**: new nuclear envelopes form around each set. Cytokinesis then splits the cytoplasm, leaving two daughter cells.
+        1. ==DNA copies itself== This happens in S phase of interphase, before mitosis starts. When mitosis begins, every chromosome is two sister chromatids joined at the centromere.
+        2. ==chromosomes line up in the middle== This is metaphase. The chromosomes line up along the middle of the cell, at the metaphase plate. Spindle fibres are attached to each kinetochore.
+
+        - **Interphase is not part of mitosis**: this is a common mistake. Interphase is the rest of the cell cycle, and the cell spends most of its life there.
+        - [ ] ==read chapter 12 before Wed== The lecturer assigned chapter twelve as the reading for Wednesday.
+        - [x] ==email the TA about the lab== The lecturer said to email your TA if you have questions about the lab.
+        > =="know the phases in order"== The lecturer said this is on every exam they have ever written: prophase, metaphase, anaphase, telophase.
+
+        ### ==Growth==
+        - ==doubling: $N = N_0 \cdot 2^n$, see [the lab sheet](https://example.com/lab)== If every cell divides once per generation, the number of cells doubles each time. After $n$ generations you have $N = N_0 \cdot 2^n$ cells. The lab sheet for next week is on the course page.
+        - **Bacteria**: in good conditions they can divide every twenty minutes. This is why a culture gets out of hand overnight.
+
+        ## Questions to review
+        1. What are the four phases of mitosis, in order, and what is the key event in each?
+        2. When and where in the cell cycle is the DNA copied, and what does each chromosome look like when mitosis begins?
+        3. Why is interphase not part of mitosis, and what is it instead?
+        4. What happens to the sister chromatids in anaphase, and why does the cell have two full sets of chromosomes at that point?
+        5. If every cell divides once per generation, how many cells are there after $n$ generations, and why does a bacterial culture grow so quickly?
+        """;
+
+    [AvaloniaFact]
+    public void Type_notes_in_Markdown_and_read_the_write_up()
+    {
+        if (Environment.GetEnvironmentVariable("STUDYSTASH_FILM") != "1") return;
+        var t = new Tour("typed-notes-markdown", ThemeVariant.Light);
+        bool written = false;
+        const string bio = "Biology 110";
+        string typed = "";
+        t.Prepare = (m, page) =>
+        {
+            var dot = Skin.ClassDot(Array.IndexOf(Skin.ClassHues, "Teal"));
+            int ml = m.Classes.ToList().FindIndex(c => c.Name == "Machine Learning");
+            m.Classes.Insert(ml + 1, new ClassItem { Name = bio, Dot = dot, Count = 6 });
+            foreach (var c in m.Classes) c.Selected = c.Name == bio;
+            if (page == Demo.Page.Recording && m.Note?.Recorder is { } recorder)
+            {
+                recorder.ClassName = bio;
+                recorder.ClassDot = dot;
+                recorder.Lines.Clear();
+                m.Note = new NoteModel
+                {
+                    Id = "rec-live", ClassName = bio, Dot = dot, Noun = Nouns.Lecture, When = "Wednesday 21 October at 9:30 AM", Title = "Biology 110, Wed 21 Oct",
+                    Live = true, Recorder = recorder, OnRename = _ => Task.FromResult(true),
+                }.Titled().Following();
+            }
+            if (page != Demo.Page.Note) return;
+            m.Note = new NoteModel
+            {
+                Id = "n1", ClassName = bio, Dot = dot, Noun = Nouns.Lecture, When = "Wednesday 21 October at 9:30 AM, 50 min",
+                Title = written ? "Cell division and mitosis" : "Biology 110, Wed 21 Oct", Markdown = TypedNotes.AllMine(typed), Mine = true,
+                Pending = written ? null : "Your library is writing the notes for this lecture. They show here when they're done.", OnRename = _ => Task.FromResult(true),
+            }.Titled();
+            m.Notes = written ? AiDemo.LectureNotes(Written, "Claude") : null;
+        };
+        t.Show(Demo.Page.Recording);
+        t.Hold(0.5);
+        var editor = t.View.Part<TypedEditor>("Typed");
+        t.MoveTo(editor.Fields[0], 0.3, 0.5, 6);
+        t.Click();
+        t.MoveTo(editor, 1.04, 0.05, 4);
+        // Real keystrokes, a few to a frame.
+        void Keys(string text, int perFrame = 4)
+        {
+            for (int i = 0; i < text.Length; i++)
+            {
+                t.Window.KeyTextInput(text[i].ToString());
+                if (i % perFrame == perFrame - 1 || i == text.Length - 1) t.Frame();
+            }
+        }
+        void Press(Key key, RawInputModifiers modifiers = RawInputModifiers.None)
+        {
+            t.Window.KeyPress(key, modifiers, PhysicalKey.None, null);
+            t.Frame();
+        }
+        Keys("# Cell division");
+        Press(Key.Enter);
+        Keys("- **Mitosis**: one cell → two *identical* cells");
+        t.Hold(0.3);
+        Press(Key.Enter);
+        Press(Key.Tab);
+        Keys("prophase, then `metaphase`");
+        Press(Key.Enter);
+        Press(Key.Enter);
+        Press(Key.Enter);
+        Keys("1. DNA copies itself", 5);
+        Press(Key.Enter);
+        Keys("chromosomes line up in the middle", 5);
+        Press(Key.Enter);
+        Press(Key.Enter);
+        Keys("[ ] read chapter 12 before Wed", 5);
+        Press(Key.Enter);
+        Keys("email the TA about the lab", 5);
+        // The box ticks with a click.
+        var tick = editor.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.ToggleButton>().Where(b => b.IsVisible).Last();
+        t.MoveTo(tick, 0.5, 0.5, 5);
+        t.Click();
+        t.Hold(0.3);
+        t.MoveTo(editor.Fields[^1], 0.98, 0.5, 4);
+        t.Click();
+        t.MoveTo(editor, 1.04, 0.3, 4);
+        Press(Key.Enter);
+        Press(Key.Enter);
+        Keys("> \"know the phases in order\"", 5);
+        Press(Key.Enter);
+        Press(Key.Enter);
+        Keys("## Growth", 5);
+        Press(Key.Enter);
+        Keys("- doubling: $N = N_0 \\cdot 2^n$, see [the lab sheet](https://example.com/lab)", 5);
+        t.Hold(0.4);
+        // The caret leaves the line: it reads as it will, its marks out of sight.
+        Press(Key.Up);
+        t.Hold(1.0);
+        typed = editor.Text;
+        File.WriteAllText(System.IO.Path.Combine(Shot.Dir, "typed-notes-markdown-typed.md"), typed);
+        // Stop: the notes are written round what was typed.
+        t.MoveTo(t.View.Part<Button>("Stop"));
+        t.Click();
+        t.Hold(0.8);
+        written = true;
+        t.Show(Demo.Page.Note, remember: false);
+        t.MoveTo(t.View.Part<Control>("NotesBody"), 1.12, 0.05, 5);
+        t.Hold(2.0);
+        // Down through them: the checkboxes, the quote, the student's own heading.
+        var scroller = t.View.Part<Control>("NotesBody").FindAncestorOfType<ScrollViewer>()!;
+        double to = Math.Min(scroller.Extent.Height - scroller.Viewport.Height, 520);
+        for (int i = 1; i <= 18; i++)
+        {
+            double f = i / 18.0;
+            scroller.Offset = scroller.Offset.WithY(to * f * f * (3 - 2 * f));
+            t.Frame();
+        }
+        t.Hold(2.0);
+        t.Window.Close();
+    }
+}
