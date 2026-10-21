@@ -38,6 +38,11 @@ public class NoteText : SelectableTextBlock
         // every paragraph, and Copy copies the whole selection, not this piece's share of it.
         Focusable = false;
         ContextFlyout = null;
+        // Selected, it's on the highlighter in ink, whatever its own colour (a link, the grey of what was added from
+        // the recording, a warning, a chat question's white): ink on the highlighter reads in every colour theme, light
+        // and dark, where some of those colours on it don't (a light theme's link nearly vanishes).
+        this.Bind(SelectionBrushProperty, this.GetResourceObservable("Hl"));
+        this.Bind(SelectionForegroundBrushProperty, this.GetResourceObservable("Fg"));
     }
 
     protected override Type StyleKeyOverride => typeof(SelectableTextBlock);
@@ -118,12 +123,7 @@ public class NoteText : SelectableTextBlock
 /// </summary>
 public sealed class PageText : NoteText
 {
-    public PageText()
-    {
-        Cursor = new Cursor(StandardCursorType.Ibeam);
-        this.Bind(SelectionBrushProperty, this.GetResourceObservable("Hl"));
-        this.Bind(SelectionForegroundBrushProperty, this.GetResourceObservable("Fg"));
-    }
+    public PageText() => Cursor = new Cursor(StandardCursorType.Ibeam);
 
     protected override Type StyleKeyOverride => typeof(TextBlock);
 
