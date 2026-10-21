@@ -84,7 +84,7 @@
 
       <Border Classes="ai-field">
         <Grid ColumnDefinitions="*,4,Auto,4,Auto" VerticalAlignment="Center">
-          <TextBox Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" FontSize="14" VerticalAlignment="Center">
+          <TextBox Classes="bare" Text="{Binding Question}" c:OneLinePaste.IsOn="True" PlaceholderText="{Binding Placeholder}" FontSize="14" VerticalAlignment="Center">
             <TextBox.KeyBindings>
               <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
             </TextBox.KeyBindings>

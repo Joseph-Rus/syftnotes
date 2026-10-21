@@ -80,7 +80,7 @@
           <c:Icon Glyph="search" Size="24" Foreground="{DynamicResource Fg2}" IsVisible="{Binding Searching}" />
           <c:Icon Glyph="auto_awesome" Filled="True" Size="24" Foreground="{DynamicResource AccentText}" IsVisible="{Binding Answering}" />
         </Panel>
-        <TextBox Name="QueryBox" Grid.Column="2" Classes="bare" Text="{Binding Query}" FontFamily="{DynamicResource DisplayFont}" FontSize="22" LetterSpacing="-0.22"
+        <TextBox Name="QueryBox" c:OneLinePaste.IsOn="True" Grid.Column="2" Classes="bare" Text="{Binding Query}" FontFamily="{DynamicResource DisplayFont}" FontSize="22" LetterSpacing="-0.22"
                  PlaceholderText="Search notes and lectures" />
         <TextBlock Grid.Column="3" Text="{Binding AskHint}" IsVisible="{Binding Searching}" FontSize="12" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center"
                    Margin="12,0,0,0" />

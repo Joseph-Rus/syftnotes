@@ -1769,7 +1769,7 @@
               </StackPanel>
               <Border Classes="settings-ask">
                 <Grid ColumnDefinitions="*,6,Auto">
-                  <TextBox Name="AskBox" Classes="bare" Text="{Binding Draft}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center"
+                  <TextBox Name="AskBox" c:OneLinePaste.IsOn="True" Classes="bare" Text="{Binding Draft}" PlaceholderText="{Binding Placeholder}" FontSize="13" VerticalAlignment="Center"
                            TextWrapping="Wrap" MaxHeight="96" AutomationProperties.Name="Ask your AI">
                     <TextBox.KeyBindings>
                       <KeyBinding Gesture="Enter" Command="{Binding SendCommand}" />

@@ -16,7 +16,7 @@
 
   <Border Classes="ask" ClipToBounds="False">
     <Grid ColumnDefinitions="*,12,Auto,2,Auto,8,Auto" VerticalAlignment="Center">
-      <TextBox Name="AskInput" Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" PlaceholderForeground="{DynamicResource InkSubtle}"
+      <TextBox Name="AskInput" c:OneLinePaste.IsOn="True" Classes="bare" Text="{Binding Question}" PlaceholderText="{Binding Placeholder}" PlaceholderForeground="{DynamicResource InkSubtle}"
                FontSize="15.5" VerticalAlignment="Center" AutomationProperties.Name="Ask about your lectures">
         <TextBox.KeyBindings>
           <KeyBinding Gesture="Enter" Command="{Binding AskCommand}" />
