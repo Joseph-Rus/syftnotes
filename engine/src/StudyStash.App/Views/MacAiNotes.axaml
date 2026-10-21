@@ -49,9 +49,9 @@
     <Border Classes="ai-problem" IsVisible="{Binding IsFailed}">
       <Grid ColumnDefinitions="Auto,12,*">
         <c:Icon Glyph="error" Filled="True" Size="20" Foreground="{DynamicResource Warn}" />
-        <StackPanel Grid.Column="2" Spacing="0">
-          <TextBlock Classes="ai-problem-title" Text="{Binding FailedTitle}" />
-          <TextBlock Classes="ai-problem-message" Text="{Binding FailedMessage}" />
+        <StackPanel Grid.Column="2" Spacing="0" c:TextSelection.Area="True">
+          <c:PageText Classes="ai-problem-title" Text="{Binding FailedTitle}" />
+          <c:PageText Classes="ai-problem-message" Text="{Binding FailedMessage}" />
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
             <Button Classes="ai-pillbtn" Command="{Binding TryAgainCommand}">
               <Border Classes="ai-pill"><TextBlock Text="Try again" /></Border>
@@ -122,7 +122,7 @@
         <TextBox Name="Editor" Classes="bare ai-editor" Text="{Binding EditText}" AcceptsReturn="True" TextWrapping="Wrap"
                  AutomationProperties.Name="Notes" />
       </Border>
-      <TextBlock Classes="ai-editor-problem" IsVisible="{Binding HasEditProblem}" Text="{Binding EditProblem}" />
+      <c:PageText Classes="ai-editor-problem" IsVisible="{Binding HasEditProblem}" Text="{Binding EditProblem}" />
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
         <Button Classes="ai-textbtn" Command="{Binding CancelEditCommand}">
           <Border Classes="ai-pill-plain"><TextBlock Text="Cancel" /></Border>

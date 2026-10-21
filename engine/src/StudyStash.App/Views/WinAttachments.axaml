@@ -81,6 +81,6 @@
       </Grid>
     </Border>
     <TextBlock IsVisible="{Binding HasSaid}" Text="{Binding Said}" FontSize="12" Foreground="{DynamicResource Fg2}" TextWrapping="Wrap" />
-    <TextBlock IsVisible="{Binding HasProblem}" Text="{Binding Problem}" FontSize="12" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" />
+    <c:PageText IsVisible="{Binding HasProblem}" Text="{Binding Problem}" FontSize="12" Foreground="{DynamicResource Warn}" TextWrapping="Wrap" />
   </StackPanel>
 </UserControl>

@@ -1,4 +1,5 @@
 using System.Text;
+using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Automation.Peers;
 using Avalonia.Controls;
@@ -22,17 +23,26 @@ public sealed class SpokenText : TextBlock
 
 /// <summary>
 /// A piece of a note's text on screen (a paragraph, a heading, a bullet's words, a table's cell), selectable; but the
-/// <see cref="NoteView"/> it's in does the selecting, so one drag runs from one piece into the next as on a web page
-/// (a <see cref="SelectableTextBlock"/> on its own selects only within itself). Read as <see cref="SpokenText"/> is.
+/// <see cref="NoteView"/> it's in does the selecting (<see cref="TextSelection"/>), so one drag runs from one piece into
+/// the next as on a web page (a <see cref="SelectableTextBlock"/> on its own selects only within itself). Read as
+/// <see cref="SpokenText"/> is.
 /// </summary>
-public sealed class NoteText : SelectableTextBlock
+public class NoteText : SelectableTextBlock
 {
+    public static readonly StyledProperty<string?> CopyJoinProperty = AvaloniaProperty.Register<NoteText, string?>(nameof(CopyJoin));
+    public static readonly StyledProperty<string?> CopyLeadProperty = AvaloniaProperty.Register<NoteText, string?>(nameof(CopyLead));
+
     public NoteText()
     {
-        // The notes take the focus (for ⌘C) and give the right-click menu, not each piece of them: Tab doesn't stop at
+        // What it's in takes the focus (for ⌘C) and gives the right-click menu, not each piece: Tab doesn't stop at
         // every paragraph, and Copy copies the whole selection, not this piece's share of it.
         Focusable = false;
         ContextFlyout = null;
+        // Selected, it's on the highlighter in ink, whatever its own colour (a link, the grey of what was added from
+        // the recording, a warning, a chat question's white): ink on the highlighter reads in every colour theme, light
+        // and dark, where some of those colours on it don't (a light theme's link nearly vanishes).
+        this.Bind(SelectionBrushProperty, this.GetResourceObservable("Hl"));
+        this.Bind(SelectionForegroundBrushProperty, this.GetResourceObservable("Fg"));
     }
 
     protected override Type StyleKeyOverride => typeof(SelectableTextBlock);
@@ -41,11 +51,19 @@ public sealed class NoteText : SelectableTextBlock
 
     /// <summary>What goes between this piece and the one before it when both are copied: a tab between a table's
     /// cells, ": " between a definition's term and its meaning; null, a new line.</summary>
-    public string? CopyJoin { get; set; }
+    public string? CopyJoin
+    {
+        get => GetValue(CopyJoinProperty);
+        set => SetValue(CopyJoinProperty, value);
+    }
 
     /// <summary>What it's copied with in front when the selection takes it from its start: a bullet's "• ", a numbered
-    /// item's "3. ", two spaces further in for each list it's inside.</summary>
-    public string? CopyLead { get; set; }
+    /// item's "3. ", two spaces further in for each list it's inside; a transcript line's "[12:30] ".</summary>
+    public string? CopyLead
+    {
+        get => GetValue(CopyLeadProperty);
+        set => SetValue(CopyLeadProperty, value);
+    }
 
     /// <summary>How many characters it holds, as its selection counts them (a formula in it is one).</summary>
     public int Length => Inlines is { Count: > 0 } inlines ? inlines.Text?.Length ?? 0 : Text?.Length ?? 0;
@@ -79,12 +97,57 @@ public sealed class NoteText : SelectableTextBlock
         return copied.ToString();
     }
 
-    // Its NoteView does the selecting.
+    /// <summary>The selection that last drew some of this piece as selected (null: none has).</summary>
+    internal TextSelection? LitBy;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == TextProperty) LitBy?.TextChanged(this);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        LitBy?.PieceLeft(this);
+    }
+
+    // What it's in does the selecting, and the copying and selecting all by the keys.
     protected override void OnPointerPressed(PointerPressedEventArgs e) { }
+
+    protected override void OnKeyDown(KeyEventArgs e) { }
+
+    /// <summary>A piece that selects for itself (<see cref="PageText"/>) keeps its selection when the focus goes
+    /// (to a button, a field); a press on other text ends it instead.</summary>
+    protected override void OnLostFocus(FocusChangedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        TextSelection.Of(this)?.Redraw();
+    }
 
     protected override void OnPointerMoved(PointerEventArgs e) { }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e) { }
+}
+
+/// <summary>
+/// A page's own words that are worth copying (a transcript's line, a chat's question, an assignment's details, an
+/// error to paste when asking for help, an address): a <see cref="TextBlock"/> to look at, styled as any other is, that
+/// selects as the notes do. In a part of the page marked <c>c:TextSelection.Area="True"</c> one drag runs on through
+/// every piece in it; on its own it's a selection of its own (<see cref="TextSelection"/>).
+/// </summary>
+public sealed class PageText : NoteText
+{
+    public PageText() => Cursor = new Cursor(StandardCursorType.Ibeam);
+
+    protected override Type StyleKeyOverride => typeof(TextBlock);
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        // Nothing above selects for it: it selects for itself.
+        if (TextSelection.Of(this) is null && !TextSelection.InOne(this)) _ = new TextSelection(this);
+    }
 }
 
 sealed class SpokenPeer(TextBlock owner) : TextBlockAutomationPeer(owner)

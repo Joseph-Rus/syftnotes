@@ -44,7 +44,7 @@
           <Grid Classes="cv-row" ColumnDefinitions="*,Auto">
             <TextBlock Text="School" VerticalAlignment="Center" FontSize="13" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" IsVisible="{Binding !EditingSchool}">
-              <TextBlock Classes="cv-value" Text="{Binding School}" VerticalAlignment="Center" />
+              <c:PageText Classes="cv-value" Text="{Binding School}" VerticalAlignment="Center" />
               <Button Classes="cv-pill" Command="{Binding ChangeSchoolCommand}"><TextBlock Text="Change" /></Button>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" IsVisible="{Binding EditingSchool}">
@@ -56,7 +56,7 @@
           <Border Classes="cv-sep" />
           <Grid Classes="cv-row" ColumnDefinitions="*,Auto,Auto,Auto">
             <TextBlock Text="{Binding ExtensionLabel}" VerticalAlignment="Center" FontSize="13" />
-            <TextBlock Grid.Column="1" Classes="cv-value" Text="{Binding ExtensionLine}" VerticalAlignment="Center" />
+            <c:PageText Grid.Column="1" Classes="cv-value" Text="{Binding ExtensionLine}" VerticalAlignment="Center" />
             <Button Name="ChooseBrowser" Grid.Column="2" Classes="cv-pill cv-plain" Margin="12,0,0,0" VerticalAlignment="Center" Command="{Binding ChooseBrowserCommand}"
                     IsVisible="{Binding CanChooseBrowser}" ToolTip.Tip="{Binding ChooseBrowserTip}"><TextBlock Text="Change browser" /></Button>
             <Button Grid.Column="3" Classes="cv-pill cv-plain" Margin="12,0,0,0" VerticalAlignment="Center" Command="{Binding SetUpExtensionCommand}"
@@ -89,7 +89,7 @@
           </Grid>
         </StackPanel>
       </Border>
-      <TextBlock Classes="cv-link" Text="{Binding SchoolError}" IsVisible="{Binding SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <c:PageText Classes="cv-link" Text="{Binding SchoolError}" IsVisible="{Binding SchoolError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
     </StackPanel>
 
     <!-- Courses to bring in: every course Find my courses found, ticked if it becomes a class and syncs -->
@@ -160,7 +160,7 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
       </Border>
-      <TextBlock Classes="cv-link" Text="{Binding CoursesSay}" IsVisible="{Binding CoursesSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <c:PageText Classes="cv-link" Text="{Binding CoursesSay}" IsVisible="{Binding CoursesSay, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
     </StackPanel>
 
     <!-- Last sync -->
@@ -172,7 +172,7 @@
             <DataTemplate x:DataType="vm:CanvasChangeRow">
               <Grid ColumnDefinitions="Auto,*" MinHeight="22" Margin="16,8">
                 <c:Icon Classes="cv-change" Glyph="{Binding Glyph}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Classes="cv-change" Text="{Binding Text}" Margin="12,0,0,0" VerticalAlignment="Center" />
+                <c:PageText Grid.Column="1" Classes="cv-change" Text="{Binding Text}" Margin="12,0,0,0" VerticalAlignment="Center" />
               </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

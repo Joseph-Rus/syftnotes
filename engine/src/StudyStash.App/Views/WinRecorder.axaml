@@ -102,7 +102,9 @@
           </ScrollViewer.OpacityMask>
           <Panel VerticalAlignment="Bottom">
             <TextBlock IsVisible="{Binding NoLines}" Text="{Binding Waiting}" FontSize="13" Foreground="{DynamicResource Fg3}" TextWrapping="Wrap" />
-            <ItemsControl ItemsSource="{Binding Lines}">
+            <!-- One drag selects from line to line (a line copied from its start keeps its time); the room between
+                 them is left to the recorder's background, which moves it. -->
+            <ItemsControl ItemsSource="{Binding Lines}" Background="{x:Null}" c:TextSelection.Area="True">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
               </ItemsControl.ItemsPanel>
@@ -110,7 +112,7 @@
                 <DataTemplate x:DataType="vm:HeardLine">
                   <Grid ColumnDefinitions="36,10,*">
                     <TextBlock Classes="num" Text="{Binding Time}" FontSize="12" Foreground="{DynamicResource Fg3}" Margin="0,2,0,0" />
-                    <TextBlock Grid.Column="2" Text="{Binding Text}" FontSize="14" LineHeight="20.3" TextWrapping="Wrap"
+                    <c:PageText Grid.Column="2" Text="{Binding Text}" CopyLead="{Binding CopyLead}" FontSize="14" LineHeight="20.3" TextWrapping="Wrap"
                                Classes.old="{Binding !Latest}" />
                   </Grid>
                 </DataTemplate>

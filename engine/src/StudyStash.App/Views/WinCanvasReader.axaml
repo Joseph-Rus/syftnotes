@@ -10,9 +10,9 @@
     <StyleInclude Source="avares://StudyStash/Views/WinCanvasStyles.axaml" />
   </UserControl.Styles>
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel MaxWidth="620" Margin="48,40,48,40" Spacing="10" HorizontalAlignment="Center">
-      <TextBlock Classes="cv-meta" Text="{Binding Meta}" />
-      <TextBlock Classes="cv-detail-title" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
+    <StackPanel MaxWidth="620" Margin="48,40,48,40" Spacing="10" HorizontalAlignment="Center" c:TextSelection.Area="True">
+      <c:PageText Classes="cv-meta" Text="{Binding Meta}" />
+      <c:PageText Classes="cv-detail-title" Text="{Binding Title}" TextWrapping="Wrap" Margin="0,0,0,8" />
       <c:NoteView Markdown="{Binding Body}" />
       <Button Classes="cv-hand-in" Margin="0,8,0,0" Command="{Binding OpenInCanvasCommand}">
         <TextBlock Classes="cv-hand-in" Text="Open in Canvas" />
