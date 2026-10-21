@@ -879,6 +879,16 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         };
         var ai = new AiEntry(Brand);
         bool shown = false;
+        // The AI's bubble goes where the turn began: above the cards it opens as it goes (an offer_… tool shows its
+        // card before the words that introduce it are in, and has no chip to bring the bubble in first).
+        int at = Thread.Count;
+        void ShowAi()
+        {
+            if (shown) return;
+            Thread.Insert(Math.Min(at, Thread.Count), ai);
+            shown = true;
+        }
+        string words = "";
         ChatProblem problem = ChatProblem.None;
         string said = "";
         var cts = Fresh();
@@ -894,19 +904,12 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                         save(s => s.SetupChat = new SetupChatSaved(id, sid));
                         break;
                     case "Text":
-                        if (!shown)
-                        {
-                            Thread.Add(ai);
-                            shown = true;
-                        }
-                        ai.Text = (ai.Text + e.Text).TrimStart();
+                        ShowAi();
+                        words += e.Text;
+                        ai.Text = PlainWords(words).TrimStart();
                         break;
                     case "Tool" when e.Chip.Length > 0:
-                        if (!shown)
-                        {
-                            Thread.Add(ai);
-                            shown = true;
-                        }
+                        ShowAi();
                         ai.Chip(e.Chip);
                         break;
                     case "Problem":
@@ -919,11 +922,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         catch (OperationCanceledException)
         {
         }
-        if (question is { } q && !(ai.Text.Contains(q, StringComparison.Ordinal)))
+        if (question is { } q && QuestionToAdd(ai.Text, q) is { } add)
         {
-            if (!shown) Thread.Add(ai);
-            shown = true;
-            ai.Text = ai.Text.Length > 0 ? ai.Text.TrimEnd() + "\n\n" + q : q;
+            ShowAi();
+            ai.Text = ai.Text.Length > 0 ? ai.Text.TrimEnd() + "\n\n" + add : add;
         }
         Busy = false;
         if (cts.IsCancellationRequested) return;
@@ -940,6 +942,25 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
             pending.Clear();
             await RunTurnAsync(next);
         }
+    }
+
+    /// <summary>ask_student's question, to add under the AI's words when they don't ask it themselves: when it said
+    /// nothing, or its words don't end on a question (an AI that put the question its own way already asked it, and
+    /// showing both read as the question twice). Null when there's nothing to add.</summary>
+    public static string? QuestionToAdd(string said, string question)
+    {
+        string words = said.TrimEnd();
+        if (words.Contains(question.Trim(), StringComparison.Ordinal) || words.EndsWith('?')) return null;
+        return question;
+    }
+
+    /// <summary>An AI's words as the chat shows them, plain: Markdown's bold, headings and code marks taken out (the
+    /// bubble isn't Markdown, and ChatGPT writes it).</summary>
+    public static string PlainWords(string markdown)
+    {
+        string s = markdown.Replace("**", "", StringComparison.Ordinal).Replace("__", "", StringComparison.Ordinal);
+        s = System.Text.RegularExpressions.Regex.Replace(s, @"(?m)^[ \t]{0,3}#{1,6}[ \t]+", "");
+        return System.Text.RegularExpressions.Regex.Replace(s, @"`([^`\n]*)`", "$1");
     }
 
     void ShowTrouble(ChatProblem kind, string said)
@@ -1041,6 +1062,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>Works the checklist out again from what's so now (it only ever moves on real state).</summary>
     public void Refresh()
     {
+        // The finish card's recap follows too ("Downloading · 42%" goes on to Ready).
+        if (OpenCard is { IsFinish: true, Open: true } finish) finish.RefreshRecap();
         var items = Items();
         if (Checklist.Select(r => r.Id).SequenceEqual(items.Select(i => i.Id)))
         {

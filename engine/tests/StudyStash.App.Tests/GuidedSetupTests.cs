@@ -473,6 +473,20 @@ public sealed class GuidedSetupTests
         Assert.False(rig.Guided.Busy);
     }
 
+    /// <summary>What the AI says shows once, as plain words: an ask_student question it already put its own way isn't
+    /// added under it again (Claude and ChatGPT both paraphrase), and ChatGPT's Markdown marks don't show.</summary>
+    [Fact]
+    public void A_question_the_ai_asked_in_its_own_words_isnt_shown_twice_and_markdown_marks_dont_show()
+    {
+        const string q = "Does your school use Canvas?";
+        Assert.Null(GuidedSetupModel.QuestionToAdd("The download is running. Next, your classes. Does your school use Canvas?", q));
+        Assert.Null(GuidedSetupModel.QuestionToAdd("While that downloads, let's add your classes. Is Canvas what your school uses?", q));
+        Assert.Equal(q, GuidedSetupModel.QuestionToAdd("", q));
+        Assert.Equal(q, GuidedSetupModel.QuestionToAdd("The download is running in the background.", q));
+        Assert.Equal("Press Open Study Stash when you're ready.\nYour library: ready",
+            GuidedSetupModel.PlainWords("Press **Open Study Stash** when you're ready.\n## Your library: `ready`"));
+    }
+
     // --- the checklist, on its own ------------------------------------------------------------------------------------
 
     static IReadOnlyList<ChecklistItem> Items(SetupModel m, ChecklistFacts f) => SetupChecklist.From(m, f);

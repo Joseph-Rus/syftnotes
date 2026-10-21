@@ -122,6 +122,7 @@ public static partial class SetupChat
             How to talk
             - Warm and short: one or two sentences, then one question. Never two questions at once.
             - Plain words. Say "the model that turns speech into text", not file names or jargon.
+            - Plain text only: no Markdown (no **bold**, headings, tables or code marks). The chat shows exactly what you type.
             - When a question has a few obvious answers, use ask_student so they can tap one.
             - If they seem stuck or unsure, offer the simple choice, or offer to finish by hand (open_manual_setup).
             - Stay on setup. If they ask about something else, answer in a line and bring them back.

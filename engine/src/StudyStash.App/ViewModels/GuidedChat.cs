@@ -149,6 +149,16 @@ public sealed partial class CardEntry : ChatEntry
 
     /// <summary>The finish card's recap: one line an item.</summary>
     public IReadOnlyList<string> Recap => owner.Recap();
+    string shownRecap = "";
+
+    /// <summary>The recap is read again when what it says has changed (the model's download moving on).</summary>
+    public void RefreshRecap()
+    {
+        string now = string.Join("\n", owner.Recap());
+        if (now == shownRecap) return;
+        shownRecap = now;
+        OnPropertyChanged(nameof(Recap));
+    }
 
     partial void OnOpenChanged(bool value) => OnPropertyChanged(nameof(Folded));
 
