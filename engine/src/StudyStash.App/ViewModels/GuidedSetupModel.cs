@@ -163,6 +163,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// ran), else "" (the step goes by what the library does).</summary>
     public string NotesPick => AiReady && Picked is ("claude" or "codex") ? Picked
         : PickedGemini ? "gemini"
+        : PickedFree ? "ollama"
         : settings().SetupAi is "ollama" or "gemini" ? settings().SetupAi : "";
 
     public bool Again => Setup.Again;
@@ -244,8 +245,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     /// <summary>Signed in, but on a plan other apps can't use (the free one): said as that, with what would work.</summary>
     public string PlanTooSmallTitle => $"This {Brand} account is on a plan that other apps can't use";
     public string PlanTooSmallText => Cli.Id == "codex"
-        ? "Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures."
-        : "Study Stash needs Claude Pro or Max. Without one, it still records and transcribes your lectures.";
+        ? "Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step."
+        : "Study Stash needs Claude Pro or Max. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.";
     public bool ShowOpenSignIn => !WaitingSignIn && !SignedIn && PlanProblem == ChatProblem.None;
     public bool HasSignInProblem => !string.IsNullOrEmpty(SignInProblem);
     public bool HasPlanProblem => PlanProblem != ChatProblem.None;

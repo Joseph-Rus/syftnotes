@@ -383,11 +383,13 @@ public sealed partial class AiSetupModel : ObservableObject
         }
         // The AI answered with on the first screen, not ready yet: it opens on what it needs, once (Gemini's key, or
         // its sign-in steps).
-        if (!preferShown && Prefer.Length > 0 && !ChosenBefore && SelectedNotes != Prefer && Engines.FirstOrDefault(r => r.Id == Prefer) is { CanWrite: false } wanted)
+        if (!preferShown && Prefer.Length > 0 && !ChosenBefore && SelectedNotes != Prefer && Engines.FirstOrDefault(r => r.Id == Prefer) is { } wanted)
         {
             preferShown = true;
-            if (wanted.ShowOneButton && wanted.Id == "gemini") KeyFor = "gemini";
-            else if (wanted.HasHelp) wanted.ShowHelp = true;
+            if (wanted is { Id: "gemini", ShowOneButton: true }) KeyFor = "gemini";
+            // The free AI's button starts a big download, so it isn't pressed for the student: the step says where it is.
+            else if (wanted is { Id: "ollama", ShowOneButton: true }) Say = $"To have the free AI write your notes, press “{wanted.OpenLabel}” on its row.";
+            else if (!wanted.CanWrite && wanted.HasHelp) wanted.ShowHelp = true;
         }
         if (KeyFor.Length > 0 && Engines.All(r => r.Id != KeyFor)) KeyFor = "";
         HelpOpen = Engines.Any(r => r.ShowHelp) || KeyOpen;

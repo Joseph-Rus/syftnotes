@@ -430,7 +430,7 @@ public sealed class GuidedSetupTests
         await g.OpenSignInCommand.ExecuteAsync(null);
         Assert.Equal(ChatProblem.Plan, g.PlanProblem);
         Assert.Equal("This ChatGPT account is on a plan that other apps can't use", g.PlanProblemTitle);
-        Assert.Equal("Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures.", g.PlanProblemText);
+        Assert.Equal("Study Stash needs ChatGPT Plus or higher. Without one, it still records and transcribes your lectures. Have an API key? Carry on, and add it on the notes step.", g.PlanProblemText);
         Assert.False(g.AiReady);
         g.OpenPlansCommand.Execute("");
         Assert.Equal(["https://chatgpt.com/pricing"], rig.Opened);

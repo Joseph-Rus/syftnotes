@@ -678,6 +678,8 @@ public class AiSetupModelTests
         var first = new AiSetupModel(lib) { Windows = false, WriteNotes = _ => Task.FromResult(true), NotesOn = () => Task.FromResult<bool?>(true), Prefer = "ollama" };
         await first.Load();
         Assert.True(first.NoAi);
+        // "I don't have a paid plan" was the answer: the step says where the free AI's button is, without pressing it.
+        Assert.Equal("To have the free AI write your notes, press “Set it up” on its row.", first.Say);
         // Its row says to press its button (which starts the download); a click alone doesn't pick it.
         var free = first.Engines.Single(r => r.Id == "ollama");
         free.SelectCommand.Execute(null);
