@@ -25,9 +25,9 @@
 
   <DockPanel>
     <!-- Whether the library answers, and when Canvas last synced: two plain lines at the foot, never under the
-         folders (they scroll). -->
+         folders (they scroll). Their words select; the room beside them is the sidebar's, which moves the window. -->
     <ItemsControl Name="StatusRow" DockPanel.Dock="Bottom" Classes.bad="{Binding !StatusGood}" ItemsSource="{Binding StatusLines}" Margin="16,0,16,2"
-                  c:TextSelection.Area="True">
+                  Background="{x:Null}" c:TextSelection.Area="True">
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="x:String">
           <c:PageText Classes="side-foot" Text="{Binding}" />

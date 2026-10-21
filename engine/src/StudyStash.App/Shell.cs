@@ -757,9 +757,8 @@ public static partial class Shell
 
     /// <summary>
     /// The recorder's transcript: what's been said so far (<see cref="AppHost.LiveLines"/>, the transcript's own lines
-    /// and the live words after them), its last 200 lines. Only what changed is redrawn: lines that scrolled off the top
-    /// go, the lines that read the same stay, and the rest (the live words' newest line, or live words the transcript
-    /// has now written down) are drawn again.
+    /// and the live words after them), its last 200 lines. Only what changed changes (<see cref="RecorderModel.ShowHeard"/>):
+    /// the live words' newest line grows in place, so a selection in it stays.
     /// </summary>
     static void ShowLive()
     {
@@ -767,13 +766,7 @@ public static partial class Shell
         recorder.QuickWords = host.LiveWordsNow;
         var lines = host.LiveLines();
         if (lines.Count > 200) lines = lines[^200..];
-        while (recorder.Lines.Count > 0 && lines.Count > 0 && recorder.Lines[0].Start < lines[0].Start) recorder.Lines.RemoveAt(0);
-        int same = 0;
-        while (same < recorder.Lines.Count && same < lines.Count && recorder.Lines[same].Text == lines[same].Text
-               && recorder.Lines[same].Start == lines[same].Start && recorder.Lines[same].Latest == (same == lines.Count - 1)) same++;
-        while (recorder.Lines.Count > same) recorder.Lines.RemoveAt(recorder.Lines.Count - 1);
-        for (int i = same; i < lines.Count; i++)
-            recorder.Lines.Add(new HeardLine { Time = TimedText.Clock(lines[i].Start), Text = lines[i].Text, Start = lines[i].Start, Latest = i == lines.Count - 1 });
+        recorder.ShowHeard(lines);
         if (lines.Count > 0) panel.LastLine = $"“…{Trim(lines[^1].Text, 90)}”";
     }
 

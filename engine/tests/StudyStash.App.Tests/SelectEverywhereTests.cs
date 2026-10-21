@@ -12,6 +12,7 @@ using StudyStash.App.Controls;
 using StudyStash.App.Services;
 using StudyStash.App.ViewModels;
 using StudyStash.App.Views;
+using StudyStash.Core;
 
 namespace StudyStash.App.Tests;
 
@@ -222,6 +223,85 @@ public class SelectEverywhereTests
     [AvaloniaTheory]
     [InlineData(SkinKind.Mac)]
     [InlineData(SkinKind.Win)]
+    public async Task A_selection_in_the_recorders_newest_line_stays_while_the_live_words_grow_it(SkinKind skin)
+    {
+        var model = new RecorderModel { ClassName = "CS 101", Expanded = true };
+        model.ShowHeard([new Spoken(1085, 1090, "Okay, the midterm. Recursion traces will be on it."), new Spoken(1170, 1175, "Think of each call as a plate")]);
+        Control view = skin == SkinKind.Mac ? new MacRecorder { DataContext = model } : new WinRecorder { DataContext = model };
+        var window = Show(view, skin, 420, 600);
+        try
+        {
+            var newest = Piece(view, "Think of each");
+            Drag(window, At(newest, 0), At(newest, " as a plate"));
+            Assert.Equal("[19:30] Think of each call", Selected(newest));
+
+            // The live words grow the line every second or so: it's the same line, still selected as it was.
+            model.ShowHeard([new Spoken(1085, 1090, "Okay, the midterm. Recursion traces will be on it."), new Spoken(1170, 1178, "Think of each call as a plate on a stack.")]);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Same(newest, Piece(view, "Think of each"));
+            Assert.Equal("Think of each call as a plate on a stack.", newest.Text);
+            Assert.Equal((0, "Think of each call".Length), (newest.SelectionStart, newest.SelectionEnd));
+            Assert.Equal("[19:30] Think of each call", Selected(newest));
+
+            // A new line comes: the one before it is no longer the newest (greyed in place), and keeps its selection.
+            model.ShowHeard([new Spoken(1085, 1090, "Okay, the midterm. Recursion traces will be on it."), new Spoken(1170, 1178, "Think of each call as a plate on a stack."),
+                new Spoken(1312, 1316, "When factorial of three")]);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Same(newest, Piece(view, "Think of each"));
+            Assert.Contains("old", newest.Classes);
+            Assert.Equal("[19:30] Think of each call", Selected(newest));
+            Assert.Equal("[19:30] Think of each call", await Copied(window));
+
+            // The transcript writes those words down its own way (a line from another moment): the selection ends,
+            // and ⌘C copies nothing it no longer shows.
+            await window.Clipboard!.SetTextAsync("before");
+            model.ShowHeard([new Spoken(1085, 1090, "Okay, the midterm. Recursion traces will be on it."), new Spoken(1168, 1180, "Think of each call as a plate on a stack; you take the top one off.")]);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Null(TopLevel.GetTopLevel(newest));
+            Assert.Equal("", Selected(Piece(view, "Okay, the midterm")));
+            Assert.Null(TextSelection.Of(view.GetVisualDescendants().OfType<ItemsControl>().First(i => TextSelection.GetArea(i) && i.ItemsSource == model.Lines))!.Anchored);
+            Assert.Equal("before", await Copied(window));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
+    public void The_sidebars_status_lines_select_and_the_room_beside_them_still_moves_the_window(SkinKind skin)
+    {
+        var m = Demo.Semester();
+        Control view = skin == SkinKind.Mac ? new MacLibrary { DataContext = m } : new WinLibrary { DataContext = m };
+        var window = Show(view, skin, 1280, 860);
+        try
+        {
+            var sidebar = view.GetVisualDescendants().OfType<Control>().First(c => c.Name == "Sidebar");
+            Assert.True(WindowHeader.GetMovesWindow(sidebar));
+            var pressed = new List<object?>();
+            sidebar.PointerPressed += (_, e) => pressed.Add(e.Source);
+            var line = view.GetVisualDescendants().OfType<PageText>().First(t => t.Classes.Contains("side-foot") && t.IsEffectivelyVisible);
+            var beside = line.TranslatePoint(new Point(line.TextLayout.WidthIncludingTrailingWhitespace + 24, line.Bounds.Height / 2), window)!.Value;
+            Click(window, beside);
+            // The sidebar itself has the press: what moves the window (WindowHeader.MoveFromEmptySpace).
+            Assert.Same(sidebar, Assert.Single(pressed));
+
+            // On its words, a drag selects them instead.
+            Drag(window, At(line, 0), At(line, Math.Min(7, Words(line).Length)));
+            Assert.Equal(Words(line)[..Math.Min(7, Words(line).Length)], Selected(line));
+            Assert.Single(pressed);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(SkinKind.Mac)]
+    [InlineData(SkinKind.Win)]
     public void An_assignment_selects_as_one_page_from_its_title_through_its_instructions(SkinKind skin)
     {
         var model = new AssignmentModel(CanvasFixtures.Context());
@@ -265,8 +345,11 @@ public class SelectEverywhereTests
             // A press on the button leaves it selected; selecting the other line ends it, one selection to a window.
             Click(window, Middle(panel.Children[2]));
             Assert.Equal("Unauthorized", Selected(error));
+            var cursor = other.Cursor;
             Drag(window, At(other, 0), At(other, "line"));
             Assert.Equal("Another ", Selected(other));
+            // Its own I-beam is back once the drag is over.
+            Assert.Same(cursor, other.Cursor);
             Assert.Equal("", Selected(error));
             Assert.Equal(0, error.SelectionEnd);
         }

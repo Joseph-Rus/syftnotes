@@ -97,6 +97,21 @@ public class NoteText : SelectableTextBlock
         return copied.ToString();
     }
 
+    /// <summary>The selection that last drew some of this piece as selected (null: none has).</summary>
+    internal TextSelection? LitBy;
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        if (change.Property == TextProperty) LitBy?.TextChanged(this);
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        LitBy?.PieceLeft(this);
+    }
+
     // What it's in does the selecting, and the copying and selecting all by the keys.
     protected override void OnPointerPressed(PointerPressedEventArgs e) { }
 

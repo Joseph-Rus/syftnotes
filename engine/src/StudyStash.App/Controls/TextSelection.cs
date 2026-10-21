@@ -96,6 +96,9 @@ public sealed class TextSelection
     Point? pressedAt;
     bool dragging;
 
+    /// <summary>The host's own cursor before a drag put the I-beam on it (null: it had none of its own).</summary>
+    Cursor? cursorBefore;
+
     /// <summary>The pieces drawn as selected now.</summary>
     HashSet<Control> lit = [];
 
@@ -178,6 +181,9 @@ public sealed class TextSelection
         menu.Opening += (_, _) => copy.IsEnabled = Owner.SelectedText.Length > 0;
         return menu;
     }
+
+    /// <summary>Where the selection begins, if there is one (a test's look at it).</summary>
+    internal Control? Anchored => anchor?.Piece;
 
     /// <summary>The selection as it's copied; empty when nothing is selected.</summary>
     internal string SelectedText
@@ -329,6 +335,8 @@ public sealed class TextSelection
             if (Math.Abs(now.Position.X - down.X) + Math.Abs(now.Position.Y - down.Y) <= Settle) return;
             dragging = true;
             e.Pointer.Capture(host);
+            // The I-beam the whole drag, wherever the mouse goes; then the host's own again (a line on its own has one).
+            cursorBefore = host.IsSet(InputElement.CursorProperty) ? host.Cursor : null;
             host.Cursor = new Cursor(StandardCursorType.Ibeam);
             FollowScroller();
         }
@@ -351,7 +359,9 @@ public sealed class TextSelection
         pressedAt = null;
         if (!dragging) return;
         dragging = false;
-        host.ClearValue(InputElement.CursorProperty);
+        if (cursorBefore is not null) host.Cursor = cursorBefore;
+        else host.ClearValue(InputElement.CursorProperty);
+        cursorBefore = null;
         edge?.Stop();
         if (scroller is not null) scroller.ScrollChanged -= OnScrolledWhileDragging;
         scroller = null;
@@ -474,7 +484,9 @@ public sealed class TextSelection
         if (first < 0 || last < 0) yield break;
         for (int i = first; i <= last; i++)
         {
-            int from = i == first ? start.Index : 0, to = i == last ? end.Index : LengthOf(pieces[i]);
+            // (A piece's text may have changed since: the live words' newest line grows, or is written another way.)
+            int length = LengthOf(pieces[i]);
+            int from = Math.Min(i == first ? start.Index : 0, length), to = Math.Min(i == last ? end.Index : length, length);
             if (from < to) yield return (pieces[i], from, to);
         }
     }
@@ -489,6 +501,7 @@ public sealed class TextSelection
             now.Add(piece);
             if (piece is NoteText t)
             {
+                t.LitBy = this;
                 t.SetCurrentValue(SelectableTextBlock.SelectionStartProperty, from);
                 t.SetCurrentValue(SelectableTextBlock.SelectionEndProperty, to);
             }
@@ -506,6 +519,20 @@ public sealed class TextSelection
                 else if (piece is MathDisplay d) d.Selected = null;
             }
         lit = now;
+    }
+
+    /// <summary>A piece this selection takes some of has new text (the live words' newest line grew): its share of the
+    /// selection is drawn again, as far as its text now reaches.</summary>
+    internal void TextChanged(NoteText piece)
+    {
+        if (lit.Contains(piece)) Show();
+    }
+
+    /// <summary>A piece this selection took some of, or begins or ends in, has gone from the page (a live line the
+    /// transcript wrote down its own way): the selection ends, rather than copying words no longer shown.</summary>
+    internal void PieceLeft(NoteText piece)
+    {
+        if (anchor is { } a && (a.Piece == piece || focus.Piece == piece || lit.Contains(piece))) Unselect();
     }
 
     /// <summary>A drag began: the page it scrolls in, so the selection follows when it scrolls (a drag past its edge,
