@@ -61,7 +61,10 @@ public class AiWordsTests
         // The list names each one as a student would: what they have, or what it is. The tools' names are in the line under.
         Assert.Equal(("Free AI on this Mac", "Claude", "ChatGPT", "Gemini"),
             (AiWords.SetupName("ollama", "Ollama", "Mac"), AiWords.SetupName("claude", "Claude Code"), AiWords.SetupName("codex", "Codex"), AiWords.SetupName("gemini", "Gemini")));
-        Assert.Equal("Installed on this computer.", AiWords.SetupAbout("gemini", "unchecked"));
+        // Gemini through Google's Antigravity, or on an API key; one the student gave a key says so.
+        Assert.Equal("Through Google's Antigravity. Installed on this computer.", AiWords.SetupAbout("gemini", "unchecked"));
+        Assert.Equal("With an API key, or Google's Antigravity app. Not on this Mac yet.", AiWords.SetupAbout("gemini", "not_installed", "Mac"));
+        Assert.Equal("With your API key. It works.", AiWords.SetupAbout("claude", "ready", hasKey: true));
         Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", AiWords.SetupAbout("claude", "not_installed", "Mac"));
         Assert.Equal("Free and private (Ollama). Study Stash downloads it for you: a few gigabytes, once.", AiWords.SetupAbout("ollama", "not_installed", "PC"));
     }
@@ -319,7 +322,8 @@ public class AiSetupModelTests
 
         await model.Load();
 
-        Assert.Equal(["ollama", "claude", "codex"], model.Engines.Select(r => r.Id));
+        // Every AI is listed, Gemini too (it can run on an API key with nothing installed).
+        Assert.Equal(["ollama", "claude", "codex", "gemini"], model.Engines.Select(r => r.Id));
         var ollama = model.Engines.Single(r => r.Id == "ollama");
         Assert.True(ollama.Advanced);
         Assert.True(ollama.Selected);
@@ -442,8 +446,8 @@ public class AiSetupModelTests
         var mac = new AiSetupModel(lib) { Windows = false };
         await mac.Load();
 
-        // Both always show, ready or not; Gemini only once it's installed.
-        Assert.Equal(["ollama", "claude", "codex"], mac.Engines.Select(r => r.Id));
+        // Every AI shows, ready or not.
+        Assert.Equal(["ollama", "claude", "codex", "gemini"], mac.Engines.Select(r => r.Id));
         var claude = mac.Engines.Single(r => r.Id == "claude");
         Assert.False(claude.CanWrite);
         Assert.Equal("With your paid Claude plan, through Claude Code. Not on this Mac yet.", claude.About);
@@ -685,6 +689,11 @@ public class AiSetupModelTests
         Assert.False(await model.SaveAsync());
         Assert.Equal("Claude isn't signed in on this Mac. Sign in from its row, or pick another.", model.Say);
         Assert.Empty(lib.DefaultsCalls);
+        // Continue again: still not saved, saying so again, and without asking Claude again (it's known signed out).
+        Assert.False(await model.SaveAsync());
+        Assert.Equal("Claude isn't signed in on this Mac. Sign in from its row, or pick another.", model.Say);
+        Assert.Empty(lib.DefaultsCalls);
+        Assert.Single(lib.Calls, c => c == "check:claude");
 
         lib.OnCheck = (id, _) => new AiSaid("Claude is ready.", lib.Overview = With((id, "ready")));
         lib.Overview = With(("claude", "unchecked"));

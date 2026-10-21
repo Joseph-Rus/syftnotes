@@ -626,15 +626,33 @@ public sealed partial class AiSetupModel : ObservableObject
     }
 
     /// <summary>
-    /// An AI that's only installed (never tried: Claude's sign-in is in the keychain, Antigravity's somewhere of its own)
-    /// is tried once before it's saved, with one tiny question, so a signed-out one doesn't pass setup and leave the
-    /// notes to fail later. True when it answered (or the library is too old to ask); else the step says why and stays.
+    /// The picked AI is saved only when it can write the notes. One that's only installed (never tried: Claude's
+    /// sign-in is in the keychain, Antigravity's somewhere of its own), or whose last try failed, is tried once more
+    /// with one tiny question, so a signed-out one doesn't pass setup and leave the notes to fail later. One known not
+    /// to work (signed out, not here) isn't saved at all: Continue again says why again. True when it can be saved
+    /// (or the library is too old to ask); else the step says why and stays.
     /// </summary>
     async Task<bool> CheckedAsync(string id)
     {
-        if (id == "ollama" || Engines.FirstOrDefault(r => r.Id == id) is not { State: "unchecked" } row) return true;
+        if (id == "ollama" || Engines.FirstOrDefault(r => r.Id == id) is not { } row) return true;
+        if (row.State == "not_signed_in" || !row.CanWrite)
+        {
+            Say = NotWorking(row, row.State == "not_signed_in" ? "signed out" : "");
+            return false;
+        }
+        if (row.State is not ("unchecked" or "failed")) return true;
         Say = $"Checking {row.Name} works…";
-        var check = await library.CheckAsync(id);
+        AiSaid? check;
+        try
+        {
+            check = await library.CheckAsync(id);
+        }
+        catch (TaskCanceledException)
+        {
+            // The library took longer than the app waits for it: the try ran out of time, the library is fine.
+            Say = NotWorking(row, "late");
+            return false;
+        }
         if (check is null)
         {
             Say = null;
@@ -646,11 +664,23 @@ public sealed partial class AiSetupModel : ObservableObject
             Say = null;
             return true;
         }
-        string device = Windows ? "PC" : "Mac";
-        Say = Core.Ai.Engines.LooksSignedOut(check.Said)
-            ? $"{row.Name} isn't signed in on this {device}. Sign in from its row, or pick another."
-            : $"{row.Name} didn't answer: {Py.Head(check.Said, 160).TrimEnd('.')}. Try again, or pick another.";
+        Say = NotWorking(Engines.FirstOrDefault(r => r.Id == id) ?? row,
+            Core.Ai.Engines.LooksSignedOut(check.Said) ? "signed out" : check.Said.Contains("didn't finish within", StringComparison.Ordinal) ? "late" : check.Said);
         return false;
+    }
+
+    /// <summary>Why the picked AI can't be saved, in the step's words: signed out, not here, too slow to answer, or
+    /// what it said.</summary>
+    string NotWorking(AiSetupRow row, string why)
+    {
+        string device = Windows ? "PC" : "Mac";
+        return why switch
+        {
+            "signed out" => $"{row.Name} isn't signed in on this {device}. Sign in from its row, or pick another.",
+            "late" => $"{row.Name} didn't answer in time: try again, or pick another.",
+            "" => $"{row.Name} isn't ready to write notes on this {device} yet. Set it up from its row, or pick another.",
+            _ => $"{row.Name} didn't answer: {Py.Head(why, 160).TrimEnd('.')}. Try again, or pick another.",
+        };
     }
 
     /// <summary>The setup host calls this on Continue: saves the pick (ask follows notes when the student left it
