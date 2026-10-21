@@ -4,5 +4,9 @@ namespace StudyStash.App.Views;
 
 public partial class MacAiAnswer : UserControl
 {
-    public MacAiAnswer() => InitializeComponent();
+    public MacAiAnswer()
+    {
+        InitializeComponent();
+        AnswerHeight.Follow(this, Thread);
+    }
 }
