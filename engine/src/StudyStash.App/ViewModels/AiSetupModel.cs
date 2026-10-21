@@ -162,7 +162,8 @@ public sealed partial class AiSetupModel : ObservableObject
 
     partial void OnKeyForChanged(string value)
     {
-        foreach (string n in new[] { nameof(KeyOpen), nameof(KeyTitle), nameof(KeyLede), nameof(KeyWhere), nameof(KeyAlternative), nameof(HasKeyAlternative) })
+        foreach (string n in new[] { nameof(KeyOpen), nameof(KeyTitle), nameof(KeyLede), nameof(KeyWhere), nameof(KeyAlternative), nameof(HasKeyAlternative),
+                     nameof(KeyPrivacy), nameof(HasKeyPrivacy) })
             OnPropertyChanged(n);
         HelpOpen = Engines.Any(r => r.ShowHelp) || KeyOpen;
     }
@@ -192,6 +193,9 @@ public sealed partial class AiSetupModel : ObservableObject
     public string KeyAlternative => KeyFor == "gemini" && Engines.FirstOrDefault(r => r.Id == "gemini") is { State: "not_installed" }
         ? "Or install Google's Antigravity app and sign in to it, then press Check again." : "";
     public bool HasKeyAlternative => KeyAlternative.Length > 0;
+    /// <summary>Under Gemini's key box: what Google's free tier does with what's sent, and who can have a free key.</summary>
+    public string KeyPrivacy => KeyFor == "gemini" ? string.Join("\n", ApiKeys.GeminiKeyNotes(Device)) : "";
+    public bool HasKeyPrivacy => KeyPrivacy.Length > 0;
     string Device => Windows ? "PC" : "Mac";
 
     void OpenKey(string id)

@@ -253,6 +253,8 @@
                       </Button>
                     </StackPanel>
                   </Grid>
+                  <!-- Gemini: what Google's free tier does with what's sent, and who can have a free key -->
+                  <TextBlock Classes="ai-row-sub" Margin="16,0,16,10" TextWrapping="Wrap" Text="{Binding Note}" IsVisible="{Binding HasNote}" />
                 </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

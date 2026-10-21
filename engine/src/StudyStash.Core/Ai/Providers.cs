@@ -40,7 +40,12 @@ public sealed record AiEvent(string Kind, string Text = "", string Name = "", st
 }
 
 /// <summary>A finished run: its answer (or why it failed) and the conversation id to continue it.</summary>
-public sealed record AiResult(bool Ok, string Text, string Session, IReadOnlyList<AiEvent> Tools);
+public sealed record AiResult(bool Ok, string Text, string Session, IReadOnlyList<AiEvent> Tools)
+{
+    /// <summary>Which model really answered, when it wasn't the one asked ("Gemini 3.5 Flash-Lite (Flash's free daily
+    /// limit is used up)"), in words for the answer's byline; "" otherwise.</summary>
+    public string Note { get; init; } = "";
+}
 
 /// <summary>
 /// One AI a person may pick. Each provider is its own command-line agent, signed in with the person's own account
@@ -114,7 +119,7 @@ public abstract class AiProvider
     public async Task<AiResult> CompleteAsync(AiRequest req, CancellationToken ct = default, Action<string>? soFar = null)
     {
         var text = new StringBuilder();
-        string final = "", session = "", error = "";
+        string final = "", session = "", error = "", note = "";
         var tools = new List<AiEvent>();
         await foreach (var e in RunAsync(req, stream: soFar is not null, ct))
         {
@@ -130,6 +135,7 @@ public abstract class AiProvider
                     break;
                 case "session" when e.Text.Length > 0: session = e.Text; break;
                 case "tool": tools.Add(e); break;
+                case "note": note = e.Text; break;
                 case "error": error = e.Text; break;
             }
         }
@@ -138,7 +144,7 @@ public abstract class AiProvider
         // Finished but said nothing (Antigravity does when print mode refuses a tool it wanted): that's no answer, so
         // nothing is saved as a lecture's notes and the job can try again or fall back.
         if (answer.Length == 0) return new AiResult(false, $"{Name} finished without answering.", session, tools);
-        return new AiResult(true, answer, session, tools);
+        return new AiResult(true, answer, session, tools) { Note = note };
     }
 
     // --- running a command ------------------------------------------------------------------------------------
