@@ -483,6 +483,9 @@ public sealed class GuidedSetupTests
         Assert.Null(GuidedSetupModel.QuestionToAdd("While that downloads, let's add your classes. Is Canvas what your school uses?", q));
         Assert.Equal(q, GuidedSetupModel.QuestionToAdd("", q));
         Assert.Equal(q, GuidedSetupModel.QuestionToAdd("The download is running in the background.", q));
+        // ChatGPT asked it, then went on: its first sentence is there already.
+        Assert.Null(GuidedSetupModel.QuestionToAdd("What classes are you taking this term? You can name them one at a time and briefly say what each covers.",
+            "What classes are you taking this term? You can name them one at a time, and say what each covers."));
         Assert.Equal("Press Open Study Stash when you're ready.\nYour library: ready",
             GuidedSetupModel.PlainWords("Press **Open Study Stash** when you're ready.\n## Your library: `ready`"));
     }

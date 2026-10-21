@@ -947,12 +947,17 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     }
 
     /// <summary>ask_student's question, to add under the AI's words when they don't ask it themselves: when it said
-    /// nothing, or its words don't end on a question (an AI that put the question its own way already asked it, and
-    /// showing both read as the question twice). Null when there's nothing to add.</summary>
+    /// nothing, or its last paragraph asks nothing and doesn't already have the question's first sentence (an AI that
+    /// put the question its own way already asked it, and showing both read as the question twice). Null when there's
+    /// nothing to add.</summary>
     public static string? QuestionToAdd(string said, string question)
     {
-        string words = said.TrimEnd();
-        if (words.Contains(question.Trim(), StringComparison.Ordinal) || words.EndsWith('?')) return null;
+        string words = said.Trim(), q = question.Trim();
+        if (words.Length == 0) return question;
+        string last = words[(words.LastIndexOf("\n\n", StringComparison.Ordinal) is var at and >= 0 ? at + 2 : 0)..];
+        int mark = q.IndexOf('?');
+        string first = mark > 0 ? q[..(mark + 1)] : q;
+        if (words.Contains(q, StringComparison.Ordinal) || words.Contains(first, StringComparison.Ordinal) || last.Contains('?')) return null;
         return question;
     }
 
