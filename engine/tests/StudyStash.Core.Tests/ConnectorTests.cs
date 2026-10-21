@@ -23,7 +23,13 @@ static class NoInternetFetch
 {
 #pragma warning disable CA2255 // the tests are the application here: this has to run before any of them
     [ModuleInitializer]
-    internal static void Set() => Environment.SetEnvironmentVariable("STUDYSTASH_TESTS", "1");
+    internal static void Set()
+    {
+        Environment.SetEnvironmentVariable("STUDYSTASH_TESTS", "1");
+        // Codex's own config.toml is the student's: no test reads the real one (a turn that reads it keeps the MCP
+        // servers it names off, and would look there for their names).
+        StudyStash.Core.Ai.SetupChat.CodexConfig = () => Path.Combine(Path.GetTempPath(), "studystash-core-tests-no-codex", "config.toml");
+    }
 #pragma warning restore CA2255
 }
 

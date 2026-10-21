@@ -15,6 +15,8 @@ static class TestSafety
         Program.Home = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests", "home");
         Directory.CreateDirectory(System.IO.Path.Combine(Program.Home, "logs"));
         Controls.Rich.SceneCache.Log = _ => { };
+        // Codex's own config.toml is the student's: no test reads the real one.
+        Core.Ai.SetupChat.CodexConfig = () => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests-no-codex", "config.toml");
     }
 #pragma warning restore CA2255
 }

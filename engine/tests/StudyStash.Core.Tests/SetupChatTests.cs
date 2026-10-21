@@ -395,14 +395,41 @@ public class SetupChatTests
         string exe = FakeAgents.WriteCli(dir["bin"], "codex");
         FakeAgents.Replay(dir["bin"], ["""{"type":"thread.started","thread_id":"t-1"}""", """{"type":"turn.failed","error":{"message":"401 Unauthorized: not logged in"}}"""], 1);
         FakeAgents.Replay(dir["bin"], ["""{"type":"thread.started","thread_id":"t-2"}""", CodexItem("item.completed", new JsonObject { ["type"] = "agent_message", ["text"] = "ready" }), """{"type":"turn.completed"}"""], 2);
-        var check = await SetupChat.CheckPlanAsync("codex", exe, null, SetupChat.Folder(dir["home"]));
+        var check = await SetupChat.CheckPlanAsync("codex", exe, null, SetupChat.Folder(dir["home"]), ownMcpServers: ["study-stash", "github"]);
 
         Assert.True(check.Ok, check.Said);
         Assert.True(check.KeptConfig);
         Assert.Contains("--ignore-user-config", FakeAgents.Argv(dir["bin"], 1));
         Assert.DoesNotContain("--ignore-user-config", FakeAgents.Argv(dir["bin"], 2));
-        // Everything else stays locked the second time too.
+        // Everything else stays locked the second time too, and the student's own MCP servers (which Codex would
+        // start, reading their config) are each turned off.
         Assert.Contains("features.shell_tool=false", FakeAgents.Argv(dir["bin"], 2));
+        Assert.Contains("mcp_servers.study-stash.enabled=false", FakeAgents.Argv(dir["bin"], 2));
+        Assert.Contains("mcp_servers.github.enabled=false", FakeAgents.Argv(dir["bin"], 2));
+        Assert.DoesNotContain(FakeAgents.Argv(dir["bin"], 1), a => a.EndsWith(".enabled=false", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_codex_configs_own_mcp_servers_are_found_by_name_only()
+    {
+        using var dir = new TempDir();
+        string config = Path.Combine(dir["codex"], "config.toml");
+        Directory.CreateDirectory(Path.GetDirectoryName(config)!);
+        File.WriteAllText(config, """
+            model = "gpt-5"
+            mcp_servers.inline.command = "x"
+
+            [mcp_servers.study-stash]
+            command = "/Applications/Study Stash.app/Contents/MacOS/studystash"
+
+            [mcp_servers.github.env]
+            TOKEN = "not read"
+
+            [model_providers.local]
+            base_url = "http://localhost:11434/v1"
+            """);
+        Assert.Equal(["inline", "study-stash", "github"], SetupChat.CodexServers(config));
+        Assert.Empty(SetupChat.CodexServers(Path.Combine(dir["codex"], "missing.toml")));
     }
 
     [Fact]

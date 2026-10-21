@@ -71,6 +71,9 @@ public sealed record SetupTurn
     public TimeSpan Timeout { get; init; } = TimeSpan.FromMinutes(3);
     /// <summary>Codex: skip the student's own config.toml (on unless a sign-in kept there needs it).</summary>
     public bool IgnoreUserConfig { get; init; } = true;
+    /// <summary>Codex reading the student's config.toml: the MCP servers it names, each turned off for the turn (Codex
+    /// would start every one of them, and nothing else keeps them out). Null: read from that config.toml itself.</summary>
+    public IReadOnlyList<string>? OwnMcpServers { get; init; }
 }
 
 /// <summary>
@@ -267,9 +270,38 @@ public static partial class SetupChat
             Set(s + ".tool_timeout_sec", "30");
         }
         if (t.Windows) Set("windows.sandbox", "\"unelevated\"");
+        // The student's own config.toml is read only for a sign-in kept there: the MCP servers it names stay off
+        // (setting the table empty doesn't do it: Codex merges overrides into it).
+        if (!t.IgnoreUserConfig)
+            foreach (string own in t.OwnMcpServers ?? CodexServers(CodexConfig()))
+                if (own != Server) Set($"mcp_servers.{own}.enabled", "false");
         if (t.Session.Length > 0) cmd.AddRange(["resume", t.Session]);
         cmd.Add("-");
         return cmd;
+    }
+
+    /// <summary>The student's own Codex config.toml (in CODEX_HOME, else ~/.codex). The tests point it at a file of
+    /// their own: nothing a test runs ever reads the real one.</summary>
+    public static Func<string> CodexConfig { get; set; } = () =>
+        Path.Combine(Environment.GetEnvironmentVariable("CODEX_HOME") is { Length: > 0 } h ? h : Path.Combine(Py.UserHome(), ".codex"), "config.toml");
+
+    [GeneratedRegex(@"^\s*\[\s*mcp_servers\s*\.\s*([A-Za-z0-9_-]+)\s*[\].]|^\s*mcp_servers\s*\.\s*([A-Za-z0-9_-]+)\s*\.", RegexOptions.Multiline)]
+    private static partial Regex McpServerName();
+
+    /// <summary>The names of the MCP servers a Codex config.toml sets up (its <c>[mcp_servers.NAME]</c> tables and
+    /// <c>mcp_servers.NAME.…</c> keys): names only, nothing else in it is kept. None when it can't be read.</summary>
+    public static IReadOnlyList<string> CodexServers(string configPath)
+    {
+        string text;
+        try
+        {
+            text = File.Exists(configPath) ? File.ReadAllText(configPath) : "";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+        return [.. McpServerName().Matches(text).Select(m => m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value).Distinct(StringComparer.Ordinal)];
     }
 
     /// <summary>A TOML basic string: quoted, with backslashes, quotes and control characters escaped (so a brief of
@@ -406,10 +438,11 @@ public static partial class SetupChat
     /// After signing in: one tiny turn with no tools at all ("Reply with the single word: ready"), to catch an
     /// account whose plan doesn't include the CLI before the chat starts. It uses a sliver of the student's plan.
     /// Codex skips the student's own config.toml; if that turns out to be where its sign-in is kept (an auth error
-    /// though it's signed in), it's asked once more without skipping it.
+    /// though it's signed in), it's asked once more without skipping it, the MCP servers it names kept off
+    /// (<paramref name="ownMcpServers"/>; null reads them from it).
     /// </summary>
     public static async Task<PlanCheck> CheckPlanAsync(string provider, string exe, Version? version, string workDir,
-        TimeSpan? timeout = null, CancellationToken ct = default)
+        TimeSpan? timeout = null, CancellationToken ct = default, IReadOnlyList<string>? ownMcpServers = null)
     {
         string brief = Prepare(workDir, PlanCheckBrief, "", "plan-check.md");
         var turn = new SetupTurn
@@ -419,7 +452,7 @@ public static partial class SetupChat
         };
         var check = await OnceAsync(turn, ct);
         if (provider == "codex" && check.Problem == ChatProblem.Auth && !ct.IsCancellationRequested)
-            check = await OnceAsync(turn with { IgnoreUserConfig = false }, ct) is { Problem: not ChatProblem.Auth } again ? again with { KeptConfig = true } : check;
+            check = await OnceAsync(turn with { IgnoreUserConfig = false, OwnMcpServers = ownMcpServers }, ct) is { Problem: not ChatProblem.Auth } again ? again with { KeptConfig = true } : check;
         return check;
     }
 
