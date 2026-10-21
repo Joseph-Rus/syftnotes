@@ -102,6 +102,12 @@ public class TypedMarkdownTests
             Key(Avalonia.Input.Key.I, Command);
             Type("fast");
             Assert.EndsWith("\n- anaphase splits the pairs *fast*", editor.Text);
+            // With the caret in a word and nothing selected, the word is what goes bold, and plain again.
+            second.SelectionStart = second.SelectionEnd = second.CaretIndex = 3;
+            Key(Avalonia.Input.Key.B, Command);
+            Assert.EndsWith("\n- **anaphase** splits the pairs *fast*", editor.Text);
+            Key(Avalonia.Input.Key.B, Command);
+            Assert.EndsWith("\n- anaphase splits the pairs *fast*", editor.Text);
 
             // "[ ] " in a bullet makes a checkbox, which ticks; Tab moves it in under the bullet above, Shift-Tab out.
             second.CaretIndex = second.SelectionStart = second.SelectionEnd = second.Text!.Length;

@@ -420,13 +420,27 @@ public class MarkdownBox : TextBox
 
     /// <summary>
     /// ⌘B (<paramref name="stars"/> 2) or ⌘I (1): what's selected gets bold or italic marks round it, or loses them
-    /// when it has them; with nothing selected, the marks go in at the caret with the caret between them, so what's
-    /// typed next is bold or italic.
+    /// when it has them. With nothing selected, the word the caret is in is made bold or italic (or plain again); out
+    /// of a word, the marks go in at the caret with the caret between them, so what's typed next is bold or italic,
+    /// and the key again takes them away.
     /// </summary>
     public void Toggle(int stars)
     {
         string text = Text ?? "";
         int from = Math.Clamp(Math.Min(SelectionStart, SelectionEnd), 0, text.Length), to = Math.Clamp(Math.Max(SelectionStart, SelectionEnd), 0, text.Length);
+        string mark = new('*', stars);
+        if (from == to)
+        {
+            if (from >= stars && to + stars <= text.Length && text[(from - stars)..from] == mark && text[to..(to + stars)] == mark)
+            {
+                // The marks just put in, nothing typed between them: they go.
+                Replace(from - stars, to + stars, "");
+                Select(from - stars, from - stars);
+                return;
+            }
+            while (from > 0 && Wordy(text[from - 1])) from--;
+            while (to < text.Length && Wordy(text[to])) to++;
+        }
         // The spaces at a selection's ends (a double-clicked word takes its space) stay outside the marks, and a
         // selection that took in its marks ("**bold**", all of it) is the words inside them.
         while (from < to && text[from] == ' ') from++;
@@ -439,7 +453,6 @@ public class MarkdownBox : TextBox
             from += inner;
             to -= inner;
         }
-        string mark = new('*', stars);
         if (from < to && Marked(text, from, to) is { } has && (stars == 2 ? has >= 2 : has is 1 or 3))
         {
             // Already bold (or italic): its marks come off.
@@ -452,6 +465,9 @@ public class MarkdownBox : TextBox
             Select(from + stars, to + stars);
         }
     }
+
+    /// <summary>A character a word is made of, for ⌘B on the word the caret is in.</summary>
+    static bool Wordy(char c) => char.IsLetterOrDigit(c) || c is '\'' or '’' or '_';
 
     /// <summary>Puts <paramref name="with"/> in place of [from, to), as typing it would (so ⌘Z takes it back).</summary>
     void Replace(int from, int to, string with)
