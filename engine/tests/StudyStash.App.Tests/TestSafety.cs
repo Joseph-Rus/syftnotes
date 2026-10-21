@@ -17,6 +17,8 @@ static class TestSafety
         Controls.Rich.SceneCache.Log = _ => { };
         // Codex's own config.toml is the student's: no test reads the real one.
         Core.Ai.SetupChat.CodexConfig = () => System.IO.Path.Combine(System.IO.Path.GetTempPath(), "studystash-app-tests-no-codex", "config.toml");
+        // Claude Code's version, as a current one says it: no test asks the real one.
+        Core.Ai.ClaudeProvider.VersionOf = _ => new Version(2, 1, 260);
     }
 #pragma warning restore CA2255
 }
