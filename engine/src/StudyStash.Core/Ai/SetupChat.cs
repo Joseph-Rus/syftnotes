@@ -708,6 +708,9 @@ public sealed class SetupChatParser(string provider)
             else if (type == "item.completed" && itemType is "agent_message" or "assistant_message" && S(item?["text"]) is { Length: > 0 } said)
             {
                 Answered = true;
+                // Codex can say the same words twice in a turn (before it offers a card, and again as its answer):
+                // shown once.
+                if (said.Trim() == Last) yield break;
                 lastMessage.Clear().Append(said);
                 yield return new SetupChatEvent("Text", (sawText ? "\n\n" : "") + said);
                 sawText = true;

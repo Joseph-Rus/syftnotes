@@ -226,6 +226,8 @@ public class SetupChatTests
             CodexItem("item.completed", new JsonObject { ["id"] = "i1", ["type"] = "mcp_tool_call", ["server"] = "study_stash_setup", ["tool"] = "get_setup_status" }),
             CodexItem("item.started", new JsonObject { ["id"] = "i2", ["type"] = "mcp_tool_call", ["server"] = "study_stash_setup", ["tool"] = "add_class", ["arguments"] = """{"name":"CS 101"}""" }),
             CodexItem("item.completed", new JsonObject { ["id"] = "i3", ["type"] = "agent_message", ["text"] = "Hi! Just this Mac, or two computers?" }),
+            // The same words again as its answer (seen with the ChatGPT app's Codex): shown once.
+            CodexItem("item.completed", new JsonObject { ["id"] = "i4", ["type"] = "agent_message", ["text"] = "Hi! Just this Mac, or two computers?" }),
             """{"type":"turn.completed","usage":{"input_tokens":10,"output_tokens":5}}""",
         ]);
         var events = await Run(Turn(dir, "codex", exe));
