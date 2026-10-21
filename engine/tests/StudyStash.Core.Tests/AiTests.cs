@@ -99,8 +99,9 @@ public class AiTests
         var cmd = new CodexProvider { PromptOnInput = false }.Command(new AiRequest("q", "/lib") { System = "brief" }, stream: false);
         Assert.Equal("read-only", cmd[cmd.IndexOf("-s") + 1]);
         Assert.StartsWith("brief", cmd[^1]);
-        // A plain answer skips the student's own config.toml (and the MCP servers it would start).
+        // A plain answer skips the student's own config.toml (and the MCP servers it would start), and their ChatGPT apps.
         Assert.Contains("--ignore-user-config", cmd);
+        Assert.Contains("features.apps=false", cmd);
         var local = new OllamaProvider().Command(new AiRequest("q", "/lib") { Write = true }, stream: false);
         Assert.Contains("--oss", local);
         Assert.DoesNotContain("--ignore-user-config", local);
@@ -133,6 +134,7 @@ public class AiTests
         Assert.DoesNotContain("--ignore-user-config", FakeAgents.Argv(dir["codex"], 2));
         Assert.Contains("mcp_servers.study-stash.enabled=false", FakeAgents.Argv(dir["codex"], 2));
         Assert.Contains("notify=[]", FakeAgents.Argv(dir["codex"], 2));
+        Assert.Contains("features.apps=false", FakeAgents.Argv(dir["codex"], 2));
         // Remembered: the next plain answer reads it at once, its servers still off.
         Assert.True((await codex.CompleteAsync(new AiRequest("again", dir.Path))).Ok);
         Assert.Equal(3, FakeAgents.Turns(dir["codex"]));

@@ -499,6 +499,8 @@ public class CodexProvider : AiProvider
         cmd.AddRange(["--json", "--skip-git-repo-check"]);
         if (!readConfig) cmd.Add("--ignore-user-config");
         cmd.AddRange(["-C", req.Cwd, "-s", req.Write ? "workspace-write" : "read-only", "-c", "approval_policy=\"never\""]);
+        // Nor the student's ChatGPT apps (connectors: their mail, drive…), as Claude's plain answers leave out claude.ai's.
+        if (Plain(req)) cmd.AddRange(["-c", "features.apps=false"]);
         if (readConfig && Plain(req))
         {
             foreach (string own in SetupChat.CodexServers(ConfigPath())) cmd.AddRange(["-c", $"mcp_servers.{own}.enabled=false"]);
