@@ -322,6 +322,45 @@ public class AskRemembersFilm
         Log($"after New chat: {ask.Turns.Count} turns, the card {(ask.HasLatest ? "shows" : "is gone")}");
     }
 
+    /// <summary>A still of the conversation card in the Windows look, light and dark, its words a stand-in's
+    /// (ask-card-win-*.png): no AI is asked.</summary>
+    [AvaloniaFact]
+    public void The_conversation_card_in_the_Windows_look()
+    {
+        if (!On) return;
+        foreach (var variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+        {
+            var ask = new AiAskModel(new FakeAiLibrary { Overview = AiTestData.MixedOverview() });
+            ask.Turns.Add(new AiTurn("What are the three kinds of blood vessel?", "Ollama")
+            {
+                Answer = "Arteries carry blood away from the heart under high pressure, capillaries are one cell thick where gases and nutrients are exchanged, and veins bring blood back at low pressure, with valves.",
+                Byline = "Ollama", Engine = "ollama",
+            });
+            ask.Turns.Add(new AiTurn("And the second one?", "Claude")
+            {
+                Answer = "The second one is **capillaries**: their walls are one cell thick, so oxygen and nutrients pass straight through to the tissues.",
+                Byline = "Claude" + AiWords.ReadChat, Engine = "claude",
+            });
+            Skin.UseTheme(ColourThemes.Default);
+            ((App)Application.Current!).UseSkin(SkinKind.Win);
+            var card = new WinAiAnswer { DataContext = ask, VerticalAlignment = VerticalAlignment.Bottom, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 24) };
+            var window = new Window
+            {
+                Width = 760, Height = 700, RequestedThemeVariant = variant, Content = card,
+                Background = new SolidColorBrush(variant == ThemeVariant.Dark ? Color.Parse("#1F1F1F") : Color.Parse("#F3F3F3")),
+            };
+            Look.Apply(window);
+            window.Show();
+            DiagramsReady.Wait(window);
+            Dispatcher.UIThread.RunJobs();
+            window.UpdateLayout();
+            Dispatcher.UIThread.RunJobs();
+            using (var file = File.Create(System.IO.Path.Combine(Shot.Dir, $"ask-card-win-{variant.Key.ToString()!.ToLowerInvariant()}.png")))
+                window.CaptureRenderedFrame()!.Save(file, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+            window.Close();
+        }
+    }
+
     /// <summary>The free AI answers the first questions, then Claude a follow-up: the chat above goes to Claude with it,
     /// and its byline says so. A still of the page at the end (ask-switch.png), and every answer in the log. Only with
     /// STUDYSTASH_FILM_SWITCH=1 as well: it asks the free AI three times and Claude once.</summary>
