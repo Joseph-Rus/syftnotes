@@ -187,6 +187,25 @@ public class TypedMarkdownTests
     }
 
     [AvaloniaFact]
+    public void Brackets_in_an_items_words_stay_words_and_only_its_first_is_a_checkbox()
+    {
+        var note = new NoteView { Width = 600, Markdown = "- E[X] = Σ x·p(x), and Var[X] too\n- arr[x] is the x-th\n- [x] [ ] done, brackets after it kept" };
+        var w = Show(note);
+        try
+        {
+            var words = note.GetVisualDescendants().OfType<TextBlock>().Where(t => t.Inlines is { Count: > 0 }).Select(t => t.Inlines!.Text).ToList();
+            Assert.Contains("E[X] = Σ x·p(x), and Var[X] too", words);
+            Assert.Contains("arr[x] is the x-th", words);
+            Assert.Contains("[ ] done, brackets after it kept", words);
+            Assert.Single(note.GetVisualDescendants().OfType<Border>(), b => AutomationProperties.GetName(b) is "Done" or "Not done");
+        }
+        finally
+        {
+            w.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public void The_written_notes_show_the_students_Markdown_formatted_and_in_ink()
     {
         var note = new NoteView

@@ -106,7 +106,7 @@ public sealed partial class NoteView : StackPanel
     /// bubble); a click still opens it at full size.</summary>
     public const double CompactDiagramMaxHeight = 260;
 
-    static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseEmphasisExtras().UseMathematics().UseAutoLinks().UseTaskLists().Build();
+    static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseEmphasisExtras().UseMathematics().UseAutoLinks().UseLeadingTaskLists().Build();
 
     /// <summary>Inline maths reads a touch smaller than the body (Latin Modern reads larger than the body fonts at
     /// equal size); a display formula, larger and centred. Past 2 000 characters, a formula goes straight to its
@@ -935,6 +935,13 @@ public sealed partial class NoteView : StackPanel
                     break;
                 case CodeInline c:
                     yield return new Run(c.Content) { FontFamily = new FontFamily("SF Mono, Menlo, Cascadia Mono, Consolas, monospace"), FontSize = 14 };
+                    break;
+                case TaskList box:
+                    // A checkbox that isn't drawn as one (only an item's first is): its brackets, as written.
+                    var words = new Run(box.Checked ? "[x]" : "[ ]");
+                    if (weight is { } bw) words.FontWeight = bw;
+                    if (style is { } bs) words.FontStyle = bs;
+                    yield return words;
                     break;
                 case LineBreakInline:
                     yield return new Run(" ");

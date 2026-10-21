@@ -99,7 +99,8 @@ public static partial class TypedNotes
     static bool NotWords(string line)
     {
         string t = line.Trim();
-        return t.StartsWith('|') || t.StartsWith("```", StringComparison.Ordinal) || t.StartsWith("$$", StringComparison.Ordinal)
+        // (A table's row starts and ends with |; "|x| = 5" is words.)
+        return (t.StartsWith('|') && t.EndsWith('|') && t.Length > 1) || t.StartsWith("```", StringComparison.Ordinal) || t.StartsWith("$$", StringComparison.Ordinal)
             || t.StartsWith("![", StringComparison.Ordinal) || Rule().IsMatch(t) || (t.StartsWith('[') && t.EndsWith(']'));
     }
 

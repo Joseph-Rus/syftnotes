@@ -41,7 +41,7 @@ enum MdLook : ushort
 static class MarkdownLook
 {
     static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
-        .UseEmphasisExtras().UseMathematics().UseAutoLinks().UseTaskLists().UsePreciseSourceLocation().Build();
+        .UseEmphasisExtras().UseMathematics().UseAutoLinks().UseLeadingTaskLists().UsePreciseSourceLocation().Build();
 
     /// <summary>How each character of <paramref name="text"/> is drawn; null when none of it is formatted.
     /// <paramref name="blocks"/>: the text is whole notes, so a heading's line is heavy and a code block mono too.</summary>
@@ -150,6 +150,27 @@ static class MarkdownLook
             if (block is LeafBlock { Inline: { } inline }) Walk(inline);
         }
         return any ? looks : null;
+    }
+}
+
+/// <summary>
+/// Markdig's checkbox ("[ ]", "[x]"), but only where a list's item starts. Markdig's own takes one anywhere in an item's
+/// words, so "- E[X] = Σ x·p(x)" or "- arr[x]" lost its brackets as a checkbox nobody draws; here those are words.
+/// </summary>
+sealed class LeadingTaskListParser : TaskListInlineParser
+{
+    public override bool Match(Markdig.Parsers.InlineProcessor processor, ref Markdig.Helpers.StringSlice slice) =>
+        processor.Block is { Parent: ListItemBlock item } words && item.Count > 0 && ReferenceEquals(item[0], words)
+        && processor.Root?.FirstChild is null && base.Match(processor, ref slice);
+}
+
+static class LeadingTaskLists
+{
+    /// <summary>Checkboxes where a list's item starts, and nowhere else (<see cref="LeadingTaskListParser"/>).</summary>
+    public static MarkdownPipelineBuilder UseLeadingTaskLists(this MarkdownPipelineBuilder pipeline)
+    {
+        if (!pipeline.InlineParsers.Contains<LeadingTaskListParser>()) pipeline.InlineParsers.Insert(0, new LeadingTaskListParser());
+        return pipeline;
     }
 }
 

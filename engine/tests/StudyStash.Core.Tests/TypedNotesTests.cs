@@ -124,6 +124,70 @@ public class TypedNotesTests
     }
 
     [Fact]
+    public void A_line_the_model_marked_only_part_of_is_marked_whole_with_no_stray_marks()
+    {
+        // The prompt's own example invites this: the model marked the words after the term, not the term.
+        string kept = Summarize.KeepTyped("## Cell division\n- **Mitosis**: ==cell division== The cell copies its DNA, then splits.\n", "- Mitosis: cell division");
+        Assert.Equal("## Cell division\n- ==Mitosis: cell division== The cell copies its DNA, then splits.\n", kept);
+        // A mark that runs on past the student's words is left as the model wrote it: never a stray ==.
+        const string longer = "- **Mitosis**: ==cell division, and more== The cell copies its DNA.\n";
+        Assert.Equal(longer, Summarize.KeepTyped(longer, "- Mitosis: cell division"));
+        // A line of one word is marked where it stands as a word, not inside a longer one.
+        Assert.Equal("- Cells divide. A ==cell== copies its DNA.", Summarize.KeepTyped("- Cells divide. A cell copies its DNA.", "cell"));
+    }
+
+    [Fact]
+    public void Code_formulas_and_tables_the_model_left_out_come_back_whole()
+    {
+        const string typed = """
+            - |x| = 5 for both roots
+            ```python
+            def divide(cell):
+                return [cell, cell]
+            ```
+            $$N = N_0 \cdot 2^n$$
+            | Phase | Event |
+            |---|---|
+            | Anaphase | chromatids part |
+            """;
+        // The model kept none of the blocks, and wrote the |x| line unmarked.
+        const string notes = "## Summary\nRoots and cells.\n\n- |x| = 5 for both roots, from the quadratic.\n";
+        string kept = Summarize.KeepTyped(notes, typed.ReplaceLineEndings("\n"));
+        Assert.Contains("- ==|x| = 5 for both roots==, from the quadratic.", kept);
+        Assert.EndsWith("""
+            ## Also in your notes
+            ```python
+            def divide(cell):
+                return [cell, cell]
+            ```
+
+            $$N = N_0 \cdot 2^n$$
+
+            | Phase | Event |
+            |---|---|
+            | Anaphase | chromatids part |
+
+            """.ReplaceLineEndings("\n"), kept);
+        // Kept (indented in a bullet, a formula on lines of its own, a table spaced otherwise): nothing comes back.
+        const string all = """
+            - ==|x| = 5 for both roots==
+              ```python
+              def divide(cell):
+                  return [cell, cell]
+              ```
+
+            $$
+            N = N_0 \cdot 2^n
+            $$
+
+            |Phase|Event|
+            |:--|:--|
+            |Anaphase|chromatids part|
+            """;
+        Assert.Equal(all.ReplaceLineEndings("\n"), Summarize.KeepTyped(all.ReplaceLineEndings("\n"), typed.ReplaceLineEndings("\n")));
+    }
+
+    [Fact]
     public async Task The_pipeline_writes_round_typed_notes_keeps_them_apart_and_keeps_a_typed_title()
     {
         using var dir = new TempDir();
