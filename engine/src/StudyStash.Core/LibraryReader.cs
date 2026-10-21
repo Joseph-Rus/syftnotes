@@ -306,9 +306,11 @@ public sealed partial class LibraryReader(Config cfg, Store store)
         }
         if (earlier.Count > 0)
         {
-            prompt.Append("The conversation so far, oldest first. The new question may follow on from it (\"that\", \"the second one\", \"more simply\"): ")
-                .Append("read it to know what the student means, then answer the new question from the sources above.\n\n");
+            // Said last, just before the question: a small model heeds what it read most recently.
+            prompt.Append("The conversation so far, oldest first:\n\n");
             foreach (var turn in earlier) prompt.Append("Student: ").Append(turn.Question).Append("\nYou: ").Append(turn.Answer).Append("\n\n");
+            prompt.Append("The new question follows on from it. Answer only the new question, from the sources above: when it says \"that\", \"it\" ")
+                .Append("or \"the second one\", work out from the conversation what it means, and don't repeat an earlier answer.\n");
         }
         prompt.Append("Question: ").Append(question.Trim());
         string text = await (chat ?? OllamaAsk)(prompt.ToString(), AnswerSchema);

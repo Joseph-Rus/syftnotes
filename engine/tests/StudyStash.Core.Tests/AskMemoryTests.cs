@@ -54,7 +54,8 @@ public class AskMemoryTests
         Assert.Contains("[2] Blood vessels (BIO 110, 2026-10-08), Three kinds of vessel:\nCapillaries are one cell thick", prompt);
         Assert.Contains("[3] Blood vessels (BIO 110, 2026-10-08), Three kinds of vessel:\nVeins carry blood back", prompt);
         Assert.DoesNotContain("Muscle fibres", prompt);
-        Assert.EndsWith("Student: What are the three kinds of blood vessel?\nYou: Arteries, capillaries and veins.\n\nQuestion: Explain that more simply", prompt);
+        Assert.Contains("The conversation so far, oldest first:\n\nStudent: What are the three kinds of blood vessel?\nYou: Arteries, capillaries and veins.\n\n", prompt);
+        Assert.EndsWith("don't repeat an earlier answer.\nQuestion: Explain that more simply", prompt);
         Assert.Equal(1, answer["remembered"]!.GetValue<int>());
         Assert.Equal("Three kinds of vessel", answer["sources"]![0]!["section"]!.GetValue<string>());
     }
@@ -93,7 +94,7 @@ public class AskMemoryTests
         Assert.DoesNotContain("Question 2?", sent);
         Assert.Contains("Student: Question 3?\nYou: Answer 3: xxx", sent);
         Assert.Contains("Student: Question 8?\nYou: Answer 8: xxx", sent);
-        string eighth = sent[(sent.IndexOf("You: Answer 8", StringComparison.Ordinal) + 5)..sent.IndexOf("\n\nQuestion: And the second one?", StringComparison.Ordinal)];
+        string eighth = sent[(sent.IndexOf("You: Answer 8", StringComparison.Ordinal) + 5)..sent.IndexOf("\n\nThe new question follows on", StringComparison.Ordinal)];
         Assert.Equal(AskMemory.TurnChars - "Question 8?".Length, eighth.Length);
         Assert.EndsWith("…", eighth);
 
