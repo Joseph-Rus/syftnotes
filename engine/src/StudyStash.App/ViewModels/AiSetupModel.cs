@@ -125,8 +125,11 @@ public sealed partial class AiSetupModel : ObservableObject
     public string Prefer { get; init; } = "";
     /// <summary>The host can save an API key for an AI (setup's window can; a test that doesn't say can't).</summary>
     public bool TakesKeys { get; init; }
+    /// <summary>An AI whose key box opens with the step: the one whose plan couldn't be used, when the student carried
+    /// on from guided setup's "plan other apps can't use" card, which says a key can be added here.</summary>
+    public string OpenKeyFor { get; init; } = "";
     bool? notesOn;
-    bool preferShown;
+    bool preferShown, keyShown;
 
     [ObservableProperty] public partial string SelectedNotes { get; set; } = "ollama";
     [ObservableProperty] public partial string SelectedAsk { get; set; } = SameAsNotes;
@@ -333,7 +336,8 @@ public sealed partial class AiSetupModel : ObservableObject
         bool Buttons(EngineInfo e) => SetUpPaid is not null && e is { Id: "claude" or "codex", State: "not_installed" or "not_signed_in" };
         // Gemini, not here at all: its one button is its API key (Google's own app is installed by the student).
         bool GeminiKey(EngineInfo e) => TakesKeys && e is { Id: "gemini", State: "not_installed" };
-        bool NotReady(EngineInfo e) => e.State is "not_installed" or "not_signed_in";
+        // Not a working pick: not here, signed out, or its last try failed (a plan other apps can't use, say).
+        bool NotReady(EngineInfo e) => e.State is "not_installed" or "not_signed_in" or "failed";
         Engines.Clear();
         // Every AI shows, each with what gets it going: the free AI, Claude, ChatGPT and Gemini.
         foreach (var e in overview.Engines)
@@ -391,6 +395,11 @@ public sealed partial class AiSetupModel : ObservableObject
             // The free AI's button starts a big download, so it isn't pressed for the student: the step says where it is.
             else if (wanted is { Id: "ollama", ShowOneButton: true }) Say = $"To have the free AI write your notes, press “{wanted.OpenLabel}” on its row.";
             else if (!wanted.CanWrite && wanted.HasHelp) wanted.ShowHelp = true;
+        }
+        if (!keyShown && TakesKeys && OpenKeyFor is "claude" or "codex" or "gemini" && SelectedNotes != OpenKeyFor && Engines.Any(r => r.Id == OpenKeyFor))
+        {
+            keyShown = true;
+            KeyFor = OpenKeyFor;
         }
         if (KeyFor.Length > 0 && Engines.All(r => r.Id != KeyFor)) KeyFor = "";
         HelpOpen = Engines.Any(r => r.ShowHelp) || KeyOpen;

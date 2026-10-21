@@ -159,6 +159,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     [ObservableProperty] public partial bool StartsAtLogin { get; set; }
     /// <summary>Setup by hand should have the free model on this computer picked for notes.</summary>
     public bool PreferOllama { get; private set; }
+    /// <summary>The AI whose plan other apps can't use, when the student carried on from that card (which says an API
+    /// key can be added on the notes step): its key box opens there. "" otherwise.</summary>
+    public string NotesKeyFor { get; private set; } = "";
 
     /// <summary>The AI setup by hand's notes step opens on (<see cref="AiSetupModel.Prefer"/>): Claude or ChatGPT once
     /// it's ready here, Gemini or the free AI when that was the answer on the first screen (now, or the last time setup
@@ -465,6 +468,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         }
         save(s => s.SetupAi = engine);
         PreferOllama = engine == "ollama";
+        NotesKeyFor = PlanProblem == ChatProblem.Plan ? Cli.Id : "";
         StopWork();
         Setup.Go(Setup.Steps[0].Step);
         Screen = GuidedScreen.Manual;

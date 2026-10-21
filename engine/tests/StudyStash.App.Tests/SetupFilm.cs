@@ -248,6 +248,7 @@ sealed class SetupFilmRig : IAsyncDisposable
                         // that takes one can have an API key pasted there.
                         Prefer = guided.NotesPick,
                         TakesKeys = true,
+                        OpenKeyFor = guided.NotesKeyFor,
                         SetUpPaid = guided.GetReadyForNotesAsync,
                     };
                     guided.ReadyForNotes = id =>

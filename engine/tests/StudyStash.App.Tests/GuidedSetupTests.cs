@@ -435,6 +435,19 @@ public sealed class GuidedSetupTests
         g.OpenPlansCommand.Execute("");
         Assert.Equal(["https://chatgpt.com/pricing"], rig.Opened);
         Assert.Equal("Use Claude instead", g.UseOtherLabel);
+
+        // "Carry on without it": the card said an API key can be added on the notes step, and ChatGPT's key box is open
+        // there; a ChatGPT that tried and failed also has "Use an API key" on its row.
+        g.UseOllamaCommand.Execute(null);
+        Assert.Equal((GuidedScreen.Manual, "codex"), (g.Screen, g.NotesKeyFor));
+        var notes = new AiSetupModel(new FakeAiLibrary { Overview = AiTestData.MixedOverview() with
+        {
+            Engines = [.. AiTestData.MixedOverview().Engines.Select(e => e.Id == "codex" ? e with { State = "failed" } : e)],
+        } }) { Windows = false, TakesKeys = true, OpenKeyFor = g.NotesKeyFor, Prefer = g.NotesPick };
+        await notes.Load();
+        Assert.Equal("codex", notes.KeyFor);
+        Assert.True(notes.Engines.Single(r => r.Id == "codex").ShowKeyLink);
+        Assert.False(notes.Engines.Single(r => r.Id == "claude").ShowKeyLink); // ready: no link
     }
 
     [AvaloniaFact]
