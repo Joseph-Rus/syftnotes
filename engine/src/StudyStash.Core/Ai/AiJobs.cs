@@ -502,12 +502,17 @@ public sealed class AiJobs(string home, Func<string>? ollamaHost = null)
     }
 
     /// <summary>Have a provider say one word, so a person knows it's signed in before relying on it. Kept in ai.json.</summary>
+    /// <summary>How long a try waits for its one-word answer: well inside what the app waits for the library
+    /// (<see cref="AiRemote.Waits"/>), so a try that runs out says so instead of the app giving up on the library. A
+    /// CLI or an API answers one tiny question in seconds; the free AI may first have to load its model.</summary>
+    public static TimeSpan TryWithin(string providerId) => providerId == "ollama" ? TimeSpan.FromSeconds(130) : TimeSpan.FromSeconds(90);
+
     public async Task<(bool Ok, string Why)> TestAsync(string providerId, string model = "")
     {
         var provider = Provider(providerId);
         var r = await provider.CompleteAsync(new AiRequest("Reply with the single word: ready", Scratch())
         {
-            Model = model, Timeout = TimeSpan.FromMinutes(3),
+            Model = model, Timeout = TryWithin(providerId),
         });
         bool ok = r.Ok && r.Text.Contains("ready", StringComparison.OrdinalIgnoreCase);
         string why = ok ? "" : r.Ok ? $"it answered \"{Py.Head(r.Text, 80)}\"" : r.Text;

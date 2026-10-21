@@ -296,7 +296,8 @@ public abstract class AiProvider
             }
             if (timedOut)
             {
-                yield return AiEvent.Error($"{Path.GetFileName(cmd[0])} didn't finish within {timeout.TotalMinutes:0} minutes.");
+                yield return AiEvent.Error($"{Path.GetFileName(cmd[0])} didn't finish within " +
+                    (timeout < TimeSpan.FromMinutes(2) ? $"{timeout.TotalSeconds:0} seconds." : $"{timeout.TotalMinutes:0} minutes."));
                 yield break;
             }
             if (!proc.WaitForExit(30_000)) yield break;

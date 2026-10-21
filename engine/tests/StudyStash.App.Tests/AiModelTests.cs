@@ -695,12 +695,25 @@ public class AiSetupModelTests
         Assert.Empty(lib.DefaultsCalls);
         Assert.Single(lib.Calls, c => c == "check:claude");
 
+        // A try that outlasts the app's wait for the library: Claude was slow, the library's fine.
+        lib.Overview = With(("claude", "unchecked"));
+        await model.Load();
+        lib.OnCheck = (_, _) => throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout of 150 seconds elapsing.");
+        Assert.False(await model.SaveAsync());
+        Assert.Equal("Claude didn't answer in time: try again, or pick another.", model.Say);
+        Assert.False(model.Offline);
+        // The library's own try gives up first, and says so.
+        Assert.All(Core.Ai.Engines.Order, id => Assert.True(Core.Ai.AiJobs.TryWithin(id) < Core.Ai.AiRemote.Waits, id));
+        lib.OnCheck = (id, _) => new AiSaid("claude didn't finish within 90 seconds.", lib.Overview = With((id, "failed")));
+        Assert.False(await model.SaveAsync());
+        Assert.Equal("Claude didn't answer in time: try again, or pick another.", model.Say);
+
         lib.OnCheck = (id, _) => new AiSaid("Claude is ready.", lib.Overview = With((id, "ready")));
         lib.Overview = With(("claude", "unchecked"));
         await model.Load();
         Assert.True(await model.SaveAsync());
         Assert.Equal("claude", lib.DefaultsCalls[^1].Notes);
-        Assert.Equal(2, lib.Calls.Count(c => c == "check:claude"));
+        Assert.Equal(4, lib.Calls.Count(c => c == "check:claude"));
     }
 
     [AvaloniaFact]
