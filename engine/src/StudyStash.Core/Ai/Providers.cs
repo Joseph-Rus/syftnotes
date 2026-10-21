@@ -686,14 +686,15 @@ public sealed class OllamaProvider(Func<string> host) : CodexProvider
         await foreach (var e in ChatAsync(req, model, ct)) yield return e;
     }
 
-    /// <summary>The model a run uses: the one asked for when it's installed, else the best one that is; null when
-    /// there's none (or Ollama isn't answering).</summary>
+    /// <summary>The model a run uses: the one asked for when it's installed, else the best one that is on this
+    /// computer (never an Ollama cloud model, which would send the lecture off it); null when there's none (or Ollama
+    /// isn't answering).</summary>
     async Task<string?> ModelAsync(string asked)
     {
         var have = await Ollama.ListModelsAsync(host()) ?? [];
         var names = have.Select(m => m.Name).ToList();
         if (asked.Length > 0 && Ollama.HasModel(names, asked)) return asked;
-        return have.Count == 0 ? null : Ollama.PickDefaultModel(names, have[0].Name);
+        return Ollama.LocalPick(have);
     }
 
     /// <summary>How long Ollama keeps the model loaded after a question, so a follow-up doesn't wait for it to load

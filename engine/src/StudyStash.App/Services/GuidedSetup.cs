@@ -41,6 +41,9 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
     public Func<Task<CanvasConnectModel?>> MakeCanvas { get; init; } = () => Task.FromResult<CanvasConnectModel?>(null);
     /// <summary>Sets who writes the notes and answers questions on the library: null when it took it, else why not.</summary>
     public Func<string, Task<string?>>? WriteNotes { get; init; }
+    /// <summary>Why an AI other than the one running the chat can't write the notes here (Gemini not set up on the
+    /// library), or null when it can: the library's own word on it.</summary>
+    public Func<string, Task<string?>>? NotReady { get; init; }
     /// <summary>The installer's suggestion (the library download says "library").</summary>
     public AppRole? Installer { get; init; } = Setup.Preset(Apps.RolePreset());
 
@@ -154,11 +157,31 @@ public sealed class GuidedSetup : ISetupDriver, IGuidedActions
         if (engine is "claude" or "codex" && engine != g.Picked)
             return $"Only {g.Brand} is set up on this {Device}. The student can add {AgentCli.Get(engine).Brand} later in Settings → Your AI.";
         if (engine is "claude" or "codex" && !g.AiReady) return $"{g.Brand} isn't ready yet.";
+        if (engine == "gemini" && await (NotReady ?? NotReadyOnLibraryAsync)(engine) is { } notYet) return notYet;
         string? refused = await (WriteNotes ?? WriteOnLibraryAsync)(engine);
         if (refused is not null) return refused;
         g.NotesWriter = engine;
         m.NotesSummary = engine == "none" ? "Transcripts only for now" : $"Notes by {Engines.Name(engine)}";
         return null;
+    }
+
+    /// <summary>Whether the library can use <paramref name="engine"/> now, by its own overview: null when it can, else
+    /// what the student can do about it.</summary>
+    async Task<string?> NotReadyOnLibraryAsync(string engine)
+    {
+        if (host.Remote() is null) return "The library isn't reachable right now.";
+        var cc = host.Client();
+        try
+        {
+            var overview = await new AiRemote(cc.ServerUrl, cc.PoolKey).EnginesAsync();
+            return overview?.Engines.FirstOrDefault(e => e.Id == engine) is { State: "not_installed" or "not_signed_in" }
+                ? $"{Engines.Name(engine)} isn't set up on this {Device}. The student can add it in Settings → Your AI, with an API key from Google AI Studio or Google's Antigravity app."
+                : null;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or LibraryRefusedException or System.Text.Json.JsonException)
+        {
+            return "The library didn't answer. Try again in a moment.";
+        }
     }
 
     /// <summary>The library's AI settings: that engine writes the notes and answers questions ("none": transcripts

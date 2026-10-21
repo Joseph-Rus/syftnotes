@@ -121,6 +121,14 @@ public sealed partial class LibraryWeb
             foreach (string? id in new[] { notes, ask, diagrams })
                 if (id is not null && overview.Engines.FirstOrDefault(e => e.Id == id) is { Installed: false } row)
                     return Http.Detail(409, $"{row.Name} isn't set up on your library's computer.");
+            // The free AI picked for a library nobody chose a model for, whose built-in one isn't here: the model it
+            // writes with now (one already on this computer) becomes the library's own.
+            if (notes == "ollama" && !Engines.FreeModelChosen(cfg) && await Jobs.Checks.OllamaModels(cfg.OllamaHost) is { } have
+                && Engines.UsableFreeModel(cfg, have) is { } usable && usable != cfg.EffectiveSummaryModel)
+            {
+                cfg.OllamaModel = usable;
+                Configs.Save(cfg);
+            }
             var settings = AiSettings.Load(cfg.Home);
             if (notes is not null) settings.ByJob["notes"] = new AiChoice(notes);
             if (ask is not null)

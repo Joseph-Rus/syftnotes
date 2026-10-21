@@ -204,7 +204,9 @@ public static class Engines
     static bool? Hinted(string id, EngineChecks checks) => id switch
     {
         "codex" => checks.FileExists(CodexAuthPath(checks)) || checks.Env("OPENAI_API_KEY") is { Length: > 0 },
-        "gemini" => checks.Env("GEMINI_API_KEY") is { Length: > 0 } || checks.FileExists(GeminiCredsPath),
+        // Gemini runs through Google's Antigravity (agy), whose sign-in isn't the Gemini CLI's oauth_creds.json: a
+        // missing file proves nothing, so without a key in the environment it's unchecked until tried.
+        "gemini" => checks.Env("GEMINI_API_KEY") is { Length: > 0 } || checks.FileExists(GeminiCredsPath) ? true : null,
         _ => null, // claude
     };
 
@@ -245,18 +247,35 @@ public static class Engines
     {
         bool installed = checks.OllamaInstalled();
         var installedModels = installed ? await checks.OllamaModels(cfg.OllamaHost) : null;
+        string usable = installedModels is null ? "" : UsableFreeModel(cfg, installedModels) ?? "";
         string state = !installed ? "not_installed"
             : installedModels is null ? "not_running"
-            : !Ollama.HasModel(installedModels.Select(m => m.Name).ToList(), cfg.EffectiveSummaryModel) ? "model_missing"
+            : usable.Length == 0 ? "model_missing"
             : "ready";
         var models = (installedModels ?? []).Select(m => new ModelOption(m.Name, $"{m.Name} ({Ollama.SizeLabel(m.SizeGb)})")).ToList();
         string wanted = FreeModel(cfg, checks);
         return new EngineInfo("ollama", Name("ollama"), state)
         {
-            Installed = installed, Model = cfg.EffectiveSummaryModel, Models = models, Site = AiProviders.Get("ollama").Site,
+            Installed = installed, Model = usable.Length > 0 ? usable : cfg.EffectiveSummaryModel, Models = models, Site = AiProviders.Get("ollama").Site,
             SetUpGb = state == "ready" ? 0 : Ollama.DownloadGb(wanted),
             Small = wanted == Ollama.SmallModel,
         };
+    }
+
+    /// <summary>Whether anyone chose the free AI's model on this library (in Settings, or setup's own download): a
+    /// new library's is only the built-in default.</summary>
+    public static bool FreeModelChosen(Config cfg) => cfg.SummaryModel.Length > 0 || cfg.OllamaModel != Config.DefaultOllamaModel;
+
+    /// <summary>
+    /// The model the free AI writes notes with as this computer is now (<paramref name="installed"/>, Ollama's list):
+    /// the library's own when it's installed; for a library nobody chose a model for, any model already on this
+    /// computer (the best of them, never a cloud one), as the notes themselves would use it; null when there's none,
+    /// and "Set it up" downloads one.
+    /// </summary>
+    public static string? UsableFreeModel(Config cfg, IReadOnlyList<(string Name, double SizeGb)> installed)
+    {
+        if (Ollama.HasModel(installed.Select(m => m.Name).ToList(), cfg.EffectiveSummaryModel)) return cfg.EffectiveSummaryModel;
+        return FreeModelChosen(cfg) ? null : Ollama.LocalPick(installed);
     }
 
     /// <summary>
@@ -266,7 +285,7 @@ public static class Engines
     /// laptop set up from the app was left to download that.)
     /// </summary>
     public static string FreeModel(Config cfg, EngineChecks checks) =>
-        cfg.SummaryModel.Length > 0 || cfg.OllamaModel != Config.DefaultOllamaModel ? cfg.EffectiveSummaryModel : Ollama.RecommendedModel(checks.RamGb());
+        FreeModelChosen(cfg) ? cfg.EffectiveSummaryModel : Ollama.RecommendedModel(checks.RamGb());
 
     static EngineInfo CliRow(string id, AiSettings settings, EngineChecks checks)
     {
