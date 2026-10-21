@@ -42,7 +42,7 @@
         <TextBlock Classes="ai-asked" Text="Chat" VerticalAlignment="Center" />
         <!-- New chat: the next question starts afresh, the AI remembering nothing before it -->
         <Button Name="NewChat" Grid.Column="1" Classes="ai-newchat" VerticalAlignment="Center" Command="{Binding NewChatCommand}"
-                ToolTip.Tip="Start a new chat: the next question won't build on these" AutomationProperties.Name="New chat">
+                AutomationProperties.Name="New chat">
           <StackPanel Orientation="Horizontal" Spacing="4">
             <c:Icon Glyph="add" Size="14" Foreground="{DynamicResource Fg2}" VerticalAlignment="Center" />
             <TextBlock Classes="ai-asked" Text="New chat" VerticalAlignment="Center" />
