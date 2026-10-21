@@ -38,6 +38,9 @@ public class TypedNotesTests
         string prompt = Summarize.WholePrompt(typed, "the transcript");
         Assert.Contains("Keep every line the student typed, word for word", prompt);
         Assert.Contains("==exactly as they typed it==", prompt);
+        // Typed in Markdown: their bold, checkboxes and nesting stay theirs, inside the marks.
+        Assert.Contains("with their formatting exactly as they typed it", prompt);
+        Assert.Contains("(- [ ] ==Read chapter 3==)", prompt);
         Assert.Contains("- q · k → softmax → weights on v", prompt);
         Assert.DoesNotContain("## Key points", prompt);
         Assert.Contains("- ChatGPT, Nov 2022", Summarize.MergePrompt(typed, ["part one", "part two"]));
@@ -62,6 +65,48 @@ public class TypedNotesTests
         // Already whole: nothing is added, and doing it again changes nothing.
         Assert.Equal(kept, Summarize.KeepTyped(kept, Typed));
         Assert.Equal(notes, Summarize.KeepTyped(notes, ""));
+    }
+
+    [Fact]
+    public void Typed_Markdown_keeps_its_formatting_in_the_notes_whatever_the_model_did_with_it()
+    {
+        const string typed = """
+            # Cell division
+            - **Mitosis**: one cell → two *identical* cells
+            - see [the textbook](https://example.com/bio), fig. 12
+            - [ ] read chapter 12 before Wed
+            - [x] email the TA
+            ```
+            divide(cell)
+            ```
+            """;
+        // The model kept the heading; marked the mitosis line but dropped its bold and italics; wrote the textbook line
+        // unmarked and in its own formatting; put a checkbox inside the marks; kept the code; and left out the last line.
+        const string notes = """
+            ## Summary
+            How cells divide.
+
+            ## ==Cell division==
+            - ==Mitosis: one cell → two identical cells== The cell copies its DNA, then splits.
+            - The lecture said to see **the textbook**, fig. 12 for the stages.
+            ==- [ ] read chapter 12 before Wed==
+
+            ```
+            divide(cell)
+            ```
+            """;
+        string kept = Summarize.KeepTyped(notes.ReplaceLineEndings("\n"), typed.ReplaceLineEndings("\n"));
+        Assert.Contains("## ==Cell division==", kept);
+        Assert.Contains("- ==**Mitosis**: one cell → two *identical* cells== The cell copies", kept);
+        Assert.Contains("- The lecture said to ==see [the textbook](https://example.com/bio), fig. 12== for the stages.", kept);
+        Assert.Contains("\n- [ ] ==read chapter 12 before Wed==\n", kept);
+        // Code isn't marked, nor taken for a line that's missing; a checkbox left out comes back as one.
+        Assert.Contains("```\ndivide(cell)\n```", kept);
+        Assert.DoesNotContain("==divide", kept);
+        Assert.EndsWith("## Also in your notes\n- [x] ==email the TA==\n", kept);
+        Assert.Equal(kept, Summarize.KeepTyped(kept, typed.ReplaceLineEndings("\n")));
+        // Lines are the same line however each is formatted.
+        Assert.Equal("Mitosis: see the textbook, snake_case", Summarize.Bare("**Mitosis**: *see* [the textbook](https://x.y)`,` snake_case"));
     }
 
     [Fact]

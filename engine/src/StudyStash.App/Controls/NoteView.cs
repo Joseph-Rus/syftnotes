@@ -11,6 +11,7 @@ using Avalonia.VisualTree;
 using Markdig;
 using Markdig.Extensions.Mathematics;
 using Markdig.Extensions.Tables;
+using Markdig.Extensions.TaskLists;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
 using StudyStash.App.Controls.Rich;
@@ -105,7 +106,7 @@ public sealed partial class NoteView : StackPanel
     /// bubble); a click still opens it at full size.</summary>
     public const double CompactDiagramMaxHeight = 260;
 
-    static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseEmphasisExtras().UseMathematics().UseAutoLinks().Build();
+    static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder().UsePipeTables().UseEmphasisExtras().UseMathematics().UseAutoLinks().UseTaskLists().Build();
 
     /// <summary>Inline maths reads a touch smaller than the body (Latin Modern reads larger than the body fonts at
     /// equal size); a display formula, larger and centred. Past 2 000 characters, a formula goes straight to its
@@ -388,7 +389,8 @@ public sealed partial class NoteView : StackPanel
             {
                 case HeadingBlock h:
                     section = Plain(h.Inline);
-                    var head = Text("DisplayFont", Mac ? 17 : 20, 1.25);
+                    // A heading three levels under the notes' sections (a student's own ###, written one level down) is smaller.
+                    var head = h.Level >= 4 ? Text("DisplayFont", Mac ? 15 : 17, 1.3) : Text("DisplayFont", Mac ? 17 : 20, 1.25);
                     head.FontWeight = Provenance ? FontWeight.ExtraBold : FontWeight.SemiBold;
                     head.Classes.Add(HeadingClass);
                     Fill(head, h.Inline);
@@ -475,10 +477,16 @@ public sealed partial class NoteView : StackPanel
                 string svg = html.Lines.ToString();
                 return !svg.Contains("</svg>", StringComparison.OrdinalIgnoreCase) && AtEnd(html) ? Pending(DrawingWords) : Diagram(DiagramKind.Svg, svg);
             case QuoteBlock q:
-                var quote = Body();
-                quote.Text = string.Join(" ", q.Descendants<ParagraphBlock>().Select(x => Plain(x.Inline)));
-                quote.Margin = new Thickness(14, 0, 0, 0);
-                quote.Bind(TextBlock.ForegroundProperty, quote.GetResourceObservable("Fg2"));
+                // A quote: its paragraphs, formatted, beside a bar.
+                var said = new StackPanel { Spacing = 6 };
+                foreach (var inner in q)
+                    if (BlockControl(inner) is { } part)
+                    {
+                        if (part is TextBlock words && !Provenance) words.Bind(TextBlock.ForegroundProperty, words.GetResourceObservable("Fg2"));
+                        said.Children.Add(part);
+                    }
+                var quote = new Border { BorderThickness = new Thickness(3, 0, 0, 0), Padding = new Thickness(12, 0, 0, 0), Child = said };
+                quote.Bind(Border.BorderBrushProperty, quote.GetResourceObservable("Sep"));
                 return quote;
             case ThematicBreakBlock:
                 var rule = new Border { Height = 1, Margin = new Thickness(0, 6) };
@@ -688,7 +696,7 @@ public sealed partial class NoteView : StackPanel
     static bool IsDefinitions(string section, ListBlock list) =>
         !list.IsOrdered && list.Count > 0 && (section.Equals("Definitions", StringComparison.OrdinalIgnoreCase)
             || list.OfType<ListItemBlock>().All(i => i.FirstOrDefault() is ParagraphBlock p && TermFirst().IsMatch(Source(p))))
-        && list.OfType<ListItemBlock>().All(i => i.FirstOrDefault() is ParagraphBlock p && p.Inline?.FirstChild is EmphasisInline { DelimiterCount: 2 });
+        && list.OfType<ListItemBlock>().All(i => i.FirstOrDefault() is ParagraphBlock p && p.Inline?.FirstChild is EmphasisInline { DelimiterCount: 2, DelimiterChar: '*' or '_' });
 
     static string Source(ParagraphBlock p) => p.Inline is null ? "" : string.Concat(p.Inline.Descendants<LiteralInline>().Select(l => l.Content.ToString()));
 
@@ -724,8 +732,17 @@ public sealed partial class NoteView : StackPanel
         {
             var row = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,12,*") };
             string mark = list.IsOrdered ? $"{n++}" : "•";
-            row.Children.Add(Marker(mark));
-            lead = indent + (list.IsOrdered ? $"{mark}. " : "• ");
+            if (Checkbox(item) is { } done)
+            {
+                // A checkbox ("- [ ]", "- [x]"): its box in place of the bullet, ticked or not.
+                row.Children.Add(TaskBox(done));
+                lead = indent + (done ? "☑ " : "☐ ");
+            }
+            else
+            {
+                row.Children.Add(Marker(mark));
+                lead = indent + (list.IsOrdered ? $"{mark}. " : "• ");
+            }
             var content = new StackPanel { Spacing = 6 };
             foreach (var inner in item)
                 if (BlockControl(inner) is { } c) content.Children.Add(c);
@@ -736,6 +753,40 @@ public sealed partial class NoteView : StackPanel
         }
         listDepth--;
         return items;
+    }
+
+    /// <summary>Whether a list's item is a checkbox ("- [ ] …"): null when it isn't, else whether it's ticked. Its
+    /// box comes out of the item's words (the page draws it in the bullet's place).</summary>
+    static bool? Checkbox(ListItemBlock item)
+    {
+        if (item.FirstOrDefault() is not ParagraphBlock { Inline: { FirstChild: TaskList task } words }) return null;
+        task.Remove();
+        if (words.FirstChild is LiteralInline { } space && space.Content.ToString().TrimStart().Length == 0) space.Remove();
+        else if (words.FirstChild is LiteralInline { } after) after.Content = new Markdig.Helpers.StringSlice(after.Content.ToString().TrimStart());
+        return task.Checked;
+    }
+
+    /// <summary>A checkbox's box, on the line its words start on: an empty rounded square, or one filled in ink with a
+    /// tick.</summary>
+    Control TaskBox(bool done)
+    {
+        var line = Marker("•");
+        double size = Compact ? 13 : 14;
+        var tick = new Avalonia.Controls.Shapes.Path
+        {
+            Data = Geometry.Parse("M3,7.2 L5.8,9.9 L11,4.4"), StrokeThickness = 1.7, StrokeLineCap = PenLineCap.Round, StrokeJoin = PenLineJoin.Round, IsVisible = done,
+        };
+        tick.Bind(Avalonia.Controls.Shapes.Shape.StrokeProperty, tick.GetResourceObservable("Canvas"));
+        var box = new Border
+        {
+            Width = size, Height = size, CornerRadius = new CornerRadius(3.5), BorderThickness = new Thickness(1.4), Child = tick,
+            VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, Math.Max(0, (line.LineHeight - size) / 2), 0, 0),
+        };
+        string ink = Provenance ? "Ink" : "Fg";
+        box.Bind(Border.BorderBrushProperty, box.GetResourceObservable(done ? ink : "Fg3"));
+        if (done) box.Bind(Border.BackgroundProperty, box.GetResourceObservable(ink));
+        AutomationProperties.SetName(box, done ? "Done" : "Not done");
+        return box;
     }
 
     /// <summary>
@@ -811,7 +862,7 @@ public sealed partial class NoteView : StackPanel
         bool lead = trimLead;
         // (In a heading, which is heavier than the student's words would be, theirs keep the heading's weight.)
         FontWeight? mine = (int)t.FontWeight > (int)FontWeight.SemiBold ? null : FontWeight.SemiBold;
-        foreach (var piece in Runs(inline, skip, null, null, t.FontSize, fgKey, mine))
+        foreach (var piece in Runs(inline, skip, null, null, t.FontSize, fgKey, mine, t.FontWeight))
         {
             if (lead)
             {
@@ -846,7 +897,7 @@ public sealed partial class NoteView : StackPanel
     /// <summary>The text as runs (or an inline formula's <see cref="InlineUIContainer"/>); weight and style are set
     /// only where the Markdown changes them, so a heading's runs stay as heavy as the heading.</summary>
     static IEnumerable<Inline> Runs(ContainerInline container, MdInline? skip, FontWeight? weight, FontStyle? style, double bodySize, string? fgKey,
-        FontWeight? mineWeight = FontWeight.SemiBold)
+        FontWeight? mineWeight = FontWeight.SemiBold, FontWeight blockWeight = FontWeight.Normal)
     {
         for (var i = container.FirstChild; i is not null; i = i.NextSibling)
         {
@@ -863,15 +914,24 @@ public sealed partial class NoteView : StackPanel
                     yield return run;
                     break;
                 case EmphasisInline { DelimiterChar: '=' } mine:
-                    // What the student typed themselves: ink, and heavier, wherever it stands.
-                    foreach (var r in Runs(mine, skip, mineWeight ?? weight, style, bodySize, "Ink", mineWeight))
+                    // What the student typed themselves: ink, and heavier, wherever it stands; their own bold and
+                    // italics in it as they typed them.
+                    foreach (var r in Runs(mine, skip, mineWeight ?? weight, style, bodySize, "Ink", mineWeight, blockWeight))
                     {
                         if (r is Run own) own.Bind(Run.ForegroundProperty, own.GetResourceObservable("Ink"));
                         yield return r;
                     }
                     break;
-                case EmphasisInline e:
-                    foreach (var r in Runs(e, skip, e.DelimiterCount >= 2 ? FontWeight.SemiBold : weight, e.DelimiterCount == 1 ? FontStyle.Italic : style, bodySize, fgKey, mineWeight)) yield return r;
+                case EmphasisInline { DelimiterChar: '~', DelimiterCount: 2 } struck:
+                    foreach (var r in Runs(struck, skip, weight, style, bodySize, fgKey, mineWeight, blockWeight))
+                    {
+                        if (r is Run line) line.TextDecorations = TextDecorations.Strikethrough;
+                        yield return r;
+                    }
+                    break;
+                case EmphasisInline { DelimiterChar: '*' or '_' } e:
+                    // Bold is a step heavier than what's round it: heavier still in the student's own words.
+                    foreach (var r in Runs(e, skip, e.DelimiterCount >= 2 ? Heavier(weight ?? blockWeight) : weight, e.DelimiterCount == 1 ? FontStyle.Italic : style, bodySize, fgKey, mineWeight, blockWeight)) yield return r;
                     break;
                 case CodeInline c:
                     yield return new Run(c.Content) { FontFamily = new FontFamily("SF Mono, Menlo, Cascadia Mono, Consolas, monospace"), FontSize = 14 };
@@ -880,7 +940,7 @@ public sealed partial class NoteView : StackPanel
                     yield return new Run(" ");
                     break;
                 case LinkInline link:
-                    foreach (var r in Runs(link, skip, weight, style, bodySize, fgKey, mineWeight))
+                    foreach (var r in Runs(link, skip, weight, style, bodySize, fgKey, mineWeight, blockWeight))
                     {
                         if (!link.IsImage && link.Url is { Length: > 0 } url && r is Run linked)
                         {
@@ -892,11 +952,14 @@ public sealed partial class NoteView : StackPanel
                     }
                     break;
                 case ContainerInline other:
-                    foreach (var r in Runs(other, skip, weight, style, bodySize, fgKey, mineWeight)) yield return r;
+                    foreach (var r in Runs(other, skip, weight, style, bodySize, fgKey, mineWeight, blockWeight)) yield return r;
                     break;
             }
         }
     }
+
+    /// <summary>Bold within text of this weight: semibold in the reading text, heavier in what's heavy already.</summary>
+    static FontWeight Heavier(FontWeight weight) => (int)weight < 600 ? FontWeight.SemiBold : (int)weight < 800 ? FontWeight.ExtraBold : FontWeight.Black;
 
     /// <summary>Makes the links in <paramref name="t"/> work: a hand over one, and a click opens it. A drag that
     /// selects text in a selectable block isn't a click.</summary>

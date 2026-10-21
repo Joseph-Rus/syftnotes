@@ -17,20 +17,22 @@ public static partial class TypedNotes
     [GeneratedRegex(@"==(?=\S)(.+?)(?<=\S)==")]
     private static partial Regex Marked();
 
-    [GeneratedRegex(@"^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+|>\s+)*")]
+    /// <summary>What a line starts with before its words: a heading's #s, a bullet (and its checkbox), a number, a
+    /// quote's &gt;. The marks go round the words after it, so the line is still a heading, a bullet or a checkbox.</summary>
+    [GeneratedRegex(@"^\s*(?:#{1,6}\s+|[-*+]\s+(?:\[[ xX]\](?:\s+|$))?|\d+[.)]\s+|>\s+)*")]
     private static partial Regex Lead();
 
-    [GeneratedRegex(@"^(\s*)(?:([-*+])|(\d+)([.)]))\s+")]
+    [GeneratedRegex(@"^(\s*)(?:([-*+])\s+(\[[ xX]\](?:\s+|$))?|(\d+)([.)])\s+)")]
     private static partial Regex ListLead();
 
-    /// <summary>The start the next line of a list takes after this one ("- ", "  * ", "3. " after "2. "); null when
-    /// the line isn't one of a list's.</summary>
+    /// <summary>The start the next line of a list takes after this one ("- ", "  * ", "3. " after "2. ", an empty
+    /// checkbox after a checkbox); null when the line isn't one of a list's.</summary>
     public static string? Bullet(string line)
     {
         var m = ListLead().Match(line);
         if (!m.Success) return null;
-        return m.Groups[2].Success ? $"{m.Groups[1].Value}{m.Groups[2].Value} "
-            : $"{m.Groups[1].Value}{int.Parse(m.Groups[3].Value, System.Globalization.CultureInfo.InvariantCulture) + 1}{m.Groups[4].Value} ";
+        return m.Groups[2].Success ? $"{m.Groups[1].Value}{m.Groups[2].Value} {(m.Groups[3].Success ? "[ ] " : "")}"
+            : $"{m.Groups[1].Value}{long.Parse(m.Groups[4].Value, System.Globalization.CultureInfo.InvariantCulture) + 1}{m.Groups[5].Value} ";
     }
 
     /// <summary>Something in the notes is the student's own.</summary>
@@ -60,9 +62,26 @@ public static partial class TypedNotes
         return kept.ToString().TrimEnd();
     }
 
-    /// <summary>What a student typed, as notes that are all theirs: each line's words marked, its heading or bullet
-    /// kept. What a lecture shows when nothing was written from its recording.</summary>
-    public static string AllMine(string typed) => string.Join("\n", typed.ReplaceLineEndings("\n").Split('\n').Select(Mine));
+    /// <summary>What a student typed, as notes that are all theirs: each line's words marked, its heading, bullet or
+    /// checkbox kept, its formatting inside the marks. What a lecture shows when nothing was written from its
+    /// recording. A block of code is left as it was typed, and a rule ("---") keeps a blank line above it, so the line
+    /// before it doesn't read as a heading.</summary>
+    public static string AllMine(string typed)
+    {
+        var lines = new List<string>();
+        bool fenced = false;
+        foreach (string line in typed.ReplaceLineEndings("\n").Split('\n'))
+        {
+            bool fence = line.TrimStart().StartsWith("```", StringComparison.Ordinal) || line.TrimStart().StartsWith("~~~", StringComparison.Ordinal);
+            if (!fenced && !fence && Rule().IsMatch(line) && lines.Count > 0 && lines[^1].Trim().Length > 0) lines.Add("");
+            lines.Add(fenced || fence ? line : Mine(line));
+            if (fence) fenced = !fenced;
+        }
+        return string.Join("\n", lines);
+    }
+
+    [GeneratedRegex(@"^\s*(?:-{3,}|\*{3,}|_{3,})\s*$")]
+    private static partial Regex Rule();
 
     /// <summary>Every word of the notes is the student's: they read exactly as what a student typed does
     /// (<see cref="AllMine"/>), with nothing added from the recording.</summary>
@@ -81,7 +100,7 @@ public static partial class TypedNotes
     {
         string t = line.Trim();
         return t.StartsWith('|') || t.StartsWith("```", StringComparison.Ordinal) || t.StartsWith("$$", StringComparison.Ordinal)
-            || t.StartsWith("![", StringComparison.Ordinal) || t is "---" or "***" || (t.StartsWith('[') && t.EndsWith(']'));
+            || t.StartsWith("![", StringComparison.Ordinal) || Rule().IsMatch(t) || (t.StartsWith('[') && t.EndsWith(']'));
     }
 
     /// <summary>

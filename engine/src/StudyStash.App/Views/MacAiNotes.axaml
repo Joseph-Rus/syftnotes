@@ -119,7 +119,7 @@
       <TextBlock Classes="ai-editor-hint" IsVisible="{Binding EditHasDiagrams}"
                  Text="A line like [Diagram 1] is a diagram. Move the line to move it, or delete the line to take it out." />
       <Border Classes="ai-editor">
-        <TextBox Name="Editor" Classes="bare ai-editor" Text="{Binding EditText}" AcceptsReturn="True" TextWrapping="Wrap"
+        <c:MarkdownBox Name="Editor" Classes="bare ai-editor" Text="{Binding EditText}" AcceptsReturn="True" TextWrapping="Wrap" WholeNotes="True"
                  AutomationProperties.Name="Notes" />
       </Border>
       <TextBlock Classes="ai-editor-problem" IsVisible="{Binding HasEditProblem}" Text="{Binding EditProblem}" />
