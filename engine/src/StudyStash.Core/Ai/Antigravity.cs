@@ -36,8 +36,33 @@ public static class Antigravity
     public static readonly string[] ResourceTools = ["list_resources", "read_resource"];
 
     /// <summary>Study Stash's own home for agy, where its sign-in, its notes and its setup chat are: the library's home's
-    /// <c>gemini</c> folder (<see cref="For"/>). The app and the library set it from their own home; the tests give their own.</summary>
-    public static Func<string> Home { get; set; } = () => For(Configs.DefaultHome);
+    /// <c>gemini</c> folder (<see cref="For"/>). The app and the library set it from their own home; a test gives its own
+    /// with <see cref="Use"/>, which no other test running beside it sees.</summary>
+    public static Func<string> Home
+    {
+        get => () => scoped.Value ?? home();
+        set => home = value;
+    }
+
+    static Func<string> home = () => For(Configs.DefaultHome);
+    static readonly AsyncLocal<string?> scoped = new();
+
+    /// <summary>
+    /// <paramref name="agyHome"/> as the home for the calls that follow in this flow of work only (a test's own), until
+    /// disposed. <see cref="Home"/> is shared by the whole process, and a library run in a test (its command line sets
+    /// it) changed it under tests beside it: one wrote into a folder another had just deleted.
+    /// </summary>
+    public static IDisposable Use(string agyHome)
+    {
+        string? before = scoped.Value;
+        scoped.Value = agyHome;
+        return new Restore(() => scoped.Value = before);
+    }
+
+    sealed class Restore(Action undo) : IDisposable
+    {
+        public void Dispose() => undo();
+    }
 
     /// <summary>The agy home for a Study Stash home: its <c>gemini</c> folder, or STUDYSTASH_AGY_HOME when that's set
     /// (an app and its library pointed at one signed-in home, as the off-screen films are).</summary>
@@ -71,6 +96,22 @@ public static class Antigravity
             $"$env:USERPROFILE = {Quoted(home)}; $env:HOME = {Quoted(home)}; & {Quoted(agy)} '-p=/usage'"]);
     }
 
+    /// <summary>
+    /// The sign-in as a line to type, for where only words can be given (the library's own computer, reached from
+    /// another): <c>HOME="…/gemini" agy -p=/usage</c> in a Mac's Terminal, PowerShell setting the home first on Windows.
+    /// Never bare <c>agy</c>, which signs in to the student's own home, not the one the library's notes use.
+    /// </summary>
+    public static string SignInLine(bool windows)
+    {
+        string home = Home();
+        if (windows)
+        {
+            string q = "'" + home.Replace("'", "''", StringComparison.Ordinal) + "'";
+            return $"$env:USERPROFILE = {q}; $env:HOME = {q}; agy '-p=/usage'";
+        }
+        return $"HOME=\"{home.Replace("\"", "\\\"", StringComparison.Ordinal)}\" agy -p=/usage";
+    }
+
     // --- the setup agent -----------------------------------------------------------------------------------------------
 
     /// <summary>
@@ -79,7 +120,7 @@ public static class Antigravity
     /// listed), none of the home's skills, rules, plugins, subagents or MCP servers taken in, commands off, and the setup
     /// tools as its one MCP server (none for a turn with no tools). agy doesn't fill in <c>${VAR}</c> in a header
     /// (tried: it sends the words as they are), so the token is written in: in a file only this account can read, in
-    /// Study Stash's own folder, good only while setup's window is open. Its body (after the H1) is the brief.
+    /// Study Stash's own folder, for the turn alone (<see cref="ForgetSetup"/>). Its body (after the H1) is the brief.
     /// </summary>
     public static string SetupAgentFile(string brief, string mcpUrl = "", string token = "")
     {
@@ -140,11 +181,88 @@ public static class Antigravity
 
         """.Replace("\r\n", "\n");
 
+    /// <summary>The agent the library's agent work runs as (the course scout, a chat that may change notes, "Open in
+    /// Antigravity"): agy's own tools and prompt, and the library's own MCP server declared in it, never in the home's
+    /// global MCP config, whose servers start in every session there, the setup chat's included.</summary>
+    public const string LibraryAgent = "study-stash-library";
+
+    /// <summary>The library agent's file: <paramref name="mcp"/> is the command that starts Study Stash's MCP server
+    /// (none: no server).</summary>
+    public static string LibraryAgentFile(IReadOnlyList<string> mcp)
+    {
+        static string Y(string v) => JsonSerializer.Serialize(v);
+        string servers = mcp.Count == 0 ? "mcpServers: []" : $"""
+            mcpServers:
+              - name: {ClaudeTools.ServerName}
+                command: {Y(mcp[0])}
+                args: [{string.Join(", ", mcp.Skip(1).Select(Y))}]
+            """;
+        return $"""
+            ---
+            name: {LibraryAgent}
+            description: Works with the student's Study Stash library, its lectures and its Canvas material.
+            mainAgent: true
+            subagent: false
+            hidden: true
+            {servers}
+            ---
+            # Study Stash
+
+            You were opened from Study Stash, the student's lecture library. The {ClaudeTools.ServerName} MCP tools (search_notes, get_lecture, due_assignments, canvas_*) read the library and Canvas.
+
+            """.Replace("\r\n", "\n");
+    }
+
+    /// <summary>The library agent written (when it isn't as it should be), its MCP tools allowed to run without asking,
+    /// and no library server left in the home's global MCP config.</summary>
+    public static void PrepareLibrary(IReadOnlyList<string> mcp)
+    {
+        string path = AgentPath(Home(), LibraryAgent);
+        string file = LibraryAgentFile(mcp);
+        if (!File.Exists(path) || File.ReadAllText(path) != file) Private(path, file);
+        Allow(SettingsPath(Home()), [$"mcp({ClaudeTools.ServerName}/*)"]);
+        ForgetGlobal(ClaudeTools.ServerName);
+    }
+
+    /// <summary>Takes <paramref name="server"/> out of the home's global MCP config (Study Stash's own home: an earlier
+    /// build put the library's server there with <c>agy mcp add</c>), keeping everything else. True when it did.</summary>
+    public static bool ForgetGlobal(string server)
+    {
+        string path = McpConfigPath(Home());
+        if (!File.Exists(path)) return false;
+        JsonObject root;
+        try
+        {
+            root = JsonNode.Parse(File.ReadAllText(path), documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) as JsonObject ?? [];
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        if (root["mcpServers"] is not JsonObject servers || !servers.Remove(server)) return false;
+        File.WriteAllText(path, root.ToJsonString(Indented));
+        return true;
+    }
+
     /// <summary>The answer agent's file in Study Stash's home for agy, written when it isn't there as it should be.</summary>
     public static void PrepareAnswer()
     {
         string path = AgentPath(Home(), AnswerAgent);
         if (!File.Exists(path) || File.ReadAllText(path) != AnswerAgentFile()) Private(path, AnswerAgentFile());
+    }
+
+    /// <summary>Removes the setup agent's file (it holds the setup tools' token): when a turn ends, and when setup
+    /// closes. A turn writes it again before it starts.</summary>
+    public static void ForgetSetup()
+    {
+        try
+        {
+            string path = AgentPath(Home(), SetupAgent);
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+        }
     }
 
     /// <summary>
@@ -155,6 +273,8 @@ public static class Antigravity
     public static void PrepareSetup(string workDir, string brief, string mcpUrl, string token)
     {
         Private(AgentPath(Home(), SetupAgent), SetupAgentFile(brief, mcpUrl, token));
+        // The home's global MCP servers start in every session there, the setup chat's too: never the library's.
+        ForgetGlobal(ClaudeTools.ServerName);
         // agy asks before any MCP tool runs, and a print run can't ask, so it refuses: the setup tools are allowed
         // (only them: any other server's tools stay refused, and the turn's guard stops a call to one besides).
         Allow(SettingsPath(Home()), [SetupToolsRule]);

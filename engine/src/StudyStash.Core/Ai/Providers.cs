@@ -638,29 +638,21 @@ public sealed class GeminiProvider : AiProvider
         [("", "Antigravity's default model"), ("gemini-3.8-flash-medium", "Gemini 3.8 Flash: fast"), ("gemini-3.1-pro-high", "Gemini 3.1 Pro: strongest")];
 
     /// <summary>
-    /// Antigravity keeps its MCP servers in its own settings (Study Stash's home for it): add Study Stash's once. In
-    /// print mode it can't ask before running a command or opening a file, so it refuses them and ends with an empty
-    /// answer; allow the commands that only read (ls, cat, grep…) and reading the turn's own folders
-    /// (<paramref name="folders"/>), or a turn that wants a look around comes back empty.
+    /// Agent work runs as Study Stash's library agent (<see cref="Antigravity.LibraryAgent"/>), which declares the
+    /// library's MCP server itself (<paramref name="mcp"/>), so it never sits in the home's global config, where it would
+    /// start in the setup chat's sessions too. In print mode agy can't ask before running a command or opening a file, so
+    /// it refuses them and ends with an empty answer; allow the commands that only read (ls, cat, grep…), reading the
+    /// turn's own folders (<paramref name="folders"/>) and the library's tools, or a turn that wants a look around comes
+    /// back empty.
     /// </summary>
     public void Prepare(IReadOnlyList<string> mcp, IEnumerable<string>? folders = null)
     {
-        string exe = Exe() ?? "agy";
-        var env = Antigravity.HomeEnv();
-        // Once seen there, it stays: later turns don't wait for `agy mcp list` again before they start.
-        if (mcp.Count > 0 && !mcpAdded && Machine.Run(exe, ["mcp", "list"], TimeSpan.FromSeconds(20), env) is { } listed)
-        {
-            mcpAdded = listed.Stdout.Contains(ClaudeTools.ServerName, StringComparison.Ordinal)
-                || Machine.Run(exe, ["mcp", "add", ClaudeTools.ServerName, .. mcp], TimeSpan.FromSeconds(20), env) is { ExitCode: 0 };
-        }
+        Antigravity.PrepareLibrary(mcp);
         AllowReading(Antigravity.SettingsPath(Antigravity.Home()), folders, create: true);
     }
 
     /// <summary>agy's home of Study Stash's own.</summary>
     protected override IReadOnlyDictionary<string, string> Env(AiRequest req) => Antigravity.HomeEnv();
-
-    /// <summary>Study Stash's MCP server is in Antigravity's settings (seen by this process, or added by it).</summary>
-    static bool mcpAdded;
 
     public static readonly string[] ReadOnlyCommands = ["ls", "cat", "head", "tail", "grep", "rg", "find", "wc", "pdftotext", "file", "stat"];
 
@@ -688,7 +680,7 @@ public sealed class GeminiProvider : AiProvider
             if (req.Session.Length > 0) plain.AddRange(["--conversation", req.Session]);
             return plain;
         }
-        var cmd = new List<string> { Exe() ?? "agy", "-p", WithSystem(req), "--output-format", "stream-json",
+        var cmd = new List<string> { Exe() ?? "agy", "-p", WithSystem(req), "--output-format", "stream-json", "--agent", Antigravity.LibraryAgent,
             "--mode", req.Write ? "accept-edits" : "plan" };
         if (!req.Write) // read-only turns may look around the other folders; editing turns stay in the library
             foreach (string d in req.ReadDirs) cmd.AddRange(["--add-dir", d]);

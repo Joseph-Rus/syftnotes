@@ -272,6 +272,8 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
     public string PlanNote => Cli.Id == "gemini" ? "Your chat with Gemini uses a little of your Google account's Gemini allowance." : $"Your chat with {Brand} uses your {Brand} plan.";
     public string ReadyWords => $"{Brand} is ready.";
     public bool HasAllowance => AllowanceWords.Length > 0 && ShowReady;
+    /// <summary>Its maker doesn't offer it in this country (at its sign-in, its check, or a turn).</summary>
+    public string RegionWords => $"{Brand} isn't available in your country yet: pick another AI or set up by hand.";
     /// <summary>Signed in, but on a plan other apps can't use (the free one): said as that, with what would work.</summary>
     public string PlanTooSmallTitle => Cli.Id == "gemini" ? "This Google account can't use Gemini from other apps" : $"This {Brand} account is on a plan that other apps can't use";
     public string PlanTooSmallText => Cli.Id switch
@@ -754,8 +756,10 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         var cts = Fresh();
         bool done = await s.WaitAsync(cts.Token, _ => services.Post(() => OfferTerminal |= s.NeedsTerminal));
         WaitingSignIn = false;
-        // Its sign-in waits a while for the browser, then stops by itself (Gemini's, after a minute).
-        if (!done && s.GaveUp && !cts.IsCancellationRequested) SignInProblem = "The sign-in stopped waiting before you'd finished. Try again.";
+        // Its sign-in waits a while for the browser, then stops by itself (Gemini's, after a minute); or its maker
+        // turned the country away.
+        if (!done && s.Region && !cts.IsCancellationRequested) SignInProblem = RegionWords;
+        else if (!done && s.GaveUp && !cts.IsCancellationRequested) SignInProblem = "The sign-in stopped waiting before you'd finished. Try again.";
         if (!done) return;
         SignedIn = true;
         await CheckPlanAsync();
@@ -833,6 +837,11 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 PlanProblemTitle = $"Study Stash couldn't reach {Brand}. Check your internet connection.";
                 PlanProblemText = "";
                 PlanProblem = ChatProblem.Offline;
+                break;
+            case ChatProblem.Region:
+                PlanProblemTitle = RegionWords;
+                PlanProblemText = "";
+                PlanProblem = ChatProblem.Region;
                 break;
             default:
                 PlanProblemTitle = $"{Brand} didn't answer the check.";
@@ -1059,6 +1068,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         ChatProblemText = kind switch
         {
             ChatProblem.Offline => $"{Brand} couldn't be reached. Check your internet connection.",
+            ChatProblem.Region => RegionWords,
             ChatProblem.Limit => $"{Brand} is at its usage limit until {UntilWords(Engines.UntilFrom(said, services.Now()))}. You can finish by hand; what's done stays done.",
             ChatProblem.NoAnswer => $"{Brand} didn't answer.",
             ChatProblem.Guard => $"Study Stash stopped {Brand}: it tried to use a tool it isn't allowed here.",
@@ -1188,5 +1198,7 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
         closing.Cancel();
         signIn?.Dispose();
         signIn = null;
+        // Gemini's setup agent holds the setup tools' token while a turn runs: never left behind once setup closes.
+        if (Picked == "gemini") Antigravity.ForgetSetup();
     }
 }

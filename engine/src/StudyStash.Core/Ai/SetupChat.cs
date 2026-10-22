@@ -25,6 +25,8 @@ public enum ChatProblem
     Guard,
     /// <summary>It couldn't reach Study Stash's setup tools.</summary>
     Tools,
+    /// <summary>Its maker doesn't offer it in this country.</summary>
+    Region,
     Other,
 }
 
@@ -66,7 +68,10 @@ public sealed record SetupTurn
     public required string BriefFile { get; init; }
     /// <summary>The setup tools' address (http://127.0.0.1:PORT/setup-mcp); empty for a turn with no tools at all.</summary>
     public string McpUrl { get; init; } = "";
-    /// <summary>The setup tools' token: put in the CLI's environment only, never on its command line or in a file.</summary>
+    /// <summary>The setup tools' token: never on the CLI's command line. Claude Code and Codex get it in their environment
+    /// only. agy can't read it from there (it sends a header's <c>${VAR}</c> as it is), so it's in the setup agent's file,
+    /// readable by this account alone, for the turn only: the file is removed when the turn ends, and when setup
+    /// closes (<see cref="Antigravity.ForgetSetup"/>).</summary>
     public string Token { get; init; } = "";
     public string Session { get; init; } = "";
     public required string Prompt { get; init; }
@@ -439,6 +444,7 @@ public static partial class SetupChat
         }
         if (p is null)
         {
+            if (gemini) Antigravity.ForgetSetup();
             yield return SetupChatEvent.Trouble(ChatProblem.Other, $"{Path.GetFileName(t.Exe)} didn't start: {startError}");
             yield break;
         }
@@ -503,6 +509,8 @@ public static partial class SetupChat
         finally
         {
             Stop(proc);
+            // The setup agent's file, with the setup tools' token, lasts only as long as the turn.
+            if (gemini) Antigravity.ForgetSetup();
             await feeding;
         }
     }
@@ -592,10 +600,12 @@ public static partial class SetupChat
         RegexOptions.IgnoreCase)]
     private static partial Regex PlanWords();
 
-    /// <summary>What an error from a turn means for the student: the network first, then a usage limit (whose words
+    /// <summary>What an error from a turn means for the student: the network first, then a country the maker doesn't
+    /// serve, then a usage limit (whose words
     /// often mention the plan too), then a plan without the CLI, then signing in, else something else.</summary>
     public static ChatProblem Classify(string error) =>
         OfflineWords().IsMatch(error) ? ChatProblem.Offline
+        : AgentCli.LooksLikeRegion(error) ? ChatProblem.Region
         : Engines.LooksLikeLimit(error) ? ChatProblem.Limit
         : PlanWords().IsMatch(error) ? ChatProblem.Plan
         : Engines.LooksLikeAuth(error) ? ChatProblem.Auth
@@ -838,6 +848,11 @@ public sealed class SetupChatParser(string provider)
     string session = "";
     int wordsStep = -1;
     readonly HashSet<int> toolSteps = [];
+    /// <summary>agy's init named the setup agent: until then nothing it does is trusted.</summary>
+    bool started;
+
+    /// <summary>The steps agy 1.4.5 makes in a setup turn (seen), and its docs' checkpoint: any other stops the turn.</summary>
+    static readonly string[] KnownSteps = ["user_input", "system_message", "agent_response", "tool", "checkpoint"];
 
 
     static string Field(JsonNode? o, params string[] names)
@@ -874,7 +889,12 @@ public sealed class SetupChatParser(string provider)
                     yield return Guard("agy's own agent, not the setup guide's");
                     yield break;
                 }
+                started = true;
                 break;
+            case "step_update" when !started:
+                // Fail closed: a step before agy said the setup agent runs.
+                yield return Guard("a step before the setup guide started");
+                yield break;
             case "step_update":
                 var st = e["step_update"];
                 if (S(st?["conversation_id"]) is { Length: > 0 } sid && sid != session)
@@ -889,6 +909,11 @@ public sealed class SetupChatParser(string provider)
                     yield break;
                 }
                 string type = S(st?["step_type"]);
+                if (!KnownSteps.Contains(type))
+                {
+                    yield return Guard($"a step agy calls \"{type}\"");
+                    yield break;
+                }
                 string tool = S(st?["tool_name"]) is { Length: > 0 } tn ? tn : S(st?["tool_info"]?["name"]);
                 if (type == "agent_response")
                 {
@@ -963,6 +988,11 @@ public sealed class SetupChatParser(string provider)
             case "error":
                 string msg = S(e["message"]) is { Length: > 0 } m ? m : "Gemini stopped with an error.";
                 yield return SetupChatEvent.Trouble(SetupChat.Classify(msg), msg);
+                break;
+            default:
+                // Fail closed: anything agy says that the parser doesn't know. (A result or an error can come with no
+                // init: a run that stopped before it began, signed out, say.)
+                yield return Guard($"something agy calls \"{S(e["event"])}\"");
                 break;
         }
     }

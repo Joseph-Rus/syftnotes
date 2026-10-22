@@ -33,6 +33,7 @@ public class GeminiSetupChatTests
     public void Gemini_is_locked_to_the_setup_tools_by_its_own_agent_home_and_settings()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         var t = Turn(dir, "agy", session: "c-9", prompt: "[Study Stash] Setup was opened.");
         var cmd = SetupChat.Command(t);
         Assert.Equal(["agy", "--agent", "study-stash-setup", "--output-format", "stream-json", "--disable-slash-commands", "--sandbox"], cmd[..7]);
@@ -71,6 +72,7 @@ public class GeminiSetupChatTests
     public async Task A_gemini_turn_runs_in_its_own_home_and_streams_its_words_and_the_setup_tools_it_uses()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         string exe = FakeAgents.WriteCli(dir["bin"], "gemini");
         FakeAgents.Replay(dir["bin"],
         [
@@ -100,6 +102,9 @@ public class GeminiSetupChatTests
         Assert.Equal("", FakeAgents.Input(bin, 1).Trim());
         Assert.DoesNotContain(FakeAgents.Argv(bin, 1), a => a.Contains(Token, StringComparison.Ordinal));
         Assert.DoesNotContain(SetupChat.TokenVar, FakeAgents.EnvNames(bin, 1));
+        // The setup agent's file (with the token) was there for the turn, and is gone once it ended.
+        Assert.Equal("yes", File.ReadAllText(Path.Combine(bin, "setup-agent-1.txt")).Trim());
+        Assert.False(File.Exists(Antigravity.AgentPath(Antigravity.Home(), Antigravity.SetupAgent)));
     }
 
     public static TheoryData<string, string> Reaches => new()
@@ -117,11 +122,29 @@ public class GeminiSetupChatTests
     public async Task A_gemini_turn_that_reaches_for_anything_but_the_setup_tools_is_stopped(string what, string line)
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         string exe = FakeAgents.WriteCli(dir["bin"], "gemini");
         FakeAgents.Replay(dir["bin"], [line.Contains("\"init\"", StringComparison.Ordinal) ? line : FakeAgents.Agy.Init(), FakeAgents.Agy.Words(1, "Let me look."), line, FakeAgents.Agy.Mcp(3, "study_stash_setup", "add_class"), FakeAgents.Agy.Result("Done.")]);
         var events = await Run(Turn(dir, exe));
         Assert.True(events[^1].Problem == ChatProblem.Guard, what);
         Assert.DoesNotContain(events, e => e.Kind == "Tool" && e.Tool == "add_class");
+    }
+
+    /// <summary>A test's own agy home is its alone: the process-wide one (a library run in a test sets it) never moves
+    /// it, so no test writes into a folder another test beside it has made or deleted (CI on Linux did once).</summary>
+    [Fact]
+    public void A_tests_own_agy_home_is_its_alone()
+    {
+        using var dir = new TempDir();
+        string shared = Antigravity.Home();
+        using (Antigravity.Use(dir["mine"]))
+        {
+            Assert.Equal(dir["mine"], Antigravity.Home());
+            Assert.Equal(dir["mine"], Antigravity.HomeEnv()["HOME"]);
+            Antigravity.PrepareAnswer(); // makes its folders itself
+            Assert.True(File.Exists(Antigravity.AgentPath(dir["mine"], Antigravity.AnswerAgent)));
+        }
+        Assert.Equal(shared, Antigravity.Home());
     }
 
     /// <summary>The library's notes on Gemini run agy in Study Stash's own home for it (the library's home's gemini
@@ -130,6 +153,7 @@ public class GeminiSetupChatTests
     public async Task The_librarys_notes_on_gemini_run_in_study_stashs_own_home_for_agy()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         Assert.Equal(Path.Combine(dir["library"], "gemini"), Antigravity.For(dir["library"]));
         string exe = FakeAgents.WriteCli(dir["bin"], "gemini");
         FakeAgents.Replay(dir["bin"], [FakeAgents.Agy.Words(1, "# Notes"), FakeAgents.Agy.Result("# Notes")]);
@@ -146,6 +170,33 @@ public class GeminiSetupChatTests
         Assert.True(check.Ok, check.Text);
         Assert.Equal("study-stash-answer", FakeAgents.Argv(dir["bin"], 2)[FakeAgents.Argv(dir["bin"], 2).ToList().IndexOf("--agent") + 1]);
         Assert.Contains("excludeDefaultComponents: true", File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.AnswerAgent)));
+    }
+
+    /// <summary>The library's own MCP server is declared in the library agent, never the home's global config, whose
+    /// servers start in every session there, the setup chat's too (an earlier build's global entry is taken out).</summary>
+    [Fact]
+    public void The_librarys_mcp_server_is_the_library_agents_alone_never_global()
+    {
+        using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
+        string global = Antigravity.McpConfigPath(Antigravity.Home());
+        Directory.CreateDirectory(Path.GetDirectoryName(global)!);
+        File.WriteAllText(global, """{"mcpServers": {"study-stash": {"command": "studystash", "args": ["mcp"]}, "theirs": {"url": "https://x"}}}""");
+
+        var gemini = new GeminiProvider();
+        gemini.Prepare(["/Applications/Study Stash.app/Contents/MacOS/studystash", "--home", "/Users/s/.study-stash", "mcp"], [dir["pool"]]);
+        string agent = File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.LibraryAgent));
+        Assert.Contains("  - name: study-stash\n    command: \"/Applications/Study Stash.app/Contents/MacOS/studystash\"\n    args: [\"--home\", \"/Users/s/.study-stash\", \"mcp\"]\n", agent);
+        var servers = JsonNode.Parse(File.ReadAllText(global))!["mcpServers"]!.AsObject();
+        Assert.Equal(["theirs"], servers.Select(kv => kv.Key));
+        Assert.Contains("mcp(study-stash/*)", File.ReadAllText(Antigravity.SettingsPath(Antigravity.Home())));
+        Assert.Contains("study-stash-library", gemini.Command(new AiRequest("q", dir.Path) { Tools = true }, false));
+
+        // The setup chat's turn takes it out too, and its agent names no server but the setup tools'.
+        File.WriteAllText(global, """{"mcpServers": {"study-stash": {"command": "studystash"}}}""");
+        Antigravity.PrepareSetup(SetupChat.Folder(dir["home"]), "brief", "http://127.0.0.1:1/setup-mcp", "t");
+        Assert.Empty(JsonNode.Parse(File.ReadAllText(global))!["mcpServers"]!.AsObject());
+        Assert.DoesNotContain("study-stash\n", File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.SetupAgent)));
     }
 
     /// <summary>Lines the real agy 1.4.5 printed for a setup turn (its paths and the tools' long output shortened): read
@@ -175,10 +226,45 @@ public class GeminiSetupChatTests
         Assert.Equal(ChatProblem.Guard, new SetupChatParser("gemini").Parse(refused).Last().Problem); // (after its conversation id)
     }
 
+    /// <summary>Fail closed: a step before agy's init has named the setup agent, a step or an event the parser doesn't
+    /// know, each stops the turn; a run that stopped before it began (signed out) is that, not a guard.</summary>
+    [Fact]
+    public void Anything_before_the_setup_agent_starts_or_unknown_stops_the_turn()
+    {
+        static List<SetupChatEvent> Read(params string[] lines)
+        {
+            var parser = new SetupChatParser("gemini");
+            return [.. lines.SelectMany(parser.Parse)];
+        }
+        Assert.Equal(ChatProblem.Guard, Read(FakeAgents.Agy.Words(1, "Hi"), FakeAgents.Agy.Init()).First(e => e.Kind == "Problem").Problem);
+        Assert.Equal(ChatProblem.Guard, Read(FakeAgents.Agy.Mcp(1, "study_stash_setup", "get_setup_status")).First(e => e.Kind == "Problem").Problem);
+        string oddStep = FakeAgents.Agy.Words(2, "x").Replace("\"agent_response\"", "\"browser_action\"", StringComparison.Ordinal);
+        Assert.Equal(ChatProblem.Guard, Read(FakeAgents.Agy.Init(), oddStep)[^1].Problem);
+        Assert.Equal(ChatProblem.Guard, Read(FakeAgents.Agy.Init(), """{"event":"control_request","request":{"subtype":"can_use_tool"}}""")[^1].Problem);
+        // agy's own known steps go through.
+        string system = FakeAgents.Agy.Words(1, "").Replace("\"agent_response\"", "\"system_message\"", StringComparison.Ordinal);
+        Assert.DoesNotContain(Read(FakeAgents.Agy.Init(), system, FakeAgents.Agy.Words(2, "Hi"), FakeAgents.Agy.Result("Hi")), e => e.Kind == "Problem");
+        // Signed out: agy's only line is its result.
+        var signedOut = Read("""{"event":"result","result":{"conversation_id":"","status":"ERROR","response":"","error":"authentication failed or timed out"}}""");
+        Assert.Equal(ChatProblem.Auth, signedOut.Single().Problem);
+    }
+
+    /// <summary>A country Google doesn't serve, in the words its services use, is said as that (not "didn't answer the
+    /// check"); a used-up quota is still the limit.</summary>
+    [Theory]
+    [InlineData("User location is not supported for the API use.", ChatProblem.Region)]
+    [InlineData("FAILED_PRECONDITION: User location is not supported for the API use.", ChatProblem.Region)]
+    [InlineData("Antigravity is not available in your country yet.", ChatProblem.Region)]
+    [InlineData("This service isn't available in your region", ChatProblem.Region)]
+    [InlineData("RESOURCE_EXHAUSTED: Quota exceeded for this week's Gemini limit. Resets at 10:47 PM", ChatProblem.Limit)]
+    [InlineData("authentication failed or timed out", ChatProblem.Auth)]
+    public void A_country_google_doesnt_serve_is_said_as_that(string said, ChatProblem kind) => Assert.Equal(kind, SetupChat.Classify(said));
+
     [Fact]
     public async Task Geminis_plan_check_says_how_much_is_left_without_spending_any_then_tries_a_turn_in_the_chats_own_home()
     {
         using var dir = new TempDir();
+        using var agyHome = Antigravity.Use(dir["agy"]); // this test's own, whatever runs beside it
         string bin = dir["bin"];
         string exe = FakeAgents.WriteCli(bin, "gemini");
         string work = SetupChat.Folder(dir["home"]);

@@ -133,7 +133,8 @@ public static class Engines
         notesModel.IndexOf(" · ", StringComparison.Ordinal) is var at and > 0 && WhoWrote(notesModel) is { Length: > 0 } who && who != "Ollama"
             ? notesModel[(at + 3)..] : WhoWrote(notesModel);
 
-    /// <summary>The command a terminal runs to sign in ("claude", "codex login", "agy").</summary>
+    /// <summary>The command a terminal runs to sign in ("claude", "codex login"; Gemini's runs in Study Stash's own home
+    /// for agy, <see cref="Antigravity.InTerminal"/>, so "agy" here is only its name).</summary>
     public static (string Exe, string[] Args) SignInCommand(string id) => id switch
     {
         "codex" => ("codex", ["login"]),
@@ -141,8 +142,10 @@ public static class Engines
         _ => ("claude", []),
     };
 
+    /// <summary>The sign-in as words to type: Gemini's in Study Stash's own home for agy (<see cref="Antigravity.SignInLine"/>).</summary>
     public static string SignInWords(string id)
     {
+        if (id == "gemini") return Antigravity.SignInLine(OperatingSystem.IsWindows());
         var (exe, args) = SignInCommand(id);
         return args.Length == 0 ? exe : exe + " " + string.Join(' ', args);
     }

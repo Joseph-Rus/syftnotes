@@ -22,7 +22,9 @@ public sealed record InstallOutcome(bool Ok, InstallFailure Failure, string Word
 }
 
 /// <summary>
-/// Installs Claude Code, Codex or Antigravity CLI for guided setup: only when the student presses Install, with the maker's own
+/// Installs Claude Code, Codex or Antigravity CLI for guided setup (Google's installer, like the others, runs with the
+/// student's own home: it puts agy in ~/.local/bin and adds that to their shell profile's PATH, and writes nothing
+/// of agy's own; tried in a home of its own): only when the student presses Install, with the maker's own
 /// installer (<see cref="AgentCli"/>), for this account alone (never as an administrator). It says where it's got to
 /// as it goes, keeps everything the installer printed for Details and <c>logs/setup-install.log</c>, gives up after
 /// ten minutes, and on cancel stops the installer and everything it started. A failure is sorted into the few kinds
@@ -75,10 +77,12 @@ public sealed class AgentInstall
     /// <summary>The CLI as it is on this computer now: found, and whether its <c>--version</c> answers.</summary>
     public AgentFound Find() => Find(cli, which);
 
+    /// <summary>Its <c>--version</c> runs with the CLI's own environment too: agy in Study Stash's own home for it,
+    /// never the student's own ~/.gemini.</summary>
     public static AgentFound Find(AgentCliInfo cli, Func<string, string?>? which = null)
     {
         if ((which ?? AiProvider.Which)(cli.Binary) is not { } exe) return AgentFound.None;
-        var r = Machine.Run(exe, ["--version"], TimeSpan.FromSeconds(20));
+        var r = Machine.Run(exe, ["--version"], TimeSpan.FromSeconds(20), cli.Env());
         string said = r is { ExitCode: 0 } ? Py.Strip(r.Stdout) : "";
         return new AgentFound(exe, said.Length > 0 ? AgentCli.ParseVersion(said) : null, Py.Head(said.Split('\n')[0], 80));
     }
@@ -253,6 +257,9 @@ public sealed class AgentSignIn : IDisposable
     public bool NeedsTerminal { get; private set; }
     /// <summary>The sign-in waited for the browser as long as it does and stopped without being signed in.</summary>
     public bool GaveUp { get; private set; }
+    /// <summary>The sign-in stopped because its maker doesn't offer it in this country (what it printed said so; the
+    /// words themselves are never kept or logged).</summary>
+    public bool Region { get; private set; }
     public bool Running => child is { HasExited: false };
 
     /// <summary>Asks the CLI whether it's signed in (its status command's exit code). Codex's words are never read
@@ -266,6 +273,8 @@ public sealed class AgentSignIn : IDisposable
         if (Running) return true;
         NeedsTerminal = false;
         GaveUp = false;
+        Region = false;
+        regionSaid = false;
         exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         List<string> cmd = [exe, .. cli.SignInArgs];
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For(cmd) : new Launch(exe, [.. cli.SignInArgs]);
@@ -298,15 +307,23 @@ public sealed class AgentSignIn : IDisposable
         var p = child;
         var at = started;
         var done = exited;
-        _ = Task.Run(() => Watch(p.StandardOutput));
-        _ = Task.Run(() => Watch(p.StandardError));
+        var reading = Task.WhenAll(Task.Run(() => Watch(p.StandardOutput)), Task.Run(() => Watch(p.StandardError)));
         _ = Task.Run(async () =>
         {
             try
             {
                 await p.WaitForExitAsync();
+                // What it printed last, read before it's judged (a refusal for the country comes just before it stops).
+                try
+                {
+                    await reading.WaitAsync(TimeSpan.FromSeconds(2));
+                }
+                catch (TimeoutException)
+                {
+                }
                 // Only the sign-in still current: one stopped to be run again isn't one that couldn't open the browser.
-                if (p.ExitCode != 0 && DateTime.UtcNow - at < QuickFail && ReferenceEquals(child, p)) NeedsTerminal = true;
+                if (p.ExitCode != 0 && regionSaid && ReferenceEquals(child, p)) Region = true;
+                else if (p.ExitCode != 0 && DateTime.UtcNow - at < QuickFail && ReferenceEquals(child, p)) NeedsTerminal = true;
                 else if (p.ExitCode != 0 && cli.SignInGivesUp is not null && ReferenceEquals(child, p)) GaveUp = true;
             }
             catch (InvalidOperationException)
@@ -359,20 +376,25 @@ public sealed class AgentSignIn : IDisposable
             {
                 return false;
             }
-            // It gave up waiting for the browser: one last look, and the wait ends with it.
-            if (GaveUp) return await Task.Run(Check, CancellationToken.None) is { SignedIn: true } last && Report(last);
+            // It gave up waiting for the browser, or its maker turned the country away: one last look, and the wait ends.
+            if (GaveUp || Region) return await Task.Run(Check, CancellationToken.None) is { SignedIn: true } last && Report(last);
             if (exited.Task.IsCompleted) exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }
         return false;
     }
 
-    /// <summary>Reads what the sign-in prints, only to keep the first https address in it: nothing is logged.</summary>
+    /// <summary>What the sign-in printed said its maker doesn't offer it in this country.</summary>
+    volatile bool regionSaid;
+
+    /// <summary>Reads what the sign-in prints, only to keep the first https address in it and to see whether it says
+    /// the country isn't served: nothing is logged.</summary>
     async Task Watch(StreamReader from)
     {
         try
         {
             while (await from.ReadLineAsync() is { } line)
             {
+                if (AgentCli.LooksLikeRegion(line)) regionSaid = true;
                 if (Url is not null) continue;
                 int at = line.IndexOf("https://", StringComparison.Ordinal);
                 if (at < 0) continue;

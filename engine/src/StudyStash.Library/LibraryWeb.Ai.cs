@@ -242,7 +242,7 @@ public sealed partial class LibraryWeb
             string id = (string)ctx.Request.RouteValues["id"]!;
             if (id == "ollama") return Http.Detail(400, "Ollama doesn't need to sign in: it's private, on this computer.");
             if (!IsLocal(ctx))
-                return Http.Detail(409, $"Sign in on your library's computer: open Terminal there and run {Engines.SignInWords(id)}.");
+                return Http.Detail(409, $"Sign in on your library's computer: open {(OperatingSystem.IsWindows() ? "PowerShell" : "Terminal")} there and run {Engines.SignInWords(id)}");
             string said;
             try
             {

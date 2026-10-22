@@ -12,7 +12,8 @@ namespace StudyStash.Core.Tests;
 /// <c>replay-N.jsonl</c> (or <c>replay.jsonl</c>) line by line. Files beside it change what it does: <c>broken</c>
 /// (its --version fails), <c>login-fails</c>, <c>sleep</c> (seconds to wait before answering), <c>exit</c>,
 /// <c>refuse</c> (an argument it doesn't know, as an older version: a turn given it stops with clap's error). The fake
-/// agy also answers <c>models</c> (its status) and <c>-p=/usage</c> (its sign-in, then <c>usage.json</c>), and writes
+/// agy also answers <c>models</c> (its status) and <c>-p=/usage</c> (its sign-in, then <c>usage.json</c>; with a
+/// <c>region</c> file, Google's refusal for the country), and writes
 /// down the HOME each turn had (<c>home-N.txt</c>).
 /// </summary>
 public static class FakeAgents
@@ -86,6 +87,7 @@ public static class FakeAgents
         #!/bin/sh
         D="$(cd "$(dirname "$0")" && pwd)"
         if [ "$1" = "--version" ]; then
+          echo "$HOME" > "$D/version-home.txt"
           [ -f "$D/broken" ] && { echo "dyld: Library not loaded" >&2; exit 1; }
           echo "{{version}}"; exit 0
         fi
@@ -103,6 +105,10 @@ public static class FakeAgents
         fi
         if [ "{{id}}" = gemini ] && [ "$1" = "-p=/usage" ]; then
           echo "$HOME" > "$D/usage-home.txt"
+          if [ -f "$D/region" ]; then
+            echo '{"conversation_id":"","status":"ERROR","response":"","error":"User location is not supported for the API use."}'
+            echo "Error: User location is not supported for the API use." >&2; exit 1
+          fi
           if [ ! -f "$D/signed-in" ]; then
             echo "Authentication required. Please visit the URL to log in:" >&2
             echo "  https://accounts.google.com/o/oauth2/auth?fake=1" >&2
@@ -123,6 +129,7 @@ public static class FakeAgents
         for a in "$@"; do printf '%s\n' "$a"; done > "$D/argv-$n.txt"
         env | cut -d= -f1 | sort > "$D/env-$n.txt"
         echo "$HOME" > "$D/home-$n.txt"; pwd > "$D/cwd-$n.txt"
+        [ -f "$HOME/.gemini/config/agents/study-stash-setup/agent.md" ] && echo yes > "$D/setup-agent-$n.txt"
         if [ -f "$D/refuse" ]; then
           r="$(cat "$D/refuse")"
           for a in "$@"; do [ "$a" = "$r" ] && { echo "error: unexpected argument '$r' found" >&2; exit 2; }; done
@@ -172,6 +179,7 @@ public static class FakeAgents
         }
         $argv = Split-Args ([string]$env:FAKE_ARGS)
         if ($argv.Count -gt 0 -and $argv[0] -eq '--version') {
+          Set-Content "$D\version-home.txt" $env:USERPROFILE
           if (Test-Path "$D\broken") { [Console]::Error.WriteLine('it will not start'); exit 1 }
           '{{version}}'; exit 0
         }
@@ -189,6 +197,10 @@ public static class FakeAgents
         }
         if ($ID -eq 'gemini' -and $argv[0] -eq '-p=/usage') {
           Set-Content "$D\usage-home.txt" $env:USERPROFILE
+          if (Test-Path "$D\region") {
+            '{"conversation_id":"","status":"ERROR","response":"","error":"User location is not supported for the API use."}'
+            [Console]::Error.WriteLine('Error: User location is not supported for the API use.'); exit 1
+          }
           if (-not (Test-Path "$D\signed-in")) {
             [Console]::Error.WriteLine('Authentication required. Please visit the URL to log in:')
             [Console]::Error.WriteLine('  https://accounts.google.com/o/oauth2/auth?fake=1')
@@ -214,6 +226,7 @@ public static class FakeAgents
         Get-ChildItem env: | ForEach-Object { $_.Name } | Sort-Object | Set-Content "$D\env-$n.txt"
         Set-Content "$D\home-$n.txt" $env:USERPROFILE
         Set-Content "$D\cwd-$n.txt" (Get-Location).Path
+        if (Test-Path "$env:USERPROFILE\.gemini\config\agents\study-stash-setup\agent.md") { Set-Content "$D\setup-agent-$n.txt" 'yes' }
         if (Test-Path "$D\refuse") {
           $r = (Get-Content "$D\refuse" -Raw).Trim()
           if ($argv -contains $r) { [Console]::Error.WriteLine("error: unexpected argument '$r' found"); exit 2 }

@@ -320,7 +320,9 @@ public sealed class GuidedSetupTests
     public async Task Each_ai_picked_on_the_first_screen_ends_up_writing_the_notes(string answer)
     {
         bool chat = answer is "claude" or "codex" or "gemini";
-        await using var rig = await new Rig(cli: chat ? answer : "claude", installed: chat, signedIn: chat, role: AppRole.Both).OpenAsync();
+        await using var rig = new Rig(cli: chat ? answer : "claude", installed: chat, signedIn: chat, role: AppRole.Both);
+        using var agyHome = Antigravity.Use(rig.Home["agy"]); // this test's own, whatever runs beside it
+        await rig.OpenAsync();
         var g = rig.Guided;
         g.PickCommand.Execute(answer);
         await g.ContinueCommand.ExecuteAsync(null);
@@ -392,7 +394,9 @@ public sealed class GuidedSetupTests
     [AvaloniaFact]
     public async Task Gemini_installs_with_one_button_signs_in_with_google_and_says_how_much_is_left()
     {
-        await using var rig = await new Rig(cli: "gemini").OpenAsync();
+        await using var rig = new Rig(cli: "gemini");
+        using var agyHome = Antigravity.Use(rig.Home["agy"]); // this test's own, whatever runs beside it
+        await rig.OpenAsync();
         var g = rig.Guided;
         g.PickCommand.Execute("gemini");
         await g.ContinueCommand.ExecuteAsync(null);
