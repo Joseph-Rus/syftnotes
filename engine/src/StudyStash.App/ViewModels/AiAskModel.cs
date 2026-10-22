@@ -374,6 +374,7 @@ public sealed partial class AiAskModel : ObservableObject
         Busy = true;
         using var stop = asking = new CancellationTokenSource();
         var paced = new Paced(text => turn.Answer = PartialText.Showable(text));
+        string? inChat = null;
         string? Partial() => paced.End() is { } text ? PartialText.Ended(text) : null;
         try
         {
@@ -390,7 +391,7 @@ public sealed partial class AiAskModel : ObservableObject
                 Chat = Place is null ? null : ChatId ?? "new",
                 Place = Place,
             };
-            AskReply? reply = await library.AskAsync(request, paced.Show, stop.Token);
+            AskReply? reply = await library.AskAsync(request, paced.Show, id => inChat = id, stop.Token);
             paced.End();
             if (reply is null)
             {
@@ -406,7 +407,11 @@ public sealed partial class AiAskModel : ObservableObject
             turn.Byline = AiWords.AskByline(reply.EngineName, reply.Sources, readChat);
             turn.BylineParts = AiWords.AskBylineParts(reply.EngineName, reply.Sources, OnSource, readChat);
             if (reply.FellBack) turn.FellBackNote = AiWords.FellBackNote(reply.EngineName, reply.Why);
-            if (reply.Chat is { } kept) Kept(kept, first);
+            if (reply.Chat is { } kept)
+            {
+                Kept(kept, first);
+                inChat = null;
+            }
             else if (Place is not null && !toldOlder)
             {
                 // A library too old to keep chats: said once, so a chat that isn't there later isn't a mystery.
@@ -433,6 +438,9 @@ public sealed partial class AiAskModel : ObservableObject
         }
         finally
         {
+            // Stopped or cut off with some of an answer: the library kept it in the chat it said it's in, and the next
+            // question carries that chat on (a new one's first turn too, so it isn't split in two).
+            if (inChat is { } said && !string.IsNullOrWhiteSpace(turn.Answer)) Kept(said, first);
             asking = null;
             Busy = false;
             OnPropertyChanged(nameof(Latest));

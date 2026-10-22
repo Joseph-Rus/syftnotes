@@ -218,6 +218,11 @@ public interface IAiLibrary
     /// each time more arrives. <paramref name="stop"/> ends it where it is. A library too old to stream (or a
     /// stand-in that doesn't) answers once, at the end.</summary>
     Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop) => AskAsync(request);
+    /// <summary>Asks in a kept chat: <paramref name="inChat"/> hears first which one (a new one's id too), whatever
+    /// comes of the answer after, so a turn stopped or cut off is carried on in the same chat. A library too old to
+    /// keep chats never says.</summary>
+    Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, Action<string> inChat, CancellationToken stop) =>
+        AskAsync(request, answerSoFar, stop);
     /// <summary>A student has started typing a question for <paramref name="engine"/> (null: the library's pick):
     /// the library gets that engine ready, so the answer starts sooner. Never fails: it's only a head start.</summary>
     Task WarmAsync(string? engine) => Task.CompletedTask;
@@ -352,7 +357,9 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
 
     /// <summary>The answer as the library streams it (see the library's <c>/api/v2/ai/ask</c> with <c>stream</c>),
     /// read a line at a time as each arrives. Stopping closes the connection, which stops the engine too.</summary>
-    public async Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop)
+    public Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, CancellationToken stop) => AskAsync(request, answerSoFar, _ => { }, stop);
+
+    public async Task<AskReply?> AskAsync(AskRequest request, Action<string> answerSoFar, Action<string> inChat, CancellationToken stop)
     {
         var body = JsonSerializer.SerializeToNode(request, Options)!.AsObject();
         body["stream"] = true;
@@ -373,6 +380,9 @@ public sealed class AiRemote(string serverUrl, Func<string> key, HttpClient? htt
                     break;
                 case "answer":
                     answerSoFar(answer.Clear().Append(text).ToString());
+                    break;
+                case "chat" when Py.AsString(said["id"]) is { Length: > 0 } id:
+                    inChat(id);
                     break;
                 case "done":
                     return As<AskReply>(said["reply"]);

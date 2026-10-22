@@ -110,6 +110,37 @@ public class AskChatsTests
     }
 
     [AvaloniaFact]
+    public async Task A_first_answer_stopped_partway_stays_in_its_chat_and_the_next_question_carries_it_on()
+    {
+        await using var lib = await Library.StartAsync();
+        var page = await lib.PageAsync();
+        const string whole = """{"answer":"Arteries, capillaries and veins.","sources":[1]}""";
+        lib.Claude.Script = [new AiEvent("text", """{"answer":"Arteries, capi"""), new AiEvent("text", "llaries and veins.\",\"sources\":[1]}"), new AiEvent("final", whole)];
+        lib.Claude.GateAfter = 1;
+        lib.Claude.Gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        page.Question = "What are the three kinds of blood vessel?";
+        var asking = page.AskCommand.ExecuteAsync(null);
+        while (string.IsNullOrEmpty(page.Turns[0].Answer)) await Task.Delay(10, TestContext.Current.CancellationToken);
+        page.Stop(); // the student stops it, to ask it another way
+        await asking;
+        await lib.Claude.StoppedWhileHeld.Task.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
+
+        // The chat it went in is the one the library kept it in, and the one the next question goes on.
+        Assert.NotNull(page.ChatId);
+        Assert.Equal(page.ChatId, Assert.Single(page.Chats).Id);
+        while (Assert.Single(await new AiRemote(lib.Site.Urls.Single(), "pw", new HttpClient()).ChatsAsync("v1", null)).Turns < 1)
+            await Task.Delay(10, TestContext.Current.CancellationToken);
+        await Task.Delay(200, TestContext.Current.CancellationToken); // its turn is over on the library too
+        lib.Claude.Gate = null;
+        lib.Claude.Script = [new AiEvent("final", whole)];
+        await Ask(page, "Which three vessels, then?");
+        Assert.Contains("Student: What are the three kinds of blood vessel?\nYou: Arteries, capi", lib.Claude.Prompts[^1]);
+        Assert.Single(page.Chats);
+        Assert.Equal(2, (await new AiRemote(lib.Site.Urls.Single(), "pw", new HttpClient()).ChatAsync(page.ChatId!))!.Turns);
+    }
+
+    [AvaloniaFact]
     public async Task A_chat_is_renamed_and_deleted_from_the_list_and_Undo_brings_it_back()
     {
         await using var lib = await Library.StartAsync();

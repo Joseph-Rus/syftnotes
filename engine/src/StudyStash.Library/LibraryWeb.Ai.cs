@@ -44,7 +44,9 @@ public sealed partial class LibraryWeb
     /// An answer as it's written, as newline-delimited JSON, each line sent the moment it's ready: <c>{"kind":
     /// "text", "text"}</c> for more of the answer, <c>{"kind": "answer", "text"}</c> for all of it so far (when what
     /// came before changed rather than grew), then <c>{"kind": "done", "reply"}</c> with the whole reply, or
-    /// <c>{"kind": "error", "status", "detail"}</c> saying why it stopped. Leaving stops the engine too.
+    /// <c>{"kind": "error", "status", "detail"}</c> saying why it stopped. Leaving stops the engine too. A question in a
+    /// kept chat says which first, <c>{"kind": "chat", "id"}</c> (a new one's id too), so the app knows it whatever
+    /// comes of the answer: one stopped or cut off is kept there as well.
     /// </summary>
     async Task StreamAnswerAsync(HttpContext ctx, AskRequest request, Chat? chat)
     {
@@ -54,6 +56,7 @@ public sealed partial class LibraryWeb
         ctx.Features.Get<IHttpResponseBodyFeature>()?.DisableBuffering();
         await ctx.Response.StartAsync(ctx.RequestAborted);
         var lines = Channel.CreateUnbounded<JsonObject>(new UnboundedChannelOptions { SingleReader = true });
+        if (chat is not null) lines.Writer.TryWrite(new JsonObject { ["kind"] = "chat", ["id"] = chat.Id });
         string sent = "";
         void SoFar(string answer)
         {
