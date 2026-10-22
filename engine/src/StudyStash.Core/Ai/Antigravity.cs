@@ -156,6 +156,69 @@ public static class Antigravity
 
         """.Replace("\r\n", "\n");
 
+    /// <summary>The agent the library's agent work runs as (the course scout, a chat that may change notes, "Open in
+    /// Antigravity"): agy's own tools and prompt, and the library's own MCP server declared in it, never in the home's
+    /// global MCP config, whose servers start in every session there, the setup chat's included.</summary>
+    public const string LibraryAgent = "study-stash-library";
+
+    /// <summary>The library agent's file: <paramref name="mcp"/> is the command that starts Study Stash's MCP server
+    /// (none: no server).</summary>
+    public static string LibraryAgentFile(IReadOnlyList<string> mcp)
+    {
+        static string Y(string v) => JsonSerializer.Serialize(v);
+        string servers = mcp.Count == 0 ? "mcpServers: []" : $"""
+            mcpServers:
+              - name: {ClaudeTools.ServerName}
+                command: {Y(mcp[0])}
+                args: [{string.Join(", ", mcp.Skip(1).Select(Y))}]
+            """;
+        return $"""
+            ---
+            name: {LibraryAgent}
+            description: Works with the student's Study Stash library, its lectures and its Canvas material.
+            mainAgent: true
+            subagent: false
+            hidden: true
+            {servers}
+            ---
+            # Study Stash
+
+            You were opened from Study Stash, the student's lecture library. The {ClaudeTools.ServerName} MCP tools (search_notes, get_lecture, due_assignments, canvas_*) read the library and Canvas.
+
+            """.Replace("\r\n", "\n");
+    }
+
+    /// <summary>The library agent written (when it isn't as it should be), its MCP tools allowed to run without asking,
+    /// and no library server left in the home's global MCP config.</summary>
+    public static void PrepareLibrary(IReadOnlyList<string> mcp)
+    {
+        string path = AgentPath(Home(), LibraryAgent);
+        string file = LibraryAgentFile(mcp);
+        if (!File.Exists(path) || File.ReadAllText(path) != file) Private(path, file);
+        Allow(SettingsPath(Home()), [$"mcp({ClaudeTools.ServerName}/*)"]);
+        ForgetGlobal(ClaudeTools.ServerName);
+    }
+
+    /// <summary>Takes <paramref name="server"/> out of the home's global MCP config (Study Stash's own home: an earlier
+    /// build put the library's server there with <c>agy mcp add</c>), keeping everything else. True when it did.</summary>
+    public static bool ForgetGlobal(string server)
+    {
+        string path = McpConfigPath(Home());
+        if (!File.Exists(path)) return false;
+        JsonObject root;
+        try
+        {
+            root = JsonNode.Parse(File.ReadAllText(path), documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) as JsonObject ?? [];
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        if (root["mcpServers"] is not JsonObject servers || !servers.Remove(server)) return false;
+        File.WriteAllText(path, root.ToJsonString(Indented));
+        return true;
+    }
+
     /// <summary>The answer agent's file in Study Stash's home for agy, written when it isn't there as it should be.</summary>
     public static void PrepareAnswer()
     {
@@ -171,6 +234,8 @@ public static class Antigravity
     public static void PrepareSetup(string workDir, string brief, string mcpUrl, string token)
     {
         Private(AgentPath(Home(), SetupAgent), SetupAgentFile(brief, mcpUrl, token));
+        // The home's global MCP servers start in every session there, the setup chat's too: never the library's.
+        ForgetGlobal(ClaudeTools.ServerName);
         // agy asks before any MCP tool runs, and a print run can't ask, so it refuses: the setup tools are allowed
         // (only them: any other server's tools stay refused, and the turn's guard stops a call to one besides).
         Allow(SettingsPath(Home()), [SetupToolsRule]);

@@ -62,7 +62,7 @@ public static class Terminal
         if (provider == "gemini")
         {
             new GeminiProvider().Prepare(mcp, [folder, library]);
-            var agy = new List<string>();
+            var agy = new List<string> { "--agent", Antigravity.LibraryAgent };
             if (!Py.SamePath(folder, library)) agy.AddRange(["--add-dir", library]);
             return ("agy", agy, Antigravity.HomeEnv());
         }

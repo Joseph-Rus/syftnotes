@@ -148,6 +148,32 @@ public class GeminiSetupChatTests
         Assert.Contains("excludeDefaultComponents: true", File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.AnswerAgent)));
     }
 
+    /// <summary>The library's own MCP server is declared in the library agent, never the home's global config, whose
+    /// servers start in every session there, the setup chat's too (an earlier build's global entry is taken out).</summary>
+    [Fact]
+    public void The_librarys_mcp_server_is_the_library_agents_alone_never_global()
+    {
+        using var dir = new TempDir();
+        string global = Antigravity.McpConfigPath(Antigravity.Home());
+        Directory.CreateDirectory(Path.GetDirectoryName(global)!);
+        File.WriteAllText(global, """{"mcpServers": {"study-stash": {"command": "studystash", "args": ["mcp"]}, "theirs": {"url": "https://x"}}}""");
+
+        var gemini = new GeminiProvider();
+        gemini.Prepare(["/Applications/Study Stash.app/Contents/MacOS/studystash", "--home", "/Users/s/.study-stash", "mcp"], [dir["pool"]]);
+        string agent = File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.LibraryAgent));
+        Assert.Contains("  - name: study-stash\n    command: \"/Applications/Study Stash.app/Contents/MacOS/studystash\"\n    args: [\"--home\", \"/Users/s/.study-stash\", \"mcp\"]\n", agent);
+        var servers = JsonNode.Parse(File.ReadAllText(global))!["mcpServers"]!.AsObject();
+        Assert.Equal(["theirs"], servers.Select(kv => kv.Key));
+        Assert.Contains("mcp(study-stash/*)", File.ReadAllText(Antigravity.SettingsPath(Antigravity.Home())));
+        Assert.Contains("study-stash-library", gemini.Command(new AiRequest("q", dir.Path) { Tools = true }, false));
+
+        // The setup chat's turn takes it out too, and its agent names no server but the setup tools'.
+        File.WriteAllText(global, """{"mcpServers": {"study-stash": {"command": "studystash"}}}""");
+        Antigravity.PrepareSetup(SetupChat.Folder(dir["home"]), "brief", "http://127.0.0.1:1/setup-mcp", "t");
+        Assert.Empty(JsonNode.Parse(File.ReadAllText(global))!["mcpServers"]!.AsObject());
+        Assert.DoesNotContain("study-stash\n", File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.SetupAgent)));
+    }
+
     /// <summary>Lines the real agy 1.4.5 printed for a setup turn (its paths and the tools' long output shortened): read
     /// as the parser expects, and agy's own agent (no "agent" in its init) or a refusal of agy's own stops the turn.</summary>
     [Fact]
