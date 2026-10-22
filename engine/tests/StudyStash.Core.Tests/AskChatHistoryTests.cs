@@ -159,6 +159,25 @@ public class AskChatHistoryTests
     }
 
     [Fact]
+    public async Task A_chat_deleted_while_it_answers_stays_deleted_and_Undo_brings_it_back_as_it_was()
+    {
+        await using var lib = await Library.StartAsync();
+        string id = (await lib.AskAsync("Vessels?", "new", new AskPlace("lecture", "v1", "BIO 110"), lecture: "v1"))!.Chat!;
+        lib.Claude.Gate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var answering = lib.AskAsync("And the second one?", id, lecture: "v1"); // on another device, say
+        while (lib.Claude.Prompts.Count < 2) await Task.Delay(10);
+
+        Assert.True(await lib.Remote.DeleteChatAsync(id));
+        lib.Claude.Gate.SetResult(true);
+        await answering; // its answer comes, and isn't kept
+
+        Assert.Null(await lib.Remote.ChatAsync(id));
+        Assert.Empty(await lib.Remote.ChatsAsync("v1", null));
+        Assert.True(await lib.Remote.RestoreChatAsync(id)); // Undo still works
+        Assert.Equal(1, (await lib.Remote.ChatAsync(id))!.Turns);
+    }
+
+    [Fact]
     public async Task A_library_from_before_lists_no_chats_and_says_none_was_kept()
     {
         // One whose chats are the browser's own (no kind) and whose answers don't say which chat they're in.

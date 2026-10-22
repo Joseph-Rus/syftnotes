@@ -208,6 +208,8 @@ public sealed partial class AiAskModel
     /// which brings it back to the list.</summary>
     public async Task DeleteChatAsync(ChatRow row)
     {
+        // An answer still being written into it stops first: nothing more is kept in a chat being deleted.
+        if (row.Id == ChatId) Stop();
         try
         {
             if (!await library.DeleteChatAsync(row.Id)) return;

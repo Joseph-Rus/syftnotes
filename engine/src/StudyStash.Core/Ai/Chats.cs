@@ -257,19 +257,25 @@ public sealed class Chats(string home, string library, AiJobs ai, History histor
     }
 
     /// <summary>One Ask turn kept: the question, and its answer (or what came of it before it stopped, or why it
-    /// failed). The chat is named for its first question.</summary>
-    public void AddAskTurn(Chat c, string question, string answer, AskReply? reply = null, bool stopped = false, bool failed = false)
+    /// failed), added to the chat as it is now (another turn may have been kept since this one began). The chat is
+    /// named for its first question. False, and nothing kept, when the chat was deleted while it answered: a deleted
+    /// chat never comes back that way (Undo brings it back).</summary>
+    public bool AddAskTurn(Chat c, string question, string answer, AskReply? reply = null, bool stopped = false, bool failed = false)
     {
         lock (gate)
         {
-            if (c.Title.Length == 0) c.Title = Py.Head(question.ReplaceLineEndings(" "), 80);
-            c.Messages.Add(new ChatMessage("user", question, Now()));
-            c.Messages.Add(new ChatMessage("assistant", answer, Now())
+            // Kept before: as it is in its file now; gone from there, it was deleted. New: unless it's been deleted already.
+            var now = File.Exists(PathOf(c.Id)) ? Get(c.Id) : c.Messages.Count == 0 && !File.Exists(Path.Combine(TrashDir, c.Id + ".json")) ? c : null;
+            if (now is null) return false;
+            if (now.Title.Length == 0) now.Title = Py.Head(question.ReplaceLineEndings(" "), 80);
+            now.Messages.Add(new ChatMessage("user", question, Now()));
+            now.Messages.Add(new ChatMessage("assistant", answer, Now())
             {
                 Sources = reply?.Sources ?? [], Engine = reply?.Engine ?? "", EngineName = reply?.EngineName ?? "", Stopped = stopped, Failed = failed,
             });
-            c.Updated = Now();
-            Save(c);
+            now.Updated = Now();
+            Save(now);
+            return true;
         }
     }
 
