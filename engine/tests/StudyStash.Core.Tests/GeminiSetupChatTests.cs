@@ -4,8 +4,8 @@ using StudyStash.Core.Ai;
 namespace StudyStash.Core.Tests;
 
 /// <summary>Guided setup's chat on Gemini, through a fake agy that writes down how it was started and replays a scripted
-/// turn: run in a home of its own whose settings and agent hold it to the setup tools, the token only in that home's
-/// private MCP config, and stopped at once when it reaches for anything else.</summary>
+/// turn: run in Study Stash's own home for agy as the setup agent (no tools of agy's own, the setup tools its one MCP
+/// server), the token only in that agent's private file, and stopped at once when it reaches for anything else.</summary>
 public class GeminiSetupChatTests
 {
     const string Url = "http://127.0.0.1:50123/setup-mcp";
@@ -48,26 +48,23 @@ public class GeminiSetupChatTests
         Assert.False(File.Exists(Path.Combine(t.WorkDir, "GEMINI.md")));
         Assert.False(Directory.Exists(Path.Combine(t.WorkDir, ".agents")));
 
-        string home = Antigravity.PrepareSetup(t.WorkDir, File.ReadAllText(t.BriefFile), Url, Token);
-        Assert.Equal(Antigravity.SetupHome(t.WorkDir), home);
-        var settings = JsonNode.Parse(File.ReadAllText(Antigravity.SettingsPath(home)))!;
-        Assert.Equal(["mcp(study_stash_setup/*)"], settings["permissions"]!["allow"]!.AsArray().Select(n => n!.GetValue<string>()));
-        Assert.Equal(["command(*)", "unsandboxed(*)", "read_file(*)", "write_file(*)", "read_url(*)", "execute_url(*)"],
-            settings["permissions"]!["deny"]!.AsArray().Select(n => n!.GetValue<string>()));
-        string agent = File.ReadAllText(Antigravity.AgentPath(home, Antigravity.SetupAgent));
-        foreach (string line in new[] { "name: study-stash-setup", "subagent: false", "excludeDefaultComponents: true", "inheritCustomizations: false", "commandExecutionPolicy: \"off\"", "tools: []" })
-            Assert.Contains(line, agent);
+        Antigravity.PrepareSetup(t.WorkDir, File.ReadAllText(t.BriefFile), Url, Token);
+        string agent = File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.SetupAgent));
+        foreach (string line in new[]
+        {
+            "name: study-stash-setup", "subagent: false", "excludeDefaultComponents: true", "inheritCustomizations: false", "inheritMcp: false",
+            "commandExecutionPolicy: \"off\"", "tools: []", "  - name: study_stash_setup", $"    url: \"{Url}\"", $"      Authorization: \"Bearer {Token}\"",
+        })
+            Assert.Contains(line + "\n", agent);
         Assert.Contains("You are Study Stash's setup guide.", agent);
         Assert.Contains("call set_notes_writer with \"gemini\"", agent);
-        var server = JsonNode.Parse(File.ReadAllText(Antigravity.McpConfigPath(home)))!["mcpServers"]!.AsObject();
-        Assert.Equal(["study_stash_setup"], server.Select(kv => kv.Key));
-        Assert.Equal(Url, server["study_stash_setup"]!["serverUrl"]!.GetValue<string>());
-        Assert.Equal("Bearer " + Token, server["study_stash_setup"]!["headers"]!["Authorization"]!.GetValue<string>());
-        // Its home is beside the folder it works in, never inside it, and its files are this account's alone.
-        Assert.False(Antigravity.SetupHome(t.WorkDir).StartsWith(Antigravity.SetupWorkspace(t.WorkDir), StringComparison.Ordinal));
+        // The folder it works in is empty, and the agent's file (with the token) is this account's alone.
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Antigravity.SetupWorkspace(t.WorkDir)));
         if (!OperatingSystem.IsWindows())
-            foreach (string f in new[] { Antigravity.SettingsPath(home), Antigravity.AgentPath(home, Antigravity.SetupAgent), Antigravity.McpConfigPath(home) })
-                Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(f));
+            Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(Antigravity.AgentPath(Antigravity.Home(), Antigravity.SetupAgent)));
+        // A turn with no tools (the plan check) has no MCP server at all.
+        Antigravity.PrepareSetup(t.WorkDir, "brief", "", "");
+        Assert.Contains("mcpServers: []\n", File.ReadAllText(Antigravity.AgentPath(Antigravity.Home(), Antigravity.SetupAgent)));
     }
 
     [Fact]
@@ -77,7 +74,7 @@ public class GeminiSetupChatTests
         string exe = FakeAgents.WriteCli(dir["bin"], "gemini");
         FakeAgents.Replay(dir["bin"],
         [
-            FakeAgents.Agy.Init("call_mcp_tool"),
+            FakeAgents.Agy.Init(),
             FakeAgents.Agy.Words(1, "Hi! This takes "), FakeAgents.Agy.Words(1, "about 5 minutes."),
             FakeAgents.Agy.Mcp(2, "study_stash_setup", "get_setup_status"),
             FakeAgents.Agy.Mcp(2, "study_stash_setup", "get_setup_status"), // the same step, DONE: one chip
@@ -94,10 +91,10 @@ public class GeminiSetupChatTests
         Assert.Equal(["Checked your setup", "Added BIO 110"], events.Where(e => e.Kind == "Tool").Select(e => e.Chip));
         Assert.Equal(("Final", "Which classes are you taking?"), (events[^1].Kind, events[^1].Text));
 
-        // Its own home and an empty folder to work in; the prompt on its command line, nothing on its input, and the
+        // Study Stash's home for agy and an empty folder to work in; the prompt on its command line, nothing on its input, and the
         // token in neither its arguments nor its environment.
         string bin = dir["bin"];
-        Assert.Equal(Antigravity.SetupHome(t.WorkDir), File.ReadAllText(Path.Combine(bin, "home-1.txt")).Trim());
+        Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(bin, "home-1.txt")).Trim());
         Assert.EndsWith(Path.Combine("setup-chat", "gemini-workspace"), File.ReadAllText(Path.Combine(bin, "cwd-1.txt")).Trim()); // (a Mac's temp folder is behind a link)
         Assert.Contains("-p=[Study Stash] Setup was opened.", FakeAgents.Argv(bin, 1));
         Assert.Equal("", FakeAgents.Input(bin, 1).Trim());
@@ -107,10 +104,11 @@ public class GeminiSetupChatTests
 
     public static TheoryData<string, string> Reaches => new()
     {
-        { "a built-in tool in its list", FakeAgents.Agy.Init("call_mcp_tool", "run_command") },
+        { "agy's own agent, with all its tools, not the setup guide", FakeAgents.Agy.Init(agent: "") },
         { "a command", FakeAgents.Agy.Builtin(2, "run_command") },
         { "a file", FakeAgents.Agy.Builtin(2, "view_file") },
         { "another MCP server", FakeAgents.Agy.Mcp(2, "github", "create_issue") },
+        { "another MCP server's resources", FakeAgents.Agy.Builtin(2, "read_resource") },
         { "something agy refused", FakeAgents.Agy.Result("Done.", denied: new JsonArray(new JsonObject { ["tool"] = "read_url" })) },
     };
 
@@ -120,10 +118,37 @@ public class GeminiSetupChatTests
     {
         using var dir = new TempDir();
         string exe = FakeAgents.WriteCli(dir["bin"], "gemini");
-        FakeAgents.Replay(dir["bin"], [FakeAgents.Agy.Init("call_mcp_tool"), FakeAgents.Agy.Words(1, "Let me look."), line, FakeAgents.Agy.Mcp(3, "study_stash_setup", "add_class"), FakeAgents.Agy.Result("Done.")]);
+        FakeAgents.Replay(dir["bin"], [line.Contains("\"init\"", StringComparison.Ordinal) ? line : FakeAgents.Agy.Init(), FakeAgents.Agy.Words(1, "Let me look."), line, FakeAgents.Agy.Mcp(3, "study_stash_setup", "add_class"), FakeAgents.Agy.Result("Done.")]);
         var events = await Run(Turn(dir, exe));
         Assert.True(events[^1].Problem == ChatProblem.Guard, what);
         Assert.DoesNotContain(events, e => e.Kind == "Tool" && e.Tool == "add_class");
+    }
+
+    /// <summary>Lines the real agy 1.4.4 printed for a setup turn (its paths and the tools' long output shortened): read
+    /// as the parser expects, and agy's own agent (no "agent" in its init) or a refusal of agy's own stops the turn.</summary>
+    [Fact]
+    public void Real_agy_lines_read_as_expected_and_agys_own_agent_or_a_refusal_stops_the_turn()
+    {
+        string[] real =
+        [
+            """{"event": "init", "conversation_id": "4b10267c", "init": {"cwd": "/x/setup-chat/gemini-workspace", "agent": "study-stash-setup", "tools": ["ask_custom_permission", "call_mcp_tool", "run_command"], "permission_mode": "request-review"}}""",
+            """{"event": "step_update", "step_update": {"conversation_id": "4b10267c", "step_index": 2, "state": "ACTIVE", "step_type": "tool", "tool_name": "call_mcp_tool", "tool_info": {"name": "call_mcp_tool", "parameters": {"Arguments": {}, "ServerName": "study_stash_setup", "ToolName": "get_setup_status"}}}}""",
+            """{"event": "step_update", "step_update": {"conversation_id": "4b10267c", "step_index": 2, "state": "DONE", "step_type": "tool", "tool_name": "call_mcp_tool", "duration_seconds": 0.031491, "tool_info": {"name": "call_mcp_tool", "parameters": {"Arguments": {}, "ServerName": "study_stash_setup", "ToolName": "get_setup_status"}, "output": "Computer: Mac"}}}""",
+            """{"event": "step_update", "step_update": {"conversation_id": "4b10267c", "step_index": 3, "state": "ACTIVE", "step_type": "agent_response", "text_delta": "Welcome to Study Stash!"}}""",
+            """{"event": "step_update", "step_update": {"conversation_id": "4b10267c", "step_index": 4, "state": "ACTIVE", "step_type": "tool", "tool_name": "call_mcp_tool", "tool_info": {"name": "call_mcp_tool", "parameters": {"Arguments": {}, "ServerName": "study_stash_setup", "ToolName": "offer_microphone_check"}}}}""",
+            """{"event": "result", "result": {"conversation_id": "4b10267c", "status": "SUCCESS", "response": "Welcome to Study Stash!\n", "duration_seconds": 7.3, "num_turns": 1}}""",
+        ];
+        var parser = new SetupChatParser("gemini");
+        var events = real.SelectMany(parser.Parse).ToList();
+        Assert.Equal(["Session", "Tool", "Text", "Tool", "Final"], events.Select(e => e.Kind));
+        Assert.Equal(("4b10267c", "get_setup_status", "offer_microphone_check"), (events[0].Text, events[1].Tool, events[3].Tool));
+
+        // agy's own agent (the setup agent didn't load): every tool agy has. Stopped at its first line.
+        var own = new SetupChatParser("gemini").Parse(real[0].Replace("\"agent\": \"study-stash-setup\", ", "", StringComparison.Ordinal)).ToList();
+        Assert.Equal(ChatProblem.Guard, own[^1].Problem);
+        // A turn agy refused something in (here, before the setup tools were allowed: "mcp").
+        string refused = """{"event": "result", "result": {"conversation_id": "50d1e82c", "status": "SUCCESS", "response": "", "num_turns": 1, "denied_actions": [{"action": "mcp", "display_name": "CallMcpTool"}]}}""";
+        Assert.Equal(ChatProblem.Guard, new SetupChatParser("gemini").Parse(refused).Last().Problem); // (after its conversation id)
     }
 
     [Fact]
@@ -145,16 +170,18 @@ public class GeminiSetupChatTests
         FakeAgents.Replay(bin, [FakeAgents.Agy.Init(), FakeAgents.Agy.Words(1, "ready"), FakeAgents.Agy.Result("ready")]);
         var check = await SetupChat.CheckPlanAsync("gemini", exe, new Version(1, 4, 4), work, ct: CancellationToken.None);
         Assert.True(check.Ok, check.Said);
-        Assert.Equal("About 80% of your Gemini allowance is left.", check.Words);
-        // The allowance is asked in Study Stash's own home for agy (where it signed in); the turn in the chat's own.
+        // Only the Gemini group counts (agy's Claude and GPT group has its own allowance, here used up).
+        Assert.Equal("About 80% of this week's Gemini allowance is left.", check.Words);
+        // Both in Study Stash's own home for agy, where it signed in; the turn as the setup agent, with no MCP server.
         Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(bin, "usage-home.txt")).Trim());
-        Assert.Equal(Antigravity.SetupHome(work), File.ReadAllText(Path.Combine(bin, "home-1.txt")).Trim());
-        Assert.Empty(JsonNode.Parse(File.ReadAllText(Antigravity.McpConfigPath(Antigravity.SetupHome(work))))!["mcpServers"]!.AsObject());
+        Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(bin, "home-1.txt")).Trim());
+        Assert.Contains("--agent", FakeAgents.Argv(bin, 1));
 
-        // Used up: said at once, with no turn.
-        File.WriteAllText(Path.Combine(bin, "usage.json"), """{"structured_output":{"quotas":[{"remainingFraction":0}]}}""");
+        // Used up: said at once, with when it's back, and no turn.
+        File.WriteAllText(Path.Combine(bin, "usage.json"), FakeAgents.Usage.Replace("\"remaining_fraction\":0.8", "\"remaining_fraction\":0", StringComparison.Ordinal));
         var usedUp = await SetupChat.CheckPlanAsync("gemini", exe, new Version(1, 4, 4), work, ct: CancellationToken.None);
         Assert.Equal(ChatProblem.Limit, usedUp.Problem);
+        Assert.StartsWith("This week's Gemini allowance is used up until ", usedUp.Words);
         Assert.Equal(1, FakeAgents.Turns(bin));
     }
 }

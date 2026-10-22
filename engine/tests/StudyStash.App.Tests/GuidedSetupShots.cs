@@ -148,7 +148,7 @@ public sealed class GuidedSetupShots
             g.Screen = GuidedScreen.SignIn;
             g.SignedIn = true;
             g.AiReady = true;
-            g.AllowanceWords = "About 80% of your Gemini allowance is left.";
+            g.AllowanceWords = "About 80% of this week's Gemini allowance is left.";
             return g;
         });
         yield return ("sign-in-plan", skin =>

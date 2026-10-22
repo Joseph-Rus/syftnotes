@@ -55,7 +55,7 @@ public static class FakeAgents
     }
 
     /// <summary>What the fake agy's <c>-p=/usage</c> says when the test gives none (<c>usage.json</c>).</summary>
-    public const string Usage = """{"status":"SUCCESS","structured_output":{"quotas":[{"model":"gemini-3.8-flash","remainingFraction":0.8}]}}""";
+    public const string Usage = """{"status":"SUCCESS","command":{"name":"usage","data":{"groups":[{"name":"Gemini Models","buckets":[{"id":"gemini-weekly","window":"weekly","remaining_fraction":0.8,"reset_time":"2026-10-29T05:47:53Z"}]},{"name":"Claude and GPT models","buckets":[{"id":"3p-weekly","window":"weekly","remaining_fraction":0,"reset_time":"2026-10-29T05:47:53Z"}]}]}}}""";
 
     /// <summary>Scripted output for turn <paramref name="turn"/> (0: every turn without its own).</summary>
     public static void Replay(string bin, IEnumerable<string> lines, int turn = 0) =>
@@ -232,11 +232,18 @@ public static class FakeAgents
     /// <summary>Lines agy's stream-json prints, for a fake agy's turn to replay.</summary>
     public static class Agy
     {
-        public static string Init(params string[] tools) => new JsonObject
+        /// <summary>agy's init: the conversation, and the agent running (agy's own when <paramref name="agent"/> is
+        /// empty). Its tool list is everything agy has, whichever agent runs.</summary>
+        public static string Init(string agent = "study-stash-setup")
         {
-            ["event"] = "init",
-            ["init"] = new JsonObject { ["cwd"] = "/x", ["permission_mode"] = "request-review", ["tools"] = new JsonArray([.. tools.Select(t => (JsonNode)t)]) },
-        }.ToJsonString();
+            var init = new JsonObject
+            {
+                ["cwd"] = "/x", ["permission_mode"] = "request-review",
+                ["tools"] = new JsonArray("call_mcp_tool", "list_resources", "read_resource", "manage_task", "run_command", "view_file", "search_web", "browser_subagent"),
+            };
+            if (agent.Length > 0) init["agent"] = agent;
+            return new JsonObject { ["event"] = "init", ["conversation_id"] = "c-1", ["init"] = init }.ToJsonString();
+        }
 
         public static string Words(int step, string delta) => new JsonObject
         {
@@ -253,7 +260,7 @@ public static class FakeAgents
                 ["tool_info"] = new JsonObject
                 {
                     ["name"] = "call_mcp_tool",
-                    ["parameters"] = new JsonObject { ["ServerName"] = server, ["ToolName"] = tool, ["Arguments"] = (args ?? []).ToJsonString() },
+                    ["parameters"] = new JsonObject { ["Arguments"] = args ?? [], ["ServerName"] = server, ["ToolName"] = tool },
                 },
             },
         }.ToJsonString();

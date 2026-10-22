@@ -296,9 +296,9 @@ public static partial class SetupChat
 
     /// <summary>
     /// Antigravity (Gemini), locked down: the setup guide's own agent (<see cref="Antigravity.SetupAgent"/>: no default
-    /// tools or prompt, nothing of the home's taken in, the setup tools its only MCP server, commands off), in the setup
-    /// chat's own home (<see cref="Antigravity.PrepareSetup"/>: settings that refuse every command, file, web page and
-    /// browser action), slash commands and skills not expanded, the terminal sandbox on, thinking kept short. The
+    /// tools or prompt, so no command, file, web page or browser; nothing of the home's taken in; the setup tools its
+    /// only MCP server; commands off), in Study Stash's own home for agy, slash commands and skills not expanded, the
+    /// terminal sandbox on, thinking kept short. The
     /// prompt goes on the command line, joined to -p (agy's -p takes the prompt itself); its input is left empty, and
     /// a run whose input is piped stops at once when it isn't signed in, instead of opening a browser. The next turn
     /// of a conversation adds <c>--conversation ID</c>.
@@ -400,8 +400,13 @@ public static partial class SetupChat
     public static async IAsyncEnumerable<SetupChatEvent> RunAsync(SetupTurn t, [EnumeratorCancellation] CancellationToken ct = default)
     {
         bool gemini = t.Provider == "gemini";
-        // Antigravity's home of the chat's own, written for this turn, and an empty folder to work in.
-        string? agyHome = gemini ? Antigravity.PrepareSetup(t.WorkDir, File.Exists(t.BriefFile) ? File.ReadAllText(t.BriefFile) : "", t.McpUrl, t.Token) : null;
+        // Antigravity: the setup agent written for this turn, in Study Stash's home for agy, and an empty folder to work in.
+        string? agyHome = null;
+        if (gemini)
+        {
+            Antigravity.PrepareSetup(t.WorkDir, File.Exists(t.BriefFile) ? File.ReadAllText(t.BriefFile) : "", t.McpUrl, t.Token);
+            agyHome = Antigravity.Home();
+        }
         var cmd = Command(t);
         var launch = OperatingSystem.IsWindows() ? WindowsCommand.For(cmd) : new Launch(cmd[0], cmd[1..]);
         var psi = new ProcessStartInfo(launch.FileName)
@@ -529,9 +534,8 @@ public static partial class SetupChat
     /// <summary>
     /// Gemini's check: first how much of the account's allowance is left (<c>agy -p=/usage</c>, in Study Stash's own
     /// home for agy, where it signed in: a slash command print mode answers itself, so nothing is spent), said in the
-    /// student's words; used up is the limit at once. Then the same tiny turn as the others, in the setup chat's own
-    /// home, which also shows the chat can use the sign-in there. Its input is piped and empty: signed out, agy says so
-    /// and stops, and never opens a browser from here.
+    /// student's words; used up is the limit at once. Then the same tiny turn as the others, as the setup agent with no
+    /// tools. Its input is piped and empty: signed out, agy says so and stops, and never opens a browser from here.
     /// </summary>
     static async Task<PlanCheck> GeminiPlanAsync(string exe, Version? version, string workDir, TimeSpan? timeout, CancellationToken ct)
     {
@@ -835,9 +839,6 @@ public sealed class SetupChatParser(string provider)
     int wordsStep = -1;
     readonly HashSet<int> toolSteps = [];
 
-    /// <summary>A tool a Gemini turn may have: the one agy reaches MCP servers through, which the turn's guard then holds
-    /// to the setup tools' server, call by call.</summary>
-    static bool GeminiOurs(string tool) => tool == Antigravity.McpTool;
 
     static string Field(JsonNode? o, params string[] names)
     {
@@ -861,15 +862,17 @@ public sealed class SetupChatParser(string provider)
         switch (S(e["event"]))
         {
             case "init":
-                // The tools the turn was given: the setup agent has none of agy's own, only its way to the setup tools.
-                foreach (var t in (e["init"]?["tools"] ?? e["tools"]) as JsonArray ?? [])
+                if (S(e["conversation_id"]) is { Length: > 0 } cid && cid != session)
                 {
-                    string name = t is JsonObject o ? S(o["name"]) : S(t);
-                    if (!GeminiOurs(name))
-                    {
-                        yield return Guard(name);
-                        yield break;
-                    }
+                    session = cid;
+                    yield return new SetupChatEvent("Session", cid);
+                }
+                // The setup agent must be the one running: agy's own agent has every tool it has. (The init's tool list
+                // is everything agy has, whichever agent runs, so it says nothing here.)
+                if (S(e["init"]?["agent"] ?? e["agent"]) != Antigravity.SetupAgent)
+                {
+                    yield return Guard("agy's own agent, not the setup guide's");
+                    yield break;
                 }
                 break;
             case "step_update":
@@ -903,20 +906,23 @@ public sealed class SetupChatParser(string provider)
                 }
                 else if (tool.Length > 0 || type == "tool")
                 {
-                    if (tool != Antigravity.McpTool)
+                    if (Antigravity.Harmless.Contains(tool)) break;
+                    bool resource = Antigravity.ResourceTools.Contains(tool);
+                    if (tool != Antigravity.McpTool && !resource)
                     {
                         yield return Guard(tool.Length > 0 ? tool : type);
                         yield break;
                     }
+                    // call_mcp_tool {ServerName, ToolName, Arguments}: only the setup tools' server, call by call.
                     var p = st?["tool_info"]?["parameters"];
                     string server = Field(p, "ServerName", "server_name", "server");
                     string name = Field(p, "ToolName", "tool_name", "tool", "name");
                     if (server != SetupChat.Server)
                     {
-                        yield return Guard($"{(server.Length > 0 ? server : "an MCP server")}.{name}");
+                        yield return Guard($"{(server.Length > 0 ? server : "an MCP server")}.{(name.Length > 0 ? name : tool)}");
                         yield break;
                     }
-                    if (!toolSteps.Add(step)) break;
+                    if (resource || !toolSteps.Add(step)) break;
                     var args = Node(p, "Arguments", "arguments", "args", "input");
                     if (args is JsonValue text && text.GetValueKind() == JsonValueKind.String) args = ParseJson(text.GetValue<string>());
                     yield return new SetupChatEvent("Tool") { Tool = name, Chip = SetupChat.Chip(name, args) };

@@ -94,7 +94,7 @@ public sealed class GuidedSetupTests
             // Every turn says a word and ends, unless a test scripts its own.
             Directory.CreateDirectory(Bin);
             FakeAgents.Replay(Bin, cli == "gemini"
-                ? [FakeAgents.Agy.Init("call_mcp_tool"), FakeAgents.Agy.Words(1, "OK."), FakeAgents.Agy.Result("OK.")]
+                ? [FakeAgents.Agy.Init(), FakeAgents.Agy.Words(1, "OK."), FakeAgents.Agy.Result("OK.")]
                 : [Init(), Says("OK."), Done("OK.")]);
             File.WriteAllText(Path.Combine(Bin, "login-delay"), "1");
             foreach (var m in WhisperModels.All) Models.Hold.Add(m.File);
@@ -410,7 +410,7 @@ public sealed class GuidedSetupTests
 
         await g.OpenSignInCommand.ExecuteAsync(null);
         await Until(() => g.AiReady, "Gemini signed in and its allowance checked");
-        Assert.Equal("About 80% of your Gemini allowance is left.", g.AllowanceWords);
+        Assert.Equal("About 80% of this week's Gemini allowance is left.", g.AllowanceWords);
         Assert.True(g.HasAllowance);
         // The sign-in ran in Study Stash's own home for agy, never the student's own.
         Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(rig.Bin, "usage-home.txt")).Trim());

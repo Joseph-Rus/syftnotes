@@ -9,34 +9,40 @@ namespace StudyStash.Core.Ai;
 /// Google's Antigravity CLI (<c>agy</c>), which Gemini runs through: Google moved personal Google accounts (free, AI Pro,
 /// Ultra) from Gemini CLI to it on 18 June 2026, and Gemini CLI now serves only API keys and company licences.
 /// <para>
-/// Study Stash runs it with a home of its own (<see cref="Home"/>; agy keeps everything under <c>~/.gemini</c>, and reads
+/// Study Stash runs it with a home of its own (<see cref="Home"/>: agy keeps everything under <c>~/.gemini</c>, and reads
 /// its home from HOME, or USERPROFILE on Windows), so nothing of the student's own agy (their MCP servers, plugins,
 /// skills, hooks, rules, settings) ever runs inside Study Stash's work, and Study Stash never writes theirs. The sign-in
-/// isn't in that home: agy keeps it in the computer's own keychain (the Mac's Keychain, Windows' Credential Manager),
-/// so a student already signed in to agy is signed in here too.
+/// is kept in that home too (agy 1.4.4 keeps it there, <c>antigravity-cli/antigravity-oauth-token</c>, which Study Stash
+/// never reads): a student signs in to Gemini for Study Stash once, in setup, and its notes and its setup chat use that.
 /// </para>
 /// <para>
-/// The setup chat gets a home of its own again, beside its folder (<see cref="SetupHome"/>): settings that refuse every
-/// command, file, web page and browser action and allow only the setup tools, the setup guide as an agent of its own
-/// (<see cref="SetupAgent"/>) with Antigravity's default tools and prompt left out and none of the home's customizations
-/// taken in, and the setup tools as the only MCP server.
+/// The setup chat runs in that home as an agent of its own (<see cref="SetupAgent"/>): Antigravity's default prompt and
+/// built-in tools left out (tried with the real agy 1.4.4: what's left is only <c>call_mcp_tool</c>, <c>list_resources</c>,
+/// <c>read_resource</c> and <c>manage_task</c>, so no command, file, web page or browser), none of the home's skills,
+/// rules, plugins, subagents or MCP servers taken in, commands off, and the setup tools as its only MCP server, declared
+/// in the agent itself. The turn's guard holds it to that as it runs (<see cref="SetupChatParser"/>).
 /// </para>
 /// </summary>
 public static class Antigravity
 {
     public const string Binary = "agy";
-    /// <summary>The setup guide's agent, in the setup chat's home.</summary>
+    /// <summary>The setup guide's agent, in Study Stash's home for agy.</summary>
     public const string SetupAgent = "study-stash-setup";
     /// <summary>The one tool agy calls any MCP server's tools through, naming the server and the tool.</summary>
     public const string McpTool = "call_mcp_tool";
+    /// <summary>The setup agent's other tools, as agy gives them (tried): listing or stopping its own background tasks
+    /// (it can start none). Its MCP resource tools are held to the setup tools' server like its MCP calls.</summary>
+    public static readonly string[] Harmless = ["manage_task"];
+    public static readonly string[] ResourceTools = ["list_resources", "read_resource"];
 
-    /// <summary>Study Stash's own home for agy, where its notes run and its sign-in is checked: the library's home's
-    /// <c>gemini</c> folder. The tests give their own.</summary>
-    public static Func<string> Home { get; set; } = () => Path.Combine(Configs.DefaultHome, "gemini");
+    /// <summary>Study Stash's own home for agy, where its sign-in, its notes and its setup chat are: the library's home's
+    /// <c>gemini</c> folder (<see cref="For"/>). The app and the library set it from their own home; the tests give their own.</summary>
+    public static Func<string> Home { get; set; } = () => For(Configs.DefaultHome);
 
-    /// <summary>The setup chat's own home for agy, beside the chat's folder (never inside it: the folder agy works in
-    /// is one it may read, and this home holds the setup tools' token).</summary>
-    public static string SetupHome(string workDir) => Path.Combine(workDir, "gemini-home");
+    /// <summary>The agy home for a Study Stash home: its <c>gemini</c> folder, or STUDYSTASH_AGY_HOME when that's set
+    /// (an app and its library pointed at one signed-in home, as the off-screen films are).</summary>
+    public static string For(string studyStashHome) =>
+        Environment.GetEnvironmentVariable("STUDYSTASH_AGY_HOME") is { Length: > 0 } set ? set : Path.Combine(studyStashHome, "gemini");
 
     /// <summary>The empty folder the setup chat's agy works in: nothing in it to read, no instructions to pick up.</summary>
     public static string SetupWorkspace(string workDir) => Path.Combine(workDir, "gemini-workspace");
@@ -65,83 +71,57 @@ public static class Antigravity
             $"$env:USERPROFILE = {Quoted(home)}; $env:HOME = {Quoted(home)}; & {Quoted(agy)} '-p=/usage'"]);
     }
 
-    // --- the setup chat's home -----------------------------------------------------------------------------------------
-
-    /// <summary>Everything the setup chat may never do, as agy's permission rules: run a command (in or out of its
-    /// sandbox), read or write a file, read a web page or act in a browser. A refused action in a print run is
-    /// skipped, and the turn's guard stops the run at once besides (<see cref="SetupChatParser"/>).</summary>
-    public static readonly string[] SetupDenied =
-        ["command(*)", "unsandboxed(*)", "read_file(*)", "write_file(*)", "read_url(*)", "execute_url(*)"];
-
-    /// <summary>The setup chat's agy settings: nothing allowed but the setup tools, the terminal sandbox on, nothing
-    /// outside its folder, no telemetry, tips or surveys.</summary>
-    public static string SetupSettings() => new JsonObject
-    {
-        ["permissions"] = new JsonObject
-        {
-            ["allow"] = new JsonArray($"mcp({SetupChat.Server}/*)"),
-            ["deny"] = new JsonArray([.. SetupDenied.Select(d => (JsonNode)d)]),
-        },
-        ["toolPermission"] = "request-review",
-        ["enableTerminalSandbox"] = true,
-        ["allowNonWorkspaceAccess"] = false,
-        ["enableTelemetry"] = false,
-        ["showTips"] = false,
-        ["showFeedbackSurvey"] = false,
-    }.ToJsonString(Indented);
+    // --- the setup agent -----------------------------------------------------------------------------------------------
 
     /// <summary>
     /// The setup guide as an agy agent: picked with <c>--agent</c>, never one another agent can call, with
     /// Antigravity's default prompt sections and built-in tools left out (<c>excludeDefaultComponents</c>, and no tools
-    /// listed), none of the home's skills, rules, plugins, subagents or MCP servers taken in, and commands off. Its body
-    /// (after the H1) is the brief.
+    /// listed), none of the home's skills, rules, plugins, subagents or MCP servers taken in, commands off, and the setup
+    /// tools as its one MCP server (none for a turn with no tools). agy doesn't fill in <c>${VAR}</c> in a header
+    /// (tried: it sends the words as they are), so the token is written in: in a file only this account can read, in
+    /// Study Stash's own folder, good only while setup's window is open. Its body (after the H1) is the brief.
     /// </summary>
-    public static string SetupAgentFile(string brief) => $"""
-        ---
-        name: {SetupAgent}
-        description: Study Stash's setup guide. It only uses the study_stash_setup tools.
-        mainAgent: true
-        subagent: false
-        hidden: true
-        excludeDefaultComponents: true
-        inheritCustomizations: false
-        commandExecutionPolicy: "off"
-        tools: []
-        mcpServers:
-          - {SetupChat.Server}
-        ---
-        # Study Stash setup guide
-
-        {brief.Replace("\r\n", "\n").Trim()}
-
-        """.Replace("\r\n", "\n");
-
-    /// <summary>The setup chat's MCP config: the setup tools only, or nothing for a turn with no tools. agy doesn't
-    /// fill in <c>${VAR}</c> in a header (tried: it sends the words as they are), so the token is written in, in a file
-    /// only this account can read, in Study Stash's own folder, and it lasts only while setup's window is open.</summary>
-    public static string SetupMcpConfig(string mcpUrl, string token)
+    public static string SetupAgentFile(string brief, string mcpUrl = "", string token = "")
     {
-        var servers = new JsonObject();
-        if (mcpUrl.Length > 0)
-            servers[SetupChat.Server] = new JsonObject
-            {
-                ["serverUrl"] = mcpUrl,
-                ["headers"] = new JsonObject { ["Authorization"] = "Bearer " + token },
-            };
-        return new JsonObject { ["mcpServers"] = servers }.ToJsonString(Indented);
+        string servers = mcpUrl.Length == 0 ? "mcpServers: []" : $"""
+            mcpServers:
+              - name: {SetupChat.Server}
+                url: "{mcpUrl}"
+                headers:
+                  Authorization: "Bearer {token}"
+            """;
+        return $"""
+            ---
+            name: {SetupAgent}
+            description: Study Stash's setup guide. It only uses the study_stash_setup tools.
+            mainAgent: true
+            subagent: false
+            hidden: true
+            excludeDefaultComponents: true
+            inheritCustomizations: false
+            inheritMcp: false
+            commandExecutionPolicy: "off"
+            tools: []
+            {servers}
+            ---
+            # Study Stash setup guide
+
+            {brief.Replace("\r\n", "\n").Trim()}
+
+            """.Replace("\r\n", "\n");
     }
 
     /// <summary>
-    /// Writes the setup chat's home afresh for a turn (its conversations, which agy keeps there, stay): the settings, the
-    /// setup agent with <paramref name="brief"/>, and the setup tools' address and token (none: no tools at all). The
-    /// folder the run works in is made empty. The home's path.
+    /// Writes the setup agent afresh for a turn, in Study Stash's home for agy, with <paramref name="brief"/> and the
+    /// setup tools' address and token (none: no tools at all); the folder the run works in is made empty. agy keeps the
+    /// conversation itself, so a turn carries it on.
     /// </summary>
-    public static string PrepareSetup(string workDir, string brief, string mcpUrl, string token)
+    public static void PrepareSetup(string workDir, string brief, string mcpUrl, string token)
     {
-        string home = SetupHome(workDir);
-        Private(SettingsPath(home), SetupSettings());
-        Private(AgentPath(home, SetupAgent), SetupAgentFile(brief));
-        Private(McpConfigPath(home), SetupMcpConfig(mcpUrl, token));
+        Private(AgentPath(Home(), SetupAgent), SetupAgentFile(brief, mcpUrl, token));
+        // agy asks before any MCP tool runs, and a print run can't ask, so it refuses: the setup tools are allowed
+        // (only them: any other server's tools stay refused, and the turn's guard stops a call to one besides).
+        Allow(SettingsPath(Home()), [SetupToolsRule]);
         string room = SetupWorkspace(workDir);
         if (Directory.Exists(room))
         {
@@ -149,7 +129,41 @@ public static class Antigravity
             foreach (string d in Directory.EnumerateDirectories(room)) Directory.Delete(d, recursive: true);
         }
         Directory.CreateDirectory(room);
-        return home;
+    }
+
+    /// <summary>The permission rule that lets the setup tools run without asking.</summary>
+    public const string SetupToolsRule = "mcp(" + SetupChat.Server + "/*)";
+
+    /// <summary>Adds <paramref name="rules"/> to agy's <c>permissions.allow</c> in <paramref name="settingsPath"/> (made
+    /// when there's none yet), keeping everything else in it. True when it changed it; false too when it isn't JSON
+    /// (not Study Stash's to repair).</summary>
+    public static bool Allow(string settingsPath, IEnumerable<string> rules)
+    {
+        JsonObject root;
+        try
+        {
+            root = File.Exists(settingsPath) ? JsonNode.Parse(File.ReadAllText(settingsPath)) as JsonObject ?? [] : [];
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+        var perms = root["permissions"] as JsonObject ?? [];
+        var allow = perms["allow"] as JsonArray ?? [];
+        var have = allow.Select(n => n is JsonValue v && v.TryGetValue(out string? r) ? r : "").ToHashSet();
+        bool changed = false;
+        foreach (string rule in rules)
+            if (have.Add(rule))
+            {
+                allow.Add(rule);
+                changed = true;
+            }
+        if (!changed) return false;
+        perms["allow"] = allow;
+        root["permissions"] = perms;
+        Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
+        File.WriteAllText(settingsPath, root.ToJsonString(Indented));
+        return true;
     }
 
     static void Private(string path, string text)
@@ -240,10 +254,32 @@ public static class Antigravity
 
     // --- the plan check ----------------------------------------------------------------------------------------------
 
-    /// <summary>How much of the account's Gemini allowance is left, as <c>agy -p=/usage --output-format json</c> says
-    /// it (a slash command print mode answers itself: no turn, nothing spent), in the student's words: "About 80% of
-    /// this week's Gemini allowance is left." Null when it doesn't say.</summary>
-    public static string? UsageWords(string printed)
+    /// <summary>
+    /// How much of the account's Gemini allowance is left, as <c>agy -p=/usage --output-format json</c> says it (a
+    /// slash command print mode answers itself: no turn, nothing spent), in the student's words: "About 80% of this
+    /// week's Gemini allowance is left.", or used up and when it's back. Only the Gemini group counts (agy also lists
+    /// the Claude and GPT models it offers, which have their own). Null when it doesn't say.
+    /// </summary>
+    public static string? UsageWords(string printed) => Allowance(printed) is { } a ? Words(a.Left, a.Window, a.Back) : null;
+
+    /// <summary>The allowance is used up (<see cref="UsageWords"/> found none left).</summary>
+    public static bool UsedUp(string printed) => Allowance(printed) is { Left: <= 0 };
+
+    /// <summary>How the plan check says it: "About 80% of this week's Gemini allowance is left."</summary>
+    public static string Words(double left, string window, DateTimeOffset? back)
+    {
+        int percent = (int)Math.Round(Math.Clamp(left, 0, 1) * 100);
+        string whose = window == "weekly" ? "this week's Gemini allowance" : "your Gemini allowance";
+        string Cap(string w) => char.ToUpperInvariant(w[0]) + w[1..];
+        if (percent <= 0)
+            return back is { } t
+                ? $"{Cap(whose)} is used up until {t.ToLocalTime().ToString("ddd d MMM, h:mm tt", System.Globalization.CultureInfo.InvariantCulture).Replace("AM", "am").Replace("PM", "pm")}."
+                : $"{Cap(whose)} is used up for now.";
+        return percent >= 100 ? $"All of {whose} is left." : $"About {percent}% of {whose} is left.";
+    }
+
+    /// <summary>The Gemini group's least-left bucket: what's left (0 to 1), its window ("weekly"), and when it's back.</summary>
+    static (double Left, string Window, DateTimeOffset? Back)? Allowance(string printed)
     {
         JsonNode? root;
         try
@@ -254,38 +290,18 @@ public static class Antigravity
         {
             return null;
         }
-        // The answer may come whole or inside the print envelope's structured output.
-        var usage = root?["structured_output"] ?? root?["usage_info"] ?? root;
-        double? left = null;
-        foreach (var node in Walk(usage))
+        var groups = (root?["command"]?["data"]?["groups"] ?? root?["data"]?["groups"]) as JsonArray ?? [];
+        var gemini = groups.Where(g => (g?["name"] is JsonValue n && n.TryGetValue(out string? name) ? name : "").Contains("Gemini", StringComparison.OrdinalIgnoreCase)).ToList();
+        (double Left, string Window, DateTimeOffset? Back)? least = null;
+        foreach (var bucket in (gemini.Count > 0 ? gemini : [.. groups]).SelectMany(g => g?["buckets"] as JsonArray ?? []))
         {
-            if (node is not JsonObject o) continue;
-            if (Number(o["remainingFraction"] ?? o["remaining_fraction"]) is { } f) left = left is { } l ? Math.Min(l, f) : f;
-            else if (Number(o["remaining_percent"] ?? o["remainingPercent"]) is { } p) left = left is { } l2 ? Math.Min(l2, p / 100) : p / 100;
-            else if (Number(o["used_percent"] ?? o["usedPercent"]) is { } u) left = left is { } l3 ? Math.Min(l3, 1 - u / 100) : 1 - u / 100;
+            if (Number(bucket?["remaining_fraction"] ?? bucket?["remainingFraction"]) is not { } left) continue;
+            string window = bucket?["window"] is JsonValue w && w.TryGetValue(out string? win) ? win : "";
+            DateTimeOffset? back = bucket?["reset_time"] is JsonValue r && r.TryGetValue(out string? at)
+                && DateTimeOffset.TryParse(at, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var t) ? t : null;
+            if (least is null || left < least.Value.Left) least = (left, window, back);
         }
-        if (left is not { } share) return null;
-        int percent = (int)Math.Round(Math.Clamp(share, 0, 1) * 100);
-        return percent switch
-        {
-            0 => "Your Gemini allowance is used up for now.",
-            100 => "All of your Gemini allowance is left.",
-            _ => $"About {percent}% of your Gemini allowance is left.",
-        };
-    }
-
-    /// <summary>The allowance is used up (<see cref="UsageWords"/> found none left).</summary>
-    public static bool UsedUp(string printed) => UsageWords(printed) is { } w && w.Contains("used up", StringComparison.Ordinal);
-
-    static IEnumerable<JsonNode?> Walk(JsonNode? node)
-    {
-        yield return node;
-        if (node is JsonObject o)
-            foreach (var (_, v) in o)
-                foreach (var n in Walk(v)) yield return n;
-        else if (node is JsonArray a)
-            foreach (var v in a)
-                foreach (var n in Walk(v)) yield return n;
+        return least;
     }
 
     static double? Number(JsonNode? n) => n is JsonValue v && v.TryGetValue(out double d) ? d : null;

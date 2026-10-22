@@ -670,29 +670,9 @@ public sealed class GeminiProvider : AiProvider
     public static bool AllowReading(string settingsPath, IEnumerable<string>? folders = null, bool create = false)
     {
         if (!File.Exists(settingsPath) && !create) return false;
-        JsonObject root;
-        try
-        {
-            root = File.Exists(settingsPath) ? JsonNode.Parse(File.ReadAllText(settingsPath)) as JsonObject ?? [] : [];
-        }
-        catch (JsonException)
-        {
-            return false; // not ours to repair
-        }
-        var perms = root["permissions"] as JsonObject ?? [];
-        var allow = perms["allow"] as JsonArray ?? [];
-        var have = allow.Select(S).ToHashSet();
-        bool changed = false;
         var rules = ReadOnlyCommands.Select(c => $"command({c})")
             .Concat((folders ?? []).Where(f => f.Length > 0).Select(f => $"read_file({Path.TrimEndingDirectorySeparator(Path.GetFullPath(f))})"));
-        foreach (string rule in rules)
-            if (have.Add(rule)) { allow.Add(rule); changed = true; }
-        if (!changed) return false;
-        perms["allow"] = allow;
-        root["permissions"] = perms;
-        Directory.CreateDirectory(Path.GetDirectoryName(settingsPath)!);
-        File.WriteAllText(settingsPath, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-        return true;
+        return Antigravity.Allow(settingsPath, rules);
     }
 
     public override List<string> Command(AiRequest req, bool stream)

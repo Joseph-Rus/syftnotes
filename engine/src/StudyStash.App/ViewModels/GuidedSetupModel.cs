@@ -805,9 +805,9 @@ public sealed partial class GuidedSetupModel : ObservableObject, IDisposable
                 PlanProblem = ChatProblem.Plan;
                 break;
             case ChatProblem.Limit when Cli.Id == "gemini":
-                // Gemini says how much is left, not when it comes back.
-                PlanProblemTitle = "This Google account has used up its Gemini allowance for now.";
-                PlanProblemText = "Set up by hand now, or come back once it's back. A free Google account gets a small allowance each week.";
+                // Gemini's check says when it's back ("This week's Gemini allowance is used up until Wed 28 Oct, 10:47 pm.").
+                PlanProblemTitle = check.Words.Length > 0 ? check.Words : "This Google account's Gemini allowance is used up for now.";
+                PlanProblemText = "Set up by hand now, or come back then. A free Google account gets a small allowance each week.";
                 PlanProblem = ChatProblem.Limit;
                 break;
             case ChatProblem.Limit:
