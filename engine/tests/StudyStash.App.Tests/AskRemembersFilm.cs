@@ -369,6 +369,39 @@ public class AskRemembersFilm
         if (home.Length == 0 && library.Folder.Length > 0) Directory.Delete(library.Folder, recursive: true);
     }
 
+    /// <summary>A still of Home's Chats list, with a stand-in's chats from a lecture, a folder and Home itself, each saying
+    /// where it was asked (ask-chats-home.png): no AI is asked.</summary>
+    [AvaloniaFact]
+    public void Homes_Chats_list()
+    {
+        if (!On) return;
+        Skin.UseTheme(ColourThemes.Default);
+        ((App)Application.Current!).UseSkin(SkinKind.Mac);
+        var ask = new AiAskModel(new FakeAiLibrary { Overview = AiTestData.MixedOverview() }) { Place = new AskPlace("home") };
+        var now = new DateTimeOffset(2026, 10, 21, 16, 40, 0, TimeSpan.FromHours(-7));
+        foreach (var (title, scope, cls, lecture, minutes) in new[]
+                 {
+                     ("What are the three kinds of blood vessel?", "lecture", "BIO 110", "Blood vessels and blood pressure", 5),
+                     ("What's on the CHEM 121 midterm?", "class", "CHEM 121", "", 60 * 20),
+                     ("Which lectures talk about memory?", "home", "", "", 60 * 50),
+                     ("How do I use the chain rule here?", "lecture", "MATH 221", "The chain rule", 60 * 24 * 5),
+                 })
+            ask.Chats.Add(new ChatRow(new AskChat("c" + minutes, title, now.AddMinutes(-minutes).ToString("o")) { Scope = scope, Class = cls, LectureTitle = lecture },
+                scope == "lecture" ? lecture : scope == "class" ? cls : "", now, ask));
+        var window = new Window
+        {
+            Width = 380, Height = 300, RequestedThemeVariant = ThemeVariant.Light, Background = new SolidColorBrush(Color.Parse("#ECEEF1")),
+            Content = new AiChatsMenu { DataContext = ask, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+        };
+        Look.Apply(window);
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        window.UpdateLayout();
+        using (var file = File.Create(System.IO.Path.Combine(Shot.Dir, "ask-chats-home.png")))
+            window.CaptureRenderedFrame()!.Save(file, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        window.Close();
+    }
+
     /// <summary>A still of the conversation card in the Windows look, light and dark, its words a stand-in's
     /// (ask-card-win-*.png): no AI is asked.</summary>
     [AvaloniaFact]
