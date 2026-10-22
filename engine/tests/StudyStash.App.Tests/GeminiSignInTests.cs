@@ -40,6 +40,17 @@ public sealed class GeminiSignInTests
         Assert.Empty(EngineSetupWords.Steps("gemini", "not_signed_in", windows: false));
     }
 
+    /// <summary>Finding Gemini (each time guided setup opens) asks agy its version in Study Stash's own home for it.</summary>
+    [Fact]
+    public void Finding_agy_asks_its_version_in_study_stashs_own_home()
+    {
+        using var home = new TempHome();
+        StudyStash.Core.Tests.FakeAgents.WriteCli(home["bin"], "gemini");
+        var found = StudyStash.App.Services.AgentInstall.Find(AgentCli.Gemini, StudyStash.Core.Tests.FakeAgents.Which(home["bin"]));
+        Assert.Equal(new Version(1, 4, 4), found.Version);
+        Assert.Equal(Antigravity.Home(), File.ReadAllText(Path.Combine(home["bin"], "version-home.txt")).Trim());
+    }
+
     [Fact]
     public void Where_only_words_can_be_given_the_sign_in_line_names_study_stashs_own_home()
     {

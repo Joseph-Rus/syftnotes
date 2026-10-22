@@ -86,6 +86,7 @@ public static class FakeAgents
         #!/bin/sh
         D="$(cd "$(dirname "$0")" && pwd)"
         if [ "$1" = "--version" ]; then
+          echo "$HOME" > "$D/version-home.txt"
           [ -f "$D/broken" ] && { echo "dyld: Library not loaded" >&2; exit 1; }
           echo "{{version}}"; exit 0
         fi
@@ -172,6 +173,7 @@ public static class FakeAgents
         }
         $argv = Split-Args ([string]$env:FAKE_ARGS)
         if ($argv.Count -gt 0 -and $argv[0] -eq '--version') {
+          Set-Content "$D\version-home.txt" $env:USERPROFILE
           if (Test-Path "$D\broken") { [Console]::Error.WriteLine('it will not start'); exit 1 }
           '{{version}}'; exit 0
         }

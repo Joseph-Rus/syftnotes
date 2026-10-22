@@ -22,7 +22,9 @@ public sealed record InstallOutcome(bool Ok, InstallFailure Failure, string Word
 }
 
 /// <summary>
-/// Installs Claude Code, Codex or Antigravity CLI for guided setup: only when the student presses Install, with the maker's own
+/// Installs Claude Code, Codex or Antigravity CLI for guided setup (Google's installer, like the others, runs with the
+/// student's own home: it puts agy in ~/.local/bin and adds that to their shell profile's PATH, and writes nothing
+/// of agy's own; tried in a home of its own): only when the student presses Install, with the maker's own
 /// installer (<see cref="AgentCli"/>), for this account alone (never as an administrator). It says where it's got to
 /// as it goes, keeps everything the installer printed for Details and <c>logs/setup-install.log</c>, gives up after
 /// ten minutes, and on cancel stops the installer and everything it started. A failure is sorted into the few kinds
@@ -75,10 +77,12 @@ public sealed class AgentInstall
     /// <summary>The CLI as it is on this computer now: found, and whether its <c>--version</c> answers.</summary>
     public AgentFound Find() => Find(cli, which);
 
+    /// <summary>Its <c>--version</c> runs with the CLI's own environment too: agy in Study Stash's own home for it,
+    /// never the student's own ~/.gemini.</summary>
     public static AgentFound Find(AgentCliInfo cli, Func<string, string?>? which = null)
     {
         if ((which ?? AiProvider.Which)(cli.Binary) is not { } exe) return AgentFound.None;
-        var r = Machine.Run(exe, ["--version"], TimeSpan.FromSeconds(20));
+        var r = Machine.Run(exe, ["--version"], TimeSpan.FromSeconds(20), cli.Env());
         string said = r is { ExitCode: 0 } ? Py.Strip(r.Stdout) : "";
         return new AgentFound(exe, said.Length > 0 ? AgentCli.ParseVersion(said) : null, Py.Head(said.Split('\n')[0], 80));
     }
